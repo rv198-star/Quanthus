@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0.0",
+  "policy_version": "p0-2026-07-23",
+  "status": "frozen",
+  "effective_date": "2026-07-23",
+  "data": {
+    "daily_history_start": "2011-01-01",
+    "included_exchanges": ["SSE", "SZSE"],
+    "excluded_exchanges": ["BSE"],
+    "sources": {
+      "daily_bars": ["akshare", "tencent", "baostock"],
+      "corporate_actions": ["cninfo"],
+      "status_announcements": ["cninfo"]
+    },
+    "license_scope": "internal_research_no_resale",
+    "price_storage": "unadjusted_with_effective_date_adjustment_factors",
+    "missing_data_policy": {
+      "new_entries": "block_and_alert",
+      "held_positions": "no_action_and_alert",
+      "structural_break": false
+    },
+    "snapshot_required_fields": [
+      "market_date",
+      "knowledge_cutoff",
+      "source_revision",
+      "snapshot_id"
+    ],
+    "official_intraday": {
+      "interval": "5m",
+      "available_from": "2024-07-01",
+      "mode": "official"
+    },
+    "research_intraday": {
+      "interval": "1m",
+      "available_from": "2026-03-01",
+      "mode": "archive_only"
+    },
+    "historical_sector_membership": "unavailable",
+    "sector_fallback": "disable_sector_expert_and_filter",
+    "level1_industry_mapping": "static_for_concentration_only"
+  },
+  "clock": {
+    "signal_time": "T_after_close",
+    "feature_cutoff": "T_close",
+    "first_execution_time": "T_plus_1_open",
+    "cross_section_cutoff": "T_close_full_market_snapshot"
+  },
+  "orders": {
+    "daily_processing_order": [
+      "corporate_actions_and_tradability",
+      "pending_orders_and_open_fills",
+      "close_snapshot_and_signals",
+      "next_session_orders"
+    ],
+    "unfilled_buy": "cancel_and_reassess_next_day",
+    "unfilled_sell": "carry_until_tradable",
+    "candidate_priority": ["aggregate_score_desc", "security_code_asc"],
+    "immutable_status_and_reason_codes": true
+  },
+  "risk": {
+    "veto_priority": ["force_liquidate", "reduce_only", "block_new"],
+    "max_units_per_level1_industry": 2,
+    "max_new_units_per_day": 2,
+    "exit_triggers": [
+      "structural_break",
+      "constraint_stop",
+      "consecutive_deterioration",
+      "maximum_holding_period"
+    ]
+  },
+  "capital": {
+    "unit_notional": "fixed",
+    "external_pool": "finite_total_budget",
+    "settlement_time": "unit_close_date",
+    "empty_pool_behavior": "unit_continues_underfunded_and_records_event",
+    "reports": [
+      "trade_return",
+      "unit_capital_day_return",
+      "total_pnl",
+      "external_cash_flow",
+      "cash_flow_adjusted_drawdown"
+    ],
+    "compound_nav": false
+  },
+  "events": {
+    "signal_day": "T",
+    "feature_window_includes_signal_day": true,
+    "return_origin": "T_plus_1_actual_executable_entry",
+    "unexecutable_outcome": "not_executable",
+    "unexecutable_usage": "exclude_from_training_and_backtest_keep_for_research",
+    "structural_break_label": "independent_frozen_replayable_rule"
+  },
+  "modules": {
+    "enabled_vertical_slice": [
+      "tradability_veto",
+      "funding_veto",
+      "basic_candidate_rule",
+      "extension_risk_constraint",
+      "market_position_constraint",
+      "structural_break_exit",
+      "concentration_constraint",
+      "complete_audit_log"
+    ],
+    "disabled": ["sector_expert", "sector_filter"],
+    "remaining_experts": "shadow_only"
+  },
+  "counterfactual": {
+    "official_metric": "capital_constrained_strategy_rerun_delta",
+    "single_signal_metric": "diagnostic_only",
+    "exit_policy": "same_version_as_baseline",
+    "maximum_holding_days": 20
+  },
+  "validation": {
+    "development_years": {"start": 2012, "end": 2021},
+    "arbitration_years": {"start": 2022, "end": 2024},
+    "permanent_blind_years": {"start": 2025, "end": 2025},
+    "simulation_start_year": 2026,
+    "run_manifest_required_fields": [
+      "code_version",
+      "parameter_hash",
+      "data_snapshot_id",
+      "feature_version",
+      "rule_version",
+      "run_id",
+      "result_summary"
+    ]
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "gate_version": "p1-2026-07-23",
+  "p1_implementation": "allowed",
+  "p1_acceptance": "blocked",
+  "p2_implementation": "blocked",
+  "blockers": [
+    {
+      "id": "C1",
+      "title": "Rebuild adjustment factors",
+      "status": "open",
+      "blocks": "p1_acceptance",
+      "required_evidence": [
+        "Unadjusted daily prices are preserved",
+        "Adjustment factors are effective-date versioned",
+        "Ex-right continuity cases pass without future factors"
+      ]
+    },
+    {
+      "id": "C2",
+      "title": "Classify every missing security-calendar row",
+      "status": "open",
+      "blocks": "p1_acceptance",
+      "required_evidence": [
+        "Trading calendar is crossed with security lifecycle",
+        "Every gap is classified as suspended, not listed, delisted, or missing",
+        "No unclassified gaps remain in the acceptance sample"
+      ]
+    },
+    {
+      "id": "S1",
+      "title": "Measure and complete delisted-security coverage",
+      "status": "open",
+      "blocks": "p1_acceptance",
+      "required_evidence": [
+        "Delisted reference universe is recorded",
+        "Coverage is measured against the reference universe",
+        "Missing histories are backfilled from baostock or explicitly blocked"
+      ]
+    }
+  ],
+  "chapter_01_acceptance": {
+    "status": "pending",
+    "required_for": "p2_implementation",
+    "checks": [
+      {
+        "id": "D1",
+        "name": "point_in_time_snapshot_replay",
+        "requirement": "10 historical dates x 10 securities match independent references"
+      },
+      {
+        "id": "D2",
+        "name": "tradability_status_reconciliation",
+        "requirement": "20 known limit or suspension dates are classified correctly"
+      },
+      {
+        "id": "D3",
+        "name": "corporate_action_return_continuity",
+        "requirement": "Returns around ex-right dates have no artificial jumps"
+      }
+    ]
+  }
+}

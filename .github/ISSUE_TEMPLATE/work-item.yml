@@ -1,0 +1,50 @@
+name: Traced work item
+description: Implement a work item from the approved Quanthus design baseline
+title: "[WORK-ID] "
+labels: ["status:triage"]
+body:
+  - type: input
+    id: work_id
+    attributes:
+      label: Work-item id
+      placeholder: P1-DATA-001
+    validations:
+      required: true
+  - type: input
+    id: design
+    attributes:
+      label: Governing design
+      placeholder: docs/design/lld/01-data-foundation.md
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective and scope
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      placeholder: List stable work-item ids or None
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance evidence
+      description: List observable evidence required before this issue can close.
+    validations:
+      required: true
+  - type: checkboxes
+    id: discipline
+    attributes:
+      label: Engineering discipline
+      options:
+        - label: Point-in-time and versioning impact is declared.
+          required: true
+        - label: Tests and stable evidence paths will be added.
+          required: true
+        - label: Arbitration/blind data access will be declared.
+          required: true

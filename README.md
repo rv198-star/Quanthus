@@ -1,0 +1,56 @@
+# Quanthus
+
+Quanthus is a point-in-time A-share event-driven trading research platform. Its first
+objective is a deterministic, auditable data and backtest foundation. It does not treat
+model output as a trading decision and it does not promise investment returns.
+
+## Current gate
+
+- P1 implementation: allowed.
+- P1 acceptance: blocked by C1, C2, and S1 in `config/p1-gates.v1.json`.
+- P2 implementation: blocked until all Chapter 01 data acceptance checks pass.
+- P3 scope: a replayable vertical slice; inactive experts run in shadow mode.
+
+## Quick start
+
+The bootstrap checks have no third-party runtime dependencies:
+
+```bash
+make doctor
+make test
+make check
+```
+
+Create a development environment when external tools are needed:
+
+```bash
+make bootstrap
+```
+
+Install the optional P1 data stack with:
+
+```bash
+make bootstrap-p1
+```
+
+## Repository layout
+
+```text
+config/              Frozen policy and release gates
+docs/                Architecture decisions, contracts, and roadmaps
+src/quanthus/        Runtime package and project doctor
+tests/               Unit, contract, and acceptance tests
+data/                Local data only; generated content is not committed
+research/            Reproducible research entry points, not production logic
+```
+
+The frozen decisions are encoded in `config/p0-policy.v1.json`. Changes to data,
+execution, risk, labels, or validation rules require a new policy version and matching
+contract tests.
+
+## Source design
+
+- Notion HLD: https://app.notion.com/p/b947cb9072444b9c8dd01d3a5a82f7a0
+- P0 decisions: https://app.notion.com/p/3a691fb8262e81aa8659d83d85fd18ed
+
+The repository is the executable record. Notion remains the design and discussion source.

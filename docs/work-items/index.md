@@ -94,3 +94,16 @@ P1 and P2 work items are created as actionable issues now. P3-P7 receive traceab
 issues plus the stable child-id checklist. Child issues for a later phase are created when its
 predecessor gate passes, preventing a stale speculative backlog while preserving full design
 traceability.
+
+## Planning synchronization
+
+OCI owns GitHub planning synchronization. Preview the document-derived plan without network
+access, then apply it through the locally authenticated GitHub CLI:
+
+```bash
+python3 scripts/sync_github_planning.py
+python3 scripts/sync_github_planning.py --apply
+```
+
+The command is idempotent, aborts on duplicate stable IDs, preserves unmanaged labels, and
+never reads credentials from the repository.

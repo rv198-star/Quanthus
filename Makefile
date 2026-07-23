@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 doctor test compile check lint format
+.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -22,7 +22,10 @@ test:
 compile:
 	PYTHONPATH=src $(PYTHON) -m compileall -q src tests
 
-check: doctor compile test
+planning-check:
+	$(PYTHON) scripts/sync_github_planning.py >/dev/null
+
+check: doctor compile test planning-check
 
 lint:
 	$(VENV)/bin/python -m ruff check .

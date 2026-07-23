@@ -426,6 +426,21 @@ class GitHub:
 
     def issues(self) -> list[dict[str, Any]]:
         issues = self.pages(f"/repos/{self.repository}/issues?state=all")
+        if issues:
+            listed_numbers = {int(issue["number"]) for issue in issues}
+            missing_numbers = sorted(set(range(1, max(listed_numbers) + 1)) - listed_numbers)
+            if len(missing_numbers) > 100:
+                raise RuntimeError(
+                    "too many issue-number gaps to safely reconcile GitHub list consistency"
+                )
+            for number in missing_numbers:
+                try:
+                    issues.append(
+                        self.api("GET", f"/repos/{self.repository}/issues/{number}")
+                    )
+                except RuntimeError as error:
+                    if "HTTP 404" not in str(error):
+                        raise
         return [issue for issue in issues if "pull_request" not in issue]
 
     def upsert_label(self, spec: LabelSpec, current: dict[str, dict[str, Any]]) -> str:
@@ -582,10 +597,19 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
         epic_urls[stable_id] = issue["html_url"]
         issues_by_id[stable_id] = issue
 
-    verified = issue_by_stable_id(github.issues(), target_ids)
-    missing = sorted(target_ids - verified.keys())
-    if missing:
-        raise RuntimeError(f"GitHub verification failed; missing stable ids: {missing}")
+    for stable_id in sorted(target_ids):
+        issue = issues_by_id.get(stable_id)
+        if issue is None:
+            raise RuntimeError(f"GitHub verification failed; missing stable id: {stable_id}")
+        remote_issue = github.api(
+            "GET", f"/repos/{repository}/issues/{issue['number']}"
+        )
+        if not remote_issue["title"].startswith(f"[{stable_id}]"):
+            raise RuntimeError(
+                f"GitHub verification failed for {stable_id}: issue #{issue['number']}"
+            )
+
+    issue_by_stable_id(github.issues(), target_ids)
 
     return {
         "repository": f"https://github.com/{repository}",

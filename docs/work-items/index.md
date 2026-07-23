@@ -98,12 +98,16 @@ traceability.
 ## Planning synchronization
 
 OCI owns GitHub planning synchronization. Preview the document-derived plan without network
-access, then apply it through the locally authenticated GitHub CLI:
+access:
 
 ```bash
 python3 scripts/sync_github_planning.py
-python3 scripts/sync_github_planning.py --apply
 ```
 
-The command is idempotent, aborts on duplicate stable IDs, preserves unmanaged labels, and
-never reads credentials from the repository.
+Pushing a planning source change to `main` starts `.github/workflows/sync-planning.yml`. The
+workflow applies the plan with GitHub's ephemeral repository token and records the verified
+counts and issue URLs in `docs/work-items/github-sync-result.json`. No account-wide GitHub API
+credential is stored on OCI or in the repository.
+
+The synchronization is idempotent, aborts on duplicate stable IDs, and preserves unmanaged
+labels. The `--apply` option is reserved for the repository-scoped CI identity.

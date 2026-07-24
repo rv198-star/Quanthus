@@ -163,7 +163,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_data_audit(audit_report)
             return 1 if audit_report.has_failures else 0
         elif args.command == "curate-daily":
-            default_policy = find_project_root() / "config" / "p1-universe.v1.json"
+            default_policy = find_project_root() / "config" / "p1-universe.v2.json"
             universe_policy = load_universe_policy(args.universe_policy or default_policy)
             curated = build_curated_daily(
                 root=args.root,
@@ -177,7 +177,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
             _print_curated_daily(curated)
         elif args.command == "build-tradability-coverage":
-            default_policy = find_project_root() / "config" / "p1-universe.v1.json"
+            default_policy = find_project_root() / "config" / "p1-universe.v2.json"
             universe_policy = load_universe_policy(args.universe_policy or default_policy)
             coverage = build_tradability_coverage(
                 root=args.root,

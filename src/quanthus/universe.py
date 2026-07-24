@@ -59,7 +59,7 @@ def _load_reason_map(value: Any, field_name: str) -> dict[str, str]:
 
 
 def load_universe_policy(path: Path | None = None) -> UniversePolicy:
-    resolved = (path or find_project_root() / "config" / "p1-universe.v1.json").resolve()
+    resolved = (path or find_project_root() / "config" / "p1-universe.v2.json").resolve()
     try:
         raw = json.loads(resolved.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:

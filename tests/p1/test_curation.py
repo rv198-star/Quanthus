@@ -78,7 +78,7 @@ class CurationTests(unittest.TestCase):
                         "exchange": "SSE",
                     },
                     {
-                        "security_id": "SSE-689009",
+                        "security_id": "689009",
                         "stock_code": "689009",
                         "exchange": "SSE",
                     },
@@ -107,7 +107,7 @@ class CurationTests(unittest.TestCase):
                 path=root / "policy.json",
                 version="test-v1",
                 allowed_exchanges=("SSE", "SZSE"),
-                excluded_security_ids={"SSE-689009": "CDR"},
+                excluded_security_ids={"689009": "CDR"},
                 out_of_scope_code_prefixes={},
                 invalid_bar_handling="retain_with_data_valid_false",
             )

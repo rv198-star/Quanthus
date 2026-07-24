@@ -19,8 +19,8 @@ corporate actions, adjustment factors, tradability, historical ST state, board-s
 limits, delisted securities, static level-one industry mapping, and snapshot manifests.
 
 P1 excludes BSE, B shares, explicitly configured non-A-share instruments, news, financial
-statements, historical concept membership, and official minute features. The frozen
-`config/p1-universe.v1.json` is the explicit selection contract; it must name exceptional
+statements, historical concept membership, and official minute features. The active frozen
+`config/p1-universe.v2.json` is the explicit selection contract; it must name exceptional
 exclusions with reasons rather than silently dropping them. Official 5-minute data begins in
 2024-07 and is deferred until event-window work. One-minute data beginning 2026-03 is
 archive-only research data.

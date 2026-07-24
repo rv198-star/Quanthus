@@ -41,7 +41,7 @@ data-audit:
 curate-none:
 	$(VENV)/bin/python -m quanthus curate-daily \
 		--root "$${QUANTHUS_DATA_ROOT:-/home/ubuntu/data/astock}" \
-		--universe-policy config/p1-universe.v1.json \
+		--universe-policy config/p1-universe.v2.json \
 		--output "$${QUANTHUS_CURATED_PATH:-/home/ubuntu/data/quanthus/curated/bars_daily_none.parquet}" \
 		--metadata-output artifacts/curated-daily-none.json
 

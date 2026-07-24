@@ -11,6 +11,11 @@ from quanthus import __version__
 from quanthus.curation import CuratedDailyResult, CurationError, build_curated_daily
 from quanthus.data_foundation import SnapshotCatalog
 from quanthus.data_quality import AuditError, DataAuditReport, run_p1_data_audit
+from quanthus.delisted_coverage import (
+    DelistedCoverageError,
+    DelistedCoverageReport,
+    run_delisted_coverage,
+)
 from quanthus.gates import GateReport, load_gate_report
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
 from quanthus.snapshot_publish import (
@@ -69,6 +74,16 @@ def _parser() -> argparse.ArgumentParser:
     coverage.add_argument("--knowledge-cutoff", type=date.fromisoformat, required=True)
     coverage.add_argument("--output", type=Path, required=True)
     coverage.add_argument("--metadata-output", type=Path)
+
+    delisted = subparsers.add_parser(
+        "delisted-coverage",
+        help="reconcile P1 delisted-security daily history against lifecycle and suspensions",
+    )
+    delisted.add_argument("--root", type=Path, required=True)
+    delisted.add_argument("--bars-file", default="daily_ohlcv_none.parquet")
+    delisted.add_argument("--universe-policy", type=Path)
+    delisted.add_argument("--knowledge-cutoff", type=date.fromisoformat, required=True)
+    delisted.add_argument("--output", type=Path, required=True)
 
     snapshot = subparsers.add_parser(
         "publish-snapshot",
@@ -138,6 +153,14 @@ def _print_materialized_snapshot(result: MaterializedSnapshot) -> None:
     print(f"datasets: {', '.join(manifest.dataset for manifest in result.snapshot.datasets)}")
 
 
+def _print_delisted_coverage(report: DelistedCoverageReport) -> None:
+    summary = report.to_dict()["summary"]
+    print(f"S1 delisted coverage: {summary['reference_delisted_security_count']} securities")
+    print(f"history window: {report.history_start.isoformat()} to {report.history_end.isoformat()}")
+    print(f"unexplained missing sessions: {summary['unexplained_missing_session_count']}")
+    print(f"invalid observed sessions: {summary['invalid_observed_session_count']}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -193,6 +216,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
             _print_tradability_coverage(coverage)
+        elif args.command == "delisted-coverage":
+            default_policy = find_project_root() / "config" / "p1-universe.v2.json"
+            report = run_delisted_coverage(
+                root=args.root,
+                bars_file=args.bars_file,
+                knowledge_cutoff=args.knowledge_cutoff,
+                universe_policy=load_universe_policy(args.universe_policy or default_policy),
+            )
+            report.write_json(args.output)
+            _print_delisted_coverage(report)
         elif args.command == "publish-snapshot":
             materialized = publish_snapshot(
                 catalog=SnapshotCatalog(args.catalog_root),
@@ -212,6 +245,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ConfigurationError,
         CoverageError,
         CurationError,
+        DelistedCoverageError,
         SnapshotBuildError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)

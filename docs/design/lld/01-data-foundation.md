@@ -146,6 +146,11 @@ Each stage is idempotent by input manifest and transformation version.
 | P1-SNAPSHOT-001 | Implement atomic snapshot catalog/API | Canonical datasets | Cutoff and revision contract tests |
 | P1-ACCEPT-001 | Run Chapter 01 acceptance suite | C1/C2/S1 and snapshot | D1/D2/D3 evidence bundle |
 
+The S1 reconciliation report measures each in-scope delisted security over the supported daily
+history window. It distinguishes observed bars, known suspension sessions, unexplained missing
+sessions, and invalid observed bars; no report may present a suspension-only history as a missing
+history. The report and the frozen universe-policy version are required acceptance evidence.
+
 ## 8. Acceptance
 
 - **D1**: 10 historical dates by 10 securities replay against independent references.

@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none publish-snapshot
+.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage publish-snapshot
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -52,6 +52,13 @@ coverage-none:
 		--knowledge-cutoff "$${QUANTHUS_KNOWLEDGE_CUTOFF}" \
 		--output "$${QUANTHUS_COVERAGE_PATH:-/home/ubuntu/data/quanthus/curated/tradability_coverage_none.parquet}" \
 		--metadata-output artifacts/tradability-coverage-none.json
+
+s1-coverage:
+	@test -n "$${QUANTHUS_KNOWLEDGE_CUTOFF:-}" || (echo "set QUANTHUS_KNOWLEDGE_CUTOFF=YYYY-MM-DD"; exit 2)
+	$(VENV)/bin/python -m quanthus delisted-coverage \
+		--root "$${QUANTHUS_DATA_ROOT:-/home/ubuntu/data/astock}" \
+		--knowledge-cutoff "$${QUANTHUS_KNOWLEDGE_CUTOFF}" \
+		--output "$${QUANTHUS_S1_REPORT_PATH:-artifacts/s1-delisted-coverage.json}"
 
 publish-snapshot:
 	@test -n "$${QUANTHUS_SNAPSHOT_PLAN:-}" || (echo "set QUANTHUS_SNAPSHOT_PLAN=/absolute/path/to/plan.json"; exit 2)

@@ -473,10 +473,17 @@ def build_p1_acceptance_evidence(
     if audit.get("summary", {}).get("fail") != 0:
         raise EvidenceBuildError("data audit contains failures")
     factor_warning = _audit_check(audit, "adjustment_factors.batch_dated_historical_visibility")
-    if factor_warning.get("status") != "warn" or factor_warning.get("count") != 6910:
+    # Controlled residual after EM exact-unique link (Hermes adj_factors_pit_exception_ledger_v1).
+    # Historical seed used 6910; post recommended-band link the fail-closed residual is 4173.
+    allowed_c1_exception_counts = {4173, 6910}
+    if factor_warning.get("status") != "warn" or int(factor_warning.get("count") or -1) not in (
+        allowed_c1_exception_counts
+    ):
         raise EvidenceBuildError(
-            "C1 exception count changed; review the PIT policy before rebuilding"
+            "C1 exception count changed outside controlled residual set {4173, 6910}; "
+            "review the PIT policy before rebuilding"
         )
+    c1_exception_count = int(factor_warning.get("count") or 0)
     allowed_statuses = {"trading", "suspended", "not_listed", "delisted", "missing"}
     status_counts = coverage_metadata.get("status_counts")
     if not isinstance(status_counts, dict) or set(status_counts) - allowed_statuses:
@@ -534,8 +541,10 @@ def build_p1_acceptance_evidence(
                     f"{data_audit_path}#adjustment_factors.batch_dated_historical_visibility"
                 ),
                 "detail": (
-                    "6910 batch-dated factor visibility exceptions remain intentionally "
-                    "conservative; no knowledge_cutoff was fabricated."
+                    f"{c1_exception_count} batch-dated factor visibility exceptions remain "
+                    "intentionally fail-closed after EM exact-unique linking; "
+                    "C1 correctness = no lookahead; C1 completeness = controlled gap "
+                    "(not full pass). knowledge_cutoff was never fabricated to effective_date."
                 ),
             },
             "C2": {

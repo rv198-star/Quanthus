@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib.util
 import tempfile
 import unittest
@@ -13,38 +15,65 @@ if P1_STACK_AVAILABLE:
     import pyarrow.parquet as pq
 
     from quanthus.data_quality import CheckStatus, run_p1_data_audit
+    from quanthus.universe import UniversePolicy
 
 
 @unittest.skipUnless(P1_STACK_AVAILABLE, "P1 optional dependencies are not installed")
 class DataQualityTests(unittest.TestCase):
-    def _write_fixture(self, root: Path, *, invalid_bar: bool) -> None:
+    def _write_fixture(
+        self,
+        root: Path,
+        *,
+        invalid_bar: bool,
+        excluded_null_volume: bool = False,
+    ) -> None:
         high = 0.0 if invalid_bar else 10.5
+        bars = [
+            {
+                "stock_code": "600000",
+                "date": date(2025, 1, 2),
+                "open": 10.0,
+                "high": high,
+                "low": 9.5,
+                "close": 10.2,
+                "volume": 100.0,
+                "amount": 1000.0,
+            }
+        ]
+        master = [
+            {
+                "security_id": "SSE-600000",
+                "stock_code": "600000",
+                "exchange": "SSE",
+                "list_date": date(1999, 11, 10),
+                "delist_date": None,
+            }
+        ]
+        if excluded_null_volume:
+            bars.append(
+                {
+                    "stock_code": "689009",
+                    "date": date(2025, 1, 2),
+                    "open": 10.0,
+                    "high": 10.5,
+                    "low": 9.5,
+                    "close": 10.2,
+                    "volume": None,
+                    "amount": 1000.0,
+                }
+            )
+            master.append(
+                {
+                    "security_id": "689009",
+                    "stock_code": "689009",
+                    "exchange": "SSE",
+                    "list_date": date(2019, 7, 22),
+                    "delist_date": None,
+                }
+            )
         tables = {
-            "daily_ohlcv.parquet": pa.Table.from_pylist(
-                [
-                    {
-                        "stock_code": "600000",
-                        "date": date(2025, 1, 2),
-                        "open": 10.0,
-                        "high": high,
-                        "low": 9.5,
-                        "close": 10.2,
-                        "volume": 100.0,
-                        "amount": 1000.0,
-                    }
-                ]
-            ),
-            "ref_security_master.parquet": pa.Table.from_pylist(
-                [
-                    {
-                        "security_id": "SSE-600000",
-                        "stock_code": "600000",
-                        "exchange": "SSE",
-                        "list_date": date(1999, 11, 10),
-                        "delist_date": None,
-                    }
-                ]
-            ),
+            "daily_ohlcv.parquet": pa.Table.from_pylist(bars),
+            "ref_security_master.parquet": pa.Table.from_pylist(master),
             "ref_trading_calendar.parquet": pa.Table.from_pylist(
                 [{"exchange": "SSE", "trade_date": date(2025, 1, 2), "is_open": 1}]
             ),
@@ -53,7 +82,7 @@ class DataQualityTests(unittest.TestCase):
                 [
                     {
                         "dataset": "daily_ohlcv",
-                        "row_count": 1,
+                        "row_count": len(bars),
                         "built_at": date(2025, 1, 3),
                     }
                 ]
@@ -81,6 +110,17 @@ class DataQualityTests(unittest.TestCase):
         for name, table in tables.items():
             pq.write_table(table, root / name)
 
+    @staticmethod
+    def _policy(root: Path) -> UniversePolicy:
+        return UniversePolicy(
+            path=root / "p1-universe.json",
+            version="test-v1",
+            allowed_exchanges=("SSE", "SZSE"),
+            excluded_security_ids={"689009": "CDR"},
+            out_of_scope_code_prefixes={},
+            invalid_bar_handling="retain_with_data_valid_false",
+        )
+
     def test_valid_fixture_passes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -99,6 +139,19 @@ class DataQualityTests(unittest.TestCase):
         self.assertEqual(by_id["bars.ohlc_invariant"].status, CheckStatus.FAIL)
         self.assertEqual(by_id["bars.ohlc_invariant"].count, 1)
         self.assertEqual(by_id["data_gaps.invalid_ohlc_reconciled"].status, CheckStatus.PASS)
+
+    def test_explicitly_excluded_security_is_not_an_in_scope_value_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_fixture(root, invalid_bar=False, excluded_null_volume=True)
+            report = run_p1_data_audit(root, universe_policy=self._policy(root))
+
+        by_id = {check.check_id: check for check in report.checks}
+        self.assertEqual(by_id["bars.volume_not_null"].status, CheckStatus.PASS)
+        self.assertEqual(by_id["bars.volume_not_null"].count, 0)
+        excluded = by_id["scope.explicitly_excluded_security_rows"]
+        self.assertEqual(excluded.status, CheckStatus.WARN)
+        self.assertEqual(excluded.count, 1)
 
     def test_c1_c2_gate_requires_the_new_reference_tables(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

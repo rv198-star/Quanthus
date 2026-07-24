@@ -89,6 +89,30 @@ def _parquet_source(path: Path) -> str:
     return f"read_parquet({_sql_string(str(path))})"
 
 
+def _in_scope_master_condition(universe_policy: UniversePolicy, *, alias: str = "m") -> str:
+    exchanges = ", ".join(
+        _sql_string(exchange) for exchange in universe_policy.allowed_exchanges
+    )
+    condition = f"{alias}.exchange IN ({exchanges})"
+    exclusions = ", ".join(
+        _sql_string(security_id) for security_id in sorted(universe_policy.excluded_security_ids)
+    )
+    if exclusions:
+        condition = f"{condition} AND {alias}.security_id NOT IN ({exclusions})"
+    return condition
+
+
+def _explicitly_excluded_master_condition(
+    universe_policy: UniversePolicy,
+    *,
+    alias: str = "m",
+) -> str:
+    exclusions = ", ".join(
+        _sql_string(security_id) for security_id in sorted(universe_policy.excluded_security_ids)
+    )
+    return f"{alias}.security_id IN ({exclusions})" if exclusions else "FALSE"
+
+
 def _scalar(connection: Any, sql: str) -> int:
     row = connection.execute(sql).fetchone()
     if row is None:
@@ -188,6 +212,8 @@ def _run_checks(
     universe_policy: UniversePolicy,
 ) -> list[CheckResult]:
     checks: list[CheckResult] = []
+    in_scope_master = _in_scope_master_condition(universe_policy)
+    explicitly_excluded_master = _explicitly_excluded_master_condition(universe_policy)
     bars_rows = int(stats["bars"]["row_count"])
     manifest_dataset = "daily_ohlcv_none" if "none" in bars_file else "daily_ohlcv"
     manifest_row = connection.execute(
@@ -243,35 +269,65 @@ def _run_checks(
                 "bars.ohlc_invariant",
                 _scalar(
                     connection,
-                    """
-                    SELECT count(*) FROM bars
-                    WHERE open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL
+                    f"""
+                    SELECT count(*) FROM bars b
+                    JOIN master m USING (stock_code)
+                    WHERE ({in_scope_master})
+                      AND (open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL
                        OR open < 0 OR high < 0 OR low < 0 OR close < 0
                        OR low > high OR open < low OR open > high
-                       OR close < low OR close > high
+                       OR close < low OR close > high)
                     """,
                 ),
-                "rows violating non-negative low <= open/close <= high",
+                "in-scope rows violating non-negative low <= open/close <= high",
             ),
             _check(
                 "bars.volume_not_null",
-                _scalar(connection, "SELECT count(*) FROM bars WHERE volume IS NULL"),
-                "rows with null volume",
+                _scalar(
+                    connection,
+                    f"""
+                    SELECT count(*) FROM bars b
+                    JOIN master m USING (stock_code)
+                    WHERE ({in_scope_master}) AND volume IS NULL
+                    """,
+                ),
+                "in-scope rows with null volume",
             ),
             _check(
                 "bars.amount_not_null",
-                _scalar(connection, "SELECT count(*) FROM bars WHERE amount IS NULL"),
-                "rows with null amount",
+                _scalar(
+                    connection,
+                    f"""
+                    SELECT count(*) FROM bars b
+                    JOIN master m USING (stock_code)
+                    WHERE ({in_scope_master}) AND amount IS NULL
+                    """,
+                ),
+                "in-scope rows with null amount",
             ),
             _check(
                 "bars.volume_non_negative",
-                _scalar(connection, "SELECT count(*) FROM bars WHERE volume < 0"),
-                "rows with negative volume",
+                _scalar(
+                    connection,
+                    f"""
+                    SELECT count(*) FROM bars b
+                    JOIN master m USING (stock_code)
+                    WHERE ({in_scope_master}) AND volume < 0
+                    """,
+                ),
+                "in-scope rows with negative volume",
             ),
             _check(
                 "bars.amount_non_negative",
-                _scalar(connection, "SELECT count(*) FROM bars WHERE amount < 0"),
-                "rows with negative amount",
+                _scalar(
+                    connection,
+                    f"""
+                    SELECT count(*) FROM bars b
+                    JOIN master m USING (stock_code)
+                    WHERE ({in_scope_master}) AND amount < 0
+                    """,
+                ),
+                "in-scope rows with negative amount",
             ),
             _check(
                 "bars.security_known",
@@ -289,10 +345,10 @@ def _run_checks(
                 "bars.inside_security_lifecycle",
                 _scalar(
                     connection,
-                    """
+                    f"""
                     SELECT count(*) FROM bars b
                     JOIN master m USING (stock_code)
-                    WHERE m.exchange IN ('SSE', 'SZSE')
+                    WHERE ({in_scope_master})
                       AND (
                           CAST(b.date AS DATE) < m.list_date
                           OR (
@@ -302,23 +358,36 @@ def _run_checks(
                       )
                     """,
                 ),
-                "SSE/SZSE bar rows before list_date or after delist_date",
+                "in-scope bar rows before list_date or after delist_date",
             ),
             _check(
                 "bars.on_open_exchange_session",
                 _scalar(
                     connection,
-                    """
+                    f"""
                     SELECT count(*) FROM bars b
                     JOIN master m USING (stock_code)
                     LEFT JOIN calendar c
                       ON c.exchange = m.exchange
                      AND c.trade_date = CAST(b.date AS DATE)
-                    WHERE m.exchange IN ('SSE', 'SZSE')
+                    WHERE ({in_scope_master})
                       AND (c.trade_date IS NULL OR c.is_open <> 1)
                     """,
                 ),
-                "SSE/SZSE bar rows not mapped to an open exchange session",
+                "in-scope bar rows not mapped to an open exchange session",
+            ),
+            _check(
+                "scope.explicitly_excluded_security_rows",
+                _scalar(
+                    connection,
+                    f"""
+                    SELECT count(*) FROM bars b
+                    JOIN master m USING (stock_code)
+                    WHERE {explicitly_excluded_master}
+                    """,
+                ),
+                "raw rows excluded by an explicit universe security_id exclusion",
+                warning=True,
             ),
             _check(
                 "scope.bse_rows_excluded_from_curated",
@@ -390,18 +459,22 @@ def _run_checks(
                 "data_gaps.invalid_ohlc_reconciled",
                 _scalar(
                     connection,
-                    """
+                    f"""
                     WITH invalid AS (
-                        SELECT stock_code, CAST(date AS DATE) AS trade_date
-                        FROM bars
-                        WHERE open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL
+                        SELECT b.stock_code, CAST(b.date AS DATE) AS trade_date
+                        FROM bars b
+                        JOIN master m USING (stock_code)
+                        WHERE ({in_scope_master})
+                          AND (open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL
                            OR open < 0 OR high < 0 OR low < 0 OR close < 0
                            OR low > high OR open < low OR open > high
-                           OR close < low OR close > high
+                           OR close < low OR close > high)
                     ), recorded AS (
-                        SELECT stock_code, trade_date
-                        FROM gaps
-                        WHERE dataset = 'daily_ohlcv' AND gap_type = 'invalid_ohlc'
+                        SELECT g.stock_code, g.trade_date
+                        FROM gaps g
+                        JOIN master m USING (stock_code)
+                        WHERE ({in_scope_master})
+                          AND dataset = 'daily_ohlcv' AND gap_type = 'invalid_ohlc'
                     ), difference AS (
                         (SELECT * FROM invalid EXCEPT SELECT * FROM recorded)
                         UNION ALL

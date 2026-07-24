@@ -172,4 +172,11 @@ the full 10-by-10 D1 date/security matrix with independent reference ids, at lea
 limit or suspension cases, and non-empty D3 ex-right cases with no artificial jump. Passing the
 bundle validator is necessary but does not itself change the release gate configuration.
 
+OCI rebuilds this bundle with `quanthus build-p1-evidence`. The command verifies each snapshot
+partition checksum before it replays D1 from the Baostock reference pack, D2 from the immutable
+coverage matrix and PIT suspension records, and D3 from linked factor rows plus adjacent
+none/qfq returns. A mismatched report checksum, missing case, or changed replay result fails the
+build. Conservative factor-visibility exceptions remain explicit C1 `open` evidence; the command
+cannot silently turn them into a passed blocker.
+
 P2 remains blocked until the gate file and evidence bundle both record this acceptance.

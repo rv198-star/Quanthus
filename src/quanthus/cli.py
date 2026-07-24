@@ -22,6 +22,11 @@ from quanthus.p1_acceptance import (
     P1AcceptanceReport,
     load_p1_acceptance_evidence,
 )
+from quanthus.p1_evidence_build import (
+    EvidenceBuildError,
+    build_p1_acceptance_evidence,
+    write_p1_acceptance_evidence,
+)
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
 from quanthus.snapshot_publish import (
     MaterializedSnapshot,
@@ -96,6 +101,20 @@ def _parser() -> argparse.ArgumentParser:
     )
     evidence.add_argument("--evidence", type=Path, required=True)
     evidence.add_argument("--json", action="store_true")
+
+    evidence_build = subparsers.add_parser(
+        "build-p1-evidence",
+        help="revalidate D1/D2/D3 and assemble a bundle from one published P1 snapshot",
+    )
+    evidence_build.add_argument("--snapshot-dir", type=Path, required=True)
+    evidence_build.add_argument("--coverage", type=Path, required=True)
+    evidence_build.add_argument("--coverage-metadata", type=Path, required=True)
+    evidence_build.add_argument("--data-audit", type=Path, required=True)
+    evidence_build.add_argument("--s1-report", type=Path, required=True)
+    evidence_build.add_argument("--prior-evidence", type=Path, required=True)
+    evidence_build.add_argument("--d1-pack", type=Path, required=True)
+    evidence_build.add_argument("--d3-seed", type=Path, required=True)
+    evidence_build.add_argument("--output", type=Path, required=True)
 
     snapshot = subparsers.add_parser(
         "publish-snapshot",
@@ -253,6 +272,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             evidence_report = load_p1_acceptance_evidence(args.evidence)
             _print_p1_acceptance(evidence_report, as_json=args.json)
             return 1 if evidence_report.has_failures else 0
+        elif args.command == "build-p1-evidence":
+            evidence = build_p1_acceptance_evidence(
+                snapshot_dir=args.snapshot_dir,
+                coverage_path=args.coverage,
+                coverage_metadata_path=args.coverage_metadata,
+                data_audit_path=args.data_audit,
+                s1_report_path=args.s1_report,
+                prior_evidence_path=args.prior_evidence,
+                d1_pack_path=args.d1_pack,
+                d3_seed_path=args.d3_seed,
+            )
+            write_p1_acceptance_evidence(args.output, evidence)
+            print(f"P1 evidence written: {args.output}")
         elif args.command == "publish-snapshot":
             materialized = publish_snapshot(
                 catalog=SnapshotCatalog(args.catalog_root),
@@ -274,6 +306,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         CurationError,
         DelistedCoverageError,
         AcceptanceEvidenceError,
+        EvidenceBuildError,
         SnapshotBuildError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)

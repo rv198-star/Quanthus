@@ -10,6 +10,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from quanthus.universe import UniversePolicy, load_universe_policy
+
 
 class AuditError(RuntimeError):
     """Raised when an audit cannot run against the supplied data root."""
@@ -113,7 +115,7 @@ def _validate_files(root: Path, bars_file: str) -> None:
         raise AuditError(f"required data files are missing: {', '.join(sorted(missing))}")
 
 
-def _register_views(connection: Any, root: Path, bars_file: str) -> None:
+def _register_views(connection: Any, root: Path, bars_file: str) -> set[str]:
     views = {
         "bars": root / bars_file,
         "manifest": root / "dataset_manifest.parquet",
@@ -124,6 +126,16 @@ def _register_views(connection: Any, root: Path, bars_file: str) -> None:
     }
     for view, path in views.items():
         connection.execute(f"CREATE VIEW {view} AS SELECT * FROM {_parquet_source(path)}")
+    optional_views = {
+        "adjustment_factors": root / "ref_adjustment_factors.parquet",
+        "suspensions": root / "ref_suspensions.parquet",
+    }
+    available: set[str] = set()
+    for view, path in optional_views.items():
+        if path.is_file():
+            connection.execute(f"CREATE VIEW {view} AS SELECT * FROM {_parquet_source(path)}")
+            available.add(view)
+    return available
 
 
 def _dataset_stats(connection: Any) -> dict[str, Mapping[str, Any]]:
@@ -171,6 +183,9 @@ def _run_checks(
     connection: Any,
     bars_file: str,
     stats: Mapping[str, Mapping[str, Any]],
+    available_views: set[str],
+    require_c1_c2: bool,
+    universe_policy: UniversePolicy,
 ) -> list[CheckResult]:
     checks: list[CheckResult] = []
     bars_rows = int(stats["bars"]["row_count"])
@@ -399,14 +414,154 @@ def _run_checks(
             ),
         ]
     )
+    checks.extend(_c1_c2_checks(connection, available_views, require_c1_c2, universe_policy))
     return checks
 
 
-def run_p1_data_audit(root: Path, bars_file: str = "daily_ohlcv.parquet") -> DataAuditReport:
+def _c1_c2_checks(
+    connection: Any,
+    available_views: set[str],
+    require_c1_c2: bool,
+    universe_policy: UniversePolicy,
+) -> list[CheckResult]:
+    missing_status = CheckStatus.FAIL if require_c1_c2 else CheckStatus.WARN
+    checks: list[CheckResult] = []
+    out_of_scope_conditions = " OR ".join(
+        f"s.stock_code LIKE {_sql_string(f'{prefix}%')}"
+        for prefix in universe_policy.out_of_scope_code_prefixes
+    )
+    out_of_scope_condition = f"({out_of_scope_conditions})" if out_of_scope_conditions else "FALSE"
+    if "adjustment_factors" not in available_views:
+        checks.append(
+            CheckResult(
+                "adjustment_factors.present",
+                missing_status,
+                1,
+                "ref_adjustment_factors.parquet is unavailable for C1 validation",
+            )
+        )
+    else:
+        checks.extend(
+            [
+                _check(
+                    "adjustment_factors.primary_key_unique",
+                    _scalar(
+                        connection,
+                        """
+                        SELECT coalesce(sum(duplicates), 0)
+                        FROM (
+                            SELECT count(*) - 1 AS duplicates
+                            FROM adjustment_factors
+                            GROUP BY stock_code, effective_date, adj_version, knowledge_cutoff
+                            HAVING count(*) > 1
+                        )
+                        """,
+                    ),
+                    "duplicate factor rows beyond the first versioned key",
+                ),
+                _check(
+                    "adjustment_factors.required_values",
+                    _scalar(
+                        connection,
+                        """
+                        SELECT count(*) FROM adjustment_factors
+                        WHERE stock_code IS NULL OR effective_date IS NULL
+                           OR fore_adjust_factor IS NULL OR back_adjust_factor IS NULL
+                           OR adjust_factor IS NULL OR adj_version IS NULL
+                           OR knowledge_cutoff IS NULL
+                           OR fore_adjust_factor <= 0 OR back_adjust_factor <= 0
+                           OR adjust_factor <= 0
+                        """,
+                    ),
+                    "factor rows require positive factors and complete PIT version fields",
+                ),
+            ]
+        )
+
+    if "suspensions" not in available_views:
+        checks.append(
+            CheckResult(
+                "suspensions.present",
+                missing_status,
+                1,
+                "ref_suspensions.parquet is unavailable for C2 validation",
+            )
+        )
+    else:
+        checks.extend(
+            [
+                _check(
+                    "suspensions.primary_key_unique",
+                    _scalar(
+                        connection,
+                        """
+                        SELECT coalesce(sum(duplicates), 0)
+                        FROM (
+                            SELECT count(*) - 1 AS duplicates
+                            FROM suspensions
+                            GROUP BY suspension_id
+                            HAVING count(*) > 1
+                        )
+                        """,
+                    ),
+                    "duplicate suspension_id rows beyond the first row",
+                ),
+                _check(
+                    "suspensions.required_values_and_dates",
+                    _scalar(
+                        connection,
+                        """
+                        SELECT count(*) FROM suspensions
+                        WHERE suspension_id IS NULL OR stock_code IS NULL
+                           OR suspend_start IS NULL OR knowledge_cutoff IS NULL
+                           OR (suspend_end IS NOT NULL AND suspend_end < suspend_start)
+                           OR (resume_expected IS NOT NULL AND resume_expected < suspend_start)
+                        """,
+                    ),
+                    "suspensions require an id, code, start, PIT cutoff, and ordered dates",
+                ),
+                _check(
+                    "suspensions.security_known",
+                    _scalar(
+                        connection,
+                        f"""
+                        SELECT count(*) FROM suspensions s
+                        LEFT JOIN master m USING (stock_code)
+                        WHERE m.security_id IS NULL AND NOT {out_of_scope_condition}
+                        """,
+                    ),
+                    "in-scope suspension rows whose stock_code is absent from security_master",
+                ),
+                _check(
+                    "suspensions.out_of_scope_codes",
+                    _scalar(
+                        connection,
+                        f"""
+                        SELECT count(*) FROM suspensions s
+                        LEFT JOIN master m USING (stock_code)
+                        WHERE m.security_id IS NULL AND {out_of_scope_condition}
+                        """,
+                    ),
+                    "unmapped suspension rows excluded by the versioned A-share scope",
+                    warning=True,
+                ),
+            ]
+        )
+    return checks
+
+
+def run_p1_data_audit(
+    root: Path,
+    bars_file: str = "daily_ohlcv.parquet",
+    *,
+    require_c1_c2: bool = False,
+    universe_policy: UniversePolicy | None = None,
+) -> DataAuditReport:
     """Audit stable local files without mutating the source snapshot."""
 
     root = root.resolve()
     _validate_files(root, bars_file)
+    resolved_policy = universe_policy or load_universe_policy()
     try:
         import duckdb
     except ModuleNotFoundError as exc:
@@ -414,9 +569,16 @@ def run_p1_data_audit(root: Path, bars_file: str = "daily_ohlcv.parquet") -> Dat
 
     connection = duckdb.connect(":memory:")
     try:
-        _register_views(connection, root, bars_file)
+        available_views = _register_views(connection, root, bars_file)
         stats = _dataset_stats(connection)
-        checks = _run_checks(connection, bars_file, stats)
+        checks = _run_checks(
+            connection,
+            bars_file,
+            stats,
+            available_views,
+            require_c1_c2,
+            resolved_policy,
+        )
     finally:
         connection.close()
     return DataAuditReport(

@@ -21,3 +21,8 @@ from Git along with the market data it describes.
 Run `make data-audit` after `make bootstrap-p1` to audit the stable Hermes snapshot at
 `/home/ubuntu/data/astock`. Set `QUANTHUS_DATA_ROOT` to use another local snapshot. The audit
 is read-only and writes its JSON report to `artifacts/p1-data-audit.json`.
+
+After Hermes publishes a manifest-backed `daily_ohlcv_none.parquet`, run
+`make curate-none` to create a separate curated file. The source snapshot remains untouched:
+BSE and explicitly excluded instruments are filtered by `config/p1-universe.v1.json`, while
+invalid source bars are retained with `data_valid=false` for downstream fail-closed handling.

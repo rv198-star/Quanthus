@@ -18,9 +18,12 @@ P1 includes SSE/SZSE daily bars from 2011 onward, security lifecycle, trading ca
 corporate actions, adjustment factors, tradability, historical ST state, board-specific price
 limits, delisted securities, static level-one industry mapping, and snapshot manifests.
 
-P1 excludes BSE, news, financial statements, historical concept membership, and official
-minute features. Official 5-minute data begins in 2024-07 and is deferred until event-window
-work. One-minute data beginning 2026-03 is archive-only research data.
+P1 excludes BSE, B shares, explicitly configured non-A-share instruments, news, financial
+statements, historical concept membership, and official minute features. The frozen
+`config/p1-universe.v1.json` is the explicit selection contract; it must name exceptional
+exclusions with reasons rather than silently dropping them. Official 5-minute data begins in
+2024-07 and is deferred until event-window work. One-minute data beginning 2026-03 is
+archive-only research data.
 
 ## 3. Data layers
 
@@ -33,6 +36,11 @@ work. One-minute data beginning 2026-03 is archive-only research data.
 
 Raw files never receive in-place corrections. A source correction creates a new revision and
 new downstream snapshot id.
+
+The curated daily view filters the versioned universe but retains an in-scope raw row that
+violates a market-data invariant with `data_valid=false`. Downstream new-entry logic fails
+closed from that flag and the corresponding gap/tradability state; it must not delete the row
+or invent a structural-break exit.
 
 ## 4. Canonical datasets
 

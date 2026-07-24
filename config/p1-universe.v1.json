@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "policy_version": "p1-universe-2026-07-24",
+  "status": "frozen",
+  "allowed_exchanges": [
+    "SSE",
+    "SZSE"
+  ],
+  "excluded_security_ids": {
+    "SSE-689009": {
+      "reason": "CDR; source volume is null for the full available history"
+    }
+  },
+  "out_of_scope_code_prefixes": {
+    "20": {
+      "reason": "SZSE B shares are outside the A-share P1 universe"
+    },
+    "900": {
+      "reason": "SSE B shares are outside the A-share P1 universe"
+    },
+    "920": {
+      "reason": "BSE securities are outside the SSE/SZSE P1 universe"
+    }
+  },
+  "invalid_bar_handling": "retain_with_data_valid_false"
+}

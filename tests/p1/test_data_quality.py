@@ -102,6 +102,16 @@ class DataQualityTests(unittest.TestCase):
         self.assertEqual(by_id["bars.ohlc_invariant"].count, 1)
         self.assertEqual(by_id["data_gaps.invalid_ohlc_reconciled"].status, CheckStatus.PASS)
 
+    def test_c1_c2_gate_requires_the_new_reference_tables(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_fixture(root, invalid_bar=False)
+            report = run_p1_data_audit(root, require_c1_c2=True)
+
+        by_id = {check.check_id: check for check in report.checks}
+        self.assertEqual(by_id["adjustment_factors.present"].status, CheckStatus.FAIL)
+        self.assertEqual(by_id["suspensions.present"].status, CheckStatus.FAIL)
+
 
 if __name__ == "__main__":
     unittest.main()

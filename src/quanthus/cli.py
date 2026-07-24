@@ -7,9 +7,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from quanthus import __version__
+from quanthus.curation import CuratedDailyResult, CurationError, build_curated_daily
 from quanthus.data_quality import AuditError, DataAuditReport, run_p1_data_audit
 from quanthus.gates import GateReport, load_gate_report
-from quanthus.policy import ConfigurationError, P0Policy, load_policy
+from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
+from quanthus.universe import load_universe_policy
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -32,6 +34,17 @@ def _parser() -> argparse.ArgumentParser:
     data_audit.add_argument("--root", type=Path, required=True)
     data_audit.add_argument("--bars-file", default="daily_ohlcv.parquet")
     data_audit.add_argument("--output", type=Path)
+    data_audit.add_argument("--require-c1-c2", action="store_true")
+
+    curate_daily = subparsers.add_parser(
+        "curate-daily",
+        help="build an immutable curated view from a stable unadjusted daily input",
+    )
+    curate_daily.add_argument("--root", type=Path, required=True)
+    curate_daily.add_argument("--bars-file", default="daily_ohlcv_none.parquet")
+    curate_daily.add_argument("--universe-policy", type=Path)
+    curate_daily.add_argument("--output", type=Path, required=True)
+    curate_daily.add_argument("--metadata-output", type=Path)
     return parser
 
 
@@ -65,6 +78,14 @@ def _print_data_audit(report: DataAuditReport) -> None:
             print(f"{check.status.value.upper()} {check.check_id}: {check.count} ({check.detail})")
 
 
+def _print_curated_daily(result: CuratedDailyResult) -> None:
+    print(f"curated output: {result.output}")
+    print(f"rows: {result.row_count}")
+    print(f"data-valid rows: {result.valid_row_count}")
+    print(f"source version: {result.source_dataset_version}")
+    print(f"universe policy: {result.universe_policy_version}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -80,14 +101,32 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 _print_gate_report(gate_report)
         elif args.command == "data-audit":
-            audit_report = run_p1_data_audit(args.root, args.bars_file)
+            audit_report = run_p1_data_audit(
+                args.root,
+                args.bars_file,
+                require_c1_c2=args.require_c1_c2,
+            )
             if args.output is not None:
                 audit_report.write_json(args.output)
             _print_data_audit(audit_report)
             return 1 if audit_report.has_failures else 0
+        elif args.command == "curate-daily":
+            default_policy = find_project_root() / "config" / "p1-universe.v1.json"
+            universe_policy = load_universe_policy(args.universe_policy or default_policy)
+            curated = build_curated_daily(
+                root=args.root,
+                output=args.output,
+                universe_policy=universe_policy,
+                bars_file=args.bars_file,
+            )
+            if args.metadata_output is not None:
+                args.metadata_output.parent.mkdir(parents=True, exist_ok=True)
+                payload = json.dumps(curated.to_dict(), ensure_ascii=True, indent=2, sort_keys=True)
+                args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
+            _print_curated_daily(curated)
         else:
             raise AssertionError(f"unhandled command: {args.command}")
-    except (AuditError, ConfigurationError) as exc:
+    except (AuditError, ConfigurationError, CurationError) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
     return 0

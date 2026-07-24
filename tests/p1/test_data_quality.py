@@ -48,9 +48,7 @@ class DataQualityTests(unittest.TestCase):
             "ref_trading_calendar.parquet": pa.Table.from_pylist(
                 [{"exchange": "SSE", "trade_date": date(2025, 1, 2), "is_open": 1}]
             ),
-            "ref_corporate_actions.parquet": pa.Table.from_pylist(
-                [{"action_id": "a1"}]
-            ),
+            "ref_corporate_actions.parquet": pa.Table.from_pylist([{"action_id": "a1"}]),
             "dataset_manifest.parquet": pa.Table.from_pylist(
                 [
                     {
@@ -111,6 +109,40 @@ class DataQualityTests(unittest.TestCase):
         by_id = {check.check_id: check for check in report.checks}
         self.assertEqual(by_id["adjustment_factors.present"].status, CheckStatus.FAIL)
         self.assertEqual(by_id["suspensions.present"].status, CheckStatus.FAIL)
+
+    def test_c1_rejects_a_factor_not_visible_by_its_effective_date(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_fixture(root, invalid_bar=False)
+            factors = pa.Table.from_pylist(
+                [
+                    {
+                        "stock_code": "600000",
+                        "effective_date": date(2024, 1, 10),
+                        "fore_adjust_factor": 1.0,
+                        "back_adjust_factor": 1.0,
+                        "adjust_factor": 1.0,
+                        "adj_version": "v1",
+                        "knowledge_cutoff": date(2024, 1, 8),
+                    },
+                    {
+                        "stock_code": "600000",
+                        "effective_date": date(2024, 2, 10),
+                        "fore_adjust_factor": 1.1,
+                        "back_adjust_factor": 1.1,
+                        "adjust_factor": 1.1,
+                        "adj_version": "v1",
+                        "knowledge_cutoff": date(2024, 2, 20),
+                    },
+                ]
+            )
+            pq.write_table(factors, root / "ref_adjustment_factors.parquet")
+            report = run_p1_data_audit(root, require_c1_c2=True)
+
+        by_id = {check.check_id: check for check in report.checks}
+        visibility = by_id["adjustment_factors.visible_by_effective_date"]
+        self.assertEqual(visibility.status, CheckStatus.FAIL)
+        self.assertEqual(visibility.count, 1)
 
 
 if __name__ == "__main__":

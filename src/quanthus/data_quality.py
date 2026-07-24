@@ -475,6 +475,17 @@ def _c1_c2_checks(
                     ),
                     "factor rows require positive factors and complete PIT version fields",
                 ),
+                _check(
+                    "adjustment_factors.visible_by_effective_date",
+                    _scalar(
+                        connection,
+                        """
+                        SELECT count(*) FROM adjustment_factors
+                        WHERE CAST(knowledge_cutoff AS DATE) > effective_date
+                        """,
+                    ),
+                    "factor knowledge_cutoff must not be later than its effective_date",
+                ),
             ]
         )
 

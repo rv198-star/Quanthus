@@ -68,7 +68,7 @@ class DataFoundationTests(unittest.TestCase):
 
     def test_snapshot_publish_is_atomic_idempotent_and_loadable(self) -> None:
         manifests = (dataset_manifest(knowledge_cutoff=self.cutoff),)
-        published = PublishedSnapshot(self.reference, manifests)
+        published = PublishedSnapshot(self.reference, manifests, "p1-universe-v1")
         with tempfile.TemporaryDirectory() as directory:
             catalog = SnapshotCatalog(Path(directory) / "snapshots")
             location = catalog.publish(published)
@@ -84,6 +84,7 @@ class DataFoundationTests(unittest.TestCase):
             PublishedSnapshot(
                 self.reference,
                 (dataset_manifest(knowledge_cutoff=future_cutoff),),
+                "p1-universe-v1",
             )
 
     def test_snapshot_id_cannot_be_reused_for_different_contents(self) -> None:
@@ -92,6 +93,7 @@ class DataFoundationTests(unittest.TestCase):
             original = PublishedSnapshot(
                 self.reference,
                 (dataset_manifest(knowledge_cutoff=self.cutoff),),
+                "p1-universe-v1",
             )
             catalog.publish(original)
             altered = DatasetManifest(
@@ -107,7 +109,98 @@ class DataFoundationTests(unittest.TestCase):
             )
 
             with self.assertRaises(FileExistsError):
-                catalog.publish(PublishedSnapshot(self.reference, (altered,)))
+                catalog.publish(PublishedSnapshot(self.reference, (altered,), "p1-universe-v1"))
+
+    def test_snapshot_resolves_latest_eligible_cutoff_with_exact_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = SnapshotCatalog(Path(directory) / "snapshots")
+            early_cutoff = datetime(2025, 1, 2, 7, 0, tzinfo=timezone.utc)
+            early_ref = SnapshotRef(
+                market_date=date(2025, 1, 2),
+                knowledge_cutoff=early_cutoff,
+                source_revision="hermes-early",
+                snapshot_id="p1-2025-01-02-early",
+            )
+            catalog.publish(
+                PublishedSnapshot(
+                    early_ref,
+                    (dataset_manifest(knowledge_cutoff=early_cutoff),),
+                    "p1-universe-v1",
+                )
+            )
+            catalog.publish(
+                PublishedSnapshot(
+                    self.reference,
+                    (dataset_manifest(knowledge_cutoff=self.cutoff),),
+                    "p1-universe-v1",
+                )
+            )
+
+            resolved = catalog.get_snapshot(
+                self.reference.market_date,
+                datetime(2025, 1, 2, 9, 0, tzinfo=timezone.utc),
+                "p1-universe-v1",
+                {"bars_daily": "normalized-v1"},
+            )
+
+        self.assertEqual(resolved, self.reference)
+
+    def test_snapshot_never_selects_a_future_cutoff_or_wrong_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = SnapshotCatalog(Path(directory) / "snapshots")
+            published = PublishedSnapshot(
+                self.reference,
+                (dataset_manifest(knowledge_cutoff=self.cutoff),),
+                "p1-universe-v1",
+            )
+            catalog.publish(published)
+
+            with self.assertRaisesRegex(KeyError, "no snapshot matches"):
+                catalog.get_snapshot(
+                    self.reference.market_date,
+                    datetime(2025, 1, 2, 7, 59, tzinfo=timezone.utc),
+                    "p1-universe-v1",
+                    {"bars_daily": "normalized-v1"},
+                )
+            with self.assertRaisesRegex(KeyError, "no snapshot matches"):
+                catalog.get_snapshot(
+                    self.reference.market_date,
+                    self.cutoff,
+                    "p1-universe-v2",
+                    {"bars_daily": "normalized-v1"},
+                )
+
+    def test_snapshot_refuses_ambiguous_newest_cutoff(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = SnapshotCatalog(Path(directory) / "snapshots")
+            catalog.publish(
+                PublishedSnapshot(
+                    self.reference,
+                    (dataset_manifest(knowledge_cutoff=self.cutoff),),
+                    "p1-universe-v1",
+                )
+            )
+            alternate_reference = SnapshotRef(
+                market_date=self.reference.market_date,
+                knowledge_cutoff=self.cutoff,
+                source_revision="hermes-alternate",
+                snapshot_id="p1-2025-01-02-alternate",
+            )
+            catalog.publish(
+                PublishedSnapshot(
+                    alternate_reference,
+                    (dataset_manifest(knowledge_cutoff=self.cutoff),),
+                    "p1-universe-v1",
+                )
+            )
+
+            with self.assertRaisesRegex(ValueError, "multiple snapshots"):
+                catalog.get_snapshot(
+                    self.reference.market_date,
+                    self.cutoff,
+                    "p1-universe-v1",
+                    {"bars_daily": "normalized-v1"},
+                )
 
 
 if __name__ == "__main__":

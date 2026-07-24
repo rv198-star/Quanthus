@@ -105,10 +105,12 @@ get_snapshot(
 ) -> SnapshotRef
 ```
 
-The call publishes atomically or fails. It returns `market_date`, timezone-aware
-`knowledge_cutoff`, `source_revision`, and `snapshot_id`. Downstream queries receive only
-views bound to that snapshot. A held security with missing data produces no synthetic
-structural-break value.
+Publication is atomic. Resolution requires an exact dataset-version mapping and universe-policy
+version, chooses only the newest snapshot whose timezone-aware `knowledge_cutoff` is no later
+than the requested cutoff, and fails on ambiguity. It returns `market_date`,
+`knowledge_cutoff`, `source_revision`, and `snapshot_id`. Downstream queries receive only views
+bound to that snapshot. A held security with missing data produces no synthetic structural-break
+value.
 
 ## 6. Pipeline sequence
 

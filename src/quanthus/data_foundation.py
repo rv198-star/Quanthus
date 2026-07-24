@@ -9,7 +9,7 @@ import re
 import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -116,8 +116,11 @@ class DatasetManifest:
 class PublishedSnapshot:
     reference: SnapshotRef
     datasets: tuple[DatasetManifest, ...]
+    universe_policy_version: str
 
     def __post_init__(self) -> None:
+        if not self.universe_policy_version.strip():
+            raise ValueError("universe_policy_version must not be empty")
         names = [manifest.dataset for manifest in self.datasets]
         if not names:
             raise ValueError("a snapshot must contain at least one dataset manifest")
@@ -134,13 +137,14 @@ class PublishedSnapshot:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "format_version": 1,
+            "format_version": 2,
             "snapshot": {
                 "market_date": self.reference.market_date.isoformat(),
                 "knowledge_cutoff": self.reference.knowledge_cutoff.isoformat(),
                 "source_revision": self.reference.source_revision,
                 "snapshot_id": self.reference.snapshot_id,
             },
+            "universe_policy_version": self.universe_policy_version,
             "datasets": [
                 manifest.to_dict()
                 for manifest in sorted(self.datasets, key=lambda item: item.dataset)
@@ -160,6 +164,7 @@ class PublishedSnapshot:
                 snapshot_id=str(snapshot["snapshot_id"]),
             ),
             datasets=tuple(DatasetManifest.from_dict(item) for item in payload["datasets"]),
+            universe_policy_version=str(payload["universe_policy_version"]),
         )
 
 
@@ -212,6 +217,62 @@ class SnapshotCatalog:
         if published.reference.snapshot_id != snapshot_id:
             raise ValueError(f"snapshot id does not match manifest path: {snapshot_id}")
         return published
+
+    def get_snapshot(
+        self,
+        market_date: date,
+        knowledge_cutoff: datetime,
+        universe_policy_version: str,
+        dataset_versions: Mapping[str, str],
+    ) -> SnapshotRef:
+        """Resolve one deterministic snapshot without ever selecting future knowledge.
+
+        The requested dataset mapping is exact.  If more than one snapshot shares
+        the newest eligible cutoff, selection is ambiguous and fails closed rather
+        than choosing a source revision implicitly.
+        """
+
+        _require_aware(knowledge_cutoff, "knowledge_cutoff")
+        if not universe_policy_version.strip():
+            raise ValueError("universe_policy_version must not be empty")
+        requested_versions = dict(dataset_versions)
+        if not requested_versions or any(
+            not name.strip() or not version.strip() for name, version in requested_versions.items()
+        ):
+            raise ValueError("dataset_versions must contain non-empty dataset names and versions")
+        if not self.root.is_dir():
+            raise KeyError("no snapshots have been published")
+
+        candidates: list[PublishedSnapshot] = []
+        for child in sorted(self.root.iterdir(), key=lambda path: path.name):
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            try:
+                published = self.load(child.name)
+            except KeyError:
+                continue
+            actual_versions = {
+                manifest.dataset: manifest.version for manifest in published.datasets
+            }
+            if (
+                published.reference.market_date == market_date
+                and published.reference.knowledge_cutoff <= knowledge_cutoff
+                and published.universe_policy_version == universe_policy_version
+                and actual_versions == requested_versions
+            ):
+                candidates.append(published)
+        if not candidates:
+            raise KeyError("no snapshot matches the requested point-in-time contract")
+
+        latest_cutoff = max(candidate.reference.knowledge_cutoff for candidate in candidates)
+        newest = [
+            candidate
+            for candidate in candidates
+            if candidate.reference.knowledge_cutoff == latest_cutoff
+        ]
+        if len(newest) != 1:
+            raise ValueError("multiple snapshots match the newest eligible knowledge_cutoff")
+        return newest[0].reference
 
     def _sync_directory(self) -> None:
         descriptor = os.open(self.root, os.O_RDONLY)

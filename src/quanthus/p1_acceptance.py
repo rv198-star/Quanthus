@@ -93,16 +93,38 @@ def _blocker_checks(raw: Mapping[str, Any]) -> list[EvidenceCheck]:
             checks.append(EvidenceCheck(blocker_id, False, "missing blocker evidence"))
             continue
         evidence_id = evidence.get("evidence_id")
+        full_pass = evidence.get("status") == "pass"
+        conditional_pass = (
+            blocker_id == "C1"
+            and evidence.get("status") == "conditional_pass"
+            and evidence.get("acceptance_mode") == "conditional_fail_closed"
+            and evidence.get("exception_count") == 4173
+            and isinstance(evidence.get("policy_version"), str)
+            and bool(evidence["policy_version"].strip())
+            and isinstance(evidence.get("exception_ledger_revision"), str)
+            and bool(evidence["exception_ledger_revision"].strip())
+            and isinstance(evidence.get("required_runtime_controls"), list)
+            and len(evidence["required_runtime_controls"]) >= 3
+            and all(
+                isinstance(control, str) and control.strip()
+                for control in evidence["required_runtime_controls"]
+            )
+        )
         passed = (
-            evidence.get("status") == "pass"
+            (full_pass or conditional_pass)
             and isinstance(evidence_id, str)
             and bool(evidence_id.strip())
         )
+        detail = "passed evidence is recorded"
+        if conditional_pass:
+            detail = "conditional fail-closed evidence is recorded"
+        elif not passed:
+            detail = "passed evidence is required"
         checks.append(
             EvidenceCheck(
                 blocker_id,
                 passed,
-                "passed evidence is required" if not passed else "passed evidence is recorded",
+                detail,
             )
         )
     return checks
@@ -178,8 +200,8 @@ def _d3_check(raw: Mapping[str, Any]) -> EvidenceCheck:
 def validate_p1_acceptance_evidence(raw: Mapping[str, Any]) -> P1AcceptanceReport:
     """Validate evidence structure; gate configuration remains a separate explicit change."""
 
-    if raw.get("schema_version") != "1.0.0":
-        raise AcceptanceEvidenceError("schema_version must be 1.0.0")
+    if raw.get("schema_version") not in {"1.0.0", "1.1.0"}:
+        raise AcceptanceEvidenceError("schema_version must be 1.0.0 or 1.1.0")
     snapshot_id = _non_empty_string(raw.get("snapshot_id"), "snapshot_id")
     checks = [*_blocker_checks(raw), _d1_check(raw), _d2_check(raw), _d3_check(raw)]
     return P1AcceptanceReport(snapshot_id=snapshot_id, checks=tuple(checks))

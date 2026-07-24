@@ -438,6 +438,32 @@ def _summary_count(report: dict[str, Any], field_name: str) -> int:
     return value
 
 
+def _load_c1_conditional_policy(path: Path) -> dict[str, Any]:
+    policy = _load_object(path)
+    if policy.get("schema_version") != "1.0.0":
+        raise EvidenceBuildError("C1 conditional policy schema_version must be 1.0.0")
+    if policy.get("status") != "accepted":
+        raise EvidenceBuildError("C1 conditional policy must be explicitly accepted")
+    exception_count = policy.get("exception_count")
+    if exception_count != 4173:
+        raise EvidenceBuildError("C1 conditional policy exception_count must be exactly 4173")
+    controls = policy.get("required_runtime_controls")
+    if (
+        not isinstance(controls, list)
+        or len(controls) < 3
+        or not all(isinstance(control, str) and control.strip() for control in controls)
+    ):
+        raise EvidenceBuildError("C1 conditional policy requires three fail-closed controls")
+    for field_name in (
+        "policy_version",
+        "snapshot_id",
+        "exception_ledger_revision",
+        "authorization",
+    ):
+        _required_string(policy.get(field_name), f"C1 conditional policy.{field_name}")
+    return policy
+
+
 def build_p1_acceptance_evidence(
     *,
     snapshot_dir: Path,
@@ -448,6 +474,7 @@ def build_p1_acceptance_evidence(
     prior_evidence_path: Path,
     d1_pack_path: Path,
     d3_seed_path: Path,
+    c1_conditional_policy_path: Path,
 ) -> dict[str, Any]:
     """Revalidate and assemble a P1 evidence bundle without changing gate state."""
 
@@ -465,6 +492,9 @@ def build_p1_acceptance_evidence(
     audit = _load_object(data_audit_path)
     s1_report = _load_object(s1_report_path)
     prior_evidence = _load_object(prior_evidence_path)
+    c1_policy = _load_c1_conditional_policy(c1_conditional_policy_path)
+    if c1_policy["snapshot_id"] != snapshot.reference.snapshot_id:
+        raise EvidenceBuildError("C1 conditional policy is not bound to the published snapshot")
     expected_none_checksum = none_checksum.removeprefix("sha256:")
     if coverage_metadata.get("source_checksum") != expected_none_checksum:
         raise EvidenceBuildError("coverage metadata is not bound to the published none snapshot")
@@ -473,15 +503,12 @@ def build_p1_acceptance_evidence(
     if audit.get("summary", {}).get("fail") != 0:
         raise EvidenceBuildError("data audit contains failures")
     factor_warning = _audit_check(audit, "adjustment_factors.batch_dated_historical_visibility")
-    # Controlled residual after EM exact-unique link (Hermes adj_factors_pit_exception_ledger_v1).
-    # Historical seed used 6910; post recommended-band link the fail-closed residual is 4173.
-    allowed_c1_exception_counts = {4173, 6910}
-    if factor_warning.get("status") != "warn" or int(factor_warning.get("count") or -1) not in (
-        allowed_c1_exception_counts
+    if factor_warning.get("status") != "warn" or int(factor_warning.get("count") or -1) != int(
+        c1_policy["exception_count"]
     ):
         raise EvidenceBuildError(
-            "C1 exception count changed outside controlled residual set {4173, 6910}; "
-            "review the PIT policy before rebuilding"
+            "C1 exception count does not match the accepted conditional policy; "
+            "review the PIT decision before rebuilding"
         )
     c1_exception_count = int(factor_warning.get("count") or 0)
     allowed_statuses = {"trading", "suspended", "not_listed", "delisted", "missing"}
@@ -508,7 +535,7 @@ def build_p1_acceptance_evidence(
         prior_evidence,
     )
     return {
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "snapshot_id": snapshot.reference.snapshot_id,
         "assembled_at": datetime.now(timezone.utc).isoformat(),
         "scope_note": (
@@ -533,18 +560,27 @@ def build_p1_acceptance_evidence(
             "D1": d1_metadata,
             "D2": d2_metadata,
             "D3": d3_metadata,
+            "C1_conditional_policy": {
+                "path": str(c1_conditional_policy_path),
+                "sha256": _sha256(c1_conditional_policy_path),
+                "policy_version": c1_policy["policy_version"],
+            },
         },
         "blockers": {
             "C1": {
-                "status": "open",
+                "status": "conditional_pass",
+                "acceptance_mode": "conditional_fail_closed",
                 "evidence_id": (
                     f"{data_audit_path}#adjustment_factors.batch_dated_historical_visibility"
                 ),
+                "policy_version": c1_policy["policy_version"],
+                "exception_count": c1_exception_count,
+                "exception_ledger_revision": c1_policy["exception_ledger_revision"],
+                "required_runtime_controls": c1_policy["required_runtime_controls"],
                 "detail": (
                     f"{c1_exception_count} batch-dated factor visibility exceptions remain "
-                    "intentionally fail-closed after EM exact-unique linking; "
-                    "C1 correctness = no lookahead; C1 completeness = controlled gap "
-                    "(not full pass). knowledge_cutoff was never fabricated to effective_date."
+                    "accepted only as a fail-closed completeness exception after EM "
+                    "exact-unique linking; this is a conditional pass, not a full pass."
                 ),
             },
             "C2": {

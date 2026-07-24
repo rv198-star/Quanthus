@@ -99,6 +99,31 @@ class P1AcceptanceEvidenceTests(unittest.TestCase):
         self.assertFalse(by_id["C1"].passed)
         self.assertFalse(by_id["D3"].passed)
 
+    def test_c1_conditional_pass_requires_the_fixed_fail_closed_boundary(self) -> None:
+        evidence = valid_evidence()
+        blockers = evidence["blockers"]
+        assert isinstance(blockers, dict)
+        blockers["C1"] = {
+            "status": "conditional_pass",
+            "acceptance_mode": "conditional_fail_closed",
+            "evidence_id": "c1-evidence",
+            "policy_version": "p1-c1-conditional-20260725-v1",
+            "exception_count": 4173,
+            "exception_ledger_revision": "adj_factors_pit_exception_ledger_v1",
+            "required_runtime_controls": ["one", "two", "three"],
+        }
+
+        report = validate_p1_acceptance_evidence(evidence)
+
+        by_id = {check.check_id: check for check in report.checks}
+        self.assertTrue(by_id["C1"].passed)
+        self.assertIn("conditional fail-closed", by_id["C1"].detail)
+
+        blockers["C1"]["exception_count"] = 4172
+        report = validate_p1_acceptance_evidence(evidence)
+        by_id = {check.check_id: check for check in report.checks}
+        self.assertFalse(by_id["C1"].passed)
+
 
 if __name__ == "__main__":
     unittest.main()

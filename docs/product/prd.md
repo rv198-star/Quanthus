@@ -169,8 +169,9 @@ Any result that has not passed the relevant arbitration gate is labeled as a res
 
 ## 11. Current decision
 
-P1 implementation is released. C2 and S1 are closed against the immutable
-`p1-identity-code-validity-20260725-v1` snapshot; C1 remains open because its 4,173
-batch-dated PIT factor exceptions are a controlled completeness gap, not a full pass. P2 remains
-blocked until the Chapter 01 gate passes. The next executable work is listed in
-`docs/work-items/index.md` and `config/p1-gates.v1.json`.
+P1 is conditionally accepted against immutable snapshot
+`p1-identity-code-validity-20260725-v1`. C1's 4,173 batch-dated PIT factor exceptions are not a
+full-data pass: they are accepted only under `p1-c1-conditional-20260725-v1`, which requires any
+factor-dependent historical path to fail closed before a declared knowledge cutoff. C2 and S1 are
+closed. P2 implementation is allowed; P3 remains blocked pending P2 acceptance. The next
+executable work is listed in `docs/work-items/index.md` and `config/p1-gates.v1.json`.

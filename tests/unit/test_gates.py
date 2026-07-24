@@ -13,14 +13,15 @@ class GateTests(unittest.TestCase):
         report = load_gate_report()
 
         self.assertTrue(report.p1_can_start)
-        self.assertFalse(report.p1_acceptance_passed)
-        self.assertFalse(report.p2_can_start)
-        self.assertEqual(report.open_blockers, ("C1",))
-        self.assertEqual(report.chapter_01_status, "pending")
+        self.assertTrue(report.p1_acceptance_passed)
+        self.assertTrue(report.p2_can_start)
+        self.assertEqual(report.open_blockers, ())
+        self.assertEqual(report.chapter_01_status, "passed")
 
     def test_p2_cannot_open_before_chapter_01_passes(self) -> None:
         gate_path = find_project_root() / "config" / "p1-gates.v1.json"
         raw = copy.deepcopy(json.loads(gate_path.read_text(encoding="utf-8")))
+        raw["chapter_01_acceptance"]["status"] = "pending"
         raw["p2_implementation"] = "allowed"
 
         with tempfile.TemporaryDirectory() as directory:

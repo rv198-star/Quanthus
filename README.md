@@ -7,8 +7,9 @@ model output as a trading decision and it does not promise investment returns.
 ## Current gate
 
 - P1 implementation: allowed.
-- P1 acceptance: blocked by C1 in `config/p1-gates.v1.json`; C2 and S1 have passed versioned evidence.
-- P2 implementation: blocked until all Chapter 01 data acceptance checks pass.
+- P1 acceptance: conditionally passed under `p1-c1-conditional-20260725-v1`; its 4,173
+  factor-visibility exceptions remain fail-closed.
+- P2 implementation: allowed. P3 remains blocked pending P2 acceptance.
 - P3 scope: a replayable vertical slice; inactive experts run in shadow mode.
 
 ## Quick start

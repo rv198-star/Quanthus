@@ -25,7 +25,7 @@ def _sha256(path: Path) -> str:
 
 @unittest.skipUnless(P1_STACK_AVAILABLE, "P1 optional dependencies are not installed")
 class P1EvidenceBuildTests(unittest.TestCase):
-    def test_rebuilds_replay_evidence_but_preserves_the_c1_exception(self) -> None:
+    def test_rebuilds_replay_evidence_with_the_accepted_c1_exception(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             sources = root / "sources"
@@ -245,7 +245,7 @@ class P1EvidenceBuildTests(unittest.TestCase):
                             {
                                 "check_id": "adjustment_factors.batch_dated_historical_visibility",
                                 "status": "warn",
-                                "count": 6910,
+                                "count": 4173,
                             }
                         ],
                     }
@@ -275,6 +275,29 @@ class P1EvidenceBuildTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            c1_policy = root / "c1-policy.json"
+            c1_policy.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0.0",
+                        "policy_version": "test-c1-conditional-v1",
+                        "status": "accepted",
+                        "snapshot_id": snapshot_id,
+                        "exception_count": 4173,
+                        "exception_ledger_revision": "test-ledger-v1",
+                        "required_runtime_controls": [
+                            "never infer an earlier knowledge_cutoff from effective_date",
+                            "treat a factor as unavailable before its declared knowledge_cutoff",
+                            (
+                                "fail closed when a factor-dependent historical path "
+                                "requires an unavailable factor"
+                            ),
+                        ],
+                        "authorization": "test",
+                    }
+                ),
+                encoding="utf-8",
+            )
 
             evidence = build_p1_acceptance_evidence(
                 snapshot_dir=snapshot.location,
@@ -285,13 +308,13 @@ class P1EvidenceBuildTests(unittest.TestCase):
                 prior_evidence_path=prior_evidence,
                 d1_pack_path=d1_pack,
                 d3_seed_path=d3_seed,
+                c1_conditional_policy_path=c1_policy,
             )
 
             report = validate_p1_acceptance_evidence(evidence)
             checks = {check.check_id: check.passed for check in report.checks}
             self.assertEqual(report.snapshot_id, snapshot_id)
-            self.assertFalse(checks["C1"])
-            self.assertTrue(all(checks[check_id] for check_id in ("C2", "S1", "D1", "D2", "D3")))
+            self.assertTrue(all(checks.values()))
 
 
 if __name__ == "__main__":

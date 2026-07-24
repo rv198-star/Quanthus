@@ -153,6 +153,7 @@ def _parser() -> argparse.ArgumentParser:
     evidence_build.add_argument("--prior-evidence", type=Path, required=True)
     evidence_build.add_argument("--d1-pack", type=Path, required=True)
     evidence_build.add_argument("--d3-seed", type=Path, required=True)
+    evidence_build.add_argument("--c1-conditional-policy", type=Path, required=True)
     evidence_build.add_argument("--output", type=Path, required=True)
 
     snapshot = subparsers.add_parser(
@@ -350,6 +351,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 prior_evidence_path=args.prior_evidence,
                 d1_pack_path=args.d1_pack,
                 d3_seed_path=args.d3_seed,
+                c1_conditional_policy_path=args.c1_conditional_policy,
             )
             write_p1_acceptance_evidence(args.output, evidence)
             print(f"P1 evidence written: {args.output}")

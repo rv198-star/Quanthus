@@ -13,8 +13,9 @@
 
 ## Current scope
 
-- P1 may be implemented. C1 blocks P1 acceptance; C2 and S1 have passed versioned evidence.
-- P2 must not begin until the Chapter 01 acceptance gate is marked passed.
+- P1 is conditionally accepted under `p1-c1-conditional-20260725-v1`: 4,173
+  factor-visibility exceptions remain fail-closed and must not receive inferred cutoffs.
+- P2 may begin; P3 remains blocked until the trusted P2 backtest engine passes its golden suite.
 - Do not implement the full expert set or training layer during the P1 vertical slice.
 
 ## Development

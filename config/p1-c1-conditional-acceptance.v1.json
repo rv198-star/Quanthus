@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "policy_version": "p1-c1-conditional-20260725-v1",
+  "status": "accepted",
+  "snapshot_id": "p1-identity-code-validity-20260725-v1",
+  "exception_count": 4173,
+  "exception_ledger_revision": "adj_factors_pit_exception_ledger_v1",
+  "required_runtime_controls": [
+    "never infer an earlier knowledge_cutoff from effective_date",
+    "treat a factor as unavailable before its declared knowledge_cutoff",
+    "fail closed when a factor-dependent historical path requires an unavailable factor"
+  ],
+  "authorization": "product_owner_2026-07-24"
+}

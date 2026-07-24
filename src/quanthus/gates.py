@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from quanthus.policy import ConfigurationError, find_project_root
 
@@ -52,6 +53,28 @@ def validate_gates(raw: Mapping[str, Any]) -> None:
     if raw.get("p1_acceptance") == "passed" and open_blockers:
         raise ConfigurationError("P1 acceptance cannot pass with open blockers")
 
+    conditional = raw.get("conditional_acceptance")
+    if conditional is not None:
+        if not isinstance(conditional, dict):
+            raise ConfigurationError("conditional_acceptance must be an object")
+        if conditional.get("id") != "C1":
+            raise ConfigurationError("conditional_acceptance must apply to C1")
+        if conditional.get("exception_count") != 4173:
+            raise ConfigurationError("conditional_acceptance.exception_count must be 4173")
+        for field_name in (
+            "policy_version",
+            "snapshot_id",
+            "exception_ledger_revision",
+            "runtime_behavior",
+        ):
+            value = conditional.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ConfigurationError(
+                    f"conditional_acceptance.{field_name} must be a non-empty string"
+                )
+        if raw.get("p1_acceptance") != "passed":
+            raise ConfigurationError("conditional_acceptance requires P1 acceptance to pass")
+
     chapter = raw.get("chapter_01_acceptance")
     if not isinstance(chapter, dict) or chapter.get("status") not in {"pending", "passed"}:
         raise ConfigurationError("chapter_01_acceptance.status must be pending or passed")
@@ -96,9 +119,7 @@ def load_gate_report(path: Path | None = None) -> GateReport:
         version=str(raw["gate_version"]),
         p1_can_start=raw["p1_implementation"] == "allowed",
         p1_acceptance_passed=raw["p1_acceptance"] == "passed" and not blockers,
-        p2_can_start=(
-            raw["p2_implementation"] == "allowed" and chapter_status == "passed"
-        ),
+        p2_can_start=(raw["p2_implementation"] == "allowed" and chapter_status == "passed"),
         open_blockers=blockers,
         chapter_01_status=chapter_status,
     )

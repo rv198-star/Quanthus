@@ -17,15 +17,16 @@ class BootstrapAcceptanceTests(unittest.TestCase):
         rendered = output.getvalue()
         self.assertIn("Quanthus environment: OK", rendered)
         self.assertIn("P1 implementation: ALLOWED", rendered)
-        self.assertIn("open blockers: C1", rendered)
-        self.assertIn("P2 implementation: BLOCKED", rendered)
+        self.assertIn("open blockers: none", rendered)
+        self.assertIn("P1 acceptance: PASSED", rendered)
+        self.assertIn("P2 implementation: ALLOWED", rendered)
 
     def test_release_gate_matches_approved_p0_decision(self) -> None:
         report = load_gate_report()
 
         self.assertTrue(report.p1_can_start)
-        self.assertFalse(report.p1_acceptance_passed)
-        self.assertFalse(report.p2_can_start)
+        self.assertTrue(report.p1_acceptance_passed)
+        self.assertTrue(report.p2_can_start)
 
 
 if __name__ == "__main__":

@@ -136,10 +136,10 @@ CHAPTERS = (
 PHASE_GATES = {
     "meta": "Active project governance; changes must preserve document and issue traceability.",
     "P1": (
-        "Implementation is released. C1 remains the P1 acceptance blocker; "
-        "C2 and S1 have passed versioned evidence."
+        "Conditionally accepted under p1-c1-conditional-20260725-v1; 4,173 C1 factor "
+        "visibility exceptions remain fail-closed."
     ),
-    "P2": "Blocked until all Chapter 01 acceptance checks D1, D2, and D3 pass.",
+    "P2": "Allowed after the conditional Chapter 01 acceptance; P3 remains blocked.",
     "P3": "Blocked until the trusted P2 backtest engine passes its golden acceptance suite.",
     "P4": "Blocked until the P3 rule-only vertical slice is accepted.",
     "P5": "Blocked until the P4 event library and frozen rule baselines are accepted.",
@@ -267,7 +267,7 @@ def work_items(root: Path) -> list[WorkItem]:
         if phase == "meta":
             status = "ready" if state == "active" else "triage"
         else:
-            status = "ready" if phase == "P1" else "blocked"
+            status = "ready" if phase in {"P1", "P2"} else "blocked"
         if stable_id in CRITICAL_IDS:
             priority = "critical"
         elif stable_id in HIGH_IDS:
@@ -297,7 +297,7 @@ def repo_url(repository: str, path: str) -> str:
 
 
 def task_body(item: WorkItem, repository: str) -> str:
-    blocked_note = "\n\n> Blocked until Chapter 01 acceptance." if item.phase == "P2" else ""
+    blocked_note = ""
     return f"""<!-- quanthus-planning:v1 id={item.stable_id} kind=task -->
 ## Objective
 

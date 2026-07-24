@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Phase | P1 |
-| Status | Implementation allowed; acceptance blocked |
+| Status | Conditionally accepted; P2 implementation allowed |
 | Governing requirements | FR-DATA-001 through FR-DATA-006 |
-| Blocking work | C1 (C2 and S1 accepted against the identity-normalized snapshot) |
+| Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
 
 ## 1. Goal
 
@@ -167,7 +167,8 @@ acceptance evidence.
 - C1, C2, and S1 are closed with stable evidence paths.
 - Repeating a build from identical manifests produces identical canonical checksums.
 
-The evidence bundle is bound to one published snapshot. It records passed C1/C2/S1 evidence,
+The evidence bundle is bound to one published snapshot. It records passed C2/S1 evidence and either
+a full C1 pass or the explicit versioned C1 conditional-acceptance policy,
 the full 10-by-10 D1 date/security matrix with independent reference ids, at least 20 unique D2
 limit or suspension cases, and non-empty D3 ex-right cases with no artificial jump. Passing the
 bundle validator is necessary but does not itself change the release gate configuration.

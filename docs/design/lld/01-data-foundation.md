@@ -5,7 +5,7 @@
 | Phase | P1 |
 | Status | Implementation allowed; acceptance blocked |
 | Governing requirements | FR-DATA-001 through FR-DATA-006 |
-| Blocking work | C1, C2, S1 |
+| Blocking work | C1 (C2 and S1 accepted against the identity-normalized snapshot) |
 
 ## 1. Goal
 

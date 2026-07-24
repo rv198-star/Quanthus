@@ -15,7 +15,7 @@ class GateTests(unittest.TestCase):
         self.assertTrue(report.p1_can_start)
         self.assertFalse(report.p1_acceptance_passed)
         self.assertFalse(report.p2_can_start)
-        self.assertEqual(report.open_blockers, ("C1", "C2", "S1"))
+        self.assertEqual(report.open_blockers, ("C1",))
         self.assertEqual(report.chapter_01_status, "pending")
 
     def test_p2_cannot_open_before_chapter_01_passes(self) -> None:

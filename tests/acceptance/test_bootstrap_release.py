@@ -17,7 +17,7 @@ class BootstrapAcceptanceTests(unittest.TestCase):
         rendered = output.getvalue()
         self.assertIn("Quanthus environment: OK", rendered)
         self.assertIn("P1 implementation: ALLOWED", rendered)
-        self.assertIn("open blockers: C1, C2, S1", rendered)
+        self.assertIn("open blockers: C1", rendered)
         self.assertIn("P2 implementation: BLOCKED", rendered)
 
     def test_release_gate_matches_approved_p0_decision(self) -> None:

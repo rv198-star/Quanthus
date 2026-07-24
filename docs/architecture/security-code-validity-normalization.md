@@ -56,6 +56,7 @@ Only the `v1_1` child above is a candidate for further acceptance work.
 ## Promotion Boundary
 
 This normalization neither changes raw Hermes evidence nor mutates existing Parquet, PostgreSQL,
-`CURRENT`, or P1 gates. Before promotion, OCI must rerun the S1/C2 and P1 acceptance evidence using
-the normalized identity table and publish a complete versioned snapshot. The mapping itself remains
+`CURRENT`, or P1 gates. Before promotion, OCI must use `quanthus build-identity-coverage` to rerun
+the S1/C2 evidence from the normalized `daily_universe`, then publish a complete versioned snapshot
+and rebuild P1 acceptance evidence. The mapping itself remains
 reusable for future DWD, DWS, event, position, and attribution builds.

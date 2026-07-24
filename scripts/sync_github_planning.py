@@ -135,7 +135,10 @@ CHAPTERS = (
 
 PHASE_GATES = {
     "meta": "Active project governance; changes must preserve document and issue traceability.",
-    "P1": "Implementation is released. C1, C2, and S1 block P1 acceptance.",
+    "P1": (
+        "Implementation is released. C1 remains the P1 acceptance blocker; "
+        "C2 and S1 have passed versioned evidence."
+    ),
     "P2": "Blocked until all Chapter 01 acceptance checks D1, D2, and D3 pass.",
     "P3": "Blocked until the trusted P2 backtest engine passes its golden acceptance suite.",
     "P4": "Blocked until the P3 rule-only vertical slice is accepted.",

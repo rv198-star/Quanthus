@@ -169,6 +169,8 @@ Any result that has not passed the relevant arbitration gate is labeled as a res
 
 ## 11. Current decision
 
-P1 implementation is released. C1, C2, and S1 block P1 acceptance. P2 remains blocked until
-all three Chapter 01 acceptance checks pass. The next executable work is listed in
+P1 implementation is released. C2 and S1 are closed against the immutable
+`p1-identity-code-validity-20260725-v1` snapshot; C1 remains open because its 4,173
+batch-dated PIT factor exceptions are a controlled completeness gap, not a full pass. P2 remains
+blocked until the Chapter 01 gate passes. The next executable work is listed in
 `docs/work-items/index.md` and `config/p1-gates.v1.json`.

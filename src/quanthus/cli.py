@@ -22,6 +22,7 @@ from quanthus.delisted_coverage import (
     run_delisted_coverage,
 )
 from quanthus.gates import GateReport, load_gate_report
+from quanthus.identity_coverage import IdentityCoverageError, build_identity_coverage
 from quanthus.identity_normalization import (
     IdentityNormalizationError,
     build_identity_normalized_revision,
@@ -90,6 +91,17 @@ def _parser() -> argparse.ArgumentParser:
     normalize_identity.add_argument("--s2-candidate", type=Path, required=True)
     normalize_identity.add_argument("--output", type=Path, required=True)
     normalize_identity.add_argument("--revision", required=True)
+
+    identity_coverage = subparsers.add_parser(
+        "build-identity-coverage",
+        help="rebuild C2/S1 evidence from a normalized identity revision",
+    )
+    identity_coverage.add_argument("--revision-root", type=Path, required=True)
+    identity_coverage.add_argument("--reference-root", type=Path, required=True)
+    identity_coverage.add_argument("--knowledge-cutoff", type=date.fromisoformat, required=True)
+    identity_coverage.add_argument("--coverage-output", type=Path, required=True)
+    identity_coverage.add_argument("--coverage-metadata-output", type=Path, required=True)
+    identity_coverage.add_argument("--s1-report-output", type=Path, required=True)
 
     curate_daily = subparsers.add_parser(
         "curate-daily",
@@ -273,6 +285,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 revision=args.revision,
             )
             print(json.dumps(normalized.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "build-identity-coverage":
+            result = build_identity_coverage(
+                revision_root=args.revision_root,
+                reference_root=args.reference_root,
+                knowledge_cutoff=args.knowledge_cutoff,
+                coverage_output=args.coverage_output,
+                coverage_metadata_output=args.coverage_metadata_output,
+                s1_report_output=args.s1_report_output,
+            )
+            print(json.dumps(result.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "curate-daily":
             default_policy = find_project_root() / "config" / "p1-universe.v2.json"
             universe_policy = load_universe_policy(args.universe_policy or default_policy)
@@ -356,6 +378,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         EvidenceBuildError,
         SnapshotBuildError,
         IdentityNormalizationError,
+        IdentityCoverageError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

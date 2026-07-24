@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "gate_version": "p1-2026-07-23",
+  "gate_version": "p1-2026-07-25",
   "p1_implementation": "allowed",
   "p1_acceptance": "blocked",
   "p2_implementation": "blocked",
@@ -19,7 +19,7 @@
     {
       "id": "C2",
       "title": "Classify every missing security-calendar row",
-      "status": "open",
+      "status": "closed",
       "blocks": "p1_acceptance",
       "required_evidence": [
         "Trading calendar is crossed with security lifecycle",
@@ -30,7 +30,7 @@
     {
       "id": "S1",
       "title": "Measure and complete delisted-security coverage",
-      "status": "open",
+      "status": "closed",
       "blocks": "p1_acceptance",
       "required_evidence": [
         "Delisted reference universe is recorded",

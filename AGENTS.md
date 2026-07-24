@@ -13,7 +13,7 @@
 
 ## Current scope
 
-- P1 may be implemented. C1, C2, and S1 block P1 acceptance.
+- P1 may be implemented. C1 blocks P1 acceptance; C2 and S1 have passed versioned evidence.
 - P2 must not begin until the Chapter 01 acceptance gate is marked passed.
 - Do not implement the full expert set or training layer during the P1 vertical slice.
 

@@ -110,7 +110,7 @@ class DataQualityTests(unittest.TestCase):
         self.assertEqual(by_id["adjustment_factors.present"].status, CheckStatus.FAIL)
         self.assertEqual(by_id["suspensions.present"].status, CheckStatus.FAIL)
 
-    def test_c1_rejects_a_factor_not_visible_by_its_effective_date(self) -> None:
+    def test_c1_warns_when_historical_factor_visibility_is_batch_dated(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self._write_fixture(root, invalid_bar=False)
@@ -124,6 +124,7 @@ class DataQualityTests(unittest.TestCase):
                         "adjust_factor": 1.0,
                         "adj_version": "v1",
                         "knowledge_cutoff": date(2024, 1, 8),
+                        "built_at": date(2024, 1, 9),
                     },
                     {
                         "stock_code": "600000",
@@ -133,6 +134,7 @@ class DataQualityTests(unittest.TestCase):
                         "adjust_factor": 1.1,
                         "adj_version": "v1",
                         "knowledge_cutoff": date(2024, 2, 20),
+                        "built_at": date(2024, 2, 20),
                     },
                 ]
             )
@@ -140,8 +142,8 @@ class DataQualityTests(unittest.TestCase):
             report = run_p1_data_audit(root, require_c1_c2=True)
 
         by_id = {check.check_id: check for check in report.checks}
-        visibility = by_id["adjustment_factors.visible_by_effective_date"]
-        self.assertEqual(visibility.status, CheckStatus.FAIL)
+        visibility = by_id["adjustment_factors.batch_dated_historical_visibility"]
+        self.assertEqual(visibility.status, CheckStatus.WARN)
         self.assertEqual(visibility.count, 1)
 
 

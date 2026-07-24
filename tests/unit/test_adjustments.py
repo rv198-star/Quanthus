@@ -32,6 +32,10 @@ class AdjustmentFactorTests(unittest.TestCase):
         self.assertEqual(resolved.factor, 1.1)
         self.assertEqual(index.at("600000", date(2024, 2, 15), date(2024, 2, 1)).factor, 1.1)
         self.assertIsNone(index.at("600000", date(2024, 2, 15), date(2024, 1, 4)))
+        correction = index.at("600000", date(2024, 2, 20), date(2024, 2, 20))
+        self.assertIsNotNone(correction)
+        assert correction is not None
+        self.assertEqual(correction.factor, 1.2)
 
     def test_lookup_selects_the_latest_eligible_effective_date(self) -> None:
         index = AdjustmentFactorIndex(

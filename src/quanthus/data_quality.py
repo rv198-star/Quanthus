@@ -476,15 +476,17 @@ def _c1_c2_checks(
                     "factor rows require positive factors and complete PIT version fields",
                 ),
                 _check(
-                    "adjustment_factors.visible_by_effective_date",
+                    "adjustment_factors.batch_dated_historical_visibility",
                     _scalar(
                         connection,
                         """
                         SELECT count(*) FROM adjustment_factors
-                        WHERE CAST(knowledge_cutoff AS DATE) > effective_date
+                        WHERE effective_date < CAST(knowledge_cutoff AS DATE)
+                          AND CAST(knowledge_cutoff AS DATE) = CAST(built_at AS DATE)
                         """,
                     ),
-                    "factor knowledge_cutoff must not be later than its effective_date",
+                    "historical factor rows whose visibility date equals their batch build date",
+                    warning=True,
                 ),
             ]
         )

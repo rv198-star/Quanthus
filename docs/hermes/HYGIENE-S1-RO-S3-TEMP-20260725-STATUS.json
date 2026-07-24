@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-25",
+  "scope": "hygiene_only",
+  "s1": {
+    "path": "revisions/s1_delisted_coverage_with_tb_20260724/s1_report.json",
+    "mode_before": "600",
+    "mode_after": "644",
+    "sha256": "10d977ff64a1a133af2307eb50dfd80fe8766606ed067ca118f2d5b6c8ba6066",
+    "unexplained_missing_session_count": 0,
+    "invalid_observed_session_count": 0,
+    "terminal_boundary_session_count": 42,
+    "rsync_content_probe": "pass",
+    "write_reject": "pass"
+  },
+  "s3": {
+    "revision": "tradability_enriched_s2s3_v1_1_20260725",
+    "removed": "parts/.y2022.19936.parquet",
+    "removed_size": 0,
+    "parts": 16,
+    "rows": 20913249,
+    "sha256": "2b39d0bbe5c4e38fcb7051fc369fe0644241d580e7e7fec8b733a5304635da61",
+    "manifest_unchanged": true,
+    "gate": "OPEN"
+  },
+  "tools": {
+    "publish": "bin/publish_revision_ro_readable.py",
+    "enrich": "bin/enrich_tradability_s2_s3_full_v1.py"
+  },
+  "oci_action": "re-pull S1 report RO; write probes still denied"
+}

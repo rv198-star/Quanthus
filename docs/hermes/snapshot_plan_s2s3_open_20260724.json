@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0.0",
+  "snapshot": {
+    "market_date": "2026-07-23",
+    "knowledge_cutoff": "2026-07-24T15:00:00+00:00",
+    "source_revision": "hermes-s2s3-v1.1-20260724",
+    "snapshot_id": "p1-hermes-s2s3-open-20260724"
+  },
+  "universe_policy_version": "p1-universe-v1",
+  "datasets": [
+    {
+      "dataset": "daily_ohlcv_none",
+      "version": "v1",
+      "path": "/root/work/astock/data/daily_ohlcv_none.parquet",
+      "source_revisions": {"hermes": "none_v1"},
+      "knowledge_cutoff": "2026-07-23T15:00:00+00:00",
+      "created_at": "2026-07-24T15:00:00+00:00"
+    },
+    {
+      "dataset": "adjustment_factors",
+      "version": "v1",
+      "path": "/root/work/astock/data/ref_adjustment_factors.parquet",
+      "source_revisions": {
+        "hermes": "adj_factors_pit_em_link_v1",
+        "exception_ledger": "adj_factors_pit_exception_ledger_v1"
+      },
+      "knowledge_cutoff": "2026-07-23T15:00:00+00:00",
+      "created_at": "2026-07-24T15:00:00+00:00"
+    },
+    {
+      "dataset": "st_status_pit",
+      "version": "v1.1",
+      "path": "/root/work/astock/data/ref_st_status_pit.parquet",
+      "source_revisions": {
+        "hermes": "st_status_pit_v1_1_20260724",
+        "parent": "st_status_pit_v1"
+      },
+      "knowledge_cutoff": "2026-07-21T15:00:00+00:00",
+      "created_at": "2026-07-24T15:00:00+00:00"
+    },
+    {
+      "dataset": "price_limit_regime_pit",
+      "version": "v1.1",
+      "path": "/root/work/astock/data/ref_price_limit_regime_pit.parquet",
+      "source_revisions": {
+        "hermes": "price_limit_regime_pit_v1_1_20260724",
+        "parent": "price_limit_regime_pit_v1"
+      },
+      "knowledge_cutoff": "2026-07-21T15:00:00+00:00",
+      "created_at": "2026-07-24T15:00:00+00:00"
+    },
+    {
+      "dataset": "trading_calendar",
+      "version": "v1",
+      "path": "/root/work/astock/data/ref_trading_calendar.parquet",
+      "source_revisions": {"hermes": "calendar_v1"},
+      "knowledge_cutoff": "2026-07-23T15:00:00+00:00",
+      "created_at": "2026-07-24T15:00:00+00:00"
+    },
+    {
+      "dataset": "security_master",
+      "version": "v1",
+      "path": "/root/work/astock/data/ref_security_master.parquet",
+      "source_revisions": {"hermes": "master_v1"},
+      "knowledge_cutoff": "2026-07-22T15:00:00+00:00",
+      "created_at": "2026-07-24T15:00:00+00:00"
+    },
+    {
+      "dataset": "suspensions",
+      "version": "v1",
+      "path": "/root/work/astock/data/ref_suspensions.parquet",
+      "source_revisions": {"hermes": "suspensions_v1"},
+      "knowledge_cutoff": "2026-07-24T15:00:00+00:00",
+      "created_at": "2026-07-24T15:00:00+00:00"
+    }
+  ],
+  "notes": {
+    "gate": "OPEN",
+    "reason": "S2/S3 datasets are bound into snapshot plan for consumer wiring; P1 acceptance remains blocked by residual C1 4173 + S2 unknown share",
+    "tradability": "foundational tradability_coverage remains separate; S2/S3 enrichment contract at hermes revisions/tradability_enriched_s2s3_v1_1_*"
+  }
+}

@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from quanthus import __version__
+from quanthus.data_quality import AuditError, DataAuditReport, run_p1_data_audit
 from quanthus.gates import GateReport, load_gate_report
 from quanthus.policy import ConfigurationError, P0Policy, load_policy
 
@@ -26,6 +27,11 @@ def _parser() -> argparse.ArgumentParser:
     gates = subparsers.add_parser("gate-status", help="show P1 and P2 release gates")
     gates.add_argument("--gates", type=Path)
     gates.add_argument("--json", action="store_true")
+
+    data_audit = subparsers.add_parser("data-audit", help="audit a stable local P1 snapshot")
+    data_audit.add_argument("--root", type=Path, required=True)
+    data_audit.add_argument("--bars-file", default="daily_ohlcv.parquet")
+    data_audit.add_argument("--output", type=Path)
     return parser
 
 
@@ -47,6 +53,18 @@ def _doctor(policy: P0Policy, gates: GateReport) -> None:
     _print_gate_report(gates)
 
 
+def _print_data_audit(report: DataAuditReport) -> None:
+    summary = report.to_dict()["summary"]
+    result = "FAIL" if report.has_failures else "PASS"
+    print(f"P1 data audit: {result}")
+    print(f"source root: {report.source_root}")
+    print(f"bars file: {report.bars_file}")
+    print(f"checks: pass={summary['pass']} warn={summary['warn']} fail={summary['fail']}")
+    for check in report.checks:
+        if check.status.value != "pass":
+            print(f"{check.status.value.upper()} {check.check_id}: {check.count} ({check.detail})")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -56,14 +74,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy = load_policy(args.policy)
             print(f"{policy.version} OK {policy.digest}")
         elif args.command == "gate-status":
-            report = load_gate_report(args.gates)
+            gate_report = load_gate_report(args.gates)
             if args.json:
-                print(json.dumps(report.to_dict(), sort_keys=True))
+                print(json.dumps(gate_report.to_dict(), sort_keys=True))
             else:
-                _print_gate_report(report)
+                _print_gate_report(gate_report)
+        elif args.command == "data-audit":
+            audit_report = run_p1_data_audit(args.root, args.bars_file)
+            if args.output is not None:
+                audit_report.write_json(args.output)
+            _print_data_audit(audit_report)
+            return 1 if audit_report.has_failures else 0
         else:
             raise AssertionError(f"unhandled command: {args.command}")
-    except ConfigurationError as exc:
+    except (AuditError, ConfigurationError) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
     return 0

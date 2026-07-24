@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format
+.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -32,3 +32,8 @@ lint:
 
 format:
 	$(VENV)/bin/python -m ruff format .
+
+data-audit:
+	$(VENV)/bin/python -m quanthus data-audit \
+		--root "$${QUANTHUS_DATA_ROOT:-/home/ubuntu/data/astock}" \
+		--output artifacts/p1-data-audit.json

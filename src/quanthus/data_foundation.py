@@ -7,10 +7,11 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from quanthus.contracts import SnapshotRef
 
@@ -24,7 +25,8 @@ def _require_aware(value: datetime, field_name: str) -> None:
 
 
 def _canonical_json(value: object) -> bytes:
-    return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    serialized = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return serialized.encode("utf-8")
 
 
 @dataclass(frozen=True)
@@ -43,7 +45,11 @@ class DatasetManifest:
     parent_manifest_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        required = {"dataset": self.dataset, "version": self.version, "schema_hash": self.schema_hash}
+        required = {
+            "dataset": self.dataset,
+            "version": self.version,
+            "schema_hash": self.schema_hash,
+        }
         blank = [name for name, value in required.items() if not value.strip()]
         if blank:
             raise ValueError(f"dataset manifest fields must not be empty: {', '.join(blank)}")
@@ -53,7 +59,11 @@ class DatasetManifest:
             raise ValueError("partitions must not be empty")
         if not self.content_checksums:
             raise ValueError("content_checksums must not be empty")
-        if any(not name.strip() or not revision.strip() for name, revision in self.source_revisions.items()):
+        invalid_revision = any(
+            not name.strip() or not revision.strip()
+            for name, revision in self.source_revisions.items()
+        )
+        if invalid_revision:
             raise ValueError("source_revisions must contain non-empty names and revisions")
         invalid_checksum = any(
             not path.strip() or not _SHA256.fullmatch(checksum)
@@ -119,7 +129,8 @@ class PublishedSnapshot:
             if manifest.knowledge_cutoff > self.reference.knowledge_cutoff
         ]
         if late:
-            raise ValueError(f"dataset manifests exceed snapshot knowledge_cutoff: {', '.join(sorted(late))}")
+            joined = ", ".join(sorted(late))
+            raise ValueError(f"dataset manifests exceed snapshot knowledge_cutoff: {joined}")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -131,7 +142,8 @@ class PublishedSnapshot:
                 "snapshot_id": self.reference.snapshot_id,
             },
             "datasets": [
-                manifest.to_dict() for manifest in sorted(self.datasets, key=lambda item: item.dataset)
+                manifest.to_dict()
+                for manifest in sorted(self.datasets, key=lambda item: item.dataset)
             ],
         }
 
@@ -168,7 +180,8 @@ class SnapshotCatalog:
             existing = self.load(snapshot_id)
             if existing.to_dict() == payload:
                 return target
-            raise FileExistsError(f"snapshot_id already exists with different contents: {snapshot_id}")
+            message = f"snapshot_id already exists with different contents: {snapshot_id}"
+            raise FileExistsError(message)
 
         self.root.mkdir(parents=True, exist_ok=True)
         staging = Path(tempfile.mkdtemp(prefix=f".{snapshot_id}.", dir=self.root))

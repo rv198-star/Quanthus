@@ -67,7 +67,8 @@ class DataFoundationTests(unittest.TestCase):
             )
 
     def test_snapshot_publish_is_atomic_idempotent_and_loadable(self) -> None:
-        published = PublishedSnapshot(self.reference, (dataset_manifest(knowledge_cutoff=self.cutoff),))
+        manifests = (dataset_manifest(knowledge_cutoff=self.cutoff),)
+        published = PublishedSnapshot(self.reference, manifests)
         with tempfile.TemporaryDirectory() as directory:
             catalog = SnapshotCatalog(Path(directory) / "snapshots")
             location = catalog.publish(published)
@@ -79,15 +80,20 @@ class DataFoundationTests(unittest.TestCase):
 
     def test_snapshot_refuses_a_manifest_known_after_the_cutoff(self) -> None:
         with self.assertRaisesRegex(ValueError, "exceed snapshot knowledge_cutoff"):
+            future_cutoff = datetime(2025, 1, 2, 8, 1, tzinfo=timezone.utc)
             PublishedSnapshot(
                 self.reference,
-                (dataset_manifest(knowledge_cutoff=datetime(2025, 1, 2, 8, 1, tzinfo=timezone.utc)),),
+                (dataset_manifest(knowledge_cutoff=future_cutoff),),
             )
 
     def test_snapshot_id_cannot_be_reused_for_different_contents(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             catalog = SnapshotCatalog(Path(directory) / "snapshots")
-            catalog.publish(PublishedSnapshot(self.reference, (dataset_manifest(knowledge_cutoff=self.cutoff),)))
+            original = PublishedSnapshot(
+                self.reference,
+                (dataset_manifest(knowledge_cutoff=self.cutoff),),
+            )
+            catalog.publish(original)
             altered = DatasetManifest(
                 dataset="bars_daily",
                 version="normalized-v2",

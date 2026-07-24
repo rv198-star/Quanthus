@@ -159,4 +159,9 @@ history. The report and the frozen universe-policy version are required acceptan
 - C1, C2, and S1 are closed with stable evidence paths.
 - Repeating a build from identical manifests produces identical canonical checksums.
 
+The evidence bundle is bound to one published snapshot. It records passed C1/C2/S1 evidence,
+the full 10-by-10 D1 date/security matrix with independent reference ids, at least 20 unique D2
+limit or suspension cases, and non-empty D3 ex-right cases with no artificial jump. Passing the
+bundle validator is necessary but does not itself change the release gate configuration.
+
 P2 remains blocked until the gate file and evidence bundle both record this acceptance.

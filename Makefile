@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage publish-snapshot
+.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -59,6 +59,10 @@ s1-coverage:
 		--root "$${QUANTHUS_DATA_ROOT:-/home/ubuntu/data/astock}" \
 		--knowledge-cutoff "$${QUANTHUS_KNOWLEDGE_CUTOFF}" \
 		--output "$${QUANTHUS_S1_REPORT_PATH:-artifacts/s1-delisted-coverage.json}"
+
+p1-evidence-check:
+	@test -n "$${QUANTHUS_P1_EVIDENCE:-}" || (echo "set QUANTHUS_P1_EVIDENCE=/absolute/path/to/evidence.json"; exit 2)
+	$(VENV)/bin/python -m quanthus p1-acceptance-check --evidence "$${QUANTHUS_P1_EVIDENCE}"
 
 publish-snapshot:
 	@test -n "$${QUANTHUS_SNAPSHOT_PLAN:-}" || (echo "set QUANTHUS_SNAPSHOT_PLAN=/absolute/path/to/plan.json"; exit 2)

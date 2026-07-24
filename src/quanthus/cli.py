@@ -17,6 +17,11 @@ from quanthus.delisted_coverage import (
     run_delisted_coverage,
 )
 from quanthus.gates import GateReport, load_gate_report
+from quanthus.p1_acceptance import (
+    AcceptanceEvidenceError,
+    P1AcceptanceReport,
+    load_p1_acceptance_evidence,
+)
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
 from quanthus.snapshot_publish import (
     MaterializedSnapshot,
@@ -84,6 +89,13 @@ def _parser() -> argparse.ArgumentParser:
     delisted.add_argument("--universe-policy", type=Path)
     delisted.add_argument("--knowledge-cutoff", type=date.fromisoformat, required=True)
     delisted.add_argument("--output", type=Path, required=True)
+
+    evidence = subparsers.add_parser(
+        "p1-acceptance-check",
+        help="validate D1/D2/D3 evidence structure without changing release gates",
+    )
+    evidence.add_argument("--evidence", type=Path, required=True)
+    evidence.add_argument("--json", action="store_true")
 
     snapshot = subparsers.add_parser(
         "publish-snapshot",
@@ -161,6 +173,17 @@ def _print_delisted_coverage(report: DelistedCoverageReport) -> None:
     print(f"invalid observed sessions: {summary['invalid_observed_session_count']}")
 
 
+def _print_p1_acceptance(report: P1AcceptanceReport, *, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(report.to_dict(), sort_keys=True))
+        return
+    print(f"P1 evidence snapshot: {report.snapshot_id}")
+    print(f"P1 evidence: {'PASS' if not report.has_failures else 'FAIL'}")
+    for check in report.checks:
+        if not check.passed:
+            print(f"FAIL {check.check_id}: {check.detail}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -226,6 +249,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             report.write_json(args.output)
             _print_delisted_coverage(report)
+        elif args.command == "p1-acceptance-check":
+            evidence_report = load_p1_acceptance_evidence(args.evidence)
+            _print_p1_acceptance(evidence_report, as_json=args.json)
+            return 1 if evidence_report.has_failures else 0
         elif args.command == "publish-snapshot":
             materialized = publish_snapshot(
                 catalog=SnapshotCatalog(args.catalog_root),
@@ -246,6 +273,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         CoverageError,
         CurationError,
         DelistedCoverageError,
+        AcceptanceEvidenceError,
         SnapshotBuildError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)

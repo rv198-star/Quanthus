@@ -84,6 +84,11 @@ cutoff, retains invalid observed bars with `data_valid=false`, and fails new ent
 flag. Historical ST and price-limit fields are later S2/S3 enrichments; their absence may not be
 represented as a tradable value.
 
+`data_valid` describes a structurally valid source bar, not fillability. A visible suspension
+takes precedence over a vendor placeholder bar. A structurally valid bar with zero volume or
+amount has `is_executable=false` and reason `zero_liquidity`; downstream entry logic must not
+simulate a fill from its close.
+
 ### `data_gaps`
 
 Primary key: security id and market date. Every absent expected bar is one of `not_listed`,

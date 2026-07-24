@@ -26,6 +26,7 @@ class TradabilityCoverageResult:
     row_count: int
     status_counts: Mapping[str, int]
     valid_bar_count: int
+    executable_bar_count: int
     source_dataset_version: str
     source_checksum: str
     output_sha256: str
@@ -39,6 +40,7 @@ class TradabilityCoverageResult:
             "row_count": self.row_count,
             "status_counts": dict(sorted(self.status_counts.items())),
             "valid_bar_count": self.valid_bar_count,
+            "executable_bar_count": self.executable_bar_count,
             "source_dataset_version": self.source_dataset_version,
             "source_checksum": self.source_checksum,
             "output_sha256": self.output_sha256,
@@ -168,6 +170,8 @@ def _coverage_query(
             SELECT
                 stock_code,
                 CAST(date AS DATE) AS market_date,
+                volume,
+                amount,
                 CASE
                     WHEN open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL
                       OR volume IS NULL OR amount IS NULL
@@ -187,10 +191,11 @@ def _coverage_query(
                 s.market_date,
                 b.stock_code IS NOT NULL AS bar_present,
                 coalesce(b.data_valid, FALSE) AS data_valid,
+                b.volume,
+                b.amount,
                 CASE
                     WHEN s.market_date < u.list_date THEN 'not_listed'
                     WHEN u.delist_date IS NOT NULL AND s.market_date > u.delist_date THEN 'delisted'
-                    WHEN b.stock_code IS NOT NULL THEN 'trading'
                     WHEN EXISTS (
                         SELECT 1
                         FROM suspensions sp
@@ -202,14 +207,13 @@ def _coverage_query(
                           )
                           AND CAST(sp.knowledge_cutoff AS DATE) <= CAST({cutoff} AS DATE)
                     ) THEN 'suspended'
+                    WHEN b.stock_code IS NOT NULL THEN 'trading'
                     ELSE 'missing'
                 END AS coverage_status,
                 CASE
                     WHEN s.market_date < u.list_date THEN 'before_list_date'
                     WHEN u.delist_date IS NOT NULL
                      AND s.market_date > u.delist_date THEN 'after_delist_date'
-                    WHEN b.stock_code IS NOT NULL AND NOT b.data_valid THEN 'invalid_bar'
-                    WHEN b.stock_code IS NOT NULL THEN 'bar_present'
                     WHEN EXISTS (
                         SELECT 1
                         FROM suspensions sp
@@ -221,6 +225,10 @@ def _coverage_query(
                           )
                           AND CAST(sp.knowledge_cutoff AS DATE) <= CAST({cutoff} AS DATE)
                     ) THEN 'suspension_record'
+                    WHEN b.stock_code IS NOT NULL AND NOT b.data_valid THEN 'invalid_bar'
+                    WHEN b.stock_code IS NOT NULL AND (b.volume = 0 OR b.amount = 0)
+                    THEN 'zero_liquidity'
+                    WHEN b.stock_code IS NOT NULL THEN 'bar_present'
                     ELSE 'bar_missing_without_suspension'
                 END AS reason_code,
                 u.list_date,
@@ -239,6 +247,13 @@ def _coverage_query(
             coverage_status,
             bar_present,
             data_valid,
+            CASE
+                WHEN coverage_status = 'trading'
+                 AND data_valid
+                 AND volume > 0
+                 AND amount > 0 THEN TRUE
+                ELSE FALSE
+            END AS is_executable,
             reason_code,
             sum(
                 CASE
@@ -307,6 +322,12 @@ def build_tradability_coverage(
         if valid_count_row is None:
             raise CoverageError("coverage validity query returned no row")
         valid_bar_count = int(valid_count_row[0])
+        executable_count_row = connection.execute(
+            f"SELECT count(*) FROM ({query}) WHERE is_executable"
+        ).fetchone()
+        if executable_count_row is None:
+            raise CoverageError("coverage executability query returned no row")
+        executable_bar_count = int(executable_count_row[0])
         output.parent.mkdir(parents=True, exist_ok=True)
         staging_dir = Path(tempfile.mkdtemp(prefix=f".{output.stem}.", dir=output.parent))
         staging_path = staging_dir / output.name
@@ -328,6 +349,7 @@ def build_tradability_coverage(
         row_count=row_count,
         status_counts=status_counts,
         valid_bar_count=valid_bar_count,
+        executable_bar_count=executable_bar_count,
         source_dataset_version=source_dataset_version,
         source_checksum=source_checksum,
         output_sha256=_sha256(output),

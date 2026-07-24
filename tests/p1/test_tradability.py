@@ -44,6 +44,26 @@ class TradabilityCoverageTests(unittest.TestCase):
                             "volume": 100.0,
                             "amount": 1000.0,
                         },
+                        {
+                            "stock_code": "600000",
+                            "date": date(2025, 1, 3),
+                            "open": 10.5,
+                            "high": 10.5,
+                            "low": 10.5,
+                            "close": 10.5,
+                            "volume": 0.0,
+                            "amount": 0.0,
+                        },
+                        {
+                            "stock_code": "000002",
+                            "date": date(2025, 1, 3),
+                            "open": 10.0,
+                            "high": 11.0,
+                            "low": 9.0,
+                            "close": 10.5,
+                            "volume": 0.0,
+                            "amount": 0.0,
+                        },
                     ]
                 ),
                 "ref_security_master.parquet": pa.Table.from_pylist(
@@ -67,6 +87,13 @@ class TradabilityCoverageTests(unittest.TestCase):
                             "stock_code": "689009",
                             "exchange": "SSE",
                             "list_date": date(2025, 1, 2),
+                            "delist_date": None,
+                        },
+                        {
+                            "security_id": "SZSE-000002",
+                            "stock_code": "000002",
+                            "exchange": "SZSE",
+                            "list_date": date(2025, 1, 3),
                             "delist_date": None,
                         },
                     ]
@@ -121,24 +148,31 @@ class TradabilityCoverageTests(unittest.TestCase):
             rows = pq.read_table(root / "coverage.parquet").to_pylist()
 
         by_key = {(row["stock_code"], row["market_date"]): row for row in rows}
-        self.assertEqual(result.row_count, 6)
+        self.assertEqual(result.row_count, 9)
         self.assertEqual(
             result.status_counts,
             {
                 "delisted": 1,
-                "missing": 1,
-                "not_listed": 1,
+                "missing": 2,
+                "not_listed": 2,
                 "suspended": 1,
-                "trading": 2,
+                "trading": 3,
             },
         )
+        self.assertEqual(result.executable_bar_count, 1)
         self.assertTrue(by_key[("600000", date(2025, 1, 2))]["data_valid"])
         self.assertEqual(by_key[("600000", date(2025, 1, 3))]["coverage_status"], "suspended")
+        self.assertTrue(by_key[("600000", date(2025, 1, 3))]["data_valid"])
+        self.assertFalse(by_key[("600000", date(2025, 1, 3))]["is_executable"])
+        self.assertEqual(by_key[("600000", date(2025, 1, 3))]["reason_code"], "suspension_record")
         self.assertEqual(by_key[("600000", date(2025, 1, 4))]["coverage_status"], "delisted")
         self.assertEqual(by_key[("600000", date(2025, 1, 4))]["list_days"], 2)
         self.assertEqual(by_key[("000001", date(2025, 1, 2))]["coverage_status"], "not_listed")
         self.assertFalse(by_key[("000001", date(2025, 1, 3))]["data_valid"])
         self.assertEqual(by_key[("000001", date(2025, 1, 4))]["coverage_status"], "missing")
+        self.assertTrue(by_key[("000002", date(2025, 1, 3))]["data_valid"])
+        self.assertFalse(by_key[("000002", date(2025, 1, 3))]["is_executable"])
+        self.assertEqual(by_key[("000002", date(2025, 1, 3))]["reason_code"], "zero_liquidity")
 
     def test_coverage_does_not_use_a_future_suspension_record(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

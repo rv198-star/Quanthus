@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0.0",
+  "mapping_version": "security-code-validity.v1",
+  "status": "frozen",
+  "source_revision": "oci-code-validity-evidence-20260725",
+  "intervals": [
+    {
+      "security_id": "SZSE-000022",
+      "stock_code": "000022",
+      "exchange": "SZSE",
+      "valid_from": "1993-05-05",
+      "valid_to": "2018-12-26",
+      "source": "SZSE/CNInfo code-change implementation notice",
+      "evidence_locator": "https://static.cninfo.com.cn/finalpage/2018-12-26/1205690369.PDF",
+      "evidence_sha256": "sha256:bf406b1759dd7fda45cc46927e36316840b0b1152bb40677a7b52e11568d4350",
+      "source_revision": "cninfo-1205690369",
+      "knowledge_cutoff": "1993-05-05T00:00:00+08:00"
+    },
+    {
+      "security_id": "SZSE-000022",
+      "stock_code": "001872",
+      "exchange": "SZSE",
+      "valid_from": "2018-12-27",
+      "valid_to": null,
+      "source": "SZSE/CNInfo code-change implementation notice",
+      "evidence_locator": "https://static.cninfo.com.cn/finalpage/2018-12-26/1205690369.PDF",
+      "evidence_sha256": "sha256:bf406b1759dd7fda45cc46927e36316840b0b1152bb40677a7b52e11568d4350",
+      "source_revision": "cninfo-1205690369",
+      "knowledge_cutoff": "2018-12-26T23:59:59+08:00"
+    },
+    {
+      "security_id": "SZSE-000043",
+      "stock_code": "000043",
+      "exchange": "SZSE",
+      "valid_from": "1994-09-28",
+      "valid_to": "2019-12-16",
+      "source": "SZSE/CNInfo code-change implementation notice",
+      "evidence_locator": "https://static.cninfo.com.cn/finalpage/2019-12-16/1207164397.PDF",
+      "evidence_sha256": "sha256:46160431c51df23c30b3be802eb140492255128fb166d103ed735a62f303ab05",
+      "source_revision": "cninfo-1207164397",
+      "knowledge_cutoff": "1994-09-28T00:00:00+08:00"
+    },
+    {
+      "security_id": "SZSE-000043",
+      "stock_code": "001914",
+      "exchange": "SZSE",
+      "valid_from": "2019-12-17",
+      "valid_to": null,
+      "source": "SZSE/CNInfo code-change implementation notice",
+      "evidence_locator": "https://static.cninfo.com.cn/finalpage/2019-12-16/1207164397.PDF",
+      "evidence_sha256": "sha256:46160431c51df23c30b3be802eb140492255128fb166d103ed735a62f303ab05",
+      "source_revision": "cninfo-1207164397",
+      "knowledge_cutoff": "2019-12-16T23:59:59+08:00"
+    },
+    {
+      "security_id": "SZSE-300114",
+      "stock_code": "300114",
+      "exchange": "SZSE",
+      "valid_from": "2010-08-27",
+      "valid_to": "2025-02-17",
+      "source": "SZSE/CNInfo code-change implementation notice",
+      "evidence_locator": "https://static.cninfo.com.cn/finalpage/2025-02-15/1222544408.PDF",
+      "evidence_sha256": "sha256:dd68049c48df826848f361fd9e7b23dd20b6805144a2e5bc36e54db638611488",
+      "source_revision": "cninfo-1222544408",
+      "knowledge_cutoff": "2010-08-27T00:00:00+08:00"
+    },
+    {
+      "security_id": "SZSE-300114",
+      "stock_code": "302132",
+      "exchange": "SZSE",
+      "valid_from": "2025-02-18",
+      "valid_to": null,
+      "source": "SZSE/CNInfo code-change implementation notice",
+      "evidence_locator": "https://static.cninfo.com.cn/finalpage/2025-02-15/1222544408.PDF",
+      "evidence_sha256": "sha256:dd68049c48df826848f361fd9e7b23dd20b6805144a2e5bc36e54db638611488",
+      "source_revision": "cninfo-1222544408",
+      "knowledge_cutoff": "2025-02-15T23:59:59+08:00"
+    }
+  ]
+}

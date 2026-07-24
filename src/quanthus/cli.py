@@ -8,6 +8,11 @@ from datetime import date
 from pathlib import Path
 
 from quanthus import __version__
+from quanthus.code_validity import (
+    CodeValidityError,
+    build_code_validity_table,
+    load_code_validity_mapping,
+)
 from quanthus.curation import CuratedDailyResult, CurationError, build_curated_daily
 from quanthus.data_foundation import SnapshotCatalog
 from quanthus.data_quality import AuditError, DataAuditReport, run_p1_data_audit
@@ -17,6 +22,10 @@ from quanthus.delisted_coverage import (
     run_delisted_coverage,
 )
 from quanthus.gates import GateReport, load_gate_report
+from quanthus.identity_normalization import (
+    IdentityNormalizationError,
+    build_identity_normalized_revision,
+)
 from quanthus.p1_acceptance import (
     AcceptanceEvidenceError,
     P1AcceptanceReport,
@@ -63,6 +72,24 @@ def _parser() -> argparse.ArgumentParser:
     data_audit.add_argument("--bars-file", default="daily_ohlcv.parquet")
     data_audit.add_argument("--output", type=Path)
     data_audit.add_argument("--require-c1-c2", action="store_true")
+
+    code_validity = subparsers.add_parser(
+        "build-code-validity",
+        help="materialize the versioned security code-validity table from the raw master",
+    )
+    code_validity.add_argument("--root", type=Path, required=True)
+    code_validity.add_argument("--mapping", type=Path)
+    code_validity.add_argument("--output", type=Path, required=True)
+
+    normalize_identity = subparsers.add_parser(
+        "normalize-security-identity",
+        help="build an immutable OCI child revision cropped to code-validity intervals",
+    )
+    normalize_identity.add_argument("--root", type=Path, required=True)
+    normalize_identity.add_argument("--code-validity", type=Path, required=True)
+    normalize_identity.add_argument("--s2-candidate", type=Path, required=True)
+    normalize_identity.add_argument("--output", type=Path, required=True)
+    normalize_identity.add_argument("--revision", required=True)
 
     curate_daily = subparsers.add_parser(
         "curate-daily",
@@ -227,6 +254,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                 audit_report.write_json(args.output)
             _print_data_audit(audit_report)
             return 1 if audit_report.has_failures else 0
+        elif args.command == "build-code-validity":
+            mapping = load_code_validity_mapping(args.mapping)
+            row_count, checksum = build_code_validity_table(
+                root=args.root,
+                mapping=mapping,
+                output=args.output,
+            )
+            print(f"code validity output: {args.output}")
+            print(f"rows: {row_count}")
+            print(f"checksum: {checksum}")
+        elif args.command == "normalize-security-identity":
+            normalized = build_identity_normalized_revision(
+                root=args.root,
+                code_validity=args.code_validity,
+                s2_candidate=args.s2_candidate,
+                output=args.output,
+                revision=args.revision,
+            )
+            print(json.dumps(normalized.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "curate-daily":
             default_policy = find_project_root() / "config" / "p1-universe.v2.json"
             universe_policy = load_universe_policy(args.universe_policy or default_policy)
@@ -302,12 +348,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (
         AuditError,
         ConfigurationError,
+        CodeValidityError,
         CoverageError,
         CurationError,
         DelistedCoverageError,
         AcceptanceEvidenceError,
         EvidenceBuildError,
         SnapshotBuildError,
+        IdentityNormalizationError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

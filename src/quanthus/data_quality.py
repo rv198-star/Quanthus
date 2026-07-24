@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from quanthus.policy import ConfigurationError, load_policy
 from quanthus.universe import UniversePolicy, load_universe_policy
 
 
@@ -130,6 +131,16 @@ def _check(check_id: str, count: int, detail: str, *, warning: bool = False) -> 
     return CheckResult(check_id, _status(count, warning=warning), count, detail)
 
 
+def _supported_history_start() -> date:
+    try:
+        value = load_policy().at("data", "daily_history_start")
+        if not isinstance(value, str):
+            raise AuditError("P0 data.daily_history_start must be an ISO date string")
+        return date.fromisoformat(value)
+    except (ConfigurationError, ValueError) as exc:
+        raise AuditError(f"invalid P0 daily history start: {exc}") from exc
+
+
 def _validate_files(root: Path, bars_file: str) -> None:
     if Path(bars_file).name != bars_file:
         raise AuditError("bars_file must be a file name, not a path")
@@ -210,10 +221,18 @@ def _run_checks(
     available_views: set[str],
     require_c1_c2: bool,
     universe_policy: UniversePolicy,
+    history_start: date,
 ) -> list[CheckResult]:
     checks: list[CheckResult] = []
     in_scope_master = _in_scope_master_condition(universe_policy)
     explicitly_excluded_master = _explicitly_excluded_master_condition(universe_policy)
+    supported_start = _sql_string(history_start.isoformat())
+    in_scope_bars = (
+        f"({in_scope_master}) AND CAST(b.date AS DATE) >= CAST({supported_start} AS DATE)"
+    )
+    in_scope_gaps = (
+        f"({in_scope_master}) AND CAST(g.trade_date AS DATE) >= CAST({supported_start} AS DATE)"
+    )
     bars_rows = int(stats["bars"]["row_count"])
     manifest_dataset = "daily_ohlcv_none" if "none" in bars_file else "daily_ohlcv"
     manifest_row = connection.execute(
@@ -272,7 +291,7 @@ def _run_checks(
                     f"""
                     SELECT count(*) FROM bars b
                     JOIN master m USING (stock_code)
-                    WHERE ({in_scope_master})
+                    WHERE {in_scope_bars}
                       AND (open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL
                        OR open < 0 OR high < 0 OR low < 0 OR close < 0
                        OR low > high OR open < low OR open > high
@@ -288,7 +307,7 @@ def _run_checks(
                     f"""
                     SELECT count(*) FROM bars b
                     JOIN master m USING (stock_code)
-                    WHERE ({in_scope_master}) AND volume IS NULL
+                    WHERE {in_scope_bars} AND volume IS NULL
                     """,
                 ),
                 "in-scope rows with null volume",
@@ -300,7 +319,7 @@ def _run_checks(
                     f"""
                     SELECT count(*) FROM bars b
                     JOIN master m USING (stock_code)
-                    WHERE ({in_scope_master}) AND amount IS NULL
+                    WHERE {in_scope_bars} AND amount IS NULL
                     """,
                 ),
                 "in-scope rows with null amount",
@@ -312,7 +331,7 @@ def _run_checks(
                     f"""
                     SELECT count(*) FROM bars b
                     JOIN master m USING (stock_code)
-                    WHERE ({in_scope_master}) AND volume < 0
+                    WHERE {in_scope_bars} AND volume < 0
                     """,
                 ),
                 "in-scope rows with negative volume",
@@ -324,7 +343,7 @@ def _run_checks(
                     f"""
                     SELECT count(*) FROM bars b
                     JOIN master m USING (stock_code)
-                    WHERE ({in_scope_master}) AND amount < 0
+                    WHERE {in_scope_bars} AND amount < 0
                     """,
                 ),
                 "in-scope rows with negative amount",
@@ -348,7 +367,7 @@ def _run_checks(
                     f"""
                     SELECT count(*) FROM bars b
                     JOIN master m USING (stock_code)
-                    WHERE ({in_scope_master})
+                    WHERE {in_scope_bars}
                       AND (
                           CAST(b.date AS DATE) < m.list_date
                           OR (
@@ -370,7 +389,7 @@ def _run_checks(
                     LEFT JOIN calendar c
                       ON c.exchange = m.exchange
                      AND c.trade_date = CAST(b.date AS DATE)
-                    WHERE ({in_scope_master})
+                    WHERE {in_scope_bars}
                       AND (c.trade_date IS NULL OR c.is_open <> 1)
                     """,
                 ),
@@ -464,7 +483,7 @@ def _run_checks(
                         SELECT b.stock_code, CAST(b.date AS DATE) AS trade_date
                         FROM bars b
                         JOIN master m USING (stock_code)
-                        WHERE ({in_scope_master})
+                        WHERE {in_scope_bars}
                           AND (open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL
                            OR open < 0 OR high < 0 OR low < 0 OR close < 0
                            OR low > high OR open < low OR open > high
@@ -473,7 +492,7 @@ def _run_checks(
                         SELECT g.stock_code, g.trade_date
                         FROM gaps g
                         JOIN master m USING (stock_code)
-                        WHERE ({in_scope_master})
+                        WHERE {in_scope_gaps}
                           AND dataset = 'daily_ohlcv' AND gap_type = 'invalid_ohlc'
                     ), difference AS (
                         (SELECT * FROM invalid EXCEPT SELECT * FROM recorded)
@@ -648,6 +667,7 @@ def run_p1_data_audit(
     root = root.resolve()
     _validate_files(root, bars_file)
     resolved_policy = universe_policy or load_universe_policy()
+    history_start = _supported_history_start()
     try:
         import duckdb
     except ModuleNotFoundError as exc:
@@ -664,6 +684,7 @@ def run_p1_data_audit(
             available_views,
             require_c1_c2,
             resolved_policy,
+            history_start,
         )
     finally:
         connection.close()

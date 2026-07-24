@@ -27,6 +27,7 @@ class DelistedSecurityCoverage:
     expected_session_count: int
     observed_session_count: int
     suspended_session_count: int
+    terminal_boundary_session_count: int
     unexplained_missing_session_count: int
     invalid_observed_session_count: int
     coverage_state: str
@@ -41,6 +42,7 @@ class DelistedSecurityCoverage:
             "expected_session_count": self.expected_session_count,
             "observed_session_count": self.observed_session_count,
             "suspended_session_count": self.suspended_session_count,
+            "terminal_boundary_session_count": self.terminal_boundary_session_count,
             "unexplained_missing_session_count": self.unexplained_missing_session_count,
             "invalid_observed_session_count": self.invalid_observed_session_count,
             "coverage_state": self.coverage_state,
@@ -93,6 +95,9 @@ class DelistedCoverageReport:
                 "suspended_session_count": sum(
                     record.suspended_session_count for record in self.records
                 ),
+                "terminal_boundary_session_count": sum(
+                    record.terminal_boundary_session_count for record in self.records
+                ),
                 "unexplained_missing_session_count": sum(
                     record.unexplained_missing_session_count for record in self.records
                 ),
@@ -128,7 +133,7 @@ def _parquet_source(path: Path) -> str:
     return f"read_parquet({_sql_string(str(path))})"
 
 
-def _validate_paths(root: Path, bars_file: str) -> tuple[Path, ...]:
+def _validate_paths(root: Path, bars_file: str) -> tuple[Path, Path, Path, Path, Path, Path | None]:
     if Path(bars_file).name != bars_file or bars_file != "daily_ohlcv_none.parquet":
         raise DelistedCoverageError("S1 coverage input must be daily_ohlcv_none.parquet")
     paths = (
@@ -143,7 +148,8 @@ def _validate_paths(root: Path, bars_file: str) -> tuple[Path, ...]:
         raise DelistedCoverageError(
             f"required data files are missing: {', '.join(sorted(missing))}"
         )
-    return paths
+    boundaries = root / "ref_delist_day_boundary_exceptions.parquet"
+    return (*paths, boundaries if boundaries.is_file() else None)
 
 
 def _manifest_details(connection: Any) -> tuple[str, str]:
@@ -213,11 +219,60 @@ def _validate_source_keys(connection: Any) -> None:
         )
 
 
+def _validate_terminal_boundaries(connection: Any) -> None:
+    duplicate_count = int(
+        connection.execute(
+            """
+            SELECT count(*) FROM (
+                SELECT stock_code, CAST(market_date AS DATE) AS market_date
+                FROM terminal_boundaries
+                GROUP BY stock_code, CAST(market_date AS DATE)
+                HAVING count(*) > 1
+            )
+            """
+        ).fetchone()[0]
+    )
+    if duplicate_count:
+        raise DelistedCoverageError(
+            "terminal boundary exceptions contain duplicate (stock_code, market_date) keys"
+        )
+
+    invalid_count = int(
+        connection.execute(
+            """
+            SELECT count(*)
+            FROM terminal_boundaries e
+            LEFT JOIN master m USING (stock_code)
+            WHERE e.stock_code IS NULL
+               OR e.exchange IS NULL
+               OR e.market_date IS NULL
+               OR e.knowledge_cutoff IS NULL
+               OR e.source_revision IS NULL
+               OR e.evidence_path IS NULL
+               OR e.exception_type <> 'terminal_boundary'
+               OR m.security_id IS NULL
+               OR e.exchange <> m.exchange
+               OR m.delist_date IS NULL
+               OR CAST(e.market_date AS DATE) <> CAST(m.delist_date AS DATE)
+               OR e.delist_date IS NULL
+               OR CAST(e.delist_date AS DATE) <> CAST(m.delist_date AS DATE)
+            """
+        ).fetchone()[0]
+    )
+    if invalid_count:
+        raise DelistedCoverageError(
+            "terminal boundary exceptions must be evidenced exact delist-date "
+            "terminal_boundary rows"
+        )
+
+
 def _coverage_query(
     universe_policy: UniversePolicy,
     history_start: date,
     history_end: date,
     knowledge_cutoff: date,
+    *,
+    has_terminal_boundaries: bool,
 ) -> str:
     exchanges = ", ".join(_sql_string(exchange) for exchange in universe_policy.allowed_exchanges)
     exclusions = ", ".join(
@@ -227,6 +282,19 @@ def _coverage_query(
     start = _sql_string(history_start.isoformat())
     end = _sql_string(history_end.isoformat())
     cutoff = _sql_string(knowledge_cutoff.isoformat())
+    terminal_boundary_predicate = "FALSE"
+    if has_terminal_boundaries:
+        terminal_boundary_predicate = f"""
+            EXISTS (
+                SELECT 1
+                FROM terminal_boundaries tb
+                WHERE tb.stock_code = e.stock_code
+                  AND tb.exchange = e.exchange
+                  AND CAST(tb.market_date AS DATE) = e.market_date
+                  AND tb.exception_type = 'terminal_boundary'
+                  AND CAST(tb.knowledge_cutoff AS DATE) <= CAST({cutoff} AS DATE)
+            )
+        """
     return f"""
         WITH scope AS (
             SELECT
@@ -289,7 +357,8 @@ def _coverage_query(
                           OR CAST(sp.suspend_end AS DATE) >= e.market_date
                       )
                       AND CAST(sp.knowledge_cutoff AS DATE) <= CAST({cutoff} AS DATE)
-                ) AS suspension_known
+                ) AS suspension_known,
+                {terminal_boundary_predicate} AS terminal_boundary_known
             FROM expected e
             LEFT JOIN bar_rows b
               ON b.stock_code = e.stock_code
@@ -308,7 +377,27 @@ def _coverage_query(
                 0
             ) AS suspended_session_count,
             coalesce(
-                sum(CASE WHEN NOT c.bar_present AND NOT c.suspension_known THEN 1 ELSE 0 END),
+                sum(
+                    CASE
+                        WHEN NOT c.bar_present
+                         AND NOT c.suspension_known
+                         AND c.terminal_boundary_known
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS terminal_boundary_session_count,
+            coalesce(
+                sum(
+                    CASE
+                        WHEN NOT c.bar_present
+                         AND NOT c.suspension_known
+                         AND NOT c.terminal_boundary_known
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
                 0
             ) AS unexplained_missing_session_count,
             coalesce(
@@ -326,6 +415,7 @@ def _coverage_state(
     expected_session_count: int,
     observed_session_count: int,
     suspended_session_count: int,
+    terminal_boundary_session_count: int,
     unexplained_missing_session_count: int,
     invalid_observed_session_count: int,
 ) -> str:
@@ -333,10 +423,12 @@ def _coverage_state(
         return "outside_history_window"
     if unexplained_missing_session_count > 0:
         return "incomplete"
-    if observed_session_count == 0 and suspended_session_count > 0:
-        return "suspension_only"
     if invalid_observed_session_count > 0:
         return "complete_with_invalid_bars"
+    if terminal_boundary_session_count > 0:
+        return "complete_with_terminal_boundary"
+    if observed_session_count == 0 and suspended_session_count > 0:
+        return "suspension_only"
     return "complete"
 
 
@@ -350,9 +442,14 @@ def run_delisted_coverage(
     """Measure P1 delisted-history coverage while separating known suspensions from gaps."""
 
     root = root.resolve()
-    bars_path, manifest_path, master_path, suspensions_path, calendar_path = _validate_paths(
-        root, bars_file
-    )
+    (
+        bars_path,
+        manifest_path,
+        master_path,
+        suspensions_path,
+        calendar_path,
+        terminal_boundaries_path,
+    ) = _validate_paths(root, bars_file)
     try:
         import duckdb
     except ModuleNotFoundError as exc:
@@ -369,7 +466,14 @@ def run_delisted_coverage(
         }
         for name, path in views.items():
             connection.execute(f"CREATE VIEW {name} AS SELECT * FROM {_parquet_source(path)}")
+        if terminal_boundaries_path is not None:
+            connection.execute(
+                "CREATE VIEW terminal_boundaries AS SELECT * FROM "
+                f"{_parquet_source(terminal_boundaries_path)}"
+            )
         _validate_source_keys(connection)
+        if terminal_boundaries_path is not None:
+            _validate_terminal_boundaries(connection)
         source_dataset_version, source_checksum = _manifest_details(connection)
         history_row = connection.execute(
             "SELECT min(CAST(date AS DATE)), max(CAST(date AS DATE)) FROM bars"
@@ -378,7 +482,13 @@ def run_delisted_coverage(
             raise DelistedCoverageError("daily_ohlcv_none has no history window")
         history_start, history_end = history_row
         rows = connection.execute(
-            _coverage_query(universe_policy, history_start, history_end, knowledge_cutoff)
+            _coverage_query(
+                universe_policy,
+                history_start,
+                history_end,
+                knowledge_cutoff,
+                has_terminal_boundaries=terminal_boundaries_path is not None,
+            )
         ).fetchall()
     finally:
         connection.close()
@@ -393,14 +503,16 @@ def run_delisted_coverage(
             expected_session_count=int(row[5]),
             observed_session_count=int(row[6]),
             suspended_session_count=int(row[7]),
-            unexplained_missing_session_count=int(row[8]),
-            invalid_observed_session_count=int(row[9]),
+            terminal_boundary_session_count=int(row[8]),
+            unexplained_missing_session_count=int(row[9]),
+            invalid_observed_session_count=int(row[10]),
             coverage_state=_coverage_state(
                 int(row[5]),
                 int(row[6]),
                 int(row[7]),
                 int(row[8]),
                 int(row[9]),
+                int(row[10]),
             ),
         )
         for row in rows

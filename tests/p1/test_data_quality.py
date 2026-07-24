@@ -26,6 +26,7 @@ class DataQualityTests(unittest.TestCase):
         *,
         invalid_bar: bool,
         excluded_null_volume: bool = False,
+        historical_invalid_bar: bool = False,
     ) -> None:
         high = 0.0 if invalid_bar else 10.5
         bars = [
@@ -69,6 +70,28 @@ class DataQualityTests(unittest.TestCase):
                     "exchange": "SSE",
                     "list_date": date(2019, 7, 22),
                     "delist_date": None,
+                }
+            )
+        if historical_invalid_bar:
+            bars.append(
+                {
+                    "stock_code": "600001",
+                    "date": date(2007, 12, 26),
+                    "open": 10.0,
+                    "high": 10.0,
+                    "low": 10.0,
+                    "close": 9.0,
+                    "volume": 0.0,
+                    "amount": 0.0,
+                }
+            )
+            master.append(
+                {
+                    "security_id": "SSE-600001",
+                    "stock_code": "600001",
+                    "exchange": "SSE",
+                    "list_date": date(2000, 1, 1),
+                    "delist_date": date(2008, 1, 1),
                 }
             )
         tables = {
@@ -152,6 +175,14 @@ class DataQualityTests(unittest.TestCase):
         excluded = by_id["scope.explicitly_excluded_security_rows"]
         self.assertEqual(excluded.status, CheckStatus.WARN)
         self.assertEqual(excluded.count, 1)
+
+    def test_pre_p1_history_does_not_fail_supported_window_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_fixture(root, invalid_bar=False, historical_invalid_bar=True)
+            report = run_p1_data_audit(root)
+
+        self.assertFalse(report.has_failures)
 
     def test_c1_c2_gate_requires_the_new_reference_tables(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

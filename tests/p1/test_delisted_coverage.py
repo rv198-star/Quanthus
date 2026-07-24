@@ -86,6 +86,13 @@ class DelistedCoverageTests(unittest.TestCase):
                             "list_date": date(2010, 1, 1),
                             "delist_date": None,
                         },
+                        {
+                            "security_id": "600004",
+                            "stock_code": "600004",
+                            "exchange": "SSE",
+                            "list_date": date(2011, 1, 6),
+                            "delist_date": date(2011, 1, 6),
+                        },
                     ]
                 ),
                 "ref_trading_calendar.parquet": pa.Table.from_pylist(
@@ -113,6 +120,20 @@ class DelistedCoverageTests(unittest.TestCase):
                             "checksum": "sha256:test",
                             "adj_mode": "none",
                             "built_at": date(2011, 1, 6),
+                        }
+                    ]
+                ),
+                "ref_delist_day_boundary_exceptions.parquet": pa.Table.from_pylist(
+                    [
+                        {
+                            "stock_code": "600004",
+                            "exchange": "SSE",
+                            "market_date": date(2011, 1, 6),
+                            "exception_type": "terminal_boundary",
+                            "source_revision": "test-boundary-v1",
+                            "evidence_path": "evidence/600004-2011-01-06.json",
+                            "knowledge_cutoff": date(2011, 1, 5),
+                            "delist_date": date(2011, 1, 6),
                         }
                     ]
                 ),
@@ -146,8 +167,12 @@ class DelistedCoverageTests(unittest.TestCase):
         self.assertEqual(by_code["600001"].unexplained_missing_session_count, 1)
         self.assertEqual(by_code["600001"].coverage_state, "incomplete")
         self.assertEqual(by_code["600002"].coverage_state, "outside_history_window")
+        self.assertEqual(by_code["600004"].terminal_boundary_session_count, 1)
+        self.assertEqual(by_code["600004"].unexplained_missing_session_count, 0)
+        self.assertEqual(by_code["600004"].coverage_state, "complete_with_terminal_boundary")
         self.assertEqual(report.to_dict()["summary"]["unexplained_missing_session_count"], 1)
-        self.assertIn('"reference_delisted_security_count": 3', report_payload)
+        self.assertEqual(report.to_dict()["summary"]["terminal_boundary_session_count"], 1)
+        self.assertIn('"reference_delisted_security_count": 4', report_payload)
 
 
 if __name__ == "__main__":

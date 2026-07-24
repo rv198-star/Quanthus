@@ -18,6 +18,13 @@ approved artifact store and are referenced by checksum and immutable id.
 containing `snapshot.json`. The catalog metadata is local runtime state and remains excluded
 from Git along with the market data it describes.
 
+Create a reviewed JSON publication plan, then publish it with `make publish-snapshot`. Each plan
+names a fixed snapshot identity and universe-policy version; each dataset must give its Parquet
+path, version, source revisions, creation time, and timezone-aware knowledge cutoff. Publication
+hard-links the Parquet files under `snapshots/<snapshot-id>/datasets/` and verifies their checksums
+before returning. The catalog and source paths must be on the same filesystem so the command never
+silently duplicates the market-data corpus.
+
 Run `make data-audit` after `make bootstrap-p1` to audit the stable Hermes snapshot at
 `/home/ubuntu/data/astock`. Set `QUANTHUS_DATA_ROOT` to use another local snapshot. The audit
 is read-only and writes its JSON report to `artifacts/p1-data-audit.json`.

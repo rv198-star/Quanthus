@@ -9,9 +9,16 @@ from pathlib import Path
 
 from quanthus import __version__
 from quanthus.curation import CuratedDailyResult, CurationError, build_curated_daily
+from quanthus.data_foundation import SnapshotCatalog
 from quanthus.data_quality import AuditError, DataAuditReport, run_p1_data_audit
 from quanthus.gates import GateReport, load_gate_report
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
+from quanthus.snapshot_publish import (
+    MaterializedSnapshot,
+    SnapshotBuildError,
+    load_snapshot_plan,
+    publish_snapshot,
+)
 from quanthus.tradability import (
     CoverageError,
     TradabilityCoverageResult,
@@ -62,6 +69,14 @@ def _parser() -> argparse.ArgumentParser:
     coverage.add_argument("--knowledge-cutoff", type=date.fromisoformat, required=True)
     coverage.add_argument("--output", type=Path, required=True)
     coverage.add_argument("--metadata-output", type=Path)
+
+    snapshot = subparsers.add_parser(
+        "publish-snapshot",
+        help="hard-link a reviewed P1 publication plan into an immutable local snapshot",
+    )
+    snapshot.add_argument("--plan", type=Path, required=True)
+    snapshot.add_argument("--catalog-root", type=Path, required=True)
+    snapshot.add_argument("--metadata-output", type=Path)
     return parser
 
 
@@ -112,6 +127,15 @@ def _print_tradability_coverage(result: TradabilityCoverageResult) -> None:
     print(f"data-valid bars: {result.valid_bar_count}")
     print(f"coverage statuses: {statuses}")
     print(f"knowledge cutoff: {result.knowledge_cutoff.isoformat()}")
+
+
+def _print_materialized_snapshot(result: MaterializedSnapshot) -> None:
+    reference = result.snapshot.reference
+    print(f"snapshot id: {reference.snapshot_id}")
+    print(f"snapshot location: {result.location}")
+    print(f"market date: {reference.market_date.isoformat()}")
+    print(f"knowledge cutoff: {reference.knowledge_cutoff.isoformat()}")
+    print(f"datasets: {', '.join(manifest.dataset for manifest in result.snapshot.datasets)}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -169,9 +193,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
             _print_tradability_coverage(coverage)
+        elif args.command == "publish-snapshot":
+            materialized = publish_snapshot(
+                catalog=SnapshotCatalog(args.catalog_root),
+                plan=load_snapshot_plan(args.plan),
+            )
+            if args.metadata_output is not None:
+                args.metadata_output.parent.mkdir(parents=True, exist_ok=True)
+                payload = json.dumps(
+                    materialized.to_dict(), ensure_ascii=True, indent=2, sort_keys=True
+                )
+                args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
+            _print_materialized_snapshot(materialized)
         else:
             raise AssertionError(f"unhandled command: {args.command}")
-    except (AuditError, ConfigurationError, CoverageError, CurationError) as exc:
+    except (
+        AuditError,
+        ConfigurationError,
+        CoverageError,
+        CurationError,
+        SnapshotBuildError,
+    ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
     return 0

@@ -7,7 +7,7 @@ import json
 import os
 import re
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -174,7 +174,11 @@ class SnapshotCatalog:
     def __init__(self, root: Path) -> None:
         self.root = root
 
-    def publish(self, snapshot: PublishedSnapshot) -> Path:
+    def publish(
+        self,
+        snapshot: PublishedSnapshot,
+        materialize: Callable[[Path], None] | None = None,
+    ) -> Path:
         snapshot_id = snapshot.reference.snapshot_id
         if not _SNAPSHOT_ID.fullmatch(snapshot_id):
             raise ValueError("snapshot_id contains unsupported characters")
@@ -192,6 +196,8 @@ class SnapshotCatalog:
         staging = Path(tempfile.mkdtemp(prefix=f".{snapshot_id}.", dir=self.root))
         manifest_path = staging / "snapshot.json"
         try:
+            if materialize is not None:
+                materialize(staging)
             with manifest_path.open("wb") as stream:
                 stream.write(_canonical_json(payload))
                 stream.flush()

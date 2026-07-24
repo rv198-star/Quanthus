@@ -7,6 +7,12 @@
 - `design/lld/`: implementation-level design for Chapters 01 through 10.
 - `work-items/index.md`: stable work-item ids used by GitHub issues.
 
+## Architecture decisions
+
+- `architecture/adr-0001-local-data-stack.md`: file-first analytical storage and execution.
+- `architecture/adr-0002-hermes-oci-data-platform.md`: Hermes/OCI ownership, PostgreSQL
+  publication and replication topology, security boundaries, and disaster recovery.
+
 ## Decision precedence
 
 When documents disagree, use this order:

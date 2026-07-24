@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-07-23
 - Scope: P1 and P2
+- Amended by: ADR 0002 for multi-node deployment and PostgreSQL serving topology
 
 ## Context
 

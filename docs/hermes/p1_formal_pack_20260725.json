@@ -1,0 +1,43 @@
+{
+  "built_at": "2026-07-24T16:36:58.667011+00:00",
+  "s1": {
+    "path": "revisions/s1_delisted_coverage_with_tb_20260724/s1_report.json",
+    "unexplained_missing_session_count": 0,
+    "invalid_observed_session_count": 0,
+    "terminal_boundary_session_count": 42,
+    "verdict": "PASS_with_terminal_boundary"
+  },
+  "c2_coverage": {
+    "path": "revisions/tradability_coverage_v1_20260725/tradability_coverage.parquet",
+    "rows": 20913249,
+    "status_counts": {
+      "delisted": 524700,
+      "missing": 675047,
+      "not_listed": 6581399,
+      "suspended": 17836,
+      "trading": 13114267
+    },
+    "sha256": "sha256:1956c1e3d496694e073adba543d22b9e06ff658a7351685e48205d425b1a0589"
+  },
+  "s3_enrich": {
+    "path": "ref_tradability_enriched_s2s3.parquet",
+    "revision": "tradability_enriched_s2s3_v1_1_20260725",
+    "rows": 20913249,
+    "sha256": "2b39d0bbe5c4e38fcb7051fc369fe0644241d580e7e7fec8b733a5304635da61",
+    "unknown_status_share": 0.9464921495459648,
+    "gate": "OPEN"
+  },
+  "c1": {
+    "residual": 4173,
+    "completeness_gap_pct": 8.95,
+    "full_pass": false,
+    "gate": "OPEN"
+  },
+  "s2": {
+    "unknown_intervals": 5538,
+    "total_intervals": 7025,
+    "gate": "OPEN",
+    "source_plan": "docs/ASTOCK-P1-S2-HIGH-COVERAGE-SOURCE-PLAN-20260724.md"
+  },
+  "p1_total_gate": "OPEN"
+}

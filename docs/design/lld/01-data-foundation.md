@@ -77,6 +77,13 @@ Primary key: security id and market date. Include suspension, ST state, list day
 limit prices, limit regime, data-valid flag, and reason codes. The 2020-08 ChiNext 20 percent
 regime change is explicit policy data, not an ad hoc conditional.
 
+The first materialized layer is `tradability_coverage`: it crosses every in-scope security with
+every open exchange session and classifies the row as `trading`, `suspended`, `not_listed`,
+`delisted`, or `missing`. It uses only suspension records visible by the requested knowledge
+cutoff, retains invalid observed bars with `data_valid=false`, and fails new entries from that
+flag. Historical ST and price-limit fields are later S2/S3 enrichments; their absence may not be
+represented as a tradable value.
+
 ### `data_gaps`
 
 Primary key: security id and market date. Every absent expected bar is one of `not_listed`,

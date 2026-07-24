@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
+from datetime import date
 from pathlib import Path
 
 from quanthus import __version__
@@ -11,6 +12,11 @@ from quanthus.curation import CuratedDailyResult, CurationError, build_curated_d
 from quanthus.data_quality import AuditError, DataAuditReport, run_p1_data_audit
 from quanthus.gates import GateReport, load_gate_report
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
+from quanthus.tradability import (
+    CoverageError,
+    TradabilityCoverageResult,
+    build_tradability_coverage,
+)
 from quanthus.universe import load_universe_policy
 
 
@@ -45,6 +51,17 @@ def _parser() -> argparse.ArgumentParser:
     curate_daily.add_argument("--universe-policy", type=Path)
     curate_daily.add_argument("--output", type=Path, required=True)
     curate_daily.add_argument("--metadata-output", type=Path)
+
+    coverage = subparsers.add_parser(
+        "build-tradability-coverage",
+        help="build immutable P1 lifecycle coverage from stable unadjusted daily inputs",
+    )
+    coverage.add_argument("--root", type=Path, required=True)
+    coverage.add_argument("--bars-file", default="daily_ohlcv_none.parquet")
+    coverage.add_argument("--universe-policy", type=Path)
+    coverage.add_argument("--knowledge-cutoff", type=date.fromisoformat, required=True)
+    coverage.add_argument("--output", type=Path, required=True)
+    coverage.add_argument("--metadata-output", type=Path)
     return parser
 
 
@@ -86,6 +103,17 @@ def _print_curated_daily(result: CuratedDailyResult) -> None:
     print(f"universe policy: {result.universe_policy_version}")
 
 
+def _print_tradability_coverage(result: TradabilityCoverageResult) -> None:
+    statuses = ", ".join(
+        f"{status}={count}" for status, count in sorted(result.status_counts.items())
+    )
+    print(f"tradability coverage output: {result.output}")
+    print(f"rows: {result.row_count}")
+    print(f"data-valid bars: {result.valid_bar_count}")
+    print(f"coverage statuses: {statuses}")
+    print(f"knowledge cutoff: {result.knowledge_cutoff.isoformat()}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -124,9 +152,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                 payload = json.dumps(curated.to_dict(), ensure_ascii=True, indent=2, sort_keys=True)
                 args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
             _print_curated_daily(curated)
+        elif args.command == "build-tradability-coverage":
+            default_policy = find_project_root() / "config" / "p1-universe.v1.json"
+            universe_policy = load_universe_policy(args.universe_policy or default_policy)
+            coverage = build_tradability_coverage(
+                root=args.root,
+                output=args.output,
+                universe_policy=universe_policy,
+                knowledge_cutoff=args.knowledge_cutoff,
+                bars_file=args.bars_file,
+            )
+            if args.metadata_output is not None:
+                args.metadata_output.parent.mkdir(parents=True, exist_ok=True)
+                payload = json.dumps(
+                    coverage.to_dict(), ensure_ascii=True, indent=2, sort_keys=True
+                )
+                args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
+            _print_tradability_coverage(coverage)
         else:
             raise AssertionError(f"unhandled command: {args.command}")
-    except (AuditError, ConfigurationError, CurationError) as exc:
+    except (AuditError, ConfigurationError, CoverageError, CurationError) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
     return 0

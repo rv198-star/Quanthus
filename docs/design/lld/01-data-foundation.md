@@ -169,6 +169,7 @@ clean skips. Minute and partial-session data are not inputs to this pipeline ver
 | P1-SNAPSHOT-001 | Implement atomic snapshot catalog/API | Canonical datasets | Cutoff and revision contract tests |
 | P1-ACCEPT-001 | Run Chapter 01 acceptance suite | C1/C2/S1 and snapshot | D1/D2/D3 evidence bundle |
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | Accepted file-first platform | Open/closed-session rehearsals and durable run ledger |
+| META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | META-DATA-PIPE-001 accepted | Shadow run, explicit cutover, rollback, and no overlapping writers |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |
 
 The S1 reconciliation report measures each in-scope delisted security over the supported daily

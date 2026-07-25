@@ -12,6 +12,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-TRACE-001 | Maintain requirement-to-issue traceability | active |
 | META-GATE-001 | Automate release gate reporting | planned |
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | active |
+| META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | planned |
 
 ## P1 data foundation
 

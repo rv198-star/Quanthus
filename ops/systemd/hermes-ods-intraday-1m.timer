@@ -1,8 +1,8 @@
 [Unit]
-Description=Shadow timer for Hermes ODS intraday 1m archive
+Description=Shadow timer for Hermes ODS intraday 1m archive (contract 20:30)
 
 [Timer]
-OnCalendar=Mon..Fri *-*-* 16:30:00 Asia/Shanghai
+OnCalendar=Mon..Fri *-*-* 20:30:00 Asia/Shanghai
 AccuracySec=1min
 Persistent=false
 Unit=hermes-ods-intraday-1m.service

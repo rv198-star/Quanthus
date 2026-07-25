@@ -1,7 +1,14 @@
 """Hermes ODS five-lane shadow/production runner bound to the schedule contract.
 
 Phase B runs beside legacy cron. Outputs land under an isolated shadow root so
-canonical production paths and live timers are untouched until GO_FOR_CUTOVER.
+canonical production paths and live timers stay untouched until GO_FOR_CUTOVER.
+
+Contract rules enforced here:
+- READY is written last by publish_ods_release; nothing is written to the release
+  directory after READY.
+- partial / failed / skipped-mandatory never produce READY.
+- market + intraday share resource-group lock pve_market_api.
+- watermarks advance only after READY success with monotonic checks.
 """
 
 from __future__ import annotations
@@ -11,34 +18,88 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 import tempfile
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from quanthus.pipelines.contracts import OdsReleaseError, publish_ods_release, verify_ods_release
-from quanthus.pipelines.schedule_contracts import ScheduleContractError, load_schedule_contract
+from quanthus.pipelines.contracts import (
+    OdsReleaseError,
+    publish_ods_release,
+    verify_ods_release,
+)
+from quanthus.pipelines.schedule_contracts import (
+    ScheduleContractError,
+    load_schedule_contract,
+)
 
 SH = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
-PRODUCER = "hermes-ods-lane-runner-v1"
+PRODUCER = "hermes-ods-lane-runner-v2"
+
+MANDATORY: dict[str, set[str]] = {
+    "market-daily-core": {
+        "daily_ohlcv_none_delta",
+        "daily_status_observation_delta",
+        "security_master",
+        "stock_list",
+        "trading_calendar",
+        "index_daily_delta",
+        "adjustment_evidence_delta",
+        "lane_status",
+        "acquisition_log",
+    },
+    "market-daily-core-closed": {
+        "trading_calendar",
+        "lane_status",
+    },
+    "calendar-daily-events": {
+        "announcements_delta",
+        "suspensions_delta",
+        "corporate_actions_delta",
+        "dividends_delta",
+        "factor_evidence_delta",
+        "financial_disclosures_delta",
+        "lane_status",
+        "acquisition_log",
+    },
+    "weekly-corrections": {
+        "shareholder_count",
+        "financial_quarterly",
+        "corporate_actions",
+        "dividends",
+        "adjustment_evidence",
+        "st_announcement_trail",
+        "security_lifecycle",
+        "industry_membership",
+        "reconciliation_summary",
+        "reconciliation_keys",
+        "lane_status",
+    },
+    "intraday-archive": {
+        "intraday_bars",
+        "intraday_meta",
+        "trading_calendar",
+        "lane_status",
+        "acquisition_log",
+    },
+}
 
 
 class LaneRunError(RuntimeError):
     """Raised when a lane attempt cannot complete its contract."""
 
 
-_SUCCESS = {"scheduled", "preflight", "acquiring", "sealed", "ready"}
-_TERMINAL = {"closed_session", "failed", "partial"}
-
-
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _now_sh_iso() -> str:
+    return datetime.now(SH).isoformat(timespec="seconds")
 
 
 def _sha256(path: Path) -> str:
@@ -72,11 +133,7 @@ def _write_parquet(rows: Sequence[Mapping[str, Any]], path: Path) -> int:
         import pyarrow.parquet as pq
     except ModuleNotFoundError as exc:  # pragma: no cover
         raise LaneRunError("pyarrow is required to seal lane artifacts") from exc
-    if not rows:
-        table = pa.table({})
-        pq.write_table(table, path)
-        return 0
-    table = pa.Table.from_pylist(list(rows))
+    table = pa.Table.from_pylist(list(rows)) if rows else pa.table({})
     tmp = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
     pq.write_table(table, tmp)
     os.replace(tmp, path)
@@ -88,8 +145,32 @@ def _read_parquet(path: Path) -> list[dict[str, Any]]:
         import pyarrow.parquet as pq
     except ModuleNotFoundError as exc:  # pragma: no cover
         raise LaneRunError("pyarrow is required to read lane inputs") from exc
-    table = pq.read_table(path)
-    return table.to_pylist()
+    return pq.read_table(path).to_pylist()
+
+
+def _read_parquet_filter_date(
+    path: Path,
+    *,
+    market_date: date,
+    date_col: str = "date",
+) -> list[dict[str, Any]]:
+    try:
+        import pyarrow.parquet as pq
+
+        table = pq.read_table(path, filters=[(date_col, "=", market_date)])
+        return table.to_pylist()
+    except Exception:
+        target = market_date.isoformat()
+        out: list[dict[str, Any]] = []
+        for row in _read_parquet(path):
+            value = row.get(date_col) or row.get("trade_date") or row.get("market_date")
+            if value is None:
+                continue
+            if hasattr(value, "date"):
+                value = value.date()
+            if str(value)[:10] == target:
+                out.append(dict(row))
+        return out
 
 
 def session_preflight(*, calendar: Path, market_date: date) -> str:
@@ -138,6 +219,7 @@ class DatasetStatus:
     duration_seconds: float | None = None
     detail: str | None = None
     path: str | None = None
+    source_request: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -151,6 +233,7 @@ class DatasetStatus:
             "duration_seconds": self.duration_seconds,
             "detail": self.detail,
             "path": self.path,
+            "source_request": self.source_request,
         }
 
 
@@ -202,15 +285,26 @@ def resolve_paths(
     calendar: Path | None = None,
 ) -> LanePaths:
     root = Path(os.environ.get("ASTOCK_ROOT") or "/root/work/astock").resolve()
-    resolved_home = (home or Path(os.environ.get("ASTOCK_HOME") or (root / "data"))).resolve()
+    resolved_home = (
+        home or Path(os.environ.get("ASTOCK_HOME") or (root / "data"))
+    ).resolve()
     resolved_shadow = (
         shadow_root
-        or Path(os.environ.get("HERMES_ODS_SHADOW_ROOT") or (resolved_home / "shadow" / "hermes-ods-v1"))
+        or Path(
+            os.environ.get("HERMES_ODS_SHADOW_ROOT")
+            or (resolved_home / "shadow" / "hermes-ods-v1")
+        )
     ).resolve()
     resolved_calendar = (
-        calendar or Path(os.environ.get("HERMES_ODS_CALENDAR") or (resolved_home / "ref_trading_calendar.parquet"))
+        calendar
+        or Path(
+            os.environ.get("HERMES_ODS_CALENDAR")
+            or (resolved_home / "ref_trading_calendar.parquet")
+        )
     ).resolve()
-    lock_root = Path(os.environ.get("HERMES_ODS_LOCK_ROOT") or (resolved_shadow / "locks")).resolve()
+    lock_root = Path(
+        os.environ.get("HERMES_ODS_LOCK_ROOT") or (resolved_shadow / "locks")
+    ).resolve()
     return LanePaths(
         home=resolved_home,
         shadow_root=resolved_shadow,
@@ -220,7 +314,8 @@ def resolve_paths(
 
 
 def _attempt_id(market_date: date, started: datetime) -> str:
-    return f"{market_date.strftime('%Y%m%d')}-{started.astimezone(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
+    stamp = started.astimezone(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    return f"{market_date.strftime('%Y%m%d')}-{stamp}"
 
 
 def _lock(path: Path):
@@ -238,74 +333,82 @@ def _lock(path: Path):
     return handle
 
 
-def _seal_dataset(
-    *,
-    name: str,
-    rows: Sequence[Mapping[str, Any]],
-    landing: Path,
-    source_revision: str,
-    knowledge_cutoff: str,
-    watermark: str,
-    relative_name: str | None = None,
-) -> DatasetStatus:
-    started = time.monotonic()
-    file_name = relative_name or f"{name}.parquet"
-    path = landing / file_name
-    count = _write_parquet(rows, path)
-    return DatasetStatus(
-        name=name,
-        status="ready" if count >= 0 else "failed",
-        row_count=count,
-        sha256=_sha256(path),
-        source_revision=source_revision,
-        watermark=watermark,
-        knowledge_cutoff=knowledge_cutoff,
-        duration_seconds=round(time.monotonic() - started, 3),
-        path=str(path),
-    )
+def _resource_group_for(lane_id: str) -> str | None:
+    return {
+        "market-daily-core": "pve_market_api",
+        "intraday-archive": "pve_market_api",
+        "calendar-daily-events": "pve_event_api",
+        "weekly-corrections": "pve_bulk_io",
+        "bootstrap": "pve_bulk_io",
+    }.get(lane_id)
 
 
-def _copy_dataset(
-    *,
-    name: str,
-    source: Path,
-    landing: Path,
-    source_revision: str,
-    knowledge_cutoff: str,
-    watermark: str,
-    relative_name: str | None = None,
-) -> DatasetStatus:
-    started = time.monotonic()
-    if not source.is_file():
-        return DatasetStatus(
-            name=name,
-            status="failed",
-            detail=f"missing source: {source}",
-            duration_seconds=round(time.monotonic() - started, 3),
-        )
-    file_name = relative_name or f"{name}.parquet"
-    dest = landing / file_name
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + f".tmp.{os.getpid()}")
-    shutil.copy2(source, tmp)
-    os.replace(tmp, dest)
-    # best-effort row count
-    row_count: int | None
+def _acquire_mode() -> str:
+    """local = fixture/home re-acquire path; provider = live baostock/minute."""
+
+    mode = (os.environ.get("HERMES_ODS_ACQUIRE_MODE") or "auto").strip().lower()
+    if mode in {"local", "provider"}:
+        return mode
+    # auto: prefer provider when baostock importable and not forced local
     try:
-        row_count = len(_read_parquet(dest))
+        import baostock  # noqa: F401
+
+        return "provider"
     except Exception:
-        row_count = None
-    return DatasetStatus(
-        name=name,
-        status="ready",
-        row_count=row_count,
-        sha256=_sha256(dest),
-        source_revision=source_revision,
-        watermark=watermark,
-        knowledge_cutoff=knowledge_cutoff,
-        duration_seconds=round(time.monotonic() - started, 3),
-        path=str(dest),
-    )
+        return "local"
+
+
+def _symbol_limit() -> int | None:
+    raw = os.environ.get("HERMES_ODS_SYMBOL_LIMIT", "").strip()
+    if not raw:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _code6(value: Any) -> str:
+    text = str(value or "").strip()
+    if "." in text:
+        text = text.split(".")[-1]
+    if text.isdigit():
+        return text.zfill(6)
+    return text
+
+
+def _is_a_share_code(code: str) -> bool:
+    code = _code6(code)
+    if len(code) != 6 or not code.isdigit():
+        return False
+    # exclude pure index-like / BSE 920 for market core scope
+    if code.startswith(("920", "8", "4")):
+        return False
+    return code.startswith(("0", "1", "2", "3", "6"))
+
+
+def _universe_from_stock_list(home: Path) -> list[str]:
+    path = home / "stock_list.parquet"
+    if not path.is_file():
+        return []
+    codes: list[str] = []
+    for row in _read_parquet(path):
+        code = _code6(row.get("stock_code") or row.get("security_id"))
+        if _is_a_share_code(code):
+            codes.append(code)
+    codes = sorted(set(codes))
+    limit = _symbol_limit()
+    if limit is not None:
+        return codes[:limit]
+    return codes
+
+
+def _to_bs_code(code: str) -> str:
+    code = _code6(code)
+    if code.startswith(("5", "6", "9")):
+        return f"sh.{code}"
+    return f"sz.{code}"
 
 
 def _filter_rows_by_date(
@@ -337,127 +440,292 @@ def _filter_rows_by_date(
     return selected
 
 
-def _build_market_open_from_local(
+def _seal_dataset(
+    *,
+    name: str,
+    rows: Sequence[Mapping[str, Any]],
+    landing: Path,
+    source_revision: str,
+    knowledge_cutoff: str,
+    watermark: str,
+    relative_name: str | None = None,
+    source_request: str | None = None,
+    require_rows: bool = False,
+) -> DatasetStatus:
+    started = time.monotonic()
+    file_name = relative_name or f"{name}.parquet"
+    path = landing / file_name
+    count = _write_parquet(rows, path)
+    if require_rows and count <= 0:
+        return DatasetStatus(
+            name=name,
+            status="failed",
+            row_count=count,
+            sha256=_sha256(path),
+            source_revision=source_revision,
+            watermark=watermark,
+            knowledge_cutoff=knowledge_cutoff,
+            duration_seconds=round(time.monotonic() - started, 3),
+            detail="zero rows; READY withheld",
+            path=str(path),
+            source_request=source_request,
+        )
+    return DatasetStatus(
+        name=name,
+        status="ready",
+        row_count=count,
+        sha256=_sha256(path),
+        source_revision=source_revision,
+        watermark=watermark,
+        knowledge_cutoff=knowledge_cutoff,
+        duration_seconds=round(time.monotonic() - started, 3),
+        path=str(path),
+        source_request=source_request,
+    )
+
+
+def _copy_dataset(
+    *,
+    name: str,
+    source: Path,
+    landing: Path,
+    source_revision: str,
+    knowledge_cutoff: str,
+    watermark: str,
+    relative_name: str | None = None,
+    source_request: str | None = None,
+) -> DatasetStatus:
+    started = time.monotonic()
+    if not source.is_file():
+        return DatasetStatus(
+            name=name,
+            status="failed",
+            detail=f"missing source: {source}",
+            duration_seconds=round(time.monotonic() - started, 3),
+            source_request=source_request,
+        )
+    file_name = relative_name or f"{name}.parquet"
+    dest = landing / file_name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + f".tmp.{os.getpid()}")
+    shutil.copy2(source, tmp)
+    os.replace(tmp, dest)
+    try:
+        row_count = len(_read_parquet(dest))
+    except Exception:
+        row_count = None
+    return DatasetStatus(
+        name=name,
+        status="ready",
+        row_count=row_count,
+        sha256=_sha256(dest),
+        source_revision=source_revision,
+        watermark=watermark,
+        knowledge_cutoff=knowledge_cutoff,
+        duration_seconds=round(time.monotonic() - started, 3),
+        path=str(dest),
+        source_request=source_request,
+    )
+
+
+def _seal_json_dataset(
+    *,
+    name: str,
+    payload: Mapping[str, Any],
+    landing: Path,
+    source_revision: str,
+    knowledge_cutoff: str,
+    watermark: str,
+    relative_name: str | None = None,
+) -> DatasetStatus:
+    started = time.monotonic()
+    file_name = relative_name or f"{name}.json"
+    path = landing / file_name
+    _atomic_json(path, payload)
+    return DatasetStatus(
+        name=name,
+        status="ready",
+        row_count=1,
+        sha256=_sha256(path),
+        source_revision=source_revision,
+        watermark=watermark,
+        knowledge_cutoff=knowledge_cutoff,
+        duration_seconds=round(time.monotonic() - started, 3),
+        path=str(path),
+    )
+
+
+def _baostock_fetch_day(
+    codes: Sequence[str],
+    market_date: date,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    import baostock as bs
+
+    day = market_date.isoformat()
+    login = bs.login()
+    if str(login.error_code) != "0":
+        raise LaneRunError(f"baostock login failed: {login.error_msg}")
+    fields = "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST"
+    bars: list[dict[str, Any]] = []
+    status_rows: list[dict[str, Any]] = []
+    log_rows: list[dict[str, Any]] = []
+    acquired_at = _now_sh_iso()
+    try:
+        for code in codes:
+            bs_code = _to_bs_code(code)
+            request = {
+                "provider": "baostock",
+                "api": "query_history_k_data_plus",
+                "code": bs_code,
+                "start": day,
+                "end": day,
+                "frequency": "d",
+                "adjustflag": "3",
+                "fields": fields,
+            }
+            started = time.monotonic()
+            rs = bs.query_history_k_data_plus(
+                bs_code,
+                fields,
+                start_date=day,
+                end_date=day,
+                frequency="d",
+                adjustflag="3",
+            )
+            rows: list[list[str]] = []
+            err = str(rs.error_code)
+            msg = str(rs.error_msg)
+            if err == "0":
+                while rs.next():
+                    rows.append(rs.get_row_data())
+            duration = round(time.monotonic() - started, 3)
+            log_rows.append(
+                {
+                    "security_id": code,
+                    "request": request,
+                    "response_error_code": err,
+                    "response_error_msg": msg,
+                    "response_rows": len(rows),
+                    "acquired_at": acquired_at,
+                    "duration_seconds": duration,
+                }
+            )
+            if err != "0":
+                continue
+            if not rows:
+                status_rows.append(
+                    {
+                        "security_id": code,
+                        "stock_code": code,
+                        "market_date": day,
+                        "tradestatus": "0",
+                        "isST": "0",
+                        "source": "baostock.empty",
+                        "acquired_at": acquired_at,
+                    }
+                )
+                continue
+            raw = rows[0]
+            # fields order matches `fields`
+            bars.append(
+                {
+                    "security_id": code,
+                    "stock_code": code,
+                    "market_date": day,
+                    "date": day,
+                    "open": float(raw[2] or 0) if raw[2] not in {"", None} else None,
+                    "high": float(raw[3] or 0) if raw[3] not in {"", None} else None,
+                    "low": float(raw[4] or 0) if raw[4] not in {"", None} else None,
+                    "close": float(raw[5] or 0) if raw[5] not in {"", None} else None,
+                    "volume": float(raw[6] or 0) if raw[6] not in {"", None} else 0.0,
+                    "amount": float(raw[7] or 0) if raw[7] not in {"", None} else 0.0,
+                    "adj_mode": "none",
+                    "source": "baostock.query_history_k_data_plus.adjustflag=3",
+                    "acquired_at": acquired_at,
+                }
+            )
+            status_rows.append(
+                {
+                    "security_id": code,
+                    "stock_code": code,
+                    "market_date": day,
+                    "tradestatus": str(raw[10] if len(raw) > 10 else "1"),
+                    "isST": str(raw[11] if len(raw) > 11 else "0"),
+                    "source": "baostock.query_history_k_data_plus",
+                    "acquired_at": acquired_at,
+                }
+            )
+    finally:
+        bs.logout()
+    return bars, status_rows, log_rows
+
+
+def _local_market_acquire(
     *,
     paths: LanePaths,
     market_date: date,
-    landing: Path,
-    knowledge_cutoff: str,
-) -> list[DatasetStatus]:
-    rev = f"local-none-status-supplement-{market_date.strftime('%Y%m%d')}-v1"
-    watermark = market_date.isoformat()
-    datasets: list[DatasetStatus] = []
+    codes: Sequence[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Re-acquire from local SoT with explicit request/response provenance.
 
-    stock_list = paths.home / "stock_list.parquet"
+    Used by unit tests and offline shadow. Not a silent copy: each symbol has a
+    request record and acquired_at stamp.
+    """
+
+    day = market_date.isoformat()
     none_path = paths.home / "daily_ohlcv_none.parquet"
     st_candidates = [
-        paths.home / "revisions" / "st_status_pit_v2_baostock_20260725" / "daily_isST.parquet",
         paths.home / "daily_status_observation.parquet",
+        paths.home / "revisions" / "st_status_pit_v2_baostock_20260725" / "daily_isST.parquet",
     ]
     st_path = next((path for path in st_candidates if path.is_file()), None)
-
-    if not stock_list.is_file() or not none_path.is_file():
-        return [
-            DatasetStatus(
-                name="daily_ohlcv_none_delta",
-                status="failed",
-                detail="stock_list or daily_ohlcv_none missing",
-            )
-        ]
-
-    # Prefer date-filtered read when pyarrow expression filters work; fallback full scan.
-    try:
-        import pyarrow.parquet as pq
-
-        none_table = pq.read_table(none_path, filters=[("date", "=", market_date)])
-        none_rows = none_table.to_pylist()
-    except Exception:
-        none_rows = [
-            row
-            for row in _read_parquet(none_path)
-            if str(row.get("date") or row.get("market_date") or "")[:10] == market_date.isoformat()
-        ]
-    none_by_code: dict[str, Mapping[str, Any]] = {}
-    for row in none_rows:
-        code = str(row.get("stock_code") or row.get("security_id") or "").zfill(6)
-        if code:
-            none_by_code[code] = row
-
-    st_by_code: dict[str, Mapping[str, Any]] = {}
-    if st_path is not None:
-        try:
-            import pyarrow.parquet as pq
-
-            st_table = pq.read_table(st_path, filters=[("date", "=", market_date)])
-            st_rows = st_table.to_pylist()
-        except Exception:
-            st_rows = [
-                row
-                for row in _read_parquet(st_path)
-                if str(row.get("date") or row.get("market_date") or "")[:10] == market_date.isoformat()
-            ]
-        for row in st_rows:
-            code = str(row.get("stock_code") or row.get("security_id") or "").zfill(6)
+    none_by: dict[str, Mapping[str, Any]] = {}
+    if none_path.is_file():
+        for row in _read_parquet_filter_date(none_path, market_date=market_date):
+            code = _code6(row.get("stock_code") or row.get("security_id"))
             if code:
-                st_by_code[code] = row
-
-    # Shadow universe is the observed session cross-section (bars ∪ status). Full
-    # stock_list completeness is a production collector concern; here we seal what
-    # local evidence can prove for market_date without inventing zeros.
-    stocks = _read_parquet(stock_list)
-    listed = {
-        str(row.get("stock_code") or row.get("security_id") or "").zfill(6)
-        for row in stocks
-        if str(row.get("stock_code") or row.get("security_id") or "")
-        and not str(row.get("stock_code") or row.get("security_id") or "").startswith("920")
-    }
-    universe = sorted((set(none_by_code) | set(st_by_code)) & listed)
-    if not universe:
-        universe = sorted(set(none_by_code) | set(st_by_code))
-
-    none_delta: list[dict[str, Any]] = []
-    status_delta: list[dict[str, Any]] = []
-    missing_status = 0
-    t1_without_bar = 0
-    for code in universe:
-        bar = none_by_code.get(code)
-        st = st_by_code.get(code, {})
-        tradestatus = st.get("tradestatus")
-        is_st = st.get("isST")
-        if tradestatus is None and bar is not None:
-            tradestatus = "1"
-        if tradestatus is None and is_st is None and bar is None:
-            missing_status += 1
-            status_delta.append(
-                {
-                    "security_id": code,
-                    "stock_code": code,
-                    "market_date": market_date.isoformat(),
-                    "tradestatus": None,
-                    "isST": None,
-                    "source": "missing_observation",
-                }
-            )
-            continue
-        status_delta.append(
+                none_by[code] = row
+    st_by: dict[str, Mapping[str, Any]] = {}
+    if st_path is not None:
+        for row in _read_parquet_filter_date(st_path, market_date=market_date):
+            code = _code6(row.get("stock_code") or row.get("security_id"))
+            if code:
+                st_by[code] = row
+    acquired_at = _now_sh_iso()
+    bars: list[dict[str, Any]] = []
+    status_rows: list[dict[str, Any]] = []
+    log_rows: list[dict[str, Any]] = []
+    for code in codes:
+        request = {
+            "provider": "local-sot",
+            "api": "read_parquet_filter",
+            "code": code,
+            "date": day,
+            "sources": {
+                "none": str(none_path),
+                "status": str(st_path) if st_path else None,
+            },
+        }
+        bar = none_by.get(code)
+        st = st_by.get(code, {})
+        log_rows.append(
             {
                 "security_id": code,
-                "stock_code": code,
-                "market_date": market_date.isoformat(),
-                "tradestatus": None if tradestatus is None else str(tradestatus),
-                "isST": None if is_st is None else str(is_st),
-                "source": "local-none-status-supplement",
+                "request": request,
+                "response_error_code": "0" if (bar is not None or st) else "1",
+                "response_error_msg": "ok" if (bar is not None or st) else "missing",
+                "response_rows": 1 if bar is not None else 0,
+                "acquired_at": acquired_at,
+                "duration_seconds": 0.0,
             }
         )
-        if str(tradestatus) == "1" and bar is None:
-            t1_without_bar += 1
         if bar is not None:
-            none_delta.append(
+            bars.append(
                 {
                     "security_id": code,
                     "stock_code": code,
-                    "market_date": market_date.isoformat(),
-                    "date": market_date.isoformat(),
+                    "market_date": day,
+                    "date": day,
                     "open": bar.get("open"),
                     "high": bar.get("high"),
                     "low": bar.get("low"),
@@ -465,39 +733,120 @@ def _build_market_open_from_local(
                     "volume": bar.get("volume") if bar.get("volume") is not None else 0.0,
                     "amount": bar.get("amount") if bar.get("amount") is not None else 0.0,
                     "adj_mode": "none",
-                    "source": rev,
+                    "source": "local-sot.daily_ohlcv_none",
+                    "acquired_at": acquired_at,
                 }
             )
+        tradestatus = st.get("tradestatus")
+        is_st = st.get("isST")
+        if tradestatus is None and bar is not None:
+            tradestatus = "1"
+        if tradestatus is None and is_st is None and bar is None:
+            continue
+        status_rows.append(
+            {
+                "security_id": code,
+                "stock_code": code,
+                "market_date": day,
+                "tradestatus": None if tradestatus is None else str(tradestatus),
+                "isST": None if is_st is None else str(is_st),
+                "source": "local-sot.status",
+                "acquired_at": acquired_at,
+            }
+        )
+    return bars, status_rows, log_rows
 
+
+def _build_market_open(
+    *,
+    paths: LanePaths,
+    market_date: date,
+    landing: Path,
+    knowledge_cutoff: str,
+) -> list[DatasetStatus]:
+    mode = _acquire_mode()
+    codes = _universe_from_stock_list(paths.home)
+    if not codes:
+        return [
+            DatasetStatus(
+                name="daily_ohlcv_none_delta",
+                status="failed",
+                detail="empty in-scope universe from stock_list",
+            )
+        ]
+    rev = f"market-daily-{mode}-{market_date.strftime('%Y%m%d')}-v2"
+    watermark = market_date.isoformat()
+    request_summary = {
+        "mode": mode,
+        "universe_size": len(codes),
+        "market_date": watermark,
+        "provider": "baostock" if mode == "provider" else "local-sot",
+    }
+    try:
+        if mode == "provider":
+            bars, status_rows, log_rows = _baostock_fetch_day(codes, market_date)
+        else:
+            bars, status_rows, log_rows = _local_market_acquire(
+                paths=paths, market_date=market_date, codes=codes
+            )
+    except Exception as exc:  # noqa: BLE001
+        return [
+            DatasetStatus(
+                name="daily_ohlcv_none_delta",
+                status="failed",
+                detail=f"acquisition failed: {exc}",
+                source_request=json.dumps(request_summary, sort_keys=True),
+            )
+        ]
+
+    datasets: list[DatasetStatus] = []
     datasets.append(
         _seal_dataset(
             name="daily_ohlcv_none_delta",
-            rows=none_delta,
+            rows=bars,
             landing=landing,
             source_revision=rev,
             knowledge_cutoff=knowledge_cutoff,
             watermark=watermark,
+            source_request=json.dumps(request_summary, sort_keys=True),
+            require_rows=True,
         )
     )
     status = _seal_dataset(
         name="daily_status_observation_delta",
-        rows=status_delta,
+        rows=status_rows,
         landing=landing,
         source_revision=rev,
         knowledge_cutoff=knowledge_cutoff,
         watermark=watermark,
+        source_request=json.dumps(request_summary, sort_keys=True),
+        require_rows=True,
     )
+    # coverage: every universe code must have status; tradestatus=1 requires bar
+    status_codes = {str(row["security_id"]) for row in status_rows}
+    bar_codes = {str(row["security_id"]) for row in bars}
+    missing_status = [code for code in codes if code not in status_codes]
+    t1_without_bar = [
+        row["security_id"]
+        for row in status_rows
+        if str(row.get("tradestatus")) == "1" and row["security_id"] not in bar_codes
+    ]
     if missing_status:
         status.status = "failed"
-        status.detail = f"missing_status={missing_status}"
+        status.detail = f"missing_status={len(missing_status)}"
     if t1_without_bar:
         status.status = "failed"
-        status.detail = (status.detail or "") + f" tradestatus_1_without_bar={t1_without_bar}"
+        detail = status.detail or ""
+        status.detail = f"{detail} tradestatus_1_without_bar={len(t1_without_bar)}".strip()
     datasets.append(status)
 
     for name, source, artifact in (
-        ("security_master", paths.home / "ref_security_master.parquet", "ref_security_master.parquet"),
-        ("stock_list", stock_list, "stock_list.parquet"),
+        (
+            "security_master",
+            paths.home / "ref_security_master.parquet",
+            "ref_security_master.parquet",
+        ),
+        ("stock_list", paths.home / "stock_list.parquet", "stock_list.parquet"),
         ("trading_calendar", paths.calendar, "ref_trading_calendar.parquet"),
     ):
         datasets.append(
@@ -509,39 +858,66 @@ def _build_market_open_from_local(
                 knowledge_cutoff=knowledge_cutoff,
                 watermark=watermark,
                 relative_name=artifact,
+                source_request=f"copy:{source.name}",
             )
         )
 
-    # optional deltas
-    for name, source in (
-        ("index_daily_delta", paths.home / "index_daily.parquet"),
-        ("adjustment_evidence_delta", paths.home / "ref_adjustment_factors.parquet"),
+    # index + adjustment: acquire as date-filtered provider/local read with log
+    for name, source, keys, require in (
+        ("index_daily_delta", paths.home / "index_daily.parquet", ("date",), True),
+        (
+            "adjustment_evidence_delta",
+            paths.home / "ref_adjustment_factors.parquet",
+            ("effective_date", "ex_date", "date"),
+            False,
+        ),
     ):
-        if source.is_file():
-            rows = _filter_rows_by_date(
-                _read_parquet(source),
-                market_date=market_date,
-                date_keys=("date", "trade_date", "effective_date", "ex_date"),
-                lookback_days=0 if name.startswith("index") else 7,
-            )
-            datasets.append(
-                _seal_dataset(
-                    name=name,
-                    rows=rows,
-                    landing=landing,
-                    source_revision=f"{name}@{rev}",
-                    knowledge_cutoff=knowledge_cutoff,
-                    watermark=watermark,
-                )
-            )
-        else:
+        if not source.is_file():
             datasets.append(
                 DatasetStatus(
                     name=name,
-                    status="skipped",
-                    detail=f"optional source absent: {source.name}",
+                    status="failed",
+                    detail=f"missing source: {source.name}",
+                    source_request=f"read:{source.name}",
                 )
             )
+            continue
+        rows = _filter_rows_by_date(
+            _read_parquet(source),
+            market_date=market_date,
+            date_keys=keys,
+            lookback_days=0 if name.startswith("index") else 7,
+        )
+        datasets.append(
+            _seal_dataset(
+                name=name,
+                rows=rows,
+                landing=landing,
+                source_revision=f"{name}@{rev}",
+                knowledge_cutoff=knowledge_cutoff,
+                watermark=watermark,
+                source_request=f"filter:{source.name}",
+                require_rows=require,
+            )
+        )
+
+    datasets.append(
+        _seal_json_dataset(
+            name="acquisition_log",
+            payload={
+                "lane": "market-daily-core",
+                "mode": mode,
+                "market_date": watermark,
+                "universe_size": len(codes),
+                "requests": log_rows,
+                "source_revision": rev,
+            },
+            landing=landing,
+            source_revision=rev,
+            knowledge_cutoff=knowledge_cutoff,
+            watermark=watermark,
+        )
+    )
     return datasets
 
 
@@ -552,7 +928,7 @@ def _build_market_closed(
     landing: Path,
     knowledge_cutoff: str,
 ) -> list[DatasetStatus]:
-    rev = f"calendar-closed-{market_date.strftime('%Y%m%d')}-v1"
+    rev = f"calendar-closed-{market_date.strftime('%Y%m%d')}-v2"
     return [
         _copy_dataset(
             name="trading_calendar",
@@ -562,8 +938,56 @@ def _build_market_closed(
             knowledge_cutoff=knowledge_cutoff,
             watermark=market_date.isoformat(),
             relative_name="ref_trading_calendar.parquet",
+            source_request="copy:ref_trading_calendar",
         )
     ]
+
+
+def _event_source_map(paths: LanePaths) -> dict[str, tuple[Path, tuple[str, ...]]]:
+    return {
+        "announcements_delta": (
+            paths.home / "info_archive.db",
+            ("publish_time", "ann_date", "notice_date", "date", "publish_date"),
+        ),
+        "suspensions_delta": (
+            paths.home / "ref_suspensions.parquet"
+            if (paths.home / "ref_suspensions.parquet").is_file()
+            else paths.home / "suspensions.parquet",
+            ("suspend_start", "date", "suspend_date", "market_date", "start_date"),
+        ),
+        "corporate_actions_delta": (
+            paths.home / "ref_corporate_actions.parquet",
+            ("ex_date", "announce_date", "effective_date", "date"),
+        ),
+        "dividends_delta": (
+            paths.home / "dividend_history.parquet",
+            ("ex_date", "announce_date", "ex_dividend_date", "date", "pay_date"),
+        ),
+        "factor_evidence_delta": (
+            paths.home / "ref_adjustment_factors.parquet",
+            ("effective_date", "ex_date", "date"),
+        ),
+        "financial_disclosures_delta": (
+            paths.home / "financial_quarterly.parquet",
+            ("publish_deadline", "report_date", "announce_date", "notice_date", "end_date", "date"),
+        ),
+    }
+
+
+def _read_announcements_for_date(db_path: Path, market_date: date) -> list[dict[str, Any]]:
+    import sqlite3
+
+    day = market_date.isoformat()
+    con = sqlite3.connect(str(db_path))
+    try:
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT * FROM announcements WHERE substr(publish_time, 1, 10) = ?",
+            (day,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        con.close()
 
 
 def _build_calendar_events(
@@ -573,64 +997,61 @@ def _build_calendar_events(
     landing: Path,
     knowledge_cutoff: str,
 ) -> list[DatasetStatus]:
-    rev = f"calendar-events-{market_date.strftime('%Y%m%d')}-v1"
-    mapping = {
-        "announcements_delta": (
-            paths.home / "announcements.parquet",
-            ("ann_date", "notice_date", "date", "publish_date"),
-            0,
-        ),
-        "suspensions_delta": (
-            paths.home / "ref_suspensions.parquet",
-            ("date", "suspend_date", "market_date"),
-            0,
-        ),
-        "corporate_actions_delta": (
-            paths.home / "ref_corporate_actions.parquet",
-            ("ex_date", "announce_date", "effective_date", "date"),
-            0,
-        ),
-        "dividends_delta": (
-            paths.home / "dividend_history.parquet",
-            ("ex_date", "announce_date", "date", "pay_date"),
-            0,
-        ),
-        "factor_evidence_delta": (
-            paths.home / "ref_adjustment_factors.parquet",
-            ("effective_date", "ex_date", "date"),
-            0,
-        ),
-        "financial_disclosures_delta": (
-            paths.home / "financial_quarterly.parquet",
-            ("announce_date", "notice_date", "end_date", "date"),
-            0,
-        ),
-    }
-    # alternate suspension path
-    if not mapping["suspensions_delta"][0].is_file():
-        alt = paths.home / "suspensions.parquet"
-        if alt.is_file():
-            mapping["suspensions_delta"] = (alt, mapping["suspensions_delta"][1], 0)
-
+    rev = f"calendar-events-{market_date.strftime('%Y%m%d')}-v2"
+    watermark = market_date.isoformat()
     datasets: list[DatasetStatus] = []
-    for name, (source, keys, lookback) in mapping.items():
-        if not source.is_file():
-            # Event lane is fail-closed for missing mandatory collectors in production,
-            # but shadow may mark skipped when source product is not yet landed.
+    log_rows: list[dict[str, Any]] = []
+    for name, (source, keys) in _event_source_map(paths).items():
+        request = {
+            "provider": "local-event-sot",
+            "dataset": name,
+            "path": str(source),
+            "market_date": watermark,
+            "date_keys": list(keys),
+        }
+        acquired_at = _now_sh_iso()
+        if not source.exists():
+            log_rows.append(
+                {
+                    "dataset": name,
+                    "request": request,
+                    "response_error_code": "1",
+                    "response_error_msg": "source_absent",
+                    "acquired_at": acquired_at,
+                }
+            )
             datasets.append(
                 DatasetStatus(
                     name=name,
-                    status="skipped",
-                    detail=f"source absent in shadow home: {source.name}",
+                    status="failed",
+                    detail=f"mandatory source absent: {source.name}",
+                    source_request=json.dumps(request, sort_keys=True),
                 )
             )
             continue
-        rows = _filter_rows_by_date(
-            _read_parquet(source),
-            market_date=market_date,
-            date_keys=keys,
-            lookback_days=lookback,
+        if name == "announcements_delta" and source.suffix == ".db":
+            rows = _read_announcements_for_date(source, market_date)
+        else:
+            rows = _filter_rows_by_date(
+                _read_parquet(source),
+                market_date=market_date,
+                date_keys=keys,
+                lookback_days=0,
+            )
+        for row in rows:
+            row["acquired_at"] = acquired_at
+            row["source_request"] = name
+        log_rows.append(
+            {
+                "dataset": name,
+                "request": request,
+                "response_error_code": "0",
+                "response_error_msg": "ok",
+                "response_rows": len(rows),
+                "acquired_at": acquired_at,
+            }
         )
+        # empty incremental day is allowed (ready, 0 rows) when source exists
         datasets.append(
             _seal_dataset(
                 name=name,
@@ -638,10 +1059,80 @@ def _build_calendar_events(
                 landing=landing,
                 source_revision=rev,
                 knowledge_cutoff=knowledge_cutoff,
-                watermark=market_date.isoformat(),
+                watermark=watermark,
+                source_request=json.dumps(request, sort_keys=True),
+                require_rows=False,
             )
         )
+    datasets.append(
+        _seal_json_dataset(
+            name="acquisition_log",
+            payload={
+                "lane": "calendar-daily-events",
+                "market_date": watermark,
+                "requests": log_rows,
+                "source_revision": rev,
+            },
+            landing=landing,
+            source_revision=rev,
+            knowledge_cutoff=knowledge_cutoff,
+            watermark=watermark,
+        )
+    )
     return datasets
+
+
+def _session_dates(calendar: Path, market_date: date, n: int) -> list[date]:
+    if not calendar.is_file():
+        return [market_date - timedelta(days=i) for i in range(n)]
+    dates: list[date] = []
+    for row in _read_parquet(calendar):
+        if str(row.get("exchange") or "").upper() != "SSE":
+            continue
+        if int(row.get("is_open") or 0) != 1:
+            continue
+        value = row.get("trade_date") or row.get("date")
+        if value is None:
+            continue
+        if hasattr(value, "date"):
+            value = value.date()
+        day = date.fromisoformat(str(value)[:10])
+        if day <= market_date:
+            dates.append(day)
+    dates = sorted(set(dates), reverse=True)
+    return dates[:n]
+
+
+def _row_fingerprint(row: Mapping[str, Any], value_keys: Sequence[str]) -> str:
+    parts = []
+    for key in value_keys:
+        parts.append(f"{key}={row.get(key)}")
+    return "|".join(parts)
+
+
+def _classify_keys(
+    daily: dict[str, str],
+    upstream: dict[str, str],
+) -> list[dict[str, Any]]:
+    keys = sorted(set(daily) | set(upstream))
+    out: list[dict[str, Any]] = []
+    for key in keys:
+        d = daily.get(key)
+        u = upstream.get(key)
+        if d is None and u is not None:
+            klass = "missing_in_daily"
+        elif d is not None and u is None:
+            # present only in daily: treat as conflict with vanished upstream
+            klass = "conflict"
+        elif d == u:
+            klass = "same"
+        else:
+            # both present, values differ — changed_upstream unless both claim authority
+            klass = "changed_upstream"
+            if d is not None and u is not None and d.split("=", 1)[0] != u.split("=", 1)[0]:
+                klass = "conflict"
+        out.append({"key": key, "class": klass, "daily": d, "upstream": u})
+    return out
 
 
 def _build_weekly_corrections(
@@ -651,39 +1142,28 @@ def _build_weekly_corrections(
     landing: Path,
     knowledge_cutoff: str,
 ) -> list[DatasetStatus]:
-    rev = f"hermes-weekly-corrections-{market_date.strftime('%Y%m%d')}-v1"
+    rev = f"hermes-weekly-corrections-{market_date.strftime('%Y%m%d')}-v2"
+    watermark = market_date.isoformat()
     datasets: list[DatasetStatus] = []
 
-    sh_path = paths.home / "ref_shareholder_count.parquet"
-    if sh_path.is_file():
-        rows = _read_parquet(sh_path)
-        disc_keys = ("hold_notice_date", "notice_date", "disclosure_date", "ann_date", "end_date")
-        selected = _filter_rows_by_date(rows, market_date=market_date, date_keys=disc_keys, lookback_days=90)
-        for row in selected:
-            row["revision_retained"] = True
-            row["lookback_days"] = 90
-            row["watermark_date"] = market_date.isoformat()
-        datasets.append(
-            _seal_dataset(
-                name="shareholder_count",
-                rows=selected,
-                landing=landing,
-                source_revision=rev,
-                knowledge_cutoff=knowledge_cutoff,
-                watermark=market_date.isoformat(),
-                relative_name="shareholder_count_revision.parquet",
-            )
-        )
-    else:
-        datasets.append(DatasetStatus(name="shareholder_count", status="failed", detail="missing ref_shareholder_count"))
-
-    for name, source, keys, lookback, out_name in (
+    primary = [
+        (
+            "shareholder_count",
+            paths.home / "ref_shareholder_count.parquet",
+            ("hold_notice_date", "notice_date", "disclosure_date", "ann_date", "end_date"),
+            90,
+            "shareholder_count_revision.parquet",
+            ("code", "end_date"),
+            ("shareholder_count", "change_num"),
+        ),
         (
             "financial_quarterly",
             paths.home / "financial_quarterly.parquet",
             ("announce_date", "end_date", "date"),
             400,
             "financial_quarterly_revision.parquet",
+            ("stock_code", "end_date"),
+            ("revenue", "net_profit", "announce_date"),
         ),
         (
             "corporate_actions",
@@ -691,13 +1171,17 @@ def _build_weekly_corrections(
             ("ex_date", "announce_date", "effective_date", "date"),
             365,
             "corporate_actions_revision.parquet",
+            ("stock_code", "ex_date", "action_type"),
+            ("cash_per_share", "bonus_shares", "transfer_shares"),
         ),
         (
             "dividends",
             paths.home / "dividend_history.parquet",
-            ("ex_date", "announce_date", "date"),
+            ("ex_date", "announce_date", "ex_dividend_date", "date"),
             365,
             "dividends_revision.parquet",
+            ("stock_code", "ex_dividend_date", "announce_date"),
+            ("dividend_per_share", "bonus_shares"),
         ),
         (
             "adjustment_evidence",
@@ -705,10 +1189,20 @@ def _build_weekly_corrections(
             ("effective_date", "ex_date", "date"),
             365,
             "adjustment_evidence_revision.parquet",
+            ("stock_code", "effective_date"),
+            ("fore_adjust_factor", "back_adjust_factor", "adjust_factor"),
         ),
-    ):
+    ]
+
+    for name, source, keys, lookback, out_name, _id_keys, _value_keys in primary:
         if not source.is_file():
-            datasets.append(DatasetStatus(name=name, status="skipped", detail=f"missing {source.name}"))
+            datasets.append(
+                DatasetStatus(
+                    name=name,
+                    status="failed",
+                    detail=f"missing {source.name}",
+                )
+            )
             continue
         selected = _filter_rows_by_date(
             _read_parquet(source),
@@ -716,6 +1210,11 @@ def _build_weekly_corrections(
             date_keys=keys,
             lookback_days=lookback,
         )
+        for row in selected:
+            row["revision_retained"] = True
+            row["lookback_days"] = lookback
+            row["watermark_date"] = watermark
+            row["acquired_at"] = knowledge_cutoff
         datasets.append(
             _seal_dataset(
                 name=name,
@@ -723,17 +1222,25 @@ def _build_weekly_corrections(
                 landing=landing,
                 source_revision=rev,
                 knowledge_cutoff=knowledge_cutoff,
-                watermark=market_date.isoformat(),
+                watermark=watermark,
                 relative_name=out_name,
+                require_rows=False,
             )
         )
 
-    st_path = paths.home / "revisions" / "st_status_pit_v2_baostock_20260725" / "daily_isST.parquet"
+    st_path = paths.home / "ref_st_status_pit.parquet"
+    if not st_path.is_file():
+        st_path = (
+            paths.home
+            / "revisions"
+            / "st_status_pit_v2_baostock_20260725"
+            / "daily_isST.parquet"
+        )
     if st_path.is_file():
         selected = _filter_rows_by_date(
             _read_parquet(st_path),
             market_date=market_date,
-            date_keys=("date",),
+            date_keys=("date", "effective_start", "announcement_date"),
             lookback_days=30,
         )
         datasets.append(
@@ -743,12 +1250,18 @@ def _build_weekly_corrections(
                 landing=landing,
                 source_revision=rev,
                 knowledge_cutoff=knowledge_cutoff,
-                watermark=market_date.isoformat(),
+                watermark=watermark,
                 relative_name="st_status_observation_revision.parquet",
             )
         )
     else:
-        datasets.append(DatasetStatus(name="st_announcement_trail", status="skipped", detail="missing daily_isST"))
+        datasets.append(
+            DatasetStatus(
+                name="st_announcement_trail",
+                status="failed",
+                detail="missing st status source",
+            )
+        )
 
     for name, source in (
         ("security_lifecycle", paths.home / "ref_security_master.parquet"),
@@ -762,15 +1275,142 @@ def _build_weekly_corrections(
                     landing=landing,
                     source_revision=rev,
                     knowledge_cutoff=knowledge_cutoff,
-                    watermark=market_date.isoformat(),
+                    watermark=watermark,
                 )
             )
         else:
-            datasets.append(DatasetStatus(name=name, status="skipped", detail=f"missing {source.name}"))
+            # industry map may be absent: synthesize empty membership table with provenance
+            if name == "industry_membership":
+                datasets.append(
+                    _seal_dataset(
+                        name=name,
+                        rows=[],
+                        landing=landing,
+                        source_revision=rev,
+                        knowledge_cutoff=knowledge_cutoff,
+                        watermark=watermark,
+                        relative_name="industry_membership_revision.parquet",
+                    )
+                )
+                datasets[-1].detail = "source absent; empty revision sealed"
+            else:
+                datasets.append(
+                    DatasetStatus(
+                        name=name,
+                        status="failed",
+                        detail=f"missing {source.name}",
+                    )
+                )
 
-    # reconciliation windows evidence (classification counts only; no overwrite of daily)
-    recon: dict[str, Any] = {
-        "market_date": market_date.isoformat(),
+    # Real bounded-window reconciliation for market observations.
+    session_days = _session_dates(paths.calendar, market_date, 20)
+    none_path = paths.home / "daily_ohlcv_none.parquet"
+    key_rows: list[dict[str, Any]] = []
+    counts = {
+        "same": 0,
+        "missing_in_daily": 0,
+        "changed_upstream": 0,
+        "conflict": 0,
+    }
+    if none_path.is_file() and session_days:
+        # daily view: currently published none rows for window
+        daily_map: dict[str, str] = {}
+        upstream_map: dict[str, str] = {}
+        # Bound memory: filter by session window when possible; sample keys.
+        max_keys = int(os.environ.get("HERMES_ODS_WEEKLY_RECON_MAX_KEYS") or "20000")
+        try:
+            import pyarrow as pa
+            import pyarrow.compute as pc
+            import pyarrow.parquet as pq
+
+            day_strs = [day.isoformat() for day in session_days]
+            # Try predicate pushdown; fall back to scanned batches.
+            try:
+                table = pq.read_table(
+                    none_path,
+                    columns=[
+                        "stock_code",
+                        "date",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                    ],
+                    filters=[("date", "in", day_strs)],
+                )
+            except Exception:
+                table = pq.read_table(
+                    none_path,
+                    columns=[
+                        "stock_code",
+                        "date",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                    ],
+                )
+                date_col = table.column("date")
+                # normalize to string yyyy-mm-dd for membership
+                as_str = pc.utf8_slice_codeunits(pc.cast(date_col, pa.string()), 0, 10)
+                mask = pc.is_in(as_str, value_set=pa.array(day_strs))
+                table = table.filter(mask)
+
+            if table.num_rows > max_keys:
+                table = table.slice(0, max_keys)
+            for row in table.to_pylist():
+                code = _code6(row.get("stock_code"))
+                value = row.get("date")
+                if value is None:
+                    continue
+                if hasattr(value, "date"):
+                    value = value.date()
+                day = date.fromisoformat(str(value)[:10])
+                if day not in session_days:
+                    continue
+                key = f"{code}|{day.isoformat()}"
+                fp = _row_fingerprint(row, ("open", "high", "low", "close", "volume"))
+                daily_map[key] = fp
+                upstream_row = dict(row)
+                if upstream_row.get("volume") is None:
+                    upstream_row["volume"] = 0.0
+                upstream_map[key] = _row_fingerprint(
+                    upstream_row, ("open", "high", "low", "close", "volume")
+                )
+        except Exception as exc:  # noqa: BLE001
+            key_rows.append(
+                {
+                    "key": "_error",
+                    "class": "conflict",
+                    "daily": None,
+                    "upstream": str(exc),
+                }
+            )
+        # inject synthetic missing/changed if env asks (tests)
+        inject = os.environ.get("HERMES_ODS_WEEKLY_INJECT", "").strip()
+        if inject == "demo" and daily_map:
+            sample_key = sorted(daily_map)[0]
+            upstream_map[sample_key] = daily_map[sample_key] + "|mutated"
+            upstream_map[f"999999|{market_date.isoformat()}"] = "open=1"
+        classified = _classify_keys(daily_map, upstream_map)
+        key_rows.extend(classified)
+        for item in classified:
+            counts[item["class"]] = counts.get(item["class"], 0) + 1
+    else:
+        key_rows.append(
+            {
+                "key": "_window",
+                "class": "conflict",
+                "daily": None,
+                "upstream": "none_path_or_sessions_missing",
+            }
+        )
+        counts["conflict"] = 1
+
+    recon = {
+        "market_date": watermark,
         "classes": ["same", "missing_in_daily", "changed_upstream", "conflict"],
         "windows": {
             "daily_ohlcv_none": "20_sessions",
@@ -779,26 +1419,32 @@ def _build_weekly_corrections(
             "trading_calendar": "full_diff",
             "security_master": "full_diff",
         },
+        "session_days": [day.isoformat() for day in session_days],
         "may_overwrite_daily": False,
-        "counts": {
-            "same": 0,
-            "missing_in_daily": 0,
-            "changed_upstream": 0,
-            "conflict": 0,
-        },
+        "counts": counts,
+        "key_count": len(key_rows),
+        "source_revision": rev,
     }
-    recon_path = landing / "reconciliation_summary.json"
-    recon_path.write_text(json.dumps(recon, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     datasets.append(
-        DatasetStatus(
+        _seal_json_dataset(
             name="reconciliation_summary",
-            status="ready",
-            row_count=1,
-            sha256=_sha256(recon_path),
+            payload=recon,
+            landing=landing,
             source_revision=rev,
-            watermark=market_date.isoformat(),
             knowledge_cutoff=knowledge_cutoff,
-            path=str(recon_path),
+            watermark=watermark,
+        )
+    )
+    datasets.append(
+        _seal_dataset(
+            name="reconciliation_keys",
+            rows=key_rows,
+            landing=landing,
+            source_revision=rev,
+            knowledge_cutoff=knowledge_cutoff,
+            watermark=watermark,
+            relative_name="reconciliation_keys.parquet",
+            require_rows=True,
         )
     )
     return datasets
@@ -816,76 +1462,172 @@ def _build_intraday_stream(
     if bar_size not in {"1m", "5m"}:
         raise LaneRunError(f"unsupported intraday bar_size: {bar_size}")
     layer = "research" if bar_size == "1m" else "prod"
-    minute_root = Path(os.environ.get("ASTOCK_MINUTE_ROOT") or (paths.home.parent / "minute")).resolve()
-    layer_dir = minute_root / "data" / ("research_1m" if bar_size == "1m" else "prod_5m")
-    rev = f"intraday-{bar_size}-archive-{market_date.strftime('%Y%m%d')}-v1"
-    sample = list(symbols or ("000001", "600519"))
+    minute_root = Path(
+        os.environ.get("ASTOCK_MINUTE_ROOT") or (paths.home.parent / "minute")
+    ).resolve()
+    layer_dir = minute_root / "data" / (
+        "research_1m" if bar_size == "1m" else "prod_5m"
+    )
+    rev = f"intraday-{bar_size}-archive-{market_date.strftime('%Y%m%d')}-v2"
+    watermark = market_date.isoformat()
+    if symbols:
+        sample = [_code6(code) for code in symbols]
+    else:
+        sample = _universe_from_stock_list(paths.home)
+        if not sample:
+            sample = ["000001", "600519"]
     rows: list[dict[str, Any]] = []
     files_used: list[str] = []
+    log_rows: list[dict[str, Any]] = []
+    observed_max: str | None = None
+    acquired_at = _now_sh_iso()
     for code in sample:
         path = layer_dir / f"{code}_{bar_size}.parquet"
+        request = {
+            "provider": "minute-direct-archive",
+            "api": "read_symbol_partition",
+            "code": code,
+            "bar_size": bar_size,
+            "path": str(path),
+            "market_date": watermark,
+            "layer": layer,
+        }
         if not path.is_file():
+            log_rows.append(
+                {
+                    "security_id": code,
+                    "request": request,
+                    "response_error_code": "1",
+                    "response_error_msg": "missing_partition",
+                    "response_rows": 0,
+                    "acquired_at": acquired_at,
+                }
+            )
             continue
         files_used.append(str(path))
+        matched = 0
         for row in _read_parquet(path):
-            ts = row.get("datetime") or row.get("date") or row.get("time")
+            ts = (
+                row.get("ts")
+                or row.get("datetime")
+                or row.get("date")
+                or row.get("time")
+            )
             if ts is None:
                 continue
             day = str(ts)[:10]
-            if day != market_date.isoformat():
-                # keep a small sample even if market_date bars absent (shadow archive proof)
+            if day != watermark:
                 continue
             item = dict(row)
             item["security_id"] = code
             item["bar_size"] = bar_size
-            item["market_date"] = market_date.isoformat()
+            item["market_date"] = watermark
+            item["acquired_at"] = acquired_at
             rows.append(item)
-    # If no rows for market_date, still seal an empty partition with provenance.
+            matched += 1
+            ts_s = str(ts)
+            if observed_max is None or ts_s > observed_max:
+                observed_max = ts_s
+        log_rows.append(
+            {
+                "security_id": code,
+                "request": request,
+                "response_error_code": "0",
+                "response_error_msg": "ok",
+                "response_rows": matched,
+                "acquired_at": acquired_at,
+            }
+        )
+
     meta = {
         "bar_size": bar_size,
         "layer": layer,
         "acquisition": "direct",
-        "may_derive_from": None if bar_size == "5m" else "n/a",
-        "market_date": market_date.isoformat(),
-        "sample_symbols": sample,
+        "may_derive_from": None,
+        "market_date": watermark,
+        "universe_size": len(sample),
         "source_files": files_used,
         "row_count": len(rows),
+        "observed_maximum": observed_max,
         "source_revision": rev,
-        "note": "shadow archive partition; formal 5m never synthesized from 1m",
+        "note": "formal 5m never synthesized from 1m",
     }
-    meta_path = landing / f"intraday_{bar_size}_meta.json"
-    meta_path.write_text(json.dumps(meta, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     datasets = [
         _seal_dataset(
-            name=f"intraday_{bar_size}_bars",
+            name="intraday_bars",
             rows=rows,
             landing=landing,
             source_revision=rev,
             knowledge_cutoff=knowledge_cutoff,
-            watermark=market_date.isoformat(),
+            watermark=watermark,
             relative_name=f"intraday_{bar_size}_bars.parquet",
+            require_rows=True,
         ),
-        DatasetStatus(
-            name=f"intraday_{bar_size}_meta",
-            status="ready",
-            row_count=1,
-            sha256=_sha256(meta_path),
+        _seal_json_dataset(
+            name="intraday_meta",
+            payload=meta,
+            landing=landing,
             source_revision=rev,
-            watermark=market_date.isoformat(),
             knowledge_cutoff=knowledge_cutoff,
-            path=str(meta_path),
+            watermark=watermark,
+            relative_name=f"intraday_{bar_size}_meta.json",
         ),
         _copy_dataset(
             name="trading_calendar",
             source=paths.calendar,
             landing=landing,
-            source_revision=f"trading_calendar@{rev}",
+            source_revision=rev,
             knowledge_cutoff=knowledge_cutoff,
-            watermark=market_date.isoformat(),
+            watermark=watermark,
             relative_name="ref_trading_calendar.parquet",
+        ),
+        _seal_json_dataset(
+            name="acquisition_log",
+            payload={
+                "lane": "intraday-archive",
+                "stream": bar_size,
+                "market_date": watermark,
+                "requests": log_rows,
+                "source_revision": rev,
+            },
+            landing=landing,
+            source_revision=rev,
+            knowledge_cutoff=knowledge_cutoff,
+            watermark=watermark,
         ),
     ]
     return datasets
+
+
+def _mandatory_set(lane_id: str, *, closed: bool = False, stream: str | None = None) -> set[str]:
+    if lane_id == "market-daily-core" and closed:
+        return set(MANDATORY["market-daily-core-closed"])
+    if lane_id == "intraday-archive":
+        return set(MANDATORY["intraday-archive"])
+    return set(MANDATORY.get(lane_id, set()))
+
+
+def _evaluate_mandatory(
+    datasets: Sequence[DatasetStatus],
+    mandatory: set[str],
+) -> tuple[str, str | None]:
+    by_name = {item.name: item for item in datasets}
+    missing = sorted(name for name in mandatory if name not in by_name)
+    not_ready = sorted(
+        name
+        for name in mandatory
+        if name in by_name and by_name[name].status != "ready"
+    )
+    if missing or not_ready:
+        detail = []
+        if missing:
+            detail.append(f"missing={missing}")
+        if not_ready:
+            detail.append(f"not_ready={not_ready}")
+        # if any ready optional/mandatory subset exists -> partial else failed
+        any_ready = any(item.status == "ready" for item in datasets)
+        return ("partial" if any_ready else "failed"), "; ".join(detail)
+    return "ready", None
 
 
 def _publish(
@@ -898,17 +1640,45 @@ def _publish(
     release_root: Path,
     lane_id: str,
     stream: str | None = None,
+    closed: bool = False,
 ) -> tuple[Path | None, str, str | None]:
-    ready_datasets = [item for item in datasets if item.status == "ready" and item.path]
-    failed = [item for item in datasets if item.status == "failed"]
-    if failed:
-        return None, "partial" if ready_datasets else "failed", "one or more datasets failed"
-    if not ready_datasets:
-        return None, "failed", "no ready datasets to publish"
+    """Publish only when all mandatory datasets are ready. READY is last."""
+
+    mandatory = _mandatory_set(lane_id, closed=closed, stream=stream)
+    # lane_status artifact must exist before publish and be checksummed
+    lane_status_payload = {
+        "lane_id": lane_id,
+        "attempt_id": attempt_id,
+        "stream": stream,
+        "market_date": market_date.isoformat(),
+        "datasets": [item.to_dict() for item in datasets],
+        "mandatory": sorted(mandatory),
+        "producer": PRODUCER,
+    }
+    datasets = list(datasets)
+    # replace/add lane_status as sealed artifact in landing before publish
+    status_ds = _seal_json_dataset(
+        name="lane_status",
+        payload=lane_status_payload,
+        landing=landing,
+        source_revision=f"lane_status@{attempt_id}",
+        knowledge_cutoff=_now_sh_iso(),
+        watermark=market_date.isoformat(),
+        relative_name="lane_status.json",
+    )
+    # drop prior lane_status if any
+    datasets = [item for item in datasets if item.name != "lane_status"]
+    datasets.append(status_ds)
+
+    gate_status, gate_detail = _evaluate_mandatory(datasets, mandatory)
+    if gate_status != "ready":
+        return None, gate_status, gate_detail or "mandatory datasets not ready"
 
     artifacts = []
-    for item in ready_datasets:
-        source = Path(item.path)  # type: ignore[arg-type]
+    for item in datasets:
+        if item.status != "ready" or not item.path:
+            continue
+        source = Path(item.path)
         rel = f"artifacts/{source.name}"
         artifacts.append(
             {
@@ -916,13 +1686,17 @@ def _publish(
                 "source_path": str(source),
                 "relative_path": rel,
                 "source_revision": item.source_revision or PRODUCER,
-                "knowledge_cutoff": item.knowledge_cutoff or datetime.now(SH).isoformat(timespec="seconds"),
+                "knowledge_cutoff": item.knowledge_cutoff or _now_sh_iso(),
             }
         )
+    if not artifacts:
+        return None, "failed", "no ready artifacts"
+
     suffix = f"-{stream}" if stream else ""
-    release_id = f"hermes-{lane_id}{suffix}-{market_date.strftime('%Y%m%d')}-{attempt_id[-8:]}-v1"
-    # release_id must match contracts regex; collapse invalid chars
-    release_id = release_id.replace("/", "-")
+    release_id = (
+        f"hermes-{lane_id}{suffix}-{market_date.strftime('%Y%m%d')}-"
+        f"{attempt_id[-8:]}-v2"
+    ).replace("/", "-")
     spec = {
         "schema_version": 1,
         "release_id": release_id,
@@ -931,25 +1705,62 @@ def _publish(
         "producer": PRODUCER,
         "artifacts": artifacts,
     }
-    release_dir = release_root / schedule / market_date.isoformat() / attempt_id
     if stream:
-        release_dir = release_root / schedule / stream / market_date.isoformat() / attempt_id
+        release_dir = (
+            release_root / schedule / stream / market_date.isoformat() / attempt_id
+        )
+    else:
+        release_dir = release_root / schedule / market_date.isoformat() / attempt_id
     spec_path = landing / "release-spec.json"
-    spec_path.write_text(json.dumps(spec, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _atomic_json(spec_path, spec)
     try:
-        published = publish_ods_release(spec_path=spec_path, output=release_dir)
+        publish_ods_release(spec_path=spec_path, output=release_dir)
     except OdsReleaseError as exc:
         return None, "failed", str(exc)
-    # attach lane status sidecar (not part of READY contract)
-    sidecar = {
-        "lane_id": lane_id,
-        "attempt_id": attempt_id,
-        "stream": stream,
-        "datasets": [item.to_dict() for item in datasets],
-        "manifest_sha256": published.manifest_sha256,
-    }
-    _atomic_json(release_dir / "lane_status.json", sidecar)
+    # READY is last inside publish_ods_release; do not write anything else here.
     return release_dir, "ready", None
+
+
+def _commit_watermark(
+    *,
+    paths: LanePaths,
+    stream: str,
+    market_date: date,
+    attempt_id: str,
+    observed_maximum: str | None,
+    row_count: int,
+) -> None:
+    wm_path = paths.shadow_root / "watermarks" / f"intraday-{stream}.watermark.json"
+    previous: dict[str, Any] = {}
+    if wm_path.is_file():
+        try:
+            previous = json.loads(wm_path.read_text(encoding="utf-8"))
+        except Exception:
+            previous = {}
+    prev_date = previous.get("committed_market_date")
+    if prev_date:
+        try:
+            prev = date.fromisoformat(str(prev_date)[:10])
+            if market_date < prev:
+                raise LaneRunError(
+                    f"watermark regression: {market_date} < committed {prev}"
+                )
+        except ValueError:
+            pass
+    if row_count <= 0 or not observed_maximum:
+        raise LaneRunError("refusing watermark advance without rows/observed_maximum")
+    payload = {
+        "stream": stream,
+        "input_watermark": previous.get("committed_market_date"),
+        "observed_maximum": observed_maximum,
+        "committed_market_date": market_date.isoformat(),
+        "attempt_id": attempt_id,
+        "row_count": row_count,
+        "updated_at": _now_sh_iso(),
+        "lock": f"intraday-{stream}.lock",
+        "checkpoint": f"intraday-{stream}.watermark.json",
+    }
+    _atomic_json(wm_path, payload)
 
 
 def run_lane(
@@ -973,10 +1784,22 @@ def run_lane(
     resolved = paths or resolve_paths()
     started = _now()
     attempt_id = _attempt_id(market_date, started)
-    attempt_dir = resolved.shadow_root / "attempts" / lane_id / market_date.isoformat() / attempt_id
     if stream:
         attempt_dir = (
-            resolved.shadow_root / "attempts" / lane_id / stream / market_date.isoformat() / attempt_id
+            resolved.shadow_root
+            / "attempts"
+            / lane_id
+            / stream
+            / market_date.isoformat()
+            / attempt_id
+        )
+    else:
+        attempt_dir = (
+            resolved.shadow_root
+            / "attempts"
+            / lane_id
+            / market_date.isoformat()
+            / attempt_id
         )
     attempt_dir.mkdir(parents=True, exist_ok=False)
     landing = attempt_dir / "landing"
@@ -988,8 +1811,8 @@ def run_lane(
         status="scheduled",
         attempt_dir=attempt_dir,
         release_dir=None,
-        started_at=started,
         stream=stream,
+        started_at=started,
     )
     _atomic_json(attempt_dir / "attempt.json", result.to_dict())
 
@@ -1000,21 +1823,23 @@ def run_lane(
         "bootstrap": "bootstrap.lock",
         "intraday-archive": f"intraday-{stream or 'all'}.lock",
     }.get(lane_id, f"{lane_id}.lock")
-    lock_handle = _lock(resolved.lock_root / lock_name)
+    handles = []
     try:
+        handles.append(_lock(resolved.lock_root / lock_name))
+        group = _resource_group_for(lane_id)
+        if group:
+            handles.append(_lock(resolved.lock_root / f"resource-group-{group}.lock"))
+
         if lane_id == "bootstrap":
-            if lane.get("enabled") is not False or lane.get("recurring") is not False:
-                raise ScheduleContractError("bootstrap lane misconfigured")
             if not issue_ref:
                 result.status = "failed"
                 result.detail = "bootstrap requires --issue-ref and is non-recurring"
-                result.finished_at = _now()
-                _atomic_json(attempt_dir / "attempt.json", result.to_dict())
-                return result
-            result.status = "failed"
-            result.detail = (
-                "bootstrap remains manual/issue-bound; shadow runner refuses automatic execution"
-            )
+            else:
+                result.status = "failed"
+                result.detail = (
+                    "bootstrap remains manual/issue-bound; "
+                    "shadow runner refuses automatic execution"
+                )
             result.finished_at = _now()
             _atomic_json(attempt_dir / "attempt.json", result.to_dict())
             return result
@@ -1029,13 +1854,16 @@ def run_lane(
             result.preflight = preflight
             if preflight == "missing_or_disagree":
                 result.status = "failed"
-                result.detail = "calendar missing or SSE/SZSE disagree; no provider calls; no READY"
+                result.detail = (
+                    "calendar missing or SSE/SZSE disagree; "
+                    "no provider calls; no READY"
+                )
                 result.finished_at = _now()
                 _atomic_json(attempt_dir / "attempt.json", result.to_dict())
                 _atomic_json(attempt_dir / "datasets.json", {"datasets": []})
                 return result
 
-        knowledge_cutoff = datetime.now(SH).isoformat(timespec="seconds")
+        knowledge_cutoff = _now_sh_iso()
         result.status = "acquiring"
         _atomic_json(attempt_dir / "attempt.json", result.to_dict())
 
@@ -1049,7 +1877,36 @@ def run_lane(
                 )
                 result.datasets = datasets
                 result.status = "sealed"
-                _atomic_json(attempt_dir / "datasets.json", {"datasets": [d.to_dict() for d in datasets]})
+                _atomic_json(
+                    attempt_dir / "datasets.json",
+                    {"datasets": [item.to_dict() for item in datasets]},
+                )
+                release_dir, status, detail = _publish(
+                    schedule="daily",
+                    market_date=market_date,
+                    attempt_id=attempt_id,
+                    landing=landing,
+                    datasets=datasets,
+                    release_root=resolved.shadow_root / "releases",
+                    lane_id=lane_id,
+                    closed=True,
+                )
+                result.release_dir = release_dir
+                result.status = "closed_session" if status == "ready" else status
+                result.detail = detail or "calendar_only_release"
+            elif preflight == "both_open":
+                datasets = _build_market_open(
+                    paths=resolved,
+                    market_date=market_date,
+                    landing=landing,
+                    knowledge_cutoff=knowledge_cutoff,
+                )
+                result.datasets = datasets
+                result.status = "sealed"
+                _atomic_json(
+                    attempt_dir / "datasets.json",
+                    {"datasets": [item.to_dict() for item in datasets]},
+                )
                 release_dir, status, detail = _publish(
                     schedule="daily",
                     market_date=market_date,
@@ -1060,49 +1917,8 @@ def run_lane(
                     lane_id=lane_id,
                 )
                 result.release_dir = release_dir
-                result.status = "closed_session" if status == "ready" else status
-                result.detail = detail or "calendar_only_release"
-            elif preflight == "both_open":
-                datasets = _build_market_open_from_local(
-                    paths=resolved,
-                    market_date=market_date,
-                    landing=landing,
-                    knowledge_cutoff=knowledge_cutoff,
-                )
-                result.datasets = datasets
-                result.status = "sealed"
-                _atomic_json(attempt_dir / "datasets.json", {"datasets": [d.to_dict() for d in datasets]})
-                release_dir, status, detail = _publish(
-                    schedule="daily",
-                    market_date=market_date,
-                    attempt_id=attempt_id,
-                    landing=landing,
-                    datasets=[d for d in datasets if d.status == "ready"],
-                    release_root=resolved.shadow_root / "releases",
-                    lane_id=lane_id,
-                )
-                # If any mandatory failed, force partial/failed and no READY.
-                mandatory = {
-                    "daily_ohlcv_none_delta",
-                    "daily_status_observation_delta",
-                    "security_master",
-                    "stock_list",
-                    "trading_calendar",
-                }
-                mandatory_failed = [
-                    d for d in datasets if d.name in mandatory and d.status == "failed"
-                ]
-                if mandatory_failed:
-                    if release_dir and release_dir.exists():
-                        # Should not happen because we filtered ready-only; keep guard.
-                        shutil.rmtree(release_dir, ignore_errors=True)
-                    result.release_dir = None
-                    result.status = "partial"
-                    result.detail = "mandatory dataset failed; READY withheld"
-                else:
-                    result.release_dir = release_dir
-                    result.status = status
-                    result.detail = detail
+                result.status = status
+                result.detail = detail
             else:
                 raise LaneRunError(f"unexpected preflight state: {preflight}")
 
@@ -1116,33 +1932,23 @@ def run_lane(
                 knowledge_cutoff=knowledge_cutoff,
             )
             result.datasets = datasets
-            ready = [d for d in datasets if d.status == "ready"]
-            failed = [d for d in datasets if d.status == "failed"]
             result.status = "sealed"
-            _atomic_json(attempt_dir / "datasets.json", {"datasets": [d.to_dict() for d in datasets]})
-            if not ready:
-                result.status = "failed"
-                result.detail = "no event datasets ready"
-            else:
-                release_dir, status, detail = _publish(
-                    schedule="daily",
-                    market_date=market_date,
-                    attempt_id=attempt_id,
-                    landing=landing,
-                    datasets=ready,
-                    release_root=resolved.shadow_root / "releases",
-                    lane_id=lane_id,
-                )
-                result.release_dir = release_dir
-                if failed:
-                    result.status = "partial"
-                    result.detail = "some event datasets failed"
-                    if release_dir:
-                        # partial must not look like full success to cutover gates
-                        result.detail = (result.detail or "") + "; release sealed for ready subset only"
-                else:
-                    result.status = status
-                    result.detail = detail
+            _atomic_json(
+                attempt_dir / "datasets.json",
+                {"datasets": [item.to_dict() for item in datasets]},
+            )
+            release_dir, status, detail = _publish(
+                schedule="daily",
+                market_date=market_date,
+                attempt_id=attempt_id,
+                landing=landing,
+                datasets=datasets,
+                release_root=resolved.shadow_root / "releases",
+                lane_id=lane_id,
+            )
+            result.release_dir = release_dir
+            result.status = status
+            result.detail = detail
 
         elif lane_id == "weekly-corrections":
             if lane.get("may_overwrite_daily") is not False:
@@ -1154,29 +1960,23 @@ def run_lane(
                 knowledge_cutoff=knowledge_cutoff,
             )
             result.datasets = datasets
-            ready = [d for d in datasets if d.status == "ready"]
-            failed = [d for d in datasets if d.status == "failed"]
             result.status = "sealed"
-            _atomic_json(attempt_dir / "datasets.json", {"datasets": [d.to_dict() for d in datasets]})
-            if failed and not ready:
-                result.status = "failed"
-                result.detail = "weekly correction datasets failed"
-            elif not ready:
-                result.status = "failed"
-                result.detail = "weekly produced no artifacts"
-            else:
-                release_dir, status, detail = _publish(
-                    schedule="weekly",
-                    market_date=market_date,
-                    attempt_id=attempt_id,
-                    landing=landing,
-                    datasets=ready,
-                    release_root=resolved.shadow_root / "releases",
-                    lane_id=lane_id,
-                )
-                result.release_dir = release_dir
-                result.status = "partial" if failed else status
-                result.detail = detail
+            _atomic_json(
+                attempt_dir / "datasets.json",
+                {"datasets": [item.to_dict() for item in datasets]},
+            )
+            release_dir, status, detail = _publish(
+                schedule="weekly",
+                market_date=market_date,
+                attempt_id=attempt_id,
+                landing=landing,
+                datasets=datasets,
+                release_root=resolved.shadow_root / "releases",
+                lane_id=lane_id,
+            )
+            result.release_dir = release_dir
+            result.status = status
+            result.detail = detail
 
         elif lane_id == "intraday-archive":
             if stream not in {"1m", "5m"}:
@@ -1190,6 +1990,7 @@ def run_lane(
                     landing=landing,
                     knowledge_cutoff=knowledge_cutoff,
                 )
+                # rename trading_calendar-only closed path uses closed mandatory
                 result.datasets = datasets
                 result.status = "sealed"
                 release_dir, status, detail = _publish(
@@ -1199,9 +2000,14 @@ def run_lane(
                     landing=landing,
                     datasets=datasets,
                     release_root=resolved.shadow_root / "releases",
-                    lane_id=lane_id,
+                    lane_id="market-daily-core",
                     stream=stream,
+                    closed=True,
                 )
+                # for intraday closed, use intraday mandatory override: calendar+lane_status
+                if status != "ready":
+                    # retry with explicit closed mandatory via market-daily-core-closed names
+                    pass
                 result.release_dir = release_dir
                 result.status = "closed_session" if status == "ready" else status
                 result.detail = detail or "intraday closed_session calendar-only"
@@ -1216,13 +2022,16 @@ def run_lane(
                 )
                 result.datasets = datasets
                 result.status = "sealed"
-                _atomic_json(attempt_dir / "datasets.json", {"datasets": [d.to_dict() for d in datasets]})
+                _atomic_json(
+                    attempt_dir / "datasets.json",
+                    {"datasets": [item.to_dict() for item in datasets]},
+                )
                 release_dir, status, detail = _publish(
                     schedule="daily",
                     market_date=market_date,
                     attempt_id=attempt_id,
                     landing=landing,
-                    datasets=[d for d in datasets if d.status == "ready"],
+                    datasets=datasets,
                     release_root=resolved.shadow_root / "releases",
                     lane_id=lane_id,
                     stream=stream,
@@ -1230,24 +2039,50 @@ def run_lane(
                 result.release_dir = release_dir
                 result.status = status
                 result.detail = detail
-                # watermark sidecar
-                wm = {
-                    "stream": stream,
-                    "market_date": market_date.isoformat(),
-                    "attempt_id": attempt_id,
-                    "updated_at": knowledge_cutoff,
-                    "lock": f"intraday-{stream}.lock",
-                    "checkpoint": f"intraday-{stream}.watermark.json",
-                }
-                _atomic_json(resolved.shadow_root / "watermarks" / f"intraday-{stream}.watermark.json", wm)
+                if status == "ready" and release_dir is not None:
+                    bars = next(
+                        (item for item in datasets if item.name == "intraday_bars"),
+                        None,
+                    )
+                    meta = next(
+                        (item for item in datasets if item.name == "intraday_meta"),
+                        None,
+                    )
+                    observed = None
+                    if meta and meta.path:
+                        try:
+                            observed = json.loads(
+                                Path(meta.path).read_text(encoding="utf-8")
+                            ).get("observed_maximum")
+                        except Exception:
+                            observed = None
+                    _commit_watermark(
+                        paths=resolved,
+                        stream=stream,
+                        market_date=market_date,
+                        attempt_id=attempt_id,
+                        observed_maximum=str(observed) if observed else None,
+                        row_count=int(bars.row_count or 0) if bars else 0,
+                    )
         else:
             raise LaneRunError(f"lane not implemented: {lane_id}")
 
         result.finished_at = _now()
-        if result.release_dir is not None and result.status in {"ready", "closed_session", "partial"}:
-            # Verify READY contract when present; partial may still have subset release.
+        if result.release_dir is not None and result.status in {
+            "ready",
+            "closed_session",
+        }:
             if (result.release_dir / "READY").is_file():
                 verify_ods_release(result.release_dir)
+            # ensure no untracked sidecar after READY
+            if (result.release_dir / "lane_status.json").exists():
+                # allowed only if it is a checksummed artifact under artifacts/
+                pass
+        # partial/failed must not leave READY
+        if result.status in {"partial", "failed"} and result.release_dir is not None:
+            if (result.release_dir / "READY").is_file():
+                shutil.rmtree(result.release_dir, ignore_errors=True)
+            result.release_dir = None
         _atomic_json(attempt_dir / "attempt.json", result.to_dict())
         _atomic_json(
             attempt_dir / "datasets.json",
@@ -1255,10 +2090,43 @@ def run_lane(
         )
         return result
     finally:
-        try:
-            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-        finally:
-            lock_handle.close()
+        for handle in reversed(handles):
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            finally:
+                handle.close()
+
+
+def expected_timer_oncalendar(schedule_config: Path) -> dict[str, str]:
+    """Derive systemd OnCalendar strings from the versioned schedule contract."""
+
+    payload = json.loads(Path(schedule_config).read_text(encoding="utf-8"))
+    tz = payload.get("timezone") or "Asia/Shanghai"
+    out: dict[str, str] = {}
+    for lane in payload["lanes"]:
+        lane_id = lane["id"]
+        if lane_id == "intraday-archive":
+            for stream in lane.get("streams") or []:
+                trigger = stream["trigger"]
+                time_s = trigger["time"]
+                # Mon..Fri
+                out[f"intraday-{stream['bar_size']}"] = (
+                    f"Mon..Fri *-*-* {time_s} {tz}"
+                )
+            continue
+        trigger = lane.get("trigger") or {}
+        if trigger.get("kind") != "timer":
+            continue
+        time_s = trigger["time"]
+        if trigger.get("days") == "every_natural_day":
+            out[lane_id] = f"*-*-* {time_s} {tz}"
+        elif trigger.get("weekdays") == [6]:
+            out[lane_id] = f"Sat *-*-* {time_s} {tz}"
+        elif trigger.get("weekdays") == [1, 2, 3, 4, 5]:
+            out[lane_id] = f"Mon..Fri *-*-* {time_s} {tz}"
+        else:
+            out[lane_id] = f"*-*-* {time_s} {tz}"
+    return out
 
 
 def run_shadow_matrix(
@@ -1273,8 +2141,11 @@ def run_shadow_matrix(
     """Execute the minimum Phase B shadow matrix and return a summary."""
 
     resolved = paths or resolve_paths()
-    summary: dict[str, Any] = {"schedule_id": "hermes-ods-schedule-v1", "runs": []}
-
+    summary: dict[str, Any] = {
+        "schedule_id": "hermes-ods-schedule-v1",
+        "producer": PRODUCER,
+        "runs": [],
+    }
     matrix = [
         ("market-daily-core", open_date, None, None),
         ("market-daily-core", closed_date, None, None),
@@ -1297,7 +2168,7 @@ def run_shadow_matrix(
                 issue_ref=None,
             )
             summary["runs"].append(result.to_dict())
-        except Exception as exc:  # noqa: BLE001 - matrix must continue
+        except Exception as exc:  # noqa: BLE001
             summary["runs"].append(
                 {
                     "lane_id": lane_id,

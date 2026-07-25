@@ -15,6 +15,10 @@ fi
 : "${HERMES_ODS_SHADOW_ROOT:=${ASTOCK_HOME}/shadow/hermes-ods-v1}"
 : "${HERMES_ODS_CALENDAR:=${ASTOCK_HOME}/ref_trading_calendar.parquet}"
 : "${HERMES_ODS_SCHEDULE:=${ROOT}/config/schedules/hermes-ods-schedule.v1.json}"
+: "${PYTHON:=${ASTOCK_ROOT}/.venv/bin/python}"
+if [[ ! -x "$PYTHON" ]]; then
+  PYTHON=python3
+fi
 
 LANE=""
 MARKET_DATE=""
@@ -29,7 +33,7 @@ Usage: run-hermes-ods-lane --lane <id> --market-date YYYY-MM-DD [options]
 
 Options:
   --lane ID                 bootstrap|market-daily-core|calendar-daily-events|intraday-archive|weekly-corrections
-  --market-date DATE        Asia/Shanghai market date
+  --market-date DATE        Asia/Shanghai market date (same-day for post-close timers)
   --stream 1m|5m            required for intraday-archive
   --force-preflight STATE   both_open|both_closed|missing_or_disagree
   --issue-ref REF           required only for manual bootstrap (still refused by runner)
@@ -66,7 +70,7 @@ fi
 mkdir -p "$HERMES_ODS_SHADOW_ROOT"/{attempts,releases,locks,watermarks,logs}
 
 args=(
-  python3 -m quanthus.cli lane-run
+  "$PYTHON" -m quanthus.cli lane-run
   --config "$HERMES_ODS_SCHEDULE"
   --lane "$LANE"
   --market-date "$MARKET_DATE"

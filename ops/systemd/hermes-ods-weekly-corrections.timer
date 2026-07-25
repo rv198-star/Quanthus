@@ -1,8 +1,8 @@
 [Unit]
-Description=Shadow timer for Hermes ODS weekly-corrections
+Description=Shadow timer for Hermes ODS weekly-corrections (contract Sat 08:00)
 
 [Timer]
-OnCalendar=Sat *-*-* 09:00:00 Asia/Shanghai
+OnCalendar=Sat *-*-* 08:00:00 Asia/Shanghai
 AccuracySec=1min
 Persistent=false
 Unit=hermes-ods-weekly-corrections.service

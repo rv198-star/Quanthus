@@ -29,6 +29,13 @@ Source files must be atomically replaced, not mutated in place, because release 
 use hard links on the same filesystem. Historical bulk completion uses `schedule=bootstrap` and a
 separate path; it is not substituted for the daily release.
 
+The host timer runs Monday through Friday, but the acquisition wrapper must preflight the target
+date against both SSE and SZSE calendar rows before contacting market-data providers. Two open rows
+start the market job. Two closed rows produce only the calendar release. A missing row or an
+SSE/SZSE disagreement is a hard failure and alert. The wrapper must not infer a holiday from an
+empty bar response. Weekend market runs are not scheduled; disclosure-watermark collectors may
+use a separate calendar-day schedule.
+
 An open-session release contains the T bar delta, raw T `tradestatus/isST` observations for the
 complete in-scope universe, the complete small security master, and the calendar. A tradable status
 without a bar or any security without a status fails the OCI gate. The current stock list scopes T

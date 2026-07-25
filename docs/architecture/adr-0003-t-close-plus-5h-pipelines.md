@@ -32,6 +32,18 @@ T+1         strategies may consume the T-close snapshot for execution
 No current-session partial daily bar is admitted. Minute data, 10:00 intervention, and 14:15
 intervention are outside `t-close-plus-5h-v1` and require a separate policy version.
 
+The market timer fires Monday through Friday, including exchange holidays. Before any market or
+intraday request, Hermes resolves the target date from complete SSE and SZSE calendar evidence:
+
+- both exchanges open: run the market acquisition;
+- both exchanges closed: skip market and intraday requests and publish a calendar-only daily
+  release so OCI records `skipped_closed_session`;
+- either exchange missing or the two states disagree: fail and alert; absence of bars is never
+  interpreted as a holiday.
+
+Weekends have no market timer. Calendar-day announcement collectors may run independently because
+disclosures can arrive on non-trading days; they do not make a closed day into a market session.
+
 ### 2. Hermes has three acquisition lanes
 
 | Lane | Purpose | Invocation | Output contract |
@@ -49,7 +61,8 @@ window, then collects the direct 5-minute track. The formal 5-minute series is n
 from the 1-minute archive. Intraday jobs use independent locks, logs, checkpoints, and status;
 their failure cannot block or falsely pass the daily T+5h release. Existing intraday data and
 scripts remain outside Git, and no intraday feature enters a snapshot until a later versioned
-policy and acceptance gate authorize consumption.
+policy and acceptance gate authorize consumption. Intraday jobs consume the same proven open-day
+decision as the daily market release and do not independently guess from an empty provider result.
 
 The daily v1 release requires:
 

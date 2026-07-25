@@ -9,8 +9,9 @@
 P1 established a trusted historical base, but most of its transformations were invoked manually.
 The project now needs a repeatable post-close path that survives machine migration without moving
 market data through Git. Intraday 1-minute and 5-minute intervention is deliberately deferred until
-the live-trading phase. The approved decision contract remains a complete T-close signal whose
-first execution is T+1.
+the live-trading phase, but source acquisition continues because short vendor retention windows
+may make later recovery impossible. The approved decision contract remains a complete T-close
+signal whose first execution is T+1.
 
 ## Decision
 
@@ -31,16 +32,24 @@ T+1         strategies may consume the T-close snapshot for execution
 No current-session partial daily bar is admitted. Minute data, 10:00 intervention, and 14:15
 intervention are outside `t-close-plus-5h-v1` and require a separate policy version.
 
-### 2. Hermes has two acquisition lanes
+### 2. Hermes has three acquisition lanes
 
 | Lane | Purpose | Invocation | Output contract |
 | --- | --- | --- | --- |
 | Historical bootstrap/backfill | Establish or repair long history using the third-party a-stock-data project and targeted sources | Manual and issue-bound | Immutable `bootstrap` revision; never silently merged into a recurring release |
 | Recurring acquisition | Collect new observations and bounded correction lookbacks | Daily and weekly timers on Hermes | Immutable `daily` or `weekly` ODS release with `release.json`, checksums, and `READY` |
+| Intraday archive acquisition | Preserve direct 1-minute and 5-minute bars before their source windows expire | Post-close timers outside the T+5h critical path | Immutable raw daily partitions; not a T+5h feature or decision input |
 
 Bootstrap code remains owned by the upstream acquisition project. Quanthus owns the release
 contract, so either lane can hand immutable evidence to OCI without moving acquisition or source
 credentials to OCI.
+
+The intraday archive prioritizes direct 1-minute acquisition because it has the shortest recovery
+window, then collects the direct 5-minute track. The formal 5-minute series is never synthesized
+from the 1-minute archive. Intraday jobs use independent locks, logs, checkpoints, and status;
+their failure cannot block or falsely pass the daily T+5h release. Existing intraday data and
+scripts remain outside Git, and no intraday feature enters a snapshot until a later versioned
+policy and acceptance gate authorize consumption.
 
 The daily v1 release requires:
 

@@ -23,8 +23,9 @@ P1 excludes BSE, B shares, explicitly configured non-A-share instruments, news, 
 statements, historical concept membership, and official minute features. The active frozen
 `config/p1-universe.v2.json` is the explicit selection contract; it must name exceptional
 exclusions with reasons rather than silently dropping them. Official 5-minute data begins in
-2024-07 and is deferred until event-window work. One-minute data beginning 2026-03 is
-archive-only research data.
+2024-07 and its consumption is deferred until event-window work; acquisition continues to retain
+recoverable history. One-minute data beginning 2026-03 is continuously acquired as archive-only
+research data because its upstream retention window is short.
 
 P1 acceptance establishes deterministic replay and fail-closed behavior. The initial S3 full build
 exposed 276 securities with incomplete normalized unadjusted-price history and 639,009 affected

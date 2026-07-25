@@ -44,6 +44,11 @@ from quanthus.snapshot_publish import (
     load_snapshot_plan,
     publish_snapshot,
 )
+from quanthus.st_status import (
+    StStatusBuildError,
+    build_st_status_revision,
+    write_current_pointer,
+)
 from quanthus.tradability import (
     CoverageError,
     TradabilityCoverageResult,
@@ -163,6 +168,17 @@ def _parser() -> argparse.ArgumentParser:
     snapshot.add_argument("--plan", type=Path, required=True)
     snapshot.add_argument("--catalog-root", type=Path, required=True)
     snapshot.add_argument("--metadata-output", type=Path)
+
+    st_status = subparsers.add_parser(
+        "build-st-status",
+        help="publish an immutable OCI S2 status revision from a normalized candidate",
+    )
+    st_status.add_argument("--candidate", type=Path, required=True)
+    st_status.add_argument("--output", type=Path, required=True)
+    st_status.add_argument("--revision", required=True)
+    st_status.add_argument("--policy", type=Path)
+    st_status.add_argument("--parent", type=Path)
+    st_status.add_argument("--promote-pointer", type=Path)
     return parser
 
 
@@ -367,6 +383,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
             _print_materialized_snapshot(materialized)
+        elif args.command == "build-st-status":
+            default_policy = find_project_root() / "config" / "st-status.v1.json"
+            result = build_st_status_revision(
+                candidate=args.candidate,
+                output=args.output,
+                revision=args.revision,
+                policy_path=args.policy or default_policy,
+                parent=args.parent,
+            )
+            if args.promote_pointer is not None:
+                write_current_pointer(revision_dir=result.output, pointer=args.promote_pointer)
+            print(json.dumps(result.to_dict(), ensure_ascii=True, sort_keys=True))
         else:
             raise AssertionError(f"unhandled command: {args.command}")
     except (
@@ -381,6 +409,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         SnapshotBuildError,
         IdentityNormalizationError,
         IdentityCoverageError,
+        StStatusBuildError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

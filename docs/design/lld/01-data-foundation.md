@@ -144,7 +144,7 @@ Each stage is idempotent by input manifest and transformation version.
 | C1 | Rebuild effective-date adjustment factors | P1-DATA-001 | Ex-right continuity and no-future-factor tests |
 | C2 | Classify every security-calendar gap | S4, security master | No unclassified gap in acceptance corpus |
 | S1 | Measure and complete delisted coverage | Security master | Reference-universe reconciliation |
-| S2 | Derive historical ST state from announcements | Landing data | Dated known-case reconciliation |
+| S2 | Build binary historical ST state from Baostock daily evidence; retain announcements for audit | Landing data | Prior-session PIT shift and dated known-case reconciliation |
 | S3 | Derive board-specific price limits | S2, security master | Regime-boundary golden cases |
 | S4 | Build authoritative trading calendar | Source ingestion | Exchange-session reconciliation |
 | P1-UNIVERSE-001 | Implement daily point-in-time universe policy | Status and bars | Historical-universe fixture |

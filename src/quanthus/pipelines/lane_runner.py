@@ -1377,6 +1377,12 @@ def _build_calendar_events(
                     "acquired_at": _now_sh_iso(),
                 }
             ]
+        ann_rows = _filter_rows_by_date(
+            ann_rows,
+            market_date=market_date,
+            date_keys=("publish_time", "announce_date"),
+            lookback_days=(market_date - start).days,
+        )
         log_rows.extend(ann_logs)
         failed_requests = [
             row for row in ann_logs if str(row.get("response_error_code")) != "0"
@@ -1528,6 +1534,13 @@ def _build_calendar_events(
                     market_date=market_date,
                     window_start=start,
                 )
+                rows = _filter_rows_by_date(
+                    rows,
+                    market_date=market_date,
+                    date_keys=keys,
+                    lookback_days=(market_date - start).days,
+                )
+                request["selected_row_count"] = len(rows)
             except Exception as exc:  # noqa: BLE001
                 request = {
                     "provider": "configured-command",
@@ -1828,6 +1841,13 @@ def _build_weekly_corrections(
                     market_date=market_date,
                     window_start=market_date - timedelta(days=lookback),
                 )
+                selected = _filter_rows_by_date(
+                    selected,
+                    market_date=market_date,
+                    date_keys=keys,
+                    lookback_days=lookback,
+                )
+                request["selected_row_count"] = len(selected)
             except Exception as exc:  # noqa: BLE001
                 datasets.append(
                     DatasetStatus(
@@ -1889,6 +1909,13 @@ def _build_weekly_corrections(
                 market_date=market_date,
                 window_start=market_date - timedelta(days=30),
             )
+            selected = _filter_rows_by_date(
+                selected,
+                market_date=market_date,
+                date_keys=("date", "effective_start", "announcement_date"),
+                lookback_days=30,
+            )
+            st_request["selected_row_count"] = len(selected)
         except Exception as exc:  # noqa: BLE001
             datasets.append(
                 DatasetStatus(

@@ -143,6 +143,14 @@ value.
 
 Each stage is idempotent by input manifest and transformation version.
 
+Recurring production execution follows ADR 0003. Hermes separates issue-bound historical
+bootstrap work from daily/weekly ODS acquisition and writes READY only after an immutable release
+manifest. OCI runs the versioned `t-close-plus-5h-v1` stages and advances a daily partition pointer
+only after complete status coverage, tradable-bar coverage, identity, checksum, and OHLC gates.
+The accepted P1 full-history DWD remains the base; daily T partitions are chained above it without
+copying the full history. Closed sessions are evidenced by the release calendar and recorded as
+clean skips. Minute and partial-session data are not inputs to this pipeline version.
+
 ## 7. Blocking work
 
 | ID | Work | Dependency | Acceptance evidence |

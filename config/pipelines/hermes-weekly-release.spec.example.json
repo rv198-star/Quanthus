@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "release_id": "hermes-weekly-YYYYMMDD-v1",
+  "schedule": "weekly",
+  "market_date": "YYYY-MM-DD",
+  "producer": "hermes-recurring-acquisition-v1",
+  "artifacts": [
+    {
+      "name": "shareholder_count_revision",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/shareholder_count_revision.parquet",
+      "relative_path": "artifacts/shareholder_count_revision.parquet",
+      "source_revision": "shareholder-watermark-lookback90-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "corporate_actions_revision",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/corporate_actions_revision.parquet",
+      "relative_path": "artifacts/corporate_actions_revision.parquet",
+      "source_revision": "corporate-actions-lookback-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "financial_quarterly_revision",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/financial_quarterly_revision.parquet",
+      "relative_path": "artifacts/financial_quarterly_revision.parquet",
+      "source_revision": "financial-quarterly-lookback-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "st_status_observation_revision",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/st_status_observation_revision.parquet",
+      "relative_path": "artifacts/st_status_observation_revision.parquet",
+      "source_revision": "baostock-isST-lookback-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    }
+  ]
+}

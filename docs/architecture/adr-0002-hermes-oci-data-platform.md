@@ -5,6 +5,7 @@
 - Scope: Data acquisition, transformation, publication, and disaster recovery
 - Supersedes: The single-node deployment assumption in ADR 0001; its file-first analytical
   contracts remain in force
+- Operationalized by: ADR 0003 for recurring T-close plus five-hour processing
 
 ## Context
 

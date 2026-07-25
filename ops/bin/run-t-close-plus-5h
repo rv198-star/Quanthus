@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv/bin/python}"
+pipeline_config="${QUANTHUS_T5H_CONFIG:-${repo_root}/config/pipelines/t-close-plus-5h.v1.json}"
+ods_root="${QUANTHUS_ODS_ROOT:-/home/ubuntu/data/astock}"
+market_date="${1:-$(TZ=Asia/Shanghai date +%F)}"
+
+exec "$python_bin" -m quanthus pipeline-run \
+  --config "$pipeline_config" --market-date "$market_date"

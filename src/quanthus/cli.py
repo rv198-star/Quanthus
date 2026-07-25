@@ -42,6 +42,20 @@ from quanthus.p1_evidence_build import (
     build_p1_acceptance_evidence,
     write_p1_acceptance_evidence,
 )
+from quanthus.pipelines import (
+    DailyWarehouseError,
+    OdsReleaseError,
+    PipelineConfigError,
+    PipelineRunError,
+    build_daily_dwd_revision,
+    check_daily_dwd_revision,
+    load_pipeline_config,
+    market_session_is_open,
+    promote_daily_dwd_revision,
+    publish_ods_release,
+    run_pipeline,
+    verify_ods_release,
+)
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
 from quanthus.price_limits import (
     PriceLimitBuildError,
@@ -212,6 +226,66 @@ def _parser() -> argparse.ArgumentParser:
     price_limits.add_argument("--revision", required=True)
     price_limits.add_argument("--policy", type=Path)
     price_limits.add_argument("--promote-pointer", type=Path)
+
+    ods_release = subparsers.add_parser(
+        "verify-ods-release",
+        help="verify one immutable Hermes ODS release and READY marker",
+    )
+    ods_release.add_argument("--release-dir", type=Path, required=True)
+
+    ods_publish = subparsers.add_parser(
+        "publish-ods-release",
+        help="publish a checksummed Hermes ODS release from a versioned artifact spec",
+    )
+    ods_publish.add_argument("--spec", type=Path, required=True)
+    ods_publish.add_argument("--output", type=Path, required=True)
+
+    pipeline_check = subparsers.add_parser(
+        "pipeline-check",
+        help="validate a versioned OCI pipeline configuration without running it",
+    )
+    pipeline_check.add_argument("--config", type=Path, required=True)
+
+    pipeline_run = subparsers.add_parser(
+        "pipeline-run",
+        help="run one market-date OCI pipeline with locking and a durable ledger",
+    )
+    pipeline_run.add_argument("--config", type=Path, required=True)
+    pipeline_run.add_argument("--market-date", type=date.fromisoformat, required=True)
+
+    daily_dwd = subparsers.add_parser(
+        "build-daily-dwd",
+        help="normalize one verified Hermes daily delta into an immutable OCI DWD partition",
+    )
+    daily_dwd.add_argument("--release-dir", type=Path, required=True)
+    daily_dwd.add_argument("--output", type=Path, required=True)
+    daily_dwd.add_argument("--revision", required=True)
+    daily_dwd.add_argument("--market-date", type=date.fromisoformat, required=True)
+    daily_dwd.add_argument("--universe-policy", type=Path, required=True)
+    daily_dwd.add_argument("--code-validity-mapping", type=Path, required=True)
+    daily_dwd.add_argument("--code-revision", required=True)
+    daily_dwd.add_argument("--parent-pointer", type=Path)
+    daily_dwd.add_argument("--base-pointer", type=Path)
+
+    daily_dwd_check = subparsers.add_parser(
+        "check-daily-dwd",
+        help="recheck a complete immutable OCI daily DWD partition",
+    )
+    daily_dwd_check.add_argument("--revision-dir", type=Path, required=True)
+
+    daily_dwd_promote = subparsers.add_parser(
+        "promote-daily-dwd",
+        help="atomically advance the accepted OCI daily DWD partition chain",
+    )
+    daily_dwd_promote.add_argument("--revision-dir", type=Path, required=True)
+    daily_dwd_promote.add_argument("--pointer", type=Path, required=True)
+
+    market_session = subparsers.add_parser(
+        "market-session-check",
+        help="return success for one open SSE/SZSE session and 3 for a known closed date",
+    )
+    market_session.add_argument("--calendar", type=Path, required=True)
+    market_session.add_argument("--market-date", type=date.fromisoformat, required=True)
     return parser
 
 
@@ -429,7 +503,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_materialized_snapshot(materialized)
         elif args.command == "build-st-status":
             default_policy = find_project_root() / "config" / "st-status.v1.json"
-            result = build_st_status_revision(
+            st_result = build_st_status_revision(
                 candidate=args.candidate,
                 output=args.output,
                 revision=args.revision,
@@ -437,11 +511,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 parent=args.parent,
             )
             if args.promote_pointer is not None:
-                write_current_pointer(revision_dir=result.output, pointer=args.promote_pointer)
-            print(json.dumps(result.to_dict(), ensure_ascii=True, sort_keys=True))
+                write_current_pointer(revision_dir=st_result.output, pointer=args.promote_pointer)
+            print(json.dumps(st_result.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "build-price-limits":
             default_policy = find_project_root() / "config" / "price-limit.v1.json"
-            result = build_price_limit_revision(
+            limit_result = build_price_limit_revision(
                 rules=args.rules,
                 identity_revision=args.identity_revision,
                 s2_revision=args.s2_revision,
@@ -450,8 +524,55 @@ def main(argv: Sequence[str] | None = None) -> int:
                 policy_path=args.policy or default_policy,
             )
             if args.promote_pointer is not None:
-                write_price_limit_current(revision_dir=result.output, pointer=args.promote_pointer)
-            print(json.dumps(result.to_dict(), ensure_ascii=True, sort_keys=True))
+                write_price_limit_current(
+                    revision_dir=limit_result.output, pointer=args.promote_pointer
+                )
+            print(json.dumps(limit_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "verify-ods-release":
+            ods_result = verify_ods_release(args.release_dir)
+            print(json.dumps(ods_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "publish-ods-release":
+            ods_result = publish_ods_release(spec_path=args.spec, output=args.output)
+            print(json.dumps(ods_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "pipeline-check":
+            config = load_pipeline_config(args.config)
+            print(f"pipeline config OK: {config.pipeline_id} ({len(config.stages)} stages)")
+        elif args.command == "pipeline-run":
+            config = load_pipeline_config(args.config)
+            pipeline_result = run_pipeline(config, market_date=args.market_date)
+            print(json.dumps(pipeline_result.to_dict(), ensure_ascii=True, sort_keys=True))
+            if pipeline_result.status == "skipped_closed_session":
+                return 0
+            return 0 if pipeline_result.sla_met else 4
+        elif args.command == "build-daily-dwd":
+            dwd_result = build_daily_dwd_revision(
+                release_dir=args.release_dir,
+                output=args.output,
+                revision=args.revision,
+                market_date=args.market_date,
+                universe_policy_path=args.universe_policy,
+                code_validity_mapping_path=args.code_validity_mapping,
+                code_revision=args.code_revision,
+                parent_pointer=args.parent_pointer,
+                base_pointer=args.base_pointer,
+            )
+            print(json.dumps(dwd_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "check-daily-dwd":
+            dwd_result = check_daily_dwd_revision(args.revision_dir)
+            print(json.dumps(dwd_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "promote-daily-dwd":
+            dwd_result = promote_daily_dwd_revision(
+                revision_dir=args.revision_dir,
+                pointer=args.pointer,
+            )
+            print(json.dumps(dwd_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "market-session-check":
+            is_open = market_session_is_open(
+                calendar=args.calendar,
+                market_date=args.market_date,
+            )
+            print(f"{args.market_date.isoformat()} {'OPEN' if is_open else 'CLOSED'}")
+            return 0 if is_open else 3
         else:
             raise AssertionError(f"unhandled command: {args.command}")
     except (
@@ -469,6 +590,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         IdentityCoverageError,
         StStatusBuildError,
         PriceLimitBuildError,
+        OdsReleaseError,
+        PipelineConfigError,
+        PipelineRunError,
+        DailyWarehouseError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

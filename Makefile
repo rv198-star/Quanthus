@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot
+.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -70,3 +70,7 @@ publish-snapshot:
 		--plan "$${QUANTHUS_SNAPSHOT_PLAN}" \
 		--catalog-root "$${QUANTHUS_SNAPSHOT_CATALOG:-/home/ubuntu/data/quanthus/snapshots}" \
 		--metadata-output artifacts/p1-snapshot.json
+
+pipeline-check:
+	$(VENV)/bin/python -m quanthus pipeline-check \
+		--config config/pipelines/t-close-plus-5h.v1.json

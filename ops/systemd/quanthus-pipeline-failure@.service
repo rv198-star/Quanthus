@@ -1,0 +1,6 @@
+[Unit]
+Description=Record failed Quanthus pipeline unit %i
+
+[Service]
+Type=oneshot
+ExecStart=-/usr/bin/systemctl --no-pager --full status %i

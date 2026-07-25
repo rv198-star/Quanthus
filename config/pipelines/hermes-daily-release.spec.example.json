@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "release_id": "hermes-daily-YYYYMMDD-v1",
+  "schedule": "daily",
+  "market_date": "YYYY-MM-DD",
+  "producer": "hermes-recurring-acquisition-v1",
+  "artifacts": [
+    {
+      "name": "daily_ohlcv_none_delta",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/daily_ohlcv_none_delta.parquet",
+      "relative_path": "artifacts/daily_ohlcv_none_delta.parquet",
+      "source_revision": "provider-and-attempt-specific-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "daily_status_observation_delta",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/daily_status_observation_delta.parquet",
+      "relative_path": "artifacts/daily_status_observation_delta.parquet",
+      "source_revision": "baostock-daily-status-attempt-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "security_master",
+      "source_path": "/root/work/astock/data/ref_security_master.parquet",
+      "relative_path": "artifacts/ref_security_master.parquet",
+      "source_revision": "security-master-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "stock_list",
+      "source_path": "/root/work/astock/data/stock_list.parquet",
+      "relative_path": "artifacts/stock_list.parquet",
+      "source_revision": "current-stock-list-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "trading_calendar",
+      "source_path": "/root/work/astock/data/ref_trading_calendar.parquet",
+      "relative_path": "artifacts/ref_trading_calendar.parquet",
+      "source_revision": "trading-calendar-revision-with-T-evidence",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    }
+  ]
+}

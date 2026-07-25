@@ -39,6 +39,7 @@ make bootstrap-p1
 ```text
 config/              Frozen policy and release gates
 docs/                Architecture decisions, contracts, and roadmaps
+ops/                 Deployable scripts and service/timer templates
 src/quanthus/        Runtime package and project doctor
 tests/               Unit, contract, and acceptance tests
 data/                Local data only; generated content is not committed
@@ -48,6 +49,10 @@ research/            Reproducible research entry points, not production logic
 The frozen decisions are encoded in `config/p0-policy.v1.json`. Changes to data,
 execution, risk, labels, or validation rules require a new policy version and matching
 contract tests.
+
+The production post-close data path is versioned in
+`config/pipelines/t-close-plus-5h.v1.json`. Runtime ODS releases, DWD partitions, logs, locks,
+environment files, and credentials remain outside Git.
 
 ## Source design
 

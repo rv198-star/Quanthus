@@ -12,6 +12,10 @@
 - `architecture/adr-0001-local-data-stack.md`: file-first analytical storage and execution.
 - `architecture/adr-0002-hermes-oci-data-platform.md`: Hermes/OCI ownership, PostgreSQL
   publication and replication topology, security boundaries, and disaster recovery.
+- `architecture/adr-0003-t-close-plus-5h-pipelines.md`: recurring acquisition lanes, the
+  post-close processing SLA, immutable daily DWD partitions, and fail-closed publication.
+- `operations/t-close-plus-5h-runbook.md`: Hermes handoff, OCI deployment, rehearsal, incident,
+  and migration procedures for the daily pipeline.
 
 ## Decision precedence
 

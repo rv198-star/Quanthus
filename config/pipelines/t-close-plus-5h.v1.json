@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "pipeline_id": "t-close-plus-5h-v1",
+  "timezone": "Asia/Shanghai",
+  "close_time": "15:00:00",
+  "completion_sla_minutes": 300,
+  "run_root": "{warehouse_root}/runs",
+  "lock_path": "{warehouse_root}/locks/t-close-plus-5h.lock",
+  "variables": {
+    "repo_root": {
+      "environment": "QUANTHUS_REPO_ROOT",
+      "default": "/opt/quanthus/current"
+    },
+    "python": {
+      "environment": "QUANTHUS_PYTHON",
+      "default": "/opt/quanthus/current/.venv/bin/python"
+    },
+    "code_revision": {
+      "environment": "QUANTHUS_CODE_REVISION"
+    },
+    "ods_root": {
+      "environment": "QUANTHUS_ODS_ROOT",
+      "default": "/home/ubuntu/data/astock"
+    },
+    "warehouse_root": {
+      "environment": "QUANTHUS_WAREHOUSE_ROOT",
+      "default": "/home/ubuntu/data/quanthus"
+    }
+  },
+  "stages": [
+    {
+      "id": "pull_hermes_daily_release",
+      "phase": "acquire",
+      "kind": "command",
+      "argv": [
+        "{repo_root}/ops/bin/pull-hermes-ods-release",
+        "daily",
+        "{market_date}",
+        "{ods_root}"
+      ],
+      "retries": 24,
+      "retry_delay_seconds": 600,
+      "timeout_seconds": 900
+    },
+    {
+      "id": "verify_hermes_daily_release",
+      "phase": "verify",
+      "kind": "verify_ods_release",
+      "release_dir": "{ods_root}/releases/daily/{market_date}",
+      "retries": 1,
+      "retry_delay_seconds": 60,
+      "timeout_seconds": 900
+    },
+    {
+      "id": "check_market_session",
+      "phase": "verify",
+      "kind": "market_session_check",
+      "calendar_path": "{ods_root}/releases/daily/{market_date}/artifacts/ref_trading_calendar.parquet",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "build_daily_dwd_partition",
+      "phase": "build",
+      "kind": "command",
+      "argv": [
+        "{python}",
+        "-m",
+        "quanthus",
+        "build-daily-dwd",
+        "--release-dir",
+        "{ods_root}/releases/daily/{market_date}",
+        "--output",
+        "{warehouse_root}/revisions/daily_market_dwd_v1_{market_date_compact}_{run_id}",
+        "--revision",
+        "daily_market_dwd_v1_{market_date_compact}_{run_id}",
+        "--market-date",
+        "{market_date}",
+        "--universe-policy",
+        "{repo_root}/config/p1-universe.v2.json",
+        "--code-validity-mapping",
+        "{repo_root}/config/security-code-validity.v1.json",
+        "--code-revision",
+        "{code_revision}",
+        "--parent-pointer",
+        "{warehouse_root}/revisions/daily_market_CURRENT.json",
+        "--base-pointer",
+        "{warehouse_root}/revisions/daily_ohlcv_none_CURRENT.json"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "gate_daily_dwd_partition",
+      "phase": "gate",
+      "kind": "command",
+      "argv": [
+        "{python}",
+        "-m",
+        "quanthus",
+        "check-daily-dwd",
+        "--revision-dir",
+        "{warehouse_root}/revisions/daily_market_dwd_v1_{market_date_compact}_{run_id}"
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "publish_daily_dwd_current",
+      "phase": "publish",
+      "kind": "command",
+      "argv": [
+        "{python}",
+        "-m",
+        "quanthus",
+        "promote-daily-dwd",
+        "--revision-dir",
+        "{warehouse_root}/revisions/daily_market_dwd_v1_{market_date_compact}_{run_id}",
+        "--pointer",
+        "{warehouse_root}/revisions/daily_market_CURRENT.json"
+      ],
+      "timeout_seconds": 900
+    }
+  ]
+}

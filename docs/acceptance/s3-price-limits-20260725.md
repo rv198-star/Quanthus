@@ -33,9 +33,10 @@ Reason distribution:
 | IPO no-limit session | 5,322 |
 | trade status unknown, fail-closed | 39 |
 
-The 639,009 missing-reference rows belong to 208 securities with no normalized `none` history;
-S3 did not lose their prior closes. They are retained as an explicit upstream coverage boundary
-and cannot generate an entry. The 39 missing trade-status rows match terminal-boundary dates.
+The 639,009 missing-reference rows belong to 276 securities with no normalized `none` history:
+265 are currently marked listed and 11 delisted. S3 did not lose their prior closes. They are
+retained as an explicit upstream coverage boundary, cannot generate an entry, and are tracked as
+a separate acquisition defect. The 39 missing trade-status rows match terminal-boundary dates.
 
 ## Golden coverage
 

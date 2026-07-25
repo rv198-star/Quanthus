@@ -6,7 +6,7 @@
 | Status | Conditionally accepted; P2 implementation allowed |
 | Governing requirements | FR-DATA-001 through FR-DATA-006 |
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
-| Coverage follow-up | 276 securities without normalized none history remain fail-closed under issue #38 |
+| Coverage follow-up | Issue #38 resolved in `none_history_276_oci_v1_20260725` |
 
 ## 1. Goal
 
@@ -26,12 +26,11 @@ exclusions with reasons rather than silently dropping them. Official 5-minute da
 2024-07 and is deferred until event-window work. One-minute data beginning 2026-03 is
 archive-only research data.
 
-P1 acceptance establishes deterministic replay and fail-closed behavior, not complete executable
-coverage for every in-scope security. The S3 full build exposed 276 securities with no normalized
-unadjusted-price history. Their 639,009 affected execution rows cannot open positions and remain an
-explicit acquisition and normalization follow-up under issue #38. This bounded defect does not
-invalidate the snapshot, S2, or S3 resolver contracts, but complete executable coverage must not be
-claimed until #38 is accepted.
+P1 acceptance establishes deterministic replay and fail-closed behavior. The initial S3 full build
+exposed 276 securities with incomplete normalized unadjusted-price history and 639,009 affected
+execution rows. Issue #38 restored their source history in a new OCI child revision. The rebuilt S3
+has zero unexpected prior-close gaps; 72 exact first-supported-trade boundaries remain separately
+coded and fail closed because no earlier tradable close exists inside the supported history.
 
 ## 3. Data layers
 

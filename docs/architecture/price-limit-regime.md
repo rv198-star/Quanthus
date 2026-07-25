@@ -30,10 +30,15 @@ Unknown S2 state, unknown trade status, missing prior close, unsupported legacy 
 missing issue price all produce explicit fail-closed reason codes. They never fall through to the
 ordinary board limit.
 
+A limited security's first `tradestatus=1` session in the supported history may have no earlier
+tradable close inside that history. It is classified separately as
+`first_supported_trade_no_prior_close_fail_closed`. A missing prior close after the first tradable
+session remains `prior_close_missing_fail_closed` and is an upstream coverage defect.
+
 ## Publication
 
 `quanthus build-price-limits` verifies candidate checksum and cutoff ordering, builds the
 execution-day resolver, checks uniqueness and IPO session bounds, and writes an immutable manifest
 with schema/content hashes. The promoted revision is
-`price_limit_execution_v2_oci_20260725`. It is consumed with formal S2 by snapshot
-`p1-s2-s3-20260725-v1`.
+`price_limit_execution_v2_oci_v1_2_20260725`. It is consumed with formal S2 by snapshot
+`p1-s2-s3-none38-20260725-v1`.

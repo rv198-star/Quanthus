@@ -27,6 +27,11 @@ from quanthus.identity_normalization import (
     IdentityNormalizationError,
     build_identity_normalized_revision,
 )
+from quanthus.none_backfill import (
+    NoneBackfillError,
+    build_none_backfill_revision,
+    write_none_current,
+)
 from quanthus.p1_acceptance import (
     AcceptanceEvidenceError,
     P1AcceptanceReport,
@@ -101,6 +106,17 @@ def _parser() -> argparse.ArgumentParser:
     normalize_identity.add_argument("--s2-candidate", type=Path, required=True)
     normalize_identity.add_argument("--output", type=Path, required=True)
     normalize_identity.add_argument("--revision", required=True)
+
+    none_backfill = subparsers.add_parser(
+        "merge-none-backfill",
+        help="build an immutable none child by filling missing keys from raw evidence",
+    )
+    none_backfill.add_argument("--parent", type=Path, required=True)
+    none_backfill.add_argument("--raw-revision", type=Path, required=True)
+    none_backfill.add_argument("--detection-file", type=Path, required=True)
+    none_backfill.add_argument("--output", type=Path, required=True)
+    none_backfill.add_argument("--revision", required=True)
+    none_backfill.add_argument("--promote-pointer", type=Path)
 
     identity_coverage = subparsers.add_parser(
         "build-identity-coverage",
@@ -319,6 +335,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 revision=args.revision,
             )
             print(json.dumps(normalized.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "merge-none-backfill":
+            merged = build_none_backfill_revision(
+                parent=args.parent,
+                raw_revision=args.raw_revision,
+                detection_file=args.detection_file,
+                output=args.output,
+                revision=args.revision,
+            )
+            if args.promote_pointer is not None:
+                write_none_current(revision_dir=merged.output, pointer=args.promote_pointer)
+            print(json.dumps(merged.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "build-identity-coverage":
             result = build_identity_coverage(
                 revision_root=args.revision_root,
@@ -438,6 +465,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         EvidenceBuildError,
         SnapshotBuildError,
         IdentityNormalizationError,
+        NoneBackfillError,
         IdentityCoverageError,
         StStatusBuildError,
         PriceLimitBuildError,

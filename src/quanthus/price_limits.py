@@ -131,6 +131,8 @@ def resolve_price_limit_policy(
         reason = "ipo_issue_price_missing_fail_closed"
     elif in_ipo_window and pct is None:
         reason = "ipo_no_limit_session"
+    elif limited and prior_trading_close is None and eligible_session_index == 1:
+        reason = "first_supported_trade_no_prior_close_fail_closed"
     elif limited and prior_trading_close is None:
         reason = "prior_close_missing_fail_closed"
     elif is_st_class:
@@ -460,6 +462,9 @@ def build_price_limit_revision(
                          'ipo_main_first_trading_day_44pct'
                         THEN 'ipo_issue_price_missing_fail_closed'
                     WHEN in_ipo_window AND resolved_upper_pct IS NULL THEN 'ipo_no_limit_session'
+                    WHEN resolved_upper_pct IS NOT NULL AND prior_trading_close IS NULL
+                         AND eligible_session_index = 1
+                        THEN 'first_supported_trade_no_prior_close_fail_closed'
                     WHEN resolved_upper_pct IS NOT NULL AND prior_trading_close IS NULL
                         THEN 'prior_close_missing_fail_closed'
                     WHEN is_st_class THEN 'st_overlay_applied'

@@ -39,7 +39,7 @@ from quanthus.pipelines.schedule_contracts import (
 
 SH = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
-PRODUCER = "hermes-ods-lane-runner-v2"
+PRODUCER = "hermes-ods-lane-runner-v3"
 
 MANDATORY: dict[str, set[str]] = {
     "market-daily-core": {
@@ -395,6 +395,104 @@ def _symbol_limit() -> int | None:
     except ValueError:
         return None
     return value if value > 0 else None
+
+
+def _provider_spec() -> dict[str, Any]:
+    """Load the explicit Hermes provider command contract.
+
+    Commands are argv arrays, never shell strings. Each collector must write the
+    parquet path supplied through ``{output}``; this keeps provider evidence in
+    the current immutable attempt instead of re-reading a mutable local SoT.
+    """
+
+    raw = os.environ.get("HERMES_ODS_PROVIDER_SPEC", "").strip()
+    if not raw:
+        raise LaneRunError("HERMES_ODS_PROVIDER_SPEC is required in provider mode")
+    path = Path(raw)
+    if not path.is_file():
+        raise LaneRunError(f"provider spec is missing: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LaneRunError(f"invalid provider spec {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise LaneRunError("provider spec root must be an object")
+    return payload
+
+
+def _run_configured_provider_collector(
+    *,
+    lane_id: str,
+    dataset: str,
+    output: Path,
+    paths: LanePaths,
+    market_date: date,
+    window_start: date,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    spec = _provider_spec()
+    lanes = spec.get("lanes")
+    lane = lanes.get(lane_id) if isinstance(lanes, dict) else None
+    collector = lane.get(dataset) if isinstance(lane, dict) else None
+    if not isinstance(collector, dict):
+        raise LaneRunError(f"provider collector not configured: {lane_id}/{dataset}")
+    argv_template = collector.get("argv")
+    if not isinstance(argv_template, list) or not argv_template:
+        raise LaneRunError(f"provider argv must be a non-empty list: {lane_id}/{dataset}")
+    if not all(isinstance(item, str) for item in argv_template):
+        raise LaneRunError(f"provider argv must contain only strings: {lane_id}/{dataset}")
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    values = {
+        "output": str(output),
+        "home": str(paths.home),
+        "market_date": market_date.isoformat(),
+        "window_start": window_start.isoformat(),
+    }
+    try:
+        argv = [item.format_map(values) for item in argv_template]
+    except (KeyError, ValueError) as exc:
+        raise LaneRunError(
+            f"invalid provider argv placeholder for {lane_id}/{dataset}: {exc}"
+        ) from exc
+    if "{output}" not in argv_template:
+        raise LaneRunError(f"provider argv must include {{output}}: {lane_id}/{dataset}")
+
+    import subprocess
+
+    started = time.monotonic()
+    proc = subprocess.run(
+        argv,
+        cwd=str(paths.home.parent),
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+        timeout=int(collector.get("timeout_seconds") or 3600),
+        check=False,
+    )
+    meta = {
+        "provider": collector.get("provider") or "configured-command",
+        "lane_id": lane_id,
+        "dataset": dataset,
+        "argv": argv,
+        "output": str(output),
+        "exit_code": proc.returncode,
+        "stdout_tail": (proc.stdout or "")[-2000:],
+        "stderr_tail": (proc.stderr or "")[-2000:],
+        "duration_seconds": round(time.monotonic() - started, 3),
+    }
+    if proc.returncode != 0:
+        raise LaneRunError(
+            f"provider collector failed {lane_id}/{dataset} exit={proc.returncode}: "
+            f"{meta['stderr_tail']}"
+        )
+    if not output.is_file():
+        raise LaneRunError(
+            f"provider collector produced no attempt output: {lane_id}/{dataset}"
+        )
+    rows = _read_parquet(output)
+    meta["row_count"] = len(rows)
+    meta["sha256"] = _sha256(output)
+    return rows, meta
 
 
 def _code6(value: Any) -> str:
@@ -1197,7 +1295,10 @@ def _cninfo_fetch_announcements(
                         }
                     )
                     got_total += 1
-                if not body.get("hasMore") or not batch:
+                has_more = bool(body.get("hasMore"))
+                if has_more and page == 40:
+                    raise RuntimeError("pagination limit reached with hasMore=true")
+                if not has_more or not batch:
                     break
                 page += 1
         except Exception as exc:  # noqa: BLE001
@@ -1260,11 +1361,26 @@ def _build_calendar_events(
 
     # Announcements: provider = cninfo live; local = sqlite/db or parquet with disclose keys
     if mode == "provider":
-        codes = _universe_from_stock_list(paths.home) or ["000001", "600519"]
-        ann_rows, ann_logs = _cninfo_fetch_announcements(
-            codes=codes, start=start, end=market_date
-        )
+        codes = _universe_from_stock_list(paths.home)
+        if codes:
+            ann_rows, ann_logs = _cninfo_fetch_announcements(
+                codes=codes, start=start, end=market_date
+            )
+        else:
+            ann_rows = []
+            ann_logs = [
+                {
+                    "dataset": "announcements_delta",
+                    "response_error_code": "1",
+                    "response_error_msg": "empty in-scope universe from stock_list",
+                    "response_rows": 0,
+                    "acquired_at": _now_sh_iso(),
+                }
+            ]
         log_rows.extend(ann_logs)
+        failed_requests = [
+            row for row in ann_logs if str(row.get("response_error_code")) != "0"
+        ]
         for row in ann_rows:
             pub = str(row.get("publish_time") or row.get("announce_date") or "")
             if pub and (observed_max is None or pub > observed_max):
@@ -1278,18 +1394,35 @@ def _build_calendar_events(
             "input_watermark": input_wm,
             "lookback_days": lookback,
         }
-        datasets.append(
-            _seal_dataset(
-                name="announcements_delta",
-                rows=ann_rows,
-                landing=landing,
-                source_revision=rev,
-                knowledge_cutoff=knowledge_cutoff,
-                watermark=watermark,
-                source_request=json.dumps(request, sort_keys=True),
-                require_rows=False,
+        if failed_requests:
+            datasets.append(
+                DatasetStatus(
+                    name="announcements_delta",
+                    status="failed",
+                    row_count=len(ann_rows),
+                    detail=(
+                        "cninfo acquisition incomplete: "
+                        f"{len(failed_requests)}/{len(ann_logs)} requests failed"
+                    ),
+                    source_revision=rev,
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                    source_request=json.dumps(request, sort_keys=True),
+                )
             )
-        )
+        else:
+            datasets.append(
+                _seal_dataset(
+                    name="announcements_delta",
+                    rows=ann_rows,
+                    landing=landing,
+                    source_revision=rev,
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                    source_request=json.dumps(request, sort_keys=True),
+                    require_rows=False,
+                )
+            )
     else:
         # local fixture path: read db/parquet with disclose-date filter + lookback
         source, keys = _event_source_map(paths)["announcements_delta"]
@@ -1379,16 +1512,86 @@ def _build_calendar_events(
                 )
             )
 
-    # Remaining event datasets: local SoT with disclose-first keys + lookback
+    # Remaining event datasets must come from this attempt in provider mode.
     for name, (source, keys) in _event_source_map(paths).items():
         if name == "announcements_delta":
             continue
+        if mode == "provider":
+            acquired_at = _now_sh_iso()
+            raw_output = landing / "provider_raw" / f"{name}.parquet"
+            try:
+                rows, request = _run_configured_provider_collector(
+                    lane_id="calendar-daily-events",
+                    dataset=name,
+                    output=raw_output,
+                    paths=paths,
+                    market_date=market_date,
+                    window_start=start,
+                )
+            except Exception as exc:  # noqa: BLE001
+                request = {
+                    "provider": "configured-command",
+                    "dataset": name,
+                    "output": str(raw_output),
+                    "window_start": start.isoformat(),
+                    "window_end": market_date.isoformat(),
+                }
+                log_rows.append(
+                    {
+                        "dataset": name,
+                        "request": request,
+                        "response_error_code": "1",
+                        "response_error_msg": str(exc),
+                        "acquired_at": acquired_at,
+                    }
+                )
+                datasets.append(
+                    DatasetStatus(
+                        name=name,
+                        status="failed",
+                        detail=str(exc),
+                        source_revision=rev,
+                        knowledge_cutoff=knowledge_cutoff,
+                        watermark=watermark,
+                        source_request=json.dumps(request, sort_keys=True),
+                    )
+                )
+                continue
+            for row in rows:
+                row["acquired_at"] = acquired_at
+                for key in keys:
+                    value = row.get(key)
+                    if value is None:
+                        continue
+                    observed = str(value)
+                    if observed_max is None or observed > observed_max:
+                        observed_max = observed
+                    break
+            log_rows.append(
+                {
+                    "dataset": name,
+                    "request": request,
+                    "response_error_code": "0",
+                    "response_error_msg": "ok",
+                    "response_rows": len(rows),
+                    "acquired_at": acquired_at,
+                }
+            )
+            datasets.append(
+                _seal_dataset(
+                    name=name,
+                    rows=rows,
+                    landing=landing,
+                    source_revision=rev,
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                    source_request=json.dumps(request, sort_keys=True, default=str),
+                    require_rows=False,
+                )
+            )
+            continue
         request = {
-            "provider": (
-                "local-event-sot"
-                if mode == "local"
-                else "event-sot-with-disclose-keys"
-            ),
+            "provider": "local-event-sot",
             "dataset": name,
             "path": str(source),
             "window_start": start.isoformat(),
@@ -1562,6 +1765,7 @@ def _build_weekly_corrections(
     rev = f"hermes-weekly-corrections-{market_date.strftime('%Y%m%d')}-v2"
     watermark = market_date.isoformat()
     datasets: list[DatasetStatus] = []
+    mode = _acquire_mode()
 
     primary = [
         (
@@ -1612,7 +1816,38 @@ def _build_weekly_corrections(
     ]
 
     for name, source, keys, lookback, out_name, _id_keys, _value_keys in primary:
-        if not source.is_file():
+        request: dict[str, Any] | None = None
+        if mode == "provider":
+            raw_output = landing / "provider_raw" / f"{name}.parquet"
+            try:
+                selected, request = _run_configured_provider_collector(
+                    lane_id="weekly-corrections",
+                    dataset=name,
+                    output=raw_output,
+                    paths=paths,
+                    market_date=market_date,
+                    window_start=market_date - timedelta(days=lookback),
+                )
+            except Exception as exc:  # noqa: BLE001
+                datasets.append(
+                    DatasetStatus(
+                        name=name,
+                        status="failed",
+                        detail=str(exc),
+                        source_revision=rev,
+                        knowledge_cutoff=knowledge_cutoff,
+                        watermark=watermark,
+                    )
+                )
+                continue
+        elif source.is_file():
+            selected = _filter_rows_by_date(
+                _read_parquet(source),
+                market_date=market_date,
+                date_keys=keys,
+                lookback_days=lookback,
+            )
+        else:
             datasets.append(
                 DatasetStatus(
                     name=name,
@@ -1621,12 +1856,6 @@ def _build_weekly_corrections(
                 )
             )
             continue
-        selected = _filter_rows_by_date(
-            _read_parquet(source),
-            market_date=market_date,
-            date_keys=keys,
-            lookback_days=lookback,
-        )
         for row in selected:
             row["revision_retained"] = True
             row["lookback_days"] = lookback
@@ -1642,24 +1871,55 @@ def _build_weekly_corrections(
                 watermark=watermark,
                 relative_name=out_name,
                 require_rows=False,
+                source_request=(
+                    json.dumps(request, sort_keys=True, default=str) if request else None
+                ),
             )
         )
 
+    st_request: dict[str, Any] | None = None
     st_path = paths.home / "ref_st_status_pit.parquet"
-    if not st_path.is_file():
-        st_path = (
-            paths.home
-            / "revisions"
-            / "st_status_pit_v2_baostock_20260725"
-            / "daily_isST.parquet"
+    if mode == "provider":
+        try:
+            selected, st_request = _run_configured_provider_collector(
+                lane_id="weekly-corrections",
+                dataset="st_announcement_trail",
+                output=landing / "provider_raw" / "st_announcement_trail.parquet",
+                paths=paths,
+                market_date=market_date,
+                window_start=market_date - timedelta(days=30),
+            )
+        except Exception as exc:  # noqa: BLE001
+            datasets.append(
+                DatasetStatus(
+                    name="st_announcement_trail",
+                    status="failed",
+                    detail=str(exc),
+                    source_revision=rev,
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                )
+            )
+            selected = None
+    else:
+        if not st_path.is_file():
+            st_path = (
+                paths.home
+                / "revisions"
+                / "st_status_pit_v2_baostock_20260725"
+                / "daily_isST.parquet"
+            )
+        selected = (
+            _filter_rows_by_date(
+                _read_parquet(st_path),
+                market_date=market_date,
+                date_keys=("date", "effective_start", "announcement_date"),
+                lookback_days=30,
+            )
+            if st_path.is_file()
+            else None
         )
-    if st_path.is_file():
-        selected = _filter_rows_by_date(
-            _read_parquet(st_path),
-            market_date=market_date,
-            date_keys=("date", "effective_start", "announcement_date"),
-            lookback_days=30,
-        )
+    if selected is not None:
         datasets.append(
             _seal_dataset(
                 name="st_announcement_trail",
@@ -1669,9 +1929,14 @@ def _build_weekly_corrections(
                 knowledge_cutoff=knowledge_cutoff,
                 watermark=watermark,
                 relative_name="st_status_observation_revision.parquet",
+                source_request=(
+                    json.dumps(st_request, sort_keys=True, default=str)
+                    if st_request
+                    else None
+                ),
             )
         )
-    else:
+    elif not any(item.name == "st_announcement_trail" for item in datasets):
         datasets.append(
             DatasetStatus(
                 name="st_announcement_trail",
@@ -1734,12 +1999,20 @@ def _build_weekly_corrections(
         "provider": None,
         "window_sessions": [day.isoformat() for day in session_days],
     }
+    correction_error: str | None = None
     if none_path.is_file() and session_days:
         daily_map: dict[str, str] = {}
         upstream_map: dict[str, str] = {}
-        max_keys = int(os.environ.get("HERMES_ODS_WEEKLY_RECON_MAX_KEYS") or "20000")
-        mode = _acquire_mode()
+        max_keys_raw = os.environ.get("HERMES_ODS_WEEKLY_RECON_MAX_KEYS", "").strip()
+        if mode == "provider" and max_keys_raw:
+            correction_error = (
+                "HERMES_ODS_WEEKLY_RECON_MAX_KEYS is smoke-only and forbidden "
+                "for provider weekly publication"
+            )
+        max_keys = None if mode == "provider" else int(max_keys_raw or "20000")
         try:
+            if correction_error:
+                raise LaneRunError(correction_error)
             import pyarrow as pa
             import pyarrow.compute as pc
             import pyarrow.parquet as pq
@@ -1777,7 +2050,7 @@ def _build_weekly_corrections(
                 mask = pc.is_in(as_str, value_set=pa.array(day_strs))
                 table = table.filter(mask)
 
-            if table.num_rows > max_keys:
+            if max_keys is not None and table.num_rows > max_keys:
                 table = table.slice(0, max_keys)
             published_rows = table.to_pylist()
             for row in published_rows:
@@ -1804,7 +2077,9 @@ def _build_weekly_corrections(
                 }
             )
             if not codes:
-                codes = _universe_from_stock_list(paths.home)[:50]
+                codes = _universe_from_stock_list(paths.home)
+            if mode == "provider" and not codes:
+                raise LaneRunError("empty in-scope universe for weekly correction")
             start_day = min(session_days)
             end_day = max(session_days)
             correction_meta.update(
@@ -1839,7 +2114,10 @@ def _build_weekly_corrections(
                             adjustflag="3",
                         )
                         if str(rs.error_code) != "0":
-                            continue
+                            raise LaneRunError(
+                                f"baostock weekly correction failed for {code}: "
+                                f"{rs.error_code} {rs.error_msg}"
+                            )
                         while rs.next():
                             raw = rs.get_row_data()
                             day = str(raw[0])[:10]
@@ -1860,6 +2138,8 @@ def _build_weekly_corrections(
                             )
                 finally:
                     bs.logout()
+                if not correction_rows:
+                    raise LaneRunError("weekly provider returned zero correction rows")
                 correction_meta["provider"] = "baostock.query_history_k_data_plus"
             else:
                 # local: independent correction revision derived from published snapshot
@@ -1916,40 +2196,38 @@ def _build_weekly_corrections(
             for item in classified:
                 counts[item["class"]] = counts.get(item["class"], 0) + 1
         except Exception as exc:  # noqa: BLE001
-            key_rows.append(
-                {
-                    "key": "_error",
-                    "class": "conflict",
-                    "daily": None,
-                    "upstream": str(exc),
-                }
-            )
-            counts["conflict"] = counts.get("conflict", 0) + 1
+            correction_error = str(exc)
     else:
-        key_rows.append(
-            {
-                "key": "_window",
-                "class": "conflict",
-                "daily": None,
-                "upstream": "none_path_or_sessions_missing",
-            }
-        )
-        counts["conflict"] = 1
+        correction_error = "none_path_or_sessions_missing"
 
     # Seal independent correction revision artifact (required evidence).
-    datasets.append(
-        _seal_dataset(
-            name="weekly_correction_revision",
-            rows=correction_rows,
-            landing=landing,
-            source_revision=rev,
-            knowledge_cutoff=knowledge_cutoff,
-            watermark=watermark,
-            relative_name="weekly_correction_revision.parquet",
-            source_request=json.dumps(correction_meta, sort_keys=True, default=str),
-            require_rows=False,
+    if correction_error:
+        correction_meta["error"] = correction_error
+        datasets.append(
+            DatasetStatus(
+                name="weekly_correction_revision",
+                status="failed",
+                detail=correction_error,
+                source_revision=rev,
+                knowledge_cutoff=knowledge_cutoff,
+                watermark=watermark,
+                source_request=json.dumps(correction_meta, sort_keys=True, default=str),
+            )
         )
-    )
+    else:
+        datasets.append(
+            _seal_dataset(
+                name="weekly_correction_revision",
+                rows=correction_rows,
+                landing=landing,
+                source_revision=rev,
+                knowledge_cutoff=knowledge_cutoff,
+                watermark=watermark,
+                relative_name="weekly_correction_revision.parquet",
+                source_request=json.dumps(correction_meta, sort_keys=True, default=str),
+                require_rows=True,
+            )
+        )
     datasets.append(
         _seal_json_dataset(
             name="weekly_correction_meta",
@@ -1987,18 +2265,30 @@ def _build_weekly_corrections(
             watermark=watermark,
         )
     )
-    datasets.append(
-        _seal_dataset(
-            name="reconciliation_keys",
-            rows=key_rows,
-            landing=landing,
-            source_revision=rev,
-            knowledge_cutoff=knowledge_cutoff,
-            watermark=watermark,
-            relative_name="reconciliation_keys.parquet",
-            require_rows=True,
+    if correction_error:
+        datasets.append(
+            DatasetStatus(
+                name="reconciliation_keys",
+                status="failed",
+                detail=f"acquisition failed: {correction_error}",
+                source_revision=rev,
+                knowledge_cutoff=knowledge_cutoff,
+                watermark=watermark,
+            )
         )
-    )
+    else:
+        datasets.append(
+            _seal_dataset(
+                name="reconciliation_keys",
+                rows=key_rows,
+                landing=landing,
+                source_revision=rev,
+                knowledge_cutoff=knowledge_cutoff,
+                watermark=watermark,
+                relative_name="reconciliation_keys.parquet",
+                require_rows=True,
+            )
+        )
     return datasets
 
 
@@ -2007,12 +2297,102 @@ def _expected_last_bar(market_date: date, bar_size: str) -> str:
     return f"{market_date.isoformat()} 15:00:00"
 
 
+def _minute_no_data_evidence(
+    *, paths: LanePaths, market_date: date, universe: Sequence[str]
+) -> dict[str, dict[str, Any]]:
+    """Index auditable same-day reasons for an in-scope symbol to have no bars."""
+
+    target = market_date.isoformat()
+    wanted = {_code6(code) for code in universe}
+    evidence: dict[str, dict[str, Any]] = {}
+
+    master = paths.home / "ref_security_master.parquet"
+    if master.is_file():
+        for row in _read_parquet(master):
+            code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
+            if code not in wanted:
+                continue
+            list_date = str(row.get("list_date") or row.get("ipo_date") or "")[:10]
+            delist_date = str(row.get("delist_date") or row.get("terminal_date") or "")[:10]
+            if list_date and list_date > target:
+                evidence[code] = {
+                    "reason": "not_yet_listed",
+                    "source": master.name,
+                    "list_date": list_date,
+                }
+            elif delist_date and delist_date < target:
+                evidence[code] = {
+                    "reason": "already_delisted",
+                    "source": master.name,
+                    "delist_date": delist_date,
+                }
+
+    status_path = paths.home / "daily_status_observation.parquet"
+    if status_path.is_file():
+        for row in _read_parquet_filter_date(
+            status_path, market_date=market_date, date_col="date"
+        ):
+            code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
+            if code not in wanted:
+                continue
+            tradestatus = str(row.get("tradestatus") or "").strip().lower()
+            status = str(row.get("status") or "").strip().lower()
+            is_tradable = row.get("is_tradable")
+            blocked = (
+                tradestatus in {"0", "false", "suspended"}
+                or is_tradable in {0, "0", "false"}
+                or status in {"suspended", "not_executable", "delisted"}
+            )
+            if blocked:
+                evidence[code] = {
+                    "reason": status or "daily_status_not_tradable",
+                    "source": status_path.name,
+                    "evidence_date": target,
+                    "tradestatus": row.get("tradestatus"),
+                    "is_tradable": is_tradable,
+                }
+
+    suspension_path = paths.home / "ref_suspensions.parquet"
+    if not suspension_path.is_file():
+        suspension_path = paths.home / "suspensions.parquet"
+    if suspension_path.is_file():
+        for row in _read_parquet(suspension_path):
+            code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
+            if code not in wanted:
+                continue
+            start = str(
+                row.get("suspend_start") or row.get("start_date") or row.get("date") or ""
+            )[:10]
+            end = str(
+                row.get("suspend_end")
+                or row.get("resume_date")
+                or row.get("end_date")
+                or start
+            )[:10]
+            known = str(
+                row.get("knowledge_cutoff")
+                or row.get("announce_date")
+                or row.get("notice_date")
+                or ""
+            )[:10]
+            if start and start <= target <= (end or target) and known and known <= target:
+                evidence[code] = {
+                    "reason": "suspended",
+                    "source": suspension_path.name,
+                    "suspend_start": start,
+                    "suspend_end": end,
+                    "knowledge_cutoff": known,
+                }
+    return evidence
+
+
 def _run_minute_collector(
     *,
     paths: LanePaths,
     market_date: date,
     bar_size: str,
     symbols: Sequence[str],
+    raw_home: Path,
 ) -> dict[str, Any]:
     """Invoke real minute collector (mootdx/TDX backfill) for this attempt's symbols."""
 
@@ -2036,9 +2416,6 @@ def _run_minute_collector(
                 break
     if not py:
         py = "python3"
-    # Write attempt-local raw landing so we do not mutate prod partitions silently
-    # when HERMES_ODS_MINUTE_ISOLATE=1; default uses shared layer dir (collector native).
-    isolate = (os.environ.get("HERMES_ODS_MINUTE_ISOLATE") or "0").strip() == "1"
     env = os.environ.copy()
     env["ASTOCK_ROOT"] = str(paths.home.parent)
     env["ASTOCK_HOME"] = str(paths.home)
@@ -2058,13 +2435,11 @@ def _run_minute_collector(
         "--sleep",
         os.environ.get("HERMES_ODS_MINUTE_SLEEP", "0.01"),
     ]
-    if isolate:
-        raw_home = paths.shadow_root / "raw" / "minute" / layer / market_date.isoformat()
-        raw_home.mkdir(parents=True, exist_ok=True)
-        cmd.extend(["--home", str(raw_home)])
-        layer_dir = raw_home
-    else:
-        layer_dir = minute_root / "data" / ("research_1m" if bar_size == "1m" else "prod_5m")
+    # Provider collection is always attempt-local. There is deliberately no
+    # production fallback: shadow runs must never mutate shared legacy partitions.
+    raw_home.mkdir(parents=True, exist_ok=False)
+    cmd.extend(["--home", str(raw_home)])
+    layer_dir = raw_home
     import subprocess
 
     started = time.monotonic()
@@ -2091,6 +2466,7 @@ def _run_minute_collector(
         "layer_dir": str(layer_dir),
         "market_date": market_date.isoformat(),
         "universe_size": len(symbols),
+        "isolation": "attempt-local",
     }
 
 
@@ -2115,11 +2491,23 @@ def _build_intraday_stream(
     rev = f"intraday-{bar_size}-archive-{market_date.strftime('%Y%m%d')}-v3"
     watermark = market_date.isoformat()
     mode = _acquire_mode()
+    smoke_only = mode == "provider" and _symbol_limit() is not None
     if symbols:
         universe = [_code6(code) for code in symbols]
     else:
         universe = _universe_from_stock_list(paths.home)
         if not universe:
+            if mode == "provider":
+                return [
+                    DatasetStatus(
+                        name="intraday_bars",
+                        status="failed",
+                        detail="empty in-scope universe from stock_list",
+                        source_revision=rev,
+                        watermark=watermark,
+                        knowledge_cutoff=knowledge_cutoff,
+                    )
+                ]
             universe = ["000001", "600519"]
 
     collector_meta: dict[str, Any] | None = None
@@ -2130,10 +2518,11 @@ def _build_intraday_stream(
             market_date=market_date,
             bar_size=bar_size,
             symbols=universe,
+            raw_home=landing / "provider_raw" / f"minute_{bar_size}",
         )
         if collector_meta.get("layer_dir"):
             layer_dir = Path(str(collector_meta["layer_dir"]))
-        if int(collector_meta.get("exit_code") or 1) != 0:
+        if int(collector_meta.get("exit_code", 1)) != 0:
             # hard fail the stream — do not READY on stale partitions alone
             return [
                 DatasetStatus(
@@ -2171,6 +2560,9 @@ def _build_intraday_stream(
     unexplained_missing = 0
     ready_symbols = 0
     justified = 0
+    no_data_evidence = _minute_no_data_evidence(
+        paths=paths, market_date=market_date, universe=universe
+    )
 
     for code in universe:
         path = layer_dir / f"{code}_{bar_size}.parquet"
@@ -2187,12 +2579,37 @@ def _build_intraday_stream(
             "expected_last_bar": expected_last,
         }
         if not path.is_file():
+            evidence = no_data_evidence.get(code)
+            if evidence:
+                justified += 1
+                coverage_rows.append(
+                    {
+                        "security_id": code,
+                        "status": "justified_no_data",
+                        "row_count": 0,
+                        "observed_maximum": None,
+                        **evidence,
+                    }
+                )
+                log_rows.append(
+                    {
+                        "security_id": code,
+                        "request": request,
+                        "response_error_code": "0",
+                        "response_error_msg": "justified_no_data",
+                        "response_rows": 0,
+                        "evidence": evidence,
+                        "acquired_at": acquired_at,
+                    }
+                )
+                continue
             unexplained_missing += 1
             coverage_rows.append(
                 {
                     "security_id": code,
                     "status": "failed",
                     "reason": "missing_partition",
+                    "source": None,
                     "row_count": 0,
                     "observed_maximum": None,
                 }
@@ -2238,21 +2655,16 @@ def _build_intraday_stream(
             if observed_max is None or ts_s > observed_max:
                 observed_max = ts_s
         if matched <= 0:
-            # no bars for open day without justification -> failed
-            # justified_no_data only when explicit marker present
-            justified_flag = False
-            marker = path.with_suffix(path.suffix + ".nodata")
-            if marker.is_file():
-                justified_flag = True
-            if justified_flag:
+            evidence = no_data_evidence.get(code)
+            if evidence:
                 justified += 1
                 coverage_rows.append(
                     {
                         "security_id": code,
                         "status": "justified_no_data",
-                        "reason": "nodata_marker",
                         "row_count": 0,
                         "observed_maximum": None,
+                        **evidence,
                     }
                 )
                 log_rows.append(
@@ -2262,6 +2674,7 @@ def _build_intraday_stream(
                         "response_error_code": "0",
                         "response_error_msg": "justified_no_data",
                         "response_rows": 0,
+                        "evidence": evidence,
                         "acquired_at": acquired_at,
                     }
                 )
@@ -2272,6 +2685,7 @@ def _build_intraday_stream(
                         "security_id": code,
                         "status": "failed",
                         "reason": "zero_rows_for_session",
+                        "source": None,
                         "row_count": 0,
                         "observed_maximum": None,
                     }
@@ -2297,6 +2711,7 @@ def _build_intraday_stream(
                     "security_id": code,
                     "status": "failed",
                     "reason": "incomplete_session",
+                    "source": None,
                     "row_count": matched,
                     "observed_maximum": code_max,
                     "expected_last_bar": expected_last,
@@ -2321,6 +2736,7 @@ def _build_intraday_stream(
                 "security_id": code,
                 "status": "ready",
                 "reason": "ok",
+                "source": None,
                 "row_count": matched,
                 "observed_maximum": code_max,
             }
@@ -2363,6 +2779,7 @@ def _build_intraday_stream(
         "observed_maximum": observed_max,
         "source_revision": rev,
         "collector": collector_meta,
+        "scope_mode": "smoke_only" if smoke_only else "full_universe",
         "note": (
             "formal 5m never synthesized from 1m; "
             "unexplained missing blocks READY"
@@ -2370,8 +2787,7 @@ def _build_intraday_stream(
     }
     datasets: list[DatasetStatus] = []
     if coverage_ok and session_complete and len(rows) > 0:
-        datasets.append(
-            _seal_dataset(
+        bars_dataset = _seal_dataset(
                 name="intraday_bars",
                 rows=rows,
                 landing=landing,
@@ -2385,7 +2801,12 @@ def _build_intraday_stream(
                     sort_keys=True,
                 ),
             )
-        )
+        if smoke_only:
+            bars_dataset.status = "smoke_only"
+            bars_dataset.detail = (
+                "HERMES_ODS_SYMBOL_LIMIT is set; smoke evidence cannot publish READY"
+            )
+        datasets.append(bars_dataset)
     else:
         detail_parts = []
         if not coverage_ok:
@@ -2530,6 +2951,13 @@ def _publish(
     # drop prior lane_status if any
     datasets = [item for item in datasets if item.name != "lane_status"]
     datasets.append(status_ds)
+
+    if not closed and _acquire_mode() == "provider" and _symbol_limit() is not None:
+        return (
+            None,
+            "partial",
+            "HERMES_ODS_SYMBOL_LIMIT is smoke-only and cannot publish READY",
+        )
 
     gate_status, gate_detail = _evaluate_mandatory(datasets, mandatory)
     if gate_status != "ready":

@@ -11,6 +11,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+import quanthus.pipelines.lane_runner as lane_runner
 from quanthus.pipelines.lane_runner import (
     LanePaths,
     expected_timer_oncalendar,
@@ -498,3 +499,204 @@ def test_bootstrap_refused(fixture_home: Path, tmp_path: Path) -> None:
     )
     assert result.status == "failed"
     assert result.release_dir is None
+
+
+def test_provider_event_request_failure_never_ready_or_advances_watermark(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    monkeypatch.delenv("HERMES_ODS_PROVIDER_SPEC", raising=False)
+    monkeypatch.setattr(
+        lane_runner,
+        "_cninfo_fetch_announcements",
+        lambda **_kwargs: (
+            [],
+            [
+                {
+                    "security_id": "000001",
+                    "response_error_code": "1",
+                    "response_error_msg": "injected timeout",
+                }
+            ],
+        ),
+    )
+    shadow = tmp_path / "shadow"
+    result = run_lane(
+        lane_id="calendar-daily-events",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, shadow),
+    )
+    announcements = next(d for d in result.datasets if d.name == "announcements_delta")
+    assert announcements.status == "failed"
+    assert result.status in {"partial", "failed"}
+    assert result.release_dir is None
+    assert not (shadow / "watermarks" / "calendar-daily-events.json").exists()
+    assert not list(shadow.rglob("READY"))
+
+
+def test_weekly_provider_error_is_not_a_business_conflict(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    provider_spec = tmp_path / "providers.json"
+    provider_spec.write_text(
+        json.dumps(
+            {
+                "lanes": {
+                    "weekly-corrections": {
+                        name: {
+                            "argv": ["/bin/false", "{output}"],
+                            "provider": "injected-failure",
+                        }
+                        for name in (
+                            "shareholder_count",
+                            "financial_quarterly",
+                            "corporate_actions",
+                            "dividends",
+                            "adjustment_evidence",
+                            "st_announcement_trail",
+                        )
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    monkeypatch.setenv("HERMES_ODS_PROVIDER_SPEC", str(provider_spec))
+
+    class FailedQuery:
+        error_code = "1"
+        error_msg = "injected provider failure"
+
+    class Login:
+        error_code = "0"
+        error_msg = "ok"
+
+    class FakeBaostock:
+        @staticmethod
+        def login():
+            return Login()
+
+        @staticmethod
+        def logout():
+            return None
+
+        @staticmethod
+        def query_history_k_data_plus(*_args, **_kwargs):
+            return FailedQuery()
+
+    monkeypatch.setitem(__import__("sys").modules, "baostock", FakeBaostock)
+    result = run_lane(
+        lane_id="weekly-corrections",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+    )
+    assert result.status in {"partial", "failed"}
+    assert result.release_dir is None
+    recon = next(d for d in result.datasets if d.name == "reconciliation_keys")
+    assert recon.status == "failed"
+    assert "acquisition failed" in (recon.detail or "")
+    assert not list((tmp_path / "shadow").rglob("READY"))
+
+
+def test_provider_minute_is_attempt_local_and_symbol_limit_is_smoke_only(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    monkeypatch.setenv("HERMES_ODS_SYMBOL_LIMIT", "1")
+    observed_raw_homes: list[Path] = []
+
+    def fake_collect(**kwargs):
+        raw_home = Path(kwargs["raw_home"])
+        observed_raw_homes.append(raw_home)
+        _write_parquet(
+            raw_home / "000001_5m.parquet",
+            [
+                {
+                    "stock_code": "000001",
+                    "ts": "2026-07-24 15:00:00",
+                    "open": 10.0,
+                    "high": 10.0,
+                    "low": 10.0,
+                    "close": 10.0,
+                    "volume": 1.0,
+                }
+            ],
+        )
+        return {
+            "exit_code": 0,
+            "layer_dir": str(raw_home),
+            "isolation": "attempt-local",
+        }
+
+    monkeypatch.setattr(lane_runner, "_run_minute_collector", fake_collect)
+    shadow = tmp_path / "shadow"
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, shadow),
+        stream="5m",
+        force_preflight="both_open",
+    )
+    assert observed_raw_homes
+    assert "attempts/intraday-archive/5m" in str(observed_raw_homes[0])
+    bars = next(d for d in result.datasets if d.name == "intraday_bars")
+    assert bars.status == "smoke_only"
+    assert result.status == "partial"
+    assert result.release_dir is None
+    assert not list(shadow.rglob("READY"))
+
+
+def test_minute_no_data_requires_structured_pit_evidence(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "local")
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    (minute / "600519_5m.parquet").unlink()
+    status_path = fixture_home / "daily_status_observation.parquet"
+    status_rows = pq.read_table(status_path).to_pylist()
+    for row in status_rows:
+        if row["stock_code"] == "600519" and str(row["date"])[:10] == "2026-07-24":
+            row["tradestatus"] = "0"
+    _write_parquet(status_path, status_rows)
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+    assert result.status == "ready"
+    coverage = next(d for d in result.datasets if d.name == "intraday_coverage")
+    rows = pq.read_table(Path(coverage.path)).to_pylist()
+    suspended = next(row for row in rows if row["security_id"] == "600519")
+    assert suspended["status"] == "justified_no_data"
+    assert suspended["source"] == "daily_status_observation.parquet"
+
+
+def test_ad_hoc_nodata_marker_does_not_justify_missing_bars(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "local")
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    partition = minute / "600519_5m.parquet"
+    _write_parquet(partition, [])
+    partition.with_suffix(".parquet.nodata").write_text("no data", encoding="utf-8")
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+    assert result.status in {"partial", "failed"}
+    assert result.release_dir is None
+    bars = next(d for d in result.datasets if d.name == "intraday_bars")
+    assert "unexplained_missing=1" in (bars.detail or "")

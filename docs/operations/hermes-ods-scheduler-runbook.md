@@ -28,6 +28,18 @@ Each recurring unit must provide:
 - a `READY` marker written only after all mandatory files and the manifest are atomically sealed;
 - a nonzero exit and alert for `failed` or `partial` output.
 
+Provider-mode event and weekly collectors are mapped by
+`HERMES_ODS_PROVIDER_SPEC`; see
+`config/pipelines/hermes-provider-collectors.spec.example.json`. Commands are argv arrays (shell
+strings are rejected) and must write parquet to the supplied `{output}` path. The path is inside
+the current attempt. A missing command, nonzero exit, missing output, or provider request error
+fails the mandatory dataset and cannot advance a watermark or create `READY`.
+
+Minute provider collection is always written under the current attempt. Shared legacy minute
+partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must
+be justified by same-day tradability, PIT suspension, or lifecycle evidence. Setting
+`HERMES_ODS_SYMBOL_LIMIT` creates smoke-only evidence and can never publish `READY`.
+
 Hermes may write only raw/ODS artifacts. Remove all direct curated PG sync from replacement
 launchers. OCI publication is a separate job and credential.
 

@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check
+.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -74,3 +74,7 @@ publish-snapshot:
 pipeline-check:
 	$(VENV)/bin/python -m quanthus pipeline-check \
 		--config config/pipelines/t-close-plus-5h.v1.json
+
+schedule-check:
+	$(VENV)/bin/python -m quanthus schedule-check \
+		--config config/schedules/hermes-ods-schedule.v1.json

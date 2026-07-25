@@ -14,8 +14,12 @@
   publication and replication topology, security boundaries, and disaster recovery.
 - `architecture/adr-0003-t-close-plus-5h-pipelines.md`: recurring acquisition lanes, the
   post-close processing SLA, immutable daily DWD partitions, and fail-closed publication.
+- `architecture/adr-0004-hermes-ods-scheduler-v1.md`: five-lane Hermes acquisition schedule,
+  correction semantics, publication state machine, and controlled legacy cutover.
 - `operations/t-close-plus-5h-runbook.md`: Hermes handoff, OCI deployment, rehearsal, incident,
   and migration procedures for the daily pipeline.
+- `operations/hermes-ods-scheduler-runbook.md`: Hermes shadow deployment, cutover gates, daily
+  operations, rollback, and scheduler migration procedures.
 
 ## Decision precedence
 

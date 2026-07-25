@@ -48,9 +48,11 @@ from quanthus.pipelines import (
     OdsReleaseError,
     PipelineConfigError,
     PipelineRunError,
+    ScheduleContractError,
     build_daily_dwd_revision,
     check_daily_dwd_revision,
     load_pipeline_config,
+    load_schedule_contract,
     market_session_is_open,
     promote_daily_dwd_revision,
     publish_ods_release,
@@ -263,6 +265,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     pipeline_run.add_argument("--config", type=Path, required=True)
     pipeline_run.add_argument("--market-date", type=date.fromisoformat, required=True)
+
+    schedule_check = subparsers.add_parser(
+        "schedule-check",
+        help="validate the versioned Hermes ODS scheduler contract",
+    )
+    schedule_check.add_argument("--config", type=Path, required=True)
 
     daily_dwd = subparsers.add_parser(
         "build-daily-dwd",
@@ -565,6 +573,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             if pipeline_result.status == "skipped_closed_session":
                 return 0
             return 0 if pipeline_result.sla_met else 4
+        elif args.command == "schedule-check":
+            schedule = load_schedule_contract(args.config)
+            print(
+                f"schedule contract OK: {schedule.schedule_id} "
+                f"({len(schedule.lanes)} lanes, {schedule.timezone})"
+            )
         elif args.command == "build-daily-dwd":
             dwd_result = build_daily_dwd_revision(
                 release_dir=args.release_dir,
@@ -614,6 +628,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         OdsReleaseError,
         PipelineConfigError,
         PipelineRunError,
+        ScheduleContractError,
         DailyWarehouseError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)

@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "schedule_id": "hermes-ods-schedule-v1",
+  "timezone": "Asia/Shanghai",
+  "ownership": {
+    "hermes": "immutable_ods_only",
+    "oci": "dwd_dws_ads_and_pg_publication",
+    "hermes_direct_curated_pg_writes": false
+  },
+  "publication": {
+    "success_states": ["scheduled", "preflight", "acquiring", "sealed", "ready"],
+    "terminal_states": ["closed_session", "failed", "partial"],
+    "ready_written_last": true,
+    "immutable_release_id": true,
+    "rerun_new_attempt": true,
+    "per_dataset_status": true,
+    "manifest_fields": [
+      "source_request",
+      "source_revision",
+      "watermark",
+      "knowledge_cutoff",
+      "row_count",
+      "sha256"
+    ]
+  },
+  "lanes": [
+    {
+      "id": "bootstrap",
+      "enabled": false,
+      "recurring": false,
+      "trigger": {"kind": "manual_issue_bound"},
+      "purpose": "initialization_and_historical_backfill",
+      "provider": "third_party_a_stock_data_with_project_evidence",
+      "resource_group": "pve_bulk_io"
+    },
+    {
+      "id": "market-daily-core",
+      "enabled": true,
+      "recurring": true,
+      "trigger": {"kind": "timer", "weekdays": [1, 2, 3, 4, 5], "time": "15:10:00"},
+      "completion_deadline": "20:00:00",
+      "resource_group": "pve_market_api",
+      "session_preflight": {
+        "exchanges": ["SSE", "SZSE"],
+        "both_open": "acquire_market_data",
+        "both_closed": "calendar_only_release",
+        "missing_or_disagree": "fail_without_provider_calls_or_ready"
+      },
+      "datasets": [
+        "daily_ohlcv_none_delta",
+        "daily_status_observation_delta",
+        "security_master",
+        "stock_list",
+        "trading_calendar",
+        "index_daily_delta",
+        "adjustment_evidence_delta"
+      ],
+      "release_schedule": "daily"
+    },
+    {
+      "id": "calendar-daily-events",
+      "enabled": true,
+      "recurring": true,
+      "trigger": {"kind": "timer", "days": "every_natural_day", "time": "19:30:00"},
+      "resource_group": "pve_event_api",
+      "can_create_market_session": false,
+      "datasets": [
+        "announcements_delta",
+        "suspensions_delta",
+        "corporate_actions_delta",
+        "dividends_delta",
+        "factor_evidence_delta",
+        "financial_disclosures_delta"
+      ],
+      "release_schedule": "daily"
+    },
+    {
+      "id": "intraday-archive",
+      "enabled": true,
+      "recurring": true,
+      "blocks_market_daily_core": false,
+      "resource_group": "pve_market_api",
+      "session_preflight": {
+        "exchanges": ["SSE", "SZSE"],
+        "both_open": "acquire_direct_streams",
+        "both_closed": "calendar_only_release",
+        "missing_or_disagree": "fail_without_provider_calls_or_ready"
+      },
+      "streams": [
+        {
+          "bar_size": "1m",
+          "acquisition": "direct",
+          "trigger": {"kind": "timer", "weekdays": [1, 2, 3, 4, 5], "time": "20:30:00"},
+          "lock": "intraday-1m.lock",
+          "checkpoint": "intraday-1m.watermark.json",
+          "priority": 1
+        },
+        {
+          "bar_size": "5m",
+          "acquisition": "direct",
+          "may_derive_from": null,
+          "trigger": {"kind": "timer", "weekdays": [1, 2, 3, 4, 5], "time": "23:00:00"},
+          "lock": "intraday-5m.lock",
+          "checkpoint": "intraday-5m.watermark.json",
+          "priority": 2
+        }
+      ],
+      "release_schedule": "daily"
+    },
+    {
+      "id": "weekly-corrections",
+      "enabled": true,
+      "recurring": true,
+      "trigger": {"kind": "timer", "weekdays": [6], "time": "08:00:00"},
+      "resource_group": "pve_bulk_io",
+      "primary_datasets": [
+        "shareholder_count",
+        "financial_quarterly",
+        "corporate_actions",
+        "dividends",
+        "adjustment_evidence",
+        "st_announcement_trail",
+        "security_lifecycle",
+        "industry_membership"
+      ],
+      "reconciliation_windows": {
+        "daily_ohlcv_none": "20_sessions",
+        "daily_status_observation": "90_days",
+        "index_daily": "20_sessions",
+        "trading_calendar": "full_diff",
+        "security_master": "full_diff"
+      },
+      "correction_classes": ["same", "missing_in_daily", "changed_upstream", "conflict"],
+      "output_mode": "independent_correction_revision",
+      "may_overwrite_daily": false,
+      "release_schedule": "weekly"
+    }
+  ],
+  "cutover": {
+    "issue": 41,
+    "mode": "shadow_then_controlled_cutover",
+    "keep_legacy_minute_until_no_gap_proven": true,
+    "requires_oci_signal": "GO_FOR_CUTOVER"
+  }
+}

@@ -22,6 +22,11 @@ from quanthus.pipelines.runner import (
     load_pipeline_config,
     run_pipeline,
 )
+from quanthus.pipelines.schedule_contracts import (
+    ScheduleContract,
+    ScheduleContractError,
+    load_schedule_contract,
+)
 
 __all__ = [
     "OdsRelease",
@@ -32,7 +37,10 @@ __all__ = [
     "PipelineConfig",
     "PipelineConfigError",
     "PipelineRunError",
+    "ScheduleContract",
+    "ScheduleContractError",
     "load_pipeline_config",
+    "load_schedule_contract",
     "build_daily_dwd_revision",
     "check_daily_dwd_revision",
     "market_session_is_open",

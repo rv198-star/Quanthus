@@ -32,6 +32,7 @@ from quanthus.none_backfill import (
     build_none_backfill_revision,
     write_none_current,
 )
+from quanthus.none_tail_repair import build_none_tail_repair_revision
 from quanthus.p1_acceptance import (
     AcceptanceEvidenceError,
     P1AcceptanceReport,
@@ -131,6 +132,16 @@ def _parser() -> argparse.ArgumentParser:
     none_backfill.add_argument("--output", type=Path, required=True)
     none_backfill.add_argument("--revision", required=True)
     none_backfill.add_argument("--promote-pointer", type=Path)
+
+    none_tail = subparsers.add_parser(
+        "merge-none-tail-repair",
+        help="build an immutable none child from the checksummed #40 tail evidence",
+    )
+    none_tail.add_argument("--parent", type=Path, required=True)
+    none_tail.add_argument("--raw-revision", type=Path, required=True)
+    none_tail.add_argument("--output", type=Path, required=True)
+    none_tail.add_argument("--revision", required=True)
+    none_tail.add_argument("--promote-pointer", type=Path)
 
     identity_coverage = subparsers.add_parser(
         "build-identity-coverage",
@@ -414,6 +425,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 parent=args.parent,
                 raw_revision=args.raw_revision,
                 detection_file=args.detection_file,
+                output=args.output,
+                revision=args.revision,
+            )
+            if args.promote_pointer is not None:
+                write_none_current(revision_dir=merged.output, pointer=args.promote_pointer)
+            print(json.dumps(merged.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "merge-none-tail-repair":
+            merged = build_none_tail_repair_revision(
+                parent=args.parent,
+                raw_revision=args.raw_revision,
                 output=args.output,
                 revision=args.revision,
             )

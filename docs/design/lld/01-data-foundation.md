@@ -6,7 +6,7 @@
 | Status | Conditionally accepted; P2 implementation allowed |
 | Governing requirements | FR-DATA-001 through FR-DATA-006 |
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
-| Coverage follow-up | Issue #38 resolved in OCI DWD revision `daily_ohlcv_none_dwd_v1_oci_20260725` |
+| Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 
 ## 1. Goal
 
@@ -31,6 +31,9 @@ exposed 276 securities with incomplete normalized unadjusted-price history and 6
 execution rows. Issue #38 restored their source history in a new OCI child revision. The rebuilt S3
 has zero unexpected prior-close gaps; 72 exact first-supported-trade boundaries remain separately
 coded and fail closed because no earlier tradable close exists inside the supported history.
+Issue #40 subsequently repaired three active histories frozen at an old 2,000-row acquisition
+checkpoint. Its OCI child retained the accepted parent and inserted 5,334 exact unadjusted tail
+keys from independently checksummed raw evidence.
 
 ## 3. Data layers
 

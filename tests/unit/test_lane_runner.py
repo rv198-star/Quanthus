@@ -176,7 +176,7 @@ def fixture_home(tmp_path: Path) -> Path:
             ],
         )
 
-    # minute partitions
+    # minute partitions (must include expected last bar 15:00 for session completeness)
     minute = tmp_path / "minute" / "data"
     for layer, bar in (("research_1m", "1m"), ("prod_5m", "5m")):
         d = minute / layer
@@ -193,7 +193,16 @@ def fixture_home(tmp_path: Path) -> Path:
                         "low": 9.9,
                         "close": 10.0,
                         "volume": 100.0,
-                    }
+                    },
+                    {
+                        "stock_code": c,
+                        "ts": f"{open_day.isoformat()} 15:00:00",
+                        "open": 10.0,
+                        "high": 10.2,
+                        "low": 9.8,
+                        "close": 10.1,
+                        "volume": 200.0,
+                    },
                 ],
             )
     os.environ["ASTOCK_MINUTE_ROOT"] = str(tmp_path / "minute")
@@ -400,6 +409,81 @@ def test_resource_group_lock_blocks_parallel(fixture_home: Path, tmp_path: Path)
     finally:
         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         handle.close()
+
+
+def test_intraday_unexplained_missing_blocks_ready(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    # only one of two universe codes has a complete partition
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    (minute / "600519_5m.parquet").unlink()
+    shadow = tmp_path / "shadow"
+    paths = _paths(fixture_home, shadow)
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+    assert result.status in {"partial", "failed"}
+    assert result.release_dir is None
+    assert not list(shadow.rglob("READY"))
+    bars = next(d for d in result.datasets if d.name == "intraday_bars")
+    assert bars.status == "failed"
+
+
+def test_acquire_mode_fail_closed(fixture_home: Path, tmp_path: Path) -> None:
+    from quanthus.pipelines.lane_runner import LaneRunError, _acquire_mode
+
+    os.environ["HERMES_ODS_ACQUIRE_MODE"] = "auto"
+    with pytest.raises(LaneRunError):
+        _acquire_mode()
+    os.environ["HERMES_ODS_ACQUIRE_MODE"] = "local"
+    assert _acquire_mode() == "local"
+
+
+def test_event_watermark_committed_on_ready(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    shadow = tmp_path / "shadow"
+    paths = _paths(fixture_home, shadow)
+    result = run_lane(
+        lane_id="calendar-daily-events",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+    )
+    assert result.status == "ready"
+    wm = shadow / "watermarks" / "calendar-daily-events.json"
+    assert wm.is_file()
+    payload = json.loads(wm.read_text(encoding="utf-8"))
+    assert payload.get("committed_watermark")
+    assert payload.get("market_date") == "2026-07-24"
+
+
+def test_weekly_has_independent_correction_revision(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    os.environ["HERMES_ODS_WEEKLY_INJECT"] = "demo"
+    shadow = tmp_path / "shadow"
+    paths = _paths(fixture_home, shadow)
+    result = run_lane(
+        lane_id="weekly-corrections",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+    )
+    assert result.status == "ready"
+    names = {d.name for d in result.datasets}
+    assert "weekly_correction_revision" in names
+    assert "weekly_correction_meta" in names
+    meta = next(d for d in result.datasets if d.name == "weekly_correction_meta")
+    payload = json.loads(Path(meta.path).read_text(encoding="utf-8"))
+    assert payload.get("provider")
+    os.environ.pop("HERMES_ODS_WEEKLY_INJECT", None)
 
 
 def test_bootstrap_refused(fixture_home: Path, tmp_path: Path) -> None:

@@ -625,7 +625,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"({len(schedule.lanes)} lanes, {schedule.timezone})"
             )
         elif args.command == "lane-run":
-            paths = resolve_paths(home=args.home, shadow_root=args.shadow_root, calendar=args.calendar)
+            paths = resolve_paths(
+                home=args.home,
+                shadow_root=args.shadow_root,
+                calendar=args.calendar,
+            )
             lane_result = run_lane(
                 lane_id=args.lane,
                 market_date=args.market_date,
@@ -643,7 +647,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 4
             return 2
         elif args.command == "lane-shadow-matrix":
-            paths = resolve_paths(home=args.home, shadow_root=args.shadow_root, calendar=args.calendar)
+            paths = resolve_paths(
+                home=args.home,
+                shadow_root=args.shadow_root,
+                calendar=args.calendar,
+            )
             matrix = run_shadow_matrix(
                 schedule_config=args.config,
                 open_date=args.open_date,
@@ -653,18 +661,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 paths=paths,
             )
             print(json.dumps(matrix, ensure_ascii=True, sort_keys=True))
-            bad = [
-                run
-                for run in matrix["runs"]
-                if run.get("status") not in {"ready", "closed_session", "failed"}
-                and not (
-                    run.get("lane_id") == "bootstrap" and run.get("status") == "failed"
-                )
-                and not (
-                    run.get("preflight") == "missing_or_disagree" and run.get("status") == "failed"
-                )
-            ]
-            # bootstrap expected failed; missing_or_disagree expected failed.
+            # bootstrap / missing-preflight expected failed; partial never success.
             unexpected = []
             for run in matrix["runs"]:
                 lane = run.get("lane_id")
@@ -675,8 +672,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if preflight == "missing_or_disagree" and status == "failed":
                     continue
                 if status in {"ready", "closed_session"}:
-                    continue
-                if status == "partial" and lane == "calendar-daily-events":
                     continue
                 unexpected.append(run)
             return 0 if not unexpected else 4
@@ -736,3 +731,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

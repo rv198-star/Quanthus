@@ -15,9 +15,16 @@ fi
 : "${HERMES_ODS_SHADOW_ROOT:=${ASTOCK_HOME}/shadow/hermes-ods-v1}"
 : "${HERMES_ODS_CALENDAR:=${ASTOCK_HOME}/ref_trading_calendar.parquet}"
 : "${HERMES_ODS_SCHEDULE:=${ROOT}/config/schedules/hermes-ods-schedule.v1.json}"
+# Fail-closed: require explicit acquire mode (provider|local). Default provider.
+: "${HERMES_ODS_ACQUIRE_MODE:=provider}"
+export HERMES_ODS_ACQUIRE_MODE
 : "${PYTHON:=${ASTOCK_ROOT}/.venv/bin/python}"
 if [[ ! -x "$PYTHON" ]]; then
   PYTHON=python3
+fi
+if [[ "$HERMES_ODS_ACQUIRE_MODE" != "provider" && "$HERMES_ODS_ACQUIRE_MODE" != "local" ]]; then
+  echo "HERMES_ODS_ACQUIRE_MODE must be 'provider' or 'local' (got: $HERMES_ODS_ACQUIRE_MODE)" >&2
+  exit 2
 fi
 
 LANE=""

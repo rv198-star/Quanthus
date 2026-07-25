@@ -22,6 +22,14 @@ from quanthus.pipelines.runner import (
     load_pipeline_config,
     run_pipeline,
 )
+from quanthus.pipelines.lane_runner import (
+    LaneRunError,
+    LaneRunResult,
+    resolve_paths,
+    run_lane,
+    run_shadow_matrix,
+    session_preflight,
+)
 from quanthus.pipelines.schedule_contracts import (
     ScheduleContract,
     ScheduleContractError,
@@ -34,6 +42,8 @@ __all__ = [
     "OdsVerificationResult",
     "DailyDwdResult",
     "DailyWarehouseError",
+    "LaneRunError",
+    "LaneRunResult",
     "PipelineConfig",
     "PipelineConfigError",
     "PipelineRunError",
@@ -46,6 +56,10 @@ __all__ = [
     "market_session_is_open",
     "publish_ods_release",
     "promote_daily_dwd_revision",
+    "resolve_paths",
+    "run_lane",
     "run_pipeline",
+    "run_shadow_matrix",
+    "session_preflight",
     "verify_ods_release",
 ]

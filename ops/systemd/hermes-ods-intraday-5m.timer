@@ -1,0 +1,11 @@
+[Unit]
+Description=Shadow timer for Hermes ODS intraday 5m archive
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:45:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=hermes-ods-intraday-5m.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Launch one Hermes ODS schedule lane into the isolated shadow root by default.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+if [[ -f /etc/quanthus/hermes-ods-lane.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/hermes-ods-lane.env
+fi
+
+: "${ASTOCK_ROOT:=/root/work/astock}"
+: "${ASTOCK_HOME:=${ASTOCK_ROOT}/data}"
+: "${HERMES_ODS_SHADOW_ROOT:=${ASTOCK_HOME}/shadow/hermes-ods-v1}"
+: "${HERMES_ODS_CALENDAR:=${ASTOCK_HOME}/ref_trading_calendar.parquet}"
+: "${HERMES_ODS_SCHEDULE:=${ROOT}/config/schedules/hermes-ods-schedule.v1.json}"
+
+LANE=""
+MARKET_DATE=""
+STREAM=""
+FORCE_PREFLIGHT=""
+ISSUE_REF=""
+SYMBOLS=()
+
+usage() {
+  cat <<'EOF'
+Usage: run-hermes-ods-lane --lane <id> --market-date YYYY-MM-DD [options]
+
+Options:
+  --lane ID                 bootstrap|market-daily-core|calendar-daily-events|intraday-archive|weekly-corrections
+  --market-date DATE        Asia/Shanghai market date
+  --stream 1m|5m            required for intraday-archive
+  --force-preflight STATE   both_open|both_closed|missing_or_disagree
+  --issue-ref REF           required only for manual bootstrap (still refused by runner)
+  --symbol CODE             optional intraday sample symbol (repeatable)
+  --shadow-root PATH        override HERMES_ODS_SHADOW_ROOT
+  --home PATH               override ASTOCK_HOME
+  --calendar PATH           override calendar parquet
+  --config PATH             override schedule contract path
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --lane) LANE="$2"; shift 2 ;;
+    --market-date) MARKET_DATE="$2"; shift 2 ;;
+    --stream) STREAM="$2"; shift 2 ;;
+    --force-preflight) FORCE_PREFLIGHT="$2"; shift 2 ;;
+    --issue-ref) ISSUE_REF="$2"; shift 2 ;;
+    --symbol) SYMBOLS+=("$2"); shift 2 ;;
+    --shadow-root) HERMES_ODS_SHADOW_ROOT="$2"; shift 2 ;;
+    --home) ASTOCK_HOME="$2"; shift 2 ;;
+    --calendar) HERMES_ODS_CALENDAR="$2"; shift 2 ;;
+    --config) HERMES_ODS_SCHEDULE="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [[ -z "$LANE" || -z "$MARKET_DATE" ]]; then
+  usage >&2
+  exit 2
+fi
+
+mkdir -p "$HERMES_ODS_SHADOW_ROOT"/{attempts,releases,locks,watermarks,logs}
+
+args=(
+  python3 -m quanthus.cli lane-run
+  --config "$HERMES_ODS_SCHEDULE"
+  --lane "$LANE"
+  --market-date "$MARKET_DATE"
+  --home "$ASTOCK_HOME"
+  --shadow-root "$HERMES_ODS_SHADOW_ROOT"
+  --calendar "$HERMES_ODS_CALENDAR"
+)
+
+if [[ -n "$STREAM" ]]; then
+  args+=(--stream "$STREAM")
+fi
+if [[ -n "$FORCE_PREFLIGHT" ]]; then
+  args+=(--force-preflight "$FORCE_PREFLIGHT")
+fi
+if [[ -n "$ISSUE_REF" ]]; then
+  args+=(--issue-ref "$ISSUE_REF")
+fi
+for symbol in "${SYMBOLS[@]:-}"; do
+  [[ -n "$symbol" ]] && args+=(--symbol "$symbol")
+done
+
+log_file="${HERMES_ODS_SHADOW_ROOT}/logs/${LANE}-${MARKET_DATE}-$(date -u +%Y%m%dT%H%M%SZ).log"
+{
+  echo "starting lane=${LANE} market_date=${MARKET_DATE} shadow_root=${HERMES_ODS_SHADOW_ROOT}"
+  "${args[@]}"
+} | tee -a "$log_file"

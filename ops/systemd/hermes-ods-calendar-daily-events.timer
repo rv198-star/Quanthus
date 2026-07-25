@@ -1,0 +1,11 @@
+[Unit]
+Description=Shadow timer for Hermes ODS calendar-daily-events
+
+[Timer]
+OnCalendar=*-*-* 21:30:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=hermes-ods-calendar-daily-events.service
+
+[Install]
+WantedBy=timers.target

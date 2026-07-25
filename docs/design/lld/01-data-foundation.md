@@ -6,7 +6,7 @@
 | Status | Conditionally accepted; P2 implementation allowed |
 | Governing requirements | FR-DATA-001 through FR-DATA-006 |
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
-| Coverage follow-up | Issue #38 resolved in `none_history_276_oci_v1_20260725` |
+| Coverage follow-up | Issue #38 resolved in OCI DWD revision `daily_ohlcv_none_dwd_v1_oci_20260725` |
 
 ## 1. Goal
 

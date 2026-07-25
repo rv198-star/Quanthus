@@ -55,3 +55,20 @@ Canonical child revisions:
   `59285e6f9ee6e96909c84bccd9edb0d221e47651396a037323808c82ed9baf6b`
 
 PostgreSQL publication is not part of this acceptance and remains governed by #37.
+
+## OCI Namespace Consolidation
+
+The first accepted none child was retained as immutable lineage, then rebuilt without changing any
+content under the OCI DWD namespace. The promoted canonical revision is
+`daily_ohlcv_none_dwd_v1_oci_20260725` at
+`/home/ubuntu/data/quanthus/revisions/`; its daily Parquet checksum remains
+`05ead429611c8726194ea2fbebb0559ee8ec224044fd1a963529e698c464aac4`.
+
+S2 and S3 were rebuilt as children `st_status_pit_v2_oci_v1_3_20260725` and
+`price_limit_execution_v2_oci_v1_3_20260725`. The published OCI DWD/DWS snapshot is
+`p1-s2-s3-dwd-20260725-v1`, whose manifest SHA-256 is
+`95280044ec8419608422d9285bd1d34b3c3348bc2d7cf9300445e11cad490176`.
+
+The `daily_ohlcv_none_CURRENT`, `st_status_pit_CURRENT`, and `price_limit_CURRENT` pointers now
+all resolve under `/home/ubuntu/data/quanthus/revisions/`. No market data or snapshot artifact is
+stored in Git.

@@ -70,6 +70,21 @@ flowchart LR
 6. OCI loads PostgreSQL through staging tables, bulk `COPY`, validation, and a transactional
    publish step. Versioned history is retained according to each dataset contract.
 
+### 3.1 OCI local layout
+
+The OCI filesystem separates landing copies from OCI-owned derived artifacts:
+
+| Location | Ownership and allowed contents |
+| --- | --- |
+| `/home/ubuntu/data/astock/` | Hermes ODS landing mirror pulled through the read-only channel; raw evidence and source revisions only |
+| `/home/ubuntu/data/quanthus/revisions/` | OCI-owned immutable DWD, DWS, PIT, and ADS revisions; every `CURRENT` pointer must resolve here |
+| `/home/ubuntu/data/quanthus/snapshots/` | OCI-owned immutable, manifest-bound consumer snapshots |
+| Git repository | Code, policies, schemas, tests, and documentation only; no Parquet, raw payload, manifest, snapshot, or database data |
+
+An OCI build may read the landing mirror, but it must publish a child under
+`/home/ubuntu/data/quanthus/revisions/` before it becomes canonical. A full ODS pull must not be
+used as a way to publish or overwrite OCI-derived data.
+
 Direct Hermes writes are limited to append-only ODS tables where a database landing copy is
 operationally useful. Curated, reference, DWD, DWS, ADS, and metadata publication is owned by
 OCI. Production fixes are made at the owning source layer and propagated as a new revision;

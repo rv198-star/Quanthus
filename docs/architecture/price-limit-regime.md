@@ -40,5 +40,5 @@ session remains `prior_close_missing_fail_closed` and is an upstream coverage de
 `quanthus build-price-limits` verifies candidate checksum and cutoff ordering, builds the
 execution-day resolver, checks uniqueness and IPO session bounds, and writes an immutable manifest
 with schema/content hashes. The promoted revision is
-`price_limit_execution_v2_oci_v1_2_20260725`. It is consumed with formal S2 by snapshot
-`p1-s2-s3-none38-20260725-v1`.
+`price_limit_execution_v2_oci_v1_3_20260725`. It is consumed with formal S2 and OCI DWD none by
+snapshot `p1-s2-s3-dwd-20260725-v1`.

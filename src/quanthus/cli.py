@@ -38,6 +38,11 @@ from quanthus.p1_evidence_build import (
     write_p1_acceptance_evidence,
 )
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
+from quanthus.price_limits import (
+    PriceLimitBuildError,
+    build_price_limit_revision,
+    write_price_limit_current,
+)
 from quanthus.snapshot_publish import (
     MaterializedSnapshot,
     SnapshotBuildError,
@@ -179,6 +184,18 @@ def _parser() -> argparse.ArgumentParser:
     st_status.add_argument("--policy", type=Path)
     st_status.add_argument("--parent", type=Path)
     st_status.add_argument("--promote-pointer", type=Path)
+
+    price_limits = subparsers.add_parser(
+        "build-price-limits",
+        help="publish an immutable OCI S3 resolver joined to formal S2 execution state",
+    )
+    price_limits.add_argument("--rules", type=Path, required=True)
+    price_limits.add_argument("--identity-revision", type=Path, required=True)
+    price_limits.add_argument("--s2-revision", type=Path, required=True)
+    price_limits.add_argument("--output", type=Path, required=True)
+    price_limits.add_argument("--revision", required=True)
+    price_limits.add_argument("--policy", type=Path)
+    price_limits.add_argument("--promote-pointer", type=Path)
     return parser
 
 
@@ -395,6 +412,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.promote_pointer is not None:
                 write_current_pointer(revision_dir=result.output, pointer=args.promote_pointer)
             print(json.dumps(result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "build-price-limits":
+            default_policy = find_project_root() / "config" / "price-limit.v1.json"
+            result = build_price_limit_revision(
+                rules=args.rules,
+                identity_revision=args.identity_revision,
+                s2_revision=args.s2_revision,
+                output=args.output,
+                revision=args.revision,
+                policy_path=args.policy or default_policy,
+            )
+            if args.promote_pointer is not None:
+                write_price_limit_current(revision_dir=result.output, pointer=args.promote_pointer)
+            print(json.dumps(result.to_dict(), ensure_ascii=True, sort_keys=True))
         else:
             raise AssertionError(f"unhandled command: {args.command}")
     except (
@@ -410,6 +440,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         IdentityNormalizationError,
         IdentityCoverageError,
         StStatusBuildError,
+        PriceLimitBuildError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

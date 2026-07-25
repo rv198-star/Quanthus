@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "policy_version": "price-limit-regime.v1",
+  "priority": [
+    "out_of_scope",
+    "st_overlay",
+    "ipo_window",
+    "board_baseline"
+  ],
+  "boards": {
+    "SSE_main": {"normal_pct": 10.0, "st_pct": 5.0},
+    "SZ_main": {"normal_pct": 10.0, "st_pct": 5.0},
+    "ChiNext_pre_2020_08_24": {"normal_pct": 10.0, "st_pct": 5.0},
+    "ChiNext_from_2020_08_24": {"normal_pct": 20.0, "st_pct": 20.0},
+    "STAR": {"normal_pct": 20.0, "st_pct": 20.0}
+  },
+  "ipo_session_count": "exchange open and provider tradestatus=1; suspension does not consume a session",
+  "price_reference": "most recent earlier tradestatus=1 unadjusted close",
+  "rounding_rule": "round_to_tick_0.01_half_up_exchange_style",
+  "unknown_status_behavior": "block_new_positions",
+  "unknown_rule_behavior": "block_new_positions",
+  "excluded_security_ids": ["689009"],
+  "out_of_scope_code_prefixes": ["920"]
+}

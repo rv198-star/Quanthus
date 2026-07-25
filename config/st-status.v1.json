@@ -18,5 +18,8 @@
   },
   "out_of_scope_code_prefixes": [
     "920"
+  ],
+  "excluded_security_ids": [
+    "689009"
   ]
 }

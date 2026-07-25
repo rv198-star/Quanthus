@@ -106,6 +106,9 @@ def _load_policy(path: Path) -> dict[str, Any]:
         raise StStatusBuildError("ST-status policy must freeze a 90-day incremental lookback")
     if payload.get("unknown_behavior") != "block_new_positions":
         raise StStatusBuildError("unknown ST status must block new positions")
+    excluded = payload.get("excluded_security_ids", [])
+    if not isinstance(excluded, list) or any(not str(item).strip() for item in excluded):
+        raise StStatusBuildError("excluded_security_ids must be a list of non-empty ids")
     return payload
 
 
@@ -144,6 +147,12 @@ def build_st_status_revision(
     if output.exists():
         raise FileExistsError(f"refusing to overwrite S2 revision: {output}")
     policy = _load_policy(policy_path)
+    excluded_ids = tuple(str(item) for item in policy.get("excluded_security_ids", []))
+    excluded_predicate = (
+        "security_id NOT IN (" + ", ".join(_sql_string(item) for item in excluded_ids) + ")"
+        if excluded_ids
+        else "TRUE"
+    )
     _verify_candidate_checksums(
         candidate,
         ("daily_isST.parquet", "daily_universe.parquet", "st_status_pit.parquet"),
@@ -191,6 +200,7 @@ def build_st_status_revision(
                 raw_shard,
                 {_sql_string(revision)} AS revision
             FROM {intervals}
+            WHERE {excluded_predicate}
             ORDER BY security_id, observed_start, stock_code
         """
         observed_count = _copy(
@@ -207,6 +217,7 @@ def build_st_status_revision(
                 FROM {universe}
                 WHERE exchange IN ('SSE', 'SZSE')
                   AND stock_code NOT LIKE '920%'
+                  AND {excluded_predicate}
             )
             SELECT
                 u.security_id,
@@ -337,6 +348,7 @@ def build_st_status_revision(
                 "same_day_or_future_observation_count": 0,
                 "unexplained_unknown_count": 0,
                 "oos_920_count": 0,
+                "explicitly_excluded_security_count": 0,
             },
         }
         (staging / "manifest.json").write_text(

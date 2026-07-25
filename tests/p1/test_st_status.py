@@ -116,6 +116,7 @@ class StStatusBuildTests(unittest.TestCase):
                     "unknown_behavior": "block_new_positions",
                     "detail_behavior": "do_not_infer_subclasses",
                     "incremental": {"lookback_calendar_days": 90},
+                    "excluded_security_ids": [],
                 }
             ),
             encoding="utf-8",

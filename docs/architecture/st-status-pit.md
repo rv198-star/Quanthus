@@ -49,19 +49,20 @@ upgraded or reused for writes.
 
 ## Current revision
 
-The promoted OCI revision is `st_status_pit_v2_oci_20260725`, derived from the immutable,
+The promoted OCI revision is `st_status_pit_v2_oci_v1_1_20260725`, derived from the immutable,
 identity-normalized candidate `st_status_pit_v2_baostock_code_validity_v1_1_20260725`.
 
 | Artifact | Rows | SHA-256 |
 | --- | ---: | --- |
-| `st_status_observed_pit.parquet` | 7,449 | `af6d243d6a6d38d9d24088ab8247de3e32f5778cbe1d0ea2d3527e9bf9db79d9` |
-| `st_status_execution_daily.parquet` | 13,800,992 | `7e3155df964e87971485987da6d754ffb644818ac6f085536fb3c0a6833312f7` |
+| `st_status_observed_pit.parquet` | 7,448 | `979efa5364059bd50fb6ba3c76df0af94f12ad66e7116f4e66237061f6ebfd28` |
+| `st_status_execution_daily.parquet` | 13,799,601 | `373e7b905cbfad06aa59031d74b641d47522f5073ad859526cab2772a01016ca` |
 
-The execution table covers 5,466 securities from 2011-01-04 through 2026-07-23. It contains
-460,021 `st_class`, 13,335,505 `non_st_class`, and exactly 5,466 fail-closed `unknown` rows: one
+The execution table covers 5,465 securities from 2011-01-04 through 2026-07-23. It contains
+460,021 `st_class`, 13,334,115 `non_st_class`, and exactly 5,465 fail-closed `unknown` rows: one
 unsupported first session per security. Independent full-table audit found zero duplicate keys,
 same-day/future observations, mid-history unknowns, unknown rows permitting entry, or `920*` rows.
+The v1.1 child also removes explicitly out-of-scope CDR `689009`; its parent remains immutable.
 
 The local evidence is outside Git at
-`/home/ubuntu/data/quanthus/revisions/st_status_pit_v2_oci_20260725/`; OCI promotion metadata is
+`/home/ubuntu/data/quanthus/revisions/st_status_pit_v2_oci_v1_1_20260725/`; OCI promotion metadata is
 `/home/ubuntu/data/quanthus/revisions/st_status_pit_CURRENT.json`.

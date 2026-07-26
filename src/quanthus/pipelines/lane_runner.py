@@ -3422,6 +3422,20 @@ def run_lane(
             {"datasets": [item.to_dict() for item in result.datasets]},
         )
         return result
+    except Exception as exc:
+        result.status = "failed"
+        result.detail = f"{type(exc).__name__}: {exc}"
+        result.finished_at = _now()
+        if result.release_dir is not None:
+            if (result.release_dir / "READY").is_file():
+                shutil.rmtree(result.release_dir, ignore_errors=True)
+            result.release_dir = None
+        _atomic_json(attempt_dir / "attempt.json", result.to_dict())
+        _atomic_json(
+            attempt_dir / "datasets.json",
+            {"datasets": [item.to_dict() for item in result.datasets]},
+        )
+        raise
     finally:
         for handle in reversed(handles):
             try:

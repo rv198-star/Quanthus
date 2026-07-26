@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -391,6 +392,42 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     assert (result.attempt_dir / "datasets.json").stat().st_mode & 0o777 == 0o644
     assert result.release_dir is not None
     assert result.release_dir.stat().st_mode & 0o777 == 0o755
+
+
+def test_intraday_timeout_records_terminal_failure(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shadow = tmp_path / "shadow"
+    paths = _paths(fixture_home, shadow)
+
+    def timeout(**_kwargs: object) -> list[lane_runner.DatasetStatus]:
+        raise subprocess.TimeoutExpired(cmd=["minute-collector"], timeout=600)
+
+    monkeypatch.setattr(lane_runner, "_build_intraday_stream", timeout)
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        run_lane(
+            lane_id="intraday-archive",
+            market_date=date(2026, 7, 24),
+            schedule_config=SCHEDULE,
+            paths=paths,
+            stream="5m",
+            force_preflight="both_open",
+        )
+
+    attempts = list(
+        (shadow / "attempts" / "intraday-archive" / "5m" / "2026-07-24").iterdir()
+    )
+    assert len(attempts) == 1
+    payload = json.loads((attempts[0] / "attempt.json").read_text(encoding="utf-8"))
+    assert payload["status"] == "failed"
+    assert payload["finished_at"] is not None
+    assert payload["release_dir"] is None
+    assert payload["datasets"] == []
+    assert "TimeoutExpired" in payload["detail"]
+    assert json.loads((attempts[0] / "datasets.json").read_text())["datasets"] == []
+    assert not list((shadow / "releases").rglob("READY"))
+    assert not (shadow / "watermarks" / "intraday-5m.watermark.json").exists()
 
 
 def test_resource_group_lock_blocks_parallel(fixture_home: Path, tmp_path: Path) -> None:

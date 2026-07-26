@@ -11,7 +11,7 @@ Group=root
 EnvironmentFile=-/etc/quanthus/hermes-ods-lane.env
 WorkingDirectory=/root/work/Quanthus
 ExecStart=/bin/bash -lc 'set -euo pipefail; \
-  MD="${MARKET_DATE:-$(TZ=Asia/Shanghai date +%F)}"; \
+  MD="${MARKET_DATE:-$(TZ=Asia/Shanghai date +%%F)}"; \
   /root/work/Quanthus/ops/bin/run-hermes-ods-lane --lane weekly-corrections --market-date "$MD"'
 Nice=10
 TimeoutStartSec=6h

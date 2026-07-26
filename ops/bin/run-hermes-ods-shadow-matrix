@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Phase B minimum shadow validation matrix. Isolated shadow root only.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+if [[ -f /etc/quanthus/hermes-ods-lane.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/hermes-ods-lane.env
+fi
+
+: "${ASTOCK_ROOT:=/root/work/astock}"
+: "${ASTOCK_HOME:=${ASTOCK_ROOT}/data}"
+: "${HERMES_ODS_SHADOW_ROOT:=${ASTOCK_HOME}/shadow/hermes-ods-v1}"
+: "${HERMES_ODS_CALENDAR:=${ASTOCK_HOME}/ref_trading_calendar.parquet}"
+: "${HERMES_ODS_SCHEDULE:=${ROOT}/config/schedules/hermes-ods-schedule.v1.json}"
+: "${OPEN_DATE:=2026-07-24}"
+: "${CLOSED_DATE:=2026-07-25}"
+: "${WEEKLY_DATE:=2026-07-24}"
+: "${EVENT_DATE:=2026-07-24}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --open-date) OPEN_DATE="$2"; shift 2 ;;
+    --closed-date) CLOSED_DATE="$2"; shift 2 ;;
+    --weekly-date) WEEKLY_DATE="$2"; shift 2 ;;
+    --event-date) EVENT_DATE="$2"; shift 2 ;;
+    --shadow-root) HERMES_ODS_SHADOW_ROOT="$2"; shift 2 ;;
+    --home) ASTOCK_HOME="$2"; shift 2 ;;
+    --calendar) HERMES_ODS_CALENDAR="$2"; shift 2 ;;
+    --config) HERMES_ODS_SCHEDULE="$2"; shift 2 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+mkdir -p "$HERMES_ODS_SHADOW_ROOT"/{attempts,releases,locks,watermarks,logs}
+log_file="${HERMES_ODS_SHADOW_ROOT}/logs/shadow-matrix-$(date -u +%Y%m%dT%H%M%SZ).log"
+
+{
+  echo "shadow matrix open=${OPEN_DATE} closed=${CLOSED_DATE} weekly=${WEEKLY_DATE} event=${EVENT_DATE}"
+  echo "shadow_root=${HERMES_ODS_SHADOW_ROOT}"
+  python3 -m quanthus.cli lane-shadow-matrix \
+    --config "$HERMES_ODS_SCHEDULE" \
+    --open-date "$OPEN_DATE" \
+    --closed-date "$CLOSED_DATE" \
+    --weekly-date "$WEEKLY_DATE" \
+    --event-date "$EVENT_DATE" \
+    --home "$ASTOCK_HOME" \
+    --shadow-root "$HERMES_ODS_SHADOW_ROOT" \
+    --calendar "$HERMES_ODS_CALENDAR"
+} | tee -a "$log_file"

@@ -45,6 +45,7 @@ from quanthus.p1_evidence_build import (
 )
 from quanthus.pipelines import (
     DailyWarehouseError,
+    LaneRunError,
     OdsReleaseError,
     PipelineConfigError,
     PipelineRunError,
@@ -56,7 +57,10 @@ from quanthus.pipelines import (
     market_session_is_open,
     promote_daily_dwd_revision,
     publish_ods_release,
+    resolve_paths,
+    run_lane,
     run_pipeline,
+    run_shadow_matrix,
     verify_ods_release,
 )
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
@@ -271,6 +275,47 @@ def _parser() -> argparse.ArgumentParser:
         help="validate the versioned Hermes ODS scheduler contract",
     )
     schedule_check.add_argument("--config", type=Path, required=True)
+
+    lane_run = subparsers.add_parser(
+        "lane-run",
+        help="run one Hermes ODS schedule lane attempt (shadow-safe by default)",
+    )
+    lane_run.add_argument("--config", type=Path, required=True)
+    lane_run.add_argument(
+        "--lane",
+        required=True,
+        choices=[
+            "bootstrap",
+            "market-daily-core",
+            "calendar-daily-events",
+            "intraday-archive",
+            "weekly-corrections",
+        ],
+    )
+    lane_run.add_argument("--market-date", type=date.fromisoformat, required=True)
+    lane_run.add_argument("--stream", choices=["1m", "5m"])
+    lane_run.add_argument(
+        "--force-preflight",
+        choices=["both_open", "both_closed", "missing_or_disagree"],
+    )
+    lane_run.add_argument("--issue-ref")
+    lane_run.add_argument("--home", type=Path)
+    lane_run.add_argument("--shadow-root", type=Path)
+    lane_run.add_argument("--calendar", type=Path)
+    lane_run.add_argument("--symbol", action="append", default=[])
+
+    shadow_matrix = subparsers.add_parser(
+        "lane-shadow-matrix",
+        help="run the minimum Hermes ODS Phase B shadow matrix into an isolated root",
+    )
+    shadow_matrix.add_argument("--config", type=Path, required=True)
+    shadow_matrix.add_argument("--open-date", type=date.fromisoformat, required=True)
+    shadow_matrix.add_argument("--closed-date", type=date.fromisoformat, required=True)
+    shadow_matrix.add_argument("--weekly-date", type=date.fromisoformat, required=True)
+    shadow_matrix.add_argument("--event-date", type=date.fromisoformat, required=True)
+    shadow_matrix.add_argument("--home", type=Path)
+    shadow_matrix.add_argument("--shadow-root", type=Path)
+    shadow_matrix.add_argument("--calendar", type=Path)
 
     daily_dwd = subparsers.add_parser(
         "build-daily-dwd",
@@ -579,6 +624,57 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"schedule contract OK: {schedule.schedule_id} "
                 f"({len(schedule.lanes)} lanes, {schedule.timezone})"
             )
+        elif args.command == "lane-run":
+            paths = resolve_paths(
+                home=args.home,
+                shadow_root=args.shadow_root,
+                calendar=args.calendar,
+            )
+            lane_result = run_lane(
+                lane_id=args.lane,
+                market_date=args.market_date,
+                schedule_config=args.config,
+                paths=paths,
+                stream=args.stream,
+                force_preflight=args.force_preflight,
+                issue_ref=args.issue_ref,
+                symbols=args.symbol or None,
+            )
+            print(json.dumps(lane_result.to_dict(), ensure_ascii=True, sort_keys=True))
+            if lane_result.status in {"ready", "closed_session"}:
+                return 0
+            if lane_result.status == "partial":
+                return 4
+            return 2
+        elif args.command == "lane-shadow-matrix":
+            paths = resolve_paths(
+                home=args.home,
+                shadow_root=args.shadow_root,
+                calendar=args.calendar,
+            )
+            matrix = run_shadow_matrix(
+                schedule_config=args.config,
+                open_date=args.open_date,
+                closed_date=args.closed_date,
+                weekly_date=args.weekly_date,
+                event_date=args.event_date,
+                paths=paths,
+            )
+            print(json.dumps(matrix, ensure_ascii=True, sort_keys=True))
+            # bootstrap / missing-preflight expected failed; partial never success.
+            unexpected = []
+            for run in matrix["runs"]:
+                lane = run.get("lane_id")
+                status = run.get("status")
+                preflight = run.get("preflight")
+                if lane == "bootstrap" and status == "failed":
+                    continue
+                if preflight == "missing_or_disagree" and status == "failed":
+                    continue
+                if status in {"ready", "closed_session"}:
+                    continue
+                unexpected.append(run)
+            return 0 if not unexpected else 4
         elif args.command == "build-daily-dwd":
             dwd_result = build_daily_dwd_revision(
                 release_dir=args.release_dir,
@@ -630,7 +726,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         PipelineRunError,
         ScheduleContractError,
         DailyWarehouseError,
+        LaneRunError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

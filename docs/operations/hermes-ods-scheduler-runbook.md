@@ -28,6 +28,18 @@ Each recurring unit must provide:
 - a `READY` marker written only after all mandatory files and the manifest are atomically sealed;
 - a nonzero exit and alert for `failed` or `partial` output.
 
+Provider-mode event and weekly collectors are mapped by
+`HERMES_ODS_PROVIDER_SPEC`; see
+`config/pipelines/hermes-provider-collectors.spec.example.json`. Commands are argv arrays (shell
+strings are rejected) and must write parquet to the supplied `{output}` path. The path is inside
+the current attempt. A missing command, nonzero exit, missing output, or provider request error
+fails the mandatory dataset and cannot advance a watermark or create `READY`.
+
+Minute provider collection is always written under the current attempt. Shared legacy minute
+partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must
+be justified by same-day tradability, PIT suspension, or lifecycle evidence. Setting
+`HERMES_ODS_SYMBOL_LIMIT` creates smoke-only evidence and can never publish `READY`.
+
 Hermes may write only raw/ODS artifacts. Remove all direct curated PG sync from replacement
 launchers. OCI publication is a separate job and credential.
 
@@ -35,6 +47,37 @@ launchers. OCI publication is a separate job and credential.
 
 Implement the five lanes without modifying old crontab entries. `bootstrap` is a manual command
 and receives no timer. Install new timers disabled, then enable only shadow output paths.
+
+### Phase B launchers (repository)
+
+| Lane | Launcher | Unit (disabled by default) |
+| --- | --- | --- |
+| market-daily-core | `ops/bin/run-hermes-ods-lane --lane market-daily-core` | `ops/systemd/hermes-ods-market-daily-core.{service,timer}` |
+| calendar-daily-events | `ops/bin/run-hermes-ods-lane --lane calendar-daily-events` | `ops/systemd/hermes-ods-calendar-daily-events.{service,timer}` |
+| weekly-corrections | `ops/bin/run-hermes-ods-lane --lane weekly-corrections` | `ops/systemd/hermes-ods-weekly-corrections.{service,timer}` |
+| intraday 1m | `ops/bin/run-hermes-ods-lane --lane intraday-archive --stream 1m` | `ops/systemd/hermes-ods-intraday-1m.{service,timer}` |
+| intraday 5m | `ops/bin/run-hermes-ods-lane --lane intraday-archive --stream 5m` | `ops/systemd/hermes-ods-intraday-5m.{service,timer}` |
+| bootstrap | manual only; runner refuses automatic execution | no timer |
+| matrix | `ops/bin/run-hermes-ods-shadow-matrix` | `ops/systemd/hermes-ods-shadow-matrix.service` |
+
+Shadow root defaults to `$ASTOCK_HOME/shadow/hermes-ods-v1`. Canonical
+`$ASTOCK_HOME/releases/{daily,weekly}` and live cron remain untouched until
+`GO_FOR_CUTOVER`.
+
+Python entrypoints:
+
+```bash
+PYTHONPATH=src python -m quanthus.cli lane-run \
+  --config config/schedules/hermes-ods-schedule.v1.json \
+  --lane market-daily-core --market-date 2026-07-24 \
+  --home /root/work/astock/data \
+  --shadow-root /root/work/astock/data/shadow/hermes-ods-v1
+
+PYTHONPATH=src python -m quanthus.cli lane-shadow-matrix \
+  --config config/schedules/hermes-ods-schedule.v1.json \
+  --open-date 2026-07-24 --closed-date 2026-07-25 \
+  --weekly-date 2026-07-24 --event-date 2026-07-24
+```
 
 1. Run `market-daily-core` for at least five open sessions, one known closed weekday, and one
    injected missing/disagreeing calendar case.
@@ -50,6 +93,12 @@ and receives no timer. Install new timers disabled, then enable only shadow outp
 Hermes posts checksums, row counts, start/end times, exit codes, release paths, and injected
 failure evidence to #41 with `READY_FOR_OCI`. OCI pulls through the read-only channel, verifies
 the releases, compares coverage and lineage, and records the acceptance decision.
+
+The matrix summary requires
+`$MATRIX_SHADOW_ROOT/evidence/minute_legacy_coverage_diff.json`. It must identify the immutable
+legacy source, set `coverage_ok=true`, and contain `streams.1m.unexplained_missing_count=0` and
+`streams.5m.unexplained_missing_count=0`. A missing or incomplete diff is a matrix residual, not
+an implicit pass.
 
 ## Cutover gates
 

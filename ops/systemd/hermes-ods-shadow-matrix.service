@@ -1,0 +1,15 @@
+[Unit]
+Description=Hermes ODS Phase B shadow validation matrix (manual/oneshot)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=-/etc/quanthus/hermes-ods-lane.env
+WorkingDirectory=/root/work/Quanthus
+ExecStart=/root/work/Quanthus/ops/bin/run-hermes-ods-shadow-matrix
+Nice=10
+TimeoutStartSec=6h
+StandardOutput=journal
+StandardError=journal

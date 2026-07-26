@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check
+.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -78,3 +78,14 @@ pipeline-check:
 schedule-check:
 	$(VENV)/bin/python -m quanthus schedule-check \
 		--config config/schedules/hermes-ods-schedule.v1.json
+
+lane-shadow-matrix:
+	PYTHONPATH=src $(PYTHON) -m quanthus.cli lane-shadow-matrix \
+		--config config/schedules/hermes-ods-schedule.v1.json \
+		--open-date "$${OPEN_DATE:-2026-07-24}" \
+		--closed-date "$${CLOSED_DATE:-2026-07-25}" \
+		--weekly-date "$${WEEKLY_DATE:-2026-07-24}" \
+		--event-date "$${EVENT_DATE:-2026-07-24}" \
+		--home "$${ASTOCK_HOME:-/root/work/astock/data}" \
+		--shadow-root "$${HERMES_ODS_SHADOW_ROOT:-/root/work/astock/data/shadow/hermes-ods-v1}" \
+		--calendar "$${HERMES_ODS_CALENDAR:-/root/work/astock/data/ref_trading_calendar.parquet}"

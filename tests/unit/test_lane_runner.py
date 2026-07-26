@@ -178,33 +178,26 @@ def fixture_home(tmp_path: Path) -> Path:
             ],
         )
 
-    # minute partitions (must include expected last bar 15:00 for session completeness)
+    # Complete A-share minute grids for both intraday streams.
     minute = tmp_path / "minute" / "data"
     for layer, bar in (("research_1m", "1m"), ("prod_5m", "5m")):
         d = minute / layer
         d.mkdir(parents=True)
+        timestamps = sorted(lane_runner._expected_bar_timestamps(open_day, bar))
         for c in codes:
             _write_parquet(
                 d / f"{c}_{bar}.parquet",
                 [
                     {
                         "stock_code": c,
-                        "ts": f"{open_day.isoformat()} 09:31:00",
+                        "ts": timestamp,
                         "open": 10.0,
                         "high": 10.1,
                         "low": 9.9,
                         "close": 10.0,
                         "volume": 100.0,
-                    },
-                    {
-                        "stock_code": c,
-                        "ts": f"{open_day.isoformat()} 15:00:00",
-                        "open": 10.0,
-                        "high": 10.2,
-                        "low": 9.8,
-                        "close": 10.1,
-                        "volume": 200.0,
-                    },
+                    }
+                    for timestamp in timestamps
                 ],
             )
     os.environ["ASTOCK_MINUTE_ROOT"] = str(tmp_path / "minute")
@@ -478,6 +471,36 @@ def test_intraday_unexplained_missing_blocks_ready(
     assert bars.status == "failed"
 
 
+def test_intraday_missing_middle_bar_blocks_ready(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    partition = minute / "000001_5m.parquet"
+    rows = pq.read_table(partition).to_pylist()
+    _write_parquet(partition, [row for row in rows if "10:00:00" not in str(row["ts"])])
+
+    shadow = tmp_path / "shadow"
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, shadow),
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001"],
+    )
+
+    assert result.status == "partial"
+    assert result.release_dir is None
+    coverage = pq.read_table(
+        result.attempt_dir / "landing" / "intraday_5m_coverage.parquet"
+    ).to_pylist()
+    assert coverage[0]["reason"] == "incomplete_session"
+    assert coverage[0]["missing_bar_count"] == 1
+    assert coverage[0]["observed_maximum"] == "2026-07-24 15:00:00"
+    assert not list(shadow.rglob("READY"))
+
+
 def test_acquire_mode_fail_closed(fixture_home: Path, tmp_path: Path) -> None:
     from quanthus.pipelines.lane_runner import LaneRunError, _acquire_mode
 
@@ -658,13 +681,16 @@ def test_provider_minute_is_attempt_local_and_symbol_limit_is_smoke_only(
             [
                 {
                     "stock_code": "000001",
-                    "ts": "2026-07-24 15:00:00",
+                    "ts": timestamp,
                     "open": 10.0,
                     "high": 10.0,
                     "low": 10.0,
                     "close": 10.0,
                     "volume": 1.0,
                 }
+                for timestamp in sorted(
+                    lane_runner._expected_bar_timestamps(date(2026, 7, 24), "5m")
+                )
             ],
         )
         return {

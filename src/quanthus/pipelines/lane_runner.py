@@ -2325,6 +2325,28 @@ def _expected_last_bar(market_date: date, bar_size: str) -> str:
     return f"{market_date.isoformat()} 15:00:00"
 
 
+def _expected_bar_timestamps(market_date: date, bar_size: str) -> set[str]:
+    if bar_size == "1m":
+        step = timedelta(minutes=1)
+        sessions = (((9, 31), (11, 30)), ((13, 1), (15, 0)))
+    elif bar_size == "5m":
+        step = timedelta(minutes=5)
+        sessions = (((9, 35), (11, 30)), ((13, 5), (15, 0)))
+    else:
+        raise LaneRunError(f"unsupported intraday bar size: {bar_size}")
+
+    timestamps: set[str] = set()
+    for (start_hour, start_minute), (end_hour, end_minute) in sessions:
+        current = datetime.combine(
+            market_date, datetime.min.time(), tzinfo=SH
+        ).replace(hour=start_hour, minute=start_minute)
+        end = current.replace(hour=end_hour, minute=end_minute)
+        while current <= end:
+            timestamps.add(current.strftime("%Y-%m-%d %H:%M:%S"))
+            current += step
+    return timestamps
+
+
 def _minute_no_data_evidence(
     *, paths: LanePaths, market_date: date, universe: Sequence[str]
 ) -> dict[str, dict[str, Any]]:
@@ -2585,6 +2607,7 @@ def _build_intraday_stream(
     observed_max: str | None = None
     acquired_at = _now_sh_iso()
     expected_last = _expected_last_bar(market_date, bar_size)
+    expected_timestamps = _expected_bar_timestamps(market_date, bar_size)
     unexplained_missing = 0
     ready_symbols = 0
     justified = 0
@@ -2656,6 +2679,7 @@ def _build_intraday_stream(
         files_used.append(str(path))
         matched = 0
         code_max: str | None = None
+        code_timestamps: list[str] = []
         for row in _read_parquet(path):
             ts = (
                 row.get("ts")
@@ -2678,6 +2702,7 @@ def _build_intraday_stream(
             ts_s = str(ts)
             # normalize comparable timestamp
             ts_s = ts_s.replace("T", " ")[:19] if "T" in ts_s else ts_s[:19]
+            code_timestamps.append(ts_s)
             if code_max is None or ts_s > code_max:
                 code_max = ts_s
             if observed_max is None or ts_s > observed_max:
@@ -2730,8 +2755,15 @@ def _build_intraday_stream(
                 )
             continue
 
-        # require observed maximum reaches expected last bar (session complete)
-        complete = bool(code_max and code_max[:16] >= expected_last[:16])
+        unique_timestamps = set(code_timestamps)
+        missing_timestamps = expected_timestamps - unique_timestamps
+        unexpected_timestamps = unique_timestamps - expected_timestamps
+        duplicate_count = matched - len(unique_timestamps)
+        complete = (
+            not missing_timestamps
+            and not unexpected_timestamps
+            and duplicate_count == 0
+        )
         if not complete:
             unexplained_missing += 1
             coverage_rows.append(
@@ -2743,6 +2775,10 @@ def _build_intraday_stream(
                     "row_count": matched,
                     "observed_maximum": code_max,
                     "expected_last_bar": expected_last,
+                    "expected_row_count": len(expected_timestamps),
+                    "missing_bar_count": len(missing_timestamps),
+                    "unexpected_bar_count": len(unexpected_timestamps),
+                    "duplicate_bar_count": duplicate_count,
                 }
             )
             log_rows.append(
@@ -2753,6 +2789,10 @@ def _build_intraday_stream(
                     "response_error_msg": "incomplete_session",
                     "response_rows": matched,
                     "observed_maximum": code_max,
+                    "expected_row_count": len(expected_timestamps),
+                    "missing_bar_count": len(missing_timestamps),
+                    "unexpected_bar_count": len(unexpected_timestamps),
+                    "duplicate_bar_count": duplicate_count,
                     "acquired_at": acquired_at,
                 }
             )
@@ -2802,6 +2842,7 @@ def _build_intraday_stream(
         "coverage_ok": coverage_ok,
         "session_complete": session_complete,
         "expected_last_bar": expected_last,
+        "expected_rows_per_ready_symbol": len(expected_timestamps),
         "source_files": files_used,
         "row_count": len(rows),
         "observed_maximum": observed_max,

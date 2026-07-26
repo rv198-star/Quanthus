@@ -18,6 +18,13 @@ p1 = [
   "polars>=1.17,<2",
   "pyarrow>=18,<24",
 ]
+ods = [
+  "baostock>=0.8.9,<0.9",
+  "mootdx>=0.11,<0.12",
+  "pandas>=2.2,<3",
+  "pyarrow>=18,<24",
+  "requests>=2.31,<3",
+]
 dev = [
   "mypy>=1.14,<2",
   "pytest>=8.3,<9",
@@ -27,6 +34,8 @@ dev = [
 
 [project.scripts]
 quanthus = "quanthus.cli:main"
+quanthus-minute-tdx = "quanthus.providers.minute_tdx:main"
+quanthus-ods-snapshot = "quanthus.providers.ods_snapshot:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

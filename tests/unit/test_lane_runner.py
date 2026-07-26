@@ -238,7 +238,8 @@ def test_timer_oncalendar_matches_schedule_contract() -> None:
     ):
         text = (root / name).read_text()
         assert 'date -d "yesterday"' not in text
-        assert "date +%F" in text
+        assert "date +%%F" in text
+        assert "date +%F" not in text.replace("date +%%F", "")
 
 
 def test_session_preflight(fixture_home: Path) -> None:

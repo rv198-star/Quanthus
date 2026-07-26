@@ -6,10 +6,12 @@
 #   this matrix soak:   HERMES_ODS_MINUTE_MODE=backfill + HERMES_ODS_MINUTE_MAX_PAGES=3
 # Pause: touch $SHADOW/MATRIX_SOAK_PAUSE — checked between steps; current attempt is not killed.
 # No timers / live cron / curated PG.
-set -uo pipefail
+set -euo pipefail
 
-REPO=${QUANTHUS_REPO:-/root/multica_workspaces/08cadd44-f7d8-430d-b7ac-7a1560403fa2/24dcc49a/workdir/Quanthus}
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=${QUANTHUS_REPO:-$(cd "$SCRIPT_DIR/.." && pwd)}
 SHADOW=${MATRIX_SHADOW_ROOT:-/root/work/astock/data/shadow/hermes-ods-v1-provider-matrix}
+PRIOR_CANARY_ROOT=${HERMES_ODS_PRIOR_CANARY_ROOT:-$(dirname "$SHADOW")/hermes-ods-v1-provider-canary}
 PY=${ASTOCK_PYTHON:-/root/work/astock/.venv/bin/python}
 CFG=$REPO/config/schedules/hermes-ods-schedule.v1.json
 CAL=${ASTOCK_CALENDAR:-/root/work/astock/data/ref_trading_calendar.parquet}
@@ -48,8 +50,6 @@ CLOSED_WEEKDAY=2026-06-19
 EVENT_DATES=(2026-07-18 2026-07-19 2026-07-20 2026-07-21 2026-07-22 2026-07-23 2026-07-24)
 WEEKLY_DATES=(2026-07-18 2026-07-25)
 RERUN_DATE=2026-07-22
-
-clear_locks() { rm -f "$SHADOW"/locks/*.lock 2>/dev/null || true; }
 
 maybe_pause() {
   if [[ -f "$PAUSE_FLAG" ]]; then
@@ -170,14 +170,18 @@ run_lane() {
       record "$step" "$expected" 0 "$extra_file"
       return 0
     fi
-    if [[ "$expected" == "closed_session" && "$cur" == "closed_session" ]]; then
+    if [[ "$expected" == "closed_session" && "$cur" == "closed_session" && "$has_ready" == "True" ]]; then
       echo "SKIP $step already closed_session" | tee -a "$LOGDIR/matrix_soak_meta.log"
       record "$step" "$expected" 0 "$extra_file"
       return 0
     fi
+    if [[ "$expected" == "failed" && "$cur" == "failed" && "$has_ready" != "True" ]]; then
+      echo "SKIP $step already failed without READY" | tee -a "$LOGDIR/matrix_soak_meta.log"
+      record "$step" "$expected" 1 "$extra_file"
+      return 0
+    fi
   fi
 
-  clear_locks
   local cmd=("$PY" -m quanthus.cli lane-run --config "$CFG" --lane "$lane" --market-date "$mdate" --home "$HOME_DATA" --shadow-root "$SHADOW" --calendar "$CAL")
   [[ -n "$stream" ]] && cmd+=(--stream "$stream")
   [[ -n "$force" ]] && cmd+=(--force-preflight "$force")
@@ -186,7 +190,7 @@ run_lane() {
   set +e
   /usr/bin/timeout "$tmo" "${cmd[@]}" >"$log" 2>&1
   local ec=$?
-  set +e
+  set -e
   latest_attempt_json "$lane" "$mdate" "$stream" > "$extra_file"
   if [[ "$expected" == "failed" ]]; then
     $PY - "$extra_file" <<'PY'
@@ -199,6 +203,38 @@ p.write_text(json.dumps(o, ensure_ascii=False))
 PY
   fi
   record "$step" "$expected" "$ec" "$extra_file"
+  if ! $PY - "$extra_file" "$expected" "$ec" <<'PY'
+import json, sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text())
+expected = sys.argv[2]
+exit_code = int(sys.argv[3])
+status = payload.get("status")
+has_ready = bool(payload.get("has_ready"))
+release_dir = payload.get("release_dir")
+
+if expected == "ready":
+    ok = exit_code == 0 and status == "ready" and has_ready and release_dir
+elif expected == "closed_session":
+    ok = exit_code == 0 and status == "closed_session" and has_ready and release_dir
+elif expected == "failed":
+    ok = exit_code != 0 and status == "failed" and not has_ready and not release_dir
+else:
+    raise SystemExit(f"unsupported expected status: {expected}")
+
+if not ok:
+    print(
+        f"matrix step mismatch: expected={expected} exit={exit_code} "
+        f"status={status} has_ready={has_ready} release_dir={release_dir}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PY
+  then
+    echo "BLOCKED $step outcome mismatch" | tee -a "$LOGDIR/matrix_soak_meta.log"
+    return 1
+  fi
   echo "DONE $step exit=$ec" | tee -a "$LOGDIR/matrix_soak_meta.log"
   cat "$extra_file" | tee -a "$LOGDIR/matrix_soak_meta.log" >/dev/null
   return 0
@@ -234,97 +270,76 @@ for d in "${OPEN_DATES[@]}"; do
 done
 
 # -------- Phase 5: bootstrap --------
-run_lane "bootstrap_WS26" bootstrap "$RERUN_DATE" "" "" "WS-26/#41" 1800 ready
+run_lane "bootstrap_WS26" bootstrap "$RERUN_DATE" "" "" "WS-26/#41" 1800 failed
 
-# -------- Phase 6: failure injection --------
+# -------- Phase 6: deterministic failure injection --------
 maybe_pause
-clear_locks
-FI_LOG=$LOGDIR/fi_market_interrupt.log
-echo "FI start market interrupt" | tee -a "$LOGDIR/matrix_soak_meta.log"
-$PY -m quanthus.cli lane-run --config "$CFG" --lane market-daily-core --market-date 2026-07-21 \
-  --home "$HOME_DATA" --shadow-root "$SHADOW" --calendar "$CAL" >"$FI_LOG" 2>&1 &
-FI_PID=$!
-sleep 8
-FI_ATT=$($PY - <<'PY'
+if [[ "${HERMES_ODS_ENABLE_FAILURE_INJECTION:-0}" != "1" ]]; then
+  {
+    date -Is
+    echo "MATRIX_SOAK_WAITING_FAILURE_INJECTION_APPROVAL"
+  } | tee -a "$LOGDIR/matrix_soak_meta.log"
+  $PY - "$PROGRESS" <<'PY'
+import json, sys
+from datetime import datetime
 from pathlib import Path
-base=Path("/root/work/astock/data/shadow/hermes-ods-v1-provider-matrix/attempts/market-daily-core/2026-07-21")
-cands=sorted([p for p in base.iterdir() if p.is_dir()], key=lambda p: p.name) if base.is_dir() else []
-print(str(cands[-1]) if cands else "")
-PY
+from zoneinfo import ZoneInfo
+
+path = Path(sys.argv[1])
+path.write_text(
+    json.dumps(
+        {
+            "updated_at": datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(
+                timespec="seconds"
+            ),
+            "last_step": "WAITING_FAILURE_INJECTION_APPROVAL",
+            "exit_code": 130,
+            "status": "paused",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+    + "\n"
 )
-KILL_TS=$(date -Is)
-kill -TERM "$FI_PID" 2>/dev/null || true
-sleep 2
-kill -KILL "$FI_PID" 2>/dev/null || true
-wait "$FI_PID" 2>/dev/null || true
-$PY - <<PY
-import json
-from pathlib import Path
-att=Path("$FI_ATT") if "$FI_ATT" else None
-payload={
-  "kind": "failure_injection_market_acquisition_interrupt",
-  "recorded_at": "$KILL_TS",
-  "pid": $FI_PID,
-  "signal": "SIGTERM+SIGKILL",
-  "attempt_dir": str(att) if att else None,
-}
-if att and (att/"attempt.json").is_file():
-  a=json.loads((att/"attempt.json").read_text())
-  payload["attempt_id"]=a.get("attempt_id")
-  payload["last_status"]=a.get("status")
-  payload["release_dir"]=a.get("release_dir")
-  payload["has_ready"]=bool(a.get("release_dir") and (Path(a["release_dir"])/"READY").is_file())
-  payload["no_ready"]=not payload["has_ready"]
-  payload["no_release"]=a.get("release_dir") is None
-Path("$EVID/failure_injection_market_interrupt.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2)+"\n")
-print(json.dumps(payload, ensure_ascii=False))
 PY
-record "fi_market_interrupt" "no_ready" 0 "$EVID/failure_injection_market_interrupt.json"
-
-maybe_pause
-clear_locks
-FI2_LOG=$LOGDIR/fi_market_transfer_interrupt.log
-$PY -m quanthus.cli lane-run --config "$CFG" --lane market-daily-core --market-date 2026-07-20 \
-  --home "$HOME_DATA" --shadow-root "$SHADOW" --calendar "$CAL" >"$FI2_LOG" 2>&1 &
-FI2_PID=$!
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  sleep 12
-  if ! kill -0 "$FI2_PID" 2>/dev/null; then break; fi
-done
-KILL2_TS=$(date -Is)
-if kill -0 "$FI2_PID" 2>/dev/null; then
-  kill -TERM "$FI2_PID" 2>/dev/null || true
-  sleep 2
-  kill -KILL "$FI2_PID" 2>/dev/null || true
+  echo 130 > "$LOGDIR/matrix_soak.exit"
+  exit 130
 fi
-wait "$FI2_PID" 2>/dev/null || true
-$PY - <<PY
-import json
+for stage in acquisition pre_seal transfer; do
+  maybe_pause
+  if $PY - "$EVID/failure_injection_${stage}.json" "$stage" <<'PY'
+import json, sys
 from pathlib import Path
-base=Path("/root/work/astock/data/shadow/hermes-ods-v1-provider-matrix/attempts/market-daily-core/2026-07-20")
-cands=sorted([p for p in base.iterdir() if p.is_dir()], key=lambda p: p.name) if base.is_dir() else []
-att=cands[-1] if cands else None
-payload={"kind":"failure_injection_market_transfer_or_midrun_interrupt","recorded_at":"$KILL2_TS","pid":$FI2_PID,"signal":"SIGTERM+SIGKILL","attempt_dir":str(att) if att else None}
-if att and (att/"attempt.json").is_file():
-  a=json.loads((att/"attempt.json").read_text())
-  payload.update({
-    "attempt_id": a.get("attempt_id"),
-    "last_status": a.get("status"),
-    "release_dir": a.get("release_dir"),
-    "has_ready": bool(a.get("release_dir") and (Path(a["release_dir"])/"READY").is_file()),
-  })
-  payload["no_ready_if_incomplete"] = (a.get("status")!="ready") or (not payload["has_ready"])
-Path("$EVID/failure_injection_market_transfer_interrupt.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2)+"\n")
-print(json.dumps(payload, ensure_ascii=False))
+p=Path(sys.argv[1])
+stage=sys.argv[2]
+payload=json.loads(p.read_text()) if p.is_file() else {}
+ok=(
+    payload.get("status")=="failed"
+    and not payload.get("has_ready")
+    and not payload.get("release_dir")
+    and f"at {stage}" in str(payload.get("detail") or "")
+)
+raise SystemExit(0 if ok else 1)
 PY
-record "fi_market_transfer_interrupt" "no_ready_or_complete_ok" 0 "$EVID/failure_injection_market_transfer_interrupt.json"
+  then
+    echo "SKIP fi_$stage evidence already valid" | tee -a "$LOGDIR/matrix_soak_meta.log"
+    continue
+  fi
+  export HERMES_ODS_FAILURE_INJECTION_STAGE=$stage
+  run_lane "fi_$stage" market-daily-core 2026-07-21 "" both_open "" 3600 failed
+  latest_attempt_json market-daily-core 2026-07-21 "" > "$EVID/failure_injection_${stage}.json"
+done
+unset HERMES_ODS_FAILURE_INJECTION_STAGE
 
 # -------- Final summary --------
-$PY - <<'PY'
+$PY - "$SHADOW" "$PRIOR_CANARY_ROOT" <<'PY'
 import json
+import sys
 from pathlib import Path
+from quanthus.pipelines import verify_ods_release
 
-SHADOW=Path("/root/work/astock/data/shadow/hermes-ods-v1-provider-matrix")
+SHADOW=Path(sys.argv[1])
+PRIOR_CANARY=Path(sys.argv[2])
 rows=[]
 sp=SHADOW/"MATRIX_SOAK_STATE.jsonl"
 if sp.is_file():
@@ -363,30 +378,30 @@ event_dates=["2026-07-18","2026-07-19","2026-07-20","2026-07-21","2026-07-22","2
 weekly_dates=["2026-07-18","2026-07-25"]
 closed="2026-06-19"
 
-def latest(lane, mdate, stream=None):
+def ready_attempt(lane, mdate, stream=None, status="ready"):
     c=[x for x in inv if x["lane"]==lane and x["market_date"]==mdate and x.get("stream")==stream]
-    c=sorted(c, key=lambda x: x["attempt_id"] or "")
-    return c[-1] if c else None
+    c=[x for x in c if x["status"]==status and x["has_ready"] and x["has_release"]]
+    return sorted(c, key=lambda x: x["attempt_id"] or "")[-1] if c else None
 
 gates={
-  "market_open_ready": {d: (latest("market-daily-core", d) or {}).get("status") for d in open_dates},
-  "market_closed": (latest("market-daily-core", closed) or {}),
-  "events": {d: (latest("calendar-daily-events", d) or {}).get("status") for d in event_dates},
-  "weekly": {d: (latest("weekly-corrections", d) or {}).get("status") for d in weekly_dates},
-  "intraday_5m_open": {d: (latest("intraday-archive", d, "5m") or {}).get("status") for d in open_dates},
-  "intraday_1m_open": {d: (latest("intraday-archive", d, "1m") or {}).get("status") for d in open_dates},
-  "intraday_5m_closed": (latest("intraday-archive", closed, "5m") or {}),
-  "intraday_1m_closed": (latest("intraday-archive", closed, "1m") or {}),
+  "market_open_ready": {d: bool(ready_attempt("market-daily-core", d)) for d in open_dates},
+  "market_closed": bool(ready_attempt("market-daily-core", closed, status="closed_session")),
+  "events": {d: bool(ready_attempt("calendar-daily-events", d)) for d in event_dates},
+  "weekly": {d: bool(ready_attempt("weekly-corrections", d)) for d in weekly_dates},
+  "intraday_5m_open": {d: bool(ready_attempt("intraday-archive", d, "5m")) for d in open_dates},
+  "intraday_1m_open": {d: bool(ready_attempt("intraday-archive", d, "1m")) for d in open_dates},
+  "intraday_5m_closed": bool(ready_attempt("intraday-archive", closed, "5m", "closed_session")),
+  "intraday_1m_closed": bool(ready_attempt("intraday-archive", closed, "1m", "closed_session")),
 }
 
-ok_market=all(gates["market_open_ready"].get(d)=="ready" for d in open_dates)
-ok_events=all(gates["events"].get(d)=="ready" for d in event_dates)
-ok_weekly=all(gates["weekly"].get(d)=="ready" for d in weekly_dates)
-ok_5m=all(gates["intraday_5m_open"].get(d)=="ready" for d in open_dates)
-ok_1m=all(gates["intraday_1m_open"].get(d)=="ready" for d in open_dates)
-ok_closed_m=(gates["market_closed"].get("status")=="closed_session")
-ok_closed_5=(gates["intraday_5m_closed"].get("status")=="closed_session")
-ok_closed_1=(gates["intraday_1m_closed"].get("status")=="closed_session")
+ok_market=all(gates["market_open_ready"].values())
+ok_events=all(gates["events"].values())
+ok_weekly=all(gates["weekly"].values())
+ok_5m=all(gates["intraday_5m_open"].values())
+ok_1m=all(gates["intraday_1m_open"].values())
+ok_closed_m=gates["market_closed"]
+ok_closed_5=gates["intraday_5m_closed"]
+ok_closed_1=gates["intraday_1m_closed"]
 
 miss=[r for r in rows if "missing" in r.get("step","")]
 miss_ok=all(not bool((r.get("extra") or {}).get("has_ready")) for r in miss) if miss else False
@@ -394,19 +409,90 @@ miss_ok=all(not bool((r.get("extra") or {}).get("has_ready")) for r in miss) if 
 m22=[x for x in inv if x["lane"]=="market-daily-core" and x["market_date"]=="2026-07-22" and x["status"]=="ready"]
 rerun_ok=len({x["attempt_id"] for x in m22})>=2
 
-fi_files=list((SHADOW/"evidence").glob("failure_injection_*.json"))
-fi_ok=len(fi_files)>=1
+fi_checks={}
+for stage in ("acquisition", "pre_seal", "transfer"):
+    p=SHADOW/"evidence"/f"failure_injection_{stage}.json"
+    payload=json.loads(p.read_text()) if p.is_file() else {}
+    fi_checks[stage]=bool(
+        payload.get("status")=="failed"
+        and not payload.get("has_ready")
+        and not payload.get("release_dir")
+        and f"at {stage}" in str(payload.get("detail") or "")
+    )
+fi_ok=all(fi_checks.values())
+
+bootstrap_rows=[r for r in rows if r.get("step")=="bootstrap_WS26"]
+bootstrap_ok=bool(bootstrap_rows) and any(
+    r.get("expected_status")=="failed"
+    and (r.get("extra") or {}).get("status")=="failed"
+    and not (r.get("extra") or {}).get("has_ready")
+    for r in bootstrap_rows
+)
+
+release_verification={}
+for item in inv:
+    release_dir=item.get("path") and item.get("has_release") and item.get("has_ready") and json.loads((Path(item["path"])/"attempt.json").read_text()).get("release_dir")
+    if not release_dir or release_dir in release_verification:
+        continue
+    try:
+        release_verification[release_dir]={"ok": True, **verify_ods_release(Path(release_dir)).to_dict()}
+    except Exception as exc:
+        release_verification[release_dir]={"ok": False, "error": str(exc)}
+releases_ok=bool(release_verification) and all(x["ok"] for x in release_verification.values())
+
+weekly_counts={name: 0 for name in ("same", "missing_in_daily", "changed_upstream", "conflict")}
+weekly_independent=True
+for d in weekly_dates:
+    item=ready_attempt("weekly-corrections", d)
+    if not item:
+        continue
+    attempt=json.loads((Path(item["path"])/"attempt.json").read_text())
+    release=Path(attempt["release_dir"])
+    manifest=json.loads((release/"release.json").read_text())
+    artifact=next((x for x in manifest["artifacts"] if x["name"]=="reconciliation_summary"), None)
+    if not artifact or "/weekly/" not in release.as_posix():
+        weekly_independent=False
+        continue
+    payload=json.loads((release/artifact["relative_path"]).read_text())
+    weekly_independent = weekly_independent and payload.get("may_overwrite_daily") is False
+    for name in weekly_counts:
+        weekly_counts[name] += int((payload.get("counts") or {}).get(name, 0))
+weekly_four_classes=weekly_independent and all(value > 0 for value in weekly_counts.values())
+
+minute_diff_path=SHADOW/"evidence"/"minute_legacy_coverage_diff.json"
+minute_diff=json.loads(minute_diff_path.read_text()) if minute_diff_path.is_file() else {}
+minute_diff_ok=bool(
+    minute_diff.get("coverage_ok") is True
+    and minute_diff.get("legacy_source")
+    and all(
+        (minute_diff.get("streams") or {}).get(stream, {}).get("unexplained_missing_count")==0
+        for stream in ("1m", "5m")
+    )
+)
 
 wm_1m = any("1m" in k for k in wms)
 wm_5m = any("5m" in k for k in wms)
 
-prior_canary = Path("/root/work/astock/data/shadow/hermes-ods-v1-provider-canary")
+def prior_ready(stream):
+    for path in PRIOR_CANARY.glob(f"attempts/intraday-archive/{stream}/*/*/attempt.json"):
+        payload=json.loads(path.read_text())
+        release_dir=payload.get("release_dir")
+        if payload.get("status")=="ready" and release_dir and (Path(release_dir)/"READY").is_file():
+            return True
+    return False
+
 prior = {
-  "5m_ready": (prior_canary/"attempts/intraday-archive/5m/2026-07-22/20260722-20260726T025242247561Z/attempt.json").is_file(),
-  "1m_ready": (prior_canary/"attempts/intraday-archive/1m/2026-07-22/20260722-20260726T041939638227Z/attempt.json").is_file(),
+  "root": str(PRIOR_CANARY),
+  "5m_ready": prior_ready("5m"),
+  "1m_ready": prior_ready("1m"),
 }
 
-all_green = all([ok_market, ok_events, ok_weekly, ok_5m, ok_1m, ok_closed_m, ok_closed_5, ok_closed_1, miss_ok, rerun_ok, fi_ok])
+all_green = all([
+    ok_market, ok_events, ok_weekly, ok_5m, ok_1m,
+    ok_closed_m, ok_closed_5, ok_closed_1, miss_ok, rerun_ok,
+    fi_ok, bootstrap_ok, releases_ok, weekly_four_classes,
+    minute_diff_ok, wm_1m, wm_5m,
+])
 
 summary={
   "producer": "hermes-ods-phase-b-matrix-soak",
@@ -419,6 +505,10 @@ summary={
   "steps_recorded": len(rows),
   "attempts": inv,
   "watermarks": wms,
+  "release_verification": release_verification,
+  "weekly_correction_counts": weekly_counts,
+  "failure_injection": fi_checks,
+  "minute_legacy_coverage_diff": minute_diff,
   "gates": gates,
   "prior_single_day_canary": prior,
   "checks": {
@@ -431,7 +521,11 @@ summary={
     "intraday_closed_session": ok_closed_5 and ok_closed_1,
     "missing_disagree_no_ready": miss_ok,
     "market_rerun_distinct_attempts": rerun_ok,
-    "failure_injection_evidence": fi_ok,
+    "failure_injection_three_stages": fi_ok,
+    "bootstrap_refused_without_release": bootstrap_ok,
+    "all_ready_releases_verified": releases_ok,
+    "weekly_four_classes_and_independent": weekly_four_classes,
+    "minute_legacy_coverage_diff": minute_diff_ok,
     "wm_1m_present": wm_1m,
     "wm_5m_present": wm_5m,
   },
@@ -442,7 +536,12 @@ summary={
 print(json.dumps({"all_green": all_green, "decision": summary["decision"], "checks": summary["checks"]}, ensure_ascii=False, indent=2))
 PY
 
+if [[ "$($PY -c 'import json,sys; print(json.load(open(sys.argv[1])).get("all_green") is True)' "$SUMMARY")" != "True" ]]; then
+  echo "MATRIX_SOAK_RESIDUAL $(date -Is)" | tee -a "$LOGDIR/matrix_soak_meta.log"
+  echo 4 > "$LOGDIR/matrix_soak.exit"
+  exit 4
+fi
+
 echo "MATRIX_SOAK_DONE $(date -Is)" | tee -a "$LOGDIR/matrix_soak_meta.log"
-clear_locks
 echo 0 > "$LOGDIR/matrix_soak.exit"
 exit 0

@@ -437,6 +437,7 @@ def test_minute_collector_fetch_mode_is_env_explicit(
     assert pages is None
 
     monkeypatch.setenv("HERMES_ODS_MINUTE_MODE", "incr")
+    monkeypatch.setenv("HERMES_ODS_MINUTE_MAX_PAGES", "3")
     mode, pages = lane_runner._minute_collector_fetch_mode(
         market_date=date(2026, 7, 20), bar_size="1m"
     )
@@ -457,10 +458,65 @@ def test_minute_collector_fetch_mode_is_env_explicit(
             market_date=date(2026, 7, 20), bar_size="1m"
         )
 
+    monkeypatch.setenv("HERMES_ODS_MINUTE_MAX_PAGES", "51")
+    with pytest.raises(lane_runner.LaneRunError, match="safety cap"):
+        lane_runner._minute_collector_fetch_mode(
+            market_date=date(2026, 7, 20), bar_size="1m"
+        )
+
+    monkeypatch.setenv("HERMES_ODS_MINUTE_MAX_PAGES", "not-an-int")
+    with pytest.raises(lane_runner.LaneRunError, match="must be an integer"):
+        lane_runner._minute_collector_fetch_mode(
+            market_date=date(2026, 7, 20), bar_size="1m"
+        )
+
     monkeypatch.setenv("HERMES_ODS_MINUTE_MODE", "history")
     with pytest.raises(lane_runner.LaneRunError, match="incr|backfill"):
         lane_runner._minute_collector_fetch_mode(
             market_date=date(2026, 7, 20), bar_size="1m"
+        )
+
+
+@pytest.mark.parametrize("stage", ["acquisition", "pre_seal", "transfer"])
+def test_deterministic_failure_injection_never_publishes_ready(
+    fixture_home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    stage: str,
+) -> None:
+    shadow = tmp_path / "shadow" / "matrix"
+    paths = _paths(fixture_home, shadow)
+    monkeypatch.setenv("HERMES_ODS_ENABLE_FAILURE_INJECTION", "1")
+    monkeypatch.setenv("HERMES_ODS_FAILURE_INJECTION_STAGE", stage)
+
+    with pytest.raises(lane_runner.LaneRunError, match=stage):
+        run_lane(
+            lane_id="calendar-daily-events",
+            market_date=date(2026, 7, 24),
+            schedule_config=SCHEDULE,
+            paths=paths,
+        )
+
+    attempts = list((shadow / "attempts").glob("**/attempt.json"))
+    assert len(attempts) == 1
+    payload = json.loads(attempts[0].read_text(encoding="utf-8"))
+    assert payload["status"] == "failed"
+    assert payload["release_dir"] is None
+    assert not list((shadow / "releases").glob("**/READY"))
+
+
+def test_failure_injection_requires_explicit_enable(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_FAILURE_INJECTION_STAGE", "acquisition")
+    monkeypatch.delenv("HERMES_ODS_ENABLE_FAILURE_INJECTION", raising=False)
+
+    with pytest.raises(lane_runner.LaneRunError, match="requires"):
+        run_lane(
+            lane_id="calendar-daily-events",
+            market_date=date(2026, 7, 24),
+            schedule_config=SCHEDULE,
+            paths=_paths(fixture_home, tmp_path / "shadow"),
         )
 
 

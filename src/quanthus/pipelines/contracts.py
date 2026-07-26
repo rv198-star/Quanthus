@@ -8,7 +8,7 @@ import os
 import re
 import shutil
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -247,7 +247,12 @@ def verify_ods_release(release_dir: Path) -> OdsVerificationResult:
     )
 
 
-def publish_ods_release(*, spec_path: Path, output: Path) -> OdsVerificationResult:
+def publish_ods_release(
+    *,
+    spec_path: Path,
+    output: Path,
+    before_ready: Callable[[], None] | None = None,
+) -> OdsVerificationResult:
     """Snapshot Hermes artifacts and write READY last under an atomic directory rename.
 
     Source jobs must publish their own files by atomic replacement rather than mutate an
@@ -373,6 +378,8 @@ def publish_ods_release(*, spec_path: Path, output: Path) -> OdsVerificationResu
             encoding="utf-8",
         )
         manifest.chmod(0o644)
+        if before_ready is not None:
+            before_ready()
         ready = staging / "READY"
         ready.write_text(f"{_sha256(manifest)}\n", encoding="ascii")
         ready.chmod(0o644)

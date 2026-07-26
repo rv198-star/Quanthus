@@ -94,6 +94,36 @@ class LaneRunError(RuntimeError):
     """Raised when a lane attempt cannot complete its contract."""
 
 
+_FAILURE_INJECTION_STAGES = {"acquisition", "pre_seal", "transfer"}
+
+
+def _failure_injection_stage(*, shadow_root: Path) -> str | None:
+    """Return an explicitly authorized shadow-only failure injection stage."""
+
+    stage = (os.environ.get("HERMES_ODS_FAILURE_INJECTION_STAGE") or "").strip()
+    enabled = os.environ.get("HERMES_ODS_ENABLE_FAILURE_INJECTION") == "1"
+    if not stage:
+        return None
+    if not enabled:
+        raise LaneRunError(
+            "HERMES_ODS_FAILURE_INJECTION_STAGE requires "
+            "HERMES_ODS_ENABLE_FAILURE_INJECTION=1"
+        )
+    if stage not in _FAILURE_INJECTION_STAGES:
+        raise LaneRunError(
+            "HERMES_ODS_FAILURE_INJECTION_STAGE must be one of: "
+            + ", ".join(sorted(_FAILURE_INJECTION_STAGES))
+        )
+    if "shadow" not in {part.lower() for part in shadow_root.resolve().parts}:
+        raise LaneRunError("failure injection is restricted to a shadow root")
+    return stage
+
+
+def _inject_failure(configured_stage: str | None, current_stage: str) -> None:
+    if configured_stage == current_stage:
+        raise LaneRunError(f"deterministic failure injection at {current_stage}")
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -2469,22 +2499,37 @@ def _minute_collector_fetch_mode(
 
     pages_raw = (os.environ.get("HERMES_ODS_MINUTE_MAX_PAGES") or "").strip()
     if mode == "incr":
-        # incr is a single page; MAX_PAGES is optional and usually unset.
-        pages = int(pages_raw) if pages_raw else None
-        return "incr", pages
+        # incr is always one page; a stale backfill page setting has no effect.
+        return "incr", None
 
     if not pages_raw:
         raise LaneRunError(
             "HERMES_ODS_MINUTE_MAX_PAGES is required when "
             "HERMES_ODS_MINUTE_MODE=backfill"
         )
-    max_pages = int(pages_raw)
+    try:
+        max_pages = int(pages_raw)
+    except ValueError as exc:
+        raise LaneRunError(
+            "HERMES_ODS_MINUTE_MAX_PAGES must be an integer when "
+            "HERMES_ODS_MINUTE_MODE=backfill"
+        ) from exc
     if max_pages < 1:
         raise LaneRunError(
             f"HERMES_ODS_MINUTE_MAX_PAGES must be >= 1 (got {max_pages})"
         )
-    cap = int(os.environ.get("HERMES_ODS_MINUTE_MAX_PAGES_CAP", "50"))
-    return "backfill", min(max_pages, cap)
+    try:
+        cap = int(os.environ.get("HERMES_ODS_MINUTE_MAX_PAGES_CAP", "50"))
+    except ValueError as exc:
+        raise LaneRunError("HERMES_ODS_MINUTE_MAX_PAGES_CAP must be an integer") from exc
+    if cap < 1:
+        raise LaneRunError(f"HERMES_ODS_MINUTE_MAX_PAGES_CAP must be >= 1 (got {cap})")
+    if max_pages > cap:
+        raise LaneRunError(
+            "HERMES_ODS_MINUTE_MAX_PAGES exceeds the configured safety cap: "
+            f"{max_pages} > {cap}"
+        )
+    return "backfill", max_pages
 
 
 def _run_minute_collector(
@@ -3050,6 +3095,7 @@ def _publish(
     lane_id: str,
     stream: str | None = None,
     closed: bool = False,
+    failure_injection_stage: str | None = None,
 ) -> tuple[Path | None, str, str | None]:
     """Publish only when all mandatory datasets are ready. READY is last."""
 
@@ -3130,7 +3176,15 @@ def _publish(
     spec_path = landing / "release-spec.json"
     _atomic_json(spec_path, spec)
     try:
-        publish_ods_release(spec_path=spec_path, output=release_dir)
+        publish_ods_release(
+            spec_path=spec_path,
+            output=release_dir,
+            before_ready=(
+                lambda: _inject_failure(failure_injection_stage, "transfer")
+                if failure_injection_stage == "transfer"
+                else None
+            ),
+        )
     except OdsReleaseError as exc:
         return None, "failed", str(exc)
     # READY is last inside publish_ods_release; do not write anything else here.
@@ -3231,6 +3285,9 @@ def run_lane(
         started_at=started,
     )
     _atomic_json(attempt_dir / "attempt.json", result.to_dict())
+    failure_injection_stage = _failure_injection_stage(
+        shadow_root=resolved.shadow_root
+    )
 
     lock_name = {
         "market-daily-core": "market-daily-core.lock",
@@ -3282,6 +3339,7 @@ def run_lane(
         knowledge_cutoff = _now_sh_iso()
         result.status = "acquiring"
         _atomic_json(attempt_dir / "attempt.json", result.to_dict())
+        _inject_failure(failure_injection_stage, "acquisition")
 
         if lane_id == "market-daily-core":
             if preflight == "both_closed":
@@ -3292,6 +3350,7 @@ def run_lane(
                     knowledge_cutoff=knowledge_cutoff,
                 )
                 result.datasets = datasets
+                _inject_failure(failure_injection_stage, "pre_seal")
                 result.status = "sealed"
                 _atomic_json(
                     attempt_dir / "datasets.json",
@@ -3306,6 +3365,7 @@ def run_lane(
                     release_root=resolved.shadow_root / "releases",
                     lane_id=lane_id,
                     closed=True,
+                    failure_injection_stage=failure_injection_stage,
                 )
                 result.release_dir = release_dir
                 result.status = "closed_session" if status == "ready" else status
@@ -3318,6 +3378,7 @@ def run_lane(
                     knowledge_cutoff=knowledge_cutoff,
                 )
                 result.datasets = datasets
+                _inject_failure(failure_injection_stage, "pre_seal")
                 result.status = "sealed"
                 _atomic_json(
                     attempt_dir / "datasets.json",
@@ -3331,6 +3392,7 @@ def run_lane(
                     datasets=datasets,
                     release_root=resolved.shadow_root / "releases",
                     lane_id=lane_id,
+                    failure_injection_stage=failure_injection_stage,
                 )
                 result.release_dir = release_dir
                 result.status = status
@@ -3349,6 +3411,7 @@ def run_lane(
                 attempt_id=attempt_id,
             )
             result.datasets = datasets
+            _inject_failure(failure_injection_stage, "pre_seal")
             result.status = "sealed"
             _atomic_json(
                 attempt_dir / "datasets.json",
@@ -3362,6 +3425,7 @@ def run_lane(
                 datasets=datasets,
                 release_root=resolved.shadow_root / "releases",
                 lane_id=lane_id,
+                failure_injection_stage=failure_injection_stage,
             )
             result.release_dir = release_dir
             result.status = status
@@ -3392,6 +3456,7 @@ def run_lane(
                 knowledge_cutoff=knowledge_cutoff,
             )
             result.datasets = datasets
+            _inject_failure(failure_injection_stage, "pre_seal")
             result.status = "sealed"
             _atomic_json(
                 attempt_dir / "datasets.json",
@@ -3405,6 +3470,7 @@ def run_lane(
                 datasets=datasets,
                 release_root=resolved.shadow_root / "releases",
                 lane_id=lane_id,
+                failure_injection_stage=failure_injection_stage,
             )
             result.release_dir = release_dir
             result.status = status
@@ -3424,6 +3490,7 @@ def run_lane(
                 )
                 # rename trading_calendar-only closed path uses closed mandatory
                 result.datasets = datasets
+                _inject_failure(failure_injection_stage, "pre_seal")
                 result.status = "sealed"
                 release_dir, status, detail = _publish(
                     schedule="daily",
@@ -3435,6 +3502,7 @@ def run_lane(
                     lane_id="market-daily-core",
                     stream=stream,
                     closed=True,
+                    failure_injection_stage=failure_injection_stage,
                 )
                 # for intraday closed, use intraday mandatory override: calendar+lane_status
                 if status != "ready":
@@ -3453,6 +3521,7 @@ def run_lane(
                     symbols=symbols,
                 )
                 result.datasets = datasets
+                _inject_failure(failure_injection_stage, "pre_seal")
                 result.status = "sealed"
                 _atomic_json(
                     attempt_dir / "datasets.json",
@@ -3467,6 +3536,7 @@ def run_lane(
                     release_root=resolved.shadow_root / "releases",
                     lane_id=lane_id,
                     stream=stream,
+                    failure_injection_stage=failure_injection_stage,
                 )
                 result.release_dir = release_dir
                 result.status = status

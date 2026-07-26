@@ -94,6 +94,12 @@ Hermes posts checksums, row counts, start/end times, exit codes, release paths, 
 failure evidence to #41 with `READY_FOR_OCI`. OCI pulls through the read-only channel, verifies
 the releases, compares coverage and lineage, and records the acceptance decision.
 
+The matrix summary requires
+`$MATRIX_SHADOW_ROOT/evidence/minute_legacy_coverage_diff.json`. It must identify the immutable
+legacy source, set `coverage_ok=true`, and contain `streams.1m.unexplained_missing_count=0` and
+`streams.5m.unexplained_missing_count=0`. A missing or incomplete diff is a matrix residual, not
+an implicit pass.
+
 ## Cutover gates
 
 OCI posts `GO_FOR_CUTOVER` only when all of the following are true:

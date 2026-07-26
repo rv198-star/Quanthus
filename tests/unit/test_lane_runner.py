@@ -423,6 +423,39 @@ def test_intraday_timeout_records_terminal_failure(
     assert not (shadow / "watermarks" / "intraday-5m.watermark.json").exists()
 
 
+def test_minute_collector_fetch_mode_uses_backfill_outside_incr_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """1m incr is a single 800-bar page (~3 sessions); older archive days need backfill."""
+    as_of = date(2026, 7, 26)
+    mode, pages = lane_runner._minute_collector_fetch_mode(
+        market_date=date(2026, 7, 24), bar_size="1m", as_of=as_of
+    )
+    assert mode == "incr"
+    assert pages is None
+
+    mode, pages = lane_runner._minute_collector_fetch_mode(
+        market_date=date(2026, 7, 20), bar_size="1m", as_of=as_of
+    )
+    assert mode == "backfill"
+    assert pages is not None and pages >= 2
+
+    # 5m: 800 bars ~16 sessions; 6 calendar days still fits incr.
+    mode, pages = lane_runner._minute_collector_fetch_mode(
+        market_date=date(2026, 7, 20), bar_size="5m", as_of=as_of
+    )
+    assert mode == "incr"
+    assert pages is None
+
+    monkeypatch.setenv("HERMES_ODS_MINUTE_MODE", "incr")
+    mode, pages = lane_runner._minute_collector_fetch_mode(
+        market_date=date(2026, 7, 20), bar_size="1m", as_of=as_of
+    )
+    assert mode == "incr"
+    assert pages is None
+    monkeypatch.delenv("HERMES_ODS_MINUTE_MODE", raising=False)
+
+
 def test_resource_group_lock_blocks_parallel(fixture_home: Path, tmp_path: Path) -> None:
     import fcntl
 

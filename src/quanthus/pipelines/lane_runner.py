@@ -2436,6 +2436,52 @@ def _minute_no_data_evidence(
     return evidence
 
 
+def _minute_collector_fetch_mode(
+    *,
+    market_date: date,
+    bar_size: str,
+    as_of: date | None = None,
+) -> tuple[str, int | None]:
+    """Choose minute_backfill fetch mode for an archive market_date.
+
+    ``minute_backfill.py --mode incr`` returns a single TDX page (PAGE=800 bars
+    newest-first). For 1m that is only ~3 sessions; for 5m ~16 sessions. Archive
+    dates outside that window filter to zero session rows and become
+    ``zero_rows_for_session`` / attempt ``partial``.
+
+    When the target date is outside the incr coverage window (calendar-day
+    proxy), use ``backfill`` with enough ``--max-pages`` to reach market_date.
+    Overrides: ``HERMES_ODS_MINUTE_MODE`` and optional ``HERMES_ODS_MINUTE_MAX_PAGES``.
+    """
+
+    override = (os.environ.get("HERMES_ODS_MINUTE_MODE") or "").strip().lower()
+    if override in {"incr", "backfill"}:
+        pages_raw = (os.environ.get("HERMES_ODS_MINUTE_MAX_PAGES") or "").strip()
+        pages = int(pages_raw) if pages_raw else None
+        return override, pages
+
+    if bar_size not in {"1m", "5m"}:
+        raise LaneRunError(f"unsupported intraday bar_size: {bar_size}")
+    bars_per_day = 240 if bar_size == "1m" else 48
+    page = 800
+    today = as_of or datetime.now(SH).date()
+    if market_date > today:
+        # Future dates should not reach the collector; keep incr as no-op-ish.
+        return "incr", None
+    calendar_span = (today - market_date).days
+    # Single incr page covers floor(PAGE / bars_per_day) calendar days at most
+    # when every day is a full session; subtract 1 so partial first-day pages
+    # do not claim an incomplete outer session is ready.
+    incr_span = max(1, page // bars_per_day) - 1
+    if calendar_span <= incr_span:
+        return "incr", None
+    need_bars = (calendar_span + 2) * bars_per_day
+    max_pages = max(2, (need_bars + page - 1) // page)
+    # Hard cap: sidecars default MAX_PAGES_DEFAULT=500; keep archive pulls lean.
+    max_pages = min(max_pages, int(os.environ.get("HERMES_ODS_MINUTE_MAX_PAGES_CAP", "50")))
+    return "backfill", max_pages
+
+
 def _run_minute_collector(
     *,
     paths: LanePaths,
@@ -2470,6 +2516,9 @@ def _run_minute_collector(
     env["ASTOCK_ROOT"] = str(paths.home.parent)
     env["ASTOCK_HOME"] = str(paths.home)
     env["ASTOCK_MINUTE_ROOT"] = str(minute_root)
+    fetch_mode, max_pages = _minute_collector_fetch_mode(
+        market_date=market_date, bar_size=bar_size
+    )
     cmd = [
         py,
         str(script),
@@ -2478,13 +2527,15 @@ def _run_minute_collector(
         "--freq",
         bar_size,
         "--mode",
-        "incr",
+        fetch_mode,
         "--symbols",
         ",".join(symbols),
         "--no-lock",
         "--sleep",
         os.environ.get("HERMES_ODS_MINUTE_SLEEP", "0.01"),
     ]
+    if max_pages is not None:
+        cmd.extend(["--max-pages", str(max_pages)])
     # Provider collection is always attempt-local. There is deliberately no
     # production fallback: shadow runs must never mutate shared legacy partitions.
     raw_home.mkdir(parents=True, exist_ok=False)
@@ -2505,9 +2556,11 @@ def _run_minute_collector(
     )
     return {
         "provider": "minute_backfill.py",
-        "api": "mootdx/tdx.incr",
+        "api": f"mootdx/tdx.{fetch_mode}",
         "layer": layer,
         "bar_size": bar_size,
+        "fetch_mode": fetch_mode,
+        "max_pages": max_pages,
         "cmd": cmd,
         "exit_code": proc.returncode,
         "stdout_tail": (proc.stdout or "")[-2000:],

@@ -149,6 +149,42 @@ print(json.dumps(rec, ensure_ascii=False)[:500])
 PY
 }
 
+recorded_step_satisfied() {
+  local step="$1" expected="$2"
+  $PY - "$STATE" "$step" "$expected" <<'PY'
+import json, sys
+from pathlib import Path
+
+state, step, expected = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+rows=[]
+if state.is_file():
+    for line in state.read_text().splitlines():
+        try:
+            row=json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("step")==step:
+            rows.append(row)
+if not rows:
+    raise SystemExit(1)
+row=rows[-1]
+extra=row.get("extra") or {}
+status=extra.get("status")
+has_ready=bool(extra.get("has_ready"))
+release_dir=extra.get("release_dir")
+exit_code=int(row.get("exit_code", 999))
+if expected=="ready":
+    ok=exit_code==0 and status=="ready" and has_ready and release_dir
+elif expected=="closed_session":
+    ok=exit_code==0 and status=="closed_session" and has_ready and release_dir
+elif expected=="failed":
+    ok=exit_code!=0 and status=="failed" and not has_ready and not release_dir
+else:
+    ok=False
+raise SystemExit(0 if ok else 1)
+PY
+}
+
 run_lane() {
   # args: step lane market_date [stream] [force_preflight] [issue_ref] [timeout_sec] [expected]
   local step="$1" lane="$2" mdate="$3"
@@ -157,6 +193,11 @@ run_lane() {
   local log=$LOGDIR/${step}.log
 
   maybe_pause
+
+  if recorded_step_satisfied "$step" "$expected"; then
+    echo "SKIP $step STATE already satisfies $expected" | tee -a "$LOGDIR/matrix_soak_meta.log"
+    return 0
+  fi
 
   # skip if already satisfied
   if [[ -z "$force" ]]; then

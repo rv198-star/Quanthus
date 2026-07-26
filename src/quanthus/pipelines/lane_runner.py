@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 import tempfile
 import time
 from collections.abc import Mapping, Sequence
@@ -476,6 +477,7 @@ def _run_configured_provider_collector(
     values = {
         "output": str(output),
         "home": str(paths.home),
+        "python": sys.executable,
         "market_date": market_date.isoformat(),
         "window_start": window_start.isoformat(),
     }
@@ -2545,23 +2547,12 @@ def _run_minute_collector(
     minute_root = Path(
         os.environ.get("ASTOCK_MINUTE_ROOT") or (paths.home.parent / "minute")
     ).resolve()
-    script = minute_root / "bin" / "minute_backfill.py"
-    if not script.is_file():
-        raise LaneRunError(f"minute collector missing: {script}")
     layer = "research" if bar_size == "1m" else "prod"
-    py = os.environ.get("ASTOCK_MINUTE_PYTHON") or os.environ.get("ASTOCK_PYTHON")
-    if not py:
-        # prefer minute venv then astock venv
-        for candidate in (
-            paths.home.parent / ".venv-a-stock-data" / "bin" / "python",
-            paths.home.parent / ".venv" / "bin" / "python",
-            Path("/root/work/astock/.venv/bin/python"),
-        ):
-            if candidate.is_file():
-                py = str(candidate)
-                break
-    if not py:
-        py = "python3"
+    py = (
+        os.environ.get("ASTOCK_MINUTE_PYTHON")
+        or os.environ.get("ASTOCK_PYTHON")
+        or sys.executable
+    )
     env = os.environ.copy()
     env["ASTOCK_ROOT"] = str(paths.home.parent)
     env["ASTOCK_HOME"] = str(paths.home)
@@ -2569,9 +2560,18 @@ def _run_minute_collector(
     fetch_mode, max_pages = _minute_collector_fetch_mode(
         market_date=market_date, bar_size=bar_size
     )
+    collector_override = os.environ.get("HERMES_ODS_MINUTE_COLLECTOR", "").strip()
+    if collector_override:
+        script = Path(collector_override).resolve()
+        if not script.is_file():
+            raise LaneRunError(f"minute collector override missing: {script}")
+        collector_argv = [py, str(script)]
+        collector_identity = str(script)
+    else:
+        collector_argv = [py, "-m", "quanthus.providers.minute_tdx"]
+        collector_identity = "quanthus.providers.minute_tdx"
     cmd = [
-        py,
-        str(script),
+        *collector_argv,
         "--layer",
         layer,
         "--freq",
@@ -2605,7 +2605,7 @@ def _run_minute_collector(
         check=False,
     )
     return {
-        "provider": "minute_backfill.py",
+        "provider": collector_identity,
         "api": f"mootdx/tdx.{fetch_mode}",
         "layer": layer,
         "bar_size": bar_size,

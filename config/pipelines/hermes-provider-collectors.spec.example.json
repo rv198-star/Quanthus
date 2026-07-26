@@ -3,59 +3,59 @@
   "lanes": {
     "calendar-daily-events": {
       "corporate_actions_delta": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "corporate-actions", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "corporate-actions", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.corporate-actions",
         "timeout_seconds": 1800
       },
       "dividends_delta": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "dividends", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "dividends", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.dividends",
         "timeout_seconds": 1800
       },
       "factor_evidence_delta": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "adjustment-evidence", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "adjustment-evidence", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.adjustment-evidence",
         "timeout_seconds": 1800
       },
       "financial_disclosures_delta": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "financial-disclosures", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "financial-disclosures", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.financial-disclosures",
         "timeout_seconds": 1800
       },
       "suspensions_delta": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "suspensions", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "suspensions", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.suspensions",
         "timeout_seconds": 1800
       }
     },
     "weekly-corrections": {
       "adjustment_evidence": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "adjustment-evidence", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "adjustment-evidence", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.adjustment-evidence",
         "timeout_seconds": 3600
       },
       "corporate_actions": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "corporate-actions", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "corporate-actions", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.corporate-actions",
         "timeout_seconds": 3600
       },
       "dividends": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "dividends", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "dividends", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.dividends",
         "timeout_seconds": 3600
       },
       "financial_quarterly": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "financial-quarterly", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "financial-quarterly", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.financial-quarterly",
         "timeout_seconds": 3600
       },
       "shareholder_count": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "shareholder-count", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "shareholder-count", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.shareholder-count",
         "timeout_seconds": 3600
       },
       "st_announcement_trail": {
-        "argv": ["/root/work/astock/bin/ods-provider-collect", "st-status", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}"],
+        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "st-status", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "baostock.isST",
         "timeout_seconds": 3600
       }

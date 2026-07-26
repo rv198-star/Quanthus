@@ -6,9 +6,11 @@ record; Hermes must not alter live cron until OCI posts `GO_FOR_CUTOVER`.
 
 ## Validate the contract
 
-On OCI, from the repository checkout:
+On a fresh ODS node, install the repository-owned providers, then validate the
+contract from the repository checkout:
 
 ```bash
+make bootstrap-ods
 make schedule-check
 ```
 
@@ -35,10 +37,20 @@ strings are rejected) and must write parquet to the supplied `{output}` path. Th
 the current attempt. A missing command, nonzero exit, missing output, or provider request error
 fails the mandatory dataset and cannot advance a watermark or create `READY`.
 
+The repository-owned default adapter is `quanthus.providers.ods_snapshot`. It windows a
+node-local canonical ODS/Base parquet into the attempt and records source lineage; it is not an
+upstream vendor collector. A replacement ODS node therefore needs both the immutable Base seed
+and explicit upstream refresh jobs for daily/event/weekly sources. A successful snapshot lane
+proves scheduling and release semantics, but it does not prove those mutable sources are current.
+Upstream credentials and raw responses remain node-local and never enter Git.
+
 Minute provider collection is always written under the current attempt. Shared legacy minute
 partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must
 be justified by same-day tradability, PIT suspension, or lifecycle evidence. Setting
 `HERMES_ODS_SYMBOL_LIMIT` creates smoke-only evidence and can never publish `READY`.
+The default minute collector is the repository module `quanthus.providers.minute_tdx`; a reviewed
+external fork may be selected with `HERMES_ODS_MINUTE_COLLECTOR`. Both forms receive an
+attempt-local `--home` and have no curated-PG path.
 
 Hermes may write only raw/ODS artifacts. Remove all direct curated PG sync from replacement
 launchers. OCI publication is a separate job and credential.
@@ -161,3 +173,7 @@ On a replacement collector, restore repository code/config, source credentials, 
 watermarks, and disabled/enabled timer state. Validate the schedule, run all preflights, publish a
 shadow attempt for each lane, verify it from OCI, and only then enable production timers. Market
 data, credentials, raw manifests, and run artifacts never enter Git.
+
+For a Base-seeded validation node, keep all timers disabled until market, events, weekly, 1m, and
+5m smoke attempts have reached a natural terminal state. The Base seed, shadow attempts, releases,
+watermarks, host env files, and provider credentials are deployment state, not repository content.

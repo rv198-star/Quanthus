@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
+.PHONY: bootstrap bootstrap-p1 bootstrap-ods doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -12,6 +12,11 @@ bootstrap-p1:
 	$(PYTHON) -m venv $(VENV)
 	$(VENV)/bin/python -m pip install --upgrade pip
 	$(VENV)/bin/python -m pip install -e ".[dev,p1]"
+
+bootstrap-ods:
+	$(PYTHON) -m venv $(VENV)
+	$(VENV)/bin/python -m pip install --upgrade pip
+	$(VENV)/bin/python -m pip install -e ".[dev,ods]"
 
 doctor:
 	PYTHONPATH=src $(PYTHON) -m quanthus doctor

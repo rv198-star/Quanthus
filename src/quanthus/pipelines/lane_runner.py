@@ -116,6 +116,7 @@ def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     tmp = Path(tmp_name)
     try:
+        os.fchmod(fd, 0o644)
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(raw)
             handle.flush()

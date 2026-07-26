@@ -386,6 +386,11 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     payload = json.loads(wm.read_text(encoding="utf-8"))
     assert payload["committed_market_date"] == "2026-07-24"
     assert payload["row_count"] > 0
+    assert wm.stat().st_mode & 0o777 == 0o644
+    assert (result.attempt_dir / "attempt.json").stat().st_mode & 0o777 == 0o644
+    assert (result.attempt_dir / "datasets.json").stat().st_mode & 0o777 == 0o644
+    assert result.release_dir is not None
+    assert result.release_dir.stat().st_mode & 0o777 == 0o755
 
 
 def test_resource_group_lock_blocks_parallel(fixture_home: Path, tmp_path: Path) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -58,6 +59,29 @@ class OdsReleaseContractTests(unittest.TestCase):
             self.assertEqual(verified.release.release_id, "hermes-daily-2026-07-24-v1")
             self.assertEqual(verified.verified_bytes, len(b"immutable-test-payload"))
             self.assertEqual((output / "READY").read_text().strip(), verified.manifest_sha256)
+
+    def test_publish_is_readable_under_restrictive_umask(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.parquet"
+            source.write_bytes(b"immutable-test-payload")
+            source.chmod(0o600)
+            output = root / "release-parent" / "release"
+
+            previous_umask = os.umask(0o077)
+            try:
+                publish_ods_release(
+                    spec_path=self._write_spec(root, source),
+                    output=output,
+                )
+            finally:
+                os.umask(previous_umask)
+
+            artifact = output / "artifacts" / "daily_ohlcv_none.parquet"
+            self.assertEqual(output.stat().st_mode & 0o777, 0o755)
+            self.assertEqual(artifact.parent.stat().st_mode & 0o777, 0o755)
+            for path in (artifact, output / "release.json", output / "READY"):
+                self.assertEqual(path.stat().st_mode & 0o777, 0o644)
 
     def test_changed_artifact_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

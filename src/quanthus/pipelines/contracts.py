@@ -309,7 +309,9 @@ def publish_ods_release(*, spec_path: Path, output: Path) -> OdsVerificationResu
         return existing
 
     output.parent.mkdir(parents=True, exist_ok=True)
+    output.parent.chmod(0o755)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
+    staging.chmod(0o755)
     try:
         artifacts: list[dict[str, Any]] = []
         for index, value in enumerate(artifact_specs):
@@ -330,11 +332,13 @@ def publish_ods_release(*, spec_path: Path, output: Path) -> OdsVerificationResu
                 raise OdsReleaseError(f"artifact {name} has an unsafe relative_path")
             destination = staging.joinpath(*relative_path.parts)
             destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.parent.chmod(0o755)
             before = source.stat()
             try:
                 os.link(source, destination)
             except OSError:
                 shutil.copy2(source, destination)
+            destination.chmod(0o644)
             checksum = _sha256(destination)
             after = destination.stat()
             stable_fields_before = (before.st_size, before.st_mtime_ns)
@@ -368,7 +372,10 @@ def publish_ods_release(*, spec_path: Path, output: Path) -> OdsVerificationResu
             json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        (staging / "READY").write_text(f"{_sha256(manifest)}\n", encoding="ascii")
+        manifest.chmod(0o644)
+        ready = staging / "READY"
+        ready.write_text(f"{_sha256(manifest)}\n", encoding="ascii")
+        ready.chmod(0o644)
         os.replace(staging, output)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)

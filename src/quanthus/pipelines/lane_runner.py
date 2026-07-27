@@ -892,11 +892,13 @@ def _baostock_fetch_day(
                         "security_id": code,
                         "stock_code": code,
                         "market_date": day,
+                        "date": day,
                         "tradestatus": "unknown",
                         "isST": "unknown",
                         "source": "baostock.empty_response",
                         "response_status": "empty",
                         "acquired_at": acquired_at,
+                        "built_at": acquired_at,
                     }
                 )
                 continue
@@ -914,9 +916,13 @@ def _baostock_fetch_day(
                     "close": _fnum(raw[5]),
                     "volume": _fnum(raw[6], 0.0) or 0.0,
                     "amount": _fnum(raw[7], 0.0) or 0.0,
+                    "turnover_rate": _fnum(raw[8]),
+                    "pct_change": _fnum(raw[9]),
                     "adj_mode": "none",
+                    "adj_version": "baostock.adjustflag=3.v1",
                     "source": "baostock.query_history_k_data_plus.adjustflag=3",
                     "acquired_at": acquired_at,
+                    "built_at": acquired_at,
                 }
             )
             status_rows.append(
@@ -924,10 +930,12 @@ def _baostock_fetch_day(
                     "security_id": code,
                     "stock_code": code,
                     "market_date": day,
+                    "date": day,
                     "tradestatus": str(raw[10] if len(raw) > 10 else "1"),
                     "isST": str(raw[11] if len(raw) > 11 else "0"),
                     "source": "baostock.query_history_k_data_plus",
                     "acquired_at": acquired_at,
+                    "built_at": acquired_at,
                 }
             )
     finally:
@@ -1076,9 +1084,13 @@ def _local_market_acquire(
                     "close": bar.get("close"),
                     "volume": bar.get("volume") if bar.get("volume") is not None else 0.0,
                     "amount": bar.get("amount") if bar.get("amount") is not None else 0.0,
+                    "turnover_rate": _fnum(bar.get("turnover_rate")),
+                    "pct_change": _fnum(bar.get("pct_change")),
                     "adj_mode": "none",
+                    "adj_version": str(bar.get("adj_version") or "local-sot-none-v1"),
                     "source": "local-sot.daily_ohlcv_none",
                     "acquired_at": acquired_at,
+                    "built_at": str(bar.get("built_at") or acquired_at),
                 }
             )
         tradestatus = st.get("tradestatus")
@@ -1092,10 +1104,12 @@ def _local_market_acquire(
                 "security_id": code,
                 "stock_code": code,
                 "market_date": day,
+                "date": day,
                 "tradestatus": None if tradestatus is None else str(tradestatus),
                 "isST": None if is_st is None else str(is_st),
                 "source": "local-sot.status",
                 "acquired_at": acquired_at,
+                "built_at": str(st.get("built_at") or acquired_at),
             }
         )
     return bars, status_rows, log_rows

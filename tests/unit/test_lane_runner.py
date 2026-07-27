@@ -356,6 +356,76 @@ def test_baostock_index_fetch_maps_the_contract_set(
     assert FakeBaostock.logged_out
 
 
+def test_baostock_daily_fetch_preserves_dwd_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Login:
+        error_code = "0"
+        error_msg = "ok"
+
+    class Query:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self, row: list[str]) -> None:
+            self.row = row
+            self.pending = True
+
+        def next(self) -> bool:
+            pending, self.pending = self.pending, False
+            return pending
+
+        def get_row_data(self) -> list[str]:
+            return self.row
+
+    class FakeBaostock:
+        fields: list[str] = []
+        logged_out = False
+
+        @staticmethod
+        def login() -> Login:
+            return Login()
+
+        @classmethod
+        def query_history_k_data_plus(cls, code: str, fields: str, **_kwargs: object) -> Query:
+            cls.fields.append(fields)
+            return Query(
+                [
+                    "2026-07-27",
+                    code,
+                    "1",
+                    "2",
+                    "0.5",
+                    "1.5",
+                    "100",
+                    "200",
+                    "1.2",
+                    "-0.5",
+                    "1",
+                    "0",
+                ]
+            )
+
+        @classmethod
+        def logout(cls) -> None:
+            cls.logged_out = True
+
+    monkeypatch.setitem(__import__("sys").modules, "baostock", FakeBaostock)
+    bars, statuses, logs = lane_runner._baostock_fetch_day(["000001"], date(2026, 7, 27))
+
+    assert FakeBaostock.fields == [
+        "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST"
+    ]
+    assert FakeBaostock.logged_out
+    assert logs[0]["response_error_code"] == "0"
+    assert bars[0]["turnover_rate"] == 1.2
+    assert bars[0]["pct_change"] == -0.5
+    assert bars[0]["adj_version"] == "baostock.adjustflag=3.v1"
+    assert bars[0]["built_at"] == bars[0]["acquired_at"]
+    assert statuses[0]["date"] == "2026-07-27"
+    assert statuses[0]["built_at"] == statuses[0]["acquired_at"]
+
+
 def test_baostock_index_fetch_reconnects_after_provider_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

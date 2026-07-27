@@ -2547,8 +2547,73 @@ def _expected_bar_timestamps(market_date: date, bar_size: str) -> set[str]:
     return timestamps
 
 
+def _latest_market_status_artifact(
+    *,
+    paths: LanePaths,
+    market_date: date,
+    available_at: datetime,
+) -> tuple[Path, dict[str, Any]] | None:
+    """Return same-day status evidence from the latest verified market release."""
+
+    if available_at.tzinfo is None or available_at.utcoffset() is None:
+        return None
+
+    release_root = (
+        paths.shadow_root / "releases" / "daily" / market_date.isoformat()
+    )
+    if not release_root.is_dir():
+        return None
+
+    candidates: list[tuple[datetime, Path, dict[str, Any]]] = []
+    for release_dir in release_root.iterdir():
+        if not release_dir.is_dir():
+            continue
+        try:
+            verified = verify_ods_release(release_dir)
+        except OdsReleaseError:
+            continue
+        release = verified.release
+        if (
+            release.market_date != market_date
+            or not release.release_id.startswith("hermes-market-daily-core-")
+            or release.created_at > available_at
+        ):
+            continue
+        artifact = next(
+            (
+                item
+                for item in release.artifacts
+                if item.name == "daily_status_observation_delta"
+            ),
+            None,
+        )
+        if artifact is None or artifact.knowledge_cutoff > available_at:
+            continue
+        candidates.append(
+            (
+                release.created_at,
+                release_dir.joinpath(*artifact.relative_path.parts),
+                {
+                    "release_id": release.release_id,
+                    "release_dir": str(release_dir),
+                    "artifact_sha256": artifact.sha256,
+                    "knowledge_cutoff": artifact.knowledge_cutoff.isoformat(),
+                },
+            )
+        )
+
+    if not candidates:
+        return None
+    _, artifact_path, metadata = max(candidates, key=lambda item: item[0])
+    return artifact_path, metadata
+
+
 def _minute_no_data_evidence(
-    *, paths: LanePaths, market_date: date, universe: Sequence[str]
+    *,
+    paths: LanePaths,
+    market_date: date,
+    universe: Sequence[str],
+    evidence_available_at: datetime,
 ) -> dict[str, dict[str, Any]]:
     """Index auditable same-day reasons for an in-scope symbol to have no bars."""
 
@@ -2577,30 +2642,48 @@ def _minute_no_data_evidence(
                     "delist_date": delist_date,
                 }
 
+    status_sources: list[tuple[Path, dict[str, Any]]] = []
     status_path = paths.home / "daily_status_observation.parquet"
     if status_path.is_file():
-        for row in _read_parquet_filter_date(
-            status_path, market_date=market_date, date_col="date"
-        ):
+        status_sources.append((status_path, {}))
+    market_status = _latest_market_status_artifact(
+        paths=paths,
+        market_date=market_date,
+        available_at=evidence_available_at,
+    )
+    if market_status is not None:
+        status_sources.append(market_status)
+
+    # Later sources take precedence, so a verified same-day market release wins
+    # over a stale node-local snapshot without mutating either artifact.
+    status_rows: dict[str, tuple[Mapping[str, Any], Path, dict[str, Any]]] = {}
+    for candidate_path, metadata in status_sources:
+        for row in _read_parquet(candidate_path):
+            evidence_date = str(row.get("market_date") or row.get("date") or "")[:10]
+            if evidence_date != target:
+                continue
             code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
             if code not in wanted:
                 continue
-            tradestatus = str(row.get("tradestatus") or "").strip().lower()
-            status = str(row.get("status") or "").strip().lower()
-            is_tradable = row.get("is_tradable")
-            blocked = (
-                tradestatus in {"0", "false", "suspended"}
-                or is_tradable in {0, "0", "false"}
-                or status in {"suspended", "not_executable", "delisted"}
-            )
-            if blocked:
-                evidence[code] = {
-                    "reason": status or "daily_status_not_tradable",
-                    "source": status_path.name,
-                    "evidence_date": target,
-                    "tradestatus": row.get("tradestatus"),
-                    "is_tradable": is_tradable,
-                }
+            status_rows[code] = (row, candidate_path, metadata)
+    for code, (row, candidate_path, metadata) in status_rows.items():
+        tradestatus = str(row.get("tradestatus") or "").strip().lower()
+        status = str(row.get("status") or "").strip().lower()
+        is_tradable = row.get("is_tradable")
+        blocked = (
+            tradestatus in {"0", "false", "suspended"}
+            or is_tradable in {0, "0", "false"}
+            or status in {"suspended", "not_executable", "delisted"}
+        )
+        if blocked:
+            evidence[code] = {
+                "reason": status or "daily_status_not_tradable",
+                "source": candidate_path.name,
+                "evidence_date": target,
+                "tradestatus": row.get("tradestatus"),
+                "is_tradable": is_tradable,
+                **metadata,
+            }
 
     suspension_path = paths.home / "ref_suspensions.parquet"
     if not suspension_path.is_file():
@@ -2797,6 +2880,7 @@ def _build_intraday_stream(
     market_date: date,
     landing: Path,
     knowledge_cutoff: str,
+    attempt_started_at: datetime,
     bar_size: str,
     minute_bar_contract: Mapping[str, Any],
     symbols: Sequence[str] | None = None,
@@ -2884,7 +2968,10 @@ def _build_intraday_stream(
     ready_symbols = 0
     justified = 0
     no_data_evidence = _minute_no_data_evidence(
-        paths=paths, market_date=market_date, universe=universe
+        paths=paths,
+        market_date=market_date,
+        universe=universe,
+        evidence_available_at=attempt_started_at,
     )
 
     for code in universe:
@@ -3097,6 +3184,13 @@ def _build_intraday_stream(
         unexplained_missing == 0
         and ready_symbols + justified == len(universe)
     )
+    coverage_columns = sorted(
+        {column for row in coverage_rows for column in row}
+    )
+    coverage_rows = [
+        {column: row.get(column) for column in coverage_columns}
+        for row in coverage_rows
+    ]
     auction_session_complete = bool(
         observed_max and observed_max[:16] >= expected_last[:16]
     )
@@ -3770,6 +3864,7 @@ def run_lane(
                     market_date=market_date,
                     landing=landing,
                     knowledge_cutoff=knowledge_cutoff,
+                    attempt_started_at=started,
                     bar_size=stream,
                     minute_bar_contract=lane["minute_bar_contract"],
                     symbols=symbols,

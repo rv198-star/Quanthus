@@ -1114,6 +1114,97 @@ def test_minute_no_data_requires_structured_pit_evidence(
     assert suspended["source"] == "daily_status_observation.parquet"
 
 
+def test_minute_uses_verified_same_day_market_release_status(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "local")
+    status_path = fixture_home / "daily_status_observation.parquet"
+    status_rows = pq.read_table(status_path).to_pylist()
+    for row in status_rows:
+        if row["stock_code"] == "600519" and str(row["date"])[:10] == "2026-07-24":
+            row["tradestatus"] = "0"
+    _write_parquet(status_path, status_rows)
+
+    shadow = tmp_path / "shadow"
+    paths = _paths(fixture_home, shadow)
+    market = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        force_preflight="both_open",
+    )
+    assert market.status == "ready"
+    assert market.release_dir is not None
+
+    # The minute lane must consume the immutable market release, not depend on
+    # a mutable node-local status snapshot remaining in place.
+    status_path.unlink()
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    (minute / "600519_5m.parquet").unlink()
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+
+    assert result.status == "ready"
+    coverage = next(d for d in result.datasets if d.name == "intraday_coverage")
+    rows = pq.read_table(Path(coverage.path)).to_pylist()
+    suspended = next(row for row in rows if row["security_id"] == "600519")
+    assert suspended["status"] == "justified_no_data"
+    assert suspended["source"] == "daily_status_observation_delta.parquet"
+    assert suspended["release_id"].startswith("hermes-market-daily-core-")
+
+
+def test_minute_rejects_corrupt_market_release_status(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "local")
+    status_path = fixture_home / "daily_status_observation.parquet"
+    status_rows = pq.read_table(status_path).to_pylist()
+    for row in status_rows:
+        if row["stock_code"] == "600519" and str(row["date"])[:10] == "2026-07-24":
+            row["tradestatus"] = "0"
+    _write_parquet(status_path, status_rows)
+
+    shadow = tmp_path / "shadow"
+    paths = _paths(fixture_home, shadow)
+    market = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        force_preflight="both_open",
+    )
+    assert market.release_dir is not None
+    (market.release_dir / "artifacts" / "daily_status_observation_delta.parquet").write_bytes(
+        b"corrupt"
+    )
+
+    status_path.unlink()
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    (minute / "600519_5m.parquet").unlink()
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+
+    assert result.status == "partial"
+    assert result.release_dir is None
+    bars = next(d for d in result.datasets if d.name == "intraday_bars")
+    assert "unexplained_missing=1" in (bars.detail or "")
+
+
 def test_ad_hoc_nodata_marker_does_not_justify_missing_bars(
     fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -356,6 +356,79 @@ def test_baostock_index_fetch_maps_the_contract_set(
     assert FakeBaostock.logged_out
 
 
+def test_baostock_index_fetch_reconnects_after_provider_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Login:
+        error_code = "0"
+        error_msg = "ok"
+
+    class FailedQuery:
+        error_code = "10002007"
+        error_msg = "network receive error"
+
+    class Query:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self, code: str) -> None:
+            self.code = code
+            self.pending = True
+
+        def next(self) -> bool:
+            pending, self.pending = self.pending, False
+            return pending
+
+        def get_row_data(self) -> list[str]:
+            return [
+                "2026-07-27",
+                self.code,
+                "1",
+                "2",
+                "0.5",
+                "1.5",
+                "100",
+                "200",
+                "1.2",
+            ]
+
+    class FakeBaostock:
+        calls: list[str] = []
+        login_calls = 0
+
+        @classmethod
+        def login(cls) -> Login:
+            cls.login_calls += 1
+            return Login()
+
+        @staticmethod
+        def logout() -> None:
+            return None
+
+        @classmethod
+        def query_history_k_data_plus(cls, code, *_args, **_kwargs):
+            cls.calls.append(code)
+            if len(cls.calls) == 1:
+                return FailedQuery()
+            return Query(code)
+
+    monkeypatch.setattr(lane_runner.time, "sleep", lambda _seconds: None)
+    monkeypatch.setitem(__import__("sys").modules, "baostock", FakeBaostock)
+    rows, logs = lane_runner._baostock_fetch_index_day(date(2026, 7, 27))
+
+    assert len(rows) == len(lane_runner.INDEX_CODES)
+    assert FakeBaostock.calls[:2] == ["sh.000001", "sh.000001"]
+    assert FakeBaostock.login_calls == 2
+    assert logs[0]["attempts"] == 2
+    assert logs[0]["retry_errors"] == [
+        {
+            "attempt": "1",
+            "error_code": "10002007",
+            "error_msg": "network receive error",
+        }
+    ]
+
+
 def test_provider_market_collects_indices_without_current_local_index_data(
     fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

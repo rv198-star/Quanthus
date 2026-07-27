@@ -22,6 +22,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -765,6 +766,75 @@ def _seal_json_dataset(
     )
 
 
+def _baostock_login_with_retry(bs: Any, *, max_attempts: int = 3) -> int:
+    last_error = "unknown error"
+    for attempt in range(1, max_attempts + 1):
+        try:
+            login = bs.login()
+            if str(login.error_code) == "0":
+                return attempt
+            last_error = str(login.error_msg)
+        except Exception as exc:  # noqa: BLE001
+            last_error = str(exc)
+        if attempt < max_attempts:
+            time.sleep(float(attempt))
+    raise LaneRunError(f"baostock login failed after {max_attempts} attempts: {last_error}")
+
+
+def _baostock_query_day_with_retry(
+    bs: Any,
+    *,
+    code: str,
+    fields: str,
+    day: str,
+    max_attempts: int = 3,
+) -> tuple[list[list[str]], str, str, int, list[dict[str, str]]]:
+    """Query one daily row, reconnecting on provider errors or empty responses."""
+
+    retry_errors: list[dict[str, str]] = []
+    for attempt in range(1, max_attempts + 1):
+        if attempt > 1:
+            with suppress(Exception):
+                bs.logout()
+            time.sleep(float(attempt - 1))
+            _baostock_login_with_retry(bs, max_attempts=max_attempts)
+
+        rows: list[list[str]] = []
+        error_code = "provider_exception"
+        error_msg = "unknown provider exception"
+        try:
+            response = bs.query_history_k_data_plus(
+                code,
+                fields,
+                start_date=day,
+                end_date=day,
+                frequency="d",
+                adjustflag="3",
+            )
+            error_code = str(response.error_code)
+            error_msg = str(response.error_msg)
+            if error_code == "0":
+                while response.next():
+                    rows.append(response.get_row_data())
+        except Exception as exc:  # noqa: BLE001
+            error_msg = str(exc)
+
+        if error_code == "0" and rows:
+            return rows, error_code, error_msg, attempt, retry_errors
+        if error_code == "0":
+            error_code = "empty_response"
+            error_msg = "provider returned no daily row"
+        retry_errors.append(
+            {
+                "attempt": str(attempt),
+                "error_code": error_code,
+                "error_msg": error_msg,
+            }
+        )
+
+    return [], error_code, error_msg, max_attempts, retry_errors
+
+
 def _baostock_fetch_day(
     codes: Sequence[str],
     market_date: date,
@@ -772,9 +842,7 @@ def _baostock_fetch_day(
     import baostock as bs
 
     day = market_date.isoformat()
-    login = bs.login()
-    if str(login.error_code) != "0":
-        raise LaneRunError(f"baostock login failed: {login.error_msg}")
+    login_attempts = _baostock_login_with_retry(bs)
     fields = "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST"
     bars: list[dict[str, Any]] = []
     status_rows: list[dict[str, Any]] = []
@@ -794,20 +862,12 @@ def _baostock_fetch_day(
                 "fields": fields,
             }
             started = time.monotonic()
-            rs = bs.query_history_k_data_plus(
-                bs_code,
-                fields,
-                start_date=day,
-                end_date=day,
-                frequency="d",
-                adjustflag="3",
+            rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
+                bs,
+                code=bs_code,
+                fields=fields,
+                day=day,
             )
-            rows: list[list[str]] = []
-            err = str(rs.error_code)
-            msg = str(rs.error_msg)
-            if err == "0":
-                while rs.next():
-                    rows.append(rs.get_row_data())
             duration = round(time.monotonic() - started, 3)
             log_rows.append(
                 {
@@ -818,6 +878,9 @@ def _baostock_fetch_day(
                     "response_rows": len(rows),
                     "acquired_at": acquired_at,
                     "duration_seconds": duration,
+                    "attempts": attempts,
+                    "initial_login_attempts": login_attempts,
+                    "retry_errors": retry_errors,
                 }
             )
             if err != "0":
@@ -880,9 +943,7 @@ def _baostock_fetch_index_day(
     import baostock as bs
 
     day = market_date.isoformat()
-    login = bs.login()
-    if str(login.error_code) != "0":
-        raise LaneRunError(f"baostock login failed: {login.error_msg}")
+    login_attempts = _baostock_login_with_retry(bs)
     fields = "date,code,open,high,low,close,volume,amount,pctChg"
     rows_out: list[dict[str, Any]] = []
     log_rows: list[dict[str, Any]] = []
@@ -900,20 +961,12 @@ def _baostock_fetch_index_day(
                 "fields": fields,
             }
             started = time.monotonic()
-            rs = bs.query_history_k_data_plus(
-                bs_code,
-                fields,
-                start_date=day,
-                end_date=day,
-                frequency="d",
-                adjustflag="3",
+            rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
+                bs,
+                code=bs_code,
+                fields=fields,
+                day=day,
             )
-            rows: list[list[str]] = []
-            err = str(rs.error_code)
-            msg = str(rs.error_msg)
-            if err == "0":
-                while rs.next():
-                    rows.append(rs.get_row_data())
             log_rows.append(
                 {
                     "index_code": index_code,
@@ -923,6 +976,9 @@ def _baostock_fetch_index_day(
                     "response_rows": len(rows),
                     "acquired_at": acquired_at,
                     "duration_seconds": round(time.monotonic() - started, 3),
+                    "attempts": attempts,
+                    "initial_login_attempts": login_attempts,
+                    "retry_errors": retry_errors,
                 }
             )
             if err != "0":

@@ -730,8 +730,12 @@ def _daily_dws_summary_query(
              FROM bar_rows WHERE pct_change = 0) AS flat_security_count,
             (SELECT count(DISTINCT security_id)::BIGINT
              FROM bar_rows WHERE pct_change IS NULL) AS missing_pct_change_security_count,
-            (SELECT coalesce(sum(volume), 0.0)::DOUBLE FROM bar_rows) AS total_volume,
-            (SELECT coalesce(sum(amount), 0.0)::DOUBLE FROM bar_rows) AS total_amount
+            (SELECT coalesce(
+                sum(CAST(volume AS DECIMAL(38, 6))), CAST(0 AS DECIMAL(38, 6))
+             )::DOUBLE FROM bar_rows) AS total_volume,
+            (SELECT coalesce(
+                sum(CAST(amount AS DECIMAL(38, 6))), CAST(0 AS DECIMAL(38, 6))
+             )::DOUBLE FROM bar_rows) AS total_amount
         FROM status_rows
     """
 
@@ -820,16 +824,16 @@ def build_daily_dws_revision(
             bars=bars,
             statuses=statuses,
         )
-        row = connection.execute(query).fetchone()
-        if row is None:
-            raise DailyWarehouseError("daily DWS summary query returned no row")
-        metrics = _validate_daily_dws_metrics(_daily_dws_metrics(row))
         partition_dir = staging / f"market_date={market_date.isoformat()}"
         partition_dir.mkdir()
         summary_path = partition_dir / "daily_market_summary.parquet"
         connection.execute(
             f"COPY ({query}) TO {_sql_string(str(summary_path))} (FORMAT PARQUET, COMPRESSION ZSTD)"
         )
+        persisted = connection.execute(f"SELECT * FROM {_source(summary_path)}").fetchone()
+        if persisted is None:
+            raise DailyWarehouseError("daily DWS summary query returned no row")
+        metrics = _validate_daily_dws_metrics(_daily_dws_metrics(tuple(persisted)))
         checksums = {
             f"market_date={market_date.isoformat()}/daily_market_summary.parquet": _sha256(
                 summary_path

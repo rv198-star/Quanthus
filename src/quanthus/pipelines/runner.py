@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import html
 import json
 import math
 import os
@@ -16,6 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 from datetime import time as wall_time
 from pathlib import Path
 from typing import Any
+from urllib import request as urlrequest
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from quanthus.pipelines.contracts import OdsReleaseError, verify_ods_release
@@ -97,6 +99,16 @@ class PipelineStage:
 
 
 @dataclass(frozen=True)
+class PipelineEmailNotification:
+    api_url: str
+    api_key_environment: str
+    sender: str
+    recipients: tuple[str, ...]
+    timeout_seconds: int
+    retries: int
+
+
+@dataclass(frozen=True)
 class PipelineConfig:
     source_path: Path
     source_sha256: str
@@ -109,6 +121,7 @@ class PipelineConfig:
     lock_path: str
     variables: tuple[PipelineVariable, ...]
     stages: tuple[PipelineStage, ...]
+    email_notification: PipelineEmailNotification | None
 
 
 @dataclass(frozen=True)
@@ -145,6 +158,46 @@ def _parse_time(value: str) -> wall_time:
     if parsed.tzinfo is not None:
         raise PipelineConfigError("close_time must be a local wall time without timezone")
     return parsed
+
+
+def _load_email_notification(payload: Mapping[str, Any]) -> PipelineEmailNotification | None:
+    notifications = payload.get("notifications")
+    if notifications is None:
+        return None
+    if not isinstance(notifications, Mapping):
+        raise PipelineConfigError("notifications must be an object")
+    email = notifications.get("email")
+    if not isinstance(email, Mapping):
+        raise PipelineConfigError("notifications.email must be an object")
+    if email.get("provider") != "resend":
+        raise PipelineConfigError("notifications.email provider must be resend")
+    api_url = _required_string(email, "api_url")
+    if api_url != "https://api.resend.com/emails":
+        raise PipelineConfigError("notifications.email api_url must be the Resend email endpoint")
+    recipients_value = email.get("to")
+    if (
+        not isinstance(recipients_value, list)
+        or not recipients_value
+        or any(
+            not isinstance(recipient, str) or not recipient.strip()
+            for recipient in recipients_value
+        )
+    ):
+        raise PipelineConfigError("notifications.email to must be a non-empty list of addresses")
+    return PipelineEmailNotification(
+        api_url=api_url,
+        api_key_environment=_required_string(email, "api_key_environment"),
+        sender=_required_string(email, "from"),
+        recipients=tuple(recipients_value),
+        timeout_seconds=_integer(
+            email,
+            "timeout_seconds",
+            default=15,
+            minimum=1,
+            maximum=60,
+        ),
+        retries=_integer(email, "retries", default=2, minimum=0, maximum=5),
+    )
 
 
 def load_pipeline_config(path: Path) -> PipelineConfig:
@@ -295,6 +348,7 @@ def load_pipeline_config(path: Path) -> PipelineConfig:
         lock_path=_required_string(payload, "lock_path"),
         variables=tuple(variables),
         stages=tuple(stages),
+        email_notification=_load_email_notification(payload),
     )
 
 
@@ -367,6 +421,222 @@ def _ledger(
     if failure is not None:
         payload["failure"] = failure
     return payload
+
+
+def _short_text(value: object | None) -> str:
+    if value is None:
+        return "-"
+    compact = " ".join(str(value).split())
+    return compact[:1000] if compact else "-"
+
+
+def _format_seconds(value: object | None) -> str:
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+        return f"{value:.3f}s"
+    return "-"
+
+
+def _html_summary_table(rows: list[tuple[str, str]]) -> str:
+    return (
+        '<table border="1" cellpadding="6" cellspacing="0">'
+        + "".join(
+            f'<tr><th align="left">{html.escape(label)}</th><td>{html.escape(value)}</td></tr>'
+            for label, value in rows
+        )
+        + "</table>"
+    )
+
+
+def _handoff_details(stages: list[dict[str, Any]]) -> tuple[str, str]:
+    for record in stages:
+        source_id = record.get("handoff_source_id")
+        if isinstance(source_id, str) and source_id:
+            attempt_id = record.get("handoff_attempt_id")
+            return source_id, attempt_id if isinstance(attempt_id, str) and attempt_id else "-"
+    return "-", "-"
+
+
+def _failed_stage_details(stages: list[dict[str, Any]]) -> tuple[str, str]:
+    for record in reversed(stages):
+        if record.get("status") == "failed":
+            stage_id = record.get("id")
+            return (
+                stage_id if isinstance(stage_id, str) else "-",
+                _short_text(record.get("last_error")),
+            )
+    return "-", "-"
+
+
+def _pipeline_email_html(*, event: str, ledger: Mapping[str, Any], run_dir: Path) -> str:
+    stages_value = ledger.get("stages")
+    stages = (
+        [stage for stage in stages_value if isinstance(stage, dict)]
+        if isinstance(stages_value, list)
+        else []
+    )
+    source_id, attempt_id = _handoff_details(stages)
+    sla_met = ledger.get("sla_met")
+    sla_status = "达标" if sla_met is True else "未达标" if sla_met is False else "未计算"
+    heading = "DWD/DWS 清洗完成" if event == "completed" else "DWD/DWS 清洗失败"
+    summary = _html_summary_table(
+        [
+            ("交易日", _short_text(ledger.get("market_date"))),
+            ("运行 ID", _short_text(ledger.get("run_id"))),
+            ("流水线状态", _short_text(ledger.get("status"))),
+            ("截止时间", _short_text(ledger.get("deadline_at"))),
+            ("SLA", sla_status),
+            ("ODS 来源", source_id),
+            ("ODS attempt", attempt_id),
+            ("运行账本", str(run_dir / "run.json")),
+        ]
+    )
+    stage_rows: list[str] = []
+    for record in stages:
+        if record.get("phase") not in {"build", "gate", "publish"}:
+            continue
+        sla_value = record.get("sla_met")
+        stage_sla = "达标" if sla_value is True else "未达标" if sla_value is False else "-"
+        stage_rows.append(
+            "<tr>"
+            f"<td>{html.escape(_short_text(record.get('id')))}</td>"
+            f"<td>{html.escape(_short_text(record.get('phase')))}</td>"
+            f"<td>{html.escape(_short_text(record.get('status')))}</td>"
+            f"<td>{html.escape(_format_seconds(record.get('elapsed_seconds')))}</td>"
+            f"<td>{html.escape(_format_seconds(record.get('sla_seconds')))}</td>"
+            f"<td>{stage_sla}</td>"
+            "</tr>"
+        )
+    stages_html = (
+        '<table border="1" cellpadding="6" cellspacing="0">'
+        "<tr><th>阶段</th><th>类型</th><th>状态</th><th>耗时</th><th>SLA</th><th>SLA 结果</th></tr>"
+        + "".join(stage_rows)
+        + "</table>"
+        if stage_rows
+        else "<p>尚未执行 DWD/DWS 清洗阶段。</p>"
+    )
+    failure_html = ""
+    if event == "failed":
+        failed_stage, stage_error = _failed_stage_details(stages)
+        failure_html = "<h3>失败详情</h3>" + _html_summary_table(
+            [
+                ("失败阶段", failed_stage),
+                ("阶段错误", stage_error),
+                ("最终错误", _short_text(ledger.get("failure"))),
+            ]
+        )
+    return (
+        "<!doctype html><html><body>"
+        f"<h2>{heading}</h2>"
+        f"{summary}"
+        "<h3>DWD/DWS 阶段</h3>"
+        f"{stages_html}"
+        f"{failure_html}"
+        "</body></html>"
+    )
+
+
+def _send_resend_email(
+    notification: PipelineEmailNotification,
+    *,
+    event: str,
+    ledger: Mapping[str, Any],
+    run_dir: Path,
+) -> dict[str, Any]:
+    started_at = datetime.now(timezone.utc)
+    attempts = 0
+    try:
+        api_key = os.environ.get(notification.api_key_environment)
+        if not api_key or not api_key.strip():
+            raise RuntimeError(
+                f"required Resend API key environment {notification.api_key_environment} is not set"
+            )
+        market_date = _short_text(ledger.get("market_date"))
+        subject = (
+            f"[Quanthus] {market_date} DWD/DWS completed"
+            if event == "completed"
+            else f"[Quanthus] {market_date} DWD/DWS failed"
+        )
+        request_body = json.dumps(
+            {
+                "from": notification.sender,
+                "to": list(notification.recipients),
+                "subject": subject,
+                "html": _pipeline_email_html(event=event, ledger=ledger, run_dir=run_dir),
+            }
+        ).encode("utf-8")
+        for attempts in range(1, notification.retries + 2):
+            try:
+                request = urlrequest.Request(
+                    notification.api_url,
+                    data=request_body,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    method="POST",
+                )
+                response = urlrequest.urlopen(request, timeout=notification.timeout_seconds)
+                try:
+                    status_code = response.getcode()
+                finally:
+                    response.close()
+                if not isinstance(status_code, int) or not 200 <= status_code < 300:
+                    raise RuntimeError(f"Resend returned HTTP status {status_code}")
+            except Exception:
+                if attempts > notification.retries:
+                    raise
+                time.sleep(min(float(2 ** (attempts - 1)), 5.0))
+            else:
+                return {
+                    "provider": "resend",
+                    "event": event,
+                    "status": "sent",
+                    "attempts": attempts,
+                    "started_at": started_at.isoformat(),
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                }
+    except Exception as exc:
+        return {
+            "provider": "resend",
+            "event": event,
+            "status": "failed",
+            "attempts": attempts,
+            "started_at": started_at.isoformat(),
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "error": _short_text(exc),
+        }
+    raise AssertionError("unreachable notification state")
+
+
+def _notify_terminal_pipeline(
+    *,
+    config: PipelineConfig,
+    ledger: dict[str, Any],
+    ledger_path: Path,
+    run_dir: Path,
+) -> None:
+    if config.email_notification is None:
+        return
+    status = ledger.get("status")
+    if status in {"succeeded", "succeeded_late", "succeeded_unqualified"}:
+        event = "completed"
+    elif status in {"failed", "blocked"}:
+        event = "failed"
+    else:
+        return
+    ledger["notifications"] = {
+        "email": _send_resend_email(
+            config.email_notification,
+            event=event,
+            ledger=ledger,
+            run_dir=run_dir,
+        )
+    }
+    try:
+        _atomic_json(ledger_path, ledger)
+    except OSError:
+        # A notification-record write must not replace the pipeline's terminal outcome.
+        return
 
 
 def _run_command(stage: PipelineStage, argv: list[str], log_path: Path) -> None:
@@ -451,6 +721,9 @@ def _apply_dynamic_sla(
     if not isinstance(source_id, str) or not source_id or not isinstance(transfer, Mapping):
         raise PipelineRunError(f"stage {stage.stage_id} dynamic SLA receipt is incomplete")
     record["handoff_source_id"] = source_id
+    attempt_id = payload.get("attempt_id")
+    if isinstance(attempt_id, str) and attempt_id:
+        record["handoff_attempt_id"] = attempt_id
     record["source_transfer_elapsed_seconds"] = transfer.get("elapsed_seconds")
     qualified = transfer.get("sla_qualified")
     if not isinstance(qualified, bool):
@@ -518,19 +791,23 @@ def run_pipeline(config: PipelineConfig, *, market_date: date) -> PipelineRunRes
         except BlockingIOError as exc:
             finished = datetime.now(timezone.utc)
             message = f"pipeline lock is already held: {lock_path}"
-            _atomic_json(
-                ledger_path,
-                _ledger(
-                    config=config,
-                    run_id=run_id,
-                    market_date=market_date,
-                    started_at=started_at,
-                    deadline_at=deadline_at,
-                    finished_at=finished,
-                    status="blocked",
-                    stages=stage_records,
-                    failure=message,
-                ),
+            terminal_payload = _ledger(
+                config=config,
+                run_id=run_id,
+                market_date=market_date,
+                started_at=started_at,
+                deadline_at=deadline_at,
+                finished_at=finished,
+                status="blocked",
+                stages=stage_records,
+                failure=message,
+            )
+            _atomic_json(ledger_path, terminal_payload)
+            _notify_terminal_pipeline(
+                config=config,
+                ledger=terminal_payload,
+                ledger_path=ledger_path,
+                run_dir=run_dir,
             )
             raise PipelineRunError(message) from exc
 
@@ -629,19 +906,23 @@ def run_pipeline(config: PipelineConfig, *, market_date: date) -> PipelineRunRes
             if stage_records and stage_records[-1]["status"] == "running":
                 stage_records[-1]["status"] = "failed"
                 _finish_stage_record(stage_records[-1], finished_at=finished)
-            _atomic_json(
-                ledger_path,
-                _ledger(
-                    config=config,
-                    run_id=run_id,
-                    market_date=market_date,
-                    started_at=started_at,
-                    deadline_at=deadline_at,
-                    finished_at=finished,
-                    status="failed",
-                    stages=stage_records,
-                    failure=str(exc),
-                ),
+            terminal_payload = _ledger(
+                config=config,
+                run_id=run_id,
+                market_date=market_date,
+                started_at=started_at,
+                deadline_at=deadline_at,
+                finished_at=finished,
+                status="failed",
+                stages=stage_records,
+                failure=str(exc),
+            )
+            _atomic_json(ledger_path, terminal_payload)
+            _notify_terminal_pipeline(
+                config=config,
+                ledger=terminal_payload,
+                ledger_path=ledger_path,
+                run_dir=run_dir,
             )
             if isinstance(exc, PipelineRunError):
                 raise
@@ -676,6 +957,12 @@ def run_pipeline(config: PipelineConfig, *, market_date: date) -> PipelineRunRes
         stages=stage_records,
     )
     _atomic_json(ledger_path, final_payload)
+    _notify_terminal_pipeline(
+        config=config,
+        ledger=final_payload,
+        ledger_path=ledger_path,
+        run_dir=run_dir,
+    )
     if not closed_session:
         _atomic_json(run_root / config.pipeline_id / "LAST_SUCCESS.json", final_payload)
     return PipelineRunResult(

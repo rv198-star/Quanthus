@@ -28,6 +28,19 @@
       "default": "/home/ubuntu/data/quanthus"
     }
   },
+  "notifications": {
+    "email": {
+      "provider": "resend",
+      "api_url": "https://api.resend.com/emails",
+      "api_key_environment": "QUANTHUS_RESEND_API_KEY",
+      "from": "report@mindthus.com",
+      "to": [
+        "61718@qq.com"
+      ],
+      "timeout_seconds": 15,
+      "retries": 2
+    }
+  },
   "stages": [
     {
       "id": "wait_daily_ods_source_ready",

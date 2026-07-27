@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from datetime import date, datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
+from urllib import request as urlrequest
 
 try:
     import pyarrow as pa
@@ -31,6 +34,10 @@ class PipelineRunnerTests(unittest.TestCase):
         self.assertEqual(config.close_time.isoformat(), "15:30:00")
         self.assertEqual(config.completion_sla_minutes, 116)
         self.assertEqual(config.stage_sla_margin_percent, 100)
+        assert config.email_notification is not None
+        self.assertEqual(config.email_notification.sender, "report@mindthus.com")
+        self.assertEqual(config.email_notification.recipients, ("61718@qq.com",))
+        self.assertEqual(config.email_notification.api_key_environment, "QUANTHUS_RESEND_API_KEY")
         wait_stage = config.stages[0]
         self.assertEqual(wait_stage.stage_id, "wait_daily_ods_source_ready")
         self.assertEqual(wait_stage.observed_max_duration_seconds, 3138.4)
@@ -45,6 +52,21 @@ class PipelineRunnerTests(unittest.TestCase):
                 "publish_daily_dws_current",
             ],
         )
+
+    def _with_email_notification(self, config_path: Path, *, retries: int = 0) -> None:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+        payload["notifications"] = {
+            "email": {
+                "provider": "resend",
+                "api_url": "https://api.resend.com/emails",
+                "api_key_environment": "QUANTHUS_TEST_RESEND_API_KEY",
+                "from": "report@mindthus.com",
+                "to": ["61718@qq.com"],
+                "timeout_seconds": 1,
+                "retries": retries,
+            }
+        }
+        config_path.write_text(json.dumps(payload), encoding="utf-8")
 
     def _release(self, root: Path, market_date: date) -> Path:
         source = root / "source.parquet"
@@ -194,6 +216,7 @@ class PipelineRunnerTests(unittest.TestCase):
             ledger = json.loads((result.run_dir / "run.json").read_text(encoding="utf-8"))
             stage = ledger["stages"][0]
             self.assertEqual(stage["handoff_source_id"], "cn01")
+            self.assertEqual(stage["handoff_attempt_id"], "20260724-20260724T080000000000Z")
             self.assertEqual(stage["source_transfer_elapsed_seconds"], 3.649)
             self.assertEqual(stage["sla_seconds"], 8)
             self.assertTrue(stage["sla_qualified"])
@@ -214,6 +237,121 @@ class PipelineRunnerTests(unittest.TestCase):
             ledger = json.loads((run_dirs[0] / "run.json").read_text(encoding="utf-8"))
             self.assertEqual(ledger["status"], "failed")
             self.assertFalse((root / "runs" / "test-t5h-v1" / "LAST_SUCCESS.json").exists())
+
+    def test_successful_pipeline_sends_completed_email_after_writing_ledger(self) -> None:
+        class Response:
+            def getcode(self) -> int:
+                return 201
+
+            def close(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            market_date = date(2026, 7, 24)
+            config_path = self._config(root, self._release(root, market_date))
+            self._with_email_notification(config_path)
+            requests: list[urlrequest.Request] = []
+
+            def send(request: urlrequest.Request, *, timeout: float) -> Response:
+                requests.append(request)
+                self.assertEqual(timeout, 1)
+                return Response()
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {"QUANTHUS_TEST_RESEND_API_KEY": "test-notification-key"},
+                    clear=False,
+                ),
+                patch("quanthus.pipelines.runner.urlrequest.urlopen", side_effect=send),
+            ):
+                result = run_pipeline(load_pipeline_config(config_path), market_date=market_date)
+
+            ledger_text = (result.run_dir / "run.json").read_text(encoding="utf-8")
+            ledger = json.loads(ledger_text)
+            self.assertEqual(ledger["notifications"]["email"]["event"], "completed")
+            self.assertEqual(ledger["notifications"]["email"]["status"], "sent")
+            self.assertEqual(len(requests), 1)
+            request_body = json.loads(requests[0].data.decode("utf-8"))
+            self.assertEqual(request_body["from"], "report@mindthus.com")
+            self.assertEqual(request_body["to"], ["61718@qq.com"])
+            self.assertIn("completed", request_body["subject"])
+            self.assertIn("DWD/DWS", request_body["html"])
+            self.assertNotIn("test-notification-key", ledger_text)
+
+    def test_failed_pipeline_sends_failed_email(self) -> None:
+        class Response:
+            def getcode(self) -> int:
+                return 200
+
+            def close(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            market_date = date(2026, 7, 24)
+            config_path = self._config(
+                root,
+                self._release(root, market_date),
+                command="/bin/false",
+            )
+            self._with_email_notification(config_path)
+            requests: list[urlrequest.Request] = []
+
+            def send(request: urlrequest.Request, *, timeout: float) -> Response:
+                requests.append(request)
+                self.assertEqual(timeout, 1)
+                return Response()
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {"QUANTHUS_TEST_RESEND_API_KEY": "test-notification-key"},
+                    clear=False,
+                ),
+                patch("quanthus.pipelines.runner.urlrequest.urlopen", side_effect=send),
+                self.assertRaisesRegex(PipelineRunError, "quality_gate failed"),
+            ):
+                run_pipeline(load_pipeline_config(config_path), market_date=market_date)
+
+            run_dir = next((root / "runs" / "test-t5h-v1").glob("2026*"))
+            ledger = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+            self.assertEqual(ledger["status"], "failed")
+            self.assertEqual(ledger["notifications"]["email"]["event"], "failed")
+            self.assertEqual(ledger["notifications"]["email"]["status"], "sent")
+            request_body = json.loads(requests[0].data.decode("utf-8"))
+            self.assertIn("failed", request_body["subject"])
+            self.assertIn("失败详情", request_body["html"])
+
+    def test_notification_failure_does_not_change_successful_pipeline_result(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            market_date = date(2026, 7, 24)
+            config_path = self._config(root, self._release(root, market_date))
+            self._with_email_notification(config_path, retries=2)
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {"QUANTHUS_TEST_RESEND_API_KEY": "test-notification-key"},
+                    clear=False,
+                ),
+                patch(
+                    "quanthus.pipelines.runner.urlrequest.urlopen",
+                    side_effect=OSError("network unavailable"),
+                ) as send,
+                patch("quanthus.pipelines.runner.time.sleep"),
+            ):
+                result = run_pipeline(load_pipeline_config(config_path), market_date=market_date)
+
+            ledger = json.loads((result.run_dir / "run.json").read_text(encoding="utf-8"))
+            self.assertTrue(result.status.startswith("succeeded"))
+            self.assertEqual(ledger["status"], result.status)
+            self.assertEqual(ledger["notifications"]["email"]["status"], "failed")
+            self.assertEqual(ledger["notifications"]["email"]["attempts"], 3)
+            self.assertIn("network unavailable", ledger["notifications"]["email"]["error"])
+            self.assertEqual(send.call_count, 3)
 
     def test_release_for_wrong_market_date_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

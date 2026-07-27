@@ -3092,9 +3092,11 @@ def _build_intraday_stream(
             )
             continue
         files_used.append(str(path))
+        rows_before_code = len(rows)
         matched = 0
         code_max: str | None = None
         code_timestamps: list[str] = []
+        code_has_trades = False
         for row in _read_parquet(path):
             ts = (
                 row.get("ts")
@@ -3113,6 +3115,9 @@ def _build_intraday_stream(
             item["market_date"] = watermark
             item["acquired_at"] = acquired_at
             rows.append(item)
+            volume = _fnum(item.get("volume"), 0.0) or 0.0
+            amount = _fnum(item.get("amount"), 0.0) or 0.0
+            code_has_trades = code_has_trades or volume > 1e-9 or amount > 1e-9
             matched += 1
             ts_s = str(ts)
             # normalize comparable timestamp
@@ -3180,6 +3185,39 @@ def _build_intraday_stream(
             and duplicate_count == 0
         )
         if not complete:
+            evidence = no_data_evidence.get(code)
+            if evidence and not code_has_trades:
+                del rows[rows_before_code:]
+                justified += 1
+                coverage_rows.append(
+                    {
+                        "security_id": code,
+                        "status": "justified_no_data",
+                        "row_count": 0,
+                        "observed_maximum": None,
+                        "provider_rows_discarded": matched,
+                        "missing_bar_count": len(missing_timestamps),
+                        "unexpected_bar_count": len(unexpected_timestamps),
+                        "duplicate_bar_count": duplicate_count,
+                        **evidence,
+                    }
+                )
+                log_rows.append(
+                    {
+                        "security_id": code,
+                        "request": request,
+                        "response_error_code": "0",
+                        "response_error_msg": "justified_no_data",
+                        "response_rows": 0,
+                        "provider_rows_discarded": matched,
+                        "missing_bar_count": len(missing_timestamps),
+                        "unexpected_bar_count": len(unexpected_timestamps),
+                        "duplicate_bar_count": duplicate_count,
+                        "evidence": evidence,
+                        "acquired_at": acquired_at,
+                    }
+                )
+                continue
             unexplained_missing += 1
             coverage_rows.append(
                 {

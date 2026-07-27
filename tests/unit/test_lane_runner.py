@@ -1214,7 +1214,13 @@ def test_minute_uses_verified_same_day_market_release_status(
     # a mutable node-local status snapshot remaining in place.
     status_path.unlink()
     minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
-    (minute / "600519_5m.parquet").unlink()
+    suspended_partition = minute / "600519_5m.parquet"
+    suspended_rows = pq.read_table(suspended_partition).to_pylist()
+    for row in suspended_rows:
+        row["volume"] = 5.877471754111438e-39
+        if str(row["ts"]).endswith("11:30:00"):
+            row["ts"] = "2026-07-24 13:00:00"
+    _write_parquet(suspended_partition, suspended_rows)
     result = run_lane(
         lane_id="intraday-archive",
         market_date=date(2026, 7, 24),
@@ -1232,6 +1238,9 @@ def test_minute_uses_verified_same_day_market_release_status(
     assert suspended["status"] == "justified_no_data"
     assert suspended["source"] == "daily_status_observation_delta.parquet"
     assert suspended["release_id"].startswith("hermes-market-daily-core-")
+    assert suspended["provider_rows_discarded"] == 48
+    bars = next(d for d in result.datasets if d.name == "intraday_bars")
+    assert bars.row_count == 48
 
 
 def test_minute_rejects_corrupt_market_release_status(

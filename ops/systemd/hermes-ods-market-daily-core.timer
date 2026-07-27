@@ -1,8 +1,8 @@
 [Unit]
-Description=Shadow timer for Hermes ODS market-daily-core (contract 15:10)
+Description=Hermes ODS market-daily-core after final daily totals (contract 15:40)
 
 [Timer]
-OnCalendar=Mon..Fri *-*-* 15:10:00 Asia/Shanghai
+OnCalendar=Mon..Fri *-*-* 15:40:00 Asia/Shanghai
 AccuracySec=1min
 Persistent=false
 Unit=hermes-ods-market-daily-core.service

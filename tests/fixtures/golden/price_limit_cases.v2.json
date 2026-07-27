@@ -1,0 +1,22 @@
+[
+  {
+    "id": "sse-main-st-last-session-before-2026-rule",
+    "inputs": {"board": "SSE_main", "market_date": "2026-07-03", "status_known": true, "is_st_class": true, "listing_window_rule": null, "eligible_session_index": 100, "ipo_window_sessions": 0, "observed_tradestatus": "1", "prior_trading_close": 10.0},
+    "expected": {"selected_rule_basis": "st_overlay", "upper_limit_pct": 5.0, "entry_policy_allows": true, "is_executable": true, "reason_code": "st_overlay_applied"}
+  },
+  {
+    "id": "sse-main-st-2026-rule-effective",
+    "inputs": {"board": "SSE_main", "market_date": "2026-07-06", "status_known": true, "is_st_class": true, "listing_window_rule": null, "eligible_session_index": 101, "ipo_window_sessions": 0, "observed_tradestatus": "1", "prior_trading_close": 10.0},
+    "expected": {"selected_rule_basis": "st_overlay", "upper_limit_pct": 10.0, "entry_policy_allows": true, "is_executable": true, "reason_code": "st_overlay_applied"}
+  },
+  {
+    "id": "sz-main-st-last-session-before-2026-rule",
+    "inputs": {"board": "SZ_main", "market_date": "2026-07-03", "status_known": true, "is_st_class": true, "listing_window_rule": null, "eligible_session_index": 100, "ipo_window_sessions": 0, "observed_tradestatus": "1", "prior_trading_close": 10.0},
+    "expected": {"selected_rule_basis": "st_overlay", "upper_limit_pct": 5.0, "entry_policy_allows": true, "is_executable": true, "reason_code": "st_overlay_applied"}
+  },
+  {
+    "id": "sz-main-st-2026-rule-effective",
+    "inputs": {"board": "SZ_main", "market_date": "2026-07-06", "status_known": true, "is_st_class": true, "listing_window_rule": null, "eligible_session_index": 101, "ipo_window_sessions": 0, "observed_tradestatus": "1", "prior_trading_close": 10.0},
+    "expected": {"selected_rule_basis": "st_overlay", "upper_limit_pct": 10.0, "entry_policy_allows": true, "is_executable": true, "reason_code": "st_overlay_applied"}
+  }
+]

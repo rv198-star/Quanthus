@@ -2,14 +2,22 @@
 
 - Status: Implemented and promoted on OCI
 - Tracking issue: [#9](https://github.com/rv198-star/Quanthus/issues/9)
-- Policy: `config/price-limit.v1.json`
+- Active policy: `config/price-limit.v2.json`
+- Preserved historical policy: `config/price-limit.v1.json`
 
 ## Resolver precedence
 
 The production resolver applies, in order: explicit OOS, ST overlay, code-specific IPO window,
-then board baseline. Main-board limits are 10%, and ST-class main-board limits are 5%. ChiNext is
+then board baseline. Main-board ordinary limits are 10%. Main-board ST-class limits are 5% through
+the last open session on 2026-07-03 and 10% from the rule effective date 2026-07-06. ChiNext is
 10% before 2020-08-24 and 20% from that session; its ST overlay changes on the same boundary.
-STAR remains 20% when ST-class because its board rule is not reduced to 5%.
+STAR remains 20% when ST-class. All boundaries are effective-dated policy rows consumed by both
+the single-case resolver and bulk DuckDB build; they are not hard-coded fall-throughs.
+
+The 2026 boundary follows the SSE and SZSE trading-rule revisions published on 2026-04-24:
+
+- [SSE trading rules](https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/c_20260424_10816492.shtml)
+- [SZSE trading rules](http://www.szse.cn/lawrules/rule/trade/current/t20260424_620190.html)
 
 IPO windows count only actual security sessions where the exchange is open and provider
 `tradestatus=1`. A suspension does not consume a window session. Registration-regime IPOs have no
@@ -39,6 +47,7 @@ session remains `prior_close_missing_fail_closed` and is an upstream coverage de
 
 `quanthus build-price-limits` verifies candidate checksum and cutoff ordering, builds the
 execution-day resolver, checks uniqueness and IPO session bounds, and writes an immutable manifest
-with schema/content hashes. The promoted revision is
+with schema/content hashes. Builds without a complete, non-overlapping board/date policy fail
+before publication. The previously promoted P1 revision is
 `price_limit_execution_v2_oci_v1_3_20260725`. It is consumed with formal S2 and OCI DWD none by
 snapshot `p1-s2-s3-dwd-20260725-v1`.

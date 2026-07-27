@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import shutil
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
@@ -52,6 +54,167 @@ class PriceLimitDecision:
     reason_code: str
 
 
+_SUPPORTED_BOARDS = {"SSE_main", "SZ_main", "ChiNext", "STAR"}
+
+
+def _legacy_board_regimes(policy: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Translate the immutable v1 shape so historical rebuilds remain reproducible."""
+
+    boards = policy.get("boards")
+    if not isinstance(boards, Mapping):
+        return []
+    required = {
+        "SSE_main",
+        "SZ_main",
+        "ChiNext_pre_2020_08_24",
+        "ChiNext_from_2020_08_24",
+        "STAR",
+    }
+    if not required.issubset(boards):
+        return []
+
+    def values(key: str) -> tuple[float, float]:
+        item = boards[key]
+        if not isinstance(item, Mapping):
+            raise PriceLimitBuildError(f"boards.{key} must be an object")
+        return float(item["normal_pct"]), float(item["st_pct"])
+
+    sse = values("SSE_main")
+    sz = values("SZ_main")
+    chinext_old = values("ChiNext_pre_2020_08_24")
+    chinext_new = values("ChiNext_from_2020_08_24")
+    star = values("STAR")
+    return [
+        {
+            "board": "SSE_main",
+            "effective_start": "1900-01-01",
+            "effective_end": None,
+            "normal_pct": sse[0],
+            "st_pct": sse[1],
+        },
+        {
+            "board": "SZ_main",
+            "effective_start": "1900-01-01",
+            "effective_end": None,
+            "normal_pct": sz[0],
+            "st_pct": sz[1],
+        },
+        {
+            "board": "ChiNext",
+            "effective_start": "1900-01-01",
+            "effective_end": "2020-08-23",
+            "normal_pct": chinext_old[0],
+            "st_pct": chinext_old[1],
+        },
+        {
+            "board": "ChiNext",
+            "effective_start": "2020-08-24",
+            "effective_end": None,
+            "normal_pct": chinext_new[0],
+            "st_pct": chinext_new[1],
+        },
+        {
+            "board": "STAR",
+            "effective_start": "1900-01-01",
+            "effective_end": None,
+            "normal_pct": star[0],
+            "st_pct": star[1],
+        },
+    ]
+
+
+def _policy_board_regimes(policy: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
+    raw = policy.get("board_regimes")
+    if raw is None:
+        raw = _legacy_board_regimes(policy)
+    if not isinstance(raw, list) or not raw:
+        raise PriceLimitBuildError("price-limit policy must define board_regimes")
+
+    normalized: list[dict[str, Any]] = []
+    by_board: dict[str, list[dict[str, Any]]] = {board: [] for board in _SUPPORTED_BOARDS}
+    for index, value in enumerate(raw):
+        if not isinstance(value, Mapping):
+            raise PriceLimitBuildError(f"board_regimes[{index}] must be an object")
+        board = str(value.get("board", ""))
+        if board not in _SUPPORTED_BOARDS:
+            raise PriceLimitBuildError(f"unsupported board regime: {board}")
+        try:
+            start = date.fromisoformat(str(value["effective_start"]))
+            end_value = value.get("effective_end")
+            end = date.fromisoformat(str(end_value)) if end_value is not None else None
+            normal_pct = float(value["normal_pct"])
+            st_pct = float(value["st_pct"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise PriceLimitBuildError(f"invalid board regime at index {index}") from exc
+        if end is not None and end < start:
+            raise PriceLimitBuildError(f"board regime ends before it starts: {board}")
+        if (
+            not math.isfinite(normal_pct)
+            or not math.isfinite(st_pct)
+            or not 0 <= normal_pct <= 100
+            or not 0 <= st_pct <= 100
+        ):
+            raise PriceLimitBuildError(
+                f"board regime percentages must be between 0 and 100: {board}"
+            )
+        item = {
+            "board": board,
+            "effective_start": start,
+            "effective_end": end,
+            "normal_pct": normal_pct,
+            "st_pct": st_pct,
+        }
+        normalized.append(item)
+        by_board[board].append(item)
+
+    for board, regimes in by_board.items():
+        regimes.sort(key=lambda item: item["effective_start"])
+        if not regimes or regimes[0]["effective_start"] != date(1900, 1, 1):
+            raise PriceLimitBuildError(f"board regimes do not cover supported history: {board}")
+        for previous, current in zip(regimes, regimes[1:], strict=False):
+            previous_end = previous["effective_end"]
+            if previous_end is None or current["effective_start"] != previous_end + timedelta(
+                days=1
+            ):
+                raise PriceLimitBuildError(f"board regimes overlap or contain a gap: {board}")
+        if regimes[-1]["effective_end"] is not None:
+            raise PriceLimitBuildError(
+                f"board regimes must have an open-ended current rule: {board}"
+            )
+    return tuple(normalized)
+
+
+def _resolve_board_percentages(
+    policy: Mapping[str, Any], *, board: str, market_date: str
+) -> tuple[Decimal, Decimal]:
+    try:
+        session = date.fromisoformat(market_date)
+    except ValueError as exc:
+        raise PriceLimitBuildError(f"invalid market_date: {market_date}") from exc
+    for regime in _policy_board_regimes(policy):
+        if regime["board"] != board or session < regime["effective_start"]:
+            continue
+        end = regime["effective_end"]
+        if end is None or session <= end:
+            return Decimal(str(regime["normal_pct"])), Decimal(str(regime["st_pct"]))
+    raise PriceLimitBuildError(f"no price-limit regime for {board} on {market_date}")
+
+
+def _sql_regime_case(policy: Mapping[str, Any], field: str) -> str:
+    clauses: list[str] = []
+    for regime in _policy_board_regimes(policy):
+        conditions = [
+            f"board = {_sql_string(str(regime['board']))}",
+            f"market_date >= DATE {_sql_string(regime['effective_start'].isoformat())}",
+        ]
+        if regime["effective_end"] is not None:
+            conditions.append(
+                f"market_date <= DATE {_sql_string(regime['effective_end'].isoformat())}"
+            )
+        clauses.append("WHEN " + " AND ".join(conditions) + f" THEN {float(regime[field])}")
+    return "CASE " + " ".join(clauses) + " ELSE NULL END"
+
+
 def round_limit_price(reference_price: Decimal, limit_pct: Decimal, *, upper: bool) -> Decimal:
     """Apply exchange-style half-up rounding to a positive A-share limit price."""
 
@@ -73,6 +236,7 @@ def resolve_price_limit_policy(
     ipo_window_sessions: int,
     observed_tradestatus: str | None,
     prior_trading_close: Decimal | None,
+    policy: Mapping[str, Any],
     is_open_session: bool = True,
 ) -> PriceLimitDecision:
     """Resolve one golden-case decision using the bulk builder's precedence."""
@@ -81,22 +245,18 @@ def resolve_price_limit_policy(
         return PriceLimitDecision(
             "non_session", None, None, None, None, False, False, "not_open_session"
         )
+    normal_pct, st_pct = _resolve_board_percentages(policy, board=board, market_date=market_date)
     in_ipo_window = bool(listing_window_rule and eligible_session_index <= ipo_window_sessions)
+    pct: Decimal | None
     if is_st_class:
         basis = "st_overlay"
-        if board in ("SSE_main", "SZ_main") or (board == "ChiNext" and market_date < "2020-08-24"):
-            pct = Decimal("5")
-        else:
-            pct = Decimal("20")
+        pct = st_pct
     elif in_ipo_window:
         basis = "ipo_window"
         pct = Decimal("44") if listing_window_rule == "ipo_main_first_trading_day_44pct" else None
     else:
         basis = "board_baseline"
-        if board in ("SSE_main", "SZ_main") or (board == "ChiNext" and market_date < "2020-08-24"):
-            pct = Decimal("10")
-        else:
-            pct = Decimal("20")
+        pct = normal_pct
 
     special_uncomputable = in_ipo_window and listing_window_rule in (
         "ipo_main_first_day_legacy_special",
@@ -183,10 +343,15 @@ def _load_policy(path: Path) -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise PriceLimitBuildError(f"cannot load price-limit policy: {path}") from exc
+    if not isinstance(payload.get("policy_version"), str) or not payload["policy_version"].strip():
+        raise PriceLimitBuildError("policy_version must be a non-empty string")
     if payload.get("unknown_status_behavior") != "block_new_positions":
         raise PriceLimitBuildError("unknown ST status must block new positions")
+    if payload.get("unknown_rule_behavior") != "block_new_positions":
+        raise PriceLimitBuildError("unknown price-limit rule must block new positions")
     if payload.get("rounding_rule") != "round_to_tick_0.01_half_up_exchange_style":
         raise PriceLimitBuildError("unsupported price-limit rounding policy")
+    _policy_board_regimes(payload)
     return payload
 
 
@@ -236,6 +401,8 @@ def build_price_limit_revision(
         raise PriceLimitBuildError("revision must not be empty")
     candidate_meta = _validate_inputs(rules, identity, s2, output, policy_path)
     policy = _load_policy(policy_path)
+    normal_pct_case = _sql_regime_case(policy, "normal_pct")
+    st_pct_case = _sql_regime_case(policy, "st_pct")
     excluded = tuple(str(item) for item in policy.get("excluded_security_ids", []))
     excluded_predicate = (
         "u.security_id NOT IN (" + ", ".join(_sql_string(item) for item in excluded) + ")"
@@ -361,24 +528,14 @@ def build_price_limit_revision(
                         ELSE 'board_baseline'
                     END AS selected_rule_basis,
                     CASE
-                        WHEN is_st_class AND board IN ('SSE_main', 'SZ_main') THEN 5.0
-                        WHEN is_st_class AND board = 'ChiNext'
-                             AND market_date < DATE '2020-08-24' THEN 5.0
-                        WHEN is_st_class AND board IN ('ChiNext', 'STAR') THEN 20.0
+                        WHEN is_st_class THEN {st_pct_case}
                         WHEN in_ipo_window THEN ipo_upper_pct
-                        WHEN board IN ('SSE_main', 'SZ_main') THEN 10.0
-                        WHEN board = 'ChiNext' AND market_date < DATE '2020-08-24' THEN 10.0
-                        ELSE 20.0
+                        ELSE {normal_pct_case}
                     END AS resolved_upper_pct,
                     CASE
-                        WHEN is_st_class AND board IN ('SSE_main', 'SZ_main') THEN 5.0
-                        WHEN is_st_class AND board = 'ChiNext'
-                             AND market_date < DATE '2020-08-24' THEN 5.0
-                        WHEN is_st_class AND board IN ('ChiNext', 'STAR') THEN 20.0
+                        WHEN is_st_class THEN {st_pct_case}
                         WHEN in_ipo_window THEN ipo_lower_pct
-                        WHEN board IN ('SSE_main', 'SZ_main') THEN 10.0
-                        WHEN board = 'ChiNext' AND market_date < DATE '2020-08-24' THEN 10.0
-                        ELSE 20.0
+                        ELSE {normal_pct_case}
                     END AS resolved_lower_pct
                 FROM with_ipo
             )
@@ -504,6 +661,14 @@ def build_price_limit_revision(
         )
         if bad_unknown:
             raise PriceLimitBuildError("unknown ST status permits a new entry")
+        unknown_regimes = int(
+            connection.execute(
+                f"SELECT count(*) FROM ({query}) WHERE NOT in_ipo_window "
+                "AND (upper_limit_pct IS NULL OR lower_limit_pct IS NULL)"
+            ).fetchone()[0]
+        )
+        if unknown_regimes:
+            raise PriceLimitBuildError("policy does not resolve every board/date regime")
         counts = connection.execute(
             f"SELECT count(*) FILTER (WHERE entry_policy_allows), "
             f"count(*) FILTER (WHERE NOT entry_policy_allows) FROM ({query})"
@@ -535,6 +700,7 @@ def build_price_limit_revision(
             "revision": revision,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "policy_version": policy["policy_version"],
+            "policy_sha256": _sha256(policy_path),
             "source_revisions": {
                 "hermes_rule_candidate": str(candidate_meta.get("revision")),
                 "hermes_rule_sha256": _sha256(rules),
@@ -562,6 +728,7 @@ def build_price_limit_revision(
                 "duplicate_execution_keys": 0,
                 "unknown_status_entry_allowed": 0,
                 "ipo_window_overrun": 0,
+                "unknown_board_date_regimes": 0,
                 "non_session_rows": 0,
                 "suspension_consumes_ipo_session": False,
                 "excluded_security_ids": list(excluded),

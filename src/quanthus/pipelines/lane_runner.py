@@ -307,6 +307,9 @@ class LaneRunResult:
     preflight: str | None = None
     detail: str | None = None
     stream: str | None = None
+    schedule_id: str | None = None
+    schedule_contract_revision: str | None = None
+    schedule_config_sha256: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -323,6 +326,9 @@ class LaneRunResult:
             "detail": self.detail,
             "stream": self.stream,
             "producer": PRODUCER,
+            "schedule_id": self.schedule_id,
+            "schedule_contract_revision": self.schedule_contract_revision,
+            "schedule_config_sha256": self.schedule_config_sha256,
         }
 
 
@@ -2630,6 +2636,7 @@ def _build_intraday_stream(
     landing: Path,
     knowledge_cutoff: str,
     bar_size: str,
+    minute_bar_contract: Mapping[str, Any],
     symbols: Sequence[str] | None = None,
 ) -> list[DatasetStatus]:
     if bar_size not in {"1m", "5m"}:
@@ -2928,7 +2935,7 @@ def _build_intraday_stream(
         unexplained_missing == 0
         and ready_symbols + justified == len(universe)
     )
-    session_complete = bool(
+    auction_session_complete = bool(
         observed_max and observed_max[:16] >= expected_last[:16]
     )
     meta = {
@@ -2943,7 +2950,17 @@ def _build_intraday_stream(
         "justified_no_data": justified,
         "unexplained_missing": unexplained_missing,
         "coverage_ok": coverage_ok,
-        "session_complete": session_complete,
+        "session_complete": auction_session_complete,
+        "auction_session_complete": auction_session_complete,
+        "session_phase": minute_bar_contract["session_phase"],
+        "session_scope": minute_bar_contract["session_scope"],
+        "session_policy_version": minute_bar_contract["policy_version"],
+        "covers_after_hours_fixed_price": minute_bar_contract[
+            "covers_after_hours_fixed_price"
+        ],
+        "after_hours_fixed_price_contract": minute_bar_contract[
+            "after_hours_fixed_price_contract"
+        ],
         "expected_last_bar": expected_last,
         "expected_rows_per_ready_symbol": len(expected_timestamps),
         "source_files": files_used,
@@ -2953,12 +2970,13 @@ def _build_intraday_stream(
         "collector": collector_meta,
         "scope_mode": "smoke_only" if smoke_only else "full_universe",
         "note": (
-            "formal 5m never synthesized from 1m; "
-            "unexplained missing blocks READY"
+            "1m/5m completeness covers the continuous and closing-auction grid only; "
+            "after-hours fixed-price trades require a separate sparse dataset; "
+            "formal 5m is never synthesized from 1m; unexplained missing blocks READY"
         ),
     }
     datasets: list[DatasetStatus] = []
-    if coverage_ok and session_complete and len(rows) > 0:
+    if coverage_ok and auction_session_complete and len(rows) > 0:
         bars_dataset = _seal_dataset(
                 name="intraday_bars",
                 rows=rows,
@@ -2983,7 +3001,7 @@ def _build_intraday_stream(
         detail_parts = []
         if not coverage_ok:
             detail_parts.append(f"unexplained_missing={unexplained_missing}")
-        if not session_complete:
+        if not auction_session_complete:
             detail_parts.append(
                 f"session_incomplete observed={observed_max} "
                 f"expected={expected_last}"
@@ -3093,6 +3111,9 @@ def _publish(
     datasets: Sequence[DatasetStatus],
     release_root: Path,
     lane_id: str,
+    schedule_id: str,
+    schedule_contract_revision: str,
+    schedule_config_sha256: str,
     stream: str | None = None,
     closed: bool = False,
     failure_injection_stage: str | None = None,
@@ -3109,6 +3130,9 @@ def _publish(
         "datasets": [item.to_dict() for item in datasets],
         "mandatory": sorted(mandatory),
         "producer": PRODUCER,
+        "schedule_id": schedule_id,
+        "schedule_contract_revision": schedule_contract_revision,
+        "schedule_config_sha256": schedule_config_sha256,
     }
     datasets = list(datasets)
     # replace/add lane_status as sealed artifact in landing before publish
@@ -3165,6 +3189,9 @@ def _publish(
         "schedule": schedule,
         "market_date": market_date.isoformat(),
         "producer": PRODUCER,
+        "schedule_contract_id": schedule_id,
+        "schedule_contract_revision": schedule_contract_revision,
+        "schedule_config_sha256": schedule_config_sha256,
         "artifacts": artifacts,
     }
     if stream:
@@ -3247,6 +3274,7 @@ def run_lane(
     """Run one lane attempt under the schedule contract."""
 
     contract = load_schedule_contract(schedule_config)
+    schedule_config_sha256 = _sha256(schedule_config)
     if lane_id not in contract.lanes:
         raise LaneRunError(f"unknown lane id: {lane_id}")
     payload = json.loads(schedule_config.read_text(encoding="utf-8"))
@@ -3283,6 +3311,9 @@ def run_lane(
         release_dir=None,
         stream=stream,
         started_at=started,
+        schedule_id=contract.schedule_id,
+        schedule_contract_revision=contract.contract_revision,
+        schedule_config_sha256=schedule_config_sha256,
     )
     _atomic_json(attempt_dir / "attempt.json", result.to_dict())
     failure_injection_stage = _failure_injection_stage(
@@ -3364,6 +3395,9 @@ def run_lane(
                     datasets=datasets,
                     release_root=resolved.shadow_root / "releases",
                     lane_id=lane_id,
+                    schedule_id=contract.schedule_id,
+                    schedule_contract_revision=contract.contract_revision,
+                    schedule_config_sha256=schedule_config_sha256,
                     closed=True,
                     failure_injection_stage=failure_injection_stage,
                 )
@@ -3392,6 +3426,9 @@ def run_lane(
                     datasets=datasets,
                     release_root=resolved.shadow_root / "releases",
                     lane_id=lane_id,
+                    schedule_id=contract.schedule_id,
+                    schedule_contract_revision=contract.contract_revision,
+                    schedule_config_sha256=schedule_config_sha256,
                     failure_injection_stage=failure_injection_stage,
                 )
                 result.release_dir = release_dir
@@ -3425,6 +3462,9 @@ def run_lane(
                 datasets=datasets,
                 release_root=resolved.shadow_root / "releases",
                 lane_id=lane_id,
+                schedule_id=contract.schedule_id,
+                schedule_contract_revision=contract.contract_revision,
+                schedule_config_sha256=schedule_config_sha256,
                 failure_injection_stage=failure_injection_stage,
             )
             result.release_dir = release_dir
@@ -3470,6 +3510,9 @@ def run_lane(
                 datasets=datasets,
                 release_root=resolved.shadow_root / "releases",
                 lane_id=lane_id,
+                schedule_id=contract.schedule_id,
+                schedule_contract_revision=contract.contract_revision,
+                schedule_config_sha256=schedule_config_sha256,
                 failure_injection_stage=failure_injection_stage,
             )
             result.release_dir = release_dir
@@ -3500,6 +3543,9 @@ def run_lane(
                     datasets=datasets,
                     release_root=resolved.shadow_root / "releases",
                     lane_id="market-daily-core",
+                    schedule_id=contract.schedule_id,
+                    schedule_contract_revision=contract.contract_revision,
+                    schedule_config_sha256=schedule_config_sha256,
                     stream=stream,
                     closed=True,
                     failure_injection_stage=failure_injection_stage,
@@ -3518,6 +3564,7 @@ def run_lane(
                     landing=landing,
                     knowledge_cutoff=knowledge_cutoff,
                     bar_size=stream,
+                    minute_bar_contract=lane["minute_bar_contract"],
                     symbols=symbols,
                 )
                 result.datasets = datasets
@@ -3535,6 +3582,9 @@ def run_lane(
                     datasets=datasets,
                     release_root=resolved.shadow_root / "releases",
                     lane_id=lane_id,
+                    schedule_id=contract.schedule_id,
+                    schedule_contract_revision=contract.contract_revision,
+                    schedule_config_sha256=schedule_config_sha256,
                     stream=stream,
                     failure_injection_stage=failure_injection_stage,
                 )

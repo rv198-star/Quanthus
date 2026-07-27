@@ -588,7 +588,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 write_current_pointer(revision_dir=st_result.output, pointer=args.promote_pointer)
             print(json.dumps(st_result.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "build-price-limits":
-            default_policy = find_project_root() / "config" / "price-limit.v1.json"
+            default_policy = find_project_root() / "config" / "price-limit.v2.json"
             limit_result = build_price_limit_revision(
                 rules=args.rules,
                 identity_revision=args.identity_revision,

@@ -2,7 +2,7 @@
 Description=Start Quanthus post-close processing window
 
 [Timer]
-OnCalendar=Mon..Fri *-*-* 15:10:00 Asia/Shanghai
+OnCalendar=Mon..Fri *-*-* 15:40:00 Asia/Shanghai
 AccuracySec=1min
 Unit=quanthus-t-close-plus-5h.service
 

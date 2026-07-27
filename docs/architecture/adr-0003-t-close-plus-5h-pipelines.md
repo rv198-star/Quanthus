@@ -17,20 +17,31 @@ signal whose first execution is T+1.
 
 ### 1. Processing window
 
-The daily service starts at 15:10 Asia/Shanghai on a known open session. Its completion SLA is
-20:00, five hours after the 15:00 close. The window is for acquisition, verification, DWD/DWS/PIT
-work, gates, and publication; it does not mean that work waits until 20:00 to start.
+From 2026-07-06, all A-shares and ETFs may trade in the after-hours fixed-price phase from
+15:05 through 15:30. Those matches are included in final daily volume and amount only after
+15:30. The daily service therefore starts at 15:40 Asia/Shanghai on a known open session. Its
+completion deadline remains 20:00. In runner configuration this is represented by a 15:30 final
+trading boundary plus 270 minutes, rather than the obsolete 15:00 plus 300 minutes.
 
 ```text
-15:00       T close
-15:10       OCI service starts and waits for the immutable Hermes release
-15:10-20:00 pull, verify, normalize, gate, publish
+15:00       closing call auction completes
+15:05-15:30 after-hours fixed-price matching
+15:30       final daily trading boundary; final volume/amount may now settle
+15:40       Hermes final daily acquisition and OCI service start
+15:40-20:00 pull, verify, normalize, gate, publish
 20:00       daily DWD CURRENT must identify the accepted T partition
 T+1         strategies may consume the T-close snapshot for execution
 ```
 
-No current-session partial daily bar is admitted. Minute data, 10:00 intervention, and 14:15
+No pre-15:30 partial daily bar is admitted. Minute data, 10:00 intervention, and 14:15
 intervention are outside `t-close-plus-5h-v1` and require a separate policy version.
+
+The versioned `config/trading-session.v1.json` also records the other material 2026 rule effects
+without prematurely adding them to the current strategy path: exchange-specific order-acceptance
+starts for the after-hours phase, exclusion when the security is suspended at 15:00, the 500,000
+share risk-warning daily buy cap across auction/block/after-hours channels, SSE fund closing call
+auction, and the deferred SSE 16:00-17:00 block-trade extension. Execution code must consume these
+rules before it is allowed to place after-hours or risk-warning orders.
 
 The market timer fires Monday through Friday, including exchange holidays. Before any market or
 intraday request, Hermes resolves the target date from complete SSE and SZSE calendar evidence:
@@ -61,8 +72,12 @@ window, then collects the direct 5-minute track. The formal 5-minute series is n
 from the 1-minute archive. Intraday jobs use independent locks, logs, checkpoints, and status;
 their failure cannot block or falsely pass the daily T+5h release. Existing intraday data and
 scripts remain outside Git, and no intraday feature enters a snapshot until a later versioned
-policy and acceptance gate authorize consumption. Intraday jobs consume the same proven open-day
-decision as the daily market release and do not independently guess from an empty provider result.
+policy and acceptance gate authorize consumption. Current TDX/mootdx 1m and 5m artifacts cover
+only the continuous-trading and closing-call-auction grid ending at 15:00. Their completeness flag
+does not claim after-hours coverage. Sparse 15:05-15:30 matches require the separate versioned
+`after_hours_fixed_price_trades.v1` dataset contract; absent trades must never be expanded into a
+dense 1m/5m grid. Intraday jobs consume the same proven open-day decision as the daily market
+release and do not independently guess from an empty provider result.
 
 The daily v1 release requires:
 

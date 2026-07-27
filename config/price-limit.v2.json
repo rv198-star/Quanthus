@@ -1,0 +1,82 @@
+{
+  "schema_version": "2.0.0",
+  "policy_version": "price-limit-regime.v2",
+  "priority": [
+    "out_of_scope",
+    "st_overlay",
+    "ipo_window",
+    "board_baseline"
+  ],
+  "board_regimes": [
+    {
+      "board": "SSE_main",
+      "effective_start": "1900-01-01",
+      "effective_end": "2026-07-05",
+      "normal_pct": 10.0,
+      "st_pct": 5.0
+    },
+    {
+      "board": "SSE_main",
+      "effective_start": "2026-07-06",
+      "effective_end": null,
+      "normal_pct": 10.0,
+      "st_pct": 10.0
+    },
+    {
+      "board": "SZ_main",
+      "effective_start": "1900-01-01",
+      "effective_end": "2026-07-05",
+      "normal_pct": 10.0,
+      "st_pct": 5.0
+    },
+    {
+      "board": "SZ_main",
+      "effective_start": "2026-07-06",
+      "effective_end": null,
+      "normal_pct": 10.0,
+      "st_pct": 10.0
+    },
+    {
+      "board": "ChiNext",
+      "effective_start": "1900-01-01",
+      "effective_end": "2020-08-23",
+      "normal_pct": 10.0,
+      "st_pct": 5.0
+    },
+    {
+      "board": "ChiNext",
+      "effective_start": "2020-08-24",
+      "effective_end": null,
+      "normal_pct": 20.0,
+      "st_pct": 20.0
+    },
+    {
+      "board": "STAR",
+      "effective_start": "1900-01-01",
+      "effective_end": null,
+      "normal_pct": 20.0,
+      "st_pct": 20.0
+    }
+  ],
+  "ipo_session_count": "exchange open and provider tradestatus=1; suspension does not consume a session",
+  "price_reference": "most recent earlier tradestatus=1 unadjusted close",
+  "rounding_rule": "round_to_tick_0.01_half_up_exchange_style",
+  "unknown_status_behavior": "block_new_positions",
+  "unknown_rule_behavior": "block_new_positions",
+  "excluded_security_ids": ["689009"],
+  "out_of_scope_code_prefixes": ["920"],
+  "sources": [
+    {
+      "exchange": "SSE",
+      "published_at": "2026-04-24",
+      "effective_start": "2026-07-06",
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/c_20260424_10816492.shtml"
+    },
+    {
+      "exchange": "SZSE",
+      "published_at": "2026-04-24",
+      "effective_start": "2026-07-06",
+      "url": "http://www.szse.cn/lawrules/rule/trade/current/t20260424_620190.html"
+    }
+  ]
+}

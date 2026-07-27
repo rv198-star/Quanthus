@@ -2,8 +2,8 @@
   "schema_version": 1,
   "pipeline_id": "t-close-plus-5h-v1",
   "timezone": "Asia/Shanghai",
-  "close_time": "15:00:00",
-  "completion_sla_minutes": 300,
+  "close_time": "15:30:00",
+  "completion_sla_minutes": 270,
   "run_root": "{warehouse_root}/runs",
   "lock_path": "{warehouse_root}/locks/t-close-plus-5h.lock",
   "variables": {

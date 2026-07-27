@@ -45,6 +45,29 @@ def _checksum(value: str, *, field: str) -> str:
     return normalized
 
 
+def _schedule_lineage(
+    payload: Mapping[str, Any],
+) -> tuple[str | None, str | None, str | None]:
+    keys = (
+        "schedule_contract_id",
+        "schedule_contract_revision",
+        "schedule_config_sha256",
+    )
+    present = [payload.get(key) is not None for key in keys]
+    if not any(present):
+        return None, None, None
+    if not all(present):
+        raise OdsReleaseError("schedule contract lineage must be complete")
+    return (
+        _required_string(payload, keys[0]),
+        _required_string(payload, keys[1]),
+        _checksum(
+            _required_string(payload, keys[2]),
+            field="schedule_config_sha256",
+        ),
+    )
+
+
 def _aware_datetime(value: str, *, field: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(value)
@@ -110,6 +133,9 @@ class OdsRelease:
     created_at: datetime
     producer: str
     artifacts: tuple[OdsArtifact, ...]
+    schedule_contract_id: str | None = None
+    schedule_contract_revision: str | None = None
+    schedule_config_sha256: str | None = None
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> OdsRelease:
@@ -150,6 +176,7 @@ class OdsRelease:
                 "artifact knowledge_cutoff exceeds release created_at: "
                 + ", ".join(sorted(late_cutoffs))
             )
+        contract_id, contract_revision, config_sha256 = _schedule_lineage(payload)
         return cls(
             release_id=release_id,
             schedule=schedule,
@@ -157,6 +184,9 @@ class OdsRelease:
             created_at=created_at,
             producer=_required_string(payload, "producer"),
             artifacts=tuple(artifacts),
+            schedule_contract_id=contract_id,
+            schedule_contract_revision=contract_revision,
+            schedule_config_sha256=config_sha256,
         )
 
     @classmethod
@@ -170,7 +200,7 @@ class OdsRelease:
         return cls.from_dict(payload)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "schema_version": 1,
             "release_id": self.release_id,
             "schedule": self.schedule,
@@ -180,6 +210,15 @@ class OdsRelease:
             "status": "ready",
             "artifacts": [artifact.to_dict() for artifact in self.artifacts],
         }
+        if self.schedule_contract_id is not None:
+            payload.update(
+                {
+                    "schedule_contract_id": self.schedule_contract_id,
+                    "schedule_contract_revision": self.schedule_contract_revision,
+                    "schedule_config_sha256": self.schedule_config_sha256,
+                }
+            )
+        return payload
 
 
 @dataclass(frozen=True)
@@ -266,6 +305,7 @@ def publish_ods_release(
         raise OdsReleaseError(f"cannot load ODS release spec: {spec_path}") from exc
     if not isinstance(spec, Mapping) or spec.get("schema_version") != 1:
         raise OdsReleaseError("ODS release spec must be a schema_version 1 object")
+    schedule_lineage = _schedule_lineage(spec)
     artifact_specs = spec.get("artifacts")
     if not isinstance(artifact_specs, list) or not artifact_specs:
         raise OdsReleaseError("ODS release spec artifacts must be a non-empty list")
@@ -292,6 +332,7 @@ def publish_ods_release(
             _required_string(spec, "schedule"),
             _required_string(spec, "market_date"),
             _required_string(spec, "producer"),
+            schedule_lineage,
             sorted(requested_artifacts),
         )
         existing_identity = (
@@ -299,6 +340,11 @@ def publish_ods_release(
             existing.release.schedule,
             existing.release.market_date.isoformat(),
             existing.release.producer,
+            (
+                existing.release.schedule_contract_id,
+                existing.release.schedule_contract_revision,
+                existing.release.schedule_config_sha256,
+            ),
             sorted(
                 (
                     artifact.name,
@@ -371,6 +417,14 @@ def publish_ods_release(
             "status": "ready",
             "artifacts": artifacts,
         }
+        if schedule_lineage[0] is not None:
+            payload.update(
+                {
+                    "schedule_contract_id": schedule_lineage[0],
+                    "schedule_contract_revision": schedule_lineage[1],
+                    "schedule_config_sha256": schedule_lineage[2],
+                }
+            )
         OdsRelease.from_dict(payload)
         manifest = staging / "release.json"
         manifest.write_text(

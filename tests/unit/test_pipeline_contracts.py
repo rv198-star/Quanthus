@@ -25,6 +25,9 @@ class OdsReleaseContractTests(unittest.TestCase):
                     "schedule": "daily",
                     "market_date": market_date,
                     "producer": "hermes-test",
+                    "schedule_contract_id": "hermes-ods-schedule-v1",
+                    "schedule_contract_revision": "test-revision-1",
+                    "schedule_config_sha256": f"sha256:{'1' * 64}",
                     "artifacts": [
                         {
                             "name": "daily_ohlcv_none",
@@ -57,6 +60,9 @@ class OdsReleaseContractTests(unittest.TestCase):
 
             self.assertEqual(published.manifest_sha256, verified.manifest_sha256)
             self.assertEqual(verified.release.release_id, "hermes-daily-2026-07-24-v1")
+            self.assertEqual(
+                verified.release.schedule_contract_revision, "test-revision-1"
+            )
             self.assertEqual(verified.verified_bytes, len(b"immutable-test-payload"))
             self.assertEqual((output / "READY").read_text().strip(), verified.manifest_sha256)
 
@@ -131,6 +137,21 @@ class OdsReleaseContractTests(unittest.TestCase):
             publish_ods_release(spec_path=spec_path, output=output)
             spec = json.loads(spec_path.read_text(encoding="utf-8"))
             spec["artifacts"][0]["source_revision"] = "different-source-v2"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+            with self.assertRaisesRegex(OdsReleaseError, "does not match the requested spec"):
+                publish_ods_release(spec_path=spec_path, output=output)
+
+    def test_existing_release_rejects_changed_schedule_contract_lineage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.parquet"
+            source.write_bytes(b"payload")
+            spec_path = self._write_spec(root, source)
+            output = root / "release"
+            publish_ods_release(spec_path=spec_path, output=output)
+            spec = json.loads(spec_path.read_text(encoding="utf-8"))
+            spec["schedule_contract_revision"] = "test-revision-2"
             spec_path.write_text(json.dumps(spec), encoding="utf-8")
 
             with self.assertRaisesRegex(OdsReleaseError, "does not match the requested spec"):

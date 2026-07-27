@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "policy_version": "cn-a-share-trading-session.v1",
+  "timezone": "Asia/Shanghai",
+  "effective_start": "2026-07-06",
+  "regular_session": {
+    "continuous_and_closing_call_auction_end": "15:00:00",
+    "minute_archive_scope": "continuous_trading_and_closing_call_auction",
+    "dense_1m_expected_rows": 240,
+    "dense_5m_expected_rows": 48
+  },
+  "after_hours_fixed_price": {
+    "applies_to": ["all_A_shares", "etfs"],
+    "matching_start": "15:05:00",
+    "matching_end": "15:30:00",
+    "price_basis": "official_closing_price",
+    "priority": "time_priority",
+    "sse_order_acceptance_start": "09:30:00",
+    "szse_order_acceptance_start": "09:15:00",
+    "suspended_at_15_00_participates": false,
+    "sparse_events": true,
+    "included_in_dense_minute_grid": false,
+    "included_in_final_daily_volume_and_amount": true,
+    "final_daily_totals_not_before": "15:30:00",
+    "dataset_contract": "after_hours_fixed_price_trades.v1",
+    "acquisition_status": "contract_only_not_yet_acquired"
+  },
+  "risk_warning_daily_buy_cap": {
+    "shares": 500000,
+    "scope": ["auction", "block_trade", "after_hours_fixed_price"]
+  },
+  "other_effects": {
+    "sse_fund_closing_phase": "closing_call_auction",
+    "sse_16_00_to_17_00_block_trade_extension": "deferred_not_effective"
+  },
+  "sources": [
+    "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/c_20260424_10816492.shtml",
+    "http://www.szse.cn/lawrules/rule/trade/current/t20260424_620190.html"
+  ]
+}

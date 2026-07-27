@@ -49,6 +49,7 @@ def _string_set(value: Any, *, field: str) -> set[str]:
 @dataclass(frozen=True)
 class ScheduleContract:
     schedule_id: str
+    contract_revision: str
     timezone: str
     lanes: tuple[str, ...]
     config_path: Path
@@ -116,6 +117,9 @@ def load_schedule_contract(path: Path) -> ScheduleContract:
 
     return ScheduleContract(
         schedule_id=_string(root.get("schedule_id"), field="schedule_id"),
+        contract_revision=_string(
+            root.get("contract_revision"), field="contract_revision"
+        ),
         timezone=timezone,
         lanes=tuple(lanes),
         config_path=path.resolve(),
@@ -134,6 +138,17 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
     trigger = _mapping(lane.get("trigger"), field="market-daily-core.trigger")
     if trigger.get("weekdays") != [1, 2, 3, 4, 5]:
         raise ScheduleContractError("market-daily-core must run Monday through Friday")
+    if trigger.get("kind") != "timer" or trigger.get("time") != "15:40:00":
+        raise ScheduleContractError(
+            "market-daily-core must start at 15:40 after final daily totals"
+        )
+    expected_finality = {
+        "auction_close_time": "15:00:00",
+        "final_trading_time": "15:30:00",
+        "finalized_acquisition_not_before": "15:40:00",
+    }
+    if any(lane.get(key) != value for key, value in expected_finality.items()):
+        raise ScheduleContractError("market-daily-core trading-day finality contract is invalid")
     preflight = _mapping(lane.get("session_preflight"), field="market-daily-core.session_preflight")
     if preflight.get("exchanges") != ["SSE", "SZSE"]:
         raise ScheduleContractError("market preflight must independently check SSE and SZSE")
@@ -169,6 +184,20 @@ def _validate_intraday(lane: Mapping[str, Any]) -> None:
     }
     if any(preflight.get(key) != value for key, value in expected.items()):
         raise ScheduleContractError("intraday session preflight must use the three-state policy")
+    minute_contract = _mapping(
+        lane.get("minute_bar_contract"), field="intraday-archive.minute_bar_contract"
+    )
+    expected_contract = {
+        "policy_version": "cn-a-share-trading-session.v1",
+        "session_phase": "auction",
+        "session_scope": "continuous_trading_and_closing_call_auction",
+        "covers_after_hours_fixed_price": False,
+        "after_hours_fixed_price_contract": "after_hours_fixed_price_trades.v1",
+    }
+    if any(minute_contract.get(key) != value for key, value in expected_contract.items()):
+        raise ScheduleContractError(
+            "intraday minute bars must explicitly exclude after-hours fixed-price trading"
+        )
     streams_value = lane.get("streams")
     if not isinstance(streams_value, list):
         raise ScheduleContractError("intraday-archive.streams must be a list")

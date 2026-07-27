@@ -21,8 +21,18 @@ from quanthus.pipelines.runner import (
     run_pipeline,
 )
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 class PipelineRunnerTests(unittest.TestCase):
+    def test_repository_pipeline_uses_final_trading_boundary_and_20_00_deadline(self) -> None:
+        config = load_pipeline_config(
+            ROOT / "config" / "pipelines" / "t-close-plus-5h.v1.json"
+        )
+
+        self.assertEqual(config.close_time.isoformat(), "15:30:00")
+        self.assertEqual(config.completion_sla_minutes, 270)
+
     def _release(self, root: Path, market_date: date) -> Path:
         source = root / "source.parquet"
         source.write_bytes(b"daily")

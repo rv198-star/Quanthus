@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
+  "contract_revision": "regulatory-finality-20260727",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_only",
@@ -37,7 +38,10 @@
       "id": "market-daily-core",
       "enabled": true,
       "recurring": true,
-      "trigger": {"kind": "timer", "weekdays": [1, 2, 3, 4, 5], "time": "15:10:00"},
+      "trigger": {"kind": "timer", "weekdays": [1, 2, 3, 4, 5], "time": "15:40:00"},
+      "auction_close_time": "15:00:00",
+      "final_trading_time": "15:30:00",
+      "finalized_acquisition_not_before": "15:40:00",
       "completion_deadline": "20:00:00",
       "resource_group": "pve_market_api",
       "session_preflight": {
@@ -85,6 +89,13 @@
         "both_open": "acquire_direct_streams",
         "both_closed": "calendar_only_release",
         "missing_or_disagree": "fail_without_provider_calls_or_ready"
+      },
+      "minute_bar_contract": {
+        "policy_version": "cn-a-share-trading-session.v1",
+        "session_phase": "auction",
+        "session_scope": "continuous_trading_and_closing_call_auction",
+        "covers_after_hours_fixed_price": false,
+        "after_hours_fixed_price_contract": "after_hours_fixed_price_trades.v1"
       },
       "streams": [
         {

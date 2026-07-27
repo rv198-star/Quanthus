@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -217,14 +218,15 @@ def _paths(home: Path, shadow: Path) -> LanePaths:
 
 def test_timer_oncalendar_matches_schedule_contract() -> None:
     expected = expected_timer_oncalendar(SCHEDULE)
-    assert expected["market-daily-core"] == "Mon..Fri *-*-* 15:10:00 Asia/Shanghai"
+    assert expected["market-daily-core"] == "Mon..Fri *-*-* 15:40:00 Asia/Shanghai"
     assert expected["calendar-daily-events"] == "*-*-* 19:30:00 Asia/Shanghai"
     assert expected["weekly-corrections"] == "Sat *-*-* 08:00:00 Asia/Shanghai"
     assert expected["intraday-1m"] == "Mon..Fri *-*-* 20:30:00 Asia/Shanghai"
     assert expected["intraday-5m"] == "Mon..Fri *-*-* 23:00:00 Asia/Shanghai"
 
     root = Path("ops/systemd")
-    assert "15:10:00 Asia/Shanghai" in (root / "hermes-ods-market-daily-core.timer").read_text()
+    assert "15:40:00 Asia/Shanghai" in (root / "hermes-ods-market-daily-core.timer").read_text()
+    assert "15:40:00 Asia/Shanghai" in (root / "quanthus-t-close-plus-5h.timer").read_text()
     assert "19:30:00 Asia/Shanghai" in (root / "hermes-ods-calendar-daily-events.timer").read_text()
     assert "08:00:00 Asia/Shanghai" in (root / "hermes-ods-weekly-corrections.timer").read_text()
     assert "20:30:00 Asia/Shanghai" in (root / "hermes-ods-intraday-1m.timer").read_text()
@@ -386,6 +388,23 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     assert (result.attempt_dir / "datasets.json").stat().st_mode & 0o777 == 0o644
     assert result.release_dir is not None
     assert result.release_dir.stat().st_mode & 0o777 == 0o755
+    expected_schedule_sha = f"sha256:{hashlib.sha256(SCHEDULE.read_bytes()).hexdigest()}"
+    attempt = json.loads((result.attempt_dir / "attempt.json").read_text(encoding="utf-8"))
+    assert attempt["schedule_id"] == "hermes-ods-schedule-v1"
+    assert attempt["schedule_contract_revision"] == "regulatory-finality-20260727"
+    assert attempt["schedule_config_sha256"] == expected_schedule_sha
+    release = json.loads((result.release_dir / "release.json").read_text(encoding="utf-8"))
+    assert release["schedule_contract_id"] == "hermes-ods-schedule-v1"
+    assert release["schedule_contract_revision"] == "regulatory-finality-20260727"
+    assert release["schedule_config_sha256"] == expected_schedule_sha
+    meta_dataset = next(item for item in result.datasets if item.name == "intraday_meta")
+    meta = json.loads(Path(meta_dataset.path).read_text(encoding="utf-8"))
+    assert meta["session_complete"] is True
+    assert meta["auction_session_complete"] is True
+    assert meta["session_phase"] == "auction"
+    assert meta["session_scope"] == "continuous_trading_and_closing_call_auction"
+    assert meta["covers_after_hours_fixed_price"] is False
+    assert meta["after_hours_fixed_price_contract"] == "after_hours_fixed_price_trades.v1"
 
 
 def test_intraday_timeout_records_terminal_failure(

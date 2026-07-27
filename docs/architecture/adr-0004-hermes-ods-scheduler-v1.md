@@ -24,10 +24,15 @@ schedule must enforce that boundary while preserving short-retention 1m data.
 Hermes has five lanes. Their definitions, timers, datasets, locks, and publication invariants
 are versioned in the machine-validated schedule contract.
 
+`schedule_id=hermes-ods-schedule-v1` identifies the stable five-lane topology. Material contract
+edits within that topology carry a separate `contract_revision`; every attempt and READY release
+records that revision and the exact schedule-file SHA-256. This preserves replay lineage without
+misrepresenting the 2026 final-trading-time update as a new lane topology.
+
 | Lane | Trigger (Asia/Shanghai) | Responsibility | Publication |
 | --- | --- | --- | --- |
 | `bootstrap` | Manual, issue-bound | Initialization and historical backfill | Immutable raw revision; never recurring |
-| `market-daily-core` | Mon-Fri 15:10 | Daily bars, binary status observation, market references and index/adjustment deltas | Daily ODS; T+5H deadline 20:00 |
+| `market-daily-core` | Mon-Fri 15:40 | Final daily bars after the 15:30 trading boundary, binary status observation, market references and index/adjustment deltas | Daily ODS; deadline 20:00 |
 | `calendar-daily-events` | Every day 19:30 | Announcements and disclosure-driven events | Natural-day ODS; never creates a market session |
 | `intraday-archive` | 1m Mon-Fri 20:30; 5m Mon-Fri 23:00 | Preserve direct minute archives while sources retain them | Independent streams outside the T+5H path |
 | `weekly-corrections` | Saturday 08:00 | Low-frequency primary acquisition and bounded reconciliation | Independent correction revision |
@@ -50,7 +55,11 @@ tradable session.
 Both 1m and 5m are acquired directly. Formal 5m evidence is never synthesized from 1m. The two
 streams have separate timers, locks, checkpoints, logs, attempts, manifests, and readiness
 markers. 1m runs first because its upstream history is retained for only about three to four
-months. Minute consumers and intraday intervention remain deferred, but acquisition does not.
+months. These provider bars cover the continuous-trading and closing-call-auction grid through
+15:00 only. `auction_session_complete` therefore does not imply coverage of sparse after-hours
+fixed-price matches from 15:05 through 15:30. Those matches belong to the separate
+`after_hours_fixed_price_trades.v1` contract. Minute consumers and intraday intervention remain
+deferred, but acquisition does not.
 
 Each minute timer applies the same SSE/SZSE three-state preflight as the market daily lane. Both
 open permits direct acquisition; both closed publishes calendar-only evidence; missing or

@@ -10,6 +10,7 @@ htmlcov/
 
 # Local environments and secrets
 .venv/
+.deps/
 .env
 .env.*
 !.env.example

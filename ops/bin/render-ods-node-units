@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "usage: $0 --node-id <hermes|cn01|node-name> --output <directory>" >&2
+}
+
+NODE_ID=""
+OUTPUT=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --node-id) NODE_ID="${2:-}"; shift 2 ;;
+    --output) OUTPUT="${2:-}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage; exit 2 ;;
+  esac
+done
+
+if [[ ! "$NODE_ID" =~ ^[a-z][a-z0-9-]*$ ]] || [[ -z "$OUTPUT" ]]; then
+  usage
+  exit 2
+fi
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SOURCE_DIR="${ROOT}/ops/systemd"
+mkdir -p "$OUTPUT"
+
+UNITS=(
+  hermes-ods-market-daily-core.service
+  hermes-ods-market-daily-core.timer
+  hermes-ods-calendar-daily-events.service
+  hermes-ods-calendar-daily-events.timer
+  hermes-ods-intraday-1m.service
+  hermes-ods-intraday-1m.timer
+  hermes-ods-intraday-5m.service
+  hermes-ods-intraday-5m.timer
+  hermes-ods-weekly-corrections.service
+  hermes-ods-weekly-corrections.timer
+)
+
+for unit in "${UNITS[@]}"; do
+  source_path="${SOURCE_DIR}/${unit}"
+  target_name="${unit/hermes-ods/${NODE_ID}-ods}"
+  target_path="${OUTPUT}/${target_name}"
+  tmp_path="${target_path}.tmp.$$"
+  sed "s/hermes-ods/${NODE_ID}-ods/g" "$source_path" > "$tmp_path"
+  chmod 0644 "$tmp_path"
+  mv "$tmp_path" "$target_path"
+done
+
+echo "rendered ${#UNITS[@]} ODS units for ${NODE_ID} under ${OUTPUT}"

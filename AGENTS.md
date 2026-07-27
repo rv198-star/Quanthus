@@ -25,3 +25,17 @@
 - Do not commit market data, credentials, run artifacts, or local databases.
 - Prefer deterministic ordering and explicit reason codes over implicit behavior.
 - Run `make check` before a handoff.
+
+## Deployment and remote access
+
+- GitHub is the only normal code-distribution path. Hermes, CN01, and future nodes each use a
+  distinct read-only deploy key and update a node-local Git checkout with `git pull --ff-only`.
+  Do not use rsync, scp, or an OCI-built archive to distribute repository code.
+- OCI audits Hermes through the reverse tunnel at host-loopback `127.0.0.1:2222`. The
+  `hermes-ods-ro` forced-command account and `astock-ro` rrsync jail are read-only; a healthy
+  tunnel does not grant shell, deployment, or root authority.
+- Codex's default command sandbox may use a different network namespace from the OCI host. A
+  failed sandbox `ss` check or `hermes-ods-schedule-check.sh` call is not evidence that the tunnel
+  is down. Re-run the approved check in the host network context before reporting an outage.
+- Do not probe Hermes root with unrelated keys. Deployment runs on Hermes itself from GitHub;
+  OCI verifies exported evidence through the read-only channel.

@@ -17,6 +17,38 @@ make schedule-check
 The result must name `hermes-ods-schedule-v1`, five lanes, and `Asia/Shanghai`. This validates
 platform invariants, not the live Hermes scheduler.
 
+## Node-local Git deployment
+
+GitHub is the only normal code-distribution path. Every ODS node has its own read-only deploy key;
+private keys are never copied between Hermes, CN01, and OCI. The fixed deployment path is a Git
+checkout at `/root/work/Quanthus`, tracking `origin/main`. OCI may publish commits and audit nodes,
+but it must not distribute repository archives, rsync source trees, or maintain an untracked copy
+as the normal deployment state.
+
+For each reviewed release:
+
+1. Confirm all lane services are inactive and preserve the current HEAD, unit checksums, and timer
+   state in the node-local cutover evidence directory.
+2. Stop timers only, then run `git fetch origin main` and `git pull --ff-only origin main` in the
+   node checkout. Merge, rebase, hard reset, and a dirty tracked worktree are deployment failures.
+3. Verify the full expected commit, run `make schedule-check` plus the focused contract tests, and
+   render node units from that same checkout:
+
+```bash
+ops/bin/render-ods-node-units --node-id hermes --output /tmp/quanthus-ods-units
+# CN01 uses: --node-id cn01
+sudo install -m 0644 /tmp/quanthus-ods-units/* /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+4. Start timers without manually starting services. Record the deployed commit, transformed unit
+   checksums, next trigger times, and rollback path. OCI independently verifies the exported
+   evidence through its read-only channel.
+
+Node-local `.venv/`, `.deps/`, protected env files, Base/ODS data, attempts, releases, and
+watermarks remain outside Git. A bootstrap archive may seed data, but it is never a substitute for
+the Git checkout that owns executable code and configuration.
+
 ## Hermes implementation contract
 
 Each recurring unit must provide:
@@ -148,6 +180,23 @@ OCI checks the read-only Hermes schedule and release status without shell or wri
 ~/bin/hermes-ods-schedule-check.sh cron
 ~/bin/hermes-ods-schedule-check.sh logs
 ```
+
+These commands must be interpreted in the correct network namespace. The OCI reverse tunnel
+binds host-loopback `127.0.0.1:2222`; a Codex command running in the default filesystem/network
+sandbox may not see that listener and can falsely report `tunnel not listening`. Before declaring
+an outage, repeat the approved probe in the OCI host network context and require both:
+
+```bash
+ss -ltn | grep '127.0.0.1:2222'
+~/bin/hermes-ods-schedule-check.sh status
+```
+
+The first proves the host listener and the second proves end-to-end SSH forced-command access.
+Service state on Hermes is not inferred from either one alone. The channel remains read-only:
+`hermes-ods-ro` exposes the sanitized schedule commands and an rrsync jail, while `astock-ro`
+exposes only the data jail. Channel availability never authorizes `git pull`, unit installation,
+timer restart, an interactive shell, or a root-key probe from OCI. Hermes performs its own GitHub
+fast-forward deployment; OCI consumes the exported evidence and independently audits it.
 
 An operator verifies the expected target date, preflight result, each mandatory dataset status,
 watermark movement, READY checksum, duration, retry count, and alert state. File existence alone

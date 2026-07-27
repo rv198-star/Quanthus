@@ -3601,6 +3601,20 @@ def _publish(
     except OdsReleaseError as exc:
         return None, "failed", str(exc)
     # READY is last inside publish_ods_release; do not write anything else here.
+    if schedule == "daily" and stream is None:
+        verified = verify_ods_release(release_dir)
+        _atomic_json(
+            release_root / schedule / market_date.isoformat() / "CURRENT.json",
+            {
+                "schema_version": 1,
+                "schedule": schedule,
+                "market_date": market_date.isoformat(),
+                "attempt_id": attempt_id,
+                "release_id": verified.release.release_id,
+                "manifest_sha256": verified.manifest_sha256,
+                "ready_at": verified.release.created_at.isoformat(),
+            },
+        )
     return release_dir, "ready", None
 
 

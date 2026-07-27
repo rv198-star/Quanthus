@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,6 +45,17 @@ def _string_set(value: Any, *, field: str) -> set[str]:
     if len(value) != len(set(value)):
         raise ScheduleContractError(f"{field} must not contain duplicates")
     return set(value)
+
+
+def _positive_number(value: Any, *, field: str) -> float:
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(value)
+        or value <= 0
+    ):
+        raise ScheduleContractError(f"{field} must be a positive number")
+    return float(value)
 
 
 @dataclass(frozen=True)
@@ -160,8 +172,21 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
     }
     if any(preflight.get(key) != value for key, value in expected.items()):
         raise ScheduleContractError("market session preflight must use the three-state policy")
-    if lane.get("completion_deadline") != "20:00:00":
-        raise ScheduleContractError("market-daily-core must retain the T+5H deadline")
+    if lane.get("completion_deadline") != "17:25:00":
+        raise ScheduleContractError("market-daily-core must use the ready-gated 17:25 deadline")
+    timing_sla = _mapping(lane.get("timing_sla"), field="market-daily-core.timing_sla")
+    observed = _positive_number(
+        timing_sla.get("observed_max_duration_seconds"),
+        field="market-daily-core.timing_sla.observed_max_duration_seconds",
+    )
+    if timing_sla.get("basis") != "accepted_market_daily_attempts_20260727":
+        raise ScheduleContractError("market-daily-core timing SLA must name its accepted evidence")
+    if timing_sla.get("safety_margin_percent") != 100:
+        raise ScheduleContractError("market-daily-core timing SLA must retain the 100% margin")
+    if timing_sla.get("allowed_duration_seconds") != math.ceil(observed * 2):
+        raise ScheduleContractError("market-daily-core timing SLA must double the observed duration")
+    if timing_sla.get("latest_ready_time") != lane.get("completion_deadline"):
+        raise ScheduleContractError("market-daily-core ready deadline must match its timing SLA")
 
 
 def _validate_calendar_events(lane: Mapping[str, Any]) -> None:

@@ -1,5 +1,5 @@
 [Unit]
-Description=Quanthus T-close plus 5h daily warehouse pipeline
+Description=Quanthus ready-gated post-close daily warehouse pipeline
 After=network-online.target
 Wants=network-online.target
 OnFailure=quanthus-pipeline-failure@%n.service

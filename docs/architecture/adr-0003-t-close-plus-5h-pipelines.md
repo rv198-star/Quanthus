@@ -19,17 +19,20 @@ signal whose first execution is T+1.
 
 From 2026-07-06, all A-shares and ETFs may trade in the after-hours fixed-price phase from
 15:05 through 15:30. Those matches are included in final daily volume and amount only after
-15:30. The daily service therefore starts at 15:40 Asia/Shanghai on a known open session. Its
-completion deadline remains 20:00. In runner configuration this is represented by a 15:30 final
-trading boundary plus 270 minutes, rather than the obsolete 15:00 plus 300 minutes.
+15:30. Hermes and CN01 therefore start final daily acquisition at 15:40 Asia/Shanghai. OCI starts
+only a readiness gate at that time: it does not pull or clean until an upstream has published a
+same-date immutable handoff. The slowest accepted acquisition took 52m18.4s; adding 100% and
+rounding up yields `ceil(3138.4 * 2) = 6277s`, so ODS must be ready by 17:25.
 
 ```text
 15:00       closing call auction completes
 15:05-15:30 after-hours fixed-price matching
 15:30       final daily trading boundary; final volume/amount may now settle
-15:40       Hermes final daily acquisition and OCI service start
-15:40-20:00 pull, verify, normalize, gate, publish
-20:00       daily DWD CURRENT must identify the accepted T partition
+15:40       Hermes and CN01 acquisition; OCI starts readiness polling only
+15:40-17:25 OCI polls both immutable handoffs every 30 seconds
+on READY     first observed source wins; same-poll tie resolves to CN01
+17:25       latest acceptable upstream ODS handoff (52m18.4s observed + 100%)
+17:26       CN01-primary DWD/DWS completion SLA
 T+1         strategies may consume the T-close snapshot for execution
 ```
 
@@ -106,21 +109,26 @@ adjustment evidence, shareholder counts, and ST observations. Shareholder-count 
 the approved disclosure-date watermark, at least a 90-day lookback, and revision history rather
 than overwriting an earlier disclosure.
 
-Hermes writes `READY` last. OCI nevertheless verifies the READY-to-manifest digest, every relative
-path, size, SHA-256, source revision, and timezone-aware knowledge cutoff. A transferred directory
-without a valid READY marker is not an input dataset.
+Hermes writes `READY` last and then atomically writes same-date `CURRENT.json` outside the immutable
+attempt directory. CN01's direct source layout is attempt-addressable, so OCI discovers its latest
+same-date `READY` attempt through rsync. OCI polls both sources every 30 seconds and records the
+first observed candidate in `ods-source-selection.json`; a tie in the same poll resolves to CN01.
+The selected source and attempt cannot change during the run. OCI nevertheless verifies the
+READY-to-manifest digest, every relative path, size, SHA-256, source revision, and timezone-aware
+knowledge cutoff. A transferred directory without a valid READY marker is not an input dataset.
 
 ### 3. OCI owns recurring transformation
 
-The versioned pipeline has five ordered phases:
+The versioned pipeline has six ordered phases:
 
-1. pull one exact Hermes daily release through the read-only rsync channel;
-2. verify release integrity, the requested market date, and open/closed session evidence;
-3. rebuild code validity and normalize T bars and raw status observations into an immutable DWD
+1. poll the CN01-primary and Hermes-fallback ODS handoffs and atomically record one winner;
+2. pull only the exact immutable attempt named by that selection;
+3. verify release integrity, the requested market date, and open/closed session evidence;
+4. rebuild code validity and normalize T bars and raw status observations into an immutable DWD
    partition;
-4. rerun checksums, row counts, duplicate keys, identity coverage, complete status coverage,
+5. rerun checksums, row counts, duplicate keys, identity coverage, complete status coverage,
    tradable-bar coverage, universe scope, and OHLC gates;
-5. atomically advance `/home/ubuntu/data/quanthus/revisions/daily_market_CURRENT.json`.
+6. atomically advance `/home/ubuntu/data/quanthus/revisions/daily_market_CURRENT.json`.
 
 The accepted P1 DWD revision is the historical base. Daily partitions form an immutable chain on
 top of that base and contain only T rows, avoiding a new 10+ GB full-history copy each day. A rerun
@@ -136,10 +144,18 @@ file state.
 - A single exclusive lock prevents overlapping market-date runs.
 - Each attempt writes a durable `run.json` and per-stage logs below
   `/home/ubuntu/data/quanthus/runs/`.
+- Measured stages record observed maximum duration, 100%-headroom SLA, actual elapsed seconds, and
+  pass/fail state in the ledger. CN01's selected 3,935,273-byte transfer completed in 3.649s, so
+  its transfer SLA is 8 seconds. The independently rounded verify/build/gate/publish budgets sum
+  to 10 seconds. Hermes transfer is an availability fallback without a completed transfer baseline;
+  its first successful fallback run records the measurement but is not falsely labeled as a
+  CN01-qualified SLA.
 - A failed stage stops all later stages. In particular, a failed gate cannot invoke publication.
 - `LAST_SUCCESS.json` changes only after every configured stage succeeds.
-- A completed run after 20:00 is retained as `succeeded_late` and must alert; it is not relabeled as
-  on time.
+- A CN01-qualified run completing after 17:26, or after any measured stage exceeds its SLA, is
+  retained as `succeeded_late` and must alert; it is not relabeled as on time.
+- A successful Hermes-fallback run without a recorded Hermes transfer baseline is retained as
+  `succeeded_unqualified`, advances the verified data pointer, and alerts for SLA measurement.
 - Commands are executed as argument arrays without a shell. Secrets remain in the service
   environment or protected files and must not be command-line arguments.
 

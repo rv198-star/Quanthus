@@ -165,7 +165,7 @@ OCI posts `GO_FOR_CUTOVER` only when all of the following are true:
 - provider-mode market and minute attempts prove a fresh target-date calendar refresh before
   their three-state preflight;
 - every required shadow scenario passes;
-- market daily core finishes before 20:00 or raises a tested SLA alert;
+- market daily core publishes READY by 17:25 or raises a tested SLA alert;
 - `closed_session`, `failed`, and `partial` cannot advance any canonical pointer;
 - direct 1m and direct 5m have no unexplained coverage gap;
 - weekly corrections retain both prior evidence and conflicting observations;

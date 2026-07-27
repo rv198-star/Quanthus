@@ -25,11 +25,16 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PipelineRunnerTests(unittest.TestCase):
-    def test_repository_pipeline_uses_final_trading_boundary_and_20_00_deadline(self) -> None:
+    def test_repository_pipeline_uses_ready_gated_stage_slas(self) -> None:
         config = load_pipeline_config(ROOT / "config" / "pipelines" / "t-close-plus-5h.v1.json")
 
         self.assertEqual(config.close_time.isoformat(), "15:30:00")
-        self.assertEqual(config.completion_sla_minutes, 270)
+        self.assertEqual(config.completion_sla_minutes, 116)
+        self.assertEqual(config.stage_sla_margin_percent, 100)
+        wait_stage = config.stages[0]
+        self.assertEqual(wait_stage.stage_id, "wait_daily_ods_source_ready")
+        self.assertEqual(wait_stage.observed_max_duration_seconds, 3138.4)
+        self.assertEqual(wait_stage.sla_seconds, 6277)
         self.assertEqual(
             [stage.stage_id for stage in config.stages][-5:],
             [
@@ -132,6 +137,66 @@ class PipelineRunnerTests(unittest.TestCase):
                 ],
             )
             self.assertTrue((root / "runs" / "test-t5h-v1" / "LAST_SUCCESS.json").is_file())
+
+    def test_stage_sla_is_durable_and_uses_the_configured_margin(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            market_date = date(2026, 7, 24)
+            config_path = self._config(root, self._release(root, market_date))
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+            payload["stage_sla_margin_percent"] = 100
+            payload["stages"][0]["observed_max_duration_seconds"] = 2
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = run_pipeline(load_pipeline_config(config_path), market_date=market_date)
+
+            ledger = json.loads((result.run_dir / "run.json").read_text(encoding="utf-8"))
+            stage = ledger["stages"][0]
+            self.assertEqual(stage["observed_max_duration_seconds"], 2.0)
+            self.assertEqual(stage["sla_seconds"], 4)
+            self.assertIn("elapsed_seconds", stage)
+            self.assertTrue(stage["sla_met"])
+            self.assertTrue(ledger["stage_sla_met"])
+
+    def test_transfer_sla_comes_from_the_selected_source_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            market_date = date(2026, 7, 24)
+            selection = root / "selection.json"
+            selection.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "source_id": "cn01",
+                        "schedule": "daily",
+                        "market_date": market_date.isoformat(),
+                        "selection": "attempt",
+                        "selected_at": "2026-07-24T08:00:00+00:00",
+                        "attempt_id": "20260724-20260724T080000000000Z",
+                        "transfer": {
+                            "elapsed_seconds": 3.649,
+                            "sla_qualified": True,
+                            "observed_max_duration_seconds": 3.649,
+                            "sla_seconds": 8,
+                            "sla_met": True,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config_path = self._config(root, self._release(root, market_date))
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+            payload["stages"][0]["dynamic_sla_receipt_path"] = str(selection)
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = run_pipeline(load_pipeline_config(config_path), market_date=market_date)
+
+            ledger = json.loads((result.run_dir / "run.json").read_text(encoding="utf-8"))
+            stage = ledger["stages"][0]
+            self.assertEqual(stage["handoff_source_id"], "cn01")
+            self.assertEqual(stage["source_transfer_elapsed_seconds"], 3.649)
+            self.assertEqual(stage["sla_seconds"], 8)
+            self.assertTrue(stage["sla_qualified"])
 
     def test_failed_gate_never_writes_last_success(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

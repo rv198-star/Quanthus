@@ -46,6 +46,7 @@ from quanthus.p1_evidence_build import (
 from quanthus.pipelines import (
     DailyWarehouseError,
     LaneRunError,
+    OdsHandoffError,
     OdsReleaseError,
     PipelineConfigError,
     PipelineRunError,
@@ -54,17 +55,20 @@ from quanthus.pipelines import (
     build_daily_dws_revision,
     check_daily_dwd_revision,
     check_daily_dws_revision,
+    load_ods_source_config,
     load_pipeline_config,
     load_schedule_contract,
     market_session_is_open,
     promote_daily_dwd_revision,
     promote_daily_dws_revision,
     publish_ods_release,
+    pull_selected_ods_release,
     resolve_paths,
     run_lane,
     run_pipeline,
     run_shadow_matrix,
     verify_ods_release,
+    wait_for_ods_ready,
 )
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
 from quanthus.price_limits import (
@@ -272,6 +276,27 @@ def _parser() -> argparse.ArgumentParser:
     )
     pipeline_run.add_argument("--config", type=Path, required=True)
     pipeline_run.add_argument("--market-date", type=date.fromisoformat, required=True)
+
+    ods_wait = subparsers.add_parser(
+        "ods-wait-ready",
+        help="select the first verified-ready ODS source and write a durable selection receipt",
+    )
+    ods_wait.add_argument("--sources", type=Path, required=True)
+    ods_wait.add_argument("--schedule", choices=["daily", "weekly"], required=True)
+    ods_wait.add_argument("--market-date", type=date.fromisoformat, required=True)
+    ods_wait.add_argument("--selection", type=Path, required=True)
+    ods_wait.add_argument("--timeout-seconds", type=int, required=True)
+    ods_wait.add_argument("--poll-seconds", type=int, required=True)
+
+    ods_pull = subparsers.add_parser(
+        "ods-pull-selected",
+        help="pull the exact ODS source and attempt recorded in a selection receipt",
+    )
+    ods_pull.add_argument("--sources", type=Path, required=True)
+    ods_pull.add_argument("--schedule", choices=["daily", "weekly"], required=True)
+    ods_pull.add_argument("--market-date", type=date.fromisoformat, required=True)
+    ods_pull.add_argument("--selection", type=Path, required=True)
+    ods_pull.add_argument("--destination-root", type=Path, required=True)
 
     schedule_check = subparsers.add_parser(
         "schedule-check",
@@ -643,6 +668,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             if pipeline_result.status == "skipped_closed_session":
                 return 0
             return 0 if pipeline_result.sla_met else 4
+        elif args.command == "ods-wait-ready":
+            selection = wait_for_ods_ready(
+                source_config=load_ods_source_config(args.sources),
+                schedule=args.schedule,
+                market_date=args.market_date.isoformat(),
+                selection_path=args.selection,
+                timeout_seconds=args.timeout_seconds,
+                poll_seconds=args.poll_seconds,
+            )
+            print(json.dumps(selection.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "ods-pull-selected":
+            selection = pull_selected_ods_release(
+                source_config=load_ods_source_config(args.sources),
+                schedule=args.schedule,
+                market_date=args.market_date.isoformat(),
+                selection_path=args.selection,
+                destination_root=args.destination_root,
+            )
+            print(json.dumps(selection.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "schedule-check":
             schedule = load_schedule_contract(args.config)
             print(
@@ -764,6 +808,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         StStatusBuildError,
         PriceLimitBuildError,
         OdsReleaseError,
+        OdsHandoffError,
         PipelineConfigError,
         PipelineRunError,
         ScheduleContractError,

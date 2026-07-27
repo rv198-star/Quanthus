@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "calendar-refresh-first-20260727",
+  "contract_revision": "ready-gated-sla-20260727",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_only",
@@ -42,7 +42,14 @@
       "auction_close_time": "15:00:00",
       "final_trading_time": "15:30:00",
       "finalized_acquisition_not_before": "15:40:00",
-      "completion_deadline": "20:00:00",
+      "completion_deadline": "17:25:00",
+      "timing_sla": {
+        "basis": "accepted_market_daily_attempts_20260727",
+        "observed_max_duration_seconds": 3138.4,
+        "safety_margin_percent": 100,
+        "allowed_duration_seconds": 6277,
+        "latest_ready_time": "17:25:00"
+      },
       "resource_group": "pve_market_api",
       "session_preflight": {
         "exchanges": ["SSE", "SZSE"],

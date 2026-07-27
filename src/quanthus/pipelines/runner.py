@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import math
 import os
 import subprocess
 import tempfile
@@ -48,6 +49,22 @@ def _integer(
     return value
 
 
+def _positive_number(
+    payload: Mapping[str, Any], key: str, *, maximum: float
+) -> float | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(value)
+        or not 0 < float(value) <= maximum
+    ):
+        raise PipelineConfigError(f"{key} must be a number from 0 (exclusive) to {maximum}")
+    return float(value)
+
+
 @dataclass(frozen=True)
 class PipelineVariable:
     name: str
@@ -74,6 +91,9 @@ class PipelineStage:
     retries: int
     retry_delay_seconds: int
     timeout_seconds: int
+    observed_max_duration_seconds: float | None
+    sla_seconds: int | None
+    dynamic_sla_receipt_path: str | None
 
 
 @dataclass(frozen=True)
@@ -84,6 +104,7 @@ class PipelineConfig:
     timezone_name: str
     close_time: wall_time
     completion_sla_minutes: int
+    stage_sla_margin_percent: int
     run_root: str
     lock_path: str
     variables: tuple[PipelineVariable, ...]
@@ -137,6 +158,13 @@ def load_pipeline_config(path: Path) -> PipelineConfig:
         raise PipelineConfigError("pipeline config must be an object")
     if payload.get("schema_version") != 1:
         raise PipelineConfigError("unsupported pipeline schema_version")
+    stage_sla_margin_percent = _integer(
+        payload,
+        "stage_sla_margin_percent",
+        default=0,
+        minimum=0,
+        maximum=500,
+    )
     timezone_name = _required_string(payload, "timezone")
     try:
         ZoneInfo(timezone_name)
@@ -191,6 +219,27 @@ def load_pipeline_config(path: Path) -> PipelineConfig:
             raise PipelineConfigError(f"stage {stage_id} calendar_path must be a string")
         if kind == "market_session_check" and not calendar_path:
             raise PipelineConfigError(f"market-session stage {stage_id} requires calendar_path")
+        observed_max_duration_seconds = _positive_number(
+            value,
+            "observed_max_duration_seconds",
+            maximum=86400.0,
+        )
+        dynamic_sla_receipt_path = value.get("dynamic_sla_receipt_path")
+        if dynamic_sla_receipt_path is not None and not isinstance(dynamic_sla_receipt_path, str):
+            raise PipelineConfigError(
+                f"stage {stage_id} dynamic_sla_receipt_path must be a string"
+            )
+        if observed_max_duration_seconds is not None and dynamic_sla_receipt_path is not None:
+            raise PipelineConfigError(
+                f"stage {stage_id} cannot use static and dynamic SLA observations together"
+            )
+        sla_seconds = (
+            math.ceil(
+                observed_max_duration_seconds * (100 + stage_sla_margin_percent) / 100
+            )
+            if observed_max_duration_seconds is not None
+            else None
+        )
         stages.append(
             PipelineStage(
                 stage_id=stage_id,
@@ -214,6 +263,9 @@ def load_pipeline_config(path: Path) -> PipelineConfig:
                     minimum=1,
                     maximum=86400,
                 ),
+                observed_max_duration_seconds=observed_max_duration_seconds,
+                sla_seconds=sla_seconds,
+                dynamic_sla_receipt_path=dynamic_sla_receipt_path,
             )
         )
     stage_ids = [stage.stage_id for stage in stages]
@@ -238,6 +290,7 @@ def load_pipeline_config(path: Path) -> PipelineConfig:
             minimum=1,
             maximum=1440,
         ),
+        stage_sla_margin_percent=stage_sla_margin_percent,
         run_root=_required_string(payload, "run_root"),
         lock_path=_required_string(payload, "lock_path"),
         variables=tuple(variables),
@@ -298,7 +351,19 @@ def _ledger(
         payload["code_revision"] = code_revision
     if finished_at is not None:
         payload["finished_at"] = finished_at.isoformat()
-        payload["sla_met"] = finished_at <= deadline_at
+        stage_sla_met = all(
+            record.get("sla_met", True)
+            for record in stages
+            if record.get("status") == "succeeded"
+        )
+        sla_qualified = all(
+            record.get("sla_qualified", True)
+            for record in stages
+            if record.get("status") == "succeeded"
+        )
+        payload["stage_sla_met"] = stage_sla_met
+        payload["sla_qualified"] = sla_qualified
+        payload["sla_met"] = finished_at <= deadline_at and stage_sla_met and sla_qualified
     if failure is not None:
         payload["failure"] = failure
     return payload
@@ -352,6 +417,61 @@ def _run_stage(
     with log_path.open("a", encoding="utf-8") as log:
         log.write(f"market_date={market_date.isoformat()} open={str(is_open).lower()}\n")
     return not is_open
+
+
+def _finish_stage_record(record: dict[str, Any], *, finished_at: datetime) -> None:
+    started_at = datetime.fromisoformat(record["started_at"])
+    elapsed_seconds = max(0.0, (finished_at - started_at).total_seconds())
+    record["finished_at"] = finished_at.isoformat()
+    record["elapsed_seconds"] = round(elapsed_seconds, 3)
+    sla_seconds = record.get("sla_seconds")
+    if isinstance(sla_seconds, int):
+        record["sla_met"] = elapsed_seconds <= sla_seconds
+
+
+def _apply_dynamic_sla(
+    stage: PipelineStage,
+    *,
+    context: Mapping[str, str],
+    record: dict[str, Any],
+) -> None:
+    if stage.dynamic_sla_receipt_path is None:
+        return
+    receipt_path = Path(_render(stage.dynamic_sla_receipt_path, context))
+    try:
+        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PipelineRunError(
+            f"stage {stage.stage_id} cannot load dynamic SLA receipt: {receipt_path}"
+        ) from exc
+    if not isinstance(payload, Mapping):
+        raise PipelineRunError(f"stage {stage.stage_id} dynamic SLA receipt must be an object")
+    source_id = payload.get("source_id")
+    transfer = payload.get("transfer")
+    if not isinstance(source_id, str) or not source_id or not isinstance(transfer, Mapping):
+        raise PipelineRunError(f"stage {stage.stage_id} dynamic SLA receipt is incomplete")
+    record["handoff_source_id"] = source_id
+    record["source_transfer_elapsed_seconds"] = transfer.get("elapsed_seconds")
+    qualified = transfer.get("sla_qualified")
+    if not isinstance(qualified, bool):
+        raise PipelineRunError(f"stage {stage.stage_id} dynamic SLA qualification is invalid")
+    record["sla_qualified"] = qualified
+    if not qualified:
+        return
+    observed = transfer.get("observed_max_duration_seconds")
+    sla_seconds = transfer.get("sla_seconds")
+    if (
+        not isinstance(observed, (int, float))
+        or isinstance(observed, bool)
+        or not math.isfinite(observed)
+        or observed <= 0
+        or not isinstance(sla_seconds, int)
+        or isinstance(sla_seconds, bool)
+        or sla_seconds < 1
+    ):
+        raise PipelineRunError(f"stage {stage.stage_id} dynamic SLA values are invalid")
+    record["observed_max_duration_seconds"] = float(observed)
+    record["sla_seconds"] = sla_seconds
 
 
 def run_pipeline(config: PipelineConfig, *, market_date: date) -> PipelineRunResult:
@@ -426,6 +546,9 @@ def run_pipeline(config: PipelineConfig, *, market_date: date) -> PipelineRunRes
                     "attempts": 0,
                     "log": f"{stage.stage_id}.log",
                 }
+                if stage.observed_max_duration_seconds is not None:
+                    record["observed_max_duration_seconds"] = stage.observed_max_duration_seconds
+                    record["sla_seconds"] = stage.sla_seconds
                 stage_records.append(record)
                 _atomic_json(
                     ledger_path,
@@ -461,8 +584,16 @@ def run_pipeline(config: PipelineConfig, *, market_date: date) -> PipelineRunRes
                         time.sleep(stage.retry_delay_seconds)
                     else:
                         record.pop("last_error", None)
+                        _apply_dynamic_sla(
+                            stage,
+                            context=context,
+                            record=record,
+                        )
                         record["status"] = "succeeded"
-                        record["finished_at"] = datetime.now(timezone.utc).isoformat()
+                        _finish_stage_record(
+                            record,
+                            finished_at=datetime.now(timezone.utc),
+                        )
                         if closed_session:
                             record["outcome"] = "closed_market_session"
                         break
@@ -497,7 +628,7 @@ def run_pipeline(config: PipelineConfig, *, market_date: date) -> PipelineRunRes
             finished = datetime.now(timezone.utc)
             if stage_records and stage_records[-1]["status"] == "running":
                 stage_records[-1]["status"] = "failed"
-                stage_records[-1]["finished_at"] = finished.isoformat()
+                _finish_stage_record(stage_records[-1], finished_at=finished)
             _atomic_json(
                 ledger_path,
                 _ledger(
@@ -517,9 +648,21 @@ def run_pipeline(config: PipelineConfig, *, market_date: date) -> PipelineRunRes
             raise PipelineRunError(f"pipeline failed: {exc}") from exc
 
     finished_at = datetime.now(timezone.utc)
-    sla_met = finished_at <= deadline_at
+    stage_sla_met = all(
+        record.get("sla_met", True)
+        for record in stage_records
+        if record.get("status") == "succeeded"
+    )
+    sla_qualified = all(
+        record.get("sla_qualified", True)
+        for record in stage_records
+        if record.get("status") == "succeeded"
+    )
+    sla_met = finished_at <= deadline_at and stage_sla_met and sla_qualified
     if closed_session:
         status = "skipped_closed_session"
+    elif not sla_qualified:
+        status = "succeeded_unqualified"
     else:
         status = "succeeded" if sla_met else "succeeded_late"
     final_payload = _ledger(

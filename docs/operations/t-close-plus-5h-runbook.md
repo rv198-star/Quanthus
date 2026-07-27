@@ -29,8 +29,8 @@ Source files must be atomically replaced, not mutated in place, because release 
 use hard links on the same filesystem. Historical bulk completion uses `schedule=bootstrap` and a
 separate path; it is not substituted for the daily release.
 
-The host timer runs Monday through Friday at 15:40 Asia/Shanghai, after the 15:05-15:30 fixed-price
-phase and final daily totals. Before session preflight, the acquisition wrapper must fetch a fresh
+Hermes and CN01 timers run Monday through Friday at 15:40 Asia/Shanghai, after the 15:05-15:30
+fixed-price phase and final daily totals. Before session preflight, the acquisition wrapper must fetch a fresh
 calendar window that includes the target date and build an attempt-local candidate. It then checks
 the target date against both SSE and SZSE rows before contacting market-data providers. Refresh
 failure, a missing row, or an SSE/SZSE disagreement is a hard failure and alert with no provider
@@ -44,6 +44,15 @@ without a bar or any security without a status fails the OCI gate. The current s
 coverage so inactive historical master codes are not treated as live. A known closed weekday may
 publish only the calendar artifact. OCI then records a clean skip without producing or advancing a
 DWD partition. No release or incomplete T calendar evidence is a pipeline failure.
+
+OCI's 15:40 timer starts a readiness gate, not DWD/DWS cleaning. It probes both same-date sources
+every 30 seconds, chooses the first observed READY immutable attempt, and uses CN01 on a same-poll
+tie. The selected source and attempt are persisted in the run directory before transfer. The latest
+ODS-ready deadline is 17:25, based on 52m18.4s observed acquisition plus 100% headroom. CN01's
+3.649s measured transfer has an 8s SLA; the measured local stages have 10 seconds of independently
+rounded budget, giving a CN01-qualified completion deadline of 17:26. Hermes remains a usable
+fallback, but its first successful transfer is explicitly recorded as the baseline rather than
+being evaluated against the CN01 transport SLA.
 
 Weekly source jobs use the weekly example and preserve correction lookbacks. Their OCI transforms
 are added as separate pipeline configurations rather than inserted into the daily critical path.
@@ -71,6 +80,11 @@ sudo --preserve-env=QUANTHUS_HERMES_RSYNC_KEY,QUANTHUS_HERMES_KNOWN_HOSTS \
 sudo systemctl enable --now quanthus-t-close-plus-5h.timer
 ```
 
+Set both source connection groups in `/etc/quanthus/t-close-plus-5h.env`: the existing Hermes
+read-only rrsync variables and the `QUANTHUS_CN01_ODS_*` variables in the example environment.
+`QUANTHUS_HERMES_ODS_RELEASE_ROOT=shadow/hermes-ods-v1/releases` stays relative to the rrsync jail;
+CN01's source root is absolute because its dedicated key is restricted to that node.
+
 Each daily release calendar must cover the date being scheduled. Missing T evidence is an error,
 not a holiday assumption. The timer is not enabled until the first real open-session release and
 one calendar-only closed-session release pass manual rehearsal.
@@ -78,7 +92,8 @@ one calendar-only closed-session release pass manual rehearsal.
 ## Manual rehearsal
 
 ```bash
-ops/bin/pull-hermes-ods-release daily 2026-07-27 /home/ubuntu/data/astock
+ops/bin/wait-ods-release-ready daily 2026-07-27 /tmp/ods-source-selection.json 6277 30
+ops/bin/pull-ods-release daily 2026-07-27 /home/ubuntu/data/astock /tmp/ods-source-selection.json
 .venv/bin/python -m quanthus verify-ods-release \
   --release-dir /home/ubuntu/data/astock/releases/daily/2026-07-27
 ops/bin/run-t-close-plus-5h 2026-07-27

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$#" -ne 5 ]]; then
+  echo "usage: wait-ods-release-ready daily|weekly YYYY-MM-DD SELECTION_PATH TIMEOUT_SECONDS POLL_SECONDS" >&2
+  exit 2
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv/bin/python}"
+sources_config="${QUANTHUS_ODS_HANDOFF_SOURCES:-${repo_root}/config/pipelines/ods-handoff-sources.v1.json}"
+if [[ ! -x "$python_bin" ]]; then
+  echo "Quanthus Python interpreter is not executable: ${python_bin}" >&2
+  exit 2
+fi
+
+exec "$python_bin" -m quanthus ods-wait-ready \
+  --sources "$sources_config" \
+  --schedule "$1" \
+  --market-date "$2" \
+  --selection "$3" \
+  --timeout-seconds "$4" \
+  --poll-seconds "$5"

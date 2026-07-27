@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "cn01",
+      "priority": 0,
+      "selection": "latest_ready_attempt",
+      "connection": {
+        "key_environment": "QUANTHUS_CN01_ODS_RSYNC_KEY",
+        "known_hosts_environment": "QUANTHUS_CN01_ODS_KNOWN_HOSTS",
+        "host_environment": "QUANTHUS_CN01_ODS_RSYNC_HOST",
+        "port_environment": "QUANTHUS_CN01_ODS_RSYNC_PORT",
+        "user_environment": "QUANTHUS_CN01_ODS_RSYNC_USER"
+      },
+      "release_root": {
+        "environment": "QUANTHUS_CN01_ODS_RELEASE_ROOT",
+        "default": "/root/work/astock/data/shadow/cn01-ods-v1/releases"
+      },
+      "transfer_sla": {
+        "basis": "cn01_pointer_selected_attempt_20260727",
+        "observed_max_duration_seconds": 3.649,
+        "safety_margin_percent": 100
+      }
+    },
+    {
+      "id": "hermes",
+      "priority": 1,
+      "selection": "current_or_flat",
+      "connection": {
+        "key_environment": "QUANTHUS_HERMES_RSYNC_KEY",
+        "known_hosts_environment": "QUANTHUS_HERMES_KNOWN_HOSTS",
+        "host_environment": "QUANTHUS_HERMES_RSYNC_HOST",
+        "port_environment": "QUANTHUS_HERMES_RSYNC_PORT",
+        "user_environment": "QUANTHUS_HERMES_RSYNC_USER"
+      },
+      "release_root": {
+        "environment": "QUANTHUS_HERMES_ODS_RELEASE_ROOT",
+        "default": "shadow/hermes-ods-v1/releases"
+      }
+    }
+  ]
+}

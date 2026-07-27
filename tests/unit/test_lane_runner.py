@@ -271,6 +271,15 @@ def test_market_open_ready_and_ready_last(fixture_home: Path, tmp_path: Path) ->
     for path in result.release_dir.rglob("*"):
         if path.is_file() and path.name != "READY":
             assert path.stat().st_mtime <= ready_mtime + 1e-3
+    current = json.loads(
+        (shadow / "releases" / "daily" / "2026-07-24" / "CURRENT.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert current["attempt_id"] == result.attempt_id
+    assert current["release_id"] == json.loads(
+        (result.release_dir / "release.json").read_text(encoding="utf-8")
+    )["release_id"]
     # no post-READY sidecar at release root other than contract files
     root_names = {p.name for p in result.release_dir.iterdir()}
     assert "lane_status.json" not in root_names or "lane_status.json" in {
@@ -784,11 +793,11 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     expected_schedule_sha = f"sha256:{hashlib.sha256(SCHEDULE.read_bytes()).hexdigest()}"
     attempt = json.loads((result.attempt_dir / "attempt.json").read_text(encoding="utf-8"))
     assert attempt["schedule_id"] == "hermes-ods-schedule-v1"
-    assert attempt["schedule_contract_revision"] == "calendar-refresh-first-20260727"
+    assert attempt["schedule_contract_revision"] == "ready-gated-sla-20260727"
     assert attempt["schedule_config_sha256"] == expected_schedule_sha
     release = json.loads((result.release_dir / "release.json").read_text(encoding="utf-8"))
     assert release["schedule_contract_id"] == "hermes-ods-schedule-v1"
-    assert release["schedule_contract_revision"] == "calendar-refresh-first-20260727"
+    assert release["schedule_contract_revision"] == "ready-gated-sla-20260727"
     assert release["schedule_config_sha256"] == expected_schedule_sha
     meta_dataset = next(item for item in result.datasets if item.name == "intraday_meta")
     meta = json.loads(Path(meta_dataset.path).read_text(encoding="utf-8"))

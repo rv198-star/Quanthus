@@ -1,5 +1,5 @@
 [Unit]
-Description=Start Quanthus post-close processing window
+Description=Start Quanthus post-close ODS readiness gate
 
 [Timer]
 OnCalendar=Mon..Fri *-*-* 15:40:00 Asia/Shanghai

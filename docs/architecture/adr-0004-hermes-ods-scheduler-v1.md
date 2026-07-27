@@ -32,7 +32,7 @@ misrepresenting the 2026 final-trading-time update as a new lane topology.
 | Lane | Trigger (Asia/Shanghai) | Responsibility | Publication |
 | --- | --- | --- | --- |
 | `bootstrap` | Manual, issue-bound | Initialization and historical backfill | Immutable raw revision; never recurring |
-| `market-daily-core` | Mon-Fri 15:40 | Final daily bars after the 15:30 trading boundary, binary status observation, market references and index/adjustment deltas | Daily ODS; deadline 20:00 |
+| `market-daily-core` | Mon-Fri 15:40 | Final daily bars after the 15:30 trading boundary, binary status observation, market references and index/adjustment deltas | Daily ODS; READY by 17:25, then OCI CN01-primary completion by 17:26 |
 | `calendar-daily-events` | Every day 19:30 | Announcements and disclosure-driven events | Natural-day ODS; never creates a market session |
 | `intraday-archive` | 1m Mon-Fri 20:30; 5m Mon-Fri 23:00 | Preserve direct minute archives while sources retain them | Independent streams outside the T+5H path |
 | `weekly-corrections` | Saturday 08:00 | Low-frequency primary acquisition and bounded reconciliation | Independent correction revision |
@@ -79,7 +79,7 @@ the same SSE/SZSE three-state preflight as the market daily lane. Both open perm
 acquisition; both closed publishes calendar-only evidence; refresh failure or missing/disagreeing
 evidence fails before any minute-provider call or READY marker.
 
-Minute work starts after the T+5H market deadline and does not block daily DWD publication. The
+Minute work starts after the ready-gated daily market deadline and does not block daily DWD publication. The
 legacy combined 16:00 minute job remains active during shadowing; it is disabled only after the
 replacement proves continuous coverage through a controlled cutover.
 
@@ -112,7 +112,7 @@ dataset's success or by a wrapper exiting zero.
 
 ## Resource policy
 
-The market daily core receives priority until its 20:00 deadline. Event calls use a separate API
+The market daily core receives priority until its 17:25 ODS-ready deadline. Event calls use a separate API
 resource group. Minute jobs use the market API group after the core deadline. Weekly bulk I/O
 runs Saturday morning, after Friday minute acquisition. Locks prevent jobs in one constrained
 resource group from competing for PVE CPU, disk, or provider quotas.

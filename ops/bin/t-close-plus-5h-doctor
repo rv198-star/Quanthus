@@ -5,8 +5,11 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
 python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv/bin/python}"
 pipeline_config="${QUANTHUS_T5H_CONFIG:-${repo_root}/config/pipelines/t-close-plus-5h.v1.json}"
+sources_config="${QUANTHUS_ODS_HANDOFF_SOURCES:-${repo_root}/config/pipelines/ods-handoff-sources.v1.json}"
 key_path="${QUANTHUS_HERMES_RSYNC_KEY:?set QUANTHUS_HERMES_RSYNC_KEY}"
 known_hosts="${QUANTHUS_HERMES_KNOWN_HOSTS:?set QUANTHUS_HERMES_KNOWN_HOSTS}"
+cn01_key_path="${QUANTHUS_CN01_ODS_RSYNC_KEY:?set QUANTHUS_CN01_ODS_RSYNC_KEY}"
+cn01_known_hosts="${QUANTHUS_CN01_ODS_KNOWN_HOSTS:?set QUANTHUS_CN01_ODS_KNOWN_HOSTS}"
 code_revision="${QUANTHUS_CODE_REVISION:?set QUANTHUS_CODE_REVISION to the deployed Git commit}"
 if [[ ! "$code_revision" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
   echo "QUANTHUS_CODE_REVISION must be a full lowercase Git object id" >&2
@@ -14,14 +17,23 @@ if [[ ! "$code_revision" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
 fi
 
 test -x "$python_bin"
-test -x "${repo_root}/ops/bin/pull-hermes-ods-release"
+test -x "${repo_root}/ops/bin/pull-ods-release"
 test -x "${repo_root}/ops/bin/run-t-close-plus-5h"
+test -x "${repo_root}/ops/bin/wait-ods-release-ready"
+test -f "$sources_config"
 test -f "$key_path"
 test -f "$known_hosts"
+test -f "$cn01_key_path"
+test -f "$cn01_known_hosts"
 
 key_mode="$(stat -c '%a' "$key_path")"
 if [[ "$key_mode" != "600" ]]; then
   echo "Hermes read-only key must have mode 600; got ${key_mode}" >&2
+  exit 2
+fi
+cn01_key_mode="$(stat -c '%a' "$cn01_key_path")"
+if [[ "$cn01_key_mode" != "600" ]]; then
+  echo "CN01 ODS key must have mode 600; got ${cn01_key_mode}" >&2
   exit 2
 fi
 

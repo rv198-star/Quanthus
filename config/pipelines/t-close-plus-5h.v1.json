@@ -3,7 +3,8 @@
   "pipeline_id": "t-close-plus-5h-v1",
   "timezone": "Asia/Shanghai",
   "close_time": "15:30:00",
-  "completion_sla_minutes": 270,
+  "completion_sla_minutes": 116,
+  "stage_sla_margin_percent": 100,
   "run_root": "{warehouse_root}/runs",
   "lock_path": "{warehouse_root}/locks/t-close-plus-5h.lock",
   "variables": {
@@ -29,18 +30,34 @@
   },
   "stages": [
     {
+      "id": "wait_daily_ods_source_ready",
+      "phase": "acquire",
+      "kind": "command",
+      "argv": [
+        "{repo_root}/ops/bin/wait-ods-release-ready",
+        "daily",
+        "{market_date}",
+        "{run_dir}/ods-source-selection.json",
+        "6277",
+        "30"
+      ],
+      "timeout_seconds": 6300,
+      "observed_max_duration_seconds": 3138.4
+    },
+    {
       "id": "pull_hermes_daily_release",
       "phase": "acquire",
       "kind": "command",
       "argv": [
-        "{repo_root}/ops/bin/pull-hermes-ods-release",
+        "{repo_root}/ops/bin/pull-ods-release",
         "daily",
         "{market_date}",
-        "{ods_root}"
+        "{ods_root}",
+        "{run_dir}/ods-source-selection.json"
       ],
-      "retries": 24,
-      "retry_delay_seconds": 600,
-      "timeout_seconds": 900
+      "retries": 0,
+      "timeout_seconds": 660,
+      "dynamic_sla_receipt_path": "{run_dir}/ods-source-selection.json"
     },
     {
       "id": "verify_hermes_daily_release",
@@ -49,14 +66,16 @@
       "release_dir": "{ods_root}/releases/daily/{market_date}",
       "retries": 1,
       "retry_delay_seconds": 60,
-      "timeout_seconds": 900
+      "timeout_seconds": 900,
+      "observed_max_duration_seconds": 0.009
     },
     {
       "id": "check_market_session",
       "phase": "verify",
       "kind": "market_session_check",
       "calendar_path": "{ods_root}/releases/daily/{market_date}/artifacts/ref_trading_calendar.parquet",
-      "timeout_seconds": 300
+      "timeout_seconds": 300,
+      "observed_max_duration_seconds": 0.407
     },
     {
       "id": "build_daily_dwd_partition",
@@ -86,7 +105,8 @@
         "--base-pointer",
         "{warehouse_root}/revisions/daily_ohlcv_none_CURRENT.json"
       ],
-      "timeout_seconds": 1800
+      "timeout_seconds": 1800,
+      "observed_max_duration_seconds": 1.373
     },
     {
       "id": "build_daily_dws_summary",
@@ -106,7 +126,8 @@
         "--market-date",
         "{market_date}"
       ],
-      "timeout_seconds": 900
+      "timeout_seconds": 900,
+      "observed_max_duration_seconds": 0.267
     },
     {
       "id": "gate_daily_dwd_partition",
@@ -120,7 +141,8 @@
         "--revision-dir",
         "{warehouse_root}/revisions/daily_market_dwd_v1_{market_date_compact}_{run_id}"
       ],
-      "timeout_seconds": 900
+      "timeout_seconds": 900,
+      "observed_max_duration_seconds": 0.167
     },
     {
       "id": "gate_daily_dws_summary",
@@ -134,7 +156,8 @@
         "--revision-dir",
         "{warehouse_root}/revisions/daily_market_dws_v1_{market_date_compact}_{run_id}"
       ],
-      "timeout_seconds": 900
+      "timeout_seconds": 900,
+      "observed_max_duration_seconds": 0.217
     },
     {
       "id": "publish_daily_dwd_current",
@@ -150,7 +173,8 @@
         "--pointer",
         "{warehouse_root}/revisions/daily_market_CURRENT.json"
       ],
-      "timeout_seconds": 900
+      "timeout_seconds": 900,
+      "observed_max_duration_seconds": 0.168
     },
     {
       "id": "publish_daily_dws_current",
@@ -166,7 +190,8 @@
         "--pointer",
         "{warehouse_root}/revisions/daily_market_summary_CURRENT.json"
       ],
-      "timeout_seconds": 900
+      "timeout_seconds": 900,
+      "observed_max_duration_seconds": 0.217
     }
   ]
 }

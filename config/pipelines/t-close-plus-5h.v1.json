@@ -89,6 +89,26 @@
       "timeout_seconds": 1800
     },
     {
+      "id": "build_daily_dws_summary",
+      "phase": "build",
+      "kind": "command",
+      "argv": [
+        "{python}",
+        "-m",
+        "quanthus",
+        "build-daily-dws",
+        "--dwd-revision-dir",
+        "{warehouse_root}/revisions/daily_market_dwd_v1_{market_date_compact}_{run_id}",
+        "--output",
+        "{warehouse_root}/revisions/daily_market_dws_v1_{market_date_compact}_{run_id}",
+        "--revision",
+        "daily_market_dws_v1_{market_date_compact}_{run_id}",
+        "--market-date",
+        "{market_date}"
+      ],
+      "timeout_seconds": 900
+    },
+    {
       "id": "gate_daily_dwd_partition",
       "phase": "gate",
       "kind": "command",
@@ -99,6 +119,20 @@
         "check-daily-dwd",
         "--revision-dir",
         "{warehouse_root}/revisions/daily_market_dwd_v1_{market_date_compact}_{run_id}"
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "gate_daily_dws_summary",
+      "phase": "gate",
+      "kind": "command",
+      "argv": [
+        "{python}",
+        "-m",
+        "quanthus",
+        "check-daily-dws",
+        "--revision-dir",
+        "{warehouse_root}/revisions/daily_market_dws_v1_{market_date_compact}_{run_id}"
       ],
       "timeout_seconds": 900
     },
@@ -115,6 +149,22 @@
         "{warehouse_root}/revisions/daily_market_dwd_v1_{market_date_compact}_{run_id}",
         "--pointer",
         "{warehouse_root}/revisions/daily_market_CURRENT.json"
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "publish_daily_dws_current",
+      "phase": "publish",
+      "kind": "command",
+      "argv": [
+        "{python}",
+        "-m",
+        "quanthus",
+        "promote-daily-dws",
+        "--revision-dir",
+        "{warehouse_root}/revisions/daily_market_dws_v1_{market_date_compact}_{run_id}",
+        "--pointer",
+        "{warehouse_root}/revisions/daily_market_summary_CURRENT.json"
       ],
       "timeout_seconds": 900
     }

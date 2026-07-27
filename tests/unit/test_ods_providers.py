@@ -184,12 +184,15 @@ def test_minute_collector_defaults_to_repository_module(
     home.mkdir()
     paths = _paths(home, tmp_path)
     observed: list[str] = []
+    observed_timeout: list[int] = []
 
     def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         observed.extend(command)
+        observed_timeout.append(int(_kwargs["timeout"]))
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
     monkeypatch.delenv("HERMES_ODS_MINUTE_COLLECTOR", raising=False)
+    monkeypatch.delenv("HERMES_ODS_MINUTE_TIMEOUT_SEC", raising=False)
     monkeypatch.setattr(subprocess, "run", fake_run)
     result = lane_runner._run_minute_collector(
         paths=paths,
@@ -201,6 +204,33 @@ def test_minute_collector_defaults_to_repository_module(
 
     assert observed[1:3] == ["-m", "quanthus.providers.minute_tdx"]
     assert result["provider"] == "quanthus.providers.minute_tdx"
+    assert observed_timeout == [1800]
+    assert result["timeout_seconds"] == 1800
+
+
+@pytest.mark.parametrize(
+    ("configured", "message"),
+    [
+        ("not-a-number", "must be an integer"),
+        ("59", "must be at least 60"),
+        ("14401", "exceeds the 4-hour service timeout"),
+    ],
+)
+def test_minute_collector_rejects_invalid_bounded_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, configured: str, message: str
+) -> None:
+    home = tmp_path / "data"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_ODS_MINUTE_TIMEOUT_SEC", configured)
+
+    with pytest.raises(lane_runner.LaneRunError, match=message):
+        lane_runner._run_minute_collector(
+            paths=_paths(home, tmp_path),
+            market_date=date(2026, 7, 24),
+            bar_size="5m",
+            symbols=["000001"],
+            raw_home=tmp_path / "attempt" / "minute_5m",
+        )
 
 
 def test_minute_collector_override_must_exist(

@@ -26,12 +26,20 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class PipelineRunnerTests(unittest.TestCase):
     def test_repository_pipeline_uses_final_trading_boundary_and_20_00_deadline(self) -> None:
-        config = load_pipeline_config(
-            ROOT / "config" / "pipelines" / "t-close-plus-5h.v1.json"
-        )
+        config = load_pipeline_config(ROOT / "config" / "pipelines" / "t-close-plus-5h.v1.json")
 
         self.assertEqual(config.close_time.isoformat(), "15:30:00")
         self.assertEqual(config.completion_sla_minutes, 270)
+        self.assertEqual(
+            [stage.stage_id for stage in config.stages][-5:],
+            [
+                "build_daily_dws_summary",
+                "gate_daily_dwd_partition",
+                "gate_daily_dws_summary",
+                "publish_daily_dwd_current",
+                "publish_daily_dws_current",
+            ],
+        )
 
     def _release(self, root: Path, market_date: date) -> Path:
         source = root / "source.parquet"
@@ -116,10 +124,13 @@ class PipelineRunnerTests(unittest.TestCase):
 
             ledger = json.loads((result.run_dir / "run.json").read_text(encoding="utf-8"))
             self.assertTrue(result.status.startswith("succeeded"))
-            self.assertEqual([stage["status"] for stage in ledger["stages"]], [
-                "succeeded",
-                "succeeded",
-            ])
+            self.assertEqual(
+                [stage["status"] for stage in ledger["stages"]],
+                [
+                    "succeeded",
+                    "succeeded",
+                ],
+            )
             self.assertTrue((root / "runs" / "test-t5h-v1" / "LAST_SUCCESS.json").is_file())
 
     def test_failed_gate_never_writes_last_success(self) -> None:

@@ -90,6 +90,9 @@ Minute provider collection is always written under the current attempt. Shared l
 partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must
 be justified by same-day tradability, PIT suspension, or lifecycle evidence. Setting
 `HERMES_ODS_SYMBOL_LIMIT` creates smoke-only evidence and can never publish `READY`.
+`HERMES_ODS_MINUTE_TIMEOUT_SEC` defaults to 1800 seconds for the serial full-universe collector;
+it must be at least 60 seconds and no more than the four-hour systemd service limit. Multi-page
+matrix backfills set their own explicit, still-bounded timeout.
 The default minute collector is the repository module `quanthus.providers.minute_tdx`; a reviewed
 external fork may be selected with `HERMES_ODS_MINUTE_COLLECTOR`. Both forms receive an
 attempt-local `--home` and have no curated-PG path.

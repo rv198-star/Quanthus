@@ -2841,6 +2841,27 @@ def _minute_collector_fetch_mode(
     return "backfill", max_pages
 
 
+_MINUTE_COLLECTOR_DEFAULT_TIMEOUT_SECONDS = 1800
+_MINUTE_COLLECTOR_MAX_TIMEOUT_SECONDS = 4 * 60 * 60
+
+
+def _minute_collector_timeout_seconds() -> int:
+    """Read a bounded child-process timeout that fits within the systemd unit."""
+
+    raw = os.environ.get(
+        "HERMES_ODS_MINUTE_TIMEOUT_SEC", str(_MINUTE_COLLECTOR_DEFAULT_TIMEOUT_SECONDS)
+    )
+    try:
+        timeout_seconds = int(raw)
+    except ValueError as exc:
+        raise LaneRunError("HERMES_ODS_MINUTE_TIMEOUT_SEC must be an integer") from exc
+    if timeout_seconds < 60:
+        raise LaneRunError("HERMES_ODS_MINUTE_TIMEOUT_SEC must be at least 60")
+    if timeout_seconds > _MINUTE_COLLECTOR_MAX_TIMEOUT_SECONDS:
+        raise LaneRunError("HERMES_ODS_MINUTE_TIMEOUT_SEC exceeds the 4-hour service timeout")
+    return timeout_seconds
+
+
 def _run_minute_collector(
     *,
     paths: LanePaths,
@@ -2900,15 +2921,14 @@ def _run_minute_collector(
     layer_dir = raw_home
     import subprocess
 
+    timeout_seconds = _minute_collector_timeout_seconds()
     started = time.monotonic()
     proc = subprocess.run(
         cmd,
         env=env,
         capture_output=True,
         text=True,
-        timeout=int(
-            os.environ.get("HERMES_ODS_MINUTE_TIMEOUT_SEC", "600")
-        ),
+        timeout=timeout_seconds,
         check=False,
     )
     return {
@@ -2923,6 +2943,7 @@ def _run_minute_collector(
         "stdout_tail": (proc.stdout or "")[-2000:],
         "stderr_tail": (proc.stderr or "")[-2000:],
         "duration_seconds": round(time.monotonic() - started, 3),
+        "timeout_seconds": timeout_seconds,
         "layer_dir": str(layer_dir),
         "market_date": market_date.isoformat(),
         "universe_size": len(symbols),

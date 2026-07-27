@@ -17,9 +17,12 @@ from quanthus.pipelines.contracts import publish_ods_release
 from quanthus.pipelines.daily_warehouse import (
     DailyWarehouseError,
     build_daily_dwd_revision,
+    build_daily_dws_revision,
     check_daily_dwd_revision,
+    check_daily_dws_revision,
     market_session_is_open,
     promote_daily_dwd_revision,
+    promote_daily_dws_revision,
 )
 
 
@@ -243,6 +246,61 @@ class DailyWarehouseTests(unittest.TestCase):
             self.assertEqual(pointer["revision"], revision)
             self.assertTrue((output / "market_date=2026-07-24" / "part-00000.parquet").is_file())
 
+    def test_dws_build_check_promotion_and_checksum_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            market_date = date(2026, 7, 24)
+            revisions = root / "revisions"
+            revisions.mkdir()
+            base_pointer = revisions / "daily_ohlcv_none_CURRENT.json"
+            base_pointer.write_text(
+                json.dumps(
+                    {
+                        "revision": "p1-history-base-v1",
+                        "meta_sha256": f"sha256:{'b' * 64}",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dwd_output = revisions / "daily-market-test-20260724-v1"
+            build_daily_dwd_revision(
+                release_dir=self._release(root, market_date),
+                output=dwd_output,
+                revision=dwd_output.name,
+                market_date=market_date,
+                universe_policy_path=Path("config/p1-universe.v2.json"),
+                code_validity_mapping_path=self._mapping(root),
+                code_revision="c" * 40,
+                base_pointer=base_pointer,
+            )
+            dws_output = revisions / "daily-summary-test-20260724-v1"
+            built = build_daily_dws_revision(
+                dwd_revision_dir=dwd_output,
+                output=dws_output,
+                revision=dws_output.name,
+                market_date=market_date,
+            )
+            checked = check_daily_dws_revision(dws_output)
+            promoted = promote_daily_dws_revision(
+                revision_dir=dws_output,
+                pointer=revisions / "daily_market_summary_CURRENT.json",
+            )
+
+            self.assertEqual(built.metrics["security_count"], 1)
+            self.assertEqual(built.metrics["tradable_security_count"], 1)
+            self.assertEqual(built.metrics["advanced_security_count"], 1)
+            self.assertEqual(checked.checksums, built.checksums)
+            self.assertEqual(promoted.market_date, market_date)
+            pointer = json.loads(
+                (revisions / "daily_market_summary_CURRENT.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(pointer["dwd_revision"], dwd_output.name)
+
+            summary = dws_output / "market_date=2026-07-24" / "daily_market_summary.parquet"
+            summary.write_bytes(b"tampered")
+            with self.assertRaisesRegex(DailyWarehouseError, "checksum mismatch"):
+                check_daily_dws_revision(dws_output)
+
     def test_invalid_ohlc_fails_closed_before_revision_exists(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -375,9 +433,7 @@ class DailyWarehouseTests(unittest.TestCase):
 
             manifest = json.loads((second_output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["lineage"]["parent"]["kind"], "historical_base")
-            self.assertEqual(
-                manifest["lineage"]["parent"]["revision"], "p1-history-base-v1"
-            )
+            self.assertEqual(manifest["lineage"]["parent"]["revision"], "p1-history-base-v1")
 
 
 if __name__ == "__main__":

@@ -51,11 +51,14 @@ from quanthus.pipelines import (
     PipelineRunError,
     ScheduleContractError,
     build_daily_dwd_revision,
+    build_daily_dws_revision,
     check_daily_dwd_revision,
+    check_daily_dws_revision,
     load_pipeline_config,
     load_schedule_contract,
     market_session_is_open,
     promote_daily_dwd_revision,
+    promote_daily_dws_revision,
     publish_ods_release,
     resolve_paths,
     run_lane,
@@ -343,6 +346,28 @@ def _parser() -> argparse.ArgumentParser:
     )
     daily_dwd_promote.add_argument("--revision-dir", type=Path, required=True)
     daily_dwd_promote.add_argument("--pointer", type=Path, required=True)
+
+    daily_dws = subparsers.add_parser(
+        "build-daily-dws",
+        help="derive one immutable OCI daily market-summary DWS revision from DWD",
+    )
+    daily_dws.add_argument("--dwd-revision-dir", type=Path, required=True)
+    daily_dws.add_argument("--output", type=Path, required=True)
+    daily_dws.add_argument("--revision", required=True)
+    daily_dws.add_argument("--market-date", type=date.fromisoformat, required=True)
+
+    daily_dws_check = subparsers.add_parser(
+        "check-daily-dws",
+        help="recheck a complete immutable OCI daily DWS summary revision",
+    )
+    daily_dws_check.add_argument("--revision-dir", type=Path, required=True)
+
+    daily_dws_promote = subparsers.add_parser(
+        "promote-daily-dws",
+        help="atomically advance the accepted OCI daily DWS summary chain",
+    )
+    daily_dws_promote.add_argument("--revision-dir", type=Path, required=True)
+    daily_dws_promote.add_argument("--pointer", type=Path, required=True)
 
     market_session = subparsers.add_parser(
         "market-session-check",
@@ -697,6 +722,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                 pointer=args.pointer,
             )
             print(json.dumps(dwd_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "build-daily-dws":
+            dws_result = build_daily_dws_revision(
+                dwd_revision_dir=args.dwd_revision_dir,
+                output=args.output,
+                revision=args.revision,
+                market_date=args.market_date,
+            )
+            print(json.dumps(dws_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "check-daily-dws":
+            dws_result = check_daily_dws_revision(args.revision_dir)
+            print(json.dumps(dws_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "promote-daily-dws":
+            dws_result = promote_daily_dws_revision(
+                revision_dir=args.revision_dir,
+                pointer=args.pointer,
+            )
+            print(json.dumps(dws_result.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "market-session-check":
             is_open = market_session_is_open(
                 calendar=args.calendar,

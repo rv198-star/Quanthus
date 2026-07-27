@@ -126,6 +126,26 @@ class DailyDwdResult:
         }
 
 
+@dataclass(frozen=True)
+class DailyDwsResult:
+    """One immutable OCI service-layer summary derived from a daily DWD revision."""
+
+    revision: str
+    output: Path
+    market_date: date
+    metrics: Mapping[str, int | float]
+    checksums: Mapping[str, str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "revision": self.revision,
+            "output": str(self.output),
+            "market_date": self.market_date.isoformat(),
+            "metrics": dict(sorted(self.metrics.items())),
+            "checksums": dict(sorted(self.checksums.items())),
+        }
+
+
 def build_daily_dwd_revision(
     *,
     release_dir: Path,
@@ -174,9 +194,7 @@ def build_daily_dwd_revision(
     status_path = release_dir.joinpath(
         *artifact_by_name["daily_status_observation_delta"].relative_path.parts
     )
-    calendar_path = release_dir.joinpath(
-        *artifact_by_name["trading_calendar"].relative_path.parts
-    )
+    calendar_path = release_dir.joinpath(*artifact_by_name["trading_calendar"].relative_path.parts)
     stock_list_path = release_dir.joinpath(*artifact_by_name["stock_list"].relative_path.parts)
     if (
         len(
@@ -257,13 +275,11 @@ def build_daily_dwd_revision(
             for row in connection.execute(f"DESCRIBE SELECT * FROM {statuses}").fetchall()
         }
         missing_status_columns = sorted(
-            {"stock_code", "date", "tradestatus", "isST", "source", "built_at"}
-            - status_columns
+            {"stock_code", "date", "tradestatus", "isST", "source", "built_at"} - status_columns
         )
         if missing_status_columns:
             raise DailyWarehouseError(
-                "daily status delta is missing columns: "
-                + ", ".join(missing_status_columns)
+                "daily status delta is missing columns: " + ", ".join(missing_status_columns)
             )
         wrong_date = _scalar(
             connection,
@@ -324,9 +340,7 @@ def build_daily_dwd_revision(
                 f"daily bar delta has {unmatched} rows without point-in-time identity"
             )
         exchanges = ", ".join(_sql_string(item) for item in policy.allowed_exchanges)
-        exclusions = ", ".join(
-            _sql_string(item) for item in sorted(policy.excluded_security_ids)
-        )
+        exclusions = ", ".join(_sql_string(item) for item in sorted(policy.excluded_security_ids))
         exclusion_clause = f"AND v.security_id NOT IN ({exclusions})" if exclusions else ""
         expected_query = f"""
             SELECT v.*
@@ -650,6 +664,310 @@ def promote_daily_dwd_revision(*, revision_dir: Path, pointer: Path) -> DailyDwd
         "revision_path": str(result.output),
         "market_date": result.market_date.isoformat(),
         "manifest_sha256": _sha256(manifest_path),
+        "promoted_at": datetime.now(timezone.utc).isoformat(),
+    }
+    pointer.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{pointer.name}.", dir=pointer.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, ensure_ascii=True, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_name, pointer)
+    except BaseException:
+        Path(temporary_name).unlink(missing_ok=True)
+        raise
+    return result
+
+
+_DWS_METRIC_COLUMNS = (
+    "security_count",
+    "tradable_security_count",
+    "suspended_security_count",
+    "st_security_count",
+    "bar_security_count",
+    "advanced_security_count",
+    "declined_security_count",
+    "flat_security_count",
+    "missing_pct_change_security_count",
+    "total_volume",
+    "total_amount",
+)
+
+
+def _daily_dws_summary_query(
+    *, market_date: date, dwd_revision: str, bars: Path, statuses: Path
+) -> str:
+    target = _sql_string(market_date.isoformat())
+    revision = _sql_string(dwd_revision)
+    return f"""
+        WITH status_rows AS (
+            SELECT *
+            FROM {_source(statuses)}
+            WHERE CAST(market_date AS DATE) = CAST({target} AS DATE)
+        ),
+        bar_rows AS (
+            SELECT *
+            FROM {_source(bars)}
+            WHERE CAST(market_date AS DATE) = CAST({target} AS DATE)
+        )
+        SELECT
+            CAST({target} AS DATE) AS market_date,
+            {revision} AS dwd_revision,
+            count(*)::BIGINT AS security_count,
+            count(*) FILTER (WHERE observed_tradestatus = '1')::BIGINT
+                AS tradable_security_count,
+            count(*) FILTER (WHERE observed_tradestatus = '0')::BIGINT
+                AS suspended_security_count,
+            count(*) FILTER (WHERE observed_is_st = '1')::BIGINT AS st_security_count,
+            (SELECT count(DISTINCT security_id)::BIGINT FROM bar_rows) AS bar_security_count,
+            (SELECT count(DISTINCT security_id)::BIGINT
+             FROM bar_rows WHERE pct_change > 0) AS advanced_security_count,
+            (SELECT count(DISTINCT security_id)::BIGINT
+             FROM bar_rows WHERE pct_change < 0) AS declined_security_count,
+            (SELECT count(DISTINCT security_id)::BIGINT
+             FROM bar_rows WHERE pct_change = 0) AS flat_security_count,
+            (SELECT count(DISTINCT security_id)::BIGINT
+             FROM bar_rows WHERE pct_change IS NULL) AS missing_pct_change_security_count,
+            (SELECT coalesce(sum(volume), 0.0)::DOUBLE FROM bar_rows) AS total_volume,
+            (SELECT coalesce(sum(amount), 0.0)::DOUBLE FROM bar_rows) AS total_amount
+        FROM status_rows
+    """
+
+
+def _daily_dws_metrics(row: tuple[Any, ...]) -> dict[str, int | float]:
+    values = row[2:]
+    metrics: dict[str, int | float] = {}
+    for column, value in zip(_DWS_METRIC_COLUMNS, values, strict=True):
+        metrics[column] = float(value) if column.startswith("total_") else int(value)
+    return metrics
+
+
+def _validate_daily_dws_metrics(metrics: Mapping[str, Any]) -> dict[str, int | float]:
+    missing = sorted(set(_DWS_METRIC_COLUMNS) - set(metrics))
+    if missing:
+        raise DailyWarehouseError("daily DWS metrics are missing: " + ", ".join(missing))
+    normalized: dict[str, int | float] = {}
+    for column in _DWS_METRIC_COLUMNS:
+        value = metrics[column]
+        normalized[column] = float(value) if column.startswith("total_") else int(value)
+    security_count = int(normalized["security_count"])
+    tradable_count = int(normalized["tradable_security_count"])
+    suspended_count = int(normalized["suspended_security_count"])
+    bar_count = int(normalized["bar_security_count"])
+    direction_count = sum(
+        int(normalized[column])
+        for column in (
+            "advanced_security_count",
+            "declined_security_count",
+            "flat_security_count",
+            "missing_pct_change_security_count",
+        )
+    )
+    if (
+        security_count <= 0
+        or tradable_count < 0
+        or suspended_count < 0
+        or tradable_count + suspended_count != security_count
+        or int(normalized["st_security_count"]) < 0
+        or int(normalized["st_security_count"]) > security_count
+        or bar_count < 0
+        or bar_count > security_count
+        or direction_count != bar_count
+        or float(normalized["total_volume"]) < 0
+        or float(normalized["total_amount"]) < 0
+    ):
+        raise DailyWarehouseError("daily DWS summary metrics violate coverage invariants")
+    return normalized
+
+
+def build_daily_dws_revision(
+    *,
+    dwd_revision_dir: Path,
+    output: Path,
+    revision: str,
+    market_date: date,
+) -> DailyDwsResult:
+    """Build one immutable market-summary DWS projection from an accepted DWD partition."""
+
+    if not revision.strip():
+        raise DailyWarehouseError("revision must not be empty")
+    dwd = check_daily_dwd_revision(dwd_revision_dir)
+    if dwd.market_date != market_date:
+        raise DailyWarehouseError("daily DWD market_date does not match DWS build")
+    output = output.resolve()
+    if output.exists():
+        raise FileExistsError(f"refusing to overwrite daily DWS revision: {output}")
+    bars = dwd.output / f"market_date={market_date.isoformat()}" / "part-00000.parquet"
+    statuses = (
+        dwd.output / f"market_date={market_date.isoformat()}" / "daily_status_observation.parquet"
+    )
+    if not bars.is_file() or not statuses.is_file():
+        raise DailyWarehouseError("daily DWD partition is missing summary inputs")
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise DailyWarehouseError("P1 dependencies are missing; run make bootstrap-p1") from exc
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
+    connection = duckdb.connect(":memory:")
+    try:
+        query = _daily_dws_summary_query(
+            market_date=market_date,
+            dwd_revision=dwd.revision,
+            bars=bars,
+            statuses=statuses,
+        )
+        row = connection.execute(query).fetchone()
+        if row is None:
+            raise DailyWarehouseError("daily DWS summary query returned no row")
+        metrics = _validate_daily_dws_metrics(_daily_dws_metrics(row))
+        partition_dir = staging / f"market_date={market_date.isoformat()}"
+        partition_dir.mkdir()
+        summary_path = partition_dir / "daily_market_summary.parquet"
+        connection.execute(
+            f"COPY ({query}) TO {_sql_string(str(summary_path))} (FORMAT PARQUET, COMPRESSION ZSTD)"
+        )
+        checksums = {
+            f"market_date={market_date.isoformat()}/daily_market_summary.parquet": _sha256(
+                summary_path
+            )
+        }
+        dwd_manifest = dwd.output / "manifest.json"
+        manifest = {
+            "schema_version": 1,
+            "kind": "oci_daily_dws_market_summary",
+            "dataset": "daily_market_summary_dws",
+            "revision": revision,
+            "market_date": market_date.isoformat(),
+            "built_at": datetime.now(timezone.utc).isoformat(),
+            "lineage": {
+                "dwd_revision": dwd.revision,
+                "dwd_revision_path": str(dwd.output),
+                "dwd_manifest_sha256": _sha256(dwd_manifest),
+            },
+            "metrics": metrics,
+            "checksums": checksums,
+        }
+        (staging / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        (staging / "CHECKSUMS.sha256").write_text(
+            "".join(
+                f"{checksum.removeprefix('sha256:')}  {name}\n"
+                for name, checksum in sorted(checksums.items())
+            ),
+            encoding="utf-8",
+        )
+        os.replace(staging, output)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    finally:
+        connection.close()
+    return DailyDwsResult(
+        revision=revision,
+        output=output,
+        market_date=market_date,
+        metrics=metrics,
+        checksums=checksums,
+    )
+
+
+def check_daily_dws_revision(revision_dir: Path) -> DailyDwsResult:
+    """Recheck an immutable daily DWS market-summary revision before publication."""
+
+    revision_dir = revision_dir.resolve()
+    manifest_path = revision_dir / "manifest.json"
+    checksum_path = revision_dir / "CHECKSUMS.sha256"
+    manifest = _load_object(manifest_path)
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("kind") != "oci_daily_dws_market_summary"
+    ):
+        raise DailyWarehouseError("unsupported daily DWS manifest")
+    revision = str(manifest.get("revision", ""))
+    if revision != revision_dir.name:
+        raise DailyWarehouseError("daily DWS revision does not match its directory")
+    try:
+        market_date = date.fromisoformat(str(manifest["market_date"]))
+    except (KeyError, ValueError) as exc:
+        raise DailyWarehouseError("daily DWS manifest has an invalid market_date") from exc
+    lineage = manifest.get("lineage")
+    if not isinstance(lineage, Mapping):
+        raise DailyWarehouseError("daily DWS manifest has no DWD lineage")
+    dwd_path = Path(str(lineage.get("dwd_revision_path", "")))
+    dwd = check_daily_dwd_revision(dwd_path)
+    if dwd.market_date != market_date or dwd.revision != lineage.get("dwd_revision"):
+        raise DailyWarehouseError("daily DWS DWD lineage does not match its market_date")
+    if _sha256(dwd.output / "manifest.json") != lineage.get("dwd_manifest_sha256"):
+        raise DailyWarehouseError("daily DWS DWD manifest checksum mismatch")
+    expected = _checksum_ledger(checksum_path)
+    declared = manifest.get("checksums")
+    if not isinstance(declared, Mapping) or dict(declared) != expected:
+        raise DailyWarehouseError("daily DWS manifest and checksum ledger disagree")
+    for relative, checksum in expected.items():
+        path = revision_dir / relative
+        if not path.is_file() or _sha256(path) != checksum:
+            raise DailyWarehouseError(f"daily DWS checksum mismatch: {relative}")
+    metrics = _validate_daily_dws_metrics(manifest.get("metrics", {}))
+    summary_path = (
+        revision_dir / f"market_date={market_date.isoformat()}" / "daily_market_summary.parquet"
+    )
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise DailyWarehouseError("P1 dependencies are missing; run make bootstrap-p1") from exc
+    connection = duckdb.connect(":memory:")
+    try:
+        rows = connection.execute(f"SELECT * FROM {_source(summary_path)}").fetchall()
+        columns = [str(column[0]) for column in connection.description]
+    finally:
+        connection.close()
+    expected_columns = ["market_date", "dwd_revision", *_DWS_METRIC_COLUMNS]
+    if columns != expected_columns or len(rows) != 1:
+        raise DailyWarehouseError("daily DWS summary must contain one canonical summary row")
+    row = rows[0]
+    if date.fromisoformat(str(row[0])) != market_date or str(row[1]) != dwd.revision:
+        raise DailyWarehouseError("daily DWS summary lineage row does not match manifest")
+    persisted = _validate_daily_dws_metrics(_daily_dws_metrics(tuple(row)))
+    if persisted != metrics:
+        raise DailyWarehouseError("daily DWS summary row does not match manifest metrics")
+    return DailyDwsResult(
+        revision=revision,
+        output=revision_dir,
+        market_date=market_date,
+        metrics=metrics,
+        checksums=expected,
+    )
+
+
+def promote_daily_dws_revision(*, revision_dir: Path, pointer: Path) -> DailyDwsResult:
+    """Atomically advance the daily DWS summary pointer after full verification."""
+
+    result = check_daily_dws_revision(revision_dir)
+    pointer = pointer.resolve()
+    if pointer.is_file():
+        current = _load_object(pointer)
+        try:
+            current_date = date.fromisoformat(str(current["market_date"]))
+        except (KeyError, ValueError) as exc:
+            raise DailyWarehouseError(
+                "current daily DWS pointer has an invalid market_date"
+            ) from exc
+        if result.market_date < current_date:
+            raise DailyWarehouseError("refusing to move daily DWS CURRENT backward")
+    payload = {
+        "schema_version": 1,
+        "dataset": "daily_market_summary_dws",
+        "revision": result.revision,
+        "revision_path": str(result.output),
+        "market_date": result.market_date.isoformat(),
+        "manifest_sha256": _sha256(result.output / "manifest.json"),
+        "dwd_revision": _load_object(result.output / "manifest.json")["lineage"]["dwd_revision"],
         "promoted_at": datetime.now(timezone.utc).isoformat(),
     }
     pointer.parent.mkdir(parents=True, exist_ok=True)

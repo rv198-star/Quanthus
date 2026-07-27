@@ -36,6 +36,7 @@ UNITS=(
   hermes-ods-intraday-5m.timer
   hermes-ods-weekly-corrections.service
   hermes-ods-weekly-corrections.timer
+  quanthus-pipeline-failure@.service
 )
 
 for unit in "${UNITS[@]}"; do
@@ -44,6 +45,7 @@ for unit in "${UNITS[@]}"; do
   target_path="${OUTPUT}/${target_name}"
   tmp_path="${target_path}.tmp.$$"
   sed "s/hermes-ods/${NODE_ID}-ods/g" "$source_path" > "$tmp_path"
+  sed -i "s/run-${NODE_ID}-ods-lane/run-hermes-ods-lane/g" "$tmp_path"
   chmod 0644 "$tmp_path"
   mv "$tmp_path" "$target_path"
 done

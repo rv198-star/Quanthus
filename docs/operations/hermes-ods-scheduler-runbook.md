@@ -41,6 +41,10 @@ sudo install -m 0644 /tmp/quanthus-ods-units/* /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
+The rendered directory includes the generic `quanthus-pipeline-failure@.service` handler. Node
+renaming changes unit names and the protected environment-file path, but the repository-owned
+launcher remains `ops/bin/run-hermes-ods-lane` on every node.
+
 4. Start timers without manually starting services. Record the deployed commit, transformed unit
    checksums, next trigger times, and rollback path. OCI independently verifies the exported
    evidence through its read-only channel.

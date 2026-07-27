@@ -26,8 +26,9 @@ class OdsUnitRendererTests(unittest.TestCase):
         output = self._render("cn01")
 
         units = sorted(output.iterdir())
-        self.assertEqual(len(units), 10)
-        self.assertTrue(all(path.name.startswith("cn01-ods-") for path in units))
+        self.assertEqual(len(units), 11)
+        node_units = [path for path in units if path.name != "quanthus-pipeline-failure@.service"]
+        self.assertTrue(all(path.name.startswith("cn01-ods-") for path in node_units))
         self.assertTrue(all(path.stat().st_mode & 0o777 == 0o644 for path in units))
 
         market_timer = (output / "cn01-ods-market-daily-core.timer").read_text()
@@ -35,8 +36,16 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("OnCalendar=Mon..Fri *-*-* 15:40:00 Asia/Shanghai", market_timer)
         self.assertIn("Unit=cn01-ods-market-daily-core.service", market_timer)
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", market_service)
+        self.assertIn("ops/bin/run-hermes-ods-lane", market_service)
+        self.assertNotIn("ops/bin/run-cn01-ods-lane", market_service)
         self.assertIn("date +%%F", market_service)
-        self.assertNotIn("hermes-ods", market_timer + market_service)
+        self.assertNotIn("hermes-ods", market_timer)
+
+        failure_handler = output / "quanthus-pipeline-failure@.service"
+        self.assertEqual(
+            failure_handler.read_bytes(),
+            (ROOT / "ops/systemd/quanthus-pipeline-failure@.service").read_bytes(),
+        )
 
     def test_hermes_render_is_byte_identical_to_repository_unit(self) -> None:
         output = self._render("hermes")

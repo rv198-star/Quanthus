@@ -551,10 +551,11 @@ def _send_resend_email(
                 f"required Resend API key environment {notification.api_key_environment} is not set"
             )
         market_date = _short_text(ledger.get("market_date"))
+        pipeline_id = _short_text(ledger.get("pipeline_id"))
         subject = (
-            f"[Quanthus] {market_date} DWD/DWS completed"
+            f"[Quanthus][{pipeline_id}] {market_date} DWD/DWS 清洗完成"
             if event == "completed"
-            else f"[Quanthus] {market_date} DWD/DWS failed"
+            else f"[Quanthus][{pipeline_id}] {market_date} DWD/DWS 清洗失败"
         )
         request_body = json.dumps(
             {
@@ -572,6 +573,8 @@ def _send_resend_email(
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "User-Agent": "Quanthus-Pipeline-Notifier/1.0",
                     },
                     method="POST",
                 )

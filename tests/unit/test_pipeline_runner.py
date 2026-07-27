@@ -276,7 +276,11 @@ class PipelineRunnerTests(unittest.TestCase):
             request_body = json.loads(requests[0].data.decode("utf-8"))
             self.assertEqual(request_body["from"], "report@mindthus.com")
             self.assertEqual(request_body["to"], ["61718@qq.com"])
-            self.assertIn("completed", request_body["subject"])
+            self.assertEqual(
+                requests[0].get_header("User-agent"),
+                "Quanthus-Pipeline-Notifier/1.0",
+            )
+            self.assertIn("清洗完成", request_body["subject"])
             self.assertIn("DWD/DWS", request_body["html"])
             self.assertNotIn("test-notification-key", ledger_text)
 
@@ -321,7 +325,7 @@ class PipelineRunnerTests(unittest.TestCase):
             self.assertEqual(ledger["notifications"]["email"]["event"], "failed")
             self.assertEqual(ledger["notifications"]["email"]["status"], "sent")
             request_body = json.loads(requests[0].data.decode("utf-8"))
-            self.assertIn("failed", request_body["subject"])
+            self.assertIn("清洗失败", request_body["subject"])
             self.assertIn("失败详情", request_body["html"])
 
     def test_notification_failure_does_not_change_successful_pipeline_result(self) -> None:

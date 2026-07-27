@@ -17,6 +17,11 @@ The registry supports primary stage, trend energy, price/volume acceptance, key-
 relationship, position/risk modifiers, market/sector context, and tradability. Primary stage
 is single-valued; modifier dimensions may be multi-valued when their card permits it.
 
+The draft `docs/design/stock-stage-state-machine.md` records a candidate primary-stage vocabulary:
+twelve directional lifecycle states (`1`-`12`), neutral `0`, and exception sentinel `X`. It is
+documentation-only until exact label cards, transition tests, PIT rules, and validation evidence
+are approved under `P3-LABEL-002`. It must not be confused with the position state machine.
+
 Historical sector-dependent labels remain disabled in official results while historical
 membership is unavailable. A missing context produces an explicit unknown/context-missing
 value rather than a current-membership approximation.

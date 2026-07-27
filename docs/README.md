@@ -5,6 +5,8 @@
 - `product/prd.md`: product background, goals, requirements, releases, and success criteria.
 - `design/hld.md`: approved system-level architecture and cross-module contracts.
 - `design/lld/`: implementation-level design for Chapters 01 through 10.
+- `design/stock-stage-state-machine.md`: draft P3 primary-stage vocabulary and transition model;
+  documentation-only until its label cards and validation gates are approved.
 - `work-items/index.md`: stable work-item ids used by GitHub issues.
 
 ## Architecture decisions

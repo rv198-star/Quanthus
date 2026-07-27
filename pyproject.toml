@@ -36,6 +36,7 @@ dev = [
 quanthus = "quanthus.cli:main"
 quanthus-minute-tdx = "quanthus.providers.minute_tdx:main"
 quanthus-ods-snapshot = "quanthus.providers.ods_snapshot:main"
+quanthus-calendar-refresh = "quanthus.providers.trading_calendar:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

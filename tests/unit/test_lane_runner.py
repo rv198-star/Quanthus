@@ -316,6 +316,106 @@ def test_missing_preflight_no_ready(fixture_home: Path, tmp_path: Path) -> None:
     assert "no READY" in (result.detail or "")
 
 
+def test_provider_refreshes_attempt_calendar_before_session_preflight(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    real_refresh = lane_runner.refresh_calendar
+
+    def refresh_with_closed_target(**kwargs: object):
+        return real_refresh(
+            **kwargs,
+            fetcher=lambda _start, _end: [
+                {"trade_date": "2026-07-26", "is_open": 0},
+                {"trade_date": "2026-07-27", "is_open": 0},
+            ],
+        )
+
+    monkeypatch.setattr(lane_runner, "refresh_calendar", refresh_with_closed_target)
+    result = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 27),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+    )
+
+    assert result.status == "closed_session"
+    assert result.preflight == "both_closed"
+    assert result.preflight_evidence is not None
+    assert result.preflight_evidence["status"] == "ready"
+    assert result.preflight_evidence["target_date"] == "2026-07-27"
+    calendar = next(item for item in result.datasets if item.name == "trading_calendar")
+    assert "refresh_then_copy" in str(calendar.source_request)
+    assert (
+        result.attempt_dir / "landing" / "preflight" / "ref_trading_calendar.parquet"
+    ).is_file()
+    assert result.release_dir is not None
+    assert (result.release_dir / "READY").is_file()
+
+
+def test_calendar_refresh_failure_blocks_all_market_provider_calls(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    market_called = False
+
+    def fail_refresh(**_kwargs: object):
+        raise lane_runner.CalendarRefreshError("injected stale upstream calendar")
+
+    def observe_market(**_kwargs: object):
+        nonlocal market_called
+        market_called = True
+        return []
+
+    monkeypatch.setattr(lane_runner, "refresh_calendar", fail_refresh)
+    monkeypatch.setattr(lane_runner, "_build_market_open", observe_market)
+    result = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 27),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+    )
+
+    assert result.status == "failed"
+    assert result.preflight == "calendar_refresh_failed"
+    assert "no market or minute provider calls" in (result.detail or "")
+    assert market_called is False
+    assert result.release_dir is None
+    assert not list((tmp_path / "shadow").rglob("READY"))
+
+
+def test_calendar_refresh_failure_blocks_all_minute_provider_calls(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    minute_called = False
+
+    def fail_refresh(**_kwargs: object):
+        raise lane_runner.CalendarRefreshError("injected stale upstream calendar")
+
+    def observe_minute(**_kwargs: object):
+        nonlocal minute_called
+        minute_called = True
+        return []
+
+    monkeypatch.setattr(lane_runner, "refresh_calendar", fail_refresh)
+    monkeypatch.setattr(lane_runner, "_build_intraday_stream", observe_minute)
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 27),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+        stream="1m",
+    )
+
+    assert result.status == "failed"
+    assert result.preflight == "calendar_refresh_failed"
+    assert "no market or minute provider calls" in (result.detail or "")
+    assert minute_called is False
+    assert result.release_dir is None
+    assert not list((tmp_path / "shadow").rglob("READY"))
+
+
 def test_closed_session(fixture_home: Path, tmp_path: Path) -> None:
     shadow = tmp_path / "shadow"
     paths = _paths(fixture_home, shadow)
@@ -391,11 +491,11 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     expected_schedule_sha = f"sha256:{hashlib.sha256(SCHEDULE.read_bytes()).hexdigest()}"
     attempt = json.loads((result.attempt_dir / "attempt.json").read_text(encoding="utf-8"))
     assert attempt["schedule_id"] == "hermes-ods-schedule-v1"
-    assert attempt["schedule_contract_revision"] == "regulatory-finality-20260727"
+    assert attempt["schedule_contract_revision"] == "calendar-refresh-first-20260727"
     assert attempt["schedule_config_sha256"] == expected_schedule_sha
     release = json.loads((result.release_dir / "release.json").read_text(encoding="utf-8"))
     assert release["schedule_contract_id"] == "hermes-ods-schedule-v1"
-    assert release["schedule_contract_revision"] == "regulatory-finality-20260727"
+    assert release["schedule_contract_revision"] == "calendar-refresh-first-20260727"
     assert release["schedule_config_sha256"] == expected_schedule_sha
     meta_dataset = next(item for item in result.datasets if item.name == "intraday_meta")
     meta = json.loads(Path(meta_dataset.path).read_text(encoding="utf-8"))

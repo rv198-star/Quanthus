@@ -44,13 +44,19 @@ auction, and the deferred SSE 16:00-17:00 block-trade extension. Execution code 
 rules before it is allowed to place after-hours or risk-warning orders.
 
 The market timer fires Monday through Friday, including exchange holidays. Before any market or
-intraday request, Hermes resolves the target date from complete SSE and SZSE calendar evidence:
+intraday request, Hermes fetches a bounded fresh calendar window, requires the target date in that
+response, builds an attempt-local candidate, and resolves the target date from its complete SSE
+and SZSE calendar evidence:
 
 - both exchanges open: run the market acquisition;
 - both exchanges closed: skip market and intraday requests and publish a calendar-only daily
   release so OCI records `skipped_closed_session`;
 - either exchange missing or the two states disagree: fail and alert; absence of bars is never
   interpreted as a holiday.
+
+Refresh failure has the same fail-closed outcome. The historical Base calendar is an input to the
+attempt-local merge, not proof that the target date was freshly observed, and is never overwritten
+by the recurring attempt.
 
 Weekends have no market timer. Calendar-day announcement collectors may run independently because
 disclosures can arrive on non-trading days; they do not make a closed day into a market session.

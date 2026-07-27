@@ -37,14 +37,27 @@ misrepresenting the 2026 final-trading-time update as a new lane topology.
 | `intraday-archive` | 1m Mon-Fri 20:30; 5m Mon-Fri 23:00 | Preserve direct minute archives while sources retain them | Independent streams outside the T+5H path |
 | `weekly-corrections` | Saturday 08:00 | Low-frequency primary acquisition and bounded reconciliation | Independent correction revision |
 
-### Market session preflight
+### Calendar refresh and market session preflight
 
-The market lane is timer-driven on weekdays, then independently checks SSE and SZSE for the
-target date before calling market-data providers.
+The market lane is timer-driven on weekdays. In provider mode its first operation is a bounded
+upstream calendar refresh through the repository-owned `quanthus.providers.trading_calendar`
+adapter. The target date must be present in that invocation's response; a row found only in the
+old Base calendar is not fresh evidence. The adapter merges the response with the historical Base
+into an attempt-local candidate, records its source, request window, checksum, and target state,
+then checks the candidate's SSE and SZSE rows before calling market-data providers.
+
+The v1 locked upstream, `baostock.query_trade_dates`, exposes one shared A-share calendar. The
+adapter mirrors that evidence to the exchange keys expected by the existing contract and labels
+the evidence model honestly; it does not claim that the two rows are independent upstream
+observations. A future source upgrade requires a new contract revision.
 
 - Both open: acquire and publish the complete market release.
 - Both closed: publish only the calendar evidence with terminal state `closed_session`.
 - Missing or disagreeing records: fail, alert, make no provider calls, and publish no `READY`.
+
+Refresh failure is also terminal and occurs before all market-provider calls. The candidate never
+overwrites the Base calendar or a prior attempt. Reruns create a new attempt and fetch the target
+date again. Explicit forced-preflight paths remain test-only and are recorded as a bypass.
 
 Weekend market timers do not exist. Event acquisition still runs every natural day because an
 announcement can be disclosed on a weekend or holiday; it cannot convert that date into a
@@ -61,9 +74,10 @@ fixed-price matches from 15:05 through 15:30. Those matches belong to the separa
 `after_hours_fixed_price_trades.v1` contract. Minute consumers and intraday intervention remain
 deferred, but acquisition does not.
 
-Each minute timer applies the same SSE/SZSE three-state preflight as the market daily lane. Both
-open permits direct acquisition; both closed publishes calendar-only evidence; missing or
-disagreeing evidence fails before any provider call or READY marker.
+Each minute timer first performs the same fresh attempt-local calendar refresh and then applies
+the same SSE/SZSE three-state preflight as the market daily lane. Both open permits direct
+acquisition; both closed publishes calendar-only evidence; refresh failure or missing/disagreeing
+evidence fails before any minute-provider call or READY marker.
 
 Minute work starts after the T+5H market deadline and does not block daily DWD publication. The
 legacy combined 16:00 minute job remains active during shadowing; it is disabled only after the

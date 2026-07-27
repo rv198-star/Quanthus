@@ -12,7 +12,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from quanthus.pipelines import lane_runner
-from quanthus.providers import ods_snapshot
+from quanthus.providers import ods_snapshot, trading_calendar
 
 
 def _write_parquet(path: Path, rows: list[dict[str, object]]) -> None:
@@ -64,6 +64,61 @@ def test_ods_snapshot_fails_closed_when_source_is_missing(tmp_path: Path) -> Non
             date(2026, 7, 24),
             tmp_path / "attempt" / "dividends.parquet",
             tmp_path / "home",
+        )
+
+
+def test_calendar_refresh_requires_fresh_target_and_preserves_history(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "base" / "ref_trading_calendar.parquet"
+    _write_parquet(
+        source,
+        [
+            {"exchange": exchange, "trade_date": "2026-07-25", "is_open": 0}
+            for exchange in ("SSE", "SZSE", "BSE")
+        ],
+    )
+    output = tmp_path / "attempt" / "ref_trading_calendar.parquet"
+
+    result = trading_calendar.refresh_calendar(
+        source=source,
+        output=output,
+        target_date=date(2026, 7, 27),
+        fetcher=lambda _start, _end: [
+            {"trade_date": "2026-07-26", "is_open": 0},
+            {"trade_date": "2026-07-27", "is_open": 1},
+        ],
+    )
+
+    rows = pq.read_table(output).to_pylist()
+    target = [row for row in rows if str(row["trade_date"]) == "2026-07-27"]
+    assert result.target_state == "both_open"
+    assert result.fetched_base_rows == 2
+    assert result.merged_rows == 9
+    assert {row["exchange"] for row in target} == {"SSE", "SZSE", "BSE"}
+    assert {row["is_open"] for row in target} == {1}
+    assert result.metadata_path.is_file()
+    assert output.stat().st_mode & 0o777 == 0o644
+
+
+def test_calendar_refresh_rejects_response_without_target(tmp_path: Path) -> None:
+    source = tmp_path / "base" / "ref_trading_calendar.parquet"
+    _write_parquet(
+        source,
+        [
+            {"exchange": exchange, "trade_date": "2026-07-25", "is_open": 0}
+            for exchange in ("SSE", "SZSE")
+        ],
+    )
+
+    with pytest.raises(trading_calendar.CalendarRefreshError, match="does not contain target"):
+        trading_calendar.refresh_calendar(
+            source=source,
+            output=tmp_path / "attempt" / "ref_trading_calendar.parquet",
+            target_date=date(2026, 7, 27),
+            fetcher=lambda _start, _end: [
+                {"trade_date": "2026-07-26", "is_open": 0}
+            ],
         )
 
 

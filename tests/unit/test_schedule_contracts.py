@@ -27,7 +27,7 @@ class ScheduleContractTests(unittest.TestCase):
         contract = load_schedule_contract(CONFIG)
 
         self.assertEqual(contract.schedule_id, "hermes-ods-schedule-v1")
-        self.assertEqual(contract.contract_revision, "regulatory-finality-20260727")
+        self.assertEqual(contract.contract_revision, "calendar-refresh-first-20260727")
         self.assertEqual(len(contract.lanes), 5)
 
     def test_2026_trading_session_contract_is_explicit_and_sparse(self) -> None:
@@ -72,6 +72,16 @@ class ScheduleContractTests(unittest.TestCase):
             lane["session_preflight"]["missing_or_disagree"] = "continue"
 
         with self.assertRaisesRegex(ScheduleContractError, "three-state policy"):
+            load_schedule_contract(self._mutated(mutate))
+
+    def test_rejects_market_preflight_without_fresh_calendar(self) -> None:
+        def mutate(payload: dict[str, object]) -> None:
+            lane = next(
+                lane for lane in payload["lanes"] if lane["id"] == "market-daily-core"
+            )
+            lane["session_preflight"].pop("calendar_refresh")
+
+        with self.assertRaisesRegex(ScheduleContractError, "calendar_refresh"):
             load_schedule_contract(self._mutated(mutate))
 
     def test_rejects_market_acquisition_before_daily_totals_are_final(self) -> None:

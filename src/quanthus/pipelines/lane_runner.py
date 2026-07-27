@@ -22,7 +22,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -37,10 +37,14 @@ from quanthus.pipelines.schedule_contracts import (
     ScheduleContractError,
     load_schedule_contract,
 )
+from quanthus.providers.trading_calendar import (
+    CalendarRefreshError,
+    refresh_calendar,
+)
 
 SH = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
-PRODUCER = "hermes-ods-lane-runner-v3"
+PRODUCER = "hermes-ods-lane-runner-v4"
 
 MANDATORY: dict[str, set[str]] = {
     "market-daily-core": {
@@ -305,6 +309,7 @@ class LaneRunResult:
     started_at: datetime = field(default_factory=_now)
     finished_at: datetime | None = None
     preflight: str | None = None
+    preflight_evidence: dict[str, Any] | None = None
     detail: str | None = None
     stream: str | None = None
     schedule_id: str | None = None
@@ -323,6 +328,7 @@ class LaneRunResult:
             "started_at": self.started_at.isoformat(),
             "finished_at": None if self.finished_at is None else self.finished_at.isoformat(),
             "preflight": self.preflight,
+            "preflight_evidence": self.preflight_evidence,
             "detail": self.detail,
             "stream": self.stream,
             "producer": PRODUCER,
@@ -702,6 +708,21 @@ def _copy_dataset(
     )
 
 
+def _calendar_source_request(calendar: Path) -> str:
+    metadata = calendar.with_suffix(calendar.suffix + ".meta.json")
+    if metadata.is_file():
+        try:
+            payload = json.loads(metadata.read_text(encoding="utf-8"))
+            return json.dumps(
+                {"operation": "refresh_then_copy", "refresh": payload},
+                ensure_ascii=True,
+                sort_keys=True,
+            )
+        except (OSError, json.JSONDecodeError):
+            pass
+    return f"copy:{calendar.name}"
+
+
 def _seal_json_dataset(
     *,
     name: str,
@@ -1034,7 +1055,11 @@ def _build_market_open(
                 knowledge_cutoff=knowledge_cutoff,
                 watermark=watermark,
                 relative_name=artifact,
-                source_request=f"copy:{source.name}",
+                source_request=(
+                    _calendar_source_request(source)
+                    if name == "trading_calendar"
+                    else f"copy:{source.name}"
+                ),
             )
         )
 
@@ -1114,7 +1139,7 @@ def _build_market_closed(
             knowledge_cutoff=knowledge_cutoff,
             watermark=market_date.isoformat(),
             relative_name="ref_trading_calendar.parquet",
-            source_request="copy:ref_trading_calendar",
+            source_request=_calendar_source_request(paths.calendar),
         )
     ]
 
@@ -3049,6 +3074,7 @@ def _build_intraday_stream(
                 knowledge_cutoff=knowledge_cutoff,
                 watermark=watermark,
                 relative_name="ref_trading_calendar.parquet",
+                source_request=_calendar_source_request(paths.calendar),
             ),
             _seal_json_dataset(
                 name="acquisition_log",
@@ -3352,6 +3378,50 @@ def run_lane(
         _atomic_json(attempt_dir / "attempt.json", result.to_dict())
         preflight = force_preflight or "n/a"
         if lane_id in {"market-daily-core", "intraday-archive"}:
+            acquire_mode = _acquire_mode()
+            if acquire_mode == "provider" and force_preflight is None:
+                calendar_output = (
+                    landing / "preflight" / "ref_trading_calendar.parquet"
+                )
+                try:
+                    refresh = refresh_calendar(
+                        source=resolved.calendar,
+                        output=calendar_output,
+                        target_date=market_date,
+                        lookback_days=int(
+                            lane["session_preflight"]["calendar_refresh"][
+                                "lookback_calendar_days"
+                            ]
+                        ),
+                    )
+                except CalendarRefreshError as exc:
+                    result.status = "failed"
+                    result.preflight = "calendar_refresh_failed"
+                    result.preflight_evidence = {
+                        "status": "failed",
+                        "source": "baostock.query_trade_dates",
+                        "target_date": market_date.isoformat(),
+                        "error": str(exc),
+                    }
+                    result.detail = (
+                        f"calendar refresh failed: {exc}; "
+                        "no market or minute provider calls; no READY"
+                    )
+                    result.finished_at = _now()
+                    _atomic_json(attempt_dir / "attempt.json", result.to_dict())
+                    _atomic_json(attempt_dir / "datasets.json", {"datasets": []})
+                    return result
+                resolved = replace(resolved, calendar=refresh.output_path)
+                result.preflight_evidence = {
+                    "status": "ready",
+                    **refresh.to_dict(),
+                }
+                _atomic_json(attempt_dir / "attempt.json", result.to_dict())
+            elif force_preflight is not None:
+                result.preflight_evidence = {
+                    "status": "bypassed_by_explicit_force_preflight",
+                    "target_date": market_date.isoformat(),
+                }
             preflight = force_preflight or session_preflight(
                 calendar=resolved.calendar, market_date=market_date
             )

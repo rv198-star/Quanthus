@@ -76,6 +76,12 @@ and explicit upstream refresh jobs for daily/event/weekly sources. A successful 
 proves scheduling and release semantics, but it does not prove those mutable sources are current.
 Upstream credentials and raw responses remain node-local and never enter Git.
 
+Market-dependent provider attempts use `quanthus.providers.trading_calendar` before session
+preflight. It requests `baostock.query_trade_dates` for the target date and a seven-day lookback,
+requires the target date in the fresh response, and writes the merged candidate under the current
+attempt's `landing/preflight/`. It does not overwrite the Base calendar. Market and minute
+collectors must not run if this refresh fails.
+
 Minute provider collection is always written under the current attempt. Shared legacy minute
 partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must
 be justified by same-day tradability, PIT suspension, or lifecycle evidence. Setting
@@ -149,6 +155,8 @@ an implicit pass.
 OCI posts `GO_FOR_CUTOVER` only when all of the following are true:
 
 - schedule configuration passes the repository validator;
+- provider-mode market and minute attempts prove a fresh target-date calendar refresh before
+  their three-state preflight;
 - every required shadow scenario passes;
 - market daily core finishes before 20:00 or raises a tested SLA alert;
 - `closed_session`, `failed`, and `partial` cannot advance any canonical pointer;
@@ -198,13 +206,14 @@ exposes only the data jail. Channel availability never authorizes `git pull`, un
 timer restart, an interactive shell, or a root-key probe from OCI. Hermes performs its own GitHub
 fast-forward deployment; OCI consumes the exported evidence and independently audits it.
 
-An operator verifies the expected target date, preflight result, each mandatory dataset status,
-watermark movement, READY checksum, duration, retry count, and alert state. File existence alone
-does not establish success.
+An operator verifies the expected target date, `preflight_evidence.status=ready`, the fresh
+calendar source/window/checksum, preflight result, each mandatory dataset status, watermark
+movement, READY checksum, duration, retry count, and alert state. File existence alone does not
+establish success.
 
-On a closed weekday, only a checksummed calendar-only release is valid. On missing/disagreeing
-calendar evidence, there must be no provider calls and no READY. On weekends, only event-lane
-output is expected.
+On a closed weekday, only a checksummed calendar-only release is valid. On refresh failure or
+missing/disagreeing calendar evidence, there must be no market/minute provider calls and no READY.
+On weekends, only event-lane output is expected.
 
 ## Failure and rollback
 

@@ -152,6 +152,7 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
     preflight = _mapping(lane.get("session_preflight"), field="market-daily-core.session_preflight")
     if preflight.get("exchanges") != ["SSE", "SZSE"]:
         raise ScheduleContractError("market preflight must independently check SSE and SZSE")
+    _validate_calendar_refresh(preflight, field="market-daily-core.session_preflight")
     expected = {
         "both_open": "acquire_market_data",
         "both_closed": "calendar_only_release",
@@ -177,6 +178,7 @@ def _validate_intraday(lane: Mapping[str, Any]) -> None:
     preflight = _mapping(lane.get("session_preflight"), field="intraday-archive.session_preflight")
     if preflight.get("exchanges") != ["SSE", "SZSE"]:
         raise ScheduleContractError("intraday preflight must independently check SSE and SZSE")
+    _validate_calendar_refresh(preflight, field="intraday-archive.session_preflight")
     expected = {
         "both_open": "acquire_direct_streams",
         "both_closed": "calendar_only_release",
@@ -216,6 +218,21 @@ def _validate_intraday(lane: Mapping[str, Any]) -> None:
     checkpoints = {stream.get("checkpoint") for stream in streams.values()}
     if None in locks or len(locks) != 2 or None in checkpoints or len(checkpoints) != 2:
         raise ScheduleContractError("intraday streams require independent locks and checkpoints")
+
+
+def _validate_calendar_refresh(preflight: Mapping[str, Any], *, field: str) -> None:
+    refresh = _mapping(preflight.get("calendar_refresh"), field=f"{field}.calendar_refresh")
+    expected = {
+        "required_before_preflight": True,
+        "source": "baostock.query_trade_dates",
+        "target_must_be_fresh": True,
+        "output_scope": "attempt_local",
+        "lookback_calendar_days": 7,
+    }
+    if any(refresh.get(key) != value for key, value in expected.items()):
+        raise ScheduleContractError(
+            f"{field} must refresh a fresh attempt-local calendar before preflight"
+        )
 
 
 def _validate_weekly(lane: Mapping[str, Any]) -> None:

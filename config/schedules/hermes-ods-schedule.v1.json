@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "regulatory-finality-20260727",
+  "contract_revision": "calendar-refresh-first-20260727",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_only",
@@ -46,6 +46,13 @@
       "resource_group": "pve_market_api",
       "session_preflight": {
         "exchanges": ["SSE", "SZSE"],
+        "calendar_refresh": {
+          "required_before_preflight": true,
+          "source": "baostock.query_trade_dates",
+          "target_must_be_fresh": true,
+          "output_scope": "attempt_local",
+          "lookback_calendar_days": 7
+        },
         "both_open": "acquire_market_data",
         "both_closed": "calendar_only_release",
         "missing_or_disagree": "fail_without_provider_calls_or_ready"
@@ -86,6 +93,13 @@
       "resource_group": "pve_market_api",
       "session_preflight": {
         "exchanges": ["SSE", "SZSE"],
+        "calendar_refresh": {
+          "required_before_preflight": true,
+          "source": "baostock.query_trade_dates",
+          "target_must_be_fresh": true,
+          "output_scope": "attempt_local",
+          "lookback_calendar_days": 7
+        },
         "both_open": "acquire_direct_streams",
         "both_closed": "calendar_only_release",
         "missing_or_disagree": "fail_without_provider_calls_or_ready"

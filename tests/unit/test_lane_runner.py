@@ -106,10 +106,11 @@ def fixture_home(tmp_path: Path) -> Path:
         home / "index_daily.parquet",
         [
             {
-                "code": "000001",
+                "index_code": code,
                 "date": open_day.isoformat(),
                 "close": 3000.0,
             }
+            for code in lane_runner.INDEX_CODES
         ],
     )
     _write_parquet(
@@ -297,8 +298,157 @@ def test_partial_never_ready(fixture_home: Path, tmp_path: Path) -> None:
     )
     assert result.status in {"partial", "failed"}
     assert result.release_dir is None
+    index = next(item for item in result.datasets if item.name == "index_daily_delta")
+    assert index.status == "failed"
+    assert "missing_index_coverage=" in (index.detail or "")
     # no READY anywhere under shadow for this attempt
     assert not list(shadow.rglob("READY"))
+
+
+def test_baostock_index_fetch_maps_the_contract_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Login:
+        error_code = "0"
+        error_msg = "ok"
+
+    class Query:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self, row: list[str]) -> None:
+            self.row = row
+            self.pending = True
+
+        def next(self) -> bool:
+            pending, self.pending = self.pending, False
+            return pending
+
+        def get_row_data(self) -> list[str]:
+            return self.row
+
+    class FakeBaostock:
+        calls: list[str] = []
+        logged_out = False
+
+        @staticmethod
+        def login() -> Login:
+            return Login()
+
+        @classmethod
+        def query_history_k_data_plus(cls, code, *_args, **_kwargs) -> Query:
+            cls.calls.append(code)
+            return Query(
+                ["2026-07-27", code, "1", "2", "0.5", "1.5", "100", "200", "1.2"]
+            )
+
+        @classmethod
+        def logout(cls) -> None:
+            cls.logged_out = True
+
+    monkeypatch.setitem(__import__("sys").modules, "baostock", FakeBaostock)
+    rows, logs = lane_runner._baostock_fetch_index_day(date(2026, 7, 27))
+
+    assert [row["index_code"] for row in rows] == list(lane_runner.INDEX_CODES)
+    assert FakeBaostock.calls == list(lane_runner.INDEX_CODES.values())
+    assert {log["request"]["code"] for log in logs} == set(FakeBaostock.calls)
+    assert all(row["date"] == "2026-07-27" for row in rows)
+    assert FakeBaostock.logged_out
+
+
+def test_provider_market_collects_indices_without_current_local_index_data(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stale node-local index seed cannot block a live provider market attempt."""
+
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    monkeypatch.delenv("HERMES_ODS_SYMBOL_LIMIT", raising=False)
+    paths = _paths(fixture_home, tmp_path / "shadow")
+    (fixture_home / "index_daily.parquet").unlink()
+
+    def fetch_stocks(codes, market_date):
+        return lane_runner._local_market_acquire(
+            paths=paths,
+            market_date=market_date,
+            codes=codes,
+        )
+
+    def fetch_indices(market_date):
+        day = market_date.isoformat()
+        return (
+            [
+                {
+                    "index_code": code,
+                    "date": day,
+                    "open": 1.0,
+                    "high": 1.0,
+                    "low": 1.0,
+                    "close": 1.0,
+                    "volume": 1.0,
+                    "amount": 1.0,
+                }
+                for code in lane_runner.INDEX_CODES
+            ],
+            [],
+        )
+
+    monkeypatch.setattr(lane_runner, "_baostock_fetch_day", fetch_stocks)
+    monkeypatch.setattr(lane_runner, "_baostock_fetch_index_day", fetch_indices)
+    result = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        force_preflight="both_open",
+    )
+
+    index = next(item for item in result.datasets if item.name == "index_daily_delta")
+    assert result.status == "ready"
+    assert index.status == "ready"
+    assert index.row_count == len(lane_runner.INDEX_CODES)
+    assert '"provider": "baostock"' in str(index.source_request)
+
+
+def test_provider_market_requires_the_complete_index_contract(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    monkeypatch.delenv("HERMES_ODS_SYMBOL_LIMIT", raising=False)
+    paths = _paths(fixture_home, tmp_path / "shadow")
+
+    def fetch_stocks(codes, market_date):
+        return lane_runner._local_market_acquire(
+            paths=paths,
+            market_date=market_date,
+            codes=codes,
+        )
+
+    def fetch_incomplete_indices(market_date):
+        return (
+            [
+                {"index_code": code, "date": market_date.isoformat(), "close": 1.0}
+                for code in list(lane_runner.INDEX_CODES)[:-1]
+            ],
+            [],
+        )
+
+    monkeypatch.setattr(lane_runner, "_baostock_fetch_day", fetch_stocks)
+    monkeypatch.setattr(
+        lane_runner, "_baostock_fetch_index_day", fetch_incomplete_indices
+    )
+    result = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        force_preflight="both_open",
+    )
+
+    index = next(item for item in result.datasets if item.name == "index_daily_delta")
+    assert index.status == "failed"
+    assert index.detail == "missing_index_coverage=399001.SZ"
+    assert result.release_dir is None
+    assert not list((tmp_path / "shadow").rglob("READY"))
 
 
 def test_missing_preflight_no_ready(fixture_home: Path, tmp_path: Path) -> None:

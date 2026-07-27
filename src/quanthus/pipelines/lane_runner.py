@@ -45,6 +45,11 @@ from quanthus.providers.trading_calendar import (
 SH = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
 PRODUCER = "hermes-ods-lane-runner-v4"
+INDEX_CODES: dict[str, str] = {
+    "000001.SH": "sh.000001",
+    "000300.SH": "sh.000300",
+    "399001.SZ": "sz.399001",
+}
 
 MANDATORY: dict[str, set[str]] = {
     "market-daily-core": {
@@ -591,6 +596,16 @@ def _to_bs_code(code: str) -> str:
     return f"sz.{code}"
 
 
+def _canonical_index_code(value: Any) -> str:
+    """Normalize a legacy index identifier to the scheduler contract code."""
+
+    raw = str(value or "").upper()
+    if raw in INDEX_CODES:
+        return raw
+    code = _code6(raw)
+    return next((item for item in INDEX_CODES if item.startswith(code)), "")
+
+
 def _filter_rows_by_date(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -857,6 +872,82 @@ def _baostock_fetch_day(
     return bars, status_rows, log_rows
 
 
+def _baostock_fetch_index_day(
+    market_date: date,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Fetch the contract's daily index set directly from Baostock."""
+
+    import baostock as bs
+
+    day = market_date.isoformat()
+    login = bs.login()
+    if str(login.error_code) != "0":
+        raise LaneRunError(f"baostock login failed: {login.error_msg}")
+    fields = "date,code,open,high,low,close,volume,amount,pctChg"
+    rows_out: list[dict[str, Any]] = []
+    log_rows: list[dict[str, Any]] = []
+    acquired_at = _now_sh_iso()
+    try:
+        for index_code, bs_code in INDEX_CODES.items():
+            request = {
+                "provider": "baostock",
+                "api": "query_history_k_data_plus",
+                "code": bs_code,
+                "start": day,
+                "end": day,
+                "frequency": "d",
+                "adjustflag": "3",
+                "fields": fields,
+            }
+            started = time.monotonic()
+            rs = bs.query_history_k_data_plus(
+                bs_code,
+                fields,
+                start_date=day,
+                end_date=day,
+                frequency="d",
+                adjustflag="3",
+            )
+            rows: list[list[str]] = []
+            err = str(rs.error_code)
+            msg = str(rs.error_msg)
+            if err == "0":
+                while rs.next():
+                    rows.append(rs.get_row_data())
+            log_rows.append(
+                {
+                    "index_code": index_code,
+                    "request": request,
+                    "response_error_code": err,
+                    "response_error_msg": msg,
+                    "response_rows": len(rows),
+                    "acquired_at": acquired_at,
+                    "duration_seconds": round(time.monotonic() - started, 3),
+                }
+            )
+            if err != "0":
+                continue
+            for raw in rows:
+                rows_out.append(
+                    {
+                        "index_code": index_code,
+                        "date": day,
+                        "open": _fnum(raw[2]),
+                        "high": _fnum(raw[3]),
+                        "low": _fnum(raw[4]),
+                        "close": _fnum(raw[5]),
+                        "volume": _fnum(raw[6], 0.0) or 0.0,
+                        "amount": _fnum(raw[7], 0.0) or 0.0,
+                        "pct_chg": _fnum(raw[8]),
+                        "source": "baostock.query_history_k_data_plus.adjustflag=3",
+                        "acquired_at": acquired_at,
+                    }
+                )
+    finally:
+        bs.logout()
+    return rows_out, log_rows
+
+
 def _local_market_acquire(
     *,
     paths: LanePaths,
@@ -971,7 +1062,7 @@ def _build_market_open(
                 detail="empty in-scope universe from stock_list",
             )
         ]
-    rev = f"market-daily-{mode}-{market_date.strftime('%Y%m%d')}-v2"
+    rev = f"market-daily-{mode}-{market_date.strftime('%Y%m%d')}-v3"
     watermark = market_date.isoformat()
     request_summary = {
         "mode": mode,
@@ -982,10 +1073,32 @@ def _build_market_open(
     try:
         if mode == "provider":
             bars, status_rows, log_rows = _baostock_fetch_day(codes, market_date)
+            index_rows, index_log_rows = _baostock_fetch_index_day(market_date)
+            log_rows.extend(index_log_rows)
         else:
             bars, status_rows, log_rows = _local_market_acquire(
                 paths=paths, market_date=market_date, codes=codes
             )
+            index_source = paths.home / "index_daily.parquet"
+            index_rows = (
+                _filter_rows_by_date(
+                    _read_parquet(index_source),
+                    market_date=market_date,
+                    date_keys=("date",),
+                    lookback_days=0,
+                )
+                if index_source.is_file()
+                else []
+            )
+            index_rows = [
+                {
+                    **row,
+                    "index_code": _canonical_index_code(
+                        row.get("index_code") or row.get("code")
+                    ),
+                }
+                for row in index_rows
+            ]
     except Exception as exc:  # noqa: BLE001
         return [
             DatasetStatus(
@@ -1063,14 +1176,38 @@ def _build_market_open(
             )
         )
 
-    # index + adjustment: acquire as date-filtered provider/local read with log
-    for name, source, keys, require in (
-        ("index_daily_delta", paths.home / "index_daily.parquet", ("date",), True),
+    index = _seal_dataset(
+        name="index_daily_delta",
+        rows=index_rows,
+        landing=landing,
+        source_revision=f"index_daily_delta@{rev}",
+        knowledge_cutoff=knowledge_cutoff,
+        watermark=watermark,
+        source_request=json.dumps(
+            {
+                "provider": "baostock" if mode == "provider" else "local-sot",
+                "codes": INDEX_CODES,
+                "market_date": watermark,
+            },
+            sort_keys=True,
+        ),
+        require_rows=True,
+    )
+    observed_indices = {
+        _canonical_index_code(row.get("index_code") or row.get("code"))
+        for row in index_rows
+    }
+    missing_indices = sorted(set(INDEX_CODES) - observed_indices)
+    if missing_indices:
+        index.status = "failed"
+        index.detail = f"missing_index_coverage={','.join(missing_indices)}"
+    datasets.append(index)
+
+    for name, source, keys in (
         (
             "adjustment_evidence_delta",
             paths.home / "ref_adjustment_factors.parquet",
             ("effective_date", "ex_date", "date"),
-            False,
         ),
     ):
         if not source.is_file():
@@ -1098,7 +1235,7 @@ def _build_market_open(
                 knowledge_cutoff=knowledge_cutoff,
                 watermark=watermark,
                 source_request=f"filter:{source.name}",
-                require_rows=require,
+                require_rows=False,
             )
         )
 

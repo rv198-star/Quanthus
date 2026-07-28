@@ -322,6 +322,8 @@ class LaneRunResult:
     schedule_id: str | None = None
     schedule_contract_revision: str | None = None
     schedule_config_sha256: str | None = None
+    run_mode: str = "scheduled"
+    recovery_deadline_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -342,6 +344,12 @@ class LaneRunResult:
             "schedule_id": self.schedule_id,
             "schedule_contract_revision": self.schedule_contract_revision,
             "schedule_config_sha256": self.schedule_config_sha256,
+            "run_mode": self.run_mode,
+            "recovery_deadline_at": (
+                None
+                if self.recovery_deadline_at is None
+                else self.recovery_deadline_at.isoformat()
+            ),
         }
 
 
@@ -1301,6 +1309,7 @@ def _build_market_open(
     provider_readiness: Mapping[str, Any] | None = None,
     completion_deadline: str | None = None,
     collection_window_experiment: Mapping[str, Any] | None = None,
+    recovery_deadline_at: datetime | None = None,
 ) -> list[DatasetStatus]:
     mode = _acquire_mode()
     codes = _universe_from_stock_list(paths.home)
@@ -1324,17 +1333,26 @@ def _build_market_open(
         "collection_window_experiment": (
             collection_window_experiment if mode == "provider" else None
         ),
+        "run_mode": "manual_recovery" if recovery_deadline_at else "scheduled",
+        "recovery_deadline_at": (
+            recovery_deadline_at.isoformat() if recovery_deadline_at else None
+        ),
+        "excluded_from_collection_window_experiment": recovery_deadline_at is not None,
     }
     try:
         if mode == "provider":
             if provider_readiness is None or completion_deadline is None:
                 raise LaneRunError("provider mode requires readiness and completion deadlines")
             socket_timeout_seconds = float(provider_readiness["socket_timeout_seconds"])
+            readiness_deadline_at = recovery_deadline_at or _contract_deadline(
+                market_date, str(provider_readiness["deadline"])
+            )
+            completion_deadline_at = recovery_deadline_at or _contract_deadline(
+                market_date, completion_deadline
+            )
             index_rows, index_log_rows = _baostock_wait_for_index_day(
                 market_date,
-                deadline_at=_contract_deadline(
-                    market_date, str(provider_readiness["deadline"])
-                ),
+                deadline_at=readiness_deadline_at,
                 poll_interval_seconds=float(provider_readiness["poll_interval_seconds"]),
                 socket_timeout_seconds=socket_timeout_seconds,
                 progress_path=landing / "provider_readiness.json",
@@ -1349,7 +1367,7 @@ def _build_market_open(
                     provider_readiness["missing_set_retry_delay_seconds"]
                 ),
                 socket_timeout_seconds=socket_timeout_seconds,
-                deadline_at=_contract_deadline(market_date, completion_deadline),
+                deadline_at=completion_deadline_at,
             )
             log_rows = [*index_log_rows, *stock_log_rows]
         else:
@@ -1533,6 +1551,13 @@ def _build_market_open(
                 "universe_size": len(codes),
                 "node_id": _ods_node_id(),
                 "collection_window_experiment": collection_window_experiment,
+                "run_mode": "manual_recovery" if recovery_deadline_at else "scheduled",
+                "recovery_deadline_at": (
+                    recovery_deadline_at.isoformat() if recovery_deadline_at else None
+                ),
+                "excluded_from_collection_window_experiment": (
+                    recovery_deadline_at is not None
+                ),
                 "metrics": _market_acquisition_metrics(log_rows),
                 "requests": log_rows,
                 "source_revision": rev,
@@ -3888,6 +3913,7 @@ def run_lane(
     force_preflight: str | None = None,
     issue_ref: str | None = None,
     symbols: Sequence[str] | None = None,
+    recovery_deadline_at: datetime | None = None,
 ) -> LaneRunResult:
     """Run one lane attempt under the schedule contract."""
 
@@ -3899,6 +3925,15 @@ def run_lane(
     lane = next(item for item in payload["lanes"] if item["id"] == lane_id)
     resolved = paths or resolve_paths()
     started = _now()
+    if recovery_deadline_at is not None:
+        if lane_id != "market-daily-core":
+            raise LaneRunError("recovery deadline is only valid for market-daily-core")
+        if recovery_deadline_at.tzinfo is None:
+            raise LaneRunError("recovery deadline must be timezone-aware")
+        if recovery_deadline_at.astimezone(UTC) <= started:
+            raise LaneRunError("recovery deadline must be in the future")
+        if market_date > started.astimezone(SH).date():
+            raise LaneRunError("manual recovery cannot target a future market date")
     attempt_id = _attempt_id(market_date, started)
     if stream:
         attempt_dir = (
@@ -3932,6 +3967,8 @@ def run_lane(
         schedule_id=contract.schedule_id,
         schedule_contract_revision=contract.contract_revision,
         schedule_config_sha256=schedule_config_sha256,
+        run_mode="manual_recovery" if recovery_deadline_at else "scheduled",
+        recovery_deadline_at=recovery_deadline_at,
     )
     _atomic_json(attempt_dir / "attempt.json", result.to_dict())
     failure_injection_stage = _failure_injection_stage(
@@ -4077,6 +4114,7 @@ def run_lane(
                     collection_window_experiment=lane.get(
                         "collection_window_experiment"
                     ),
+                    recovery_deadline_at=recovery_deadline_at,
                 )
                 result.datasets = datasets
                 _inject_failure(failure_injection_stage, "pre_seal")

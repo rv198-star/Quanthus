@@ -259,6 +259,13 @@ During the five-session A/B, a failed node remains fail-closed and may be rerun 
 but its timer is not moved into the other node's window mid-sample. A safety or repeated-availability
 failure ends the experiment explicitly and records the shortened sample before rollback.
 
+A missed daily release is recovered with the launcher, never by moving or manually firing the
+timer. Pass the original `--market-date` and a reviewed, timezone-aware
+`--recovery-deadline-at`; the deadline must be in the future. The resulting attempt and acquisition
+log are marked `run_mode=manual_recovery` and
+`excluded_from_collection_window_experiment=true`. It may restore ODS continuity and feed OCI, but
+it is never counted as an early/late A/B observation.
+
 ## Migration
 
 On a replacement collector, restore repository code/config, source credentials, ODS raw evidence,

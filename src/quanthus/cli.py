@@ -4,7 +4,7 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from quanthus import __version__
@@ -327,6 +327,11 @@ def _parser() -> argparse.ArgumentParser:
         choices=["both_open", "both_closed", "missing_or_disagree"],
     )
     lane_run.add_argument("--issue-ref")
+    lane_run.add_argument(
+        "--recovery-deadline-at",
+        type=datetime.fromisoformat,
+        help="timezone-aware absolute deadline for one manual market recovery",
+    )
     lane_run.add_argument("--home", type=Path)
     lane_run.add_argument("--shadow-root", type=Path)
     lane_run.add_argument("--calendar", type=Path)
@@ -708,6 +713,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 force_preflight=args.force_preflight,
                 issue_ref=args.issue_ref,
                 symbols=args.symbol or None,
+                recovery_deadline_at=args.recovery_deadline_at,
             )
             print(json.dumps(lane_result.to_dict(), ensure_ascii=True, sort_keys=True))
             if lane_result.status in {"ready", "closed_session"}:

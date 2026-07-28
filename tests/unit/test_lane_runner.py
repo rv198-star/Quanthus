@@ -16,6 +16,7 @@ import pytest
 import quanthus.pipelines.lane_runner as lane_runner
 from quanthus.pipelines.lane_runner import (
     LanePaths,
+    LaneRunError,
     expected_timer_oncalendar,
     run_lane,
     session_preflight,
@@ -811,6 +812,98 @@ def test_provider_market_requires_the_complete_index_contract(
     assert result.release_dir is None
     assert not list((tmp_path / "shadow").rglob("READY"))
     assert (result.attempt_dir / "landing" / "provider_readiness.json").is_file()
+
+
+def test_manual_recovery_uses_absolute_deadline_and_is_excluded_from_experiment(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    monkeypatch.setenv("HERMES_ODS_NODE_ID", "cn01")
+    monkeypatch.delenv("HERMES_ODS_SYMBOL_LIMIT", raising=False)
+    paths = _paths(fixture_home, tmp_path / "shadow")
+    observed = datetime(2026, 7, 28, 11, 10, tzinfo=timezone.utc)
+    deadline = datetime(2026, 7, 28, 23, 30, tzinfo=lane_runner.SH)
+    deadlines: list[datetime] = []
+
+    def wait_for_indices(market_date: date, *, deadline_at: datetime, **_kwargs: object):
+        deadlines.append(deadline_at)
+        day = market_date.isoformat()
+        return (
+            [
+                {
+                    "index_code": code,
+                    "date": day,
+                    "open": 1.0,
+                    "high": 1.0,
+                    "low": 1.0,
+                    "close": 1.0,
+                    "volume": 1.0,
+                    "amount": 1.0,
+                    "acquired_at": "2026-07-28T19:10:00+08:00",
+                }
+                for code in lane_runner.INDEX_CODES
+            ],
+            [],
+        )
+
+    def fetch_stocks(
+        codes: list[str], market_date: date, *, deadline_at: datetime, **_kwargs: object
+    ):
+        deadlines.append(deadline_at)
+        return lane_runner._local_market_acquire(
+            paths=paths,
+            market_date=market_date,
+            codes=codes,
+        )
+
+    monkeypatch.setattr(lane_runner, "_now", lambda: observed)
+    monkeypatch.setattr(lane_runner, "_baostock_wait_for_index_day", wait_for_indices)
+    monkeypatch.setattr(lane_runner, "_baostock_fetch_day", fetch_stocks)
+    result = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        force_preflight="both_open",
+        recovery_deadline_at=deadline,
+    )
+
+    assert result.status == "ready"
+    assert result.run_mode == "manual_recovery"
+    assert result.recovery_deadline_at == deadline
+    assert deadlines == [deadline, deadline]
+    acquisition_log = next(
+        item for item in result.datasets if item.name == "acquisition_log"
+    )
+    payload = json.loads(Path(acquisition_log.path).read_text(encoding="utf-8"))
+    assert payload["run_mode"] == "manual_recovery"
+    assert payload["recovery_deadline_at"] == deadline.isoformat()
+    assert payload["excluded_from_collection_window_experiment"] is True
+
+
+def test_manual_recovery_rejects_naive_or_expired_deadline(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    observed = datetime(2026, 7, 28, 11, 10, tzinfo=timezone.utc)
+    monkeypatch.setattr(lane_runner, "_now", lambda: observed)
+    paths = _paths(fixture_home, tmp_path / "shadow")
+
+    with pytest.raises(LaneRunError, match="timezone-aware"):
+        run_lane(
+            lane_id="market-daily-core",
+            market_date=date(2026, 7, 28),
+            schedule_config=SCHEDULE,
+            paths=paths,
+            recovery_deadline_at=datetime(2026, 7, 28, 23, 30),
+        )
+    with pytest.raises(LaneRunError, match="in the future"):
+        run_lane(
+            lane_id="market-daily-core",
+            market_date=date(2026, 7, 28),
+            schedule_config=SCHEDULE,
+            paths=paths,
+            recovery_deadline_at=datetime(2026, 7, 28, 18, 0, tzinfo=lane_runner.SH),
+        )
 
 
 def test_missing_preflight_no_ready(fixture_home: Path, tmp_path: Path) -> None:

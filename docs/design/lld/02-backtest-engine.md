@@ -3,13 +3,37 @@
 | Field | Value |
 | --- | --- |
 | Phase | P2 |
-| Status | Blocked by LLD 01 acceptance |
+| Design status | approved |
+| Delivery gate | open |
+| Implementation status | not-started |
+| Gate source | `config/p1-gates.v1.json` |
 | Governing requirements | FR-BT-001 through FR-BT-006, FR-AUDIT-001/002 |
 
 ## 1. Goal
 
 Act as a conservative and deterministic referee. Strategy code emits proposals; the engine
 owns time, orders, fills, costs, capital, positions, and audit events.
+
+### Scope and ownership boundary
+
+P2 owns the dated event loop, order lifecycle, conservative matching, fill/cost calculation,
+accounting ledger, run manifest, deterministic metrics, and golden replay. It consumes explicit
+signals or proposals and must not implement P3 labels, experts, aggregation, strategy exits,
+trial/add policy, concentration policy, or cooldown behavior. Those later decisions may call the
+same engine but cannot be embedded in its matcher or ledger.
+
+The Pre-P2 conformance audit records that no P2 matcher, order, fill, or ledger implementation
+exists at its evidence cutoff. `src/quanthus/contracts.py` contains shared `SnapshotRef`,
+`CandidateSignal`, and `RunManifest` contracts only; the operational data-pipeline runner under
+`src/quanthus/pipelines/` is not the trading event engine. P2 must establish one canonical
+production ownership boundary under `src/quanthus` and must not create alternate notebook, script,
+or test-only engines.
+
+Evidence: `docs/acceptance/pre-p2-conformance-20260728.md`.
+
+Load `10-monitoring-attribution.md` for P2 decision/shadow-log and hypothetical-ledger contracts.
+Load `05-position-execution.md` only to keep its P3 strategy-position lifecycle outside P2
+accounting ownership.
 
 ## 2. Core event types
 

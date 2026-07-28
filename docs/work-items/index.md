@@ -28,6 +28,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | P1-UNIVERSE-001 | Implement daily point-in-time universe policy | Status and bars |
 | P1-SNAPSHOT-001 | Implement atomic point-in-time snapshots | Canonical datasets |
 | P1-ACCEPT-001 | Execute Chapter 01 acceptance suite | All P1 blockers |
+| P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 |
 
 ## P2 backtest and observability

@@ -3,8 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Phase | P3 candidate label model |
-| Status | Draft concept; not active in research, backtest, simulation, or trading |
-| Version | 0.2 |
+| Design status | draft |
+| Delivery gate | blocked |
+| Authority | Non-governing concept; not active in research, backtest, simulation, or trading |
+| Version | 0.3 |
 | Governing work item | `P3-LABEL-002` |
 
 ## 1. Purpose and boundary
@@ -14,12 +16,19 @@ single-valued label for the P3 feature and label system; it is not the position 
 machine and has no direct authority to create orders, force an exit, or bypass expert/veto logic.
 
 The name "12-state model" refers to the twelve directional lifecycle states `1` through `12`.
-The emitted vocabulary also contains neutral state `0` and freeze sentinel `X`, so an evaluator
-may output fourteen distinct codes. This distinction must remain explicit in schemas and reports.
+The stage vocabulary also contains neutral state `0`, and the evaluator has freeze sentinel `X`,
+so its outward representation may contain fourteen distinct codes. `ABSTAIN` is an epistemic
+classification outcome, not a fifteenth market state. Whether it is represented as a separate
+field or as a qualified outward `0/ABSTAIN` remains schema work, but it must never be pooled with
+`0/DIRECTIONLESS` in evidence, metrics, or reports.
 
 No numerical threshold, lookback, key-level algorithm, confidence rule, or minimum dwell time is
 approved yet. Those details require versioned label cards and point-in-time acceptance evidence
 before the model can leave draft status.
+
+Implementation carriers discussed around this model, including agent frameworks, LLM arbitration,
+UI extensions, language choices, and delivery roadmaps, are outside this document's authority.
+They do not amend the current project architecture, phase plan, or work-item dependencies.
 
 ## 2. State vocabulary
 
@@ -27,8 +36,16 @@ before the model can leave draft status.
 
 | Code | State | Semantic intent |
 | --- | --- | --- |
-| `0` | 无序震荡 (unordered oscillation) | Default state when price action is directionless or evidence is insufficient for a directional stage. |
+| `0` | 无序震荡 (unordered oscillation) | Valid PIT evidence supports directionless price action; classifier uncertainty alone must not create this market-state label. |
 | `X` | 数据异常 (data exception) | Suspension, consecutive one-price limit sessions, event gap, or another condition that makes ordinary stage inference invalid; freeze the stage decision. |
+
+The evaluator must preserve three different meanings:
+
+| Outcome | Meaning | Topology treatment |
+| --- | --- | --- |
+| `0/DIRECTIONLESS` | Valid observations support a neutral, directionless market stage. | Ordinary stage output; transitions may be defined by a future label card. |
+| `ABSTAIN` | Inputs are usable, but directional evidence is insufficient, conflicting, or below the approved confidence rule. | No inferred stage transition; handling remains a versioned evaluator/schema decision. |
+| `X` | Data or market conditions make ordinary inference invalid. | Interrupt and freeze; not an ordinary lifecycle transition. |
 
 `X` is fail-closed control flow, not evidence of structural damage. It blocks or freezes a new
 stage decision according to the future label card, while missing/invalid data alone must not force
@@ -97,7 +114,9 @@ flowchart TD
     S10 -->|direct decline| S12["12 下行推进"]
     S11 -->|rebound ends| S12
     S11 -->|rare direct bottom| S1
+    S1 -.->|stabilization thesis fails| S12
     S12 -->|momentum exhausts| S1
+    S9 -.->|distribution thesis invalidated| S5
 
     SX["X 数据异常：freeze classification"]
 ```
@@ -120,12 +139,19 @@ specified; the diagram intentionally does not draw fourteen bidirectional edges 
 - `5 -> 8 -> 9/10` and `5 -> 9 -> 10`: pointed-top and rounded-top paths remain distinct.
 - `10 -> 11 -> 12` or `10 -> 12`: post-failure rebound or direct decline.
 - `11 -> 1`: rare direct bottoming transition.
+- `1 -> 12`: stabilization fails and the declining trend resumes.
 - `12 -> 1`: declining momentum exhausts, closing the directional cycle.
+- `9 -> 5`: renewed acceptance and advance falsify the distribution thesis.
 
 The shared `3/4/5 -> 2/10` exits make structural integrity the branch condition. A failed
 breakout from `3` remains a transition to `2`, not a separate state; loss of acceptance from `4`
 and trend degradation from `5` follow the same high-level distinction. State `0` is reserved for
-directionless or insufficient evidence and is no longer a structured breakout-failure target.
+directionless price action and is no longer a classifier-uncertainty or structured
+breakout-failure target.
+
+The `1 -> 12` and `9 -> 5` edges are candidate falsification escapes, not a demand to complete a
+mathematically symmetric graph. They prevent bottoming and distribution labels from becoming
+one-way narratives after contrary evidence appears. No other reverse edge follows by analogy.
 
 The transitions above are the currently proposed high-value constraints, not a complete
 permission graph. Unspecified transitions must not be guessed during implementation.
@@ -137,13 +163,28 @@ features and versions, mathematical rules, thresholds, lookbacks, minimum histor
 confidence/abstention behavior, and counterexamples. Acceptance must include:
 
 - deterministic golden cases for every code and listed transition;
+- distinct fixtures and accounting for `0/DIRECTIONLESS`, `ABSTAIN`, and `X`, proving that market
+  neutrality, epistemic uncertainty, and invalid-input freezes are not pooled;
 - explicit precedence for `X`, with tests proving it cannot become an automatic structural exit;
 - transition-frequency, dwell-time, conflict, and unreachable-state audits by market era;
+- targeted counterexamples for `1 -> 12` and `9 -> 5`, with evidence that each edge resolves a
+  stable falsification pattern rather than label noise;
+- comparison of unconstrained outputs with any proposed dwell-time rule: temporal smoothing may
+  suppress chatter, but it must not hide structural evidence or add unmeasured detection delay;
 - separation of pointed-top `8` and rounded-top `9` behavior;
 - an audit of the shared `3/4/5 -> 2/10` structural-integrity branch, including the `3 -> 2`
   breakout-failure path, before considering a new state;
-- stratified human review and multi-year out-of-sample stability;
+- stratified, adjudicated human review with disagreements retained as evidence, plus multi-year
+  out-of-sample stability; reviewer labels are not assumed to be ground truth merely by naming;
 - no use of future bars, future key levels, or current classifications in historical replay.
 
 Until these gates pass, the vocabulary is documentation-only and may be used for discussion or
 shadow annotation, never as an official feature, expert input, or action rule.
+
+## 5. Exploration provenance and non-goals
+
+This revision selectively records model-level questions raised in a 2026-07-28 exploratory
+platform discussion. It does not adopt that discussion's Pi extension, Python/TypeScript split,
+LLM classifier, TUI, feature list, parameter examples, trading guidance, or phased roadmap. The
+revision creates no implementation commitment and does not authorize P3 work to start before its
+existing dependencies and acceptance gates are satisfied.

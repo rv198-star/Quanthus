@@ -59,4 +59,6 @@ environment files, and credentials remain outside Git.
 - Notion HLD: https://app.notion.com/p/b947cb9072444b9c8dd01d3a5a82f7a0
 - P0 decisions: https://app.notion.com/p/3a691fb8262e81aa8659d83d85fd18ed
 
-The repository is the executable record. Notion remains the design and discussion source.
+The repository is the approved executable and design baseline. Notion remains a historical
+discussion and rationale source; it cannot override repository policy, contracts, or approved
+design without a reconciled repository change.

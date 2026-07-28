@@ -2,12 +2,14 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Approved for P1 implementation |
-| Version | 0.1 |
-| Decision date | 2026-07-23 |
+| Design status | approved |
+| Delivery gate | not-applicable |
+| Current phase | P2 implementation open |
+| Version | 0.2 |
+| Effective date | 2026-07-28 |
 | Product type | Internal research and trading decision system |
 | Market | China A-shares, SSE and SZSE |
-| Current release | P1 data foundation |
+| Governing gate | `config/p1-gates.v1.json` |
 
 ## 1. Background
 

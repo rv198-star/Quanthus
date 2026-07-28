@@ -12,11 +12,11 @@ import json
 import re
 import subprocess
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import quote
-
 
 DEFAULT_REPOSITORY = "rv198-star/Quanthus"
 MANAGED_LABEL_PREFIXES = ("type:", "status:", "priority:", "phase:", "area:")
@@ -92,7 +92,7 @@ CHAPTERS = (
         "01", "docs/design/lld/01-data-foundation.md", "P1", "data", MILESTONES[0], "ready"
     ),
     ChapterSpec(
-        "02", "docs/design/lld/02-backtest-engine.md", "P2", "backtest", MILESTONES[1], "blocked"
+        "02", "docs/design/lld/02-backtest-engine.md", "P2", "backtest", MILESTONES[1], "ready"
     ),
     ChapterSpec(
         "03", "docs/design/lld/03-label-feature-system.md", "P3", "labels", MILESTONES[2], "blocked"
@@ -129,7 +129,7 @@ CHAPTERS = (
         "P2",
         "observability",
         MILESTONES[1],
-        "blocked",
+        "ready",
     ),
 )
 
@@ -167,7 +167,7 @@ def parse_table(lines: list[str], start: int) -> list[dict[str, str]]:
             break
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
         if len(cells) == len(header):
-            rows.append(dict(zip(header, cells)))
+            rows.append(dict(zip(header, cells, strict=True)))
     return rows
 
 
@@ -402,8 +402,7 @@ class GitHub:
             command,
             check=False,
             input=input_text,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
         )
         if result.returncode != 0:

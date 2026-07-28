@@ -3,7 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Phase | Instrumentation in P2; reports after P3 |
-| Status | Approved baseline |
+| Design status | approved |
+| Delivery gate | open |
+| Implementation status | P2 decision/shadow logging not started |
+| Gate source | `config/p1-gates.v1.json` |
 | Governing requirements | FR-AUDIT-001 through FR-AUDIT-004 |
 
 ## 1. Goal

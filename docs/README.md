@@ -1,45 +1,56 @@
 # Documentation Map
 
-## Product and design baseline
+This file is the level-zero router for people and AI sessions. It names the current delivery
+branch and the smallest context set for common tasks; detailed rules and design stay in child
+nodes.
 
-- `product/prd.md`: product background, goals, requirements, releases, and success criteria.
-- `design/hld.md`: approved system-level architecture and cross-module contracts.
-- `design/lld/`: implementation-level design for Chapters 01 through 10.
-- `design/stock-stage-state-machine.md`: draft P3 primary-stage vocabulary and transition model;
-  documentation-only until its label cards and validation gates are approved.
-- `work-items/index.md`: stable work-item ids used by GitHub issues.
+| Field | Value |
+| --- | --- |
+| Current phase | P2 implementation open |
+| Gate source | `config/p1-gates.v1.json` |
 
-## Architecture decisions
+## Current branch
 
-- `architecture/adr-0001-local-data-stack.md`: file-first analytical storage and execution.
-- `architecture/adr-0002-hermes-oci-data-platform.md`: Hermes/OCI ownership, PostgreSQL
-  publication and replication topology, security boundaries, and disaster recovery.
-- `architecture/adr-0003-t-close-plus-5h-pipelines.md`: recurring acquisition lanes, the
-  post-close processing SLA, immutable daily DWD partitions, and fail-closed publication.
-- `architecture/adr-0004-hermes-ods-scheduler-v1.md`: five-lane Hermes acquisition schedule,
-  correction semantics, publication state machine, and controlled legacy cutover.
-- `operations/t-close-plus-5h-runbook.md`: Hermes handoff, OCI deployment, rehearsal, incident,
-  and migration procedures for the daily pipeline.
-- `operations/hermes-ods-scheduler-runbook.md`: Hermes shadow deployment, cutover gates, daily
-  operations, rollback, and scheduler migration procedures.
+- P1 is accepted with the versioned C1 fail-closed condition.
+- The P2 matcher, order, ledger, and reporting engine is not implemented.
+- P3 and later delivery remain blocked by their existing gates.
+- `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
-## Decision precedence
+The machine-readable release state is `config/p1-gates.v1.json`. Prose that disagrees with that
+gate is a conformance defect rather than an alternate project state.
 
-When documents disagree, use this order:
+## Tree
 
-1. `config/p0-policy.v1.json` and its contract tests.
-2. Approved repository PRD/HLD/LLD documents.
-3. The Notion P0 decision page dated 2026-07-23.
-4. Earlier Notion HLD/LLD text.
+| Branch | Authority and purpose | Child index |
+| --- | --- | --- |
+| `product/` | Product goals, requirements, non-goals, and release criteria | `product/prd.md` |
+| `design/` | Approved current-state HLD and module LLDs | `design/hld.md`, `design/lld/README.md` |
+| `architecture/` | Accepted decisions and stable topic contracts | `architecture/README.md` |
+| `work-items/` | Stable ids joining design, code, tests, issues, and evidence | `work-items/index.md` |
+| `operations/` | Deployment, recurring operation, incident, migration, and rollback | Runbook selected by the active component |
+| `acceptance/` | Point-in-time acceptance and conformance evidence | Load only for the claim being audited |
+| `hermes/` | Historical audit and handoff artifacts | Not part of default design context |
 
-This order matters because the original Notion Chapter 01 still mentions forward-adjusted
-prices and a current-sector-membership fallback. Both were superseded by P0 decisions.
+## Progressive load routes
+
+| Task | Required context | Add only when needed |
+| --- | --- | --- |
+| P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
+| P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004, relevant acceptance file |
+| ODS or daily operations | this map, architecture index, ADR 0003/0004, selected runbook | Exact config, service, and contract tests |
+| Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
+| P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
+
+## Authority and conflicts
+
+`design/source-precedence.md` defines repository and external-source authority. Within the
+repository, executable policy and approved design must agree. Contract-test success does not make
+an undocumented behavior architectural truth, and prose does not override a frozen executable
+contract.
 
 ## Change discipline
 
-Every behavior-changing pull request must identify:
-
-- the requirement or work-item id;
-- the policy, feature, label, or rule version affected;
-- the acceptance evidence added or updated;
-- whether arbitration or blind data was accessed.
+Every behavior-changing change identifies the requirement or work-item id, governing design node,
+affected code/config paths, contract or golden tests, and acceptance evidence. Accepted ADRs update
+current-state HLD/LLD text in the same change. Drafts, discussions, runbooks, and evidence files do
+not silently promote themselves into the design baseline.

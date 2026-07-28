@@ -3,7 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Phase | P1 |
-| Status | Conditionally accepted; P2 implementation allowed |
+| Design status | approved |
+| Delivery gate | accepted-conditional |
+| Gate source | `config/p1-gates.v1.json` |
 | Governing requirements | FR-DATA-001 through FR-DATA-006 |
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
@@ -146,20 +148,34 @@ value.
 3. Reconcile the exchange calendar and security lifecycle.
 4. Build adjustment factors and tradability state.
 5. Run schema, invariant, gap, and cross-source checks.
-6. Publish canonical partitions and an immutable manifest.
-7. Materialize and register the point-in-time snapshot.
+6. Publish canonical partitions and immutable manifests.
+7. Build and gate a lineage-bound DWS market summary from the accepted daily DWD revision.
+8. Advance the DWD and DWS dataset pointers; downstream snapshot materialization remains governed
+   by the snapshot interface.
 
 Each stage is idempotent by input manifest and transformation version.
 
 Recurring production execution follows ADR 0003. Hermes separates issue-bound historical
 bootstrap work from daily/weekly ODS acquisition and writes READY only after an immutable release
-manifest. OCI runs the versioned `t-close-plus-5h-v1` stages and advances a daily partition pointer
-only after complete status coverage, tradable-bar coverage, identity, checksum, and OHLC gates.
-The accepted P1 full-history DWD remains the base; daily T partitions are chained above it without
-copying the full history. Closed sessions are evidenced by the release calendar and recorded as
-clean skips. Minute and partial-session data are not inputs to this pipeline version.
+manifest. OCI runs the versioned `t-close-plus-5h-v1` stages, builds both the normalized daily DWD
+partition and its DWS market summary, gates both revisions, and then advances their dataset
+pointers. The DWS manifest binds the exact DWD revision and manifest checksum; it is a rebuildable
+projection rather than an alternative canonical bar source. The accepted P1 full-history DWD
+remains the base; daily T partitions are chained above it without copying the full history. Closed
+sessions are evidenced by the release calendar and recorded as clean skips. Minute and
+partial-session data are not inputs to this pipeline version. Terminal email delivery occurs only
+after the durable run ledger is written; a notification failure is recorded but does not change a
+successful data result.
 
-## 7. Blocking work
+### Implementation conformance map
+
+| Capability | Governing implementation | Contract and evidence |
+| --- | --- | --- |
+| PIT identity, tradability, and snapshots | `src/quanthus/adjustments.py`, `src/quanthus/tradability.py`, `src/quanthus/snapshot_publish.py`, versioned P1 config | `tests/p1/`, `tests/contract/test_p0_decisions.py`, P1 acceptance files |
+| Immutable ODS handoff and daily DWD/DWS | `src/quanthus/pipelines/`, `config/pipelines/` | `tests/unit/test_ods_handoff.py`, `tests/unit/test_pipeline_runner.py`, `tests/p1/test_daily_warehouse.py` |
+| Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
+
+## 7. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
@@ -175,6 +191,7 @@ clean skips. Minute and partial-session data are not inputs to this pipeline ver
 | P1-ACCEPT-001 | Run Chapter 01 acceptance suite | C1/C2/S1 and snapshot | D1/D2/D3 evidence bundle |
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | Accepted file-first platform | Open/closed-session rehearsals and durable run ledger |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | META-DATA-PIPE-001 accepted | Shadow run, explicit cutover, rollback, and no overlapping writers |
+| P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |
 
 The S1 reconciliation report measures each in-scope delisted security over the supported daily
@@ -206,4 +223,6 @@ none/qfq returns. A mismatched report checksum, missing case, or changed replay 
 build. Conservative factor-visibility exceptions remain explicit C1 `open` evidence; the command
 cannot silently turn them into a passed blocker.
 
-P2 remains blocked until the gate file and evidence bundle both record this acceptance.
+The gate file and evidence bundle now record this conditional acceptance, so P2 implementation is
+open. A future gate regression or invalidated evidence bundle blocks further P2 promotion; prose
+in this document cannot keep the gate open by itself.

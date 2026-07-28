@@ -2,10 +2,13 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Approved baseline |
-| Version | 0.2 |
-| Effective date | 2026-07-24 |
+| Design status | approved |
+| Delivery gate | not-applicable |
+| Current phase | P2 implementation open |
+| Version | 0.3 |
+| Effective date | 2026-07-28 |
 | Governing policy | `config/p0-policy.v1.json` |
+| Governing gate | `config/p1-gates.v1.json` |
 
 ## 1. System context
 
@@ -54,6 +57,9 @@ P1 uses a file-first analytical architecture distributed across Hermes and OCI:
   watermarks, checksums, and append-only landing batches.
 - OCI is the primary development and analytical runtime. It owns DWD normalization, DWS/PIT
   computation, ADS/data-mart builds, quality gates, acceptance, and version publication.
+- The recurring daily path publishes an identity-normalized DWD partition and a lineage-bound,
+  rebuildable DWS market summary. Each revision is immutable and each dataset's `CURRENT` update
+  is atomic under its own contract; DWD remains the canonical normalized record.
 - Canonical normalized and derived tables are versioned Parquet datasets partitioned by market
   date where appropriate. DuckDB provides local SQL and snapshot materialization on OCI.
 - Polars/PyArrow implement typed transformations and validation.
@@ -113,7 +119,9 @@ Every feature and decision references:
 ### Run contract
 
 Every run records code version, parameter hash, data snapshot id, feature version, rule
-version, run id, and result summary. A report without that manifest is not an official result.
+version, run id, and result summary. Operational pipelines also record terminal notification
+outcomes without persisting notification credentials. A report without its manifest is not an
+official result.
 
 ## 6. Vertical-slice release
 
@@ -135,6 +143,9 @@ Other labels and experts execute in shadow mode without changing position action
 - Candidate ordering is score descending, then security code ascending.
 - Repeated runs over the same immutable inputs must produce byte-equivalent canonical records.
 - Partially published snapshots are never visible to downstream decisions.
+- The daily DWD and DWS revisions both pass their gates before publication begins. Notification
+  delivery is secondary: its failure is recorded for monitoring but does not roll back accepted
+  data.
 
 ## 8. Security and operations
 
@@ -156,6 +167,7 @@ failed proposal. Repository docs and configuration are updated in the same pull 
 
 ## 10. Detailed designs
 
-The implementation contracts are defined under `docs/design/lld/01-data-foundation.md`
-through `docs/design/lld/10-monitoring-attribution.md`. Stable work-item ids connect each
-design section to GitHub issues.
+The implementation contracts are indexed by `docs/design/lld/README.md` and defined under
+`docs/design/lld/01-data-foundation.md` through
+`docs/design/lld/10-monitoring-attribution.md`. Stable work-item ids connect each design section
+to code, tests, acceptance evidence, and GitHub issues.

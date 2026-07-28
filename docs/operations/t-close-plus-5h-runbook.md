@@ -5,7 +5,7 @@
 ```text
 /opt/quanthus/current/                       deployed Git revision
 /home/ubuntu/data/astock/releases/           read-only Hermes ODS mirror
-/home/ubuntu/data/quanthus/revisions/        OCI DWD/DWS/PIT revisions and CURRENT
+/home/ubuntu/data/quanthus/revisions/        OCI DWD/DWS/PIT revisions and dataset CURRENT pointers
 /home/ubuntu/data/quanthus/runs/             pipeline ledgers and logs
 /home/ubuntu/data/quanthus/locks/            process locks
 /etc/quanthus/t-close-plus-5h.env             secrets and deployment paths, never Git
@@ -54,6 +54,12 @@ rounded budget, giving a CN01-qualified completion deadline of 17:26. Hermes rem
 fallback, but its first successful transfer is explicitly recorded as the baseline rather than
 being evaluated against the CN01 transport SLA.
 
+For an open session, OCI builds the immutable daily DWD partition and then a one-row DWS market
+summary bound to the DWD revision and manifest checksum. Both revisions pass their gates before
+publication begins. Publication advances `daily_market_CURRENT.json` and
+`daily_market_summary_CURRENT.json` separately; consumers of the DWS pointer must validate its
+`dwd_revision` rather than assuming the two pointers form one atomic pair.
+
 Weekly source jobs use the weekly example and preserve correction lookbacks. Their OCI transforms
 are added as separate pipeline configurations rather than inserted into the daily critical path.
 
@@ -63,7 +69,9 @@ are added as separate pipeline configurations rather than inserted into the dail
 2. Install `ops/systemd/t-close-plus-5h.env.example` as
    `/etc/quanthus/t-close-plus-5h.env`, mode `0600`, and adjust paths only. Do not add secrets to
    the repository copy. Set `QUANTHUS_CODE_REVISION` to the full commit deployed behind
-   `/opt/quanthus/current`; the doctor rejects a symbolic branch name or abbreviated hash.
+   `/opt/quanthus/current`; the doctor rejects a symbolic branch name or abbreviated hash. Set
+   `QUANTHUS_RESEND_API_KEY` in the protected environment for configured outcome email; it must
+   never appear in Git, command arguments, or the run ledger.
 3. Install the service and timer from `ops/systemd/`.
 4. Run the doctor and validate the timer before enabling it.
 
@@ -106,11 +114,24 @@ find /home/ubuntu/data/quanthus/runs/t-close-plus-5h-v1 -name run.json -type f
 ```
 
 Successful publication creates or advances
-`/home/ubuntu/data/quanthus/revisions/daily_market_CURRENT.json`. Failed builds can leave an
-immutable unpromoted revision for diagnosis; they never change the pointer or `LAST_SUCCESS`.
-An SLA-late run exits nonzero after retaining its successful publication, so systemd records a
-failed unit for monitoring even though canonical data is not rolled back. The failure handler puts
-the full unit status in the journal; production monitoring must alert on either failed unit.
+`/home/ubuntu/data/quanthus/revisions/daily_market_CURRENT.json` and, after it,
+`daily_market_summary_CURRENT.json`. Failed builds can leave an immutable unpromoted revision for
+diagnosis. A failure before publication changes neither pointer; a failure during the second
+pointer publication may leave the canonical DWD ahead of its rebuildable DWS projection and does
+not advance `LAST_SUCCESS`. Replay the exact market date and immutable handoff, then confirm DWS
+lineage before treating the run as recovered. An SLA-late run exits nonzero after retaining its
+successful publication, so systemd records a failed unit for monitoring even though canonical data
+is not rolled back. The failure handler puts the full unit status in the journal; production
+monitoring must alert on either failed unit.
+
+## Outcome notifications
+
+The versioned pipeline config sends one terminal completion or failure email through Resend after
+the durable `run.json` exists. The runner records provider, event, status, attempts, and any bounded
+error text under `notifications.email`; it never records the API key. Notification delivery is a
+secondary monitoring path: failure is visible in the ledger but does not turn a successful data
+pipeline into a failed publication or roll back canonical data. Systemd failure monitoring remains
+required independently of email delivery.
 
 ## Migration
 

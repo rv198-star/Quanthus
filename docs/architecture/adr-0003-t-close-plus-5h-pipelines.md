@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-25
+- Last reconciled: 2026-07-28
 - Scope: Recurring Hermes acquisition and OCI daily warehouse processing
 
 ## Context
@@ -124,20 +125,28 @@ The versioned pipeline has six ordered phases:
 1. poll the CN01-primary and Hermes-fallback ODS handoffs and atomically record one winner;
 2. pull only the exact immutable attempt named by that selection;
 3. verify release integrity, the requested market date, and open/closed session evidence;
-4. rebuild code validity and normalize T bars and raw status observations into an immutable DWD
-   partition;
-5. rerun checksums, row counts, duplicate keys, identity coverage, complete status coverage,
-   tradable-bar coverage, universe scope, and OHLC gates;
-6. atomically advance `/home/ubuntu/data/quanthus/revisions/daily_market_CURRENT.json`.
+4. rebuild code validity, normalize T bars and raw status observations into an immutable DWD
+   partition, and derive one lineage-bound DWS market summary from that exact DWD revision;
+5. rerun DWD checksums, row counts, duplicate keys, identity coverage, complete status coverage,
+   tradable-bar coverage, universe scope, and OHLC gates, then validate DWS checksums, lineage, and
+   aggregate metric invariants;
+6. advance the individually atomic DWD and DWS pointers at
+   `/home/ubuntu/data/quanthus/revisions/daily_market_CURRENT.json` and
+   `/home/ubuntu/data/quanthus/revisions/daily_market_summary_CURRENT.json`.
 
 The accepted P1 DWD revision is the historical base. Daily partitions form an immutable chain on
 top of that base and contain only T rows, avoiding a new 10+ GB full-history copy each day. A rerun
 of T creates a new child revision and may replace the T pointer only after the same gates pass.
-A pointer cannot move to an earlier market date.
+A pointer cannot move to an earlier market date. DWS is a rebuildable projection whose manifest
+contains the exact DWD revision and DWD-manifest checksum; it is not an alternate normalized source.
 
-Future DWS/PIT jobs use the same runner and add stages before publication. PostgreSQL publication
-remains an optional final projection after issue #37; it is never needed to establish canonical
-file state.
+The two dataset pointers are not a cross-file transaction. Both revisions are gated before either
+publication stage begins, but a DWS-pointer failure after DWD publication can leave DWS behind. The
+run then fails, does not advance `LAST_SUCCESS.json`, and must be repaired by replaying the same
+immutable inputs. Consumers of DWS must verify its declared DWD lineage rather than assume pointer
+dates match. Future PIT jobs use the same runner and add stages before publication. PostgreSQL
+publication remains an optional final projection after issue #37; it is never needed to establish
+canonical file state.
 
 ### 4. Failure and audit behavior
 
@@ -152,6 +161,10 @@ file state.
   CN01-qualified SLA.
 - A failed stage stops all later stages. In particular, a failed gate cannot invoke publication.
 - `LAST_SUCCESS.json` changes only after every configured stage succeeds.
+- After the terminal `run.json` is durable, the runner sends configured completion/failure email
+  through Resend and writes only delivery outcome metadata back to the ledger. API credentials stay
+  in the protected environment. Notification failure is alertable but does not change a successful
+  data result or roll back an accepted pointer.
 - A CN01-qualified run completing after 17:26, or after any measured stage exceeds its SLA, is
   retained as `succeeded_late` and must alert; it is not relabeled as on time.
 - A successful Hermes-fallback run without a recorded Hermes transfer baseline is retained as
@@ -171,7 +184,8 @@ the environment file and units, and runs the doctor before enabling the timer.
 
 ## Consequences
 
-The first automated version closes the most urgent daily path without prematurely designing the
+The automated version closes the most urgent daily path without prematurely designing the
 intraday system. It also makes the collector/warehouse boundary executable rather than a verbal
-convention. Weekly OCI PIT transforms and PostgreSQL projection remain separate increments; adding
-them does not change the daily release or runner contracts.
+convention and publishes a small, lineage-bound daily market summary without making DWS canonical.
+Weekly OCI PIT transforms and PostgreSQL projection remain separate increments; adding them does
+not change the daily release or runner contracts.

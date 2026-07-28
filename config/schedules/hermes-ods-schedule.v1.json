@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "provider-readiness-gated-20260728",
+  "contract_revision": "provider-readiness-window-gated-20260728",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_only",
@@ -50,12 +50,14 @@
           {
             "node_id": "hermes",
             "timer_start": "15:40:00",
+            "activation_grace_seconds": 300,
             "start_policy": "first_provider_ready_after_timer",
             "service_timeout_seconds": 15000
           },
           {
             "node_id": "cn01",
             "timer_start": "19:00:00",
+            "activation_grace_seconds": 300,
             "start_policy": "fixed_late_window",
             "service_timeout_seconds": 3000
           }

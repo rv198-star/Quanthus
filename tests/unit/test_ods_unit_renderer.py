@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RENDERER = ROOT / "ops" / "bin" / "render-ods-node-units"
+WINDOW_CHECKER = ROOT / "ops" / "bin" / "check-ods-collection-window"
 
 
 class OdsUnitRendererTests(unittest.TestCase):
@@ -37,6 +38,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("Unit=cn01-ods-market-daily-core.service", market_timer)
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", market_service)
         self.assertIn("Environment=HERMES_ODS_NODE_ID=cn01", market_service)
+        self.assertIn("check-ods-collection-window --node-id cn01", market_service)
         self.assertIn("TimeoutStartSec=50min", market_service)
         self.assertIn("ops/bin/run-hermes-ods-lane", market_service)
         self.assertNotIn("ops/bin/run-cn01-ods-lane", market_service)
@@ -55,6 +57,52 @@ class OdsUnitRendererTests(unittest.TestCase):
         rendered = (output / "hermes-ods-market-daily-core.timer").read_bytes()
         source = (ROOT / "ops/systemd/hermes-ods-market-daily-core.timer").read_bytes()
         self.assertEqual(rendered, source)
+
+    def test_collection_window_checker_enforces_each_node_start(self) -> None:
+        config = ROOT / "config/schedules/hermes-ods-schedule.v1.json"
+
+        cases = [
+            ("hermes", "2026-07-29T15:40:00+08:00", 0),
+            ("hermes", "2026-07-29T18:20:00+08:00", 1),
+            ("cn01", "2026-07-29T15:40:00+08:00", 1),
+            ("cn01", "2026-07-29T19:04:59+08:00", 0),
+            ("cn01", "2026-07-29T19:05:00+08:00", 1),
+        ]
+        for node_id, observed_at, expected in cases:
+            with self.subTest(node_id=node_id, observed_at=observed_at):
+                result = subprocess.run(
+                    [
+                        str(WINDOW_CHECKER),
+                        "--node-id",
+                        node_id,
+                        "--config",
+                        str(config),
+                        "--at",
+                        observed_at,
+                    ],
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                self.assertEqual(result.returncode, expected, result.stderr)
+
+    def test_collection_window_checker_fails_closed_for_unknown_node(self) -> None:
+        result = subprocess.run(
+            [
+                str(WINDOW_CHECKER),
+                "--node-id",
+                "unknown",
+                "--config",
+                str(ROOT / "config/schedules/hermes-ods-schedule.v1.json"),
+                "--at",
+                "2026-07-29T15:40:00+08:00",
+            ],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 255)
+        self.assertIn("configuration error", result.stderr)
 
 
 if __name__ == "__main__":

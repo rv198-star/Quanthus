@@ -172,8 +172,10 @@ three contract indices. Empty successful responses are availability evidence and
 immediate reconnect; only provider/network errors do. The full stock scan starts after readiness,
 retries only its bounded missing set, records request-local acquisition timestamps, and derives
 dataset `knowledge_cutoff` no earlier than the latest observed acquisition. Hermes and CN01 use
-the versioned early/late collection-window experiment in ADR 0003; both retain identical coverage
-and READY gates.
+the versioned early/late collection-window experiment in ADR 0004; both retain identical coverage
+and READY gates. The rendered systemd service checks the contract's node-specific start plus
+five-minute activation grace before invoking the lane runner, so restarting a timer after its
+window cannot silently turn into an unplanned third observation.
 
 ### Implementation conformance map
 

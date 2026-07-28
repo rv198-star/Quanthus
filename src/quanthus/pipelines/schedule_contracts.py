@@ -183,12 +183,14 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
             {
                 "node_id": "hermes",
                 "timer_start": "15:40:00",
+                "activation_grace_seconds": 300,
                 "start_policy": "first_provider_ready_after_timer",
                 "service_timeout_seconds": 15000,
             },
             {
                 "node_id": "cn01",
                 "timer_start": "19:00:00",
+                "activation_grace_seconds": 300,
                 "start_policy": "fixed_late_window",
                 "service_timeout_seconds": 3000,
             },

@@ -63,6 +63,8 @@ P1 uses a file-first analytical architecture distributed across Hermes and OCI:
 - Daily BaoStock acquisition is provider-readiness gated: Hermes tests the earliest usable window
   while CN01 tests a fixed late window. Both require the complete target-date sentinel-index set
   before scanning stocks, bound socket and retry behavior, and publish no READY on any coverage gap.
+  A contract-defined systemd activation grace rejects elapsed-window timer replays before they can
+  create an acquisition attempt.
 - Canonical normalized and derived tables are versioned Parquet datasets partitioned by market
   date where appropriate. DuckDB provides local SQL and snapshot materialization on OCI.
 - Polars/PyArrow implement typed transformations and validation.

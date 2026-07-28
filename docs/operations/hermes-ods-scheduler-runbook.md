@@ -47,9 +47,12 @@ but the repository-owned launcher remains `ops/bin/run-hermes-ods-lane` on every
 render keeps the 15:40 early window with a 4h10m timeout; the CN01 render uses the 19:00 late window
 with a 50-minute timeout. Do not hand-edit either installed timer.
 
-4. Start timers without manually starting services. Record the deployed commit, transformed unit
-   checksums, next trigger times, and rollback path. OCI independently verifies the exported
-   evidence through its read-only channel.
+4. Start timers without manually starting services. The market service first runs
+   `check-ods-collection-window`; an elapsed same-day event presented after a timer restart is
+   condition-skipped outside the node's contract-defined five-minute grace and creates no attempt.
+   Do not bypass that gate with `systemctl start` on the service. Record the deployed commit,
+   transformed unit checksums, next trigger times, and rollback path. OCI independently verifies
+   the exported evidence through its read-only channel.
 
 Node-local `.venv/`, `.deps/`, protected env files, Base/ODS data, attempts, releases, and
 watermarks remain outside Git. A bootstrap archive may seed data, but it is never a substitute for

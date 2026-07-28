@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Fail closed when systemd activates an ODS collector outside its node window."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from datetime import datetime, time, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+
+class WindowConfigError(RuntimeError):
+    """Raised when the schedule cannot define one unambiguous node window."""
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--node-id", required=True)
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("/root/work/Quanthus/config/schedules/hermes-ods-schedule.v1.json"),
+    )
+    parser.add_argument("--at", help=argparse.SUPPRESS)
+    return parser
+
+
+def _window(config: Path, node_id: str) -> tuple[ZoneInfo, time, int]:
+    try:
+        payload = json.loads(config.read_text(encoding="utf-8"))
+        zone = ZoneInfo(str(payload["timezone"]))
+        lane = next(item for item in payload["lanes"] if item["id"] == "market-daily-core")
+        nodes = lane["collection_window_experiment"]["nodes"]
+        node = next(item for item in nodes if item["node_id"] == node_id)
+        start = time.fromisoformat(str(node["timer_start"]))
+        grace = int(node["activation_grace_seconds"])
+    except (KeyError, OSError, ValueError, StopIteration, TypeError, json.JSONDecodeError) as exc:
+        raise WindowConfigError(
+            f"cannot resolve collection window for node {node_id!r}: {exc}"
+        ) from exc
+    if grace <= 0 or grace > 3600:
+        raise WindowConfigError("activation_grace_seconds must be in the range 1..3600")
+    return zone, start, grace
+
+
+def _observed_at(value: str | None, zone: ZoneInfo) -> datetime:
+    if value is None:
+        return datetime.now(zone)
+    observed = datetime.fromisoformat(value)
+    if observed.tzinfo is None:
+        raise WindowConfigError("--at must include a timezone offset")
+    return observed.astimezone(zone)
+
+
+def main() -> int:
+    args = _parser().parse_args()
+    try:
+        zone, start_time, grace = _window(args.config, args.node_id)
+        observed = _observed_at(args.at, zone)
+    except WindowConfigError as exc:
+        print(f"ODS collection window configuration error: {exc}", file=sys.stderr)
+        return 255
+
+    start = datetime.combine(observed.date(), start_time, tzinfo=zone)
+    end = start + timedelta(seconds=grace)
+    if start <= observed < end:
+        print(
+            f"ODS collection window open: node={args.node_id} "
+            f"observed_at={observed.isoformat()} start={start.isoformat()}"
+        )
+        return 0
+    print(
+        f"ODS collection window closed: node={args.node_id} "
+        f"observed_at={observed.isoformat()} allowed=[{start.isoformat()},{end.isoformat()})"
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

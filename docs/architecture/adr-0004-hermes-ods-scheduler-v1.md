@@ -69,12 +69,18 @@ connection churn; only provider/network errors receive bounded reconnect retries
 process-global socket receives a 30-second timeout after every login. The stock scan performs one
 initial pass and one bounded retry of only the missing set, then fails closed on any residual gap.
 
-Contract revision `provider-readiness-gated-20260728` also owns a five-open-session A/B. Hermes
+Contract revision `provider-readiness-window-gated-20260728` also owns a five-open-session A/B. Hermes
 starts at 15:40 and scans at first provider readiness; CN01 starts at 19:00. Rendered node units set
 the node id and use timeouts aligned to the shared 19:46 completion deadline. Both attempts retain
 the same source, universe, quality gates, and immutable release semantics. Their acquisition logs
 record the comparison metrics named by the contract. The experiment may change a future timer only
 through another contract revision after the minimum sample is present.
+
+Each node also has a five-minute activation grace declared in the contract and enforced by the
+systemd service before Python acquisition starts. Restarting a calendar timer after its same-day
+window may make systemd present the elapsed event again even with `Persistent=false`; that event is
+condition-skipped, creates no attempt, and cannot contaminate the A/B sample. Operators use the
+launcher directly for an explicitly reviewed manual rerun rather than bypassing the service gate.
 
 Weekend market timers do not exist. Event acquisition still runs every natural day because an
 announcement can be disclosed on a weekend or holiday; it cannot convert that date into a

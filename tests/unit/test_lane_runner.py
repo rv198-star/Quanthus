@@ -1003,11 +1003,17 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     expected_schedule_sha = f"sha256:{hashlib.sha256(SCHEDULE.read_bytes()).hexdigest()}"
     attempt = json.loads((result.attempt_dir / "attempt.json").read_text(encoding="utf-8"))
     assert attempt["schedule_id"] == "hermes-ods-schedule-v1"
-    assert attempt["schedule_contract_revision"] == "provider-readiness-gated-20260728"
+    assert (
+        attempt["schedule_contract_revision"]
+        == "provider-readiness-window-gated-20260728"
+    )
     assert attempt["schedule_config_sha256"] == expected_schedule_sha
     release = json.loads((result.release_dir / "release.json").read_text(encoding="utf-8"))
     assert release["schedule_contract_id"] == "hermes-ods-schedule-v1"
-    assert release["schedule_contract_revision"] == "provider-readiness-gated-20260728"
+    assert (
+        release["schedule_contract_revision"]
+        == "provider-readiness-window-gated-20260728"
+    )
     assert release["schedule_config_sha256"] == expected_schedule_sha
     meta_dataset = next(item for item in result.datasets if item.name == "intraday_meta")
     meta = json.loads(Path(meta_dataset.path).read_text(encoding="utf-8"))

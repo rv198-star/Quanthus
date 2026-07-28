@@ -27,7 +27,9 @@ class ScheduleContractTests(unittest.TestCase):
         contract = load_schedule_contract(CONFIG)
 
         self.assertEqual(contract.schedule_id, "hermes-ods-schedule-v1")
-        self.assertEqual(contract.contract_revision, "provider-readiness-gated-20260728")
+        self.assertEqual(
+            contract.contract_revision, "provider-readiness-window-gated-20260728"
+        )
         self.assertEqual(len(contract.lanes), 5)
 
     def test_2026_trading_session_contract_is_explicit_and_sparse(self) -> None:
@@ -120,6 +122,18 @@ class ScheduleContractTests(unittest.TestCase):
                 lane for lane in payload["lanes"] if lane["id"] == "market-daily-core"
             )
             lane["collection_window_experiment"]["nodes"][1]["timer_start"] = "18:00:00"
+
+        with self.assertRaisesRegex(ScheduleContractError, "collection window experiment"):
+            load_schedule_contract(self._mutated(mutate))
+
+    def test_rejects_collection_window_without_activation_grace(self) -> None:
+        def mutate(payload: dict[str, object]) -> None:
+            lane = next(
+                lane for lane in payload["lanes"] if lane["id"] == "market-daily-core"
+            )
+            lane["collection_window_experiment"]["nodes"][0].pop(
+                "activation_grace_seconds"
+            )
 
         with self.assertRaisesRegex(ScheduleContractError, "collection window experiment"):
             load_schedule_contract(self._mutated(mutate))

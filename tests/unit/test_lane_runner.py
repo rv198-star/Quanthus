@@ -511,6 +511,58 @@ def test_baostock_index_fetch_reconnects_after_provider_error(
     ]
 
 
+def test_baostock_query_keeps_reconnect_failure_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Login:
+        error_code = "10002007"
+        error_msg = "network receive error"
+
+    class FailedQuery:
+        error_code = "10002007"
+        error_msg = "network receive error"
+
+    class FakeBaostock:
+        login_calls = 0
+        query_calls = 0
+
+        @classmethod
+        def login(cls) -> Login:
+            cls.login_calls += 1
+            return Login()
+
+        @staticmethod
+        def logout() -> None:
+            return None
+
+        @classmethod
+        def query_history_k_data_plus(cls, *_args, **_kwargs) -> FailedQuery:
+            cls.query_calls += 1
+            return FailedQuery()
+
+    monkeypatch.setattr(lane_runner.time, "sleep", lambda _seconds: None)
+    rows, error_code, error_msg, attempts, retry_errors = (
+        lane_runner._baostock_query_day_with_retry(
+            FakeBaostock,
+            code="sz.000001",
+            fields="date,code",
+            day="2026-07-28",
+        )
+    )
+
+    assert rows == []
+    assert error_code == "provider_reconnect_failed"
+    assert "login failed after 3 attempts" in error_msg
+    assert attempts == 3
+    assert FakeBaostock.query_calls == 1
+    assert FakeBaostock.login_calls == 6
+    assert [item["error_code"] for item in retry_errors] == [
+        "10002007",
+        "provider_reconnect_failed",
+        "provider_reconnect_failed",
+    ]
+
+
 def test_baostock_empty_response_does_not_reconnect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

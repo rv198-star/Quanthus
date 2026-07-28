@@ -813,11 +813,23 @@ def _baostock_query_day_with_retry(
             with suppress(Exception):
                 bs.logout()
             time.sleep(float(attempt - 1))
-            _baostock_login_with_retry(
-                bs,
-                max_attempts=max_attempts,
-                socket_timeout_seconds=socket_timeout_seconds,
-            )
+            try:
+                _baostock_login_with_retry(
+                    bs,
+                    max_attempts=max_attempts,
+                    socket_timeout_seconds=socket_timeout_seconds,
+                )
+            except LaneRunError as exc:
+                error_code = "provider_reconnect_failed"
+                error_msg = str(exc)
+                retry_errors.append(
+                    {
+                        "attempt": str(attempt),
+                        "error_code": error_code,
+                        "error_msg": error_msg,
+                    }
+                )
+                continue
 
         rows: list[list[str]] = []
         error_code = "provider_exception"

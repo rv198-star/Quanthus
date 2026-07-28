@@ -42,8 +42,10 @@ sudo systemctl daemon-reload
 ```
 
 The rendered directory includes the generic `quanthus-pipeline-failure@.service` handler. Node
-renaming changes unit names and the protected environment-file path, but the repository-owned
-launcher remains `ops/bin/run-hermes-ods-lane` on every node.
+renaming changes unit names, the protected environment-file path, and the market-window metadata,
+but the repository-owned launcher remains `ops/bin/run-hermes-ods-lane` on every node. The Hermes
+render keeps the 15:40 early window with a 4h10m timeout; the CN01 render uses the 19:00 late window
+with a 50-minute timeout. Do not hand-edit either installed timer.
 
 4. Start timers without manually starting services. Record the deployed commit, transformed unit
    checksums, next trigger times, and rollback path. OCI independently verifies the exported
@@ -85,6 +87,14 @@ preflight. It requests `baostock.query_trade_dates` for the target date and a se
 requires the target date in the fresh response, and writes the merged candidate under the current
 attempt's `landing/preflight/`. It does not overwrite the Base calendar. Market and minute
 collectors must not run if this refresh fails.
+
+For an open session, inspect `landing/provider_readiness.json`. The market collector polls
+`sh.000001`, `sh.000300`, and `sz.399001` until all three return the target date or the 19:00
+readiness deadline expires. An empty successful response is not a connection error and must not
+cause an immediate logout/login cycle. Provider/network errors have bounded reconnects; each
+successful login applies a 30-second socket timeout. After readiness, the first stock pass is
+followed by one retry of only the missing set. A residual gap or the 19:46 completion deadline
+produces no READY.
 
 Minute provider collection is always written under the current attempt. Shared legacy minute
 partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must
@@ -136,8 +146,10 @@ PYTHONPATH=src python -m quanthus.cli lane-shadow-matrix \
   --weekly-date 2026-07-24 --event-date 2026-07-24
 ```
 
-1. Run `market-daily-core` for at least five open sessions, one known closed weekday, and one
-   injected missing/disagreeing calendar case.
+1. Run `market-daily-core` on both Hermes and CN01 for at least five open sessions, plus one known
+   closed weekday and one injected missing/disagreeing calendar case. Keep Hermes at 15:40 and
+   CN01 at 19:00 for the full sample. Compare the contract metrics in each acquisition log; do not
+   select a preferred window from one day.
 2. Run `calendar-daily-events` for at least seven natural days including a weekend.
 3. Run direct 1m and 5m streams for at least five open sessions. Prove no key/date coverage gap
    against the legacy combined job, prove that the two checkpoints advance independently, and
@@ -165,7 +177,9 @@ OCI posts `GO_FOR_CUTOVER` only when all of the following are true:
 - provider-mode market and minute attempts prove a fresh target-date calendar refresh before
   their three-state preflight;
 - every required shadow scenario passes;
-- market daily core publishes READY by 17:25 or raises a tested SLA alert;
+- market daily core publishes READY by 19:46 or raises a tested SLA alert;
+- the early/late collection experiment contains at least five open sessions per node before any
+  timer preference is accepted;
 - `closed_session`, `failed`, and `partial` cannot advance any canonical pointer;
 - direct 1m and direct 5m have no unexplained coverage gap;
 - weekly corrections retain both prior evidence and conflicting observations;
@@ -218,6 +232,12 @@ calendar source/window/checksum, preflight result, each mandatory dataset status
 movement, READY checksum, duration, retry count, and alert state. File existence alone does not
 establish success.
 
+For the collection-window experiment, also compare `metrics.readiness_polls`,
+`empty_response_count`, `provider_error_count`, `reconnect_count`, average/maximum request duration,
+and batch duration from `acquisition_log.json`. Keep node, market date, universe size, and contract
+revision in the comparison. Provider readiness time and network congestion are different possible
+causes; do not infer either from a single aggregate duration.
+
 On a closed weekday, only a checksummed calendar-only release is valid. On refresh failure or
 missing/disagreeing calendar evidence, there must be no market/minute provider calls and no READY.
 On weekends, only event-lane output is expected.
@@ -231,6 +251,10 @@ If a replacement lane misses data or violates its manifest contract, disable onl
 re-enable its archived legacy entry, and post `ROLLED_BACK` with exact evidence to #41. Do not
 roll back lanes that are operating correctly. OCI does not advance DWD `CURRENT` from the bad
 release and can rebuild from the last accepted ODS revision.
+
+During the five-session A/B, a failed node remains fail-closed and may be rerun as a new attempt,
+but its timer is not moved into the other node's window mid-sample. A safety or repeated-availability
+failure ends the experiment explicitly and records the shortened sample before rollback.
 
 ## Migration
 

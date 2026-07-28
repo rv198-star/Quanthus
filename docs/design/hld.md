@@ -60,6 +60,9 @@ P1 uses a file-first analytical architecture distributed across Hermes and OCI:
 - The recurring daily path publishes an identity-normalized DWD partition and a lineage-bound,
   rebuildable DWS market summary. Each revision is immutable and each dataset's `CURRENT` update
   is atomic under its own contract; DWD remains the canonical normalized record.
+- Daily BaoStock acquisition is provider-readiness gated: Hermes tests the earliest usable window
+  while CN01 tests a fixed late window. Both require the complete target-date sentinel-index set
+  before scanning stocks, bound socket and retry behavior, and publish no READY on any coverage gap.
 - Canonical normalized and derived tables are versioned Parquet datasets partitioned by market
   date where appropriate. DuckDB provides local SQL and snapshot materialization on OCI.
 - Polars/PyArrow implement typed transformations and validation.

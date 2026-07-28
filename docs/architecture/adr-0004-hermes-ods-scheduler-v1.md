@@ -2,7 +2,8 @@
 
 - Status: Accepted for shadow deployment
 - Date: 2026-07-25
-- Scope: Recurring acquisition and reconciliation on Hermes
+- Last reconciled: 2026-07-28
+- Scope: Recurring acquisition and reconciliation on Hermes and CN01 ODS nodes
 - Contract: `config/schedules/hermes-ods-schedule.v1.json`
 - Migration tracking: GitHub issue #41
 
@@ -32,7 +33,7 @@ misrepresenting the 2026 final-trading-time update as a new lane topology.
 | Lane | Trigger (Asia/Shanghai) | Responsibility | Publication |
 | --- | --- | --- | --- |
 | `bootstrap` | Manual, issue-bound | Initialization and historical backfill | Immutable raw revision; never recurring |
-| `market-daily-core` | Mon-Fri 15:40 | Final daily bars after the 15:30 trading boundary, binary status observation, market references and index/adjustment deltas | Daily ODS; READY by 17:25, then OCI CN01-primary completion by 17:26 |
+| `market-daily-core` | Hermes Mon-Fri 15:40 first-ready; CN01 Mon-Fri 19:00 fixed late window | Final daily bars after the 15:30 trading boundary, binary status observation, market references and index/adjustment deltas | Daily ODS; READY by 19:46, then OCI completion by 20:30 |
 | `calendar-daily-events` | Every day 19:30 | Announcements and disclosure-driven events | Natural-day ODS; never creates a market session |
 | `intraday-archive` | 1m Mon-Fri 20:30; 5m Mon-Fri 23:00 | Preserve direct minute archives while sources retain them | Independent streams outside the T+5H path |
 | `weekly-corrections` | Saturday 08:00 | Low-frequency primary acquisition and bounded reconciliation | Independent correction revision |
@@ -58,6 +59,22 @@ observations. A future source upgrade requires a new contract revision.
 Refresh failure is also terminal and occurs before all market-provider calls. The candidate never
 overwrites the Base calendar or a prior attempt. Reruns create a new attempt and fetch the target
 date again. Explicit forced-preflight paths remain test-only and are recorded as a bypass.
+
+### Provider readiness and collection-window experiment
+
+Open-session preflight does not prove that BaoStock has published final daily rows. The market lane
+therefore polls the target date for `sh.000001`, `sh.000300`, and `sz.399001` before scanning the
+stock universe. All three must be present in one poll. Empty successful responses never trigger
+connection churn; only provider/network errors receive bounded reconnect retries. BaoStock's
+process-global socket receives a 30-second timeout after every login. The stock scan performs one
+initial pass and one bounded retry of only the missing set, then fails closed on any residual gap.
+
+Contract revision `provider-readiness-gated-20260728` also owns a five-open-session A/B. Hermes
+starts at 15:40 and scans at first provider readiness; CN01 starts at 19:00. Rendered node units set
+the node id and use timeouts aligned to the shared 19:46 completion deadline. Both attempts retain
+the same source, universe, quality gates, and immutable release semantics. Their acquisition logs
+record the comparison metrics named by the contract. The experiment may change a future timer only
+through another contract revision after the minimum sample is present.
 
 Weekend market timers do not exist. Event acquisition still runs every natural day because an
 announcement can be disclosed on a weekend or holiday; it cannot convert that date into a
@@ -112,7 +129,7 @@ dataset's success or by a wrapper exiting zero.
 
 ## Resource policy
 
-The market daily core receives priority until its 17:25 ODS-ready deadline. Event calls use a separate API
+The market daily core receives priority until its 19:46 ODS-ready deadline. Event calls use a separate API
 resource group. Minute jobs use the market API group after the core deadline. Weekly bulk I/O
 runs Saturday morning, after Friday minute acquisition. Locks prevent jobs in one constrained
 resource group from competing for PVE CPU, disk, or provider quotas.

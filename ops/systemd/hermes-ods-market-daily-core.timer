@@ -1,5 +1,5 @@
 [Unit]
-Description=Hermes ODS market-daily-core after final daily totals (contract 15:40)
+Description=Hermes ODS market-daily-core early collection window (contract 15:40)
 
 [Timer]
 OnCalendar=Mon..Fri *-*-* 15:40:00 Asia/Shanghai

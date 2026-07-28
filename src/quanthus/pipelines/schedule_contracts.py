@@ -172,19 +172,81 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
     }
     if any(preflight.get(key) != value for key, value in expected.items()):
         raise ScheduleContractError("market session preflight must use the three-state policy")
-    if lane.get("completion_deadline") != "17:25:00":
-        raise ScheduleContractError("market-daily-core must use the ready-gated 17:25 deadline")
+    experiment = _mapping(
+        lane.get("collection_window_experiment"),
+        field="market-daily-core.collection_window_experiment",
+    )
+    expected_experiment = {
+        "experiment_id": "baostock-load-window-20260728-v1",
+        "minimum_open_sessions": 5,
+        "nodes": [
+            {
+                "node_id": "hermes",
+                "timer_start": "15:40:00",
+                "start_policy": "first_provider_ready_after_timer",
+                "service_timeout_seconds": 15000,
+            },
+            {
+                "node_id": "cn01",
+                "timer_start": "19:00:00",
+                "start_policy": "fixed_late_window",
+                "service_timeout_seconds": 3000,
+            },
+        ],
+        "comparison_metrics": [
+            "readiness_polls",
+            "empty_response_count",
+            "provider_error_count",
+            "reconnect_count",
+            "average_request_duration_seconds",
+            "maximum_request_duration_seconds",
+            "batch_duration_seconds",
+        ],
+        "decision_policy": "compare_only_after_minimum_open_sessions",
+    }
+    if any(experiment.get(key) != value for key, value in expected_experiment.items()):
+        raise ScheduleContractError("market-daily-core collection window experiment is invalid")
+    readiness = _mapping(
+        lane.get("provider_readiness"), field="market-daily-core.provider_readiness"
+    )
+    expected_readiness = {
+        "sentinel_indices": ["sh.000001", "sh.000300", "sz.399001"],
+        "target_row_policy": "all_sentinels_return_target_market_date",
+        "deadline": "19:00:00",
+        "empty_response_policy": "poll_or_missing_set_retry_without_reconnect",
+        "provider_error_policy": "bounded_reconnect",
+        "missing_set_retry_rounds": 1,
+    }
+    if any(readiness.get(key) != value for key, value in expected_readiness.items()):
+        raise ScheduleContractError("market-daily-core provider readiness contract is invalid")
+    for field in (
+        "poll_interval_seconds",
+        "socket_timeout_seconds",
+        "missing_set_retry_delay_seconds",
+    ):
+        _positive_number(
+            readiness.get(field), field=f"market-daily-core.provider_readiness.{field}"
+        )
+    if lane.get("completion_deadline") != "19:46:00":
+        raise ScheduleContractError("market-daily-core must use the provisional 19:46 deadline")
     timing_sla = _mapping(lane.get("timing_sla"), field="market-daily-core.timing_sla")
     observed = _positive_number(
         timing_sla.get("observed_max_duration_seconds"),
         field="market-daily-core.timing_sla.observed_max_duration_seconds",
     )
-    if timing_sla.get("basis") != "accepted_market_daily_attempts_20260727":
-        raise ScheduleContractError("market-daily-core timing SLA must name its accepted evidence")
+    if (
+        timing_sla.get("basis")
+        != "scheduled_market_daily_incident_20260728_rounded_to_123_minutes"
+    ):
+        raise ScheduleContractError("market-daily-core timing SLA must name its incident evidence")
+    if timing_sla.get("validation_status") != "provisional_pending_five_open_sessions":
+        raise ScheduleContractError("market-daily-core timing SLA must remain provisional")
     if timing_sla.get("safety_margin_percent") != 100:
         raise ScheduleContractError("market-daily-core timing SLA must retain the 100% margin")
     if timing_sla.get("allowed_duration_seconds") != math.ceil(observed * 2):
-        raise ScheduleContractError("market-daily-core timing SLA must double the observed duration")
+        raise ScheduleContractError(
+            "market-daily-core timing SLA must double the observed duration"
+        )
     if timing_sla.get("latest_ready_time") != lane.get("completion_deadline"):
         raise ScheduleContractError("market-daily-core ready deadline must match its timing SLA")
 

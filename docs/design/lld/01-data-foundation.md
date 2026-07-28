@@ -167,6 +167,14 @@ partial-session data are not inputs to this pipeline version. Terminal email del
 after the durable run ledger is written; a notification failure is recorded but does not change a
 successful data result.
 
+For an open session, daily acquisition first requires BaoStock to return the target date for all
+three contract indices. Empty successful responses are availability evidence and never trigger an
+immediate reconnect; only provider/network errors do. The full stock scan starts after readiness,
+retries only its bounded missing set, records request-local acquisition timestamps, and derives
+dataset `knowledge_cutoff` no earlier than the latest observed acquisition. Hermes and CN01 use
+the versioned early/late collection-window experiment in ADR 0003; both retain identical coverage
+and READY gates.
+
 ### Implementation conformance map
 
 | Capability | Governing implementation | Contract and evidence |

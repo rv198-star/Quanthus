@@ -19,6 +19,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
 
+from quanthus.providers.baostock_transport import set_socket_timeout
+
 SOURCE = "baostock.query_trade_dates"
 EXCHANGES = ("SSE", "SZSE", "BSE")
 REQUIRED_EXCHANGES = ("SSE", "SZSE")
@@ -103,6 +105,7 @@ def fetch_baostock_calendar(start: date, end: date) -> list[dict[str, Any]]:
         raise CalendarRefreshError(f"baostock login request failed: {exc}") from exc
     if str(login.error_code) != "0":
         raise CalendarRefreshError(f"baostock login failed: {login.error_msg}")
+    set_socket_timeout(30)
     try:
         query = bs.query_trade_dates(
             start_date=start.isoformat(),

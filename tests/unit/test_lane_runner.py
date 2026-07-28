@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import subprocess
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pyarrow as pa
@@ -219,7 +219,9 @@ def _paths(home: Path, shadow: Path) -> LanePaths:
 
 def test_timer_oncalendar_matches_schedule_contract() -> None:
     expected = expected_timer_oncalendar(SCHEDULE)
+    cn01_expected = expected_timer_oncalendar(SCHEDULE, node_id="cn01")
     assert expected["market-daily-core"] == "Mon..Fri *-*-* 15:40:00 Asia/Shanghai"
+    assert cn01_expected["market-daily-core"] == "Mon..Fri *-*-* 19:00:00 Asia/Shanghai"
     assert expected["calendar-daily-events"] == "*-*-* 19:30:00 Asia/Shanghai"
     assert expected["weekly-corrections"] == "Sat *-*-* 08:00:00 Asia/Shanghai"
     assert expected["intraday-1m"] == "Mon..Fri *-*-* 20:30:00 Asia/Shanghai"
@@ -508,6 +510,195 @@ def test_baostock_index_fetch_reconnects_after_provider_error(
     ]
 
 
+def test_baostock_empty_response_does_not_reconnect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Login:
+        error_code = "0"
+        error_msg = "ok"
+
+    class EmptyQuery:
+        error_code = "0"
+        error_msg = "ok"
+
+        @staticmethod
+        def next() -> bool:
+            return False
+
+    class FakeBaostock:
+        login_calls = 0
+        query_calls = 0
+
+        @classmethod
+        def login(cls) -> Login:
+            cls.login_calls += 1
+            return Login()
+
+        @staticmethod
+        def logout() -> None:
+            return None
+
+        @classmethod
+        def query_history_k_data_plus(cls, *_args, **_kwargs) -> EmptyQuery:
+            cls.query_calls += 1
+            return EmptyQuery()
+
+    monkeypatch.setitem(__import__("sys").modules, "baostock", FakeBaostock)
+    bars, statuses, logs = lane_runner._baostock_fetch_day(
+        ["000001"],
+        date(2026, 7, 27),
+        missing_set_retry_rounds=0,
+    )
+
+    assert bars == []
+    assert statuses == []
+    assert FakeBaostock.login_calls == 1
+    assert FakeBaostock.query_calls == 1
+    assert logs[0]["response_error_code"] == "empty_response"
+    assert logs[0]["attempts"] == 1
+    assert logs[0]["retry_errors"] == []
+
+
+def test_baostock_missing_set_retry_repairs_only_early_gaps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Login:
+        error_code = "0"
+        error_msg = "ok"
+
+    class Query:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self, row: list[str] | None) -> None:
+            self.row = row
+            self.pending = row is not None
+
+        def next(self) -> bool:
+            pending, self.pending = self.pending, False
+            return pending
+
+        def get_row_data(self) -> list[str]:
+            assert self.row is not None
+            return self.row
+
+    class FakeBaostock:
+        calls: list[str] = []
+        per_code: dict[str, int] = {}
+        login_calls = 0
+
+        @classmethod
+        def login(cls) -> Login:
+            cls.login_calls += 1
+            return Login()
+
+        @staticmethod
+        def logout() -> None:
+            return None
+
+        @classmethod
+        def query_history_k_data_plus(cls, code: str, *_args, **_kwargs) -> Query:
+            cls.calls.append(code)
+            cls.per_code[code] = cls.per_code.get(code, 0) + 1
+            if code == "sz.000001" and cls.per_code[code] == 1:
+                return Query(None)
+            return Query(
+                [
+                    "2026-07-27",
+                    code,
+                    "1",
+                    "2",
+                    "0.5",
+                    "1.5",
+                    "100",
+                    "200",
+                    "1.2",
+                    "-0.5",
+                    "1",
+                    "0",
+                ]
+            )
+
+    sleeps: list[float] = []
+    timestamps = iter(
+        [
+            "2026-07-27T17:00:01+08:00",
+            "2026-07-27T17:00:02+08:00",
+            "2026-07-27T17:00:10+08:00",
+        ]
+    )
+    monkeypatch.setattr(lane_runner.time, "sleep", sleeps.append)
+    monkeypatch.setattr(lane_runner, "_now_sh_iso", lambda: next(timestamps))
+    monkeypatch.setitem(__import__("sys").modules, "baostock", FakeBaostock)
+    bars, statuses, logs = lane_runner._baostock_fetch_day(
+        ["000001", "000002"],
+        date(2026, 7, 27),
+        missing_set_retry_rounds=1,
+        missing_set_retry_delay_seconds=7,
+    )
+
+    assert [row["security_id"] for row in bars] == ["000001", "000002"]
+    assert [row["security_id"] for row in statuses] == ["000001", "000002"]
+    assert FakeBaostock.calls == ["sz.000001", "sz.000002", "sz.000001"]
+    assert FakeBaostock.login_calls == 1
+    assert sleeps == [7]
+    assert [row["scan_round"] for row in logs] == [1, 1, 2]
+    assert [row["acquired_at"] for row in logs] == [
+        "2026-07-27T17:00:01+08:00",
+        "2026-07-27T17:00:02+08:00",
+        "2026-07-27T17:00:10+08:00",
+    ]
+    assert bars[0]["acquired_at"] == "2026-07-27T17:00:10+08:00"
+    assert bars[1]["acquired_at"] == "2026-07-27T17:00:02+08:00"
+
+
+def test_baostock_readiness_waits_for_all_three_target_indices(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = 0
+
+    def fetch_indices(_market_date: date, **_kwargs: object):
+        nonlocal calls
+        calls += 1
+        codes = list(lane_runner.INDEX_CODES)
+        if calls == 1:
+            codes = codes[:-1]
+        return (
+            [
+                {
+                    "index_code": code,
+                    "date": "2026-07-27",
+                    "acquired_at": "2026-07-27T17:00:00+08:00",
+                }
+                for code in codes
+            ],
+            [],
+        )
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(lane_runner, "_baostock_fetch_index_day", fetch_indices)
+    monkeypatch.setattr(
+        lane_runner,
+        "_now",
+        lambda: datetime(2026, 7, 27, 9, 0, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr(lane_runner.time, "sleep", sleeps.append)
+    rows, _logs = lane_runner._baostock_wait_for_index_day(
+        date(2026, 7, 27),
+        deadline_at=datetime(2026, 7, 27, 19, 0, tzinfo=lane_runner.SH),
+        poll_interval_seconds=60,
+        socket_timeout_seconds=30,
+        progress_path=tmp_path / "provider_readiness.json",
+    )
+
+    assert calls == 2
+    assert sleeps == [60]
+    assert {row["index_code"] for row in rows} == set(lane_runner.INDEX_CODES)
+    progress = json.loads((tmp_path / "provider_readiness.json").read_text())
+    assert progress["ready"] is True
+    assert progress["polls"] == 2
+
+
 def test_provider_market_collects_indices_without_current_local_index_data(
     fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -517,15 +708,18 @@ def test_provider_market_collects_indices_without_current_local_index_data(
     monkeypatch.delenv("HERMES_ODS_SYMBOL_LIMIT", raising=False)
     paths = _paths(fixture_home, tmp_path / "shadow")
     (fixture_home / "index_daily.parquet").unlink()
+    call_order: list[str] = []
 
-    def fetch_stocks(codes, market_date):
+    def fetch_stocks(codes, market_date, **_kwargs: object):
+        call_order.append("stocks")
         return lane_runner._local_market_acquire(
             paths=paths,
             market_date=market_date,
             codes=codes,
         )
 
-    def fetch_indices(market_date):
+    def fetch_indices(market_date, **_kwargs: object):
+        call_order.append("indices")
         day = market_date.isoformat()
         return (
             [
@@ -559,6 +753,17 @@ def test_provider_market_collects_indices_without_current_local_index_data(
     assert index.status == "ready"
     assert index.row_count == len(lane_runner.INDEX_CODES)
     assert '"provider": "baostock"' in str(index.source_request)
+    assert call_order == ["indices", "stocks"]
+    acquisition_log = next(
+        item for item in result.datasets if item.name == "acquisition_log"
+    )
+    payload = json.loads(Path(acquisition_log.path).read_text(encoding="utf-8"))
+    latest_acquired_at = max(
+        datetime.fromisoformat(row["acquired_at"])
+        for row in payload["requests"]
+        if row.get("acquired_at")
+    )
+    assert datetime.fromisoformat(acquisition_log.knowledge_cutoff) >= latest_acquired_at
 
 
 def test_provider_market_requires_the_complete_index_contract(
@@ -567,15 +772,18 @@ def test_provider_market_requires_the_complete_index_contract(
     monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
     monkeypatch.delenv("HERMES_ODS_SYMBOL_LIMIT", raising=False)
     paths = _paths(fixture_home, tmp_path / "shadow")
+    stock_calls = 0
 
-    def fetch_stocks(codes, market_date):
+    def fetch_stocks(codes, market_date, **_kwargs: object):
+        nonlocal stock_calls
+        stock_calls += 1
         return lane_runner._local_market_acquire(
             paths=paths,
             market_date=market_date,
             codes=codes,
         )
 
-    def fetch_incomplete_indices(market_date):
+    def fetch_incomplete_indices(market_date, **_kwargs: object):
         return (
             [
                 {"index_code": code, "date": market_date.isoformat(), "close": 1.0}
@@ -596,11 +804,13 @@ def test_provider_market_requires_the_complete_index_contract(
         force_preflight="both_open",
     )
 
-    index = next(item for item in result.datasets if item.name == "index_daily_delta")
-    assert index.status == "failed"
-    assert index.detail == "missing_index_coverage=399001.SZ"
+    failure = next(item for item in result.datasets if item.name == "daily_ohlcv_none_delta")
+    assert failure.status == "failed"
+    assert "provider readiness deadline reached" in (failure.detail or "")
+    assert stock_calls == 0
     assert result.release_dir is None
     assert not list((tmp_path / "shadow").rglob("READY"))
+    assert (result.attempt_dir / "landing" / "provider_readiness.json").is_file()
 
 
 def test_missing_preflight_no_ready(fixture_home: Path, tmp_path: Path) -> None:
@@ -793,11 +1003,11 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     expected_schedule_sha = f"sha256:{hashlib.sha256(SCHEDULE.read_bytes()).hexdigest()}"
     attempt = json.loads((result.attempt_dir / "attempt.json").read_text(encoding="utf-8"))
     assert attempt["schedule_id"] == "hermes-ods-schedule-v1"
-    assert attempt["schedule_contract_revision"] == "ready-gated-sla-20260727"
+    assert attempt["schedule_contract_revision"] == "provider-readiness-gated-20260728"
     assert attempt["schedule_config_sha256"] == expected_schedule_sha
     release = json.loads((result.release_dir / "release.json").read_text(encoding="utf-8"))
     assert release["schedule_contract_id"] == "hermes-ods-schedule-v1"
-    assert release["schedule_contract_revision"] == "ready-gated-sla-20260727"
+    assert release["schedule_contract_revision"] == "provider-readiness-gated-20260728"
     assert release["schedule_config_sha256"] == expected_schedule_sha
     meta_dataset = next(item for item in result.datasets if item.name == "intraday_meta")
     meta = json.loads(Path(meta_dataset.path).read_text(encoding="utf-8"))

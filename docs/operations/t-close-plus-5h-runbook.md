@@ -29,14 +29,22 @@ Source files must be atomically replaced, not mutated in place, because release 
 use hard links on the same filesystem. Historical bulk completion uses `schedule=bootstrap` and a
 separate path; it is not substituted for the daily release.
 
-Hermes and CN01 timers run Monday through Friday at 15:40 Asia/Shanghai, after the 15:05-15:30
-fixed-price phase and final daily totals. Before session preflight, the acquisition wrapper must fetch a fresh
-calendar window that includes the target date and build an attempt-local candidate. It then checks
-the target date against both SSE and SZSE rows before contacting market-data providers. Refresh
-failure, a missing row, or an SSE/SZSE disagreement is a hard failure and alert with no provider
-calls or READY. Two open rows start the market job. Two closed rows produce only the calendar
-release. The wrapper must not infer a holiday from an empty bar response. Weekend market runs are
-not scheduled; disclosure-watermark collectors may use a separate calendar-day schedule.
+Hermes and CN01 use separate Monday-Friday collection windows during the provisional five-session
+test. Hermes starts at 15:40 Asia/Shanghai and begins the stock scan at first provider readiness;
+CN01 starts at 19:00 as the fixed late-window sample. Before session preflight, each acquisition
+wrapper fetches a fresh calendar window that includes the target date and builds an attempt-local
+candidate. It then checks the target date against both SSE and SZSE rows before contacting market
+data providers. Refresh failure, a missing row, or an SSE/SZSE disagreement is a hard failure and
+alert with no provider calls or READY. Two open rows start provider readiness checks. Two closed
+rows produce only the calendar release. The wrapper must not infer a holiday from an empty bar
+response. Weekend market runs are not scheduled; disclosure-watermark collectors may use a
+separate calendar-day schedule.
+
+Open sessions require all three BaoStock sentinel indices to return T before any full-market scan.
+Empty responses are not reconnected; only true provider errors receive bounded reconnects. The
+scan retries only its missing set once and assigns each request its actual acquisition timestamp.
+Any residual coverage gap fails the release, and manifest `knowledge_cutoff` cannot precede the
+latest observed acquisition.
 
 An open-session release contains the T bar delta, raw T `tradestatus/isST` observations for the
 complete in-scope universe, the complete small security master, and the calendar. A tradable status
@@ -48,11 +56,11 @@ DWD partition. No release or incomplete T calendar evidence is a pipeline failur
 OCI's 15:40 timer starts a readiness gate, not DWD/DWS cleaning. It probes both same-date sources
 every 30 seconds, chooses the first observed READY immutable attempt, and uses CN01 on a same-poll
 tie. The selected source and attempt are persisted in the run directory before transfer. The latest
-ODS-ready deadline is 17:25, based on 52m18.4s observed acquisition plus 100% headroom. CN01's
-3.649s measured transfer has an 8s SLA; the measured local stages have 10 seconds of independently
-rounded budget, giving a CN01-qualified completion deadline of 17:26. Hermes remains a usable
-fallback, but its first successful transfer is explicitly recorded as the baseline rather than
-being evaluated against the CN01 transport SLA.
+ODS-ready deadline is 19:46. It uses the 2026-07-28 scheduled incident rounded to 123 minutes plus
+100% headroom and remains provisional pending five open sessions. CN01's 3.649s measured transfer
+still has an 8s SLA; Hermes remains a usable source whose first successful transfer establishes its
+own baseline. The end-to-end pipeline deadline is T+5h, 20:30. A later successful publication is
+retained and alerted as late rather than relabeled on time.
 
 For an open session, OCI builds the immutable daily DWD partition and then a one-row DWS market
 summary bound to the DWD revision and manifest checksum. Both revisions pass their gates before
@@ -100,7 +108,7 @@ one calendar-only closed-session release pass manual rehearsal.
 ## Manual rehearsal
 
 ```bash
-ops/bin/wait-ods-release-ready daily 2026-07-27 /tmp/ods-source-selection.json 6277 30
+ops/bin/wait-ods-release-ready daily 2026-07-27 /tmp/ods-source-selection.json 14760 30
 ops/bin/pull-ods-release daily 2026-07-27 /home/ubuntu/data/astock /tmp/ods-source-selection.json
 .venv/bin/python -m quanthus verify-ods-release \
   --release-dir /home/ubuntu/data/astock/releases/daily/2026-07-27

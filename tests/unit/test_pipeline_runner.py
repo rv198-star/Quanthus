@@ -32,7 +32,7 @@ class PipelineRunnerTests(unittest.TestCase):
         config = load_pipeline_config(ROOT / "config" / "pipelines" / "t-close-plus-5h.v1.json")
 
         self.assertEqual(config.close_time.isoformat(), "15:30:00")
-        self.assertEqual(config.completion_sla_minutes, 116)
+        self.assertEqual(config.completion_sla_minutes, 300)
         self.assertEqual(config.stage_sla_margin_percent, 100)
         assert config.email_notification is not None
         self.assertEqual(config.email_notification.sender, "report@mindthus.com")
@@ -40,8 +40,8 @@ class PipelineRunnerTests(unittest.TestCase):
         self.assertEqual(config.email_notification.api_key_environment, "QUANTHUS_RESEND_API_KEY")
         wait_stage = config.stages[0]
         self.assertEqual(wait_stage.stage_id, "wait_daily_ods_source_ready")
-        self.assertEqual(wait_stage.observed_max_duration_seconds, 3138.4)
-        self.assertEqual(wait_stage.sla_seconds, 6277)
+        self.assertEqual(wait_stage.observed_max_duration_seconds, 7380)
+        self.assertEqual(wait_stage.sla_seconds, 14760)
         self.assertEqual(
             [stage.stage_id for stage in config.stages][-5:],
             [

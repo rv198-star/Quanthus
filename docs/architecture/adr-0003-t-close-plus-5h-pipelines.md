@@ -20,20 +20,29 @@ signal whose first execution is T+1.
 
 From 2026-07-06, all A-shares and ETFs may trade in the after-hours fixed-price phase from
 15:05 through 15:30. Those matches are included in final daily volume and amount only after
-15:30. Hermes and CN01 therefore start final daily acquisition at 15:40 Asia/Shanghai. OCI starts
-only a readiness gate at that time: it does not pull or clean until an upstream has published a
-same-date immutable handoff. The slowest accepted acquisition took 52m18.4s; adding 100% and
-rounding up yields `ceil(3138.4 * 2) = 6277s`, so ODS must be ready by 17:25.
+15:30. OCI starts only a readiness gate at 15:40: it does not pull or clean until an upstream has
+published a same-date immutable handoff. The 2026-07-28 scheduled attempt showed that BaoStock was
+not reliably readable at 15:40: early symbols returned empty until about 17:25, and the bounded
+attempt ended after 2h02m39s. The provisional SLA rounds that incident duration to 123 minutes and
+adds 100% headroom: `7380 * 2 = 14760s`, so ODS must be ready by 19:46. This evidence is explicitly
+provisional until five open sessions complete.
+
+Hermes and CN01 use different collection windows during that validation. Hermes starts at 15:40
+and performs low-frequency readiness checks, representing the earliest usable provider window.
+CN01 starts at 19:00, representing a lower-load fixed late window. This avoids synchronized
+full-market requests and creates comparable evidence without changing either node's coverage or
+publication gates.
 
 ```text
 15:00       closing call auction completes
 15:05-15:30 after-hours fixed-price matching
 15:30       final daily trading boundary; final volume/amount may now settle
-15:40       Hermes and CN01 acquisition; OCI starts readiness polling only
-15:40-17:25 OCI polls both immutable handoffs every 30 seconds
+15:40       Hermes starts the early readiness gate; OCI polls immutable handoffs
+on readiness Hermes starts its full-market scan only after all sentinel indices are complete
+19:00       CN01 starts the fixed late-window attempt; Hermes readiness deadline
 on READY     first observed source wins; same-poll tie resolves to CN01
-17:25       latest acceptable upstream ODS handoff (52m18.4s observed + 100%)
-17:26       CN01-primary DWD/DWS completion SLA
+19:46       latest acceptable upstream ODS handoff (123m rounded incident + 100%)
+20:30       DWD/DWS T+5h completion SLA
 T+1         strategies may consume the T-close snapshot for execution
 ```
 
@@ -61,6 +70,20 @@ and SZSE calendar evidence:
 Refresh failure has the same fail-closed outcome. The historical Base calendar is an input to the
 attempt-local merge, not proof that the target date was freshly observed, and is never overwritten
 by the recurring attempt.
+
+After open-session preflight, BaoStock readiness is established with `sh.000001`, `sh.000300`, and
+`sz.399001`. All three must return the target market date in one poll before the stock universe is
+scanned. A successful empty response does not log out or reconnect; it remains an unavailable or
+missing observation. True provider/network errors retain bounded reconnect retries, and every
+successful login applies a 30-second socket timeout. After the first stock pass, only the missing
+set receives one bounded retry. Remaining gaps, readiness expiry, or the completion deadline fail
+closed without READY. Each request receives its actual completion timestamp and every dataset
+cutoff is at least the latest observed acquisition timestamp.
+
+The collection-window experiment runs for at least five open sessions. Each node records readiness
+polls, empty responses, provider errors, reconnects, average and maximum request duration, and total
+batch duration. A time-window decision is made only after that minimum; one success or failure does
+not establish provider congestion causality.
 
 Weekends have no market timer. Calendar-day announcement collectors may run independently because
 disclosures can arrive on non-trading days; they do not make a closed day into a market session.
@@ -165,7 +188,7 @@ canonical file state.
   through Resend and writes only delivery outcome metadata back to the ledger. API credentials stay
   in the protected environment. Notification failure is alertable but does not change a successful
   data result or roll back an accepted pointer.
-- A CN01-qualified run completing after 17:26, or after any measured stage exceeds its SLA, is
+- A qualified run completing after 20:30, or after any measured stage exceeds its SLA, is
   retained as `succeeded_late` and must alert; it is not relabeled as on time.
 - A successful Hermes-fallback run without a recorded Hermes transfer baseline is retained as
   `succeeded_unqualified`, advances the verified data pointer, and alerts for SLA measurement.

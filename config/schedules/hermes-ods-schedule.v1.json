@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "ready-gated-sla-20260727",
+  "contract_revision": "provider-readiness-gated-20260728",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_only",
@@ -42,13 +42,53 @@
       "auction_close_time": "15:00:00",
       "final_trading_time": "15:30:00",
       "finalized_acquisition_not_before": "15:40:00",
-      "completion_deadline": "17:25:00",
+      "completion_deadline": "19:46:00",
+      "collection_window_experiment": {
+        "experiment_id": "baostock-load-window-20260728-v1",
+        "minimum_open_sessions": 5,
+        "nodes": [
+          {
+            "node_id": "hermes",
+            "timer_start": "15:40:00",
+            "start_policy": "first_provider_ready_after_timer",
+            "service_timeout_seconds": 15000
+          },
+          {
+            "node_id": "cn01",
+            "timer_start": "19:00:00",
+            "start_policy": "fixed_late_window",
+            "service_timeout_seconds": 3000
+          }
+        ],
+        "comparison_metrics": [
+          "readiness_polls",
+          "empty_response_count",
+          "provider_error_count",
+          "reconnect_count",
+          "average_request_duration_seconds",
+          "maximum_request_duration_seconds",
+          "batch_duration_seconds"
+        ],
+        "decision_policy": "compare_only_after_minimum_open_sessions"
+      },
+      "provider_readiness": {
+        "sentinel_indices": ["sh.000001", "sh.000300", "sz.399001"],
+        "target_row_policy": "all_sentinels_return_target_market_date",
+        "poll_interval_seconds": 60,
+        "deadline": "19:00:00",
+        "socket_timeout_seconds": 30,
+        "empty_response_policy": "poll_or_missing_set_retry_without_reconnect",
+        "provider_error_policy": "bounded_reconnect",
+        "missing_set_retry_rounds": 1,
+        "missing_set_retry_delay_seconds": 30
+      },
       "timing_sla": {
-        "basis": "accepted_market_daily_attempts_20260727",
-        "observed_max_duration_seconds": 3138.4,
+        "basis": "scheduled_market_daily_incident_20260728_rounded_to_123_minutes",
+        "validation_status": "provisional_pending_five_open_sessions",
+        "observed_max_duration_seconds": 7380,
         "safety_margin_percent": 100,
-        "allowed_duration_seconds": 6277,
-        "latest_ready_time": "17:25:00"
+        "allowed_duration_seconds": 14760,
+        "latest_ready_time": "19:46:00"
       },
       "resource_group": "pve_market_api",
       "session_preflight": {

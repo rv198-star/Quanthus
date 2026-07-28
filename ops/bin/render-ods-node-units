@@ -46,6 +46,13 @@ for unit in "${UNITS[@]}"; do
   tmp_path="${target_path}.tmp.$$"
   sed "s/hermes-ods/${NODE_ID}-ods/g" "$source_path" > "$tmp_path"
   sed -i "s/run-${NODE_ID}-ods-lane/run-hermes-ods-lane/g" "$tmp_path"
+  sed -i "s/HERMES_ODS_NODE_ID=hermes/HERMES_ODS_NODE_ID=${NODE_ID}/g" "$tmp_path"
+  if [[ "$NODE_ID" == "cn01" && "$unit" == "hermes-ods-market-daily-core.timer" ]]; then
+    sed -i "s/15:40:00/19:00:00/g; s/early collection window/late collection window/g" "$tmp_path"
+  fi
+  if [[ "$NODE_ID" == "cn01" && "$unit" == "hermes-ods-market-daily-core.service" ]]; then
+    sed -i "s/TimeoutStartSec=4h10min/TimeoutStartSec=50min/g" "$tmp_path"
+  fi
   chmod 0644 "$tmp_path"
   mv "$tmp_path" "$target_path"
 done

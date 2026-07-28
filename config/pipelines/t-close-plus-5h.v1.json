@@ -3,7 +3,7 @@
   "pipeline_id": "t-close-plus-5h-v1",
   "timezone": "Asia/Shanghai",
   "close_time": "15:30:00",
-  "completion_sla_minutes": 116,
+  "completion_sla_minutes": 300,
   "stage_sla_margin_percent": 100,
   "run_root": "{warehouse_root}/runs",
   "lock_path": "{warehouse_root}/locks/t-close-plus-5h.lock",
@@ -51,11 +51,11 @@
         "daily",
         "{market_date}",
         "{run_dir}/ods-source-selection.json",
-        "6277",
+        "14760",
         "30"
       ],
-      "timeout_seconds": 6300,
-      "observed_max_duration_seconds": 3138.4
+      "timeout_seconds": 14820,
+      "observed_max_duration_seconds": 7380
     },
     {
       "id": "pull_hermes_daily_release",

@@ -27,7 +27,7 @@ class ScheduleContractTests(unittest.TestCase):
         contract = load_schedule_contract(CONFIG)
 
         self.assertEqual(contract.schedule_id, "hermes-ods-schedule-v1")
-        self.assertEqual(contract.contract_revision, "ready-gated-sla-20260727")
+        self.assertEqual(contract.contract_revision, "provider-readiness-gated-20260728")
         self.assertEqual(len(contract.lanes), 5)
 
     def test_2026_trading_session_contract_is_explicit_and_sparse(self) -> None:
@@ -102,6 +102,36 @@ class ScheduleContractTests(unittest.TestCase):
             lane["timing_sla"]["safety_margin_percent"] = 50
 
         with self.assertRaisesRegex(ScheduleContractError, "100% margin"):
+            load_schedule_contract(self._mutated(mutate))
+
+    def test_rejects_incomplete_provider_readiness_sentinel_set(self) -> None:
+        def mutate(payload: dict[str, object]) -> None:
+            lane = next(
+                lane for lane in payload["lanes"] if lane["id"] == "market-daily-core"
+            )
+            lane["provider_readiness"]["sentinel_indices"] = ["sh.000001"]
+
+        with self.assertRaisesRegex(ScheduleContractError, "provider readiness contract"):
+            load_schedule_contract(self._mutated(mutate))
+
+    def test_rejects_unversioned_collection_window_change(self) -> None:
+        def mutate(payload: dict[str, object]) -> None:
+            lane = next(
+                lane for lane in payload["lanes"] if lane["id"] == "market-daily-core"
+            )
+            lane["collection_window_experiment"]["nodes"][1]["timer_start"] = "18:00:00"
+
+        with self.assertRaisesRegex(ScheduleContractError, "collection window experiment"):
+            load_schedule_contract(self._mutated(mutate))
+
+    def test_rejects_promoting_provisional_sla_without_five_sessions(self) -> None:
+        def mutate(payload: dict[str, object]) -> None:
+            lane = next(
+                lane for lane in payload["lanes"] if lane["id"] == "market-daily-core"
+            )
+            lane["timing_sla"]["validation_status"] = "accepted"
+
+        with self.assertRaisesRegex(ScheduleContractError, "must remain provisional"):
             load_schedule_contract(self._mutated(mutate))
 
     def test_rejects_synthesized_formal_5m(self) -> None:

@@ -38,6 +38,7 @@ from quanthus.pipelines.schedule_contracts import (
     ScheduleContractError,
     load_schedule_contract,
 )
+from quanthus.providers.baostock_transport import set_socket_timeout
 from quanthus.providers.trading_calendar import (
     CalendarRefreshError,
     refresh_calendar,
@@ -45,7 +46,7 @@ from quanthus.providers.trading_calendar import (
 
 SH = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
-PRODUCER = "hermes-ods-lane-runner-v4"
+PRODUCER = "hermes-ods-lane-runner-v5"
 INDEX_CODES: dict[str, str] = {
     "000001.SH": "sh.000001",
     "000300.SH": "sh.000300",
@@ -766,12 +767,18 @@ def _seal_json_dataset(
     )
 
 
-def _baostock_login_with_retry(bs: Any, *, max_attempts: int = 3) -> int:
+def _baostock_login_with_retry(
+    bs: Any,
+    *,
+    max_attempts: int = 3,
+    socket_timeout_seconds: float = 30,
+) -> int:
     last_error = "unknown error"
     for attempt in range(1, max_attempts + 1):
         try:
             login = bs.login()
             if str(login.error_code) == "0":
+                set_socket_timeout(socket_timeout_seconds)
                 return attempt
             last_error = str(login.error_msg)
         except Exception as exc:  # noqa: BLE001
@@ -788,8 +795,9 @@ def _baostock_query_day_with_retry(
     fields: str,
     day: str,
     max_attempts: int = 3,
+    socket_timeout_seconds: float = 30,
 ) -> tuple[list[list[str]], str, str, int, list[dict[str, str]]]:
-    """Query one daily row, reconnecting on provider errors or empty responses."""
+    """Query one daily row, reconnecting only on genuine provider errors."""
 
     retry_errors: list[dict[str, str]] = []
     for attempt in range(1, max_attempts + 1):
@@ -797,7 +805,11 @@ def _baostock_query_day_with_retry(
             with suppress(Exception):
                 bs.logout()
             time.sleep(float(attempt - 1))
-            _baostock_login_with_retry(bs, max_attempts=max_attempts)
+            _baostock_login_with_retry(
+                bs,
+                max_attempts=max_attempts,
+                socket_timeout_seconds=socket_timeout_seconds,
+            )
 
         rows: list[list[str]] = []
         error_code = "provider_exception"
@@ -822,8 +834,15 @@ def _baostock_query_day_with_retry(
         if error_code == "0" and rows:
             return rows, error_code, error_msg, attempt, retry_errors
         if error_code == "0":
-            error_code = "empty_response"
-            error_msg = "provider returned no daily row"
+            # An empty successful response is a data-availability state, not a
+            # broken connection. The caller may retry the missing set later.
+            return (
+                [],
+                "empty_response",
+                "provider returned no daily row",
+                attempt,
+                retry_errors,
+            )
         retry_errors.append(
             {
                 "attempt": str(attempt),
@@ -838,74 +857,91 @@ def _baostock_query_day_with_retry(
 def _baostock_fetch_day(
     codes: Sequence[str],
     market_date: date,
+    *,
+    missing_set_retry_rounds: int = 1,
+    missing_set_retry_delay_seconds: float = 30,
+    socket_timeout_seconds: float = 30,
+    deadline_at: datetime | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     import baostock as bs
 
+    if missing_set_retry_rounds < 0:
+        raise LaneRunError("missing_set_retry_rounds must be non-negative")
+    if missing_set_retry_delay_seconds < 0:
+        raise LaneRunError("missing_set_retry_delay_seconds must be non-negative")
     day = market_date.isoformat()
-    login_attempts = _baostock_login_with_retry(bs)
+    login_attempts = _baostock_login_with_retry(
+        bs, socket_timeout_seconds=socket_timeout_seconds
+    )
     fields = "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST"
-    bars: list[dict[str, Any]] = []
-    status_rows: list[dict[str, Any]] = []
+    bars_by_code: dict[str, dict[str, Any]] = {}
+    status_by_code: dict[str, dict[str, Any]] = {}
     log_rows: list[dict[str, Any]] = []
-    acquired_at = _now_sh_iso()
+    remaining = list(dict.fromkeys(codes))
     try:
-        for code in codes:
-            bs_code = _to_bs_code(code)
-            request = {
-                "provider": "baostock",
-                "api": "query_history_k_data_plus",
-                "code": bs_code,
-                "start": day,
-                "end": day,
-                "frequency": "d",
-                "adjustflag": "3",
-                "fields": fields,
-            }
-            started = time.monotonic()
-            rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
-                bs,
-                code=bs_code,
-                fields=fields,
-                day=day,
-            )
-            duration = round(time.monotonic() - started, 3)
-            log_rows.append(
-                {
-                    "security_id": code,
-                    "request": request,
-                    "response_error_code": err,
-                    "response_error_msg": msg,
-                    "response_rows": len(rows),
-                    "acquired_at": acquired_at,
-                    "duration_seconds": duration,
-                    "attempts": attempts,
-                    "initial_login_attempts": login_attempts,
-                    "retry_errors": retry_errors,
+        for scan_round in range(1, missing_set_retry_rounds + 2):
+            if not remaining:
+                break
+            if scan_round > 1 and missing_set_retry_delay_seconds:
+                time.sleep(missing_set_retry_delay_seconds)
+            next_missing: list[str] = []
+            for offset, code in enumerate(remaining):
+                if deadline_at is not None and _now() >= deadline_at.astimezone(UTC):
+                    next_missing.extend(remaining[offset:])
+                    log_rows.append(
+                        {
+                            "event": "completion_deadline_reached",
+                            "scan_round": scan_round,
+                            "remaining_symbols": len(remaining) - offset,
+                            "acquired_at": _now_sh_iso(),
+                        }
+                    )
+                    break
+                bs_code = _to_bs_code(code)
+                request = {
+                    "provider": "baostock",
+                    "api": "query_history_k_data_plus",
+                    "code": bs_code,
+                    "start": day,
+                    "end": day,
+                    "frequency": "d",
+                    "adjustflag": "3",
+                    "fields": fields,
                 }
-            )
-            if err != "0":
-                continue
-            if not rows:
-                # Empty response proves only "no row this call" — not halt, not non-ST.
-                status_rows.append(
+                started = time.monotonic()
+                rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
+                    bs,
+                    code=bs_code,
+                    fields=fields,
+                    day=day,
+                    socket_timeout_seconds=socket_timeout_seconds,
+                )
+                acquired_at = _now_sh_iso()
+                matching = next((row for row in rows if row and str(row[0]) == day), None)
+                if err == "0" and matching is None:
+                    err = "target_date_missing"
+                    msg = f"provider response did not contain target date {day}"
+                log_rows.append(
                     {
                         "security_id": code,
-                        "stock_code": code,
-                        "market_date": day,
-                        "date": day,
-                        "tradestatus": "unknown",
-                        "isST": "unknown",
-                        "source": "baostock.empty_response",
-                        "response_status": "empty",
+                        "request": request,
+                        "response_error_code": err,
+                        "response_error_msg": msg,
+                        "response_rows": len(rows),
                         "acquired_at": acquired_at,
-                        "built_at": acquired_at,
+                        "duration_seconds": round(time.monotonic() - started, 3),
+                        "attempts": attempts,
+                        "initial_login_attempts": login_attempts,
+                        "retry_errors": retry_errors,
+                        "scan_round": scan_round,
                     }
                 )
-                continue
-            raw = rows[0]
-            # fields order matches `fields`
-            bars.append(
-                {
+                if err != "0" or matching is None:
+                    next_missing.append(code)
+                    continue
+                raw = matching
+                # fields order matches `fields`
+                bars_by_code[code] = {
                     "security_id": code,
                     "stock_code": code,
                     "market_date": day,
@@ -924,9 +960,7 @@ def _baostock_fetch_day(
                     "acquired_at": acquired_at,
                     "built_at": acquired_at,
                 }
-            )
-            status_rows.append(
-                {
+                status_by_code[code] = {
                     "security_id": code,
                     "stock_code": code,
                     "market_date": day,
@@ -937,25 +971,32 @@ def _baostock_fetch_day(
                     "acquired_at": acquired_at,
                     "built_at": acquired_at,
                 }
-            )
+            remaining = next_missing
     finally:
         bs.logout()
-    return bars, status_rows, log_rows
+    return (
+        [bars_by_code[code] for code in codes if code in bars_by_code],
+        [status_by_code[code] for code in codes if code in status_by_code],
+        log_rows,
+    )
 
 
 def _baostock_fetch_index_day(
     market_date: date,
+    *,
+    socket_timeout_seconds: float = 30,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Fetch the contract's daily index set directly from Baostock."""
 
     import baostock as bs
 
     day = market_date.isoformat()
-    login_attempts = _baostock_login_with_retry(bs)
+    login_attempts = _baostock_login_with_retry(
+        bs, socket_timeout_seconds=socket_timeout_seconds
+    )
     fields = "date,code,open,high,low,close,volume,amount,pctChg"
     rows_out: list[dict[str, Any]] = []
     log_rows: list[dict[str, Any]] = []
-    acquired_at = _now_sh_iso()
     try:
         for index_code, bs_code in INDEX_CODES.items():
             request = {
@@ -974,7 +1015,9 @@ def _baostock_fetch_index_day(
                 code=bs_code,
                 fields=fields,
                 day=day,
+                socket_timeout_seconds=socket_timeout_seconds,
             )
+            acquired_at = _now_sh_iso()
             log_rows.append(
                 {
                     "index_code": index_code,
@@ -995,7 +1038,7 @@ def _baostock_fetch_index_day(
                 rows_out.append(
                     {
                         "index_code": index_code,
-                        "date": day,
+                        "date": str(raw[0]),
                         "open": _fnum(raw[2]),
                         "high": _fnum(raw[3]),
                         "low": _fnum(raw[4]),
@@ -1010,6 +1053,140 @@ def _baostock_fetch_index_day(
     finally:
         bs.logout()
     return rows_out, log_rows
+
+
+def _contract_deadline(market_date: date, value: str) -> datetime:
+    try:
+        clock = datetime.strptime(value, "%H:%M:%S").time()
+    except ValueError as exc:
+        raise LaneRunError(f"invalid schedule deadline: {value!r}") from exc
+    return datetime.combine(market_date, clock, tzinfo=SH)
+
+
+def _latest_observed_cutoff(
+    fallback: str,
+    *row_groups: Sequence[Mapping[str, Any]],
+) -> str:
+    candidates = [fallback, _now_sh_iso()]
+    for rows in row_groups:
+        candidates.extend(
+            str(row["acquired_at"])
+            for row in rows
+            if row.get("acquired_at") not in {None, ""}
+        )
+
+    def parsed(value: str) -> datetime:
+        stamp = datetime.fromisoformat(value)
+        if stamp.tzinfo is None:
+            raise LaneRunError(f"knowledge cutoff timestamp is timezone-naive: {value!r}")
+        return stamp.astimezone(UTC)
+
+    return max(candidates, key=parsed)
+
+
+def _ods_node_id() -> str:
+    return (os.environ.get("HERMES_ODS_NODE_ID") or "unknown").strip().lower()
+
+
+def _market_acquisition_metrics(log_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    request_rows = [row for row in log_rows if row.get("duration_seconds") is not None]
+    durations = [float(row["duration_seconds"]) for row in request_rows]
+    stamps = [
+        datetime.fromisoformat(str(row["acquired_at"])).astimezone(UTC)
+        for row in request_rows
+        if row.get("acquired_at") not in {None, ""}
+    ]
+    provider_error_codes = {
+        "0",
+        "empty_response",
+        "target_date_missing",
+    }
+    return {
+        "node_id": _ods_node_id(),
+        "readiness_polls": max(
+            (int(row.get("readiness_poll") or 0) for row in log_rows), default=0
+        ),
+        "request_count": len(request_rows),
+        "empty_response_count": sum(
+            str(row.get("response_error_code")) == "empty_response" for row in request_rows
+        ),
+        "provider_error_count": sum(
+            str(row.get("response_error_code")) not in provider_error_codes
+            for row in request_rows
+        ),
+        "reconnect_count": sum(
+            max(int(row.get("attempts") or 1) - 1, 0) for row in request_rows
+        ),
+        "average_request_duration_seconds": (
+            round(sum(durations) / len(durations), 3) if durations else None
+        ),
+        "maximum_request_duration_seconds": round(max(durations), 3) if durations else None,
+        "batch_duration_seconds": (
+            round((max(stamps) - min(stamps)).total_seconds(), 3) if stamps else None
+        ),
+    }
+
+
+def _baostock_wait_for_index_day(
+    market_date: date,
+    *,
+    deadline_at: datetime,
+    poll_interval_seconds: float,
+    socket_timeout_seconds: float,
+    progress_path: Path,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Poll the complete sentinel index set before starting the stock scan."""
+
+    if poll_interval_seconds <= 0:
+        raise LaneRunError("provider readiness poll interval must be positive")
+    target = market_date.isoformat()
+    required = set(INDEX_CODES)
+    all_logs: list[dict[str, Any]] = []
+    poll = 0
+    latest_rows: list[dict[str, Any]] = []
+    while True:
+        poll += 1
+        latest_rows, poll_logs = _baostock_fetch_index_day(
+            market_date,
+            socket_timeout_seconds=socket_timeout_seconds,
+        )
+        for item in poll_logs:
+            item["phase"] = "provider_readiness"
+            item["readiness_poll"] = poll
+        all_logs.extend(poll_logs)
+        observed = {
+            _canonical_index_code(row.get("index_code") or row.get("code"))
+            for row in latest_rows
+            if str(row.get("date") or "") == target
+        }
+        missing = sorted(required - observed)
+        checked_at = _now_sh_iso()
+        _atomic_json(
+            progress_path,
+            {
+                "provider": "baostock",
+                "node_id": _ods_node_id(),
+                "target_date": target,
+                "sentinel_indices": INDEX_CODES,
+                "polls": poll,
+                "checked_at": checked_at,
+                "deadline_at": deadline_at.isoformat(),
+                "ready": not missing,
+                "missing_indices": missing,
+                "requests": all_logs,
+            },
+        )
+        if not missing:
+            return latest_rows, all_logs
+        now = _now().astimezone(SH)
+        if now >= deadline_at:
+            raise LaneRunError(
+                "baostock provider readiness deadline reached; "
+                f"missing_indices={','.join(missing)}; polls={poll}; "
+                f"evidence={progress_path}"
+            )
+        remaining = (deadline_at - now).total_seconds()
+        time.sleep(min(poll_interval_seconds, remaining))
 
 
 def _local_market_acquire(
@@ -1121,6 +1298,9 @@ def _build_market_open(
     market_date: date,
     landing: Path,
     knowledge_cutoff: str,
+    provider_readiness: Mapping[str, Any] | None = None,
+    completion_deadline: str | None = None,
+    collection_window_experiment: Mapping[str, Any] | None = None,
 ) -> list[DatasetStatus]:
     mode = _acquire_mode()
     codes = _universe_from_stock_list(paths.home)
@@ -1132,19 +1312,46 @@ def _build_market_open(
                 detail="empty in-scope universe from stock_list",
             )
         ]
-    rev = f"market-daily-{mode}-{market_date.strftime('%Y%m%d')}-v3"
+    rev = f"market-daily-{mode}-{market_date.strftime('%Y%m%d')}-v4"
     watermark = market_date.isoformat()
     request_summary = {
         "mode": mode,
         "universe_size": len(codes),
         "market_date": watermark,
         "provider": "baostock" if mode == "provider" else "local-sot",
+        "node_id": _ods_node_id(),
+        "provider_readiness": provider_readiness if mode == "provider" else None,
+        "collection_window_experiment": (
+            collection_window_experiment if mode == "provider" else None
+        ),
     }
     try:
         if mode == "provider":
-            bars, status_rows, log_rows = _baostock_fetch_day(codes, market_date)
-            index_rows, index_log_rows = _baostock_fetch_index_day(market_date)
-            log_rows.extend(index_log_rows)
+            if provider_readiness is None or completion_deadline is None:
+                raise LaneRunError("provider mode requires readiness and completion deadlines")
+            socket_timeout_seconds = float(provider_readiness["socket_timeout_seconds"])
+            index_rows, index_log_rows = _baostock_wait_for_index_day(
+                market_date,
+                deadline_at=_contract_deadline(
+                    market_date, str(provider_readiness["deadline"])
+                ),
+                poll_interval_seconds=float(provider_readiness["poll_interval_seconds"]),
+                socket_timeout_seconds=socket_timeout_seconds,
+                progress_path=landing / "provider_readiness.json",
+            )
+            bars, status_rows, stock_log_rows = _baostock_fetch_day(
+                codes,
+                market_date,
+                missing_set_retry_rounds=int(
+                    provider_readiness["missing_set_retry_rounds"]
+                ),
+                missing_set_retry_delay_seconds=float(
+                    provider_readiness["missing_set_retry_delay_seconds"]
+                ),
+                socket_timeout_seconds=socket_timeout_seconds,
+                deadline_at=_contract_deadline(market_date, completion_deadline),
+            )
+            log_rows = [*index_log_rows, *stock_log_rows]
         else:
             bars, status_rows, log_rows = _local_market_acquire(
                 paths=paths, market_date=market_date, codes=codes
@@ -1179,6 +1386,13 @@ def _build_market_open(
             )
         ]
 
+    knowledge_cutoff = _latest_observed_cutoff(
+        knowledge_cutoff,
+        bars,
+        status_rows,
+        index_rows,
+        log_rows,
+    )
     datasets: list[DatasetStatus] = []
     datasets.append(
         _seal_dataset(
@@ -1317,6 +1531,9 @@ def _build_market_open(
                 "mode": mode,
                 "market_date": watermark,
                 "universe_size": len(codes),
+                "node_id": _ods_node_id(),
+                "collection_window_experiment": collection_window_experiment,
+                "metrics": _market_acquisition_metrics(log_rows),
                 "requests": log_rows,
                 "source_revision": rev,
             },
@@ -2398,6 +2615,7 @@ def _build_weekly_corrections(
                         "baostock login failed for weekly correction: "
                         f"{login.error_msg}"
                     )
+                set_socket_timeout(30)
                 fields = "date,code,open,high,low,close,volume,amount"
                 acquired_at = _now_sh_iso()
                 try:
@@ -3854,6 +4072,11 @@ def run_lane(
                     market_date=market_date,
                     landing=landing,
                     knowledge_cutoff=knowledge_cutoff,
+                    provider_readiness=lane.get("provider_readiness"),
+                    completion_deadline=str(lane.get("completion_deadline") or ""),
+                    collection_window_experiment=lane.get(
+                        "collection_window_experiment"
+                    ),
                 )
                 result.datasets = datasets
                 _inject_failure(failure_injection_stage, "pre_seal")
@@ -4108,7 +4331,9 @@ def run_lane(
                 handle.close()
 
 
-def expected_timer_oncalendar(schedule_config: Path) -> dict[str, str]:
+def expected_timer_oncalendar(
+    schedule_config: Path, *, node_id: str = "hermes"
+) -> dict[str, str]:
     """Derive systemd OnCalendar strings from the versioned schedule contract."""
 
     payload = json.loads(Path(schedule_config).read_text(encoding="utf-8"))
@@ -4129,6 +4354,18 @@ def expected_timer_oncalendar(schedule_config: Path) -> dict[str, str]:
         if trigger.get("kind") != "timer":
             continue
         time_s = trigger["time"]
+        if lane_id == "market-daily-core":
+            experiment = lane.get("collection_window_experiment") or {}
+            node = next(
+                (
+                    value
+                    for value in experiment.get("nodes") or []
+                    if value.get("node_id") == node_id
+                ),
+                None,
+            )
+            if node is not None:
+                time_s = node["timer_start"]
         if trigger.get("days") == "every_natural_day":
             out[lane_id] = f"*-*-* {time_s} {tz}"
         elif trigger.get("weekdays") == [6]:

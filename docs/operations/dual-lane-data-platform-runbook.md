@@ -160,7 +160,11 @@ Portable research ADS is a separate consumer boundary below `/srv`; it does not 
 dual-lane publication root and has no `CURRENT`. Install the locked reader principals from the
 reviewed commit, then publish each scope as a distinct physical tree. The publisher requires a
 clean exact Git revision, writes `READY` last, applies role-specific ownership, runs the deep logical
-content check as the authorized reader, and rejects development access to sealed manifests.
+content check under the authorized logical role, and rejects development access to sealed
+manifests. The semantic verifier runs inside the root-owned publisher. A separate filesystem probe
+runs as the locked scope principal and must traverse and read every bundle path without being able
+to modify one; the data principal does not receive access to the deployment checkout or its virtual
+environment.
 
 ```bash
 sudo systemd-sysusers /opt/quanthus/current/ops/sysusers.d/quanthus-ads.conf

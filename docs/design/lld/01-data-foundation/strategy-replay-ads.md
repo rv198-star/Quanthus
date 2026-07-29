@@ -75,6 +75,11 @@ root; development is group-readable by `ubuntu`, while arbitration and blind bun
 locked system principals. There is no portable ADS `CURRENT` pointer. Every run names one immutable
 bundle id and its exact role.
 
+The semantic deep check runs in the root-owned publisher with the scope's locked logical reader
+role. A separate OS probe runs as the scope principal and must traverse and read every bundle path
+without being able to modify any of them. Data principals do not receive access to the root-owned
+deployment checkout or its virtual environment merely to execute the verifier.
+
 The normal CLI inputs are `--ads-bundle` and `--ads-role`. The runner owns the ADS reader and passes
 only typed decision views to strategy code. Runner-only execution/action methods increment an
 access counter; reaching one during `decide()` fails the run. Repository-governed strategy code is

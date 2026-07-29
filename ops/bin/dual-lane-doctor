@@ -154,7 +154,8 @@ if [[ "$role" == "node" ]]; then
   if runuser -u "$candidate_user" -- test -w "$candidate_root"; then
     fail "$candidate_user must not be able to write the candidate root"
   fi
-  unreadable="$(runuser -u "$candidate_user" -- find "$candidate_root" -type f ! -readable -print -quit)"
+  unreadable="$(runuser -u "$candidate_user" -- \
+    /bin/sh -c 'cd / && find "$1" -type f ! -readable -print -quit' sh "$candidate_root")"
   [[ -z "$unreadable" ]] || fail "$candidate_user cannot read candidate file: $unreadable"
   [[ -x /usr/bin/rrsync ]] || fail "/usr/bin/rrsync is missing"
   [[ -x "${repo_root}/ops/bin/promote-dual-lane-epoch" ]] || fail "node-local epoch promoter is missing"

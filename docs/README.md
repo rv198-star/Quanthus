@@ -23,6 +23,10 @@ nodes.
   panel and a three-strategy one-unit baseline runner. Moderated catalogue v2 is the CLI default;
   v1 remains a replayable but rejected extreme-control record. The command is locked to 2012-2021
   development data and does not promote a target P3 policy or open arbitration/blind partitions.
+- Targeted backtest sanity diagnostics passed a same-pipeline single-security buy-and-hold sentinel,
+  reproduced v1 near-total losses with every cost set to zero, and reconciled daily-return extremes
+  to raw bars. This narrows the v1 failure to strategy construction without making the sentinel a
+  market benchmark or proving every engine path.
 - The mixed-unit corporate-action normalization contract and a real-corpus audit are implemented
   under `P1-DATA-004`. Exact implementation-plan authority resolves the former factor/unit
   ambiguity, and all 272 retained rows now have a versioned per-security fail-closed disposition.

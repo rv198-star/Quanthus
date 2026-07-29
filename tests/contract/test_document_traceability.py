@@ -338,6 +338,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
         v2_evidence_path = (
             root / "docs" / "acceptance" / "p3-baseline-strategy-suite-v2-20260729.md"
         )
+        diagnostic_evidence_path = (
+            root / "docs" / "acceptance" / "p3-backtest-sanity-diagnostics-20260729.md"
+        )
         source_path = root / "src" / "quanthus" / "backtest" / "baseline_research.py"
         cli_path = root / "src" / "quanthus" / "cli.py"
         feature_fields = _header_fields(feature_lld_path)
@@ -346,6 +349,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         replay_lld = replay_lld_path.read_text(encoding="utf-8")
         v1_evidence = v1_evidence_path.read_text(encoding="utf-8")
         v2_evidence = v2_evidence_path.read_text(encoding="utf-8")
+        diagnostic_evidence = diagnostic_evidence_path.read_text(encoding="utf-8")
         source = source_path.read_text(encoding="utf-8")
         cli = cli_path.read_text(encoding="utf-8")
         v1_catalogue = json.loads(
@@ -370,6 +374,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("Payoff ratio", v2_evidence)
         self.assertIn("`execution_authorized=false`", v2_evidence)
         self.assertIn("2022-2024 arbitration partition", v2_evidence)
+        self.assertIn("buy-and-hold sentinel passed", diagnostic_evidence)
+        self.assertIn("Zero-cost v1 counterfactual", diagnostic_evidence)
+        self.assertIn("Days above 20% absolute", diagnostic_evidence)
+        self.assertIn("post-selected winner", diagnostic_evidence)
+        self.assertIn("-99.3918%", diagnostic_evidence)
         self.assertEqual(v1_catalogue["status"], "research-only")
         self.assertEqual(v2_catalogue["status"], "research-only")
         self.assertEqual(v1_catalogue["validation"]["development_end"], "2021-12-31")

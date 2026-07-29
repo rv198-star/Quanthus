@@ -167,6 +167,7 @@ anomalous date so bypassing the feature panel cannot create a false held-positio
 | Continuous replay-bundle completeness and integrity gate | `src/quanthus/backtest/historical_bundle.py`, `tests/unit/test_historical_replay_bundle.py`, `docs/acceptance/p3-historical-replay-bundle-gate-slice-20260728.md` |
 | Continuous PIT frame reader and real-corpus audit | `src/quanthus/backtest/historical_frames.py`, `tests/unit/test_historical_frame_reader.py`, `docs/acceptance/p3-historical-frame-reader-slice-20260729.md` |
 | Baseline feature panel, strategies, and development suite | `src/quanthus/backtest/baseline_research.py`, `tests/unit/test_baseline_research.py`, `docs/acceptance/p3-baseline-strategy-suite-20260729.md`, `docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md` |
+| Backtest sanity diagnostics | `docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md` |
 
 The integration slice additionally publishes `StrategyReplayResult.audit_dict()` together with
 the immutable P2 run through `AuditEventStore.persist_strategy_replay`. The replay manifest binds

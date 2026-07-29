@@ -124,7 +124,9 @@ rebound rules through the accepted one-unit P2 replay. Both are restricted to th
 development partition. The v1 acceptance record preserves the rejected full-capital/extreme
 control; moderated v2 is the current CLI default and publishes a combined activity/performance
 scoreboard. Evidence: `docs/acceptance/p3-baseline-strategy-suite-20260729.md` and
-`docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md`.
+`docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md`. The follow-up same-pipeline
+buy-and-hold, zero-cost v1, and raw-extreme diagnostics are recorded in
+`docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md`.
 
 | ID | Title | Depends on |
 | --- | --- | --- |

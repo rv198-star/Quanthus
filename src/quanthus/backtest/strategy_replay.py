@@ -978,6 +978,9 @@ def run_strategy_replay(
             market_view=frame.decision_view,
         )
         decision = strategy.decide(context)
+        capability_check = getattr(context.market_view, "assert_decision_capability", None)
+        if capability_check is not None:
+            capability_check()
         if not isinstance(decision, ReplayDecision):
             raise BacktestInputError("strategy must return ReplayDecision")
         state_before = "empty" if state.settled_quantity == 0 else "positioned"

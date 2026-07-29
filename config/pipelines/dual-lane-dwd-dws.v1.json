@@ -30,6 +30,8 @@
       "missing_candidate",
       "invalid_candidate"
     ],
+    "eligible_attempt_source": "lane_ods_current",
+    "attempt_selection": "exact_only",
     "cross_lane_divergence_policy": "withhold_both",
     "row_or_artifact_mixing": false
   },
@@ -37,7 +39,24 @@
     "consumer_pointer": "release-set_CURRENT.json",
     "operational_ads_required": true,
     "legacy_dataset_pointers_are_authoritative": false,
-    "postgresql_projection_authoritative": false
+    "postgresql_projection_authoritative": false,
+    "fenced_lease": {
+      "lease_name": "canonical-publisher",
+      "duration_seconds": 1860,
+      "pointer_cas": "sha256-precondition-v1",
+      "target_owner": "dual-lane-target",
+      "legacy_owner": "legacy-oci"
+    },
+    "cutover_gate": {
+      "artifact": "GO_FOR_CUTOVER.json",
+      "environment": "GO_FOR_CUTOVER",
+      "live_activation_default": false,
+      "required_evidence": [
+        "legacy_writer_fenced",
+        "retention_gate_passed",
+        "restore_drill_passed"
+      ]
+    }
   },
   "qualification": {
     "calibration_open_sessions": 1,
@@ -50,7 +69,27 @@
     "delete_enabled": false,
     "retain_legacy_oci_ods": true,
     "retain_legacy_dwd_dws": true,
-    "retain_all_migration_candidates": true
+    "retain_all_migration_candidates": true,
+    "accepted_ods_recovery": {
+      "minimum_failure_independent_copies": 2,
+      "minimum_correction_horizon_days": 90,
+      "restore_rpo_seconds": 0,
+      "restore_rto_seconds": 3600,
+      "purge_requires": [
+        "correction_horizon_expired",
+        "zero_descendant_references",
+        "successful_restore_drill",
+        "explicit_inventory_approval"
+      ]
+    }
+  },
+  "correction": {
+    "state_machine": "immutable-correction-v1",
+    "approval_required": true,
+    "late_equivalent_republishes": false,
+    "revoked_generation_publishable": false,
+    "rollback_requires_fenced_cas": true,
+    "reason_code_required": true
   },
   "ads": {
     "operational_profile": "operational_daily_v1",

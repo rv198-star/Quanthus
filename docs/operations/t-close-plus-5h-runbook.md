@@ -88,7 +88,7 @@ schema or source-semantic drift, checksum failure, backward cutoffs, and abnorma
 changes. This transform belongs to the separate weekly pipeline; scheduler wiring is not part of
 the daily T-close critical path yet.
 
-After publication, audit the exact immutable bundle before using it for strategy research:
+After publication, audit the exact immutable snapshot as a portable-ADS source gate:
 
 ```bash
 .venv/bin/python -m quanthus audit-historical-replay-frames \
@@ -103,7 +103,10 @@ universe, execution evidence, bars, normalized actions, and exception intervals.
 evidence remains counted and fail-closed rather than disappearing from the universe. A successful
 report must bind the expected bundle digest, declare `ready_for_strategy_replay=true`, and retain
 `execution_authorized=false`. A nonzero exit, unexpected count movement, digest drift, or new
-missing-evidence pattern blocks research promotion and requires source-level diagnosis.
+missing-evidence pattern blocks ADS publication and requires source-level diagnosis. New research
+does not run from `--snapshot-dir`; OCI next publishes the role-scoped `strategy_replay` ADS
+described in `docs/operations/dual-lane-data-platform-runbook.md`. The snapshot option remains only
+for frozen P3 acceptance reproduction.
 
 ## OCI deployment
 

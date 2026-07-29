@@ -6,7 +6,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | strategy-neutral replay accepted; three baseline suite accepted; governed five-unit development delivery accepted after byte-identical full rerun |
+| Implementation status | strategy-neutral replay accepted; three baseline suite accepted; governed five-unit development accepted; normal research boundary migrated to role-scoped portable ADS; formal ADS backfill/deployment evidence pending |
 | Continuous corpus gate | accepted by `p1-historical-replay-20260729-v1` |
 | Governing work | `P3-REPLAY-001` |
 | Governing requirements | FR-BT-001/002/003/004/006, FR-AUDIT-001/002 |
@@ -38,8 +38,7 @@ deterministically, reject execution-date drift and duplicate securities, and nev
 evidence object to the strategy callback. They are not a raw Parquet query layer and perform no
 coverage, suspension, limit, or tradability inference.
 
-The continuous PIT frame reader, `HistoricalReplayFrameReader`, consumes only a single immutable
-bundle that includes the
+The continuous PIT frame reader consumes only a single immutable bundle that includes the
 authoritative exchange calendar, daily execution/tradability facts, normalized corporate actions,
 the same-version corporate-action exception ledger, and their exact source revisions. It verifies
 required schemas and identity bounds, enumerates complete SSE/SZSE calendar sessions rather than
@@ -50,6 +49,13 @@ The decision view is keyed by the bundle's opaque economic `security_id`; a stra
 value and must not synthesize an id from exchange plus stock code. The daily universe is the source
 of candidate rows. Missing execution evidence remains a visible, non-executable row rather than
 being dropped. T+1 sessions and corporate actions are loaded only by the runner-owned frame source.
+
+Normal research uses `StrategyReplayADSFrameReader`, which is authorized against one physical ADS
+scope and also supplies its checksum-bound benchmark and policy reference. It binds the ADS content
+digest and exact manifest SHA into feature panels and run manifests. A decision callback receives
+no paths; any access to a runner-only table during `decide()` fails the capability check. The legacy
+`HistoricalReplayFrameReader` snapshot entry remains hidden and warning-bound solely for frozen P3
+acceptance reproduction.
 
 Corporate-action normalization completes before frame construction. Source stock codes map through
 the versioned code-validity table to one economic identity. For a held position, the frame applies
@@ -143,25 +149,29 @@ Missing held-position features produce hold, while maximum holding remains an in
 No add/reduce, label, expert, state model, sector filter, email transport, or broker interface is
 enabled.
 
-The CLI `run-baseline-strategy-suite` first materializes one lineage-bound vectorized feature panel,
-then runs each strategy through `run_strategy_replay`. It accepts only the frozen 2012-2021
-development partition, and the final T+1 execution must also remain inside that partition. The
-panel's full-scope continuity filter must extend through that final T+1 execution session even
-though strategy decisions stop at T; a narrower panel fails before replay. The 2022-2024
-arbitration and 2025 permanent-blind partitions remain unopened by this command. Results are
-research-only, declare `execution_authorized=false`, and retain a zero-return cash baseline;
-profitability is not a delivery gate for this infrastructure slice. Its canonical JSON includes
+The CLI `run-baseline-strategy-suite` first opens one explicitly authorized development ADS bundle,
+materializes one lineage-bound vectorized feature panel, then runs each strategy through
+`run_strategy_replay`. The frozen P3 catalogue still rejects every date outside 2012-2021;
+building isolated arbitration and permanent-blind bundles does not grant this fixture permission to
+open them. A future approved evaluation command would additionally require the distinct OS
+principal, reader role, and physical path; no command may infer or combine scopes. The final T+1
+execution must remain inside the authorized development partition. The panel's full-scope
+continuity filter must extend through that final T+1 execution session even though strategy
+decisions stop at T; a narrower panel fails before replay. Results are research-only, declare
+`execution_authorized=false`, and retain a zero-return cash baseline; profitability is not a
+delivery gate for this infrastructure slice. Its canonical JSON includes
 fill-operation counts split into buys and sells plus closed-trade counts. A co-generated Markdown
 scoreboard shows those counts with win rate, cumulative return, PnL, ending equity, maximum
 drawdown, annualized volatility, fees, turnover, time in market, average invested capital, average
 hold, payoff ratio, profit factor, Sharpe, top-three robustness, benchmark return, and excess
 return. Total return is non-compounded and is never labeled as CAGR.
 
-The suite also requires an offline, checksum-verified benchmark curve through CLI `--benchmark`.
-The current broad-market control is CSI 300 with explicit instrument identity `sh000300`; ambiguous
-`000300` is rejected because it can route to the wrong market identity. The artifact records source,
-source revision, acquisition time, close observations, and its canonical digest. The runner does
-not fetch market data. It requires a benchmark observation for every strategy-equity date and
+The ADS profile supplies an offline, checksum-verified benchmark curve; the hidden `--benchmark`
+argument exists only for frozen snapshot reproduction. The current broad-market control is CSI 300
+with explicit instrument identity `sh000300`; ambiguous `000300` is rejected because it can route
+to the wrong market identity. The artifact records source, source revision, acquisition time, close
+observations, and its canonical digest. The runner does not fetch market data. It requires a
+benchmark observation for every strategy-equity date and
 computes close-to-close buy-and-hold return from the initial equity date through the last T+1
 execution date. Excess return is strategy total return minus that benchmark total return.
 
@@ -230,6 +240,7 @@ matching engine or authority to access later validation partitions.
 | Backtest sanity diagnostics | `docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md` |
 | Governed five-unit orchestration and metrics | `src/quanthus/backtest/portfolio_replay.py`, `tests/unit/test_portfolio_replay.py` |
 | Governed policy, labels, experts, industry input, and first development result | `config/p3-governed-strategy.research.v1.json`, `src/quanthus/governed_strategy.py`, `src/quanthus/industry_mapping.py`, `docs/acceptance/p3-governed-strategy-development-20260729.md` |
+| Portable ADS publication, role authorization, and normal replay boundary | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `../01-data-foundation/strategy-replay-ads.md` |
 
 The integration slice additionally publishes `StrategyReplayResult.audit_dict()` together with
 the immutable P2 run through `AuditEventStore.persist_strategy_replay`. The replay manifest binds
@@ -244,6 +255,6 @@ The accepted baselines remain comparison controls, not a promoted P3 policy. Can
 immutable 2012-2021 run passed its predeclared performance gates, and an independent full
 invocation reproduced its panel, result, and scoreboard byte-identically. This closes only its
 development delivery gate. The evaluator implements only its named registry; it is not a generic
-formula language. Partial/add/reduce actions, intraday matching, arbitration/blind access,
+formula language. Partial/add/reduce actions, intraday matching, valid new blind evidence,
 constrained contribution reruns, shadow decision production, and production promotion remain
 open.

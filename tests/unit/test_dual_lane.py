@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
 import os
 import shutil
 import tempfile
 import unittest
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 try:
     import pyarrow as pa
@@ -35,6 +37,52 @@ from quanthus.pipelines.dual_lane import (
 
 def _sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def _acquire_lease_process(
+    policy_path: str,
+    root: str,
+    owner: str,
+    now: str,
+    results,
+) -> None:
+    try:
+        lease = dual_lane.acquire_fenced_lease(
+            root=Path(root),
+            policy=load_dual_lane_policy(Path(policy_path)),
+            owner=owner,
+            clock=lambda: datetime.fromisoformat(now),
+        )
+        results.put(("acquired", owner, lease.fencing_token))
+    except Exception as exc:  # pragma: no cover - asserted in the parent process
+        results.put(("rejected", owner, type(exc).__name__, str(exc)))
+
+
+def _arbitrate_process(
+    policy_path: str,
+    epoch_path: str,
+    primary_path: str,
+    standby_path: str,
+    root: str,
+    market_date: str,
+    now: str,
+    results,
+) -> None:
+    try:
+        policy = load_dual_lane_policy(Path(policy_path))
+        epoch = verify_epoch_input(Path(epoch_path))
+        result = arbitrate_and_publish(
+            market_date=date.fromisoformat(market_date),
+            primary_candidate_path=Path(primary_path),
+            standby_candidate_path=Path(standby_path),
+            root=Path(root),
+            policy=policy,
+            expected_epoch=epoch,
+            clock=lambda: datetime.fromisoformat(now),
+        )
+        results.put(("published", result.release_set_id))
+    except Exception as exc:  # pragma: no cover - asserted in the parent process
+        results.put(("failed", type(exc).__name__, str(exc)))
 
 
 @unittest.skipIf(pa is None or pq is None, "P1 dependencies are not installed")
@@ -164,6 +212,8 @@ class DualLaneTests(unittest.TestCase):
                 "standby_lane": "hermes",
                 "maximum_consecutive_standby_absence": maximum_absence,
                 "fallback_failure_reasons": ["missing_candidate", "invalid_candidate"],
+                "eligible_attempt_source": "lane_ods_current",
+                "attempt_selection": "exact_only",
                 "cross_lane_divergence_policy": "withhold_both",
                 "row_or_artifact_mixing": False,
             },
@@ -172,6 +222,23 @@ class DualLaneTests(unittest.TestCase):
                 "operational_ads_required": True,
                 "legacy_dataset_pointers_are_authoritative": False,
                 "postgresql_projection_authoritative": False,
+                "fenced_lease": {
+                    "lease_name": "canonical-publisher",
+                    "duration_seconds": 1860,
+                    "pointer_cas": "sha256-precondition-v1",
+                    "target_owner": "dual-lane-target",
+                    "legacy_owner": "legacy-oci",
+                },
+                "cutover_gate": {
+                    "artifact": "GO_FOR_CUTOVER.json",
+                    "environment": "GO_FOR_CUTOVER",
+                    "live_activation_default": False,
+                    "required_evidence": [
+                        "legacy_writer_fenced",
+                        "retention_gate_passed",
+                        "restore_drill_passed",
+                    ],
+                },
             },
             "retention": {
                 "migration_mode": "copy_only",
@@ -179,6 +246,26 @@ class DualLaneTests(unittest.TestCase):
                 "retain_legacy_oci_ods": True,
                 "retain_legacy_dwd_dws": True,
                 "retain_all_migration_candidates": True,
+                "accepted_ods_recovery": {
+                    "minimum_failure_independent_copies": 2,
+                    "minimum_correction_horizon_days": 90,
+                    "restore_rpo_seconds": 0,
+                    "restore_rto_seconds": 3600,
+                    "purge_requires": [
+                        "correction_horizon_expired",
+                        "zero_descendant_references",
+                        "successful_restore_drill",
+                        "explicit_inventory_approval",
+                    ],
+                },
+            },
+            "correction": {
+                "state_machine": "immutable-correction-v1",
+                "approval_required": True,
+                "late_equivalent_republishes": False,
+                "revoked_generation_publishable": False,
+                "rollback_requires_fenced_cas": True,
+                "reason_code_required": True,
             },
             "qualification": {
                 "calibration_open_sessions": 1,
@@ -193,6 +280,15 @@ class DualLaneTests(unittest.TestCase):
                 "artifact_discovery": "manifest_tables_parts",
             },
         }
+
+    @staticmethod
+    def _clock(market_date: date, hour: int, minute: int = 0):
+        value = datetime.combine(
+            market_date,
+            time(hour, minute),
+            tzinfo=ZoneInfo("Asia/Shanghai"),
+        )
+        return lambda: value
 
     def _epoch(self, market_date: date) -> EpochInput:
         input_digest = dual_lane._epoch_input_digest(
@@ -217,6 +313,7 @@ class DualLaneTests(unittest.TestCase):
             security_master_path=self.security_master_path,
             code_revision=self.CODE_REVISION,
             base_pointer=self.base_pointer,
+            clock=self._clock(market_date, 16, 30),
         )
 
     def _release(
@@ -226,13 +323,17 @@ class DualLaneTests(unittest.TestCase):
         lane: str,
         close: float = 10.1,
         variant: str = "base",
+        knowledge_cutoff: datetime | None = None,
+        release_created_at: datetime | None = None,
     ) -> Path:
         assert pa is not None
         assert pq is not None
-        root = self.root / "ods" / market_date.isoformat() / f"{lane}-{variant}"
+        root = self.root / "ods-inputs" / market_date.isoformat() / f"{lane}-{variant}"
         inputs = root / "inputs"
         inputs.mkdir(parents=True)
-        built_at = datetime.combine(market_date, time(8), tzinfo=timezone.utc)
+        built_at = knowledge_cutoff or datetime.combine(
+            market_date, time(8), tzinfo=timezone.utc
+        )
         bars = inputs / "daily_ohlcv_none_delta.parquet"
         statuses = inputs / "daily_status_observation_delta.parquet"
         master = inputs / "ref_security_master.parquet"
@@ -351,8 +452,33 @@ class DualLaneTests(unittest.TestCase):
                 ],
             },
         )
-        release = root / "release"
-        publish_ods_release(spec_path=spec, output=release)
+        attempt_id = f"attempt-{lane}-{market_date.strftime('%Y%m%d')}-{variant}"
+        date_root = self.root / "ods" / lane / "daily" / market_date.isoformat()
+        release = date_root / attempt_id
+        sealed_at = release_created_at or datetime.combine(
+            market_date, time(19, 45), tzinfo=ZoneInfo("Asia/Shanghai")
+        )
+
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return sealed_at if tz is None else sealed_at.astimezone(tz)
+
+        with mock.patch("quanthus.pipelines.contracts.datetime", FrozenDateTime):
+            publish_ods_release(spec_path=spec, output=release)
+        verified = dual_lane.verify_ods_release(release)
+        self._write_json(
+            date_root / "CURRENT.json",
+            {
+                "schema_version": 1,
+                "schedule": "daily",
+                "market_date": market_date.isoformat(),
+                "attempt_id": attempt_id,
+                "release_id": verified.release.release_id,
+                "manifest_sha256": verified.manifest_sha256,
+                "ready_at": verified.release.created_at.isoformat(),
+            },
+        )
         return release
 
     def _candidate(
@@ -379,6 +505,7 @@ class DualLaneTests(unittest.TestCase):
             epoch_root=epoch.root,
             policy=self.policy,
             code_revision=self.CODE_REVISION,
+            clock=self._clock(market_date, 19, 55),
         )
 
     @staticmethod
@@ -400,6 +527,47 @@ class DualLaneTests(unittest.TestCase):
 
         with self.assertRaisesRegex(DualLaneError, "deletion disabled"):
             load_dual_lane_policy(path)
+
+    def test_policy_rejects_directory_order_attempt_selection(self) -> None:
+        payload = self._policy_payload()
+        arbitration = payload["arbitration"]
+        assert isinstance(arbitration, dict)
+        arbitration["attempt_selection"] = "latest_directory"
+        path = self.root / "unsafe-attempt-policy.json"
+        self._write_json(path, payload)
+
+        with self.assertRaisesRegex(DualLaneError, "exact lane ODS CURRENT"):
+            load_dual_lane_policy(path)
+
+    def test_epoch_publication_requires_aware_trusted_clock_inside_window(self) -> None:
+        market_date = date(2026, 7, 24)
+        input_digest = dual_lane._epoch_input_digest(
+            _sha256(self.base_pointer),
+            _sha256(self.base_metadata_path),
+            self.policy.digest,
+            _sha256(self.universe_path),
+            _sha256(self.validity_path),
+            _sha256(self.security_master_path),
+        )
+        arguments = {
+            "output": self.root / "clock-rejected-epoch",
+            "epoch_id": dual_lane._derive_epoch_id(
+                market_date=market_date,
+                code_revision=self.CODE_REVISION,
+                input_digest=input_digest,
+            ),
+            "market_date": market_date,
+            "policy": self.policy,
+            "universe_policy_path": self.universe_path,
+            "code_validity_path": self.validity_path,
+            "security_master_path": self.security_master_path,
+            "code_revision": self.CODE_REVISION,
+            "base_pointer": self.base_pointer,
+        }
+        with self.assertRaisesRegex(DualLaneError, "timezone-aware"):
+            publish_epoch_input(**arguments, clock=lambda: datetime(2026, 7, 24, 8, 30))
+        with self.assertRaisesRegex(DualLaneError, "publication window"):
+            publish_epoch_input(**arguments, clock=self._clock(market_date, 16, 29))
 
     def test_epoch_is_portable_and_rejects_tamper_and_path_traversal(self) -> None:
         epoch = self._epoch(date(2026, 7, 24))
@@ -425,6 +593,7 @@ class DualLaneTests(unittest.TestCase):
                 security_master_path=changed_master,
                 code_revision=self.CODE_REVISION,
                 base_pointer=self.base_pointer,
+                clock=self._clock(epoch.market_date, 16, 30),
             )
 
         tampered = self.root / "tampered" / "epoch"
@@ -475,6 +644,7 @@ class DualLaneTests(unittest.TestCase):
                 security_master_path=self.security_master_path,
                 code_revision=self.CODE_REVISION,
                 base_pointer=self.base_pointer,
+                clock=self._clock(market_date, 16, 30),
             )
 
     def test_epoch_rejects_parent_pointer_that_disagrees_with_dwd(self) -> None:
@@ -502,6 +672,7 @@ class DualLaneTests(unittest.TestCase):
                 security_master_path=self.security_master_path,
                 code_revision=self.CODE_REVISION,
                 parent_pointer=parent_pointer,
+                clock=self._clock(date(2026, 7, 25), 16, 30),
             )
 
     def test_epoch_rejects_historical_base_revision_alias(self) -> None:
@@ -526,6 +697,7 @@ class DualLaneTests(unittest.TestCase):
                 security_master_path=self.security_master_path,
                 code_revision=self.CODE_REVISION,
                 base_pointer=pointer,
+                clock=self._clock(date(2026, 7, 24), 16, 30),
             )
 
     def test_legacy_epoch_and_candidate_remain_auditable_but_ineligible(self) -> None:
@@ -591,6 +763,10 @@ class DualLaneTests(unittest.TestCase):
                 "runtime": candidate_manifest["runtime"],
                 "contract_id": candidate_manifest["contract_id"],
                 "policy_sha256": candidate_manifest["policy_sha256"],
+                "eligibility": candidate_manifest["eligibility"],
+                "attempt_selection": dual_lane._EXACT_ATTEMPT_SELECTION,
+                "source_inputs": candidate_manifest["source_inputs"],
+                "knowledge_cutoff": candidate_manifest["knowledge_cutoff"],
             }
         )
         self._rewrite_ready_manifest(legacy_candidate, candidate_manifest)
@@ -605,14 +781,19 @@ class DualLaneTests(unittest.TestCase):
                 attempt_id="attempt-from-legacy-epoch",
                 market_date=market_date,
                 ods_release_dir=(
-                    self.root / "ods" / market_date.isoformat() / "cn01-base" / "release"
+                    self.root
+                    / "ods"
+                    / "cn01"
+                    / "daily"
+                    / market_date.isoformat()
+                    / "attempt-cn01-20260724-base"
                 ),
                 epoch_root=legacy_epoch,
                 policy=self.policy,
                 code_revision=self.CODE_REVISION,
             )
 
-    def test_market_release_selection_does_not_trust_shared_current_attempt(self) -> None:
+    def test_market_release_selection_never_falls_back_from_exact_current(self) -> None:
         market_date = date(2026, 7, 24)
         date_root = self.root / "lane-releases" / "daily" / market_date.isoformat()
         market_attempt = date_root / "attempt-market"
@@ -645,14 +826,227 @@ class DualLaneTests(unittest.TestCase):
         )
         event_attempt = date_root / "attempt-event"
         publish_ods_release(spec_path=event_spec, output=event_attempt)
-
-        selected = select_market_daily_ods_release(
-            date_root,
-            market_date=market_date,
-            preferred_attempt=event_attempt.name,
+        event = dual_lane.verify_ods_release(event_attempt)
+        self._write_json(
+            date_root / "CURRENT.json",
+            {
+                "schema_version": 1,
+                "schedule": "daily",
+                "market_date": market_date.isoformat(),
+                "attempt_id": event_attempt.name,
+                "release_id": event.release.release_id,
+                "manifest_sha256": event.manifest_sha256,
+                "ready_at": event.release.created_at.isoformat(),
+            },
         )
 
-        self.assertEqual(selected, market_attempt.resolve())
+        with self.assertRaisesRegex(DualLaneError, "eligible market-daily"):
+            select_market_daily_ods_release(
+                date_root,
+                market_date=market_date,
+                preferred_attempt=event_attempt.name,
+            )
+
+    def test_candidate_requires_exact_current_descriptor(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        release = self._release(market_date, lane="cn01")
+        current = release.parent / "CURRENT.json"
+        payload = json.loads(current.read_text(encoding="utf-8"))
+        payload["manifest_sha256"] = f"sha256:{'0' * 64}"
+        self._write_json(current, payload)
+
+        with self.assertRaisesRegex(DualLaneError, "ODS CURRENT"):
+            build_lane_candidate(
+                output=self.root / "candidate-invalid-current",
+                candidate_id="candidate-invalid-current",
+                lane_id="cn01",
+                attempt_id=release.name,
+                market_date=market_date,
+                ods_release_dir=release,
+                epoch_root=epoch.root,
+                policy=self.policy,
+                code_revision=self.CODE_REVISION,
+                clock=self._clock(market_date, 19, 55),
+            )
+
+    def test_candidate_preserves_and_enforces_per_input_pit_lineage(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        candidate = self._candidate(epoch=epoch, lane="cn01")
+
+        self.assertEqual(len(candidate.source_inputs), 5)
+        self.assertEqual(
+            {item["name"] for item in candidate.source_inputs},
+            {
+                "daily_ohlcv_none_delta",
+                "daily_status_observation_delta",
+                "security_master",
+                "stock_list",
+                "trading_calendar",
+            },
+        )
+        shutil.rmtree(self.root / "ods" / "cn01")
+        relocated = verify_lane_candidate(candidate.root)
+        self.assertEqual(relocated.source_inputs, candidate.source_inputs)
+
+        late_release = self._release(
+            market_date,
+            lane="hermes",
+            variant="late-cutoff",
+            knowledge_cutoff=datetime.combine(
+                market_date,
+                time(20, 1),
+                tzinfo=ZoneInfo("Asia/Shanghai"),
+            ),
+            release_created_at=datetime.combine(
+                market_date,
+                time(20, 2),
+                tzinfo=ZoneInfo("Asia/Shanghai"),
+            ),
+        )
+        with self.assertRaisesRegex(DualLaneError, "PIT cutoff"):
+            build_lane_candidate(
+                output=self.root / "candidate-late-cutoff",
+                candidate_id="candidate-late-cutoff",
+                lane_id="hermes",
+                attempt_id=late_release.name,
+                market_date=market_date,
+                ods_release_dir=late_release,
+                epoch_root=epoch.root,
+                policy=self.policy,
+                code_revision=self.CODE_REVISION,
+                clock=self._clock(market_date, 19, 55),
+            )
+
+    def test_trusted_clock_enforces_candidate_and_arbitration_windows(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        release = self._release(market_date, lane="cn01")
+        with self.assertRaisesRegex(DualLaneError, "candidate build window"):
+            build_lane_candidate(
+                output=self.root / "candidate-after-cutoff",
+                candidate_id="candidate-after-cutoff",
+                lane_id="cn01",
+                attempt_id=release.name,
+                market_date=market_date,
+                ods_release_dir=release,
+                epoch_root=epoch.root,
+                policy=self.policy,
+                code_revision=self.CODE_REVISION,
+                clock=self._clock(market_date, 20, 1),
+            )
+
+        primary = self._candidate(epoch=epoch, lane="cn01", variant="on-time")
+        with self.assertRaisesRegex(DualLaneError, "before the frozen arbitration"):
+            arbitrate_and_publish(
+                market_date=market_date,
+                primary_candidate_path=primary.root,
+                standby_candidate_path=None,
+                root=self.root / "clock-publication",
+                policy=self.policy,
+                expected_epoch=epoch,
+                clock=self._clock(market_date, 19, 59),
+            )
+        missed = arbitrate_and_publish(
+            market_date=market_date,
+            primary_candidate_path=primary.root,
+            standby_candidate_path=None,
+            root=self.root / "deadline-publication",
+            policy=self.policy,
+            expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 31),
+        )
+        self.assertEqual(missed.status, "withheld")
+        self.assertEqual(missed.reason, "withheld_completion_deadline_missed")
+
+    def test_terminal_automatic_epoch_cannot_reopen_with_late_inputs(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        publication = self.root / "terminal-publication"
+        terminal = arbitrate_and_publish(
+            market_date=market_date,
+            primary_candidate_path=None,
+            standby_candidate_path=None,
+            root=publication,
+            policy=self.policy,
+            expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
+        )
+        self.assertEqual(terminal.status, "withheld")
+        terminal_record = next(
+            (publication / "state" / "terminal-decisions").rglob("*.json")
+        )
+        self.assertEqual(
+            json.loads(terminal_record.read_text(encoding="utf-8"))["decided_at"],
+            self._clock(market_date, 20, 5)().astimezone(timezone.utc).isoformat(),
+        )
+
+        primary = self._candidate(epoch=epoch, lane="cn01")
+        standby = self._candidate(epoch=epoch, lane="hermes")
+        with self.assertRaisesRegex(DualLaneError, "cannot reopen"):
+            arbitrate_and_publish(
+                market_date=market_date,
+                primary_candidate_path=primary.root,
+                standby_candidate_path=standby.root,
+                root=publication,
+                policy=self.policy,
+                expected_epoch=epoch,
+                clock=self._clock(market_date, 20, 6),
+            )
+
+    def test_terminal_decision_retry_repairs_arbitration_state_after_crash(self) -> None:
+        first_date = date(2026, 7, 24)
+        second_date = date(2026, 7, 25)
+        first_epoch = self._epoch(first_date)
+        second_epoch = self._epoch(second_date)
+        first = self._candidate(epoch=first_epoch, lane="cn01")
+        second = self._candidate(epoch=second_epoch, lane="cn01")
+        publication = self.root / "terminal-recovery-publication"
+        original_atomic_json = dual_lane._atomic_json
+        injected = False
+
+        def fail_before_state(path: Path, value: dict[str, object]) -> None:
+            nonlocal injected
+            if path.name == "arbitration-state.json" and not injected:
+                injected = True
+                raise RuntimeError("injected after terminal decision")
+            original_atomic_json(path, value)
+
+        with (
+            mock.patch.object(dual_lane, "_atomic_json", side_effect=fail_before_state),
+            self.assertRaisesRegex(RuntimeError, "after terminal decision"),
+        ):
+            arbitrate_and_publish(
+                market_date=first_date,
+                primary_candidate_path=first.root,
+                standby_candidate_path=None,
+                root=publication,
+                policy=self.policy,
+                expected_epoch=first_epoch,
+                clock=self._clock(first_date, 20, 5),
+            )
+
+        recovered = arbitrate_and_publish(
+            market_date=first_date,
+            primary_candidate_path=first.root,
+            standby_candidate_path=None,
+            root=publication,
+            policy=self.policy,
+            expected_epoch=first_epoch,
+            clock=self._clock(first_date, 20, 6),
+        )
+        following = arbitrate_and_publish(
+            market_date=second_date,
+            primary_candidate_path=second.root,
+            standby_candidate_path=None,
+            root=publication,
+            policy=self.policy,
+            expected_epoch=second_epoch,
+            clock=self._clock(second_date, 20, 5),
+        )
+        self.assertEqual(recovered.status, "published")
+        self.assertEqual(following.reason, "withheld_standby_absence_budget_exceeded")
 
     def test_same_business_content_selects_cn01_and_publishes_release_set_ads(self) -> None:
         market_date = date(2026, 7, 24)
@@ -671,6 +1065,7 @@ class DualLaneTests(unittest.TestCase):
             root=publication_root,
             policy=self.policy,
             expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
         )
 
         self.assertEqual(result.status, "published")
@@ -736,11 +1131,17 @@ class DualLaneTests(unittest.TestCase):
                 attempt_id="attempt-cn01-20260724-retry",
                 market_date=market_date,
                 ods_release_dir=(
-                    self.root / "ods" / market_date.isoformat() / "cn01-base" / "release"
+                    self.root
+                    / "ods"
+                    / "cn01"
+                    / "daily"
+                    / market_date.isoformat()
+                    / "attempt-cn01-20260724-base"
                 ),
                 epoch_root=epoch.root,
                 policy=self.policy,
                 code_revision=self.CODE_REVISION,
+                clock=self._clock(market_date, 19, 55),
             )
 
     def test_candidate_manifest_cannot_forge_epoch_security_master_lineage(self) -> None:
@@ -775,6 +1176,7 @@ class DualLaneTests(unittest.TestCase):
             root=publication_root,
             policy=self.policy,
             expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
         )
 
         self.assertEqual(result.status, "withheld")
@@ -802,6 +1204,10 @@ class DualLaneTests(unittest.TestCase):
                 "contract_id": manifest["contract_id"],
                 "policy_sha256": manifest["policy_sha256"],
                 "security_master_sha256": manifest["security_master_sha256"],
+                "eligibility": manifest["eligibility"],
+                "attempt_selection": dual_lane._EXACT_ATTEMPT_SELECTION,
+                "source_inputs": manifest["source_inputs"],
+                "knowledge_cutoff": manifest["knowledge_cutoff"],
             }
         )
         self._rewrite_ready_manifest(forged, manifest)
@@ -813,6 +1219,7 @@ class DualLaneTests(unittest.TestCase):
             root=self.root / "publication",
             policy=self.policy,
             expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
         )
 
         self.assertEqual(result.status, "withheld")
@@ -846,6 +1253,7 @@ class DualLaneTests(unittest.TestCase):
             root=self.root / "publication",
             policy=self.policy,
             expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
         )
 
         self.assertEqual(result.status, "published")
@@ -868,6 +1276,7 @@ class DualLaneTests(unittest.TestCase):
             root=publication_root,
             policy=self.policy,
             expected_epoch=first_epoch,
+            clock=self._clock(first_date, 20, 5),
         )
         withheld = arbitrate_and_publish(
             market_date=second_date,
@@ -876,6 +1285,7 @@ class DualLaneTests(unittest.TestCase):
             root=publication_root,
             policy=self.policy,
             expected_epoch=second_epoch,
+            clock=self._clock(second_date, 20, 5),
         )
 
         self.assertEqual(allowed.reason, "primary_without_comparison")
@@ -906,6 +1316,7 @@ class DualLaneTests(unittest.TestCase):
             root=publication_root,
             policy=self.policy,
             expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
         )
         second = arbitrate_and_publish(
             market_date=market_date,
@@ -914,6 +1325,7 @@ class DualLaneTests(unittest.TestCase):
             root=publication_root,
             policy=self.policy,
             expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
         )
 
         self.assertEqual(second.status, "published")
@@ -947,6 +1359,7 @@ class DualLaneTests(unittest.TestCase):
                 root=publication_root,
                 policy=self.policy,
                 expected_epoch=epoch,
+                clock=self._clock(market_date, 20, 5),
             )
 
         self.assertFalse((publication_root / "release-set_CURRENT.json").exists())
@@ -960,6 +1373,7 @@ class DualLaneTests(unittest.TestCase):
             root=publication_root,
             policy=self.policy,
             expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
         )
 
         self.assertEqual(recovered.status, "published")
@@ -997,6 +1411,486 @@ class DualLaneTests(unittest.TestCase):
             expected = 0o750 if path.is_dir() else 0o640
             self.assertEqual(path.stat().st_mode & 0o777, expected, path)
         self.assertEqual(current.stat().st_mode & 0o777, 0o640)
+
+    def test_fenced_lease_is_single_owner_across_processes(self) -> None:
+        context = multiprocessing.get_context("fork")
+        results = context.Queue()
+        root = self.root / "multiprocess-publication"
+        now = self._clock(date(2026, 7, 24), 20, 5)().isoformat()
+        processes = [
+            context.Process(
+                target=_acquire_lease_process,
+                args=(str(self.policy_path), str(root), owner, now, results),
+            )
+            for owner in ("writer-a", "writer-b")
+        ]
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join(10)
+            self.assertEqual(process.exitcode, 0)
+
+        outcomes = sorted(results.get(timeout=2) for _ in processes)
+        self.assertEqual([item[0] for item in outcomes].count("acquired"), 1)
+        self.assertEqual([item[0] for item in outcomes].count("rejected"), 1)
+        lease_events = sorted(
+            (root / "state" / "fenced-leases" / "canonical-publisher" / "events").glob(
+                "*.json"
+            )
+        )
+        self.assertEqual(len(lease_events), 1)
+
+    def test_concurrent_arbiters_publish_one_acceptance_and_one_pointer_cas(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        primary = self._candidate(epoch=epoch, lane="cn01")
+        standby = self._candidate(epoch=epoch, lane="hermes")
+        root = self.root / "multiprocess-arbitration"
+        context = multiprocessing.get_context("fork")
+        results = context.Queue()
+        arguments = (
+            str(self.policy_path),
+            str(epoch.root),
+            str(primary.root),
+            str(standby.root),
+            str(root),
+            market_date.isoformat(),
+            self._clock(market_date, 20, 5)().isoformat(),
+            results,
+        )
+        processes = [
+            context.Process(target=_arbitrate_process, args=arguments) for _ in range(2)
+        ]
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join(20)
+            self.assertEqual(process.exitcode, 0)
+
+        outcomes = [results.get(timeout=2) for _ in processes]
+        self.assertEqual({item[0] for item in outcomes}, {"published"})
+        self.assertEqual(len({item[1] for item in outcomes}), 1)
+        self.assertEqual(
+            len(list((root / "canonical" / "acceptance").rglob("*.json"))), 1
+        )
+        self.assertEqual(len(list((root / "pointer-cas-events").glob("*.json"))), 1)
+        self.assertEqual(len(list((root / "publication-events").glob("*.json"))), 1)
+
+    def test_lease_crash_does_not_reuse_fencing_token(self) -> None:
+        root = self.root / "lease-crash-publication"
+        original_atomic_json = dual_lane._atomic_json
+
+        def fail_after_lease_event(path: Path, value: dict[str, object]) -> None:
+            if path.name == "CURRENT.json" and path.parent.name == "canonical-publisher":
+                raise RuntimeError("injected after lease event")
+            original_atomic_json(path, value)
+
+        with (
+            mock.patch.object(dual_lane, "_atomic_json", side_effect=fail_after_lease_event),
+            self.assertRaisesRegex(RuntimeError, "after lease event"),
+        ):
+            dual_lane.acquire_fenced_lease(
+                root=root,
+                policy=self.policy,
+                owner="writer-a",
+                clock=self._clock(date(2026, 7, 24), 20, 5),
+            )
+
+        recovered = dual_lane.acquire_fenced_lease(
+            root=root,
+            policy=self.policy,
+            owner="writer-b",
+            clock=self._clock(date(2026, 7, 24), 20, 5),
+        )
+        self.assertEqual(recovered.fencing_token, 2)
+        events = sorted(
+            (root / "state" / "fenced-leases" / "canonical-publisher" / "events").glob(
+                "*.json"
+            )
+        )
+        self.assertEqual([json.loads(path.read_text())["fencing_token"] for path in events], [1, 2])
+
+    def test_expired_lease_takeover_fences_stale_pointer_commit(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        primary = self._candidate(epoch=epoch, lane="cn01")
+        standby = self._candidate(epoch=epoch, lane="hermes")
+        root = self.root / "fenced-publication"
+        result = arbitrate_and_publish(
+            market_date=market_date,
+            primary_candidate_path=primary.root,
+            standby_candidate_path=standby.root,
+            root=root,
+            policy=self.policy,
+            expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
+        )
+        stale = dual_lane.acquire_fenced_lease(
+            root=root,
+            policy=self.policy,
+            owner=self.policy.target_publisher_owner,
+            clock=self._clock(market_date, 20, 5),
+        )
+        takeover = dual_lane.acquire_fenced_lease(
+            root=root,
+            policy=self.policy,
+            owner=self.policy.legacy_publisher_owner,
+            clock=self._clock(market_date, 20, 36),
+        )
+        self.assertGreater(takeover.fencing_token, stale.fencing_token)
+        pointer_path = root / "release-set_CURRENT.json"
+        pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+        with self.assertRaisesRegex(DualLaneError, "fenced by a newer lease"):
+            dual_lane.compare_and_swap_release_pointer(
+                root=root,
+                policy=self.policy,
+                release_set_root=root / "release-sets" / str(result.release_set_id),
+                publication_event_path=root / pointer["publication_event_path"],
+                expected_pointer_sha256=_sha256(pointer_path),
+                lease=stale,
+                reason_code="stale_retry",
+                clock=self._clock(market_date, 20, 36),
+            )
+
+    def test_automatic_arbitration_rechecks_lease_expiry_before_pointer_commit(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        primary = self._candidate(epoch=epoch, lane="cn01")
+        standby = self._candidate(epoch=epoch, lane="hermes")
+        times = iter(
+            (
+                self._clock(market_date, 20, 0)(),
+                self._clock(market_date, 20, 32)(),
+            )
+        )
+        root = self.root / "expired-automatic-publication"
+
+        with self.assertRaisesRegex(DualLaneError, "lease expired before commit"):
+            arbitrate_and_publish(
+                market_date=market_date,
+                primary_candidate_path=primary.root,
+                standby_candidate_path=standby.root,
+                root=root,
+                policy=self.policy,
+                expected_epoch=epoch,
+                clock=lambda: next(times),
+            )
+
+        self.assertFalse((root / "release-set_CURRENT.json").exists())
+
+    def test_go_for_cutover_requires_environment_and_complete_evidence(self) -> None:
+        self.assertFalse(dual_lane.live_activation_requested(self.policy, {}))
+        self.assertTrue(
+            dual_lane.live_activation_requested(self.policy, {"GO_FOR_CUTOVER": "1"})
+        )
+        with self.assertRaisesRegex(DualLaneError, "must be 0, 1, or unset"):
+            dual_lane.live_activation_requested(self.policy, {"GO_FOR_CUTOVER": "yes"})
+
+        market_date = date(2026, 7, 24)
+        gate_path = self.root / "GO_FOR_CUTOVER.json"
+        legacy_lease = dual_lane.acquire_fenced_lease(
+            root=self.root,
+            policy=self.policy,
+            owner=self.policy.legacy_publisher_owner,
+            clock=self._clock(market_date, 19, 30),
+        )
+        self._write_json(
+            gate_path,
+            {
+                "schema_version": 1,
+                "kind": "go_for_cutover",
+                "contract_id": self.policy.contract_id,
+                "policy_sha256": self.policy.digest,
+                "approved": True,
+                "live_writer": self.policy.target_publisher_owner,
+                "legacy_fencing_token": legacy_lease.fencing_token,
+                "reason_code": "go_for_cutover_approved",
+                "approved_at": self._clock(market_date, 20, 0)().isoformat(),
+                "expires_at": self._clock(market_date, 21, 0)().isoformat(),
+                "evidence": {
+                    "legacy_writer_fenced": True,
+                    "retention_gate_passed": True,
+                    "restore_drill_passed": True,
+                },
+            },
+        )
+        verified = dual_lane.verify_go_for_cutover(
+            gate_path=gate_path,
+            policy=self.policy,
+            clock=self._clock(market_date, 20, 5),
+        )
+        self.assertTrue(verified["approved"])
+
+    def test_late_candidate_correction_approval_is_append_only(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        root = self.root / "correction-governance"
+        standby = self._candidate(epoch=epoch, lane="hermes")
+        published = arbitrate_and_publish(
+            market_date=market_date,
+            primary_candidate_path=None,
+            standby_candidate_path=standby.root,
+            root=root,
+            policy=self.policy,
+            expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
+        )
+        self.assertEqual(published.selected_lane, "hermes")
+        pointer_path = root / "release-set_CURRENT.json"
+        pointer_before = _sha256(pointer_path)
+        release = json.loads(
+            (
+                root
+                / json.loads(pointer_path.read_text(encoding="utf-8"))["release_set_path"]
+                / "manifest.json"
+            ).read_text(encoding="utf-8")
+        )
+        active_generation_id = str(release["generation_id"])
+        accepted_path = root / str(release["generation_path"])
+        equivalent = self._candidate(epoch=epoch, lane="cn01")
+        first = dual_lane.evaluate_late_candidate(
+            root=root,
+            policy=self.policy,
+            active_generation_id=active_generation_id,
+            accepted_candidate_path=accepted_path,
+            late_candidate_path=equivalent.root,
+            actor="oci-arbiter",
+            reason_code="late_primary_equivalent",
+            clock=self._clock(market_date, 20, 10),
+        )
+        self.assertEqual(first.action, "late_equivalent")
+        self.assertEqual(_sha256(pointer_path), pointer_before)
+
+        material = self._candidate(
+            epoch=epoch,
+            lane="cn01",
+            close=11.0,
+            variant="material-late",
+        )
+        proposal = dual_lane.evaluate_late_candidate(
+            root=root,
+            policy=self.policy,
+            active_generation_id=active_generation_id,
+            accepted_candidate_path=accepted_path,
+            late_candidate_path=material.root,
+            actor="oci-arbiter",
+            reason_code="late_primary_material_difference",
+            clock=self._clock(market_date, 20, 11),
+        )
+        self.assertEqual(proposal.action, "correction_proposed")
+        approval = dual_lane.approve_correction(
+            root=root,
+            policy=self.policy,
+            proposal_event_path=proposal.path,
+            replacement_generation_id="generation-corrected",
+            impact_digest="sha256:" + "a" * 64,
+            authority="data-owner",
+            reason_code="correction_diff_approved",
+            clock=self._clock(market_date, 20, 12),
+        )
+        self.assertEqual(approval.action, "correction_approved")
+        self.assertTrue(first.path.is_file())
+        self.assertTrue(proposal.path.is_file())
+        self.assertTrue(approval.path.is_file())
+        self.assertEqual(_sha256(pointer_path), pointer_before)
+
+    def test_revocation_then_fenced_rollback_selects_older_complete_release(self) -> None:
+        first_date = date(2026, 7, 24)
+        second_date = date(2026, 7, 25)
+        root = self.root / "rollback-publication"
+        releases: list[str] = []
+        for market_date in (first_date, second_date):
+            epoch = self._epoch(market_date)
+            result = arbitrate_and_publish(
+                market_date=market_date,
+                primary_candidate_path=self._candidate(epoch=epoch, lane="cn01").root,
+                standby_candidate_path=self._candidate(epoch=epoch, lane="hermes").root,
+                root=root,
+                policy=self.policy,
+                expected_epoch=epoch,
+                clock=self._clock(market_date, 20, 5),
+            )
+            assert result.release_set_id is not None
+            releases.append(result.release_set_id)
+
+        current = json.loads((root / "release-set_CURRENT.json").read_text(encoding="utf-8"))
+        current_release = json.loads(
+            (root / current["release_set_path"] / "manifest.json").read_text(encoding="utf-8")
+        )
+        revocation = dual_lane.record_generation_revocation(
+            root=root,
+            policy=self.policy,
+            generation_path=root / current_release["generation_path"],
+            authority="data-owner",
+            reason_code="integrity_failure_confirmed",
+            integrity_evidence_digest="sha256:" + "b" * 64,
+            clock=self._clock(second_date, 20, 6),
+        )
+        self.assertEqual(revocation.action, "generation_revoked")
+
+        original_append = dual_lane._append_governance_transition
+        injected = False
+
+        def fail_after_pointer(**kwargs):
+            nonlocal injected
+            if kwargs["action"] == "rollback_published" and not injected:
+                injected = True
+                raise RuntimeError("injected after rollback pointer CAS")
+            return original_append(**kwargs)
+
+        with (
+            mock.patch.object(
+                dual_lane,
+                "_append_governance_transition",
+                side_effect=fail_after_pointer,
+            ),
+            self.assertRaisesRegex(RuntimeError, "after rollback pointer CAS"),
+        ):
+            dual_lane.rollback_release_set(
+                root=root,
+                policy=self.policy,
+                target_release_set_id=releases[0],
+                authority="release-owner",
+                reason_code="rollback_after_revocation",
+                clock=self._clock(second_date, 20, 7),
+            )
+        self.assertEqual(
+            json.loads((root / "release-set_CURRENT.json").read_text())["release_set_id"],
+            releases[0],
+        )
+        rollback = dual_lane.rollback_release_set(
+            root=root,
+            policy=self.policy,
+            target_release_set_id=releases[0],
+            authority="release-owner",
+            reason_code="rollback_after_revocation",
+            clock=self._clock(second_date, 20, 8),
+        )
+        self.assertEqual(rollback.action, "rollback_published")
+        pointer = json.loads((root / "release-set_CURRENT.json").read_text(encoding="utf-8"))
+        self.assertEqual(pointer["release_set_id"], releases[0])
+        self.assertEqual(pointer["reason_code"], "approved_rollback")
+        self.assertTrue(revocation.path.is_file())
+
+    def test_rollback_rechecks_lease_expiry_before_pointer_commit(self) -> None:
+        first_date = date(2026, 7, 24)
+        second_date = date(2026, 7, 25)
+        root = self.root / "expired-rollback-publication"
+        releases: list[str] = []
+        for market_date in (first_date, second_date):
+            epoch = self._epoch(market_date)
+            result = arbitrate_and_publish(
+                market_date=market_date,
+                primary_candidate_path=self._candidate(epoch=epoch, lane="cn01").root,
+                standby_candidate_path=self._candidate(epoch=epoch, lane="hermes").root,
+                root=root,
+                policy=self.policy,
+                expected_epoch=epoch,
+                clock=self._clock(market_date, 20, 5),
+            )
+            assert result.release_set_id is not None
+            releases.append(result.release_set_id)
+        pointer_path = root / "release-set_CURRENT.json"
+        pointer_before = _sha256(pointer_path)
+        times = iter(
+            (
+                self._clock(second_date, 20, 6)(),
+                self._clock(second_date, 20, 7)(),
+                self._clock(second_date, 20, 39)(),
+            )
+        )
+
+        with self.assertRaisesRegex(DualLaneError, "lease expired before commit"):
+            dual_lane.rollback_release_set(
+                root=root,
+                policy=self.policy,
+                target_release_set_id=releases[0],
+                authority="release-owner",
+                reason_code="operator_requested_rollback",
+                clock=lambda: next(times),
+            )
+
+        self.assertEqual(_sha256(pointer_path), pointer_before)
+
+    def test_accepted_ods_recovery_requires_two_domains_and_proves_restore(self) -> None:
+        market_date = date(2026, 7, 24)
+        candidate = self._candidate(epoch=self._epoch(market_date), lane="cn01")
+        source_release = (
+            self.root
+            / "ods"
+            / "cn01"
+            / "daily"
+            / market_date.isoformat()
+            / candidate.attempt_id
+        )
+        recovery_root = self.root / "accepted-ods-governance"
+        retention_until = datetime.combine(
+            market_date + timedelta(days=100),
+            time(0, 0),
+            tzinfo=ZoneInfo("Asia/Shanghai"),
+        )
+        dual_lane.record_accepted_ods_copy(
+            root=recovery_root,
+            policy=self.policy,
+            accepted_candidate_path=candidate.root,
+            ods_release_copy_path=source_release,
+            copy_id="source-copy",
+            location_class="source_lane",
+            failure_domain="cn01-node",
+            retention_until=retention_until,
+            clock=self._clock(market_date, 20, 5),
+        )
+        insufficient = dual_lane.assess_accepted_ods_recovery(
+            root=recovery_root,
+            policy=self.policy,
+            accepted_candidate_path=candidate.root,
+            clock=self._clock(market_date, 20, 5),
+        )
+        self.assertFalse(insufficient.passed)
+
+        independent = self.root / "independent-recovery" / source_release.name
+        independent.parent.mkdir(parents=True)
+        shutil.copytree(source_release, independent)
+        dual_lane.record_accepted_ods_copy(
+            root=recovery_root,
+            policy=self.policy,
+            accepted_candidate_path=candidate.root,
+            ods_release_copy_path=independent,
+            copy_id="recovery-copy",
+            location_class="independent_recovery",
+            failure_domain="recovery-store-a",
+            retention_until=retention_until,
+            clock=self._clock(market_date, 20, 6),
+        )
+        passed = dual_lane.assess_accepted_ods_recovery(
+            root=recovery_root,
+            policy=self.policy,
+            accepted_candidate_path=candidate.root,
+            clock=self._clock(market_date, 20, 6),
+        )
+        self.assertTrue(passed.passed)
+        rebuilt = self.root / "clean-restore" / "candidate"
+        rebuilt.parent.mkdir(parents=True)
+        shutil.copytree(candidate.root, rebuilt)
+        drill = dual_lane.record_accepted_ods_restore_drill(
+            root=recovery_root,
+            policy=self.policy,
+            accepted_candidate_path=candidate.root,
+            restored_ods_release_path=independent,
+            rebuilt_candidate_path=rebuilt,
+            started_at=self._clock(market_date, 20, 0)(),
+            actor="recovery-operator",
+            clock=self._clock(market_date, 20, 7),
+        )
+        self.assertTrue(drill.is_file())
+        purge = dual_lane.record_accepted_ods_purge_gate(
+            root=recovery_root,
+            policy=self.policy,
+            accepted_candidate_path=candidate.root,
+            actor="retention-auditor",
+            clock=self._clock(market_date, 20, 8),
+        )
+        self.assertFalse(json.loads(purge.read_text(encoding="utf-8"))["eligible"])
 
     def test_transfer_helper_is_compatible_with_rrsync_forced_commands(self) -> None:
         project_root = Path(__file__).resolve().parents[2]

@@ -85,12 +85,15 @@ OCI:
 - PostgreSQL contains indexed, rebuildable serving projections. It is not a canonical system of
   record and is not the execution venue for full-history transformations.
 
-This is the approved target boundary, not a claim that every listed surface is delivered. The
-current dual-lane contract slice covers DWD daily bars, DWD daily status observations, one DWS
-daily market summary, fixed-primary arbitration, and a limited research-only operational ADS with
-`market_daily`, `market_status`, and `market_summary`. Full PIT/tradability candidate families,
-clock-health enforcement, correction/revocation/rollback workflows, and portable research bundles
-remain open target gates.
+This is the approved target boundary, not a claim that every listed surface is deployed. The
+current repository contract covers DWD daily bars, DWD daily status observations, one DWS daily
+market summary, fixed-primary arbitration, a limited research-only operational ADS, trusted
+Shanghai-time arbitration windows, fenced publication and rollback, immutable correction and
+revocation state, accepted-ODS recovery evidence, and the self-contained portable
+`strategy_replay` ADS profile. Runtime qualification, real NTP/clock evidence, independent accepted-
+ODS restore evidence, full PIT/tradability candidate families, and portable `event_library` and
+`ml_training` profiles remain open gates. The historical strategy ADS bootstrap records that it
+lacks per-decision publication proof; its 2025 output is not a genuine unopened blind evaluation.
 
 The legacy OCI full-ODS pull/build path remains live until ADR 0005's shadow, fencing, recovery,
 rollback, and explicit `GO_FOR_CUTOVER` gates pass. Target work is copy-only and uses separate

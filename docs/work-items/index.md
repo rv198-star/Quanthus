@@ -21,6 +21,13 @@ does not authorize a live `CURRENT` change, data deletion, retention cleanup, or
 research partitions. Production cutover requires its separate evidence gate and explicit
 `GO_FOR_CUTOVER`.
 
+The repository contract now includes portable `strategy_replay` ADS, fenced publication and
+rollback, correction/revocation records, and accepted-ODS recovery evidence. Formal three-node
+deployment, three historical ADS backfills, replay equivalence evidence, independent restore
+qualification, and consumer migration remain active work. The historical 2025 bootstrap can prove
+physical role separation only; prior developer visibility prevents it from serving as genuine
+unopened blind evidence.
+
 ## P1 data foundation
 
 | ID | Title | Depends on |

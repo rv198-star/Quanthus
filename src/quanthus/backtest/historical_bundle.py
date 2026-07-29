@@ -225,13 +225,28 @@ def validate_historical_replay_snapshot(
     """Gate materialized snapshot contents before or after atomic catalog publication."""
 
     root = root.resolve()
-    by_name = {manifest.dataset: manifest for manifest in published.datasets}
+    _verify_bundle_integrity(root, published)
+    bundle = HistoricalReplayBundle(
+        root=root,
+        snapshot=published.reference,
+        universe_policy_version=published.universe_policy_version,
+        datasets=tuple(published.datasets),
+    )
+    return validate_historical_replay_bundle_contract(bundle, policy)
+
+
+def validate_historical_replay_bundle_contract(
+    bundle: HistoricalReplayBundle,
+    policy: CorporateActionNormalizationPolicy,
+) -> HistoricalReplayBundle:
+    """Validate replay semantics after the owning envelope has verified file integrity."""
+
+    by_name = {manifest.dataset: manifest for manifest in bundle.datasets}
     missing = REQUIRED_HISTORICAL_REPLAY_DATASETS - set(by_name)
     if missing:
         raise HistoricalReplayBundleError(
             "historical replay bundle is missing datasets: " + ", ".join(sorted(missing))
         )
-    _verify_bundle_integrity(root, published)
     _validate_normalized_actions(
         by_name["corporate_actions_normalized"],
         by_name["corporate_action_exceptions"],
@@ -241,8 +256,8 @@ def validate_historical_replay_snapshot(
         by_name[name] for name in sorted(REQUIRED_HISTORICAL_REPLAY_DATASETS)
     )
     return HistoricalReplayBundle(
-        root=root,
-        snapshot=published.reference,
-        universe_policy_version=published.universe_policy_version,
+        root=bundle.root,
+        snapshot=bundle.snapshot,
+        universe_policy_version=bundle.universe_policy_version,
         datasets=required_manifests,
     )

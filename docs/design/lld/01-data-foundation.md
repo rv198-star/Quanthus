@@ -10,7 +10,7 @@
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
-| Dual-lane delivery | contract/shadow implementation open; consumer cutover blocked pending evidence and `GO_FOR_CUTOVER` |
+| Dual-lane delivery | repository contract implemented; three-node deployment/qualification and consumer cutover blocked pending evidence and `GO_FOR_CUTOVER` |
 
 ## 1. Goal
 
@@ -235,11 +235,12 @@ OCI validates each candidate independently before cross-lane comparison. Integri
 coverage, schema, clock, and business-quality failures are lane-local evidence and cannot be
 repaired with rows or gate results from the peer candidate.
 
-That sentence defines the target gate family. The delivered v1 slice verifies integrity,
-lineage/identity, source cutoff, schema, coverage, business equivalence, epoch/runtime/reference
-binding, and fixed-primary arbitration for its three artifacts. Full PIT/tradability gates and an
-enforced clock-health/skew gate remain open and must not be inferred from epoch metadata or
-timestamps alone.
+That sentence defines the target gate family. The delivered v1 repository slice verifies integrity,
+lineage/identity, exact lane ODS `CURRENT` attempt selection, source cutoff, schema, coverage,
+business equivalence, epoch/runtime/reference binding, fixed-primary arbitration, and contract-
+trusted Shanghai-time windows for its three artifacts. Full PIT/tradability gates and real host
+NTP/skew qualification evidence remain open and must not be inferred from epoch metadata or
+application timestamps alone.
 
 CN01 is accepted when its eligible candidate is ready by cutoff and passes every independent hard
 gate. Hermes is eligible only after an independently established CN01 missing, late, unverifiable,
@@ -294,6 +295,14 @@ manifest is `research_only=true` and `execution_authorized=false`. It is not the
 bundle contract described below and does not yet supply strategy replay, event-library, feature,
 label, execution-runner, or training surfaces.
 
+The delivered portable `strategy_replay` profile is specified by
+`01-data-foundation/strategy-replay-ads.md`. Each bundle contains the seven replay tables plus the
+checksum-bound CSI 300 curve and static concentration-only industry mapping required by the active
+P3 runners. It binds exact content and manifest identities into the feature panel and run manifest,
+authorizes one configured reader role, and never resolves ODS, DWD/DWS, PostgreSQL, a legacy
+snapshot path, or any mutable `CURRENT` while running. Normal replay commands use this profile;
+the hidden snapshot path is retained only to reproduce frozen P3 evidence.
+
 The initial portable layout has no mandatory calendar-year directories. Each semantic table is
 date-sorted where applicable and exposes one or a small number of parts through
 `tables[].parts[]`. A part declares its role, safe relative path, SHA-256, size, row count, schema
@@ -331,9 +340,13 @@ evidence are not deleted, moved destructively, or reused as staging. The exact a
 basis must have a failure-independent recovery copy before cutover. Any future deletion requires a
 separate reviewed decision and is not authorized by this work item.
 
-The correction, successor revalidation, revocation, and rollback rules above remain target
-contracts. The current implementation only refuses to replace an existing date generation without
-an explicit correction policy; that guard is not a correction, revocation, or rollback workflow.
+The repository implementation now records late-equivalent or proposed-correction outcomes,
+requires explicit approval before publishing a corrected immutable generation, prevents revoked
+generations from entering new release sets, and performs rollback under a fresh fenced lease and
+SHA-precondition pointer CAS. It also records accepted-ODS recovery copies, restore assessments and
+drills, and denies purge until every retention precondition passes. Production evidence for these
+paths, creation of an externally reviewed corrected release set, and failure-independent restore
+qualification remain open; code coverage alone does not authorize cutover or cleanup.
 
 ## 6. Snapshot interface
 
@@ -413,7 +426,8 @@ window cannot silently turn into an unplanned third observation.
 | Mixed-unit corporate-action audit and immutable replay revision | `src/quanthus/corporate_action_normalization.py`, `src/quanthus/corporate_action_corpus.py`, `src/quanthus/corporate_action_revision.py`, `src/quanthus/historical_replay_snapshot.py`, `config/p1-corporate-action-normalization.v2.json` | `tests/unit/test_corporate_action_normalization.py`, `tests/unit/test_corporate_action_corpus.py`, `tests/unit/test_corporate_action_revision.py`, `docs/acceptance/p1-corporate-action-normalization-audit-20260728.md` |
 | Immutable ODS handoff and daily DWD/DWS | `src/quanthus/pipelines/`, `config/pipelines/` | `tests/unit/test_ods_handoff.py`, `tests/unit/test_pipeline_runner.py`, `tests/p1/test_daily_warehouse.py` |
 | Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
-| Dual-lane v1 epoch, daily bars/status/summary candidates, fixed-primary arbitration, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; full target and cutover acceptance evidence remains open |
+| Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
+| Portable strategy-replay ADS publication and role-scoped consumption | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `ops/bin/publish-strategy-replay-ads` | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `01-data-foundation/strategy-replay-ads.md`; formal backfill/deployment evidence remains open |
 
 ## 8. Work items
 
@@ -473,11 +487,12 @@ in this document cannot keep the gate open by itself.
 
 ### `META-DATA-PIPE-003` target delivery
 
-The bounded v1 contract slice covers immutable epochs, daily bars/status/summary candidates,
-fixed-primary selection and fail-closed divergence, catalog and release-set construction, limited
-operational ADS, pre-CAS publication intent, atomic `CURRENT`, and idempotent retry. Unit coverage
-for that slice is implementation evidence only; shadow migration, full target delivery, and
-production cutover remain open.
+The repository contract covers immutable epochs, daily bars/status/summary candidates, fixed-
+primary selection and fail-closed divergence, catalog and release-set construction, limited
+operational ADS, pre-CAS publication intent, fenced atomic `CURRENT`, idempotent retry, correction,
+revocation, rollback, accepted-ODS recovery evidence, and portable strategy-replay ADS. Unit
+coverage is implementation evidence only; formal three-node deployment, portable ADS backfill,
+shadow qualification, full target delivery, and production cutover remain open.
 
 Production cutover remains blocked until all of the following have stable evidence:
 

@@ -154,6 +154,51 @@ modes, pinned host files, the canonical parent/base selection, the shared securi
 and jail-relative remote roots. It does not contact either node and therefore does not prove the
 reverse tunnel or end-to-end rrsync path.
 
+## Prepare and backfill portable strategy ADS on OCI
+
+Portable research ADS is a separate consumer boundary below `/srv`; it does not live under the
+dual-lane publication root and has no `CURRENT`. Install the locked reader principals from the
+reviewed commit, then publish each scope as a distinct physical tree. The publisher requires a
+clean exact Git revision, writes `READY` last, applies role-specific ownership, runs the deep logical
+content check as the authorized reader, and rejects development access to sealed manifests.
+
+```bash
+sudo systemd-sysusers /opt/quanthus/current/ops/sysusers.d/quanthus-ads.conf
+sudo install -d -o root -g root -m 0755 /srv/quanthus
+sudo install -d -o root -g root -m 0751 /srv/quanthus/portable-ads
+
+sudo /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
+  development strategy-replay-development-<revision>
+sudo /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
+  arbitration strategy-replay-arbitration-<revision>
+sudo /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
+  permanent_blind strategy-replay-permanent-blind-<revision>
+```
+
+Run those three publications sequentially. Each full build computes canonical logical-row digests
+and can consume substantial memory; concurrent builds are not an accepted operating mode. Never
+replace an existing bundle id or use an incomplete staging child as a published artifact.
+
+After all three return successfully, prove positive and negative access explicitly:
+
+```bash
+sudo -u ubuntu test -r \
+  /srv/quanthus/portable-ads/development/strategy-replay-development-<revision>/manifest.json
+sudo -u ubuntu test ! -r \
+  /srv/quanthus/portable-ads/arbitration/strategy-replay-arbitration-<revision>/manifest.json
+sudo -u ubuntu test ! -r \
+  /srv/quanthus/portable-ads/permanent_blind/strategy-replay-permanent-blind-<revision>/manifest.json
+sudo -u quanthus-arbitration test -r \
+  /srv/quanthus/portable-ads/arbitration/strategy-replay-arbitration-<revision>/manifest.json
+sudo -u quanthus-blind test -r \
+  /srv/quanthus/portable-ads/permanent_blind/strategy-replay-permanent-blind-<revision>/manifest.json
+```
+
+Reproduce the frozen P3 portfolio only from the development bundle and compare its canonical trade
+sequence and accepted metrics before making ADS the documented normal replay input. The 2025 bundle
+is a physically isolated historical migration/capability artifact, not a genuine blind result:
+the source snapshot was readable by the development principal before role isolation existed.
+
 ## Copy-only migration order
 
 Migration creates new artifacts and pointers only under the target roots. It does not move,
@@ -164,11 +209,13 @@ rename, overwrite, or delete legacy ODS, OCI mirrors, DWD/DWS, ADS, logs, or poi
 2. Fast-forward all three Git checkouts to one reviewed commit and build each node's local runtime.
 3. Create the two new jails on CN01 and Hermes and the three target roots on OCI.
 4. Install environment and unit files disabled. Run the applicable doctor on all three nodes.
-5. Rehearse epoch transfer, both candidate builds, OCI pull/arbitration, and target release-set
+5. Backfill and deep-check the three OCI portable strategy ADS bundles sequentially, reproduce P3
+   from the development bundle, and retain the role-access probes.
+6. Rehearse epoch transfer, both candidate builds, OCI pull/arbitration, and target release-set
    publication for an explicit market date.
-6. Compare target evidence with the legacy result. Confirm the byte/checksum of every legacy
+7. Compare target evidence with the legacy result. Confirm the byte/checksum of every legacy
    consumer pointer is unchanged by the shadow run.
-7. Enable target timers for bounded shadow observation only after the manual rehearsal passes.
+8. Enable target timers for bounded shadow observation only after the manual rehearsal passes.
    Target publication remains under `/home/ubuntu/data/quanthus/dual-lane/publication` and is not a
    consumer authority before cutover.
 

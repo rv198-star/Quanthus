@@ -60,13 +60,16 @@ nodes.
 - ADR 0005 accepts the dual-lane data-platform target under `META-DATA-PIPE-003`: CN01 produces the
   fixed-primary DWD/DWS candidate, Hermes produces the standby candidate, and OCI alone owns epoch
   arbitration, canonical catalogs, operational ADS, and the sole consumer release-set `CURRENT`.
-  Contract/shadow implementation is open, but the legacy OCI full-ODS pull/build path remains live
-  until an explicit cutover gate passes. Migration is copy-only; no existing data or evidence may
-  be deleted. The delivered slice covers daily bars/status/summary candidates and a limited
-  three-table research-only operational ADS. Portable research ADS, full PIT/tradability and clock
-  gates, and correction/revocation/rollback workflows remain accepted target design, not delivered
-  capability. The target portable layout uses manifest-discovered semantic parts without mandatory
-  annual directories and does not open arbitration/blind scopes.
+  Repository contracts now cover exact ODS-attempt selection, trusted Shanghai-time windows,
+  fenced lease tokens and SHA-precondition pointer CAS, cutover gating, immutable correction and
+  revocation records, fenced rollback, accepted-ODS recovery receipts, and one self-contained
+  `strategy_replay` ADS profile. Runtime deployment, qualification, independent restore evidence,
+  full PIT/tradability candidate families, and production cutover remain open. The legacy OCI
+  full-ODS pull/build path stays live until an explicit cutover gate passes. Migration is copy-only;
+  no existing data or evidence may be deleted. Portable bundles use manifest-discovered semantic
+  parts without mandatory annual directories. The historical 2025 bootstrap may be physically
+  isolated for migration, but because its source was already visible to the development principal
+  it is not evidence of a genuinely unopened blind evaluation.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional
@@ -99,7 +102,7 @@ gate is a conformance defect rather than an alternate project state.
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
-| P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child | Exact strategy, P1 snapshot input, and P2 execution evidence |
+| P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child, LLD 01 `strategy-replay-ads.md` | Exact strategy, authorized ADS bundle, and P2 execution evidence; load the legacy P1 snapshot only for frozen P3 reproduction |
 | P3 governed strategy implementation | root `AGENTS.md`, this map, selected `design/strategies/` card, LLD 03/04/05, accepted P2 interfaces | LLD 10 for decision/funnel evidence; exact feature, label, policy, and industry-map inputs |
 | P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | ADR 0005 and LLD 01 only when producing/consuming portable ADS; exact frozen candidate source, label cards, split policy, and P3 replay evidence |
 

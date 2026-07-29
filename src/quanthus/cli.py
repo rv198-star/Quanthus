@@ -153,6 +153,13 @@ from quanthus.st_status import (
     write_current_pointer,
 )
 from quanthus.strategy_policy import StrategyPolicyError, load_governed_strategy_policy
+from quanthus.strategy_replay_ads import (
+    StrategyReplayADSError,
+    build_strategy_replay_ads,
+    load_strategy_replay_ads,
+    load_strategy_replay_ads_policy,
+    load_strategy_replay_ads_reader,
+)
 from quanthus.tradability import (
     CoverageError,
     TradabilityCoverageResult,
@@ -357,11 +364,47 @@ def _parser() -> argparse.ArgumentParser:
     replay_snapshot.add_argument("--policy", type=Path)
     replay_snapshot.add_argument("--metadata-output", type=Path)
 
+    replay_ads_build = subparsers.add_parser(
+        "build-strategy-replay-ads",
+        help="publish one immutable role-scoped historical strategy ADS bundle",
+    )
+    replay_ads_build.add_argument("--source-snapshot-dir", type=Path, required=True)
+    replay_ads_build.add_argument("--output", type=Path, required=True)
+    replay_ads_build.add_argument("--bundle-id", required=True)
+    replay_ads_build.add_argument("--code-revision", required=True)
+    replay_ads_build.add_argument("--benchmark", type=Path, required=True)
+    replay_ads_build.add_argument("--industry-mapping", type=Path, required=True)
+    replay_ads_build.add_argument(
+        "--scope-id",
+        choices=("development", "arbitration", "permanent_blind"),
+        required=True,
+    )
+    replay_ads_build.add_argument("--ads-policy", type=Path)
+    replay_ads_build.add_argument("--corporate-action-policy", type=Path)
+
+    replay_ads_check = subparsers.add_parser(
+        "check-strategy-replay-ads",
+        help="verify one immutable strategy ADS and its configured reader role",
+    )
+    replay_ads_check.add_argument("--ads-bundle", type=Path, required=True)
+    replay_ads_check.add_argument("--reader-role", required=True)
+    replay_ads_check.add_argument("--ads-policy", type=Path)
+    replay_ads_check.add_argument("--corporate-action-policy", type=Path)
+
     replay_frames = subparsers.add_parser(
         "audit-historical-replay-frames",
         help="audit continuous PIT decision-to-execution frames from a verified bundle",
     )
-    replay_frames.add_argument("--snapshot-dir", type=Path, required=True)
+    replay_frame_source = replay_frames.add_mutually_exclusive_group(required=True)
+    replay_frame_source.add_argument("--ads-bundle", type=Path)
+    replay_frame_source.add_argument(
+        "--snapshot-dir",
+        dest="legacy_snapshot_dir",
+        type=Path,
+        help=argparse.SUPPRESS,
+    )
+    replay_frames.add_argument("--ads-role")
+    replay_frames.add_argument("--ads-policy", type=Path)
     replay_frames.add_argument("--scope-start", type=date.fromisoformat, required=True)
     replay_frames.add_argument("--scope-end", type=date.fromisoformat, required=True)
     replay_frames.add_argument("--policy", type=Path)
@@ -371,11 +414,20 @@ def _parser() -> argparse.ArgumentParser:
         "run-baseline-strategy-suite",
         help="build PIT daily indicators and replay the three research-only P3 baselines",
     )
-    baseline_suite.add_argument("--snapshot-dir", type=Path, required=True)
+    baseline_source = baseline_suite.add_mutually_exclusive_group(required=True)
+    baseline_source.add_argument("--ads-bundle", type=Path)
+    baseline_source.add_argument(
+        "--snapshot-dir",
+        dest="legacy_snapshot_dir",
+        type=Path,
+        help=argparse.SUPPRESS,
+    )
+    baseline_suite.add_argument("--ads-role")
+    baseline_suite.add_argument("--ads-policy", type=Path)
     baseline_suite.add_argument("--scope-start", type=date.fromisoformat, required=True)
     baseline_suite.add_argument("--scope-end", type=date.fromisoformat, required=True)
     baseline_suite.add_argument("--feature-panel", type=Path, required=True)
-    baseline_suite.add_argument("--benchmark", type=Path, required=True)
+    baseline_suite.add_argument("--benchmark", type=Path, help=argparse.SUPPRESS)
     baseline_suite.add_argument("--output", type=Path, required=True)
     baseline_suite.add_argument("--scoreboard-output", type=Path)
     baseline_suite.add_argument("--audit-output-dir", type=Path)
@@ -388,12 +440,21 @@ def _parser() -> argparse.ArgumentParser:
         "run-governed-portfolio-replay",
         help="replay the frozen five-unit governed P3 candidate on development data",
     )
-    governed_portfolio.add_argument("--snapshot-dir", type=Path, required=True)
+    governed_source = governed_portfolio.add_mutually_exclusive_group(required=True)
+    governed_source.add_argument("--ads-bundle", type=Path)
+    governed_source.add_argument(
+        "--snapshot-dir",
+        dest="legacy_snapshot_dir",
+        type=Path,
+        help=argparse.SUPPRESS,
+    )
+    governed_portfolio.add_argument("--ads-role")
+    governed_portfolio.add_argument("--ads-policy", type=Path)
     governed_portfolio.add_argument("--scope-start", type=date.fromisoformat, required=True)
     governed_portfolio.add_argument("--scope-end", type=date.fromisoformat, required=True)
     governed_portfolio.add_argument("--feature-panel", type=Path, required=True)
-    governed_portfolio.add_argument("--industry-mapping", type=Path, required=True)
-    governed_portfolio.add_argument("--benchmark", type=Path, required=True)
+    governed_portfolio.add_argument("--industry-mapping", type=Path, help=argparse.SUPPRESS)
+    governed_portfolio.add_argument("--benchmark", type=Path, help=argparse.SUPPRESS)
     governed_portfolio.add_argument("--output", type=Path, required=True)
     governed_portfolio.add_argument("--scoreboard-output", type=Path)
     governed_portfolio.add_argument("--strategy-policy", type=Path)
@@ -983,11 +1044,53 @@ def main(argv: Sequence[str] | None = None) -> int:
                     encoding="utf-8",
                 )
             print(json.dumps(replay_payload, ensure_ascii=True, sort_keys=True))
+        elif args.command == "build-strategy-replay-ads":
+            replay_ads = build_strategy_replay_ads(
+                source_snapshot_dir=args.source_snapshot_dir,
+                output=args.output,
+                bundle_id=args.bundle_id,
+                scope_id=args.scope_id,
+                code_revision=args.code_revision,
+                benchmark_path=args.benchmark,
+                industry_mapping_path=args.industry_mapping,
+                ads_policy=load_strategy_replay_ads_policy(args.ads_policy),
+                corporate_action_policy=load_corporate_action_normalization_policy(
+                    args.corporate_action_policy
+                ),
+            )
+            print(json.dumps(replay_ads.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "check-strategy-replay-ads":
+            replay_ads = load_strategy_replay_ads(
+                args.ads_bundle,
+                ads_policy=load_strategy_replay_ads_policy(args.ads_policy),
+                reader_role=args.reader_role,
+                corporate_action_policy=load_corporate_action_normalization_policy(
+                    args.corporate_action_policy
+                ),
+                verify_logical_content=True,
+            )
+            print(json.dumps(replay_ads.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "audit-historical-replay-frames":
-            with load_historical_frame_reader(
-                args.snapshot_dir,
-                load_corporate_action_normalization_policy(args.policy),
-            ) as replay_reader:
+            corporate_action_policy = load_corporate_action_normalization_policy(args.policy)
+            if args.ads_bundle is not None:
+                if args.ads_role is None:
+                    raise StrategyReplayADSError("--ads-role is required with --ads-bundle")
+                opened_reader = load_strategy_replay_ads_reader(
+                    args.ads_bundle,
+                    ads_policy=load_strategy_replay_ads_policy(args.ads_policy),
+                    reader_role=args.ads_role,
+                    corporate_action_policy=corporate_action_policy,
+                )
+            else:
+                print(
+                    "warning: --snapshot-dir is a frozen P3 acceptance-only compatibility path",
+                    file=sys.stderr,
+                )
+                opened_reader = load_historical_frame_reader(
+                    args.legacy_snapshot_dir,
+                    corporate_action_policy,
+                )
+            with opened_reader as replay_reader:
                 replay_frame_report = replay_reader.audit(args.scope_start, args.scope_end)
             replay_frame_payload = replay_frame_report.to_dict()
             if args.output is not None:
@@ -1020,10 +1123,34 @@ def main(argv: Sequence[str] | None = None) -> int:
                     or project_root / "config" / "p2-execution-policy.research.v1.json"
                 )
             )
-            with load_historical_frame_reader(
-                args.snapshot_dir,
-                load_corporate_action_normalization_policy(args.corporate_action_policy),
-            ) as baseline_reader:
+            corporate_action_policy = load_corporate_action_normalization_policy(
+                args.corporate_action_policy
+            )
+            if args.ads_bundle is not None:
+                if args.ads_role is None:
+                    raise StrategyReplayADSError("--ads-role is required with --ads-bundle")
+                opened_reader = load_strategy_replay_ads_reader(
+                    args.ads_bundle,
+                    ads_policy=load_strategy_replay_ads_policy(args.ads_policy),
+                    reader_role=args.ads_role,
+                    corporate_action_policy=corporate_action_policy,
+                )
+                legacy_benchmark = None
+            else:
+                if args.benchmark is None:
+                    raise StrategyReplayADSError(
+                        "--benchmark is required only for frozen --snapshot-dir reproduction"
+                    )
+                print(
+                    "warning: --snapshot-dir is a frozen P3 acceptance-only compatibility path",
+                    file=sys.stderr,
+                )
+                opened_reader = load_historical_frame_reader(
+                    args.legacy_snapshot_dir,
+                    corporate_action_policy,
+                )
+                legacy_benchmark = load_benchmark_curve(args.benchmark)
+            with opened_reader as baseline_reader:
                 panel_scope_end = baseline_reader.frames(
                     args.scope_end,
                     args.scope_end,
@@ -1034,14 +1161,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                     scope_start=args.scope_start,
                     scope_end=panel_scope_end,
                     output=args.feature_panel,
+                    data_content_digest=(
+                        baseline_reader.data_content_digest
+                        if baseline_reader.data_manifest_sha256 is not None
+                        else None
+                    ),
+                    data_manifest_sha256=baseline_reader.data_manifest_sha256,
                 ) as baseline_panel:
+                    benchmark = (
+                        baseline_reader.load_benchmark()
+                        if hasattr(baseline_reader, "load_benchmark")
+                        else legacy_benchmark
+                    )
+                    assert benchmark is not None
                     baseline_result = run_baseline_strategy_suite(
                         baseline_reader,
                         baseline_engine,
                         baseline_catalogue,
                         baseline_registry,
                         baseline_panel,
-                        load_benchmark_curve(args.benchmark),
+                        benchmark,
                         scope_start=args.scope_start,
                         scope_end=args.scope_end,
                     )
@@ -1091,10 +1230,40 @@ def main(argv: Sequence[str] | None = None) -> int:
                     or project_root / "config" / "p2-execution-policy.research.v1.json"
                 )
             )
-            with load_historical_frame_reader(
-                args.snapshot_dir,
-                load_corporate_action_normalization_policy(args.corporate_action_policy),
-            ) as governed_reader:
+            corporate_action_policy = load_corporate_action_normalization_policy(
+                args.corporate_action_policy
+            )
+            if args.ads_bundle is not None:
+                if args.ads_role is None:
+                    raise StrategyReplayADSError("--ads-role is required with --ads-bundle")
+                opened_reader = load_strategy_replay_ads_reader(
+                    args.ads_bundle,
+                    ads_policy=load_strategy_replay_ads_policy(args.ads_policy),
+                    reader_role=args.ads_role,
+                    corporate_action_policy=corporate_action_policy,
+                )
+                legacy_benchmark = None
+                legacy_industry = None
+            else:
+                if args.benchmark is None or args.industry_mapping is None:
+                    raise StrategyReplayADSError(
+                        "--benchmark and --industry-mapping are required only for frozen "
+                        "--snapshot-dir reproduction"
+                    )
+                print(
+                    "warning: --snapshot-dir is a frozen P3 acceptance-only compatibility path",
+                    file=sys.stderr,
+                )
+                opened_reader = load_historical_frame_reader(
+                    args.legacy_snapshot_dir,
+                    corporate_action_policy,
+                )
+                legacy_benchmark = load_benchmark_curve(args.benchmark)
+                legacy_industry = load_static_industry_mapping(
+                    args.industry_mapping,
+                    expected_version=strategy_policy.bindings.industry_mapping_version,
+                )
+            with opened_reader as governed_reader:
                 panel_scope_end = governed_reader.frames(
                     args.scope_end,
                     args.scope_end,
@@ -1105,11 +1274,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                     scope_start=args.scope_start,
                     scope_end=panel_scope_end,
                     output=args.feature_panel,
+                    data_content_digest=(
+                        governed_reader.data_content_digest
+                        if governed_reader.data_manifest_sha256 is not None
+                        else None
+                    ),
+                    data_manifest_sha256=governed_reader.data_manifest_sha256,
                 ) as governed_panel:
-                    industry_mapping = load_static_industry_mapping(
-                        args.industry_mapping,
-                        expected_version=strategy_policy.bindings.industry_mapping_version,
+                    industry_mapping = (
+                        governed_reader.load_industry_mapping(
+                            expected_version=strategy_policy.bindings.industry_mapping_version,
+                        )
+                        if hasattr(governed_reader, "load_industry_mapping")
+                        else legacy_industry
                     )
+                    benchmark = (
+                        governed_reader.load_benchmark()
+                        if hasattr(governed_reader, "load_benchmark")
+                        else legacy_benchmark
+                    )
+                    assert industry_mapping is not None and benchmark is not None
                     governed_result = run_governed_portfolio_replay(
                         governed_reader,
                         governed_engine,
@@ -1119,7 +1303,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         strategy_policy,
                         load_policy(args.p0_policy),
                         industry_mapping,
-                        load_benchmark_curve(args.benchmark),
+                        benchmark,
                         scope_start=args.scope_start,
                         scope_end=args.scope_end,
                     )
@@ -1510,6 +1694,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         LabelRegistryError,
         PortfolioReplayError,
         StrategyPolicyError,
+        StrategyReplayADSError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

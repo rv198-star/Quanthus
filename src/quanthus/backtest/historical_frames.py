@@ -126,6 +126,13 @@ def _sql_string(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def _read_parquet_expression(paths: Sequence[Path]) -> str:
+    if not paths:
+        raise HistoricalFrameReaderError("historical replay dataset has no parts")
+    values = ",".join(_sql_string(str(path.resolve())) for path in paths)
+    return f"read_parquet([{values}])"
+
+
 def _decimal(value: object | None) -> Decimal | None:
     if value is None:
         return None
@@ -308,6 +315,7 @@ class PITBundleMarketView:
     def __init__(self, reader: HistoricalReplayFrameReader, snapshot: SnapshotRef) -> None:
         self._reader = reader
         self._snapshot = snapshot
+        self._runner_only_access_count = reader.runner_only_access_count
         self._bars: tuple[PITDailyBar, ...] | None = None
         self._bar_index: dict[str, PITDailyBar] = {}
         self._history: dict[tuple[str, int], tuple[PITDailyBar, ...]] = {}
@@ -354,6 +362,14 @@ class PITBundleMarketView:
                 sessions,
             )
         return self._history[key]
+
+    def assert_decision_capability(self) -> None:
+        """Fail when strategy code reached execution-only reader methods during decide()."""
+
+        if self._reader.runner_only_access_count != self._runner_only_access_count:
+            raise HistoricalFrameReaderError(
+                "strategy decision attempted to access runner-only replay evidence"
+            )
 
 
 class _HistoricalFrameSource:
@@ -442,6 +458,18 @@ class HistoricalReplayFrameReader:
             self.close()
             raise
 
+    @property
+    def data_content_digest(self) -> str:
+        return self.bundle.digest
+
+    @property
+    def data_manifest_sha256(self) -> str | None:
+        return None
+
+    @property
+    def runner_only_access_count(self) -> int:
+        return 0
+
     def __enter__(self) -> HistoricalReplayFrameReader:
         self._ensure_open()
         return self
@@ -474,12 +502,8 @@ class HistoricalReplayFrameReader:
         connection = self._ensure_open()
         for view, dataset in _VIEW_DATASETS.items():
             paths = self.bundle.partition_paths(dataset)
-            if len(paths) != 1:
-                raise HistoricalFrameReaderError(
-                    f"continuous frame reader requires one partition for {dataset}"
-                )
             connection.execute(
-                f"CREATE VIEW {view} AS SELECT * FROM read_parquet({_sql_string(str(paths[0]))})"
+                f"CREATE VIEW {view} AS SELECT * FROM {_read_parquet_expression(paths)}"
             )
         connection.execute(
             """
@@ -490,24 +514,25 @@ class HistoricalReplayFrameReader:
             HAVING count(DISTINCT security_id) = 1
             """
         )
-        connection.execute(
-            """
-            CREATE VIEW replay_actions_mapped AS
-            SELECT actions.*, identity_map.security_id
-            FROM replay_actions actions
-            JOIN replay_identity_code_map identity_map
-              ON identity_map.stock_code = actions.security_code
-            """
-        )
-        connection.execute(
-            """
-            CREATE VIEW replay_action_exceptions_mapped AS
-            SELECT exceptions.*, identity_map.security_id
-            FROM replay_action_exceptions exceptions
-            JOIN replay_identity_code_map identity_map
-              ON identity_map.stock_code = exceptions.security_code
-            """
-        )
+        for source, mapped in (
+            ("replay_actions", "replay_actions_mapped"),
+            ("replay_action_exceptions", "replay_action_exceptions_mapped"),
+        ):
+            columns = {
+                str(row[0]) for row in connection.execute(f"DESCRIBE {source}").fetchall()
+            }
+            if "security_id" in columns:
+                connection.execute(f"CREATE VIEW {mapped} AS SELECT * FROM {source}")
+            else:
+                connection.execute(
+                    f"""
+                    CREATE VIEW {mapped} AS
+                    SELECT source.*, identity_map.security_id
+                    FROM {source} source
+                    JOIN replay_identity_code_map identity_map
+                      ON identity_map.stock_code = source.security_code
+                    """
+                )
         connection.execute(
             """
             CREATE TEMP TABLE replay_unexplained_price_transitions AS
@@ -573,11 +598,20 @@ class HistoricalReplayFrameReader:
                     f"{view} is missing required columns: {', '.join(missing)}"
                 )
         for view in ("replay_actions", "replay_action_exceptions"):
-            unmapped_or_ambiguous = int(
-                self._scalar(
-                    f"""
-                    SELECT count(*)
-                    FROM {view} source
+            available = {
+                str(row[0]) for row in connection.execute(f"DESCRIBE {view}").fetchall()
+            }
+            if "security_id" in available:
+                join = """
+                    LEFT JOIN (
+                        SELECT DISTINCT security_id
+                        FROM replay_validity
+                    ) identity_map
+                      ON identity_map.security_id = source.security_id
+                    WHERE identity_map.security_id IS NULL
+                """
+            else:
+                join = """
                     LEFT JOIN (
                         SELECT stock_code, count(DISTINCT security_id) AS identity_count
                         FROM replay_validity
@@ -585,6 +619,13 @@ class HistoricalReplayFrameReader:
                     ) identity_map
                       ON identity_map.stock_code = source.security_code
                     WHERE coalesce(identity_map.identity_count, 0) <> 1
+                """
+            unmapped_or_ambiguous = int(
+                self._scalar(
+                    f"""
+                    SELECT count(*)
+                    FROM {view} source
+                    {join}
                     """
                 )
             )

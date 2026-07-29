@@ -23,17 +23,20 @@ canonical authority. Arrival order, favorable content, or a row-level merge cann
 The design also needs one atomic consumer publication boundary: a valid DWD pointer beside a stale
 DWS or ADS pointer is not a complete release.
 
-This decision accepts the target architecture. It does not claim that the target is deployed. The
-legacy OCI pull/build publisher remains the operating authority until the shadow, fencing,
+This decision accepts the target architecture. The repository now implements the bounded fencing,
+correction, revocation, rollback, accepted-ODS recovery-evidence, and portable `strategy_replay`
+contracts described below; this does not claim that the exact commit is deployed or qualified. The
+legacy OCI pull/build publisher remains the operating authority until the shadow, runtime fencing,
 recoverability, and cutover gates below pass and an explicit `GO_FOR_CUTOVER` is recorded.
 
-The first implemented contract slice is intentionally narrower than this target. It produces DWD
-daily bars, DWD daily status observations, and one DWS daily market summary per lane; OCI can
-arbitrate those candidates and build a research-only operational ADS revision containing
-`market_daily`, `market_status`, and `market_summary`. Full PIT/tradability families, clock-health
-enforcement, correction/revocation/rollback workflows, and portable `strategy_replay`,
-`event_library`, or `ml_training` bundles remain open delivery gates. Contract tests for this
-bounded slice are not cutover evidence.
+The implemented contract slice remains narrower than the full target. It produces DWD daily bars,
+DWD daily status observations, and one DWS daily market summary per lane; OCI can arbitrate those
+candidates and build a research-only operational ADS revision containing `market_daily`,
+`market_status`, and `market_summary`. It also provides contract-trusted clock windows, fenced
+lease/CAS publication, correction/revocation/rollback state, accepted-ODS recovery evidence, and a
+self-contained role-scoped portable `strategy_replay` bundle. Full PIT/tradability, real NTP
+qualification, independent restore evidence, and portable `event_library` or `ml_training`
+bundles remain open delivery gates. Contract tests are not production or cutover evidence.
 
 ## Decision
 

@@ -1095,6 +1095,10 @@ def _make_run(
         execution_profile_id=engine.policy.active_profile.profile_id,
         schedule_version=engine.policy.active_profile.schedule_version,
         official=False,
+        data_content_digest=(
+            reader.data_content_digest if reader.data_manifest_sha256 is not None else None
+        ),
+        data_manifest_sha256=reader.data_manifest_sha256,
     )
 
 
@@ -1129,6 +1133,11 @@ def run_governed_portfolio_replay(
         raise PortfolioReplayError("strategy and position lifecycle versions do not match")
     if panel.report.bundle_digest != reader.bundle.digest:
         raise PortfolioReplayError("feature panel does not bind the historical replay bundle")
+    if reader.data_manifest_sha256 is not None and (
+        panel.report.data_content_digest != reader.data_content_digest
+        or panel.report.data_manifest_sha256 != reader.data_manifest_sha256
+    ):
+        raise PortfolioReplayError("feature panel does not bind the verified ADS identity")
     if benchmark.instrument_id != "sh000300":
         raise PortfolioReplayError("governed replay benchmark must be CSI 300 sh000300")
 

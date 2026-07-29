@@ -212,6 +212,8 @@ class BacktestRunSpec:
     execution_profile_id: str
     schedule_version: str
     official: bool = False
+    data_content_digest: str | None = None
+    data_manifest_sha256: str | None = None
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -228,6 +230,10 @@ class BacktestRunSpec:
             _require_text(getattr(self, field_name), field_name)
         if not isinstance(self.official, bool):
             raise ValueError("official must be boolean")
+        for field_name in ("data_content_digest", "data_manifest_sha256"):
+            value = getattr(self, field_name)
+            if value is not None:
+                _require_text(value, field_name)
 
     def manifest(self, result_summary: Mapping[str, Any]) -> dict[str, Any]:
         base = RunManifest(
@@ -247,6 +253,10 @@ class BacktestRunSpec:
                 "official": self.official,
             }
         )
+        if self.data_content_digest is not None:
+            base["data_content_digest"] = self.data_content_digest
+        if self.data_manifest_sha256 is not None:
+            base["data_manifest_sha256"] = self.data_manifest_sha256
         return base
 
 

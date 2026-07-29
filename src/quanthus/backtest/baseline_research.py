@@ -59,6 +59,13 @@ def _sql_string(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def _read_parquet_expression(paths: Sequence[Path]) -> str:
+    if not paths:
+        raise BaselineResearchError("baseline source dataset has no parts")
+    values = ",".join(_sql_string(str(path.resolve())) for path in paths)
+    return f"read_parquet([{values}])"
+
+
 def _mapping(value: Any, path: str) -> Mapping[str, Any]:
     if not isinstance(value, dict):
         raise BaselineResearchError(f"{path} must be an object")
@@ -659,13 +666,15 @@ class BaselineFeaturePanelReport:
     exception_active_count: int
     unexplained_transition_count: int
     continuity_excluded_security_count: int
+    data_content_digest: str | None = None
+    data_manifest_sha256: str | None = None
 
     @property
     def digest(self) -> str:
         return _digest(self.payload_dict())
 
     def payload_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "evaluator_version": self.evaluator_version,
             "feature_registry_version": self.feature_registry_version,
             "feature_registry_digest": self.feature_registry_digest,
@@ -683,6 +692,11 @@ class BaselineFeaturePanelReport:
             "data_quality_scope_selection_bias": True,
             "execution_authorized": False,
         }
+        if self.data_content_digest is not None:
+            payload["data_content_digest"] = self.data_content_digest
+        if self.data_manifest_sha256 is not None:
+            payload["data_manifest_sha256"] = self.data_manifest_sha256
+        return payload
 
     def to_dict(self) -> dict[str, Any]:
         return {**self.payload_dict(), "digest": self.digest}
@@ -1097,6 +1111,8 @@ class BaselineFeaturePanel:
         scope_start: date,
         scope_end: date,
         output: Path,
+        data_content_digest: str | None = None,
+        data_manifest_sha256: str | None = None,
     ) -> BaselineFeaturePanel:
         """Build the PIT total-return panel with one vectorized historical scan."""
 
@@ -1126,14 +1142,8 @@ class BaselineFeaturePanel:
                 "P1 dependencies are required for baseline research"
             ) from exc
 
-        def dataset_path(name: str) -> Path:
-            paths = bundle.partition_paths(name)
-            if len(paths) != 1:
-                raise BaselineResearchError(f"baseline evaluator requires one partition for {name}")
-            return paths[0]
-
         paths = {
-            name: dataset_path(name)
+            name: bundle.partition_paths(name)
             for name in (
                 "corporate_action_exceptions",
                 "corporate_actions_normalized",
@@ -1148,10 +1158,10 @@ class BaselineFeaturePanel:
         temporary = resolved.with_name(f".{resolved.name}.{uuid.uuid4().hex}.tmp")
         connection = duckdb.connect(":memory:")
         try:
-            for name, path in paths.items():
+            for name, dataset_paths in paths.items():
                 connection.execute(
                     f"CREATE VIEW source_{name} AS "
-                    f"SELECT * FROM read_parquet({_sql_string(str(path))})"
+                    f"SELECT * FROM {_read_parquet_expression(dataset_paths)}"
                 )
             connection.execute(
                 """
@@ -1162,6 +1172,27 @@ class BaselineFeaturePanel:
                 HAVING count(DISTINCT security_id) = 1
                 """
             )
+            for source in (
+                "source_corporate_actions_normalized",
+                "source_corporate_action_exceptions",
+            ):
+                columns = {
+                    str(row[0])
+                    for row in connection.execute(f"DESCRIBE {source}").fetchall()
+                }
+                mapped = f"{source}_mapped"
+                if "security_id" in columns:
+                    connection.execute(f"CREATE VIEW {mapped} AS SELECT * FROM {source}")
+                else:
+                    connection.execute(
+                        f"""
+                        CREATE VIEW {mapped} AS
+                        SELECT source.*, identity_map.security_id
+                        FROM {source} source
+                        JOIN feature_identity_map identity_map
+                          ON identity_map.stock_code = source.security_code
+                        """
+                    )
             ambiguous_row = connection.execute(
                 """
                     SELECT count(*)
@@ -1219,6 +1250,8 @@ class BaselineFeaturePanel:
             exception_active_count=int(counts[3]),
             unexplained_transition_count=int(counts[4]),
             continuity_excluded_security_count=int(counts[5]),
+            data_content_digest=data_content_digest,
+            data_manifest_sha256=data_manifest_sha256,
         )
         if report.row_count == 0 or report.feature_ready_count == 0:
             raise BaselineResearchError("feature panel contains no research-ready observations")
@@ -1229,9 +1262,12 @@ def _validate_feature_sources(connection: Any) -> None:
     checks = {
         "unmapped action identity": """
             SELECT count(*)
-            FROM source_corporate_actions_normalized actions
-            LEFT JOIN feature_identity_map identities
-              ON identities.stock_code = actions.security_code
+            FROM source_corporate_actions_normalized_mapped actions
+            LEFT JOIN (
+                SELECT DISTINCT security_id
+                FROM source_security_code_validity
+            ) identities
+              ON identities.security_id = actions.security_id
             WHERE identities.security_id IS NULL
         """,
         "invalid normalized action": """
@@ -1245,19 +1281,20 @@ def _validate_feature_sources(connection: Any) -> None:
         """,
         "duplicate normalized action date": """
             SELECT count(*) FROM (
-                SELECT identities.security_id, actions.effective_date
-                FROM source_corporate_actions_normalized actions
-                JOIN feature_identity_map identities
-                  ON identities.stock_code = actions.security_code
-                GROUP BY identities.security_id, actions.effective_date
+                SELECT actions.security_id, actions.effective_date
+                FROM source_corporate_actions_normalized_mapped actions
+                GROUP BY actions.security_id, actions.effective_date
                 HAVING count(*) <> 1
             )
         """,
         "unmapped exception identity": """
             SELECT count(*)
-            FROM source_corporate_action_exceptions exceptions
-            LEFT JOIN feature_identity_map identities
-              ON identities.stock_code = exceptions.security_code
+            FROM source_corporate_action_exceptions_mapped exceptions
+            LEFT JOIN (
+                SELECT DISTINCT security_id
+                FROM source_security_code_validity
+            ) identities
+              ON identities.security_id = exceptions.security_id
             WHERE identities.security_id IS NULL
         """,
         "invalid exception interval": """
@@ -1304,22 +1341,18 @@ def _feature_panel_query(scope_start: date, scope_end: date) -> str:
     end = _sql_string(scope_end.isoformat())
     return f"""
         WITH mapped_actions AS (
-            SELECT identity_map.security_id,
+            SELECT actions.security_id,
                    CAST(actions.effective_date AS DATE) AS effective_date,
                    CAST(actions.cash_dividend_per_share AS DOUBLE) AS cash_dividend_per_share,
                    CAST(actions.bonus_share_ratio AS DOUBLE) AS bonus_share_ratio
-            FROM source_corporate_actions_normalized actions
-            JOIN feature_identity_map identity_map
-              ON identity_map.stock_code = actions.security_code
+            FROM source_corporate_actions_normalized_mapped actions
             WHERE CAST(actions.known_at AS DATE) < CAST(actions.effective_date AS DATE)
         ),
         mapped_exceptions AS (
-            SELECT identity_map.security_id,
+            SELECT exceptions.security_id,
                    CAST(exceptions.blocked_from AS DATE) AS blocked_from,
                    CAST(exceptions.blocked_through AS DATE) AS blocked_through
-            FROM source_corporate_action_exceptions exceptions
-            JOIN feature_identity_map identity_map
-              ON identity_map.stock_code = exceptions.security_code
+            FROM source_corporate_action_exceptions_mapped exceptions
         ),
         base AS (
             SELECT universe.security_id,
@@ -1785,6 +1818,11 @@ def run_baseline_strategy_suite(
         raise BaselineResearchError("feature panel does not bind the loaded feature registry")
     if panel.report.bundle_digest != reader.bundle.digest:
         raise BaselineResearchError("feature panel does not bind the replay bundle")
+    if reader.data_manifest_sha256 is not None and (
+        panel.report.data_content_digest != reader.data_content_digest
+        or panel.report.data_manifest_sha256 != reader.data_manifest_sha256
+    ):
+        raise BaselineResearchError("feature panel does not bind the verified ADS identity")
     replay_frames = reader.frames(scope_start, scope_end)
     benchmark_dates = (
         replay_frames[0].snapshot.market_date,
@@ -1809,6 +1847,10 @@ def run_baseline_strategy_suite(
             execution_profile_id=engine.policy.active_profile.profile_id,
             schedule_version=engine.policy.active_profile.schedule_version,
             official=False,
+            data_content_digest=(
+                reader.data_content_digest if reader.data_manifest_sha256 is not None else None
+            ),
+            data_manifest_sha256=reader.data_manifest_sha256,
         )
         spec = reader.build_replay_spec(
             run=run,

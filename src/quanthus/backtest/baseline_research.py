@@ -13,7 +13,7 @@ from decimal import ROUND_FLOOR, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from quanthus.backtest.contracts import BacktestRunSpec, UnitState, decimal_text
+from quanthus.backtest.contracts import BacktestRunSpec, EventType, UnitState, decimal_text
 from quanthus.backtest.engine import BacktestEngine, BacktestInputError
 from quanthus.backtest.historical_bundle import HistoricalReplayBundle
 from quanthus.backtest.historical_frames import HistoricalReplayFrameReader
@@ -27,7 +27,7 @@ from quanthus.backtest.strategy_replay import (
 from quanthus.feature_registry import FeatureRegistry
 
 FEATURE_EVALUATOR_VERSION = "1.0.0"
-BASELINE_RUNNER_VERSION = "1.0.0"
+BASELINE_RUNNER_VERSION = "2.0.0"
 _STRATEGY_KINDS = {"ma_trend", "breakout20", "oversold_rebound"}
 
 
@@ -114,6 +114,9 @@ class BaselineSharedPolicy:
     minimum_listing_sessions: int
     minimum_average_amount_20: Decimal
     continuity_scope_policy: str
+    position_fraction: Decimal | None = None
+    maximum_realized_volatility20: Decimal | None = None
+    maximum_entry_day_return: Decimal | None = None
 
     def __post_init__(self) -> None:
         if self.initial_cash <= 0 or self.initial_cash != self.initial_cash.quantize(
@@ -131,9 +134,33 @@ class BaselineSharedPolicy:
             != "exclude_security_with_any_unresolved_continuity_evidence"
         ):
             raise BaselineResearchError("unsupported continuity_scope_policy")
+        moderation_values = (
+            self.position_fraction,
+            self.maximum_realized_volatility20,
+            self.maximum_entry_day_return,
+        )
+        if any(value is None for value in moderation_values) and any(
+            value is not None for value in moderation_values
+        ):
+            raise BaselineResearchError("moderated shared policy fields must be declared together")
+        if self.position_fraction is not None and not Decimal("0") < self.position_fraction <= 1:
+            raise BaselineResearchError("position_fraction must be in (0, 1]")
+        if (
+            self.maximum_realized_volatility20 is not None
+            and self.maximum_realized_volatility20 <= 0
+        ):
+            raise BaselineResearchError("maximum_realized_volatility20 must be positive")
+        if self.maximum_entry_day_return is not None and not (
+            Decimal("0") < self.maximum_entry_day_return < Decimal("1")
+        ):
+            raise BaselineResearchError("maximum_entry_day_return must be in (0, 1)")
+
+    @property
+    def moderated(self) -> bool:
+        return self.position_fraction is not None
 
     def to_dict(self) -> dict[str, str | int]:
-        return {
+        payload: dict[str, str | int] = {
             "initial_cash": decimal_text(self.initial_cash),
             "entry_lot_size": self.entry_lot_size,
             "sizing_cash_buffer": decimal_text(self.sizing_cash_buffer),
@@ -141,6 +168,20 @@ class BaselineSharedPolicy:
             "minimum_average_amount_20": decimal_text(self.minimum_average_amount_20),
             "continuity_scope_policy": self.continuity_scope_policy,
         }
+        if self.moderated:
+            assert self.position_fraction is not None
+            assert self.maximum_realized_volatility20 is not None
+            assert self.maximum_entry_day_return is not None
+            payload.update(
+                {
+                    "position_fraction": decimal_text(self.position_fraction),
+                    "maximum_realized_volatility20": decimal_text(
+                        self.maximum_realized_volatility20
+                    ),
+                    "maximum_entry_day_return": decimal_text(self.maximum_entry_day_return),
+                }
+            )
+        return payload
 
 
 @dataclass(frozen=True)
@@ -197,7 +238,7 @@ class BaselineStrategyDefinition:
             raise BaselineResearchError("strategy id and version must not be empty")
         if self.kind not in _STRATEGY_KINDS:
             raise BaselineResearchError(f"unsupported baseline strategy kind: {self.kind}")
-        expected = {
+        v1_expected = {
             "ma_trend": {"maximum_holding_sessions", "minimum_momentum20"},
             "breakout20": {"maximum_holding_sessions", "minimum_volume_ratio20"},
             "oversold_rebound": {
@@ -206,17 +247,77 @@ class BaselineStrategyDefinition:
                 "maximum_holding_sessions",
             },
         }[self.kind]
-        _exact_keys(self.parameters, expected, f"strategy {self.strategy_id} parameters")
+        v2_expected = {
+            "ma_trend": {
+                "maximum_holding_sessions",
+                "minimum_momentum20",
+                "maximum_momentum20",
+            },
+            "breakout20": {
+                "maximum_holding_sessions",
+                "minimum_volume_ratio20",
+                "maximum_volume_ratio20",
+                "minimum_breakout20",
+                "maximum_breakout20",
+                "maximum_momentum20",
+            },
+            "oversold_rebound": {
+                "entry_rsi_floor",
+                "entry_rsi_ceiling",
+                "exit_rsi_floor",
+                "maximum_holding_sessions",
+            },
+        }[self.kind]
+        actual = set(self.parameters)
+        if actual not in (v1_expected, v2_expected):
+            raise BaselineResearchError(
+                f"strategy {self.strategy_id} parameters do not match a supported catalogue schema"
+            )
         maximum_holding = self.parameters["maximum_holding_sessions"]
         if not isinstance(maximum_holding, int) or maximum_holding <= 0:
             raise BaselineResearchError("maximum_holding_sessions must be positive")
-        if self.kind == "oversold_rebound":
+        if self.kind == "ma_trend" and self.moderated:
+            minimum = self.decimal_parameter("minimum_momentum20")
+            maximum = self.decimal_parameter("maximum_momentum20")
+            if not Decimal("0") <= minimum < maximum < Decimal("1"):
+                raise BaselineResearchError(
+                    "momentum bounds must satisfy 0 <= minimum < maximum < 1"
+                )
+        elif self.kind == "breakout20" and self.moderated:
+            minimum_breakout = self.decimal_parameter("minimum_breakout20")
+            maximum_breakout = self.decimal_parameter("maximum_breakout20")
+            minimum_volume = self.decimal_parameter("minimum_volume_ratio20")
+            maximum_volume = self.decimal_parameter("maximum_volume_ratio20")
+            maximum_momentum = self.decimal_parameter("maximum_momentum20")
+            if not Decimal("0") <= minimum_breakout < maximum_breakout < Decimal("1"):
+                raise BaselineResearchError(
+                    "breakout bounds must satisfy 0 <= minimum < maximum < 1"
+                )
+            if not Decimal("0") < minimum_volume < maximum_volume:
+                raise BaselineResearchError("volume-ratio bounds must be positive and ordered")
+            if not Decimal("0") < maximum_momentum < Decimal("1"):
+                raise BaselineResearchError("maximum_momentum20 must be in (0, 1)")
+        elif self.kind == "oversold_rebound":
+            floor = self.parameters.get("entry_rsi_floor", Decimal("0"))
             entry = self.parameters["entry_rsi_ceiling"]
             exit_value = self.parameters["exit_rsi_floor"]
-            if not isinstance(entry, Decimal) or not isinstance(exit_value, Decimal):
+            if (
+                not isinstance(floor, Decimal)
+                or not isinstance(entry, Decimal)
+                or not isinstance(exit_value, Decimal)
+            ):
                 raise BaselineResearchError("RSI thresholds must be decimals")
-            if not Decimal("0") <= entry < exit_value <= Decimal("100"):
-                raise BaselineResearchError("RSI thresholds must satisfy 0 <= entry < exit <= 100")
+            if not Decimal("0") <= floor < entry < exit_value <= Decimal("100"):
+                raise BaselineResearchError(
+                    "RSI thresholds must satisfy 0 <= floor < entry < exit <= 100"
+                )
+
+    @property
+    def moderated(self) -> bool:
+        return any(
+            name in self.parameters
+            for name in ("maximum_momentum20", "maximum_breakout20", "entry_rsi_floor")
+        )
 
     @property
     def digest(self) -> str:
@@ -258,8 +359,10 @@ class BaselineStrategyCatalogue:
     strategies: tuple[BaselineStrategyDefinition, ...]
 
     def __post_init__(self) -> None:
-        if self.schema_version != "1.0.0" or self.status != "research-only":
-            raise BaselineResearchError("baseline catalogue must be schema 1.0.0 research-only")
+        if self.schema_version not in {"1.0.0", "2.0.0"} or self.status != "research-only":
+            raise BaselineResearchError(
+                "baseline catalogue must use a supported research-only schema"
+            )
         if not self.catalogue_version.strip() or not self.feature_registry_version.strip():
             raise BaselineResearchError("catalogue and feature registry versions must not be empty")
         if not self.strategies:
@@ -270,6 +373,13 @@ class BaselineStrategyCatalogue:
         kinds = [item.kind for item in self.strategies]
         if set(kinds) != _STRATEGY_KINDS or len(kinds) != len(set(kinds)):
             raise BaselineResearchError("catalogue must define exactly one strategy of each kind")
+        expects_moderation = self.schema_version == "2.0.0"
+        if self.shared.moderated != expects_moderation or any(
+            item.moderated != expects_moderation for item in self.strategies
+        ):
+            raise BaselineResearchError(
+                "catalogue schema, shared policy, and strategy parameter versions disagree"
+            )
 
     @property
     def digest(self) -> str:
@@ -287,20 +397,52 @@ class BaselineStrategyCatalogue:
         }
 
 
-def _strategy_definition(value: Any, path: str) -> BaselineStrategyDefinition:
+def _strategy_definition(
+    value: Any,
+    path: str,
+    *,
+    schema_version: str,
+) -> BaselineStrategyDefinition:
     raw = _mapping(value, path)
     _exact_keys(raw, {"strategy_id", "strategy_version", "kind", "parameters"}, path)
     kind = _text(raw.get("kind"), f"{path}.kind")
     parameters = _mapping(raw.get("parameters"), f"{path}.parameters")
-    expected = {
-        "ma_trend": {"maximum_holding_sessions", "minimum_momentum20"},
-        "breakout20": {"maximum_holding_sessions", "minimum_volume_ratio20"},
-        "oversold_rebound": {
-            "entry_rsi_ceiling",
-            "exit_rsi_floor",
-            "maximum_holding_sessions",
+    expected_by_schema = {
+        "1.0.0": {
+            "ma_trend": {"maximum_holding_sessions", "minimum_momentum20"},
+            "breakout20": {"maximum_holding_sessions", "minimum_volume_ratio20"},
+            "oversold_rebound": {
+                "entry_rsi_ceiling",
+                "exit_rsi_floor",
+                "maximum_holding_sessions",
+            },
         },
-    }.get(kind)
+        "2.0.0": {
+            "ma_trend": {
+                "maximum_holding_sessions",
+                "minimum_momentum20",
+                "maximum_momentum20",
+            },
+            "breakout20": {
+                "maximum_holding_sessions",
+                "minimum_volume_ratio20",
+                "maximum_volume_ratio20",
+                "minimum_breakout20",
+                "maximum_breakout20",
+                "maximum_momentum20",
+            },
+            "oversold_rebound": {
+                "entry_rsi_floor",
+                "entry_rsi_ceiling",
+                "exit_rsi_floor",
+                "maximum_holding_sessions",
+            },
+        },
+    }
+    schema_parameters = expected_by_schema.get(schema_version)
+    if schema_parameters is None:
+        raise BaselineResearchError(f"unsupported baseline catalogue schema: {schema_version}")
+    expected = schema_parameters.get(kind)
     if expected is None:
         raise BaselineResearchError(f"{path}.kind is unsupported: {kind}")
     _exact_keys(parameters, expected, f"{path}.parameters")
@@ -348,19 +490,27 @@ def load_baseline_strategy_catalogue(path: Path) -> BaselineStrategyCatalogue:
         },
         "baseline_catalogue",
     )
+    schema_version = _text(raw.get("schema_version"), "schema_version")
+    shared_keys = {
+        "initial_cash",
+        "entry_lot_size",
+        "sizing_cash_buffer",
+        "minimum_listing_sessions",
+        "minimum_average_amount_20",
+        "continuity_scope_policy",
+    }
+    if schema_version == "2.0.0":
+        shared_keys.update(
+            {
+                "position_fraction",
+                "maximum_realized_volatility20",
+                "maximum_entry_day_return",
+            }
+        )
+    elif schema_version != "1.0.0":
+        raise BaselineResearchError(f"unsupported baseline catalogue schema: {schema_version}")
     shared = _mapping(raw.get("shared"), "shared")
-    _exact_keys(
-        shared,
-        {
-            "initial_cash",
-            "entry_lot_size",
-            "sizing_cash_buffer",
-            "minimum_listing_sessions",
-            "minimum_average_amount_20",
-            "continuity_scope_policy",
-        },
-        "shared",
-    )
+    _exact_keys(shared, shared_keys, "shared")
     validation = _mapping(raw.get("validation"), "validation")
     validation_keys = {
         "development_start",
@@ -373,7 +523,7 @@ def load_baseline_strategy_catalogue(path: Path) -> BaselineStrategyCatalogue:
     _exact_keys(validation, validation_keys, "validation")
     return BaselineStrategyCatalogue(
         path=resolved,
-        schema_version=_text(raw.get("schema_version"), "schema_version"),
+        schema_version=schema_version,
         catalogue_version=_text(raw.get("catalogue_version"), "catalogue_version"),
         status=_text(raw.get("status"), "status"),
         feature_registry_version=_text(
@@ -396,12 +546,39 @@ def load_baseline_strategy_catalogue(path: Path) -> BaselineStrategyCatalogue:
                 shared.get("continuity_scope_policy"),
                 "shared.continuity_scope_policy",
             ),
+            position_fraction=(
+                _decimal(shared.get("position_fraction"), "shared.position_fraction")
+                if schema_version == "2.0.0"
+                else None
+            ),
+            maximum_realized_volatility20=(
+                _decimal(
+                    shared.get("maximum_realized_volatility20"),
+                    "shared.maximum_realized_volatility20",
+                    positive=True,
+                )
+                if schema_version == "2.0.0"
+                else None
+            ),
+            maximum_entry_day_return=(
+                _decimal(
+                    shared.get("maximum_entry_day_return"),
+                    "shared.maximum_entry_day_return",
+                    positive=True,
+                )
+                if schema_version == "2.0.0"
+                else None
+            ),
         ),
         validation=BaselineValidationPolicy(
             **{name: _date(validation.get(name), f"validation.{name}") for name in validation_keys}
         ),
         strategies=tuple(
-            _strategy_definition(item, f"strategies[{index}]")
+            _strategy_definition(
+                item,
+                f"strategies[{index}]",
+                schema_version=schema_version,
+            )
             for index, item in enumerate(_sequence(raw.get("strategies"), "strategies"))
         ),
     )
@@ -606,7 +783,35 @@ class BaselineFeaturePanel:
             shared.minimum_listing_sessions,
             shared.minimum_average_amount_20,
         ]
-        if definition.kind == "ma_trend":
+        moderation_predicate = ""
+        if shared.moderated:
+            assert shared.maximum_realized_volatility20 is not None
+            assert shared.maximum_entry_day_return is not None
+            moderation_predicate = """
+                AND realized_volatility20 <= ?
+                AND abs(daily_total_return) <= ?
+            """
+            parameters.extend(
+                (
+                    shared.maximum_realized_volatility20,
+                    shared.maximum_entry_day_return,
+                )
+            )
+        if definition.kind == "ma_trend" and definition.moderated:
+            predicate = """
+                AND total_return_index > sma20
+                AND sma20 > sma60
+                AND momentum20 BETWEEN ? AND ?
+            """
+            parameters.extend(
+                (
+                    definition.decimal_parameter("minimum_momentum20"),
+                    definition.decimal_parameter("maximum_momentum20"),
+                )
+            )
+            score = "momentum20"
+            ordering = "realized_volatility20 ASC, score DESC, security_id ASC"
+        elif definition.kind == "ma_trend":
             predicate = """
                 AND total_return_index > sma20
                 AND sma20 > sma60
@@ -615,6 +820,23 @@ class BaselineFeaturePanel:
             parameters.append(definition.decimal_parameter("minimum_momentum20"))
             score = "momentum20"
             ordering = "score DESC, realized_volatility20 ASC, security_id ASC"
+        elif definition.kind == "breakout20" and definition.moderated:
+            predicate = """
+                AND total_return_index / prior_high20 - 1 BETWEEN ? AND ?
+                AND volume_ratio20 BETWEEN ? AND ?
+                AND momentum20 <= ?
+            """
+            parameters.extend(
+                (
+                    definition.decimal_parameter("minimum_breakout20"),
+                    definition.decimal_parameter("maximum_breakout20"),
+                    definition.decimal_parameter("minimum_volume_ratio20"),
+                    definition.decimal_parameter("maximum_volume_ratio20"),
+                    definition.decimal_parameter("maximum_momentum20"),
+                )
+            )
+            score = "total_return_index / prior_high20 - 1"
+            ordering = "realized_volatility20 ASC, score ASC, security_id ASC"
         elif definition.kind == "breakout20":
             predicate = """
                 AND total_return_index > prior_high20
@@ -623,6 +845,17 @@ class BaselineFeaturePanel:
             parameters.append(definition.decimal_parameter("minimum_volume_ratio20"))
             score = "total_return_index / prior_high20 - 1"
             ordering = "score DESC, volume_ratio20 DESC, security_id ASC"
+        elif definition.moderated:
+            predicate = """
+                AND rsi14_previous BETWEEN ? AND ?
+                AND rsi14 > ?
+                AND daily_total_return > 0
+            """
+            floor = definition.decimal_parameter("entry_rsi_floor")
+            ceiling = definition.decimal_parameter("entry_rsi_ceiling")
+            parameters.extend((floor, ceiling, ceiling))
+            score = "100.0 - rsi14_previous"
+            ordering = "realized_volatility20 ASC, score ASC, security_id ASC"
         else:
             predicate = """
                 AND rsi14_previous <= ?
@@ -641,7 +874,7 @@ class BaselineFeaturePanel:
                 scope_continuity_excluded
             ), {score} AS score
             FROM feature_panel
-            WHERE {common} {predicate}
+            WHERE {common} {moderation_predicate} {predicate}
             ORDER BY {ordering}
             LIMIT 1
             """,
@@ -675,7 +908,35 @@ class BaselineFeaturePanel:
             shared.minimum_listing_sessions,
             shared.minimum_average_amount_20,
         ]
-        if definition.kind == "ma_trend":
+        moderation_predicate = ""
+        if shared.moderated:
+            assert shared.maximum_realized_volatility20 is not None
+            assert shared.maximum_entry_day_return is not None
+            moderation_predicate = """
+                AND realized_volatility20 <= ?
+                AND abs(daily_total_return) <= ?
+            """
+            parameters.extend(
+                (
+                    shared.maximum_realized_volatility20,
+                    shared.maximum_entry_day_return,
+                )
+            )
+        if definition.kind == "ma_trend" and definition.moderated:
+            predicate = """
+                AND total_return_index > sma20
+                AND sma20 > sma60
+                AND momentum20 BETWEEN ? AND ?
+            """
+            parameters.extend(
+                (
+                    definition.decimal_parameter("minimum_momentum20"),
+                    definition.decimal_parameter("maximum_momentum20"),
+                )
+            )
+            score = "momentum20"
+            ordering = "realized_volatility20 ASC, score DESC, security_id ASC"
+        elif definition.kind == "ma_trend":
             predicate = """
                 AND total_return_index > sma20
                 AND sma20 > sma60
@@ -684,6 +945,23 @@ class BaselineFeaturePanel:
             parameters.append(definition.decimal_parameter("minimum_momentum20"))
             score = "momentum20"
             ordering = "score DESC, realized_volatility20 ASC, security_id ASC"
+        elif definition.kind == "breakout20" and definition.moderated:
+            predicate = """
+                AND total_return_index / prior_high20 - 1 BETWEEN ? AND ?
+                AND volume_ratio20 BETWEEN ? AND ?
+                AND momentum20 <= ?
+            """
+            parameters.extend(
+                (
+                    definition.decimal_parameter("minimum_breakout20"),
+                    definition.decimal_parameter("maximum_breakout20"),
+                    definition.decimal_parameter("minimum_volume_ratio20"),
+                    definition.decimal_parameter("maximum_volume_ratio20"),
+                    definition.decimal_parameter("maximum_momentum20"),
+                )
+            )
+            score = "total_return_index / prior_high20 - 1"
+            ordering = "realized_volatility20 ASC, score ASC, security_id ASC"
         elif definition.kind == "breakout20":
             predicate = """
                 AND total_return_index > prior_high20
@@ -692,6 +970,17 @@ class BaselineFeaturePanel:
             parameters.append(definition.decimal_parameter("minimum_volume_ratio20"))
             score = "total_return_index / prior_high20 - 1"
             ordering = "score DESC, volume_ratio20 DESC, security_id ASC"
+        elif definition.moderated:
+            predicate = """
+                AND rsi14_previous BETWEEN ? AND ?
+                AND rsi14 > ?
+                AND daily_total_return > 0
+            """
+            floor = definition.decimal_parameter("entry_rsi_floor")
+            ceiling = definition.decimal_parameter("entry_rsi_ceiling")
+            parameters.extend((floor, ceiling, ceiling))
+            score = "100.0 - rsi14_previous"
+            ordering = "realized_volatility20 ASC, score ASC, security_id ASC"
         else:
             predicate = """
                 AND rsi14_previous <= ?
@@ -707,7 +996,7 @@ class BaselineFeaturePanel:
             WITH eligible AS (
                 SELECT *, {score} AS score
                 FROM feature_panel
-                WHERE {common} {predicate}
+                WHERE {common} {moderation_predicate} {predicate}
             ), ranked AS (
                 SELECT *, row_number() OVER (
                     PARTITION BY market_date ORDER BY {ordering}
@@ -1221,7 +1510,12 @@ class BaselineHistoricalStrategy:
 
     def _entry_quantity(self, cash: Decimal, close_price: Decimal) -> int:
         buffered_price = close_price * (Decimal("1") + self.shared.sizing_cash_buffer)
-        lots = (cash / (buffered_price * self.shared.entry_lot_size)).to_integral_value(
+        deployable_cash = cash
+        if self.shared.position_fraction is not None:
+            deployable_cash *= self.shared.position_fraction
+        lots = (
+            deployable_cash / (buffered_price * self.shared.entry_lot_size)
+        ).to_integral_value(
             rounding=ROUND_FLOOR
         )
         return int(lots) * self.shared.entry_lot_size
@@ -1308,29 +1602,95 @@ class BaselineSuiteResult:
             "feature_panel": self.feature_panel.to_dict(),
             "scope": {"start": self.scope_start.isoformat(), "end": self.scope_end.isoformat()},
             "cash_baseline_total_return": "0",
-            "strategies": [
-                {
-                    "strategy_id": result.strategy_id,
-                    "strategy_version": result.strategy_version,
-                    "run_id": result.backtest.run.run_id,
-                    "result_digest": (
-                        "sha256:"
-                        + hashlib.sha256(result.canonical_bytes()).hexdigest()
-                    ),
-                    "performance": result.performance.to_dict(),
-                    "decision_count": len(result.decisions),
-                    "trade_count": len(result.trades),
-                    "pending_exit": result.pending_exit,
-                    "ending_position": result.final_state.security_code,
-                }
-                for result in self.strategies
-            ],
+            "strategies": [_strategy_summary(result) for result in self.strategies],
             "research_only": True,
             "execution_authorized": False,
         }
 
     def to_dict(self) -> dict[str, Any]:
         return {**self.payload_dict(), "digest": self.digest}
+
+
+def _strategy_summary(result: StrategyReplayResult) -> dict[str, Any]:
+    fills = [
+        event
+        for event in result.backtest.events
+        if event.event_type is EventType.FILL
+    ]
+    buy_operations = sum(event.payload.get("side") == "buy" for event in fills)
+    sell_operations = sum(event.payload.get("side") == "sell" for event in fills)
+    return {
+        "strategy_id": result.strategy_id,
+        "strategy_version": result.strategy_version,
+        "run_id": result.backtest.run.run_id,
+        "result_digest": "sha256:" + hashlib.sha256(result.canonical_bytes()).hexdigest(),
+        "performance": result.performance.to_dict(),
+        "decision_count": len(result.decisions),
+        "operation_count": len(fills),
+        "buy_operation_count": buy_operations,
+        "sell_operation_count": sell_operations,
+        "closed_trade_count": len(result.trades),
+        "trade_count": len(result.trades),
+        "pending_exit": result.pending_exit,
+        "ending_position": result.final_state.security_code,
+    }
+
+
+def _scoreboard_percent(value: Decimal | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value * Decimal('100'):.2f}%"
+
+
+def _scoreboard_decimal(value: Decimal | None) -> str:
+    return "n/a" if value is None else f"{value:.3f}"
+
+
+def render_baseline_scoreboard(result: BaselineSuiteResult) -> str:
+    """Render the decision-useful metrics without replacing the canonical JSON audit."""
+
+    header = (
+        "| Strategy | Operations (B/S) | Closed trades | Win rate | Total return | "
+        "Total PnL | Ending equity | Max drawdown | Ann. volatility | Fees | Turnover | "
+        "Exposure | Avg hold | Payoff ratio | Profit factor | Sharpe |"
+    )
+    separator = (
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
+        "---: | ---: | ---: | ---: | ---: |"
+    )
+    rows = [header, separator]
+    for replay in result.strategies:
+        summary = _strategy_summary(replay)
+        performance = replay.performance
+        operations = (
+            f"{summary['operation_count']} "
+            f"({summary['buy_operation_count']}/{summary['sell_operation_count']})"
+        )
+        rows.append(
+            "| "
+            + " | ".join(
+                (
+                    f"{replay.strategy_id} {replay.strategy_version}",
+                    operations,
+                    str(summary["closed_trade_count"]),
+                    _scoreboard_percent(performance.win_rate),
+                    _scoreboard_percent(performance.total_return),
+                    f"CNY {performance.total_pnl:.2f}",
+                    f"CNY {performance.ending_equity:.2f}",
+                    _scoreboard_percent(performance.maximum_drawdown),
+                    _scoreboard_percent(performance.annualized_volatility),
+                    f"CNY {performance.total_fees:.2f}",
+                    _scoreboard_percent(performance.turnover),
+                    _scoreboard_percent(performance.exposure_rate),
+                    _scoreboard_decimal(performance.average_holding_sessions),
+                    _scoreboard_decimal(performance.payoff_ratio),
+                    _scoreboard_decimal(performance.profit_factor),
+                    _scoreboard_decimal(performance.sharpe_ratio),
+                )
+            )
+            + " |"
+        )
+    return "\n".join(rows)
 
 
 def run_baseline_strategy_suite(

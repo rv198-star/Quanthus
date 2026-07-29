@@ -115,9 +115,17 @@ second backtester with different fill assumptions.
 `P3-STRAT-001` supplies three deliberately simple comparison strategies: moving-average trend,
 20-session price/volume breakout, and RSI oversold rebound. Their exact features, thresholds,
 liquidity floor, lot size, cash buffer, holding limits, period boundaries, and versions live in
-`config/p3-baseline-features.research.v1.json` and
-`config/p3-baseline-strategies.research.v1.json`. They use one CNY 100,000 fixed unit, one security
-at a time, whole-position entry/exit, T-close decisions, and the accepted T+1-open P2 matcher.
+`config/p3-baseline-features.research.v1.json` and the versioned strategy catalogues. Catalogue v2,
+`config/p3-baseline-strategies.research.v2.json`, is the CLI default. It uses one CNY 100,000 fixed
+unit, one security at a time, at most 30% of available cash per entry, whole-position entry/exit,
+T-close decisions, and the accepted T+1-open P2 matcher. Its 21% sizing buffer covers a possible
+20% T+1 price-limit opening gap plus transaction costs.
+
+Catalogue v1 remains explicitly loadable and digest-locked as a rejected extreme comparison. Its
+full-capital sizing and selection of market-wide momentum/breakout extremes caused near-total loss
+in the first development run; it is evidence of what was tested, not an alternate current default.
+V2 additionally bounds momentum, breakout distance and volume, and rebound RSI; filters listing
+history, liquidity, volatility, and entry-day return; and prefers lower-volatility candidates.
 
 The baseline runner ranks eligible securities deterministically and resolves quantity from T-close
 price with a configured cash buffer and 100-share lot. Current T executability is evidence for
@@ -133,10 +141,14 @@ panel's full-scope continuity filter must extend through that final T+1 executio
 though strategy decisions stop at T; a narrower panel fails before replay. The 2022-2024
 arbitration and 2025 permanent-blind partitions remain unopened by this command. Results are
 research-only, declare `execution_authorized=false`, and compare with a zero-return cash baseline;
-profitability is not a delivery gate for this infrastructure slice.
+profitability is not a delivery gate for this infrastructure slice. Its canonical JSON includes
+fill-operation counts split into buys and sells plus closed-trade counts. A co-generated Markdown
+scoreboard shows those counts with win rate, cumulative return, PnL, ending equity, maximum
+drawdown, annualized volatility, fees, turnover, exposure, average hold, payoff ratio, profit
+factor, and Sharpe. Total return is non-compounded and is never labeled as CAGR.
 
 The first real corpus also contains versioned action exceptions and action-like price-scale changes
-without normalized economic evidence. The v1 catalogue therefore excludes any affected identity
+without normalized economic evidence. The research suite therefore excludes any affected identity
 for the complete requested development scope before strategy ranking. This run-scope completeness
 filter is versioned and reported as selection bias; it is not presented as a point-in-time signal
 or an acceptable rule for later official evaluation. The execution reader still blocks the exact
@@ -154,7 +166,7 @@ anomalous date so bypassing the feature panel cannot create a false held-positio
 | Upstream corporate-action contract and corpus audit | `src/quanthus/corporate_action_normalization.py`, `src/quanthus/corporate_action_corpus.py`, `docs/acceptance/p1-corporate-action-normalization-audit-20260728.md` |
 | Continuous replay-bundle completeness and integrity gate | `src/quanthus/backtest/historical_bundle.py`, `tests/unit/test_historical_replay_bundle.py`, `docs/acceptance/p3-historical-replay-bundle-gate-slice-20260728.md` |
 | Continuous PIT frame reader and real-corpus audit | `src/quanthus/backtest/historical_frames.py`, `tests/unit/test_historical_frame_reader.py`, `docs/acceptance/p3-historical-frame-reader-slice-20260729.md` |
-| Baseline feature panel, strategies, and development suite | `src/quanthus/backtest/baseline_research.py`, `tests/unit/test_baseline_research.py`, `docs/acceptance/p3-baseline-strategy-suite-20260729.md` |
+| Baseline feature panel, strategies, and development suite | `src/quanthus/backtest/baseline_research.py`, `tests/unit/test_baseline_research.py`, `docs/acceptance/p3-baseline-strategy-suite-20260729.md`, `docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md` |
 
 The integration slice additionally publishes `StrategyReplayResult.audit_dict()` together with
 the immutable P2 run through `AuditEventStore.persist_strategy_replay`. The replay manifest binds

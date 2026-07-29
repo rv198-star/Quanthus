@@ -20,8 +20,9 @@ nodes.
   typed P1-frame adaptation, carried-sell company actions, immutable replay packaging, the lazy
   continuous PIT frame reader, full 2012-2025 input audit, and a real-corpus round-trip smoke.
 - The research-only `P3-FEAT-002`/`P3-STRAT-001` increment adds a vectorized PIT daily-indicator
-  panel and three one-unit baseline strategies. Its command is locked to 2012-2021 development
-  data; it does not promote a target P3 policy or open arbitration/blind partitions.
+  panel and a three-strategy one-unit baseline runner. Moderated catalogue v2 is the CLI default;
+  v1 remains a replayable but rejected extreme-control record. The command is locked to 2012-2021
+  development data and does not promote a target P3 policy or open arbitration/blind partitions.
 - The mixed-unit corporate-action normalization contract and a real-corpus audit are implemented
   under `P1-DATA-004`. Exact implementation-plan authority resolves the former factor/unit
   ambiguity, and all 272 retained rows now have a versioned per-security fail-closed disposition.

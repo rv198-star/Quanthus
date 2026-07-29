@@ -116,9 +116,11 @@ transition and the accepted P2 Signal-to-Order path before any simulated executi
 The three `P3-STRAT-001` baselines are one-unit comparison controls over the accepted P2 replay,
 not implementations of the target Trial/Dynamic lifecycle. They intentionally use whole-position
 entry and exit, do not add or reduce, and keep their small holding rules in the research catalogue.
-Their results cannot close `P3-POLICY-001`, `P3-POS-002`, or `P3-POS-003`, and cannot be promoted by
-renaming a run. A future governed strategy must still pass the lifecycle, allocation, exit-source,
-and promotion boundaries in this LLD.
+The current v2 baseline caps each entry at 30% of available unit cash and carries the remainder as
+cash, but this research-only cap is not the target trial/add sizing policy. V1's full-unit entries
+remain only as rejected extreme-control evidence. Their results cannot close `P3-POLICY-001`,
+`P3-POS-002`, or `P3-POS-003`, and cannot be promoted by renaming a run. A future governed strategy
+must still pass the lifecycle, allocation, exit-source, and promotion boundaries in this LLD.
 
 ## 6. Operator-assisted boundary
 

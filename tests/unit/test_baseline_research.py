@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta
@@ -10,11 +11,14 @@ from quanthus.backtest import (
     BacktestEngine,
     BaselineFeaturePanel,
     BaselineResearchError,
+    EventType,
     HistoricalReplayFrameReader,
     load_baseline_strategy_catalogue,
     load_execution_policy,
+    render_baseline_scoreboard,
     run_baseline_strategy_suite,
 )
+from quanthus.backtest.baseline_research import BaselineHistoricalStrategy
 from quanthus.backtest.historical_bundle import HistoricalReplayBundle
 from quanthus.contracts import SnapshotRef
 from quanthus.data_foundation import DatasetManifest
@@ -48,13 +52,16 @@ class BaselineResearchTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        self.dates = weekdays(date(2012, 1, 2), 72)
+        self.dates = weekdays(date(2012, 1, 2), 132)
         self.bundle = self._build_bundle()
         self.registry = load_feature_registry(
             ROOT / "config" / "p3-baseline-features.research.v1.json"
         )
-        self.catalogue = load_baseline_strategy_catalogue(
+        self.v1_catalogue = load_baseline_strategy_catalogue(
             ROOT / "config" / "p3-baseline-strategies.research.v1.json"
+        )
+        self.catalogue = load_baseline_strategy_catalogue(
+            ROOT / "config" / "p3-baseline-strategies.research.v2.json"
         )
 
     def _build_bundle(self) -> HistoricalReplayBundle:
@@ -82,7 +89,7 @@ class BaselineResearchTests(unittest.TestCase):
                 exchange = "SSE" if security_id.startswith("SSE") else "SZSE"
                 close = split_price if security_id == "SSE-600001" else Decimal("10")
                 price_reference = prior_prices.get(security_id, close)
-                volume = Decimal("2000000") if index == 61 else Decimal("1000000")
+                volume = Decimal("2000000") if index == 121 else Decimal("1000000")
                 universe.append(
                     {
                         "security_id": security_id,
@@ -221,12 +228,33 @@ class BaselineResearchTests(unittest.TestCase):
             raw_after = Decimal("80")
             self.assertLess(raw_after / raw_before - Decimal("1"), Decimal("-0.49"))
 
+    def test_v1_remains_replayable_and_v2_freezes_moderation_bounds(self) -> None:
+        self.assertEqual(
+            self.v1_catalogue.digest,
+            "sha256:573d53b0046823af0f613e2efbf2a51b4393686de63dc4ae67a6af35f7210c4c",
+        )
+        self.assertFalse(self.v1_catalogue.shared.moderated)
+        self.assertTrue(self.catalogue.shared.moderated)
+        self.assertEqual(self.catalogue.shared.position_fraction, Decimal("0.30"))
+        self.assertEqual(
+            self.catalogue.shared.maximum_realized_volatility20,
+            Decimal("0.50"),
+        )
+        self.assertTrue(all(item.moderated for item in self.catalogue.strategies))
+
+        raw = json.loads(self.catalogue.path.read_text(encoding="utf-8"))
+        raw["shared"]["position_fraction"] = "1.01"
+        invalid_path = self.root / "invalid-baseline-v2.json"
+        invalid_path.write_text(json.dumps(raw), encoding="utf-8")
+        with self.assertRaisesRegex(BaselineResearchError, "position_fraction"):
+            load_baseline_strategy_catalogue(invalid_path)
+
     def test_suite_runs_all_baselines_and_rejects_non_development_scope(self) -> None:
         execution_policy = load_execution_policy(
             ROOT / "config" / "p2-execution-policy.research.v1.json"
         )
-        scope_start = self.dates[61]
-        scope_end = self.dates[68]
+        scope_start = self.dates[121]
+        scope_end = self.dates[128]
         with HistoricalReplayFrameReader(self.bundle) as reader, self._panel() as panel:
             result = run_baseline_strategy_suite(
                 reader,
@@ -246,6 +274,38 @@ class BaselineResearchTests(unittest.TestCase):
                 },
             )
             self.assertTrue(all(not item.backtest.run.official for item in result.strategies))
+            result_payload = result.to_dict()
+            for strategy_payload in result_payload["strategies"]:
+                self.assertEqual(
+                    strategy_payload["operation_count"],
+                    strategy_payload["buy_operation_count"]
+                    + strategy_payload["sell_operation_count"],
+                )
+                self.assertEqual(
+                    strategy_payload["closed_trade_count"],
+                    strategy_payload["trade_count"],
+                )
+            buy_fills = [
+                event
+                for replay in result.strategies
+                for event in replay.backtest.events
+                if event.event_type is EventType.FILL and event.payload.get("side") == "buy"
+            ]
+            self.assertTrue(buy_fills)
+            self.assertTrue(
+                all(
+                    Decimal(str(event.payload["gross_amount"])) <= Decimal("30000")
+                    for event in buy_fills
+                )
+            )
+            scoreboard = render_baseline_scoreboard(result)
+            self.assertIn("Operations (B/S)", scoreboard)
+            self.assertIn("Win rate", scoreboard)
+            self.assertIn("Max drawdown", scoreboard)
+            self.assertIn("Profit factor", scoreboard)
+            self.assertIn("Ann. volatility", scoreboard)
+            self.assertIn("Payoff ratio", scoreboard)
+            self.assertIn("Turnover", scoreboard)
             with BaselineFeaturePanel.build(
                 self.bundle,
                 self.registry,
@@ -275,6 +335,27 @@ class BaselineResearchTests(unittest.TestCase):
                     scope_start=date(2022, 1, 4),
                     scope_end=date(2022, 1, 5),
                 )
+
+    def test_v2_sizing_keeps_20_percent_t_plus_one_gap_below_budget(self) -> None:
+        with self._panel() as panel:
+            strategy = BaselineHistoricalStrategy(
+                self.catalogue.strategies[0],
+                self.catalogue.shared,
+                panel,
+            )
+            cash = Decimal("100000")
+            decision_close = Decimal("10")
+            limit_up_open = decision_close * Decimal("1.20")
+            quantity = strategy._entry_quantity(cash, decision_close)
+
+            assert self.catalogue.shared.position_fraction is not None
+            entry_budget = cash * self.catalogue.shared.position_fraction
+            self.assertEqual(quantity, 2400)
+            self.assertLess(quantity * limit_up_open, entry_budget)
+            self.assertGreaterEqual(
+                entry_budget - quantity * limit_up_open,
+                Decimal("1000"),
+            )
 
     def test_invalid_future_known_action_fails_closed(self) -> None:
         import pyarrow as pa

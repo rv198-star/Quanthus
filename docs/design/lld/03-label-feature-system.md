@@ -102,6 +102,12 @@ in `src/quanthus/backtest/baseline_research.py` scans one immutable historical b
 DuckDB and writes a date-sorted feature panel. Strategy callbacks query that panel by exact
 T-close date and economic `security_id`; they do not issue one history query per security.
 
+`config/p3-baseline-strategies.research.v2.json` is the current moderated consumer of this panel.
+It leaves feature definitions and the historical panel unchanged while bounding entry regions,
+filtering volatile/extreme candidates, and sizing entries below the full fixed unit. The v1
+catalogue remains loadable only to reproduce the rejected extreme-control run. Evidence:
+`docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md`.
+
 The continuity index starts from unadjusted closes. On an effective normalized action date its
 gross return is:
 
@@ -124,7 +130,7 @@ publication. The report separately counts unexplained price transitions, so futu
 can reduce this conservative exclusion without changing strategy code. Evidence:
 `docs/acceptance/p3-baseline-strategy-suite-20260729.md`.
 
-The v1 research catalogue applies one explicit full-scope data-quality filter: if an economic
+The research suite applies one explicit full-scope data-quality filter: if an economic
 identity has any versioned corporate-action exception or unexplained transition in the requested
 development decision interval or its final T+1 execution session, it is ineligible for entry
 throughout that run. This prevents a later unknown quantity change from invalidating a position

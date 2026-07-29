@@ -121,8 +121,10 @@ decision production and a populated historical opportunity funnel remain open.
 production policy. The former materializes eight PIT daily indicators from unadjusted prices and
 normalized actions; the latter runs moving-average trend, 20-session breakout, and oversold-
 rebound rules through the accepted one-unit P2 replay. Both are restricted to the 2012-2021
-development partition. Evidence:
-`docs/acceptance/p3-baseline-strategy-suite-20260729.md`.
+development partition. The v1 acceptance record preserves the rejected full-capital/extreme
+control; moderated v2 is the current CLI default and publishes a combined activity/performance
+scoreboard. Evidence: `docs/acceptance/p3-baseline-strategy-suite-20260729.md` and
+`docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md`.
 
 | ID | Title | Depends on |
 | --- | --- | --- |

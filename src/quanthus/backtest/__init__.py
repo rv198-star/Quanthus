@@ -23,6 +23,7 @@ from quanthus.backtest.baseline_research import (
     BaselineSuiteResult,
     BaselineValidationPolicy,
     load_baseline_strategy_catalogue,
+    render_baseline_scoreboard,
     run_baseline_strategy_suite,
 )
 from quanthus.backtest.contracts import (
@@ -193,6 +194,7 @@ __all__ = [
     "market_session_from_p1",
     "merge_replay_events",
     "rank_signals",
+    "render_baseline_scoreboard",
     "run_diagnostic_path",
     "run_baseline_strategy_suite",
     "run_round_trip",

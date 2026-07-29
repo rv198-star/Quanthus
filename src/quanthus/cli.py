@@ -12,6 +12,7 @@ from quanthus.backtest.baseline_research import (
     BaselineFeaturePanel,
     BaselineResearchError,
     load_baseline_strategy_catalogue,
+    render_baseline_scoreboard,
     run_baseline_strategy_suite,
 )
 from quanthus.backtest.engine import BacktestEngine, BacktestInputError
@@ -342,6 +343,7 @@ def _parser() -> argparse.ArgumentParser:
     baseline_suite.add_argument("--scope-end", type=date.fromisoformat, required=True)
     baseline_suite.add_argument("--feature-panel", type=Path, required=True)
     baseline_suite.add_argument("--output", type=Path, required=True)
+    baseline_suite.add_argument("--scoreboard-output", type=Path)
     baseline_suite.add_argument("--audit-output-dir", type=Path)
     baseline_suite.add_argument("--catalogue", type=Path)
     baseline_suite.add_argument("--feature-registry", type=Path)
@@ -866,7 +868,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             project_root = find_project_root()
             baseline_catalogue = load_baseline_strategy_catalogue(
                 args.catalogue
-                or project_root / "config" / "p3-baseline-strategies.research.v1.json"
+                or project_root / "config" / "p3-baseline-strategies.research.v2.json"
             )
             baseline_registry = load_feature_registry(
                 args.feature_registry
@@ -915,6 +917,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 json.dumps(baseline_payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            baseline_scoreboard = render_baseline_scoreboard(baseline_result)
+            if args.scoreboard_output is not None:
+                args.scoreboard_output.parent.mkdir(parents=True, exist_ok=True)
+                args.scoreboard_output.write_text(
+                    baseline_scoreboard + "\n",
+                    encoding="utf-8",
+                )
+            print(baseline_scoreboard, file=sys.stderr)
             print(json.dumps(baseline_payload, ensure_ascii=True, sort_keys=True))
         elif args.command == "build-st-status":
             default_policy = find_project_root() / "config" / "st-status.v1.json"

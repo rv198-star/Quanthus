@@ -332,18 +332,29 @@ class DocumentTraceabilityTests(unittest.TestCase):
         replay_lld_path = (
             root / "docs" / "design" / "lld" / "02-backtest-engine" / "strategy-replay.md"
         )
-        evidence_path = (
+        v1_evidence_path = (
             root / "docs" / "acceptance" / "p3-baseline-strategy-suite-20260729.md"
         )
+        v2_evidence_path = (
+            root / "docs" / "acceptance" / "p3-baseline-strategy-suite-v2-20260729.md"
+        )
         source_path = root / "src" / "quanthus" / "backtest" / "baseline_research.py"
+        cli_path = root / "src" / "quanthus" / "cli.py"
         feature_fields = _header_fields(feature_lld_path)
         replay_fields = _header_fields(replay_lld_path)
         feature_lld = feature_lld_path.read_text(encoding="utf-8")
         replay_lld = replay_lld_path.read_text(encoding="utf-8")
-        evidence = evidence_path.read_text(encoding="utf-8")
+        v1_evidence = v1_evidence_path.read_text(encoding="utf-8")
+        v2_evidence = v2_evidence_path.read_text(encoding="utf-8")
         source = source_path.read_text(encoding="utf-8")
-        catalogue = json.loads(
+        cli = cli_path.read_text(encoding="utf-8")
+        v1_catalogue = json.loads(
             (root / "config" / "p3-baseline-strategies.research.v1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        v2_catalogue = json.loads(
+            (root / "config" / "p3-baseline-strategies.research.v2.json").read_text(
                 encoding="utf-8"
             )
         )
@@ -352,11 +363,27 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("three baseline suite accepted", replay_fields["Implementation status"])
         self.assertIn("data_quality_scope_selection_bias=true", feature_lld)
         self.assertIn("final T+1 execution session", replay_lld)
-        self.assertIn("all three strategies failed the cash comparison", evidence)
-        self.assertIn("`execution_authorized=false`", evidence)
-        self.assertIn("2022-2024 arbitration partition", evidence)
-        self.assertEqual(catalogue["status"], "research-only")
-        self.assertEqual(catalogue["validation"]["development_end"], "2021-12-31")
+        self.assertIn("all three strategies failed the cash comparison", v1_evidence)
+        self.assertIn("rejected v1 extreme-control evidence", v2_evidence)
+        self.assertIn("Operations (B/S)", v2_evidence)
+        self.assertIn("Max drawdown", v2_evidence)
+        self.assertIn("Payoff ratio", v2_evidence)
+        self.assertIn("`execution_authorized=false`", v2_evidence)
+        self.assertIn("2022-2024 arbitration partition", v2_evidence)
+        self.assertEqual(v1_catalogue["status"], "research-only")
+        self.assertEqual(v2_catalogue["status"], "research-only")
+        self.assertEqual(v1_catalogue["validation"]["development_end"], "2021-12-31")
+        self.assertEqual(v2_catalogue["validation"]["development_end"], "2021-12-31")
+        self.assertEqual(v2_catalogue["shared"]["position_fraction"], "0.30")
+        self.assertEqual(v2_catalogue["shared"]["sizing_cash_buffer"], "0.21")
+        self.assertEqual(v2_catalogue["shared"]["maximum_realized_volatility20"], "0.50")
+        self.assertEqual(v2_catalogue["shared"]["maximum_entry_day_return"], "0.04")
+        self.assertIn("p3-baseline-strategies.research.v2.json", cli)
+        self.assertIn("render_baseline_scoreboard", cli)
+        self.assertIn("--scoreboard-output", cli)
+        self.assertIn('"operation_count"', source)
+        self.assertIn('"buy_operation_count"', source)
+        self.assertIn('"sell_operation_count"', source)
         self.assertIn(
             "feature-panel continuity scope must include the final execution date",
             source,

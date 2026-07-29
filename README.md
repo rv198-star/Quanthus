@@ -13,8 +13,9 @@ model output as a trading decision and it does not promise investment returns.
   activation remains blocked by `config/p2-gates.v1.json`.
 - P3 implementation: allowed for a replayable rule-only historical vertical slice. The bounded
   strategy-neutral daily replay substrate, continuous real-history frame reader, and three simple
-  development-only research baselines are accepted. Target strategy rules and inactive experts
-  remain open or shadow-only as declared by their work items.
+  development-only research baselines are accepted. Moderated catalogue v2 is the current research
+  default; v1 is retained only as a rejected extreme-control replay. Target strategy rules and
+  inactive experts remain open or shadow-only as declared by their work items.
 
 ## Quick start
 

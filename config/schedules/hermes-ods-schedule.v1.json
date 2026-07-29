@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "provider-readiness-window-gated-20260728",
+  "contract_revision": "hermes-1730-window-gated-20260729",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_only",
@@ -38,18 +38,18 @@
       "id": "market-daily-core",
       "enabled": true,
       "recurring": true,
-      "trigger": {"kind": "timer", "weekdays": [1, 2, 3, 4, 5], "time": "15:40:00"},
+      "trigger": {"kind": "timer", "weekdays": [1, 2, 3, 4, 5], "time": "17:30:00"},
       "auction_close_time": "15:00:00",
       "final_trading_time": "15:30:00",
       "finalized_acquisition_not_before": "15:40:00",
       "completion_deadline": "19:46:00",
       "collection_window_experiment": {
-        "experiment_id": "baostock-load-window-20260728-v1",
+        "experiment_id": "baostock-load-window-20260729-v2",
         "minimum_open_sessions": 5,
         "nodes": [
           {
             "node_id": "hermes",
-            "timer_start": "15:40:00",
+            "timer_start": "17:30:00",
             "activation_grace_seconds": 300,
             "start_policy": "first_provider_ready_after_timer",
             "service_timeout_seconds": 15000

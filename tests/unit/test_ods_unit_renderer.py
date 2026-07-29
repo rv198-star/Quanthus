@@ -35,6 +35,8 @@ class OdsUnitRendererTests(unittest.TestCase):
         market_timer = (output / "cn01-ods-market-daily-core.timer").read_text()
         market_service = (output / "cn01-ods-market-daily-core.service").read_text()
         self.assertIn("OnCalendar=Mon..Fri *-*-* 19:00:00 Asia/Shanghai", market_timer)
+        self.assertIn("contract 19:00", market_timer)
+        self.assertNotIn("contract 17:30", market_timer)
         self.assertIn("Unit=cn01-ods-market-daily-core.service", market_timer)
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", market_service)
         self.assertIn("Environment=HERMES_ODS_NODE_ID=cn01", market_service)
@@ -62,7 +64,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         config = ROOT / "config/schedules/hermes-ods-schedule.v1.json"
 
         cases = [
-            ("hermes", "2026-07-29T15:40:00+08:00", 0),
+            ("hermes", "2026-07-29T17:30:00+08:00", 0),
             ("hermes", "2026-07-29T18:20:00+08:00", 1),
             ("cn01", "2026-07-29T15:40:00+08:00", 1),
             ("cn01", "2026-07-29T19:04:59+08:00", 0),

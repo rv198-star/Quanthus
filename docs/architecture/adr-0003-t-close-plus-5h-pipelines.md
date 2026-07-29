@@ -27,8 +27,9 @@ attempt ended after 2h02m39s. The provisional SLA rounds that incident duration 
 adds 100% headroom: `7380 * 2 = 14760s`, so ODS must be ready by 19:46. This evidence is explicitly
 provisional until five open sessions complete.
 
-Hermes and CN01 use different collection windows during that validation. Hermes starts at 15:40
-and performs low-frequency readiness checks, representing the earliest usable provider window.
+Hermes and CN01 use different collection windows during that validation. The first 15:40 sample
+is retained as v1 evidence; the v2 experiment restarts its five-session sample with Hermes at 17:30,
+close to the first observed provider-ready time while still separated from CN01.
 CN01 starts at 19:00, representing a lower-load fixed late window. This avoids synchronized
 full-market requests and creates comparable evidence without changing either node's coverage or
 publication gates.
@@ -37,7 +38,8 @@ publication gates.
 15:00       closing call auction completes
 15:05-15:30 after-hours fixed-price matching
 15:30       final daily trading boundary; final volume/amount may now settle
-15:40       Hermes starts the early readiness gate; OCI polls immutable handoffs
+15:40       OCI starts polling immutable handoffs
+17:30       Hermes starts the v2 readiness gate
 on readiness Hermes starts its full-market scan only after all sentinel indices are complete
 19:00       CN01 starts the fixed late-window attempt; Hermes readiness deadline
 on READY     first observed source wins; same-poll tie resolves to CN01

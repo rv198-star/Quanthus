@@ -1,8 +1,8 @@
 [Unit]
-Description=Hermes ODS market-daily-core early collection window (contract 15:40)
+Description=Hermes ODS market-daily-core collection window (contract 17:30)
 
 [Timer]
-OnCalendar=Mon..Fri *-*-* 15:40:00 Asia/Shanghai
+OnCalendar=Mon..Fri *-*-* 17:30:00 Asia/Shanghai
 AccuracySec=1min
 Persistent=false
 Unit=hermes-ods-market-daily-core.service

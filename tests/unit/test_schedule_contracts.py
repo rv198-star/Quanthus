@@ -28,7 +28,7 @@ class ScheduleContractTests(unittest.TestCase):
 
         self.assertEqual(contract.schedule_id, "hermes-ods-schedule-v1")
         self.assertEqual(
-            contract.contract_revision, "provider-readiness-window-gated-20260728"
+            contract.contract_revision, "hermes-1730-window-gated-20260729"
         )
         self.assertEqual(len(contract.lanes), 5)
 
@@ -93,7 +93,7 @@ class ScheduleContractTests(unittest.TestCase):
             )
             lane["trigger"]["time"] = "15:10:00"
 
-        with self.assertRaisesRegex(ScheduleContractError, "15:40"):
+        with self.assertRaisesRegex(ScheduleContractError, "17:30"):
             load_schedule_contract(self._mutated(mutate))
 
     def test_rejects_market_sla_without_the_full_100_percent_margin(self) -> None:

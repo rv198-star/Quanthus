@@ -150,9 +150,9 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
     trigger = _mapping(lane.get("trigger"), field="market-daily-core.trigger")
     if trigger.get("weekdays") != [1, 2, 3, 4, 5]:
         raise ScheduleContractError("market-daily-core must run Monday through Friday")
-    if trigger.get("kind") != "timer" or trigger.get("time") != "15:40:00":
+    if trigger.get("kind") != "timer" or trigger.get("time") != "17:30:00":
         raise ScheduleContractError(
-            "market-daily-core must start at 15:40 after final daily totals"
+            "market-daily-core must start at the versioned 17:30 collection window"
         )
     expected_finality = {
         "auction_close_time": "15:00:00",
@@ -177,12 +177,12 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
         field="market-daily-core.collection_window_experiment",
     )
     expected_experiment = {
-        "experiment_id": "baostock-load-window-20260728-v1",
+        "experiment_id": "baostock-load-window-20260729-v2",
         "minimum_open_sessions": 5,
         "nodes": [
             {
                 "node_id": "hermes",
-                "timer_start": "15:40:00",
+                "timer_start": "17:30:00",
                 "activation_grace_seconds": 300,
                 "start_policy": "first_provider_ready_after_timer",
                 "service_timeout_seconds": 15000,

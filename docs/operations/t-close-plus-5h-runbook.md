@@ -30,7 +30,7 @@ use hard links on the same filesystem. Historical bulk completion uses `schedule
 separate path; it is not substituted for the daily release.
 
 Hermes and CN01 use separate Monday-Friday collection windows during the provisional five-session
-test. Hermes starts at 15:40 Asia/Shanghai and begins the stock scan at first provider readiness;
+test. Hermes starts at 17:30 Asia/Shanghai and begins the stock scan at first provider readiness;
 CN01 starts at 19:00 as the fixed late-window sample. Before session preflight, each acquisition
 wrapper fetches a fresh calendar window that includes the target date and builds an attempt-local
 candidate. It then checks the target date against both SSE and SZSE rows before contacting market

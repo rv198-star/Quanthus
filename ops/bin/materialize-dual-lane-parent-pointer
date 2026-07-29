@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Materialize a verified daily-DWD parent descriptor from release-set CURRENT."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+from quanthus.pipelines.dual_lane import DualLaneError, verify_lane_candidate
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return f"sha256:{digest.hexdigest()}"
+
+
+def _object(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError(f"JSON value must be an object: {path}")
+    return value
+
+
+def _text(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field} must be a non-empty string")
+    return value
+
+
+def _inside(root: Path, value: object, field: str) -> Path:
+    relative = PurePosixPath(_text(value, field))
+    if relative.is_absolute() or relative.as_posix() == "." or ".." in relative.parts:
+        raise ValueError(f"{field} must be a safe relative path")
+    resolved = root.joinpath(*relative.parts).resolve()
+    if root not in resolved.parents:
+        raise ValueError(f"{field} escapes the publication root")
+    return resolved
+
+
+def _atomic_json(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        if _object(path) != value:
+            raise ValueError("existing parent descriptor differs from the release set")
+        return
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+        json.dump(value, stream, ensure_ascii=True, indent=2, sort_keys=True)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--publication-root", type=Path, required=True)
+    parser.add_argument("--release-set-current", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        root = args.publication_root.resolve(strict=True)
+        current = _object(args.release_set_current.resolve(strict=True))
+        if current.get("schema_version") != 1:
+            raise ValueError("release-set CURRENT has an unsupported schema")
+        release_root = _inside(root, current.get("release_set_path"), "release_set_path")
+        release_manifest_path = release_root / "manifest.json"
+        release_ready_path = release_root / "READY"
+        release_manifest_sha256 = _sha256(release_manifest_path)
+        if release_manifest_sha256 != current.get("manifest_sha256"):
+            raise ValueError("release-set CURRENT manifest checksum mismatch")
+        if release_ready_path.read_text(encoding="ascii").strip() != release_manifest_sha256:
+            raise ValueError("release-set READY does not bind its manifest")
+        release = _object(release_manifest_path)
+        if release.get("kind") != "dual_lane_release_set":
+            raise ValueError("release-set manifest kind is invalid")
+        generation_root = _inside(root, release.get("generation_path"), "generation_path")
+        candidate = verify_lane_candidate(generation_root)
+        if candidate.manifest_sha256 != release.get("candidate_manifest_sha256"):
+            raise ValueError("release-set candidate checksum mismatch")
+        dwd_manifest_path = candidate.dwd_root / "manifest.json"
+        dwd_manifest = _object(dwd_manifest_path)
+        pointer = {
+            "schema_version": 1,
+            "dataset": "daily_market_dwd",
+            "market_date": candidate.market_date.isoformat(),
+            "revision": _text(dwd_manifest.get("revision"), "DWD revision"),
+            "revision_path": str(candidate.dwd_root),
+            "manifest_sha256": _sha256(dwd_manifest_path),
+            "source_release_set_id": _text(release.get("release_set_id"), "release_set_id"),
+            "source_release_set_manifest_sha256": release_manifest_sha256,
+        }
+        _atomic_json(args.output.resolve(), pointer)
+    except (DualLaneError, OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"cannot materialize dual-lane parent pointer: {exc}", file=sys.stderr)
+        return 2
+    print(args.output.resolve())
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

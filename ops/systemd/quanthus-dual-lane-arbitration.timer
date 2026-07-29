@@ -1,0 +1,11 @@
+[Unit]
+Description=Pull and arbitrate Quanthus dual-lane candidates at 20:00
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 20:00:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=quanthus-dual-lane-arbitration.service
+
+[Install]
+WantedBy=timers.target

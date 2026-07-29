@@ -840,6 +840,7 @@ def build_daily_dws_revision(
             )
         }
         dwd_manifest = dwd.output / "manifest.json"
+        dwd_relative_path = os.path.relpath(dwd.output, start=output)
         manifest = {
             "schema_version": 1,
             "kind": "oci_daily_dws_market_summary",
@@ -849,7 +850,7 @@ def build_daily_dws_revision(
             "built_at": datetime.now(timezone.utc).isoformat(),
             "lineage": {
                 "dwd_revision": dwd.revision,
-                "dwd_revision_path": str(dwd.output),
+                "dwd_revision_path": Path(dwd_relative_path).as_posix(),
                 "dwd_manifest_sha256": _sha256(dwd_manifest),
             },
             "metrics": metrics,
@@ -904,6 +905,8 @@ def check_daily_dws_revision(revision_dir: Path) -> DailyDwsResult:
     if not isinstance(lineage, Mapping):
         raise DailyWarehouseError("daily DWS manifest has no DWD lineage")
     dwd_path = Path(str(lineage.get("dwd_revision_path", "")))
+    if not dwd_path.is_absolute():
+        dwd_path = revision_dir / dwd_path
     dwd = check_daily_dwd_revision(dwd_path)
     if dwd.market_date != market_date or dwd.revision != lineage.get("dwd_revision"):
         raise DailyWarehouseError("daily DWS DWD lineage does not match its market_date")

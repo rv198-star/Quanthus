@@ -13,6 +13,13 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-GATE-001 | Automate release gate reporting | planned |
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | active |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | planned |
+| META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and portable ADS | active; cutover blocked |
+
+`META-DATA-PIPE-003` is governed by ADR 0005 and GitHub issue #45. Implementation is limited to
+copy-only contract, shadow, comparison, recovery, and release-set work beside the legacy path. It
+does not authorize a live `CURRENT` change, data deletion, retention cleanup, or access to sealed
+research partitions. Production cutover requires its separate evidence gate and explicit
+`GO_FOR_CUTOVER`.
 
 ## P1 data foundation
 

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Fence the old OCI timer without masking units, deleting files, or touching retained data.
+set -euo pipefail
+
+if [[ "${1:-}" != "--confirm" || "${2:-}" != "GO_FOR_CUTOVER" || \
+      "${3:-}" != "--decision" || "${4:-}" != "META-DATA-PIPE-003" || $# -ne 4 ]]; then
+  echo "usage: $0 --confirm GO_FOR_CUTOVER --decision META-DATA-PIPE-003" >&2
+  exit 2
+fi
+
+legacy_timer="quanthus-t-close-plus-5h.timer"
+legacy_service="quanthus-t-close-plus-5h.service"
+systemctl disable --now "$legacy_timer"
+if systemctl is-active --quiet "$legacy_service"; then
+  echo "legacy timer is disabled, but its active service must finish before cutover" >&2
+  exit 3
+fi
+if systemctl is-enabled --quiet "$legacy_timer"; then
+  echo "legacy timer remains enabled" >&2
+  exit 4
+fi
+
+echo "legacy OCI publisher disabled; unit files and all historical data remain retained"

@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# Verify an untrusted ingress epoch and atomically promote it into the node-local sealed root.
+set -euo pipefail
+
+if [[ -f /etc/quanthus/dual-lane-node.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/dual-lane-node.env
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv-p1/bin/python}"
+ingress_root="${QUANTHUS_DUAL_LANE_EPOCH_INGRESS_ROOT:?set the node epoch ingress root}"
+staging_root="${QUANTHUS_DUAL_LANE_EPOCH_STAGING_ROOT:?set the node epoch staging root}"
+epoch_root="${QUANTHUS_DUAL_LANE_EPOCH_ROOT:?set the node sealed epoch root}"
+market_date="${1:-$(TZ=Asia/Shanghai date +%F)}"
+
+if (( EUID != 0 )); then
+  echo "dual-lane epoch promotion must run as root" >&2
+  exit 2
+fi
+if [[ ! "$market_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+  echo "market date must use YYYY-MM-DD" >&2
+  exit 2
+fi
+if [[ ! -x "$python_bin" || "$ingress_root" == "$epoch_root" || \
+      "$staging_root" == "$ingress_root" || "$staging_root" == "$epoch_root" ]]; then
+  echo "dual-lane epoch runtime or distinct ingress/staging/sealed roots are invalid" >&2
+  exit 2
+fi
+
+resolver="${repo_root}/ops/bin/resolve-dual-lane-pointer"
+source_date_root="${ingress_root%/}/${market_date}"
+source_pointer="${source_date_root}/CURRENT.json"
+sealed_date_root="${epoch_root%/}/${market_date}"
+sealed_pointer="${sealed_date_root}/CURRENT.json"
+
+if [[ ! -f "$source_pointer" ]]; then
+  echo "epoch ingress CURRENT is not ready: ${source_pointer}" >&2
+  exit 3
+fi
+source_line="$($resolver --kind epoch --pointer "$source_pointer" --market-date "$market_date")"
+IFS=$'\t' read -r epoch_id source_epoch manifest_sha256 <<<"$source_line"
+if [[ "$source_epoch" != "${source_date_root}/${epoch_id}" ]]; then
+  echo "epoch ingress must contain one immediate-child artifact named by epoch_id" >&2
+  exit 2
+fi
+
+mkdir -p "${epoch_root%/}/locks"
+exec 9>"${epoch_root%/}/locks/epoch-promoter.lock"
+if ! flock -n 9; then
+  echo "another node-local epoch promoter holds the lock" >&2
+  exit 3
+fi
+install -d -o root -g root -m 0750 "$sealed_date_root"
+destination_epoch="${sealed_date_root}/${epoch_id}"
+
+if [[ -d "$destination_epoch" ]]; then
+  existing_sha256="$(sha256sum "${destination_epoch}/manifest.json")"
+  existing_sha256="sha256:${existing_sha256%% *}"
+  if [[ "$existing_sha256" != "$manifest_sha256" ]]; then
+    echo "sealed epoch identity already exists with different content" >&2
+    exit 4
+  fi
+  PYTHONPATH="${repo_root}/src" "$python_bin" -m quanthus dual-lane-epoch-check \
+    --epoch-dir "$destination_epoch" >/dev/null
+else
+  staging="$(mktemp -d --tmpdir="$staging_root" ".${market_date}.${epoch_id}.XXXXXX")"
+  rsync -a --checksum --protect-args "${source_epoch}/" "${staging}/"
+  staging_sha256="$(sha256sum "${staging}/manifest.json")"
+  staging_sha256="sha256:${staging_sha256%% *}"
+  if [[ "$staging_sha256" != "$manifest_sha256" ]]; then
+    echo "copied epoch manifest differs from ingress CURRENT" >&2
+    exit 4
+  fi
+  PYTHONPATH="${repo_root}/src" "$python_bin" -m quanthus dual-lane-epoch-check \
+    --epoch-dir "$staging" >/dev/null
+  chown -R root:root "$staging"
+  find "$staging" -type d -exec chmod 0750 {} +
+  find "$staging" -type f -exec chmod 0640 {} +
+  mv -T "$staging" "$destination_epoch"
+fi
+
+latest_line="$($resolver --kind epoch --pointer "$source_pointer" --market-date "$market_date")"
+if [[ "$latest_line" != "$source_line" ]]; then
+  echo "epoch ingress CURRENT changed during promotion; retry the new descriptor" >&2
+  exit 3
+fi
+pointer_staging="$(mktemp --tmpdir="$sealed_date_root" .CURRENT.json.XXXXXX)"
+install -o root -g root -m 0640 "$source_pointer" "$pointer_staging"
+sealed_line="$($resolver --kind epoch --pointer "$pointer_staging" --market-date "$market_date")"
+IFS=$'\t' read -r sealed_epoch_id sealed_epoch_path sealed_manifest_sha256 <<<"$sealed_line"
+if [[ "$sealed_epoch_id" != "$epoch_id" || "$sealed_epoch_path" != "$destination_epoch" || \
+      "$sealed_manifest_sha256" != "$manifest_sha256" ]]; then
+  echo "sealed epoch pointer does not bind the promoted artifact" >&2
+  exit 4
+fi
+mv -fT "$pointer_staging" "$sealed_pointer"
+
+echo "dual-lane epoch promoted: market_date=${market_date} epoch=${epoch_id}"

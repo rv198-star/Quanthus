@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Publish an OCI epoch input, then distribute the date root to both candidate nodes.
+set -euo pipefail
+
+if [[ -f /etc/quanthus/dual-lane-oci.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/dual-lane-oci.env
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv/bin/python}"
+policy="${QUANTHUS_DUAL_LANE_CONFIG:-${repo_root}/config/pipelines/dual-lane-dwd-dws.v1.json}"
+epoch_root="${QUANTHUS_DUAL_LANE_EPOCH_ROOT:-/home/ubuntu/data/quanthus/dual-lane/epochs}"
+publication_root="${QUANTHUS_DUAL_LANE_PUBLICATION_ROOT:-/home/ubuntu/data/quanthus/dual-lane/publication}"
+release_set_current="${QUANTHUS_DUAL_LANE_RELEASE_SET_CURRENT:-${publication_root}/release-set_CURRENT.json}"
+universe_policy="${QUANTHUS_DUAL_LANE_UNIVERSE_POLICY:-${repo_root}/config/p1-universe.v2.json}"
+code_validity="${QUANTHUS_DUAL_LANE_CODE_VALIDITY:-${repo_root}/config/security-code-validity.v1.json}"
+market_date="${1:-$(TZ=Asia/Shanghai date +%F)}"
+code_revision="${QUANTHUS_CODE_REVISION:?set QUANTHUS_CODE_REVISION to the deployed Git commit}"
+
+if [[ ! "$market_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ || ! "$code_revision" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "market date or deployed Git revision is invalid" >&2
+  exit 2
+fi
+if [[ ! -x "$python_bin" || ! -f "$policy" || ! -f "$universe_policy" || ! -f "$code_validity" ]]; then
+  echo "dual-lane epoch runtime or governed input is missing" >&2
+  exit 2
+fi
+actual_revision="$(git -C "$repo_root" rev-parse HEAD)"
+if [[ "$actual_revision" != "$code_revision" ]]; then
+  echo "deployed checkout does not match QUANTHUS_CODE_REVISION" >&2
+  exit 2
+fi
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+mkdir -p "${epoch_root%/}/locks"
+exec 9>"${epoch_root%/}/locks/epoch-publisher.lock"
+if ! flock -n 9; then
+  echo "another dual-lane epoch publisher holds the lock" >&2
+  exit 3
+fi
+
+parent_pointer="${QUANTHUS_DUAL_LANE_PARENT_POINTER:-}"
+base_pointer="${QUANTHUS_DUAL_LANE_BASE_POINTER:-}"
+if [[ -n "$parent_pointer" && -n "$base_pointer" ]]; then
+  echo "set exactly one dual-lane parent or historical-base pointer" >&2
+  exit 2
+fi
+if [[ -f "$release_set_current" ]]; then
+  release_digest="$(sha256sum "$release_set_current")"
+  release_digest="${release_digest%% *}"
+  source_pointer="${epoch_root%/}/parent-pointers/parent-${release_digest:0:24}.json"
+  "$python_bin" "${repo_root}/ops/bin/materialize-dual-lane-parent-pointer" \
+    --publication-root "$publication_root" \
+    --release-set-current "$release_set_current" \
+    --output "$source_pointer"
+  source_arg=(--parent-pointer "$source_pointer")
+elif [[ -n "$parent_pointer" ]]; then
+  source_pointer="$parent_pointer"
+  source_arg=(--parent-pointer "$parent_pointer")
+elif [[ -n "$base_pointer" ]]; then
+  source_pointer="$base_pointer"
+  source_arg=(--base-pointer "$base_pointer")
+else
+  echo "set QUANTHUS_DUAL_LANE_PARENT_POINTER or QUANTHUS_DUAL_LANE_BASE_POINTER" >&2
+  exit 2
+fi
+if [[ ! -f "$source_pointer" ]]; then
+  echo "epoch canonical-source pointer does not exist: ${source_pointer}" >&2
+  exit 2
+fi
+
+source_digest="$(sha256sum "$source_pointer")"
+source_digest="${source_digest%% *}"
+date_compact="${market_date//-/}"
+epoch_id="epoch-${date_compact}-${code_revision:0:12}-${source_digest:0:12}"
+date_root="${epoch_root%/}/${market_date}"
+epoch_output="${date_root}/${epoch_id}"
+
+"$python_bin" -m quanthus dual-lane-policy-check --config "$policy"
+"$python_bin" -m quanthus dual-lane-epoch-publish \
+  --config "$policy" \
+  --output "$epoch_output" \
+  --epoch-id "$epoch_id" \
+  --market-date "$market_date" \
+  --universe-policy "$universe_policy" \
+  --code-validity-mapping "$code_validity" \
+  --code-revision "$code_revision" \
+  --current-pointer "${date_root}/CURRENT.json" \
+  "${source_arg[@]}"
+
+sync_root="${repo_root}/ops/bin/sync-dual-lane-date-root"
+transfer_status=0
+if ! "$sync_root" --direction push --market-date "$market_date" \
+  --local-root "$epoch_root" \
+  --remote-root "${QUANTHUS_CN01_DUAL_LANE_EPOCH_ROOT:?set CN01 epoch root}" \
+  --host "${QUANTHUS_CN01_DUAL_LANE_HOST:?set CN01 transfer host}" \
+  --port "${QUANTHUS_CN01_DUAL_LANE_PORT:-22}" \
+  --user "${QUANTHUS_CN01_DUAL_LANE_EPOCH_USER:?set CN01 epoch writer}" \
+  --key "${QUANTHUS_CN01_DUAL_LANE_EPOCH_KEY:?set CN01 epoch key}" \
+  --known-hosts "${QUANTHUS_CN01_DUAL_LANE_KNOWN_HOSTS:?set CN01 known-hosts}"; then
+  transfer_status=1
+fi
+if ! "$sync_root" --direction push --market-date "$market_date" \
+  --local-root "$epoch_root" \
+  --remote-root "${QUANTHUS_HERMES_DUAL_LANE_EPOCH_ROOT:?set Hermes epoch root}" \
+  --host "${QUANTHUS_HERMES_DUAL_LANE_HOST:?set Hermes transfer host}" \
+  --port "${QUANTHUS_HERMES_DUAL_LANE_PORT:-2222}" \
+  --user "${QUANTHUS_HERMES_DUAL_LANE_EPOCH_USER:?set Hermes epoch writer}" \
+  --key "${QUANTHUS_HERMES_DUAL_LANE_EPOCH_KEY:?set Hermes epoch key}" \
+  --known-hosts "${QUANTHUS_HERMES_DUAL_LANE_KNOWN_HOSTS:?set Hermes known-hosts}"; then
+  transfer_status=1
+fi
+if (( transfer_status != 0 )); then
+  echo "epoch is locally published but distribution did not reach both lanes" >&2
+  exit 4
+fi
+
+echo "dual-lane epoch published and distributed: ${epoch_id}"

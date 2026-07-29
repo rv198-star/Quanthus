@@ -1,0 +1,23 @@
+[Unit]
+Description=Quanthus OCI dual-lane epoch publication and distribution
+After=network-online.target
+Wants=network-online.target
+OnFailure=quanthus-pipeline-failure@%n.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+EnvironmentFile=/etc/quanthus/dual-lane-oci.env
+WorkingDirectory=/opt/quanthus/current
+ExecStart=/opt/quanthus/current/ops/bin/run-dual-lane-epoch-publish
+TimeoutStartSec=2h
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=5
+PrivateTmp=true
+NoNewPrivileges=true
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

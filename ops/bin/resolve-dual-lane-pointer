@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Resolve one date-local ODS, epoch, or candidate CURRENT without trusting its path."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path, PurePosixPath
+
+_SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$")
+_SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--kind", choices=("ods", "epoch", "candidate"), required=True)
+    parser.add_argument("--pointer", type=Path, required=True)
+    parser.add_argument("--market-date", required=True)
+    return parser
+
+
+def _text(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field} must be a non-empty string")
+    return value
+
+
+def main() -> int:
+    args = _parser().parse_args()
+    try:
+        pointer = args.pointer.resolve(strict=True)
+        value = json.loads(pointer.read_text(encoding="utf-8"))
+        if not isinstance(value, dict) or value.get("schema_version") != 1:
+            raise ValueError("pointer must be a schema-version 1 object")
+        if value.get("market_date") != args.market_date:
+            raise ValueError("pointer market_date does not match the request")
+        manifest_sha256 = _text(value.get("manifest_sha256"), "manifest_sha256")
+        if _SHA256.fullmatch(manifest_sha256) is None:
+            raise ValueError("manifest_sha256 is invalid")
+        if args.kind == "ods":
+            artifact_id = _text(value.get("attempt_id"), "attempt_id")
+            relative = PurePosixPath(artifact_id)
+        elif args.kind == "epoch":
+            artifact_id = _text(value.get("epoch_id"), "epoch_id")
+            relative = PurePosixPath(_text(value.get("epoch_path"), "epoch_path"))
+        else:
+            artifact_id = _text(value.get("candidate_id"), "candidate_id")
+            relative = PurePosixPath(_text(value.get("candidate_path"), "candidate_path"))
+        if _SAFE_ID.fullmatch(artifact_id) is None:
+            raise ValueError("pointer artifact id contains unsupported characters")
+        if relative.is_absolute() or relative.as_posix() == "." or ".." in relative.parts:
+            raise ValueError("pointer artifact path is not a safe relative path")
+        artifact = pointer.parent.joinpath(*relative.parts).resolve()
+        if pointer.parent not in artifact.parents:
+            raise ValueError("pointer artifact path escapes its date root")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"invalid dual-lane pointer: {exc}", file=sys.stderr)
+        return 2
+    print(f"{artifact_id}\t{artifact}\t{manifest_sha256}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

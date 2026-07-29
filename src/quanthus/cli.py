@@ -98,30 +98,42 @@ from quanthus.p1_evidence_build import (
 )
 from quanthus.pipelines import (
     DailyWarehouseError,
+    DualLaneError,
     LaneRunError,
     OdsHandoffError,
     OdsReleaseError,
     PipelineConfigError,
     PipelineRunError,
     ScheduleContractError,
+    arbitrate_and_publish,
     build_daily_dwd_revision,
     build_daily_dws_revision,
+    build_lane_candidate,
     check_daily_dwd_revision,
     check_daily_dws_revision,
+    load_candidate_current,
+    load_dual_lane_policy,
+    load_epoch_current,
     load_ods_source_config,
     load_pipeline_config,
     load_schedule_contract,
     market_session_is_open,
     promote_daily_dwd_revision,
     promote_daily_dws_revision,
+    publish_epoch_input,
     publish_ods_release,
     pull_selected_ods_release,
     resolve_paths,
     run_lane,
     run_pipeline,
     run_shadow_matrix,
+    select_market_daily_ods_release,
+    verify_epoch_input,
+    verify_lane_candidate,
     verify_ods_release,
     wait_for_ods_ready,
+    write_candidate_current,
+    write_epoch_current,
 )
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
 from quanthus.price_limits import (
@@ -562,6 +574,80 @@ def _parser() -> argparse.ArgumentParser:
     )
     daily_dws_promote.add_argument("--revision-dir", type=Path, required=True)
     daily_dws_promote.add_argument("--pointer", type=Path, required=True)
+
+    dual_policy = subparsers.add_parser(
+        "dual-lane-policy-check",
+        help="validate the CN01/Hermes candidate and OCI publication contract",
+    )
+    dual_policy.add_argument("--config", type=Path, required=True)
+
+    epoch_publish = subparsers.add_parser(
+        "dual-lane-epoch-publish",
+        help="publish one immutable OCI epoch-input package",
+    )
+    epoch_publish.add_argument("--config", type=Path, required=True)
+    epoch_publish.add_argument("--output", type=Path, required=True)
+    epoch_publish.add_argument("--epoch-id", required=True)
+    epoch_publish.add_argument("--market-date", type=date.fromisoformat, required=True)
+    epoch_publish.add_argument("--universe-policy", type=Path, required=True)
+    epoch_publish.add_argument("--code-validity-mapping", type=Path, required=True)
+    epoch_publish.add_argument("--code-revision", required=True)
+    epoch_publish.add_argument("--parent-pointer", type=Path)
+    epoch_publish.add_argument("--base-pointer", type=Path)
+    epoch_publish.add_argument("--current-pointer", type=Path)
+
+    epoch_check = subparsers.add_parser(
+        "dual-lane-epoch-check",
+        help="verify one portable dual-lane epoch-input package",
+    )
+    epoch_check.add_argument("--epoch-dir", type=Path, required=True)
+
+    candidate_build = subparsers.add_parser(
+        "dual-lane-candidate-build",
+        help="build one immutable lane-local DWD/DWS candidate",
+    )
+    candidate_build.add_argument("--config", type=Path, required=True)
+    candidate_build.add_argument("--output", type=Path, required=True)
+    candidate_build.add_argument("--candidate-id", required=True)
+    candidate_build.add_argument("--lane-id", choices=["cn01", "hermes"], required=True)
+    candidate_build.add_argument("--attempt-id", required=True)
+    candidate_build.add_argument("--market-date", type=date.fromisoformat, required=True)
+    candidate_build.add_argument("--ods-release-dir", type=Path, required=True)
+    candidate_build.add_argument("--epoch-dir", type=Path, required=True)
+    candidate_build.add_argument("--code-revision", required=True)
+    candidate_build.add_argument("--current-pointer", type=Path)
+
+    candidate_check = subparsers.add_parser(
+        "dual-lane-candidate-check",
+        help="verify one portable lane DWD/DWS candidate",
+    )
+    candidate_check.add_argument("--candidate-dir", type=Path, required=True)
+
+    candidate_current = subparsers.add_parser(
+        "dual-lane-candidate-from-current",
+        help="build a candidate from exact ODS and epoch CURRENT descriptors",
+    )
+    candidate_current.add_argument("--config", type=Path, required=True)
+    candidate_current.add_argument("--lane-id", choices=["cn01", "hermes"], required=True)
+    candidate_current.add_argument("--market-date", type=date.fromisoformat, required=True)
+    candidate_current.add_argument("--ods-current", type=Path, required=True)
+    candidate_current.add_argument("--epoch-current", type=Path, required=True)
+    candidate_current.add_argument("--candidate-root", type=Path, required=True)
+    candidate_current.add_argument("--code-revision", required=True)
+
+    dual_accept = subparsers.add_parser(
+        "dual-lane-accept",
+        help="arbitrate lane candidates and atomically publish one OCI release set",
+    )
+    dual_accept.add_argument("--config", type=Path, required=True)
+    dual_accept.add_argument("--market-date", type=date.fromisoformat, required=True)
+    dual_accept.add_argument("--primary-candidate", type=Path)
+    dual_accept.add_argument("--standby-candidate", type=Path)
+    dual_accept.add_argument("--primary-current", type=Path)
+    dual_accept.add_argument("--standby-current", type=Path)
+    dual_accept.add_argument("--epoch-current", type=Path, required=True)
+    dual_accept.add_argument("--root", type=Path, required=True)
+    dual_accept.add_argument("--publisher-lock", type=Path)
 
     market_session = subparsers.add_parser(
         "market-session-check",
@@ -1216,6 +1302,165 @@ def main(argv: Sequence[str] | None = None) -> int:
                 pointer=args.pointer,
             )
             print(json.dumps(dws_result.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "dual-lane-policy-check":
+            policy = load_dual_lane_policy(args.config)
+            print(
+                json.dumps(
+                    {
+                        "contract_id": policy.contract_id,
+                        "digest": policy.digest,
+                        "primary_lane": policy.primary_lane,
+                        "standby_lane": policy.standby_lane,
+                        "delete_enabled": policy.delete_enabled,
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "dual-lane-epoch-publish":
+            policy = load_dual_lane_policy(args.config)
+            epoch = publish_epoch_input(
+                output=args.output,
+                epoch_id=args.epoch_id,
+                market_date=args.market_date,
+                policy=policy,
+                universe_policy_path=args.universe_policy,
+                code_validity_path=args.code_validity_mapping,
+                code_revision=args.code_revision,
+                parent_pointer=args.parent_pointer,
+                base_pointer=args.base_pointer,
+            )
+            if args.current_pointer is not None:
+                write_epoch_current(epoch, args.current_pointer)
+            print(
+                json.dumps(
+                    {
+                        "epoch_id": epoch.epoch_id,
+                        "market_date": epoch.market_date.isoformat(),
+                        "root": str(epoch.root),
+                        "manifest_sha256": epoch.manifest_sha256,
+                        "source_kind": epoch.source_kind,
+                        "source_revision": epoch.source_revision,
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "dual-lane-epoch-check":
+            epoch = verify_epoch_input(args.epoch_dir)
+            print(
+                json.dumps(
+                    {
+                        "epoch_id": epoch.epoch_id,
+                        "market_date": epoch.market_date.isoformat(),
+                        "root": str(epoch.root),
+                        "manifest_sha256": epoch.manifest_sha256,
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "dual-lane-candidate-build":
+            policy = load_dual_lane_policy(args.config)
+            candidate = build_lane_candidate(
+                output=args.output,
+                candidate_id=args.candidate_id,
+                lane_id=args.lane_id,
+                attempt_id=args.attempt_id,
+                market_date=args.market_date,
+                ods_release_dir=args.ods_release_dir,
+                epoch_root=args.epoch_dir,
+                policy=policy,
+                code_revision=args.code_revision,
+            )
+            if args.current_pointer is not None:
+                write_candidate_current(candidate, args.current_pointer)
+            print(
+                json.dumps(
+                    {
+                        "candidate_id": candidate.candidate_id,
+                        "lane_id": candidate.lane_id,
+                        "market_date": candidate.market_date.isoformat(),
+                        "root": str(candidate.root),
+                        "manifest_sha256": candidate.manifest_sha256,
+                        "candidate_content_digest": candidate.candidate_content_digest,
+                        "business_content_digest": candidate.business_content_digest,
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "dual-lane-candidate-check":
+            candidate = verify_lane_candidate(args.candidate_dir)
+            print(
+                json.dumps(
+                    {
+                        "candidate_id": candidate.candidate_id,
+                        "lane_id": candidate.lane_id,
+                        "market_date": candidate.market_date.isoformat(),
+                        "manifest_sha256": candidate.manifest_sha256,
+                        "business_content_digest": candidate.business_content_digest,
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "dual-lane-candidate-from-current":
+            policy = load_dual_lane_policy(args.config)
+            epoch = load_epoch_current(args.epoch_current)
+            preferred_attempt = None
+            if args.ods_current.is_file():
+                ods_current = json.loads(args.ods_current.read_text(encoding="utf-8"))
+                if not isinstance(ods_current, dict):
+                    raise DualLaneError("ODS CURRENT must be an object")
+                value = ods_current.get("attempt_id")
+                if not isinstance(value, str) or not value:
+                    raise DualLaneError("ODS CURRENT is missing attempt_id")
+                preferred_attempt = value
+            release_dir = select_market_daily_ods_release(
+                args.ods_current.parent,
+                market_date=args.market_date,
+                preferred_attempt=preferred_attempt,
+            )
+            attempt_id = release_dir.name
+            date_root = args.candidate_root / args.market_date.isoformat()
+            candidate_id = (
+                f"candidate-{args.lane_id}-{args.market_date.strftime('%Y%m%d')}-"
+                f"{epoch.manifest_sha256.removeprefix('sha256:')[:12]}-{attempt_id}"
+            )
+            candidate = build_lane_candidate(
+                output=date_root / candidate_id,
+                candidate_id=candidate_id,
+                lane_id=args.lane_id,
+                attempt_id=attempt_id,
+                market_date=args.market_date,
+                ods_release_dir=release_dir,
+                epoch_root=epoch.root,
+                policy=policy,
+                code_revision=args.code_revision,
+            )
+            write_candidate_current(candidate, date_root / "CURRENT.json")
+            print(json.dumps({"candidate": candidate.candidate_id}, sort_keys=True))
+        elif args.command == "dual-lane-accept":
+            policy = load_dual_lane_policy(args.config)
+            expected_epoch = load_epoch_current(args.epoch_current)
+            primary_path = args.primary_candidate
+            standby_path = args.standby_candidate
+            if args.primary_current is not None and args.primary_current.is_file():
+                primary_path = load_candidate_current(args.primary_current).root
+            if args.standby_current is not None and args.standby_current.is_file():
+                standby_path = load_candidate_current(args.standby_current).root
+            result = arbitrate_and_publish(
+                market_date=args.market_date,
+                primary_candidate_path=primary_path,
+                standby_candidate_path=standby_path,
+                root=args.root,
+                policy=policy,
+                expected_epoch=expected_epoch,
+                publisher_lock_path=args.publisher_lock,
+            )
+            print(json.dumps(result.to_dict(), ensure_ascii=True, sort_keys=True))
+            return 0 if result.status == "published" else 4
         elif args.command == "market-session-check":
             is_open = market_session_is_open(
                 calendar=args.calendar,
@@ -1246,6 +1491,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         PipelineRunError,
         ScheduleContractError,
         DailyWarehouseError,
+        DualLaneError,
         LaneRunError,
         CorporateActionCorpusError,
         CorporateActionNormalizationError,

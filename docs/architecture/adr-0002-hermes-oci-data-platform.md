@@ -1,11 +1,17 @@
 # ADR 0002: Hermes and OCI Data Platform Boundaries
 
-- Status: Accepted
+- Status: Partially superseded by ADR 0005
 - Date: 2026-07-24
 - Scope: Data acquisition, transformation, publication, and disaster recovery
 - Supersedes: The single-node deployment assumption in ADR 0001; its file-first analytical
   contracts remain in force
 - Operationalized by: ADR 0003 for recurring T-close plus five-hour processing
+
+ADR 0005 replaces this ADR's target placement of daily DWD/DWS builds and per-dataset publication
+authority with dual-lane candidate production and one OCI release-set authority. The file-first
+system-of-record, PostgreSQL, network-security, backup, and disaster-recovery decisions below
+remain accepted. Until ADR 0005's explicit cutover gate passes, the OCI-only transform path below
+also remains the live operating boundary.
 
 ## Context
 

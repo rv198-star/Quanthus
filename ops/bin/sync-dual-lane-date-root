@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Copy one immutable date root over SSH. Artifact READY markers and CURRENT arrive last.
+set -euo pipefail
+
+usage() {
+  echo "usage: $0 --direction push|pull --market-date YYYY-MM-DD --local-root PATH --remote-root PATH --host HOST --port PORT --user USER --key PATH --known-hosts PATH" >&2
+}
+
+direction=""
+market_date=""
+local_root=""
+remote_root=""
+remote_host=""
+remote_port=""
+remote_user=""
+key_path=""
+known_hosts=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --direction) direction="${2:-}"; shift 2 ;;
+    --market-date) market_date="${2:-}"; shift 2 ;;
+    --local-root) local_root="${2:-}"; shift 2 ;;
+    --remote-root) remote_root="${2:-}"; shift 2 ;;
+    --host) remote_host="${2:-}"; shift 2 ;;
+    --port) remote_port="${2:-}"; shift 2 ;;
+    --user) remote_user="${2:-}"; shift 2 ;;
+    --key) key_path="${2:-}"; shift 2 ;;
+    --known-hosts) known_hosts="${2:-}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage; exit 2 ;;
+  esac
+done
+
+if [[ "$direction" != "push" && "$direction" != "pull" ]]; then
+  usage
+  exit 2
+fi
+if [[ ! "$market_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+  echo "market date must use YYYY-MM-DD" >&2
+  exit 2
+fi
+if [[ -z "$local_root" || -z "$remote_root" || ! "$remote_root" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+  echo "local root is required and remote root must be a safe path" >&2
+  exit 2
+fi
+if [[ "/${remote_root#/}/" == *"/../"* || "$remote_root" == ".." ]]; then
+  echo "remote root must not contain parent traversal" >&2
+  exit 2
+fi
+if [[ ! "$remote_host" =~ ^[A-Za-z0-9.-]+$ || ! "$remote_port" =~ ^[0-9]{1,5}$ ]]; then
+  echo "remote host or port is invalid" >&2
+  exit 2
+fi
+if (( remote_port < 1 || remote_port > 65535 )) || [[ ! "$remote_user" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+  echo "remote port or user is invalid" >&2
+  exit 2
+fi
+if [[ ! "$key_path" =~ ^/[A-Za-z0-9._/-]+$ || ! "$known_hosts" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+  echo "key and known-hosts paths must be safe absolute paths" >&2
+  exit 2
+fi
+if [[ ! -f "$key_path" || ! -f "$known_hosts" ]]; then
+  echo "SSH key or pinned known-hosts file is missing" >&2
+  exit 2
+fi
+key_mode="$(stat -c '%a' "$key_path")"
+if [[ "$key_mode" != "400" && "$key_mode" != "600" ]]; then
+  echo "SSH key must have mode 0400 or 0600; got ${key_mode}" >&2
+  exit 2
+fi
+
+local_date_root="${local_root%/}/${market_date}"
+remote_date_root="${remote_root%/}/${market_date}"
+if [[ "$direction" == "push" ]]; then
+  if [[ ! -d "$local_date_root" || ! -f "$local_date_root/CURRENT.json" ]]; then
+    echo "local push root is not ready: ${local_date_root}" >&2
+    exit 3
+  fi
+  source_path="${local_date_root}/"
+  destination_path="${remote_user}@${remote_host}:${remote_date_root}/"
+else
+  mkdir -p "$local_date_root"
+  source_path="${remote_user}@${remote_host}:${remote_date_root}/"
+  destination_path="${local_date_root}/"
+fi
+
+ssh_command="ssh -i ${key_path} -p ${remote_port} -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${known_hosts}"
+common=(
+  -a
+  --checksum
+  --delay-updates
+  --partial-dir=.rsync-partial
+  --timeout=300
+  --mkpath
+  --protect-args
+  -e "$ssh_command"
+)
+
+# Existing immutable artifact files are never replaced. Nested READY files belong to the
+# artifact family; only each immediate child's publication READY is held for the second pass.
+rsync "${common[@]}" --ignore-existing \
+  --exclude=/CURRENT.json --exclude='/*/READY' \
+  "$source_path" "$destination_path"
+rsync "${common[@]}" --ignore-existing \
+  --include='/*/' --include='/*/READY' --exclude='*' \
+  "$source_path" "$destination_path"
+
+# CURRENT is a mutable descriptor and is copied only after every referenced child can be READY.
+rsync "${common[@]}" \
+  "${source_path}CURRENT.json" "${destination_path}CURRENT.json"
+
+echo "dual-lane ${direction} complete: market_date=${market_date} remote=${remote_user}@${remote_host}"

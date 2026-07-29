@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "contract_id": "dual-lane-dwd-dws-v1",
+  "timezone": "Asia/Shanghai",
+  "roles": {
+    "cn01": "fixed_primary_candidate_producer",
+    "hermes": "standby_candidate_producer",
+    "oci": "epoch_arbitration_ads_release_authority"
+  },
+  "schedule": {
+    "epoch_publish_time": "16:30:00",
+    "candidate_build_time": "19:50:00",
+    "arbitration_time": "20:00:00",
+    "completion_deadline": "20:30:00"
+  },
+  "runtime": {
+    "python_series": "3.10",
+    "packages": {
+      "duckdb": "1.5.5",
+      "polars": "1.43.0",
+      "pyarrow": "23.0.1",
+      "quanthus": "0.1.0.dev0"
+    }
+  },
+  "arbitration": {
+    "primary_lane": "cn01",
+    "standby_lane": "hermes",
+    "maximum_consecutive_standby_absence": 1,
+    "fallback_failure_reasons": [
+      "missing_candidate",
+      "invalid_candidate"
+    ],
+    "cross_lane_divergence_policy": "withhold_both",
+    "row_or_artifact_mixing": false
+  },
+  "publication": {
+    "consumer_pointer": "release-set_CURRENT.json",
+    "operational_ads_required": true,
+    "legacy_dataset_pointers_are_authoritative": false,
+    "postgresql_projection_authoritative": false
+  },
+  "qualification": {
+    "calibration_open_sessions": 1,
+    "qualification_open_sessions": 2,
+    "closed_session_fixtures": 1,
+    "threshold_retuning_during_qualification": false
+  },
+  "retention": {
+    "migration_mode": "copy_only",
+    "delete_enabled": false,
+    "retain_legacy_oci_ods": true,
+    "retain_legacy_dwd_dws": true,
+    "retain_all_migration_candidates": true
+  },
+  "ads": {
+    "operational_profile": "operational_daily_v1",
+    "portable_profiles": [
+      "strategy_replay",
+      "event_library",
+      "ml_training"
+    ],
+    "mandatory_year_partitioning": false,
+    "artifact_discovery": "manifest_tables_parts"
+  }
+}

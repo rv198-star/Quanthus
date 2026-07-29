@@ -18,6 +18,7 @@ a parallel current-state architecture.
 | `adr-0002-hermes-oci-data-platform.md` | Runtime ownership and publication topology | Changing node, warehouse, PG, or disaster-recovery boundaries |
 | `adr-0003-t-close-plus-5h-pipelines.md` | Daily immutable ODS-to-DWD/DWS path | Changing post-close acquisition, cleaning, gates, publication, or alerts |
 | `adr-0004-hermes-ods-scheduler-v1.md` | Repository-owned ODS lane schedule | Changing collectors, timers, cutover, or release states |
+| `adr-0005-dual-lane-canonical-and-ads-publication.md` | Dual-lane candidates, OCI canonical authority, atomic release sets, and portable ADS | Changing daily candidate ownership, arbitration, canonical catalogs, ADS portability, or target cutover |
 
 ## Topic contracts
 

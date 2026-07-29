@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# Pull both candidate date roots and let OCI's fenced publisher arbitrate once.
+set -euo pipefail
+
+if [[ -f /etc/quanthus/dual-lane-oci.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/dual-lane-oci.env
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv/bin/python}"
+policy="${QUANTHUS_DUAL_LANE_CONFIG:-${repo_root}/config/pipelines/dual-lane-dwd-dws.v1.json}"
+epoch_root="${QUANTHUS_DUAL_LANE_EPOCH_ROOT:-/home/ubuntu/data/quanthus/dual-lane/epochs}"
+incoming_root="${QUANTHUS_DUAL_LANE_INCOMING_ROOT:-/home/ubuntu/data/quanthus/dual-lane/incoming}"
+publication_root="${QUANTHUS_DUAL_LANE_PUBLICATION_ROOT:-/home/ubuntu/data/quanthus/dual-lane/publication}"
+publisher_lock="${QUANTHUS_DUAL_LANE_PUBLISHER_LOCK:-/home/ubuntu/data/quanthus/locks/t-close-plus-5h.lock}"
+pull_attempts="${QUANTHUS_DUAL_LANE_PULL_ATTEMPTS:-20}"
+pull_interval="${QUANTHUS_DUAL_LANE_PULL_INTERVAL_SECONDS:-15}"
+market_date="${1:-$(TZ=Asia/Shanghai date +%F)}"
+code_revision="${QUANTHUS_CODE_REVISION:?set QUANTHUS_CODE_REVISION to the deployed Git commit}"
+
+if [[ ! "$market_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ || ! "$code_revision" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "market date or deployed Git revision is invalid" >&2
+  exit 2
+fi
+if [[ ! "$pull_attempts" =~ ^[1-9][0-9]*$ || ! "$pull_interval" =~ ^[1-9][0-9]*$ ]]; then
+  echo "pull attempts and interval must be positive integers" >&2
+  exit 2
+fi
+if [[ ! -x "$python_bin" || ! -f "$policy" ]]; then
+  echo "dual-lane arbitration runtime or policy is missing" >&2
+  exit 2
+fi
+actual_revision="$(git -C "$repo_root" rev-parse HEAD)"
+if [[ "$actual_revision" != "$code_revision" ]]; then
+  echo "deployed checkout does not match QUANTHUS_CODE_REVISION" >&2
+  exit 2
+fi
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+mkdir -p "${incoming_root%/}/locks"
+exec 9>"${incoming_root%/}/locks/candidate-pull.lock"
+if ! flock -n 9; then
+  echo "another dual-lane candidate pull holds the lock" >&2
+  exit 3
+fi
+
+sync_root="${repo_root}/ops/bin/sync-dual-lane-date-root"
+resolver="${repo_root}/ops/bin/resolve-dual-lane-pointer"
+primary_local_root="${incoming_root%/}/cn01/candidates"
+standby_local_root="${incoming_root%/}/hermes/candidates"
+primary_current="${primary_local_root}/${market_date}/CURRENT.json"
+standby_current="${standby_local_root}/${market_date}/CURRENT.json"
+
+pull_cn01() {
+  "$sync_root" --direction pull --market-date "$market_date" \
+    --local-root "$primary_local_root" \
+    --remote-root "${QUANTHUS_CN01_DUAL_LANE_CANDIDATE_ROOT:?set CN01 candidate root}" \
+    --host "${QUANTHUS_CN01_DUAL_LANE_HOST:?set CN01 transfer host}" \
+    --port "${QUANTHUS_CN01_DUAL_LANE_PORT:-22}" \
+    --user "${QUANTHUS_CN01_DUAL_LANE_CANDIDATE_USER:?set CN01 candidate reader}" \
+    --key "${QUANTHUS_CN01_DUAL_LANE_CANDIDATE_KEY:?set CN01 candidate key}" \
+    --known-hosts "${QUANTHUS_CN01_DUAL_LANE_KNOWN_HOSTS:?set CN01 known-hosts}"
+}
+
+pull_hermes() {
+  "$sync_root" --direction pull --market-date "$market_date" \
+    --local-root "$standby_local_root" \
+    --remote-root "${QUANTHUS_HERMES_DUAL_LANE_CANDIDATE_ROOT:?set Hermes candidate root}" \
+    --host "${QUANTHUS_HERMES_DUAL_LANE_HOST:?set Hermes transfer host}" \
+    --port "${QUANTHUS_HERMES_DUAL_LANE_PORT:-2222}" \
+    --user "${QUANTHUS_HERMES_DUAL_LANE_CANDIDATE_USER:?set Hermes candidate reader}" \
+    --key "${QUANTHUS_HERMES_DUAL_LANE_CANDIDATE_KEY:?set Hermes candidate key}" \
+    --known-hosts "${QUANTHUS_HERMES_DUAL_LANE_KNOWN_HOSTS:?set Hermes known-hosts}"
+}
+
+candidate_ready() {
+  local pointer="$1"
+  local line candidate_path
+  line="$($resolver --kind candidate --pointer "$pointer" --market-date "$market_date" 2>/dev/null)" || return 1
+  IFS=$'\t' read -r _ candidate_path _ <<<"$line"
+  "$python_bin" -m quanthus dual-lane-candidate-check --candidate-dir "$candidate_path" >/dev/null 2>&1
+}
+
+for ((attempt = 1; attempt <= pull_attempts; attempt++)); do
+  pull_cn01 || echo "CN01 candidate not ready on pull attempt ${attempt}" >&2
+  pull_hermes || echo "Hermes candidate not ready on pull attempt ${attempt}" >&2
+  if candidate_ready "$primary_current" && candidate_ready "$standby_current"; then
+    break
+  fi
+  if (( attempt < pull_attempts )); then
+    sleep "$pull_interval"
+  fi
+done
+
+accept_args=(
+  "$python_bin" -m quanthus dual-lane-accept
+  --config "$policy"
+  --market-date "$market_date"
+  --epoch-current "${epoch_root%/}/${market_date}/CURRENT.json"
+  --root "$publication_root"
+  --publisher-lock "$publisher_lock"
+)
+if [[ -f "$primary_current" ]]; then
+  if primary_line="$($resolver --kind candidate --pointer "$primary_current" --market-date "$market_date")"; then
+    IFS=$'\t' read -r _ primary_path _ <<<"$primary_line"
+    accept_args+=(--primary-candidate "$primary_path")
+  else
+    accept_args+=(--primary-candidate "${primary_local_root}/${market_date}/.invalid-current")
+  fi
+fi
+if [[ -f "$standby_current" ]]; then
+  if standby_line="$($resolver --kind candidate --pointer "$standby_current" --market-date "$market_date")"; then
+    IFS=$'\t' read -r _ standby_path _ <<<"$standby_line"
+    accept_args+=(--standby-candidate "$standby_path")
+  else
+    accept_args+=(--standby-candidate "${standby_local_root}/${market_date}/.invalid-current")
+  fi
+fi
+
+"${accept_args[@]}"

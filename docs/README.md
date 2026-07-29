@@ -57,6 +57,16 @@ nodes.
   semantic input. They are not reasons to extend the frozen P3 fixture.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
   evidence; forward email transport remains P6 work. P4 and later keep their existing gates.
+- ADR 0005 accepts the dual-lane data-platform target under `META-DATA-PIPE-003`: CN01 produces the
+  fixed-primary DWD/DWS candidate, Hermes produces the standby candidate, and OCI alone owns epoch
+  arbitration, canonical catalogs, operational ADS, and the sole consumer release-set `CURRENT`.
+  Contract/shadow implementation is open, but the legacy OCI full-ODS pull/build path remains live
+  until an explicit cutover gate passes. Migration is copy-only; no existing data or evidence may
+  be deleted. The delivered slice covers daily bars/status/summary candidates and a limited
+  three-table research-only operational ADS. Portable research ADS, full PIT/tradability and clock
+  gates, and correction/revocation/rollback workflows remain accepted target design, not delivered
+  capability. The target portable layout uses manifest-discovered semantic parts without mandatory
+  annual directories and does not open arbitration/blind scopes.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional
@@ -82,15 +92,16 @@ gate is a conformance defect rather than an alternate project state.
 | Task | Required context | Add only when needed |
 | --- | --- | --- |
 | P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
-| P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004, relevant acceptance file |
-| ODS or daily operations | this map, architecture index, ADR 0003/0004, selected runbook | Exact config, service, and contract tests |
+| P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004/0005, relevant acceptance file |
+| ODS or daily operations | this map, architecture index, ADR 0003/0004/0005, selected runbook | Exact config, service, and contract tests |
+| Dual-lane candidate or ADS publication | root `AGENTS.md`, this map, HLD, ADR 0005, LLD 01 | Exact epoch/candidate/release config and contract tests; `operations/dual-lane-data-platform-runbook.md` for shadow/migration; cutover remains separately gated |
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child | Exact strategy, P1 snapshot input, and P2 execution evidence |
 | P3 governed strategy implementation | root `AGENTS.md`, this map, selected `design/strategies/` card, LLD 03/04/05, accepted P2 interfaces | LLD 10 for decision/funnel evidence; exact feature, label, policy, and industry-map inputs |
-| P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | Exact frozen candidate source, label cards, split policy, and P3 replay evidence |
+| P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | ADR 0005 and LLD 01 only when producing/consuming portable ADS; exact frozen candidate source, label cards, split policy, and P3 replay evidence |
 
 ## Authority and conflicts
 

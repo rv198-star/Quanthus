@@ -4,8 +4,9 @@
   "contract_revision": "hermes-1730-window-gated-20260729",
   "timezone": "Asia/Shanghai",
   "ownership": {
-    "hermes": "immutable_ods_only",
-    "oci": "dwd_dws_ads_and_pg_publication",
+    "hermes": "immutable_ods_and_standby_dwd_dws_candidate",
+    "cn01": "immutable_ods_and_primary_dwd_dws_candidate",
+    "oci": "epoch_arbitration_ads_release_and_pg_publication",
     "hermes_direct_curated_pg_writes": false
   },
   "publication": {

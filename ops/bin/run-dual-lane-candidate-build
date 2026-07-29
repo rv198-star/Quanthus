@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Build one lane-local immutable DWD/DWS candidate from exact ODS and epoch CURRENT descriptors.
+set -euo pipefail
+
+if [[ -f /etc/quanthus/dual-lane-node.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/dual-lane-node.env
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv-p1/bin/python}"
+policy="${QUANTHUS_DUAL_LANE_CONFIG:-${repo_root}/config/pipelines/dual-lane-dwd-dws.v1.json}"
+lane_id="${QUANTHUS_DUAL_LANE_NODE_ID:?set QUANTHUS_DUAL_LANE_NODE_ID to cn01 or hermes}"
+ods_root="${QUANTHUS_DUAL_LANE_ODS_RELEASE_ROOT:?set the lane-local ODS release root}"
+epoch_ingress_root="${QUANTHUS_DUAL_LANE_EPOCH_INGRESS_ROOT:?set the lane-local epoch ingress root}"
+epoch_root="${QUANTHUS_DUAL_LANE_EPOCH_ROOT:?set the lane-local epoch root}"
+candidate_root="${QUANTHUS_DUAL_LANE_CANDIDATE_ROOT:?set the lane-local candidate root}"
+wait_seconds="${QUANTHUS_DUAL_LANE_INPUT_WAIT_SECONDS:-600}"
+poll_seconds="${QUANTHUS_DUAL_LANE_INPUT_POLL_SECONDS:-10}"
+market_date="${1:-$(TZ=Asia/Shanghai date +%F)}"
+code_revision="${QUANTHUS_CODE_REVISION:?set QUANTHUS_CODE_REVISION to the deployed Git commit}"
+
+if [[ "$lane_id" != "cn01" && "$lane_id" != "hermes" ]]; then
+  echo "dual-lane node id must be cn01 or hermes" >&2
+  exit 2
+fi
+if [[ ! "$market_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ || ! "$code_revision" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "market date or deployed Git revision is invalid" >&2
+  exit 2
+fi
+if [[ ! "$wait_seconds" =~ ^[0-9]+$ || ! "$poll_seconds" =~ ^[1-9][0-9]*$ ]]; then
+  echo "input wait and poll seconds must be nonnegative integers" >&2
+  exit 2
+fi
+if [[ ! -x "$python_bin" || ! -f "$policy" ]]; then
+  echo "dual-lane candidate runtime or policy is missing" >&2
+  exit 2
+fi
+actual_revision="$(git -C "$repo_root" rev-parse HEAD)"
+if [[ "$actual_revision" != "$code_revision" ]]; then
+  echo "deployed checkout does not match QUANTHUS_CODE_REVISION" >&2
+  exit 2
+fi
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+mkdir -p "${candidate_root%/}/locks"
+exec 9>"${candidate_root%/}/locks/candidate-builder.lock"
+if ! flock -n 9; then
+  echo "another lane-local candidate builder holds the lock" >&2
+  exit 3
+fi
+
+ods_current="${ods_root%/}/daily/${market_date}/CURRENT.json"
+epoch_current="${epoch_root%/}/${market_date}/CURRENT.json"
+resolver="${repo_root}/ops/bin/resolve-dual-lane-pointer"
+promoter="${repo_root}/ops/bin/promote-dual-lane-epoch"
+deadline=$((SECONDS + wait_seconds))
+epoch_line=""
+while true; do
+  if "$promoter" "$market_date" >/dev/null 2>&1 && \
+     epoch_line="$($resolver --kind epoch --pointer "$epoch_current" --market-date "$market_date" 2>/dev/null)" && \
+     [[ -d "${ods_current%/CURRENT.json}" ]]; then
+    break
+  fi
+  if (( SECONDS >= deadline )); then
+    echo "timed out waiting for exact ODS and epoch CURRENT descriptors" >&2
+    exit 3
+  fi
+  sleep "$poll_seconds"
+done
+
+IFS=$'\t' read -r epoch_id _ _ <<<"$epoch_line"
+
+"$python_bin" -m quanthus dual-lane-policy-check --config "$policy"
+while ! "$python_bin" -m quanthus dual-lane-candidate-from-current \
+  --config "$policy" \
+  --lane-id "$lane_id" \
+  --market-date "$market_date" \
+  --ods-current "$ods_current" \
+  --epoch-current "$epoch_current" \
+  --candidate-root "$candidate_root" \
+  --code-revision "$code_revision"; do
+  if (( SECONDS >= deadline )); then
+    echo "timed out selecting a complete market-daily ODS attempt" >&2
+    exit 4
+  fi
+  sleep "$poll_seconds"
+done
+
+echo "dual-lane candidate READY: lane=${lane_id} market_date=${market_date} epoch=${epoch_id}"

@@ -9,6 +9,8 @@
 | Governing requirements | FR-DATA-001 through FR-DATA-006 |
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
+| Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
+| Dual-lane delivery | contract/shadow implementation open; consumer cutover blocked pending evidence and `GO_FOR_CUTOVER` |
 
 ## 1. Goal
 
@@ -46,6 +48,10 @@ keys from independently checksummed raw evidence.
 | Normalized | Rebuildable/versioned | Canonical columns, types, lifecycle, and source revision |
 | Curated | Versioned | Adjustment factors, tradability, gaps, and derived state |
 | Snapshot | Immutable | Atomic dataset references at a knowledge cutoff |
+| Lane candidate | Immutable | One epoch-bound DWD/DWS/PIT family produced from one lane's ODS |
+| Canonical catalog | Immutable | OCI acceptance records and a market-date to generation mapping |
+| Operational ADS | Immutable | Release-profile output bound to an exact catalog and generation subset |
+| Research bundle | Immutable | Self-contained, scope-authorized semantic tables for replay or training |
 
 Raw files never receive in-place corrections. A source correction creates a new revision and
 new downstream snapshot id.
@@ -192,9 +198,138 @@ non-point-in-time limitation must be present in lineage. It cannot enable the se
 ### `dataset_manifest`
 
 Include dataset name/version, source revisions, row count, partitions, schema hash, content
-checksums, creation time, knowledge cutoff, and parent manifests.
+checksums, creation time, knowledge cutoff, and parent manifests. Portable manifests use safe
+bundle-relative paths only and reject external links or producer-local database/path references.
 
-## 5. Snapshot interface
+`content_digest` covers deterministic data, schema, exact upstream inputs, and policy. Volatile
+timestamps are excluded. `manifest_digest` identifies one exact immutable revision envelope, while
+the idempotency key binds the epoch, exact inputs, and policy used to recognize a retry. Results
+bind an exact revision and manifest digest; reproducibility compares content digests.
+
+## 5. Dual-lane daily publication
+
+### 5.1 Epoch and candidate family
+
+OCI publishes one immutable arbitration epoch input for each market date. It binds the expected
+canonical parent or historical base, every shared reference/PIT input, and the transform, runtime,
+schema, gate, clock, schedule, and arbitration contracts. Both lanes must verify the same epoch
+manifest before building. A parent/reference mismatch or any attempt to infer a new `security_id`
+makes the candidate ineligible.
+
+The target candidate family contains DWD, its exact lineage-bound DWS projection, and every
+required lane-bound PIT/status/tradability artifact. The delivered v1 slice is narrower: CN01 and
+Hermes each produce DWD daily bars, DWD daily status observations, and one DWS daily market summary
+from their own ODS. The v1 `pit_cutoff` source-time check is not a full PIT/tradability family.
+`READY` is written last. Candidate ids are immutable and attempt sequencing is monotonic within
+`(lane_id, market_date)`; a rerun does not reuse an id with different lineage.
+
+### 5.2 Independent gates and arbitration
+
+OCI validates each candidate independently before cross-lane comparison. Integrity, identity, PIT,
+coverage, schema, clock, and business-quality failures are lane-local evidence and cannot be
+repaired with rows or gate results from the peer candidate.
+
+That sentence defines the target gate family. The delivered v1 slice verifies integrity,
+lineage/identity, source cutoff, schema, coverage, business equivalence, epoch/runtime/reference
+binding, and fixed-primary arbitration for its three artifacts. Full PIT/tradability gates and an
+enforced clock-health/skew gate remain open and must not be inferred from epoch metadata or
+timestamps alone.
+
+CN01 is accepted when its eligible candidate is ready by cutoff and passes every independent hard
+gate. Hermes is eligible only after an independently established CN01 missing, late, unverifiable,
+or hard-gate failure and must pass the same gates itself. If both pass but an unresolved material
+difference remains, the epoch ends as `withheld_unattributed_divergence`; OCI publishes neither.
+Arrival order, favorable prices/returns, and whole-file hash proximity are never selection rules.
+
+A fenced lease plus compare-and-swap permits at most one accepted generation for an automatic
+epoch. Late, duplicate, and stale attempts remain evidence and cannot reopen it. Closed/open
+calendar disagreement, excessive clock skew, or parent/reference/runtime drift blocks both lanes.
+
+### 5.3 Acceptance, catalog, and release set
+
+The publication graph is strictly one-way:
+
+```text
+candidate -> acceptance record -> catalog snapshot -> operational ADS
+          -> release set -> publication intent -> release-set CURRENT
+```
+
+An immutable acceptance record binds one selected market-date generation, its complete lane family,
+all source and reference lineage, independent gates, reason, digests, and `accepted_at`. It does not
+refer to a future ADS or release set. A catalog snapshot maps each included market date to one
+accepted, non-revoked generation and is never independently promoted.
+
+An operational ADS revision binds one exact catalog snapshot and the exact generation subset it
+read. The release-set manifest binds that catalog, the release profile's required canonical inputs,
+and every mandatory operational ADS output. OCI seals all members and release-set `READY`, then
+writes an immutable `release_set_publication_intent` before atomically advancing
+`release-set_CURRENT.json`, the only consumer-visible pointer. The intent binds the prior/new
+release-set identity and new manifest digest. Its `published_at` field records intent creation and
+does not prove that `CURRENT` advanced; `CURRENT` is the commit point and binds the intent path and
+digest. A crash may leave an intent with no new consumer publication, and retry validates and
+reuses that intent. The delivered contract emits no separate post-CAS success record.
+Compatibility dataset pointers are projections only and cannot authorize or compose a consumer
+view.
+
+If ADS build or validation fails, the acceptance record remains internal evidence but no catalog,
+ADS, or DWD/DWS-only state becomes consumer-visible. The legacy and target publishers share one
+fenced single-writer lease; target cutover first quiesces and fences the legacy writer.
+
+### 5.4 ADS lifecycle and layout
+
+Operational ADS participates in one atomic OCI release profile. A portable research bundle is a
+separate frozen revision assembled from an exact catalog snapshot for `strategy_replay`,
+`event_library`, or `ml_training`; it has no `CURRENT` and resolves no mutable pointer after
+construction.
+
+The delivered `operational_daily_v1` ADS is only a bounded migration projection. It contains the
+three decision-visible tables `market_daily`, `market_status`, and `market_summary`, and its
+manifest is `research_only=true` and `execution_authorized=false`. It is not the portable research
+bundle contract described below and does not yet supply strategy replay, event-library, feature,
+label, execution-runner, or training surfaces.
+
+The initial portable layout has no mandatory calendar-year directories. Each semantic table is
+date-sorted where applicable and exposes one or a small number of parts through
+`tables[].parts[]`. A part declares its role, safe relative path, SHA-256, size, row count, schema
+hash, date bounds, and sort keys. Consumers use the manifest rather than globbing filenames or
+inferring semantics from partitions. A future size-based layout requires measured evidence and a
+new immutable bundle revision.
+
+Decision-visible, runner-only execution, and label-only outcome tables are separate evidence
+surfaces. Development, arbitration, permanent-blind, and forward-simulation scopes are physically
+separate authorized bundles. Warm-up context cannot become a sample; a horizon crossing a sealed
+scope is excluded or right-censored without reading that scope. P4/P5 own event, label, feature,
+target, split, and model semantics, while this LLD owns the common publication envelope.
+
+Each source input retains its original `knowledge_cutoff`; candidate readiness, acceptance, bundle
+build, and release publication are separate timestamps. Historical replay uses per-decision PIT
+snapshots even when its bundle is built later. Forward/operational decisions additionally require
+the release set to be resolved from `release-set_CURRENT.json` and its bound
+`published_at <= decision_time`; a publication intent alone is insufficient.
+
+### 5.5 Correction and retention
+
+A late primary after fallback is either `late_equivalent` with no republication or a
+`correction_proposed` record that changes no pointer. Approval creates a new generation with
+supersession, authority, policy, and diff evidence. A corrected historical date cannot enter a new
+catalog while publication-critical successors still depend on the old generation; required
+DWS/PIT, operational ADS, and active serving projections are rebuilt or explicitly revalidated.
+
+Existing frozen research bundles/results remain immutable retained descendants. Impact,
+supersession, or revocation is recorded separately and does not force their rewrite or block an
+operational release. A revoked generation cannot enter a newly published or rollback-selected
+release set.
+
+ADR 0005 implementation is copy-only. Existing ODS, OCI mirrors, DWD/DWS, ADS, pointers, logs, and
+evidence are not deleted, moved destructively, or reused as staging. The exact accepted ODS rebuild
+basis must have a failure-independent recovery copy before cutover. Any future deletion requires a
+separate reviewed decision and is not authorized by this work item.
+
+The correction, successor revalidation, revocation, and rollback rules above remain target
+contracts. The current implementation only refuses to replace an existing date generation without
+an explicit correction policy; that guard is not a correction, revocation, or rollback workflow.
+
+## 6. Snapshot interface
 
 Conceptual call:
 
@@ -214,31 +349,45 @@ than the requested cutoff, and fails on ambiguity. It returns `market_date`,
 bound to that snapshot. A held security with missing data produces no synthetic structural-break
 value.
 
-## 6. Pipeline sequence
+Under the target publisher, a consumer first resolves one release-set `CURRENT`, then uses only the
+catalog and snapshot ids bound by that release set. It never resolves DWD, DWS, PIT, or ADS pointers
+independently. Historical reconstruction may publish a snapshot after the historical date, but its
+per-row and per-decision information must still satisfy the requested historical cutoff. A forward
+decision additionally requires the bound release set to have been published by its decision time.
 
-1. Acquire and checksum source payloads.
-2. Normalize identities, dates, numeric units, and source metadata.
-3. Reconcile the exchange calendar and security lifecycle.
-4. Build adjustment factors and tradability state.
-5. Run schema, invariant, gap, and cross-source checks.
-6. Publish canonical partitions and immutable manifests.
-7. Build and gate a lineage-bound DWS market summary from the accepted daily DWD revision.
-8. Advance the DWD and DWS dataset pointers; downstream snapshot materialization remains governed
-   by the snapshot interface.
+## 7. Pipeline sequence
 
-Each stage is idempotent by input manifest and transformation version.
+The ADR 0005 target daily sequence is:
 
-Recurring production execution follows ADR 0003. Hermes separates issue-bound historical
-bootstrap work from daily/weekly ODS acquisition and writes READY only after an immutable release
-manifest. OCI runs the versioned `t-close-plus-5h-v1` stages, builds both the normalized daily DWD
-partition and its DWS market summary, gates both revisions, and then advances their dataset
-pointers. The DWS manifest binds the exact DWD revision and manifest checksum; it is a rebuildable
-projection rather than an alternative canonical bar source. The accepted P1 full-history DWD
-remains the base; daily T partitions are chained above it without copying the full history. Closed
-sessions are evidenced by the release calendar and recorded as clean skips. Minute and
-partial-session data are not inputs to this pipeline version. Terminal email delivery occurs only
-after the durable run ledger is written; a notification failure is recorded but does not change a
-successful data result.
+1. OCI seals and copies the exact epoch parent/base, shared references, and frozen policies to both
+   lanes.
+2. CN01 and Hermes independently acquire/checksum ODS and build complete immutable candidate
+   families with `READY` last.
+3. OCI copies and verifies candidates, then runs every lane's hard gates independently.
+4. OCI compares only independently valid candidates and applies fixed-primary/fallback arbitration.
+5. OCI copies the selected family into canonical storage and seals an acceptance record.
+6. OCI creates a new catalog snapshot, builds and gates required operational ADS, and seals one
+   complete release-set manifest.
+7. OCI seals an immutable publication intent, then atomically advances only release-set `CURRENT`;
+   the latter is the consumer-visible commit point.
+8. Optional PostgreSQL projections and portable research bundles consume exact immutable release or
+   catalog ids; neither can establish canonical truth.
+
+Each stage is idempotent by exact input manifests, frozen policy, and idempotency key. A failure
+before the final compare-and-swap exposes no partial new consumer release.
+
+Until target cutover, recurring production continues to follow ADR 0003. OCI selects and pulls one
+immutable ODS handoff, builds the normalized daily DWD partition and lineage-bound DWS projection,
+gates both, and advances the legacy pointers. Target candidates, catalogs, ADS, and release sets
+live under separate roots and cannot alter those pointers. The cutover gate requires accepted
+shadow/failure evidence, recovery and rollback rehearsal, a fenced legacy writer, and explicit
+`GO_FOR_CUTOVER`.
+
+Under both paths, DWS binds the exact DWD revision and manifest checksum and is never an alternative
+normalized source. The accepted P1 full-history DWD remains the base. Closed sessions are evidenced
+by the release calendar and recorded as clean skips. Minute and partial-session data are not inputs
+to the current daily profile. Terminal email occurs only after the durable run ledger; delivery
+failure is recorded but does not change the data result.
 
 For an open session, daily acquisition first requires BaoStock to return the target date for all
 three contract indices. Empty successful responses are availability evidence and never trigger an
@@ -258,8 +407,9 @@ window cannot silently turn into an unplanned third observation.
 | Mixed-unit corporate-action audit and immutable replay revision | `src/quanthus/corporate_action_normalization.py`, `src/quanthus/corporate_action_corpus.py`, `src/quanthus/corporate_action_revision.py`, `src/quanthus/historical_replay_snapshot.py`, `config/p1-corporate-action-normalization.v2.json` | `tests/unit/test_corporate_action_normalization.py`, `tests/unit/test_corporate_action_corpus.py`, `tests/unit/test_corporate_action_revision.py`, `docs/acceptance/p1-corporate-action-normalization-audit-20260728.md` |
 | Immutable ODS handoff and daily DWD/DWS | `src/quanthus/pipelines/`, `config/pipelines/` | `tests/unit/test_ods_handoff.py`, `tests/unit/test_pipeline_runner.py`, `tests/p1/test_daily_warehouse.py` |
 | Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
+| Dual-lane v1 epoch, daily bars/status/summary candidates, fixed-primary arbitration, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; full target and cutover acceptance evidence remains open |
 
-## 7. Work items
+## 8. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
@@ -275,6 +425,7 @@ window cannot silently turn into an unplanned third observation.
 | P1-ACCEPT-001 | Run Chapter 01 acceptance suite | C1/C2/S1 and snapshot | D1/D2/D3 evidence bundle |
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | Accepted file-first platform | Open/closed-session rehearsals and durable run ledger |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | META-DATA-PIPE-001 accepted | Shadow run, explicit cutover, rollback, and no overlapping writers |
+| META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI arbitration, atomic release sets, and portable ADS | META-DATA-PIPE-001, ADR 0005 | Contract tests, shadow comparison, failure/recovery drills, and explicit cutover evidence |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |
 | P1-DATA-004 | Normalize mixed-unit corporate actions for continuous historical replay | C1, S4, P1-SNAPSHOT-001 | Deterministic authority audit, fully versioned per-security exceptions, and immutable replay input bundle |
@@ -287,7 +438,9 @@ keys; they are never a blanket delisting exemption. No report may present a susp
 history as a missing history. The report and the frozen universe-policy version are required
 acceptance evidence.
 
-## 8. Acceptance
+## 9. Acceptance
+
+### P1 historical baseline
 
 - **D1**: 10 historical dates by 10 securities replay against independent references.
 - **D2**: 20 known limit or suspension dates reconcile exactly.
@@ -311,3 +464,28 @@ cannot silently turn them into a passed blocker.
 The gate file and evidence bundle now record this conditional acceptance, so P2 implementation is
 open. A future gate regression or invalidated evidence bundle blocks further P2 promotion; prose
 in this document cannot keep the gate open by itself.
+
+### `META-DATA-PIPE-003` target delivery
+
+The bounded v1 contract slice covers immutable epochs, daily bars/status/summary candidates,
+fixed-primary selection and fail-closed divergence, catalog and release-set construction, limited
+operational ADS, pre-CAS publication intent, atomic `CURRENT`, and idempotent retry. Unit coverage
+for that slice is implementation evidence only; shadow migration, full target delivery, and
+production cutover remain open.
+
+Production cutover remains blocked until all of the following have stable evidence:
+
+- both lanes build portable candidate families from the same epoch parent/reference/runtime inputs;
+- independent-gate, fixed-primary, fallback, both-failed, unresolved-divergence, clock/calendar
+  drift, late/duplicate, and no-mixing fixtures pass;
+- copied candidates and ADS verify without original host paths or network/database access;
+- crash/concurrency injection exposes only an old or new complete release set and proves legacy and
+  target writers cannot overlap;
+- historical and operational PIT time rules, correction/successor/revocation, and rollback pass;
+- development bundles contain no arbitration/blind artifacts and reproduce a bound replay result;
+- retained canonical inputs rebuild ADS without live lanes, and exact accepted ODS evidence survives
+  one producer-node loss; and
+- `GO_FOR_CUTOVER` is explicit, target roots remain separate, and every legacy artifact is retained.
+
+No success in this subsection authorizes deletion. Retention cleanup requires a separate design and
+reviewed execution decision.

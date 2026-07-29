@@ -5,7 +5,7 @@
 | Design status | approved |
 | Delivery gate | not-applicable |
 | Current phase | P4 implementation open |
-| Version | 0.7 |
+| Version | 0.8 |
 | Effective date | 2026-07-29 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
@@ -56,37 +56,58 @@ outside automated execution; no broker adapter exists in the near-term profile.
 
 ## 3. Data platform and storage design
 
-P1 uses a file-first analytical architecture distributed across Hermes and OCI:
+The approved target is a file-first analytical architecture distributed across CN01, Hermes, and
+OCI:
 
-- Hermes on PVE acquires external data and owns immutable raw/ODS evidence, request metadata,
-  watermarks, checksums, and append-only landing batches.
-- OCI is the primary development and analytical runtime. It owns DWD normalization, DWS/PIT
-  computation, ADS/data-mart builds, quality gates, acceptance, and version publication.
-- The recurring daily path publishes an identity-normalized DWD partition and a lineage-bound,
-  rebuildable DWS market summary. Each revision is immutable and each dataset's `CURRENT` update
-  is atomic under its own contract; DWD remains the canonical normalized record.
-- Daily BaoStock acquisition is provider-readiness gated: Hermes tests the earliest usable window
-  while CN01 tests a fixed late window. Both require the complete target-date sentinel-index set
-  before scanning stocks, bound socket and retry behavior, and publish no READY on any coverage gap.
-  A contract-defined systemd activation grace rejects elapsed-window timer replays before they can
-  create an acquisition attempt.
-- Canonical normalized and derived tables are versioned Parquet datasets partitioned by market
-  date where appropriate. DuckDB provides local SQL and snapshot materialization on OCI.
-- Polars/PyArrow implement typed transformations and validation.
-- Metadata, manifests, and small registries may use JSON before a transactional catalog is needed.
-- PostgreSQL contains indexed, rebuildable serving projections. It is not the canonical system
-  of record and is not the execution venue for full-history transformations.
+- CN01 is the fixed-primary daily lane and Hermes is a continuously exercised standby. Each owns
+  its immutable raw/ODS evidence and builds one complete DWD/DWS candidate family from its own ODS
+  against the exact epoch parent and shared reference set supplied by OCI. Neither lane can publish
+  canonical data, ADS, PostgreSQL projections, or consumer pointers.
+- OCI owns arbitration epochs, independent candidate gates, cross-lane comparison, canonical
+  acceptance/catalogs, ADS builds, atomic release sets, and serving publication. CN01 remains
+  primary regardless of readiness order or favorable output. Hermes may replace it only after an
+  independently established primary failure; unresolved material divergence blocks both lanes.
+- A canonical acceptance record selects one complete lane family without mixing DWD, DWS, or
+  lane-bound PIT artifacts. A versioned catalog snapshot maps market dates to accepted generations.
+  Operational ADS is built from an exact catalog snapshot and required generation subset.
+- One release-set manifest binds the catalog, canonical inputs, and required operational ADS.
+  `release-set_CURRENT.json` is the sole consumer publication pointer; compatibility dataset
+  pointers are non-authoritative projections and cannot be joined independently.
+- Portable research ADS bundles are self-contained, immutable, manifest-bound inputs for replay,
+  P4 event research, and later P5 training. Initial bundles use semantic `tables[].parts[]` without
+  mandatory calendar-year directories. Development, arbitration, blind, and forward scopes are
+  issued as physically separate authorized bundles.
+- Daily acquisition remains provider-readiness gated. Both lanes require the complete target-date
+  sentinel-index set before scanning stocks, bounded socket/retry behavior, and no `READY` on any
+  coverage gap. Contract-defined activation grace rejects elapsed-window timer replays.
+- Canonical and derived artifacts are versioned Parquet with portable relative-path manifests.
+  DuckDB, Polars, and PyArrow provide local query, typed transformation, and validation.
+- PostgreSQL contains indexed, rebuildable serving projections. It is not a canonical system of
+  record and is not the execution venue for full-history transformations.
 
-P1/P2 computation and replay do not depend on PostgreSQL availability once exact source
-revisions have been mirrored to OCI. OCI normally publishes accepted, versioned outputs to PG;
+This is the approved target boundary, not a claim that every listed surface is delivered. The
+current dual-lane contract slice covers DWD daily bars, DWD daily status observations, one DWS
+daily market summary, fixed-primary arbitration, and a limited research-only operational ADS with
+`market_daily`, `market_status`, and `market_summary`. Full PIT/tradability candidate families,
+clock-health enforcement, correction/revocation/rollback workflows, and portable research bundles
+remain open target gates.
+
+The legacy OCI full-ODS pull/build path remains live until ADR 0005's shadow, fencing, recovery,
+rollback, and explicit `GO_FOR_CUTOVER` gates pass. Target work is copy-only and uses separate
+roots; no existing ODS, DWD/DWS, ADS, pointer, log, or evidence may be deleted or reused as staging.
+
+P1/P2 computation and replay do not depend on PostgreSQL availability once bound to an accepted
+snapshot or self-contained research bundle. OCI publishes accepted release-set projections to PG;
 Hermes may directly append only small ODS landing tables. Notebooks never own canonical
 transformation logic.
 
 PostgreSQL may remain on PVE initially. If it later moves, OCI is the writable primary and PVE
 is a read-only streaming standby, while Hermes retains the internal raw-evidence copy.
 Replication is not a backup, so independent base backups, WAL archiving, PITR, and restore
-drills are required. Detailed ownership, network, publication, and migration rules are frozen
-in `docs/architecture/adr-0002-hermes-oci-data-platform.md`.
+drills are required. Detailed PostgreSQL, network, and recovery boundaries remain in
+`docs/architecture/adr-0002-hermes-oci-data-platform.md`; dual-lane ownership, canonical
+publication, and ADS portability are governed by
+`docs/architecture/adr-0005-dual-lane-canonical-and-ads-publication.md`.
 
 ## 4. Canonical daily sequence
 
@@ -153,6 +174,12 @@ Every feature and decision references:
 - `source_revision`;
 - immutable `snapshot_id`.
 
+A forward or operational decision additionally binds the consumer release-set id resolved from
+`release-set_CURRENT.json` and its bound `published_at` no later than the decision time. An
+uncommitted publication intent is insufficient. Historical replay instead binds each decision to
+its historical PIT snapshot; the later time at which a portable bundle was assembled is not
+historical knowledge.
+
 ### Decision contract
 
 - Scoring: signal, confidence, evidence.
@@ -168,6 +195,10 @@ schedule version, and window ids; target activation must version the executable 
 before those fields become required. Operational pipelines and signal delivery record terminal
 notification outcomes without persisting notification credentials. A report without its manifest
 is not an official result.
+
+A replay or training run also binds the exact research-bundle revision, manifest digest, content
+digest, authorization/split digest, and runner or trainer version. It never resolves a mutable
+pointer after the run starts.
 
 ## 6. Vertical-slice release
 
@@ -204,13 +235,16 @@ hypotheses remain separately governed and the later validation partitions remain
 ## 7. Reliability and failure behavior
 
 - Missing or invalid data blocks new entries and alerts; held positions take no synthetic action.
-- Every batch is idempotent by run id, source revision, and output partition.
+- Every batch is idempotent by frozen inputs, policy, and its declared idempotency key.
 - Candidate ordering is score descending, then security code ascending.
-- Repeated runs over the same immutable inputs must produce byte-equivalent canonical records.
+- Repeated runs over the same immutable inputs must reproduce the deterministic content digest;
+  exact results remain bound to one immutable revision and manifest digest.
 - Partially published snapshots are never visible to downstream decisions.
-- The daily DWD and DWS revisions both pass their gates before publication begins. Notification
-  delivery is secondary: its failure is recorded for monitoring but does not roll back accepted
-  data.
+- Each lane candidate passes independent gates before comparison. Consumers see only an old or new
+  complete release set after the sole `CURRENT` compare-and-swap; canonical acceptance without a
+  valid operational ADS remains internal evidence.
+- Notification delivery is secondary: its failure is recorded for monitoring but does not roll
+  back an accepted data release.
 - A signal email is never execution evidence. Simulated, notified, and manually confirmed states
   cannot share a fill or position record by implication.
 
@@ -224,8 +258,9 @@ hypotheses remain separately governed and the later validation partitions remain
   reconciliation before it enters the actual ledger.
 - OCI-to-PVE database writes use a private overlay/tunnel or TLS with certificate verification;
   public write connections using `sslmode=disable` are prohibited.
-- Runtime database roles separate Hermes append-only ODS ingestion, OCI publication, migrations,
-  and read-only consumption.
+- Runtime roles separate CN01/Hermes ODS and candidate production, OCI canonical/ADS/serving
+  publication, migrations, and read-only consumption. Lane nodes possess no OCI publication
+  credential or path authority.
 - The private GitHub repository stores code, configuration, tests, and approved documentation.
 - CI validates policy, gates, imports, and deterministic bootstrap tests.
 
@@ -242,3 +277,7 @@ contracts are indexed by `docs/design/lld/README.md` and defined under
 `docs/design/lld/01-data-foundation.md` through `docs/design/lld/10-monitoring-attribution.md`.
 Stable work-item ids connect each design section to code, tests, acceptance evidence, and GitHub
 issues.
+
+The data-foundation target topology and transition authority are decided by
+`docs/architecture/adr-0005-dual-lane-canonical-and-ads-publication.md`; LLD 01 owns its manifests,
+state transitions, failure behavior, and module acceptance.

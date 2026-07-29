@@ -1,11 +1,16 @@
 # ADR 0004: Hermes ODS Scheduler Version 1
 
-- Status: Accepted for shadow deployment
+- Status: Accepted for the current ODS schedule; candidate-build boundary amended by ADR 0005
 - Date: 2026-07-25
 - Last reconciled: 2026-07-28
 - Scope: Recurring acquisition and reconciliation on Hermes and CN01 ODS nodes
 - Contract: `config/schedules/hermes-ods-schedule.v1.json`
 - Migration tracking: GitHub issue #41
+
+ADR 0005 retains this acquisition schedule and immutable ODS contract but permits CN01 and Hermes
+to build complete DWD/DWS candidate families after acquisition. Lane candidates have no canonical,
+ADS, PostgreSQL, or consumer-publication authority. The ODS-only statement below remains the live
+boundary until ADR 0005's explicit cutover and is then superseded only for candidate production.
 
 ## Context
 

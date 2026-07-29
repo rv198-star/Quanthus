@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# Validate one OCI or candidate-node deployment without changing files, units, or remote state.
+set -euo pipefail
+
+usage() {
+  echo "usage: $0 oci|node" >&2
+}
+
+role="${1:-}"
+if [[ "$role" != "oci" && "$role" != "node" ]] || (( $# != 1 )); then
+  usage
+  exit 2
+fi
+
+if [[ "$role" == "oci" && -f /etc/quanthus/dual-lane-oci.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/dual-lane-oci.env
+elif [[ "$role" == "node" && -f /etc/quanthus/dual-lane-node.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/dual-lane-node.env
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+if [[ "$role" == "node" ]]; then
+  python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv-p1/bin/python}"
+else
+  python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv/bin/python}"
+fi
+policy="${QUANTHUS_DUAL_LANE_CONFIG:-${repo_root}/config/pipelines/dual-lane-dwd-dws.v1.json}"
+code_revision="${QUANTHUS_CODE_REVISION:?set QUANTHUS_CODE_REVISION to the deployed Git commit}"
+
+fail() {
+  echo "dual-lane doctor: $*" >&2
+  exit 2
+}
+
+require_canonical_dir() {
+  local path="$1"
+  local label="$2"
+  [[ "$path" == /* && -d "$path" && ! -L "$path" ]] || fail "$label must be a real absolute directory: $path"
+  [[ "$(realpath -e -- "$path")" == "${path%/}" ]] || fail "$label must not use symlinked or noncanonical components: $path"
+}
+
+require_owner_mode() {
+  local path="$1"
+  local owner="$2"
+  local group="$3"
+  local mode="$4"
+  local actual
+  actual="$(stat -c '%U:%G:%a' -- "$path")"
+  [[ "$actual" == "${owner}:${group}:${mode}" ]] || fail "$path must be ${owner}:${group} mode ${mode}; got $actual"
+}
+
+require_account() {
+  local user="$1"
+  local group="$2"
+  local password_field
+  getent passwd "$user" >/dev/null || fail "required user is missing: $user"
+  getent group "$group" >/dev/null || fail "required group is missing: $group"
+  id -nG "$user" | tr ' ' '\n' | grep -Fx "$group" >/dev/null || fail "$user is not a member of $group"
+  password_field="$(getent shadow "$user" | cut -d: -f2)"
+  [[ "$password_field" == '!'* || "$password_field" == '*'* ]] || fail "$user password must be locked"
+}
+
+require_key() {
+  local path="$1"
+  local label="$2"
+  local mode owner
+  [[ "$path" == /* && -f "$path" && ! -L "$path" ]] || fail "$label must be a real absolute file"
+  mode="$(stat -c '%a' -- "$path")"
+  owner="$(stat -c '%U' -- "$path")"
+  [[ "$mode" == "400" || "$mode" == "600" ]] || fail "$label must have mode 0400 or 0600; got $mode"
+  [[ "$owner" == "ubuntu" ]] || fail "$label must be owned by ubuntu; got $owner"
+}
+
+require_authorized_keys() {
+  local user="$1"
+  local required_command="$2"
+  local home authorized_keys line token
+  local active=0
+  home="$(getent passwd "$user" | cut -d: -f6)"
+  authorized_keys="${home}/.ssh/authorized_keys"
+  [[ -f "$authorized_keys" && ! -L "$authorized_keys" ]] || fail "$user authorized_keys is missing or symlinked"
+  require_owner_mode "${home}/.ssh" "$user" "$(id -gn "$user")" 700
+  require_owner_mode "$authorized_keys" "$user" "$(id -gn "$user")" 600
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[[:space:]]*($|#) ]] && continue
+    ((active += 1))
+    for token in \
+      "command=\"${required_command}\"" \
+      "no-agent-forwarding" \
+      "no-port-forwarding" \
+      "no-pty" \
+      "no-user-rc" \
+      "no-X11-forwarding"; do
+      [[ "$line" == *"$token"* ]] || fail "$user authorized key lacks $token"
+    done
+  done < "$authorized_keys"
+  (( active > 0 )) || fail "$user authorized_keys contains no active key"
+}
+
+[[ "$code_revision" =~ ^[0-9a-f]{40}$ ]] || fail "QUANTHUS_CODE_REVISION must be a full lowercase 40-character Git commit"
+[[ -d "$repo_root/.git" && -x "$python_bin" && -f "$policy" ]] || fail "repository, Python runtime, or policy is missing"
+actual_revision="$(git -C "$repo_root" rev-parse HEAD)"
+[[ "$actual_revision" == "$code_revision" ]] || fail "deployed checkout does not match QUANTHUS_CODE_REVISION"
+[[ -z "$(git -C "$repo_root" status --porcelain --untracked-files=no)" ]] || fail "deployed checkout has tracked modifications"
+unexpected_untracked="$(git -C "$repo_root" ls-files --others --exclude-standard | awk '$0 !~ /^\.venv-p1\// { print; exit }')"
+[[ -z "$unexpected_untracked" ]] || fail "deployed checkout has unexpected untracked content: $unexpected_untracked"
+
+if [[ "$role" == "node" ]]; then
+  (( EUID == 0 )) || fail "node preflight must run as root"
+  [[ -f /etc/quanthus/dual-lane-node.env ]] || fail "node environment file is missing"
+  require_owner_mode /etc/quanthus/dual-lane-node.env root root 640
+  expected_python="${repo_root%/}/.venv-p1/bin/python"
+  [[ "${python_bin%/}" == "$expected_python" ]] || fail "candidate nodes must use the dedicated .venv-p1 runtime"
+
+  epoch_ingress_root="${QUANTHUS_DUAL_LANE_EPOCH_INGRESS_ROOT:?set the node epoch ingress root}"
+  epoch_staging_root="${QUANTHUS_DUAL_LANE_EPOCH_STAGING_ROOT:?set the node epoch staging root}"
+  epoch_root="${QUANTHUS_DUAL_LANE_EPOCH_ROOT:?set the node sealed epoch root}"
+  candidate_root="${QUANTHUS_DUAL_LANE_CANDIDATE_ROOT:?set the node candidate root}"
+  epoch_user="${QUANTHUS_DUAL_LANE_EPOCH_USER:-quanthus-epoch-in}"
+  candidate_user="${QUANTHUS_DUAL_LANE_CANDIDATE_USER:-quanthus-candidate-ro}"
+  [[ "$epoch_user" != "$candidate_user" ]] || fail "epoch ingress and candidate export must use separate users"
+  [[ "$epoch_ingress_root" == /srv/quanthus/dual-lane/epoch-incoming ]] || fail "node epoch ingress root must be /srv/quanthus/dual-lane/epoch-incoming"
+  [[ "$epoch_staging_root" == /srv/quanthus/dual-lane/epoch-staging ]] || fail "node epoch staging root must be /srv/quanthus/dual-lane/epoch-staging"
+  [[ "$epoch_root" == /srv/quanthus/dual-lane/epochs ]] || fail "node epoch root must be /srv/quanthus/dual-lane/epochs"
+  [[ "$candidate_root" == /srv/quanthus/dual-lane/candidates ]] || fail "node candidate root must be /srv/quanthus/dual-lane/candidates"
+
+  require_account "$epoch_user" "$epoch_user"
+  require_account "$candidate_user" "$candidate_user"
+  require_canonical_dir /srv/quanthus/dual-lane "dual-lane transfer parent"
+  require_canonical_dir "$epoch_ingress_root" "epoch ingress root"
+  require_canonical_dir "$epoch_staging_root" "epoch staging root"
+  require_canonical_dir "$epoch_root" "epoch root"
+  require_canonical_dir "$candidate_root" "candidate root"
+  require_owner_mode /srv/quanthus/dual-lane root root 755
+  require_owner_mode "$epoch_ingress_root" "$epoch_user" "$epoch_user" 750
+  require_owner_mode "$epoch_staging_root" root root 700
+  require_owner_mode "$epoch_root" root root 750
+  require_owner_mode "$candidate_root" root "$candidate_user" 750
+  for user in "$epoch_user" "$candidate_user"; do
+    home="$(getent passwd "$user" | cut -d: -f6)"
+    require_canonical_dir "$home" "$user home"
+    require_owner_mode "$home" "$user" "$user" 750
+  done
+  command -v runuser >/dev/null || fail "runuser is required for permission probes"
+  runuser -u "$epoch_user" -- test -w "$epoch_ingress_root" || fail "$epoch_user cannot write the ingress root"
+  if runuser -u "$epoch_user" -- test -w "$epoch_root"; then
+    fail "$epoch_user must not be able to write the sealed epoch root"
+  fi
+  runuser -u "$candidate_user" -- test -r "$candidate_root" || fail "$candidate_user cannot read the candidate root"
+  runuser -u "$candidate_user" -- test -x "$candidate_root" || fail "$candidate_user cannot traverse the candidate root"
+  if runuser -u "$candidate_user" -- test -w "$candidate_root"; then
+    fail "$candidate_user must not be able to write the candidate root"
+  fi
+  unreadable="$(runuser -u "$candidate_user" -- find "$candidate_root" -type f ! -readable -print -quit)"
+  [[ -z "$unreadable" ]] || fail "$candidate_user cannot read candidate file: $unreadable"
+  [[ -x /usr/bin/rrsync ]] || fail "/usr/bin/rrsync is missing"
+  [[ -x "${repo_root}/ops/bin/promote-dual-lane-epoch" ]] || fail "node-local epoch promoter is missing"
+  /usr/bin/rrsync -h 2>&1 | grep -F -- '-no-del' >/dev/null || fail "rrsync does not support -no-del"
+  require_authorized_keys "$epoch_user" "/usr/bin/rrsync -wo -no-del ${epoch_ingress_root}"
+  require_authorized_keys "$candidate_user" "/usr/bin/rrsync -ro ${candidate_root}"
+else
+  (( EUID == 0 )) || fail "OCI preflight must run as root"
+  [[ -f /etc/quanthus/dual-lane-oci.env ]] || fail "OCI environment file is missing"
+  require_owner_mode /etc/quanthus/dual-lane-oci.env root ubuntu 640
+  epoch_root="${QUANTHUS_DUAL_LANE_EPOCH_ROOT:-/home/ubuntu/data/quanthus/dual-lane/epochs}"
+  incoming_root="${QUANTHUS_DUAL_LANE_INCOMING_ROOT:-/home/ubuntu/data/quanthus/dual-lane/incoming}"
+  publication_root="${QUANTHUS_DUAL_LANE_PUBLICATION_ROOT:-/home/ubuntu/data/quanthus/dual-lane/publication}"
+  for root in "$epoch_root" "$incoming_root" "$publication_root"; do
+    require_canonical_dir "$root" "OCI dual-lane root"
+    require_owner_mode "$root" ubuntu ubuntu 750
+  done
+
+  parent_pointer="${QUANTHUS_DUAL_LANE_PARENT_POINTER:-}"
+  base_pointer="${QUANTHUS_DUAL_LANE_BASE_POINTER:-}"
+  [[ -z "$parent_pointer" || -z "$base_pointer" ]] || fail "set only one parent or base pointer"
+  [[ -n "$parent_pointer" || -n "$base_pointer" ]] || fail "set one parent or historical-base pointer"
+
+  declare -A seen_keys=()
+  for node in CN01 HERMES; do
+    epoch_user_var="QUANTHUS_${node}_DUAL_LANE_EPOCH_USER"
+    candidate_user_var="QUANTHUS_${node}_DUAL_LANE_CANDIDATE_USER"
+    epoch_key_var="QUANTHUS_${node}_DUAL_LANE_EPOCH_KEY"
+    candidate_key_var="QUANTHUS_${node}_DUAL_LANE_CANDIDATE_KEY"
+    known_hosts_var="QUANTHUS_${node}_DUAL_LANE_KNOWN_HOSTS"
+    epoch_remote_root_var="QUANTHUS_${node}_DUAL_LANE_EPOCH_ROOT"
+    candidate_remote_root_var="QUANTHUS_${node}_DUAL_LANE_CANDIDATE_ROOT"
+    [[ -n "${!epoch_user_var:-}" && -n "${!candidate_user_var:-}" ]] || fail "$node transfer users are missing"
+    [[ "${!epoch_user_var}" != "${!candidate_user_var}" ]] || fail "$node epoch and candidate users must differ"
+    [[ "${!epoch_remote_root_var:-}" == "." && "${!candidate_remote_root_var:-}" == "." ]] || fail "$node rrsync-jailed remote roots must both be ."
+    [[ "${!epoch_key_var:-}" != "${!candidate_key_var:-}" ]] || fail "$node epoch and candidate keys must differ"
+    for key_var in "$epoch_key_var" "$candidate_key_var"; do
+      key_path="${!key_var:-}"
+      [[ -n "$key_path" ]] || fail "$node transfer key is missing"
+      [[ -z "${seen_keys[$key_path]:-}" ]] || fail "transfer key is reused by $node: $key_path"
+      seen_keys[$key_path]="$node"
+      require_key "$key_path" "$node transfer key"
+    done
+    known_hosts="${!known_hosts_var:-}"
+    [[ "$known_hosts" == /* && -f "$known_hosts" && ! -L "$known_hosts" ]] || fail "$node pinned known-hosts file is missing or symlinked"
+    known_hosts_mode="$(stat -c '%a' -- "$known_hosts")"
+    known_hosts_owner="$(stat -c '%U' -- "$known_hosts")"
+    [[ "$known_hosts_mode" == "600" || "$known_hosts_mode" == "644" ]] || fail "$node known-hosts must have mode 0600 or 0644"
+    [[ "$known_hosts_owner" == "ubuntu" ]] || fail "$node known-hosts must be owned by ubuntu"
+  done
+fi
+
+PYTHONPATH="${repo_root}/src" "$python_bin" -m quanthus dual-lane-policy-check --config "$policy"
+echo "dual-lane ${role} deployment preflight OK"

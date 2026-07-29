@@ -1,9 +1,15 @@
 # ADR 0003: T-Close Plus Five-Hour Data Pipelines
 
-- Status: Accepted
+- Status: Accepted for the legacy live path; target ownership/publication superseded by ADR 0005
 - Date: 2026-07-25
 - Last reconciled: 2026-07-28
 - Scope: Recurring Hermes acquisition and OCI daily warehouse processing
+
+ADR 0005 replaces the target first-arrival source selection, OCI-only DWD/DWS build placement, and
+independent consumer dataset pointers with epoch-bound dual-lane candidates, fixed-primary
+arbitration, and one release-set `CURRENT`. The timing, final-daily-bar, fail-closed acquisition,
+audit, and notification rules in this ADR remain accepted. This pipeline remains the live path
+until ADR 0005 records `GO_FOR_CUTOVER`; target shadow artifacts cannot advance its pointers.
 
 ## Context
 

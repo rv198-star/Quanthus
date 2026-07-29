@@ -1,0 +1,11 @@
+[Unit]
+Description=Publish and distribute the Quanthus dual-lane epoch at 16:30
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:30:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=quanthus-dual-lane-epoch.service
+
+[Install]
+WantedBy=timers.target

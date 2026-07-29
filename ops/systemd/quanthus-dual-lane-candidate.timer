@@ -1,0 +1,11 @@
+[Unit]
+Description=Build the CN01 or Hermes DWD/DWS candidate at 19:50
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 19:50:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=quanthus-dual-lane-candidate.service
+
+[Install]
+WantedBy=timers.target

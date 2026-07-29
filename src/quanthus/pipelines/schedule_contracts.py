@@ -85,10 +85,14 @@ def load_schedule_contract(path: Path) -> ScheduleContract:
         raise ScheduleContractError("Hermes schedules must use Asia/Shanghai")
 
     ownership = _mapping(root.get("ownership"), field="ownership")
-    if ownership.get("hermes") != "immutable_ods_only":
-        raise ScheduleContractError("Hermes ownership must be immutable_ods_only")
-    if ownership.get("oci") != "dwd_dws_ads_and_pg_publication":
-        raise ScheduleContractError("OCI must own DWD/DWS/ADS and PG publication")
+    if ownership.get("hermes") != "immutable_ods_and_standby_dwd_dws_candidate":
+        raise ScheduleContractError("Hermes must own ODS and standby DWD/DWS candidates")
+    if ownership.get("cn01") != "immutable_ods_and_primary_dwd_dws_candidate":
+        raise ScheduleContractError("CN01 must own ODS and primary DWD/DWS candidates")
+    if ownership.get("oci") != "epoch_arbitration_ads_release_and_pg_publication":
+        raise ScheduleContractError(
+            "OCI must own epoch, arbitration, ADS, release, and PG publication"
+        )
     if ownership.get("hermes_direct_curated_pg_writes") is not False:
         raise ScheduleContractError("Hermes direct curated PG writes must be disabled")
 

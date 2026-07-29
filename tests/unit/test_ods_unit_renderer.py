@@ -36,6 +36,8 @@ class OdsUnitRendererTests(unittest.TestCase):
         market_service = (output / "cn01-ods-market-daily-core.service").read_text()
         self.assertIn("OnCalendar=Mon..Fri *-*-* 19:00:00 Asia/Shanghai", market_timer)
         self.assertIn("contract 19:00", market_timer)
+        self.assertIn("Description=CN01 ODS", market_timer)
+        self.assertNotIn("Description=Hermes ODS", market_timer)
         self.assertNotIn("contract 17:30", market_timer)
         self.assertIn("Unit=cn01-ods-market-daily-core.service", market_timer)
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", market_service)

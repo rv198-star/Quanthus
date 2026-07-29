@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-NORMAL-BUY-001",
+  "description": "T-close signal buys one 100-share lot at the next session open under a synthetic cost policy.",
+  "source_basis": "Hand-calculated synthetic acceptance case; no market or private account data.",
+  "inputs": {
+    "signal_market_date": "2026-07-27",
+    "decision_at": "2026-07-27T15:05:00+08:00",
+    "next_session_date": "2026-07-28",
+    "open_at": "2026-07-28T09:30:00+08:00",
+    "close_at": "2026-07-28T15:00:00+08:00",
+    "security_code": "600000",
+    "quantity": 100,
+    "open_price": "10.00",
+    "close_price": "10.20",
+    "initial_cash": "10000.00"
+  },
+  "expected": {
+    "event_types": [
+      "signal_accepted",
+      "order_intent_created",
+      "order_created",
+      "order_status",
+      "fill",
+      "ledger_entry",
+      "daily_snapshot"
+    ],
+    "fill_price": "10.01",
+    "open_execution_state": "executable",
+    "gross_amount": "1001.00",
+    "commission": "5.00",
+    "ending_cash": "8994.00",
+    "position_quantity": 100,
+    "position_cost": "1001.00",
+    "market_value": "1020.00",
+    "total_equity": "10014.00"
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "schema_version": "1.0.0",
+  "registry_version": "p3-baseline-features-research-v1",
+  "definitions": [
+    {
+      "feature_id": "price.total_return_index",
+      "version": "1.0.0",
+      "formula": "100 * cumulative_product((close_t * (1 + bonus_share_ratio_t) + cash_dividend_per_share_t) / close_t_minus_1); unresolved action or invalid-bar transitions are null",
+      "inputs": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "unit": "index",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 61,
+      "minimum_history_sessions": 2,
+      "cutoff_rule": "snapshot_or_earlier",
+      "output_type": "decimal",
+      "owner": "p3-baseline-research",
+      "lifecycle": "active"
+    },
+    {
+      "feature_id": "price.sma20",
+      "version": "1.0.0",
+      "formula": "mean(price.total_return_index over the current 20 sessions)",
+      "inputs": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "unit": "index",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 20,
+      "minimum_history_sessions": 20,
+      "cutoff_rule": "snapshot_or_earlier",
+      "output_type": "decimal",
+      "owner": "p3-baseline-research",
+      "lifecycle": "active"
+    },
+    {
+      "feature_id": "price.sma60",
+      "version": "1.0.0",
+      "formula": "mean(price.total_return_index over the current 60 sessions)",
+      "inputs": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "unit": "index",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 60,
+      "minimum_history_sessions": 60,
+      "cutoff_rule": "snapshot_or_earlier",
+      "output_type": "decimal",
+      "owner": "p3-baseline-research",
+      "lifecycle": "active"
+    },
+    {
+      "feature_id": "price.momentum20",
+      "version": "1.0.0",
+      "formula": "price.total_return_index_t / price.total_return_index_t_minus_20 - 1",
+      "inputs": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "unit": "ratio",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 21,
+      "minimum_history_sessions": 21,
+      "cutoff_rule": "snapshot_or_earlier",
+      "output_type": "decimal",
+      "owner": "p3-baseline-research",
+      "lifecycle": "active"
+    },
+    {
+      "feature_id": "price.prior_high20",
+      "version": "1.0.0",
+      "formula": "max(price.total_return_index over the 20 sessions before T)",
+      "inputs": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "unit": "index",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 21,
+      "minimum_history_sessions": 21,
+      "cutoff_rule": "snapshot_or_earlier",
+      "output_type": "decimal",
+      "owner": "p3-baseline-research",
+      "lifecycle": "active"
+    },
+    {
+      "feature_id": "price.rsi14",
+      "version": "1.0.0",
+      "formula": "100 * mean(max(total_return, 0), 14) / (mean(max(total_return, 0), 14) + mean(max(-total_return, 0), 14)); flat window is 50",
+      "inputs": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "unit": "score_0_100",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 15,
+      "minimum_history_sessions": 15,
+      "cutoff_rule": "snapshot_or_earlier",
+      "output_type": "decimal",
+      "owner": "p3-baseline-research",
+      "lifecycle": "active"
+    },
+    {
+      "feature_id": "liquidity.volume_ratio20",
+      "version": "1.0.0",
+      "formula": "volume_t / mean(volume over the 20 sessions before T)",
+      "inputs": [
+        {"dataset": "daily_ohlcv_none", "column": "volume"}
+      ],
+      "unit": "ratio",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 21,
+      "minimum_history_sessions": 21,
+      "cutoff_rule": "snapshot_or_earlier",
+      "output_type": "decimal",
+      "owner": "p3-baseline-research",
+      "lifecycle": "active"
+    },
+    {
+      "feature_id": "risk.realized_volatility20",
+      "version": "1.0.0",
+      "formula": "sample_standard_deviation(total_return over current 20 sessions) * sqrt(252)",
+      "inputs": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "unit": "annualized_ratio",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 21,
+      "minimum_history_sessions": 21,
+      "cutoff_rule": "snapshot_or_earlier",
+      "output_type": "decimal",
+      "owner": "p3-baseline-research",
+      "lifecycle": "active"
+    }
+  ]
+}

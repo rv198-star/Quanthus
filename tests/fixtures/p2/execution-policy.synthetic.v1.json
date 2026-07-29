@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "policy_version": "p2-execution-synthetic-v1",
+  "status": "synthetic-test-only",
+  "scope": "synthetic-acceptance-only",
+  "basis": {
+    "commission": "synthetic hand-calculation input",
+    "stamp_duty": "synthetic hand-calculation input",
+    "transfer_fee": "synthetic hand-calculation input",
+    "slippage": "synthetic hand-calculation input"
+  },
+  "currency": "CNY",
+  "timezone": "Asia/Shanghai",
+  "money": {
+    "price_tick": "0.01",
+    "cash_quantum": "0.01",
+    "rounding": "ROUND_HALF_UP"
+  },
+  "orders": {
+    "entry_lot_size": 100,
+    "partial_fill": "unsupported"
+  },
+  "costs": {
+    "buy": {
+      "slippage_bps": "5",
+      "commission_rate": "0.0003",
+      "minimum_commission": "5.00"
+    },
+    "sell": {
+      "slippage_bps": "5",
+      "commission_rate": "0.0003",
+      "minimum_commission": "5.00",
+      "stamp_duty_rate": "0.0005",
+      "transfer_fee_rate": "0.00001"
+    }
+  },
+  "profiles": [
+    {
+      "profile_id": "close-to-next-open-v1",
+      "kind": "close_to_next_open",
+      "active": true,
+      "schedule_version": "close-to-next-open-synthetic-v1",
+      "windows": []
+    },
+    {
+      "profile_id": "synthetic-two-window-fixture-v1",
+      "kind": "two_window",
+      "active": false,
+      "schedule_version": "synthetic-two-window-schedule-v1",
+      "windows": [
+        {
+          "window_id": "window_1",
+          "start": "09:45:00",
+          "end": "10:15:00",
+          "decision_cutoff": "09:55:00",
+          "first_eligible_execution": "10:00:00",
+          "expiry": "10:15:00"
+        },
+        {
+          "window_id": "window_2",
+          "start": "14:15:00",
+          "end": "15:00:00",
+          "decision_cutoff": "14:30:00",
+          "first_eligible_execution": "14:35:00",
+          "expiry": "15:00:00"
+        }
+      ]
+    }
+  ]
+}

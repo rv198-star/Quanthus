@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-CARRIED-SELL-001",
+  "description": "A full-position sell carries across limit-down and suspension before filling and settling the fixed unit.",
+  "source_basis": "Hand-calculated synthetic acceptance case; no market or private account data.",
+  "inputs": {
+    "signal_market_date": "2026-07-27",
+    "decision_at": "2026-07-27T15:05:00+08:00",
+    "security_code": "600000",
+    "quantity": 100,
+    "opening_state": {
+      "target_notional": "10000.00",
+      "cash": "8994.00",
+      "position_cost": "1001.00",
+      "commission_expense": "5.00",
+      "stamp_duty_expense": "0.00",
+      "transfer_fee_expense": "0.00",
+      "realized_pnl": "0.00",
+      "dividend_income": "0.00",
+      "external_pool": "100.00",
+      "last_mark_price": "10.20",
+      "last_mark_snapshot_id": "p2-mark-2026-07-27-v1"
+    },
+    "sessions": [
+      {
+        "session_date": "2026-07-28",
+        "open_at": "2026-07-28T09:30:00+08:00",
+        "close_at": "2026-07-28T15:00:00+08:00",
+        "open_execution_state": "sell_blocked_limit_down",
+        "open_price": "9.00",
+        "close_price": "9.00",
+        "snapshot_id": "p2-execution-2026-07-28-v1"
+      },
+      {
+        "session_date": "2026-07-29",
+        "open_at": "2026-07-29T09:30:00+08:00",
+        "close_at": "2026-07-29T15:00:00+08:00",
+        "open_execution_state": "suspended",
+        "open_price": null,
+        "close_price": null,
+        "snapshot_id": "p2-execution-2026-07-29-v1"
+      },
+      {
+        "session_date": "2026-07-30",
+        "open_at": "2026-07-30T09:30:00+08:00",
+        "close_at": "2026-07-30T15:00:00+08:00",
+        "open_execution_state": "executable",
+        "open_price": "10.20",
+        "close_price": "10.10",
+        "snapshot_id": "p2-execution-2026-07-30-v1"
+      }
+    ]
+  },
+  "expected": {
+    "event_types": [
+      "signal_accepted",
+      "order_intent_created",
+      "order_created",
+      "order_status",
+      "daily_snapshot",
+      "order_status",
+      "daily_snapshot",
+      "order_status",
+      "fill",
+      "ledger_entry",
+      "unit_settlement",
+      "ledger_entry",
+      "daily_snapshot"
+    ],
+    "status_transitions": [
+      "created_to_carried",
+      "carried_to_carried",
+      "carried_to_filled"
+    ],
+    "carry_mark_statuses": ["observed_close", "carried_forward"],
+    "carry_market_values": ["900.00", "900.00"],
+    "fill_price": "10.19",
+    "gross_amount": "1019.00",
+    "commission": "5.00",
+    "stamp_duty": "0.51",
+    "transfer_fee": "0.01",
+    "total_fees": "5.52",
+    "realized_pnl": "12.48",
+    "profit_transfer": "7.48",
+    "ending_cash": "10000.00",
+    "ending_external_pool": "107.48",
+    "underfunded_amount": "0.00"
+  }
+}

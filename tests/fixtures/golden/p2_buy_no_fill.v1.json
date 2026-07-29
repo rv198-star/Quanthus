@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Hand-calculated fail-closed buy cases under the synthetic P2 policy.",
+  "source_basis": "Synthetic acceptance cases; no market or private account data.",
+  "cases": [
+    {
+      "case_id": "P2-BUY-SUSPENDED-001",
+      "open_execution_state": "suspended",
+      "initial_cash": "10000.00",
+      "expected_reason_code": "security_suspended",
+      "expected_transition": "created_to_cancelled",
+      "expected_status": "completed_with_cancellation",
+      "expected_ending_cash": "10000.00",
+      "rejections": 0,
+      "cancellations": 1
+    },
+    {
+      "case_id": "P2-BUY-LIMIT-UP-001",
+      "open_execution_state": "buy_blocked_limit_up",
+      "initial_cash": "10000.00",
+      "expected_reason_code": "buy_blocked_limit_up",
+      "expected_transition": "created_to_cancelled",
+      "expected_status": "completed_with_cancellation",
+      "expected_ending_cash": "10000.00",
+      "rejections": 0,
+      "cancellations": 1
+    },
+    {
+      "case_id": "P2-BUY-MISSING-EVIDENCE-001",
+      "open_execution_state": "missing_evidence",
+      "initial_cash": "10000.00",
+      "expected_reason_code": "missing_execution_evidence",
+      "expected_transition": "created_to_cancelled",
+      "expected_status": "completed_with_cancellation",
+      "expected_ending_cash": "10000.00",
+      "rejections": 0,
+      "cancellations": 1
+    },
+    {
+      "case_id": "P2-BUY-CASH-SHORTAGE-001",
+      "open_execution_state": "executable",
+      "initial_cash": "1000.00",
+      "expected_reason_code": "insufficient_unit_cash",
+      "expected_transition": "created_to_rejected",
+      "expected_status": "completed_with_rejection",
+      "expected_ending_cash": "1000.00",
+      "rejections": 1,
+      "cancellations": 0
+    }
+  ]
+}

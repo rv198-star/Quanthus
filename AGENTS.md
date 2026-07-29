@@ -4,7 +4,9 @@
 
 - Preserve point-in-time semantics. Features may only use information available at the
   declared `knowledge_cutoff`.
-- Daily signals are produced after the T close and may first execute at the T+1 open.
+- Under the active `close-to-next-open-v1` profile, daily signals are produced after the T close
+  and may first execute at the T+1 open. Any intraday profile requires versioned windows and PIT
+  cutoffs; email delivery or manual operation never implies a fill.
 - Model or representation outputs never bypass the expert and veto decision path.
 - Missing or invalid data blocks new entries and raises an alert. It is not structural
   damage and must not force a sale.
@@ -15,8 +17,10 @@
 
 - P1 is conditionally accepted under `p1-c1-conditional-20260725-v1`: 4,173
   factor-visibility exceptions remain fail-closed and must not receive inferred cutoffs.
-- P2 may begin; P3 remains blocked until the trusted P2 backtest engine passes its golden suite.
-- Do not implement the full expert set or training layer during the P1 vertical slice.
+- P2 is conditionally accepted for `close-to-next-open-v1` under `config/p2-gates.v1.json`.
+  P3 may implement the bounded rule-only historical vertical slice through that accepted profile.
+- The operator-assisted two-window profile, forward email transport, the full expert set, and the
+  training layer remain blocked by their explicit phase and activation gates.
 
 ## Development
 

@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-MAXIMUM-HOLD-SELL-001",
+  "description": "An upstream maximum-hold exit instruction is executed by P2 without P2 deriving the strategy decision.",
+  "source_basis": "Hand-calculated synthetic acceptance case derived from the carried-sell accounting oracle.",
+  "inputs": {
+    "decision_reason_code": "maximum_hold_exit",
+    "decision_version": "synthetic-upstream-exit-v1",
+    "signal_market_date": "2026-07-27",
+    "decision_at": "2026-07-27T15:05:00+08:00",
+    "execution_session": "2026-07-28",
+    "security_code": "600000",
+    "quantity": 100,
+    "open_price": "10.20",
+    "close_price": "10.10"
+  },
+  "expected": {
+    "event_types": [
+      "signal_accepted",
+      "order_intent_created",
+      "order_created",
+      "order_status",
+      "fill",
+      "ledger_entry",
+      "unit_settlement",
+      "ledger_entry",
+      "daily_snapshot"
+    ],
+    "status_transition": "created_to_filled",
+    "fill_price": "10.19",
+    "realized_pnl": "12.48",
+    "strategy_decision_reason_preserved": "maximum_hold_exit"
+  }
+}

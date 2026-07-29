@@ -84,6 +84,69 @@ Corporate actions retain announcement, registration, ex-right, and payment dates
 Factors are effective-date versioned and reproducible from action inputs. A historical query
 may use only factors known at its knowledge cutoff.
 
+`P1-DATA-004` governs the replay-facing normalization boundary. The source corporate-action corpus
+contains one frozen share-quantity unit but mixed cash units. The v1 factor-only fallback remains
+reproducible, while `config/p1-corporate-action-normalization.v2.json` makes an exact Eastmoney
+implementation plan the first authority. Its notice must precede the effective date, its plan text
+must agree with its structured cash/share fields, and source fields must select one uniquely best
+same-security/same-date candidate.
+
+Eastmoney cash and share quantities are per ten shares. Binary float noise is removed at `1e-12`;
+display-precision matching is followed by business tolerances of `0.00001` yuan per share for cash
+and `0.0001` shares per ten shares for bonus/transfer quantities. These tolerances absorb
+economically immaterial source precision differences. They do not absorb materially different cash
+plans, missing dates, late notices, or conflicting plan text.
+
+When exact authority is unavailable, each non-zero source cash value is tested as either per share
+or per ten shares. The selected factor fallback must reconcile the observed ratio to:
+
+```text
+(1 + bonus_share_ratio) * prior_unadjusted_close
+/ (prior_unadjusted_close - cash_dividend_per_share)
+```
+
+The maximum absolute factor-ratio error is `0.005`, and the best two cash candidates must differ
+by at least `0.00001` error. The preferred baseline is the previous PIT-visible adjustment factor;
+when that factor is unavailable or not historically visible, the prior-day qfq/raw close ratio is
+allowed only as snapshot-bound corroboration. It does not become a strategy feature or repair a
+factor cutoff. Missing dates, cross-checks, candidate separation, or factor agreement remain
+explicit exceptions. Under v2 they enter a versioned `security_fail_closed` ledger: dated
+exceptions block from the effective date, while missing-effective-date rows block from their
+announcement date. A report is ready as publication input only when every exception is covered by
+that same-version ledger.
+
+`src/quanthus/corporate_action_corpus.py` is the read-only real-shape adapter for this contract. It
+binds the action source, relevant Eastmoney raw files, raw bars, qfq bars, and factors by SHA-256 and
+one immutable P1 snapshot manifest. The 2026-07-29 audit normalizes 35,157 dated rows and versions
+all 272 retained exceptions without granting execution authority.
+
+`src/quanthus/corporate_action_revision.py` atomically materializes that audit as normalized-action
+and exception-ledger Parquet datasets. It always rebuilds the bounded full corpus, verifies its own
+checksums and row reconciliation, and compares exception ids with an optional verified prior
+revision to report new, persistent, and resolved exceptions. Known exception reason codes require
+no AI or row-by-row approval. `check-corporate-action-revision` gates a revision and
+`promote-corporate-action-revision` advances its immutable CURRENT pointer without allowing the
+knowledge cutoff to move backward.
+
+`src/quanthus/historical_replay_snapshot.py` extends one verified P1 snapshot with the accepted
+corporate-action revision and authoritative calendar, materializes by hard link, and runs the
+historical-bundle gate before the catalog's atomic rename. Snapshot
+`p1-historical-replay-20260729-v1` contains all three
+formerly missing datasets and is ready for frame construction with `execution_authorized=false`.
+Evidence: `docs/acceptance/p1-corporate-action-normalization-audit-20260728.md`.
+
+`quanthus audit-corporate-actions` is the repeatable interface. It prints a stable summary, may
+atomically write the full row-level report and exception ledger to explicit paths, and returns
+non-zero whenever an exception is not versioned or no normalized row is available.
+
+Future accepted full-corpus or authority revisions use `build-corporate-action-revision` with the
+current verified revision as their comparison baseline. A known unresolved row remains explicit in
+the next ledger; newly resolvable evidence removes it and appears in the resolved count. Schema or
+source-semantic drift, an unknown reason code, checksum failure, backward cutoff, or abnormal
+exception-volume change is an operational alert rather than an invitation to silently repair data.
+The command is ready for the separate weekly OCI transform; scheduler wiring remains an operations
+follow-up and is not inserted into the daily market critical path.
+
 ### `tradability`
 
 Primary key: security id and market date. Include suspension, ST state, list days, upper/lower
@@ -105,6 +168,16 @@ not project the current 10% rule backward.
 takes precedence over a vendor placeholder bar. A structurally valid bar with zero volume or
 amount has `is_executable=false` and reason `zero_liquidity`; downstream entry logic must not
 simulate a fill from its close.
+
+The historical replay reader adds one conservative continuity check over these accepted inputs.
+When an observed raw close falls outside the resolved daily price-limit interval and no normalized
+action explains that effective date, or the action-adjusted gross return still exceeds the
+effective price-limit percentage, the exact security/date is
+`unexplained_price_transition`. It blocks new simulated execution, aborts an affected held-
+position replay before a false mark enters the ledger, and invalidates rolling research features
+until their complete lookback is clean. This is a deterministic data-quality disposition, not a
+structural-break label or inferred corporate-action repair. Its count remains explicit in frame
+and feature-panel reports so an upstream corpus repair can remove it reproducibly.
 
 ### `data_gaps`
 
@@ -182,6 +255,7 @@ window cannot silently turn into an unplanned third observation.
 | Capability | Governing implementation | Contract and evidence |
 | --- | --- | --- |
 | PIT identity, tradability, and snapshots | `src/quanthus/adjustments.py`, `src/quanthus/tradability.py`, `src/quanthus/snapshot_publish.py`, versioned P1 config | `tests/p1/`, `tests/contract/test_p0_decisions.py`, P1 acceptance files |
+| Mixed-unit corporate-action audit and immutable replay revision | `src/quanthus/corporate_action_normalization.py`, `src/quanthus/corporate_action_corpus.py`, `src/quanthus/corporate_action_revision.py`, `src/quanthus/historical_replay_snapshot.py`, `config/p1-corporate-action-normalization.v2.json` | `tests/unit/test_corporate_action_normalization.py`, `tests/unit/test_corporate_action_corpus.py`, `tests/unit/test_corporate_action_revision.py`, `docs/acceptance/p1-corporate-action-normalization-audit-20260728.md` |
 | Immutable ODS handoff and daily DWD/DWS | `src/quanthus/pipelines/`, `config/pipelines/` | `tests/unit/test_ods_handoff.py`, `tests/unit/test_pipeline_runner.py`, `tests/p1/test_daily_warehouse.py` |
 | Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
 
@@ -203,6 +277,7 @@ window cannot silently turn into an unplanned third observation.
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | META-DATA-PIPE-001 accepted | Shadow run, explicit cutover, rollback, and no overlapping writers |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |
+| P1-DATA-004 | Normalize mixed-unit corporate actions for continuous historical replay | C1, S4, P1-SNAPSHOT-001 | Deterministic authority audit, fully versioned per-security exceptions, and immutable replay input bundle |
 
 The S1 reconciliation report measures each in-scope delisted security over the supported daily
 history window. It distinguishes observed bars, known suspension sessions, exact versioned

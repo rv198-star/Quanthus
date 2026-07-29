@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-CANDIDATE-TIE-001",
+  "description": "Same-snapshot candidates sort by aggregate score descending and security code ascending.",
+  "source_basis": "Synthetic acceptance case; no market or private account data.",
+  "candidates": [
+    {"signal_id": "signal-3", "security_code": "600002", "aggregate_score": "0.80"},
+    {"signal_id": "signal-2", "security_code": "600001", "aggregate_score": "0.90"},
+    {"signal_id": "signal-1", "security_code": "600000", "aggregate_score": "0.90"}
+  ],
+  "expected": {
+    "ordered_signal_ids": ["signal-1", "signal-2", "signal-3"],
+    "ordered_security_codes": ["600000", "600001", "600002"]
+  }
+}

@@ -78,6 +78,39 @@ class DataFoundationTests(unittest.TestCase):
             self.assertEqual(loaded.to_dict(), published.to_dict())
             self.assertTrue((location / "snapshot.json").is_file())
 
+    def test_snapshot_validation_runs_before_atomic_publication(self) -> None:
+        published = PublishedSnapshot(
+            self.reference,
+            (dataset_manifest(knowledge_cutoff=self.cutoff),),
+            "p1-universe-v1",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = SnapshotCatalog(Path(directory) / "snapshots")
+
+            def reject(_staging: Path, _snapshot: PublishedSnapshot) -> None:
+                raise ValueError("pre-publication gate failed")
+
+            with self.assertRaisesRegex(ValueError, "pre-publication gate failed"):
+                catalog.publish(published, validate=reject)
+
+            self.assertFalse((catalog.root / self.reference.snapshot_id).exists())
+
+    def test_idempotent_publication_reruns_the_requested_validator(self) -> None:
+        published = PublishedSnapshot(
+            self.reference,
+            (dataset_manifest(knowledge_cutoff=self.cutoff),),
+            "p1-universe-v1",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = SnapshotCatalog(Path(directory) / "snapshots")
+            catalog.publish(published)
+
+            def reject(_location: Path, _snapshot: PublishedSnapshot) -> None:
+                raise ValueError("existing snapshot gate failed")
+
+            with self.assertRaisesRegex(ValueError, "existing snapshot gate failed"):
+                catalog.publish(published, validate=reject)
+
     def test_snapshot_refuses_a_manifest_known_after_the_cutoff(self) -> None:
         with self.assertRaisesRegex(ValueError, "exceed snapshot knowledge_cutoff"):
             future_cutoff = datetime(2025, 1, 2, 8, 1, tzinfo=timezone.utc)

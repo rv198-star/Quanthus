@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -217,10 +217,21 @@ def _build_manifest(dataset: SnapshotDatasetPlan) -> DatasetManifest:
     )
 
 
-def _verify_materialized(snapshot_dir: Path, snapshot: PublishedSnapshot) -> None:
+def verify_materialized_snapshot(snapshot_dir: Path, snapshot: PublishedSnapshot) -> None:
+    """Verify every published partition against its manifest checksum."""
+
+    root = snapshot_dir.resolve()
     for manifest in snapshot.datasets:
+        if set(manifest.partitions) != set(manifest.content_checksums):
+            raise SnapshotBuildError(
+                f"manifest partitions and checksums differ: {manifest.dataset}"
+            )
         for partition, expected_checksum in manifest.content_checksums.items():
-            materialized_path = snapshot_dir / partition
+            materialized_path = (root / partition).resolve()
+            if not materialized_path.is_relative_to(root):
+                raise SnapshotBuildError(
+                    f"materialized partition escapes snapshot directory: {partition}"
+                )
             if not materialized_path.is_file():
                 raise SnapshotBuildError(f"materialized partition is missing: {materialized_path}")
             if _sha256(materialized_path) != expected_checksum:
@@ -232,6 +243,8 @@ def _verify_materialized(snapshot_dir: Path, snapshot: PublishedSnapshot) -> Non
 def publish_snapshot(
     catalog: SnapshotCatalog,
     plan: SnapshotPublicationPlan,
+    *,
+    validate: Callable[[Path, PublishedSnapshot], None] | None = None,
 ) -> MaterializedSnapshot:
     """Hard-link planned Parquet inputs and atomically publish their snapshot manifest.
 
@@ -265,6 +278,6 @@ def publish_snapshot(
                     f"source changed while materializing snapshot partition: {dataset.source_path}"
                 )
 
-    location = catalog.publish(snapshot, materialize=materialize)
-    _verify_materialized(location, snapshot)
+    location = catalog.publish(snapshot, materialize=materialize, validate=validate)
+    verify_materialized_snapshot(location, snapshot)
     return MaterializedSnapshot(location=location, snapshot=snapshot)

@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-ROUND-TRIP-REPLAY-001",
+  "description": "One explicit historical unit path composes buy, dividend, sell, settlement, metrics, and audit publication.",
+  "source_basis": "Hand-calculated synthetic composition of the bounded P2 buy, corporate-action, sell, and metric oracles.",
+  "inputs": {
+    "entry_signal_date": "2026-07-27",
+    "entry_decision_at": "2026-07-27T15:05:00+08:00",
+    "entry_session": "2026-07-28",
+    "corporate_action_at": "2026-07-29T09:00:00+08:00",
+    "cash_dividend_per_share": "0.20",
+    "post_action_mark_price": "10.00",
+    "exit_signal_date": "2026-07-29",
+    "exit_decision_at": "2026-07-29T15:05:00+08:00",
+    "exit_session": "2026-07-30",
+    "security_code": "600000",
+    "quantity": 100,
+    "initial_cash": "10000.00",
+    "capital_days": 3
+  },
+  "expected": {
+    "event_types": [
+      "signal_accepted",
+      "order_intent_created",
+      "order_created",
+      "order_status",
+      "fill",
+      "ledger_entry",
+      "daily_snapshot",
+      "corporate_action",
+      "ledger_entry",
+      "signal_accepted",
+      "order_intent_created",
+      "order_created",
+      "order_status",
+      "fill",
+      "ledger_entry",
+      "unit_settlement",
+      "ledger_entry",
+      "daily_snapshot"
+    ],
+    "ending_cash": "10000.00",
+    "external_pool": "27.48",
+    "realized_pnl": "12.48",
+    "total_pnl": "27.48",
+    "performance": {
+      "trade_return": "0.02731610",
+      "unit_capital_day_return": "0.00091600",
+      "total_pnl": "27.48",
+      "external_cash_flow": "0.00",
+      "cash_flow_adjusted_drawdown": "0.00000000",
+      "compound_nav": false
+    },
+    "diagnostic": {
+      "result_class": "diagnostic_hypothetical",
+      "capital_constrained": false,
+      "aggregatable_as_official": false,
+      "maximum_capital_days": 20
+    }
+  }
+}

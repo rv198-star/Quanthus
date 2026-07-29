@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "policy_version": "p2-daily-research-v1",
+  "status": "frozen",
+  "scope": "historical-and-paper-research-only",
+  "basis": {
+    "commission": "conservative explicit research assumption; calibrate to the actual broker account before P7",
+    "stamp_duty": "seller-side 0.05 percent research rule",
+    "transfer_fee": "both-side 0.001 percent research rule",
+    "slippage": "5 bps per side conservative daily-open assumption"
+  },
+  "currency": "CNY",
+  "timezone": "Asia/Shanghai",
+  "money": {
+    "price_tick": "0.01",
+    "cash_quantum": "0.01",
+    "rounding": "ROUND_HALF_UP"
+  },
+  "orders": {
+    "entry_lot_size": 100,
+    "partial_fill": "unsupported"
+  },
+  "costs": {
+    "buy": {
+      "slippage_bps": "5",
+      "commission_rate": "0.0003",
+      "minimum_commission": "5.00"
+    },
+    "sell": {
+      "slippage_bps": "5",
+      "commission_rate": "0.0003",
+      "minimum_commission": "5.00",
+      "stamp_duty_rate": "0.0005",
+      "transfer_fee_rate": "0.00001"
+    }
+  },
+  "profiles": [
+    {
+      "profile_id": "close-to-next-open-v1",
+      "kind": "close_to_next_open",
+      "active": true,
+      "schedule_version": "close-to-next-open-research-v1",
+      "windows": []
+    }
+  ]
+}

@@ -6,17 +6,41 @@ nodes.
 
 | Field | Value |
 | --- | --- |
-| Current phase | P2 implementation open |
-| Gate source | `config/p1-gates.v1.json` |
+| Current phase | P3 implementation open |
+| Gate source | `config/p2-gates.v1.json` |
 
 ## Current branch
 
 - P1 is accepted with the versioned C1 fail-closed condition.
-- The P2 matcher, order, ledger, and reporting engine is not implemented.
-- P3 and later delivery remain blocked by their existing gates.
+- P2 is conditionally accepted for historical and paper research under the frozen
+  `close-to-next-open-v1` profile. Its matcher, unit accounting, audit persistence, decision and
+  shadow records, diagnostic replay, P1 execution-state adapter, and golden round trip pass.
+- P3 rule-only historical implementation is open through that accepted daily profile.
+- The strategy-neutral daily replay substrate is accepted under `P3-REPLAY-001`, including strict
+  typed P1-frame adaptation, carried-sell company actions, immutable replay packaging, the lazy
+  continuous PIT frame reader, full 2012-2025 input audit, and a real-corpus round-trip smoke.
+- The research-only `P3-FEAT-002`/`P3-STRAT-001` increment adds a vectorized PIT daily-indicator
+  panel and three one-unit baseline strategies. Its command is locked to 2012-2021 development
+  data; it does not promote a target P3 policy or open arbitration/blind partitions.
+- The mixed-unit corporate-action normalization contract and a real-corpus audit are implemented
+  under `P1-DATA-004`. Exact implementation-plan authority resolves the former factor/unit
+  ambiguity, and all 272 retained rows now have a versioned per-security fail-closed disposition.
+  Snapshot `p1-historical-replay-20260729-v1` publishes the 35,157 normalized actions, that ledger,
+  the authoritative calendar, and accepted daily execution inputs together. The completeness,
+  checksum, frame, and exception gates accept it for research replay without granting execution
+  authority.
+- P3 candidate-to-empty-unit reservation competition is accepted under the existing frozen P0
+  ordering and concentration caps; sizing, concrete labels/experts/actions, multi-unit execution,
+  and multi-year acceptance remain open.
+- P3 opportunity-funnel reconciliation is accepted as a non-executing contract over explicitly
+  supplied source events; concrete P3 decisions and populated historical funnel reports remain
+  open.
+- The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
+  evidence; forward email transport remains P6 work. P4 and later keep their existing gates.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
-The machine-readable release state is `config/p1-gates.v1.json`. Prose that disagrees with that
+The current machine-readable release state is `config/p2-gates.v1.json`; P1's retained gate is
+`config/p1-gates.v1.json`. Prose that disagrees with either applicable
 gate is a conformance defect rather than an alternate project state.
 
 ## Tree
@@ -24,7 +48,7 @@ gate is a conformance defect rather than an alternate project state.
 | Branch | Authority and purpose | Child index |
 | --- | --- | --- |
 | `product/` | Product goals, requirements, non-goals, and release criteria | `product/prd.md` |
-| `design/` | Approved current-state HLD and module LLDs | `design/hld.md`, `design/lld/README.md` |
+| `design/` | Approved current-state HLD, execution profiles, and module LLDs | `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md` |
 | `architecture/` | Accepted decisions and stable topic contracts | `architecture/README.md` |
 | `work-items/` | Stable ids joining design, code, tests, issues, and evidence | `work-items/index.md` |
 | `operations/` | Deployment, recurring operation, incident, migration, and rollback | Runbook selected by the active component |
@@ -35,11 +59,14 @@ gate is a conformance defect rather than an alternate project state.
 
 | Task | Required context | Add only when needed |
 | --- | --- | --- |
-| P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
+| P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
 | P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004, relevant acceptance file |
 | ODS or daily operations | this map, architecture index, ADR 0003/0004, selected runbook | Exact config, service, and contract tests |
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
+| P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
+| P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
+| P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child | Exact strategy, P1 snapshot input, and P2 execution evidence |
 
 ## Authority and conflicts
 

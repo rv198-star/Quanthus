@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-AUDIT-NOTIFICATION-001",
+  "description": "A persisted signal is notified through an append-only retry stream without creating or implying a fill.",
+  "source_basis": "Synthetic audit acceptance case; no recipient, credential, or provider response data.",
+  "inputs": {
+    "run_id": "p2-audit-notification-001",
+    "signal_id": "signal-notification-001",
+    "profile_id": "synthetic-two-window-fixture-v1",
+    "window_id": "window_1",
+    "notification_id": "notification-001",
+    "content_hash": "sha256:7ecdb010f9e3bb002a71d9e837cc5855246045f24a6f3bc2259f9379c25cbeee",
+    "provider": "synthetic-email-provider",
+    "attempts": [
+      {
+        "attempt": 1,
+        "attempted_at": "2026-07-28T09:55:00+08:00",
+        "terminal_state": "failed",
+        "reason_code": "provider_timeout"
+      },
+      {
+        "attempt": 2,
+        "attempted_at": "2026-07-28T09:56:00+08:00",
+        "terminal_state": "delivered",
+        "reason_code": "provider_accepted"
+      }
+    ]
+  },
+  "expected": {
+    "run_event_types": ["signal_accepted"],
+    "notification_event_type": "notification",
+    "terminal_states": ["failed", "delivered"],
+    "fill_count": 0,
+    "notification_attempt_count": 2
+  }
+}

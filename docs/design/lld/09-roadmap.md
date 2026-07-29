@@ -16,11 +16,18 @@ and live operation. A later phase cannot compensate for an untrusted earlier pha
 | P3 | Rule-only vertical slice and shadow experts | Multi-year closed loop is auditable | P2 |
 | P4 | Event library and daily group report | Three leading differentiators | P3 |
 | P5 | Research scoring layer | Beats rule baseline and passes promotion gate | P4 |
-| P6 | Frozen simulation | Distribution aligns with honest backtest | P3 baseline |
-| P7 | Small-capital live units | Fill/slippage assumptions reconcile | P6 |
+| P6 | Frozen paper operation and two-window notification rehearsal | Distribution aligns with honest backtest; no live-fill claims | P3 baseline |
+| P7 | Operator-assisted small-capital operation | Every advice closes with an accepted actual/no-action report and reconciliation | P6 |
 
 P5 research may run beside P6 frozen simulation, but a development build cannot alter the
 simulation policy.
+
+Current state: P2 is conditionally accepted for the active daily research profile by
+`config/p2-gates.v1.json`; P3 is open. Its strategy-neutral one-unit daily replay substrate is
+accepted through the real continuous historical reader and 2012-2025 input audit. The next step is
+to freeze terminology and a small baseline strategy family, then evaluate those rules through the
+same P2 execution facts. Target two-window activation and forward notification keep their separate
+blockers and are not prerequisites for the daily rule-only historical slice.
 
 ## 3. Milestones
 
@@ -28,8 +35,9 @@ simulation policy.
 - **M1**: accepted data foundation and simple baseline strategy through the trusted engine.
 - **M2**: rule-only vertical slice over multiple years with complete decision trace.
 - **M3**: first event differentiation report and proposal-to-shadow-to-decision loop.
-- **M4**: frozen simulation begins and continuously records arbitration evidence.
-- **M5**: first quarterly reveal and explicit live/no-live decision.
+- **M4**: frozen paper operation and idempotent signal notification begin and continuously record
+  arbitration evidence without live-fill claims.
+- **M5**: first operator-assisted live review and explicit continue/stop decision.
 
 ## 4. Release mechanics
 
@@ -53,6 +61,6 @@ changes only through configuration, tests, and evidence in one pull request.
 | META-DOC-001 | Maintain PRD/HLD/LLD and precedence | Docs and policy agree |
 | META-TRACE-001 | Maintain requirement-to-issue traceability | No orphan active issue |
 | META-GATE-001 | Automate release gate reporting | CI gate artifact |
-| P7-LIVE-001 | Define broker adapter and live safety boundary | Simulation-compatible contract |
-| P7-RECON-001 | Reconcile live fills, costs, and slippage | Daily discrepancy report |
+| P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | Paper-compatible manual protocol |
+| P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | Daily discrepancy report |
 | P7-SCALE-001 | Implement explicit unit expansion decision | Signed reveal decision |

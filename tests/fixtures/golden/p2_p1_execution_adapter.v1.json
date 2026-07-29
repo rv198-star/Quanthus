@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-P1-EXECUTION-ADAPTER-001",
+  "description": "PIT-resolved P1 daily facts map deterministically to conservative P2 open states.",
+  "source_basis": "Synthetic rows matching the approved P1 bars_daily, tradability, and price-limit field semantics.",
+  "base": {
+    "market_date": "2026-07-28",
+    "security_code": "600000",
+    "open_at": "2026-07-28T09:30:00+08:00",
+    "close_at": "2026-07-28T15:00:00+08:00",
+    "open_price": "10.00",
+    "high_price": "10.20",
+    "low_price": "9.90",
+    "close_price": "10.10",
+    "upper_limit_price": "11.00",
+    "lower_limit_price": "9.00"
+  },
+  "cases": [
+    {
+      "id": "normal",
+      "coverage_status": "trading",
+      "data_valid": true,
+      "is_executable": true,
+      "entry_policy_allows": true,
+      "reason_code": "price_limit_resolved",
+      "expected_state": "executable",
+      "keeps_prices": true
+    },
+    {
+      "id": "suspended-placeholder-ignored",
+      "coverage_status": "suspended",
+      "data_valid": true,
+      "is_executable": false,
+      "entry_policy_allows": true,
+      "reason_code": "suspension_record",
+      "expected_state": "suspended",
+      "keeps_prices": false
+    },
+    {
+      "id": "limit-up-open",
+      "coverage_status": "trading",
+      "data_valid": true,
+      "is_executable": true,
+      "entry_policy_allows": true,
+      "reason_code": "price_limit_resolved",
+      "open_price": "11.00",
+      "high_price": "11.00",
+      "close_price": "11.00",
+      "expected_state": "buy_blocked_limit_up",
+      "keeps_prices": true
+    },
+    {
+      "id": "limit-down-open",
+      "coverage_status": "trading",
+      "data_valid": true,
+      "is_executable": true,
+      "entry_policy_allows": true,
+      "reason_code": "price_limit_resolved",
+      "open_price": "9.00",
+      "low_price": "9.00",
+      "close_price": "9.00",
+      "expected_state": "sell_blocked_limit_down",
+      "keeps_prices": true
+    },
+    {
+      "id": "invalid-bar",
+      "coverage_status": "trading",
+      "data_valid": false,
+      "is_executable": false,
+      "entry_policy_allows": true,
+      "reason_code": "invalid_bar",
+      "expected_state": "missing_evidence",
+      "keeps_prices": false
+    },
+    {
+      "id": "zero-liquidity",
+      "coverage_status": "trading",
+      "data_valid": true,
+      "is_executable": false,
+      "entry_policy_allows": true,
+      "reason_code": "zero_liquidity",
+      "expected_state": "missing_evidence",
+      "keeps_prices": false
+    }
+  ]
+}

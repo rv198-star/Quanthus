@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0.0",
+  "gate_version": "p2-2026-07-28.1",
+  "p2_acceptance": "passed-conditional",
+  "p3_implementation": "allowed",
+  "accepted_scope": "close-to-next-open historical and paper research",
+  "accepted_profile": "close-to-next-open-v1",
+  "execution_policy": {
+    "path": "config/p2-execution-policy.research.v1.json",
+    "version": "p2-daily-research-v1"
+  },
+  "acceptance_evidence": "docs/acceptance/p2-conformance-acceptance-20260728.md",
+  "conditional_acceptance": {
+    "id": "P2-TARGET-PROFILE-BLOCKED",
+    "blocked_profile": "operator-assisted-two-window-v1",
+    "runtime_behavior": "target profile matching and forward notification fail explicitly until activation blockers close"
+  },
+  "work_items": {
+    "P2-ENG-001": "closed",
+    "P2-POLICY-001": "closed",
+    "P2-MATCH-001": "closed",
+    "P2-LEDGER-001": "closed",
+    "P2-ORDER-001": "closed",
+    "P2-AUDIT-001": "closed",
+    "P2-METRIC-001": "closed",
+    "P2-OBS-001": "closed",
+    "P2-HYP-001": "closed",
+    "P2-ACCEPT-001": "closed"
+  },
+  "activation_blockers": [
+    {
+      "id": "P2-INTRADAY-INPUT",
+      "status": "open",
+      "blocks": "operator-assisted-two-window-v1",
+      "required_evidence": "accepted complete intraday snapshots and forward latency SLA"
+    },
+    {
+      "id": "P2-INTRADAY-MATCH",
+      "status": "open",
+      "blocks": "operator-assisted-two-window-v1",
+      "required_evidence": "non-synthetic cutoff cadence, fill reference, expiry, and no-lookahead golden cases"
+    },
+    {
+      "id": "P6-NOTIFICATION-TRANSPORT",
+      "status": "open",
+      "blocks": "operator-assisted-two-window-v1-forward-notification",
+      "required_evidence": "idempotent provider integration without implied fills or recipient data in audit events"
+    }
+  ]
+}

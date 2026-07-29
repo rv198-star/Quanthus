@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-FIXED-UNIT-REPORT-001",
+  "description": "One closed fixed-unit trade reconciles cash flows, total wealth, capital days, and drawdown.",
+  "source_basis": "Hand-calculated synthetic acceptance case derived from the normal-buy and carried-sell fixtures.",
+  "inputs": {
+    "target_notional": "10000.00",
+    "entry_gross": "1001.00",
+    "entry_fees": "5.00",
+    "exit_gross": "1019.00",
+    "exit_fees": "5.52",
+    "dividends": "0.00",
+    "capital_days": 3,
+    "equity_points": [
+      {"market_date": "2026-07-27", "system_equity": "10100.00", "external_cash_flow": "0.00"},
+      {"market_date": "2026-07-28", "system_equity": "10114.00", "external_cash_flow": "0.00"},
+      {"market_date": "2026-07-29", "system_equity": "9994.00", "external_cash_flow": "0.00"},
+      {"market_date": "2026-07-30", "system_equity": "10107.48", "external_cash_flow": "0.00"}
+    ]
+  },
+  "expected": {
+    "trade_return": "0.00743539",
+    "unit_capital_day_return": "0.00024933",
+    "total_pnl": "7.48",
+    "external_cash_flow": "0.00",
+    "cash_flow_adjusted_drawdown": "0.01186474",
+    "compound_nav": false
+  }
+}

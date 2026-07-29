@@ -4,12 +4,12 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P2 implementation open |
-| Version | 0.2 |
+| Current phase | P3 implementation open |
+| Version | 0.4 |
 | Effective date | 2026-07-28 |
 | Product type | Internal research and trading decision system |
 | Market | China A-shares, SSE and SZSE |
-| Governing gate | `config/p1-gates.v1.json` |
+| Governing gate | `config/p2-gates.v1.json` |
 
 ## 1. Background
 
@@ -35,7 +35,8 @@ The staged objectives are:
 3. Run a rule-only vertical slice whose drawdown is explainable and whose trades are auditable.
 4. Build an event library that separates positive, intermediate, failed, and unexecutable cases.
 5. Use models as a research instrument and promote them only after strict out-of-sample proof.
-6. Validate frozen behavior in simulation before any small-capital live deployment.
+6. Validate frozen behavior through paper notification before operator-assisted small-capital
+   deployment; automated broker integration is not required.
 
 ## 3. Non-goals
 
@@ -46,6 +47,7 @@ The staged objectives are:
 - News and financial-statement experts in the first release.
 - Production Transformer models before event volume and baselines justify them.
 - Use of present-day universes, present-day sector membership, or future adjustment factors.
+- Automated broker connectivity or unattended live order placement in the near-term product.
 
 ## 4. Users and operating roles
 
@@ -53,7 +55,7 @@ The staged objectives are:
 | --- | --- |
 | Researcher | Reproducible event scans, labels, experiments, and attribution reports |
 | Strategy owner | Versioned expert rules, evidence, shadow comparisons, and approvals |
-| Operator | Daily decisions, orders, exceptions, and complete audit trails |
+| Operator | Windowed action-advice emails, manual actions, actual-operation reports, and exceptions |
 | Reviewer | Blind validation, change history, and reproducible acceptance evidence |
 | Developer | Explicit contracts, release gates, deterministic fixtures, and issue traceability |
 
@@ -66,7 +68,8 @@ One person may hold several roles, but the artifacts and gates remain separate.
 3. Capital units have fixed notional. Profits leave and losses are replenished from a finite pool.
 4. Rules precede models. A model must beat a frozen rule baseline to enter an action path.
 5. Validation discipline outranks performance. Unarbitrated results are research results only.
-6. Backtests are conservative. T-close signals may first execute at T+1 open with costs.
+6. Backtests are conservative. The active T-close profile may first execute at T+1 open; any
+   intraday profile freezes its windows, PIT cutoffs, fill references, and costs before use.
 7. Every accepted, rejected, shadow, and hypothetical decision is traceable to a snapshot.
 
 ## 6. Functional requirements
@@ -86,11 +89,14 @@ One person may hold several roles, but the artifacts and gates remain separate.
 ### Backtest and execution
 
 - **FR-BT-001**: Consume dated signals and produce fills, rejections, order events, and ledgers.
-- **FR-BT-002**: Execute daily signals no earlier than the next session open.
+- **FR-BT-002**: Under the active daily profile, execute T-close signals no earlier than the next
+  session open.
 - **FR-BT-003**: Cancel unfilled buys and reassess; carry unfilled sells until tradable.
 - **FR-BT-004**: Enforce fixed-capital-unit state transitions and finite external funding.
 - **FR-BT-005**: Rank same-day candidates by score descending and code ascending.
 - **FR-BT-006**: Produce deterministic results and reconcile golden trade cases exactly.
+- **FR-BT-007**: Support a versioned target profile with exactly two eligible action windows per
+  session; every decision and simulated execution carries its profile, window, and PIT cutoff.
 
 ### Rules, experts, and positions
 
@@ -121,6 +127,9 @@ One person may hold several roles, but the artifacts and gates remain separate.
 - **FR-AUDIT-003**: Keep single-signal hypothetical PnL diagnostic only.
 - **FR-AUDIT-004**: Calculate official risk-avoided and opportunity-captured amounts from
   capital-constrained strategy reruns.
+- **FR-AUDIT-005**: Persist action advice, notification, operator-reported action, simulated
+  execution, and actual ledger events separately; email delivery never constitutes an order or
+  fill, and only an accepted operator report may update the actual ledger.
 - **FR-GOV-001**: Enforce proposal, review, shadow, and promote/rollback states.
 - **FR-GOV-002**: Separate development, arbitration, permanent blind, and live simulation data.
 
@@ -134,6 +143,8 @@ One person may hold several roles, but the artifacts and gates remain separate.
 - **NFR-006 Testability**: Business rules have unit tests and critical paths have golden fixtures.
 - **NFR-007 Local-first operation**: P1/P2 can run on OCI without external service dependencies.
 - **NFR-008 Secret hygiene**: Credentials and market data are never committed.
+- **NFR-009 Notification idempotency**: Retry preserves one logical notification per signal and
+  cannot create a duplicate opportunity or execution record.
 
 ## 8. Release plan and success criteria
 
@@ -145,8 +156,8 @@ One person may hold several roles, but the artifacts and gates remain separate.
 | P3 | Rule-only vertical slice | Multi-year replay survives and every decision is auditable |
 | P4 | Event library and three-class dataset | Three leading differentiators are reproducible |
 | P5 | Research scoring layer | Model beats frozen baseline without regime collapse |
-| P6 | Frozen simulation | Results remain inside the expected backtest distribution |
-| P7 | Small-capital live operation | Measured fills and slippage align with assumptions |
+| P6 | Frozen paper operation and signal notification | Results remain inside the expected backtest distribution; no live-fill claims |
+| P7 | Operator-assisted small-capital operation | Every advice reconciles to reported fills, modified/partial action, or no action |
 
 ## 9. Data and validation partitions
 
@@ -156,6 +167,9 @@ One person may hold several roles, but the artifacts and gates remain separate.
 - Simulation accumulation: 2026 onward.
 
 Any result that has not passed the relevant arbitration gate is labeled as a research result.
+Official two-window backtests are additionally limited to accepted intraday evidence. The current
+data policy starts official 5-minute history at 2024-07; daily OHLC cannot stand in for an
+intraday decision or fill when reporting two-window performance.
 
 ## 10. Key product risks
 
@@ -168,6 +182,8 @@ Any result that has not passed the relevant arbitration gate is labeled as a res
 | Correlated unit exposure | Industry and same-day entry concentration caps |
 | Counterfactual overclaim | Official values from capital-constrained reruns only |
 | Model authority creep | Model outputs cannot bypass expert contracts |
+| Intraday proxy leakage | Two-window claims require accepted intraday snapshots and window cutoffs |
+| Notification/execution confusion | Advice, email, paper fills, operator reports, and actual-ledger events remain separate |
 
 ## 11. Current decision
 
@@ -175,5 +191,12 @@ P1 is conditionally accepted against immutable snapshot
 `p1-identity-code-validity-20260725-v1`. C1's 4,173 batch-dated PIT factor exceptions are not a
 full-data pass: they are accepted only under `p1-c1-conditional-20260725-v1`, which requires any
 factor-dependent historical path to fail closed before a declared knowledge cutoff. C2 and S1 are
-closed. P2 implementation is allowed; P3 remains blocked pending P2 acceptance. The next
-executable work is listed in `docs/work-items/index.md` and `config/p1-gates.v1.json`.
+closed. P2 is conditionally accepted for the frozen `close-to-next-open-v1` historical and paper
+research policy, and P3 rule-only historical implementation is allowed. The acceptance boundary
+is machine-readable in `config/p2-gates.v1.json`; it does not activate the target intraday profile.
+The next executable work is listed in `docs/work-items/index.md`. The approved
+near-term operating direction is `operator-assisted-two-window-v1`: exactly two versioned action
+windows at `09:45-10:15` and `14:15-session close` in `Asia/Shanghai`, email notification, manual
+operator action, and no broker connection. The clock bounds are approved; evaluation cadence,
+data-latency, and fill policy remain blocked until a versioned executable configuration and
+acceptance evidence are committed. `close-to-next-open-v1` remains the active executable profile.

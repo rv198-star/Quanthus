@@ -4,10 +4,10 @@
 | --- | --- |
 | Phase | Instrumentation in P2; reports after P3 |
 | Design status | approved |
-| Delivery gate | open |
-| Implementation status | P2 decision/shadow logging not started |
-| Gate source | `config/p1-gates.v1.json` |
-| Governing requirements | FR-AUDIT-001 through FR-AUDIT-004 |
+| Delivery gate | accepted-conditional |
+| Implementation status | P2 event contracts plus P3 shadow comparison and `P3-FUNNEL-001` reconciliation contracts accepted; P3 decision production, populated reports, and attribution open |
+| Gate source | `config/p2-gates.v1.json` |
+| Governing requirements | FR-AUDIT-001 through FR-AUDIT-005 |
 
 ## 1. Goal
 
@@ -32,11 +32,68 @@ unit, lifecycle stage, complete expert outputs, aggregate score, vetoes/constrai
 and final action, reason codes, snapshot, policy versions, and linked order ids. Shadow outputs
 use the same schema and are explicitly non-executing.
 
+The P2 `DecisionEvent` persists these fields as opaque upstream evidence for accepted, rejected,
+and shadow dispositions. Accepted records resolve their Signal and exact Order ids in an immutable
+run; rejected and shadow records are structurally forbidden from linking orders. P3 owns the
+expert meanings and production of one record per review. Evidence:
+`docs/acceptance/p2-round-trip-observability-slice-20260728.md`.
+
+The bounded P3 comparison contract consumes one non-shadow baseline and one or more shadow
+`DecisionEvent` values from the same review. It reports action, score, expert-output, veto,
+constraint, reason, and policy-version differences with deterministic ids and digests. It does not
+persist a `DecisionEvent` or create any execution artifact; P2's immutable audit store remains the
+owner of decision persistence. Evidence:
+`docs/acceptance/p3-shadow-divergence-contract-slice-20260728.md`.
+
+The strategy-neutral replay now has a separate immutable analysis package. It persists replay
+decision traces, equity points, trades, metrics, and final state, then binds their checksum to the
+exact P2 run manifest and event stream. This closes replay reproducibility but does not substitute
+for the complete expert/veto/constraint fields of a concrete P3 `DecisionEvent`; those records stay
+blocked on concrete experts and score/action policy. Evidence:
+`docs/acceptance/p3-strategy-replay-integration-slice-20260728.md`.
+
+### Notification log
+
+An operator notification is emitted only from a persisted decision or OrderIntent. It records
+notification and signal ids, execution profile/window ids, content hash, provider, attempt,
+timestamps, terminal delivery state, and bounded reason code. Provider credentials and recipient
+addresses do not enter the event record.
+
+Delivery success never creates an Order or Fill. Delivery failure does not change the decision;
+retry preserves one logical notification identity. A manually entered trade is actual only after a
+separate operator execution report is accepted under P7. Until then, notification outcomes and the
+paper ledger remain separate evidence streams.
+
+The bounded P2 store now atomically publishes an immutable run event stream, then accepts a
+notification only when its run contains exactly one matching persisted Signal with the same
+profile/window. Attempts append under one immutable notification identity and checksum chain.
+This is storage and contract evidence only: it does not send email, persist recipient data, or
+implement operator execution reports. Evidence:
+`docs/acceptance/p2-audit-window-slice-20260728.md`.
+
+### Operator execution and reconciliation log
+
+P7 accepts an append-only `OperatorExecutionReport` linked to one advice and signal. Its outcome is
+`not_executed`, `executed_as_advised`, `partially_executed`, or `executed_modified`; it retains zero
+or more actual fill rows, fees, evidence reference, operator/report times, and any deviation reason.
+A correction uses `supersedes_report_id` and preserves both versions.
+
+Reconciliation compares advice, notification, paper execution, and accepted actual fills without
+making any stream authoritative for another. It reports response/skip rate, action and size
+divergence, timing delay, price/slippage difference, fee difference, and unreconciled reports.
+Only accepted report events feed the actual ledger; paper and hypothetical metrics remain labeled.
+
 ## 4. Hypothetical ledger
 
 Rejected and near-threshold signals are followed under the frozen baseline entry/exit policy
 for at most 20 sessions. These isolated paths diagnose a decision but ignore competition for
 capital and must never be summed as official risk/opportunity money.
+
+The P2 diagnostic runner enforces the 20-capital-day bound, requires an explicit rejected or
+near-threshold source decision and baseline version, and marks output as not capital constrained
+and not aggregatable as official. It reuses the accepted matcher/accounting path rather than a
+second pricing engine. P3 still supplies the frozen baseline entry/exit decisions and later owns
+the full capital-constrained attribution rerun.
 
 Official monetary attribution reruns the full strategy under identical capital and execution
 constraints with one module removed or neutralized. The reported value is the delta from the
@@ -49,6 +106,20 @@ Fixed stages are candidate to score, score to veto, entry to add, and hold to ex
 reconciles input/output counts and joins realized or diagnostic outcomes. A funnel that does
 not reconcile to the event total fails publication.
 
+`src/quanthus/opportunity_funnel.py` now implements the bounded reconciliation contract. A caller
+must declare the exact input-event set for all four fixed stages, including an explicit empty set
+for a stage with no input. Every source event receives exactly one advanced, stopped, or unavailable
+classification and exactly one realized, diagnostic, or pending outcome state. Missing, extra,
+duplicate, or out-of-period observations fail publication. When one stage output is also present as
+another stage input, the link must enter the next fixed stage and retain opportunity identity.
+Input order cannot change the report id, digest, stage summaries, or canonical bytes. Evidence:
+`docs/acceptance/p3-opportunity-funnel-slice-20260728.md`.
+
+This completes only the reusable reconciliation portion of `P3-FUNNEL-001`. It consumes already
+produced evidence, declares `execution_authorized=false`, and cannot create a decision, signal,
+order, fill, position transition, or notification. Concrete label/expert/action production and a
+populated historical funnel remain part of the open P3 vertical slice.
+
 ## 6. Reporting cuts
 
 Reports support month/quarter, market regime, lifecycle stage, expert/aggregator/position rule,
@@ -59,7 +130,7 @@ contribution matrix, and failure ranking appear below it.
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P2-OBS-001 | Define decision/shadow log schema | P2 events | Accepted/rejected trace fixture |
+| P2-OBS-001 | Define decision/shadow/notification log schema | P2 events | Accepted, rejected, delivered, and no-implied-fill fixture |
 | P2-HYP-001 | Implement diagnostic hypothetical ledger | Matcher/exit policy | 20-session path fixture |
 | P3-FUNNEL-001 | Implement reconciled opportunity funnel | P3 vertical slice | Count reconciliation |
 | P3-ATTR-001 | Implement constrained remove/neutralize reruns | Trusted engine | Reproducible contribution matrix |
@@ -67,6 +138,7 @@ contribution matrix, and failure ranking appear below it.
 
 ## 8. Acceptance
 
-Every fill and rejection resolves to a complete decision log; monthly north stars are
-reproducible; the first contribution matrix reruns from a manifest; and all funnel stages
-reconcile exactly.
+Every fill and rejection resolves to a complete decision log; every notification resolves to one
+persisted signal without implying execution; and every actual-ledger event resolves to one accepted
+operator report without rewriting its advice. Monthly north stars are reproducible; the first
+contribution matrix reruns from a manifest; and all funnel stages reconcile exactly.

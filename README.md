@@ -9,8 +9,12 @@ model output as a trading decision and it does not promise investment returns.
 - P1 implementation: allowed.
 - P1 acceptance: conditionally passed under `p1-c1-conditional-20260725-v1`; its 4,173
   factor-visibility exceptions remain fail-closed.
-- P2 implementation: allowed. P3 remains blocked pending P2 acceptance.
-- P3 scope: a replayable vertical slice; inactive experts run in shadow mode.
+- P2 acceptance: conditional pass for `close-to-next-open-v1` research; target two-window
+  activation remains blocked by `config/p2-gates.v1.json`.
+- P3 implementation: allowed for a replayable rule-only historical vertical slice. The bounded
+  strategy-neutral daily replay substrate, continuous real-history frame reader, and three simple
+  development-only research baselines are accepted. Target strategy rules and inactive experts
+  remain open or shadow-only as declared by their work items.
 
 ## Quick start
 

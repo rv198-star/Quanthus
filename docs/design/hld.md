@@ -4,18 +4,19 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P2 implementation open |
-| Version | 0.3 |
+| Current phase | P3 implementation open |
+| Version | 0.6 |
 | Effective date | 2026-07-28 |
 | Governing policy | `config/p0-policy.v1.json` |
-| Governing gate | `config/p1-gates.v1.json` |
+| Governing gate | `config/p2-gates.v1.json` |
 
 ## 1. System context
 
 Quanthus is a file-first research and decision platform. It ingests market data, creates
 point-in-time snapshots, describes market state, obtains independent expert opinions,
-applies vetoes and constraints, maps the result to position actions, and executes those
-actions through the same order and ledger contracts in backtest and simulation.
+applies vetoes and constraints, maps the result to position actions, and evaluates those
+actions through the same order and ledger contracts in backtest and paper operation. A separate
+notification path may deliver persisted signals to a human operator; it does not place orders.
 
 ```mermaid
 flowchart LR
@@ -28,12 +29,15 @@ flowchart LR
     A --> M["Position state machine"]
     M --> O["Orders and matching"]
     O --> G["Capital-unit ledger"]
+    M --> N["Signal notification"]
+    N --> H["Human operator"]
     A --> D["Decision log"]
     O --> D
     D --> C["Counterfactual replay and attribution"]
 ```
 
-The representation and model layer has no direct edge to orders.
+The representation and model layer has no direct edge to orders. The human-operator edge is
+outside automated execution; no broker adapter exists in the near-term profile.
 
 ## 2. Architectural layers
 
@@ -47,6 +51,7 @@ The representation and model layer has no direct edge to orders.
 | Aggregator | Fixed-priority governance and action mapping | Proposed position action |
 | Position engine | Capital-unit lifecycle and concentration rules | Desired orders |
 | Matching/ledger | Conservative fills, rejects, costs, and accounting | Immutable order/fill/ledger events |
+| Notification delivery | Idempotent delivery of persisted signal or intent | Notification events; never fills |
 | Audit/attribution | Provenance, hypothetical ledger, reruns, scorecards | Run manifests and reports |
 
 ## 3. Data platform and storage design
@@ -85,6 +90,8 @@ in `docs/architecture/adr-0002-hermes-oci-data-platform.md`.
 
 ## 4. Canonical daily sequence
 
+### Active close-to-next-open profile
+
 ```mermaid
 sequenceDiagram
     participant Data as "Data foundation"
@@ -102,6 +109,38 @@ sequenceDiagram
 
 Unfilled buys are cancelled and reconsidered after the next close. Unfilled sells remain
 pending until tradable and produce one status event per session.
+
+### Target two-window operator-assisted profile
+
+The approved near-term direction evaluates opportunities in exactly two versioned action windows
+per eligible session: `09:45-10:15` and `14:15-session close` in `Asia/Shanghai`. These are
+half-open action intervals, so session close is not itself a new decision or execution instant.
+Historical execution remains simulated. Forward operation persists the same profile/window-bound
+signal and may email it to the operator for manual action; delivery does not create an order or
+fill. Synthetic P2 fixtures prove cutoff and expiry mechanics, but target evaluation cadence,
+input-latency SLA, and fill reference remain inactive until a non-synthetic executable policy and
+tests freeze them.
+
+```mermaid
+sequenceDiagram
+    participant Decide as "Decision pipeline"
+    participant Notify as "Email notification"
+    participant Human as "Human operator"
+    participant Report as "Execution reporting"
+    participant Actual as "Actual ledger"
+    Decide->>Notify: Persisted action advice with signal/profile/window ids
+    Notify-->>Human: Suggested action; never an order or fill
+    Human->>Report: Actual fills, modified/partial action, or no action
+    Report->>Actual: Accepted append-only report and reconciliation
+```
+
+The actual report may differ from the advice. The system preserves that divergence for slippage,
+timing, compliance, and behavior analysis rather than changing the original decision.
+
+Official intraday evidence currently begins with 5-minute data on 2024-07-01. Daily bars cannot be
+used to reconstruct a two-window decision or fill, and the current after-session minute archive is
+not a live signal feed. The cross-module contract and activation gates are defined in
+`docs/design/execution-notification-profiles.md`.
 
 ## 5. Cross-module contracts
 
@@ -123,12 +162,27 @@ Every feature and decision references:
 
 ### Run contract
 
-Every run records code version, parameter hash, data snapshot id, feature version, rule
-version, run id, and result summary. Operational pipelines also record terminal notification
-outcomes without persisting notification credentials. A report without its manifest is not an
-official result.
+Every run records code version, parameter hash, data snapshot id, feature version, rule version,
+run id, and result summary. A profile-aware trading run additionally records its execution profile,
+schedule version, and window ids; target activation must version the executable manifest contract
+before those fields become required. Operational pipelines and signal delivery record terminal
+notification outcomes without persisting notification credentials. A report without its manifest
+is not an official result.
 
 ## 6. Vertical-slice release
+
+Before a concrete P3 rule is frozen, the strategy-neutral daily replay layer runs consecutive PIT
+reviews through the accepted P2 matcher and fixed-unit ledger. It preserves the strategy/execution
+information boundary, supports sequential complete trades and held-position marks, and emits a
+canonical decision trace, equity curve, trade ledger, and strategy performance report. This
+accepted substrate does not authorize a strategy or threshold by itself.
+
+The continuous implementation reads only one checksum-verified historical bundle. A strategy sees
+an opaque-security-id T-close bar view whose history ends at T; a separate runner-only lazy source
+loads T+1 execution evidence and company actions. Universe rows with missing execution evidence
+remain visible and fail closed. Versioned company-action exceptions block new entry by
+security/date and abort an affected held-position replay rather than silently corrupting quantity
+or marks.
 
 The first P3 action path enables only:
 
@@ -151,12 +205,17 @@ Other labels and experts execute in shadow mode without changing position action
 - The daily DWD and DWS revisions both pass their gates before publication begins. Notification
   delivery is secondary: its failure is recorded for monitoring but does not roll back accepted
   data.
+- A signal email is never execution evidence. Simulated, notified, and manually confirmed states
+  cannot share a fill or position record by implication.
 
 ## 8. Security and operations
 
 - Git uses a repository-scoped deploy key on OCI.
 - Market credentials are environment or secret-store values and never enter run manifests.
 - Data and research artifacts are excluded from Git.
+- Near-term operation has no automated broker connectivity. Any real-capital manual action is a P7
+  activity and requires explicit append-only execution reporting and advice-to-actual
+  reconciliation before it enters the actual ledger.
 - OCI-to-PVE database writes use a private overlay/tunnel or TLS with certificate verification;
   public write connections using `sslmode=disable` are prohibited.
 - Runtime database roles separate Hermes append-only ODS ingestion, OCI publication, migrations,
@@ -172,7 +231,8 @@ failed proposal. Repository docs and configuration are updated in the same pull 
 
 ## 10. Detailed designs
 
-The implementation contracts are indexed by `docs/design/lld/README.md` and defined under
-`docs/design/lld/01-data-foundation.md` through
-`docs/design/lld/10-monitoring-attribution.md`. Stable work-item ids connect each design section
-to code, tests, acceptance evidence, and GitHub issues.
+The operating profiles are defined in `docs/design/execution-notification-profiles.md`. Module
+contracts are indexed by `docs/design/lld/README.md` and defined under
+`docs/design/lld/01-data-foundation.md` through `docs/design/lld/10-monitoring-attribution.md`.
+Stable work-item ids connect each design section to code, tests, acceptance evidence, and GitHub
+issues.

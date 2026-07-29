@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "policy_version": "p1-corporate-action-normalization-20260728-v1",
+  "status": "frozen",
+  "share_quantity_unit": "per_ten_shares",
+  "cash_unit_candidates": ["per_share", "per_ten_shares"],
+  "maximum_factor_ratio_error": "0.005",
+  "minimum_candidate_error_separation": "0.00001",
+  "cross_check_baselines": ["prior_factor", "prior_qfq_ratio"]
+}

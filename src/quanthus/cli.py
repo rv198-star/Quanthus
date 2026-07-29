@@ -8,10 +8,38 @@ from datetime import date, datetime
 from pathlib import Path
 
 from quanthus import __version__
+from quanthus.backtest.baseline_research import (
+    BaselineFeaturePanel,
+    BaselineResearchError,
+    load_baseline_strategy_catalogue,
+    run_baseline_strategy_suite,
+)
+from quanthus.backtest.engine import BacktestEngine, BacktestInputError
+from quanthus.backtest.historical_bundle import HistoricalReplayBundleError
+from quanthus.backtest.historical_frames import (
+    HistoricalFrameReaderError,
+    load_historical_frame_reader,
+)
+from quanthus.backtest.policy import load_execution_policy
 from quanthus.code_validity import (
     CodeValidityError,
     build_code_validity_table,
     load_code_validity_mapping,
+)
+from quanthus.corporate_action_corpus import (
+    CorporateActionCorpusError,
+    CorporateActionCorpusPaths,
+    audit_corporate_action_corpus,
+)
+from quanthus.corporate_action_normalization import (
+    CorporateActionNormalizationError,
+    load_corporate_action_normalization_policy,
+)
+from quanthus.corporate_action_revision import (
+    CorporateActionRevisionError,
+    build_corporate_action_revision,
+    check_corporate_action_revision,
+    promote_corporate_action_revision,
 )
 from quanthus.curation import CuratedDailyResult, CurationError, build_curated_daily
 from quanthus.data_foundation import SnapshotCatalog
@@ -21,7 +49,12 @@ from quanthus.delisted_coverage import (
     DelistedCoverageReport,
     run_delisted_coverage,
 )
-from quanthus.gates import GateReport, load_gate_report
+from quanthus.feature_registry import FeatureRegistryError, load_feature_registry
+from quanthus.gates import GateReport, P2GateReport, load_gate_report, load_p2_gate_report
+from quanthus.historical_replay_snapshot import (
+    HistoricalReplaySnapshotError,
+    publish_historical_replay_snapshot,
+)
 from quanthus.identity_coverage import IdentityCoverageError, build_identity_coverage
 from quanthus.identity_normalization import (
     IdentityNormalizationError,
@@ -103,6 +136,7 @@ def _parser() -> argparse.ArgumentParser:
     doctor = subparsers.add_parser("doctor", help="validate the bootstrap environment")
     doctor.add_argument("--policy", type=Path)
     doctor.add_argument("--gates", type=Path)
+    doctor.add_argument("--p2-gates", type=Path)
 
     policy = subparsers.add_parser("policy-check", help="validate the frozen P0 policy")
     policy.add_argument("--policy", type=Path)
@@ -116,6 +150,49 @@ def _parser() -> argparse.ArgumentParser:
     data_audit.add_argument("--bars-file", default="daily_ohlcv.parquet")
     data_audit.add_argument("--output", type=Path)
     data_audit.add_argument("--require-c1-c2", action="store_true")
+
+    corporate_action_audit = subparsers.add_parser(
+        "audit-corporate-actions",
+        help="audit mixed-unit corporate actions against one immutable P1 snapshot",
+    )
+    corporate_action_audit.add_argument("--snapshot-dir", type=Path, required=True)
+    corporate_action_audit.add_argument("--corporate-actions", type=Path, required=True)
+    corporate_action_audit.add_argument("--eastmoney-raw-dir", type=Path)
+    corporate_action_audit.add_argument("--policy", type=Path)
+    corporate_action_audit.add_argument("--scope-start", type=date.fromisoformat, required=True)
+    corporate_action_audit.add_argument("--scope-end", type=date.fromisoformat, required=True)
+    corporate_action_audit.add_argument("--report-output", type=Path)
+    corporate_action_audit.add_argument("--exception-ledger-output", type=Path)
+
+    corporate_action_build = subparsers.add_parser(
+        "build-corporate-action-revision",
+        help="build an immutable normalized-action and exception-ledger revision",
+    )
+    corporate_action_build.add_argument("--snapshot-dir", type=Path, required=True)
+    corporate_action_build.add_argument("--corporate-actions", type=Path, required=True)
+    corporate_action_build.add_argument("--eastmoney-raw-dir", type=Path, required=True)
+    corporate_action_build.add_argument("--policy", type=Path)
+    corporate_action_build.add_argument("--scope-start", type=date.fromisoformat, required=True)
+    corporate_action_build.add_argument("--scope-end", type=date.fromisoformat, required=True)
+    corporate_action_build.add_argument(
+        "--knowledge-cutoff", type=datetime.fromisoformat, required=True
+    )
+    corporate_action_build.add_argument("--output", type=Path, required=True)
+    corporate_action_build.add_argument("--revision", required=True)
+    corporate_action_build.add_argument("--previous-revision", type=Path)
+
+    corporate_action_check = subparsers.add_parser(
+        "check-corporate-action-revision",
+        help="verify one immutable corporate-action replay revision",
+    )
+    corporate_action_check.add_argument("--revision-dir", type=Path, required=True)
+
+    corporate_action_promote = subparsers.add_parser(
+        "promote-corporate-action-revision",
+        help="advance the accepted corporate-action replay revision pointer",
+    )
+    corporate_action_promote.add_argument("--revision-dir", type=Path, required=True)
+    corporate_action_promote.add_argument("--pointer", type=Path, required=True)
 
     code_validity = subparsers.add_parser(
         "build-code-validity",
@@ -227,6 +304,49 @@ def _parser() -> argparse.ArgumentParser:
     snapshot.add_argument("--plan", type=Path, required=True)
     snapshot.add_argument("--catalog-root", type=Path, required=True)
     snapshot.add_argument("--metadata-output", type=Path)
+
+    replay_snapshot = subparsers.add_parser(
+        "publish-historical-replay-snapshot",
+        help="extend one P1 snapshot with replay inputs and verify the complete bundle",
+    )
+    replay_snapshot.add_argument("--base-snapshot", type=Path, required=True)
+    replay_snapshot.add_argument("--corporate-action-revision", type=Path, required=True)
+    replay_snapshot.add_argument("--trading-calendar", type=Path, required=True)
+    replay_snapshot.add_argument("--calendar-source-revision", required=True)
+    replay_snapshot.add_argument(
+        "--calendar-knowledge-cutoff", type=datetime.fromisoformat, required=True
+    )
+    replay_snapshot.add_argument("--snapshot-id", required=True)
+    replay_snapshot.add_argument("--source-revision", required=True)
+    replay_snapshot.add_argument("--knowledge-cutoff", type=datetime.fromisoformat, required=True)
+    replay_snapshot.add_argument("--catalog-root", type=Path, required=True)
+    replay_snapshot.add_argument("--policy", type=Path)
+    replay_snapshot.add_argument("--metadata-output", type=Path)
+
+    replay_frames = subparsers.add_parser(
+        "audit-historical-replay-frames",
+        help="audit continuous PIT decision-to-execution frames from a verified bundle",
+    )
+    replay_frames.add_argument("--snapshot-dir", type=Path, required=True)
+    replay_frames.add_argument("--scope-start", type=date.fromisoformat, required=True)
+    replay_frames.add_argument("--scope-end", type=date.fromisoformat, required=True)
+    replay_frames.add_argument("--policy", type=Path)
+    replay_frames.add_argument("--output", type=Path)
+
+    baseline_suite = subparsers.add_parser(
+        "run-baseline-strategy-suite",
+        help="build PIT daily indicators and replay the three research-only P3 baselines",
+    )
+    baseline_suite.add_argument("--snapshot-dir", type=Path, required=True)
+    baseline_suite.add_argument("--scope-start", type=date.fromisoformat, required=True)
+    baseline_suite.add_argument("--scope-end", type=date.fromisoformat, required=True)
+    baseline_suite.add_argument("--feature-panel", type=Path, required=True)
+    baseline_suite.add_argument("--output", type=Path, required=True)
+    baseline_suite.add_argument("--audit-output-dir", type=Path)
+    baseline_suite.add_argument("--catalogue", type=Path)
+    baseline_suite.add_argument("--feature-registry", type=Path)
+    baseline_suite.add_argument("--execution-policy", type=Path)
+    baseline_suite.add_argument("--corporate-action-policy", type=Path)
 
     st_status = subparsers.add_parser(
         "build-st-status",
@@ -418,12 +538,20 @@ def _print_gate_report(report: GateReport) -> None:
     print(f"P2 implementation: {'ALLOWED' if report.p2_can_start else 'BLOCKED'}")
 
 
-def _doctor(policy: P0Policy, gates: GateReport) -> None:
+def _doctor(policy: P0Policy, gates: GateReport, p2_gates: P2GateReport) -> None:
     print("Quanthus environment: OK")
     print(f"policy: {policy.version}")
     print(f"policy digest: {policy.digest}")
     print(f"policy path: {policy.path}")
     _print_gate_report(gates)
+    p2_blockers = (
+        ", ".join(p2_gates.open_activation_blockers)
+        if p2_gates.open_activation_blockers
+        else "none"
+    )
+    print(f"P2 acceptance: {p2_gates.acceptance_status.upper()}")
+    print(f"P3 implementation: {'ALLOWED' if p2_gates.p3_can_start else 'BLOCKED'}")
+    print(f"target-profile blockers: {p2_blockers}")
 
 
 def _print_data_audit(report: DataAuditReport) -> None:
@@ -489,7 +617,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         if args.command == "doctor":
-            _doctor(load_policy(args.policy), load_gate_report(args.gates))
+            _doctor(
+                load_policy(args.policy),
+                load_gate_report(args.gates),
+                load_p2_gate_report(args.p2_gates),
+            )
         elif args.command == "policy-check":
             policy = load_policy(args.policy)
             print(f"{policy.version} OK {policy.digest}")
@@ -509,6 +641,64 @@ def main(argv: Sequence[str] | None = None) -> int:
                 audit_report.write_json(args.output)
             _print_data_audit(audit_report)
             return 1 if audit_report.has_failures else 0
+        elif args.command == "audit-corporate-actions":
+            corporate_action_report = audit_corporate_action_corpus(
+                CorporateActionCorpusPaths(
+                    snapshot_dir=args.snapshot_dir,
+                    corporate_actions=args.corporate_actions,
+                    eastmoney_raw_dir=args.eastmoney_raw_dir,
+                ),
+                load_corporate_action_normalization_policy(args.policy),
+                scope_start=args.scope_start,
+                scope_end=args.scope_end,
+            )
+            if args.report_output is not None:
+                corporate_action_report.write_json(args.report_output)
+            if args.exception_ledger_output is not None:
+                if corporate_action_report.exception_ledger is None:
+                    raise ValueError(
+                        "the selected normalization policy does not produce an exception ledger"
+                    )
+                corporate_action_report.exception_ledger.write_json(args.exception_ledger_output)
+            print(
+                json.dumps(
+                    corporate_action_report.summary_dict(),
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+            return 0 if corporate_action_report.ready_for_snapshot else 1
+        elif args.command == "build-corporate-action-revision":
+            corporate_action_revision = build_corporate_action_revision(
+                paths=CorporateActionCorpusPaths(
+                    snapshot_dir=args.snapshot_dir,
+                    corporate_actions=args.corporate_actions,
+                    eastmoney_raw_dir=args.eastmoney_raw_dir,
+                ),
+                policy=load_corporate_action_normalization_policy(args.policy),
+                scope_start=args.scope_start,
+                scope_end=args.scope_end,
+                output=args.output,
+                revision=args.revision,
+                knowledge_cutoff=args.knowledge_cutoff,
+                previous_revision=args.previous_revision,
+            )
+            print(
+                json.dumps(corporate_action_revision.to_dict(), ensure_ascii=True, sort_keys=True)
+            )
+        elif args.command == "check-corporate-action-revision":
+            corporate_action_revision = check_corporate_action_revision(args.revision_dir)
+            print(
+                json.dumps(corporate_action_revision.to_dict(), ensure_ascii=True, sort_keys=True)
+            )
+        elif args.command == "promote-corporate-action-revision":
+            corporate_action_revision = promote_corporate_action_revision(
+                revision_dir=args.revision_dir,
+                pointer=args.pointer,
+            )
+            print(
+                json.dumps(corporate_action_revision.to_dict(), ensure_ascii=True, sort_keys=True)
+            )
         elif args.command == "build-code-validity":
             mapping = load_code_validity_mapping(args.mapping)
             row_count, checksum = build_code_validity_table(
@@ -540,15 +730,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 write_none_current(revision_dir=merged.output, pointer=args.promote_pointer)
             print(json.dumps(merged.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "merge-none-tail-repair":
-            merged = build_none_tail_repair_revision(
+            tail_repair = build_none_tail_repair_revision(
                 parent=args.parent,
                 raw_revision=args.raw_revision,
                 output=args.output,
                 revision=args.revision,
             )
             if args.promote_pointer is not None:
-                write_none_current(revision_dir=merged.output, pointer=args.promote_pointer)
-            print(json.dumps(merged.to_dict(), ensure_ascii=True, sort_keys=True))
+                write_none_current(revision_dir=tail_repair.output, pointer=args.promote_pointer)
+            print(json.dumps(tail_repair.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "build-identity-coverage":
             result = build_identity_coverage(
                 revision_root=args.revision_root,
@@ -630,6 +820,102 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 args.metadata_output.write_text(f"{payload}\n", encoding="utf-8")
             _print_materialized_snapshot(materialized)
+        elif args.command == "publish-historical-replay-snapshot":
+            replay_publication = publish_historical_replay_snapshot(
+                catalog=SnapshotCatalog(args.catalog_root),
+                base_snapshot_dir=args.base_snapshot,
+                corporate_action_revision_dir=args.corporate_action_revision,
+                trading_calendar=args.trading_calendar,
+                calendar_source_revision=args.calendar_source_revision,
+                calendar_knowledge_cutoff=args.calendar_knowledge_cutoff,
+                snapshot_id=args.snapshot_id,
+                source_revision=args.source_revision,
+                knowledge_cutoff=args.knowledge_cutoff,
+                policy=load_corporate_action_normalization_policy(args.policy),
+            )
+            replay_payload = replay_publication.to_dict()
+            if args.metadata_output is not None:
+                args.metadata_output.parent.mkdir(parents=True, exist_ok=True)
+                args.metadata_output.write_text(
+                    json.dumps(replay_payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            print(json.dumps(replay_payload, ensure_ascii=True, sort_keys=True))
+        elif args.command == "audit-historical-replay-frames":
+            with load_historical_frame_reader(
+                args.snapshot_dir,
+                load_corporate_action_normalization_policy(args.policy),
+            ) as replay_reader:
+                replay_frame_report = replay_reader.audit(args.scope_start, args.scope_end)
+            replay_frame_payload = replay_frame_report.to_dict()
+            if args.output is not None:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(
+                    json.dumps(
+                        replay_frame_payload,
+                        ensure_ascii=True,
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            print(json.dumps(replay_frame_payload, ensure_ascii=True, sort_keys=True))
+            return 0 if replay_frame_report.ready_for_strategy_replay else 1
+        elif args.command == "run-baseline-strategy-suite":
+            project_root = find_project_root()
+            baseline_catalogue = load_baseline_strategy_catalogue(
+                args.catalogue
+                or project_root / "config" / "p3-baseline-strategies.research.v1.json"
+            )
+            baseline_registry = load_feature_registry(
+                args.feature_registry
+                or project_root / "config" / "p3-baseline-features.research.v1.json"
+            )
+            baseline_engine = BacktestEngine(
+                load_execution_policy(
+                    args.execution_policy
+                    or project_root / "config" / "p2-execution-policy.research.v1.json"
+                )
+            )
+            with load_historical_frame_reader(
+                args.snapshot_dir,
+                load_corporate_action_normalization_policy(args.corporate_action_policy),
+            ) as baseline_reader:
+                panel_scope_end = baseline_reader.frames(
+                    args.scope_end,
+                    args.scope_end,
+                )[0].execution_date
+                with BaselineFeaturePanel.build(
+                    baseline_reader.bundle,
+                    baseline_registry,
+                    scope_start=args.scope_start,
+                    scope_end=panel_scope_end,
+                    output=args.feature_panel,
+                ) as baseline_panel:
+                    baseline_result = run_baseline_strategy_suite(
+                        baseline_reader,
+                        baseline_engine,
+                        baseline_catalogue,
+                        baseline_registry,
+                        baseline_panel,
+                        scope_start=args.scope_start,
+                        scope_end=args.scope_end,
+                    )
+            baseline_payload = baseline_result.to_dict()
+            if args.audit_output_dir is not None:
+                args.audit_output_dir.mkdir(parents=True, exist_ok=True)
+                for strategy_result in baseline_result.strategies:
+                    audit_path = args.audit_output_dir / (
+                        f"{strategy_result.strategy_id}-{strategy_result.strategy_version}.json"
+                    )
+                    audit_path.write_bytes(strategy_result.canonical_bytes() + b"\n")
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(
+                json.dumps(baseline_payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            print(json.dumps(baseline_payload, ensure_ascii=True, sort_keys=True))
         elif args.command == "build-st-status":
             default_policy = find_project_root() / "config" / "st-status.v1.json"
             st_result = build_st_status_revision(
@@ -820,6 +1106,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         ScheduleContractError,
         DailyWarehouseError,
         LaneRunError,
+        CorporateActionCorpusError,
+        CorporateActionNormalizationError,
+        CorporateActionRevisionError,
+        HistoricalReplaySnapshotError,
+        HistoricalReplayBundleError,
+        HistoricalFrameReaderError,
+        BaselineResearchError,
+        BacktestInputError,
+        FeatureRegistryError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

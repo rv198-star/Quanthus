@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from quanthus.gates import load_gate_report
+from quanthus.gates import load_gate_report, load_p2_gate_report
 from quanthus.policy import ConfigurationError, find_project_root
 
 
@@ -29,6 +29,30 @@ class GateTests(unittest.TestCase):
             path.write_text(json.dumps(raw), encoding="utf-8")
             with self.assertRaisesRegex(ConfigurationError, "Chapter 01"):
                 load_gate_report(path)
+
+    def test_p2_gate_accepts_daily_research_and_opens_p3(self) -> None:
+        report = load_p2_gate_report()
+
+        self.assertEqual(report.acceptance_status, "passed-conditional")
+        self.assertTrue(report.p2_acceptance_passed)
+        self.assertTrue(report.p3_can_start)
+        self.assertEqual(report.accepted_profile, "close-to-next-open-v1")
+        self.assertEqual(
+            report.open_activation_blockers,
+            ("P2-INTRADAY-INPUT", "P2-INTRADAY-MATCH", "P6-NOTIFICATION-TRANSPORT"),
+        )
+
+    def test_p3_cannot_open_before_p2_acceptance(self) -> None:
+        gate_path = find_project_root() / "config" / "p2-gates.v1.json"
+        raw = copy.deepcopy(json.loads(gate_path.read_text(encoding="utf-8")))
+        raw["p2_acceptance"] = "pending"
+        raw["p3_implementation"] = "allowed"
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "p2-gates.json"
+            path.write_text(json.dumps(raw), encoding="utf-8")
+            with self.assertRaisesRegex(ConfigurationError, "P3 cannot be allowed"):
+                load_p2_gate_report(path)
 
 
 if __name__ == "__main__":

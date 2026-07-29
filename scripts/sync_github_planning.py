@@ -95,10 +95,10 @@ CHAPTERS = (
         "02", "docs/design/lld/02-backtest-engine.md", "P2", "backtest", MILESTONES[1], "ready"
     ),
     ChapterSpec(
-        "03", "docs/design/lld/03-label-feature-system.md", "P3", "labels", MILESTONES[2], "blocked"
+        "03", "docs/design/lld/03-label-feature-system.md", "P3", "labels", MILESTONES[2], "ready"
     ),
     ChapterSpec(
-        "04", "docs/design/lld/04-experts-aggregator.md", "P3", "experts", MILESTONES[2], "blocked"
+        "04", "docs/design/lld/04-experts-aggregator.md", "P3", "experts", MILESTONES[2], "ready"
     ),
     ChapterSpec(
         "05",
@@ -106,7 +106,7 @@ CHAPTERS = (
         "P3",
         "positions",
         MILESTONES[2],
-        "blocked",
+        "ready",
     ),
     ChapterSpec(
         "06", "docs/design/lld/06-event-library.md", "P4", "events", MILESTONES[3], "blocked"
@@ -139,8 +139,11 @@ PHASE_GATES = {
         "Conditionally accepted under p1-c1-conditional-20260725-v1; 4,173 C1 factor "
         "visibility exceptions remain fail-closed."
     ),
-    "P2": "Allowed after the conditional Chapter 01 acceptance; P3 remains blocked.",
-    "P3": "Blocked until the trusted P2 backtest engine passes its golden acceptance suite.",
+    "P2": (
+        "Conditionally accepted for close-to-next-open research; target two-window activation "
+        "remains blocked by config/p2-gates.v1.json."
+    ),
+    "P3": "Allowed for the rule-only historical vertical slice through the accepted daily engine.",
     "P4": "Blocked until the P3 rule-only vertical slice is accepted.",
     "P5": "Blocked until the P4 event library and frozen rule baselines are accepted.",
     "P6": "Simulation governance starts after the P3 baseline is frozen.",
@@ -224,8 +227,7 @@ def chapter_rows(
             if stable_id in owners:
                 previous = owners[stable_id][0]
                 raise ValueError(
-                    f"{stable_id} is owned by both LLD-{previous.number} "
-                    f"and LLD-{chapter.number}"
+                    f"{stable_id} is owned by both LLD-{previous.number} and LLD-{chapter.number}"
                 )
             owners[stable_id] = (chapter, row)
     return owners, by_chapter
@@ -238,6 +240,7 @@ def index_rows(root: Path) -> list[dict[str, str]]:
         "Meta": "meta",
         "P1 data foundation": "P1",
         "P2 backtest and observability": "P2",
+        "P3 rule-only vertical slice": "P3",
     }
     phase: str | None = None
     rows: list[dict[str, str]] = []
@@ -267,7 +270,7 @@ def work_items(root: Path) -> list[WorkItem]:
         if phase == "meta":
             status = "ready" if state == "active" else "triage"
         else:
-            status = "ready" if phase in {"P1", "P2"} else "blocked"
+            status = "ready" if phase in {"P1", "P2", "P3"} else "blocked"
         if stable_id in CRITICAL_IDS:
             priority = "critical"
         elif stable_id in HIGH_IDS:
@@ -306,8 +309,8 @@ def task_body(item: WorkItem, repository: str) -> str:
 ## Governing design
 
 - [Detailed design]({repo_url(repository, item.design_path)})
-- [Product requirements]({repo_url(repository, 'docs/product/prd.md')})
-- [High-level design]({repo_url(repository, 'docs/design/hld.md')})
+- [Product requirements]({repo_url(repository, "docs/product/prd.md")})
+- [High-level design]({repo_url(repository, "docs/design/hld.md")})
 
 ## Phase and gate
 
@@ -324,8 +327,8 @@ def task_body(item: WorkItem, repository: str) -> str:
 ## Traceability
 
 - Stable work-item id: `{item.stable_id}`
-- [Work-item index]({repo_url(repository, 'docs/work-items/index.md')})
-- Policy source: [`config/p0-policy.v1.json`]({repo_url(repository, 'config/p0-policy.v1.json')})
+- [Work-item index]({repo_url(repository, "docs/work-items/index.md")})
+- Policy source: [`config/p0-policy.v1.json`]({repo_url(repository, "config/p0-policy.v1.json")})
 
 ## Completion checklist
 
@@ -349,8 +352,7 @@ def epic_body(
     acceptance = section(path, "Acceptance")
     if not acceptance:
         acceptance = (
-            "- [ ] The chapter's milestones and release mechanics are represented by linked "
-            "issues."
+            "- [ ] The chapter's milestones and release mechanics are represented by linked issues."
         )
     checklist = []
     for row in rows:
@@ -369,8 +371,8 @@ def epic_body(
 ## Governing documents
 
 - [LLD {chapter.number}: {document_title(path)}]({repo_url(repository, chapter.path)})
-- [Product requirements]({repo_url(repository, 'docs/product/prd.md')})
-- [High-level design]({repo_url(repository, 'docs/design/hld.md')})
+- [Product requirements]({repo_url(repository, "docs/product/prd.md")})
+- [High-level design]({repo_url(repository, "docs/design/hld.md")})
 
 ## Phase and gate
 
@@ -437,9 +439,7 @@ class GitHub:
                 )
             for number in missing_numbers:
                 try:
-                    issues.append(
-                        self.api("GET", f"/repos/{self.repository}/issues/{number}")
-                    )
+                    issues.append(self.api("GET", f"/repos/{self.repository}/issues/{number}"))
                 except RuntimeError as error:
                     if "HTTP 404" not in str(error):
                         raise
@@ -456,9 +456,10 @@ class GitHub:
             )
             current[spec.name.casefold()] = created
             return "created"
-        if existing.get("color", "").casefold() == spec.color.casefold() and existing.get(
-            "description", ""
-        ) == spec.description:
+        if (
+            existing.get("color", "").casefold() == spec.color.casefold()
+            and existing.get("description", "") == spec.description
+        ):
             return "reused"
         updated = self.api(
             "PATCH",
@@ -600,15 +601,15 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
         issues_by_id[stable_id] = issue
 
     for stable_id in sorted(target_ids):
-        issue = issues_by_id.get(stable_id)
-        if issue is None:
+        verification_issue = issues_by_id.get(stable_id)
+        if verification_issue is None:
             raise RuntimeError(f"GitHub verification failed; missing stable id: {stable_id}")
         remote_issue = github.api(
-            "GET", f"/repos/{repository}/issues/{issue['number']}"
+            "GET", f"/repos/{repository}/issues/{verification_issue['number']}"
         )
         if not remote_issue["title"].startswith(f"[{stable_id}]"):
             raise RuntimeError(
-                f"GitHub verification failed for {stable_id}: issue #{issue['number']}"
+                f"GitHub verification failed for {stable_id}: issue #{verification_issue['number']}"
             )
 
     issue_by_stable_id(github.issues(), target_ids)
@@ -654,8 +655,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--apply",
         action="store_true",
         help=(
-            "Apply the plan through the authenticated gh CLI; otherwise perform an offline "
-            "dry run"
+            "Apply the plan through the authenticated gh CLI; otherwise perform an offline dry run"
         ),
     )
     return parser.parse_args(argv)

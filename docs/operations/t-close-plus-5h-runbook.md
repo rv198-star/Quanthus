@@ -71,6 +71,40 @@ publication begins. Publication advances `daily_market_CURRENT.json` and
 Weekly source jobs use the weekly example and preserve correction lookbacks. Their OCI transforms
 are added as separate pipeline configurations rather than inserted into the daily critical path.
 
+### Corporate-action replay revision
+
+After an accepted full corporate-action or authority-source revision arrives on OCI, run
+`build-corporate-action-revision` against the current immutable P1 source snapshot. Pass the
+verified `corporate_action_replay_CURRENT.json` revision as `--previous-revision`; the output
+contains normalized and exception Parquet datasets plus new, persistent, and resolved exception
+counts. Run `check-corporate-action-revision` before
+`promote-corporate-action-revision`. The promotion command rejects a backward knowledge cutoff.
+
+Use `publish-historical-replay-snapshot` to combine that verified revision with an authoritative
+calendar and one immutable P1 base snapshot. The command returns success only after the complete
+historical bundle passes checksums, required-dataset, lineage, policy, and ledger-row gates. Known
+exception reason codes do not require row-by-row human or AI review. Escalate unknown reason codes,
+schema or source-semantic drift, checksum failure, backward cutoffs, and abnormal exception-volume
+changes. This transform belongs to the separate weekly pipeline; scheduler wiring is not part of
+the daily T-close critical path yet.
+
+After publication, audit the exact immutable bundle before using it for strategy research:
+
+```bash
+.venv/bin/python -m quanthus audit-historical-replay-frames \
+  --snapshot-dir /home/ubuntu/data/quanthus/snapshots/<snapshot-id> \
+  --scope-start 2012-01-01 \
+  --scope-end 2025-12-31 \
+  --output /home/ubuntu/data/quanthus/audits/<snapshot-id>-frames.json
+```
+
+The command verifies continuous SSE/SZSE session pairs, source schemas and identities, the daily
+universe, execution evidence, bars, normalized actions, and exception intervals. Missing execution
+evidence remains counted and fail-closed rather than disappearing from the universe. A successful
+report must bind the expected bundle digest, declare `ready_for_strategy_replay=true`, and retain
+`execution_authorized=false`. A nonzero exit, unexpected count movement, digest drift, or new
+missing-evidence pattern blocks research promotion and requires source-level diagnosis.
+
 ## OCI deployment
 
 1. Install the repository and P1 environment, then point `/opt/quanthus/current` at the release.

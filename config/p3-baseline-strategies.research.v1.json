@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0.0",
+  "catalogue_version": "p3-baseline-strategies-research-v1",
+  "status": "research-only",
+  "feature_registry_version": "p3-baseline-features-research-v1",
+  "shared": {
+    "initial_cash": "100000.00",
+    "entry_lot_size": 100,
+    "sizing_cash_buffer": "0.01",
+    "minimum_listing_sessions": 60,
+    "minimum_average_amount_20": "20000000.00",
+    "continuity_scope_policy": "exclude_security_with_any_unresolved_continuity_evidence"
+  },
+  "validation": {
+    "development_start": "2012-01-01",
+    "development_end": "2021-12-31",
+    "arbitration_start": "2022-01-01",
+    "arbitration_end": "2024-12-31",
+    "permanent_blind_start": "2025-01-01",
+    "permanent_blind_end": "2025-12-31"
+  },
+  "strategies": [
+    {
+      "strategy_id": "baseline.ma-trend",
+      "strategy_version": "1.0.0",
+      "kind": "ma_trend",
+      "parameters": {
+        "maximum_holding_sessions": "20",
+        "minimum_momentum20": "0.00"
+      }
+    },
+    {
+      "strategy_id": "baseline.breakout20",
+      "strategy_version": "1.0.0",
+      "kind": "breakout20",
+      "parameters": {
+        "maximum_holding_sessions": "20",
+        "minimum_volume_ratio20": "1.20"
+      }
+    },
+    {
+      "strategy_id": "baseline.oversold-rebound",
+      "strategy_version": "1.0.0",
+      "kind": "oversold_rebound",
+      "parameters": {
+        "entry_rsi_ceiling": "30.00",
+        "exit_rsi_floor": "55.00",
+        "maximum_holding_sessions": "10"
+      }
+    }
+  ]
+}

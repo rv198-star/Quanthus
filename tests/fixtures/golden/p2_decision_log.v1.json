@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "P2-DECISION-LOG-001",
+  "description": "Accepted, rejected, and shadow decisions retain complete opaque upstream evidence without granting shadow execution authority.",
+  "source_basis": "Synthetic audit-schema fixture; expert payloads are evidence examples, not P3 strategy definitions.",
+  "inputs": {
+    "run_id": "p2-round-trip-replay-001",
+    "accepted_signal_id": "signal-round-trip-entry",
+    "profile_id": "close-to-next-open-v1",
+    "security_code": "600000",
+    "unit_id": "unit-001"
+  },
+  "expected": {
+    "dispositions": ["accepted", "rejected", "shadow"],
+    "accepted_final_action": "buy",
+    "rejected_final_action": "none",
+    "shadow_final_action": "none",
+    "non_executing_linked_order_count": 0
+  }
+}

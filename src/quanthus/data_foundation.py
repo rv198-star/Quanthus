@@ -178,6 +178,7 @@ class SnapshotCatalog:
         self,
         snapshot: PublishedSnapshot,
         materialize: Callable[[Path], None] | None = None,
+        validate: Callable[[Path, PublishedSnapshot], None] | None = None,
     ) -> Path:
         snapshot_id = snapshot.reference.snapshot_id
         if not _SNAPSHOT_ID.fullmatch(snapshot_id):
@@ -188,6 +189,8 @@ class SnapshotCatalog:
         if target.exists():
             existing = self.load(snapshot_id)
             if existing.to_dict() == payload:
+                if validate is not None:
+                    validate(target, existing)
                 return target
             message = f"snapshot_id already exists with different contents: {snapshot_id}"
             raise FileExistsError(message)
@@ -202,6 +205,8 @@ class SnapshotCatalog:
                 stream.write(_canonical_json(payload))
                 stream.flush()
                 os.fsync(stream.fileno())
+            if validate is not None:
+                validate(staging, snapshot)
             staging.rename(target)
             self._sync_directory()
         except BaseException:

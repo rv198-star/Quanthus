@@ -591,6 +591,7 @@ def _parser() -> argparse.ArgumentParser:
     epoch_publish.add_argument("--market-date", type=date.fromisoformat, required=True)
     epoch_publish.add_argument("--universe-policy", type=Path, required=True)
     epoch_publish.add_argument("--code-validity-mapping", type=Path, required=True)
+    epoch_publish.add_argument("--security-master", type=Path, required=True)
     epoch_publish.add_argument("--code-revision", required=True)
     epoch_publish.add_argument("--parent-pointer", type=Path)
     epoch_publish.add_argument("--base-pointer", type=Path)
@@ -1326,6 +1327,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 policy=policy,
                 universe_policy_path=args.universe_policy,
                 code_validity_path=args.code_validity_mapping,
+                security_master_path=args.security_master,
                 code_revision=args.code_revision,
                 parent_pointer=args.parent_pointer,
                 base_pointer=args.base_pointer,

@@ -220,6 +220,9 @@ The target candidate family contains DWD, its exact lineage-bound DWS projection
 required lane-bound PIT/status/tradability artifact. The delivered v1 slice is narrower: CN01 and
 Hermes each produce DWD daily bars, DWD daily status observations, and one DWS daily market summary
 from their own ODS. The v1 `pit_cutoff` source-time check is not a full PIT/tradability family.
+The delivered epoch carries the OCI-selected `ref_security_master.parquet` together with the
+universe and code-validity policies; lane-local security-master drift cannot redefine candidate
+identity or create a false cross-lane business divergence.
 `READY` is written last. Candidate ids are immutable and attempt sequencing is monotonic within
 `(lane_id, market_date)`; a rerun does not reuse an id with different lineage.
 

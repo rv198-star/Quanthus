@@ -155,6 +155,7 @@ def build_daily_dwd_revision(
     universe_policy_path: Path,
     code_validity_mapping_path: Path,
     code_revision: str,
+    security_master_path: Path | None = None,
     parent_pointer: Path | None = None,
     base_pointer: Path | None = None,
 ) -> DailyDwdResult:
@@ -209,7 +210,6 @@ def build_daily_dwd_revision(
         != 1
     ):
         raise DailyWarehouseError("daily artifacts must share one ODS artifact root")
-    raw_root = bars_path.parent
     if bars_path.name != "daily_ohlcv_none_delta.parquet":
         raise DailyWarehouseError("daily bar artifact must use daily_ohlcv_none_delta.parquet")
     if master_path.name != "ref_security_master.parquet":
@@ -232,13 +232,18 @@ def build_daily_dwd_revision(
 
     policy = load_universe_policy(universe_policy_path)
     mapping = load_code_validity_mapping(code_validity_mapping_path)
+    validity_master_path = (
+        master_path if security_master_path is None else security_master_path.resolve(strict=True)
+    )
+    if validity_master_path.name != "ref_security_master.parquet":
+        raise DailyWarehouseError("shared security master must use ref_security_master.parquet")
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
     connection = duckdb.connect(":memory:")
     try:
         validity_path = staging / "ref_security_code_validity.parquet"
         validity_rows, validity_checksum = build_code_validity_table(
-            root=raw_root,
+            root=validity_master_path.parent,
             mapping=mapping,
             output=validity_path,
         )
@@ -543,6 +548,7 @@ def build_daily_dwd_revision(
             "lineage": {
                 "ods_release_id": verified.release.release_id,
                 "ods_manifest_sha256": verified.manifest_sha256,
+                "security_master_sha256": _sha256(validity_master_path),
                 "parent": parent,
             },
             "policy": {

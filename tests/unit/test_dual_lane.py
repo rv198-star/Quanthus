@@ -85,6 +85,29 @@ class DualLaneTests(unittest.TestCase):
                 ],
             },
         )
+        assert pa is not None
+        assert pq is not None
+        self.security_master_path = self.root / "ref_security_master.parquet"
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "security_id": "000001",
+                        "stock_code": "000001",
+                        "exchange": "SZSE",
+                        "name": "TEST",
+                        "list_date": date(1991, 4, 3),
+                        "delist_date": None,
+                        "status": "listed",
+                        "bs_code": "sz.000001",
+                        "as_of": date(2026, 7, 24),
+                        "source": "test",
+                        "built_at": datetime(2026, 7, 24, tzinfo=timezone.utc),
+                    }
+                ]
+            ),
+            self.security_master_path,
+        )
         base = self.root / "historical-base" / "p1-history-base-v1"
         base.mkdir(parents=True)
         self._write_json(base / "META.json", {"revision": base.name, "kind": "test-base"})
@@ -168,13 +191,25 @@ class DualLaneTests(unittest.TestCase):
         }
 
     def _epoch(self, market_date: date) -> EpochInput:
+        input_digest = dual_lane._epoch_input_digest(
+            _sha256(self.base_pointer),
+            self.policy.digest,
+            _sha256(self.universe_path),
+            _sha256(self.validity_path),
+            _sha256(self.security_master_path),
+        )
         return publish_epoch_input(
             output=self.root / "epochs" / market_date.isoformat(),
-            epoch_id=f"epoch-{market_date.strftime('%Y%m%d')}",
+            epoch_id=dual_lane._derive_epoch_id(
+                market_date=market_date,
+                code_revision=self.CODE_REVISION,
+                input_digest=input_digest,
+            ),
             market_date=market_date,
             policy=self.policy,
             universe_policy_path=self.universe_path,
             code_validity_path=self.validity_path,
+            security_master_path=self.security_master_path,
             code_revision=self.CODE_REVISION,
             base_pointer=self.base_pointer,
         )
@@ -236,26 +271,38 @@ class DualLaneTests(unittest.TestCase):
             ),
             statuses,
         )
-        pq.write_table(
-            pa.Table.from_pylist(
-                [
-                    {
-                        "security_id": "000001",
-                        "stock_code": "000001",
-                        "exchange": "SZSE",
-                        "name": "TEST",
-                        "list_date": date(1991, 4, 3),
-                        "delist_date": None,
-                        "status": "listed",
-                        "bs_code": "sz.000001",
-                        "as_of": market_date,
-                        "source": "test",
-                        "built_at": built_at,
-                    }
-                ]
-            ),
-            master,
-        )
+        master_rows = [
+            {
+                "security_id": "000001",
+                "stock_code": "000001",
+                "exchange": "SZSE",
+                "name": "TEST",
+                "list_date": date(1991, 4, 3),
+                "delist_date": None,
+                "status": "listed",
+                "bs_code": "sz.000001",
+                "as_of": market_date,
+                "source": "test",
+                "built_at": built_at,
+            }
+        ]
+        if variant == "local-reference-drift":
+            master_rows.append(
+                {
+                    "security_id": "920238",
+                    "stock_code": "920238",
+                    "exchange": "BSE",
+                    "name": "OUT OF SCOPE",
+                    "list_date": market_date,
+                    "delist_date": None,
+                    "status": "listed",
+                    "bs_code": None,
+                    "as_of": market_date,
+                    "source": "test",
+                    "built_at": built_at,
+                }
+            )
+        pq.write_table(pa.Table.from_pylist(master_rows), master)
         pq.write_table(
             pa.Table.from_pylist(
                 [
@@ -358,6 +405,22 @@ class DualLaneTests(unittest.TestCase):
         self.assertEqual(relocated.epoch_id, epoch.epoch_id)
         self.assertTrue(relocated.universe_policy_path.is_relative_to(portable))
         self.assertTrue(relocated.code_validity_path.is_relative_to(portable))
+        self.assertTrue(relocated.security_master_path.is_relative_to(portable))
+
+        changed_master = self.root / "changed-ref_security_master.parquet"
+        changed_master.write_bytes(self.security_master_path.read_bytes() + b"changed")
+        with self.assertRaisesRegex(DualLaneError, "existing epoch does not match"):
+            publish_epoch_input(
+                output=epoch.root,
+                epoch_id=epoch.epoch_id,
+                market_date=epoch.market_date,
+                policy=self.policy,
+                universe_policy_path=self.universe_path,
+                code_validity_path=self.validity_path,
+                security_master_path=changed_master,
+                code_revision=self.CODE_REVISION,
+                base_pointer=self.base_pointer,
+            )
 
         tampered = self.root / "tampered" / "epoch"
         shutil.copytree(epoch.root, tampered)
@@ -378,6 +441,62 @@ class DualLaneTests(unittest.TestCase):
         (unlisted / "unexpected.txt").write_text("not declared\n", encoding="utf-8")
         with self.assertRaisesRegex(DualLaneError, "file set differs"):
             verify_epoch_input(unlisted)
+
+    def test_epoch_rejects_input_changed_after_id_derivation(self) -> None:
+        market_date = date(2026, 7, 24)
+        input_digest = dual_lane._epoch_input_digest(
+            _sha256(self.base_pointer),
+            self.policy.digest,
+            _sha256(self.universe_path),
+            _sha256(self.validity_path),
+            _sha256(self.security_master_path),
+        )
+        epoch_id = dual_lane._derive_epoch_id(
+            market_date=market_date,
+            code_revision=self.CODE_REVISION,
+            input_digest=input_digest,
+        )
+        self.security_master_path.write_bytes(self.security_master_path.read_bytes() + b"changed")
+
+        with self.assertRaisesRegex(DualLaneError, "sealed governed inputs"):
+            publish_epoch_input(
+                output=self.root / "changed-input-epoch",
+                epoch_id=epoch_id,
+                market_date=market_date,
+                policy=self.policy,
+                universe_policy_path=self.universe_path,
+                code_validity_path=self.validity_path,
+                security_master_path=self.security_master_path,
+                code_revision=self.CODE_REVISION,
+                base_pointer=self.base_pointer,
+            )
+
+    def test_epoch_rejects_parent_pointer_that_disagrees_with_dwd(self) -> None:
+        market_date = date(2026, 7, 24)
+        candidate = self._candidate(epoch=self._epoch(market_date), lane="cn01")
+        parent_pointer = self.root / "invalid-parent-pointer.json"
+        self._write_json(
+            parent_pointer,
+            {
+                "revision": candidate.dwd_root.name,
+                "revision_path": str(candidate.dwd_root),
+                "market_date": market_date.isoformat(),
+                "manifest_sha256": f"sha256:{'0' * 64}",
+            },
+        )
+
+        with self.assertRaisesRegex(DualLaneError, "parent pointer"):
+            publish_epoch_input(
+                output=self.root / "invalid-parent-epoch",
+                epoch_id="epoch-invalid-parent",
+                market_date=date(2026, 7, 25),
+                policy=self.policy,
+                universe_policy_path=self.universe_path,
+                code_validity_path=self.validity_path,
+                security_master_path=self.security_master_path,
+                code_revision=self.CODE_REVISION,
+                parent_pointer=parent_pointer,
+            )
 
     def test_market_release_selection_does_not_trust_shared_current_attempt(self) -> None:
         market_date = date(2026, 7, 24)
@@ -472,6 +591,56 @@ class DualLaneTests(unittest.TestCase):
             self.assertEqual(part["min_market_date"], market_date.isoformat())
             self.assertEqual(part["max_market_date"], market_date.isoformat())
 
+    def test_lane_local_security_master_drift_cannot_change_candidate_reference(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        primary = self._candidate(epoch=epoch, lane="cn01")
+        standby = self._candidate(
+            epoch=epoch,
+            lane="hermes",
+            variant="local-reference-drift",
+        )
+
+        self.assertEqual(primary.business_content_digest, standby.business_content_digest)
+        self.assertEqual(
+            _sha256(epoch.security_master_path),
+            json.loads((primary.dwd_root / "manifest.json").read_text(encoding="utf-8"))["lineage"][
+                "security_master_sha256"
+            ],
+        )
+
+    def test_candidate_retry_cannot_reuse_a_different_attempt(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        candidate = self._candidate(epoch=epoch, lane="cn01")
+
+        with self.assertRaisesRegex(DualLaneError, "existing candidate does not match"):
+            build_lane_candidate(
+                output=candidate.root,
+                candidate_id=candidate.candidate_id,
+                lane_id="cn01",
+                attempt_id="attempt-cn01-20260724-retry",
+                market_date=market_date,
+                ods_release_dir=(
+                    self.root / "ods" / market_date.isoformat() / "cn01-base" / "release"
+                ),
+                epoch_root=epoch.root,
+                policy=self.policy,
+                code_revision=self.CODE_REVISION,
+            )
+
+    def test_candidate_manifest_cannot_forge_epoch_security_master_lineage(self) -> None:
+        market_date = date(2026, 7, 24)
+        candidate = self._candidate(epoch=self._epoch(market_date), lane="cn01")
+        forged = self.root / "forged-security-master"
+        shutil.copytree(candidate.root, forged)
+        manifest = json.loads((forged / "manifest.json").read_text(encoding="utf-8"))
+        manifest["security_master_sha256"] = f"sha256:{'0' * 64}"
+        self._rewrite_ready_manifest(forged, manifest)
+
+        with self.assertRaisesRegex(DualLaneError, "security-master lineage mismatch"):
+            verify_lane_candidate(forged)
+
     def test_material_cross_lane_divergence_withholds_publication(self) -> None:
         market_date = date(2026, 7, 24)
         epoch = self._epoch(market_date)
@@ -518,6 +687,7 @@ class DualLaneTests(unittest.TestCase):
                 "runtime": manifest["runtime"],
                 "contract_id": manifest["contract_id"],
                 "policy_sha256": manifest["policy_sha256"],
+                "security_master_sha256": manifest["security_master_sha256"],
             }
         )
         self._rewrite_ready_manifest(forged, manifest)
@@ -716,9 +886,7 @@ class DualLaneTests(unittest.TestCase):
 
     def test_transfer_helper_is_compatible_with_rrsync_forced_commands(self) -> None:
         project_root = Path(__file__).resolve().parents[2]
-        helper = (project_root / "ops/bin/sync-dual-lane-date-root").read_text(
-            encoding="utf-8"
-        )
+        helper = (project_root / "ops/bin/sync-dual-lane-date-root").read_text(encoding="utf-8")
 
         self.assertNotIn("--protect-args", helper)
         self.assertNotIn("--delete", helper)

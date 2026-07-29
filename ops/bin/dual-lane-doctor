@@ -176,8 +176,15 @@ else
 
   parent_pointer="${QUANTHUS_DUAL_LANE_PARENT_POINTER:-}"
   base_pointer="${QUANTHUS_DUAL_LANE_BASE_POINTER:-}"
+  security_master="${QUANTHUS_DUAL_LANE_SECURITY_MASTER:?set the OCI shared security master}"
   [[ -z "$parent_pointer" || -z "$base_pointer" ]] || fail "set only one parent or base pointer"
   [[ -n "$parent_pointer" || -n "$base_pointer" ]] || fail "set one parent or historical-base pointer"
+  [[ "$security_master" == /* && -f "$security_master" && ! -L "$security_master" ]] || \
+    fail "OCI shared security master must be a real absolute file"
+  [[ "${security_master##*/}" == ref_security_master.parquet ]] || \
+    fail "OCI shared security master must use the governed filename"
+  runuser -u ubuntu -- test -r "$security_master" || \
+    fail "OCI shared security master is not readable by ubuntu"
 
   declare -A seen_keys=()
   for node in CN01 HERMES; do

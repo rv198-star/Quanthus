@@ -126,6 +126,11 @@ Deploy the same reviewed commit through OCI's own GitHub checkout. Install four 
 keys, pinned known-hosts files, and a node-local environment derived from
 `ops/systemd/dual-lane-oci.env.example`. Private keys are owned by `ubuntu` with mode 0400 or 0600.
 The two remote roots for each node remain `.`; do not replace them with host paths.
+`QUANTHUS_DUAL_LANE_SECURITY_MASTER` must name OCI's regular, non-symlink
+`ref_security_master.parquet`; epoch publication copies and checksums that exact snapshot so both
+lanes build code-validity evidence from one shared reference rather than their lane-local copies.
+The publisher rejects the epoch before `READY` when the id derived by the wrapper no longer matches
+the sealed pointer, policy, universe, code-validity, and security-master inputs.
 
 ```bash
 sudo install -o root -g ubuntu -m 0640 /tmp/dual-lane-oci.env \
@@ -143,9 +148,9 @@ sudo ops/bin/dual-lane-doctor oci
 ```
 
 The OCI doctor verifies the commit/policy, target-root ownership, separate users and keys, key
-modes, pinned host files, the canonical parent/base selection, and jail-relative remote roots. It
-does not contact either node and therefore does not prove the reverse tunnel or end-to-end rrsync
-path.
+modes, pinned host files, the canonical parent/base selection, the shared security-master input,
+and jail-relative remote roots. It does not contact either node and therefore does not prove the
+reverse tunnel or end-to-end rrsync path.
 
 ## Copy-only migration order
 

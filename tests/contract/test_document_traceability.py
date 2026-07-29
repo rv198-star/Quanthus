@@ -3,7 +3,7 @@ import re
 import unittest
 from pathlib import Path
 
-from quanthus.gates import load_gate_report, load_p2_gate_report
+from quanthus.gates import load_gate_report, load_p2_gate_report, load_p3_gate_report
 from quanthus.policy import find_project_root
 from scripts.sync_github_planning import CHAPTERS, work_items
 
@@ -98,6 +98,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "docs/design/source-precedence.md",
             "docs/work-items/index.md",
             "config/p2-gates.v1.json",
+            "config/p3-gates.v1.json",
         )
 
         missing = [path for path in required if not (root / path).is_file()]
@@ -108,6 +109,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         root = find_project_root()
         gate = load_gate_report()
         p2_gate = load_p2_gate_report()
+        p3_gate = load_p3_gate_report()
         gate_raw = json.loads(gate.path.read_text(encoding="utf-8"))
         docs_map = _header_fields(root / "docs" / "README.md")
         prd = _header_fields(root / "docs" / "product" / "prd.md")
@@ -117,12 +119,16 @@ class DocumentTraceabilityTests(unittest.TestCase):
         p3_labels = _header_fields(root / "docs" / "design" / "lld" / "03-label-feature-system.md")
         p3_experts = _header_fields(root / "docs" / "design" / "lld" / "04-experts-aggregator.md")
         p3_positions = _header_fields(root / "docs" / "design" / "lld" / "05-position-execution.md")
+        p4_events = _header_fields(root / "docs" / "design" / "lld" / "06-event-library.md")
 
         self.assertEqual(prd["Design status"], "approved")
         self.assertEqual(hld["Design status"], "approved")
-        expected_phase = (
-            "P3 implementation open" if p2_gate.p3_can_start else "P2 implementation open"
-        )
+        if p3_gate.p4_can_start:
+            expected_phase = "P4 implementation open"
+        elif p2_gate.p3_can_start:
+            expected_phase = "P3 implementation open"
+        else:
+            expected_phase = "P2 implementation open"
         self.assertEqual(docs_map["Current phase"], expected_phase)
         self.assertEqual(prd["Current phase"], expected_phase)
         self.assertEqual(hld["Current phase"], expected_phase)
@@ -137,10 +143,25 @@ class DocumentTraceabilityTests(unittest.TestCase):
             expected_p1,
         )
         self.assertEqual(p2["Delivery gate"], "accepted-conditional")
-        expected_p3 = "open" if p2_gate.p3_can_start else "blocked"
+        expected_p3 = (
+            "accepted"
+            if p3_gate.p3_acceptance_passed
+            else ("open" if p2_gate.p3_can_start else "blocked")
+        )
         for fields in (p3_labels, p3_experts, p3_positions):
             self.assertEqual(fields["Delivery gate"], expected_p3)
-        for fields in (docs_map, prd, hld, p1, p2, p3_labels, p3_experts, p3_positions):
+        self.assertEqual(p4_events["Delivery gate"], "open" if p3_gate.p4_can_start else "blocked")
+        for fields in (
+            docs_map,
+            prd,
+            hld,
+            p1,
+            p2,
+            p3_labels,
+            p3_experts,
+            p3_positions,
+            p4_events,
+        ):
             gate_path = fields.get("Governing gate") or fields.get("Gate source")
             if gate_path is not None:
                 self.assertTrue((root / gate_path.strip("`")).is_file(), gate_path)
@@ -432,7 +453,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
         source = source_path.read_text(encoding="utf-8")
 
         self.assertEqual(card_fields["Delivery gate"], "accepted")
-        self.assertIn("independent full rerun byte-identical", card_fields["Implementation status"])
+        self.assertIn("frozen P3 capability fixture", card_fields["Implementation status"])
+        self.assertEqual(
+            card_fields["Strategy role"],
+            "composition and regression evidence; not a formal strategy lineage",
+        )
         self.assertIn("accepted; independent full invocation", evidence_fields["Evidence status"])
         self.assertIn("bounded preselection", card)
         self.assertIn("research_only=true", evidence)
@@ -447,6 +472,21 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("policy.portfolio.maximum_active_units", source)
         self.assertTrue(source_path.is_file())
         self.assertTrue((root / "tests" / "unit" / "test_portfolio_replay.py").is_file())
+
+    def test_p3_phase_acceptance_freezes_fixture_and_opens_only_p4(self) -> None:
+        root = find_project_root()
+        gate = load_p3_gate_report()
+        evidence_path = root / "docs" / "acceptance" / "p3-conformance-acceptance-20260729.md"
+        fields = _header_fields(evidence_path)
+        evidence = evidence_path.read_text(encoding="utf-8")
+
+        self.assertEqual(fields["Evidence status"], "accepted")
+        self.assertEqual(fields["Delivery gate"], "`config/p3-gates.v1.json`")
+        self.assertTrue(gate.p4_can_start)
+        self.assertIn("`promotion_authorized=false`", evidence)
+        self.assertIn("`tuning_authorized=false`", evidence)
+        self.assertIn("2022-2024 arbitration", evidence)
+        self.assertIn("remain unopened", evidence)
 
     def test_p3_label_card_slice_is_bounded_and_traceable(self) -> None:
         root = find_project_root()
@@ -733,22 +773,33 @@ class DocumentTraceabilityTests(unittest.TestCase):
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())
         p3_items = [item for item in items if item.phase == "P3"]
+        p4_items = [item for item in items if item.phase == "P4"]
 
         self.assertTrue(p3_items)
-        self.assertTrue(all(item.status == "ready" for item in p3_items))
-        self.assertFalse(any(item.phase in {"P4", "P5", "P6", "P7"} for item in items))
+        self.assertEqual(
+            {item.stable_id for item in p3_items if item.status == "blocked"},
+            {"P3-LABEL-004", "P3-ATTR-001", "P3-DASH-001"},
+        )
+        self.assertTrue(
+            all(item.status == "closed" for item in p3_items if item.status != "blocked")
+        )
+        self.assertTrue(p4_items)
+        self.assertTrue(all(item.status == "ready" for item in p4_items))
+        self.assertTrue(
+            all(item.status == "blocked" for item in items if item.phase in {"P5", "P6", "P7"})
+        )
 
     def test_planning_epic_status_matches_document_delivery_gate(self) -> None:
         root = find_project_root()
         status_by_gate = {
-            "accepted": "ready",
+            "accepted": "closed",
             "accepted-conditional": "ready",
             "open": "ready",
             "blocked": "blocked",
         }
 
         for chapter in CHAPTERS:
-            if chapter.phase not in {"P1", "P2", "P3"}:
+            if chapter.phase not in {"P1", "P2", "P3", "P4"}:
                 continue
             fields = _header_fields(root / chapter.path)
             delivery_gate = fields.get("Delivery gate")

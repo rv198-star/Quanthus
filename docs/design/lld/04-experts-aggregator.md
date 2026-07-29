@@ -4,9 +4,9 @@
 | --- | --- |
 | Phase | P3 |
 | Design status | approved |
-| Delivery gate | open |
-| Implementation status | `P3-EXP-001` accepted; `P3-AGG-001` accepted; `P3-SHADOW-001` comparison contract accepted; candidate-v1 scoring/action mapping and concrete experts implemented; shadow decision production open |
-| Gate source | `config/p2-gates.v1.json` |
+| Delivery gate | accepted |
+| Implementation status | `P3-EXP-001` accepted; `P3-AGG-001` accepted; `P3-SHADOW-001` comparison contract accepted; fixture scoring/action and experts accepted; concrete shadow production is proposal-triggered |
+| Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-002/003/006, FR-AUDIT-001 |
 
 ## 1. Goal
@@ -72,7 +72,7 @@ This slice does not compute a score or map governance output to a position actio
 
 ### Governed candidate action mapping
 
-`src/quanthus/aggregator.py` now adds the candidate-v1 continuation of the accepted governance
+`src/quanthus/aggregator.py` adds the capability-fixture continuation of the accepted governance
 boundary. Applicable scoring outputs are ordered by expert identity, converted to an equal-weight
 confidence-adjusted aggregate, and mapped through a versioned minimum-entry score. A system or
 strategy block-new veto still changes a proposed Trial entry to no action; score cannot override
@@ -88,9 +88,9 @@ remaining 51,962 are non-ordering rejections or holds. Evidence:
 ## 4. Release modes
 
 The vertical slice enables tradability/funding vetoes, a basic candidate rule, extension-risk
-and market constraints, structural exit, concentration, and audit logging. Other price/volume,
-trend, leadership, and context experts run shadow-only. Sector, news, and company-quality
-experts are disabled until their point-in-time inputs are approved.
+and market constraints, structural exit, concentration, and audit logging. Later price/volume,
+trend, leadership, and context proposals must begin in shadow-only mode. Sector, news, and
+company-quality experts are disabled until their point-in-time inputs are approved.
 
 `src/quanthus/shadow_divergence.py` now validates that an active/rejected decision and each shadow
 decision belong to the same review, then emits a canonical comparison of actions, scores, expert
@@ -99,10 +99,10 @@ not change comparison identity. Every output declares `execution_authorized=fals
 not create or persist decisions, signals, intents, orders, fills, or positions. Evidence:
 `docs/acceptance/p3-shadow-divergence-contract-slice-20260728.md`.
 
-This completes only the reusable `P3-SHADOW-001` comparison contract. Candidate-v1 experts and
-score/action mapping now exist, but the governed runner does not produce alternative shadow
-decisions. Production shadow-decision generation remains open and cannot be inferred from the
-active decision stream.
+This completes the reusable `P3-SHADOW-001` comparison contract. The frozen fixture has no genuine
+alternative expert proposal, so generating synthetic shadow decisions would add volume without a
+falsifiable comparison. Concrete shadow production resumes under the later proposal/promotion
+workflow when a formal alternative exists; it cannot be inferred from the active decision stream.
 
 ## 5. Audit record
 

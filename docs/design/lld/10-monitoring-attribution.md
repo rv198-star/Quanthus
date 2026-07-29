@@ -5,8 +5,8 @@
 | Phase | Instrumentation in P2; reports after P3 |
 | Design status | approved |
 | Delivery gate | accepted-conditional |
-| Implementation status | P2 contracts accepted; `P3-FUNNEL-001` reconciliation contracts accepted; candidate-v1 decision production and populated funnel implemented; attribution, dashboard, and shadow production open |
-| Gate source | `config/p2-gates.v1.json` |
+| Implementation status | P2 event contracts accepted; `P3-FUNNEL-001` reconciliation contracts accepted; fixture funnel populated; attribution and recurring reports are proposal-triggered |
+| Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-AUDIT-001 through FR-AUDIT-005 |
 
 ## 1. Goal
@@ -119,12 +119,13 @@ Input order cannot change the report id, digest, stage summaries, or canonical b
 
 The reusable reconciler still consumes already-produced evidence, declares
 `execution_authorized=false`, and cannot create a decision, signal, order, fill, position
-transition, or notification. The governed runner now supplies a populated candidate-v1 funnel:
+transition, or notification. The governed runner supplies a populated capability-fixture funnel:
 101,549 source events reconcile across all four stages, including 48,591 candidate/score inputs,
 535 entry-allocation inputs, and 3,832 held reviews. Twenty held-review outcomes remain explicitly
 pending because one legal Trial position is open at the final mark; pending is reconciled, not
-silently treated as a closed trade. This closes populated-funnel production for candidate v1 while
-constrained attribution and dashboard work remain open.
+silently treated as a closed trade. This closes populated-funnel production for the P3 capability
+fixture. Constrained attribution and dashboard work are deferred until a formal strategy supplies
+predeclared module-removal questions and recurring monitoring semantics.
 
 ## 6. Reporting cuts
 
@@ -139,12 +140,12 @@ contribution matrix, and failure ranking appear below it.
 | P2-OBS-001 | Define decision/shadow/notification log schema | P2 events | Accepted, rejected, delivered, and no-implied-fill fixture |
 | P2-HYP-001 | Implement diagnostic hypothetical ledger | Matcher/exit policy | 20-session path fixture |
 | P3-FUNNEL-001 | Implement reconciled opportunity funnel | P3 vertical slice | Count reconciliation |
-| P3-ATTR-001 | Implement constrained remove/neutralize reruns | Trusted engine | Reproducible contribution matrix |
-| P3-DASH-001 | Produce three-layer monitoring report | Funnel/attribution | Monthly report fixture |
+| P3-ATTR-001 | Implement constrained remove/neutralize reruns when a formal strategy requires them | Trusted engine and predeclared attribution questions | Reproducible contribution matrix |
+| P3-DASH-001 | Produce three-layer monitoring report for a recurring formal strategy | Funnel/attribution and reporting cadence | Monthly report fixture |
 
 ## 8. Acceptance
 
-Every fill and rejection resolves to a complete decision log; every notification resolves to one
-persisted signal without implying execution; and every actual-ledger event resolves to one accepted
-operator report without rewriting its advice. Monthly north stars are reproducible; the first
-contribution matrix reruns from a manifest; and all funnel stages reconcile exactly.
+The reusable P2/P3 boundary is accepted when every fill and rejection resolves to a complete
+decision log and all populated funnel stages reconcile exactly. A later formal-strategy reporting
+release additionally requires reproducible monthly north stars and a manifest-bound contribution
+matrix. Notification and actual-ledger acceptance remain under their P6/P7 gates.

@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Phase | P3 discussion input |
+| Phase | Post-P3 formal-strategy discussion input |
 | Design status | draft |
 | Delivery gate | blocked |
 | Authority | Non-governing checklist; no item authorizes implementation until its governing LLD/config is versioned and approved |
@@ -140,8 +140,9 @@ not a prerequisite for the first baseline strategies, and gains no authority fro
 
 1. Freeze the vocabulary differences that affect implementation: identity, PIT, label versus
    action, capital unit versus position, and advice versus fill.
-2. Choose one one-unit daily baseline with enter/full-exit only and no dependency on the twelve-state
-   model.
-3. Freeze its universe, minimal features, entry, exit, hold, and sizing rules.
+2. Define a formal strategy hypothesis independently of the frozen P3 capability fixture, with no
+   automatic dependency on the twelve-state model.
+3. Freeze its universe, minimal features, entry, exit, hold, and sizing rules only after that
+   hypothesis is agreed.
 4. Freeze evaluation periods, metrics, thresholds, and stop rules before running the baseline.
 5. Compare later label/expert/state-machine additions against that baseline in shadow form.

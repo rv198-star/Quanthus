@@ -1,4 +1,4 @@
-# Market-Breadth Trend-Breakout Candidate V1
+# Market-Breadth Trend-Breakout P3 Capability Fixture V1
 
 | Field | Value |
 | --- | --- |
@@ -6,7 +6,8 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | complete for candidate v1; development performance gates passed; independent full rerun byte-identical |
+| Implementation status | frozen P3 capability fixture; independent full rerun byte-identical; tuning and promotion prohibited |
+| Strategy role | composition and regression evidence; not a formal strategy lineage |
 | Strategy id | `candidate.market-breadth-trend-breakout` |
 | Strategy version | `1.0.0` |
 | Governing config | `config/p3-governed-strategy.research.v1.json` |
@@ -25,6 +26,11 @@ predeclared policy revision; it is not repaired by opening later partitions.
 This version does not claim that the optional twelve-state stock model, intraday timing, sector
 expertise, news, fundamentals, or a model is required. It does not send notifications or place
 real orders.
+
+This card exists to exercise one complete implementation path. Its hypothesis and thresholds are
+not the starting point for a formal strategy, and accepted infrastructure evidence is not authority
+to create v1.1/v2 tuning descendants. A future formal strategy starts from a separate proposal and
+may reuse only the platform contracts it explicitly selects.
 
 ## 2. Scope And Information Boundary
 
@@ -67,7 +73,7 @@ approval: the complete labels and entry evidence remain visible downstream. Syst
 vetoes run before scoring. Applicable trend, breakout, and risk-quality scoring experts contribute
 equal-weight confidence-adjusted signals. An empty unit may request a trial entry only at aggregate
 score `>= 0.35`; score cannot override a veto or conflicting constraint. This preselection contract
-is part of candidate v1 and may change only with a strategy/evaluator version revision.
+is frozen with the capability fixture and cannot seed a tuned strategy/evaluator revision.
 
 ## 4. Capital And Position Policy
 
@@ -110,9 +116,9 @@ divides aggregate marked position value by aggregate system wealth, including ea
 external pool, then averages those daily ratios. A 30% trial target can therefore produce a lower
 portfolio invested ratio when fewer than five units are occupied.
 
-The first run is immutable evidence. At most two policy revisions may follow while the development
-partition is open, and each revision changes the strategy version and records a pre-run rationale.
-No threshold may be changed after viewing arbitration or blind results.
+The first run is immutable evidence. No policy revision, parameter tuning, or promotion may follow
+from this fixture. Arbitration and blind results remain unopened; a separate formal strategy must
+declare its own development budget and validation policy before any run.
 
 ### Initial development result
 

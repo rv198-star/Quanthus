@@ -4,9 +4,9 @@
 | --- | --- |
 | Phase | P3 |
 | Design status | approved |
-| Delivery gate | open |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; candidate-v1 breadth feature and four concrete labels accepted for development after byte-identical rerun |
-| Gate source | `config/p2-gates.v1.json` |
+| Delivery gate | accepted |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal |
+| Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
 ## 1. Goal
@@ -150,11 +150,15 @@ manifests and the exact T-close snapshot before running the strict LabelCard eva
 
 The extension label uses realized volatility and RSI. Absolute entry-day return is a separate
 entry-evidence veto over the same T-close panel, so the two controls remain independently visible
-instead of being collapsed into one label. These cards implement only the frozen
-`candidate.market-breadth-trend-breakout@1.0.0` vocabulary; they do not activate the optional
+instead of being collapsed into one label. These cards implement only the frozen P3
+capability-fixture vocabulary `candidate.market-breadth-trend-breakout@1.0.0`; they do not activate the optional
 twelve-state stock-stage model or create a generic label-formula language. The first 2012-2021
 run produced 48,591 complete candidate-to-score observations without unknown or unreconciled
 funnel inputs. Evidence: `docs/acceptance/p3-governed-strategy-development-20260729.md`.
+
+The fixture is closed to tuning and promotion. `P3-LABEL-004` human review is deferred until a
+formal label family exists; manufacturing a review corpus for this fixture would not improve the
+accepted platform contract or establish strategy semantics.
 
 ## 5. Daily-bar anatomy
 

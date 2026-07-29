@@ -6,8 +6,8 @@ nodes.
 
 | Field | Value |
 | --- | --- |
-| Current phase | P3 implementation open |
-| Gate source | `config/p2-gates.v1.json` |
+| Current phase | P4 implementation open |
+| Gate source | `config/p3-gates.v1.json` |
 
 ## Current branch
 
@@ -15,7 +15,8 @@ nodes.
 - P2 is conditionally accepted for historical and paper research under the frozen
   `close-to-next-open-v1` profile. Its matcher, unit accounting, audit persistence, decision and
   shadow records, diagnostic replay, P1 execution-state adapter, and golden round trip pass.
-- P3 rule-only historical implementation is open through that accepted daily profile.
+- P3 rule-only historical capability acceptance is closed under `config/p3-gates.v1.json`; P4
+  event-library implementation is open through the same accepted daily profile.
 - The strategy-neutral daily replay substrate is accepted under `P3-REPLAY-001`, including strict
   typed P1-frame adaptation, carried-sell company actions, immutable replay packaging, the lazy
   continuous PIT frame reader, full 2012-2025 input audit, and a real-corpus round-trip smoke.
@@ -38,24 +39,29 @@ nodes.
   the authoritative calendar, and accepted daily execution inputs together. The completeness,
   checksum, frame, and exception gates accept it for research replay without granting execution
   authority.
-- The first governed P3 candidate now has a frozen strategy card, concrete feature/label/expert/
+- The frozen P3 capability fixture has a versioned card, concrete feature/label/expert/
   action chain, strict static-industry input, five fixed-capital-unit replay, P2-backed fills and
   settlement, four-source exits, carried orders, cooldown, benchmark metrics, and populated
   opportunity-funnel production. Its first frozen 2012-2021 development run passed all three
   strategy gates and the drawdown warning at 230 closed trades, 31.91% total return, 22.49%
   capital-matched excess, 19.11% return after removing the top three closed-trade contributions,
   and 4.75% maximum drawdown. An independent full invocation reproduced the feature panel,
-  result, and scoreboard byte-identically, closing the candidate-v1 development delivery gate.
-  The candidate is still research-only and has -83.01% full-capital excess versus CSI 300.
+  result, and scoreboard byte-identically, closing the P3 capability acceptance. It is not the
+  first member of a formal strategy family, is ineligible for tuning or promotion, remains
+  research-only, and has -83.01% full-capital excess versus CSI 300.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.
+- Human label review, constrained strategy attribution, recurring dashboards, and concrete shadow
+  decision production resume only when a formal label or strategy proposal supplies their missing
+  semantic input. They are not reasons to extend the frozen P3 fixture.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
   evidence; forward email transport remains P6 work. P4 and later keep their existing gates.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
-The current machine-readable release state is `config/p2-gates.v1.json`; P1's retained gate is
-`config/p1-gates.v1.json`. Prose that disagrees with either applicable
+The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional
+gate is `config/p2-gates.v1.json` and P1's retained gate is `config/p1-gates.v1.json`. Prose that
+disagrees with any applicable
 gate is a conformance defect rather than an alternate project state.
 
 ## Tree
@@ -64,7 +70,7 @@ gate is a conformance defect rather than an alternate project state.
 | --- | --- | --- |
 | `product/` | Product goals, requirements, non-goals, and release criteria | `product/prd.md` |
 | `design/` | Approved current-state HLD, execution profiles, and module LLDs | `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md` |
-| `design/strategies/` | Approved governed strategy hypotheses and frozen research policies | `design/strategies/README.md` |
+| `design/strategies/` | Formal strategy proposals and frozen capability fixtures | `design/strategies/README.md` |
 | `architecture/` | Accepted decisions and stable topic contracts | `architecture/README.md` |
 | `work-items/` | Stable ids joining design, code, tests, issues, and evidence | `work-items/index.md` |
 | `operations/` | Deployment, recurring operation, incident, migration, and rollback | Runbook selected by the active component |
@@ -84,6 +90,7 @@ gate is a conformance defect rather than an alternate project state.
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child | Exact strategy, P1 snapshot input, and P2 execution evidence |
 | P3 governed strategy implementation | root `AGENTS.md`, this map, selected `design/strategies/` card, LLD 03/04/05, accepted P2 interfaces | LLD 10 for decision/funnel evidence; exact feature, label, policy, and industry-map inputs |
+| P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | Exact frozen candidate source, label cards, split policy, and P3 replay evidence |
 
 ## Authority and conflicts
 

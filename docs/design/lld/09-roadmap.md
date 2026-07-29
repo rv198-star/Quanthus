@@ -22,12 +22,12 @@ and live operation. A later phase cannot compensate for an untrusted earlier pha
 P5 research may run beside P6 frozen simulation, but a development build cannot alter the
 simulation policy.
 
-Current state: P2 is conditionally accepted for the active daily research profile by
-`config/p2-gates.v1.json`; P3 is open. Its strategy-neutral one-unit daily replay substrate is
-accepted through the real continuous historical reader and 2012-2025 input audit. The next step is
-to freeze terminology and a small baseline strategy family, then evaluate those rules through the
-same P2 execution facts. Target two-window activation and forward notification keep their separate
-blockers and are not prerequisites for the daily rule-only historical slice.
+Current state: P2 remains conditionally accepted for the active daily research profile by
+`config/p2-gates.v1.json`, and P3 is accepted by `config/p3-gates.v1.json`. Its strategy-neutral
+replay, rule contracts, position/risk path, audit funnel, and one frozen capability fixture prove
+the multi-year closed loop. That fixture is not a formal strategy lineage and cannot be tuned or
+promoted. P4 event-library implementation is open; target two-window activation and forward
+notification retain their separate blockers.
 
 ## 3. Milestones
 
@@ -53,6 +53,10 @@ changes only through configuration, tests, and evidence in one pull request.
   difference through data, execution, and decision logs.
 - Two failed quarterly reveals freeze live-capital expansion.
 - No phase creates a return promise.
+
+M2 is accepted by `docs/acceptance/p3-conformance-acceptance-20260729.md`. Deferred human label
+review, constrained attribution, dashboards, and concrete shadow production resume only for a
+formal semantic proposal; they do not reopen M2 or authorize changes to its fixture.
 
 ## 6. Work items
 

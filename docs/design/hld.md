@@ -4,11 +4,11 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P3 implementation open |
-| Version | 0.6 |
-| Effective date | 2026-07-28 |
+| Current phase | P4 implementation open |
+| Version | 0.7 |
+| Effective date | 2026-07-29 |
 | Governing policy | `config/p0-policy.v1.json` |
-| Governing gate | `config/p2-gates.v1.json` |
+| Governing gate | `config/p3-gates.v1.json` |
 
 ## 1. System context
 
@@ -194,6 +194,12 @@ The first P3 action path enables only:
 - complete audit logging.
 
 Other labels and experts execute in shadow mode without changing position actions.
+
+P3 acceptance uses one frozen governed candidate only to prove that these layers compose over a
+multi-year replay with complete audit evidence. Its rules and results are not the seed of a formal
+strategy lineage, and the gate explicitly forbids tuning or promotion. P4 may reuse the accepted
+interfaces and frozen event source while defining an independent event library; formal strategy
+hypotheses remain separately governed and the later validation partitions remain unopened.
 
 ## 7. Reliability and failure behavior
 

@@ -3,7 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Phase | P4 |
-| Status | Design baseline; parameters freeze in P4 |
+| Design status | approved |
+| Delivery gate | open |
+| Implementation status | not started; event semantics require a P4 proposal before code |
+| Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
 ## 1. Goal
@@ -23,9 +26,11 @@ an unchanged event library produces the same ids.
 
 ## 3. Candidate creation
 
-Candidates come from a forward historical scan using the rule-only trial-entry expert. They
-must not be selected by looking backward from a later price rise. Candidate rules and
-thresholds freeze before outcome comparison.
+Candidates come from a forward historical scan using a separately approved P4 event-source rule.
+They must not be selected by looking backward from a later price rise. Event-source rules and
+thresholds freeze before outcome comparison. The frozen P3 capability fixture proves the scan and
+audit interfaces but is not the default P4 event definition; reusing any of its rules requires an
+explicit P4 hypothesis and rationale.
 
 Historical concept membership is unavailable, so official candidate rules cannot require it.
 Static level-one industry may support stratification but cannot stand in for a historical
@@ -69,7 +74,7 @@ is which observable state separates positive from intermediate events before ent
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P4-EVENT-001 | Define event, isolation, and split schemas | P3 candidate rule | Deterministic ids and split tests |
+| P4-EVENT-001 | Define event, isolation, and split schemas | Accepted P3 replay and audit contracts | Deterministic ids and split tests |
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | No backward selection |
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Reproducible label corpus |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Three leading features |

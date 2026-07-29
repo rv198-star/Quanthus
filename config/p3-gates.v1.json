@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "gate_version": "p3-2026-07-29.1",
+  "p3_acceptance": "passed",
+  "p4_implementation": "allowed",
+  "accepted_scope": "rule-only close-to-next-open historical capability slice",
+  "accepted_profile": "close-to-next-open-v1",
+  "acceptance_evidence": "docs/acceptance/p3-conformance-acceptance-20260729.md",
+  "capability_fixture": {
+    "strategy_id": "candidate.market-breadth-trend-breakout",
+    "strategy_version": "1.0.0",
+    "role": "frozen-capability-fixture",
+    "promotion_authorized": false,
+    "tuning_authorized": false
+  },
+  "work_items": {
+    "P3-REPLAY-001": "closed",
+    "P3-FEAT-001": "closed",
+    "P3-FEAT-002": "closed",
+    "P3-STRAT-001": "closed",
+    "P3-LABEL-001": "closed",
+    "P3-LABEL-002": "closed",
+    "P3-LABEL-003": "closed",
+    "P3-LABEL-004": "deferred",
+    "P3-EXP-001": "closed",
+    "P3-AGG-001": "closed",
+    "P3-AGG-002": "closed",
+    "P3-SHADOW-001": "closed",
+    "P3-EXP-002": "closed",
+    "P3-POS-001": "closed",
+    "P3-POLICY-001": "closed",
+    "P3-RISK-001": "closed",
+    "P3-POS-002": "closed",
+    "P3-EXIT-001": "closed",
+    "P3-POS-003": "closed",
+    "P3-FUNNEL-001": "closed",
+    "P3-ATTR-001": "deferred",
+    "P3-DASH-001": "deferred",
+    "P3-ACCEPT-001": "closed"
+  },
+  "deferred_capabilities": [
+    {
+      "id": "P3-LABEL-004",
+      "resume_condition": "a formal market label family is proposed for human semantic validation"
+    },
+    {
+      "id": "P3-ATTR-001",
+      "resume_condition": "a formal strategy has modules with predeclared causal attribution questions"
+    },
+    {
+      "id": "P3-DASH-001",
+      "resume_condition": "a formal strategy produces attribution and recurring monitoring evidence"
+    }
+  ],
+  "unopened_partitions": [
+    "2022-2024-arbitration",
+    "2025-permanent-blind"
+  ]
+}

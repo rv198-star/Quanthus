@@ -4,12 +4,12 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P3 implementation open |
-| Version | 0.4 |
-| Effective date | 2026-07-28 |
+| Current phase | P4 implementation open |
+| Version | 0.5 |
+| Effective date | 2026-07-29 |
 | Product type | Internal research and trading decision system |
 | Market | China A-shares, SSE and SZSE |
-| Governing gate | `config/p2-gates.v1.json` |
+| Governing gate | `config/p3-gates.v1.json` |
 
 ## 1. Background
 
@@ -192,8 +192,10 @@ P1 is conditionally accepted against immutable snapshot
 full-data pass: they are accepted only under `p1-c1-conditional-20260725-v1`, which requires any
 factor-dependent historical path to fail closed before a declared knowledge cutoff. C2 and S1 are
 closed. P2 is conditionally accepted for the frozen `close-to-next-open-v1` historical and paper
-research policy, and P3 rule-only historical implementation is allowed. The acceptance boundary
-is machine-readable in `config/p2-gates.v1.json`; it does not activate the target intraday profile.
+research policy. P3 is accepted for the bounded rule-only historical capability slice under
+`config/p3-gates.v1.json`, and P4 event-library implementation is allowed. The frozen P3 candidate
+is an acceptance fixture, not an approved strategy lineage; it cannot be tuned or promoted by
+that gate. Neither gate activates the target intraday profile or opens the 2022-2025 partitions.
 The next executable work is listed in `docs/work-items/index.md`. The approved
 near-term operating direction is `operator-assisted-two-window-v1`: exactly two versioned action
 windows at `09:45-10:15` and `14:15-session close` in `Asia/Shanghai`, email notification, manual

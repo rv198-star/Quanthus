@@ -3,7 +3,7 @@ import unittest
 from contextlib import redirect_stdout
 
 from quanthus.cli import main
-from quanthus.gates import load_gate_report, load_p2_gate_report
+from quanthus.gates import load_gate_report, load_p2_gate_report, load_p3_gate_report
 
 
 class BootstrapAcceptanceTests(unittest.TestCase):
@@ -22,6 +22,12 @@ class BootstrapAcceptanceTests(unittest.TestCase):
         self.assertIn("P2 implementation: ALLOWED", rendered)
         self.assertIn("P2 acceptance: PASSED-CONDITIONAL", rendered)
         self.assertIn("P3 implementation: ALLOWED", rendered)
+        self.assertIn("P3 acceptance: PASSED", rendered)
+        self.assertIn("P4 implementation: ALLOWED", rendered)
+        self.assertIn(
+            "P3 frozen capability fixture: candidate.market-breadth-trend-breakout@1.0.0",
+            rendered,
+        )
         self.assertIn("P2-INTRADAY-INPUT", rendered)
 
     def test_release_gate_matches_approved_p0_decision(self) -> None:
@@ -31,6 +37,7 @@ class BootstrapAcceptanceTests(unittest.TestCase):
         self.assertTrue(report.p1_acceptance_passed)
         self.assertTrue(report.p2_can_start)
         self.assertTrue(load_p2_gate_report().p3_can_start)
+        self.assertTrue(load_p3_gate_report().p4_can_start)
 
 
 if __name__ == "__main__":

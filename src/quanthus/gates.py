@@ -243,3 +243,143 @@ def load_p2_gate_report(path: Path | None = None) -> P2GateReport:
         accepted_profile=str(raw["accepted_profile"]),
         open_activation_blockers=blockers,
     )
+
+
+_P3_WORK_ITEMS = {
+    "P3-REPLAY-001",
+    "P3-FEAT-001",
+    "P3-FEAT-002",
+    "P3-STRAT-001",
+    "P3-LABEL-001",
+    "P3-LABEL-002",
+    "P3-LABEL-003",
+    "P3-LABEL-004",
+    "P3-EXP-001",
+    "P3-AGG-001",
+    "P3-AGG-002",
+    "P3-SHADOW-001",
+    "P3-EXP-002",
+    "P3-POS-001",
+    "P3-POLICY-001",
+    "P3-RISK-001",
+    "P3-POS-002",
+    "P3-EXIT-001",
+    "P3-POS-003",
+    "P3-FUNNEL-001",
+    "P3-ATTR-001",
+    "P3-DASH-001",
+    "P3-ACCEPT-001",
+}
+_P3_DEFERRABLE_WORK_ITEMS = {"P3-LABEL-004", "P3-ATTR-001", "P3-DASH-001"}
+
+
+def validate_p3_gates(raw: Mapping[str, Any]) -> None:
+    if not isinstance(raw.get("gate_version"), str) or not raw["gate_version"].strip():
+        raise ConfigurationError("P3 gate_version must be a non-empty string")
+    acceptance = raw.get("p3_acceptance")
+    if acceptance not in {"pending", "passed"}:
+        raise ConfigurationError("p3_acceptance must be pending or passed")
+    if raw.get("p4_implementation") not in {"allowed", "blocked"}:
+        raise ConfigurationError("p4_implementation must be allowed or blocked")
+    if raw.get("p4_implementation") == "allowed" and acceptance != "passed":
+        raise ConfigurationError("P4 cannot be allowed before P3 acceptance")
+    for field_name in ("accepted_scope", "accepted_profile", "acceptance_evidence"):
+        value = raw.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise ConfigurationError(f"{field_name} must be a non-empty string")
+
+    fixture = raw.get("capability_fixture")
+    if not isinstance(fixture, Mapping):
+        raise ConfigurationError("capability_fixture must be an object")
+    for field_name in ("strategy_id", "strategy_version", "role"):
+        value = fixture.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise ConfigurationError(f"capability_fixture.{field_name} must be non-empty")
+    if fixture.get("role") != "frozen-capability-fixture":
+        raise ConfigurationError("capability_fixture role must be frozen-capability-fixture")
+    for field_name in ("promotion_authorized", "tuning_authorized"):
+        if fixture.get(field_name) is not False:
+            raise ConfigurationError(f"capability_fixture.{field_name} must be false")
+
+    work_items = raw.get("work_items")
+    if not isinstance(work_items, Mapping) or set(work_items) != _P3_WORK_ITEMS:
+        raise ConfigurationError("P3 work_items must contain the exact disposition set")
+    if any(status not in {"closed", "deferred"} for status in work_items.values()):
+        raise ConfigurationError("P3 work-item status must be closed or deferred")
+    if work_items.get("P3-ACCEPT-001") != "closed":
+        raise ConfigurationError("P3-ACCEPT-001 must be closed before P3 acceptance")
+
+    deferred = raw.get("deferred_capabilities")
+    if not isinstance(deferred, list):
+        raise ConfigurationError("deferred_capabilities must be an array")
+    deferred_ids: list[str] = []
+    for item in deferred:
+        if not isinstance(item, Mapping):
+            raise ConfigurationError("each deferred capability must be an object")
+        item_id = item.get("id")
+        resume_condition = item.get("resume_condition")
+        if not isinstance(item_id, str) or not item_id.strip():
+            raise ConfigurationError("each deferred capability must have an id")
+        if not isinstance(resume_condition, str) or not resume_condition.strip():
+            raise ConfigurationError(f"deferred capability {item_id} needs a resume_condition")
+        deferred_ids.append(item_id)
+    if len(deferred_ids) != len(set(deferred_ids)):
+        raise ConfigurationError("deferred capability ids must be unique")
+    expected_deferred = {item_id for item_id, status in work_items.items() if status == "deferred"}
+    if expected_deferred != _P3_DEFERRABLE_WORK_ITEMS:
+        raise ConfigurationError("P3 gate has an invalid deferred work-item set")
+    if set(deferred_ids) != expected_deferred:
+        raise ConfigurationError("deferred capabilities must match deferred P3 work items")
+
+    unopened = raw.get("unopened_partitions")
+    if not isinstance(unopened, list) or not unopened:
+        raise ConfigurationError("unopened_partitions must be a non-empty array")
+    if any(not isinstance(value, str) or not value.strip() for value in unopened):
+        raise ConfigurationError("unopened partition ids must be non-empty strings")
+
+
+@dataclass(frozen=True)
+class P3GateReport:
+    path: Path
+    version: str
+    acceptance_status: str
+    p3_acceptance_passed: bool
+    p4_can_start: bool
+    accepted_profile: str
+    capability_fixture_id: str
+    deferred_work_items: tuple[str, ...]
+    unopened_partitions: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "acceptance_status": self.acceptance_status,
+            "p3_acceptance_passed": self.p3_acceptance_passed,
+            "p4_can_start": self.p4_can_start,
+            "accepted_profile": self.accepted_profile,
+            "capability_fixture_id": self.capability_fixture_id,
+            "deferred_work_items": list(self.deferred_work_items),
+            "unopened_partitions": list(self.unopened_partitions),
+        }
+
+
+def load_p3_gate_report(path: Path | None = None) -> P3GateReport:
+    resolved = (path or find_project_root() / "config" / "p3-gates.v1.json").resolve()
+    raw = _read_gate_file(resolved)
+    validate_p3_gates(raw)
+    acceptance = str(raw["p3_acceptance"])
+    fixture = raw["capability_fixture"]
+    deferred = tuple(
+        sorted(item_id for item_id, status in raw["work_items"].items() if status == "deferred")
+    )
+    return P3GateReport(
+        path=resolved,
+        version=str(raw["gate_version"]),
+        acceptance_status=acceptance,
+        p3_acceptance_passed=acceptance == "passed",
+        p4_can_start=acceptance == "passed" and raw["p4_implementation"] == "allowed",
+        accepted_profile=str(raw["accepted_profile"]),
+        capability_fixture_id=f"{fixture['strategy_id']}@{fixture['strategy_version']}",
+        deferred_work_items=deferred,
+        unopened_partitions=tuple(str(value) for value in raw["unopened_partitions"]),
+    )

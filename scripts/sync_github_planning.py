@@ -57,6 +57,7 @@ LABELS = (
     LabelSpec("type:epic", "5319E7", "Design chapter or delivery epic"),
     LabelSpec("type:task", "1D76DB", "Executable work item"),
     LabelSpec("status:ready", "0E8A16", "Ready under the current release gate"),
+    LabelSpec("status:closed", "6E7781", "Accepted or completed with linked evidence"),
     LabelSpec("status:blocked", "B60205", "Blocked by an explicit predecessor gate"),
     LabelSpec("status:triage", "FBCA04", "Defined but not released for implementation"),
     LabelSpec("priority:critical", "D73A4A", "Release-blocking critical work"),
@@ -95,10 +96,10 @@ CHAPTERS = (
         "02", "docs/design/lld/02-backtest-engine.md", "P2", "backtest", MILESTONES[1], "ready"
     ),
     ChapterSpec(
-        "03", "docs/design/lld/03-label-feature-system.md", "P3", "labels", MILESTONES[2], "ready"
+        "03", "docs/design/lld/03-label-feature-system.md", "P3", "labels", MILESTONES[2], "closed"
     ),
     ChapterSpec(
-        "04", "docs/design/lld/04-experts-aggregator.md", "P3", "experts", MILESTONES[2], "ready"
+        "04", "docs/design/lld/04-experts-aggregator.md", "P3", "experts", MILESTONES[2], "closed"
     ),
     ChapterSpec(
         "05",
@@ -106,10 +107,10 @@ CHAPTERS = (
         "P3",
         "positions",
         MILESTONES[2],
-        "ready",
+        "closed",
     ),
     ChapterSpec(
-        "06", "docs/design/lld/06-event-library.md", "P4", "events", MILESTONES[3], "blocked"
+        "06", "docs/design/lld/06-event-library.md", "P4", "events", MILESTONES[3], "ready"
     ),
     ChapterSpec(
         "07", "docs/design/lld/07-research-scoring.md", "P5", "ml", MILESTONES[4], "blocked"
@@ -143,8 +144,11 @@ PHASE_GATES = {
         "Conditionally accepted for close-to-next-open research; target two-window activation "
         "remains blocked by config/p2-gates.v1.json."
     ),
-    "P3": "Allowed for the rule-only historical vertical slice through the accepted daily engine.",
-    "P4": "Blocked until the P3 rule-only vertical slice is accepted.",
+    "P3": (
+        "Accepted as a rule-only historical capability slice under config/p3-gates.v1.json; "
+        "the frozen fixture is not a strategy lineage."
+    ),
+    "P4": "Allowed for event-library implementation under config/p3-gates.v1.json.",
     "P5": "Blocked until the P4 event library and frozen rule baselines are accepted.",
     "P6": "Simulation governance starts after the P3 baseline is frozen.",
     "P7": "Blocked until frozen simulation supports an explicit live/no-live decision.",
@@ -241,6 +245,7 @@ def index_rows(root: Path) -> list[dict[str, str]]:
         "P1 data foundation": "P1",
         "P2 backtest and observability": "P2",
         "P3 rule-only vertical slice": "P3",
+        "P4-P7": "explicit",
     }
     phase: str | None = None
     rows: list[dict[str, str]] = []
@@ -249,7 +254,8 @@ def index_rows(root: Path) -> list[dict[str, str]]:
             phase = wanted_sections.get(line[3:])
         if phase is not None and line.startswith("| ID |"):
             for row in parse_table(lines, index):
-                row["Phase"] = phase
+                if phase != "explicit":
+                    row["Phase"] = phase
                 rows.append(row)
             phase = None
     return rows
@@ -269,8 +275,12 @@ def work_items(root: Path) -> list[WorkItem]:
         state = row.get("State", "")
         if phase == "meta":
             status = "ready" if state == "active" else "triage"
+        elif phase == "P3" and row.get("Disposition", "").startswith("closed"):
+            status = "closed"
+        elif phase == "P3" and row.get("Disposition", "").startswith("deferred"):
+            status = "blocked"
         else:
-            status = "ready" if phase in {"P1", "P2", "P3"} else "blocked"
+            status = "ready" if phase in {"P1", "P2", "P3", "P4"} else "blocked"
         if stable_id in CRITICAL_IDS:
             priority = "critical"
         elif stable_id in HIGH_IDS:

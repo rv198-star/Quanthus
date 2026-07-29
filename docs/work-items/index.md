@@ -53,11 +53,18 @@ status and retained target-profile activation blockers are in `config/p2-gates.v
 
 ## P3 rule-only vertical slice
 
+P3 is accepted under `config/p3-gates.v1.json`. The phase gate closes the reusable rule-only
+historical capability slice and opens P4. The governed V1 is frozen as a composition/regression
+fixture, not a formal strategy lineage. `P3-LABEL-004`, `P3-ATTR-001`, and `P3-DASH-001` are
+explicitly deferred until a formal label or strategy proposal supplies their semantic inputs; they
+do not authorize fixture tuning and do not block the P3 release criterion.
+
 `P3-FEAT-001` and `P3-LABEL-001` have bounded accepted implementations in
 `docs/acceptance/p3-feature-registry-slice-20260728.md` and
 `docs/acceptance/p3-label-card-contract-slice-20260728.md`. They establish registry, PIT lineage,
 LabelCard, and evaluator-boundary contracts only. Candidate-v1 concrete feature/label definitions
-are now implemented separately under `P3-LABEL-002`; broader production vocabularies remain open.
+are implemented separately under `P3-LABEL-002`; broader production vocabularies are outside the
+P3 fixture scope and require a later formal proposal.
 
 `P3-LABEL-003` has a bounded accepted frequency/conflict audit in
 `docs/acceptance/p3-label-frequency-conflict-audit-slice-20260728.md`. It audits registered results
@@ -66,14 +73,14 @@ label. Candidate-v1's concrete labels and development evidence are recorded sepa
 
 `P3-EXP-001` has a bounded accepted typed-protocol implementation in
 `docs/acceptance/p3-expert-protocol-slice-20260728.md`. It defines expert opinions, abstention, PIT
-context, and evidence validation only; concrete experts remain open, while accepted governance
-aggregation is recorded separately below. Candidate-v1 concrete experts now close the bounded
+context, and evidence validation only; concrete experts are supplied only by a strategy or fixture,
+while accepted governance aggregation is recorded separately below. The fixture experts close the bounded
 `P3-EXP-002` implementation path without creating a general expert library.
 
 `P3-AGG-001` has a bounded accepted governance implementation in
 `docs/acceptance/p3-governance-aggregation-slice-20260728.md`. Fixed veto precedence and constraint
-intersection are implemented. Candidate-v1 now adds versioned scoring/action mapping under
-`P3-AGG-002`; shadow decision production remains open.
+intersection are implemented. The fixture adds versioned scoring/action mapping under
+`P3-AGG-002`; concrete shadow production waits for a genuine alternative proposal.
 
 `P3-POS-001` has a bounded accepted lifecycle implementation in
 `docs/acceptance/p3-position-lifecycle-slice-20260728.md`. It freezes only legal
@@ -139,39 +146,40 @@ prior-close-weighted, checksum-bound capital-matched benchmark while preserving 
 300 as the opportunity-cost control. Evidence:
 `docs/acceptance/p3-capital-matched-benchmark-20260729.md`.
 
-The first governed candidate closes the bounded implementation paths for `P3-LABEL-002`,
+The frozen governed capability fixture closes the bounded implementation paths for `P3-LABEL-002`,
 `P3-EXP-002`, `P3-AGG-002`, `P3-POLICY-001`, `P3-POS-002`, and `P3-POS-003`. Its frozen initial
 2012-2021 run passed all declared performance gates with 230 closed trades, and its 101,549-source-
 event funnel plus five P2 ledgers reconcile. An independent full invocation reproduced the feature
-panel, result, and scoreboard byte-identically, accepting the development-run portion of
-`P3-ACCEPT-001`. Later-partition promotion and the other open P3 work remain separate. Evidence:
-`docs/acceptance/p3-governed-strategy-development-20260729.md`.
+panel, result, and scoreboard byte-identically. The bounded conformance review then accepted
+`P3-ACCEPT-001` without opening later partitions or promoting the fixture. Evidence:
+`docs/acceptance/p3-governed-strategy-development-20260729.md` and
+`docs/acceptance/p3-conformance-acceptance-20260729.md`.
 
-| ID | Title | Depends on |
-| --- | --- | --- |
-| P3-REPLAY-001 | Implement strategy-neutral daily historical replay | P2-ACCEPT-001 |
-| P3-FEAT-001 | Implement feature registry and lineage | P2 snapshots |
-| P3-FEAT-002 | Implement research baseline daily feature evaluator | P3-FEAT-001, P3-REPLAY-001 |
-| P3-STRAT-001 | Implement three one-unit research baseline strategies | P3-FEAT-002, P3-REPLAY-001 |
-| P3-LABEL-001 | Implement label-card schema and evaluator | P3-FEAT-001 |
-| P3-LABEL-002 | Implement vertical-slice labels | P3-LABEL-001 |
-| P3-LABEL-003 | Implement label frequency/conflict audit | P3-LABEL-001 |
-| P3-LABEL-004 | Build human label review corpus | P3-LABEL-002 |
-| P3-EXP-001 | Define expert protocols and abstention | P3 labels |
-| P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 |
-| P3-AGG-002 | Implement score and action mapping | P3-AGG-001 |
-| P3-SHADOW-001 | Implement shadow execution and divergence log | P3-AGG-001 |
-| P3-EXP-002 | Add vertical-slice rule experts | P3 aggregator |
-| P3-POS-001 | Implement unit/position state machine | P2 ledger |
-| P3-POLICY-001 | Freeze trial/add/hold/cooldown parameters | P2 acceptance |
-| P3-RISK-001 | Implement concentration caps | P3-POS-001 |
-| P3-POS-002 | Implement trial/add/review rules | P3 experts |
-| P3-EXIT-001 | Implement four-source exit arbitration | P3 aggregator |
-| P3-POS-003 | Implement cooldown and carried exit | P2 matcher |
-| P3-FUNNEL-001 | Implement opportunity funnel | P3 vertical slice |
-| P3-ATTR-001 | Implement constrained contribution reruns | P3 vertical slice |
-| P3-DASH-001 | Produce monitoring report | Funnel and attribution |
-| P3-ACCEPT-001 | Execute multi-year vertical-slice acceptance | All active P3 work |
+| ID | Title | Depends on | Disposition |
+| --- | --- | --- | --- |
+| P3-REPLAY-001 | Implement strategy-neutral daily historical replay | P2-ACCEPT-001 | closed |
+| P3-FEAT-001 | Implement feature registry and lineage | P2 snapshots | closed |
+| P3-FEAT-002 | Implement research baseline daily feature evaluator | P3-FEAT-001, P3-REPLAY-001 | closed |
+| P3-STRAT-001 | Implement three one-unit research baseline strategies | P3-FEAT-002, P3-REPLAY-001 | closed |
+| P3-LABEL-001 | Implement label-card schema and evaluator | P3-FEAT-001 | closed |
+| P3-LABEL-002 | Implement vertical-slice labels | P3-LABEL-001 | closed for fixture scope |
+| P3-LABEL-003 | Implement label frequency/conflict audit | P3-LABEL-001 | closed |
+| P3-LABEL-004 | Build human label review corpus | P3-LABEL-002 | deferred pending formal label family |
+| P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
+| P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
+| P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |
+| P3-SHADOW-001 | Implement shadow execution and divergence log | P3-AGG-001 | closed for comparison-contract scope |
+| P3-EXP-002 | Add vertical-slice rule experts | P3 aggregator | closed for fixture scope |
+| P3-POS-001 | Implement unit/position state machine | P2 ledger | closed |
+| P3-POLICY-001 | Freeze trial/add/hold/cooldown parameters | P2 acceptance | closed for fixture scope |
+| P3-RISK-001 | Implement concentration caps | P3-POS-001 | closed |
+| P3-POS-002 | Implement trial/add/review rules | P3 experts | closed for no-add fixture scope |
+| P3-EXIT-001 | Implement four-source exit arbitration | P3 aggregator | closed |
+| P3-POS-003 | Implement cooldown and carried exit | P2 matcher | closed |
+| P3-FUNNEL-001 | Implement opportunity funnel | P3 vertical slice | closed |
+| P3-ATTR-001 | Implement constrained contribution reruns | P3 vertical slice | deferred pending formal strategy questions |
+| P3-DASH-001 | Produce monitoring report | Funnel and attribution | deferred pending recurring formal strategy |
+| P3-ACCEPT-001 | Execute multi-year vertical-slice acceptance | All P3 release blockers | closed |
 
 ## P4-P7
 

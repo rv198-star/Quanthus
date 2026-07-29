@@ -57,7 +57,14 @@ from quanthus.delisted_coverage import (
     run_delisted_coverage,
 )
 from quanthus.feature_registry import FeatureRegistryError, load_feature_registry
-from quanthus.gates import GateReport, P2GateReport, load_gate_report, load_p2_gate_report
+from quanthus.gates import (
+    GateReport,
+    P2GateReport,
+    P3GateReport,
+    load_gate_report,
+    load_p2_gate_report,
+    load_p3_gate_report,
+)
 from quanthus.governed_strategy import (
     GovernedStrategyError,
     load_governed_feature_registry,
@@ -151,6 +158,7 @@ def _parser() -> argparse.ArgumentParser:
     doctor.add_argument("--policy", type=Path)
     doctor.add_argument("--gates", type=Path)
     doctor.add_argument("--p2-gates", type=Path)
+    doctor.add_argument("--p3-gates", type=Path)
 
     policy = subparsers.add_parser("policy-check", help="validate the frozen P0 policy")
     policy.add_argument("--policy", type=Path)
@@ -574,7 +582,12 @@ def _print_gate_report(report: GateReport) -> None:
     print(f"P2 implementation: {'ALLOWED' if report.p2_can_start else 'BLOCKED'}")
 
 
-def _doctor(policy: P0Policy, gates: GateReport, p2_gates: P2GateReport) -> None:
+def _doctor(
+    policy: P0Policy,
+    gates: GateReport,
+    p2_gates: P2GateReport,
+    p3_gates: P3GateReport,
+) -> None:
     print("Quanthus environment: OK")
     print(f"policy: {policy.version}")
     print(f"policy digest: {policy.digest}")
@@ -588,6 +601,11 @@ def _doctor(policy: P0Policy, gates: GateReport, p2_gates: P2GateReport) -> None
     print(f"P2 acceptance: {p2_gates.acceptance_status.upper()}")
     print(f"P3 implementation: {'ALLOWED' if p2_gates.p3_can_start else 'BLOCKED'}")
     print(f"target-profile blockers: {p2_blockers}")
+    deferred = ", ".join(p3_gates.deferred_work_items) or "none"
+    print(f"P3 acceptance: {p3_gates.acceptance_status.upper()}")
+    print(f"P4 implementation: {'ALLOWED' if p3_gates.p4_can_start else 'BLOCKED'}")
+    print(f"P3 frozen capability fixture: {p3_gates.capability_fixture_id}")
+    print(f"P3 deferred capabilities: {deferred}")
 
 
 def _print_data_audit(report: DataAuditReport) -> None:
@@ -657,6 +675,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 load_policy(args.policy),
                 load_gate_report(args.gates),
                 load_p2_gate_report(args.p2_gates),
+                load_p3_gate_report(args.p3_gates),
             )
         elif args.command == "policy-check":
             policy = load_policy(args.policy)

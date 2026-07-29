@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 from quanthus.expert_protocols import (
@@ -15,6 +16,7 @@ from quanthus.expert_protocols import (
     ExpertApplicability,
     ExpertContext,
     RequiredAction,
+    ScoringOutput,
     VetoAuthority,
     VetoOutput,
 )
@@ -148,6 +150,76 @@ class GovernanceResult:
         }
 
 
+class GovernedAction(str, Enum):
+    NO_ACTION = "no_action"
+    TRIAL_ENTRY = "trial_entry"
+    REDUCE = "reduce"
+    FULL_EXIT = "full_exit"
+
+
+@dataclass(frozen=True)
+class ScoreActionPolicy:
+    policy_version: str
+    minimum_entry_score: Decimal
+
+    def __post_init__(self) -> None:
+        if not self.policy_version.strip():
+            raise AggregationError("invalid_action_policy", "policy version must not be empty")
+        if not self.minimum_entry_score.is_finite() or not Decimal(
+            "-1"
+        ) <= self.minimum_entry_score <= Decimal("1"):
+            raise AggregationError(
+                "invalid_action_policy", "minimum entry score must be in [-1, 1]"
+            )
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.to_dict())
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "policy_version": self.policy_version,
+            "minimum_entry_score": str(self.minimum_entry_score),
+            "score_formula": "mean(signal_times_confidence_over_applicable_outputs)",
+        }
+
+
+@dataclass(frozen=True)
+class ScoreActionResult:
+    security_code: str
+    snapshot_id: str
+    knowledge_cutoff: datetime
+    position_state: str
+    governance_digest: str
+    action_policy_version: str
+    action_policy_digest: str
+    scoring_outputs: tuple[ScoringOutput, ...]
+    aggregate_score: Decimal
+    proposed_action: GovernedAction
+    final_action: GovernedAction
+    reason_codes: tuple[str, ...]
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.to_dict())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "security_code": self.security_code,
+            "snapshot_id": self.snapshot_id,
+            "knowledge_cutoff": self.knowledge_cutoff.isoformat(),
+            "position_state": self.position_state,
+            "governance_digest": self.governance_digest,
+            "action_policy_version": self.action_policy_version,
+            "action_policy_digest": self.action_policy_digest,
+            "scoring_outputs": [item.to_dict() for item in self.scoring_outputs],
+            "aggregate_score": str(self.aggregate_score),
+            "proposed_action": self.proposed_action.value,
+            "final_action": self.final_action.value,
+            "reason_codes": list(self.reason_codes),
+        }
+
+
 def _veto_key(output: VetoOutput) -> tuple[int, str, str]:
     return (_AUTHORITY_PRIORITY[output.authority], output.expert_id, output.expert_version)
 
@@ -157,7 +229,10 @@ def _constraint_key(output: ConstraintOutput) -> tuple[str, str, str]:
     return (scope, output.expert_id, output.expert_version)
 
 
-def _validate_unique_outputs(outputs: Sequence[VetoOutput | ConstraintOutput], kind: str) -> None:
+def _validate_unique_outputs(
+    outputs: Sequence[VetoOutput | ConstraintOutput | ScoringOutput],
+    kind: str,
+) -> None:
     keys = [(output.expert_id, output.expert_version) for output in outputs]
     if len(keys) != len(set(keys)):
         raise AggregationError("duplicate_expert_output", f"duplicate {kind} expert outputs")
@@ -173,6 +248,21 @@ def _validate_context_evidence(
         *tuple(vetoes),
         *tuple(constraints),
     )
+    for output in outputs:
+        supplied = {item.key for item in output.evidence}
+        if not supplied.issubset(allowed):
+            raise AggregationError(
+                "context_evidence_mismatch",
+                f"expert {output.expert_id} references evidence outside aggregation context",
+            )
+
+
+def _validate_scoring_context(
+    context: ExpertContext,
+    outputs: tuple[ScoringOutput, ...],
+) -> None:
+    _validate_unique_outputs(outputs, "scoring")
+    allowed = {item.key for item in context.evidence_refs}
     for output in outputs:
         supplied = {item.key for item in output.evidence}
         if not supplied.issubset(allowed):
@@ -273,4 +363,83 @@ def aggregate_governance(
         veto_outputs=ordered_vetoes,
         constraint_outputs=ordered_constraints,
         merged_constraints=merged,
+    )
+
+
+def aggregate_score_and_map_action(
+    context: ExpertContext,
+    governance: GovernanceResult,
+    scoring_outputs: Sequence[ScoringOutput],
+    policy: ScoreActionPolicy,
+) -> ScoreActionResult:
+    """Compute the fixed score, then map governance and state to one proposed/final action."""
+
+    if (
+        governance.security_code != context.security_code
+        or governance.snapshot_id != context.snapshot_id
+        or governance.knowledge_cutoff != context.knowledge_cutoff
+    ):
+        raise AggregationError(
+            "governance_context_mismatch", "governance and score context must be identical"
+        )
+    ordered = tuple(sorted(scoring_outputs, key=lambda item: (item.expert_id, item.expert_version)))
+    _validate_scoring_context(context, ordered)
+    applicable = tuple(
+        output for output in ordered if output.applicability is ExpertApplicability.APPLICABLE
+    )
+    if not applicable:
+        raise AggregationError("no_applicable_scores", "at least one applicable score is required")
+    if any(output.signal is None or output.confidence is None for output in applicable):
+        raise AggregationError("invalid_scoring_input", "applicable score output is incomplete")
+    aggregate_score = sum(
+        (
+            output.signal * output.confidence
+            for output in applicable
+            if output.signal is not None and output.confidence is not None
+        ),
+        Decimal("0"),
+    ) / Decimal(len(applicable))
+
+    if context.position_state == "empty":
+        proposed = (
+            GovernedAction.TRIAL_ENTRY
+            if aggregate_score >= policy.minimum_entry_score
+            else GovernedAction.NO_ACTION
+        )
+    else:
+        proposed = GovernedAction.NO_ACTION
+
+    required = governance.required_action
+    if required is RequiredAction.FORCE_LIQUIDATE:
+        final = GovernedAction.FULL_EXIT
+        reasons = ("force_liquidate_veto",)
+    elif required is RequiredAction.REDUCE_ONLY:
+        final = GovernedAction.REDUCE
+        reasons = ("reduce_only_veto",)
+    elif required is RequiredAction.BLOCK_NEW and context.position_state == "empty":
+        final = GovernedAction.NO_ACTION
+        reasons = ("block_new_veto",)
+    elif proposed is GovernedAction.TRIAL_ENTRY:
+        final = proposed
+        reasons = ("entry_score_threshold_met",)
+    elif context.position_state == "empty":
+        final = GovernedAction.NO_ACTION
+        reasons = ("entry_score_below_threshold",)
+    else:
+        final = GovernedAction.NO_ACTION
+        reasons = ("position_review_hold",)
+
+    return ScoreActionResult(
+        security_code=context.security_code,
+        snapshot_id=context.snapshot_id,
+        knowledge_cutoff=context.knowledge_cutoff,
+        position_state=context.position_state,
+        governance_digest=governance.digest,
+        action_policy_version=policy.policy_version,
+        action_policy_digest=policy.digest,
+        scoring_outputs=ordered,
+        aggregate_score=aggregate_score,
+        proposed_action=proposed,
+        final_action=final,
+        reason_codes=reasons,
     )

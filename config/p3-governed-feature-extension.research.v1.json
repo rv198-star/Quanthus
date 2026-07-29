@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0.0",
+  "registry_version": "p3-governed-features-research-v1",
+  "base_registry": {
+    "path": "p3-baseline-features.research.v1.json",
+    "registry_version": "p3-baseline-features-research-v1",
+    "digest": "sha256:4bcf56d2b6d32741f212dccebd4fcdd44596b836a7f11691462ae7190abcd798"
+  },
+  "definitions": [
+    {
+      "feature_id": "market.breadth_above_sma60",
+      "version": "1.0.0",
+      "formula": "ready securities with total_return_index above sma60 divided by all ready securities in the complete T-close cross-section",
+      "inputs": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "unit": "ratio",
+      "null_policy": "fail_closed",
+      "lookback_sessions": 60,
+      "minimum_history_sessions": 60,
+      "cutoff_rule": "complete_t_close_cross_section",
+      "output_type": "decimal",
+      "owner": "p3-governed-strategy-research",
+      "lifecycle": "active"
+    }
+  ]
+}

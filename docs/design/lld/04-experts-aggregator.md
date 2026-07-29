@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P3-EXP-001` accepted; `P3-AGG-001` accepted; `P3-SHADOW-001` comparison contract accepted; scoring/action mapping, concrete experts, and shadow decision production not started |
+| Implementation status | `P3-EXP-001` accepted; `P3-AGG-001` accepted; `P3-SHADOW-001` comparison contract accepted; candidate-v1 scoring/action mapping and concrete experts implemented; shadow decision production open |
 | Gate source | `config/p2-gates.v1.json` |
 | Governing requirements | FR-RULE-002/003/006, FR-AUDIT-001 |
 
@@ -70,6 +70,21 @@ serialized. Evidence: `docs/acceptance/p3-governance-aggregation-slice-20260728.
 This slice does not compute a score or map governance output to a position action. Those remain
 `P3-AGG-002`, after a versioned action policy is frozen.
 
+### Governed candidate action mapping
+
+`src/quanthus/aggregator.py` now adds the candidate-v1 continuation of the accepted governance
+boundary. Applicable scoring outputs are ordered by expert identity, converted to an equal-weight
+confidence-adjusted aggregate, and mapped through a versioned minimum-entry score. A system or
+strategy block-new veto still changes a proposed Trial entry to no action; score cannot override
+the governance result.
+
+`src/quanthus/governed_strategy.py` supplies two vetoes, one Trial-position constraint, and three
+concrete scoring experts for the frozen candidate. The complete chain materializes one P2
+`DecisionEvent` for every bounded candidate and held-position review. The initial development run
+produced 52,423 decisions, of which 461 accepted decisions resolve to exactly 461 P2 fills and the
+remaining 51,962 are non-ordering rejections or holds. Evidence:
+`docs/acceptance/p3-governed-strategy-development-20260729.md`.
+
 ## 4. Release modes
 
 The vertical slice enables tradability/funding vetoes, a basic candidate rule, extension-risk
@@ -84,9 +99,10 @@ not change comparison identity. Every output declares `execution_authorized=fals
 not create or persist decisions, signals, intents, orders, fills, or positions. Evidence:
 `docs/acceptance/p3-shadow-divergence-contract-slice-20260728.md`.
 
-This completes only the reusable `P3-SHADOW-001` comparison contract. Production shadow decisions
-still require concrete experts and versioned score/action mapping, so the end-to-end work item
-remains open.
+This completes only the reusable `P3-SHADOW-001` comparison contract. Candidate-v1 experts and
+score/action mapping now exist, but the governed runner does not produce alternative shadow
+decisions. Production shadow-decision generation remains open and cannot be inferred from the
+active decision stream.
 
 ## 5. Audit record
 

@@ -276,13 +276,8 @@ class StrategyReplayFrame:
         prior_mark_price: Decimal,
     ) -> tuple[CorporateActionStep, ...]:
         if self.corporate_actions:
-            if any(
-                step.action.security_code != security_code
-                for step in self.corporate_actions
-            ):
-                raise BacktestInputError(
-                    "frame corporate action does not match the held security"
-                )
+            if any(step.action.security_code != security_code for step in self.corporate_actions):
+                raise BacktestInputError("frame corporate action does not match the held security")
             return self.corporate_actions
         if self.source is None:
             return ()
@@ -421,6 +416,24 @@ class StrategyEquityPoint:
 
 
 @dataclass(frozen=True)
+class StrategyCapitalPoint:
+    market_date: date
+    invested_capital_ratio: Decimal
+
+    def __post_init__(self) -> None:
+        if not self.invested_capital_ratio.is_finite() or not Decimal(
+            "0"
+        ) <= self.invested_capital_ratio <= Decimal("1"):
+            raise ValueError("invested_capital_ratio must be in [0, 1]")
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "market_date": self.market_date.isoformat(),
+            "invested_capital_ratio": decimal_text(self.invested_capital_ratio),
+        }
+
+
+@dataclass(frozen=True)
 class StrategyTrade:
     security_code: str
     entry_date: date
@@ -480,6 +493,9 @@ class StrategyPerformanceReport:
     return_excluding_top_3_closed_trades: Decimal
     benchmark_total_return: Decimal | None = None
     excess_total_return: Decimal | None = None
+    capital_matched_benchmark_total_return: Decimal | None = None
+    capital_matched_excess_total_return: Decimal | None = None
+    capital_matched_benchmark_path_digest: str | None = None
     periods_per_year: int = 252
     risk_free_rate: Decimal = Decimal("0")
     compound_nav: bool = False
@@ -506,9 +522,7 @@ class StrategyPerformanceReport:
             "turnover": decimal_text(self.turnover),
             "total_fees": decimal_text(self.total_fees),
             "exposure_rate": decimal_text(self.exposure_rate),
-            "average_invested_capital_ratio": decimal_text(
-                self.average_invested_capital_ratio
-            ),
+            "average_invested_capital_ratio": decimal_text(self.average_invested_capital_ratio),
             "average_holding_sessions": optional(self.average_holding_sessions),
             "top_3_closed_trade_count": self.top_3_closed_trade_count,
             "top_3_closed_trade_pnl": decimal_text(self.top_3_closed_trade_pnl),
@@ -517,6 +531,13 @@ class StrategyPerformanceReport:
             ),
             "benchmark_total_return": optional(self.benchmark_total_return),
             "excess_total_return": optional(self.excess_total_return),
+            "capital_matched_benchmark_total_return": optional(
+                self.capital_matched_benchmark_total_return
+            ),
+            "capital_matched_excess_total_return": optional(
+                self.capital_matched_excess_total_return
+            ),
+            "capital_matched_benchmark_path_digest": (self.capital_matched_benchmark_path_digest),
             "periods_per_year": self.periods_per_year,
             "risk_free_rate": decimal_text(self.risk_free_rate),
             "compound_nav": self.compound_nav,
@@ -639,6 +660,51 @@ def _equity_from_events(events: Sequence[EngineEvent]) -> Mapping[date, Decimal]
     return points
 
 
+def _capital_path(
+    equity_curve: tuple[StrategyEquityPoint, ...],
+    events: Sequence[EngineEvent],
+) -> tuple[StrategyCapitalPoint, ...]:
+    daily_snapshots: dict[date, Mapping[str, Any]] = {}
+    for event in events:
+        if event.event_type is EventType.DAILY_SNAPSHOT:
+            payload = event.payload
+            daily_snapshots[date.fromisoformat(str(payload["session_date"]))] = payload
+    replay_dates = tuple(point.market_date for point in equity_curve[1:])
+    if not set(daily_snapshots).issubset(replay_dates):
+        raise BacktestInputError("performance snapshots do not align with replay dates")
+
+    points = [
+        StrategyCapitalPoint(
+            market_date=equity_curve[0].market_date,
+            invested_capital_ratio=Decimal("0"),
+        )
+    ]
+    for market_date in replay_dates:
+        daily_payload = daily_snapshots.get(market_date)
+        if daily_payload is None:
+            ratio = Decimal("0")
+        else:
+            system_equity = Decimal(str(daily_payload["total_equity"])) + Decimal(
+                str(daily_payload["external_pool"])
+            )
+            if system_equity <= 0:
+                raise BacktestInputError("daily system equity must remain positive")
+            ratio = _rate(Decimal(str(daily_payload["market_value"])) / system_equity)
+        points.append(
+            StrategyCapitalPoint(
+                market_date=market_date,
+                invested_capital_ratio=ratio,
+            )
+        )
+    return tuple(points)
+
+
+def strategy_capital_path(result: StrategyReplayResult) -> tuple[StrategyCapitalPoint, ...]:
+    """Return the audited terminal daily capital path, including an initial zero weight."""
+
+    return _capital_path(result.equity_curve, result.backtest.events)
+
+
 def _build_performance(
     *,
     equity_curve: tuple[StrategyEquityPoint, ...],
@@ -696,37 +762,17 @@ def _build_performance(
         else _rate(Decimal(sum(trade.holding_sessions for trade in trades)) / len(trades))
     )
 
-    daily_snapshots: dict[date, Mapping[str, Any]] = {}
-    for event in events:
-        if event.event_type is EventType.DAILY_SNAPSHOT:
-            payload = event.payload
-            daily_snapshots[date.fromisoformat(str(payload["session_date"]))] = payload
-    replay_dates = tuple(point.market_date for point in equity_curve[1:])
-    if len(replay_dates) != replay_sessions or not set(daily_snapshots).issubset(replay_dates):
-        raise BacktestInputError("performance snapshots do not align with replay dates")
-    invested_ratios: list[Decimal] = []
-    for market_date in replay_dates:
-        daily_payload = daily_snapshots.get(market_date)
-        if daily_payload is None:
-            invested_ratios.append(Decimal("0"))
-            continue
-        system_equity = Decimal(str(daily_payload["total_equity"])) + Decimal(
-            str(daily_payload["external_pool"])
-        )
-        if system_equity <= 0:
-            raise BacktestInputError("daily system equity must remain positive")
-        invested_ratios.append(Decimal(str(daily_payload["market_value"])) / system_equity)
+    capital_path = _capital_path(equity_curve, events)
+    invested_ratios = tuple(point.invested_capital_ratio for point in capital_path[1:])
+    if len(invested_ratios) != replay_sessions:
+        raise BacktestInputError("capital path does not align with replay session count")
     average_invested_capital_ratio = _rate(
         sum(invested_ratios, Decimal("0")) / Decimal(replay_sessions)
     )
 
     top_trades = tuple(sorted(trades, key=lambda trade: trade.pnl, reverse=True)[:3])
-    top_3_closed_trade_pnl = _money(
-        sum((trade.pnl for trade in top_trades), Decimal("0"))
-    )
-    return_excluding_top_3_closed_trades = _rate(
-        (total_pnl - top_3_closed_trade_pnl) / initial
-    )
+    top_3_closed_trade_pnl = _money(sum((trade.pnl for trade in top_trades), Decimal("0")))
+    return_excluding_top_3_closed_trades = _rate((total_pnl - top_3_closed_trade_pnl) / initial)
 
     fill_payloads = [event.payload for event in events if event.event_type is EventType.FILL]
     gross_turnover = sum(
@@ -822,9 +868,7 @@ def _apply_actions(
         raise BacktestInputError("an empty unit cannot consume portfolio corporate actions")
     block_reason = frame.block_reason(state.security_code)
     if block_reason is not None:
-        raise BacktestInputError(
-            "held security is blocked by replay evidence: " + block_reason
-        )
+        raise BacktestInputError("held security is blocked by replay evidence: " + block_reason)
     if state.last_mark_price is None:
         raise BacktestInputError("positioned state requires a prior mark before corporate actions")
     corporate_actions = frame.actions(state.security_code, state.last_mark_price)

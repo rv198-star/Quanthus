@@ -4,7 +4,13 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from quanthus.aggregator import AggregationError, aggregate_governance
+from quanthus.aggregator import (
+    AggregationError,
+    GovernedAction,
+    ScoreActionPolicy,
+    aggregate_governance,
+    aggregate_score_and_map_action,
+)
 from quanthus.expert_protocols import (
     ConstraintOutput,
     ConstraintScope,
@@ -13,6 +19,7 @@ from quanthus.expert_protocols import (
     ExpertContext,
     ExpertEvidenceRef,
     RequiredAction,
+    ScoringOutput,
     VetoAuthority,
     VetoOutput,
 )
@@ -102,6 +109,19 @@ def constraint(
         stop_rule="stop_rule" if active else None,
         hold_rule="hold_rule" if active else None,
         scope=ConstraintScope.UNIT if active else None,
+    )
+
+
+def score(expert_id: str, signal: str, confidence: str) -> ScoringOutput:
+    return ScoringOutput(
+        expert_id=expert_id,
+        expert_version="1.0.0",
+        applicability=ExpertApplicability.APPLICABLE,
+        applicability_reason="label_available",
+        reason_code="scored",
+        evidence=(context().evidence_refs[0],),
+        signal=Decimal(signal),
+        confidence=Decimal(confidence),
     )
 
 
@@ -264,6 +284,46 @@ class AggregatorTests(unittest.TestCase):
 
         self.assertEqual(first.to_dict(), second.to_dict())
         self.assertEqual(first.digest, second.digest)
+
+    def test_score_mapping_is_confidence_adjusted_and_veto_cannot_be_bypassed(self) -> None:
+        current = context()
+        policy = ScoreActionPolicy("candidate-action-v1", Decimal("0.35"))
+        scoring = (score("score.trend", "0.80", "0.75"), score("score.risk", "0.60", "0.50"))
+        allowed = aggregate_governance(
+            current,
+            (veto("veto.system", RequiredAction.NONE),),
+            (constraint("constraint.position", "0", "0.30"),),
+        )
+        accepted = aggregate_score_and_map_action(current, allowed, scoring, policy)
+
+        self.assertEqual(accepted.aggregate_score, Decimal("0.45"))
+        self.assertEqual(accepted.final_action, GovernedAction.TRIAL_ENTRY)
+
+        blocked = aggregate_governance(
+            current,
+            (veto("veto.system", RequiredAction.BLOCK_NEW),),
+            (constraint("constraint.position", "0", "0.30"),),
+        )
+        rejected = aggregate_score_and_map_action(current, blocked, scoring, policy)
+        self.assertEqual(rejected.aggregate_score, Decimal("0.45"))
+        self.assertEqual(rejected.proposed_action, GovernedAction.TRIAL_ENTRY)
+        self.assertEqual(rejected.final_action, GovernedAction.NO_ACTION)
+
+    def test_score_mapping_is_input_order_independent(self) -> None:
+        current = context()
+        governance = aggregate_governance(
+            current,
+            (veto("veto.system", RequiredAction.NONE),),
+            (constraint("constraint.position", "0", "0.30"),),
+        )
+        policy = ScoreActionPolicy("candidate-action-v1", Decimal("0.35"))
+        outputs = (score("score.trend", "0.90", "0.90"), score("score.risk", "0.30", "0.50"))
+
+        first = aggregate_score_and_map_action(current, governance, outputs, policy)
+        second = aggregate_score_and_map_action(
+            current, governance, tuple(reversed(outputs)), policy
+        )
+        self.assertEqual(first.to_dict(), second.to_dict())
 
 
 if __name__ == "__main__":

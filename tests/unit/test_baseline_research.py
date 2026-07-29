@@ -94,14 +94,10 @@ class BaselineResearchTests(unittest.TestCase):
         prior_prices: dict[str, Decimal] = {}
         for market_date in self.dates:
             for exchange in ("SSE", "SZSE"):
-                calendar.append(
-                    {"exchange": exchange, "trade_date": market_date, "is_open": 1}
-                )
+                calendar.append({"exchange": exchange, "trade_date": market_date, "is_open": 1})
         for index, market_date in enumerate(self.dates):
             economic_price = Decimal("100") + Decimal("2") * index
-            split_price = (
-                economic_price if index < split_index else economic_price / Decimal("2")
-            )
+            split_price = economic_price if index < split_index else economic_price / Decimal("2")
             for security_id, stock_code in securities.items():
                 exchange = "SSE" if security_id.startswith("SSE") else "SZSE"
                 close = split_price if security_id == "SSE-600001" else Decimal("10")
@@ -283,7 +279,7 @@ class BaselineResearchTests(unittest.TestCase):
                 scope_start=scope_start,
                 scope_end=scope_end,
             )
-            self.assertEqual(result.runner_version, "2.1.0")
+            self.assertEqual(result.runner_version, "2.2.0")
             self.assertEqual(
                 {item.strategy_id for item in result.strategies},
                 {
@@ -330,7 +326,17 @@ class BaselineResearchTests(unittest.TestCase):
             self.assertIn("Avg invested", scoreboard)
             self.assertIn("Benchmark return", scoreboard)
             self.assertIn("Excess return", scoreboard)
+            self.assertIn("Capital-matched benchmark", scoreboard)
+            self.assertIn("Capital-matched excess", scoreboard)
             self.assertIn("Return ex top 3", scoreboard)
+            self.assertTrue(
+                all(
+                    item.performance.capital_matched_benchmark_total_return is not None
+                    and item.performance.capital_matched_excess_total_return is not None
+                    and item.performance.capital_matched_benchmark_path_digest is not None
+                    for item in result.strategies
+                )
+            )
             with self.assertRaisesRegex(BaselineResearchError, "explicit sh000300"):
                 run_baseline_strategy_suite(
                     reader,
@@ -342,15 +348,18 @@ class BaselineResearchTests(unittest.TestCase):
                     scope_start=scope_start,
                     scope_end=scope_end,
                 )
-            with BaselineFeaturePanel.build(
-                self.bundle,
-                self.registry,
-                scope_start=self.dates[0],
-                scope_end=scope_end,
-                output=self.root / "under-scoped-baseline-features.parquet",
-            ) as under_scoped_panel, self.assertRaisesRegex(
-                BaselineResearchError,
-                "continuity scope must include the final execution date",
+            with (
+                BaselineFeaturePanel.build(
+                    self.bundle,
+                    self.registry,
+                    scope_start=self.dates[0],
+                    scope_end=scope_end,
+                    output=self.root / "under-scoped-baseline-features.parquet",
+                ) as under_scoped_panel,
+                self.assertRaisesRegex(
+                    BaselineResearchError,
+                    "continuity scope must include the final execution date",
+                ),
             ):
                 run_baseline_strategy_suite(
                     reader,

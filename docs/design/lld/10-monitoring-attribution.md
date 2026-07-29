@@ -5,7 +5,7 @@
 | Phase | Instrumentation in P2; reports after P3 |
 | Design status | approved |
 | Delivery gate | accepted-conditional |
-| Implementation status | P2 event contracts plus P3 shadow comparison and `P3-FUNNEL-001` reconciliation contracts accepted; P3 decision production, populated reports, and attribution open |
+| Implementation status | P2 contracts accepted; `P3-FUNNEL-001` reconciliation contracts accepted; candidate-v1 decision production and populated funnel implemented; attribution, dashboard, and shadow production open |
 | Gate source | `config/p2-gates.v1.json` |
 | Governing requirements | FR-AUDIT-001 through FR-AUDIT-005 |
 
@@ -48,9 +48,11 @@ owner of decision persistence. Evidence:
 The strategy-neutral replay now has a separate immutable analysis package. It persists replay
 decision traces, equity points, trades, metrics, and final state, then binds their checksum to the
 exact P2 run manifest and event stream. This closes replay reproducibility but does not substitute
-for the complete expert/veto/constraint fields of a concrete P3 `DecisionEvent`; those records stay
-blocked on concrete experts and score/action policy. Evidence:
-`docs/acceptance/p3-strategy-replay-integration-slice-20260728.md`.
+for the complete expert/veto/constraint fields of a concrete P3 `DecisionEvent`. The governed
+candidate runner now produces those concrete records for its own frozen vocabulary; generic replay
+and other strategies do not inherit them. Evidence:
+`docs/acceptance/p3-strategy-replay-integration-slice-20260728.md` and
+`docs/acceptance/p3-governed-strategy-development-20260729.md`.
 
 ### Notification log
 
@@ -115,10 +117,14 @@ another stage input, the link must enter the next fixed stage and retain opportu
 Input order cannot change the report id, digest, stage summaries, or canonical bytes. Evidence:
 `docs/acceptance/p3-opportunity-funnel-slice-20260728.md`.
 
-This completes only the reusable reconciliation portion of `P3-FUNNEL-001`. It consumes already
-produced evidence, declares `execution_authorized=false`, and cannot create a decision, signal,
-order, fill, position transition, or notification. Concrete label/expert/action production and a
-populated historical funnel remain part of the open P3 vertical slice.
+The reusable reconciler still consumes already-produced evidence, declares
+`execution_authorized=false`, and cannot create a decision, signal, order, fill, position
+transition, or notification. The governed runner now supplies a populated candidate-v1 funnel:
+101,549 source events reconcile across all four stages, including 48,591 candidate/score inputs,
+535 entry-allocation inputs, and 3,832 held reviews. Twenty held-review outcomes remain explicitly
+pending because one legal Trial position is open at the final mark; pending is reconciled, not
+silently treated as a closed trade. This closes populated-funnel production for candidate v1 while
+constrained attribution and dashboard work remain open.
 
 ## 6. Reporting cuts
 

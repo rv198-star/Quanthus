@@ -295,9 +295,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
 
     def test_continuous_historical_frame_reader_is_bounded_and_traceable(self) -> None:
         root = find_project_root()
-        lld_path = (
-            root / "docs" / "design" / "lld" / "02-backtest-engine" / "strategy-replay.md"
-        )
+        lld_path = root / "docs" / "design" / "lld" / "02-backtest-engine" / "strategy-replay.md"
         evidence_path = (
             root / "docs" / "acceptance" / "p3-historical-frame-reader-slice-20260729.md"
         )
@@ -322,9 +320,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("class HistoricalReplayFrameReader", source)
         self.assertIn("class PITBundleMarketView", source)
         self.assertTrue(source_path.is_file())
-        self.assertTrue(
-            (root / "tests" / "unit" / "test_historical_frame_reader.py").is_file()
-        )
+        self.assertTrue((root / "tests" / "unit" / "test_historical_frame_reader.py").is_file())
 
     def test_p3_baseline_suite_is_research_only_and_traceable(self) -> None:
         root = find_project_root()
@@ -332,9 +328,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         replay_lld_path = (
             root / "docs" / "design" / "lld" / "02-backtest-engine" / "strategy-replay.md"
         )
-        v1_evidence_path = (
-            root / "docs" / "acceptance" / "p3-baseline-strategy-suite-20260729.md"
-        )
+        v1_evidence_path = root / "docs" / "acceptance" / "p3-baseline-strategy-suite-20260729.md"
         v2_evidence_path = (
             root / "docs" / "acceptance" / "p3-baseline-strategy-suite-v2-20260729.md"
         )
@@ -343,6 +337,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         metric_evidence_path = (
             root / "docs" / "acceptance" / "p3-baseline-benchmark-metrics-20260729.md"
+        )
+        capital_evidence_path = (
+            root / "docs" / "acceptance" / "p3-capital-matched-benchmark-20260729.md"
         )
         source_path = root / "src" / "quanthus" / "backtest" / "baseline_research.py"
         benchmark_path = root / "src" / "quanthus" / "backtest" / "benchmark.py"
@@ -355,6 +352,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         v2_evidence = v2_evidence_path.read_text(encoding="utf-8")
         diagnostic_evidence = diagnostic_evidence_path.read_text(encoding="utf-8")
         metric_evidence = metric_evidence_path.read_text(encoding="utf-8")
+        capital_evidence = capital_evidence_path.read_text(encoding="utf-8")
         source = source_path.read_text(encoding="utf-8")
         cli = cli_path.read_text(encoding="utf-8")
         v1_catalogue = json.loads(
@@ -389,6 +387,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("Return ex top 3", metric_evidence)
         self.assertIn("-89.049688%", metric_evidence)
         self.assertIn("static contribution subtraction", metric_evidence)
+        self.assertIn("Capital-matched excess", capital_evidence)
+        self.assertIn("+3.761204%", capital_evidence)
+        self.assertIn("prior-close", capital_evidence)
         self.assertEqual(v1_catalogue["status"], "research-only")
         self.assertEqual(v2_catalogue["status"], "research-only")
         self.assertEqual(v1_catalogue["validation"]["development_end"], "2021-12-31")
@@ -412,6 +413,40 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(benchmark_path.is_file())
         self.assertTrue((root / "tests" / "unit" / "test_benchmark.py").is_file())
         self.assertTrue((root / "tests" / "unit" / "test_baseline_research.py").is_file())
+
+    def test_p3_governed_candidate_development_acceptance_is_bounded_and_traceable(
+        self,
+    ) -> None:
+        root = find_project_root()
+        card_path = root / "docs" / "design" / "strategies" / "market-breadth-trend-breakout-v1.md"
+        evidence_path = (
+            root / "docs" / "acceptance" / "p3-governed-strategy-development-20260729.md"
+        )
+        policy_path = root / "config" / "p3-governed-strategy.research.v1.json"
+        source_path = root / "src" / "quanthus" / "backtest" / "portfolio_replay.py"
+        card_fields = _header_fields(card_path)
+        evidence_fields = _header_fields(evidence_path)
+        card = card_path.read_text(encoding="utf-8")
+        evidence = evidence_path.read_text(encoding="utf-8")
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        source = source_path.read_text(encoding="utf-8")
+
+        self.assertEqual(card_fields["Delivery gate"], "accepted")
+        self.assertIn("independent full rerun byte-identical", card_fields["Implementation status"])
+        self.assertIn("accepted; independent full invocation", evidence_fields["Evidence status"])
+        self.assertIn("bounded preselection", card)
+        self.assertIn("research_only=true", evidence)
+        self.assertIn("execution_authorized=false", evidence)
+        self.assertIn("-83.006028%", evidence)
+        self.assertIn("one is a legal Trial", evidence)
+        self.assertIn("d64f34179a275c17e5095b8a33036663cfe61299c211050d863ae1bb6e7f1f23", evidence)
+        self.assertIn("53dc8030c0e0dcaaa514edb77ea9fdd59bd59c5de7e8c2eac83bd75451e5c552", evidence)
+        self.assertEqual(policy["status"], "research-only")
+        self.assertEqual(policy["validation"]["development_end"], "2021-12-31")
+        self.assertEqual(policy["validation"]["arbitration_start"], "2022-01-01")
+        self.assertIn("policy.portfolio.maximum_active_units", source)
+        self.assertTrue(source_path.is_file())
+        self.assertTrue((root / "tests" / "unit" / "test_portfolio_replay.py").is_file())
 
     def test_p3_label_card_slice_is_bounded_and_traceable(self) -> None:
         root = find_project_root()

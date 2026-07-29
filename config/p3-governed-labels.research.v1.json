@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0.0",
+  "registry_version": "p3-governed-labels-research-v1",
+  "cards": [
+    {
+      "label_id": "market.breadth-regime",
+      "display_name": "Market breadth regime",
+      "dimension": "market_sector_context",
+      "version": "1.0.0",
+      "lifecycle": "active",
+      "source_fields": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "feature_requirements": [
+        {"feature_id": "market.breadth_above_sma60", "version": "1.0.0"}
+      ],
+      "rule": "supportive when market breadth above SMA60 is at least the governed policy threshold",
+      "parameters": {"policy_binding": "candidate.market-breadth-trend-breakout@1.0.0"},
+      "lookback_sessions": 60,
+      "minimum_history_sessions": 60,
+      "mutually_exclusive_with": [],
+      "coexists_with": [],
+      "output_values": ["supportive", "weak"],
+      "evidence_fields": ["breadth", "minimum_breadth"],
+      "reason_codes": ["breadth_supportive", "breadth_weak", "feature_unavailable"],
+      "counterexamples": [
+        {"case_id": "breadth_below_threshold", "description": "Broad participation is below the frozen threshold", "expected_value": "weak", "evidence_ref": "tests/unit/test_governed_strategy.py"},
+        {"case_id": "breadth_equal_threshold", "description": "Equality at the frozen threshold remains supportive", "expected_value": "supportive", "evidence_ref": "tests/unit/test_governed_strategy.py"}
+      ],
+      "expected_frequency": {"minimum_rate": "0.95", "maximum_rate": "1.00", "sample_scope": "governed_candidate_scan"},
+      "validation_sample_refs": ["tests/unit/test_governed_strategy.py"]
+    },
+    {
+      "label_id": "trend.moderate-uptrend",
+      "display_name": "Moderate uptrend",
+      "dimension": "trend_energy",
+      "version": "1.0.0",
+      "lifecycle": "active",
+      "source_fields": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "feature_requirements": [
+        {"feature_id": "price.total_return_index", "version": "1.0.0"},
+        {"feature_id": "price.sma20", "version": "1.0.0"},
+        {"feature_id": "price.sma60", "version": "1.0.0"},
+        {"feature_id": "price.momentum20", "version": "1.0.0"}
+      ],
+      "rule": "moderate when price is above SMA20 above SMA60 and momentum is inside frozen bounds",
+      "parameters": {"policy_binding": "candidate.market-breadth-trend-breakout@1.0.0"},
+      "lookback_sessions": 60,
+      "minimum_history_sessions": 60,
+      "mutually_exclusive_with": [],
+      "coexists_with": [],
+      "output_values": ["moderate", "not_moderate"],
+      "evidence_fields": ["momentum20", "price_to_sma20", "sma20_to_sma60"],
+      "reason_codes": ["moderate_uptrend", "trend_outside_bounds", "feature_unavailable"],
+      "counterexamples": [
+        {"case_id": "trend_too_extended", "description": "Momentum above the governed maximum is not moderate", "expected_value": "not_moderate", "evidence_ref": "tests/unit/test_governed_strategy.py"},
+        {"case_id": "trend_not_stacked", "description": "SMA20 not above SMA60 is not a moderate uptrend", "expected_value": "not_moderate", "evidence_ref": "tests/unit/test_governed_strategy.py"}
+      ],
+      "expected_frequency": {"minimum_rate": "0.95", "maximum_rate": "1.00", "sample_scope": "governed_candidate_scan"},
+      "validation_sample_refs": ["tests/unit/test_governed_strategy.py"]
+    },
+    {
+      "label_id": "price-volume.breakout-confirmation",
+      "display_name": "Price-volume breakout confirmation",
+      "dimension": "price_volume_acceptance",
+      "version": "1.0.0",
+      "lifecycle": "active",
+      "source_fields": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "daily_ohlcv_none", "column": "volume"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "feature_requirements": [
+        {"feature_id": "price.total_return_index", "version": "1.0.0"},
+        {"feature_id": "price.prior_high20", "version": "1.0.0"},
+        {"feature_id": "liquidity.volume_ratio20", "version": "1.0.0"},
+        {"feature_id": "price.rsi14", "version": "1.0.0"}
+      ],
+      "rule": "confirmed when breakout, volume ratio, and RSI all remain inside frozen bounds",
+      "parameters": {"policy_binding": "candidate.market-breadth-trend-breakout@1.0.0"},
+      "lookback_sessions": 21,
+      "minimum_history_sessions": 21,
+      "mutually_exclusive_with": [],
+      "coexists_with": [],
+      "output_values": ["confirmed", "not_confirmed"],
+      "evidence_fields": ["breakout20", "rsi14", "volume_ratio20"],
+      "reason_codes": ["breakout_confirmed", "breakout_not_confirmed", "feature_unavailable"],
+      "counterexamples": [
+        {"case_id": "breakout_too_extended", "description": "A breakout above the governed maximum is rejected", "expected_value": "not_confirmed", "evidence_ref": "tests/unit/test_governed_strategy.py"},
+        {"case_id": "volume_too_extreme", "description": "An extreme volume ratio is not accepted confirmation", "expected_value": "not_confirmed", "evidence_ref": "tests/unit/test_governed_strategy.py"}
+      ],
+      "expected_frequency": {"minimum_rate": "0.95", "maximum_rate": "1.00", "sample_scope": "governed_candidate_scan"},
+      "validation_sample_refs": ["tests/unit/test_governed_strategy.py"]
+    },
+    {
+      "label_id": "risk.extension-state",
+      "display_name": "Extension risk state",
+      "dimension": "position_risk",
+      "version": "1.0.0",
+      "lifecycle": "active",
+      "source_fields": [
+        {"dataset": "corporate_action_exceptions", "column": "blocked_from"},
+        {"dataset": "corporate_actions_normalized", "column": "bonus_share_ratio"},
+        {"dataset": "corporate_actions_normalized", "column": "cash_dividend_per_share"},
+        {"dataset": "daily_ohlcv_none", "column": "close"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "lower_limit_price"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_pct"},
+        {"dataset": "price_limit_execution_daily", "column": "upper_limit_price"}
+      ],
+      "feature_requirements": [
+        {"feature_id": "risk.realized_volatility20", "version": "1.0.0"},
+        {"feature_id": "price.rsi14", "version": "1.0.0"}
+      ],
+      "rule": "contained when realized volatility and RSI do not exceed governed entry bounds",
+      "parameters": {"policy_binding": "candidate.market-breadth-trend-breakout@1.0.0"},
+      "lookback_sessions": 21,
+      "minimum_history_sessions": 21,
+      "mutually_exclusive_with": [],
+      "coexists_with": [],
+      "output_values": ["contained", "extended"],
+      "evidence_fields": ["realized_volatility20", "rsi14"],
+      "reason_codes": ["extension_contained", "extension_excessive", "feature_unavailable"],
+      "counterexamples": [
+        {"case_id": "volatility_excessive", "description": "Volatility above the governed maximum is extended", "expected_value": "extended", "evidence_ref": "tests/unit/test_governed_strategy.py"},
+        {"case_id": "rsi_excessive", "description": "RSI above the governed maximum is extended", "expected_value": "extended", "evidence_ref": "tests/unit/test_governed_strategy.py"}
+      ],
+      "expected_frequency": {"minimum_rate": "0.95", "maximum_rate": "1.00", "sample_scope": "governed_candidate_scan"},
+      "validation_sample_refs": ["tests/unit/test_governed_strategy.py"]
+    }
+  ]
+}

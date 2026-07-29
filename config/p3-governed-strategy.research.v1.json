@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0.0",
+  "strategy_id": "candidate.market-breadth-trend-breakout",
+  "strategy_version": "1.0.0",
+  "status": "research-only",
+  "hypothesis": "Moderate medium-term trend continuation with bounded price-volume breakout has positive selection value when broad-market participation is supportive and extension risk is contained.",
+  "non_goals": [
+    "twelve_state_stock_stage_activation",
+    "intraday_decision_or_execution",
+    "add_or_reduce_actions",
+    "sector_expert_or_sector_filter",
+    "broker_or_notification_delivery"
+  ],
+  "bindings": {
+    "feature_registry_version": "p3-governed-features-research-v1",
+    "label_registry_version": "p3-governed-labels-research-v1",
+    "execution_policy_version": "p2-daily-research-v1",
+    "p0_policy_version": "p0-2026-07-23",
+    "position_state_machine_version": "1.0.0",
+    "industry_mapping_version": "static-level1-concentration-research-v1"
+  },
+  "validation": {
+    "development_start": "2012-01-01",
+    "development_end": "2021-12-31",
+    "arbitration_start": "2022-01-01",
+    "arbitration_end": "2024-12-31",
+    "permanent_blind_start": "2025-01-01",
+    "permanent_blind_end": "2025-12-31",
+    "parameter_change_budget_after_initial_run": 2
+  },
+  "portfolio": {
+    "unit_count": 5,
+    "unit_notional": "100000.00",
+    "trial_position_fraction": "0.30",
+    "sizing_cash_buffer": "0.21",
+    "entry_lot_size": 100,
+    "maximum_active_units": 5,
+    "adds_enabled": false,
+    "reductions_enabled": false,
+    "cooldown_sessions": 5
+  },
+  "entry": {
+    "candidate_scan_limit": 20,
+    "minimum_listing_sessions": 120,
+    "minimum_average_amount20": "100000000.00",
+    "minimum_market_breadth_above_sma60": "0.45",
+    "minimum_momentum20": "0.03",
+    "maximum_momentum20": "0.15",
+    "minimum_breakout20": "0.0025",
+    "maximum_breakout20": "0.025",
+    "minimum_volume_ratio20": "1.10",
+    "maximum_volume_ratio20": "2.50",
+    "minimum_rsi14": "50.00",
+    "maximum_rsi14": "72.00",
+    "maximum_realized_volatility20": "0.45",
+    "maximum_absolute_entry_day_return": "0.04",
+    "minimum_aggregate_score": "0.35"
+  },
+  "exit": {
+    "minimum_holding_sessions": 3,
+    "maximum_holding_sessions": 40,
+    "constraint_stop_loss": "0.08",
+    "deterioration_sessions": 2,
+    "structural_break_rule": "total_return_index_below_sma60_and_sma20_not_above_sma60",
+    "deterioration_rule": "total_return_index_below_sma20_or_momentum20_not_positive"
+  },
+  "evaluation": {
+    "minimum_closed_trades": 100,
+    "maximum_drawdown_warning": "0.25",
+    "minimum_capital_matched_excess": "0.00",
+    "minimum_return_excluding_top3": "0.00",
+    "full_capital_excess_is_gate": false,
+    "required_breakdowns": [
+      "calendar_year",
+      "market_breadth_regime",
+      "holding_duration",
+      "exit_source"
+    ]
+  }
+}

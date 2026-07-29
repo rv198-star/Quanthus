@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; concrete labels not started |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; candidate-v1 breadth feature and four concrete labels accepted for development after byte-identical rerun |
 | Gate source | `config/p2-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -138,6 +138,23 @@ opened earlier, but it is not PIT market evidence and creates sample-selection b
 reports the excluded identity count and `data_quality_scope_selection_bias=true`. Results under
 this filter are conditional infrastructure baselines, never official all-universe return claims.
 Repairing the action corpus is the path to removing the filter.
+
+### Governed candidate extension
+
+`config/p3-governed-feature-extension.research.v1.json` checksum-binds the accepted baseline
+registry and adds exactly one complete-T-close cross-sectional feature,
+`market.breadth_above_sma60`. `config/p3-governed-labels.research.v1.json` defines four active,
+candidate-specific cards for breadth regime, moderate uptrend, price-volume breakout confirmation,
+and extension risk. `src/quanthus/governed_strategy.py` binds their facts to the immutable bundle
+manifests and the exact T-close snapshot before running the strict LabelCard evaluator.
+
+The extension label uses realized volatility and RSI. Absolute entry-day return is a separate
+entry-evidence veto over the same T-close panel, so the two controls remain independently visible
+instead of being collapsed into one label. These cards implement only the frozen
+`candidate.market-breadth-trend-breakout@1.0.0` vocabulary; they do not activate the optional
+twelve-state stock-stage model or create a generic label-formula language. The first 2012-2021
+run produced 48,591 complete candidate-to-score observations without unknown or unreconciled
+funnel inputs. Evidence: `docs/acceptance/p3-governed-strategy-development-20260729.md`.
 
 ## 5. Daily-bar anatomy
 

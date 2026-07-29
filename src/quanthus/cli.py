@@ -23,6 +23,11 @@ from quanthus.backtest.historical_frames import (
     load_historical_frame_reader,
 )
 from quanthus.backtest.policy import load_execution_policy
+from quanthus.backtest.portfolio_replay import (
+    PortfolioReplayError,
+    render_governed_portfolio_scoreboard,
+    run_governed_portfolio_replay,
+)
 from quanthus.code_validity import (
     CodeValidityError,
     build_code_validity_table,
@@ -53,6 +58,10 @@ from quanthus.delisted_coverage import (
 )
 from quanthus.feature_registry import FeatureRegistryError, load_feature_registry
 from quanthus.gates import GateReport, P2GateReport, load_gate_report, load_p2_gate_report
+from quanthus.governed_strategy import (
+    GovernedStrategyError,
+    load_governed_feature_registry,
+)
 from quanthus.historical_replay_snapshot import (
     HistoricalReplaySnapshotError,
     publish_historical_replay_snapshot,
@@ -62,6 +71,8 @@ from quanthus.identity_normalization import (
     IdentityNormalizationError,
     build_identity_normalized_revision,
 )
+from quanthus.industry_mapping import IndustryMappingError, load_static_industry_mapping
+from quanthus.label_registry import LabelRegistryError, load_label_registry
 from quanthus.none_backfill import (
     NoneBackfillError,
     build_none_backfill_revision,
@@ -122,6 +133,7 @@ from quanthus.st_status import (
     build_st_status_revision,
     write_current_pointer,
 )
+from quanthus.strategy_policy import StrategyPolicyError, load_governed_strategy_policy
 from quanthus.tradability import (
     CoverageError,
     TradabilityCoverageResult,
@@ -351,6 +363,26 @@ def _parser() -> argparse.ArgumentParser:
     baseline_suite.add_argument("--feature-registry", type=Path)
     baseline_suite.add_argument("--execution-policy", type=Path)
     baseline_suite.add_argument("--corporate-action-policy", type=Path)
+
+    governed_portfolio = subparsers.add_parser(
+        "run-governed-portfolio-replay",
+        help="replay the frozen five-unit governed P3 candidate on development data",
+    )
+    governed_portfolio.add_argument("--snapshot-dir", type=Path, required=True)
+    governed_portfolio.add_argument("--scope-start", type=date.fromisoformat, required=True)
+    governed_portfolio.add_argument("--scope-end", type=date.fromisoformat, required=True)
+    governed_portfolio.add_argument("--feature-panel", type=Path, required=True)
+    governed_portfolio.add_argument("--industry-mapping", type=Path, required=True)
+    governed_portfolio.add_argument("--benchmark", type=Path, required=True)
+    governed_portfolio.add_argument("--output", type=Path, required=True)
+    governed_portfolio.add_argument("--scoreboard-output", type=Path)
+    governed_portfolio.add_argument("--strategy-policy", type=Path)
+    governed_portfolio.add_argument("--baseline-feature-registry", type=Path)
+    governed_portfolio.add_argument("--governed-feature-registry", type=Path)
+    governed_portfolio.add_argument("--label-registry", type=Path)
+    governed_portfolio.add_argument("--p0-policy", type=Path)
+    governed_portfolio.add_argument("--execution-policy", type=Path)
+    governed_portfolio.add_argument("--corporate-action-policy", type=Path)
 
     st_status = subparsers.add_parser(
         "build-st-status",
@@ -929,6 +961,83 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             print(baseline_scoreboard, file=sys.stderr)
             print(json.dumps(baseline_payload, ensure_ascii=True, sort_keys=True))
+        elif args.command == "run-governed-portfolio-replay":
+            project_root = find_project_root()
+            strategy_policy = load_governed_strategy_policy(
+                args.strategy_policy
+                or project_root / "config" / "p3-governed-strategy.research.v1.json"
+            )
+            baseline_registry = load_feature_registry(
+                args.baseline_feature_registry
+                or project_root / "config" / "p3-baseline-features.research.v1.json"
+            )
+            governed_registry = load_governed_feature_registry(
+                args.governed_feature_registry
+                or project_root / "config" / "p3-governed-feature-extension.research.v1.json"
+            )
+            label_registry = load_label_registry(
+                args.label_registry
+                or project_root / "config" / "p3-governed-labels.research.v1.json"
+            )
+            governed_engine = BacktestEngine(
+                load_execution_policy(
+                    args.execution_policy
+                    or project_root / "config" / "p2-execution-policy.research.v1.json"
+                )
+            )
+            with load_historical_frame_reader(
+                args.snapshot_dir,
+                load_corporate_action_normalization_policy(args.corporate_action_policy),
+            ) as governed_reader:
+                panel_scope_end = governed_reader.frames(
+                    args.scope_end,
+                    args.scope_end,
+                )[0].execution_date
+                with BaselineFeaturePanel.build(
+                    governed_reader.bundle,
+                    baseline_registry,
+                    scope_start=args.scope_start,
+                    scope_end=panel_scope_end,
+                    output=args.feature_panel,
+                ) as governed_panel:
+                    industry_mapping = load_static_industry_mapping(
+                        args.industry_mapping,
+                        expected_version=strategy_policy.bindings.industry_mapping_version,
+                    )
+                    governed_result = run_governed_portfolio_replay(
+                        governed_reader,
+                        governed_engine,
+                        governed_panel,
+                        governed_registry,
+                        label_registry,
+                        strategy_policy,
+                        load_policy(args.p0_policy),
+                        industry_mapping,
+                        load_benchmark_curve(args.benchmark),
+                        scope_start=args.scope_start,
+                        scope_end=args.scope_end,
+                    )
+            governed_payload = governed_result.to_dict()
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(
+                json.dumps(
+                    governed_payload,
+                    ensure_ascii=True,
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            governed_scoreboard = render_governed_portfolio_scoreboard(governed_result)
+            if args.scoreboard_output is not None:
+                args.scoreboard_output.parent.mkdir(parents=True, exist_ok=True)
+                args.scoreboard_output.write_text(
+                    governed_scoreboard + "\n",
+                    encoding="utf-8",
+                )
+            print(governed_scoreboard, file=sys.stderr)
+            print(json.dumps(governed_payload, ensure_ascii=True, sort_keys=True))
         elif args.command == "build-st-status":
             default_policy = find_project_root() / "config" / "st-status.v1.json"
             st_result = build_st_status_revision(
@@ -1129,6 +1238,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         BenchmarkCurveError,
         BacktestInputError,
         FeatureRegistryError,
+        GovernedStrategyError,
+        IndustryMappingError,
+        LabelRegistryError,
+        PortfolioReplayError,
+        StrategyPolicyError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

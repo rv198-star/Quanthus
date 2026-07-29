@@ -28,10 +28,12 @@ from quanthus.backtest.baseline_research import (
 )
 from quanthus.backtest.benchmark import (
     BENCHMARK_CURVE_SCHEMA_VERSION,
+    BenchmarkCapitalWeight,
     BenchmarkComparison,
     BenchmarkCurve,
     BenchmarkCurveError,
     BenchmarkObservation,
+    CapitalMatchedBenchmarkComparison,
     load_benchmark_curve,
 )
 from quanthus.backtest.contracts import (
@@ -98,6 +100,7 @@ from quanthus.backtest.strategy_replay import (
     ReplayAction,
     ReplayDecision,
     ReplayFrameSource,
+    StrategyCapitalPoint,
     StrategyDecisionTrace,
     StrategyDecisionView,
     StrategyEquityPoint,
@@ -108,6 +111,7 @@ from quanthus.backtest.strategy_replay import (
     StrategyReplaySpec,
     StrategyTrade,
     run_strategy_replay,
+    strategy_capital_path,
     strategy_replay_frame_from_p1,
 )
 from quanthus.backtest.window import (
@@ -137,10 +141,12 @@ __all__ = [
     "BaselineStrategyDefinition",
     "BaselineSuiteResult",
     "BaselineValidationPolicy",
+    "BenchmarkCapitalWeight",
     "BenchmarkComparison",
     "BenchmarkCurve",
     "BenchmarkCurveError",
     "BenchmarkObservation",
+    "CapitalMatchedBenchmarkComparison",
     "CorporateAction",
     "CorporateActionApplication",
     "CorporateActionStep",
@@ -183,6 +189,7 @@ __all__ = [
     "RoundTripReplaySpec",
     "StrategyDecisionTrace",
     "StrategyDecisionView",
+    "StrategyCapitalPoint",
     "StrategyEquityPoint",
     "StrategyPerformanceReport",
     "StrategyReplayContext",
@@ -213,5 +220,6 @@ __all__ = [
     "run_baseline_strategy_suite",
     "run_round_trip",
     "run_strategy_replay",
+    "strategy_capital_path",
     "strategy_replay_frame_from_p1",
 ]

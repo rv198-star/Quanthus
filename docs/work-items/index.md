@@ -56,40 +56,43 @@ status and retained target-profile activation blockers are in `config/p2-gates.v
 `P3-FEAT-001` and `P3-LABEL-001` have bounded accepted implementations in
 `docs/acceptance/p3-feature-registry-slice-20260728.md` and
 `docs/acceptance/p3-label-card-contract-slice-20260728.md`. They establish registry, PIT lineage,
-LabelCard, and evaluator-boundary contracts only; concrete production features and labels remain
-open, and downstream slices are tracked independently below.
+LabelCard, and evaluator-boundary contracts only. Candidate-v1 concrete feature/label definitions
+are now implemented separately under `P3-LABEL-002`; broader production vocabularies remain open.
 
 `P3-LABEL-003` has a bounded accepted frequency/conflict audit in
 `docs/acceptance/p3-label-frequency-conflict-audit-slice-20260728.md`. It audits registered results
 and card-declared ranges/relationships only; it does not define or validate a concrete market
-label, which remains `P3-LABEL-002` work.
+label. Candidate-v1's concrete labels and development evidence are recorded separately below.
 
 `P3-EXP-001` has a bounded accepted typed-protocol implementation in
 `docs/acceptance/p3-expert-protocol-slice-20260728.md`. It defines expert opinions, abstention, PIT
 context, and evidence validation only; concrete experts remain open, while accepted governance
-aggregation is recorded separately below.
+aggregation is recorded separately below. Candidate-v1 concrete experts now close the bounded
+`P3-EXP-002` implementation path without creating a general expert library.
 
 `P3-AGG-001` has a bounded accepted governance implementation in
 `docs/acceptance/p3-governance-aggregation-slice-20260728.md`. Fixed veto precedence and constraint
-intersection are implemented; scoring, action mapping, shadow execution, and concrete experts
-remain open.
+intersection are implemented. Candidate-v1 now adds versioned scoring/action mapping under
+`P3-AGG-002`; shadow decision production remains open.
 
 `P3-POS-001` has a bounded accepted lifecycle implementation in
 `docs/acceptance/p3-position-lifecycle-slice-20260728.md`. It freezes only legal
-empty/trial/dynamic/exiting/closed transitions reconciled to P2 `UnitState`; sizing, market-wide
-position cap, review, exit arbitration, cooldown duration, and execution creation remain open.
+empty/trial/dynamic/exiting/closed transitions reconciled to P2 `UnitState`. Candidate-v1 now
+supplies the frozen five-unit sizing, review, cooldown, and P2 execution composition separately.
 
 `P3-RISK-001` has a bounded accepted entry-capacity implementation in
 `docs/acceptance/p3-concentration-capacity-slice-20260728.md`. It enforces the frozen P0 static
 industry and daily new-unit caps. The follow-on accepted reservation-competition slice in
 `docs/acceptance/p3-capital-allocation-slice-20260728.md` deterministically assigns already-governed
 candidates to explicitly supplied empty units and counts same-batch reservations against both caps,
-without sizing cash or creating execution artifacts; market-wide sizing remains open policy work.
+without sizing cash or creating execution artifacts. Candidate-v1's policy now supplies the five-
+unit maximum and Trial sizing while the allocator itself remains non-executing.
 
 `P3-EXIT-001` has a bounded accepted four-source arbitration implementation in
 `docs/acceptance/p3-four-source-exit-arbitration-slice-20260728.md`. It combines already-evaluated
 frozen exit sources and treats unavailable evidence as alerting hold, without defining evaluator
-thresholds or creating an exit Signal/Order.
+thresholds or creating an exit Signal/Order. Candidate-v1 now supplies the frozen evaluators and
+routes an accepted exit request through P2.
 
 `P3-SHADOW-001` has a bounded accepted comparison contract in
 `docs/acceptance/p3-shadow-divergence-contract-slice-20260728.md`. It compares already-produced P2
@@ -102,7 +105,8 @@ through P2, preserves one fixed-unit state, and reports deterministic multi-trad
 now also has an accepted integration increment in
 `docs/acceptance/p3-strategy-replay-integration-slice-20260728.md` for strict typed P1 adaptation,
 carried-sell company actions, and immutable replay packaging. It does not define a concrete
-strategy, enable add/reduce behavior, or complete the multi-year P3 acceptance run. The first
+strategy or enable add/reduce behavior. Candidate-v1 now completes the first multi-year governed
+run on top of this substrate. The first
 real-corpus bridge under `P1-DATA-004` now audits authoritative mixed-unit corporate actions,
 versions every retained exception, and publishes the accepted calendar/action/ledger bundle in
 `p1-historical-replay-20260729-v1`. The continuous reader, security/date exception enforcement,
@@ -114,8 +118,9 @@ or composing datasets across snapshots implicitly.
 
 `P3-FUNNEL-001` has a bounded accepted reconciliation contract in
 `docs/acceptance/p3-opportunity-funnel-slice-20260728.md`. It proves complete fixed-stage source
-event accounting and outcome-link classification for already-produced evidence only. Concrete P3
-decision production and a populated historical opportunity funnel remain open.
+event accounting and outcome-link classification for already-produced evidence only. Candidate-v1
+now supplies concrete decisions and a populated 2012-2021 funnel; constrained attribution remains
+separate work.
 
 `P3-FEAT-002` and `P3-STRAT-001` add the first concrete research controls without promoting a P3
 production policy. The former materializes eight PIT daily indicators from unadjusted prices and
@@ -129,7 +134,18 @@ buy-and-hold, zero-cost v1, and raw-extreme diagnostics are recorded in
 `docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md`. Runner 2.1 adds the checksum-bound
 `sh000300` comparison, time-in-market, average-invested-capital, excess-return, and static top-three
 robustness report without changing strategy behavior. Evidence:
-`docs/acceptance/p3-baseline-benchmark-metrics-20260729.md`.
+`docs/acceptance/p3-baseline-benchmark-metrics-20260729.md`. Runner 2.2 additionally publishes a
+prior-close-weighted, checksum-bound capital-matched benchmark while preserving full-capital CSI
+300 as the opportunity-cost control. Evidence:
+`docs/acceptance/p3-capital-matched-benchmark-20260729.md`.
+
+The first governed candidate closes the bounded implementation paths for `P3-LABEL-002`,
+`P3-EXP-002`, `P3-AGG-002`, `P3-POLICY-001`, `P3-POS-002`, and `P3-POS-003`. Its frozen initial
+2012-2021 run passed all declared performance gates with 230 closed trades, and its 101,549-source-
+event funnel plus five P2 ledgers reconcile. An independent full invocation reproduced the feature
+panel, result, and scoreboard byte-identically, accepting the development-run portion of
+`P3-ACCEPT-001`. Later-partition promotion and the other open P3 work remain separate. Evidence:
+`docs/acceptance/p3-governed-strategy-development-20260729.md`.
 
 | ID | Title | Depends on |
 | --- | --- | --- |

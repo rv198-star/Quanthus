@@ -6,7 +6,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | strategy-neutral replay plus research-only indicator panel and three baseline suite accepted |
+| Implementation status | strategy-neutral replay accepted; three baseline suite accepted; governed five-unit development delivery accepted after byte-identical full rerun |
 | Continuous corpus gate | accepted by `p1-historical-replay-20260729-v1` |
 | Governing work | `P3-REPLAY-001` |
 | Governing requirements | FR-BT-001/002/003/004/006, FR-AUDIT-001/002 |
@@ -165,6 +165,13 @@ not fetch market data. It requires a benchmark observation for every strategy-eq
 computes close-to-close buy-and-hold return from the initial equity date through the last T+1
 execution date. Excess return is strategy total return minus that benchmark total return.
 
+The full-capital comparison measures the opportunity cost of leaving wealth in cash. A separate
+capital-matched diagnostic uses each strategy's terminal invested-capital ratio known at one close
+for the following benchmark close-to-close return and assigns zero return to the remaining cash.
+Its dated weight path is checksum-bound and its post-initial mean must reconcile exactly to average
+invested capital. Capital-matched excess diagnoses selection and timing under the same capital-use
+path; it never replaces the full-capital benchmark or uses a future strategy weight.
+
 The first real corpus also contains versioned action exceptions and action-like price-scale changes
 without normalized economic evidence. The research suite therefore excludes any affected identity
 for the complete requested development scope before strategy ranking. This run-scope completeness
@@ -172,7 +179,39 @@ filter is versioned and reported as selection bias; it is not presented as a poi
 or an acceptable rule for later official evaluation. The execution reader still blocks the exact
 anomalous date so bypassing the feature panel cannot create a false held-position mark.
 
-## 7. Accepted implementation
+## 7. Governed five-unit replay
+
+`run-governed-portfolio-replay` composes the accepted modules without creating another matcher.
+It initializes five fixed CNY 100,000 P2 ledgers and corresponding P3 Empty lifecycles. For every
+T-close frame it reviews active positions, creates at most one immutable exit order per position,
+evaluates every bounded candidate through facts, labels, experts, governance, and action mapping,
+reserves available units under P0 concentration limits, and then consumes T+1 P2 outcomes. Adds
+and reductions remain unsupported.
+
+A sell that cannot execute is evaluated once with all consecutive future sessions and cached as
+one order path. Other units continue through the global daily replay while that unit remains
+Exiting. Each carried session consumes its own order-status evidence; the eventual fill consumes
+the P2 fill and enters Closed. Five following authoritative sessions are required before
+Closed-to-Empty. A bonus-share action during a carried sell currently fails closed because the
+lifecycle's carried transition requires an unchanged quantity; cash dividends remain supported.
+
+Portfolio equity sums each unit's cash, marked position value, and external pool. Time in market is
+active unit-days divided by total available unit-days. Average invested capital is the arithmetic
+mean of aggregate close-marked position value divided by aggregate system wealth on every replay
+execution day. The report preserves all one-unit diagnostics and adds operation counts, full and
+capital-matched CSI 300 comparisons, top-three contribution ratio, static return after removing
+the top three closed trades, four required breakdowns, validation gates, and a reconciled
+opportunity funnel. The calendar-year cut uses actual year-start/year-end portfolio equity; the
+other cuts classify closed trades by entry breadth, holding duration, and exit source.
+
+The frozen 2012-2021 first run produced 230 closed trades, 31.91% return, 22.49%
+capital-matched excess, 19.11% return after removing the top-three closed-trade contribution, and
+4.75% maximum drawdown. It also reports -83.01% full-capital excess because average invested
+capital was only 6.88%. All five ledgers reconcile to CNY 659,547.35; one final Trial position
+explains the 231 buys versus 230 sells. These are candidate results, not acceptance of a new
+matching engine or authority to access later validation partitions.
+
+## 8. Accepted implementation
 
 | Concern | Governing path |
 | --- | --- |
@@ -187,7 +226,10 @@ anomalous date so bypassing the feature panel cannot create a false held-positio
 | Continuous PIT frame reader and real-corpus audit | `src/quanthus/backtest/historical_frames.py`, `tests/unit/test_historical_frame_reader.py`, `docs/acceptance/p3-historical-frame-reader-slice-20260729.md` |
 | Baseline feature panel, strategies, and development suite | `src/quanthus/backtest/baseline_research.py`, `tests/unit/test_baseline_research.py`, `docs/acceptance/p3-baseline-strategy-suite-20260729.md`, `docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md` |
 | Baseline benchmark and robustness metrics | `docs/acceptance/p3-baseline-benchmark-metrics-20260729.md` |
+| Capital-matched benchmark | `docs/acceptance/p3-capital-matched-benchmark-20260729.md` |
 | Backtest sanity diagnostics | `docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md` |
+| Governed five-unit orchestration and metrics | `src/quanthus/backtest/portfolio_replay.py`, `tests/unit/test_portfolio_replay.py` |
+| Governed policy, labels, experts, industry input, and first development result | `config/p3-governed-strategy.research.v1.json`, `src/quanthus/governed_strategy.py`, `src/quanthus/industry_mapping.py`, `docs/acceptance/p3-governed-strategy-development-20260729.md` |
 
 The integration slice additionally publishes `StrategyReplayResult.audit_dict()` together with
 the immutable P2 run through `AuditEventStore.persist_strategy_replay`. The replay manifest binds
@@ -196,12 +238,12 @@ stream checksum under one atomic READY boundary. A replay package cannot silentl
 different execution stream. Evidence:
 `docs/acceptance/p3-strategy-replay-integration-slice-20260728.md`.
 
-## 8. Residual work
+## 9. Residual work
 
-The accepted baselines are comparison controls, not the promoted P3 vertical-slice decision path.
-`P3-LABEL-002`, `P3-EXP-002`, and `P3-AGG-002` may later provide governed strategy decisions. The
-accepted evaluator implements only its named registry; it is not a generic formula language for
-arbitrary registered features. Candidate-to-unit reservation competition is accepted separately
-in LLD 05, but a multi-unit strategy replay,
-partial/add/reduce actions, concrete P3 `DecisionEvent` production, opportunity funnels, and
-multi-year acceptance remain open.
+The accepted baselines remain comparison controls, not a promoted P3 policy. Candidate v1's first
+immutable 2012-2021 run passed its predeclared performance gates, and an independent full
+invocation reproduced its panel, result, and scoreboard byte-identically. This closes only its
+development delivery gate. The evaluator implements only its named registry; it is not a generic
+formula language. Partial/add/reduce actions, intraday matching, arbitration/blind access,
+constrained contribution reruns, shadow decision production, and production promotion remain
+open.

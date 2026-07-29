@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P3-POS-001` accepted; `P3-RISK-001` accepted for capacity and reservation competition; `P3-EXIT-001` accepted; sizing policy, market-wide cap, trigger evaluators, review rules, and cooldown policy not started |
+| Implementation status | `P3-POS-001` accepted; `P3-RISK-001` accepted; `P3-EXIT-001` accepted; candidate-v1 sizing, five-unit cap, reviews, carried exits, and cooldown accepted for development after byte-identical rerun |
 | Gate source | `config/p2-gates.v1.json` |
 | Governing requirements | FR-RULE-004/005, FR-BT-003/004 |
 
@@ -121,6 +121,22 @@ cash, but this research-only cap is not the target trial/add sizing policy. V1's
 remain only as rejected extreme-control evidence. Their results cannot close `P3-POLICY-001`,
 `P3-POS-002`, or `P3-POS-003`, and cannot be promoted by renaming a run. A future governed strategy
 must still pass the lifecycle, allocation, exit-source, and promotion boundaries in this LLD.
+
+### Governed candidate implementation
+
+`config/p3-governed-strategy.research.v1.json` freezes five CNY 100,000 units, a 30% Trial target,
+a 21% T+1 sizing buffer, 100-share lots, a maximum of five active units, and five authoritative
+cooldown sessions. Adds and reductions are explicitly disabled rather than silently omitted.
+`src/quanthus/backtest/portfolio_replay.py` applies the accepted allocator before creating any
+order, then sends every accepted buy or sell through P2.
+
+The same runner evaluates all four exit sources at every positioned T close. A sell request moves
+the lifecycle to Exiting once, caches one P2 sell sequence, consumes each carried order-status
+event, and moves to Closed only on a full fill. The first development run reconciled 231 entry
+fills, 230 exit fills, 26 carried-exit transitions, 230 settlements, 230 cooldown completions, and
+one legal final Trial position. A maximum-hold request occurs at the 40th positioned T close; its
+eligible T+1-open fill is counted as holding session 41 in the closed-trade report. Evidence:
+`docs/acceptance/p3-governed-strategy-development-20260729.md`.
 
 ## 6. Operator-assisted boundary
 

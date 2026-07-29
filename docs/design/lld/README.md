@@ -16,6 +16,8 @@ index, and one active branch; expand to linked siblings only for a concrete inte
 
 For user-facing terminology and strategy-policy discussion, start with the non-governing
 `../p3-strategy-semantics-checklist.md` and expand only the LLD branch for the item being decided.
+For an approved candidate implementation, start with its card under `../strategies/` and then load
+only the LLD modules named by that card.
 
 ## Module tree
 

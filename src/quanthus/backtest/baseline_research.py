@@ -13,7 +13,11 @@ from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from quanthus.backtest.benchmark import BenchmarkComparison, BenchmarkCurve
+from quanthus.backtest.benchmark import (
+    BenchmarkCapitalWeight,
+    BenchmarkComparison,
+    BenchmarkCurve,
+)
 from quanthus.backtest.contracts import BacktestRunSpec, EventType, UnitState, decimal_text
 from quanthus.backtest.engine import BacktestEngine, BacktestInputError
 from quanthus.backtest.historical_bundle import HistoricalReplayBundle
@@ -24,11 +28,12 @@ from quanthus.backtest.strategy_replay import (
     StrategyReplayContext,
     StrategyReplayResult,
     run_strategy_replay,
+    strategy_capital_path,
 )
 from quanthus.feature_registry import FeatureRegistry
 
 FEATURE_EVALUATOR_VERSION = "1.0.0"
-BASELINE_RUNNER_VERSION = "2.1.0"
+BASELINE_RUNNER_VERSION = "2.2.0"
 BASELINE_BENCHMARK_INSTRUMENT_ID = "sh000300"
 _STRATEGY_KINDS = {"ma_trend", "breakout20", "oversold_rebound"}
 
@@ -728,8 +733,7 @@ class BaselineFeaturePanel:
             f"{_sql_string(str(self.path))})"
         )
         self._connection.execute(
-            "CREATE UNIQUE INDEX feature_panel_key ON "
-            "feature_panel (market_date, security_id)"
+            "CREATE UNIQUE INDEX feature_panel_key ON feature_panel (market_date, security_id)"
         )
 
     def __enter__(self) -> BaselineFeaturePanel:
@@ -766,6 +770,65 @@ class BaselineFeaturePanel:
         if len(rows) != 1:
             raise BaselineResearchError("feature panel contains duplicate security/date rows")
         return BaselineFeatureRow.from_mapping(rows[0])
+
+    def market_breadth_above_sma60(self, market_date: date) -> Decimal | None:
+        """Return the complete ready-cross-section share above SMA60 at T close."""
+
+        rows = self._rows(
+            """
+            SELECT count(*) FILTER (WHERE feature_ready) AS ready_count,
+                   count(*) FILTER (
+                       WHERE feature_ready AND total_return_index > sma60
+                   ) AS above_count
+            FROM feature_panel
+            WHERE market_date = ?
+            """,
+            (market_date,),
+        )
+        if len(rows) != 1:
+            raise BaselineResearchError("market breadth query must return one row")
+        ready_count = int(rows[0]["ready_count"])
+        if ready_count == 0:
+            return None
+        return Decimal(int(rows[0]["above_count"])) / Decimal(ready_count)
+
+    def governed_candidate_scan(
+        self,
+        market_date: date,
+        *,
+        minimum_listing_sessions: int,
+        minimum_average_amount20: Decimal,
+        limit: int,
+    ) -> tuple[BaselineFeatureRow, ...]:
+        """Return a bounded broad scan; labels and experts own final entry eligibility."""
+
+        if minimum_listing_sessions <= 0 or minimum_average_amount20 < 0 or limit <= 0:
+            raise BaselineResearchError("governed candidate scan bounds are invalid")
+        rows = self._rows(
+            """
+            SELECT * EXCLUDE (
+                exception_active,
+                unexplained_price_transition,
+                scope_continuity_excluded
+            )
+            FROM feature_panel
+            WHERE market_date = ?
+              AND feature_ready
+              AND listing_sessions >= ?
+              AND average_amount20 >= ?
+              AND total_return_index > sma60
+              AND momentum20 > 0
+            ORDER BY realized_volatility20 ASC, momentum20 DESC, security_id ASC
+            LIMIT ?
+            """,
+            (
+                market_date,
+                minimum_listing_sessions,
+                minimum_average_amount20,
+                limit,
+            ),
+        )
+        return tuple(BaselineFeatureRow.from_mapping(row) for row in rows)
 
     def best_candidate(
         self,
@@ -1515,9 +1578,7 @@ class BaselineHistoricalStrategy:
         deployable_cash = cash
         if self.shared.position_fraction is not None:
             deployable_cash *= self.shared.position_fraction
-        lots = (
-            deployable_cash / (buffered_price * self.shared.entry_lot_size)
-        ).to_integral_value(
+        lots = (deployable_cash / (buffered_price * self.shared.entry_lot_size)).to_integral_value(
             rounding=ROUND_FLOOR
         )
         return int(lots) * self.shared.entry_lot_size
@@ -1616,11 +1677,7 @@ class BaselineSuiteResult:
 
 
 def _strategy_summary(result: StrategyReplayResult) -> dict[str, Any]:
-    fills = [
-        event
-        for event in result.backtest.events
-        if event.event_type is EventType.FILL
-    ]
+    fills = [event for event in result.backtest.events if event.event_type is EventType.FILL]
     buy_operations = sum(event.payload.get("side") == "buy" for event in fills)
     sell_operations = sum(event.payload.get("side") == "sell" for event in fills)
     return {
@@ -1655,11 +1712,12 @@ def render_baseline_scoreboard(result: BaselineSuiteResult) -> str:
 
     header = (
         "| Strategy | Operations (B/S) | Closed trades | Win rate | Total return | "
-        "Benchmark return | Excess return | Return ex top 3 | Top 3 PnL | Total PnL | "
-        "Ending equity | Max drawdown | Ann. volatility | Fees | Turnover | Time in market | "
-        "Avg invested | Avg hold | Payoff ratio | Profit factor | Sharpe |"
+        "Benchmark return | Excess return | Capital-matched benchmark | Capital-matched excess | "
+        "Return ex top 3 | Top 3 PnL | Total PnL | Ending equity | Max drawdown | "
+        "Ann. volatility | Fees | Turnover | Time in market | Avg invested | Avg hold | "
+        "Payoff ratio | Profit factor | Sharpe |"
     )
-    separator = "| --- |" + " ---: |" * 20
+    separator = "| --- |" + " ---: |" * 22
     rows = [header, separator]
     for replay in result.strategies:
         summary = _strategy_summary(replay)
@@ -1679,6 +1737,8 @@ def render_baseline_scoreboard(result: BaselineSuiteResult) -> str:
                     _scoreboard_percent(performance.total_return),
                     _scoreboard_percent(performance.benchmark_total_return),
                     _scoreboard_percent(performance.excess_total_return),
+                    _scoreboard_percent(performance.capital_matched_benchmark_total_return),
+                    _scoreboard_percent(performance.capital_matched_excess_total_return),
                     _scoreboard_percent(performance.return_excluding_top_3_closed_trades),
                     f"CNY {performance.top_3_closed_trade_pnl:.2f} "
                     f"({performance.top_3_closed_trade_count})",
@@ -1772,18 +1832,44 @@ def run_baseline_strategy_suite(
         )
         if tuple(point.market_date for point in replay_result.equity_curve) != benchmark_dates:
             raise BaselineResearchError("strategy equity dates do not match benchmark comparison")
+        capital_path = strategy_capital_path(replay_result)
+        capital_comparison = benchmark.compare_capital_path(
+            tuple(
+                BenchmarkCapitalWeight(
+                    market_date=point.market_date,
+                    invested_ratio=point.invested_capital_ratio,
+                )
+                for point in capital_path
+            )
+        )
+        if (
+            capital_comparison.average_invested_ratio
+            != replay_result.performance.average_invested_capital_ratio
+        ):
+            raise BaselineResearchError(
+                "capital-matched benchmark does not reconcile to average invested capital"
+            )
         excess_return = (
             replay_result.performance.total_return - benchmark_comparison.total_return
+        ).quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP)
+        capital_matched_excess_return = (
+            replay_result.performance.total_return - capital_comparison.total_return
         ).quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP)
         performance = replace(
             replay_result.performance,
             benchmark_total_return=benchmark_comparison.total_return,
             excess_total_return=excess_return,
+            capital_matched_benchmark_total_return=capital_comparison.total_return,
+            capital_matched_excess_total_return=capital_matched_excess_return,
+            capital_matched_benchmark_path_digest=capital_comparison.capital_path_digest,
         )
         backtest_summary = {
             **replay_result.backtest.result_summary,
             "benchmark_total_return": decimal_text(benchmark_comparison.total_return),
             "excess_total_return": decimal_text(excess_return),
+            "capital_matched_benchmark_total_return": decimal_text(capital_comparison.total_return),
+            "capital_matched_excess_total_return": decimal_text(capital_matched_excess_return),
+            "capital_matched_benchmark_path_digest": capital_comparison.capital_path_digest,
         }
         results.append(
             replace(

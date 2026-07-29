@@ -25,6 +25,8 @@ nodes.
   development data and does not promote a target P3 policy or open arbitration/blind partitions.
   Its report now requires an offline checksum-bound `sh000300` CSI 300 curve and includes benchmark
   excess, time in market, average invested capital, and top-three closed-trade robustness metrics.
+  Runner 2.2 retains that full-capital opportunity-cost comparison and adds a prior-close-weighted
+  capital-matched diagnostic for selection/timing analysis.
 - Targeted backtest sanity diagnostics passed a same-pipeline single-security buy-and-hold sentinel,
   reproduced v1 near-total losses with every cost set to zero, and reconciled daily-return extremes
   to raw bars. This narrows the v1 failure to strategy construction without making the sentinel a
@@ -36,12 +38,18 @@ nodes.
   the authoritative calendar, and accepted daily execution inputs together. The completeness,
   checksum, frame, and exception gates accept it for research replay without granting execution
   authority.
-- P3 candidate-to-empty-unit reservation competition is accepted under the existing frozen P0
-  ordering and concentration caps; sizing, concrete labels/experts/actions, multi-unit execution,
-  and multi-year acceptance remain open.
-- P3 opportunity-funnel reconciliation is accepted as a non-executing contract over explicitly
-  supplied source events; concrete P3 decisions and populated historical funnel reports remain
-  open.
+- The first governed P3 candidate now has a frozen strategy card, concrete feature/label/expert/
+  action chain, strict static-industry input, five fixed-capital-unit replay, P2-backed fills and
+  settlement, four-source exits, carried orders, cooldown, benchmark metrics, and populated
+  opportunity-funnel production. Its first frozen 2012-2021 development run passed all three
+  strategy gates and the drawdown warning at 230 closed trades, 31.91% total return, 22.49%
+  capital-matched excess, 19.11% return after removing the top three closed-trade contributions,
+  and 4.75% maximum drawdown. An independent full invocation reproduced the feature panel,
+  result, and scoreboard byte-identically, closing the candidate-v1 development delivery gate.
+  The candidate is still research-only and has -83.01% full-capital excess versus CSI 300.
+- P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
+  runner now supplies complete candidate, score/veto, entry, and held-review source observations;
+  the funnel describes research evidence and cannot authorize an order.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
   evidence; forward email transport remains P6 work. P4 and later keep their existing gates.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
@@ -56,6 +64,7 @@ gate is a conformance defect rather than an alternate project state.
 | --- | --- | --- |
 | `product/` | Product goals, requirements, non-goals, and release criteria | `product/prd.md` |
 | `design/` | Approved current-state HLD, execution profiles, and module LLDs | `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md` |
+| `design/strategies/` | Approved governed strategy hypotheses and frozen research policies | `design/strategies/README.md` |
 | `architecture/` | Accepted decisions and stable topic contracts | `architecture/README.md` |
 | `work-items/` | Stable ids joining design, code, tests, issues, and evidence | `work-items/index.md` |
 | `operations/` | Deployment, recurring operation, incident, migration, and rollback | Runbook selected by the active component |
@@ -74,6 +83,7 @@ gate is a conformance defect rather than an alternate project state.
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child | Exact strategy, P1 snapshot input, and P2 execution evidence |
+| P3 governed strategy implementation | root `AGENTS.md`, this map, selected `design/strategies/` card, LLD 03/04/05, accepted P2 interfaces | LLD 10 for decision/funnel evidence; exact feature, label, policy, and industry-map inputs |
 
 ## Authority and conflicts
 

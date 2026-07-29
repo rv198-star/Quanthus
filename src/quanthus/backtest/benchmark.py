@@ -100,6 +100,50 @@ class BenchmarkComparison:
 
 
 @dataclass(frozen=True)
+class BenchmarkCapitalWeight:
+    market_date: date
+    invested_ratio: Decimal
+
+    def __post_init__(self) -> None:
+        if not self.invested_ratio.is_finite() or not Decimal(
+            "0"
+        ) <= self.invested_ratio <= Decimal("1"):
+            raise BenchmarkCurveError("benchmark capital weight must be in [0, 1]")
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "date": self.market_date.isoformat(),
+            "invested_ratio": str(self.invested_ratio),
+        }
+
+
+@dataclass(frozen=True)
+class CapitalMatchedBenchmarkComparison:
+    benchmark_id: str
+    instrument_id: str
+    curve_digest: str
+    capital_path_digest: str
+    start_date: date
+    end_date: date
+    observation_count: int
+    average_invested_ratio: Decimal
+    total_return: Decimal
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "benchmark_id": self.benchmark_id,
+            "instrument_id": self.instrument_id,
+            "curve_digest": self.curve_digest,
+            "capital_path_digest": self.capital_path_digest,
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "observation_count": self.observation_count,
+            "average_invested_ratio": str(self.average_invested_ratio),
+            "total_return": str(self.total_return),
+        }
+
+
+@dataclass(frozen=True)
 class BenchmarkCurve:
     benchmark_id: str
     instrument_id: str
@@ -185,6 +229,53 @@ class BenchmarkCurve:
             start_close=start_close,
             end_close=end_close,
             observation_count=len(required_dates),
+            total_return=total_return,
+        )
+
+    def compare_capital_path(
+        self,
+        weights: tuple[BenchmarkCapitalWeight, ...],
+    ) -> CapitalMatchedBenchmarkComparison:
+        """Apply each close-known capital weight to the following close-to-close return."""
+
+        if len(weights) < 2:
+            raise BenchmarkCurveError("capital-matched comparison requires at least two dates")
+        required_dates = tuple(item.market_date for item in weights)
+        if required_dates != tuple(sorted(required_dates)) or len(required_dates) != len(
+            set(required_dates)
+        ):
+            raise BenchmarkCurveError("capital weights must be unique and date-ascending")
+        by_date = {item.market_date: item.close for item in self.observations}
+        missing = tuple(value for value in required_dates if value not in by_date)
+        if missing:
+            preview = ", ".join(value.isoformat() for value in missing[:5])
+            raise BenchmarkCurveError(
+                f"benchmark curve is missing {len(missing)} capital-path dates; first={preview}"
+            )
+
+        wealth = Decimal("1")
+        for current, following in zip(weights, weights[1:], strict=False):
+            benchmark_return = by_date[following.market_date] / by_date[
+                current.market_date
+            ] - Decimal("1")
+            wealth *= Decimal("1") + current.invested_ratio * benchmark_return
+        total_return = (wealth - Decimal("1")).quantize(
+            RATE_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+        replay_weights = tuple(item.invested_ratio for item in weights[1:])
+        average_invested_ratio = (
+            sum(replay_weights, Decimal("0")) / Decimal(len(replay_weights))
+        ).quantize(RATE_QUANTUM, rounding=ROUND_HALF_UP)
+        return CapitalMatchedBenchmarkComparison(
+            benchmark_id=self.benchmark_id,
+            instrument_id=self.instrument_id,
+            curve_digest=self.digest,
+            capital_path_digest=_digest([item.to_dict() for item in weights]),
+            start_date=required_dates[0],
+            end_date=required_dates[-1],
+            observation_count=len(weights),
+            average_invested_ratio=average_invested_ratio,
             total_return=total_return,
         )
 

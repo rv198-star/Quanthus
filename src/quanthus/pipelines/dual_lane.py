@@ -395,7 +395,7 @@ class EpochInput:
     source_path: Path | None
     universe_policy_path: Path
     code_validity_path: Path
-    security_master_path: Path
+    security_master_path: Path | None
 
 
 def verify_epoch_input(root: Path) -> EpochInput:
@@ -441,16 +441,24 @@ def verify_epoch_input(root: Path) -> EpochInput:
         _required_string(references, "code_validity_path"),
         field="shared_references.code_validity_path",
     )
-    security_master_path = _resolve_inside(
-        root,
-        _required_string(references, "security_master_path"),
-        field="shared_references.security_master_path",
-    )
+    security_master_value = references.get("security_master_path")
+    security_master_digest = references.get("security_master_sha256")
+    security_master_path: Path | None = None
+    if security_master_value is not None or security_master_digest is not None:
+        if not isinstance(security_master_value, str) or not isinstance(
+            security_master_digest, str
+        ):
+            raise DualLaneError("epoch security-master reference is incomplete")
+        security_master_path = _resolve_inside(
+            root,
+            security_master_value,
+            field="shared_references.security_master_path",
+        )
     if _sha256(universe_path) != references.get("universe_policy_sha256"):
         raise DualLaneError("epoch universe-policy checksum mismatch")
     if _sha256(validity_path) != references.get("code_validity_sha256"):
         raise DualLaneError("epoch code-validity checksum mismatch")
-    if _sha256(security_master_path) != references.get("security_master_sha256"):
+    if security_master_path is not None and _sha256(security_master_path) != security_master_digest:
         raise DualLaneError("epoch security-master checksum mismatch")
     code_revision = _required_string(manifest, "code_revision")
     if _HEX_OBJECT.fullmatch(code_revision) is None:
@@ -459,8 +467,11 @@ def verify_epoch_input(root: Path) -> EpochInput:
     policy_sha256 = _required_string(manifest, "policy_sha256")
     declared_input_digest = manifest.get("input_digest")
     if declared_input_digest is not None:
+        if security_master_path is None:
+            raise DualLaneError("modern epoch input digest requires a security master")
         input_digest = _epoch_input_digest(
             _required_string(source, "source_pointer_sha256"),
+            _required_string(source, "manifest_sha256"),
             policy_sha256,
             _required_string(references, "universe_policy_sha256"),
             _required_string(references, "code_validity_sha256"),
@@ -526,6 +537,7 @@ def publish_epoch_input(
             == _sha256(universe_policy_path.resolve(strict=True))
             and _sha256(existing.code_validity_path)
             == _sha256(code_validity_path.resolve(strict=True))
+            and existing.security_master_path is not None
             and _sha256(existing.security_master_path)
             == _sha256(security_master_path.resolve(strict=True))
         )
@@ -599,6 +611,10 @@ def publish_epoch_input(
             declared = pointer.get("meta_sha256")
             if declared != _sha256(metadata_target):
                 raise DualLaneError("historical-base pointer META checksum mismatch")
+            metadata = _load_object(metadata_target)
+            if _required_string(metadata, "revision") != revision:
+                raise DualLaneError("historical-base pointer does not match its metadata")
+            _required_string(metadata, "kind")
             source = {
                 "kind": "historical_base",
                 "revision": revision,
@@ -609,6 +625,7 @@ def publish_epoch_input(
             }
         input_digest = _epoch_input_digest(
             _required_string(source, "source_pointer_sha256"),
+            _required_string(source, "manifest_sha256"),
             policy.digest,
             _sha256(universe_target),
             _sha256(validity_target),
@@ -816,7 +833,7 @@ class LaneCandidate:
     policy_sha256: str
     code_revision: str
     runtime: Mapping[str, Any]
-    security_master_sha256: str
+    security_master_sha256: str | None
 
 
 def verify_lane_candidate(root: Path) -> LaneCandidate:
@@ -848,11 +865,17 @@ def verify_lane_candidate(root: Path) -> LaneCandidate:
     dwd_lineage = dwd_manifest.get("lineage")
     if not isinstance(dwd_lineage, Mapping):
         raise DualLaneError("candidate DWD lineage is missing")
-    security_master_sha256 = _required_string(dwd_lineage, "security_master_sha256")
-    if re.fullmatch(r"sha256:[0-9a-f]{64}", security_master_sha256) is None:
-        raise DualLaneError("candidate security-master digest is invalid")
-    if security_master_sha256 != manifest.get("security_master_sha256"):
-        raise DualLaneError("candidate security-master lineage mismatch")
+    lineage_security_master = dwd_lineage.get("security_master_sha256")
+    manifest_security_master = manifest.get("security_master_sha256")
+    security_master_sha256: str | None = None
+    if lineage_security_master is not None or manifest_security_master is not None:
+        if (
+            not isinstance(lineage_security_master, str)
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", lineage_security_master) is None
+            or lineage_security_master != manifest_security_master
+        ):
+            raise DualLaneError("candidate security-master lineage mismatch")
+        security_master_sha256 = lineage_security_master
     dws_manifest = _load_object(dws_root / "manifest.json")
     lineage = dws_manifest.get("lineage")
     if not isinstance(lineage, Mapping):
@@ -889,7 +912,7 @@ def verify_lane_candidate(root: Path) -> LaneCandidate:
         "python_series": _required_string(runtime, "python_series"),
         "packages": dict(sorted(packages.items())),
     }
-    content_value = {
+    content_value: dict[str, Any] = {
         "lane_id": lane_id,
         "market_date": market_date.isoformat(),
         "epoch_manifest_sha256": manifest.get("epoch_manifest_sha256"),
@@ -899,8 +922,9 @@ def verify_lane_candidate(root: Path) -> LaneCandidate:
         "runtime": normalized_runtime,
         "contract_id": manifest.get("contract_id"),
         "policy_sha256": manifest.get("policy_sha256"),
-        "security_master_sha256": security_master_sha256,
     }
+    if security_master_sha256 is not None:
+        content_value["security_master_sha256"] = security_master_sha256
     content_digest = _canonical_digest(content_value)
     if content_digest != manifest.get("candidate_content_digest"):
         raise DualLaneError("candidate content digest mismatch")
@@ -948,6 +972,9 @@ def build_lane_candidate(
     if _HEX_OBJECT.fullmatch(code_revision) is None:
         raise DualLaneError("code_revision must be a full lowercase Git object id")
     epoch = verify_epoch_input(epoch_root)
+    if epoch.security_master_path is None:
+        raise DualLaneError("legacy epoch is audit-only and cannot build a new candidate")
+    security_master_path = epoch.security_master_path
     if epoch.market_date != market_date:
         raise DualLaneError("epoch and candidate market_date differ")
     if epoch.contract_id != policy.contract_id or epoch.policy_sha256 != policy.digest:
@@ -972,7 +999,7 @@ def build_lane_candidate(
             or existing.ods_manifest_sha256 != ods.manifest_sha256
             or existing.contract_id != policy.contract_id
             or existing.policy_sha256 != policy.digest
-            or existing.security_master_sha256 != _sha256(epoch.security_master_path)
+            or existing.security_master_sha256 != _sha256(security_master_path)
         ):
             raise DualLaneError("existing candidate does not match the request")
         return existing
@@ -1016,7 +1043,7 @@ def build_lane_candidate(
             universe_policy_path=epoch.universe_policy_path,
             code_validity_mapping_path=epoch.code_validity_path,
             code_revision=code_revision,
-            security_master_path=epoch.security_master_path,
+            security_master_path=security_master_path,
             parent_pointer=parent_pointer,
             base_pointer=base_pointer,
         )
@@ -1038,7 +1065,7 @@ def build_lane_candidate(
             "runtime": runtime,
             "contract_id": policy.contract_id,
             "policy_sha256": policy.digest,
-            "security_master_sha256": _sha256(epoch.security_master_path),
+            "security_master_sha256": _sha256(security_master_path),
         }
         manifest = {
             "schema_version": 1,
@@ -1057,7 +1084,7 @@ def build_lane_candidate(
             "epoch_manifest_sha256": epoch.manifest_sha256,
             "ods_release_id": ods.release.release_id,
             "ods_manifest_sha256": ods.manifest_sha256,
-            "security_master_sha256": _sha256(epoch.security_master_path),
+            "security_master_sha256": _sha256(security_master_path),
             "knowledge_cutoff": ods.release.created_at.isoformat(),
             "business_content_digest": business_digest,
             "candidate_content_digest": _canonical_digest(content_value),
@@ -1418,6 +1445,9 @@ def arbitrate_and_publish(
         or expected_epoch.policy_sha256 != policy.digest
     ):
         raise DualLaneError("trusted OCI epoch is not bound to the active policy")
+    if expected_epoch.security_master_path is None:
+        raise DualLaneError("legacy epoch is audit-only and cannot be arbitrated")
+    expected_security_master_sha256 = _sha256(expected_epoch.security_master_path)
     lock_path = (
         publisher_lock_path.resolve()
         if publisher_lock_path is not None
@@ -1455,7 +1485,7 @@ def arbitrate_and_publish(
                 coherence_reason = "withheld_code_revision_mismatch"
             elif candidate.runtime != policy.runtime:
                 coherence_reason = "withheld_runtime_mismatch"
-            elif candidate.security_master_sha256 != _sha256(expected_epoch.security_master_path):
+            elif candidate.security_master_sha256 != expected_security_master_sha256:
                 coherence_reason = "withheld_security_master_mismatch"
         state_path = root / "state" / "arbitration-state.json"
         state = _load_object(state_path) if state_path.is_file() else {"standby_absence_count": 0}

@@ -110,7 +110,11 @@ class DualLaneTests(unittest.TestCase):
         )
         base = self.root / "historical-base" / "p1-history-base-v1"
         base.mkdir(parents=True)
-        self._write_json(base / "META.json", {"revision": base.name, "kind": "test-base"})
+        self.base_metadata_path = base / "META.json"
+        self._write_json(
+            self.base_metadata_path,
+            {"revision": base.name, "kind": "test-base"},
+        )
         self.base_pointer = self.root / "historical-base-CURRENT.json"
         self._write_json(
             self.base_pointer,
@@ -193,6 +197,7 @@ class DualLaneTests(unittest.TestCase):
     def _epoch(self, market_date: date) -> EpochInput:
         input_digest = dual_lane._epoch_input_digest(
             _sha256(self.base_pointer),
+            _sha256(self.base_metadata_path),
             self.policy.digest,
             _sha256(self.universe_path),
             _sha256(self.validity_path),
@@ -446,6 +451,7 @@ class DualLaneTests(unittest.TestCase):
         market_date = date(2026, 7, 24)
         input_digest = dual_lane._epoch_input_digest(
             _sha256(self.base_pointer),
+            _sha256(self.base_metadata_path),
             self.policy.digest,
             _sha256(self.universe_path),
             _sha256(self.validity_path),
@@ -496,6 +502,114 @@ class DualLaneTests(unittest.TestCase):
                 security_master_path=self.security_master_path,
                 code_revision=self.CODE_REVISION,
                 parent_pointer=parent_pointer,
+            )
+
+    def test_epoch_rejects_historical_base_revision_alias(self) -> None:
+        pointer = self.root / "invalid-base-pointer.json"
+        self._write_json(
+            pointer,
+            {
+                "revision": "not-the-meta-revision",
+                "revision_path": str(self.base_metadata_path.parent),
+                "meta_sha256": _sha256(self.base_metadata_path),
+            },
+        )
+
+        with self.assertRaisesRegex(DualLaneError, "does not match its metadata"):
+            publish_epoch_input(
+                output=self.root / "invalid-base-epoch",
+                epoch_id="epoch-invalid-base",
+                market_date=date(2026, 7, 24),
+                policy=self.policy,
+                universe_policy_path=self.universe_path,
+                code_validity_path=self.validity_path,
+                security_master_path=self.security_master_path,
+                code_revision=self.CODE_REVISION,
+                base_pointer=pointer,
+            )
+
+    def test_legacy_epoch_and_candidate_remain_auditable_but_ineligible(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        candidate = self._candidate(epoch=epoch, lane="cn01")
+
+        legacy_epoch = self.root / "legacy-epoch"
+        shutil.copytree(epoch.root, legacy_epoch)
+        epoch_manifest = json.loads(
+            (legacy_epoch / "manifest.json").read_text(encoding="utf-8")
+        )
+        references = epoch_manifest["shared_references"]
+        security_relative = references.pop("security_master_path")
+        references.pop("security_master_sha256")
+        epoch_manifest.pop("input_digest")
+        (legacy_epoch / security_relative).unlink()
+        epoch_manifest["files"] = [
+            item for item in epoch_manifest["files"] if item["path"] != security_relative
+        ]
+        self._rewrite_ready_manifest(legacy_epoch, epoch_manifest)
+        verified_epoch = verify_epoch_input(legacy_epoch)
+        self.assertIsNone(verified_epoch.security_master_path)
+
+        legacy_candidate = self.root / "legacy-candidate"
+        shutil.copytree(candidate.root, legacy_candidate)
+        candidate_manifest_path = legacy_candidate / "manifest.json"
+        candidate_manifest = json.loads(candidate_manifest_path.read_text(encoding="utf-8"))
+        dwd_relative = candidate_manifest["artifacts"]["dwd"]["path"]
+        dwd_manifest_path = legacy_candidate / dwd_relative / "manifest.json"
+        dwd_manifest = json.loads(dwd_manifest_path.read_text(encoding="utf-8"))
+        dwd_manifest["lineage"].pop("security_master_sha256")
+        self._write_json(dwd_manifest_path, dwd_manifest)
+        candidate_manifest.pop("security_master_sha256")
+        candidate_manifest["artifacts"]["dwd"]["manifest_sha256"] = _sha256(
+            dwd_manifest_path
+        )
+        dws_relative = candidate_manifest["artifacts"]["dws"]["path"]
+        dws_manifest_path = legacy_candidate / dws_relative / "manifest.json"
+        dws_manifest = json.loads(dws_manifest_path.read_text(encoding="utf-8"))
+        dws_manifest["lineage"]["dwd_manifest_sha256"] = _sha256(dwd_manifest_path)
+        self._write_json(dws_manifest_path, dws_manifest)
+        candidate_manifest["artifacts"]["dws"]["manifest_sha256"] = _sha256(
+            dws_manifest_path
+        )
+        dwd_manifest_relative = dwd_manifest_path.relative_to(legacy_candidate).as_posix()
+        dws_manifest_relative = dws_manifest_path.relative_to(legacy_candidate).as_posix()
+        for item in candidate_manifest["files"]:
+            if item["path"] == dwd_manifest_relative:
+                item["sha256"] = _sha256(dwd_manifest_path)
+                item["size_bytes"] = dwd_manifest_path.stat().st_size
+            elif item["path"] == dws_manifest_relative:
+                item["sha256"] = _sha256(dws_manifest_path)
+                item["size_bytes"] = dws_manifest_path.stat().st_size
+        candidate_manifest["candidate_content_digest"] = dual_lane._canonical_digest(
+            {
+                "lane_id": candidate_manifest["lane_id"],
+                "market_date": candidate_manifest["market_date"],
+                "epoch_manifest_sha256": candidate_manifest["epoch_manifest_sha256"],
+                "ods_manifest_sha256": candidate_manifest["ods_manifest_sha256"],
+                "business_content_digest": candidate_manifest["business_content_digest"],
+                "code_revision": candidate_manifest["code_revision"],
+                "runtime": candidate_manifest["runtime"],
+                "contract_id": candidate_manifest["contract_id"],
+                "policy_sha256": candidate_manifest["policy_sha256"],
+            }
+        )
+        self._rewrite_ready_manifest(legacy_candidate, candidate_manifest)
+        verified_candidate = verify_lane_candidate(legacy_candidate)
+        self.assertIsNone(verified_candidate.security_master_sha256)
+
+        with self.assertRaisesRegex(DualLaneError, "audit-only"):
+            build_lane_candidate(
+                output=self.root / "legacy-epoch-candidate",
+                candidate_id="candidate-from-legacy-epoch",
+                lane_id="cn01",
+                attempt_id="attempt-from-legacy-epoch",
+                market_date=market_date,
+                ods_release_dir=(
+                    self.root / "ods" / market_date.isoformat() / "cn01-base" / "release"
+                ),
+                epoch_root=legacy_epoch,
+                policy=self.policy,
+                code_revision=self.CODE_REVISION,
             )
 
     def test_market_release_selection_does_not_trust_shared_current_attempt(self) -> None:

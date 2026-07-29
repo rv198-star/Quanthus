@@ -75,6 +75,20 @@ fi
 
 source_digest="$(sha256sum "$source_pointer")"
 source_digest="${source_digest%% *}"
+source_manifest_digest="$("$python_bin" -c '
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    pointer = json.load(stream)
+value = pointer.get("manifest_sha256") or pointer.get("meta_sha256") or ""
+print(value)
+' "$source_pointer")"
+if [[ ! "$source_manifest_digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+  echo "epoch canonical-source pointer has no valid manifest digest" >&2
+  exit 2
+fi
+source_manifest_digest="${source_manifest_digest#sha256:}"
 policy_digest="$(sha256sum "$policy")"
 policy_digest="${policy_digest%% *}"
 universe_digest="$(sha256sum "$universe_policy")"
@@ -84,7 +98,7 @@ validity_digest="${validity_digest%% *}"
 security_master_digest="$(sha256sum "$security_master")"
 security_master_digest="${security_master_digest%% *}"
 input_digest="$(printf '%s' \
-  "${source_digest}${policy_digest}${universe_digest}${validity_digest}${security_master_digest}" \
+  "${source_digest}${source_manifest_digest}${policy_digest}${universe_digest}${validity_digest}${security_master_digest}" \
   | sha256sum)"
 input_digest="${input_digest%% *}"
 date_compact="${market_date//-/}"

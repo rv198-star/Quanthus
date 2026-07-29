@@ -223,6 +223,9 @@ from their own ODS. The v1 `pit_cutoff` source-time check is not a full PIT/trad
 The delivered epoch carries the OCI-selected `ref_security_master.parquet` together with the
 universe and code-validity policies; lane-local security-master drift cannot redefine candidate
 identity or create a false cross-lane business divergence.
+Its id binds both the canonical-source pointer and the verified copied parent/base digest. Epochs
+and candidates created before this shared-reference contract remain verifiable as retained audit
+evidence, but are ineligible for new candidate construction or arbitration.
 `READY` is written last. Candidate ids are immutable and attempt sequencing is monotonic within
 `(lane_id, market_date)`; a rerun does not reuse an id with different lineage.
 

@@ -130,7 +130,9 @@ The two remote roots for each node remain `.`; do not replace them with host pat
 `ref_security_master.parquet`; epoch publication copies and checksums that exact snapshot so both
 lanes build code-validity evidence from one shared reference rather than their lane-local copies.
 The publisher rejects the epoch before `READY` when the id derived by the wrapper no longer matches
-the sealed pointer, policy, universe, code-validity, and security-master inputs.
+the sealed pointer, copied parent/base, policy, universe, code-validity, and security-master inputs.
+Legacy pre-shared-reference epochs and candidates remain readable for audit and must not be reused
+for a new build or arbitration attempt.
 
 ```bash
 sudo install -o root -g ubuntu -m 0640 /tmp/dual-lane-oci.env \

@@ -473,7 +473,13 @@ class StrategyPerformanceReport:
     turnover: Decimal
     total_fees: Decimal
     exposure_rate: Decimal
+    average_invested_capital_ratio: Decimal
     average_holding_sessions: Decimal | None
+    top_3_closed_trade_count: int
+    top_3_closed_trade_pnl: Decimal
+    return_excluding_top_3_closed_trades: Decimal
+    benchmark_total_return: Decimal | None = None
+    excess_total_return: Decimal | None = None
     periods_per_year: int = 252
     risk_free_rate: Decimal = Decimal("0")
     compound_nav: bool = False
@@ -500,7 +506,17 @@ class StrategyPerformanceReport:
             "turnover": decimal_text(self.turnover),
             "total_fees": decimal_text(self.total_fees),
             "exposure_rate": decimal_text(self.exposure_rate),
+            "average_invested_capital_ratio": decimal_text(
+                self.average_invested_capital_ratio
+            ),
             "average_holding_sessions": optional(self.average_holding_sessions),
+            "top_3_closed_trade_count": self.top_3_closed_trade_count,
+            "top_3_closed_trade_pnl": decimal_text(self.top_3_closed_trade_pnl),
+            "return_excluding_top_3_closed_trades": decimal_text(
+                self.return_excluding_top_3_closed_trades
+            ),
+            "benchmark_total_return": optional(self.benchmark_total_return),
+            "excess_total_return": optional(self.excess_total_return),
             "periods_per_year": self.periods_per_year,
             "risk_free_rate": decimal_text(self.risk_free_rate),
             "compound_nav": self.compound_nav,
@@ -680,6 +696,38 @@ def _build_performance(
         else _rate(Decimal(sum(trade.holding_sessions for trade in trades)) / len(trades))
     )
 
+    daily_snapshots: dict[date, Mapping[str, Any]] = {}
+    for event in events:
+        if event.event_type is EventType.DAILY_SNAPSHOT:
+            payload = event.payload
+            daily_snapshots[date.fromisoformat(str(payload["session_date"]))] = payload
+    replay_dates = tuple(point.market_date for point in equity_curve[1:])
+    if len(replay_dates) != replay_sessions or not set(daily_snapshots).issubset(replay_dates):
+        raise BacktestInputError("performance snapshots do not align with replay dates")
+    invested_ratios: list[Decimal] = []
+    for market_date in replay_dates:
+        daily_payload = daily_snapshots.get(market_date)
+        if daily_payload is None:
+            invested_ratios.append(Decimal("0"))
+            continue
+        system_equity = Decimal(str(daily_payload["total_equity"])) + Decimal(
+            str(daily_payload["external_pool"])
+        )
+        if system_equity <= 0:
+            raise BacktestInputError("daily system equity must remain positive")
+        invested_ratios.append(Decimal(str(daily_payload["market_value"])) / system_equity)
+    average_invested_capital_ratio = _rate(
+        sum(invested_ratios, Decimal("0")) / Decimal(replay_sessions)
+    )
+
+    top_trades = tuple(sorted(trades, key=lambda trade: trade.pnl, reverse=True)[:3])
+    top_3_closed_trade_pnl = _money(
+        sum((trade.pnl for trade in top_trades), Decimal("0"))
+    )
+    return_excluding_top_3_closed_trades = _rate(
+        (total_pnl - top_3_closed_trade_pnl) / initial
+    )
+
     fill_payloads = [event.payload for event in events if event.event_type is EventType.FILL]
     gross_turnover = sum(
         (Decimal(str(payload["gross_amount"])) for payload in fill_payloads),
@@ -709,7 +757,11 @@ def _build_performance(
         turnover=_rate(gross_turnover / initial),
         total_fees=total_fees,
         exposure_rate=_rate(Decimal(exposure_sessions) / replay_sessions),
+        average_invested_capital_ratio=average_invested_capital_ratio,
         average_holding_sessions=average_holding,
+        top_3_closed_trade_count=len(top_trades),
+        top_3_closed_trade_pnl=top_3_closed_trade_pnl,
+        return_excluding_top_3_closed_trades=return_excluding_top_3_closed_trades,
     )
 
 

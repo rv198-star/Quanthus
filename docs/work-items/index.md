@@ -126,7 +126,10 @@ control; moderated v2 is the current CLI default and publishes a combined activi
 scoreboard. Evidence: `docs/acceptance/p3-baseline-strategy-suite-20260729.md` and
 `docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md`. The follow-up same-pipeline
 buy-and-hold, zero-cost v1, and raw-extreme diagnostics are recorded in
-`docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md`.
+`docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md`. Runner 2.1 adds the checksum-bound
+`sh000300` comparison, time-in-market, average-invested-capital, excess-return, and static top-three
+robustness report without changing strategy behavior. Evidence:
+`docs/acceptance/p3-baseline-benchmark-metrics-20260729.md`.
 
 | ID | Title | Depends on |
 | --- | --- | --- |

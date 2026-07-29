@@ -15,6 +15,7 @@ from quanthus.backtest.baseline_research import (
     render_baseline_scoreboard,
     run_baseline_strategy_suite,
 )
+from quanthus.backtest.benchmark import BenchmarkCurveError, load_benchmark_curve
 from quanthus.backtest.engine import BacktestEngine, BacktestInputError
 from quanthus.backtest.historical_bundle import HistoricalReplayBundleError
 from quanthus.backtest.historical_frames import (
@@ -342,6 +343,7 @@ def _parser() -> argparse.ArgumentParser:
     baseline_suite.add_argument("--scope-start", type=date.fromisoformat, required=True)
     baseline_suite.add_argument("--scope-end", type=date.fromisoformat, required=True)
     baseline_suite.add_argument("--feature-panel", type=Path, required=True)
+    baseline_suite.add_argument("--benchmark", type=Path, required=True)
     baseline_suite.add_argument("--output", type=Path, required=True)
     baseline_suite.add_argument("--scoreboard-output", type=Path)
     baseline_suite.add_argument("--audit-output-dir", type=Path)
@@ -901,6 +903,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         baseline_catalogue,
                         baseline_registry,
                         baseline_panel,
+                        load_benchmark_curve(args.benchmark),
                         scope_start=args.scope_start,
                         scope_end=args.scope_end,
                     )
@@ -1123,6 +1126,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         HistoricalReplayBundleError,
         HistoricalFrameReaderError,
         BaselineResearchError,
+        BenchmarkCurveError,
         BacktestInputError,
         FeatureRegistryError,
     ) as exc:

@@ -7,12 +7,13 @@ import json
 import os
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
-from decimal import ROUND_FLOOR, Decimal, InvalidOperation
+from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from quanthus.backtest.benchmark import BenchmarkComparison, BenchmarkCurve
 from quanthus.backtest.contracts import BacktestRunSpec, EventType, UnitState, decimal_text
 from quanthus.backtest.engine import BacktestEngine, BacktestInputError
 from quanthus.backtest.historical_bundle import HistoricalReplayBundle
@@ -27,7 +28,8 @@ from quanthus.backtest.strategy_replay import (
 from quanthus.feature_registry import FeatureRegistry
 
 FEATURE_EVALUATOR_VERSION = "1.0.0"
-BASELINE_RUNNER_VERSION = "2.0.0"
+BASELINE_RUNNER_VERSION = "2.1.0"
+BASELINE_BENCHMARK_INSTRUMENT_ID = "sh000300"
 _STRATEGY_KINDS = {"ma_trend", "breakout20", "oversold_rebound"}
 
 
@@ -1588,6 +1590,7 @@ class BaselineSuiteResult:
     feature_panel: BaselineFeaturePanelReport
     scope_start: date
     scope_end: date
+    benchmark: BenchmarkComparison
     strategies: tuple[StrategyReplayResult, ...]
 
     @property
@@ -1602,6 +1605,7 @@ class BaselineSuiteResult:
             "feature_panel": self.feature_panel.to_dict(),
             "scope": {"start": self.scope_start.isoformat(), "end": self.scope_end.isoformat()},
             "cash_baseline_total_return": "0",
+            "benchmark": self.benchmark.to_dict(),
             "strategies": [_strategy_summary(result) for result in self.strategies],
             "research_only": True,
             "execution_authorized": False,
@@ -1651,13 +1655,11 @@ def render_baseline_scoreboard(result: BaselineSuiteResult) -> str:
 
     header = (
         "| Strategy | Operations (B/S) | Closed trades | Win rate | Total return | "
-        "Total PnL | Ending equity | Max drawdown | Ann. volatility | Fees | Turnover | "
-        "Exposure | Avg hold | Payoff ratio | Profit factor | Sharpe |"
+        "Benchmark return | Excess return | Return ex top 3 | Top 3 PnL | Total PnL | "
+        "Ending equity | Max drawdown | Ann. volatility | Fees | Turnover | Time in market | "
+        "Avg invested | Avg hold | Payoff ratio | Profit factor | Sharpe |"
     )
-    separator = (
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
-        "---: | ---: | ---: | ---: | ---: |"
-    )
+    separator = "| --- |" + " ---: |" * 20
     rows = [header, separator]
     for replay in result.strategies:
         summary = _strategy_summary(replay)
@@ -1675,6 +1677,11 @@ def render_baseline_scoreboard(result: BaselineSuiteResult) -> str:
                     str(summary["closed_trade_count"]),
                     _scoreboard_percent(performance.win_rate),
                     _scoreboard_percent(performance.total_return),
+                    _scoreboard_percent(performance.benchmark_total_return),
+                    _scoreboard_percent(performance.excess_total_return),
+                    _scoreboard_percent(performance.return_excluding_top_3_closed_trades),
+                    f"CNY {performance.top_3_closed_trade_pnl:.2f} "
+                    f"({performance.top_3_closed_trade_count})",
                     f"CNY {performance.total_pnl:.2f}",
                     f"CNY {performance.ending_equity:.2f}",
                     _scoreboard_percent(performance.maximum_drawdown),
@@ -1682,6 +1689,7 @@ def render_baseline_scoreboard(result: BaselineSuiteResult) -> str:
                     f"CNY {performance.total_fees:.2f}",
                     _scoreboard_percent(performance.turnover),
                     _scoreboard_percent(performance.exposure_rate),
+                    _scoreboard_percent(performance.average_invested_capital_ratio),
                     _scoreboard_decimal(performance.average_holding_sessions),
                     _scoreboard_decimal(performance.payoff_ratio),
                     _scoreboard_decimal(performance.profit_factor),
@@ -1699,6 +1707,7 @@ def run_baseline_strategy_suite(
     catalogue: BaselineStrategyCatalogue,
     registry: FeatureRegistry,
     panel: BaselineFeaturePanel,
+    benchmark: BenchmarkCurve,
     *,
     scope_start: date,
     scope_end: date,
@@ -1706,12 +1715,22 @@ def run_baseline_strategy_suite(
     """Run all three frozen baselines only inside the development partition."""
 
     catalogue.validation.require_development_scope(scope_start, scope_end)
+    if benchmark.instrument_id != BASELINE_BENCHMARK_INSTRUMENT_ID:
+        raise BaselineResearchError(
+            "baseline suite benchmark must use explicit sh000300 instrument identity"
+        )
     if catalogue.feature_registry_version != registry.registry_version:
         raise BaselineResearchError("catalogue and feature registry versions do not match")
     if panel.report.feature_registry_digest != registry.digest:
         raise BaselineResearchError("feature panel does not bind the loaded feature registry")
     if panel.report.bundle_digest != reader.bundle.digest:
         raise BaselineResearchError("feature panel does not bind the replay bundle")
+    replay_frames = reader.frames(scope_start, scope_end)
+    benchmark_dates = (
+        replay_frames[0].snapshot.market_date,
+        *(frame.execution_date for frame in replay_frames),
+    )
+    benchmark_comparison = benchmark.compare(benchmark_dates)
     results: list[StrategyReplayResult] = []
     for definition in catalogue.strategies:
         run = BacktestRunSpec(
@@ -1746,11 +1765,31 @@ def run_baseline_strategy_suite(
             raise BaselineResearchError(
                 "feature-panel continuity scope must include the final execution date"
             )
+        replay_result = run_strategy_replay(
+            engine,
+            BaselineHistoricalStrategy(definition, catalogue.shared, panel),
+            spec,
+        )
+        if tuple(point.market_date for point in replay_result.equity_curve) != benchmark_dates:
+            raise BaselineResearchError("strategy equity dates do not match benchmark comparison")
+        excess_return = (
+            replay_result.performance.total_return - benchmark_comparison.total_return
+        ).quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP)
+        performance = replace(
+            replay_result.performance,
+            benchmark_total_return=benchmark_comparison.total_return,
+            excess_total_return=excess_return,
+        )
+        backtest_summary = {
+            **replay_result.backtest.result_summary,
+            "benchmark_total_return": decimal_text(benchmark_comparison.total_return),
+            "excess_total_return": decimal_text(excess_return),
+        }
         results.append(
-            run_strategy_replay(
-                engine,
-                BaselineHistoricalStrategy(definition, catalogue.shared, panel),
-                spec,
+            replace(
+                replay_result,
+                performance=performance,
+                backtest=replace(replay_result.backtest, result_summary=backtest_summary),
             )
         )
     return BaselineSuiteResult(
@@ -1760,5 +1799,6 @@ def run_baseline_strategy_suite(
         feature_panel=panel.report,
         scope_start=scope_start,
         scope_end=scope_end,
+        benchmark=benchmark_comparison,
         strategies=tuple(results),
     )

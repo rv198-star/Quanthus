@@ -2,6 +2,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -11,6 +12,8 @@ from quanthus.backtest import (
     BacktestEngine,
     BaselineFeaturePanel,
     BaselineResearchError,
+    BenchmarkCurve,
+    BenchmarkObservation,
     EventType,
     HistoricalReplayFrameReader,
     load_baseline_strategy_catalogue,
@@ -62,6 +65,20 @@ class BaselineResearchTests(unittest.TestCase):
         )
         self.catalogue = load_baseline_strategy_catalogue(
             ROOT / "config" / "p3-baseline-strategies.research.v2.json"
+        )
+        self.benchmark = BenchmarkCurve(
+            benchmark_id="csi300",
+            instrument_id="sh000300",
+            display_name="CSI 300",
+            currency="CNY",
+            price_field="close",
+            source="synthetic",
+            source_revision="synthetic-csi300-v1",
+            acquired_at=at(self.dates[-1], 18),
+            observations=tuple(
+                BenchmarkObservation(market_date=value, close=Decimal(3000 + index))
+                for index, value in enumerate(self.dates)
+            ),
         )
 
     def _build_bundle(self) -> HistoricalReplayBundle:
@@ -262,9 +279,11 @@ class BaselineResearchTests(unittest.TestCase):
                 self.catalogue,
                 self.registry,
                 panel,
+                self.benchmark,
                 scope_start=scope_start,
                 scope_end=scope_end,
             )
+            self.assertEqual(result.runner_version, "2.1.0")
             self.assertEqual(
                 {item.strategy_id for item in result.strategies},
                 {
@@ -275,6 +294,7 @@ class BaselineResearchTests(unittest.TestCase):
             )
             self.assertTrue(all(not item.backtest.run.official for item in result.strategies))
             result_payload = result.to_dict()
+            self.assertEqual(result_payload["benchmark"]["instrument_id"], "sh000300")
             for strategy_payload in result_payload["strategies"]:
                 self.assertEqual(
                     strategy_payload["operation_count"],
@@ -306,6 +326,22 @@ class BaselineResearchTests(unittest.TestCase):
             self.assertIn("Ann. volatility", scoreboard)
             self.assertIn("Payoff ratio", scoreboard)
             self.assertIn("Turnover", scoreboard)
+            self.assertIn("Time in market", scoreboard)
+            self.assertIn("Avg invested", scoreboard)
+            self.assertIn("Benchmark return", scoreboard)
+            self.assertIn("Excess return", scoreboard)
+            self.assertIn("Return ex top 3", scoreboard)
+            with self.assertRaisesRegex(BaselineResearchError, "explicit sh000300"):
+                run_baseline_strategy_suite(
+                    reader,
+                    BacktestEngine(execution_policy),
+                    self.catalogue,
+                    self.registry,
+                    panel,
+                    replace(self.benchmark, instrument_id="000300"),
+                    scope_start=scope_start,
+                    scope_end=scope_end,
+                )
             with BaselineFeaturePanel.build(
                 self.bundle,
                 self.registry,
@@ -322,6 +358,7 @@ class BaselineResearchTests(unittest.TestCase):
                     self.catalogue,
                     self.registry,
                     under_scoped_panel,
+                    self.benchmark,
                     scope_start=scope_start,
                     scope_end=scope_end,
                 )
@@ -332,6 +369,7 @@ class BaselineResearchTests(unittest.TestCase):
                     self.catalogue,
                     self.registry,
                     panel,
+                    self.benchmark,
                     scope_start=date(2022, 1, 4),
                     scope_end=date(2022, 1, 5),
                 )

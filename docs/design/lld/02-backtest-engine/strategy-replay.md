@@ -89,14 +89,23 @@ All monetary results come from P2 fills, ledger-derived state, and sourced close
 contains initial and ending system equity, total PnL and return, fixed-unit capital-day return,
 maximum drawdown, 252-period annualized volatility, zero-risk-free Sharpe ratio, closed/winning/
 losing trades, win rate, payoff ratio, profit factor, gross turnover, total fees, exposure rate,
-and average holding sessions.
+average invested-capital ratio, average holding sessions, the net PnL contribution of the largest
+three closed trades, and return after statically removing that contribution. A benchmark-bound
+research suite additionally reports the same-period buy-and-hold return and strategy excess return.
 
 Total return and drawdown use system wealth including the external pool. Fixed-unit capital-day
 return is total PnL divided by target notional and replay-session count. Gross turnover is the sum
 of absolute fill gross amounts divided by initial system equity. Exposure is the share of replay
 sessions in which the unit carried capital at any point. Volatility uses the sample standard
 deviation of consecutive system-equity returns; Sharpe uses the same returns, 252 periods, and the
-declared zero risk-free assumption.
+declared zero risk-free assumption. Average invested capital is the arithmetic mean, across every
+replay execution day including empty days, of terminal position market value divided by total
+system wealth including the external pool.
+
+The top-three robustness metric ranks closed trades by net PnL, sums at most the largest three, and
+subtracts that amount from total system PnL before dividing by initial equity. It reports the
+removed count and amount. This is a static contribution subtraction; it does not delete decisions,
+rerun the capital path, or replace the constrained counterfactual work owned by `P3-ATTR-001`.
 
 Profits transferred to the external pool remain part of total system wealth but are not redeployed
 implicitly. The report declares `compound_nav=false`; it does not publish CAGR or imply compounded
@@ -140,12 +149,21 @@ development partition, and the final T+1 execution must also remain inside that 
 panel's full-scope continuity filter must extend through that final T+1 execution session even
 though strategy decisions stop at T; a narrower panel fails before replay. The 2022-2024
 arbitration and 2025 permanent-blind partitions remain unopened by this command. Results are
-research-only, declare `execution_authorized=false`, and compare with a zero-return cash baseline;
+research-only, declare `execution_authorized=false`, and retain a zero-return cash baseline;
 profitability is not a delivery gate for this infrastructure slice. Its canonical JSON includes
 fill-operation counts split into buys and sells plus closed-trade counts. A co-generated Markdown
 scoreboard shows those counts with win rate, cumulative return, PnL, ending equity, maximum
-drawdown, annualized volatility, fees, turnover, exposure, average hold, payoff ratio, profit
-factor, and Sharpe. Total return is non-compounded and is never labeled as CAGR.
+drawdown, annualized volatility, fees, turnover, time in market, average invested capital, average
+hold, payoff ratio, profit factor, Sharpe, top-three robustness, benchmark return, and excess
+return. Total return is non-compounded and is never labeled as CAGR.
+
+The suite also requires an offline, checksum-verified benchmark curve through CLI `--benchmark`.
+The current broad-market control is CSI 300 with explicit instrument identity `sh000300`; ambiguous
+`000300` is rejected because it can route to the wrong market identity. The artifact records source,
+source revision, acquisition time, close observations, and its canonical digest. The runner does
+not fetch market data. It requires a benchmark observation for every strategy-equity date and
+computes close-to-close buy-and-hold return from the initial equity date through the last T+1
+execution date. Excess return is strategy total return minus that benchmark total return.
 
 The first real corpus also contains versioned action exceptions and action-like price-scale changes
 without normalized economic evidence. The research suite therefore excludes any affected identity
@@ -159,6 +177,7 @@ anomalous date so bypassing the feature panel cannot create a false held-positio
 | Concern | Governing path |
 | --- | --- |
 | Strategy/frame/result contracts and runner | `src/quanthus/backtest/strategy_replay.py` |
+| Versioned benchmark curve and comparison | `src/quanthus/backtest/benchmark.py`, `tests/unit/test_benchmark.py` |
 | Stateful buy and held-position mark reuse | `src/quanthus/backtest/engine.py` |
 | Multi-trade metrics and failure boundaries | `tests/unit/test_strategy_replay.py` |
 | Hand-reconciled oracle | `tests/fixtures/golden/p3_strategy_replay.v1.json` |
@@ -167,6 +186,7 @@ anomalous date so bypassing the feature panel cannot create a false held-positio
 | Continuous replay-bundle completeness and integrity gate | `src/quanthus/backtest/historical_bundle.py`, `tests/unit/test_historical_replay_bundle.py`, `docs/acceptance/p3-historical-replay-bundle-gate-slice-20260728.md` |
 | Continuous PIT frame reader and real-corpus audit | `src/quanthus/backtest/historical_frames.py`, `tests/unit/test_historical_frame_reader.py`, `docs/acceptance/p3-historical-frame-reader-slice-20260729.md` |
 | Baseline feature panel, strategies, and development suite | `src/quanthus/backtest/baseline_research.py`, `tests/unit/test_baseline_research.py`, `docs/acceptance/p3-baseline-strategy-suite-20260729.md`, `docs/acceptance/p3-baseline-strategy-suite-v2-20260729.md` |
+| Baseline benchmark and robustness metrics | `docs/acceptance/p3-baseline-benchmark-metrics-20260729.md` |
 | Backtest sanity diagnostics | `docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md` |
 
 The integration slice additionally publishes `StrategyReplayResult.audit_dict()` together with

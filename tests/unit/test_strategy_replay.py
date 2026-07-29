@@ -223,6 +223,16 @@ class StrategyReplayTests(unittest.TestCase):
         self.assertEqual(len(replay.decisions), 6)
         self.assertEqual(replay.performance.winning_trades, 1)
         self.assertEqual(replay.performance.losing_trades, 1)
+        self.assertEqual(
+            replay.performance.average_invested_capital_ratio,
+            Decimal("0.09861448"),
+        )
+        self.assertEqual(replay.performance.top_3_closed_trade_count, 2)
+        self.assertEqual(replay.performance.top_3_closed_trade_pnl, Decimal("-115.47"))
+        self.assertEqual(
+            replay.performance.return_excluding_top_3_closed_trades,
+            Decimal("0.00000000"),
+        )
         self.assertFalse(replay.performance.compound_nav)
         self.assertFalse(replay.pending_exit)
         self.assertEqual(replay.final_state.settled_quantity, 0)

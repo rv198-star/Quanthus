@@ -26,6 +26,14 @@ from quanthus.backtest.baseline_research import (
     render_baseline_scoreboard,
     run_baseline_strategy_suite,
 )
+from quanthus.backtest.benchmark import (
+    BENCHMARK_CURVE_SCHEMA_VERSION,
+    BenchmarkComparison,
+    BenchmarkCurve,
+    BenchmarkCurveError,
+    BenchmarkObservation,
+    load_benchmark_curve,
+)
 from quanthus.backtest.contracts import (
     BacktestResult,
     BacktestRunSpec,
@@ -112,6 +120,7 @@ __all__ = [
     "AuditEventStore",
     "AuditIntegrityError",
     "BASELINE_RUNNER_VERSION",
+    "BENCHMARK_CURVE_SCHEMA_VERSION",
     "BacktestEngine",
     "BacktestInputError",
     "BacktestResult",
@@ -128,6 +137,10 @@ __all__ = [
     "BaselineStrategyDefinition",
     "BaselineSuiteResult",
     "BaselineValidationPolicy",
+    "BenchmarkComparison",
+    "BenchmarkCurve",
+    "BenchmarkCurveError",
+    "BenchmarkObservation",
     "CorporateAction",
     "CorporateActionApplication",
     "CorporateActionStep",
@@ -187,6 +200,7 @@ __all__ = [
     "build_fixed_unit_report",
     "build_window_order_intent",
     "load_execution_policy",
+    "load_benchmark_curve",
     "load_baseline_strategy_catalogue",
     "load_historical_frame_reader",
     "load_historical_replay_bundle",

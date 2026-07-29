@@ -341,7 +341,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
         diagnostic_evidence_path = (
             root / "docs" / "acceptance" / "p3-backtest-sanity-diagnostics-20260729.md"
         )
+        metric_evidence_path = (
+            root / "docs" / "acceptance" / "p3-baseline-benchmark-metrics-20260729.md"
+        )
         source_path = root / "src" / "quanthus" / "backtest" / "baseline_research.py"
+        benchmark_path = root / "src" / "quanthus" / "backtest" / "benchmark.py"
         cli_path = root / "src" / "quanthus" / "cli.py"
         feature_fields = _header_fields(feature_lld_path)
         replay_fields = _header_fields(replay_lld_path)
@@ -350,6 +354,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         v1_evidence = v1_evidence_path.read_text(encoding="utf-8")
         v2_evidence = v2_evidence_path.read_text(encoding="utf-8")
         diagnostic_evidence = diagnostic_evidence_path.read_text(encoding="utf-8")
+        metric_evidence = metric_evidence_path.read_text(encoding="utf-8")
         source = source_path.read_text(encoding="utf-8")
         cli = cli_path.read_text(encoding="utf-8")
         v1_catalogue = json.loads(
@@ -379,6 +384,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("Days above 20% absolute", diagnostic_evidence)
         self.assertIn("post-selected winner", diagnostic_evidence)
         self.assertIn("-99.3918%", diagnostic_evidence)
+        self.assertIn("`sh000300`", metric_evidence)
+        self.assertIn("Average invested capital", metric_evidence)
+        self.assertIn("Return ex top 3", metric_evidence)
+        self.assertIn("-89.049688%", metric_evidence)
+        self.assertIn("static contribution subtraction", metric_evidence)
         self.assertEqual(v1_catalogue["status"], "research-only")
         self.assertEqual(v2_catalogue["status"], "research-only")
         self.assertEqual(v1_catalogue["validation"]["development_end"], "2021-12-31")
@@ -390,6 +400,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("p3-baseline-strategies.research.v2.json", cli)
         self.assertIn("render_baseline_scoreboard", cli)
         self.assertIn("--scoreboard-output", cli)
+        self.assertIn("--benchmark", cli)
         self.assertIn('"operation_count"', source)
         self.assertIn('"buy_operation_count"', source)
         self.assertIn('"sell_operation_count"', source)
@@ -398,6 +409,8 @@ class DocumentTraceabilityTests(unittest.TestCase):
             source,
         )
         self.assertTrue(source_path.is_file())
+        self.assertTrue(benchmark_path.is_file())
+        self.assertTrue((root / "tests" / "unit" / "test_benchmark.py").is_file())
         self.assertTrue((root / "tests" / "unit" / "test_baseline_research.py").is_file())
 
     def test_p3_label_card_slice_is_bounded_and_traceable(self) -> None:

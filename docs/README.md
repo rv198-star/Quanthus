@@ -23,6 +23,8 @@ nodes.
   panel and a three-strategy one-unit baseline runner. Moderated catalogue v2 is the CLI default;
   v1 remains a replayable but rejected extreme-control record. The command is locked to 2012-2021
   development data and does not promote a target P3 policy or open arbitration/blind partitions.
+  Its report now requires an offline checksum-bound `sh000300` CSI 300 curve and includes benchmark
+  excess, time in market, average invested capital, and top-three closed-trade robustness metrics.
 - Targeted backtest sanity diagnostics passed a same-pipeline single-security buy-and-hold sentinel,
   reproduced v1 near-total losses with every cost set to zero, and reconciled daily-return extremes
   to raw bars. This narrows the v1 failure to strategy construction without making the sentinel a

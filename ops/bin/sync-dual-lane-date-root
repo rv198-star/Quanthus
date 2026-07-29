@@ -93,7 +93,6 @@ common=(
   --partial-dir=.rsync-partial
   --timeout=300
   --mkpath
-  --protect-args
   -e "$ssh_command"
 )
 

@@ -24,6 +24,10 @@ class OdsHandoffError(RuntimeError):
 _SOURCE_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
 _ATTEMPT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
+_MARKET_CALENDAR_ARTIFACT = (
+    "trading_calendar",
+    "artifacts/ref_trading_calendar.parquet",
+)
 
 
 def _required_string(payload: Mapping[str, Any], key: str) -> str:
@@ -296,17 +300,93 @@ def _probe_current(source: ResolvedOdsSource, *, schedule: str, market_date: str
 
 
 def _probe_flat(source: ResolvedOdsSource, *, schedule: str, market_date: str) -> bool:
-    remote_path = f"{source.release_root}/{schedule}/{market_date}/READY"
+    remote_root = f"{source.release_root}/{schedule}/{market_date}"
     with tempfile.TemporaryDirectory(prefix="quanthus-ods-ready-") as directory:
-        completed = _rsync(
+        local_root = Path(directory)
+        ready = _rsync(
             source,
             "-a",
             "--timeout=20",
-            _remote(source, remote_path),
-            str(Path(directory) / "READY"),
+            _remote(source, f"{remote_root}/READY"),
+            str(local_root / "READY"),
             timeout_seconds=30,
         )
-    return completed.returncode == 0
+        if ready.returncode:
+            return False
+        if schedule != "daily":
+            return True
+        manifest = _rsync(
+            source,
+            "-a",
+            "--timeout=20",
+            _remote(source, f"{remote_root}/release.json"),
+            str(local_root / "release.json"),
+            timeout_seconds=30,
+        )
+        return manifest.returncode == 0 and _is_market_daily_manifest(
+            local_root / "release.json", market_date=market_date
+        )
+
+
+def _is_market_daily_manifest(path: Path, *, market_date: str) -> bool:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, Mapping):
+        return False
+    if (
+        payload.get("schema_version") != 1
+        or payload.get("schedule") != "daily"
+        or payload.get("market_date") != market_date
+        or payload.get("status") != "ready"
+    ):
+        return False
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, list):
+        return False
+    expected_name, expected_path = _MARKET_CALENDAR_ARTIFACT
+    return any(
+        isinstance(artifact, Mapping)
+        and artifact.get("name") == expected_name
+        and artifact.get("relative_path") == expected_path
+        for artifact in artifacts
+    )
+
+
+def _probe_ready_attempt(
+    source: ResolvedOdsSource,
+    *,
+    schedule: str,
+    market_date: str,
+    attempt_id: str,
+) -> bool:
+    remote_root = f"{source.release_root}/{schedule}/{market_date}/{attempt_id}"
+    with tempfile.TemporaryDirectory(prefix="quanthus-ods-ready-") as directory:
+        local_root = Path(directory)
+        ready = _rsync(
+            source,
+            "-a",
+            "--timeout=20",
+            _remote(source, f"{remote_root}/READY"),
+            str(local_root / "READY"),
+            timeout_seconds=30,
+        )
+        if ready.returncode:
+            return False
+        if schedule != "daily":
+            return True
+        manifest = _rsync(
+            source,
+            "-a",
+            "--timeout=20",
+            _remote(source, f"{remote_root}/release.json"),
+            str(local_root / "release.json"),
+            timeout_seconds=30,
+        )
+        return manifest.returncode == 0 and _is_market_daily_manifest(
+            local_root / "release.json", market_date=market_date
+        )
 
 
 def _attempt_directories(
@@ -337,17 +417,12 @@ def _probe_latest_ready_attempt(
     source: ResolvedOdsSource, *, schedule: str, market_date: str
 ) -> str | None:
     for attempt_id in _attempt_directories(source, schedule=schedule, market_date=market_date):
-        remote_path = f"{source.release_root}/{schedule}/{market_date}/{attempt_id}/READY"
-        with tempfile.TemporaryDirectory(prefix="quanthus-ods-ready-") as directory:
-            completed = _rsync(
-                source,
-                "-a",
-                "--timeout=20",
-                _remote(source, remote_path),
-                str(Path(directory) / "READY"),
-                timeout_seconds=30,
-            )
-        if completed.returncode == 0:
+        if _probe_ready_attempt(
+            source,
+            schedule=schedule,
+            market_date=market_date,
+            attempt_id=attempt_id,
+        ):
             return attempt_id
     return None
 
@@ -357,6 +432,16 @@ def probe_ods_source(
 ) -> tuple[str, str | None] | None:
     if source.source.selection == "current_or_flat":
         attempt_id = _probe_current(source, schedule=schedule, market_date=market_date)
+        if attempt_id is not None and _probe_ready_attempt(
+            source,
+            schedule=schedule,
+            market_date=market_date,
+            attempt_id=attempt_id,
+        ):
+            return "attempt", attempt_id
+        attempt_id = _probe_latest_ready_attempt(
+            source, schedule=schedule, market_date=market_date
+        )
         if attempt_id is not None:
             return "attempt", attempt_id
         if _probe_flat(source, schedule=schedule, market_date=market_date):

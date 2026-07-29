@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -86,3 +87,73 @@ def test_invalid_cn01_probe_does_not_block_a_ready_hermes_fallback(
 
     assert result.source_id == "hermes"
     assert result.attempt_id == "hermes-20260727T000000Z"
+
+
+def test_daily_manifest_requires_market_calendar_artifact(tmp_path: Path) -> None:
+    manifest = tmp_path / "release.json"
+    payload = {
+        "schema_version": 1,
+        "schedule": "daily",
+        "market_date": "2026-07-29",
+        "status": "ready",
+        "artifacts": [
+            {
+                "name": "announcements_delta",
+                "relative_path": "artifacts/announcements_delta.parquet",
+            }
+        ],
+    }
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    assert not handoff._is_market_daily_manifest(
+        manifest, market_date="2026-07-29"
+    )
+
+    payload["artifacts"].append(
+        {
+            "name": "trading_calendar",
+            "relative_path": "artifacts/ref_trading_calendar.parquet",
+        }
+    )
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    assert handoff._is_market_daily_manifest(manifest, market_date="2026-07-29")
+
+
+def test_latest_daily_attempt_skips_newer_calendar_events_release(monkeypatch) -> None:
+    source = SimpleNamespace()
+    monkeypatch.setattr(
+        handoff,
+        "_attempt_directories",
+        lambda *_args, **_kwargs: ["calendar-events", "market-daily"],
+    )
+    seen: list[str] = []
+
+    def ready(_source, *, schedule: str, market_date: str, attempt_id: str) -> bool:
+        seen.append(attempt_id)
+        return attempt_id == "market-daily"
+
+    monkeypatch.setattr(handoff, "_probe_ready_attempt", ready)
+
+    assert handoff._probe_latest_ready_attempt(
+        source, schedule="daily", market_date="2026-07-29"
+    ) == "market-daily"
+    assert seen == ["calendar-events", "market-daily"]
+
+
+def test_current_calendar_events_attempt_falls_back_to_market_attempt(monkeypatch) -> None:
+    configured = SimpleNamespace(selection="current_or_flat")
+    source = SimpleNamespace(source=configured)
+    monkeypatch.setattr(handoff, "_probe_current", lambda *_args, **_kwargs: "events")
+    monkeypatch.setattr(
+        handoff,
+        "_probe_ready_attempt",
+        lambda *_args, attempt_id, **_kwargs: attempt_id != "events",
+    )
+    monkeypatch.setattr(
+        handoff,
+        "_probe_latest_ready_attempt",
+        lambda *_args, **_kwargs: "market",
+    )
+
+    assert handoff.probe_ods_source(
+        source, schedule="daily", market_date="2026-07-29"
+    ) == ("attempt", "market")

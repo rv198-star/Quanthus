@@ -463,6 +463,13 @@
         ],
         "source_exceptions": [
           {
+            "market_date": "2026-07-24",
+            "source_node": "hermes",
+            "source": "data/revisions/hermes_intraday_gap_fill_20260724/releases/daily/1m/2026-07-24",
+            "reason": "The original Hermes attempt was retained but incomplete; a later isolated Hermes backfill produced a complete checksum-bound release with all no-data cases justified from governed ODS evidence",
+            "manifest_sha256": "sha256:3fc2d4e6078b09d73bbf4cc71e255a9013cd3f275d2aff99178d26f6d125992c"
+          },
+          {
             "market_date": "2026-07-28",
             "source_node": "cn01",
             "source": "data/revisions/cn01_intraday_gap_fill_20260728/1m",
@@ -482,6 +489,13 @@
           "trading_calendar"
         ],
         "source_exceptions": [
+          {
+            "market_date": "2026-07-24",
+            "source_node": "hermes",
+            "source": "data/revisions/hermes_intraday_gap_fill_20260724/releases/daily/5m/2026-07-24",
+            "reason": "The original Hermes attempt was retained but incomplete; a later isolated Hermes backfill produced a complete checksum-bound release with all no-data cases justified from governed ODS evidence",
+            "manifest_sha256": "sha256:bd3af1d252a1ec96242df082974c28f6d71a3c6b01279821d0e0d8e32b9a0310"
+          },
           {
             "market_date": "2026-07-28",
             "source_node": "cn01",

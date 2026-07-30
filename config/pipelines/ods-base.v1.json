@@ -116,7 +116,7 @@
         "target": "payload/canonical/dividend_history.parquet",
         "role": "source_evidence",
         "format": "parquet",
-        "key_columns": ["stock_code", "announce_date", "ex_dividend_date"],
+        "key_columns": ["stock_code", "announce_date"],
         "date_columns": ["announce_date", "ex_dividend_date"]
       },
       {

@@ -619,6 +619,17 @@ class OdsBaseTests(unittest.TestCase):
             )
         )
 
+    def test_production_dividend_identity_allows_a_missing_ex_date(self) -> None:
+        policy = load_ods_base_policy(
+            REPOSITORY_ROOT / "config" / "pipelines" / "ods-base.v1.json"
+        )
+        dividend = next(
+            item for item in policy.files if item.dataset_id == "dividend_history"
+        )
+
+        self.assertEqual(dividend.key_columns, ("stock_code", "announce_date"))
+        self.assertIn("ex_dividend_date", dividend.date_columns)
+
     def test_promote_and_load_current(self) -> None:
         output = self._build()
         base_root = self.root / "node" / "base"

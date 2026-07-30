@@ -96,6 +96,9 @@ nodes.
   `acceptance/issue-45-historical-dwd-dws-completion-20260730.md`: OCI, CN01, and Hermes hold the
   same sealed base bytes, and both lane-local logical catalogs join it to four daily candidates
   without physical concatenation or cleanup authority.
+  Candidate-success-driven daily lane-history refresh is deployed on both producer nodes in
+  `acceptance/issue-45-daily-history-catalog-automation-20260730.md`; installation and idempotent
+  execution are accepted, while the first real scheduled `OnSuccess` observation remains pending.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional

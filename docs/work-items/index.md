@@ -37,7 +37,10 @@ qualification session. Copy-only DWD/DWS historical completion through 2026-07-3
 identical three-node sealed base and both lane-local logical catalogs, is accepted in
 `docs/acceptance/issue-45-historical-dwd-dws-completion-20260730.md`. The historical 2025 bootstrap
 proves physical role separation only; prior developer visibility prevents it from serving as
-genuine unopened blind evidence.
+genuine unopened blind evidence. Daily candidate-success catalog automation is deployed and its
+idempotent node-local execution is accepted in
+`docs/acceptance/issue-45-daily-history-catalog-automation-20260730.md`; the first real scheduled
+success trigger remains pending.
 
 ## P1 data foundation
 

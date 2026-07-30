@@ -101,6 +101,7 @@ sudo install -o root -g root -m 0640 /tmp/dual-lane-node.env \
 sudo install -o root -g root -m 0644 \
   ops/systemd/quanthus-dual-lane-candidate.service \
   ops/systemd/quanthus-dual-lane-candidate.timer \
+  ops/systemd/quanthus-dual-lane-history-catalog.service \
   /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl disable quanthus-dual-lane-candidate.timer
@@ -109,7 +110,8 @@ sudo ops/bin/dual-lane-doctor node
 
 The doctor must name `dual-lane node deployment preflight OK`. It verifies the exact Git commit,
 clean tracked checkout, `.venv-p1`, policy, real non-symlink jail paths, users/groups, ownership,
-modes, rrsync capabilities, and every active forced-command key. It changes no state.
+modes, rrsync capabilities, every active forced-command key, exact installed candidate/catalog
+units, and the loaded candidate-success trigger. It changes no state.
 
 ## Prepare OCI
 
@@ -295,6 +297,23 @@ partition. Do not require the standby candidate to name the prior standby candid
 fixed-primary design its legitimate parent is normally the accepted CN01 revision. Run the node
 doctor after both `CURRENT` descriptors exist. A common copied base is continuity/recovery evidence,
 not independent cross-lane truth.
+
+After the initial catalog exists, daily refresh is event-driven rather than clock-driven.
+`quanthus-dual-lane-candidate.service` names
+`quanthus-dual-lane-history-catalog.service` in `OnSuccess`; there is no separate catalog timer.
+The catalog service takes its own lock, runs the same builder and verifier, and is idempotent when
+the candidate set is unchanged. Its independent `OnFailure` alert does not remove or invalidate a
+successfully sealed candidate and does not block OCI from evaluating that candidate. Operators may
+replay the safe idempotent refresh after repairing a catalog-only failure:
+
+```bash
+sudo systemctl start quanthus-dual-lane-history-catalog.service
+sudo systemctl status quanthus-dual-lane-history-catalog.service --no-pager
+sudo /root/work/Quanthus/ops/bin/dual-lane-doctor node
+```
+
+The service must report a verified `through_date` equal to the latest lane candidate. Do not treat
+a successful catalog refresh as canonical acceptance or consumer publication.
 
 ## Copy-only migration order
 

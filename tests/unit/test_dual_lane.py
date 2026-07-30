@@ -1901,6 +1901,31 @@ class DualLaneTests(unittest.TestCase):
                 self.assertNotIn("--delete", helper)
                 self.assertIn("--ignore-existing", helper)
 
+    def test_daily_history_catalog_refresh_is_success_triggered_and_independent(self) -> None:
+        project_root = Path(__file__).resolve().parents[2]
+        systemd_root = project_root / "ops" / "systemd"
+        candidate_unit = (systemd_root / "quanthus-dual-lane-candidate.service").read_text(
+            encoding="utf-8"
+        )
+        catalog_unit = (systemd_root / "quanthus-dual-lane-history-catalog.service").read_text(
+            encoding="utf-8"
+        )
+        runner = (project_root / "ops" / "bin" / "run-dual-lane-history-catalog").read_text(
+            encoding="utf-8"
+        )
+        doctor = (project_root / "ops" / "bin" / "dual-lane-doctor").read_text(encoding="utf-8")
+
+        self.assertIn("OnSuccess=quanthus-dual-lane-history-catalog.service", candidate_unit)
+        self.assertIn("OnFailure=quanthus-pipeline-failure@%n.service", catalog_unit)
+        self.assertIn(
+            "ExecStart=/root/work/Quanthus/ops/bin/run-dual-lane-history-catalog", catalog_unit
+        )
+        self.assertIn("build-dual-lane-history-catalog", runner)
+        self.assertIn("verify-dual-lane-history", runner)
+        self.assertIn("flock -n", runner)
+        self.assertNotIn("--delete", runner)
+        self.assertIn("candidate service does not load the daily lane-history", doctor)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

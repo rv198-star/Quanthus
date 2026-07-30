@@ -89,7 +89,11 @@ catalog. The first candidate binds the seed; every later candidate binds the exa
 DWD sealed in that candidate's epoch. The standby therefore follows the accepted canonical parent,
 which may be a CN01 revision, rather than inventing a same-lane parent chain. The common seed is
 recovery and continuity evidence; it is not independent CN01/Hermes market evidence. No process
-appends daily rows to the seed or relabels a legacy artifact as a lane candidate.
+appends daily rows to the seed or relabels a legacy artifact as a lane candidate. A successful
+candidate unit triggers a separate lane-local catalog service: it verifies the whole chain,
+publishes or reuses one immutable catalog, and atomically advances only that lane's catalog
+`CURRENT`. Catalog failure alerts independently and does not revoke the sealed candidate or grant
+the lane canonical publication authority.
 
 ### 3. Gate first, compare second
 

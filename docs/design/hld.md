@@ -62,7 +62,9 @@ OCI:
 - CN01 is the fixed-primary daily lane and Hermes is a continuously exercised standby. Each owns
   its immutable raw/ODS evidence and builds one complete DWD/DWS candidate family from its own ODS
   against the exact epoch parent and shared reference set supplied by OCI. Neither lane can publish
-  canonical data, ADS, PostgreSQL projections, or consumer pointers.
+  canonical data, ADS, PostgreSQL projections, or consumer pointers. After a candidate succeeds,
+  an independently monitored node-local service advances that lane's immutable logical history
+  catalog; it has no canonical or consumer-publication authority.
 - OCI owns arbitration epochs, independent candidate gates, cross-lane comparison, canonical
   acceptance/catalogs, ADS builds, atomic release sets, and serving publication. CN01 remains
   primary regardless of readiness order or favorable output. Hermes may replace it only after an

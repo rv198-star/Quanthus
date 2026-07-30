@@ -119,6 +119,7 @@ if [[ "$role" == "node" ]]; then
   epoch_staging_root="${QUANTHUS_DUAL_LANE_EPOCH_STAGING_ROOT:?set the node epoch staging root}"
   epoch_root="${QUANTHUS_DUAL_LANE_EPOCH_ROOT:?set the node sealed epoch root}"
   candidate_root="${QUANTHUS_DUAL_LANE_CANDIDATE_ROOT:?set the node candidate root}"
+  storage_root="${QUANTHUS_DUAL_LANE_STORAGE_ROOT:-/srv/quanthus/dual-lane}"
   history_policy="${QUANTHUS_DUAL_LANE_HISTORY_POLICY:?set the history-base policy}"
   history_base_root="${QUANTHUS_DUAL_LANE_HISTORY_BASE_ROOT:?set the sealed history-base root}"
   history_base_current="${QUANTHUS_DUAL_LANE_HISTORY_BASE_CURRENT:?set history-base CURRENT}"
@@ -130,6 +131,7 @@ if [[ "$role" == "node" ]]; then
   [[ "$epoch_staging_root" == /srv/quanthus/dual-lane/epoch-staging ]] || fail "node epoch staging root must be /srv/quanthus/dual-lane/epoch-staging"
   [[ "$epoch_root" == /srv/quanthus/dual-lane/epochs ]] || fail "node epoch root must be /srv/quanthus/dual-lane/epochs"
   [[ "$candidate_root" == /srv/quanthus/dual-lane/candidates ]] || fail "node candidate root must be /srv/quanthus/dual-lane/candidates"
+  [[ "$storage_root" == /srv/quanthus/dual-lane ]] || fail "node storage root must be /srv/quanthus/dual-lane"
   [[ "$history_base_root" == /srv/quanthus/dual-lane/history-bases ]] || fail "node history-base root must be /srv/quanthus/dual-lane/history-bases"
   [[ "$history_catalog_root" == /srv/quanthus/dual-lane/lane-history ]] || fail "node lane-history root must be /srv/quanthus/dual-lane/lane-history"
   [[ -f "$history_policy" && -f "$history_base_current" ]] || fail "node history policy or base CURRENT is missing"
@@ -177,13 +179,22 @@ if [[ "$role" == "node" ]]; then
   [[ -z "$unreadable" ]] || fail "$candidate_user cannot read candidate file: $unreadable"
   [[ -x /usr/bin/rrsync ]] || fail "/usr/bin/rrsync is missing"
   [[ -x "${repo_root}/ops/bin/promote-dual-lane-epoch" ]] || fail "node-local epoch promoter is missing"
+  [[ -x "${repo_root}/ops/bin/run-dual-lane-history-catalog" ]] || fail "daily lane-history refresher is missing"
+  for unit in quanthus-dual-lane-candidate.service quanthus-dual-lane-history-catalog.service; do
+    [[ -f "/etc/systemd/system/${unit}" ]] || fail "installed unit is missing: $unit"
+    cmp -s "${repo_root}/ops/systemd/${unit}" "/etc/systemd/system/${unit}" || \
+      fail "installed unit differs from the deployed repository: $unit"
+  done
+  on_success_units="$(systemctl show quanthus-dual-lane-candidate.service -p OnSuccess --value)"
+  [[ " $on_success_units " == *" quanthus-dual-lane-history-catalog.service "* ]] || \
+    fail "candidate service does not load the daily lane-history success trigger"
   /usr/bin/rrsync -h 2>&1 | grep -F -- '-no-del' >/dev/null || fail "rrsync does not support -no-del"
   require_authorized_keys "$epoch_user" "/usr/bin/rrsync -wo -no-del ${epoch_ingress_root}"
   require_authorized_keys "$candidate_user" "/usr/bin/rrsync -ro ${candidate_root}"
   catalog_current="${history_catalog_root%/}/${QUANTHUS_DUAL_LANE_NODE_ID:?set node id}/CURRENT.json"
   PYTHONPATH="${repo_root}/src" "$python_bin" "${repo_root}/ops/bin/verify-dual-lane-history" \
     --policy "$history_policy" \
-    --storage-root /srv/quanthus/dual-lane \
+    --storage-root "$storage_root" \
     --base-current "$history_base_current" \
     --catalog-current "$catalog_current" >/dev/null || fail "sealed history base or lane catalog is invalid"
 else

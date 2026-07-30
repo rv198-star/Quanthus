@@ -1,0 +1,19 @@
+[Unit]
+Description=Quanthus lane-local logical DWD/DWS history catalog refresh
+After=quanthus-dual-lane-candidate.service
+OnFailure=quanthus-pipeline-failure@%n.service
+
+[Service]
+Type=oneshot
+User=root
+Group=quanthus-candidate-ro
+EnvironmentFile=/etc/quanthus/dual-lane-node.env
+WorkingDirectory=/root/work/Quanthus
+ExecStart=/root/work/Quanthus/ops/bin/run-dual-lane-history-catalog
+TimeoutStartSec=30min
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=5
+PrivateTmp=true
+NoNewPrivileges=true
+UMask=0027

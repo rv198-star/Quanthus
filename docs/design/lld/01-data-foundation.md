@@ -303,6 +303,14 @@ used to claim that the shared historical seed was independently acquired by both
 `CURRENT` selects only a new immutable catalog envelope; it does not mutate or concatenate DWD/DWS
 files.
 
+Each successful daily candidate service triggers an independent node-local catalog refresh rather
+than relying on a wall-clock merge timer. The refresh takes the lock for that lane's catalog root,
+rebuilds the complete logical chain from immutable `CURRENT` descriptors, verifies the result, and
+then atomically advances only the lane-history `CURRENT`. Repeating the refresh over unchanged
+inputs reuses the same catalog bytes and pointer bytes. A refresh failure emits the standard unit
+failure alert but does not mutate or invalidate the already sealed candidate; OCI arbitration does
+not consume this node-local catalog.
+
 If ADS build or validation fails, the acceptance record remains internal evidence but no catalog,
 ADS, or DWD/DWS-only state becomes consumer-visible. The legacy and target publishers share one
 fenced single-writer lease; target cutover first quiesces and fences the legacy writer.

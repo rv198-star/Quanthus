@@ -3,6 +3,7 @@ Description=Quanthus lane-local DWD/DWS candidate build
 After=network-online.target
 Wants=network-online.target
 OnFailure=quanthus-pipeline-failure@%n.service
+OnSuccess=quanthus-dual-lane-history-catalog.service
 
 [Service]
 Type=oneshot

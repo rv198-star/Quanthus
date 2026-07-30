@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Refresh one lane's immutable logical history catalog after a candidate succeeds.
+set -euo pipefail
+
+if [[ -f /etc/quanthus/dual-lane-node.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/dual-lane-node.env
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv-p1/bin/python}"
+policy="${QUANTHUS_DUAL_LANE_HISTORY_POLICY:-${repo_root}/config/pipelines/dual-lane-history-base.v1.json}"
+storage_root="${QUANTHUS_DUAL_LANE_STORAGE_ROOT:-/srv/quanthus/dual-lane}"
+base_current="${QUANTHUS_DUAL_LANE_HISTORY_BASE_CURRENT:?set history-base CURRENT}"
+candidate_root="${QUANTHUS_DUAL_LANE_CANDIDATE_ROOT:?set the lane-local candidate root}"
+catalog_root="${QUANTHUS_DUAL_LANE_HISTORY_CATALOG_ROOT:?set the lane-history catalog root}"
+lane_id="${QUANTHUS_DUAL_LANE_NODE_ID:?set QUANTHUS_DUAL_LANE_NODE_ID to cn01 or hermes}"
+catalog_group="${QUANTHUS_DUAL_LANE_CANDIDATE_USER:-quanthus-candidate-ro}"
+code_revision="${QUANTHUS_CODE_REVISION:?set QUANTHUS_CODE_REVISION to the deployed Git commit}"
+
+if (( EUID != 0 )); then
+  echo "lane-history catalog refresh must run as root" >&2
+  exit 2
+fi
+if [[ "$lane_id" != "cn01" && "$lane_id" != "hermes" ]]; then
+  echo "dual-lane node id must be cn01 or hermes" >&2
+  exit 2
+fi
+if [[ ! "$code_revision" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "deployed Git revision is invalid" >&2
+  exit 2
+fi
+if [[ "$storage_root" != /srv/quanthus/dual-lane || ! -x "$python_bin" || \
+      ! -f "$policy" || ! -f "$base_current" || ! -d "$candidate_root" || \
+      ! -d "$catalog_root" ]]; then
+  echo "lane-history runtime, policy, base, candidate, or catalog root is invalid" >&2
+  exit 2
+fi
+actual_revision="$(git -C "$repo_root" rev-parse HEAD)"
+if [[ "$actual_revision" != "$code_revision" ]]; then
+  echo "deployed checkout does not match QUANTHUS_CODE_REVISION" >&2
+  exit 2
+fi
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+mkdir -p "${catalog_root%/}/locks"
+exec 9>"${catalog_root%/}/locks/catalog-builder.lock"
+if ! flock -n 9; then
+  echo "another lane-history catalog builder holds the lock" >&2
+  exit 3
+fi
+
+builder="${repo_root}/ops/bin/build-dual-lane-history-catalog"
+verifier="${repo_root}/ops/bin/verify-dual-lane-history"
+if [[ ! -x "$builder" || ! -x "$verifier" ]]; then
+  echo "lane-history builder or verifier is missing" >&2
+  exit 2
+fi
+
+build_result="$("$python_bin" "$builder" \
+  --policy "$policy" \
+  --storage-root "$storage_root" \
+  --base-current "$base_current" \
+  --candidate-root "$candidate_root" \
+  --catalog-root "$catalog_root" \
+  --lane-id "$lane_id" \
+  --owner root \
+  --group "$catalog_group")"
+printf '%s\n' "$build_result"
+
+"$python_bin" "$verifier" \
+  --policy "$policy" \
+  --storage-root "$storage_root" \
+  --base-current "$base_current" \
+  --catalog-current "${catalog_root%/}/${lane_id}/CURRENT.json"
+
+echo "dual-lane lane-history CURRENT refreshed: lane=${lane_id}"

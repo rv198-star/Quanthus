@@ -340,9 +340,22 @@ class DualLaneHistoryTests(unittest.TestCase):
                 storage_root=storage_root,
                 policy=self.policy,
             )
+            manifest_bytes = (catalog.root / "manifest.json").read_bytes()
+            current_bytes = (catalog_root / "cn01" / "CURRENT.json").read_bytes()
+            repeated = build_lane_history_catalog(
+                storage_root=storage_root,
+                base_current=current,
+                candidate_root=storage_root / "candidates",
+                catalog_root=catalog_root,
+                lane_id="cn01",
+                policy=self.policy,
+            )
         self.assertEqual(catalog.catalog_id, loaded.catalog_id)
         self.assertEqual(catalog.through_date, date(2024, 1, 4))
         self.assertEqual(len(catalog.candidates), 1)
+        self.assertEqual(repeated.root, catalog.root)
+        self.assertEqual((catalog.root / "manifest.json").read_bytes(), manifest_bytes)
+        self.assertEqual((catalog_root / "cn01" / "CURRENT.json").read_bytes(), current_bytes)
 
     def test_bundle_tamper_is_rejected(self) -> None:
         bundle_path = self._build_bundle()

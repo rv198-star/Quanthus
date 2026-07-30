@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Promote a verified ODS Base package and atomically advance BASE_CURRENT."""
+
+from __future__ import annotations
+
+import argparse
+import grp
+import json
+import os
+import pwd
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.ods_base import (
+    OdsBaseError,
+    load_ods_base_policy,
+    promote_ods_base_bundle,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--ingress-bundle", type=Path, required=True)
+    parser.add_argument("--base-root", type=Path, required=True)
+    parser.add_argument("--current", type=Path, required=True)
+    parser.add_argument("--owner")
+    parser.add_argument("--group")
+    parser.add_argument("--move-ingress", action="store_true")
+    args = parser.parse_args()
+    if (args.owner is None) != (args.group is None):
+        parser.error("--owner and --group must be provided together")
+    if args.owner is not None and os.geteuid() != 0:
+        parser.error("ownership changes require root")
+    owner_uid = None if args.owner is None else pwd.getpwnam(args.owner).pw_uid
+    group_gid = None if args.group is None else grp.getgrnam(args.group).gr_gid
+    try:
+        result = promote_ods_base_bundle(
+            ingress_bundle=args.ingress_bundle,
+            base_root=args.base_root,
+            current_pointer=args.current,
+            policy=load_ods_base_policy(args.policy),
+            owner_uid=owner_uid,
+            group_gid=group_gid,
+            move_ingress=args.move_ingress,
+        )
+    except (OdsBaseError, FileExistsError, OSError) as exc:
+        print(f"ODS Base promotion failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "bundle_id": result.bundle_id,
+                "content_digest": result.content_digest,
+                "manifest_sha256": result.manifest_sha256,
+                "root": str(result.root),
+                "through_date": result.through_date.isoformat(),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -428,6 +428,8 @@ class DwdDwsBaseTests(unittest.TestCase):
         pair = self._pair(dwd_root, dws_root)
         connection = mock.Mock()
         connection.execute.side_effect = [
+            mock.Mock(),
+            mock.Mock(),
             mock.Mock(fetchall=mock.Mock(return_value=[(1,), (1,)])),
             mock.Mock(fetchall=mock.Mock(return_value=[(1,), (2,)])),
         ]
@@ -447,8 +449,10 @@ class DwdDwsBaseTests(unittest.TestCase):
         ):
             difference = dwd_dws_base._projection_difference_rows(pair.dwd, pair.dws)
         self.assertEqual(difference, 2)
-        self.assertEqual(connection.execute.call_count, 2)
+        self.assertEqual(connection.execute.call_count, 4)
         executed_sql = " ".join(call.args[0] for call in connection.execute.call_args_list)
+        self.assertIn("CREATE TEMP TABLE projected_dws", executed_sql)
+        self.assertEqual(executed_sql.count("SELECT 1 AS market_date"), 1)
         self.assertNotIn("EXCEPT", executed_sql)
         connection.close.assert_called_once_with()
 

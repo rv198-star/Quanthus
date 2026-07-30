@@ -1725,11 +1725,13 @@ def _projection_difference_rows(dwd: LayerBasePackage, dws: LayerBasePackage) ->
     expected = f"SELECT * FROM read_parquet({_sql_string(str(summary))})"
     connection = _duckdb_connection()
     try:
+        connection.execute(f"CREATE TEMP TABLE projected_dws AS {projection}")
+        connection.execute(f"CREATE TEMP TABLE expected_dws AS {expected}")
         projected_rows = connection.execute(
-            f"SELECT * FROM ({projection}) ORDER BY market_date"
+            "SELECT * FROM projected_dws ORDER BY market_date"
         ).fetchall()
         expected_rows = connection.execute(
-            f"SELECT * FROM ({expected}) ORDER BY market_date"
+            "SELECT * FROM expected_dws ORDER BY market_date"
         ).fetchall()
     finally:
         connection.close()

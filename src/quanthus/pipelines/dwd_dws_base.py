@@ -10,6 +10,7 @@ import re
 import shutil
 import sys
 import tempfile
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -1294,14 +1295,19 @@ def _derive_dws(
     output.parent.mkdir(parents=True, exist_ok=True)
     connection = _duckdb_connection()
     try:
+        # The projection scans the full historical DWD. Materialize both sides once so the
+        # bidirectional EXCEPT does not expand and execute that scan twice in one query.
+        connection.execute(f"CREATE TEMP TABLE projected_dws AS {projection}")
+        connection.execute(f"CREATE TEMP TABLE expected_dws AS {expected}")
         difference = connection.execute(
-            f"SELECT count(*) FROM ((({projection}) EXCEPT ALL ({expected})) "
-            f"UNION ALL (({expected}) EXCEPT ALL ({projection})))"
+            "SELECT count(*) FROM ((SELECT * FROM projected_dws EXCEPT ALL "
+            "SELECT * FROM expected_dws) UNION ALL (SELECT * FROM expected_dws "
+            "EXCEPT ALL SELECT * FROM projected_dws))"
         ).fetchone()
         if difference is None or int(difference[0]) != 0:
             raise DwdDwsBaseError("DWS projection differs from historical seed plus daily sources")
         connection.execute(
-            f"COPY (SELECT * FROM ({projection}) ORDER BY market_date) "
+            "COPY (SELECT * FROM projected_dws ORDER BY market_date) "
             f"TO {_sql_string(str(output))} (FORMAT PARQUET, COMPRESSION ZSTD)"
         )
         audit = connection.execute(
@@ -1719,15 +1725,19 @@ def _projection_difference_rows(dwd: LayerBasePackage, dws: LayerBasePackage) ->
     expected = f"SELECT * FROM read_parquet({_sql_string(str(summary))})"
     connection = _duckdb_connection()
     try:
-        row = connection.execute(
-            f"SELECT count(*) FROM ((({projection}) EXCEPT ALL ({expected})) "
-            f"UNION ALL (({expected}) EXCEPT ALL ({projection})))"
-        ).fetchone()
+        projected_rows = connection.execute(
+            f"SELECT * FROM ({projection}) ORDER BY market_date"
+        ).fetchall()
+        expected_rows = connection.execute(
+            f"SELECT * FROM ({expected}) ORDER BY market_date"
+        ).fetchall()
     finally:
         connection.close()
-    if row is None:
-        raise DwdDwsBaseError("DWS semantic verification returned no row")
-    return int(row[0])
+    projected_counts = Counter(projected_rows)
+    expected_counts = Counter(expected_rows)
+    return sum((projected_counts - expected_counts).values()) + sum(
+        (expected_counts - projected_counts).values()
+    )
 
 
 def verify_dwd_dws_base_pair(

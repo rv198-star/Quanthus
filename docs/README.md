@@ -69,8 +69,10 @@ nodes.
   is recorded separately in `acceptance/issue-45-ads-parallelism-20260730.md`; normal strategy
   replay now uses an explicit immutable ADS bundle. Catalog-native publication, independent
   restore evidence, full PIT/tradability candidate families, and production cutover remain open.
-  The legacy OCI
-  full-ODS pull/build path stays live until an explicit cutover gate passes. Migration is copy-only;
+  Bounded daily shadow timers for OCI epoch, both lane candidates, and OCI arbitration were
+  activated in `acceptance/issue-45-shadow-timer-activation-20260730.md`; their first scheduled
+  cycle remains pending acceptance. The legacy OCI full-ODS pull/build path stays live until an
+  explicit cutover gate passes. Migration is copy-only;
   no existing data or evidence may be deleted. Portable bundles use manifest-discovered semantic
   parts without mandatory annual directories. The historical 2025 bootstrap is physically isolated
   for migration, but because its source was already visible to the development principal it is not

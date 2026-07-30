@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Build one OCI history base and distribute it to both write-only node ingress roots.
+set -euo pipefail
+
+if [[ -f /etc/quanthus/dual-lane-oci.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/quanthus/dual-lane-oci.env
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv/bin/python}"
+policy="${QUANTHUS_DUAL_LANE_HISTORY_POLICY:-${repo_root}/config/pipelines/dual-lane-history-base.v1.json}"
+source_root="${QUANTHUS_DUAL_LANE_HISTORY_SOURCE:?set the accepted historical DWD source}"
+build_root="${QUANTHUS_DUAL_LANE_HISTORY_BUILD_ROOT:-/home/ubuntu/data/quanthus/dual-lane/history-bases}"
+bundle_id="${1:-dual-lane-history-base-p1-20260725-v1}"
+code_revision="${QUANTHUS_CODE_REVISION:?set QUANTHUS_CODE_REVISION to the deployed Git commit}"
+
+if [[ ! "$code_revision" =~ ^[0-9a-f]{40}$ || ! "$bundle_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$ ]]; then
+  echo "code revision or history bundle id is invalid" >&2
+  exit 2
+fi
+actual_revision="$(git -C "$repo_root" rev-parse HEAD)"
+if [[ "$actual_revision" != "$code_revision" ]]; then
+  echo "deployed checkout does not match QUANTHUS_CODE_REVISION" >&2
+  exit 2
+fi
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+"$python_bin" "${repo_root}/ops/bin/build-dual-lane-history-base" \
+  --policy "$policy" \
+  --source "$source_root" \
+  --output "${build_root%/}/${bundle_id}" \
+  --bundle-id "$bundle_id" \
+  --code-revision "$code_revision"
+
+sync_base="${repo_root}/ops/bin/sync-dual-lane-history-base"
+"$sync_base" --bundle-id "$bundle_id" --local-root "$build_root" \
+  --remote-root "${QUANTHUS_CN01_DUAL_LANE_EPOCH_ROOT:?set CN01 epoch root}" \
+  --host "${QUANTHUS_CN01_DUAL_LANE_HOST:?set CN01 transfer host}" \
+  --port "${QUANTHUS_CN01_DUAL_LANE_PORT:-22}" \
+  --user "${QUANTHUS_CN01_DUAL_LANE_EPOCH_USER:?set CN01 epoch writer}" \
+  --key "${QUANTHUS_CN01_DUAL_LANE_EPOCH_KEY:?set CN01 epoch key}" \
+  --known-hosts "${QUANTHUS_CN01_DUAL_LANE_KNOWN_HOSTS:?set CN01 known-hosts}"
+"$sync_base" --bundle-id "$bundle_id" --local-root "$build_root" \
+  --remote-root "${QUANTHUS_HERMES_DUAL_LANE_EPOCH_ROOT:?set Hermes epoch root}" \
+  --host "${QUANTHUS_HERMES_DUAL_LANE_HOST:?set Hermes transfer host}" \
+  --port "${QUANTHUS_HERMES_DUAL_LANE_PORT:-2222}" \
+  --user "${QUANTHUS_HERMES_DUAL_LANE_EPOCH_USER:?set Hermes epoch writer}" \
+  --key "${QUANTHUS_HERMES_DUAL_LANE_EPOCH_KEY:?set Hermes epoch key}" \
+  --known-hosts "${QUANTHUS_HERMES_DUAL_LANE_KNOWN_HOSTS:?set Hermes known-hosts}"
+
+echo "dual-lane history base built and distributed: ${bundle_id}"

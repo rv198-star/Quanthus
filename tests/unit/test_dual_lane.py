@@ -1894,11 +1894,12 @@ class DualLaneTests(unittest.TestCase):
 
     def test_transfer_helper_is_compatible_with_rrsync_forced_commands(self) -> None:
         project_root = Path(__file__).resolve().parents[2]
-        helper = (project_root / "ops/bin/sync-dual-lane-date-root").read_text(encoding="utf-8")
-
-        self.assertNotIn("--protect-args", helper)
-        self.assertNotIn("--delete", helper)
-        self.assertIn("--ignore-existing", helper)
+        for name in ("sync-dual-lane-date-root", "sync-dual-lane-history-base"):
+            with self.subTest(helper=name):
+                helper = (project_root / "ops/bin" / name).read_text(encoding="utf-8")
+                self.assertNotIn("--protect-args", helper)
+                self.assertNotIn("--delete", helper)
+                self.assertIn("--ignore-existing", helper)
 
 
 if __name__ == "__main__":  # pragma: no cover

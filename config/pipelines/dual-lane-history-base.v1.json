@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "contract_id": "dual-lane-history-base-v1",
+  "source": {
+    "revision": "daily_ohlcv_none_dwd_v2_oci_20260725",
+    "meta_sha256": "sha256:c562820c91d14c4acb821aa259c8713c74b57fda4321f2610c05f1c4a387d883",
+    "checksums_sha256": "sha256:e4b52f7a70fc7c5c4357970c4633779547cb9640460b5f3b697b135514a51bd8",
+    "required_payloads": [
+      "daily_isST.parquet",
+      "daily_ohlcv_none.parquet",
+      "daily_universe.parquet",
+      "ref_security_code_validity.parquet",
+      "st_status_pit.parquet"
+    ],
+    "dwd_date_start": "1990-12-19",
+    "dwd_date_end": "2026-07-24"
+  },
+  "dws": {
+    "contract": "historical-market-summary-v1",
+    "status_scope": "observed_daily_status_keys",
+    "bar_scope": "intersection_with_observed_daily_status_keys",
+    "date_start": "2011-01-04",
+    "date_end": "2026-07-24",
+    "metric_columns": [
+      "security_count",
+      "tradable_security_count",
+      "suspended_security_count",
+      "st_security_count",
+      "bar_security_count",
+      "advanced_security_count",
+      "declined_security_count",
+      "flat_security_count",
+      "missing_pct_change_security_count",
+      "total_volume",
+      "total_amount"
+    ]
+  },
+  "merge": {
+    "lanes": [
+      "cn01",
+      "hermes"
+    ],
+    "daily_candidate_kind": "dual_lane_dwd_dws_candidate",
+    "parent_chain": "exact_manifest_v1",
+    "physical_merge": false
+  },
+  "retention": {
+    "migration_mode": "copy_only",
+    "delete_enabled": false,
+    "minimum_sealed_node_copies": 2
+  }
+}

@@ -119,6 +119,10 @@ if [[ "$role" == "node" ]]; then
   epoch_staging_root="${QUANTHUS_DUAL_LANE_EPOCH_STAGING_ROOT:?set the node epoch staging root}"
   epoch_root="${QUANTHUS_DUAL_LANE_EPOCH_ROOT:?set the node sealed epoch root}"
   candidate_root="${QUANTHUS_DUAL_LANE_CANDIDATE_ROOT:?set the node candidate root}"
+  history_policy="${QUANTHUS_DUAL_LANE_HISTORY_POLICY:?set the history-base policy}"
+  history_base_root="${QUANTHUS_DUAL_LANE_HISTORY_BASE_ROOT:?set the sealed history-base root}"
+  history_base_current="${QUANTHUS_DUAL_LANE_HISTORY_BASE_CURRENT:?set history-base CURRENT}"
+  history_catalog_root="${QUANTHUS_DUAL_LANE_HISTORY_CATALOG_ROOT:?set lane-history catalog root}"
   epoch_user="${QUANTHUS_DUAL_LANE_EPOCH_USER:-quanthus-epoch-in}"
   candidate_user="${QUANTHUS_DUAL_LANE_CANDIDATE_USER:-quanthus-candidate-ro}"
   [[ "$epoch_user" != "$candidate_user" ]] || fail "epoch ingress and candidate export must use separate users"
@@ -126,6 +130,9 @@ if [[ "$role" == "node" ]]; then
   [[ "$epoch_staging_root" == /srv/quanthus/dual-lane/epoch-staging ]] || fail "node epoch staging root must be /srv/quanthus/dual-lane/epoch-staging"
   [[ "$epoch_root" == /srv/quanthus/dual-lane/epochs ]] || fail "node epoch root must be /srv/quanthus/dual-lane/epochs"
   [[ "$candidate_root" == /srv/quanthus/dual-lane/candidates ]] || fail "node candidate root must be /srv/quanthus/dual-lane/candidates"
+  [[ "$history_base_root" == /srv/quanthus/dual-lane/history-bases ]] || fail "node history-base root must be /srv/quanthus/dual-lane/history-bases"
+  [[ "$history_catalog_root" == /srv/quanthus/dual-lane/lane-history ]] || fail "node lane-history root must be /srv/quanthus/dual-lane/lane-history"
+  [[ -f "$history_policy" && -f "$history_base_current" ]] || fail "node history policy or base CURRENT is missing"
 
   require_account "$epoch_user" "$epoch_user"
   require_account "$candidate_user" "$candidate_user"
@@ -134,11 +141,15 @@ if [[ "$role" == "node" ]]; then
   require_canonical_dir "$epoch_staging_root" "epoch staging root"
   require_canonical_dir "$epoch_root" "epoch root"
   require_canonical_dir "$candidate_root" "candidate root"
+  require_canonical_dir "$history_base_root" "history-base root"
+  require_canonical_dir "$history_catalog_root" "lane-history root"
   require_owner_mode /srv/quanthus/dual-lane root root 755
   require_owner_mode "$epoch_ingress_root" "$epoch_user" "$epoch_user" 750
   require_owner_mode "$epoch_staging_root" root root 700
   require_owner_mode "$epoch_root" root root 750
   require_owner_mode "$candidate_root" root "$candidate_user" 750
+  require_owner_mode "$history_base_root" root "$candidate_user" 750
+  require_owner_mode "$history_catalog_root" root "$candidate_user" 750
   for user in "$epoch_user" "$candidate_user"; do
     home="$(getent passwd "$user" | cut -d: -f6)"
     require_canonical_dir "$home" "$user home"
@@ -154,6 +165,13 @@ if [[ "$role" == "node" ]]; then
   if runuser -u "$candidate_user" -- test -w "$candidate_root"; then
     fail "$candidate_user must not be able to write the candidate root"
   fi
+  for readable_root in "$history_base_root" "$history_catalog_root"; do
+    runuser -u "$candidate_user" -- test -r "$readable_root" || fail "$candidate_user cannot read $readable_root"
+    runuser -u "$candidate_user" -- test -x "$readable_root" || fail "$candidate_user cannot traverse $readable_root"
+    if runuser -u "$candidate_user" -- test -w "$readable_root"; then
+      fail "$candidate_user must not be able to write $readable_root"
+    fi
+  done
   unreadable="$(runuser -u "$candidate_user" -- \
     /bin/sh -c 'cd / && find "$1" -type f ! -readable -print -quit' sh "$candidate_root")"
   [[ -z "$unreadable" ]] || fail "$candidate_user cannot read candidate file: $unreadable"
@@ -162,6 +180,12 @@ if [[ "$role" == "node" ]]; then
   /usr/bin/rrsync -h 2>&1 | grep -F -- '-no-del' >/dev/null || fail "rrsync does not support -no-del"
   require_authorized_keys "$epoch_user" "/usr/bin/rrsync -wo -no-del ${epoch_ingress_root}"
   require_authorized_keys "$candidate_user" "/usr/bin/rrsync -ro ${candidate_root}"
+  catalog_current="${history_catalog_root%/}/${QUANTHUS_DUAL_LANE_NODE_ID:?set node id}/CURRENT.json"
+  PYTHONPATH="${repo_root}/src" "$python_bin" "${repo_root}/ops/bin/verify-dual-lane-history" \
+    --policy "$history_policy" \
+    --storage-root /srv/quanthus/dual-lane \
+    --base-current "$history_base_current" \
+    --catalog-current "$catalog_current" >/dev/null || fail "sealed history base or lane catalog is invalid"
 else
   (( EUID == 0 )) || fail "OCI preflight must run as root"
   [[ -f /etc/quanthus/dual-lane-oci.env ]] || fail "OCI environment file is missing"

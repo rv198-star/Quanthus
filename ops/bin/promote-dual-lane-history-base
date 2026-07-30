@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Promote one verified ingress history base into a node's sealed base root."""
+
+from __future__ import annotations
+
+import argparse
+import grp
+import json
+import os
+import pwd
+import sys
+from pathlib import Path
+
+from quanthus.pipelines.dual_lane_history import (
+    DualLaneHistoryError,
+    load_history_base_policy,
+    promote_history_base_bundle,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--ingress-bundle", type=Path, required=True)
+    parser.add_argument("--base-root", type=Path, required=True)
+    parser.add_argument("--current", type=Path, required=True)
+    parser.add_argument("--owner")
+    parser.add_argument("--group")
+    args = parser.parse_args()
+    if (args.owner is None) != (args.group is None):
+        parser.error("--owner and --group must be provided together")
+    if args.owner is not None and os.geteuid() != 0:
+        parser.error("ownership changes require root")
+    owner_uid = None if args.owner is None else pwd.getpwnam(args.owner).pw_uid
+    group_gid = None if args.group is None else grp.getgrnam(args.group).gr_gid
+    try:
+        result = promote_history_base_bundle(
+            ingress_bundle=args.ingress_bundle,
+            base_root=args.base_root,
+            current_pointer=args.current,
+            policy=load_history_base_policy(args.policy),
+            owner_uid=owner_uid,
+            group_gid=group_gid,
+        )
+    except (DualLaneHistoryError, FileExistsError, OSError) as exc:
+        print(f"historical-base promotion failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "bundle_id": result.bundle_id,
+                "content_digest": result.content_digest,
+                "manifest_sha256": result.manifest_sha256,
+                "root": str(result.root),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -74,7 +74,9 @@ nodes.
   Repository contracts now cover exact ODS-attempt selection, trusted Shanghai-time windows,
   fenced lease tokens and SHA-precondition pointer CAS, cutover gating, immutable correction and
   revocation records, fenced rollback, accepted-ODS recovery receipts, and one self-contained
-  `strategy_replay` ADS profile. Three-node deployment, the three physically separate historical
+  `strategy_replay` ADS profile. The repository now also defines a sealed historical DWD/DWS seed
+  and lane-local logical catalogs that join the common seed to each node's daily candidate chain
+  without rewriting either. Three-node deployment, the three physically separate historical
   bootstrap bundles, role probes, and development-bundle replay equivalence are accepted in
   `acceptance/issue-45-portable-ads-20260730.md`; conditional two-build OCI resource qualification
   is recorded separately in `acceptance/issue-45-ads-parallelism-20260730.md`; normal strategy

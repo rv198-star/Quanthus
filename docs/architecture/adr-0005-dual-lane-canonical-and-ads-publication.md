@@ -34,7 +34,10 @@ DWD daily status observations, and one DWS daily market summary per lane; OCI ca
 candidates and build a research-only operational ADS revision containing `market_daily`,
 `market_status`, and `market_summary`. It also provides contract-trusted clock windows, fenced
 lease/CAS publication, correction/revocation/rollback state, accepted-ODS recovery evidence, and a
-self-contained role-scoped portable `strategy_replay` bundle. Full PIT/tradability, real NTP
+self-contained role-scoped portable `strategy_replay` bundle. The migration contract additionally
+packages the accepted historical DWD seed with a newly derived historical DWS projection, seals
+one byte-identical copy on each candidate node, and builds a lane-local logical history catalog
+over that common seed plus the lane's daily candidate chain. Full PIT/tradability, real NTP
 qualification, independent restore evidence, and portable `event_library` or `ml_training`
 bundles remain open delivery gates. Contract tests are not production or cutover evidence.
 
@@ -76,6 +79,15 @@ exact DWD manifest, not a second normalized truth.
 Candidate and derived manifests contain logical ids, digests, and safe bundle-relative paths only.
 Host-local absolute paths, external links, credentials, and producer database references are
 forbidden. A copied artifact must verify after its producer path is unavailable.
+
+Historical completion is a separate migration action, not a fabricated lane candidate. OCI wraps
+the exact accepted P1 DWD revision as one immutable history-base bundle, derives the versioned DWS
+history from its bars and observed daily status keys, and sends the bundle through the write-only
+ingress to both nodes. Each node verifies every source checksum, copies the bundle into a root-owned
+sealed base root, and joins it to its post-base candidates only through an immutable lane-history
+catalog. The common seed is recovery and continuity evidence; it is not independent CN01/Hermes
+market evidence. No process appends daily rows to the seed or relabels a legacy artifact as a lane
+candidate.
 
 ### 3. Gate first, compare second
 
@@ -223,6 +235,13 @@ class. The exact accepted ODS rebuild basis must survive loss of its producer no
 other lane's different ODS are not recovery copies. This does not require OCI to keep a routine ODS
 working mirror after a separately authorized future cleanup.
 
+The accepted historical DWD seed must exist as complete sealed data, not only as an epoch metadata
+descriptor, on both CN01 and Hermes before any OCI DWD cleanup can be proposed. Its DWS history is
+a reproducible projection governed by `dual-lane-history-base-v1`; the lane-local logical catalog
+references the seed and immutable daily candidates without physically merging or rewriting either.
+That catalog is a recovery/read boundary and never competes with OCI's canonical catalog or
+consumer release-set authority.
+
 Recovery is proved in layers: retained canonical inputs rebuild ADS without live lanes; retained
 DWD rebuilds DWS; and exact ODS, epoch parent/base, references, runtime, and transform rebuild the
 same DWD content digest on a clean path.
@@ -231,14 +250,16 @@ same DWD content digest on a clean path.
 
 1. Freeze and test epoch, candidate, arbitration, catalog, ADS, release-set, correction, fencing,
    alert, and retention contracts.
-2. Build candidates on both lanes in shadow without canonical or consumer publication authority.
-3. Run frozen multi-session comparisons and rehearse primary/standby failure, material divergence,
+2. Seal the governed DWD/DWS historical base on both nodes and verify each lane-local logical
+   history catalog through the latest candidate.
+3. Build candidates on both lanes in shadow without canonical or consumer publication authority.
+4. Run frozen multi-session comparisons and rehearse primary/standby failure, material divergence,
    clock/reference drift, concurrent arbitration, crash recovery, correction, and resource limits.
-4. Build target release sets in shadow and verify copied research bundles on clean CPU/GPU readers.
-5. Record `GO_FOR_CUTOVER`, fence the legacy writer, and atomically enable the target publisher only
+5. Build target release sets in shadow and verify copied research bundles on clean CPU/GPU readers.
+6. Record `GO_FOR_CUTOVER`, fence the legacy writer, and atomically enable the target publisher only
    after the accepted evidence and rollback rehearsal pass.
 
-Until step 5, ADR 0003's OCI pull/build path remains the live operating procedure. Target artifacts
+Until step 6, ADR 0003's OCI pull/build path remains the live operating procedure. Target artifacts
 must use separate roots and pointers and cannot alter live `CURRENT` values.
 
 ## Consequences

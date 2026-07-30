@@ -232,6 +232,16 @@ The exact lane ODS `CURRENT` descriptor is owned only by `market-daily-core`. Na
 releases remain immutable ODS evidence but cannot replace the market-data attempt selected for a
 DWD/DWS candidate.
 
+The daily epoch carries only the exact parent or historical-base identity required for candidate
+lineage; it is not the historical data-transfer mechanism. The separate
+`dual-lane-history-base-v1` migration bundle contains the complete accepted P1 DWD seed and one
+historical DWS projection. DWS begins where observed daily status evidence begins and scopes bars
+to matching status keys, preserving missing historical bars as lower `bar_security_count` rather
+than inventing rows. Both nodes seal an identical common bundle, then publish a node-local logical
+catalog consisting of that seed plus their own ordered daily candidate chain. The catalog rejects
+the first candidate unless it binds the exact seed revision/META digest and rejects every later
+candidate unless its DWD parent revision and manifest digest equal the preceding entry.
+
 ### 5.2 Independent gates and arbitration
 
 OCI validates each candidate independently before cross-lane comparison. Integrity, identity, PIT,
@@ -280,6 +290,13 @@ digest. A crash may leave an intent with no new consumer publication, and retry 
 reuses that intent. The delivered contract emits no separate post-CAS success record.
 Compatibility dataset pointers are projections only and cannot authorize or compose a consumer
 view.
+
+The node-local lane-history catalog is distinct from this canonical catalog. It is a verified
+recovery and continuous-read index over one shared history seed plus one lane's immutable daily
+partitions. It has no canonical acceptance record, no ADS or release-set authority, and cannot be
+used to claim that the shared historical seed was independently acquired by both lanes. Its
+`CURRENT` selects only a new immutable catalog envelope; it does not mutate or concatenate DWD/DWS
+files.
 
 If ADS build or validation fails, the acceptance record remains internal evidence but no catalog,
 ADS, or DWD/DWS-only state becomes consumer-visible. The legacy and target publishers share one
@@ -342,6 +359,11 @@ ADR 0005 implementation is copy-only. Existing ODS, OCI mirrors, DWD/DWS, ADS, p
 evidence are not deleted, moved destructively, or reused as staging. The exact accepted ODS rebuild
 basis must have a failure-independent recovery copy before cutover. Any future deletion requires a
 separate reviewed decision and is not authorized by this work item.
+
+The same cutover block applies to the historical DWD seed. An epoch containing only its META digest
+is lineage evidence, not a recovery copy. CN01 and Hermes must each hold a complete root-owned,
+checksum-verified bundle plus a verified lane-history catalog through the latest candidate. The
+common seed remains explicitly non-independent; daily lane evidence begins only after its boundary.
 
 The repository implementation now records late-equivalent or proposed-correction outcomes,
 requires explicit approval before publishing a corrected immutable generation, prevents revoked
@@ -430,6 +452,7 @@ window cannot silently turn into an unplanned third observation.
 | Immutable ODS handoff and daily DWD/DWS | `src/quanthus/pipelines/`, `config/pipelines/` | `tests/unit/test_ods_handoff.py`, `tests/unit/test_pipeline_runner.py`, `tests/p1/test_daily_warehouse.py` |
 | Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
+| Sealed DWD/DWS history seed and lane-local logical merge | `src/quanthus/pipelines/dual_lane_history.py`, `config/pipelines/dual-lane-history-base.v1.json`, `ops/bin/*dual-lane-history*` | `tests/unit/test_dual_lane_history.py`, ADR 0005, `docs/operations/dual-lane-data-platform-runbook.md` |
 | Portable strategy-replay ADS publication and role-scoped consumption | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `config/strategy-replay-ads.v2.json`, `ops/bin/publish-strategy-replay-ads` | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `01-data-foundation/strategy-replay-ads.md`, `docs/acceptance/issue-45-portable-ads-20260730.md`, `docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md` |
 
 ## 8. Work items
@@ -491,7 +514,8 @@ in this document cannot keep the gate open by itself.
 ### `META-DATA-PIPE-003` target delivery
 
 The repository contract covers immutable epochs, daily bars/status/summary candidates, fixed-
-primary selection and fail-closed divergence, catalog and release-set construction, limited
+primary selection and fail-closed divergence, catalog and release-set construction, sealed
+historical DWD/DWS bases with lane-local logical catalogs, limited
 operational ADS, pre-CAS publication intent, fenced atomic `CURRENT`, idempotent retry, correction,
 revocation, rollback, accepted-ODS recovery evidence, and portable strategy-replay ADS. Unit
 coverage is implementation evidence only. Formal three-node shadow deployment, portable historical

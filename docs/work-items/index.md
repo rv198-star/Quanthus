@@ -22,7 +22,8 @@ research partitions. Production cutover requires its separate evidence gate and 
 `GO_FOR_CUTOVER`.
 
 The repository contract now includes portable `strategy_replay` ADS, fenced publication and
-rollback, correction/revocation records, and accepted-ODS recovery evidence. Formal three-node
+rollback, correction/revocation records, accepted-ODS recovery evidence, and a copy-only historical
+DWD/DWS base with lane-local logical catalogs. Formal three-node
 deployment, the three historical bootstrap bundles, role isolation, and development replay
 equivalence are accepted in `docs/acceptance/issue-45-portable-ads-20260730.md`. Catalog-native ADS
 publication, independent restore qualification, and consumer migration remain active work. The

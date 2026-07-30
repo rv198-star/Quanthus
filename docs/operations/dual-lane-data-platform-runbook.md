@@ -239,6 +239,60 @@ sequence and accepted metrics before making ADS the documented normal replay inp
 is a physically isolated historical migration/capability artifact, not a genuine blind result:
 the source snapshot was readable by the development principal before role isolation existed.
 
+## Seal historical DWD/DWS on both candidate nodes
+
+The daily epoch intentionally carries only the historical-base META identity when no accepted
+daily parent exists. That descriptor is not a data backup. Before cutover, build one governed
+history bundle on OCI from the exact accepted DWD seed; the builder verifies every source checksum,
+derives the historical DWS summary under `dual-lane-history-base-v1`, writes `READY` last, and
+distributes the immutable bundle through both existing write-only epoch jails.
+
+Set these OCI environment values to the paths shown in the reviewed example, then run from the
+deployed exact revision:
+
+```bash
+sudo install -d -o ubuntu -g ubuntu -m 0750 \
+  /home/ubuntu/data/quanthus/dual-lane/history-bases
+sudo -u ubuntu /opt/quanthus/current/ops/bin/publish-dual-lane-history-base \
+  dual-lane-history-base-p1-20260725-v1
+```
+
+On each node, create sealed roots outside the write-only ingress jail. Promote the exact ingress
+bundle by copy and checksum; do not move or delete the ingress copy. Then build the lane-local
+logical catalog over the sealed base and every date-local candidate `CURRENT` in the exact parent
+chain:
+
+```bash
+sudo install -d -o root -g quanthus-candidate-ro -m 0750 \
+  /srv/quanthus/dual-lane/history-bases \
+  /srv/quanthus/dual-lane/lane-history
+
+sudo env PYTHONPATH=/root/work/Quanthus/src \
+  /root/work/Quanthus/.venv-p1/bin/python \
+  /root/work/Quanthus/ops/bin/promote-dual-lane-history-base \
+  --policy /root/work/Quanthus/config/pipelines/dual-lane-history-base.v1.json \
+  --ingress-bundle /srv/quanthus/dual-lane/epoch-incoming/history-bases/dual-lane-history-base-p1-20260725-v1 \
+  --base-root /srv/quanthus/dual-lane/history-bases \
+  --current /srv/quanthus/dual-lane/history-bases/CURRENT.json \
+  --owner root --group quanthus-candidate-ro
+
+sudo env PYTHONPATH=/root/work/Quanthus/src \
+  /root/work/Quanthus/.venv-p1/bin/python \
+  /root/work/Quanthus/ops/bin/build-dual-lane-history-catalog \
+  --policy /root/work/Quanthus/config/pipelines/dual-lane-history-base.v1.json \
+  --storage-root /srv/quanthus/dual-lane \
+  --base-current /srv/quanthus/dual-lane/history-bases/CURRENT.json \
+  --candidate-root /srv/quanthus/dual-lane/candidates \
+  --catalog-root /srv/quanthus/dual-lane/lane-history \
+  --lane-id NODE_ID --owner root --group quanthus-candidate-ro
+```
+
+Use `cn01` or `hermes` for `NODE_ID`. The catalog is a logical merge only: the base and daily
+candidate files remain immutable and physically separate. The first candidate must bind the exact
+base revision and META digest; each successor must bind the previous daily DWD manifest. Run the
+node doctor after both `CURRENT` descriptors exist. A common copied base is continuity/recovery
+evidence, not independent cross-lane truth.
+
 ## Copy-only migration order
 
 Migration creates new artifacts and pointers only under the target roots. It does not move,
@@ -249,13 +303,15 @@ rename, overwrite, or delete legacy ODS, OCI mirrors, DWD/DWS, ADS, logs, or poi
 2. Fast-forward all three Git checkouts to one reviewed commit and build each node's local runtime.
 3. Create the two new jails on CN01 and Hermes and the three target roots on OCI.
 4. Install environment and unit files disabled. Run the applicable doctor on all three nodes.
-5. Backfill and deep-check the three OCI portable strategy ADS bundles under the resource rules
+5. Build, distribute, promote, and verify the common historical DWD/DWS base on both nodes; build
+   each lane's logical history catalog through its latest candidate.
+6. Backfill and deep-check the three OCI portable strategy ADS bundles under the resource rules
    above, reproduce P3 from the development bundle, and retain the role-access probes.
-6. Rehearse epoch transfer, both candidate builds, OCI pull/arbitration, and target release-set
+7. Rehearse epoch transfer, both candidate builds, OCI pull/arbitration, and target release-set
    publication for an explicit market date.
-7. Compare target evidence with the legacy result. Confirm the byte/checksum of every legacy
+8. Compare target evidence with the legacy result. Confirm the byte/checksum of every legacy
    consumer pointer is unchanged by the shadow run.
-8. Enable target timers for bounded shadow observation only after the manual rehearsal passes.
+9. Enable target timers for bounded shadow observation only after the manual rehearsal passes.
    Target publication remains under `/home/ubuntu/data/quanthus/dual-lane/publication` and is not a
    consumer authority before cutover.
 

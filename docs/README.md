@@ -92,6 +92,10 @@ nodes.
   parts without mandatory annual directories. The historical 2025 bootstrap is physically isolated
   for migration, but because its source was already visible to the development principal it is not
   evidence of a genuinely unopened blind evaluation.
+  The copy-only historical DWD/DWS migration is accepted through 2026-07-30 in
+  `acceptance/issue-45-historical-dwd-dws-completion-20260730.md`: OCI, CN01, and Hermes hold the
+  same sealed base bytes, and both lane-local logical catalogs join it to four daily candidates
+  without physical concatenation or cleanup authority.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional

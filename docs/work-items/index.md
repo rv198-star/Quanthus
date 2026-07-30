@@ -33,8 +33,11 @@ consumer pointer. Its through-2026-07-30 v3 refresh is accepted in
 `docs/acceptance/issue-45-2026-research-ads-refresh-20260730.md`. The first scheduled dual-lane
 cycle completed with an operator-recovered ODS pointer-ownership defect and is recorded in
 `docs/acceptance/issue-45-first-scheduled-cycle-20260730.md`; it is not a clean unattended
-qualification session. The historical 2025 bootstrap proves physical role separation only; prior
-developer visibility prevents it from serving as genuine unopened blind evidence.
+qualification session. Copy-only DWD/DWS historical completion through 2026-07-30, including the
+identical three-node sealed base and both lane-local logical catalogs, is accepted in
+`docs/acceptance/issue-45-historical-dwd-dws-completion-20260730.md`. The historical 2025 bootstrap
+proves physical role separation only; prior developer visibility prevents it from serving as
+genuine unopened blind evidence.
 
 ## P1 data foundation
 

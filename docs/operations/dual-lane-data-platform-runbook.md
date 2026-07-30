@@ -185,12 +185,20 @@ sudo env \
   QUANTHUS_STRATEGY_ADS_CORPORATE_ACTION_POLICY=/opt/quanthus/current/config/p1-corporate-action-normalization.v3.json \
   /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
   recent_research strategy-replay-recent-research-<revision>
+
+sudo env \
+  QUANTHUS_STRATEGY_ADS_SOURCE=/home/ubuntu/data/quanthus/snapshots/p1-historical-replay-2026-through-20260730-v3 \
+  QUANTHUS_STRATEGY_ADS_BENCHMARK=/home/ubuntu/data/quanthus/benchmarks/csi300-sh000300-2012-20260730.mixed-v3.json \
+  QUANTHUS_STRATEGY_ADS_POLICY=/opt/quanthus/current/config/strategy-replay-ads.v3.json \
+  QUANTHUS_STRATEGY_ADS_CORPORATE_ACTION_POLICY=/opt/quanthus/current/config/p1-corporate-action-normalization.v3.json \
+  /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
+  recent_research strategy-replay-recent-research-<revision>-v3
 ```
 
-The recent-research command is additive and development-readable. It must use all four explicit v2
-inputs together; mixing the v2 scope policy with the v1 snapshot, benchmark, or corporate-action
-policy fails identity validation. Do not rebuild the original three scopes under v2 merely to add
-the 2026 backfill.
+Each recent-research command is additive and development-readable. It must use the matching set of
+four explicit v2 or v3 inputs together; mixing a scope policy with another version's snapshot,
+benchmark, or corporate-action policy fails identity validation. Do not rebuild the original three
+scopes merely to add or refresh the 2026 bundle.
 
 Run full publications serially by default. On the qualified four-CPU OCI shape, at most two
 full builds may overlap only when `/swapfile-quanthus` is active and allocated as a 12 GiB file,

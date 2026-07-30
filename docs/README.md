@@ -45,6 +45,11 @@ nodes.
   remains readable only as `development_research`, and does not rewrite the original three bundles
   or any mutable pointer. Formal publication and 134-frame replay evidence are accepted in
   `acceptance/issue-45-2026-research-ads-backfill-20260730.md`.
+- Its v3 successor uses snapshot `p1-historical-replay-2026-through-20260730-v3`, the mixed-source
+  CSI 300 tail, and the versioned fail-closed ST missing-source rule. Formal bundle
+  `strategy-replay-recent-research-7c99724-v3` contains 137 decision frames through 2026-07-29 and
+  T+1 context through 2026-07-30; publication and independent audit evidence are accepted in
+  `acceptance/issue-45-2026-research-ads-refresh-20260730.md`.
 - The frozen P3 capability fixture has a versioned card, concrete feature/label/expert/
   action chain, strict static-industry input, five fixed-capital-unit replay, P2-backed fills and
   settlement, four-source exits, carried orders, cooldown, benchmark metrics, and populated
@@ -76,9 +81,11 @@ nodes.
   replay now uses an explicit immutable ADS bundle. Catalog-native publication, independent
   restore evidence, full PIT/tradability candidate families, and production cutover remain open.
   Bounded daily shadow timers for OCI epoch, both lane candidates, and OCI arbitration were
-  activated in `acceptance/issue-45-shadow-timer-activation-20260730.md`; their first scheduled
-  cycle remains pending acceptance. The legacy OCI full-ODS pull/build path stays live until an
-  explicit cutover gate passes. Migration is copy-only;
+  activated in `acceptance/issue-45-shadow-timer-activation-20260730.md`. Their first scheduled
+  cycle completed after a recovered ODS pointer-ownership defect and is recorded in
+  `acceptance/issue-45-first-scheduled-cycle-20260730.md`; corrective revision `7c99724c` is
+  deployed on all three nodes, but a later clean unattended session is still required. The legacy
+  OCI full-ODS pull/build path stays live until an explicit cutover gate passes. Migration is copy-only;
   no existing data or evidence may be deleted. Portable bundles use manifest-discovered semantic
   parts without mandatory annual directories. The historical 2025 bootstrap is physically isolated
   for migration, but because its source was already visible to the development principal it is not

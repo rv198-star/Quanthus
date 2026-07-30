@@ -28,7 +28,11 @@ equivalence are accepted in `docs/acceptance/issue-45-portable-ads-20260730.md`.
 publication, independent restore qualification, and consumer migration remain active work. The
 additive 2026 recent-research backfill is accepted in
 `docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md`; it changes no existing bundle or
-consumer pointer. The historical 2025 bootstrap proves physical role separation only; prior
+consumer pointer. Its through-2026-07-30 v3 refresh is accepted in
+`docs/acceptance/issue-45-2026-research-ads-refresh-20260730.md`. The first scheduled dual-lane
+cycle completed with an operator-recovered ODS pointer-ownership defect and is recorded in
+`docs/acceptance/issue-45-first-scheduled-cycle-20260730.md`; it is not a clean unattended
+qualification session. The historical 2025 bootstrap proves physical role separation only; prior
 developer visibility prevents it from serving as genuine unopened blind evidence.
 
 ## P1 data foundation

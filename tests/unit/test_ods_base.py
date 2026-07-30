@@ -28,6 +28,8 @@ from quanthus.pipelines.ods_base import (
     write_ods_base_source_inventory,
 )
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
 
 def _sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
@@ -318,6 +320,14 @@ class OdsBaseTests(unittest.TestCase):
                             "minimum_files": 2,
                         }
                     ],
+                    "scope_gaps": [
+                        {
+                            "dataset_family": "fixture_unacquired_source",
+                            "classification": "not_formally_acquired",
+                            "reason": "fixture source family was never collected",
+                            "downstream_impact": "fixture consumers cannot use that family",
+                        }
+                    ],
                     "daily": {
                         "source": "data/shadow/hermes/releases/daily",
                         "increment_start": "2026-07-30",
@@ -345,12 +355,12 @@ class OdsBaseTests(unittest.TestCase):
                     "exclusions": [
                         {
                             "pattern": "data/revisions",
-                            "classification": "mixed",
+                            "classification": "excluded_superseded_revision",
                             "reason": "only accepted evidence descendants are included",
                         },
                         {
                             "pattern": "data/shadow",
-                            "classification": "mixed",
+                            "classification": "excluded_unselected_release_root",
                             "reason": "only selected releases are included",
                         },
                         {
@@ -420,6 +430,10 @@ class OdsBaseTests(unittest.TestCase):
         manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
         lineages = manifest["content"]["daily_releases"]
         self.assertEqual(len(lineages), 4)
+        self.assertEqual(
+            manifest["content"]["scope_gaps"][0]["dataset_family"],
+            "fixture_unacquired_source",
+        )
         self.assertTrue(
             any(
                 artifact["name"] == "acquisition_log"
@@ -448,6 +462,38 @@ class OdsBaseTests(unittest.TestCase):
                 policy=self.policy,
                 code_revision="a" * 40,
             )
+
+    def test_mixed_source_roots_are_classified_at_source_unit_depth(self) -> None:
+        excluded = self.data / "revisions" / "superseded-revision"
+        self._write_json(excluded / "META.json", {"superseded": True})
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=self.policy,
+        )
+        classifications = {
+            item["path"]: item["classification"]
+            for item in inventory["source_inventory"]
+        }
+        self.assertEqual(classifications["data/revisions"], "mixed")
+        self.assertEqual(
+            classifications["data/revisions/accepted-evidence"], "included"
+        )
+        self.assertEqual(
+            classifications["data/revisions/superseded-revision"],
+            "excluded_superseded_revision",
+        )
+
+    def test_production_policy_discloses_full_statement_scope_gap(self) -> None:
+        policy = load_ods_base_policy(
+            REPOSITORY_ROOT / "config" / "pipelines" / "ods-base.v1.json"
+        )
+        gaps = {item.dataset_family: item for item in policy.scope_gaps}
+        self.assertIn("raw_f10_and_full_financial_statements", gaps)
+        self.assertEqual(
+            gaps["raw_f10_and_full_financial_statements"].classification,
+            "not_formally_acquired",
+        )
 
     def test_frozen_inventory_blocks_changed_sources(self) -> None:
         inventory = self._inventory(date(2026, 7, 30), "frozen.json")
@@ -505,6 +551,74 @@ class OdsBaseTests(unittest.TestCase):
         }
         self.assertEqual(roles, {"market": "market-attempt", "events": "event-attempt"})
 
+    def test_intraday_gap_fill_may_use_an_explicit_hermes_revision(self) -> None:
+        policy_value = json.loads(self.policy_path.read_text(encoding="utf-8"))
+        for frequency in ("1m", "5m"):
+            source_attempt = (
+                self._daily_root()
+                / frequency
+                / "2026-07-30"
+                / f"intraday-{frequency}-attempt"
+            )
+            revision_root = self.data / "revisions" / "hermes-gap" / frequency
+            revision_attempt = revision_root / source_attempt.name
+            shutil.copytree(source_attempt, revision_attempt)
+            release_digest = _sha256(revision_attempt / "release.json")
+            item = next(
+                candidate
+                for candidate in policy_value["source"]["intraday_releases"]
+                if candidate["frequency"] == frequency
+            )
+            item["source_exceptions"] = [
+                {
+                    "market_date": "2026-07-30",
+                    "source_node": "hermes",
+                    "source": f"data/revisions/hermes-gap/{frequency}",
+                    "reason": "formal Hermes release was incomplete; retained revision is complete",
+                    "manifest_sha256": release_digest,
+                }
+            ]
+        self._write_json(self.policy_path, policy_value)
+        policy = load_ods_base_policy(self.policy_path)
+
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=policy,
+        )
+
+        intraday = [
+            item
+            for item in inventory["daily_releases"]
+            if item["release_role"].startswith("intraday_")
+        ]
+        self.assertEqual({item["source_node"] for item in intraday}, {"hermes"})
+        self.assertTrue(all(item["gap_fill"] is not None for item in intraday))
+
+    def test_production_legacy_manifest_is_not_a_canonical_base_member(self) -> None:
+        policy = load_ods_base_policy(
+            REPOSITORY_ROOT / "config" / "pipelines" / "ods-base.v1.json"
+        )
+        legacy = {
+            item.dataset_id: item
+            for item in policy.files
+            if item.dataset_id.startswith("legacy_dataset_manifest")
+        }
+
+        self.assertEqual(
+            set(legacy),
+            {"legacy_dataset_manifest", "legacy_dataset_manifest_metadata"},
+        )
+        self.assertTrue(
+            all(item.role == "legacy_source_lineage" for item in legacy.values())
+        )
+        self.assertTrue(
+            all(
+                item.target.startswith("payload/source-evidence/legacy-dataset-manifest/")
+                for item in legacy.values()
+            )
+        )
+
     def test_promote_and_load_current(self) -> None:
         output = self._build()
         base_root = self.root / "node" / "base"
@@ -518,6 +632,33 @@ class OdsBaseTests(unittest.TestCase):
         loaded = load_ods_base_current(current, policy=self.policy, deep=True)
         self.assertEqual(promoted.content_digest, loaded.content_digest)
         self.assertEqual(loaded.through_date, date(2026, 7, 30))
+
+    def test_hidden_transfer_staging_requires_explicit_verification_mode(self) -> None:
+        output = self._build()
+        base_root = self.root / "node" / "base"
+        base_root.mkdir(parents=True)
+        staging = base_root / f".incoming-{output.name}"
+        shutil.copytree(output, staging)
+
+        with self.assertRaisesRegex(OdsBaseError, "directory and bundle identity"):
+            verify_ods_base_bundle(staging, policy=self.policy, deep=True)
+        staged = verify_ods_base_bundle(
+            staging,
+            policy=self.policy,
+            deep=True,
+            allow_staging_name=True,
+        )
+        self.assertEqual(staged.bundle_id, output.name)
+
+        promoted = promote_ods_base_bundle(
+            ingress_bundle=staging,
+            base_root=base_root,
+            current_pointer=base_root / "BASE_CURRENT.json",
+            policy=self.policy,
+            move_ingress=True,
+        )
+        self.assertEqual(promoted.bundle_id, output.name)
+        self.assertFalse(staging.exists())
 
     def test_final_base_reuses_unchanged_parent_files(self) -> None:
         provisional = self._build()
@@ -544,6 +685,64 @@ class OdsBaseTests(unittest.TestCase):
             verify_ods_base_bundle(provisional, policy=self.policy).content_digest,
         )
         self.assertGreater(manifest["storage_reuse"]["file_count"], 0)
+
+    def test_pointer_advance_requires_compare_and_swap_precondition(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node" / "base"
+        current_pointer = base_root / "BASE_CURRENT.json"
+        promoted = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current_pointer,
+            policy=self.policy,
+        )
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+        final = self.root / "build" / "ods-base-202607-v1"
+        build_ods_base_bundle(
+            astock_root=self.astock,
+            output=final,
+            bundle_id=final.name,
+            through_date=date(2026, 7, 31),
+            policy=self.policy,
+            code_revision="b" * 40,
+            parent_base=provisional,
+            source_inventory=self._inventory(date(2026, 7, 31), "cas-final.json"),
+        )
+
+        with self.assertRaisesRegex(OdsBaseError, "expected manifest"):
+            promote_ods_base_bundle(
+                ingress_bundle=final,
+                base_root=base_root,
+                current_pointer=current_pointer,
+                policy=self.policy,
+            )
+        with self.assertRaisesRegex(OdsBaseError, "precondition failed"):
+            promote_ods_base_bundle(
+                ingress_bundle=final,
+                base_root=base_root,
+                current_pointer=current_pointer,
+                policy=self.policy,
+                expected_current_manifest_sha256="sha256:" + "0" * 64,
+            )
+
+        final_promoted = promote_ods_base_bundle(
+            ingress_bundle=final,
+            base_root=base_root,
+            current_pointer=current_pointer,
+            policy=self.policy,
+            expected_current_manifest_sha256=promoted.manifest_sha256,
+        )
+        self.assertEqual(final_promoted.bundle_id, "ods-base-202607-v1")
+        self.assertEqual(
+            promote_ods_base_bundle(
+                ingress_bundle=final,
+                base_root=base_root,
+                current_pointer=current_pointer,
+                policy=self.policy,
+                expected_current_manifest_sha256=promoted.manifest_sha256,
+            ).manifest_sha256,
+            final_promoted.manifest_sha256,
+        )
 
 
 if __name__ == "__main__":

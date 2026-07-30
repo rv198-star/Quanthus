@@ -1382,6 +1382,94 @@ def test_intraday_unexplained_missing_blocks_ready(
     assert bars.status == "failed"
 
 
+def test_intraday_open_ended_suspension_justifies_no_bars(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    _write_parquet(
+        fixture_home / "ref_suspensions.parquet",
+        [
+            {
+                "stock_code": "600519",
+                "suspend_start": "2026-07-23",
+                "suspend_end": None,
+                "announce_date": "2026-07-23",
+            }
+        ],
+    )
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    (minute / "600519_5m.parquet").unlink()
+
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+
+    assert result.status == "ready"
+    coverage = next(d for d in result.datasets if d.name == "intraday_coverage")
+    rows = pq.read_table(Path(coverage.path)).to_pylist()
+    suspended = next(row for row in rows if row["security_id"] == "600519")
+    assert suspended == {
+        "security_id": "600519",
+        "status": "justified_no_data",
+        "row_count": 0,
+        "observed_maximum": None,
+        "reason": "suspended",
+        "source": "ref_suspensions.parquet",
+        "suspend_start": "2026-07-23",
+        "suspend_end": None,
+        "knowledge_cutoff": "2026-07-23",
+    }
+
+
+def test_intraday_zero_turnover_daily_bar_justifies_no_bars(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    daily_path = fixture_home / "daily_ohlcv_none.parquet"
+    daily_rows = pq.read_table(daily_path).to_pylist()
+    for row in daily_rows:
+        if row["stock_code"] == "600519" and str(row["date"])[:10] == "2026-07-24":
+            row.update(
+                {
+                    "open": 10.5,
+                    "high": 10.5,
+                    "low": 10.5,
+                    "close": 10.5,
+                    "volume": 0.0,
+                    "amount": 0.0,
+                }
+            )
+    _write_parquet(daily_path, daily_rows)
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    (minute / "600519_5m.parquet").unlink()
+
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+
+    assert result.status == "ready"
+    coverage = next(d for d in result.datasets if d.name == "intraday_coverage")
+    rows = pq.read_table(Path(coverage.path)).to_pylist()
+    zero_turnover = next(row for row in rows if row["security_id"] == "600519")
+    assert zero_turnover["status"] == "justified_no_data"
+    assert zero_turnover["reason"] == "zero_turnover_daily_bar"
+    assert zero_turnover["source"] == "daily_ohlcv_none.parquet"
+    assert zero_turnover["volume"] == 0.0
+    assert zero_turnover["amount"] == 0.0
+    assert zero_turnover["source_sha256"].startswith("sha256:")
+    assert len(zero_turnover["source_sha256"]) == len("sha256:") + 64
+
+
 def test_intraday_missing_middle_bar_blocks_ready(
     fixture_home: Path, tmp_path: Path
 ) -> None:

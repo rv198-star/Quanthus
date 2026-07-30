@@ -84,19 +84,19 @@
         "date_columns": ["date"]
       },
       {
-        "dataset_id": "dataset_manifest",
+        "dataset_id": "legacy_dataset_manifest",
         "source": "data/dataset_manifest.parquet",
-        "target": "payload/canonical/dataset_manifest.parquet",
-        "role": "source_lineage",
+        "target": "payload/source-evidence/legacy-dataset-manifest/dataset_manifest.parquet",
+        "role": "legacy_source_lineage",
         "format": "parquet",
         "key_columns": [],
         "date_columns": []
       },
       {
-        "dataset_id": "dataset_manifest_metadata",
+        "dataset_id": "legacy_dataset_manifest_metadata",
         "source": "data/dataset_manifest_meta.json",
-        "target": "payload/canonical/dataset_manifest_meta.json",
-        "role": "source_lineage",
+        "target": "payload/source-evidence/legacy-dataset-manifest/dataset_manifest_meta.json",
+        "role": "legacy_source_lineage",
         "format": "json",
         "key_columns": [],
         "date_columns": []
@@ -244,7 +244,7 @@
         "target": "payload/minute/research_1m",
         "role": "source_market_archive",
         "pattern": "*_1m.parquet",
-        "minimum_parts": 4990,
+        "minimum_parts": 4992,
         "key_columns": ["stock_code", "ts"],
         "date_columns": ["ts"]
       },
@@ -254,7 +254,7 @@
         "target": "payload/minute/prod_5m",
         "role": "source_market_archive",
         "pattern": "*_5m.parquet",
-        "minimum_parts": 4990,
+        "minimum_parts": 4992,
         "key_columns": ["stock_code", "ts"],
         "date_columns": ["ts"]
       }
@@ -325,6 +325,30 @@
         "minimum_files": 100
       },
       {
+        "dataset_id": "source_evidence_delisted_history_decisions",
+        "source": "data/revisions/none_delisted_history_v1",
+        "target": "payload/source-evidence/none_delisted_history_v1",
+        "role": "accepted_source_lineage",
+        "include_patterns": ["META.json", "*.json", "*.csv"],
+        "minimum_files": 5
+      },
+      {
+        "dataset_id": "source_evidence_volume_amount_null_decision",
+        "source": "data/revisions/none_vol_amount_null_fill_v1",
+        "target": "payload/source-evidence/none_vol_amount_null_fill_v1",
+        "role": "accepted_source_lineage",
+        "include_patterns": ["META.json"],
+        "minimum_files": 1
+      },
+      {
+        "dataset_id": "source_evidence_delist_placeholder_decisions",
+        "source": "data/revisions/none_delist_day_invalid_ohlc_v1",
+        "target": "payload/source-evidence/none_delist_day_invalid_ohlc_v1",
+        "role": "accepted_source_lineage",
+        "include_patterns": ["META.json", "decisions.json", "qa_exception_ledger.json", "pg_sync_result.json", "evidence/*.json", "evidence/*.csv"],
+        "minimum_files": 20
+      },
+      {
         "dataset_id": "source_evidence_none_tail_repairs",
         "source": "data/revisions/none_tail_fix3_raw_v1_20260725",
         "target": "payload/source-evidence/none_tail_fix3_raw_v1_20260725",
@@ -357,6 +381,14 @@
         "minimum_files": 5
       },
       {
+        "dataset_id": "source_evidence_shareholder_export",
+        "source": "data/revisions/shareholder_count_export_v1",
+        "target": "payload/source-evidence/shareholder_count_export_v1",
+        "role": "accepted_source_lineage",
+        "include_patterns": ["META.json", "STATS.json", "sample_head20.csv"],
+        "minimum_files": 3
+      },
+      {
         "dataset_id": "source_evidence_st_baostock_raw",
         "source": "data/revisions/st_status_pit_v2_baostock_20260725",
         "target": "payload/source-evidence/st_status_pit_v2_baostock_20260725",
@@ -387,6 +419,14 @@
         "role": "supplementary_source_evidence",
         "include_patterns": ["**"],
         "minimum_files": 3
+      },
+      {
+        "dataset_id": "source_evidence_weekly_corrections_20260724",
+        "source": "data/shadow/hermes-ods-v1/releases/weekly/2026-07-24/20260724-20260725T120601729315Z",
+        "target": "payload/source-evidence/weekly-corrections/2026-07-24/20260724-20260725T120601729315Z",
+        "role": "retained_immutable_source_lineage",
+        "include_patterns": ["READY", "release.json", "artifacts/**"],
+        "minimum_files": 10
       }
     ],
     "daily": {
@@ -450,6 +490,14 @@
             "manifest_sha256": "sha256:c628a5aec96037595bc7b380e79a1dae3f5783bcf56ec48995ba9dc40439e99f"
           }
         ]
+      }
+    ],
+    "scope_gaps": [
+      {
+        "dataset_family": "raw_f10_and_full_financial_statements",
+        "classification": "not_formally_acquired",
+        "reason": "Hermes currently retains a governed quarterly financial summary but no immutable raw F10 text or complete balance-sheet, income-statement, and cash-flow archive",
+        "downstream_impact": "The Base can reproduce the accepted financial_quarterly summary only; full-statement or F10 research requires a separately governed acquisition and a new Base revision"
       }
     ],
     "exclusions": [

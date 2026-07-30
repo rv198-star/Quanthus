@@ -25,11 +25,19 @@ def main() -> int:
     source.add_argument("--bundle", type=Path)
     source.add_argument("--current", type=Path)
     parser.add_argument("--deep", action="store_true")
+    parser.add_argument("--allow-staging-name", action="store_true")
     args = parser.parse_args()
+    if args.allow_staging_name and args.bundle is None:
+        parser.error("--allow-staging-name requires --bundle")
     policy = load_ods_base_policy(args.policy)
     try:
         result = (
-            verify_ods_base_bundle(args.bundle, policy=policy, deep=args.deep)
+            verify_ods_base_bundle(
+                args.bundle,
+                policy=policy,
+                deep=args.deep,
+                allow_staging_name=args.allow_staging_name,
+            )
             if args.bundle is not None
             else load_ods_base_current(args.current, policy=policy, deep=args.deep)
         )

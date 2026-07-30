@@ -7,7 +7,9 @@ export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
 
 if [[ -f /etc/quanthus/hermes-ods-lane.env ]]; then
   # shellcheck disable=SC1091
+  set -a
   source /etc/quanthus/hermes-ods-lane.env
+  set +a
 fi
 
 : "${ASTOCK_ROOT:=/root/work/astock}"

@@ -252,6 +252,24 @@ Recovery is proved in layers: retained canonical inputs rebuild ADS without live
 DWD rebuilds DWS; and exact ODS, epoch parent/base, references, runtime, and transform rebuild the
 same DWD content digest on a clean path.
 
+The exact ODS recovery basis is one immutable Hermes-authoritative ODS Base with one
+checksum-identical CN01 mirror. OCI does not retain the target-chain ODS Base. The package contains
+multiple schema-appropriate members discovered only through its own manifest; "one Base" does not
+mean concatenating heterogeneous datasets into one Parquet file. Hermes source gaps may use a
+Hermes retained revision, and CN01 may fill a proven Hermes gap, only through an explicit
+dataset/date exception with source node, reason, and expected immutable manifest digest. A Base
+build classifies every top-level source and recursively expands mixed roots to explicit source
+units, binds a frozen source-selection digest, discloses unacquired source-family gaps, verifies
+member checksums and data-quality metadata, and publishes `READY` last. A legacy source-side dataset
+manifest is retained only as historical lineage evidence; the Base `manifest.json` is the package
+authority.
+
+July migration uses a provisional package through 2026-07-30 and creates a new final package after
+the accepted 2026-07-31 close releases exist. The final package may hard-link unchanged provisional
+members on the same filesystem, but it remains a distinct immutable identity. Neither the
+provisional package nor the absorbed daily release is deleted by this decision. Detailed source
+membership and operation are owned by LLD 01's ODS Base child and the ODS Base runbook.
+
 ## Transition and delivery gates
 
 1. Freeze and test epoch, candidate, arbitration, catalog, ADS, release-set, correction, fencing,

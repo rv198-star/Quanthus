@@ -2872,13 +2872,14 @@ def _expected_bar_timestamps(market_date: date, bar_size: str) -> set[str]:
     return timestamps
 
 
-def _latest_market_status_artifact(
+def _latest_market_artifact(
     *,
     paths: LanePaths,
     market_date: date,
     available_at: datetime,
+    artifact_name: str,
 ) -> tuple[Path, dict[str, Any]] | None:
-    """Return same-day status evidence from the latest verified market release."""
+    """Return same-day evidence from the latest verified market release."""
 
     if available_at.tzinfo is None or available_at.utcoffset() is None:
         return None
@@ -2908,7 +2909,7 @@ def _latest_market_status_artifact(
             (
                 item
                 for item in release.artifacts
-                if item.name == "daily_status_observation_delta"
+                if item.name == artifact_name
             ),
             None,
         )
@@ -2933,6 +2934,24 @@ def _latest_market_status_artifact(
     return artifact_path, metadata
 
 
+def _first_iso_date(*values: Any) -> str:
+    """Return the first real ISO date, ignoring null-like temporal scalars."""
+
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text.lower() in {"", "nat", "nan", "none", "null", "<na>"}:
+            continue
+        candidate = text[:10]
+        try:
+            date.fromisoformat(candidate)
+        except ValueError:
+            continue
+        return candidate
+    return ""
+
+
 def _minute_no_data_evidence(
     *,
     paths: LanePaths,
@@ -2952,8 +2971,10 @@ def _minute_no_data_evidence(
             code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
             if code not in wanted:
                 continue
-            list_date = str(row.get("list_date") or row.get("ipo_date") or "")[:10]
-            delist_date = str(row.get("delist_date") or row.get("terminal_date") or "")[:10]
+            list_date = _first_iso_date(row.get("list_date"), row.get("ipo_date"))
+            delist_date = _first_iso_date(
+                row.get("delist_date"), row.get("terminal_date")
+            )
             if list_date and list_date > target:
                 evidence[code] = {
                     "reason": "not_yet_listed",
@@ -2971,10 +2992,11 @@ def _minute_no_data_evidence(
     status_path = paths.home / "daily_status_observation.parquet"
     if status_path.is_file():
         status_sources.append((status_path, {}))
-    market_status = _latest_market_status_artifact(
+    market_status = _latest_market_artifact(
         paths=paths,
         market_date=market_date,
         available_at=evidence_available_at,
+        artifact_name="daily_status_observation_delta",
     )
     if market_status is not None:
         status_sources.append(market_status)
@@ -3010,6 +3032,45 @@ def _minute_no_data_evidence(
                 **metadata,
             }
 
+    daily_sources: list[tuple[Path, dict[str, Any]]] = []
+    daily_path = paths.home / "daily_ohlcv_none.parquet"
+    if daily_path.is_file():
+        daily_sources.append((daily_path, {"source_sha256": _sha256(daily_path)}))
+    market_daily = _latest_market_artifact(
+        paths=paths,
+        market_date=market_date,
+        available_at=evidence_available_at,
+        artifact_name="daily_ohlcv_none_delta",
+    )
+    if market_daily is not None:
+        daily_sources.append(market_daily)
+
+    # A same-day accepted daily row with exactly zero volume and amount is
+    # structured evidence that no minute trades should exist. A verified
+    # immutable market release takes precedence over the mutable local SoT.
+    zero_turnover_rows: dict[str, tuple[Mapping[str, Any], Path, dict[str, Any]]] = {}
+    for candidate_path, metadata in daily_sources:
+        for row in _read_parquet_filter_date(candidate_path, market_date=market_date):
+            code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
+            if code not in wanted:
+                continue
+            volume = _fnum(row.get("volume"))
+            amount = _fnum(row.get("amount"))
+            if volume == 0.0 and amount == 0.0:
+                zero_turnover_rows[code] = (row, candidate_path, metadata)
+    for code, (row, candidate_path, metadata) in zero_turnover_rows.items():
+        if code in evidence:
+            continue
+        evidence[code] = {
+            "reason": "zero_turnover_daily_bar",
+            "source": candidate_path.name,
+            "evidence_date": target,
+            "volume": row.get("volume"),
+            "amount": row.get("amount"),
+            "close": row.get("close"),
+            **metadata,
+        }
+
     suspension_path = paths.home / "ref_suspensions.parquet"
     if not suspension_path.is_file():
         suspension_path = paths.home / "suspensions.parquet"
@@ -3018,27 +3079,24 @@ def _minute_no_data_evidence(
             code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
             if code not in wanted:
                 continue
-            start = str(
-                row.get("suspend_start") or row.get("start_date") or row.get("date") or ""
-            )[:10]
-            end = str(
-                row.get("suspend_end")
-                or row.get("resume_date")
-                or row.get("end_date")
-                or start
-            )[:10]
-            known = str(
-                row.get("knowledge_cutoff")
-                or row.get("announce_date")
-                or row.get("notice_date")
-                or ""
-            )[:10]
-            if start and start <= target <= (end or target) and known and known <= target:
+            start = _first_iso_date(
+                row.get("suspend_start"), row.get("start_date"), row.get("date")
+            )
+            end = _first_iso_date(
+                row.get("suspend_end"), row.get("resume_date"), row.get("end_date")
+            )
+            known = _first_iso_date(
+                row.get("knowledge_cutoff"),
+                row.get("announce_date"),
+                row.get("notice_date"),
+            )
+            active_on_target = bool(start and start <= target and (not end or target <= end))
+            if active_on_target and known and known <= target:
                 evidence[code] = {
                     "reason": "suspended",
                     "source": suspension_path.name,
                     "suspend_start": start,
-                    "suspend_end": end,
+                    "suspend_end": end or None,
                     "knowledge_cutoff": known,
                 }
     return evidence

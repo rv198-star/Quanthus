@@ -29,6 +29,7 @@ def main() -> int:
     parser.add_argument("--owner")
     parser.add_argument("--group")
     parser.add_argument("--move-ingress", action="store_true")
+    parser.add_argument("--expected-current-manifest-sha256")
     args = parser.parse_args()
     if (args.owner is None) != (args.group is None):
         parser.error("--owner and --group must be provided together")
@@ -45,6 +46,9 @@ def main() -> int:
             owner_uid=owner_uid,
             group_gid=group_gid,
             move_ingress=args.move_ingress,
+            expected_current_manifest_sha256=(
+                args.expected_current_manifest_sha256
+            ),
         )
     except (OdsBaseError, FileExistsError, OSError) as exc:
         print(f"ODS Base promotion failed: {exc}", file=sys.stderr)

@@ -866,6 +866,109 @@ def _trading_calendar_path(astock_root: Path, policy: OdsBasePolicy) -> Path:
     return _inside(astock_root, matches[0].source, "trading_calendar.source")
 
 
+def _selected_daily_date_releases(
+    astock_root: Path, policy: OdsBasePolicy, market_date: date
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, str]]]:
+    daily_root = _inside(astock_root, policy.daily.source, "daily.source")
+    date_root = daily_root / market_date.isoformat()
+    if not date_root.is_dir() or date_root.is_symlink():
+        raise OdsBaseError(f"daily ODS has no release root for {market_date}")
+    pointer = _object(date_root / "CURRENT.json")
+    attempt_id = _text(pointer, "attempt_id")
+    if _RELEASE_ATTEMPT.fullmatch(attempt_id) is None:
+        raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
+    current = _ready_release(date_root / attempt_id, market_date)
+    if (
+        pointer.get("schema_version") != 1
+        or pointer.get("market_date") != market_date.isoformat()
+        or pointer.get("schedule") != "daily"
+        or pointer.get("manifest_sha256") != current["manifest_sha256"]
+    ):
+        raise OdsBaseError(f"daily ODS CURRENT is inconsistent: {market_date}")
+
+    market_required = set(policy.daily.market_required_artifacts)
+    event_required = set(policy.daily.event_required_artifacts)
+    market_candidates: list[dict[str, Any]] = []
+    event_candidates: list[dict[str, Any]] = []
+    inventory: list[dict[str, str]] = []
+    for attempt_root in sorted(date_root.iterdir()):
+        if not attempt_root.is_dir():
+            continue
+        try:
+            candidate = (
+                current
+                if attempt_root.name == attempt_id
+                else _ready_release(attempt_root, market_date)
+            )
+        except OdsBaseError:
+            inventory.append(
+                {
+                    "path": attempt_root.relative_to(astock_root).as_posix(),
+                    "classification": "excluded_failed_or_incomplete_attempt",
+                    "reason": "attempt did not pass immutable READY and artifact verification",
+                }
+            )
+            continue
+        is_market = market_required.issubset(candidate["artifact_names"])
+        is_events = event_required.issubset(candidate["artifact_names"])
+        if is_market and is_events:
+            raise OdsBaseError(f"daily ODS attempt has ambiguous roles: {attempt_root}")
+        if is_market:
+            market_candidates.append(candidate)
+        elif is_events:
+            event_candidates.append(candidate)
+        else:
+            inventory.append(
+                {
+                    "path": attempt_root.relative_to(astock_root).as_posix(),
+                    "classification": "excluded_unclassified_complete_attempt",
+                    "reason": "complete attempt satisfies neither Base release role",
+                }
+            )
+    if not market_candidates or not event_candidates:
+        raise OdsBaseError(f"daily market or event release is missing for {market_date}")
+
+    def select_role(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        current_role = [item for item in candidates if item["attempt_id"] == attempt_id]
+        if current_role:
+            return current_role[0]
+        return max(candidates, key=lambda item: (item["created_at"], item["attempt_id"]))
+
+    market = select_role(market_candidates)
+    events = select_role(event_candidates)
+    selected = ((market, "market"), (events, "events"))
+    for candidate, role in selected:
+        inventory.append(
+            {
+                "path": candidate["root"].relative_to(astock_root).as_posix(),
+                "classification": "included_selected_daily_release",
+                "reason": f"selected {role} release under CURRENT-or-latest-role policy",
+            }
+        )
+    selected_roots = {market["root"], events["root"]}
+    for candidate in (*market_candidates, *event_candidates):
+        if candidate["root"] in selected_roots:
+            continue
+        inventory.append(
+            {
+                "path": candidate["root"].relative_to(astock_root).as_posix(),
+                "classification": "excluded_superseded_daily_attempt",
+                "reason": "superseded under CURRENT-or-latest-role policy",
+            }
+        )
+
+    def annotate(release: dict[str, Any], role: str) -> dict[str, Any]:
+        return {
+            **release,
+            "release_role": role,
+            "source_node": "hermes",
+            "source_path": date_root.relative_to(astock_root).as_posix(),
+            "gap_fill": None,
+        }
+
+    return annotate(market, "market"), annotate(events, "events"), inventory
+
+
 def _selection_calendar_path(
     astock_root: Path, policy: OdsBasePolicy, through_date: date
 ) -> Path:
@@ -878,22 +981,7 @@ def _selection_calendar_path(
     if canonical_dates and canonical_dates[-1] == through_date:
         return canonical
 
-    daily_root = _inside(astock_root, policy.daily.source, "daily.source")
-    date_root = daily_root / through_date.isoformat()
-    pointer = _object(date_root / "CURRENT.json")
-    attempt_id = _text(pointer, "attempt_id")
-    if _RELEASE_ATTEMPT.fullmatch(attempt_id) is None:
-        raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
-    release = _ready_release(date_root / attempt_id, through_date)
-    if (
-        pointer.get("market_date") != through_date.isoformat()
-        or pointer.get("schedule") != "daily"
-        or pointer.get("manifest_sha256") != release["manifest_sha256"]
-        or not set(policy.daily.market_required_artifacts).issubset(
-            release["artifact_names"]
-        )
-    ):
-        raise OdsBaseError("through-date market CURRENT is incomplete or inconsistent")
+    release, _, _ = _selected_daily_date_releases(astock_root, policy, through_date)
     calendars = [
         item for item in release["artifacts"] if item["name"] == "trading_calendar"
     ]
@@ -911,7 +999,6 @@ def _selection_calendar_path(
 def _selected_daily_releases(
     astock_root: Path, policy: OdsBasePolicy, through_date: date
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    daily_root = _inside(astock_root, policy.daily.source, "daily.source")
     dates = _open_dates(
         _selection_calendar_path(astock_root, policy, through_date),
         policy.daily.increment_start,
@@ -922,83 +1009,11 @@ def _selected_daily_releases(
     selected: list[dict[str, Any]] = []
     attempt_inventory: list[dict[str, str]] = []
     for market_date in dates:
-        date_root = daily_root / market_date.isoformat()
-        pointer = _object(date_root / "CURRENT.json")
-        attempt_id = _text(pointer, "attempt_id")
-        if _RELEASE_ATTEMPT.fullmatch(attempt_id) is None:
-            raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
-        market = _ready_release(date_root / attempt_id, market_date)
-        if (
-            pointer.get("market_date") != market_date.isoformat()
-            or pointer.get("schedule") != "daily"
-            or pointer.get("manifest_sha256") != market["manifest_sha256"]
-            or not set(policy.daily.market_required_artifacts).issubset(market["artifact_names"])
-        ):
-            raise OdsBaseError(f"daily market CURRENT is incomplete or inconsistent: {market_date}")
-        selected.append(
-            {
-                **market,
-                "release_role": "market",
-                "source_node": "hermes",
-                "source_path": date_root.relative_to(astock_root).as_posix(),
-                "gap_fill": None,
-            }
+        market, events, inventory = _selected_daily_date_releases(
+            astock_root, policy, market_date
         )
-
-        event_candidates: list[dict[str, Any]] = []
-        for attempt_root in sorted(date_root.iterdir()):
-            if not attempt_root.is_dir() or attempt_root.name == attempt_id:
-                continue
-            try:
-                candidate = _ready_release(attempt_root, market_date)
-            except OdsBaseError:
-                attempt_inventory.append(
-                    {
-                        "path": attempt_root.relative_to(astock_root).as_posix(),
-                        "classification": "excluded_failed_or_incomplete_attempt",
-                        "reason": "attempt did not pass immutable READY and artifact verification",
-                    }
-                )
-                continue
-            if set(policy.daily.event_required_artifacts).issubset(candidate["artifact_names"]):
-                event_candidates.append(candidate)
-            else:
-                attempt_inventory.append(
-                    {
-                        "path": attempt_root.relative_to(astock_root).as_posix(),
-                        "classification": "excluded_superseded_market_attempt",
-                        "reason": "market authority is the date-local CURRENT descriptor",
-                    }
-                )
-        if not event_candidates:
-            raise OdsBaseError(f"no complete daily event release for {market_date}")
-        event_candidates.sort(key=lambda item: (item["created_at"], item["attempt_id"]))
-        event = event_candidates[-1]
-        selected.append(
-            {
-                **event,
-                "release_role": "events",
-                "source_node": "hermes",
-                "source_path": date_root.relative_to(astock_root).as_posix(),
-                "gap_fill": None,
-            }
-        )
-        for candidate in event_candidates[:-1]:
-            attempt_inventory.append(
-                {
-                    "path": candidate["root"].relative_to(astock_root).as_posix(),
-                    "classification": "excluded_superseded_event_attempt",
-                    "reason": "latest complete READY event release wins under policy",
-                }
-            )
-        attempt_inventory.extend(
-            {
-                "path": item["root"].relative_to(astock_root).as_posix(),
-                "classification": "included_selected_daily_release",
-                "reason": f"selected {item['release_role']} release",
-            }
-            for item in (selected[-2], selected[-1])
-        )
+        selected.extend((market, events))
+        attempt_inventory.extend(inventory)
     return selected, attempt_inventory
 
 

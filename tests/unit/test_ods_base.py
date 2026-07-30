@@ -480,6 +480,31 @@ class OdsBaseTests(unittest.TestCase):
         self.assertEqual(inventory["through_date"], "2026-07-30")
         self.assertEqual(len(inventory["daily_releases"]), 4)
 
+    def test_daily_current_may_authorize_the_event_role(self) -> None:
+        date_root = self._daily_root() / "2026-07-30"
+        event_release = date_root / "event-attempt" / "release.json"
+        self._write_json(
+            date_root / "CURRENT.json",
+            {
+                "schema_version": 1,
+                "schedule": "daily",
+                "market_date": "2026-07-30",
+                "attempt_id": "event-attempt",
+                "manifest_sha256": _sha256(event_release),
+            },
+        )
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=self.policy,
+        )
+        roles = {
+            item["release_role"]: item["attempt_id"]
+            for item in inventory["daily_releases"]
+            if item["release_role"] in {"market", "events"}
+        }
+        self.assertEqual(roles, {"market": "market-attempt", "events": "event-attempt"})
+
     def test_promote_and_load_current(self) -> None:
         output = self._build()
         base_root = self.root / "node" / "base"

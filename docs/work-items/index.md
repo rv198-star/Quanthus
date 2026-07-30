@@ -26,8 +26,10 @@ rollback, correction/revocation records, and accepted-ODS recovery evidence. For
 deployment, the three historical bootstrap bundles, role isolation, and development replay
 equivalence are accepted in `docs/acceptance/issue-45-portable-ads-20260730.md`. Catalog-native ADS
 publication, independent restore qualification, and consumer migration remain active work. The
-historical 2025 bootstrap proves physical role separation only; prior developer visibility prevents
-it from serving as genuine unopened blind evidence.
+additive 2026 recent-research backfill is accepted in
+`docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md`; it changes no existing bundle or
+consumer pointer. The historical 2025 bootstrap proves physical role separation only; prior
+developer visibility prevents it from serving as genuine unopened blind evidence.
 
 ## P1 data foundation
 

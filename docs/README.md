@@ -43,7 +43,8 @@ nodes.
   `p1-historical-replay-2026-through-20260727-v1`, corporate-action policy v3, and portable ADS
   policy v2. It covers decisions through 2026-07-24 with next-open execution context on 2026-07-27,
   remains readable only as `development_research`, and does not rewrite the original three bundles
-  or any mutable pointer.
+  or any mutable pointer. Formal publication and 134-frame replay evidence are accepted in
+  `acceptance/issue-45-2026-research-ads-backfill-20260730.md`.
 - The frozen P3 capability fixture has a versioned card, concrete feature/label/expert/
   action chain, strict static-industry input, five fixed-capital-unit replay, P2-backed fills and
   settlement, four-source exits, carried orders, cooldown, benchmark metrics, and populated

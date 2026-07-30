@@ -349,6 +349,22 @@ class StrategyReplayADSTests(unittest.TestCase):
             frames = reader.frames(date(2026, 1, 5), date(2026, 1, 7))
             self.assertEqual(len(frames), 3)
             self.assertEqual(frames[-1].execution_date, date(2026, 1, 8))
+            final_session = frames[-1].source.session("SZSE-000001")
+            self.assertEqual(final_session.session_date, date(2026, 1, 8))
+            self.assertEqual(
+                final_session.close_at,
+                datetime(2026, 1, 8, 15, 0, tzinfo=SHANGHAI),
+            )
+            self.assertIn(".execution.20260108", final_session.snapshot_id)
+            self.assertIn(
+                "authorized-by-decision=2026-01-07",
+                final_session.source_revision,
+            )
+            with self.assertRaisesRegex(
+                StrategyReplayADSError,
+                "next session of an authorized ADS decision",
+            ):
+                reader._session("SZSE-000001", date(2026, 1, 9))
             scoped_benchmark = reader.load_benchmark()
             self.assertEqual(scoped_benchmark.instrument_id, "sh000300")
             self.assertEqual(scoped_benchmark.observations[-1].market_date, date(2026, 1, 8))

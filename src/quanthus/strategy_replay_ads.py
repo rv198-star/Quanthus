@@ -1526,6 +1526,13 @@ class StrategyReplayADSFrameReader(HistoricalReplayFrameReader):
         self._accesses: list[tuple[str, str]] = []
         self._runner_access_count = 0
         super().__init__(ads_bundle.historical_bundle)
+        self._execution_decisions = {
+            execution_date: decision_date
+            for decision_date, execution_date in self._date_pairs(
+                ads_bundle.decision_start,
+                ads_bundle.decision_end,
+            )
+        }
 
     @property
     def ads_identity(self) -> Mapping[str, str]:
@@ -1578,18 +1585,38 @@ class StrategyReplayADSFrameReader(HistoricalReplayFrameReader):
         return load_static_industry_mapping(paths[0], expected_version=expected_version)
 
     def _snapshot(self, market_date: date, *, role: str) -> SnapshotRef:
-        try:
-            binding = self._ads_bundle.pit_bindings[market_date]
-        except KeyError as exc:
-            raise StrategyReplayADSError(
-                f"decision date is missing its ADS PIT binding: {market_date.isoformat()}"
-            ) from exc
+        if role == "decision":
+            try:
+                binding = self._ads_bundle.pit_bindings[market_date]
+            except KeyError as exc:
+                raise StrategyReplayADSError(
+                    f"decision date is missing its ADS PIT binding: {market_date.isoformat()}"
+                ) from exc
+            knowledge_cutoff = binding.decision_cutoff
+            authorization = f"decision={market_date.isoformat()}"
+        elif role == "execution":
+            try:
+                decision_date = self._execution_decisions[market_date]
+                binding = self._ads_bundle.pit_bindings[decision_date]
+            except KeyError as exc:
+                raise StrategyReplayADSError(
+                    "execution date is not the next session of an authorized ADS decision: "
+                    f"{market_date.isoformat()}"
+                ) from exc
+            knowledge_cutoff = datetime.combine(
+                market_date,
+                time(15, 0),
+                tzinfo=MARKET_TIMEZONE,
+            )
+            authorization = f"authorized-by-decision={decision_date.isoformat()}"
+        else:
+            raise StrategyReplayADSError(f"unsupported ADS snapshot role: {role}")
         return SnapshotRef(
             market_date=market_date,
-            knowledge_cutoff=binding.decision_cutoff,
+            knowledge_cutoff=knowledge_cutoff,
             source_revision=(
                 f"{self.bundle.snapshot.source_revision}|pit-mode={binding.evidence_mode}"
-                f"|pit-status={binding.evidence_status}"
+                f"|pit-status={binding.evidence_status}|{authorization}"
             ),
             snapshot_id=(
                 f"{self.bundle.snapshot.snapshot_id}.{role}.{market_date.strftime('%Y%m%d')}"

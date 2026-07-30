@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Verify one sealed DWD/DWS Base pair and its exact projection binding."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from quanthus.pipelines.dwd_dws_base import (
+    DwdDwsBaseError,
+    load_dwd_dws_base_policy,
+    verify_dwd_dws_base_pair,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-policy", type=Path, required=True)
+    parser.add_argument("--dwd", type=Path, required=True)
+    parser.add_argument("--dws", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        pair = verify_dwd_dws_base_pair(
+            dwd_root=args.dwd,
+            dws_root=args.dws,
+            policy=load_dwd_dws_base_policy(args.base_policy),
+        )
+    except (DwdDwsBaseError, FileExistsError, OSError) as exc:
+        print(f"DWD/DWS Base verification failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "dwd_content_digest": pair.dwd.content_digest,
+                "dwd_manifest_sha256": pair.dwd.manifest_sha256,
+                "dwd_package_id": pair.dwd.package_id,
+                "dws_content_digest": pair.dws.content_digest,
+                "dws_manifest_sha256": pair.dws.manifest_sha256,
+                "dws_package_id": pair.dws.package_id,
+                "input_ledger_digest": pair.dwd.input_ledger_digest,
+                "through_date": pair.dwd.through_date.isoformat(),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

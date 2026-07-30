@@ -14,6 +14,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | active |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | planned |
 | META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and portable ADS | active; cutover blocked |
+| META-DATA-BASE-002 | Build authoritative DWD/DWS July Base (Issue #48) | active; Phase A tooling implemented |
 
 `META-DATA-PIPE-003` is governed by ADR 0005 and GitHub issue #45. Implementation is limited to
 copy-only contract, shadow, comparison, recovery, and release-set work beside the legacy path. It
@@ -41,6 +42,13 @@ genuine unopened blind evidence. Daily candidate-success catalog automation is d
 idempotent node-local execution is accepted in
 `docs/acceptance/issue-45-daily-history-catalog-automation-20260730.md`; the first real scheduled
 success trigger remains pending.
+
+`META-DATA-BASE-002` is governed by ADR 0005, LLD 01, and GitHub issue #48. The repository now
+implements canonical input-ledger freeze, deterministic provisional DWD/DWS package construction,
+exact DWS reprojection, clean verification, copy-only installation, SHA-preconditioned Base
+descriptors, and Base-aware lane catalogs. OCI local dry-run evidence is recorded in
+`docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. Three-node publication, catalog
+rebuilds against the new Base, restore/rebuild evidence, and the final July pair remain open.
 
 ## P1 data foundation
 

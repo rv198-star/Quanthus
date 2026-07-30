@@ -99,6 +99,12 @@ nodes.
   Candidate-success-driven daily lane-history refresh is deployed on both producer nodes in
   `acceptance/issue-45-daily-history-catalog-automation-20260730.md`; installation and idempotent
   execution are accepted, while the first real scheduled `OnSuccess` observation remains pending.
+- Issue #48 Phase A tooling now freezes one canonical input ledger and builds separate immutable
+  provisional DWD/DWS Base packages through 2026-07-30. A real OCI-local clean-path dry-run passed
+  exact DWS reprojection and guarded install/descriptor rehearsals in
+  `acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. No package was installed on the
+  three target nodes and no live or consumer pointer changed; final July publication remains
+  blocked on Issue #47 and the accepted July 31 generation.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional

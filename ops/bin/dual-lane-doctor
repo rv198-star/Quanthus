@@ -124,6 +124,12 @@ if [[ "$role" == "node" ]]; then
   history_base_root="${QUANTHUS_DUAL_LANE_HISTORY_BASE_ROOT:?set the sealed history-base root}"
   history_base_current="${QUANTHUS_DUAL_LANE_HISTORY_BASE_CURRENT:?set history-base CURRENT}"
   history_catalog_root="${QUANTHUS_DUAL_LANE_HISTORY_CATALOG_ROOT:?set lane-history catalog root}"
+  platform_root="${QUANTHUS_PLATFORM_ROOT:-/srv/quanthus}"
+  monthly_base_policy="${QUANTHUS_DWD_DWS_BASE_POLICY:-${repo_root}/config/pipelines/dwd-dws-base-through-20260730.v1.json}"
+  dwd_base_root="${QUANTHUS_DWD_BASE_ROOT:-/srv/quanthus/dwd/base}"
+  dws_base_root="${QUANTHUS_DWS_BASE_ROOT:-/srv/quanthus/dws/base}"
+  dwd_base_current="${QUANTHUS_DWD_BASE_CURRENT:-${dwd_base_root}/BASE_CURRENT.json}"
+  dws_base_current="${QUANTHUS_DWS_BASE_CURRENT:-${dws_base_root}/BASE_CURRENT.json}"
   epoch_user="${QUANTHUS_DUAL_LANE_EPOCH_USER:-quanthus-epoch-in}"
   candidate_user="${QUANTHUS_DUAL_LANE_CANDIDATE_USER:-quanthus-candidate-ro}"
   [[ "$epoch_user" != "$candidate_user" ]] || fail "epoch ingress and candidate export must use separate users"
@@ -134,7 +140,15 @@ if [[ "$role" == "node" ]]; then
   [[ "$storage_root" == /srv/quanthus/dual-lane ]] || fail "node storage root must be /srv/quanthus/dual-lane"
   [[ "$history_base_root" == /srv/quanthus/dual-lane/history-bases ]] || fail "node history-base root must be /srv/quanthus/dual-lane/history-bases"
   [[ "$history_catalog_root" == /srv/quanthus/dual-lane/lane-history ]] || fail "node lane-history root must be /srv/quanthus/dual-lane/lane-history"
+  [[ "$platform_root" == /srv/quanthus ]] || fail "node platform root must be /srv/quanthus"
   [[ -f "$history_policy" && -f "$history_base_current" ]] || fail "node history policy or base CURRENT is missing"
+  if [[ -f "$dwd_base_current" || -f "$dws_base_current" ]]; then
+    [[ -f "$dwd_base_current" && -f "$dws_base_current" && -f "$monthly_base_policy" ]] || \
+      fail "active monthly DWD/DWS Base descriptors or policy are incomplete"
+    monthly_base_active=1
+  else
+    monthly_base_active=0
+  fi
 
   require_account "$epoch_user" "$epoch_user"
   require_account "$candidate_user" "$candidate_user"
@@ -145,6 +159,12 @@ if [[ "$role" == "node" ]]; then
   require_canonical_dir "$candidate_root" "candidate root"
   require_canonical_dir "$history_base_root" "history-base root"
   require_canonical_dir "$history_catalog_root" "lane-history root"
+  if (( monthly_base_active )); then
+    require_canonical_dir "$dwd_base_root" "DWD Base root"
+    require_canonical_dir "$dws_base_root" "DWS Base root"
+    require_owner_mode "$dwd_base_root" root "$candidate_user" 750
+    require_owner_mode "$dws_base_root" root "$candidate_user" 750
+  fi
   require_owner_mode /srv/quanthus/dual-lane root root 755
   require_owner_mode "$epoch_ingress_root" "$epoch_user" "$epoch_user" 750
   require_owner_mode "$epoch_staging_root" root root 700
@@ -167,7 +187,11 @@ if [[ "$role" == "node" ]]; then
   if runuser -u "$candidate_user" -- test -w "$candidate_root"; then
     fail "$candidate_user must not be able to write the candidate root"
   fi
-  for readable_root in "$history_base_root" "$history_catalog_root"; do
+  readable_roots=("$history_base_root" "$history_catalog_root")
+  if (( monthly_base_active )); then
+    readable_roots+=("$dwd_base_root" "$dws_base_root")
+  fi
+  for readable_root in "${readable_roots[@]}"; do
     runuser -u "$candidate_user" -- test -r "$readable_root" || fail "$candidate_user cannot read $readable_root"
     runuser -u "$candidate_user" -- test -x "$readable_root" || fail "$candidate_user cannot traverse $readable_root"
     if runuser -u "$candidate_user" -- test -w "$readable_root"; then
@@ -192,11 +216,22 @@ if [[ "$role" == "node" ]]; then
   require_authorized_keys "$epoch_user" "/usr/bin/rrsync -wo -no-del ${epoch_ingress_root}"
   require_authorized_keys "$candidate_user" "/usr/bin/rrsync -ro ${candidate_root}"
   catalog_current="${history_catalog_root%/}/${QUANTHUS_DUAL_LANE_NODE_ID:?set node id}/CURRENT.json"
-  PYTHONPATH="${repo_root}/src" "$python_bin" "${repo_root}/ops/bin/verify-dual-lane-history" \
-    --policy "$history_policy" \
-    --storage-root "$storage_root" \
-    --base-current "$history_base_current" \
-    --catalog-current "$catalog_current" >/dev/null || fail "sealed history base or lane catalog is invalid"
+  if (( monthly_base_active )); then
+    PYTHONPATH="${repo_root}/src" "$python_bin" "${repo_root}/ops/bin/verify-dwd-dws-base-catalog" \
+      --base-policy "$monthly_base_policy" \
+      --platform-root "$platform_root" \
+      --dwd-base-current "$dwd_base_current" \
+      --dws-base-current "$dws_base_current" \
+      --catalog-current "$catalog_current" >/dev/null || \
+      fail "active monthly Base or lane catalog is invalid"
+  else
+    PYTHONPATH="${repo_root}/src" "$python_bin" "${repo_root}/ops/bin/verify-dual-lane-history" \
+      --policy "$history_policy" \
+      --storage-root "$storage_root" \
+      --base-current "$history_base_current" \
+      --catalog-current "$catalog_current" >/dev/null || \
+      fail "sealed history base or lane catalog is invalid"
+  fi
 else
   (( EUID == 0 )) || fail "OCI preflight must run as root"
   [[ -f /etc/quanthus/dual-lane-oci.env ]] || fail "OCI environment file is missing"

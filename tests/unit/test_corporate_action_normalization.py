@@ -17,7 +17,7 @@ from quanthus.corporate_action_normalization import (
     load_corporate_action_normalization_policy,
     normalize_corporate_action,
 )
-from quanthus.policy import ConfigurationError
+from quanthus.policy import ConfigurationError, find_project_root
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
@@ -71,6 +71,29 @@ def evidence(
 class CorporateActionNormalizationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.policy = load_corporate_action_normalization_policy()
+
+    def test_v3_changes_only_policy_and_exception_ledger_identities(self) -> None:
+        root = find_project_root()
+        v2 = load_corporate_action_normalization_policy(
+            root / "config" / "p1-corporate-action-normalization.v2.json"
+        )
+        v3 = load_corporate_action_normalization_policy(
+            root / "config" / "p1-corporate-action-normalization.v3.json"
+        )
+
+        self.assertEqual(
+            replace(
+                v3,
+                policy_version=v2.policy_version,
+                exception_ledger_version=v2.exception_ledger_version,
+            ),
+            v2,
+        )
+        self.assertEqual(v3.policy_version, "p1-corporate-action-normalization-20260730-v3")
+        self.assertEqual(
+            v3.exception_ledger_version,
+            "p1-corporate-action-exceptions-20260730-v2",
+        )
 
     def test_per_share_cash_is_selected_by_factor_evidence(self) -> None:
         result = normalize_corporate_action(evidence(), self.policy)

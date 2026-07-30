@@ -31,6 +31,22 @@ class StrategyADSBoundaryContractTests(unittest.TestCase):
             publisher,
         )
 
+    def test_publisher_treats_recent_research_as_development_access(self) -> None:
+        publisher = (
+            Path(__file__).resolve().parents[2]
+            / "ops"
+            / "bin"
+            / "publish-strategy-replay-ads"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("recent_research)", publisher)
+        self.assertIn("reader_role=development_research", publisher)
+        self.assertIn(
+            "[[ ${scope_id} == arbitration || ${scope_id} == permanent_blind ]]",
+            publisher,
+        )
+        self.assertNotIn("[[ ${scope_id} != development ]]", publisher)
+
     def test_strategy_replay_commands_require_ads_capabilities(self) -> None:
         parser = _parser()
         subparsers = next(action for action in parser._actions if getattr(action, "choices", None))

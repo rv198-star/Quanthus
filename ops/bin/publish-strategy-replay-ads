@@ -3,7 +3,7 @@ set -euo pipefail
 umask 0027
 
 if [[ $# -ne 2 ]]; then
-  echo "usage: $0 <development|arbitration|permanent_blind> <bundle-id>" >&2
+  echo "usage: $0 <development|arbitration|permanent_blind|recent_research> <bundle-id>" >&2
   exit 2
 fi
 if [[ ${EUID} -ne 0 ]]; then
@@ -37,6 +37,11 @@ case "${scope_id}" in
     scope_group=quanthus-blind
     reader_user=quanthus-blind
     reader_role=blind_evaluation_operator
+    ;;
+  recent_research)
+    scope_group=ubuntu
+    reader_user=ubuntu
+    reader_role=development_research
     ;;
   *)
     echo "unsupported strategy-replay ADS scope: ${scope_id}" >&2
@@ -113,7 +118,8 @@ if [[ -n ${reader_writable_path} ]]; then
   exit 1
 fi
 
-if [[ ${scope_id} != development ]] && runuser -u ubuntu -- test -r "${bundle_root}/manifest.json"; then
+if [[ ${scope_id} == arbitration || ${scope_id} == permanent_blind ]] \
+  && runuser -u ubuntu -- test -r "${bundle_root}/manifest.json"; then
   echo "development principal can read sealed ${scope_id} ADS" >&2
   exit 1
 fi

@@ -1,0 +1,28 @@
+{
+  "schema_version": "2.0.0",
+  "policy_version": "p1-corporate-action-normalization-20260730-v3",
+  "status": "frozen",
+  "share_quantity_unit": "per_ten_shares",
+  "cash_unit_candidates": ["per_share", "per_ten_shares"],
+  "maximum_factor_ratio_error": "0.005",
+  "minimum_candidate_error_separation": "0.00001",
+  "cross_check_baselines": ["prior_factor", "prior_qfq_ratio"],
+  "authority_precedence": ["eastmoney_implementation_plan", "factor_ratio"],
+  "eastmoney_implementation_plan": {
+    "exact_key": ["security_code", "effective_date"],
+    "assignment_progress": "实施分配",
+    "cash_unit": "per_ten_shares",
+    "quantity_unit": "per_ten_shares",
+    "source_input_quantum": "0.000000000001",
+    "source_match_quantum_floor": "0.00001",
+    "cash_per_share_tolerance": "0.00001",
+    "share_per_ten_tolerance": "0.0001",
+    "source_value_match": "precision_interval_then_business_tolerance",
+    "require_notice_before_effective_date": true,
+    "require_profile_consistency": true
+  },
+  "exception_ledger": {
+    "version": "p1-corporate-action-exceptions-20260730-v2",
+    "replay_disposition": "security_fail_closed"
+  }
+}

@@ -376,8 +376,8 @@ def _parser() -> argparse.ArgumentParser:
     replay_ads_build.add_argument("--industry-mapping", type=Path, required=True)
     replay_ads_build.add_argument(
         "--scope-id",
-        choices=("development", "arbitration", "permanent_blind"),
         required=True,
+        help="scope id declared by --ads-policy",
     )
     replay_ads_build.add_argument("--ads-policy", type=Path)
     replay_ads_build.add_argument("--corporate-action-policy", type=Path)

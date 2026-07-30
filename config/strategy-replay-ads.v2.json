@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "contract_id": "strategy-replay-ads-v2",
+  "profile": "strategy_replay",
+  "context_policy": "all_available_history_through_execution_end",
+  "artifact_discovery": "manifest_tables_parts",
+  "mandatory_year_partitioning": false,
+  "bootstrap_source": {
+    "kind": "accepted_historical_replay_snapshot_bootstrap",
+    "snapshot_id": "p1-historical-replay-2026-through-20260727-v1",
+    "bundle_digest": "sha256:17a1a02f4a4fffb2bcf25aab1bbc429f776af0802948f1afdcbdbf621cbcd304",
+    "manifest_sha256": "sha256:d86260353ac79313965fe847e87b2b5b3c87dddd5d36e6f7527973d9cd4c2fc1"
+  },
+  "profile_tables": {
+    "benchmark_curve": {
+      "instrument_id": "sh000300",
+      "logical_digest": "sha256:b6626b93375e7c826df5f0775adb04bcfd134eb7512d9f6952397844059ac09f",
+      "file_sha256": "sha256:669021379583551af352624182f312e32105979440bce6851da0a39a29605434"
+    },
+    "static_industry_mapping": {
+      "mapping_version": "static-level1-concentration-research-v1",
+      "logical_digest": "sha256:8a3ce0af78706039d5423740378d102ef9b17eec05ec5ceada679143104eb45a",
+      "file_sha256": "sha256:4ee486decef111c854576b74217a228015eb463b82efe87505c9715d4e70ca31"
+    }
+  },
+  "scopes": {
+    "development": {
+      "partition_start": "2012-01-01",
+      "partition_end": "2021-12-31",
+      "reader_role": "development_research"
+    },
+    "arbitration": {
+      "partition_start": "2022-01-01",
+      "partition_end": "2024-12-31",
+      "reader_role": "arbitration_operator"
+    },
+    "permanent_blind": {
+      "partition_start": "2025-01-01",
+      "partition_end": "2025-12-31",
+      "reader_role": "blind_evaluation_operator"
+    },
+    "recent_research": {
+      "partition_start": "2026-01-01",
+      "partition_end": "2026-07-27",
+      "reader_role": "development_research"
+    }
+  }
+}

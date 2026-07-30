@@ -383,16 +383,19 @@ def load_strategy_replay_ads_policy(path: Path | None = None) -> StrategyReplayA
     ):
         raise ConfigurationError("strategy-replay ADS profile identities are invalid")
     scope_values = raw["scopes"]
-    if not isinstance(scope_values, dict) or set(scope_values) != {
-        "development",
-        "arbitration",
-        "permanent_blind",
-    }:
-        raise ConfigurationError("strategy-replay ADS scopes are incomplete")
+    if not isinstance(scope_values, dict) or not scope_values:
+        raise ConfigurationError("strategy-replay ADS scopes must be a non-empty object")
+    required_scope_ids = ("development", "arbitration", "permanent_blind")
+    scope_ids = tuple(scope_values)
+    if scope_ids[: len(required_scope_ids)] != required_scope_ids:
+        raise ConfigurationError(
+            "strategy-replay ADS scopes must retain the governed base scope order"
+        )
     scopes: dict[str, StrategyReplayADSScope] = {}
     prior_end: date | None = None
-    roles: set[str] = set()
-    for scope_id in ("development", "arbitration", "permanent_blind"):
+    for scope_id in scope_ids:
+        if not isinstance(scope_id, str) or not _SAFE_ID.fullmatch(scope_id):
+            raise ConfigurationError("strategy-replay ADS scope id is invalid")
         value = scope_values[scope_id]
         if not isinstance(value, dict) or set(value) != {
             "partition_start",
@@ -413,11 +416,9 @@ def load_strategy_replay_ads_policy(path: Path | None = None) -> StrategyReplayA
             or (prior_end is not None and start <= prior_end)
             or not isinstance(reader_role, str)
             or not reader_role.strip()
-            or reader_role in roles
         ):
             raise ConfigurationError(f"strategy-replay ADS scope boundary is invalid: {scope_id}")
         scopes[scope_id] = StrategyReplayADSScope(scope_id, start, end, reader_role)
-        roles.add(reader_role)
         prior_end = end
     return StrategyReplayADSPolicy(
         contract_id=contract_id,

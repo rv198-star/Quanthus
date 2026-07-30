@@ -20,6 +20,7 @@ from quanthus.corporate_action_normalization import (
 )
 from quanthus.data_foundation import SnapshotCatalog
 from quanthus.industry_mapping import load_static_industry_mapping
+from quanthus.policy import ConfigurationError
 from quanthus.snapshot_publish import (
     SnapshotDatasetPlan,
     SnapshotPublicationPlan,
@@ -314,6 +315,58 @@ class StrategyReplayADSTests(unittest.TestCase):
             policy.scopes["development"].partition_end,
             policy.scopes["arbitration"].partition_start,
         )
+
+    def test_policy_accepts_later_research_scope_with_reused_reader_role(self) -> None:
+        source = Path(__file__).resolve().parents[2] / "config" / "strategy-replay-ads.v1.json"
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        payload["contract_id"] = "strategy-replay-ads-test-recent-v2"
+        payload["scopes"]["recent_research"] = {
+            "partition_start": "2026-01-01",
+            "partition_end": "2026-07-27",
+            "reader_role": "development_research",
+        }
+        policy_path = self.root / "strategy-replay-ads.recent-test.json"
+        policy_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+        policy = load_strategy_replay_ads_policy(policy_path)
+
+        self.assertEqual(tuple(policy.scopes)[-1], "recent_research")
+        self.assertEqual(
+            policy.scopes["recent_research"].reader_role,
+            policy.scopes["development"].reader_role,
+        )
+        self.assertGreater(
+            policy.scopes["recent_research"].partition_start,
+            policy.scopes["permanent_blind"].partition_end,
+        )
+
+    def test_v2_policy_adds_bounded_recent_research_without_changing_v1(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        v1 = load_strategy_replay_ads_policy(root / "config" / "strategy-replay-ads.v1.json")
+        v2 = load_strategy_replay_ads_policy(root / "config" / "strategy-replay-ads.v2.json")
+
+        self.assertEqual(tuple(v1.scopes), ("development", "arbitration", "permanent_blind"))
+        self.assertEqual(tuple(v2.scopes)[:-1], tuple(v1.scopes))
+        self.assertEqual(v2.scopes["recent_research"].partition_start, date(2026, 1, 1))
+        self.assertEqual(v2.scopes["recent_research"].partition_end, date(2026, 7, 27))
+        self.assertEqual(
+            v2.scopes["recent_research"].reader_role,
+            v1.scopes["development"].reader_role,
+        )
+        self.assertEqual(
+            v2.bootstrap_source_snapshot_id,
+            "p1-historical-replay-2026-through-20260727-v1",
+        )
+
+    def test_policy_extension_cannot_remove_governed_base_scopes(self) -> None:
+        source = Path(__file__).resolve().parents[2] / "config" / "strategy-replay-ads.v2.json"
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        del payload["scopes"]["development"]
+        policy_path = self.root / "strategy-replay-ads.missing-base.json"
+        policy_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ConfigurationError, "governed base scope order"):
+            load_strategy_replay_ads_policy(policy_path)
 
     def test_build_filters_future_rows_and_opens_only_through_typed_role_reader(self) -> None:
         output = self._build()

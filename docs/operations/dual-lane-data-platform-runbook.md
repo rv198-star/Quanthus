@@ -177,9 +177,22 @@ sudo /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
   arbitration strategy-replay-arbitration-<revision>
 sudo /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
   permanent_blind strategy-replay-permanent-blind-<revision>
+
+sudo env \
+  QUANTHUS_STRATEGY_ADS_SOURCE=/home/ubuntu/data/quanthus/snapshots/p1-historical-replay-2026-through-20260727-v1 \
+  QUANTHUS_STRATEGY_ADS_BENCHMARK=/home/ubuntu/data/quanthus/benchmarks/csi300-sh000300-2012-20260727.tencent-v2.json \
+  QUANTHUS_STRATEGY_ADS_POLICY=/opt/quanthus/current/config/strategy-replay-ads.v2.json \
+  QUANTHUS_STRATEGY_ADS_CORPORATE_ACTION_POLICY=/opt/quanthus/current/config/p1-corporate-action-normalization.v3.json \
+  /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
+  recent_research strategy-replay-recent-research-<revision>
 ```
 
-Run those three publications serially by default. On the qualified four-CPU OCI shape, at most two
+The recent-research command is additive and development-readable. It must use all four explicit v2
+inputs together; mixing the v2 scope policy with the v1 snapshot, benchmark, or corporate-action
+policy fails identity validation. Do not rebuild the original three scopes under v2 merely to add
+the 2026 backfill.
+
+Run full publications serially by default. On the qualified four-CPU OCI shape, at most two
 full builds may overlap only when `/swapfile-quanthus` is active and allocated as a 12 GiB file,
 `vm.swappiness <= 10`, and the root filesystem has at least 20 GiB free before launch. Never run
 all three scopes concurrently. Each full build computes canonical logical-row digests and can use
@@ -195,7 +208,8 @@ probe: the locked scope principal must traverse and read every path without writ
 actual `/srv/quanthus/portable-ads` target. A build and deep semantic check that pass before this
 probe do not make the overall publisher command successful.
 
-After all three return successfully, prove positive and negative access explicitly:
+After the original three return successfully, prove positive and negative access explicitly. A
+recent-research publication additionally requires the development-role positive probe shown last:
 
 ```bash
 sudo -u ubuntu test -r \
@@ -208,6 +222,8 @@ sudo -u quanthus-arbitration test -r \
   /srv/quanthus/portable-ads/arbitration/strategy-replay-arbitration-<revision>/manifest.json
 sudo -u quanthus-blind test -r \
   /srv/quanthus/portable-ads/permanent_blind/strategy-replay-permanent-blind-<revision>/manifest.json
+sudo -u ubuntu test -r \
+  /srv/quanthus/portable-ads/recent_research/strategy-replay-recent-research-<revision>/manifest.json
 ```
 
 Reproduce the frozen P3 portfolio only from the development bundle and compare its canonical trade

@@ -14,23 +14,31 @@ This profile is the normal immutable input boundary for historical strategy repl
 node receives one explicit bundle and needs no ODS, DWD/DWS, PostgreSQL, mutable `CURRENT`, or
 producer path. The bundle is research-only and cannot authorize an order, notification, or fill.
 
-The delivered bootstrap is assembled from accepted snapshot
-`p1-historical-replay-20260729-v1`. That source was materialized after the historical decision
-dates. It supplies a self-contained historical capability fixture, but does not prove that an
-independently published snapshot existed on every historical decision date. Its PIT map therefore
-records `capability_fixture_without_per_decision_publication_proof` for every decision session.
-Future catalog-native bundles must replace that limitation with exact per-date canonical
-generation and publication lineage.
+The 2012-2025 bootstrap is assembled from accepted snapshot
+`p1-historical-replay-20260729-v1`. The additive 2026 research backfill is assembled from
+`p1-historical-replay-2026-through-20260727-v1`. Both sources were materialized after their
+historical decision dates. They supply self-contained historical capability fixtures, but do not
+prove that an independently published snapshot existed on every historical decision date. Their
+PIT maps therefore record `capability_fixture_without_per_decision_publication_proof` for every
+decision session. Future catalog-native bundles must replace that limitation with exact per-date
+canonical generation and publication lineage.
 
 ## 2. Scope and tables
 
-The policy in `config/strategy-replay-ads.v1.json` freezes three separate bundle scopes:
+The policy in `config/strategy-replay-ads.v1.json` freezes the original three separate bundle
+scopes. `config/strategy-replay-ads.v2.json` retains those boundaries and adds one development-
+readable recent-research scope without reopening arbitration or blind data:
 
 | Scope | Decision partition | Reader role |
 | --- | --- | --- |
 | development | 2012-2021 | `development_research` |
 | arbitration | 2022-2024 | `arbitration_operator` |
 | permanent blind | 2025 | `blind_evaluation_operator` |
+| recent research | 2026-01-01 through 2026-07-27 execution boundary | `development_research` |
+
+The recent scope contains decision sessions from 2026-01-05 through 2026-07-24 and their next-open
+execution context through 2026-07-27. It is an additive research backfill, has no `CURRENT`, and
+does not modify or supersede the original three bundles.
 
 Each bundle may contain earlier warm-up context under
 `all_available_history_through_execution_end`, but cannot contain a row, benchmark observation, or
@@ -71,9 +79,9 @@ full logical digest cost on every run.
 ## 4. Access and replay interface
 
 Formal OCI bundles live below `/srv/quanthus/portable-ads/<scope>/<bundle-id>`. Publication runs as
-root; development is group-readable by `ubuntu`, while arbitration and blind bundles use distinct
-locked system principals. There is no portable ADS `CURRENT` pointer. Every run names one immutable
-bundle id and its exact role.
+root; development and recent research are group-readable by `ubuntu`, while arbitration and blind
+bundles use distinct locked system principals. There is no portable ADS `CURRENT` pointer. Every
+run names one immutable bundle id and its exact role.
 
 The semantic deep check runs in the root-owned publisher with the scope's locked logical reader
 role. A separate OS probe runs as the scope principal and must traverse and read every bundle path
@@ -98,7 +106,7 @@ It is not a normal research entry point and may not be used by a new strategy or
 
 | Concern | Governing path |
 | --- | --- |
-| Policy and scope identities | `config/strategy-replay-ads.v1.json` |
+| Policy and scope identities | `config/strategy-replay-ads.v1.json`, `config/strategy-replay-ads.v2.json` |
 | Publisher, verifier, role reader | `src/quanthus/strategy_replay_ads.py` |
 | Normal CLI boundary | `src/quanthus/cli.py` |
 | OS-role publication | `ops/bin/publish-strategy-replay-ads`, `ops/sysusers.d/quanthus-ads.conf` |
@@ -106,7 +114,10 @@ It is not a normal research entry point and may not be used by a new strategy or
 | Operations | `docs/operations/dual-lane-data-platform-runbook.md` |
 | Deployment evidence | `docs/acceptance/issue-45-portable-ads-20260730.md` |
 
-Acceptance requires three formal bundles, deep checks, exact P3 development reproduction from the
-formal development bundle, role-permission probes, a dependency audit showing strategy consumers
-do not resolve warehouse/snapshot pointers, and retained evidence of size and resource behavior.
-None of those claims authorizes production dual-lane cutover or deletion of legacy data.
+The original migration acceptance requires three formal bundles, deep checks, exact P3 development
+reproduction from the formal development bundle, role-permission probes, a dependency audit showing
+strategy consumers do not resolve warehouse/snapshot pointers, and retained evidence of size and
+resource behavior. A recent-research backfill additionally requires its exact v2 source, benchmark,
+policy identities, continuous-frame audit, development-role probe, and evidence that no existing
+bundle or pointer changed. None of those claims authorizes production dual-lane cutover or deletion
+of legacy data.

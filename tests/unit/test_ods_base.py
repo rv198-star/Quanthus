@@ -146,10 +146,20 @@ class OdsBaseTests(unittest.TestCase):
             self._write_json(path, {"name": name, "date": market_date.isoformat()})
         else:
             path = root / "artifacts" / f"{name}.parquet"
+            rows = (
+                [
+                    {"trade_date": value, "is_open": 1, "exchange": "SSE"}
+                    for value in (
+                        [date(2026, 7, 30)]
+                        if market_date == date(2026, 7, 30)
+                        else [date(2026, 7, 30), market_date]
+                    )
+                ]
+                if name == "trading_calendar"
+                else [{"market_date": market_date, "artifact": name}]
+            )
             pq.write_table(
-                pa.Table.from_pylist(
-                    [{"market_date": market_date, "artifact": name}]
-                ),
+                pa.Table.from_pylist(rows),
                 path,
             )
         return {
@@ -165,7 +175,7 @@ class OdsBaseTests(unittest.TestCase):
         root = self._daily_root() / market_date.isoformat() / attempt
         root.mkdir(parents=True, exist_ok=True)
         required = (
-            ("bars", "status", "calendar")
+            ("bars", "status", "trading_calendar")
             if role == "market"
             else ("announcements", "actions")
         )
@@ -311,7 +321,11 @@ class OdsBaseTests(unittest.TestCase):
                     "daily": {
                         "source": "data/shadow/hermes/releases/daily",
                         "increment_start": "2026-07-30",
-                        "market_required_artifacts": ["bars", "status", "calendar"],
+                        "market_required_artifacts": [
+                            "bars",
+                            "status",
+                            "trading_calendar",
+                        ],
                         "event_required_artifacts": ["announcements", "actions"],
                     },
                     "intraday_releases": [
@@ -448,6 +462,23 @@ class OdsBaseTests(unittest.TestCase):
                 code_revision="a" * 40,
                 source_inventory=inventory,
             )
+
+    def test_latest_accepted_release_extends_a_stale_base_calendar(self) -> None:
+        assert pa is not None
+        assert pq is not None
+        pq.write_table(
+            pa.Table.from_pylist(
+                [{"exchange": "SSE", "trade_date": date(2026, 7, 29), "is_open": 1}]
+            ),
+            self.data / "calendar.parquet",
+        )
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=self.policy,
+        )
+        self.assertEqual(inventory["through_date"], "2026-07-30")
+        self.assertEqual(len(inventory["daily_releases"]), 4)
 
     def test_promote_and_load_current(self) -> None:
         output = self._build()

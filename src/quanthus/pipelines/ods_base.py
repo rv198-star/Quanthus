@@ -866,12 +866,54 @@ def _trading_calendar_path(astock_root: Path, policy: OdsBasePolicy) -> Path:
     return _inside(astock_root, matches[0].source, "trading_calendar.source")
 
 
+def _selection_calendar_path(
+    astock_root: Path, policy: OdsBasePolicy, through_date: date
+) -> Path:
+    canonical = _trading_calendar_path(astock_root, policy)
+    earliest = min(
+        policy.daily.increment_start,
+        *(item.increment_start for item in policy.intraday),
+    )
+    canonical_dates = _open_dates(canonical, earliest, through_date)
+    if canonical_dates and canonical_dates[-1] == through_date:
+        return canonical
+
+    daily_root = _inside(astock_root, policy.daily.source, "daily.source")
+    date_root = daily_root / through_date.isoformat()
+    pointer = _object(date_root / "CURRENT.json")
+    attempt_id = _text(pointer, "attempt_id")
+    if _RELEASE_ATTEMPT.fullmatch(attempt_id) is None:
+        raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
+    release = _ready_release(date_root / attempt_id, through_date)
+    if (
+        pointer.get("market_date") != through_date.isoformat()
+        or pointer.get("schedule") != "daily"
+        or pointer.get("manifest_sha256") != release["manifest_sha256"]
+        or not set(policy.daily.market_required_artifacts).issubset(
+            release["artifact_names"]
+        )
+    ):
+        raise OdsBaseError("through-date market CURRENT is incomplete or inconsistent")
+    calendars = [
+        item for item in release["artifacts"] if item["name"] == "trading_calendar"
+    ]
+    if len(calendars) != 1:
+        raise OdsBaseError("through-date market release has no unique trading calendar")
+    calendar_path = _inside(
+        release["root"], calendars[0]["relative_path"], "trading_calendar artifact"
+    )
+    release_dates = _open_dates(calendar_path, earliest, through_date)
+    if not release_dates or release_dates[-1] != through_date:
+        raise OdsBaseError("through_date is absent from the accepted release calendar")
+    return calendar_path
+
+
 def _selected_daily_releases(
     astock_root: Path, policy: OdsBasePolicy, through_date: date
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     daily_root = _inside(astock_root, policy.daily.source, "daily.source")
     dates = _open_dates(
-        _trading_calendar_path(astock_root, policy),
+        _selection_calendar_path(astock_root, policy, through_date),
         policy.daily.increment_start,
         through_date,
     )
@@ -965,7 +1007,7 @@ def _selected_intraday_releases(
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     selected: list[dict[str, Any]] = []
     attempt_inventory: list[dict[str, str]] = []
-    calendar_path = _trading_calendar_path(astock_root, policy)
+    calendar_path = _selection_calendar_path(astock_root, policy, through_date)
     for spec in policy.intraday:
         release_root = _inside(astock_root, spec.source, "intraday_releases.source")
         exceptions = {item.market_date: item for item in spec.source_exceptions}

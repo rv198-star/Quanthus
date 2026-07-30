@@ -8,6 +8,7 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
+from quanthus.pipelines import dwd_dws_base
 from quanthus.pipelines.dual_lane import EpochInput, LaneCandidate
 from quanthus.pipelines.dual_lane_history import HistoryBaseBundle
 from quanthus.pipelines.dwd_dws_base import (
@@ -418,6 +419,38 @@ class DwdDwsBaseTests(unittest.TestCase):
         self.assertEqual(current.read_bytes(), current_bytes)
         current_value = json.loads(current.read_text(encoding="utf-8"))
         self.assertEqual(current_value["kind"], "dwd_dws_base_lane_history_current")
+
+    def test_projection_difference_materializes_the_dwd_projection_once(self) -> None:
+        dwd_root = self.root / "dwd"
+        dws_root = self.root / "dws"
+        dwd_root.mkdir()
+        dws_root.mkdir()
+        pair = self._pair(dwd_root, dws_root)
+        connection = mock.Mock()
+        connection.execute.side_effect = [
+            mock.Mock(fetchall=mock.Mock(return_value=[(1,), (1,)])),
+            mock.Mock(fetchall=mock.Mock(return_value=[(1,), (2,)])),
+        ]
+        with (
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base._dws_projection_query",
+                return_value="SELECT 1 AS market_date",
+            ),
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base._dataset_parts",
+                return_value=[{"path": "summary.parquet"}],
+            ),
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base._duckdb_connection",
+                return_value=connection,
+            ),
+        ):
+            difference = dwd_dws_base._projection_difference_rows(pair.dwd, pair.dws)
+        self.assertEqual(difference, 2)
+        self.assertEqual(connection.execute.call_count, 2)
+        executed_sql = " ".join(call.args[0] for call in connection.execute.call_args_list)
+        self.assertNotIn("EXCEPT", executed_sql)
+        connection.close.assert_called_once_with()
 
 
 if __name__ == "__main__":

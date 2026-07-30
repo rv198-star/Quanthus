@@ -65,9 +65,11 @@ nodes.
   revocation records, fenced rollback, accepted-ODS recovery receipts, and one self-contained
   `strategy_replay` ADS profile. Three-node deployment, the three physically separate historical
   bootstrap bundles, role probes, and development-bundle replay equivalence are accepted in
-  `acceptance/issue-45-portable-ads-20260730.md`; normal strategy replay now uses an explicit
-  immutable ADS bundle. Qualification, catalog-native publication, independent restore evidence,
-  full PIT/tradability candidate families, and production cutover remain open. The legacy OCI
+  `acceptance/issue-45-portable-ads-20260730.md`; conditional two-build OCI resource qualification
+  is recorded separately in `acceptance/issue-45-ads-parallelism-20260730.md`; normal strategy
+  replay now uses an explicit immutable ADS bundle. Catalog-native publication, independent
+  restore evidence, full PIT/tradability candidate families, and production cutover remain open.
+  The legacy OCI
   full-ODS pull/build path stays live until an explicit cutover gate passes. Migration is copy-only;
   no existing data or evidence may be deleted. Portable bundles use manifest-discovered semantic
   parts without mandatory annual directories. The historical 2025 bootstrap is physically isolated

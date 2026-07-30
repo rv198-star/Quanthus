@@ -179,9 +179,21 @@ sudo /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
   permanent_blind strategy-replay-permanent-blind-<revision>
 ```
 
-Run those three publications sequentially. Each full build computes canonical logical-row digests
-and can consume substantial memory; concurrent builds are not an accepted operating mode. Never
-replace an existing bundle id or use an incomplete staging child as a published artifact.
+Run those three publications serially by default. On the qualified four-CPU OCI shape, at most two
+full builds may overlap only when `/swapfile-quanthus` is active and allocated as a 12 GiB file,
+`vm.swappiness <= 10`, and the root filesystem has at least 20 GiB free before launch. Never run
+all three scopes concurrently. Each full build computes canonical logical-row digests and can use
+approximately 12 GiB RSS. Monitor available memory, swap-in, swap-out, I/O wait, and free disk for
+the whole overlap; stop launching work and return to serial operation if bidirectional paging or
+I/O wait is sustained, disk headroom erodes materially, or a process is terminated under memory
+pressure. Swap is an emergency reserve, not working-memory capacity. Never replace an existing
+bundle id or use an incomplete staging child as a published artifact.
+
+The two-build resource boundary is evidenced by the acceptance record at
+`docs/acceptance/issue-45-ads-parallelism-20260730.md`. It does not waive the final filesystem
+probe: the locked scope principal must traverse and read every path without write access on the
+actual `/srv/quanthus/portable-ads` target. A build and deep semantic check that pass before this
+probe do not make the overall publisher command successful.
 
 After all three return successfully, prove positive and negative access explicitly:
 
@@ -213,8 +225,8 @@ rename, overwrite, or delete legacy ODS, OCI mirrors, DWD/DWS, ADS, logs, or poi
 2. Fast-forward all three Git checkouts to one reviewed commit and build each node's local runtime.
 3. Create the two new jails on CN01 and Hermes and the three target roots on OCI.
 4. Install environment and unit files disabled. Run the applicable doctor on all three nodes.
-5. Backfill and deep-check the three OCI portable strategy ADS bundles sequentially, reproduce P3
-   from the development bundle, and retain the role-access probes.
+5. Backfill and deep-check the three OCI portable strategy ADS bundles under the resource rules
+   above, reproduce P3 from the development bundle, and retain the role-access probes.
 6. Rehearse epoch transfer, both candidate builds, OCI pull/arbitration, and target release-set
    publication for an explicit market date.
 7. Compare target evidence with the legacy result. Confirm the byte/checksum of every legacy

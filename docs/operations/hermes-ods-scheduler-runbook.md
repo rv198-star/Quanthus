@@ -134,6 +134,12 @@ Shadow root defaults to `$ASTOCK_HOME/shadow/hermes-ods-v1`. Canonical
 `$ASTOCK_HOME/releases/{daily,weekly}` and live cron remain untouched until
 `GO_FOR_CUTOVER`.
 
+Within the shadow daily release tree, only `market-daily-core` advances the date-local
+`CURRENT.json`. After `calendar-daily-events` completes, verify that its immutable release and
+watermark exist while the market-data `CURRENT.json` bytes remain unchanged. A changed pointer is
+a candidate-blocking incident; retain both release manifests, restore only the last verified
+market-data descriptor atomically, and do not delete either release.
+
 Python entrypoints:
 
 ```bash

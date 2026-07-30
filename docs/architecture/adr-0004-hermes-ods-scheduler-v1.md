@@ -135,6 +135,11 @@ knowledge cutoff, and checksum. `READY` is written last after all mandatory arti
 manifest are sealed. A release id cannot be reused with changed lineage; reruns create a new
 attempt or revision.
 
+Only a successful `market-daily-core` release may atomically advance the date-local
+`releases/daily/<market-date>/CURRENT.json` used for DWD/DWS candidate selection. Other daily
+lanes, including `calendar-daily-events`, publish complete immutable releases in the same schedule
+tree but never create or replace that market-data selection pointer.
+
 Hermes publishes immutable ODS only. It does not advance OCI `CURRENT`, build DWD/DWS/ADS, or
 write curated PostgreSQL schemas. A soft failure in one dataset cannot be hidden by another
 dataset's success or by a wrapper exiting zero.

@@ -228,6 +228,9 @@ and candidates created before this shared-reference contract remain verifiable a
 evidence, but are ineligible for new candidate construction or arbitration.
 `READY` is written last. Candidate ids are immutable and attempt sequencing is monotonic within
 `(lane_id, market_date)`; a rerun does not reuse an id with different lineage.
+The exact lane ODS `CURRENT` descriptor is owned only by `market-daily-core`. Natural-day event
+releases remain immutable ODS evidence but cannot replace the market-data attempt selected for a
+DWD/DWS candidate.
 
 ### 5.2 Independent gates and arbitration
 

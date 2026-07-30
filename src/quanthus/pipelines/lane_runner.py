@@ -3856,7 +3856,7 @@ def _publish(
     except OdsReleaseError as exc:
         return None, "failed", str(exc)
     # READY is last inside publish_ods_release; do not write anything else here.
-    if schedule == "daily" and stream is None:
+    if lane_id == "market-daily-core" and schedule == "daily" and stream is None:
         verified = verify_ods_release(release_dir)
         _atomic_json(
             release_root / schedule / market_date.isoformat() / "CURRENT.json",

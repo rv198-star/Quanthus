@@ -1099,6 +1099,37 @@ def test_calendar_events(fixture_home: Path, tmp_path: Path) -> None:
     )
     assert result.status == "ready"
     assert result.release_dir is not None
+    assert not (
+        shadow / "releases" / "daily" / "2026-07-24" / "CURRENT.json"
+    ).exists()
+
+
+def test_calendar_events_do_not_replace_market_daily_current(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    shadow = tmp_path / "shadow"
+    paths = _paths(fixture_home, shadow)
+    market_result = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        force_preflight="both_open",
+    )
+    assert market_result.status == "ready"
+    current_path = shadow / "releases" / "daily" / "2026-07-24" / "CURRENT.json"
+    market_current = current_path.read_bytes()
+
+    event_result = run_lane(
+        lane_id="calendar-daily-events",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+    )
+
+    assert event_result.status == "ready"
+    assert event_result.release_dir is not None
+    assert current_path.read_bytes() == market_current
 
 
 def test_weekly_reconciliation_classes(fixture_home: Path, tmp_path: Path) -> None:

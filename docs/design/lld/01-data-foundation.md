@@ -10,7 +10,7 @@
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
-| Dual-lane delivery | repository contract implemented; three-node deployment/qualification and consumer cutover blocked pending evidence and `GO_FOR_CUTOVER` |
+| Dual-lane delivery | three-node shadow deployment and role-scoped historical ADS bootstrap accepted; qualification, catalog-native publication, and consumer cutover blocked pending evidence and `GO_FOR_CUTOVER` |
 
 ## 1. Goal
 
@@ -427,7 +427,7 @@ window cannot silently turn into an unplanned third observation.
 | Immutable ODS handoff and daily DWD/DWS | `src/quanthus/pipelines/`, `config/pipelines/` | `tests/unit/test_ods_handoff.py`, `tests/unit/test_pipeline_runner.py`, `tests/p1/test_daily_warehouse.py` |
 | Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
-| Portable strategy-replay ADS publication and role-scoped consumption | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `ops/bin/publish-strategy-replay-ads` | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `01-data-foundation/strategy-replay-ads.md`; formal backfill/deployment evidence remains open |
+| Portable strategy-replay ADS publication and role-scoped consumption | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `ops/bin/publish-strategy-replay-ads` | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `01-data-foundation/strategy-replay-ads.md`, `docs/acceptance/issue-45-portable-ads-20260730.md` |
 
 ## 8. Work items
 
@@ -491,8 +491,10 @@ The repository contract covers immutable epochs, daily bars/status/summary candi
 primary selection and fail-closed divergence, catalog and release-set construction, limited
 operational ADS, pre-CAS publication intent, fenced atomic `CURRENT`, idempotent retry, correction,
 revocation, rollback, accepted-ODS recovery evidence, and portable strategy-replay ADS. Unit
-coverage is implementation evidence only; formal three-node deployment, portable ADS backfill,
-shadow qualification, full target delivery, and production cutover remain open.
+coverage is implementation evidence only. Formal three-node shadow deployment, portable historical
+ADS bootstrap, role isolation, and development replay equivalence are accepted in
+`docs/acceptance/issue-45-portable-ads-20260730.md`; shadow qualification, catalog-native
+publication, full target delivery, and production cutover remain open.
 
 Production cutover remains blocked until all of the following have stable evidence:
 

@@ -104,6 +104,7 @@ It is not a normal research entry point and may not be used by a new strategy or
 | OS-role publication | `ops/bin/publish-strategy-replay-ads`, `ops/sysusers.d/quanthus-ads.conf` |
 | Contract tests | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py` |
 | Operations | `docs/operations/dual-lane-data-platform-runbook.md` |
+| Deployment evidence | `docs/acceptance/issue-45-portable-ads-20260730.md` |
 
 Acceptance requires three formal bundles, deep checks, exact P3 development reproduction from the
 formal development bundle, role-permission probes, a dependency audit showing strategy consumers

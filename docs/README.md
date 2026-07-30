@@ -63,13 +63,16 @@ nodes.
   Repository contracts now cover exact ODS-attempt selection, trusted Shanghai-time windows,
   fenced lease tokens and SHA-precondition pointer CAS, cutover gating, immutable correction and
   revocation records, fenced rollback, accepted-ODS recovery receipts, and one self-contained
-  `strategy_replay` ADS profile. Runtime deployment, qualification, independent restore evidence,
+  `strategy_replay` ADS profile. Three-node deployment, the three physically separate historical
+  bootstrap bundles, role probes, and development-bundle replay equivalence are accepted in
+  `acceptance/issue-45-portable-ads-20260730.md`; normal strategy replay now uses an explicit
+  immutable ADS bundle. Qualification, catalog-native publication, independent restore evidence,
   full PIT/tradability candidate families, and production cutover remain open. The legacy OCI
   full-ODS pull/build path stays live until an explicit cutover gate passes. Migration is copy-only;
   no existing data or evidence may be deleted. Portable bundles use manifest-discovered semantic
-  parts without mandatory annual directories. The historical 2025 bootstrap may be physically
-  isolated for migration, but because its source was already visible to the development principal
-  it is not evidence of a genuinely unopened blind evaluation.
+  parts without mandatory annual directories. The historical 2025 bootstrap is physically isolated
+  for migration, but because its source was already visible to the development principal it is not
+  evidence of a genuinely unopened blind evaluation.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional

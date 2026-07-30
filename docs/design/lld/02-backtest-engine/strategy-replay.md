@@ -6,7 +6,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | strategy-neutral replay accepted; three baseline suite accepted; governed five-unit development accepted; normal research boundary migrated to role-scoped portable ADS; formal ADS backfill/deployment evidence pending |
+| Implementation status | strategy-neutral replay accepted; three baseline suite accepted; governed five-unit development accepted; normal research boundary and formal historical bootstrap migrated to role-scoped portable ADS |
 | Continuous corpus gate | accepted by `p1-historical-replay-20260729-v1` |
 | Governing work | `P3-REPLAY-001` |
 | Governing requirements | FR-BT-001/002/003/004/006, FR-AUDIT-001/002 |

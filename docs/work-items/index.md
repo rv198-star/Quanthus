@@ -47,8 +47,10 @@ success trigger remains pending.
 implements canonical input-ledger freeze, deterministic provisional DWD/DWS package construction,
 exact DWS reprojection, clean verification, copy-only installation, SHA-preconditioned Base
 descriptors, and Base-aware lane catalogs. OCI local dry-run evidence is recorded in
-`docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. Three-node publication, catalog
-rebuilds against the new Base, restore/rebuild evidence, and the final July pair remain open.
+`docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`; the clean provisional pair is
+installed in OCI's authoritative Base roots without advancing either active descriptor. Three-node
+publication, catalog rebuilds against the new Base, restore/rebuild evidence, and the final July
+pair remain open.
 
 ## P1 data foundation
 

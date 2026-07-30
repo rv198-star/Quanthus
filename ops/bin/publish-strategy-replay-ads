@@ -103,9 +103,9 @@ PYTHONPATH="${repo_root}/src" "${python_bin}" -m quanthus check-strategy-replay-
   --corporate-action-policy "${corporate_action_policy}" >/dev/null
 
 runuser -u "${reader_user}" -- \
-  find "${bundle_root}" -type d -exec test -x {} +
+  find "${bundle_root}" -type d -exec test -x {} \;
 runuser -u "${reader_user}" -- \
-  find "${bundle_root}" -type f -exec test -r {} +
+  find "${bundle_root}" -type f -exec test -r {} \;
 reader_writable_path=$(runuser -u "${reader_user}" -- \
   find "${bundle_root}" -writable -print -quit)
 if [[ -n ${reader_writable_path} ]]; then

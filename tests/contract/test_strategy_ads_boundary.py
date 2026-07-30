@@ -16,9 +16,11 @@ class StrategyADSBoundaryContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         semantic_check = '"${python_bin}" -m quanthus check-strategy-replay-ads'
-        role_read_probe = 'find "${bundle_root}" -type f -exec test -r {} +'
+        role_traverse_probe = 'find "${bundle_root}" -type d -exec test -x {} \\;'
+        role_read_probe = 'find "${bundle_root}" -type f -exec test -r {} \\;'
         role_write_probe = 'find "${bundle_root}" -writable -print -quit'
         self.assertIn(semantic_check, publisher)
+        self.assertIn(role_traverse_probe, publisher)
         self.assertIn(role_read_probe, publisher)
         self.assertIn(role_write_probe, publisher)
         self.assertLess(publisher.index(semantic_check), publisher.index(role_read_probe))

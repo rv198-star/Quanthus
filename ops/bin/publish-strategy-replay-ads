@@ -44,7 +44,7 @@ case "${scope_id}" in
     ;;
 esac
 
-for command in git getent runuser; do
+for command in env git getent runuser; do
   command -v "${command}" >/dev/null
 done
 [[ -x ${python_bin} ]]
@@ -102,11 +102,11 @@ PYTHONPATH="${repo_root}/src" "${python_bin}" -m quanthus check-strategy-replay-
   --ads-policy "${ads_policy}" \
   --corporate-action-policy "${corporate_action_policy}" >/dev/null
 
-runuser -u "${reader_user}" -- \
+runuser -u "${reader_user}" -- env -C / \
   find "${bundle_root}" -type d -exec test -x {} \;
-runuser -u "${reader_user}" -- \
+runuser -u "${reader_user}" -- env -C / \
   find "${bundle_root}" -type f -exec test -r {} \;
-reader_writable_path=$(runuser -u "${reader_user}" -- \
+reader_writable_path=$(runuser -u "${reader_user}" -- env -C / \
   find "${bundle_root}" -writable -print -quit)
 if [[ -n ${reader_writable_path} ]]; then
   echo "${reader_user} can modify strategy-replay ADS path: ${reader_writable_path}" >&2

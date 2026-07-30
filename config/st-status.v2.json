@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.1.0",
+  "policy_version": "st-status-pit.v2",
+  "authoritative_binary_source": "baostock.query_history_k_data_plus.isST",
+  "states": [
+    "non_st_class",
+    "st_class",
+    "unknown"
+  ],
+  "execution_visibility": "a status observed on market session T is first usable on the next open exchange session",
+  "unknown_behavior": "block_new_positions",
+  "missing_observation": {
+    "allow_when_source_bar_missing": true,
+    "result": "unknown_fail_closed"
+  },
+  "detail_behavior": "do_not_infer_ST_starST_or_delisting_risk_subclasses",
+  "incremental": {
+    "schedule": "weekly",
+    "lookback_calendar_days": 90,
+    "publication": "new_immutable_revision",
+    "parent_required_after_initial_publication": true
+  },
+  "out_of_scope_code_prefixes": [
+    "920"
+  ],
+  "excluded_security_ids": [
+    "689009"
+  ]
+}

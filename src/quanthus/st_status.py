@@ -109,6 +109,12 @@ def _load_policy(path: Path) -> dict[str, Any]:
     excluded = payload.get("excluded_security_ids", [])
     if not isinstance(excluded, list) or any(not str(item).strip() for item in excluded):
         raise StStatusBuildError("excluded_security_ids must be a list of non-empty ids")
+    missing_observation = payload.get("missing_observation")
+    if missing_observation is not None and missing_observation != {
+        "allow_when_source_bar_missing": True,
+        "result": "unknown_fail_closed",
+    }:
+        raise StStatusBuildError("unsupported missing-observation policy")
     return payload
 
 
@@ -134,6 +140,8 @@ def build_st_status_revision(
     parent = parent.resolve() if parent is not None else None
     if not revision.strip():
         raise StStatusBuildError("revision must not be empty")
+    policy = _load_policy(policy_path)
+    explain_missing_with_bar = "missing_observation" in policy
     required = (
         candidate / "daily_isST.parquet",
         candidate / "daily_universe.parquet",
@@ -141,22 +149,23 @@ def build_st_status_revision(
         candidate / "META.json",
         candidate / "CHECKSUMS.sha256",
     )
+    if explain_missing_with_bar:
+        required += (candidate / "daily_ohlcv_none.parquet",)
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
         raise StStatusBuildError("required candidate inputs are missing: " + ", ".join(missing))
     if output.exists():
         raise FileExistsError(f"refusing to overwrite S2 revision: {output}")
-    policy = _load_policy(policy_path)
     excluded_ids = tuple(str(item) for item in policy.get("excluded_security_ids", []))
     excluded_predicate = (
         "security_id NOT IN (" + ", ".join(_sql_string(item) for item in excluded_ids) + ")"
         if excluded_ids
         else "TRUE"
     )
-    _verify_candidate_checksums(
-        candidate,
-        ("daily_isST.parquet", "daily_universe.parquet", "st_status_pit.parquet"),
-    )
+    checksum_inputs = ["daily_isST.parquet", "daily_universe.parquet", "st_status_pit.parquet"]
+    if explain_missing_with_bar:
+        checksum_inputs.append("daily_ohlcv_none.parquet")
+    _verify_candidate_checksums(candidate, tuple(checksum_inputs))
 
     try:
         import duckdb
@@ -170,6 +179,7 @@ def build_st_status_revision(
         daily = _source(candidate / "daily_isST.parquet")
         universe = _source(candidate / "daily_universe.parquet")
         intervals = _source(candidate / "st_status_pit.parquet")
+        bars = _source(candidate / "daily_ohlcv_none.parquet") if explain_missing_with_bar else None
         invalid_state_row = connection.execute(
             f"SELECT count(*) FROM {daily} WHERE isST NOT IN ('0', '1')"
         ).fetchone()
@@ -207,6 +217,26 @@ def build_st_status_revision(
             connection, observed_query, staging / "st_status_observed_pit.parquet"
         )
 
+        bar_join = (
+            f"""
+            LEFT JOIN {bars} b
+              ON b.security_id = u.security_id
+             AND CAST(b.date AS DATE) = CAST(u.source_market_date AS DATE)
+            """
+            if bars is not None
+            else ""
+        )
+        unknown_reason = (
+            """
+                CASE
+                    WHEN u.source_market_date IS NULL THEN 'st_status_unknown_fail_closed'
+                    WHEN b.security_id IS NULL THEN 'source_bar_and_status_missing_fail_closed'
+                    ELSE 'st_status_unexplained_missing'
+                END
+            """
+            if bars is not None
+            else "'st_status_unknown_fail_closed'"
+        )
         execution_query = f"""
             WITH ordered_universe AS (
                 SELECT
@@ -243,13 +273,14 @@ def build_st_status_revision(
                 CASE WHEN s.isST IN ('0', '1') THEN true ELSE false END AS can_open_position,
                 CASE
                     WHEN s.isST IN ('0', '1') THEN 'status_known_from_prior_session'
-                    ELSE 'st_status_unknown_fail_closed'
+                    ELSE {unknown_reason}
                 END AS reason_code,
                 {_sql_string(revision)} AS revision
             FROM ordered_universe u
             LEFT JOIN {daily} s
               ON s.security_id = u.security_id
              AND CAST(s.date AS DATE) = CAST(u.source_market_date AS DATE)
+            {bar_join}
             ORDER BY u.security_id, u.market_date, u.stock_code
         """
         execution_count = _copy(
@@ -275,14 +306,28 @@ def build_st_status_revision(
             )
         unexpected_unknown = int(
             connection.execute(
-                f"SELECT count(*) FROM ({execution_query}) "
-                "WHERE status_label = 'unknown' AND source_market_date IS NOT NULL"
+                f"SELECT count(*) FROM ({execution_query}) WHERE "
+                + (
+                    "reason_code = 'st_status_unexplained_missing'"
+                    if explain_missing_with_bar
+                    else "status_label = 'unknown' AND source_market_date IS NOT NULL"
+                )
             ).fetchone()[0]
         )
         if unexpected_unknown:
             raise StStatusBuildError(
                 f"candidate has {unexpected_unknown} unexplained prior-session ST gaps"
             )
+        explained_missing = (
+            int(
+                connection.execute(
+                    f"SELECT count(*) FROM ({execution_query}) "
+                    "WHERE reason_code = 'source_bar_and_status_missing_fail_closed'"
+                ).fetchone()[0]
+            )
+            if explain_missing_with_bar
+            else 0
+        )
     finally:
         connection.close()
 
@@ -341,6 +386,11 @@ def build_st_status_revision(
                 "unknown_behavior": policy["unknown_behavior"],
                 "detail_behavior": policy["detail_behavior"],
                 "incremental": policy["incremental"],
+                **(
+                    {"missing_observation": policy["missing_observation"]}
+                    if explain_missing_with_bar
+                    else {}
+                ),
             },
             "constraints": {
                 "immutable_revision": True,
@@ -349,6 +399,11 @@ def build_st_status_revision(
                 "unexplained_unknown_count": 0,
                 "oos_920_count": 0,
                 "explicitly_excluded_security_count": 0,
+                **(
+                    {"source_bar_and_status_missing_count": explained_missing}
+                    if explain_missing_with_bar
+                    else {}
+                ),
             },
         }
         (staging / "manifest.json").write_text(

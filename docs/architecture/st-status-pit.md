@@ -2,7 +2,7 @@
 
 - Status: Implemented and promoted on OCI (2026-07-25)
 - Tracking issue: [#8](https://github.com/rv198-star/Quanthus/issues/8)
-- Policy: `config/st-status.v1.json`
+- Policies: `config/st-status.v1.json`, `config/st-status.v2.json`
 
 ## Authority and meaning
 
@@ -30,12 +30,22 @@ explicitly `unknown`, `can_open_position=false`, and reason
 `st_status_unknown_fail_closed`. Consumers must use the execution table and may not join the
 same-day provider flag into an opening decision.
 
+Policy v2 additionally permits a bounded mid-history `unknown` only when the same normalized
+source session has neither a provider ST observation nor a daily bar. Such rows use
+`source_bar_and_status_missing_fail_closed`, never permit entry, and are counted in the immutable
+manifest. A missing ST observation beside an existing source bar remains unexplained and blocks
+publication. The rule does not carry the last observed ST value forward or infer that a suspended
+or missing security retained its prior state. Policy v1 retains its original zero-mid-history-gap
+requirement.
+
 ## Build and publication
 
 `quanthus build-st-status` verifies binary states, economic-identity uniqueness, absence of
-same-day/future leakage, and complete prior-session coverage. It writes a new immutable OCI
-revision with content and schema checksums, source revision hashes, and a manifest. Promotion
-atomically updates the OCI `CURRENT` metadata only; Hermes raw files and pointers remain intact.
+same-day/future leakage, and policy-qualified prior-session coverage. Under v2 it checksum-binds
+the normalized daily bars used to explain a missing observation and rejects any gap whose source
+bar exists. It writes a new immutable OCI revision with content and schema checksums, source
+revision hashes, and a manifest. Promotion atomically updates the OCI `CURRENT` metadata only;
+Hermes raw files and pointers remain intact.
 
 Weekly acquisition remains a Hermes responsibility. OCI consumes the resulting immutable raw
 candidate, rebuilds with at least a 90-calendar-day lookback, creates a new child revision, runs

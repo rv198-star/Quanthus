@@ -123,6 +123,59 @@ class StStatusBuildTests(unittest.TestCase):
         )
         return policy
 
+    def _missing_bar_policy(self, root: Path) -> Path:
+        policy = self._policy(root)
+        payload = json.loads(policy.read_text(encoding="utf-8"))
+        payload["policy_version"] = "test-v2"
+        payload["missing_observation"] = {
+            "allow_when_source_bar_missing": True,
+            "result": "unknown_fail_closed",
+        }
+        policy.write_text(json.dumps(payload), encoding="utf-8")
+        return policy
+
+    def _add_source_bars(self, candidate: Path, *, include_missing_source: bool) -> None:
+        universe = pq.read_table(candidate / "daily_universe.parquet").to_pylist()
+        rows = universe if include_missing_source else universe[:-2] + universe[-1:]
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "security_id": row["security_id"],
+                        "stock_code": row["stock_code"],
+                        "date": row["market_date"],
+                        "close": 10.0,
+                    }
+                    for row in rows
+                ]
+            ),
+            candidate / "daily_ohlcv_none.parquet",
+        )
+        checksum = hashlib.sha256((candidate / "daily_ohlcv_none.parquet").read_bytes()).hexdigest()
+        with (candidate / "CHECKSUMS.sha256").open("a", encoding="utf-8") as stream:
+            stream.write(f"{checksum}  daily_ohlcv_none.parquet\n")
+
+    def _add_execution_session(self, candidate: Path) -> None:
+        universe = pq.read_table(candidate / "daily_universe.parquet").to_pylist()
+        final = dict(universe[-1])
+        final["market_date"] = date(2025, 1, 9)
+        pq.write_table(
+            pa.Table.from_pylist(universe + [final]),
+            candidate / "daily_universe.parquet",
+        )
+        digest = hashlib.sha256((candidate / "daily_universe.parquet").read_bytes()).hexdigest()
+        lines = (candidate / "CHECKSUMS.sha256").read_text(encoding="utf-8").splitlines()
+        (candidate / "CHECKSUMS.sha256").write_text(
+            "\n".join(
+                f"{digest}  daily_universe.parquet"
+                if line.endswith("daily_universe.parquet")
+                else line
+                for line in lines
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     def test_execution_uses_prior_actual_session_and_fails_closed_on_first_day(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -164,6 +217,64 @@ class StStatusBuildTests(unittest.TestCase):
 
         self.assertEqual(payload["revision"], "formal-v1")
         self.assertRegex(payload["manifest_sha256"], r"^sha256:[0-9a-f]{64}$")
+
+    def test_missing_status_is_fail_closed_only_when_source_bar_is_also_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = self._candidate(root)
+            daily = pq.read_table(candidate / "daily_isST.parquet")
+            pq.write_table(daily.slice(0, 2), candidate / "daily_isST.parquet")
+            digest = hashlib.sha256((candidate / "daily_isST.parquet").read_bytes()).hexdigest()
+            lines = (candidate / "CHECKSUMS.sha256").read_text(encoding="utf-8").splitlines()
+            (candidate / "CHECKSUMS.sha256").write_text(
+                "\n".join(
+                    f"{digest}  daily_isST.parquet" if line.endswith("daily_isST.parquet") else line
+                    for line in lines
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            self._add_execution_session(candidate)
+            self._add_source_bars(candidate, include_missing_source=False)
+            result = build_st_status_revision(
+                candidate=candidate,
+                output=root / "formal-v2",
+                revision="formal-v2",
+                policy_path=self._missing_bar_policy(root),
+            )
+            rows = pq.read_table(result.output / "st_status_execution_daily.parquet").to_pylist()
+            manifest = json.loads((result.output / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(rows[-1]["status_label"], "unknown")
+        self.assertFalse(rows[-1]["can_open_position"])
+        self.assertEqual(rows[-1]["reason_code"], "source_bar_and_status_missing_fail_closed")
+        self.assertEqual(manifest["constraints"]["source_bar_and_status_missing_count"], 1)
+
+    def test_missing_status_with_a_source_bar_still_blocks_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = self._candidate(root)
+            daily = pq.read_table(candidate / "daily_isST.parquet")
+            pq.write_table(daily.slice(0, 2), candidate / "daily_isST.parquet")
+            digest = hashlib.sha256((candidate / "daily_isST.parquet").read_bytes()).hexdigest()
+            lines = (candidate / "CHECKSUMS.sha256").read_text(encoding="utf-8").splitlines()
+            (candidate / "CHECKSUMS.sha256").write_text(
+                "\n".join(
+                    f"{digest}  daily_isST.parquet" if line.endswith("daily_isST.parquet") else line
+                    for line in lines
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            self._add_execution_session(candidate)
+            self._add_source_bars(candidate, include_missing_source=True)
+            with self.assertRaisesRegex(RuntimeError, "1 unexplained prior-session ST gaps"):
+                build_st_status_revision(
+                    candidate=candidate,
+                    output=root / "formal-v2",
+                    revision="formal-v2",
+                    policy_path=self._missing_bar_policy(root),
+                )
 
 
 if __name__ == "__main__":

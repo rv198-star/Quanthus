@@ -358,6 +358,22 @@ class StrategyReplayADSTests(unittest.TestCase):
             "p1-historical-replay-2026-through-20260727-v1",
         )
 
+    def test_v3_policy_extends_only_the_recent_research_boundary(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        v2 = load_strategy_replay_ads_policy(root / "config" / "strategy-replay-ads.v2.json")
+        v3 = load_strategy_replay_ads_policy(root / "config" / "strategy-replay-ads.v3.json")
+
+        self.assertEqual(tuple(v3.scopes), tuple(v2.scopes))
+        self.assertEqual(
+            v3.scopes["recent_research"].partition_start,
+            v2.scopes["recent_research"].partition_start,
+        )
+        self.assertEqual(v3.scopes["recent_research"].partition_end, date(2026, 7, 30))
+        self.assertEqual(
+            v3.bootstrap_source_snapshot_id,
+            "p1-historical-replay-2026-through-20260730-v3",
+        )
+
     def test_policy_extension_cannot_remove_governed_base_scopes(self) -> None:
         source = Path(__file__).resolve().parents[2] / "config" / "strategy-replay-ads.v2.json"
         payload = json.loads(source.read_text(encoding="utf-8"))

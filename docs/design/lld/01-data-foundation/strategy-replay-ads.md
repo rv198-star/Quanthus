@@ -16,7 +16,8 @@ producer path. The bundle is research-only and cannot authorize an order, notifi
 
 The 2012-2025 bootstrap is assembled from accepted snapshot
 `p1-historical-replay-20260729-v1`. The additive 2026 research backfill is assembled from
-`p1-historical-replay-2026-through-20260727-v1`. Both sources were materialized after their
+`p1-historical-replay-2026-through-20260727-v1`; its additive through-2026-07-30 successor is
+`p1-historical-replay-2026-through-20260730-v3`. These sources were materialized after their
 historical decision dates. They supply self-contained historical capability fixtures, but do not
 prove that an independently published snapshot existed on every historical decision date. Their
 PIT maps therefore record `capability_fixture_without_per_decision_publication_proof` for every
@@ -27,18 +28,23 @@ canonical generation and publication lineage.
 
 The policy in `config/strategy-replay-ads.v1.json` freezes the original three separate bundle
 scopes. `config/strategy-replay-ads.v2.json` retains those boundaries and adds one development-
-readable recent-research scope without reopening arbitration or blind data:
+readable recent-research scope without reopening arbitration or blind data. Policy v3 retains the
+same role boundaries and creates a new additive recent-research bundle through the latest complete
+T/T+1 pair:
 
 | Scope | Decision partition | Reader role |
 | --- | --- | --- |
 | development | 2012-2021 | `development_research` |
 | arbitration | 2022-2024 | `arbitration_operator` |
 | permanent blind | 2025 | `blind_evaluation_operator` |
-| recent research | 2026-01-01 through 2026-07-27 execution boundary | `development_research` |
+| recent research v2 | 2026-01-01 through 2026-07-27 execution boundary | `development_research` |
+| recent research v3 | 2026-01-01 through 2026-07-30 execution boundary | `development_research` |
 
-The recent scope contains decision sessions from 2026-01-05 through 2026-07-24 and their next-open
-execution context through 2026-07-27. It is an additive research backfill, has no `CURRENT`, and
-does not modify or supersede the original three bundles.
+The v2 recent scope contains decision sessions from 2026-01-05 through 2026-07-24 and their
+next-open execution context through 2026-07-27. Its v3 successor contains 137 decision sessions
+through 2026-07-29 and next-open execution context through 2026-07-30. Both are immutable additive
+research bundles, have no `CURRENT`, and do not modify or supersede the original three bundles or
+each other.
 
 Each bundle may contain earlier warm-up context under
 `all_available_history_through_execution_end`, but cannot contain a row, benchmark observation, or
@@ -106,7 +112,7 @@ It is not a normal research entry point and may not be used by a new strategy or
 
 | Concern | Governing path |
 | --- | --- |
-| Policy and scope identities | `config/strategy-replay-ads.v1.json`, `config/strategy-replay-ads.v2.json` |
+| Policy and scope identities | `config/strategy-replay-ads.v1.json`, `config/strategy-replay-ads.v2.json`, `config/strategy-replay-ads.v3.json` |
 | Publisher, verifier, role reader | `src/quanthus/strategy_replay_ads.py` |
 | Normal CLI boundary | `src/quanthus/cli.py` |
 | OS-role publication | `ops/bin/publish-strategy-replay-ads`, `ops/sysusers.d/quanthus-ads.conf` |
@@ -119,5 +125,6 @@ reproduction from the formal development bundle, role-permission probes, a depen
 strategy consumers do not resolve warehouse/snapshot pointers, and retained evidence of size and
 resource behavior. A recent-research backfill additionally requires its exact v2 source, benchmark,
 policy identities, continuous-frame audit, development-role probe, and evidence that no existing
-bundle or pointer changed. None of those claims authorizes production dual-lane cutover or deletion
-of legacy data.
+bundle or pointer changed. A v3 refresh additionally binds the source snapshot, mixed-source CSI
+300 curve, ST missing-observation policy v2, and the exact last decision/execution pair. None of
+those claims authorizes production dual-lane cutover or deletion of legacy data.

@@ -15,7 +15,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised by the P1 dependency
     pa = None
     pq = None
 
-from quanthus.pipelines.dual_lane import LaneCandidate
+from quanthus.pipelines.dual_lane import EpochInput, LaneCandidate
 from quanthus.pipelines.dual_lane_history import (
     DualLaneHistoryError,
     build_history_base_bundle,
@@ -188,11 +188,21 @@ class DualLaneHistoryTests(unittest.TestCase):
         self.assertEqual(result.dwd_date_end, date(2024, 1, 3))
         return output
 
-    def _candidate(self, *, storage_root: Path, base_meta: str) -> LaneCandidate:
-        market_date = date(2024, 1, 4)
-        candidate_root = storage_root / "candidates" / market_date.isoformat() / "candidate-cn01"
-        dwd_root = candidate_root / "artifacts" / "daily-dwd-cn01-20240104"
-        dws_root = candidate_root / "artifacts" / "daily-dws-cn01-20240104"
+    def _candidate(
+        self,
+        *,
+        storage_root: Path,
+        base_meta: str,
+        lane_id: str = "cn01",
+        market_date: date = date(2024, 1, 4),
+        parent: dict[str, str] | None = None,
+    ) -> LaneCandidate:
+        suffix = market_date.strftime("%Y%m%d")
+        candidate_root = (
+            storage_root / "candidates" / market_date.isoformat() / f"candidate-{lane_id}"
+        )
+        dwd_root = candidate_root / "artifacts" / f"daily-dwd-{lane_id}-{suffix}"
+        dws_root = candidate_root / "artifacts" / f"daily-dws-{lane_id}-{suffix}"
         dwd_root.mkdir(parents=True)
         dws_root.mkdir(parents=True)
         self._write_json(
@@ -200,7 +210,8 @@ class DualLaneHistoryTests(unittest.TestCase):
             {
                 "revision": dwd_root.name,
                 "lineage": {
-                    "parent": {
+                    "parent": parent
+                    or {
                         "kind": "historical_base",
                         "revision": self.source.name,
                         "manifest_sha256": base_meta,
@@ -209,13 +220,17 @@ class DualLaneHistoryTests(unittest.TestCase):
             },
         )
         self._write_json(dws_root / "manifest.json", {"revision": dws_root.name})
-        self._write_json(candidate_root / "manifest.json", {"fixture": "candidate"})
+        epoch_id = f"epoch-{lane_id}-{suffix}"
+        self._write_json(
+            candidate_root / "manifest.json",
+            {"epoch_id": epoch_id, "fixture": "candidate"},
+        )
         self._write_json(candidate_root.parent / "CURRENT.json", {"fixture": "current"})
         return LaneCandidate(
             root=candidate_root,
-            candidate_id="candidate-cn01",
+            candidate_id=f"candidate-{lane_id}",
             attempt_id="attempt-1",
-            lane_id="cn01",
+            lane_id=lane_id,
             market_date=market_date,
             manifest_sha256=_sha256(candidate_root / "manifest.json"),
             candidate_content_digest=f"sha256:{'1' * 64}",
@@ -232,6 +247,42 @@ class DualLaneHistoryTests(unittest.TestCase):
             eligibility=None,
             source_inputs=(),
             candidate_ready_at=None,
+        )
+
+    def _epoch(
+        self,
+        *,
+        candidate: LaneCandidate,
+        source_kind: str,
+        source_revision: str,
+        source_manifest_sha256: str,
+        parent_date: date | None = None,
+    ) -> EpochInput:
+        manifest = json.loads((candidate.root / "manifest.json").read_text(encoding="utf-8"))
+        source_path = None
+        if source_kind == "daily_partition":
+            assert parent_date is not None
+            source_path = self.root / "epoch-parents" / source_revision
+            self._write_json(
+                source_path / "manifest.json",
+                {"market_date": parent_date.isoformat(), "revision": source_revision},
+            )
+        return EpochInput(
+            root=self.root / "epochs" / str(manifest["epoch_id"]),
+            epoch_id=str(manifest["epoch_id"]),
+            market_date=candidate.market_date,
+            manifest_sha256=candidate.epoch_manifest_sha256,
+            contract_id=candidate.contract_id,
+            policy_sha256=candidate.policy_sha256,
+            code_revision=candidate.code_revision,
+            source_kind=source_kind,
+            source_revision=source_revision,
+            source_manifest_sha256=source_manifest_sha256,
+            source_path=source_path,
+            universe_policy_path=self.policy_path,
+            code_validity_path=self.policy_path,
+            security_master_path=None,
+            eligibility=None,
         )
 
     def test_build_verify_promote_and_catalog(self) -> None:
@@ -255,6 +306,12 @@ class DualLaneHistoryTests(unittest.TestCase):
             storage_root=storage_root,
             base_meta=bundle.source_meta_sha256,
         )
+        epoch = self._epoch(
+            candidate=candidate,
+            source_kind="historical_base",
+            source_revision=bundle.source_revision,
+            source_manifest_sha256=bundle.source_meta_sha256,
+        )
         catalog_root = storage_root / "lane-history"
         with (
             mock.patch(
@@ -264,6 +321,10 @@ class DualLaneHistoryTests(unittest.TestCase):
             mock.patch(
                 "quanthus.pipelines.dual_lane_history.load_candidate_current_from_catalog",
                 return_value=candidate,
+            ),
+            mock.patch(
+                "quanthus.pipelines.dual_lane_history.verify_epoch_input",
+                return_value=epoch,
             ),
         ):
             catalog = build_lane_history_catalog(
@@ -306,12 +367,22 @@ class DualLaneHistoryTests(unittest.TestCase):
             storage_root=storage_root,
             base_meta=f"sha256:{'f' * 64}",
         )
+        epoch = self._epoch(
+            candidate=candidate,
+            source_kind="historical_base",
+            source_revision=self.source.name,
+            source_manifest_sha256=_sha256(self.source / "META.json"),
+        )
         with (
             mock.patch(
                 "quanthus.pipelines.dual_lane_history.load_candidate_current",
                 return_value=candidate,
             ),
-            self.assertRaisesRegex(DualLaneHistoryError, "sealed history base"),
+            mock.patch(
+                "quanthus.pipelines.dual_lane_history.verify_epoch_input",
+                return_value=epoch,
+            ),
+            self.assertRaisesRegex(DualLaneHistoryError, "epoch canonical parent"),
         ):
             build_lane_history_catalog(
                 storage_root=storage_root,
@@ -321,6 +392,84 @@ class DualLaneHistoryTests(unittest.TestCase):
                 lane_id="cn01",
                 policy=self.policy,
             )
+
+    def test_standby_chain_binds_each_sealed_canonical_parent(self) -> None:
+        bundle_path = self._build_bundle()
+        bundle = verify_history_base_bundle(bundle_path, policy=self.policy)
+        storage_root = self.root / "node"
+        current = storage_root / "history-bases" / "CURRENT.json"
+        promote_history_base_bundle(
+            ingress_bundle=bundle_path,
+            base_root=current.parent,
+            current_pointer=current,
+            policy=self.policy,
+        )
+        first = self._candidate(
+            storage_root=storage_root,
+            base_meta=bundle.source_meta_sha256,
+            lane_id="hermes",
+        )
+        canonical_revision = "daily-dwd-cn01-20240104"
+        canonical_manifest = f"sha256:{'9' * 64}"
+        second = self._candidate(
+            storage_root=storage_root,
+            base_meta=bundle.source_meta_sha256,
+            lane_id="hermes",
+            market_date=date(2024, 1, 5),
+            parent={
+                "kind": "daily_partition",
+                "revision": canonical_revision,
+                "manifest_sha256": canonical_manifest,
+            },
+        )
+        epochs = {
+            "epoch-hermes-20240104": self._epoch(
+                candidate=first,
+                source_kind="historical_base",
+                source_revision=bundle.source_revision,
+                source_manifest_sha256=bundle.source_meta_sha256,
+            ),
+            "epoch-hermes-20240105": self._epoch(
+                candidate=second,
+                source_kind="daily_partition",
+                source_revision=canonical_revision,
+                source_manifest_sha256=canonical_manifest,
+                parent_date=first.market_date,
+            ),
+        }
+
+        def candidate_from_catalog(*, storage_root: Path, path: str, manifest_sha256: str):
+            del storage_root, manifest_sha256
+            return second if path.endswith("candidate-hermes") and "2024-01-05" in path else first
+
+        with (
+            mock.patch(
+                "quanthus.pipelines.dual_lane_history.load_candidate_current",
+                side_effect=(first, second),
+            ),
+            mock.patch(
+                "quanthus.pipelines.dual_lane_history.load_candidate_current_from_catalog",
+                side_effect=candidate_from_catalog,
+            ),
+            mock.patch(
+                "quanthus.pipelines.dual_lane_history.verify_epoch_input",
+                side_effect=lambda root: epochs[root.name],
+            ),
+        ):
+            catalog = build_lane_history_catalog(
+                storage_root=storage_root,
+                base_current=current,
+                candidate_root=storage_root / "candidates",
+                catalog_root=storage_root / "lane-history",
+                lane_id="hermes",
+                policy=self.policy,
+            )
+        self.assertEqual(len(catalog.candidates), 2)
+        manifest = json.loads((catalog.root / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            manifest["daily_partitions"][1]["canonical_parent"]["revision"],
+            canonical_revision,
+        )
 
 
 if __name__ == "__main__":

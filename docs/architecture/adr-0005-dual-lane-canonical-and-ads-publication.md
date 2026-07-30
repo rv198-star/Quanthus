@@ -85,9 +85,11 @@ the exact accepted P1 DWD revision as one immutable history-base bundle, derives
 history from its bars and observed daily status keys, and sends the bundle through the write-only
 ingress to both nodes. Each node verifies every source checksum, copies the bundle into a root-owned
 sealed base root, and joins it to its post-base candidates only through an immutable lane-history
-catalog. The common seed is recovery and continuity evidence; it is not independent CN01/Hermes
-market evidence. No process appends daily rows to the seed or relabels a legacy artifact as a lane
-candidate.
+catalog. The first candidate binds the seed; every later candidate binds the exact prior canonical
+DWD sealed in that candidate's epoch. The standby therefore follows the accepted canonical parent,
+which may be a CN01 revision, rather than inventing a same-lane parent chain. The common seed is
+recovery and continuity evidence; it is not independent CN01/Hermes market evidence. No process
+appends daily rows to the seed or relabels a legacy artifact as a lane candidate.
 
 ### 3. Gate first, compare second
 

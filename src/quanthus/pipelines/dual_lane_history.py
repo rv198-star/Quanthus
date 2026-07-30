@@ -14,7 +14,12 @@ from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from quanthus.pipelines.dual_lane import LaneCandidate, load_candidate_current
+from quanthus.pipelines.dual_lane import (
+    EpochInput,
+    LaneCandidate,
+    load_candidate_current,
+    verify_epoch_input,
+)
 
 
 class DualLaneHistoryError(RuntimeError):
@@ -813,7 +818,7 @@ def load_history_base_current(
 
 
 def _candidate_chain(
-    *, candidate_root: Path, lane_id: str, base: HistoryBaseBundle
+    *, storage_root: Path, candidate_root: Path, lane_id: str, base: HistoryBaseBundle
 ) -> tuple[LaneCandidate, ...]:
     if lane_id not in _LANES:
         raise DualLaneHistoryError("lane_id must be cn01 or hermes")
@@ -830,31 +835,88 @@ def _candidate_chain(
         candidates.append(candidate)
     if not candidates:
         raise DualLaneHistoryError("lane history has no post-base candidate")
+    chain = tuple(candidates)
+    _candidate_history_links(storage_root=storage_root, candidates=chain, base=base)
+    return chain
+
+
+def _candidate_epoch(*, storage_root: Path, candidate: LaneCandidate) -> EpochInput:
+    candidate_manifest = _object(candidate.root / "manifest.json")
+    epoch_id = _text(candidate_manifest, "epoch_id")
+    if _SAFE_ID.fullmatch(epoch_id) is None:
+        raise DualLaneHistoryError("candidate epoch_id contains unsupported characters")
+    epoch = verify_epoch_input(
+        storage_root.resolve()
+        / "epochs"
+        / candidate.market_date.isoformat()
+        / epoch_id
+    )
+    if (
+        epoch.epoch_id != epoch_id
+        or epoch.market_date != candidate.market_date
+        or epoch.manifest_sha256 != candidate.epoch_manifest_sha256
+        or epoch.contract_id != candidate.contract_id
+        or epoch.policy_sha256 != candidate.policy_sha256
+    ):
+        raise DualLaneHistoryError("candidate differs from its sealed epoch")
+    return epoch
+
+
+def _candidate_history_links(
+    *,
+    storage_root: Path,
+    candidates: tuple[LaneCandidate, ...],
+    base: HistoryBaseBundle,
+) -> tuple[dict[str, Any], ...]:
+    ordered_dates = tuple(candidate.market_date for candidate in candidates)
+    if ordered_dates != tuple(sorted(ordered_dates)) or len(set(ordered_dates)) != len(
+        ordered_dates
+    ):
+        raise DualLaneHistoryError("lane-history candidates are not uniquely date ordered")
+    links: list[dict[str, Any]] = []
     previous: LaneCandidate | None = None
     for candidate in candidates:
+        epoch = _candidate_epoch(storage_root=storage_root, candidate=candidate)
         dwd_manifest = _object(candidate.dwd_root / "manifest.json")
         lineage = dwd_manifest.get("lineage")
         parent = lineage.get("parent") if isinstance(lineage, Mapping) else None
         if not isinstance(parent, Mapping):
             raise DualLaneHistoryError("candidate DWD has no parent lineage")
         if previous is None:
-            if dict(parent) != {
+            expected = {
                 "kind": "historical_base",
                 "manifest_sha256": base.source_meta_sha256,
                 "revision": base.source_revision,
-            }:
-                raise DualLaneHistoryError("first candidate does not bind the sealed history base")
+            }
+            if (
+                epoch.source_kind != "historical_base"
+                or epoch.source_revision != base.source_revision
+                or epoch.source_manifest_sha256 != base.source_meta_sha256
+            ):
+                raise DualLaneHistoryError("first candidate epoch differs from history base")
         else:
-            previous_manifest = _object(previous.dwd_root / "manifest.json")
             expected = {
                 "kind": "daily_partition",
-                "manifest_sha256": _sha256(previous.dwd_root / "manifest.json"),
-                "revision": previous_manifest.get("revision"),
+                "manifest_sha256": epoch.source_manifest_sha256,
+                "revision": epoch.source_revision,
             }
-            if dict(parent) != expected:
-                raise DualLaneHistoryError("candidate DWD parent chain is discontinuous")
+            if epoch.source_kind != "daily_partition" or epoch.source_path is None:
+                raise DualLaneHistoryError("post-base candidate epoch has no canonical parent")
+            parent_manifest = _object(epoch.source_path / "manifest.json")
+            parent_date = _parse_date(parent_manifest.get("market_date"), "epoch parent date")
+            if parent_date != previous.market_date:
+                raise DualLaneHistoryError("candidate canonical parent date is discontinuous")
+        if dict(parent) != expected:
+            raise DualLaneHistoryError("candidate DWD differs from its epoch canonical parent")
+        links.append(
+            {
+                "epoch_id": epoch.epoch_id,
+                "epoch_manifest_sha256": epoch.manifest_sha256,
+                "canonical_parent": expected,
+            }
+        )
         previous = candidate
-    return tuple(candidates)
+    return tuple(links)
 
 
 def _catalog_content(
@@ -864,6 +926,11 @@ def _catalog_content(
     base: HistoryBaseBundle,
     candidates: tuple[LaneCandidate, ...],
 ) -> dict[str, Any]:
+    links = _candidate_history_links(
+        storage_root=storage_root,
+        candidates=candidates,
+        base=base,
+    )
     return {
         "lane_id": lane_id,
         "base": {
@@ -880,8 +947,9 @@ def _catalog_content(
                 "manifest_sha256": candidate.manifest_sha256,
                 "dwd_manifest_sha256": _sha256(candidate.dwd_root / "manifest.json"),
                 "dws_manifest_sha256": _sha256(candidate.dws_root / "manifest.json"),
+                **link,
             }
-            for candidate in candidates
+            for candidate, link in zip(candidates, links, strict=True)
         ],
         "boundaries": {
             "dwd_date_start": base.dwd_date_start.isoformat(),
@@ -904,7 +972,12 @@ def build_lane_history_catalog(
 ) -> LaneHistoryCatalog:
     storage_root = storage_root.resolve()
     base = load_history_base_current(base_current, policy=policy)
-    candidates = _candidate_chain(candidate_root=candidate_root, lane_id=lane_id, base=base)
+    candidates = _candidate_chain(
+        storage_root=storage_root,
+        candidate_root=candidate_root,
+        lane_id=lane_id,
+        base=base,
+    )
     content = _catalog_content(
         storage_root=storage_root,
         lane_id=lane_id,
@@ -1015,7 +1088,11 @@ def verify_lane_history_catalog(
         ):
             raise DualLaneHistoryError("lane-history candidate identity mismatch")
         candidates.append(candidate)
-    chain = _candidate_chain_from_values(candidates=tuple(candidates), base=base)
+    chain = _candidate_chain_from_values(
+        storage_root=storage_root,
+        candidates=tuple(candidates),
+        base=base,
+    )
     content = _catalog_content(
         storage_root=storage_root,
         lane_id=lane_id,
@@ -1048,35 +1125,16 @@ def load_candidate_current_from_catalog(
 
 
 def _candidate_chain_from_values(
-    *, candidates: tuple[LaneCandidate, ...], base: HistoryBaseBundle
+    *,
+    storage_root: Path,
+    candidates: tuple[LaneCandidate, ...],
+    base: HistoryBaseBundle,
 ) -> tuple[LaneCandidate, ...]:
-    if tuple(sorted(candidate.market_date for candidate in candidates)) != tuple(
-        candidate.market_date for candidate in candidates
-    ):
-        raise DualLaneHistoryError("lane-history candidates are not date ordered")
-    previous: LaneCandidate | None = None
-    for candidate in candidates:
-        manifest = _object(candidate.dwd_root / "manifest.json")
-        lineage = manifest.get("lineage")
-        parent = lineage.get("parent") if isinstance(lineage, Mapping) else None
-        if not isinstance(parent, Mapping):
-            raise DualLaneHistoryError("candidate DWD has no parent lineage")
-        if previous is None:
-            expected = {
-                "kind": "historical_base",
-                "manifest_sha256": base.source_meta_sha256,
-                "revision": base.source_revision,
-            }
-        else:
-            prior_manifest = _object(previous.dwd_root / "manifest.json")
-            expected = {
-                "kind": "daily_partition",
-                "manifest_sha256": _sha256(previous.dwd_root / "manifest.json"),
-                "revision": prior_manifest.get("revision"),
-            }
-        if dict(parent) != expected:
-            raise DualLaneHistoryError("lane-history candidate parent chain is discontinuous")
-        previous = candidate
+    _candidate_history_links(
+        storage_root=storage_root,
+        candidates=candidates,
+        base=base,
+    )
     return candidates
 
 

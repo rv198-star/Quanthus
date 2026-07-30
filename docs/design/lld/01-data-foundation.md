@@ -228,6 +228,11 @@ and candidates created before this shared-reference contract remain verifiable a
 evidence, but are ineligible for new candidate construction or arbitration.
 `READY` is written last. Candidate ids are immutable and attempt sequencing is monotonic within
 `(lane_id, market_date)`; a rerun does not reuse an id with different lineage.
+Lane-history continuity follows those sealed epoch sources: the first candidate binds the governed
+historical base, while each successor binds the exact prior canonical DWD copied into its own
+epoch. A Hermes successor may therefore name a CN01 canonical revision; requiring a same-lane
+parent would contradict the fixed-primary arbitration design. The logical catalog records the
+epoch and canonical-parent digests and requires the parent date to equal its preceding partition.
 The exact lane ODS `CURRENT` descriptor is owned only by `market-daily-core`. Natural-day event
 releases remain immutable ODS evidence but cannot replace the market-data attempt selected for a
 DWD/DWS candidate.

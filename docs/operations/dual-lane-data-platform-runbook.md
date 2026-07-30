@@ -289,9 +289,12 @@ sudo env PYTHONPATH=/root/work/Quanthus/src \
 
 Use `cn01` or `hermes` for `NODE_ID`. The catalog is a logical merge only: the base and daily
 candidate files remain immutable and physically separate. The first candidate must bind the exact
-base revision and META digest; each successor must bind the previous daily DWD manifest. Run the
-node doctor after both `CURRENT` descriptors exist. A common copied base is continuity/recovery
-evidence, not independent cross-lane truth.
+base revision and META digest; each successor must bind the exact prior canonical DWD manifest
+sealed in that candidate's epoch, and that canonical parent's date must equal the preceding catalog
+partition. Do not require the standby candidate to name the prior standby candidate: under the
+fixed-primary design its legitimate parent is normally the accepted CN01 revision. Run the node
+doctor after both `CURRENT` descriptors exist. A common copied base is continuity/recovery evidence,
+not independent cross-lane truth.
 
 ## Copy-only migration order
 

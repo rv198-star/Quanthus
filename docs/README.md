@@ -100,11 +100,12 @@ nodes.
   `acceptance/issue-45-historical-dwd-dws-completion-20260730.md`: OCI, CN01, and Hermes hold the
   same sealed base bytes, and both lane-local logical catalogs join it to four daily candidates
   without physical concatenation or cleanup authority.
-  The provisional OCI operational ADS historical Base through 2026-07-30 is accepted in
-  `acceptance/meta-data-base-003-ads-base-202607/provisional-base-acceptance-20260731.md`.
-  It byte-copies the accepted semantic source v2, binds the exact DWD/DWS v2 pair, passes an
-  isolated one-day replay, and advances only its administrative `BASE_CURRENT.json`. The final
-  July Base and every consumer-visible release/cutover gate remain open.
+  The provisional and final OCI operational ADS historical Bases are accepted in
+  `acceptance/meta-data-base-003-ads-base-202607/README.md`. Final `ads-base-202607-v1` binds the
+  accepted July DWD/DWS pair and July 31 operational daily ADS, reproduces two verified candidate
+  table sets byte-for-byte, passes bounded replay, and is active through its administrative
+  `BASE_CURRENT.json`. It remains research-only; every consumer-visible release/cutover gate is
+  separate and remains open.
   Candidate-success-driven daily lane-history refresh is deployed on both producer nodes in
   `acceptance/issue-45-daily-history-catalog-automation-20260730.md`; installation and idempotent
   execution are accepted, while the first real scheduled `OnSuccess` observation remains pending.

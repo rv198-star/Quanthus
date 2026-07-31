@@ -6,7 +6,7 @@
 | Work item | `META-DATA-BASE-003` |
 | Tracking issue | GitHub issue #46 |
 | Design status | approved under ADR 0005 |
-| Delivery gate | provisional Base accepted; final Base blocked on July 31 accepted upstreams |
+| Delivery gate | provisional and final July Bases accepted; consumer publication remains separate |
 | Profile | `strategy_replay_operational_v1` |
 
 ## 1. Purpose and authority

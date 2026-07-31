@@ -16,7 +16,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and offline research bundles | active; cutover blocked |
 | META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | active; Phase A accepted, final July pending |
 | META-DATA-BASE-002 | Build authoritative DWD/DWS July Base (Issue #48) | active; Phase A accepted, Phase B pending |
-| META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | active |
+| META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | accepted |
 
 `META-DATA-PIPE-003` is governed by ADR 0005 and GitHub issue #45. Implementation is limited to
 copy-only contract, shadow, comparison, recovery, and release-set work beside the legacy path. It
@@ -67,11 +67,11 @@ three-node, deterministic rebuild, descriptor, catalog, and doctor gates.
 `META-DATA-BASE-003` is governed by ADR 0005, the operational ADS Base LLD, and GitHub issue #46.
 The repository implements exact-plan validation, deterministic semantic packaging, deep clean-path
 verification, role-scoped access, the existing replay-reader adapter, and locked
-`BASE_CURRENT.json` compare-and-swap. Repository capability and the read-only OCI inventory
-preflight are recorded in `docs/acceptance/meta-data-base-003-ads-base-202607/README.md`. Neither
-the provisional nor final Base is accepted: Phase A now has the accepted Issue #48 v2 packages but
-still waits for an ADS Base build and acceptance, while Phase B additionally waits for the accepted
-July 31 generation.
+`BASE_CURRENT.json` compare-and-swap. The provisional and final July Bases are accepted in
+`docs/acceptance/meta-data-base-003-ads-base-202607/README.md`. The final package binds the exact
+accepted DWD/DWS pair and July 31 daily ADS, reproduces two independently verified candidate table
+sets, passes bounded replay, and is active through the administrative Base descriptor. Consumer
+release-set publication and cutover remain separate authority gates.
 
 ## P1 data foundation
 

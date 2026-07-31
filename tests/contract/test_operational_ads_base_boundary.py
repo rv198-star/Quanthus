@@ -132,7 +132,8 @@ class OperationalADSBaseBoundaryTests(unittest.TestCase):
             runbook.index("advances only"),
         )
         self.assertIn(
-            "Phase A provisional Base accepted; Phase B final Base remains open",
+            "Phase A provisional Base and Phase B final Base accepted",
             evidence,
         )
+        self.assertIn("consumer authority unchanged", evidence)
         self.assertIn("No guessed", evidence)

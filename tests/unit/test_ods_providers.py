@@ -12,7 +12,13 @@ import pyarrow.parquet as pq
 import pytest
 
 from quanthus.pipelines import lane_runner
-from quanthus.providers import after_hours_tdx, fundamentals, ods_snapshot, trading_calendar
+from quanthus.providers import (
+    after_hours_tdx,
+    fundamentals,
+    ods_snapshot,
+    trading_calendar,
+    valuation_history,
+)
 
 
 def _write_parquet(path: Path, rows: list[dict[str, object]]) -> None:
@@ -405,6 +411,90 @@ def test_after_hours_etf_universe_retries_transient_login_failure() -> None:
     assert BaoStock.login_calls == 2
     assert BaoStock.logout_calls == 2
     assert sleeps == [0.25]
+
+
+def test_valuation_history_is_checkpointed_with_per_security_receipts(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    class Result:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self, code: str) -> None:
+            self._rows = iter(
+                [
+                    [
+                        "2026-07-20",
+                        code,
+                        "10.0",
+                        "1",
+                        "12.5",
+                        "1.4",
+                        "2.1",
+                        "9.0",
+                    ]
+                ]
+            )
+            self.current: list[str] | None = None
+
+        def next(self) -> bool:
+            self.current = next(self._rows, None)
+            return self.current is not None
+
+        def get_row_data(self) -> list[str]:
+            assert self.current is not None
+            return self.current
+
+    class BaoStock:
+        @staticmethod
+        def login():
+            return type("Login", (), {"error_code": "0", "error_msg": "ok"})()
+
+        @staticmethod
+        def logout() -> None:
+            return None
+
+        @staticmethod
+        def query_history_k_data_plus(code: str, *_args: object, **_kwargs: object):
+            calls.append(code)
+            return Result(code)
+
+    collector_kwargs = {
+        "bs_module": BaoStock,
+        "sleep": lambda _seconds: None,
+        "configure_timeout": lambda _seconds: True,
+    }
+    kwargs = {
+        "output": tmp_path / "valuation.parquet",
+        "receipts_path": tmp_path / "valuation.receipts.parquet",
+        "checkpoint_dir": tmp_path / "checkpoints",
+        "batch_size": 1,
+        "collector_kwargs": collector_kwargs,
+    }
+    first = valuation_history.collect_valuation_history_checkpointed(
+        ["000001", "600519"],
+        date(2026, 7, 20),
+        date(2026, 7, 30),
+        **kwargs,
+    )
+    second = valuation_history.collect_valuation_history_checkpointed(
+        ["000001", "600519"],
+        date(2026, 7, 20),
+        date(2026, 7, 30),
+        **kwargs,
+    )
+
+    assert first["row_count"] == 2
+    assert first["receipt_count"] == 2
+    assert first["failed_receipts"] == 0
+    assert second["reused_batches"] == 2
+    assert calls == ["sz.000001", "sh.600519"]
+    rows = pq.read_table(kwargs["output"]).to_pylist()
+    assert {row["pe_ttm"] for row in rows} == {12.5}
+    receipts = pq.read_table(kwargs["receipts_path"]).to_pylist()
+    assert {row["status"] for row in receipts} == {"success_nonempty"}
 
 
 def test_minute_collector_defaults_to_repository_module(

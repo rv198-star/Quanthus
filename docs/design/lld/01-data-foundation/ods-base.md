@@ -61,6 +61,13 @@ not retroactively place those assets in the provisional Base. The final package 
 verify a successful full-market acquisition before adding the new files and removing the existing
 scope gap; until then the accepted Base continues to describe the holdings honestly.
 
+The retained valuation history currently ends on 2026-07-18. The bounded July repair uses the
+repository-owned BaoStock range collector in `src/quanthus/providers/valuation_history.py`, not a
+slice of that retained Parquet. It records one receipt per requested security, checkpoints fixed
+security batches, and fails on provider errors, empty responses, identity/date drift, or an
+all-null valuation response. Normal post-repair valuation remains owned by the daily market lane;
+the repair collector is not a second recurring writer.
+
 ## 3. Selection And Quality Gates
 
 The builder first freezes a source inventory and a deterministic selection digest. Every top-level

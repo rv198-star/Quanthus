@@ -99,6 +99,29 @@ Record and compare on both nodes:
 Any mismatch blocks publication. Do not repair a copied package in place; repeat transfer into a
 new hidden staging child after diagnosing the source.
 
+## July Valuation Gap Repair
+
+The retained valuation history ends on 2026-07-18. Acquire the open-session gap through July 30
+directly from BaoStock before final inventory freeze; do not re-slice the retained Parquet and label
+it as a new acquisition:
+
+```bash
+PYTHONPATH=/root/work/Quanthus/src \
+  /root/work/astock/.venv/bin/python -m quanthus.providers.valuation_history \
+  --start 2026-07-20 \
+  --end 2026-07-30 \
+  --stock-list /root/work/astock/data/stock_list.parquet \
+  --output /root/work/astock/data/backfill/valuation/2026-07-20_2026-07-30/valuation_history.parquet \
+  --receipts /root/work/astock/data/backfill/valuation/2026-07-20_2026-07-30/receipts.parquet \
+  --checkpoint-dir /root/work/astock/data/backfill/valuation/2026-07-20_2026-07-30/checkpoints
+```
+
+Acceptance requires a nonempty artifact, one receipt per requested security, zero `failed`
+receipts, dates bounded to the requested interval, and at least one non-null valuation field per
+successful security. July 31 and later are acquired by `market-daily-core`; the bounded repair is
+not installed as another timer. Preserve the repair metadata, receipts, and checkpoints through
+final Base verification.
+
 ## Final July Base
 
 The close-release gate is expected to become runnable only after the final 5m job completes. Run it

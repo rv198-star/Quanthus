@@ -315,6 +315,75 @@ sudo /root/work/Quanthus/ops/bin/dual-lane-doctor node
 The service must report a verified `through_date` equal to the latest lane candidate. Do not treat
 a successful catalog refresh as canonical acceptance or consumer publication.
 
+## Monthly-complete DWD/DWS Base
+
+Run this flow on OCI only from one clean reviewed commit. It creates the Issue #48 Base pair beside
+all retained artifacts and does not publish a consumer release set.
+
+1. Freeze the input ledger with `freeze-dwd-dws-base-ledger` using the accepted historical bundle,
+   `/srv/quanthus/dual-lane`, its publication root, and
+   `config/pipelines/dwd-dws-base-through-20260730.v1.json`. Retain the resulting ledger digest.
+2. Build `dwd-base-through-20260730-v1` and `dws-base-through-20260730-v1` in unique staging with
+   `build-dwd-dws-base`, passing the full clean Git object id. Verify the pair independently with
+   `verify-dwd-dws-base`; DWS semantic-difference rows must be zero.
+3. Transfer repository code only through Git. Transfer package data through node staging, verify
+   checksums, then run `install-dwd-dws-base` into `/srv/quanthus/dwd/base/` and
+   `/srv/quanthus/dws/base/`. Installation deliberately writes no `BASE_CURRENT.json`.
+4. Compare manifest, content, whole-tree, and ledger digests across OCI, CN01, and Hermes. Any
+   mismatch blocks every descriptor. Preserve free-space, elapsed-time, peak-memory, and clean-path
+   verification evidence.
+5. After all three nodes pass, run `advance-dwd-dws-base-current` on each node with the exact old
+   DWD and DWS descriptor SHA-256 values, or the literal `absent` only when each descriptor is
+   proven absent. Verify both descriptors cross-bind the same pair before rebuilding lane logical
+   catalogs against the new Base.
+
+Do not infer authority from a package or descriptor alone. Do not move or delete the old seed,
+absorbed candidates, catalogs, ADS, logs, pointers, or evidence. Do not advance canonical,
+release-set, ADS, or legacy consumer pointers. The final July Base requires a new policy binding
+the actual Issue #47 ODS Base and accepted July 31 generation; never relabel the provisional pair.
+
+## Operational ADS historical Base on OCI
+
+Run this Issue #46 flow only on OCI from one clean reviewed commit. The external build plan must
+bind exact immutable manifests for the canonical catalog, DWD Base, DWS Base, PIT, identity, and
+calendar roles. It must also inventory every retained operational daily ADS and portable export,
+including excluded, superseded, duplicate, and unverifiable objects. A floating `CURRENT`, guessed
+path or digest, incomplete inventory, or portable bootstrap PIT claim is not an input.
+
+1. Confirm the exact Issue #48 DWD/DWS packages are published and independently verified. Record
+   their ids, manifest SHA-256 values, content digests, and the canonical generation ledger.
+2. Freeze a build plan outside the package root. Classify every source and select table bytes only
+   when schema, key, role, source generation, logical digest, and per-decision PIT equivalence are
+   all bound. Otherwise select an exact accepted DWD/DWS/reference source for rebuild.
+3. Record the current `BASE_CURRENT.json` manifest SHA-256, or prove the descriptor is absent. Run:
+
+   ```bash
+   sudo /opt/quanthus/current/ops/bin/publish-operational-ads-base \
+     /path/to/exact-build-plan.json \
+     ads-base-through-20260730-v1 \
+     absent \
+     2026-07-29 \
+     2026-07-29
+   ```
+
+   Replace `absent` with the exact current manifest SHA-256 when a descriptor exists. The operator
+   enforces root ownership and a clean checkout, builds in unique staging, deep-checks all declared
+   parts without producer paths, runs the existing bounded replay loader, then advances only
+   `BASE_CURRENT.json` under a locked compare-and-swap.
+4. Retain the exact plan, package manifest/`READY`, table counts and digests, semantic comparisons,
+   replay report, elapsed time, peak resources, and descriptor bytes before and after. Re-run the
+   verifier from a copied clean path with source nodes, producer paths, databases, and network
+   unavailable before accepting Phase A.
+
+After the July 31 close, create a new final plan and immutable `ads-base-202607-v1`. It must bind
+the provisional package plus the exact accepted July 31 daily ADS and final DWD/DWS manifests.
+Never append to, edit, or relabel the provisional package. Failure or interruption must leave the
+prior descriptor and all retained ADS, exports, upstream Bases, and daily releases unchanged.
+
+`BASE_CURRENT.json` is an administrative historical-Base descriptor. It is not
+`release-set_CURRENT.json`, does not authorize a strategy or consumer publication, and must not be
+used to record `GO_FOR_CUTOVER`. Do not rename or clean up `/srv/quanthus/portable-ads` in this flow.
+
 ## Copy-only migration order
 
 Migration creates new artifacts and pointers only under the target roots. It does not move,

@@ -5,7 +5,7 @@
 | Phase | Instrumentation in P2; reports after P3 |
 | Design status | approved |
 | Delivery gate | accepted-conditional |
-| Implementation status | P2 event contracts accepted; `P3-FUNNEL-001` reconciliation contracts accepted; fixture funnel populated; attribution and recurring reports are proposal-triggered |
+| Implementation status | P2 event contracts accepted; `P3-FUNNEL-001` reconciliation contracts accepted; fixture funnel populated; bounded synthetic attribution Pipeline/publication/viewer closure accepted; formal attribution and recurring reports are proposal-triggered |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-AUDIT-001 through FR-AUDIT-005 |
 
@@ -13,6 +13,12 @@
 
 Measure where risk was avoided, where opportunities were captured or missed, and how profit
 quality changed. Monitoring is an event contract, not a dashboard added after the fact.
+
+### Detailed design
+
+| Child | Ownership | Delivery state |
+| --- | --- | --- |
+| `10-monitoring-attribution/strategy-attribution.md` | Strategy-owned topology adapter, predeclared questions, legal interventions, evidence validation, paired replay effects, interactions, and three-layer explanations | Bounded synthetic Pipeline/publication/viewer closure accepted; `P3-ATTR-001` and `P3-DASH-001` remain deferred by the P3 gate |
 
 ## 2. North-star metrics
 
@@ -102,6 +108,12 @@ constraints with one module removed or neutralized. The reported value is the de
 versioned baseline. Module deltas are not additive because interactions exist; material claims
 receive pairwise reruns or an explicit interaction caveat.
 
+The detailed strategy-attribution contract, including feature, state-router, expert, veto, and
+allocator intervention semantics, is owned by
+`10-monitoring-attribution/strategy-attribution.md`.
+Its adapter boundary consumes a strategy's native topology; these examples do not require every
+future strategy to implement the current candidate/expert pipeline.
+
 ## 5. Opportunity funnel
 
 Fixed stages are candidate to score, score to veto, entry to add, and hold to exit. Each stage
@@ -130,8 +142,15 @@ predeclared module-removal questions and recurring monitoring semantics.
 ## 6. Reporting cuts
 
 Reports support month/quarter, market regime, lifecycle stage, expert/aggregator/position rule,
-and policy version. The first dashboard row always has exactly the three north stars. Funnel,
-contribution matrix, and failure ranking appear below it.
+and policy version. For the current candidate/expert report profile, the first dashboard row has
+exactly the three north stars. A different formal-strategy adapter must version an equivalent
+mapping or explicit `not_applicable` reasons before dashboard acceptance; the report profile does
+not define that strategy's topology. Funnel, contribution matrix, and failure ranking appear below
+the first row when their native semantics exist.
+
+The child strategy-attribution design owns the decision-summary, reason-analysis, and
+method/evidence views. All three are projections of the same versioned claim; a presentation layer
+cannot create or upgrade attribution evidence.
 
 ## 7. Work items
 

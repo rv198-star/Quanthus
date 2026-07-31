@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Install a verified Base pair without advancing either active descriptor."""
+
+from __future__ import annotations
+
+import argparse
+import grp
+import json
+import os
+import pwd
+import sys
+from pathlib import Path
+
+from quanthus.pipelines.dwd_dws_base import (
+    DwdDwsBaseError,
+    install_dwd_dws_base_pair,
+    load_dwd_dws_base_policy,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-policy", type=Path, required=True)
+    parser.add_argument("--ingress-dwd", type=Path, required=True)
+    parser.add_argument("--ingress-dws", type=Path, required=True)
+    parser.add_argument("--dwd-base-root", type=Path, required=True)
+    parser.add_argument("--dws-base-root", type=Path, required=True)
+    parser.add_argument("--owner")
+    parser.add_argument("--group")
+    args = parser.parse_args()
+    if (args.owner is None) != (args.group is None):
+        parser.error("--owner and --group must be provided together")
+    if args.owner is not None and os.geteuid() != 0:
+        parser.error("ownership changes require root")
+    owner_uid = None if args.owner is None else pwd.getpwnam(args.owner).pw_uid
+    group_gid = None if args.group is None else grp.getgrnam(args.group).gr_gid
+    try:
+        pair = install_dwd_dws_base_pair(
+            ingress_dwd=args.ingress_dwd,
+            ingress_dws=args.ingress_dws,
+            dwd_base_root=args.dwd_base_root,
+            dws_base_root=args.dws_base_root,
+            policy=load_dwd_dws_base_policy(args.base_policy),
+            owner_uid=owner_uid,
+            group_gid=group_gid,
+        )
+    except (DwdDwsBaseError, FileExistsError, OSError) as exc:
+        print(f"DWD/DWS Base installation failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "descriptors_advanced": False,
+                "dwd": str(pair.dwd.root),
+                "dws": str(pair.dws.root),
+                "input_ledger_digest": pair.dwd.input_ledger_digest,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""Build one immutable Hermes-authoritative ODS Base package."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from datetime import date
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.ods_base import (
+    OdsBaseError,
+    build_ods_base_bundle,
+    load_ods_base_policy,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--astock-root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--bundle-id", required=True)
+    parser.add_argument("--through-date", type=date.fromisoformat, required=True)
+    parser.add_argument("--code-revision", required=True)
+    parser.add_argument("--parent-base", type=Path)
+    args = parser.parse_args()
+    try:
+        result = build_ods_base_bundle(
+            astock_root=args.astock_root,
+            output=args.output,
+            bundle_id=args.bundle_id,
+            through_date=args.through_date,
+            policy=load_ods_base_policy(args.policy),
+            code_revision=args.code_revision,
+            parent_base=args.parent_base,
+        )
+    except (OdsBaseError, FileExistsError, OSError) as exc:
+        print(f"ODS Base build failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "bundle_id": result.bundle_id,
+                "content_digest": result.content_digest,
+                "file_count": result.file_count,
+                "manifest_sha256": result.manifest_sha256,
+                "output": str(result.root),
+                "size_bytes": result.size_bytes,
+                "through_date": result.through_date.isoformat(),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

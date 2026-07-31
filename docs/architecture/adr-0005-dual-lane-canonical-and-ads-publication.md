@@ -37,7 +37,11 @@ lease/CAS publication, correction/revocation/rollback state, accepted-ODS recove
 self-contained role-scoped portable `strategy_replay` bundle. The migration contract additionally
 packages the accepted historical DWD seed with a newly derived historical DWS projection, seals
 one byte-identical copy on each candidate node, and builds a lane-local logical history catalog
-over that common seed plus the lane's daily candidate chain. Full PIT/tradability, real NTP
+over that common seed plus the lane's daily candidate chain. The monthly-complete Base extension
+freezes an OCI canonical-catalog input ledger, absorbs accepted daily members into separate
+immutable DWD and DWS packages, and derives DWS from the exact DWD package. Installation and
+`BASE_CURRENT.json` advancement are separate operations; these Base descriptors do not replace the
+consumer release-set pointer. Full PIT/tradability, real NTP
 qualification, independent restore evidence, and portable `event_library` or `ml_training`
 bundles remain open delivery gates. Contract tests are not production or cutover evidence.
 
@@ -247,6 +251,15 @@ a reproducible projection governed by `dual-lane-history-base-v1`; the lane-loca
 references the seed and immutable daily candidates without physically merging or rewriting either.
 That catalog is a recovery/read boundary and never competes with OCI's canonical catalog or
 consumer release-set authority.
+
+Monthly-complete DWD/DWS Bases are new immutable descendants, not mutations or renames of that
+seed. OCI selects daily inputs only through one checksum-bound canonical catalog, records each
+acceptance, lane, ODS release, epoch parent, shared reference, cutoff, transform, and quality
+identity in a deterministic ledger, and rejects a chain gap or conflicting business key. DWD may
+retain separate manifest-discovered members when schemas differ; DWS binds the exact DWD package
+manifest/content digests and must reproduce the prior projection row-for-row. All three nodes
+install and verify identical package bytes before any new Base descriptor is advanced. The old
+seed, absorbed daily candidates, lane catalogs, and consumer release-set pointer remain unchanged.
 
 Recovery is proved in layers: retained canonical inputs rebuild ADS without live lanes; retained
 DWD rebuilds DWS; and exact ODS, epoch parent/base, references, runtime, and transform rebuild the

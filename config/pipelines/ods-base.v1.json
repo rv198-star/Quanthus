@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "contract_id": "hermes-authoritative-ods-base-v1",
+  "authority": {
+    "source_node": "hermes",
+    "mirror_nodes": [
+      "hermes",
+      "cn01"
+    ],
+    "oci_ods_enabled": false
+  },
+  "source": {
+    "files": [
+      {
+        "dataset_id": "adjustment_contract_qfq",
+        "source": "data/adj_contract_qfq_v1.json",
+        "target": "payload/canonical/adj_contract_qfq_v1.json",
+        "role": "source_contract",
+        "format": "json",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "adjustment_contract_quanthus",
+        "source": "data/adj_contract_quanthus_v1.json",
+        "target": "payload/canonical/adj_contract_quanthus_v1.json",
+        "role": "source_contract",
+        "format": "json",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "announcement_archive",
+        "source": "data/info_archive.db",
+        "target": "payload/canonical/info_archive.db",
+        "role": "source_evidence",
+        "format": "sqlite",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "announcement_orgid_map",
+        "source": "data/cninfo_orgid_map.json",
+        "target": "payload/canonical/cninfo_orgid_map.json",
+        "role": "source_reference",
+        "format": "json",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "corporate_actions",
+        "source": "data/ref_corporate_actions.parquet",
+        "target": "payload/canonical/ref_corporate_actions.parquet",
+        "role": "source_evidence",
+        "format": "parquet",
+        "key_columns": ["action_id"],
+        "date_columns": ["announce_date", "ex_date"]
+      },
+      {
+        "dataset_id": "daily_ohlcv_adjusted",
+        "source": "data/daily_ohlcv.parquet",
+        "target": "payload/canonical/daily_ohlcv.parquet",
+        "role": "source_market_data",
+        "format": "parquet",
+        "key_columns": ["stock_code", "date"],
+        "date_columns": ["date"]
+      },
+      {
+        "dataset_id": "daily_ohlcv_unadjusted",
+        "source": "data/daily_ohlcv_none.parquet",
+        "target": "payload/canonical/daily_ohlcv_none.parquet",
+        "role": "source_market_data",
+        "format": "parquet",
+        "key_columns": ["stock_code", "date"],
+        "date_columns": ["date"]
+      },
+      {
+        "dataset_id": "dataset_manifest",
+        "source": "data/dataset_manifest.parquet",
+        "target": "payload/canonical/dataset_manifest.parquet",
+        "role": "source_lineage",
+        "format": "parquet",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "dataset_manifest_metadata",
+        "source": "data/dataset_manifest_meta.json",
+        "target": "payload/canonical/dataset_manifest_meta.json",
+        "role": "source_lineage",
+        "format": "json",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "delist_boundary_exceptions",
+        "source": "data/ref_delist_day_boundary_exceptions.parquet",
+        "target": "payload/canonical/ref_delist_day_boundary_exceptions.parquet",
+        "role": "source_exception_evidence",
+        "format": "parquet",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "dividend_history",
+        "source": "data/dividend_history.parquet",
+        "target": "payload/canonical/dividend_history.parquet",
+        "role": "source_evidence",
+        "format": "parquet",
+        "key_columns": ["stock_code", "announce_date", "ex_dividend_date"],
+        "date_columns": ["announce_date", "ex_dividend_date"]
+      },
+      {
+        "dataset_id": "factor_pit_exceptions",
+        "source": "data/ref_adjustment_factor_pit_exceptions.parquet",
+        "target": "payload/canonical/ref_adjustment_factor_pit_exceptions.parquet",
+        "role": "source_exception_evidence",
+        "format": "parquet",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "financial_quarterly",
+        "source": "data/financial_quarterly.parquet",
+        "target": "payload/canonical/financial_quarterly.parquet",
+        "role": "source_evidence",
+        "format": "parquet",
+        "key_columns": ["stock_code", "report_date"],
+        "date_columns": ["report_date", "publish_deadline"]
+      },
+      {
+        "dataset_id": "index_daily",
+        "source": "data/index_daily.parquet",
+        "target": "payload/canonical/index_daily.parquet",
+        "role": "source_market_data",
+        "format": "parquet",
+        "key_columns": ["index_code", "date"],
+        "date_columns": ["date"]
+      },
+      {
+        "dataset_id": "index_daily_metadata",
+        "source": "data/index_daily_meta.json",
+        "target": "payload/canonical/index_daily_meta.json",
+        "role": "source_lineage",
+        "format": "json",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "reference_build_metadata",
+        "source": "data/ref_build_meta.json",
+        "target": "payload/canonical/ref_build_meta.json",
+        "role": "source_lineage",
+        "format": "json",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "price_limit_regime",
+        "source": "data/ref_price_limit_regime_pit.parquet",
+        "target": "payload/canonical/ref_price_limit_regime_pit.parquet",
+        "role": "source_reference",
+        "format": "parquet",
+        "key_columns": [],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "security_master",
+        "source": "data/ref_security_master.parquet",
+        "target": "payload/canonical/ref_security_master.parquet",
+        "role": "source_identity",
+        "format": "parquet",
+        "key_columns": ["security_id"],
+        "date_columns": ["list_date", "delist_date", "as_of"]
+      },
+      {
+        "dataset_id": "shareholder_count",
+        "source": "data/ref_shareholder_count.parquet",
+        "target": "payload/canonical/ref_shareholder_count.parquet",
+        "role": "source_evidence",
+        "format": "parquet",
+        "key_columns": ["stock_code", "end_date"],
+        "date_columns": ["end_date", "hold_notice_date", "knowledge_cutoff"]
+      },
+      {
+        "dataset_id": "stock_list",
+        "source": "data/stock_list.parquet",
+        "target": "payload/canonical/stock_list.parquet",
+        "role": "source_identity",
+        "format": "parquet",
+        "key_columns": ["code"],
+        "date_columns": []
+      },
+      {
+        "dataset_id": "st_status_pit",
+        "source": "data/ref_st_status_pit.parquet",
+        "target": "payload/canonical/ref_st_status_pit.parquet",
+        "role": "source_status_evidence",
+        "format": "parquet",
+        "key_columns": ["interval_id"],
+        "date_columns": ["announcement_date", "effective_start", "effective_end", "knowledge_cutoff"]
+      },
+      {
+        "dataset_id": "suspensions",
+        "source": "data/ref_suspensions.parquet",
+        "target": "payload/canonical/ref_suspensions.parquet",
+        "role": "source_status_evidence",
+        "format": "parquet",
+        "key_columns": ["suspension_id"],
+        "date_columns": ["suspend_start", "suspend_end", "knowledge_cutoff"]
+      },
+      {
+        "dataset_id": "trading_calendar",
+        "source": "data/ref_trading_calendar.parquet",
+        "target": "payload/canonical/ref_trading_calendar.parquet",
+        "role": "source_reference",
+        "format": "parquet",
+        "key_columns": ["exchange", "trade_date"],
+        "date_columns": ["trade_date"]
+      },
+      {
+        "dataset_id": "valuation_daily",
+        "source": "data/valuation_daily.parquet",
+        "target": "payload/canonical/valuation_daily.parquet",
+        "role": "source_market_data",
+        "format": "parquet",
+        "key_columns": ["stock_code", "date"],
+        "date_columns": ["date"]
+      }
+    ],
+    "trees": [
+      {
+        "dataset_id": "minute_1m_research_archive",
+        "source": "minute/data/research_1m",
+        "target": "payload/minute/research_1m",
+        "role": "source_market_archive",
+        "pattern": "*_1m.parquet",
+        "minimum_parts": 5000,
+        "key_columns": ["stock_code", "ts"],
+        "date_columns": ["ts"]
+      },
+      {
+        "dataset_id": "minute_5m_formal_archive",
+        "source": "minute/data/prod_5m",
+        "target": "payload/minute/prod_5m",
+        "role": "source_market_archive",
+        "pattern": "*_5m.parquet",
+        "minimum_parts": 5000,
+        "key_columns": ["stock_code", "ts"],
+        "date_columns": ["ts"]
+      }
+    ],
+    "archive_trees": [
+      {
+        "dataset_id": "source_evidence_adjustment_factor_pit",
+        "source": "data/revisions/adj_factors_pit_em_link_v1",
+        "target": "payload/source-evidence/adj_factors_pit_em_link_v1",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 100
+      },
+      {
+        "dataset_id": "source_evidence_adjustment_factor_exceptions",
+        "source": "data/revisions/adj_factors_pit_exception_ledger_v1",
+        "target": "payload/source-evidence/adj_factors_pit_exception_ledger_v1",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 2
+      },
+      {
+        "dataset_id": "source_evidence_baostock_none_reference",
+        "source": "data/revisions/d1_baostock_none_ref_v1",
+        "target": "payload/source-evidence/d1_baostock_none_ref_v1",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 10
+      },
+      {
+        "dataset_id": "source_evidence_delist_boundaries",
+        "source": "data/revisions/delist_day_boundary_exceptions_v1",
+        "target": "payload/source-evidence/delist_day_boundary_exceptions_v1",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 3
+      },
+      {
+        "dataset_id": "source_evidence_delisted_coverage",
+        "source": "data/revisions/s1_delisted_coverage_with_tb_20260724",
+        "target": "payload/source-evidence/s1_delisted_coverage_with_tb_20260724",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 1
+      },
+      {
+        "dataset_id": "source_evidence_invalid_ohlc",
+        "source": "data/revisions/invalid_ohlc_20241106",
+        "target": "payload/source-evidence/invalid_ohlc_20241106",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["*.json", "*.csv"],
+        "minimum_files": 15
+      },
+      {
+        "dataset_id": "source_evidence_missing_none_history",
+        "source": "data/revisions/none_missing_276_raw_v1_20260725",
+        "target": "payload/source-evidence/none_missing_276_raw_v1_20260725",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 100
+      },
+      {
+        "dataset_id": "source_evidence_none_tail_repairs",
+        "source": "data/revisions/none_tail_fix3_raw_v1_20260725",
+        "target": "payload/source-evidence/none_tail_fix3_raw_v1_20260725",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 3
+      },
+      {
+        "dataset_id": "source_evidence_p1_formal_pack",
+        "source": "data/revisions/p1_formal_pack_20260725",
+        "target": "payload/source-evidence/p1_formal_pack_20260725",
+        "role": "accepted_source_lineage",
+        "include_patterns": ["**"],
+        "minimum_files": 3
+      },
+      {
+        "dataset_id": "source_evidence_price_limit_regime",
+        "source": "data/revisions/price_limit_regime_pit_v1_1_20260725",
+        "target": "payload/source-evidence/price_limit_regime_pit_v1_1_20260725",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 2
+      },
+      {
+        "dataset_id": "source_evidence_st_pit_accepted",
+        "source": "data/revisions/st_status_pit_v1_1_20260725",
+        "target": "payload/source-evidence/st_status_pit_v1_1_20260725",
+        "role": "accepted_source_lineage",
+        "include_patterns": ["**"],
+        "minimum_files": 5
+      },
+      {
+        "dataset_id": "source_evidence_st_baostock_raw",
+        "source": "data/revisions/st_status_pit_v2_baostock_20260725",
+        "target": "payload/source-evidence/st_status_pit_v2_baostock_20260725",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 100
+      },
+      {
+        "dataset_id": "source_evidence_st_semantics_audit",
+        "source": "data/revisions/st_status_pit_baostock_isST_semantics_v2_1_stats_20260725",
+        "target": "payload/source-evidence/st_status_pit_baostock_isST_semantics_v2_1_stats_20260725",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 5
+      },
+      {
+        "dataset_id": "source_evidence_suspension_repairs",
+        "source": "data/revisions/suspensions_pit_688237_688277_20260722_v1",
+        "target": "payload/source-evidence/suspensions_pit_688237_688277_20260722_v1",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 3
+      },
+      {
+        "dataset_id": "source_evidence_tradability_c2_s1",
+        "source": "data/revisions/tradability_c2_s1_v1",
+        "target": "payload/source-evidence/tradability_c2_s1_v1",
+        "role": "supplementary_source_evidence",
+        "include_patterns": ["**"],
+        "minimum_files": 3
+      }
+    ],
+    "daily": {
+      "source": "data/shadow/hermes-ods-v1/releases/daily",
+      "increment_start": "2026-07-27",
+      "market_required_artifacts": [
+        "daily_ohlcv_none_delta",
+        "daily_status_observation_delta",
+        "security_master",
+        "stock_list",
+        "trading_calendar",
+        "index_daily_delta",
+        "adjustment_evidence_delta"
+      ],
+      "event_required_artifacts": [
+        "announcements_delta",
+        "suspensions_delta",
+        "corporate_actions_delta",
+        "dividends_delta",
+        "factor_evidence_delta",
+        "financial_disclosures_delta"
+      ]
+    },
+    "intraday_releases": [
+      {
+        "frequency": "1m",
+        "source": "data/shadow/hermes-ods-v1/releases/daily/1m",
+        "increment_start": "2026-07-24",
+        "required_artifacts": [
+          "intraday_bars",
+          "intraday_meta",
+          "intraday_coverage",
+          "trading_calendar"
+        ]
+      },
+      {
+        "frequency": "5m",
+        "source": "data/shadow/hermes-ods-v1/releases/daily/5m",
+        "increment_start": "2026-07-24",
+        "required_artifacts": [
+          "intraday_bars",
+          "intraday_meta",
+          "intraday_coverage",
+          "trading_calendar"
+        ]
+      }
+    ],
+    "exclusions": [
+      {"pattern": "data/*.bak*", "classification": "excluded_backup", "reason": "superseded mutable-file backup"},
+      {"pattern": "data/cutover", "classification": "excluded_cutover_evidence", "reason": "deployment evidence is not ODS payload"},
+      {"pattern": "data/errors.json", "classification": "excluded_failed_attempt_state", "reason": "collector failure state is not Base payload"},
+      {"pattern": "data/hist_*", "classification": "excluded_superseded_working_data", "reason": "historical repair workspace is represented by accepted canonical files"},
+      {"pattern": "data/landing", "classification": "excluded_staging", "reason": "mutable landing workspace is not an accepted Base member"},
+      {"pattern": "data/pipeline_status.json", "classification": "excluded_operational_state", "reason": "mutable scheduler status is not Base payload"},
+      {"pattern": "data/progress.json*", "classification": "excluded_operational_state", "reason": "mutable collector checkpoint is replaced by the Base manifest"},
+      {"pattern": "data/qa_data_gaps.parquet", "classification": "excluded_derived_quality", "reason": "derived quality output belongs downstream of ODS"},
+      {"pattern": "data/ref_tradability_*", "classification": "excluded_derived_curated_data", "reason": "tradability coverage/enrichment belongs to DWD"},
+      {"pattern": "data/releases", "classification": "excluded_legacy_release_root", "reason": "legacy releases are superseded by selected repository-owned shadow releases"},
+      {"pattern": "data/revisions", "classification": "excluded_superseded_revisions", "reason": "accepted canonical bytes are included; revision workspaces remain separate evidence"},
+      {"pattern": "data/shadow", "classification": "mixed_selected_release_root", "reason": "only selected complete Hermes daily attempts are included"},
+      {"pattern": "data/temp_*", "classification": "excluded_temporary", "reason": "temporary acquisition files are not accepted Base payload"},
+      {"pattern": "data/tradability_overrides_20241106.parquet", "classification": "excluded_derived_exception", "reason": "curated tradability override belongs to DWD policy/evidence"},
+      {"pattern": "minute/data/*.json", "classification": "excluded_operational_state", "reason": "root-level minute smoke/checkpoint state is not formal archive data"},
+      {"pattern": "minute/data/*.meta.json", "classification": "excluded_smoke_fixture", "reason": "root-level minute sample metadata is not formal archive data"},
+      {"pattern": "minute/data/*.parquet", "classification": "excluded_smoke_fixture", "reason": "root-level minute samples are outside prod_5m and research_1m"}
+    ]
+  },
+  "retention": {
+    "migration_mode": "copy_only",
+    "delete_enabled": false,
+    "minimum_identical_copies": 2
+  }
+}

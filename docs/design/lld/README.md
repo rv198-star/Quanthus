@@ -14,12 +14,20 @@ index, and one active branch; expand to linked siblings only for a concrete inte
    `02-backtest-engine/strategy-replay.md` P3 orchestration child; load exact evidence only when
    changing that boundary.
 7. `01-data-foundation.md` and its `01-data-foundation/strategy-replay-ads.md` child for portable
-   replay inputs; `10-monitoring-attribution.md` only for the exact audit path.
+   replay inputs or `01-data-foundation/operational-ads-base.md` for the OCI historical Base;
+   `10-monitoring-attribution.md` only for the exact audit path.
 
 For user-facing terminology and strategy-policy discussion, start with the non-governing
 `../p3-strategy-semantics-checklist.md` and expand only the LLD branch for the item being decided.
 For an approved candidate implementation, start with its card under `../strategies/` and then load
 only the LLD modules named by that card.
+
+For strategy-attribution protocol work, load `10-monitoring-attribution.md` and its
+`10-monitoring-attribution/strategy-attribution.md` child. The parent owns audit and reporting
+boundaries; the child owns the strategy-adapter boundary, attribution questions, interventions,
+evidence validation, and explanation views. Strategy topology remains native and may be coarser
+than the current candidate/expert path. Its design approval does not reopen the deferred P3
+attribution or dashboard work items.
 
 ## Module tree
 
@@ -34,7 +42,7 @@ only the LLD modules named by that card.
 | `07-research-scoring.md` | P5 | Deferred | Statistical/ML research and promotion |
 | `08-validation-governance.md` | P6 policy | Approved future governance | Arbitration, blind data, change budgets, or model promotion |
 | `09-roadmap.md` | All | Delivery sequence | Phase gates, milestones, or stop rules |
-| `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts; attribution and recurring reports resume for formal strategies | Decision or notification logs, hypothetical paths, funnels, or attribution |
+| `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts and bounded synthetic attribution closure; formal attribution and recurring reports remain proposal-triggered | Decision or notification logs, hypothetical paths, funnels, or attribution |
 
 Detailed child files are added beneath a same-named module directory only after one module becomes
 too large to load usefully as a single node. The parent LLD remains the stable entry point and owns

@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Verify one Base-aware lane logical-catalog CURRENT descriptor."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from quanthus.pipelines.dwd_dws_base import (
+    DwdDwsBaseError,
+    load_dwd_dws_base_lane_catalog_current,
+    load_dwd_dws_base_policy,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-policy", type=Path, required=True)
+    parser.add_argument("--platform-root", type=Path, required=True)
+    parser.add_argument("--dwd-base-current", type=Path, required=True)
+    parser.add_argument("--dws-base-current", type=Path, required=True)
+    parser.add_argument("--catalog-current", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        catalog = load_dwd_dws_base_lane_catalog_current(
+            args.catalog_current,
+            platform_root=args.platform_root,
+            policy=load_dwd_dws_base_policy(args.base_policy),
+            dwd_pointer=args.dwd_base_current,
+            dws_pointer=args.dws_base_current,
+        )
+    except (DwdDwsBaseError, FileExistsError, OSError) as exc:
+        print(f"DWD/DWS Base lane-catalog verification failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "candidate_count": len(catalog.candidates),
+                "catalog_id": catalog.catalog_id,
+                "content_digest": catalog.content_digest,
+                "lane_id": catalog.lane_id,
+                "manifest_sha256": catalog.manifest_sha256,
+                "through_date": catalog.through_date.isoformat(),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

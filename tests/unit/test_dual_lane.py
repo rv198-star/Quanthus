@@ -1894,7 +1894,11 @@ class DualLaneTests(unittest.TestCase):
 
     def test_transfer_helper_is_compatible_with_rrsync_forced_commands(self) -> None:
         project_root = Path(__file__).resolve().parents[2]
-        for name in ("sync-dual-lane-date-root", "sync-dual-lane-history-base"):
+        for name in (
+            "sync-dual-lane-date-root",
+            "sync-dual-lane-history-base",
+            "sync-dwd-dws-base",
+        ):
             with self.subTest(helper=name):
                 helper = (project_root / "ops/bin" / name).read_text(encoding="utf-8")
                 self.assertNotIn("--protect-args", helper)
@@ -1922,6 +1926,9 @@ class DualLaneTests(unittest.TestCase):
         )
         self.assertIn("build-dual-lane-history-catalog", runner)
         self.assertIn("verify-dual-lane-history", runner)
+        self.assertIn("build-dwd-dws-base-catalog", runner)
+        self.assertIn("verify-dwd-dws-base-catalog", runner)
+        self.assertIn("use_monthly_base", runner)
         self.assertIn("flock -n", runner)
         self.assertNotIn("--delete", runner)
         self.assertIn("candidate service does not load the daily lane-history", doctor)

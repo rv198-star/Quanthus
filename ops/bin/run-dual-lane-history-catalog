@@ -11,8 +11,12 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
 python_bin="${QUANTHUS_PYTHON:-${repo_root}/.venv-p1/bin/python}"
 policy="${QUANTHUS_DUAL_LANE_HISTORY_POLICY:-${repo_root}/config/pipelines/dual-lane-history-base.v1.json}"
+base_policy="${QUANTHUS_DWD_DWS_BASE_POLICY:-${repo_root}/config/pipelines/dwd-dws-base-through-20260730.v1.json}"
+platform_root="${QUANTHUS_PLATFORM_ROOT:-/srv/quanthus}"
 storage_root="${QUANTHUS_DUAL_LANE_STORAGE_ROOT:-/srv/quanthus/dual-lane}"
 base_current="${QUANTHUS_DUAL_LANE_HISTORY_BASE_CURRENT:?set history-base CURRENT}"
+dwd_base_current="${QUANTHUS_DWD_BASE_CURRENT:-/srv/quanthus/dwd/base/BASE_CURRENT.json}"
+dws_base_current="${QUANTHUS_DWS_BASE_CURRENT:-/srv/quanthus/dws/base/BASE_CURRENT.json}"
 candidate_root="${QUANTHUS_DUAL_LANE_CANDIDATE_ROOT:?set the lane-local candidate root}"
 catalog_root="${QUANTHUS_DUAL_LANE_HISTORY_CATALOG_ROOT:?set the lane-history catalog root}"
 lane_id="${QUANTHUS_DUAL_LANE_NODE_ID:?set QUANTHUS_DUAL_LANE_NODE_ID to cn01 or hermes}"
@@ -31,11 +35,20 @@ if [[ ! "$code_revision" =~ ^[0-9a-f]{40}$ ]]; then
   echo "deployed Git revision is invalid" >&2
   exit 2
 fi
-if [[ "$storage_root" != /srv/quanthus/dual-lane || ! -x "$python_bin" || \
-      ! -f "$policy" || ! -f "$base_current" || ! -d "$candidate_root" || \
+if [[ "$platform_root" != /srv/quanthus || "$storage_root" != /srv/quanthus/dual-lane || \
+      ! -x "$python_bin" || ! -f "$policy" || ! -f "$base_current" || ! -d "$candidate_root" || \
       ! -d "$catalog_root" ]]; then
   echo "lane-history runtime, policy, base, candidate, or catalog root is invalid" >&2
   exit 2
+fi
+if [[ -f "$dwd_base_current" || -f "$dws_base_current" ]]; then
+  if [[ ! -f "$dwd_base_current" || ! -f "$dws_base_current" || ! -f "$base_policy" ]]; then
+    echo "active DWD/DWS Base descriptors or policy are incomplete" >&2
+    exit 2
+  fi
+  use_monthly_base=1
+else
+  use_monthly_base=0
 fi
 actual_revision="$(git -C "$repo_root" rev-parse HEAD)"
 if [[ "$actual_revision" != "$code_revision" ]]; then
@@ -51,28 +64,52 @@ if ! flock -n 9; then
   exit 3
 fi
 
-builder="${repo_root}/ops/bin/build-dual-lane-history-catalog"
-verifier="${repo_root}/ops/bin/verify-dual-lane-history"
-if [[ ! -x "$builder" || ! -x "$verifier" ]]; then
-  echo "lane-history builder or verifier is missing" >&2
-  exit 2
+if (( use_monthly_base )); then
+  builder="${repo_root}/ops/bin/build-dwd-dws-base-catalog"
+  verifier="${repo_root}/ops/bin/verify-dwd-dws-base-catalog"
+  if [[ ! -x "$builder" || ! -x "$verifier" ]]; then
+    echo "Base-aware lane-history builder or verifier is missing" >&2
+    exit 2
+  fi
+  build_result="$("$python_bin" "$builder" \
+    --base-policy "$base_policy" \
+    --platform-root "$platform_root" \
+    --dwd-base-current "$dwd_base_current" \
+    --dws-base-current "$dws_base_current" \
+    --candidate-root "$candidate_root" \
+    --catalog-root "$catalog_root" \
+    --lane-id "$lane_id" \
+    --owner root \
+    --group "$catalog_group")"
+  printf '%s\n' "$build_result"
+  "$python_bin" "$verifier" \
+    --base-policy "$base_policy" \
+    --platform-root "$platform_root" \
+    --dwd-base-current "$dwd_base_current" \
+    --dws-base-current "$dws_base_current" \
+    --catalog-current "${catalog_root%/}/${lane_id}/CURRENT.json"
+else
+  builder="${repo_root}/ops/bin/build-dual-lane-history-catalog"
+  verifier="${repo_root}/ops/bin/verify-dual-lane-history"
+  if [[ ! -x "$builder" || ! -x "$verifier" ]]; then
+    echo "lane-history builder or verifier is missing" >&2
+    exit 2
+  fi
+  build_result="$("$python_bin" "$builder" \
+    --policy "$policy" \
+    --storage-root "$storage_root" \
+    --base-current "$base_current" \
+    --candidate-root "$candidate_root" \
+    --catalog-root "$catalog_root" \
+    --lane-id "$lane_id" \
+    --owner root \
+    --group "$catalog_group")"
+  printf '%s\n' "$build_result"
+  "$python_bin" "$verifier" \
+    --policy "$policy" \
+    --storage-root "$storage_root" \
+    --base-current "$base_current" \
+    --catalog-current "${catalog_root%/}/${lane_id}/CURRENT.json"
 fi
-
-build_result="$("$python_bin" "$builder" \
-  --policy "$policy" \
-  --storage-root "$storage_root" \
-  --base-current "$base_current" \
-  --candidate-root "$candidate_root" \
-  --catalog-root "$catalog_root" \
-  --lane-id "$lane_id" \
-  --owner root \
-  --group "$catalog_group")"
-printf '%s\n' "$build_result"
-
-"$python_bin" "$verifier" \
-  --policy "$policy" \
-  --storage-root "$storage_root" \
-  --base-current "$base_current" \
-  --catalog-current "${catalog_root%/}/${lane_id}/CURRENT.json"
 
 echo "dual-lane lane-history CURRENT refreshed: lane=${lane_id}"

@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""Advance installed DWD/DWS BASE_CURRENT descriptors under SHA preconditions."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from quanthus.pipelines.dwd_dws_base import (
+    DwdDwsBaseError,
+    advance_dwd_dws_base_current,
+    load_dwd_dws_base_policy,
+)
+
+
+def _precondition(value: str) -> str | None:
+    return None if value == "absent" else value
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-policy", type=Path, required=True)
+    parser.add_argument("--dwd-base-root", type=Path, required=True)
+    parser.add_argument("--dws-base-root", type=Path, required=True)
+    parser.add_argument("--expected-dwd-current-sha256", required=True)
+    parser.add_argument("--expected-dws-current-sha256", required=True)
+    args = parser.parse_args()
+    try:
+        pair = advance_dwd_dws_base_current(
+            dwd_base_root=args.dwd_base_root,
+            dws_base_root=args.dws_base_root,
+            policy=load_dwd_dws_base_policy(args.base_policy),
+            expected_dwd_current_sha256=_precondition(args.expected_dwd_current_sha256),
+            expected_dws_current_sha256=_precondition(args.expected_dws_current_sha256),
+        )
+    except (DwdDwsBaseError, FileExistsError, OSError) as exc:
+        print(f"DWD/DWS BASE_CURRENT advancement failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "dwd_package_id": pair.dwd.package_id,
+                "dws_package_id": pair.dws.package_id,
+                "input_ledger_digest": pair.dwd.input_ledger_digest,
+                "through_date": pair.dwd.through_date.isoformat(),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

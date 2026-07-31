@@ -99,6 +99,12 @@ nodes.
   Candidate-success-driven daily lane-history refresh is deployed on both producer nodes in
   `acceptance/issue-45-daily-history-catalog-automation-20260730.md`; installation and idempotent
   execution are accepted, while the first real scheduled `OnSuccess` observation remains pending.
+- Issue #48 Phase A tooling now freezes one canonical input ledger and builds separate immutable
+  provisional DWD/DWS Base packages through 2026-07-30. A real OCI-local clean-path dry-run passed
+  exact DWS reprojection and guarded install/descriptor rehearsals in
+  `acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. No package was installed on the
+  three target nodes and no live or consumer pointer changed; final July publication remains
+  blocked on Issue #47 and the accepted July 31 generation.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional
@@ -126,7 +132,7 @@ gate is a conformance defect rather than an alternate project state.
 | P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
 | P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004/0005, relevant acceptance file |
 | ODS or daily operations | this map, architecture index, ADR 0003/0004/0005, selected runbook | Exact config, service, and contract tests |
-| Dual-lane candidate or ADS publication | root `AGENTS.md`, this map, HLD, ADR 0005, LLD 01 | Exact epoch/candidate/release config and contract tests; `operations/dual-lane-data-platform-runbook.md` for shadow/migration; cutover remains separately gated |
+| Dual-lane candidate or ADS publication | root `AGENTS.md`, this map, HLD, ADR 0005, LLD 01 and its exact ADS child | Use `operational-ads-base.md` for the OCI historical Base or `strategy-replay-ads.md` for portable exports; load exact config/tests and the dual-lane runbook; cutover remains separately gated |
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |

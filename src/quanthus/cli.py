@@ -162,6 +162,16 @@ from quanthus.st_status import (
     build_st_status_revision,
     write_current_pointer,
 )
+from quanthus.strategy_attribution import AttributionError
+from quanthus.strategy_attribution_demo import (
+    SyntheticAttributionExecutor,
+    synthetic_run_request,
+)
+from quanthus.strategy_attribution_pipeline import AttributionPipeline
+from quanthus.strategy_attribution_publication import (
+    AttributionPublisher,
+    verify_attribution_release,
+)
 from quanthus.strategy_policy import StrategyPolicyError, load_governed_strategy_policy
 from quanthus.strategy_replay_ads import (
     StrategyReplayADSError,
@@ -765,6 +775,57 @@ def _parser() -> argparse.ArgumentParser:
     dual_accept.add_argument("--epoch-current", type=Path, required=True)
     dual_accept.add_argument("--root", type=Path, required=True)
     dual_accept.add_argument("--publisher-lock", type=Path)
+
+    attribution_plan = subparsers.add_parser(
+        "attribution-plan",
+        help="persist one outcome-blind attribution plan",
+    )
+    attribution_plan.add_argument(
+        "--fixture",
+        choices=["synthetic-v1"],
+        required=True,
+        help="explicit bounded fixture; formal strategy adapters remain gated",
+    )
+    attribution_plan.add_argument("--run-root", type=Path, required=True)
+
+    attribution_run = subparsers.add_parser(
+        "attribution-run",
+        help="run and atomically publish one complete attribution fixture",
+    )
+    attribution_run.add_argument(
+        "--fixture", choices=["synthetic-v1"], required=True
+    )
+    attribution_run.add_argument("--run-root", type=Path, required=True)
+    attribution_run.add_argument("--publication-root", type=Path, required=True)
+    attribution_run.add_argument("--title", default="Quanthus 策略归因")
+    attribution_run.add_argument("--subtitle")
+
+    attribution_status = subparsers.add_parser(
+        "attribution-status",
+        help="verify and report one persisted attribution run state",
+    )
+    attribution_status.add_argument(
+        "--fixture", choices=["synthetic-v1"], required=True
+    )
+    attribution_status.add_argument("--run-root", type=Path, required=True)
+
+    attribution_resume = subparsers.add_parser(
+        "attribution-resume",
+        help="resume and atomically publish one attribution fixture",
+    )
+    attribution_resume.add_argument(
+        "--fixture", choices=["synthetic-v1"], required=True
+    )
+    attribution_resume.add_argument("--run-root", type=Path, required=True)
+    attribution_resume.add_argument("--publication-root", type=Path, required=True)
+    attribution_resume.add_argument("--title", default="Quanthus 策略归因")
+    attribution_resume.add_argument("--subtitle")
+
+    attribution_verify = subparsers.add_parser(
+        "attribution-verify",
+        help="deep-verify one READY attribution publication",
+    )
+    attribution_verify.add_argument("--release-dir", type=Path, required=True)
 
     market_session = subparsers.add_parser(
         "market-session-check",
@@ -1758,6 +1819,97 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             print(json.dumps(result.to_dict(), ensure_ascii=True, sort_keys=True))
             return 0 if result.status == "published" else 4
+        elif args.command == "attribution-plan":
+            request = synthetic_run_request()
+            planned = AttributionPipeline(args.run_root).plan(request)
+            print(
+                json.dumps(
+                    {
+                        "fixture": args.fixture,
+                        "plan_digest": planned.plan.digest,
+                        "plan_id": planned.plan.plan_id,
+                        "run_dir": str(planned.run_dir),
+                        "run_id": planned.run_id,
+                        "source_kind": request.adapter_manifest.evidence_source_kind,
+                        "state": "planned",
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+        elif args.command in {"attribution-run", "attribution-resume"}:
+            request = synthetic_run_request()
+            pipeline = AttributionPipeline(args.run_root)
+            executor = SyntheticAttributionExecutor()
+            if args.command == "attribution-run":
+                attribution_result = pipeline.run(request, executor)
+            else:
+                attribution_result = pipeline.resume(request, executor)
+            published = AttributionPublisher(args.publication_root).publish(
+                request,
+                attribution_result,
+                title=args.title,
+                subtitle=args.subtitle,
+            )
+            print(
+                json.dumps(
+                    {
+                        "fixture": args.fixture,
+                        "release_dir": str(published.root),
+                        "release_digest": published.manifest.digest,
+                        "release_id": published.release_id,
+                        "run_id": attribution_result.run_id,
+                        "source_kind": attribution_result.source_kind,
+                        "state": attribution_result.state.value,
+                        "synthetic_fixture": published.manifest.synthetic_fixture,
+                        "workspace_digest": published.manifest.workspace_digest,
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "attribution-status":
+            snapshot = AttributionPipeline(args.run_root).status(
+                synthetic_run_request()
+            )
+            print(
+                json.dumps(
+                    {
+                        "claim_count": snapshot.claim_count,
+                        "executed_nodes": snapshot.executed_nodes,
+                        "fixture": args.fixture,
+                        "plan_digest": snapshot.plan_digest,
+                        "reason_codes": list(snapshot.reason_codes),
+                        "run_dir": str(snapshot.run_dir),
+                        "run_id": snapshot.run_id,
+                        "state": snapshot.state.value,
+                        "total_nodes": snapshot.total_nodes,
+                        "verified_nodes": snapshot.verified_nodes,
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "attribution-verify":
+            published = verify_attribution_release(args.release_dir)
+            print(
+                json.dumps(
+                    {
+                        "formal_strategy_evidence": (
+                            published.manifest.formal_strategy_evidence
+                        ),
+                        "release_digest": published.manifest.digest,
+                        "release_id": published.release_id,
+                        "run_id": published.manifest.run_id,
+                        "source_kind": published.manifest.source_kind,
+                        "synthetic_fixture": published.manifest.synthetic_fixture,
+                        "verified": True,
+                        "workspace_digest": published.manifest.workspace_digest,
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
         elif args.command == "market-session-check":
             is_open = market_session_is_open(
                 calendar=args.calendar,
@@ -1807,6 +1959,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         StrategyPolicyError,
         StrategyReplayADSError,
         OperationalADSBaseError,
+        AttributionError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

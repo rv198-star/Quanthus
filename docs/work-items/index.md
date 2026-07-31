@@ -14,6 +14,9 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | active |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | planned |
 | META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and portable ADS | active; cutover blocked |
+| META-DATA-BASE-001 | Build Hermes-authoritative ODS July Base (Issue #47) | active |
+| META-DATA-BASE-002 | Build authoritative DWD/DWS July Base (Issue #48) | active; Phase A tooling implemented |
+| META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | active |
 
 `META-DATA-PIPE-003` is governed by ADR 0005 and GitHub issue #45. Implementation is limited to
 copy-only contract, shadow, comparison, recovery, and release-set work beside the legacy path. It
@@ -41,6 +44,21 @@ genuine unopened blind evidence. Daily candidate-success catalog automation is d
 idempotent node-local execution is accepted in
 `docs/acceptance/issue-45-daily-history-catalog-automation-20260730.md`; the first real scheduled
 success trigger remains pending.
+
+`META-DATA-BASE-002` is governed by ADR 0005, LLD 01, and GitHub issue #48. The repository now
+implements canonical input-ledger freeze, deterministic provisional DWD/DWS package construction,
+exact DWS reprojection, clean verification, copy-only installation, and SHA-preconditioned Base
+descriptors. OCI local dry-run evidence is recorded in
+`docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. Three-node publication, catalog
+rebuilds against the new Base, restore/rebuild evidence, and the final July pair remain open.
+
+`META-DATA-BASE-003` is governed by ADR 0005, the operational ADS Base LLD, and GitHub issue #46.
+The repository implements exact-plan validation, deterministic semantic packaging, deep clean-path
+verification, role-scoped access, the existing replay-reader adapter, and locked
+`BASE_CURRENT.json` compare-and-swap. Repository capability and the read-only OCI inventory
+preflight are recorded in `docs/acceptance/meta-data-base-003-ads-base-202607/README.md`. Neither
+the provisional nor final Base is accepted: Phase A waits for actual Issue #48 packages, while
+Phase B additionally waits for the accepted July 31 generation.
 
 ## P1 data foundation
 

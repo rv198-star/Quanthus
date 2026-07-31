@@ -96,6 +96,10 @@ revocation state, accepted-ODS recovery evidence, and the self-contained portabl
 ODS restore evidence, full PIT/tradability candidate families, and portable `event_library` and
 `ml_training` profiles remain open gates. The historical strategy ADS bootstrap records that it
 lacks per-decision publication proof; its 2025 output is not a genuine unopened blind evaluation.
+The repository also contains the provisional monthly-complete DWD/DWS Base contract: it freezes
+canonical inputs, preserves schema-distinct members under one manifest per layer, reprojects DWS
+from the exact DWD package, and separates package installation from Base-descriptor advancement.
+This contract is not three-node publication evidence and does not change the consumer release set.
 
 The legacy OCI full-ODS pull/build path remains live until ADR 0005's shadow, fencing, recovery,
 rollback, and explicit `GO_FOR_CUTOVER` gates pass. Target work is copy-only and uses separate

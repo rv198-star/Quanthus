@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Build one lane-local logical catalog over an active DWD/DWS Base pair."""
+
+from __future__ import annotations
+
+import argparse
+import grp
+import json
+import os
+import pwd
+import sys
+from pathlib import Path
+
+from quanthus.pipelines.dwd_dws_base import (
+    DwdDwsBaseError,
+    build_dwd_dws_base_lane_catalog,
+    load_dwd_dws_base_policy,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-policy", type=Path, required=True)
+    parser.add_argument("--platform-root", type=Path, required=True)
+    parser.add_argument("--dwd-base-current", type=Path, required=True)
+    parser.add_argument("--dws-base-current", type=Path, required=True)
+    parser.add_argument("--candidate-root", type=Path, required=True)
+    parser.add_argument("--catalog-root", type=Path, required=True)
+    parser.add_argument("--lane-id", choices=("cn01", "hermes"), required=True)
+    parser.add_argument("--owner")
+    parser.add_argument("--group")
+    args = parser.parse_args()
+    if (args.owner is None) != (args.group is None):
+        parser.error("--owner and --group must be provided together")
+    if args.owner is not None and os.geteuid() != 0:
+        parser.error("ownership changes require root")
+    owner_uid = None if args.owner is None else pwd.getpwnam(args.owner).pw_uid
+    group_gid = None if args.group is None else grp.getgrnam(args.group).gr_gid
+    try:
+        catalog = build_dwd_dws_base_lane_catalog(
+            platform_root=args.platform_root,
+            dwd_pointer=args.dwd_base_current,
+            dws_pointer=args.dws_base_current,
+            candidate_root=args.candidate_root,
+            catalog_root=args.catalog_root,
+            lane_id=args.lane_id,
+            policy=load_dwd_dws_base_policy(args.base_policy),
+            owner_uid=owner_uid,
+            group_gid=group_gid,
+        )
+    except (DwdDwsBaseError, FileExistsError, OSError) as exc:
+        print(f"DWD/DWS Base lane-catalog build failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "input_ledger_digest": catalog.pair.dwd.input_ledger_digest,
+                "candidate_count": len(catalog.candidates),
+                "catalog_id": catalog.catalog_id,
+                "content_digest": catalog.content_digest,
+                "lane_id": catalog.lane_id,
+                "manifest_sha256": catalog.manifest_sha256,
+                "through_date": catalog.through_date.isoformat(),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

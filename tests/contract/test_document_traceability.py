@@ -723,6 +723,75 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(source_path.is_file())
         self.assertTrue((root / "tests" / "unit" / "test_opportunity_funnel.py").is_file())
 
+    def test_strategy_attribution_design_is_blocked_and_traceable(self) -> None:
+        root = find_project_root()
+        parent_path = root / "docs" / "design" / "lld" / "10-monitoring-attribution.md"
+        child_path = (
+            root
+            / "docs"
+            / "design"
+            / "lld"
+            / "10-monitoring-attribution"
+            / "strategy-attribution.md"
+        )
+        index_path = root / "docs" / "design" / "lld" / "README.md"
+        gate_path = root / "config" / "p3-gates.v1.json"
+        p0_path = root / "config" / "p0-policy.v1.json"
+        acceptance_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p3-attribution-synthetic-publication-20260731.md"
+        )
+        fields = _header_fields(child_path)
+        child = child_path.read_text(encoding="utf-8")
+        parent = parent_path.read_text(encoding="utf-8")
+        index = index_path.read_text(encoding="utf-8")
+        acceptance = acceptance_path.read_text(encoding="utf-8")
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        p0 = json.loads(p0_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(fields["Parent"], "`../10-monitoring-attribution.md`")
+        self.assertEqual(fields["Design status"], "approved")
+        self.assertEqual(fields["Delivery gate"], "blocked")
+        self.assertIn("bounded synthetic closure accepted", fields["Implementation status"])
+        self.assertEqual(fields["Counterfactual policy"], "`config/p0-policy.v1.json`")
+        self.assertIn("`P3-ATTR-001`", fields["Governing work"])
+        self.assertIn("`P3-DASH-001`", fields["Governing work"])
+        self.assertEqual(gate["work_items"]["P3-ATTR-001"], "deferred")
+        self.assertEqual(gate["work_items"]["P3-DASH-001"], "deferred")
+        self.assertEqual(p0["counterfactual"]["exit_policy"], "same_version_as_baseline")
+        self.assertIn("10-monitoring-attribution/strategy-attribution.md", parent)
+        self.assertIn("10-monitoring-attribution/strategy-attribution.md", index)
+        self.assertIn("counterfactual_replay", child)
+        self.assertIn("AdapterCapabilityManifest", child)
+        self.assertIn("does not require strategy code", child)
+        self.assertIn("same exit-policy version", child)
+        self.assertIn("three-layer explanation", child.lower())
+        self.assertIn("cannot calculate, merge, or upgrade", child)
+        self.assertIn("synthetic_fixture_not_strategy_evidence", child)
+        self.assertIn("does not recompute", child)
+        self.assertIn("effects", child)
+        self.assertIn("`CHECKSUMS.sha256`", child)
+        self.assertIn("`READY`", child)
+        self.assertIn("no formal strategy", acceptance.lower())
+        self.assertIn("`P3-ATTR-001` remains `deferred`", acceptance)
+        self.assertTrue((root / "src" / "quanthus" / "strategy_attribution.py").is_file())
+        self.assertTrue(
+            (root / "src" / "quanthus" / "strategy_attribution_pipeline.py").is_file()
+        )
+        self.assertTrue(
+            (root / "src" / "quanthus" / "strategy_attribution_publication.py").is_file()
+        )
+        self.assertTrue((root / "tests" / "unit" / "test_strategy_attribution.py").is_file())
+        self.assertTrue(
+            (root / "tests" / "unit" / "test_strategy_attribution_publication.py").is_file()
+        )
+        self.assertTrue((root / "web" / "app" / "attribution-workbench.tsx").is_file())
+        self.assertTrue(
+            (root / "web" / "app" / "published-workspace-catalog.ts").is_file()
+        )
+
     def test_two_window_profile_preserves_active_clock_and_manual_boundary(self) -> None:
         root = find_project_root()
         profile_path = root / "docs" / "design" / "execution-notification-profiles.md"

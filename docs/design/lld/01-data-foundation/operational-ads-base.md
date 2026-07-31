@@ -143,8 +143,12 @@ exact plan -> DWD/DWS current-descriptor preflight -> sealed source gates
 
 Each upstream preflight requires the complete versioned descriptor shape, resolves its exact
 `package_path` to the plan-bound sealed manifest, verifies the package manifest identity and input
-ledger, and recomputes the DWD/DWS pair digest. The second preflight prevents a descriptor change
-during the build and smoke interval from being promoted as though it still matched the plan.
+ledger, and recomputes the DWD/DWS pair digest. Input-ledger verification requires its safe exact
+package-relative path, manifest file-inventory size and SHA-256, actual file bytes, canonical
+semantic digest, and matching contract, phase, and through-date; a missing file, symlink/path
+escape, byte change, or outer-checksum-resealed semantic forgery fails preflight. The second
+preflight prevents a descriptor change during the build and smoke interval from being promoted as
+though it still matched the plan.
 
 `promote-operational-ads-base` copies when necessary, seal-verifies the copy, refuses an existing id
 with different bytes, and compares the prior descriptor manifest SHA-256 (or explicit `absent`)

@@ -152,6 +152,15 @@ The child strategy-attribution design owns the decision-summary, reason-analysis
 method/evidence views. All three are projections of the same versioned claim; a presentation layer
 cannot create or upgrade attribution evidence.
 
+The bounded delivery path publishes one closed workspace only after the Python verifier rebuilds
+its claims from the exact evidence bytes. Publication writes a canonical checksum ledger and
+`READY` last, renames one fully verified release atomically, and refreshes a catalog from complete,
+deeply verified releases only. The Web workbench follows that transport chain using raw response
+bytes and strict UTF-8 decoding, then renders the three projections without effect arithmetic,
+receipt creation, evidence upgrade, contributor ranking, or risk/opportunity aggregation. A manual
+import remains unverified. These are reusable report-system contracts; a synthetic workspace is
+never a formal strategy report and cannot satisfy `P3-DASH-001`.
+
 ## 7. Work items
 
 | ID | Work | Dependency | Acceptance evidence |

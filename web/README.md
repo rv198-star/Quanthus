@@ -19,6 +19,12 @@ Use the import action to open a `quanthus.strategy-attribution-workspace.v1` JSO
 files are marked unverified because digest and evidence verification remain kernel responsibilities.
 The download action returns the original loaded JSON text.
 
+The default published view reads `public/data/attribution-releases/catalog.json`. For each catalog
+entry, the loader verifies `READY`, the checksum ledger, and the exact release/workspace response
+bytes before strict UTF-8 decoding and parsing. Only the Python publisher performs deep semantic
+workspace verification; browser publication trust does not turn an imported or synthetic artifact
+into formal strategy evidence.
+
 ## Checks
 
 ```bash

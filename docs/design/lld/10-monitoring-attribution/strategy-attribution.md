@@ -109,7 +109,10 @@ publishes it atomically with `CHECKSUMS.sha256` and `READY`. The five local CLI 
 `web/` is a thin read-only viewer over the versioned workspace artifact. It may validate the v1
 workspace shape, select records, translate registered labels, preserve and download original JSON
 text, verify the publication transport chain from `READY` through `CHECKSUMS.sha256` to the exact
-release and workspace bytes it reads, and render already-published values. It does not recompute
+release and workspace bytes it reads, and render already-published values. It strictly decodes
+`READY` as the expected checksum-ledger digest, hashes the raw ledger before decoding it, and
+hashes the raw release/workspace responses before decoding them; lossy replacement-character
+decoding cannot satisfy a byte-level checksum and then enter JSON parsing. It does not recompute
 effects, resolve evidence, issue verification receipts, validate semantic attribution digests,
 rank contributors, aggregate risk and opportunity money, assign evidence, or recommend strategy
 changes. An imported file is therefore displayed as unverified unless the authoritative parser
@@ -150,6 +153,8 @@ framework.
 | `AttributionClaim` | Machine-derived classification, evidence type/validation flags, interaction state, limitations, and evidence references |
 | `ExplanationView` | Three projections of the same claim for decision, analysis, and audit readers |
 | `AttributionWorkspace` | Canonical closure containing every question, experiment, evidence object, semantic artifact, receipt-backed claim, and reference required to reproduce its claims |
+| `AttributionReleaseManifest` | Source-kind-bound publication identity joining one verified Pipeline result to its closed workspace and separating synthetic display claims from formal publishable claims |
+| `AttributionPublicationCatalog` | Stable-path index rebuilt only from complete, deeply verified `READY` releases for read-only Web discovery |
 
 Every kernel semantic object has a stable schema or contract version, canonical content digest,
 and explicit parent identities where applicable. Every externally produced result or trace that
@@ -330,6 +335,32 @@ transition as audit evidence. Plan experiments are emitted in stable topological
 identity as the same-level tie-break. An `AttributionPlan` also recompiles its embedded request and
 requires byte-identical nodes and question bindings, so callers cannot promote an unavailable
 question or substitute different adapter semantics by reconstructing the dataclasses.
+
+### 3.7 Publication and read-only consumption
+
+`AttributionPublisher` accepts only an evaluated Pipeline result whose persisted request, plan,
+node receipts, evaluation bundle, claims, and source identity reconstruct successfully. It reruns
+the deterministic kernel instead of trusting an executor's conclusion, materializes the full
+workspace closure in unique staging, writes the canonical `CHECKSUMS.sha256`, writes `READY` last,
+deep-verifies the staged tree, and atomically renames the release. A duplicate publication is
+idempotent only when the complete semantic release is identical; conflicting bytes fail closed.
+
+Catalog refresh discovers releases from disk rather than trusting caller-supplied entries. It
+ignores incomplete or symlinked directories, fails the whole refresh when any discovered `READY`
+release is malformed, tampered, or fails deep verification, and atomically writes stable release,
+workspace, checksum-ledger, and readiness paths only after the complete discovered set passes.
+Synthetic source identity uniquely forces `synthetic_fixture=true`,
+`formal_strategy_evidence=false`, and an empty set of formal publishable claims; changing those
+flags and resealing transport checksums does not pass semantic verification.
+
+The Web loader treats the catalog as discovery metadata and establishes transport trust separately
+for every release. It restricts paths to the catalog directory, reads `READY` and the checksum
+ledger, hashes the exact `ArrayBuffer` response bytes, strictly decodes UTF-8 only after the
+applicable byte check passes, and then reconciles catalog, release, and workspace identities. A
+failed release remains absent and visible as a load error without contaminating other valid
+entries. Browser publication trust means that an authoritative publisher previously produced the
+artifact and that transport bytes match; it does not mean the browser independently reproduced
+semantic evidence verification.
 
 ## 4. Evidence model
 

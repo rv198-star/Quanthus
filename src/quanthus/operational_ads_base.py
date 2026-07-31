@@ -76,6 +76,8 @@ _DWD_DWS_CURRENT_FIELDS = {
     "peer_manifest_sha256",
     "pair_digest",
 }
+_DWD_DWS_INPUT_LEDGER_FIELDS = {"path", "sha256", "digest"}
+_DWD_DWS_FILE_FIELDS = {"path", "sha256", "size_bytes"}
 
 
 class OperationalADSBaseError(RuntimeError):
@@ -797,10 +799,6 @@ def preflight_operational_ads_base_upstreams(
         manifest_path = _source_manifest_path(
             upstream.get("manifest_path"), f"operational ADS Base {role}.manifest_path"
         )
-        input_ledger = manifest.get("input_ledger")
-        ledger_digest = (
-            input_ledger.get("digest") if isinstance(input_ledger, Mapping) else None
-        )
         if (
             descriptor.get("schema_version") != 1
             or descriptor.get("kind") != "dwd_dws_base_current"
@@ -818,12 +816,17 @@ def preflight_operational_ads_base_upstreams(
             or manifest.get("manifest_id") != f"{package_id}-manifest-v1"
             or manifest.get("content_digest") != upstream.get("content_digest")
             or manifest.get("through_date") != plan.through_date.isoformat()
-            or not isinstance(ledger_digest, str)
-            or _SHA256.fullmatch(ledger_digest) is None
         ):
             raise OperationalADSBaseError(
                 f"operational ADS Base {layer} descriptor drifted from the build plan"
             )
+        ledger_digest = _verify_dwd_dws_input_ledger(
+            manifest,
+            package_root=package_root,
+            layer=layer,
+            phase=plan.phase,
+            through_date=plan.through_date,
+        )
         descriptors[role] = (layer, current, descriptor, upstream, ledger_digest)
     dwd = descriptors["dwd_base"]
     dws = descriptors["dws_base"]
@@ -871,6 +874,89 @@ def preflight_operational_ads_base_upstreams(
         "dwd_manifest_sha256": dwd[3]["manifest_sha256"],
         "dws_manifest_sha256": dws[3]["manifest_sha256"],
     }
+
+
+def _verify_dwd_dws_input_ledger(
+    manifest: Mapping[str, Any],
+    *,
+    package_root: Path,
+    layer: str,
+    phase: str,
+    through_date: date,
+) -> str:
+    binding = manifest.get("input_ledger")
+    if not isinstance(binding, Mapping) or set(binding) != _DWD_DWS_INPUT_LEDGER_FIELDS:
+        raise OperationalADSBaseError(
+            f"operational ADS Base {layer} package input ledger binding is invalid"
+        )
+    binding_path = _required_text(binding, "path")
+    relative = _safe_relative(
+        binding_path, f"operational ADS Base {layer}.input_ledger.path"
+    )
+    if binding_path != relative.as_posix():
+        raise OperationalADSBaseError(
+            f"operational ADS Base {layer} package input ledger path is not canonical"
+        )
+    lexical_path = package_root / relative
+    ledger_path = lexical_path.resolve()
+    if ledger_path != lexical_path or not ledger_path.is_file():
+        raise OperationalADSBaseError(
+            f"operational ADS Base {layer} package input ledger path is not exact"
+        )
+    declared_sha256 = binding.get("sha256")
+    declared_digest = binding.get("digest")
+    if (
+        not isinstance(declared_sha256, str)
+        or _SHA256.fullmatch(declared_sha256) is None
+        or not isinstance(declared_digest, str)
+        or _SHA256.fullmatch(declared_digest) is None
+    ):
+        raise OperationalADSBaseError(
+            f"operational ADS Base {layer} package input ledger digests are invalid"
+        )
+    files = manifest.get("files")
+    matches = (
+        [
+            item
+            for item in files
+            if isinstance(item, Mapping) and item.get("path") == relative.as_posix()
+        ]
+        if isinstance(files, list)
+        else []
+    )
+    if len(matches) != 1 or set(matches[0]) != _DWD_DWS_FILE_FIELDS:
+        raise OperationalADSBaseError(
+            f"operational ADS Base {layer} package file inventory omits its input ledger"
+        )
+    file_binding = matches[0]
+    if (
+        file_binding.get("sha256") != declared_sha256
+        or file_binding.get("size_bytes") != ledger_path.stat().st_size
+        or _sha256(ledger_path) != declared_sha256
+    ):
+        raise OperationalADSBaseError(
+            f"operational ADS Base {layer} package input ledger checksum mismatch"
+        )
+    ledger = _load_object(ledger_path)
+    content = {
+        key: value
+        for key, value in ledger.items()
+        if key not in {"schema_version", "kind", "ledger_digest"}
+    }
+    if (
+        ledger.get("schema_version") != 1
+        or ledger.get("kind") != "dwd_dws_base_input_ledger"
+        or ledger.get("contract_id") != manifest.get("contract_id")
+        or ledger.get("phase") != phase
+        or manifest.get("phase") != phase
+        or ledger.get("through_date") != through_date.isoformat()
+        or ledger.get("ledger_digest") != declared_digest
+        or _canonical_digest(content) != declared_digest
+    ):
+        raise OperationalADSBaseError(
+            f"operational ADS Base {layer} package input ledger content is invalid"
+        )
+    return declared_digest
 
 
 def _manifest_content_digest(value: Mapping[str, Any]) -> str | None:

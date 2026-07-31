@@ -25,9 +25,11 @@ only the LLD modules named by that card.
 For strategy-attribution protocol work, load `10-monitoring-attribution.md` and its
 `10-monitoring-attribution/strategy-attribution.md` child. The parent owns audit and reporting
 boundaries; the child owns the strategy-adapter boundary, attribution questions, interventions,
-evidence validation, and explanation views. Strategy topology remains native and may be coarser
-than the current candidate/expert path. Its design approval does not reopen the deferred P3
-attribution or dashboard work items.
+outcome-blind planning, resumable Pipeline, evidence validation, atomic publication, and read-only
+explanation views. Load `../../architecture/strategy-attribution-publication.md` when changing the
+publisher-to-browser trust boundary. Strategy topology remains native and may be coarser than the
+current candidate/expert path. Its bounded synthetic implementation does not reopen the deferred
+formal P3 attribution or dashboard work items.
 
 ## Module tree
 

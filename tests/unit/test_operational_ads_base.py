@@ -26,6 +26,7 @@ from quanthus.operational_ads_base import (
     _package_content_identity,
     _parquet_content_digest,
     _validate_ledger_decision_calendar,
+    _verify_dwd_dws_input_ledger,
     build_operational_ads_base,
     load_operational_ads_base_current,
     load_operational_ads_base_plan,
@@ -874,7 +875,20 @@ class OperationalADSBaseTests(unittest.TestCase):
     def test_upstream_descriptor_drift_blocks_preflight(self) -> None:
         value = json.loads(self.plan_path.read_text(encoding="utf-8"))
         current_paths: dict[str, Path] = {}
-        ledger_digest = f"sha256:{'7' * 64}"
+        ledger_content = {
+            "contract_id": "dwd-dws-base-test-v1",
+            "phase": "provisional",
+            "through_date": "2024-01-03",
+            "generations": [],
+        }
+        ledger_digest = self._json_content_digest(ledger_content)
+        ledger_value = {
+            "schema_version": 1,
+            "kind": "dwd_dws_base_input_ledger",
+            **ledger_content,
+            "ledger_digest": ledger_digest,
+        }
+        ledger_paths: dict[str, Path] = {}
         packages: dict[str, dict[str, str]] = {}
         for role, layer, digest_character in (
             ("dwd_base", "dwd", "6"),
@@ -884,6 +898,9 @@ class OperationalADSBaseTests(unittest.TestCase):
             package_root = self.root / f"{layer}-base" / package_id
             content_digest = f"sha256:{digest_character * 64}"
             manifest_path = package_root / "manifest.json"
+            ledger_path = package_root / "lineage" / "input-ledger.json"
+            self._write_json(ledger_path, ledger_value)
+            ledger_sha256 = _sha256(ledger_path)
             self._write_json(
                 manifest_path,
                 {
@@ -892,9 +909,22 @@ class OperationalADSBaseTests(unittest.TestCase):
                     "layer": layer,
                     "package_id": package_id,
                     "manifest_id": f"{package_id}-manifest-v1",
+                    "contract_id": ledger_content["contract_id"],
+                    "phase": "provisional",
                     "content_digest": content_digest,
                     "through_date": "2024-01-03",
-                    "input_ledger": {"digest": ledger_digest},
+                    "input_ledger": {
+                        "path": "lineage/input-ledger.json",
+                        "sha256": ledger_sha256,
+                        "digest": ledger_digest,
+                    },
+                    "files": [
+                        {
+                            "path": "lineage/input-ledger.json",
+                            "sha256": ledger_sha256,
+                            "size_bytes": ledger_path.stat().st_size,
+                        }
+                    ],
                 },
             )
             manifest_sha256 = _sha256(manifest_path)
@@ -925,6 +955,7 @@ class OperationalADSBaseTests(unittest.TestCase):
                 "manifest_sha256": manifest_sha256,
                 "content_digest": content_digest,
             }
+            ledger_paths[layer] = ledger_path
         self._write_json(self.plan_path, value)
         plan = self._plan()
         pair_digest = self._json_content_digest(
@@ -966,6 +997,24 @@ class OperationalADSBaseTests(unittest.TestCase):
         self.assertEqual(report["status"], "ready")
         self.assertEqual(report["pair_digest"], pair_digest)
 
+        dwd_ledger = ledger_paths["dwd"]
+        original_ledger = dwd_ledger.read_bytes()
+        dwd_ledger.unlink()
+        with self.assertRaisesRegex(OperationalADSBaseError, "input ledger path"):
+            preflight_operational_ads_base_upstreams(
+                plan,
+                dwd_current=current_paths["dwd"],
+                dws_current=current_paths["dws"],
+            )
+        dwd_ledger.write_bytes(original_ledger + b" ")
+        with self.assertRaisesRegex(OperationalADSBaseError, "input ledger checksum"):
+            preflight_operational_ads_base_upstreams(
+                plan,
+                dwd_current=current_paths["dwd"],
+                dws_current=current_paths["dws"],
+            )
+        dwd_ledger.write_bytes(original_ledger)
+
         original = json.loads(current_paths["dwd"].read_text(encoding="utf-8"))
         mutations = {
             "missing schema": {
@@ -1003,6 +1052,122 @@ class OperationalADSBaseTests(unittest.TestCase):
                 plan,
                 dwd_current=current_paths["dwd"],
                 dws_current=current_paths["dws"],
+            )
+
+    def test_upstream_input_ledger_rejects_path_and_semantic_forgery(self) -> None:
+        package_root = self.root / "ledger-package"
+        ledger_path = package_root / "lineage" / "input-ledger.json"
+        content = {
+            "contract_id": "dwd-dws-base-test-v1",
+            "phase": "provisional",
+            "through_date": "2024-01-03",
+            "generations": [],
+        }
+        digest = self._json_content_digest(content)
+        self._write_json(
+            ledger_path,
+            {
+                "schema_version": 1,
+                "kind": "dwd_dws_base_input_ledger",
+                **content,
+                "ledger_digest": digest,
+            },
+        )
+        sha256 = _sha256(ledger_path)
+        manifest = {
+            "contract_id": content["contract_id"],
+            "phase": "provisional",
+            "input_ledger": {
+                "path": "lineage/input-ledger.json",
+                "sha256": sha256,
+                "digest": digest,
+            },
+            "files": [
+                {
+                    "path": "lineage/input-ledger.json",
+                    "sha256": sha256,
+                    "size_bytes": ledger_path.stat().st_size,
+                }
+            ],
+        }
+        self.assertEqual(
+            _verify_dwd_dws_input_ledger(
+                manifest,
+                package_root=package_root,
+                layer="dwd",
+                phase="provisional",
+                through_date=date(2024, 1, 3),
+            ),
+            digest,
+        )
+
+        escaped = json.loads(json.dumps(manifest))
+        escaped["input_ledger"]["path"] = "../input-ledger.json"
+        with self.assertRaisesRegex(OperationalADSBaseError, "safe relative path"):
+            _verify_dwd_dws_input_ledger(
+                escaped,
+                package_root=package_root,
+                layer="dwd",
+                phase="provisional",
+                through_date=date(2024, 1, 3),
+            )
+
+        for alias in (
+            "lineage/./input-ledger.json",
+            "lineage//input-ledger.json",
+        ):
+            noncanonical = json.loads(json.dumps(manifest))
+            noncanonical["input_ledger"]["path"] = alias
+            with self.assertRaisesRegex(OperationalADSBaseError, "path is not canonical"):
+                _verify_dwd_dws_input_ledger(
+                    noncanonical,
+                    package_root=package_root,
+                    layer="dwd",
+                    phase="provisional",
+                    through_date=date(2024, 1, 3),
+                )
+
+        direct_link = package_root / "input-ledger-link.json"
+        direct_link.symlink_to(ledger_path)
+        direct_symlink = json.loads(json.dumps(manifest))
+        direct_symlink["input_ledger"]["path"] = direct_link.name
+        with self.assertRaisesRegex(OperationalADSBaseError, "path is not exact"):
+            _verify_dwd_dws_input_ledger(
+                direct_symlink,
+                package_root=package_root,
+                layer="dwd",
+                phase="provisional",
+                through_date=date(2024, 1, 3),
+            )
+
+        ancestor_link = package_root / "linked-lineage"
+        ancestor_link.symlink_to(ledger_path.parent, target_is_directory=True)
+        ancestor_symlink = json.loads(json.dumps(manifest))
+        ancestor_symlink["input_ledger"]["path"] = "linked-lineage/input-ledger.json"
+        with self.assertRaisesRegex(OperationalADSBaseError, "path is not exact"):
+            _verify_dwd_dws_input_ledger(
+                ancestor_symlink,
+                package_root=package_root,
+                layer="dwd",
+                phase="provisional",
+                through_date=date(2024, 1, 3),
+            )
+
+        forged = json.loads(ledger_path.read_text(encoding="utf-8"))
+        forged["generations"] = [{"market_date": "2024-01-03"}]
+        self._write_json(ledger_path, forged)
+        forged_sha256 = _sha256(ledger_path)
+        manifest["input_ledger"]["sha256"] = forged_sha256
+        manifest["files"][0].update(
+            {"sha256": forged_sha256, "size_bytes": ledger_path.stat().st_size}
+        )
+        with self.assertRaisesRegex(OperationalADSBaseError, "input ledger content"):
+            _verify_dwd_dws_input_ledger(
+                manifest,
+                package_root=package_root,
+                layer="dwd",
+                phase="provisional",
+                through_date=date(2024, 1, 3),
             )
 
     def test_build_rejects_manifest_logical_identity_mismatch(self) -> None:

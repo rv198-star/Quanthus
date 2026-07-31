@@ -27,6 +27,7 @@ a parallel current-state architecture.
 | `security-code-validity-normalization.md` | Identity and code-validity correction | `docs/design/lld/01-data-foundation.md` |
 | `st-status-pit.md` | Point-in-time ST state | `docs/design/lld/01-data-foundation.md` |
 | `price-limit-regime.md` | Effective-dated A-share limit rules | `docs/design/lld/01-data-foundation.md` |
+| `strategy-attribution-publication.md` | Verified attribution publication and read-only report-consumption trust boundary | `docs/design/hld.md`, `docs/design/lld/10-monitoring-attribution/strategy-attribution.md` |
 
 An accepted ADR must update affected HLD/LLD current-state text in the same change. A topic
 contract may refine one module but cannot override the HLD boundary, frozen policy, or contract

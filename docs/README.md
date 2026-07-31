@@ -63,9 +63,13 @@ nodes.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.
-- Human label review, constrained strategy attribution, recurring dashboards, and concrete shadow
-  decision production resume only when a formal label or strategy proposal supplies their missing
-  semantic input. They are not reasons to extend the frozen P3 fixture.
+- The reusable strategy-attribution and report-viewing substrate is implemented and accepted for
+  bounded synthetic plumbing: strategy-owned adapters feed an outcome-blind immutable plan, a
+  resumable local Pipeline, deterministic kernel verification, atomic release publication, and a
+  checksum-gated read-only Web workbench. This proves analysis/report transport, not a strategy
+  conclusion. Formal constrained attribution, recurring dashboards, human label review, and
+  concrete shadow decision production still resume only when a formal label or strategy proposal
+  supplies their missing semantic input. They are not reasons to extend the frozen P3 fixture.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
   evidence; forward email transport remains P6 work. P4 and later keep their existing gates.
 - ADR 0005 accepts the dual-lane data-platform target under `META-DATA-PIPE-003`: CN01 produces the
@@ -153,6 +157,7 @@ gate is a conformance defect rather than an alternate project state.
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child, LLD 01 `strategy-replay-ads.md` | Exact strategy, authorized ADS bundle, and P2 execution evidence; load the legacy P1 snapshot only for frozen P3 reproduction |
 | P3 governed strategy implementation | root `AGENTS.md`, this map, selected `design/strategies/` card, LLD 03/04/05, accepted P2 interfaces | LLD 10 for decision/funnel evidence; exact feature, label, policy, and industry-map inputs |
+| Strategy attribution or report viewing | root `AGENTS.md`, this map, HLD, `architecture/strategy-attribution-publication.md`, LLD 10 and its `strategy-attribution.md` child | Exact adapter, method registry, Pipeline/publication code, Web contract tests, gate, and acceptance evidence for the claim under review |
 | P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | ADR 0005 and LLD 01 only when producing/consuming offline research bundles; exact frozen candidate source, label cards, split policy, and P3 replay evidence |
 
 ## Authority and conflicts

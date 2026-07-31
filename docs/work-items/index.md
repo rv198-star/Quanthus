@@ -117,6 +117,14 @@ fixture, not a formal strategy lineage. `P3-LABEL-004`, `P3-ATTR-001`, and `P3-D
 explicitly deferred until a formal label or strategy proposal supplies their semantic inputs; they
 do not authorize fixture tuning and do not block the P3 release criterion.
 
+The deferred disposition does not mean the attribution/report stack is absent. Issues #50 through
+#53 implemented and accepted the bounded synthetic infrastructure: adapter and method registry,
+outcome-blind immutable planning, checkpointed local Pipeline execution, receipt-backed kernel
+evaluation, atomic verified publication/catalog discovery, and checksum-gated read-only Web
+rendering. That reusable capability is evidence for implementation readiness only. It produced no
+formal strategy claim or recurring report, does not satisfy either resume condition in the gate,
+and does not change the `deferred` rows below.
+
 `P3-FEAT-001` and `P3-LABEL-001` have bounded accepted implementations in
 `docs/acceptance/p3-feature-registry-slice-20260728.md` and
 `docs/acceptance/p3-label-card-contract-slice-20260728.md`. They establish registry, PIT lineage,

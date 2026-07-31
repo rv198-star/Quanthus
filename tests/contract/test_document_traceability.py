@@ -89,6 +89,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "docs/AGENTS.md",
             "docs/README.md",
             "docs/architecture/README.md",
+            "docs/architecture/strategy-attribution-publication.md",
             "docs/design/execution-notification-profiles.md",
             "docs/design/hld.md",
             "docs/design/lld/README.md",
@@ -747,6 +748,20 @@ class DocumentTraceabilityTests(unittest.TestCase):
         child = child_path.read_text(encoding="utf-8")
         parent = parent_path.read_text(encoding="utf-8")
         index = index_path.read_text(encoding="utf-8")
+        docs_map = (root / "docs" / "README.md").read_text(encoding="utf-8")
+        hld = (root / "docs" / "design" / "hld.md").read_text(encoding="utf-8")
+        architecture_index = (root / "docs" / "architecture" / "README.md").read_text(
+            encoding="utf-8"
+        )
+        architecture_contract = (
+            root / "docs" / "architecture" / "strategy-attribution-publication.md"
+        ).read_text(encoding="utf-8")
+        architecture_fields = _header_fields(
+            root / "docs" / "architecture" / "strategy-attribution-publication.md"
+        )
+        work_items = (root / "docs" / "work-items" / "index.md").read_text(
+            encoding="utf-8"
+        )
         acceptance = acceptance_path.read_text(encoding="utf-8")
         gate = json.loads(gate_path.read_text(encoding="utf-8"))
         p0 = json.loads(p0_path.read_text(encoding="utf-8"))
@@ -774,6 +789,13 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("effects", child)
         self.assertIn("`CHECKSUMS.sha256`", child)
         self.assertIn("`READY`", child)
+        self.assertIn("outcome-blind immutable plan", docs_map)
+        self.assertIn("### Attribution publication contract", hld)
+        self.assertIn("hashes the exact raw", hld)
+        self.assertIn("strategy-attribution-publication.md", architecture_index)
+        self.assertEqual(architecture_fields["Delivery gate"], "blocked")
+        self.assertIn("raw release/workspace responses", architecture_contract)
+        self.assertIn("checkpointed local Pipeline execution", work_items)
         self.assertIn("no formal strategy", acceptance.lower())
         self.assertIn("`P3-ATTR-001` remains `deferred`", acceptance)
         self.assertTrue((root / "src" / "quanthus" / "strategy_attribution.py").is_file())

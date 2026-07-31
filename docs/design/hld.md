@@ -5,8 +5,8 @@
 | Design status | approved |
 | Delivery gate | not-applicable |
 | Current phase | P4 implementation open |
-| Version | 0.9 |
-| Effective date | 2026-07-30 |
+| Version | 0.10 |
+| Effective date | 2026-07-31 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
 
@@ -52,7 +52,8 @@ outside automated execution; no broker adapter exists in the near-term profile.
 | Position engine | Capital-unit lifecycle and concentration rules | Desired orders |
 | Matching/ledger | Conservative fills, rejects, costs, and accounting | Immutable order/fill/ledger events |
 | Notification delivery | Idempotent delivery of persisted signal or intent | Notification events; never fills |
-| Audit/attribution | Provenance, hypothetical ledger, reruns, scorecards | Run manifests and reports |
+| Audit/attribution | Provenance, immutable planning, verified reruns, claim construction, and atomic publication | Run manifests, receipts, claims, and workspace releases |
+| Report viewing | Checksum-gated read-only consumption of published attribution workspaces | Three-layer explanation views; never new analysis facts |
 
 ## 3. Data platform and storage design
 
@@ -217,6 +218,43 @@ A replay or training run also binds the exact research-bundle revision, manifest
 digest, authorization/split digest, and runner or trainer version. It never resolves a mutable
 pointer after the run starts.
 
+### Attribution publication contract
+
+Strategy attribution is a diagnostic path downstream of a strategy's native replay and audit
+evidence. It explains a frozen result and does not create a signal, order, fill, policy promotion,
+or execution right. An attribution result cannot bypass the expert, veto, constraint, or position
+path shown in the system context.
+
+```mermaid
+flowchart LR
+    S["Formal or synthetic strategy adapter"] --> Q["Frozen questions and immutable plan"]
+    Q --> P["Checkpointed attribution Pipeline"]
+    P --> K["Registered kernel and deep evidence verification"]
+    K --> W["Closed attribution workspace"]
+    W --> R["Atomic release and verified catalog"]
+    R --> V["Read-only Web workbench"]
+```
+
+The Python attribution modules own planning, execution, evidence resolution, receipt derivation,
+metric effects, classifications, and the three explanation projections. The publisher exposes
+only a complete staged release after deep verification, a canonical checksum ledger, `READY`
+written last, and an atomic rename. Its catalog indexes only complete releases that pass the same
+deep verifier.
+
+The browser is a presentation consumer, not a second attribution engine. For a catalog release it
+uses `READY` to bind the raw `CHECKSUMS.sha256` bytes, then hashes the exact raw
+`release.json`/`workspace.json` responses before strictly decoding and parsing those files. It may
+render and translate registered labels, but it cannot recompute effects, issue receipts, upgrade
+evidence, rank components, aggregate money, or recommend a policy. Manually imported workspaces
+remain unverified because browser envelope checks do not establish semantic attribution trust.
+
+Synthetic releases remain explicitly `synthetic_fixture_not_strategy_evidence` and cannot be
+resealed as formal evidence. The bounded synthetic chain is implemented and accepted as reusable
+infrastructure, while `P3-ATTR-001` and `P3-DASH-001` remain deferred until their formal-strategy
+and recurring-report resume conditions are met. The stable cross-module trust boundary is indexed
+by `docs/architecture/strategy-attribution-publication.md`; detailed algorithms and failure
+semantics are owned by LLD 10's strategy-attribution child.
+
 ## 6. Vertical-slice release
 
 Before a concrete P3 rule is frozen, the strategy-neutral daily replay layer runs consecutive PIT
@@ -298,3 +336,7 @@ issues.
 The data-foundation target topology and transition authority are decided by
 `docs/architecture/adr-0005-dual-lane-canonical-and-ads-publication.md`; LLD 01 owns its manifests,
 state transitions, failure behavior, and module acceptance.
+
+The attribution publication and read-only report boundary is refined by
+`docs/architecture/strategy-attribution-publication.md`; LLD 10 owns its adapter, planning,
+Pipeline, kernel, publication, report-view, failure, and acceptance contracts.

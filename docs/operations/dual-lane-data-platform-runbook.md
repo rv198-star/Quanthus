@@ -315,6 +315,43 @@ sudo /root/work/Quanthus/ops/bin/dual-lane-doctor node
 The service must report a verified `through_date` equal to the latest lane candidate. Do not treat
 a successful catalog refresh as canonical acceptance or consumer publication.
 
+## Monthly-complete DWD/DWS Base
+
+Run this flow on OCI only from one clean reviewed commit. It creates the Issue #48 Base pair beside
+all retained artifacts and does not publish a consumer release set.
+
+1. Freeze the input ledger with `freeze-dwd-dws-base-ledger` using the accepted historical bundle,
+   `/home/ubuntu/data/quanthus/dual-lane`, its publication root, and
+   `config/pipelines/dwd-dws-base-through-20260730.v2.json`. Retain the resulting ledger digest.
+2. Build `dwd-base-through-20260730-v2` and `dws-base-through-20260730-v2` in unique staging with
+   `build-dwd-dws-base`, passing the full clean Git object id. Verify the pair independently with
+   `verify-dwd-dws-base`; DWS semantic-difference rows must be zero.
+3. Install and verify the pair into OCI's `/srv/quanthus/dwd/base/` and
+   `/srv/quanthus/dws/base/` without descriptors. Push package data to each candidate node's
+   write-only epoch staging with `sync-dwd-dws-base`; repository code still moves only through Git.
+   On each node, install from
+   `/srv/quanthus/dual-lane/epoch-incoming/dwd-dws-bases/{dwd,dws}/...` with owner `root` and group
+   `quanthus-candidate-ro`. Installation deliberately writes no `BASE_CURRENT.json`.
+4. Compare manifest, content, whole-tree, and ledger digests across OCI, CN01, and Hermes. Any
+   mismatch blocks every descriptor. Preserve free-space, elapsed-time, peak-memory, and clean-path
+   verification evidence.
+5. After all three nodes pass, run `advance-dwd-dws-base-current` on each node with the exact old
+   DWD and DWS descriptor SHA-256 values, or the literal `absent` only when each descriptor is
+   proven absent. Verify both descriptors cross-bind the same pair.
+6. Run `run-dual-lane-history-catalog` on CN01 and Hermes. When both Base descriptors exist, it
+   selects `build-dwd-dws-base-catalog` automatically, binds the exact active pair, retains only
+   candidates after the Base through-date, and verifies the first post-Base candidate against the
+   absorbed canonical tail. Re-run it to prove immutable catalog and pointer bytes are idempotent,
+   then run `dual-lane-doctor node`.
+
+Do not infer authority from a package or descriptor alone. Do not move or delete the old seed,
+absorbed candidates, catalogs, ADS, logs, pointers, or evidence. Do not advance canonical,
+release-set, ADS, or legacy consumer pointers. The final July Base requires a new policy binding
+the actual Issue #47 ODS Base and accepted July 31 generation; never relabel the provisional pair.
+The original through-20260730 v1 ids were produced from two different pre-activation code revisions.
+Retain every v1 artifact and descriptor as incident evidence; never overwrite one v1 identity with
+the other. Corrective v2 ids are the only eligible Phase A publication target.
+
 ## Copy-only migration order
 
 Migration creates new artifacts and pointers only under the target roots. It does not move,

@@ -108,6 +108,12 @@ nodes.
   full-market fundamentals acquisition exist. Repository collectors and fail-closed schedules now
   cover raw F10, complete three-statement responses, real industry membership, and per-security
   receipts, but the Base scope gap remains open until those runtime assets are accepted.
+- Issue #48 Phase A is accepted in
+  `acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. Corrective v2 provisional DWD/DWS
+  Bases through 2026-07-30 are checksum-identical and active on OCI, CN01, and Hermes; independent
+  rebuild, isolated restore, exact-SHA descriptor advancement, and idempotent lane-catalog replay
+  passed. Canonical, ADS, release-set, legacy, and consumer authority remained unchanged. Phase B
+  and final July publication remain blocked on Issue #47 and the accepted July 31 generation.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional

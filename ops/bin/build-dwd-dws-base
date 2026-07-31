@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Build one immutable DWD/DWS Base package pair."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from quanthus.pipelines.dual_lane_history import load_history_base_policy
+from quanthus.pipelines.dwd_dws_base import (
+    DwdDwsBaseError,
+    build_dwd_dws_base_pair,
+    load_dwd_dws_base_policy,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--history-policy", type=Path, required=True)
+    parser.add_argument("--base-policy", type=Path, required=True)
+    parser.add_argument("--history-bundle", type=Path, required=True)
+    parser.add_argument("--dual-lane-root", type=Path, required=True)
+    parser.add_argument("--publication-root", type=Path, required=True)
+    parser.add_argument("--ledger", type=Path, required=True)
+    parser.add_argument("--dwd-output", type=Path, required=True)
+    parser.add_argument("--dws-output", type=Path, required=True)
+    parser.add_argument("--code-revision", required=True)
+    args = parser.parse_args()
+    try:
+        pair = build_dwd_dws_base_pair(
+            history_bundle=args.history_bundle,
+            history_policy=load_history_base_policy(args.history_policy),
+            dual_lane_root=args.dual_lane_root,
+            publication_root=args.publication_root,
+            ledger_path=args.ledger,
+            dwd_output=args.dwd_output,
+            dws_output=args.dws_output,
+            policy=load_dwd_dws_base_policy(args.base_policy),
+            code_revision=args.code_revision,
+        )
+    except (DwdDwsBaseError, FileExistsError, OSError) as exc:
+        print(f"DWD/DWS Base build failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "dwd": {
+                    "package_id": pair.dwd.package_id,
+                    "manifest_sha256": pair.dwd.manifest_sha256,
+                    "content_digest": pair.dwd.content_digest,
+                    "root": str(pair.dwd.root),
+                },
+                "dws": {
+                    "package_id": pair.dws.package_id,
+                    "manifest_sha256": pair.dws.manifest_sha256,
+                    "content_digest": pair.dws.content_digest,
+                    "root": str(pair.dws.root),
+                },
+                "input_ledger_digest": pair.dwd.input_ledger_digest,
+                "through_date": pair.dwd.through_date.isoformat(),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

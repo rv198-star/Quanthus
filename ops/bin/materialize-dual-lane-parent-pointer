@@ -12,7 +12,11 @@ import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from quanthus.pipelines.dual_lane import DualLaneError, verify_lane_candidate
+from quanthus.pipelines.dual_lane import (
+    DualLaneError,
+    verify_lane_candidate,
+    verify_release_set_current,
+)
 
 
 def _sha256(path: Path) -> str:
@@ -70,19 +74,8 @@ def main() -> int:
     try:
         root = args.publication_root.resolve(strict=True)
         current = _object(args.release_set_current.resolve(strict=True))
-        if current.get("schema_version") != 1:
-            raise ValueError("release-set CURRENT has an unsupported schema")
-        release_root = _inside(root, current.get("release_set_path"), "release_set_path")
-        release_manifest_path = release_root / "manifest.json"
-        release_ready_path = release_root / "READY"
-        release_manifest_sha256 = _sha256(release_manifest_path)
-        if release_manifest_sha256 != current.get("manifest_sha256"):
-            raise ValueError("release-set CURRENT manifest checksum mismatch")
-        if release_ready_path.read_text(encoding="ascii").strip() != release_manifest_sha256:
-            raise ValueError("release-set READY does not bind its manifest")
-        release = _object(release_manifest_path)
-        if release.get("kind") != "dual_lane_release_set":
-            raise ValueError("release-set manifest kind is invalid")
+        release_root, release = verify_release_set_current(root, current)
+        release_manifest_sha256 = _sha256(release_root / "manifest.json")
         generation_root = _inside(root, release.get("generation_path"), "generation_path")
         candidate = verify_lane_candidate(generation_root)
         if candidate.manifest_sha256 != release.get("candidate_manifest_sha256"):

@@ -6,6 +6,7 @@ import multiprocessing
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
@@ -1552,6 +1553,67 @@ class DualLaneTests(unittest.TestCase):
                 reason_code="stale_retry",
                 clock=self._clock(market_date, 20, 36),
             )
+
+    def test_parent_pointer_materializer_accepts_v2_current_and_enforces_cas(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        primary = self._candidate(epoch=epoch, lane="cn01")
+        standby = self._candidate(epoch=epoch, lane="hermes")
+        publication_root = self.root / "v2-parent-publication"
+        arbitrate_and_publish(
+            market_date=market_date,
+            primary_candidate_path=primary.root,
+            standby_candidate_path=standby.root,
+            root=publication_root,
+            policy=self.policy,
+            expected_epoch=epoch,
+            clock=self._clock(market_date, 20, 5),
+        )
+        current_path = publication_root / "release-set_CURRENT.json"
+        current = json.loads(current_path.read_text(encoding="utf-8"))
+        self.assertEqual(current["schema_version"], 2)
+
+        project_root = Path(__file__).resolve().parents[2]
+        helper = project_root / "ops/bin/materialize-dual-lane-parent-pointer"
+        environment = os.environ | {"PYTHONPATH": str(project_root / "src")}
+
+        def materialize(output: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [
+                    sys.executable,
+                    helper,
+                    "--publication-root",
+                    publication_root,
+                    "--release-set-current",
+                    current_path,
+                    "--output",
+                    self.root / output,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+
+        accepted = materialize("parent-v2.json")
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        parent = json.loads((self.root / "parent-v2.json").read_text(encoding="utf-8"))
+        self.assertEqual(parent["source_release_set_id"], current["release_set_id"])
+        self.assertEqual(parent["market_date"], market_date.isoformat())
+
+        tampered_values = {
+            "pointer_cas_event_sha256": f"sha256:{'0' * 64}",
+            "lease_owner": "forged-owner",
+            "fencing_token": current["fencing_token"] + 1,
+        }
+        for field, value in tampered_values.items():
+            with self.subTest(field=field):
+                tampered = {**current, field: value}
+                self._write_json(current_path, tampered)
+                rejected = materialize(f"rejected-{field}.json")
+                self.assertEqual(rejected.returncode, 2)
+                self.assertIn("CAS evidence", rejected.stderr)
+        self._write_json(current_path, current)
 
     def test_automatic_arbitration_rechecks_lease_expiry_before_pointer_commit(self) -> None:
         market_date = date(2026, 7, 24)

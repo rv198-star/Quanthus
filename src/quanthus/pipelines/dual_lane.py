@@ -2137,6 +2137,14 @@ def _release_from_pointer(
     return release_path, release
 
 
+def verify_release_set_current(
+    root: Path,
+    pointer_payload: Mapping[str, Any],
+) -> tuple[Path, dict[str, Any]]:
+    """Verify a release-set CURRENT pointer and its immutable release graph."""
+    return _release_from_pointer(root.resolve(), pointer_payload)
+
+
 def _release_generation_ids(root: Path, release: Mapping[str, Any]) -> tuple[str, ...]:
     catalog_path = _resolve_inside(
         root,

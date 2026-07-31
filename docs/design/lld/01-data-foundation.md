@@ -432,10 +432,10 @@ candidate-success catalog runner detects the complete active pair, builds a Base
 with zero or more exact post-Base candidates, and rejects any first-parent mismatch against the
 absorbed canonical tail. It retains the old history-catalog path until both Base descriptors exist.
 Do not alter canonical catalogs, ADS, release-set `CURRENT`, schedules, or retained source
-artifacts. The provisional through-2026-07-30 contract is implemented; final July publication
-remains blocked on the actual Issue #47 ODS Base and the accepted 2026-07-31 generation. Corrective
-policy v2 owns the active provisional package ids after two pre-activation builds bound different
-code revisions to the original v1 ids; all v1 artifacts remain retained evidence and are never
+artifacts. The final July pair is published checksum-identically on all three nodes and binds the
+actual Issue #47 ODS Base plus the accepted 2026-07-31 generation. Corrective policy v2 retains the
+provisional package ids after two pre-activation builds bound different code revisions to the
+original provisional v1 ids; all provisional v1 artifacts remain retained evidence and are never
 overwritten or relabeled.
 
 ## 6. Snapshot interface

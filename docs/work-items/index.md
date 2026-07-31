@@ -47,21 +47,22 @@ success trigger remains pending.
 
 `META-DATA-BASE-001` is governed by ADR 0005, the ODS Base child of LLD 01, and GitHub issue #47.
 It is copy-only and does not change a production schedule, legacy pointer, target cutover state, or
-OCI ODS retention. The 2026-07-30 package is provisional; final July completion requires accepted
-July 31 releases and matching final Base descriptors on Hermes and CN01. Phase A is accepted in
-`docs/acceptance/meta-data-base-001-ods-base-202607/README.md`: Hermes and CN01 hold the same
-20,743-file package, manifest, content digest, `READY`, and `BASE_CURRENT.json` bytes through
-2026-07-30. Raw F10 and full financial statements remain outside that provisional package until
-the newly governed full-market collectors produce an accepted immutable acquisition.
+OCI ODS retention. The 2026-07-30 package remains the retained provisional parent; final July
+completion and matching final Base descriptors on Hermes and CN01 are accepted in
+`docs/acceptance/meta-data-base-001-ods-base-202607/README.md`: Hermes and CN01 hold the same final
+`ods-base-202607-v1` package and active `BASE_CURRENT.json` bytes through 2026-07-31. The package
+binds the accepted full-market fundamentals gap-fill; normal weekly and catalog qualification
+remains separate operational evidence.
 
 `META-DATA-BASE-002` is governed by ADR 0005, LLD 01, and GitHub issue #48. The repository now
-implements canonical input-ledger freeze, deterministic provisional DWD/DWS package construction,
+implements canonical input-ledger freeze, deterministic DWD/DWS package construction,
 exact DWS reprojection, clean verification, copy-only installation, SHA-preconditioned Base
 descriptors, and Base-aware lane catalogs. Phase A evidence is recorded in
 `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`: corrective v2 packages are
 checksum-identical and active on OCI, CN01, and Hermes; clean rebuild and isolated restore passed;
 and both lane catalogs replay byte-idempotently against the new Base. Canonical, ADS, release-set,
-legacy, and consumer authority remained unchanged. Phase B and the final July pair remain open.
+legacy, and consumer authority remained unchanged. Final July Phase B is accepted with the same
+three-node, deterministic rebuild, descriptor, catalog, and doctor gates.
 
 `META-DATA-BASE-003` is governed by ADR 0005, the operational ADS Base LLD, and GitHub issue #46.
 The repository implements exact-plan validation, deterministic semantic packaging, deep clean-path

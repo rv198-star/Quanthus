@@ -113,16 +113,14 @@ nodes.
   hold the same 20,743-file, 11,145,679,742-byte package with manifest
   `sha256:d38b8332ddd5427104bbc6f71bf89df1c81f85cca507a1f9a80ac58662b7352e` and content digest
   `sha256:e51644929fb4c5fc20f30db0652aa469c6164ac27d1ffcb1c864c2c46119589d`.
-  The final July package remains blocked until accepted 2026-07-31 post-close releases and the first
-  full-market fundamentals acquisition exist. Repository collectors and fail-closed schedules now
-  cover raw F10, complete three-statement responses, real industry membership, and per-security
-  receipts, but the Base scope gap remains open until those runtime assets are accepted.
-- Issue #48 Phase A is accepted in
-  `acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. Corrective v2 provisional DWD/DWS
-  Bases through 2026-07-30 are checksum-identical and active on OCI, CN01, and Hermes; independent
-  rebuild, isolated restore, exact-SHA descriptor advancement, and idempotent lane-catalog replay
-  passed. Canonical, ADS, release-set, legacy, and consumer authority remained unchanged. Phase B
-  and final July publication remain blocked on Issue #47 and the accepted July 31 generation.
+  The final `ods-base-202607-v1` is checksum-identical and active on Hermes and CN01 at manifest
+  `sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c`; normal weekly and
+  catalog qualification remains separate operational evidence.
+- Issue #48 Phase A and final July Phase B are accepted in
+  `acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. The final DWD/DWS Bases through
+  2026-07-31 are checksum-identical and active on OCI, CN01, and Hermes; deterministic rebuild,
+  exact-SHA descriptor advancement, idempotent lane-catalog replay, and both node doctors passed.
+  Canonical, ADS, release-set, legacy, and consumer authority remained unchanged.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional

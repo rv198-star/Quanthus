@@ -5,24 +5,25 @@
 | Work item | `META-DATA-BASE-002` |
 | Tracking issue | GitHub issue #48 |
 | Evidence date | 2026-07-31 UTC |
-| Evidence status | Phase A accepted on OCI, CN01, and Hermes; Phase B remains open |
-| Policy | `config/pipelines/dwd-dws-base-through-20260730.v2.json` |
-| Producer revision | `77214e28c5a0025f7b0da9da7e3fc40480d450e8` |
+| Evidence status | Phase A and final July Phase B accepted on OCI, CN01, and Hermes |
+| Policies | `config/pipelines/dwd-dws-base-through-20260730.v2.json` and `config/pipelines/dwd-dws-base-202607.v1.json` |
+| Final producer revision | `74278d4fefd4b44a678bfa81c3be66aaffa0ed3e` |
 | Publication authority | only DWD/DWS Base descriptors and lane-history catalogs advanced |
 
 ## Verdict
 
-Phase A is accepted. OCI, CN01, and Hermes hold byte-identical corrective
-`dwd-base-through-20260730-v2` and `dws-base-through-20260730-v2` packages. Independent deep
-verification, canonical whole-tree comparison, exact-SHA descriptor advancement, clean rebuild,
-isolated restore, and both lane-history catalog replays passed. All three Base descriptor pairs
-contain identical bytes and cross-bind the same package pair and input ledger.
+Phase A and final July Phase B are accepted. OCI, CN01, and Hermes retain the byte-identical
+corrective `dwd-base-through-20260730-v2` and `dws-base-through-20260730-v2` packages and now also
+hold byte-identical final `dwd-base-202607-v1` and `dws-base-202607-v1` packages through
+2026-07-31. Independent deep verification, deterministic rebuild, canonical whole-tree comparison,
+exact-SHA descriptor advancement, idempotent lane-history catalog replay, and both node doctors
+passed. All three active Base descriptor pairs contain identical bytes and cross-bind the same
+final package pair and input ledger.
 
-Only the new DWD/DWS `BASE_CURRENT.json` descriptors and the CN01/Hermes lane-history catalog
+Only the DWD/DWS `BASE_CURRENT.json` descriptors and the CN01/Hermes lane-history catalog
 descriptors advanced. Canonical, ADS, target release-set, legacy, and consumer authority pointers
-were unchanged, and no `GO_FOR_CUTOVER.json` was created. Phase B was not started. The final July
-Base still requires the actual Issue #47 ODS Base and an accepted July 31 generation; the
-through-2026-07-30 v2 pair must never be relabeled as that final Base.
+were unchanged, and no `GO_FOR_CUTOVER.json` was created. The through-2026-07-30 v2 pair remains
+immutable retained evidence and was not relabeled as the final Base.
 
 ## Frozen inputs
 
@@ -232,10 +233,38 @@ artifact was deleted, moved, overwritten, or repurposed. `GO_FOR_CUTOVER.json` r
 Repository doctor, compile, 437 tests, and planning synchronization passed from the reviewed P1
 runtime after the evidence update.
 
-## Phase B open gates
+## Final July Phase B Acceptance
 
-- Wait for the actual Issue #47 final ODS Base digest and an accepted July 31 candidate family.
-- Build new immutable `dwd-base-202607-v1` and `dws-base-202607-v1` packages with
-  `through_date=2026-07-31`; never modify or relabel the Phase A v2 packages.
-- Re-run every package, semantic, three-node, descriptor, catalog, restore, and authority-boundary
-  gate before recording final July acceptance.
+The final input ledger binds `ods-base-202607-v1` at manifest
+`sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c` and content
+`sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1`, canonical catalog
+`catalog-772e7c591fd9edb87c94`, and accepted July 31 generation
+`generation-20260731-hermes-061a62cfbf797045`. Its logical digest is
+`sha256:d1fff8127c55e4a9dd6137d42fabfab9432deeff26c3a561dafe346fd488ff84`; the frozen ledger file is
+`sha256:dbfe9ac0b6eb72ad074904861a5673c141169d03772d86ff7ecca8025714cd38`.
+
+| Layer | Package | Manifest SHA-256 | Content digest | Canonical tree SHA-256 |
+| --- | --- | --- | --- | --- |
+| DWD | `dwd-base-202607-v1` | `sha256:e220b8a60f50112f6d2c4fbae7248c810c7ab5461fc926dcd86990e4260de0fb` | `sha256:98a158a686c24770b3136585e22817612acf68973ccf330dece4acb35bcebeb7` | `sha256:3bfaf116c3655d90c48d7230345ef6ead4bef21788bbdbb878a0b8fc5c3b0b17` |
+| DWS | `dws-base-202607-v1` | `sha256:515840db7ddca8364ba8ef5fe8a3379bd09c4e848856704c9ea620599245169e` | `sha256:36d0644f46e6bf5e3426abca3af063fe682a9e6661713c6aa4d39171e8f67ee0` | `sha256:651a519f037d9f40e9ac639f5f2b9440a33d8afa804e6c5457c153d5b4ac287b` |
+
+The first build and an independent rebuild produced the same manifests, content digests, and
+canonical trees. The pair was installed without descriptors on OCI, transferred with `READY`
+last through attempt `final-202607-v1-20260731T193919Z`, and independently installed and deeply
+verified on CN01 and Hermes. All three nodes then returned the digest set above before any pointer
+advanced.
+
+All three descriptor pairs advanced from the exact retained-v2 SHA preconditions. The final DWD
+and DWS descriptor SHA-256 values are respectively
+`sha256:a103432acf484e6089115bd532c0bdeea78113257f91c2b19f16f5048641805e` and
+`sha256:72ba2b6022a0bbe1779c7834238b78ffe65c5c8d6eb3bdb12f5a59c3c1a5a7d3`; both cross-bind pair
+digest `sha256:7c44f82ab1b2a9a3bfc57ccc6d7aa560bf7d6b836d7f31c28f3b56ec55b53a27`.
+
+CN01 and Hermes rebuilt and replayed their Base-aware catalogs with `candidate_count=0` and
+`through_date=2026-07-31`. CN01 selected
+`base-lane-history-cn01-20260731-2943321f11e14419` with CURRENT SHA-256
+`sha256:c3de1e64a7145f6a99bb5f5fc2e975f3e68fffa1fafe5dcc32ecc2d2c3f135af`; Hermes selected
+`base-lane-history-hermes-20260731-d866fa02b44b76da` with CURRENT SHA-256
+`sha256:af95b84a2bdac0fa94f61e6c59ab695fce7fd22883bfe3d94e7cbc4cf67f7cd1`. Second runs preserved
+both ids and pointer bytes. Both `dual-lane-doctor node` runs passed at deployed revision
+`74278d4fefd4b44a678bfa81c3be66aaffa0ed3e`.

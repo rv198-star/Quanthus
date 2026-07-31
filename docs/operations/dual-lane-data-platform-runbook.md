@@ -352,8 +352,9 @@ all retained artifacts and does not publish a consumer release set.
 
 Do not infer authority from a package or descriptor alone. Do not move or delete the old seed,
 absorbed candidates, catalogs, ADS, logs, pointers, or evidence. Do not advance canonical,
-release-set, ADS, or legacy consumer pointers. The final July Base requires a new policy binding
-the actual Issue #47 ODS Base and accepted July 31 generation; never relabel the provisional pair.
+release-set, ADS, or legacy consumer pointers. The accepted final July Base uses
+`config/pipelines/dwd-dws-base-202607.v1.json`, which binds the actual Issue #47 ODS Base and the
+accepted July 31 generation; never relabel the provisional pair.
 The original through-20260730 v1 ids were produced from two different pre-activation code revisions.
 Retain every v1 artifact and descriptor as incident evidence; never overwrite one v1 identity with
 the other. Corrective v2 ids are the only eligible Phase A publication target.

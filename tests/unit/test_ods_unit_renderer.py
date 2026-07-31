@@ -34,8 +34,8 @@ class OdsUnitRendererTests(unittest.TestCase):
 
         market_timer = (output / "cn01-ods-market-daily-core.timer").read_text()
         market_service = (output / "cn01-ods-market-daily-core.service").read_text()
-        self.assertIn("OnCalendar=Mon..Fri *-*-* 19:00:00 Asia/Shanghai", market_timer)
-        self.assertIn("contract 19:00", market_timer)
+        self.assertIn("OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai", market_timer)
+        self.assertIn("contract 18:30", market_timer)
         self.assertIn("Description=CN01 ODS", market_timer)
         self.assertNotIn("Description=Hermes ODS", market_timer)
         self.assertNotIn("contract 17:30", market_timer)
@@ -43,7 +43,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", market_service)
         self.assertIn("Environment=HERMES_ODS_NODE_ID=cn01", market_service)
         self.assertIn("check-ods-collection-window --node-id cn01", market_service)
-        self.assertIn("TimeoutStartSec=50min", market_service)
+        self.assertIn("TimeoutStartSec=80min", market_service)
         self.assertIn("ops/bin/run-hermes-ods-lane", market_service)
         self.assertNotIn("ops/bin/run-cn01-ods-lane", market_service)
         self.assertIn("date +%%F", market_service)
@@ -69,8 +69,8 @@ class OdsUnitRendererTests(unittest.TestCase):
             ("hermes", "2026-07-29T17:30:00+08:00", 0),
             ("hermes", "2026-07-29T18:20:00+08:00", 1),
             ("cn01", "2026-07-29T15:40:00+08:00", 1),
-            ("cn01", "2026-07-29T19:04:59+08:00", 0),
-            ("cn01", "2026-07-29T19:05:00+08:00", 1),
+            ("cn01", "2026-07-29T18:34:59+08:00", 0),
+            ("cn01", "2026-07-29T18:35:00+08:00", 1),
         ]
         for node_id, observed_at, expected in cases:
             with self.subTest(node_id=node_id, observed_at=observed_at):

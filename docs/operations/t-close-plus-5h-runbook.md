@@ -31,14 +31,14 @@ separate path; it is not substituted for the daily release.
 
 Hermes and CN01 use separate Monday-Friday collection windows during the provisional five-session
 test. Hermes starts at 17:30 Asia/Shanghai and begins the stock scan at first provider readiness;
-CN01 starts at 19:00 as the fixed late-window sample. Before session preflight, each acquisition
-wrapper fetches a fresh calendar window that includes the target date and builds an attempt-local
-candidate. It then checks the target date against both SSE and SZSE rows before contacting market
-data providers. Refresh failure, a missing row, or an SSE/SZSE disagreement is a hard failure and
-alert with no provider calls or READY. Two open rows start provider readiness checks. Two closed
-rows produce only the calendar release. The wrapper must not infer a holiday from an empty bar
-response. Weekend market runs are not scheduled; disclosure-watermark collectors may use a
-separate calendar-day schedule.
+CN01 starts at 18:30 with an 80-minute service timeout as the throughput-budgeted sample. Before
+session preflight, each acquisition wrapper fetches a fresh calendar window that includes the
+target date and builds an attempt-local candidate. It then checks the target date against both SSE
+and SZSE rows before contacting market data providers. Refresh failure, a missing row, or an
+SSE/SZSE disagreement is a hard failure and alert with no provider calls or READY. Two open rows
+start provider readiness checks. Two closed rows produce only the calendar release. The wrapper
+must not infer a holiday from an empty bar response. Weekend market runs are not scheduled;
+disclosure-watermark collectors may use a separate calendar-day schedule.
 
 Open sessions require all three BaoStock sentinel indices to return T before any full-market scan.
 Empty responses are not reconnected; only true provider errors receive bounded reconnects. The

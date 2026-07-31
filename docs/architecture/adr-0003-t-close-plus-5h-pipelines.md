@@ -2,7 +2,7 @@
 
 - Status: Accepted for the legacy live path; target ownership/publication superseded by ADR 0005
 - Date: 2026-07-25
-- Last reconciled: 2026-07-28
+- Last reconciled: 2026-07-31
 - Scope: Recurring Hermes acquisition and OCI daily warehouse processing
 
 ADR 0005 replaces the target first-arrival source selection, OCI-only DWD/DWS build placement, and
@@ -34,20 +34,21 @@ adds 100% headroom: `7380 * 2 = 14760s`, so ODS must be ready by 19:46. This evi
 provisional until five open sessions complete.
 
 Hermes and CN01 use different collection windows during that validation. The first 15:40 sample
-is retained as v1 evidence; the v2 experiment restarts its five-session sample with Hermes at 17:30,
-close to the first observed provider-ready time while still separated from CN01.
-CN01 starts at 19:00, representing a lower-load fixed late window. This avoids synchronized
-full-market requests and creates comparable evidence without changing either node's coverage or
-publication gates.
+is retained as v1 evidence and the 19:00 sample as v2 evidence. The v3 experiment starts its
+five-session sample with Hermes at 17:30, close to the first observed provider-ready time, and
+CN01 at 18:30. CN01's throughput-budgeted window follows the 2026-07-31 attempt: 4,342 requests
+completed in 2,748 seconds at 0.633 seconds per request, leaving 653 securities at the 19:46
+deadline. Starting 30 minutes earlier preserves node separation and the shared publication gate
+while allowing a complete scan under the observed request rate.
 
 ```text
 15:00       closing call auction completes
 15:05-15:30 after-hours fixed-price matching
 15:30       final daily trading boundary; final volume/amount may now settle
 15:40       OCI starts polling immutable handoffs
-17:30       Hermes starts the v2 readiness gate
+17:30       Hermes starts the v3 readiness gate
 on readiness Hermes starts its full-market scan only after all sentinel indices are complete
-19:00       CN01 starts the fixed late-window attempt; Hermes readiness deadline
+18:30       CN01 starts the throughput-budgeted attempt
 on READY     first observed source wins; same-poll tie resolves to CN01
 19:46       latest acceptable upstream ODS handoff (123m rounded incident + 100%)
 20:30       DWD/DWS T+5h completion SLA

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "hermes-full-ods-scope-20260731",
+  "contract_revision": "hermes-full-ods-scope-cn01-throughput-20260731",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_and_standby_dwd_dws_candidate",
@@ -45,7 +45,7 @@
       "finalized_acquisition_not_before": "15:40:00",
       "completion_deadline": "19:46:00",
       "collection_window_experiment": {
-        "experiment_id": "baostock-load-window-20260729-v2",
+        "experiment_id": "baostock-load-window-20260731-v3",
         "minimum_open_sessions": 5,
         "nodes": [
           {
@@ -57,10 +57,10 @@
           },
           {
             "node_id": "cn01",
-            "timer_start": "19:00:00",
+            "timer_start": "18:30:00",
             "activation_grace_seconds": 300,
-            "start_policy": "fixed_late_window",
-            "service_timeout_seconds": 3000
+            "start_policy": "throughput_budgeted_window",
+            "service_timeout_seconds": 4800
           }
         ],
         "comparison_metrics": [

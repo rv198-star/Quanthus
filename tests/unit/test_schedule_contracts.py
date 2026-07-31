@@ -28,7 +28,8 @@ class ScheduleContractTests(unittest.TestCase):
 
         self.assertEqual(contract.schedule_id, "hermes-ods-schedule-v1")
         self.assertEqual(
-            contract.contract_revision, "hermes-full-ods-scope-20260731"
+            contract.contract_revision,
+            "hermes-full-ods-scope-cn01-throughput-20260731",
         )
         self.assertEqual(len(contract.lanes), 5)
 

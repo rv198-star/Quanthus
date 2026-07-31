@@ -302,7 +302,7 @@ def test_timer_oncalendar_matches_schedule_contract() -> None:
     expected = expected_timer_oncalendar(SCHEDULE)
     cn01_expected = expected_timer_oncalendar(SCHEDULE, node_id="cn01")
     assert expected["market-daily-core"] == "Mon..Fri *-*-* 17:30:00 Asia/Shanghai"
-    assert cn01_expected["market-daily-core"] == "Mon..Fri *-*-* 19:00:00 Asia/Shanghai"
+    assert cn01_expected["market-daily-core"] == "Mon..Fri *-*-* 18:30:00 Asia/Shanghai"
     assert expected["calendar-daily-events"] == "*-*-* 19:30:00 Asia/Shanghai"
     assert expected["weekly-corrections"] == "Sat *-*-* 08:00:00 Asia/Shanghai"
     assert expected["intraday-1m"] == "Mon..Fri *-*-* 20:30:00 Asia/Shanghai"
@@ -1375,14 +1375,14 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     assert attempt["schedule_id"] == "hermes-ods-schedule-v1"
     assert (
         attempt["schedule_contract_revision"]
-        == "hermes-full-ods-scope-20260731"
+        == "hermes-full-ods-scope-cn01-throughput-20260731"
     )
     assert attempt["schedule_config_sha256"] == expected_schedule_sha
     release = json.loads((result.release_dir / "release.json").read_text(encoding="utf-8"))
     assert release["schedule_contract_id"] == "hermes-ods-schedule-v1"
     assert (
         release["schedule_contract_revision"]
-        == "hermes-full-ods-scope-20260731"
+        == "hermes-full-ods-scope-cn01-throughput-20260731"
     )
     assert release["schedule_config_sha256"] == expected_schedule_sha
     meta_dataset = next(item for item in result.datasets if item.name == "intraday_meta")

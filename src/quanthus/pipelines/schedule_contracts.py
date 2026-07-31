@@ -181,7 +181,7 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
         field="market-daily-core.collection_window_experiment",
     )
     expected_experiment = {
-        "experiment_id": "baostock-load-window-20260729-v2",
+        "experiment_id": "baostock-load-window-20260731-v3",
         "minimum_open_sessions": 5,
         "nodes": [
             {
@@ -193,10 +193,10 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
             },
             {
                 "node_id": "cn01",
-                "timer_start": "19:00:00",
+                "timer_start": "18:30:00",
                 "activation_grace_seconds": 300,
-                "start_policy": "fixed_late_window",
-                "service_timeout_seconds": 3000,
+                "start_policy": "throughput_budgeted_window",
+                "service_timeout_seconds": 4800,
             },
         ],
         "comparison_metrics": [

@@ -123,5 +123,5 @@ class OperationalADSBaseBoundaryTests(unittest.TestCase):
             runbook.index("seal-checks all declared"),
             runbook.index("advances only"),
         )
-        self.assertIn("Phase A and Phase B not accepted", evidence)
+        self.assertIn("Phase A provisional Base accepted; Phase B final Base remains open", evidence)
         self.assertIn("No guessed", evidence)

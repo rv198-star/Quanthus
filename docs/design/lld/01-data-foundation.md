@@ -10,7 +10,7 @@
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
-| Dual-lane delivery | three-node shadow deployment and role-scoped historical ADS bootstrap accepted; qualification, catalog-native publication, and consumer cutover blocked pending evidence and `GO_FOR_CUTOVER` |
+| Dual-lane delivery | three-node shadow deployment, role-scoped historical ADS bootstrap, and provisional OCI operational ADS Base accepted; final Base, catalog-native consumer publication, and cutover remain blocked pending their own evidence and `GO_FOR_CUTOVER` |
 
 ## 1. Goal
 

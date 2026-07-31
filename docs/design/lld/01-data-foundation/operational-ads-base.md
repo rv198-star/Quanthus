@@ -6,7 +6,7 @@
 | Work item | `META-DATA-BASE-003` |
 | Tracking issue | GitHub issue #46 |
 | Design status | approved under ADR 0005 |
-| Delivery gate | repository capability implemented; provisional and final publication blocked on exact upstream packages |
+| Delivery gate | provisional Base accepted; final Base blocked on July 31 accepted upstreams |
 | Profile | `strategy_replay_operational_v1` |
 
 ## 1. Purpose and authority
@@ -14,7 +14,7 @@
 OCI owns the one authoritative operational ADS historical Base. It lives below
 `/srv/quanthus/ads/operational/base/`; immutable daily operational ADS revisions remain below the
 daily publication tree. Existing development, arbitration, permanent-blind, recent-research, and
-other portable exports are derived offline snapshots. Copying or comparing one does not promote it
+other offline research bundles are derived snapshots. Copying or comparing one does not promote it
 to operational authority.
 
 The provisional package is `ads-base-through-20260730-v1`. After the July 31 close and exact final
@@ -39,7 +39,7 @@ The plan contains:
 - a complete inventory that classifies every current operational daily revision and retained
   research export, records its coverage and upstream-generation digest, and makes a `reuse`,
   `rebuild`, `exclude`, or `evidence_only` decision;
-- one or more exact source bindings per semantic table, including source role, table logical
+- exactly one sealed source binding per semantic table, including source role, table logical
   digest, lineage digest, and per-decision PIT evidence digest where required;
 - one sorted generation-ledger row per decision session with catalog/DWD/DWS manifest hashes,
   accepted lane/generation, original `knowledge_cutoff`, and decision cutoff;
@@ -86,17 +86,25 @@ is rebuilt from the accepted Base/upstream family. Build time never replaces a s
 
 ## 4. Build and verification
 
-`src/quanthus/operational_ads_base.py` verifies every bound source manifest and part before creating
-unique staging. Parquet sources have their canonical logical-row stream recomputed. Every selected
-source is independently checked for duplicate business keys; overlapping sources may collapse only
-when the business key, lineage digest, schema, and complete row value agree. A different lineage or
-row value is a blocking conflict.
+`src/quanthus/operational_ads_base.py` verifies every bound source manifest, source `READY`, and
+part before creating unique staging. Each table must bind exactly one sealed semantic source and
+one part. The builder verifies the source path, byte size, and SHA-256, copies the part
+byte-for-byte, verifies the copied bytes, and runs one DuckDB vectorized quality pass for schema,
+row count, nulls, duplicate business keys, and date bounds. Multi-source merge, deduplication, and
+semantic conflict resolution belong in the accepted semantic-source normalization step; an ADS
+package plan that still requires those operations is rejected before staging.
 
-The builder emits one compact sorted part per initial table. It records logical schema, table
-content digest, row and null counts, zero duplicate/conflict facts, date bounds, part size and
-SHA-256, schema SHA-256, sort keys, path-free original lineage, exact upstreams, inventory,
-generation ledger, runtime, code revision, and plan digest. `manifest.json` follows all table
-parts; `READY` is written last and binds the exact manifest SHA-256 before one directory rename.
+The builder emits the copied sealed part for each initial table. Parquet tables reuse the accepted
+source logical digest and fingerprint. JSON tables retain the source artifact digest in
+`source_bindings[].table_content_digest` and record the independently reproducible ADS canonical
+row digest in the table-level `table_content_digest`. Every table retains path-free lineage and
+records the copied part's actual logical schema, row and null counts, zero duplicate/conflict
+facts, date bounds, byte size and SHA-256, schema SHA-256, and sort keys together with exact
+upstreams, inventory, generation ledger, runtime, code revision, and plan digest. An upstream
+schema identifier may name its own logical contract; the ADS manifest always records the schema
+computed from the copied bytes.
+`manifest.json` follows all table parts; `READY` is written last and binds the exact manifest
+SHA-256 before one directory rename.
 The package content digest binds logical table content, schema, lineage, policy, and upstream
 identity; it excludes each generated part's encoding-dependent byte size and SHA-256. Those
 physical facts remain mandatory in the manifest and are bound by the manifest SHA-256 and `READY`.
@@ -106,10 +114,15 @@ only available overnight, its timezone-aware decision cutoff may be on T+1 but m
 the `09:30 Asia/Shanghai` open. The replay frame retains the T snapshot and T+1 execution date; it
 does not relabel T+1 as the decision session or expose execution-day observations to the strategy.
 
-The deep verifier starts only from `manifest.json` and `READY`, checks the complete declared file
-set, recomputes table statistics and logical content, and reads no build-plan or producer path.
-An identical logical input rebuild must reproduce table and package content digests; `built_at` is
-outside content identity.
+The normal verifier starts only from `manifest.json` and `READY`, checks the complete declared file
+set, part bytes, schema, and sealed metadata, and reads no build-plan or producer path. Build runs
+the one required vectorized quality pass; normal check, replay, copy verification, and promotion
+do not repeat it and do not invoke Python logical-row hashing. `check-operational-ads-base
+--deep-logical-content` remains an explicit offline audit that recomputes Parquet statistics and
+logical row digests when a new semantic investigation requires it. It is not a publication-loop
+gate. An identical logical input rebuild must reproduce table bytes and table/package content
+digests; `built_at`, publisher code revision, and publisher runtime are outside logical content
+identity but remain bound by manifest SHA-256.
 
 ## 5. Replay and publication sequence
 
@@ -122,11 +135,18 @@ publication can move the Base descriptor.
 The root operator sequence is:
 
 ```text
-exact plan -> source/deep semantic gates -> unique staging -> package READY
-           -> clean-path existing-reader smoke -> BASE_CURRENT compare-and-swap
+exact plan -> DWD/DWS current-descriptor preflight -> sealed source gates
+           -> byte-copy plus one vectorized quality pass -> package READY
+           -> seal check -> clean-path existing-reader smoke
+           -> final DWD/DWS current-descriptor preflight -> BASE_CURRENT compare-and-swap
 ```
 
-`promote-operational-ads-base` copies when necessary, re-verifies the copy, refuses an existing id
+Each upstream preflight requires the complete versioned descriptor shape, resolves its exact
+`package_path` to the plan-bound sealed manifest, verifies the package manifest identity and input
+ledger, and recomputes the DWD/DWS pair digest. The second preflight prevents a descriptor change
+during the build and smoke interval from being promoted as though it still matched the plan.
+
+`promote-operational-ads-base` copies when necessary, seal-verifies the copy, refuses an existing id
 with different bytes, and compares the prior descriptor manifest SHA-256 (or explicit `absent`)
 under an OCI process lock before one atomic replacement and directory sync. A failure before
 descriptor CAS leaves the prior descriptor and all existing packages unchanged. Retry over

@@ -40,7 +40,7 @@ nodes.
   checksum, frame, and exception gates accept it for research replay without granting execution
   authority.
 - The additive 2026 research backfill uses snapshot
-  `p1-historical-replay-2026-through-20260727-v1`, corporate-action policy v3, and portable ADS
+  `p1-historical-replay-2026-through-20260727-v1`, corporate-action policy v3, and research-bundle
   policy v2. It covers decisions through 2026-07-24 with next-open execution context on 2026-07-27,
   remains readable only as `development_research`, and does not rewrite the original three bundles
   or any mutable pointer. Formal publication and 134-frame replay evidence are accepted in
@@ -96,6 +96,11 @@ nodes.
   `acceptance/issue-45-historical-dwd-dws-completion-20260730.md`: OCI, CN01, and Hermes hold the
   same sealed base bytes, and both lane-local logical catalogs join it to four daily candidates
   without physical concatenation or cleanup authority.
+  The provisional OCI operational ADS historical Base through 2026-07-30 is accepted in
+  `acceptance/meta-data-base-003-ads-base-202607/provisional-base-acceptance-20260731.md`.
+  It byte-copies the accepted semantic source v2, binds the exact DWD/DWS v2 pair, passes an
+  isolated one-day replay, and advances only its administrative `BASE_CURRENT.json`. The final
+  July Base and every consumer-visible release/cutover gate remain open.
   Candidate-success-driven daily lane-history refresh is deployed on both producer nodes in
   `acceptance/issue-45-daily-history-catalog-automation-20260730.md`; installation and idempotent
   execution are accepted, while the first real scheduled `OnSuccess` observation remains pending.
@@ -141,14 +146,14 @@ gate is a conformance defect rather than an alternate project state.
 | P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
 | P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004/0005, relevant acceptance file |
 | ODS or daily operations | this map, architecture index, ADR 0003/0004/0005, selected runbook | Exact config, service, and contract tests |
-| Dual-lane candidate or ADS publication | root `AGENTS.md`, this map, HLD, ADR 0005, LLD 01 and its exact ADS child | Use `operational-ads-base.md` for the OCI historical Base or `strategy-replay-ads.md` for portable exports; load exact config/tests and the dual-lane runbook; cutover remains separately gated |
+| Dual-lane candidate or ADS publication | root `AGENTS.md`, this map, HLD, ADR 0005, LLD 01 and its exact ADS child | Use `operational-ads-base.md` for the OCI historical Base or `strategy-replay-ads.md` for offline research bundles; load exact config/tests and the dual-lane runbook; cutover remains separately gated |
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child, LLD 01 `strategy-replay-ads.md` | Exact strategy, authorized ADS bundle, and P2 execution evidence; load the legacy P1 snapshot only for frozen P3 reproduction |
 | P3 governed strategy implementation | root `AGENTS.md`, this map, selected `design/strategies/` card, LLD 03/04/05, accepted P2 interfaces | LLD 10 for decision/funnel evidence; exact feature, label, policy, and industry-map inputs |
-| P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | ADR 0005 and LLD 01 only when producing/consuming portable ADS; exact frozen candidate source, label cards, split policy, and P3 replay evidence |
+| P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | ADR 0005 and LLD 01 only when producing/consuming offline research bundles; exact frozen candidate source, label cards, split policy, and P3 replay evidence |
 
 ## Authority and conflicts
 

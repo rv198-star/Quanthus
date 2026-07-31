@@ -13,7 +13,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-GATE-001 | Automate release gate reporting | planned |
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | active |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | planned |
-| META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and portable ADS | active; cutover blocked |
+| META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and offline research bundles | active; cutover blocked |
 | META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | active; Phase A accepted, final July pending |
 | META-DATA-BASE-002 | Build authoritative DWD/DWS July Base (Issue #48) | active; Phase A accepted, Phase B pending |
 | META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | active |
@@ -24,7 +24,7 @@ does not authorize a live `CURRENT` change, data deletion, retention cleanup, or
 research partitions. Production cutover requires its separate evidence gate and explicit
 `GO_FOR_CUTOVER`.
 
-The repository contract now includes portable `strategy_replay` ADS, fenced publication and
+The repository contract now includes offline `strategy_replay` research bundles, fenced publication and
 rollback, correction/revocation records, accepted-ODS recovery evidence, and a copy-only historical
 DWD/DWS base with lane-local logical catalogs. Formal three-node
 deployment, the three historical bootstrap bundles, role isolation, and development replay

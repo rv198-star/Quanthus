@@ -156,9 +156,9 @@ modes, pinned host files, the canonical parent/base selection, the shared securi
 and jail-relative remote roots. It does not contact either node and therefore does not prove the
 reverse tunnel or end-to-end rrsync path.
 
-## Prepare and backfill portable strategy ADS on OCI
+## Prepare and backfill offline strategy-replay research bundles on OCI
 
-Portable research ADS is a separate consumer boundary below `/srv`; it does not live under the
+An offline research bundle is a separate consumer boundary below `/srv`; it does not live under the
 dual-lane publication root and has no `CURRENT`. Install the locked reader principals from the
 reviewed commit, then publish each scope as a distinct physical tree. The publisher requires a
 clean exact Git revision, writes `READY` last, applies role-specific ownership, runs the deep logical
@@ -166,12 +166,14 @@ content check under the authorized logical role, and rejects development access 
 manifests. The semantic verifier runs inside the root-owned publisher. A separate filesystem probe
 runs as the locked scope principal and must traverse and read every bundle path without being able
 to modify one; the data principal does not receive access to the deployment checkout or its virtual
-environment.
+environment. The canonical root is `/srv/quanthus/research-bundles`; the former
+`/srv/quanthus/portable-ads` name is forbidden because these derived packages are not ADS authority.
+Do not create a compatibility symlink at the old path.
 
 ```bash
 sudo systemd-sysusers /opt/quanthus/current/ops/sysusers.d/quanthus-ads.conf
 sudo install -d -o root -g root -m 0755 /srv/quanthus
-sudo install -d -o root -g root -m 0751 /srv/quanthus/portable-ads
+sudo install -d -o root -g root -m 0751 /srv/quanthus/research-bundles
 
 sudo /opt/quanthus/current/ops/bin/publish-strategy-replay-ads \
   development strategy-replay-development-<revision>
@@ -215,7 +217,7 @@ bundle id or use an incomplete staging child as a published artifact.
 The two-build resource boundary is evidenced by the acceptance record at
 `docs/acceptance/issue-45-ads-parallelism-20260730.md`. It does not waive the final filesystem
 probe: the locked scope principal must traverse and read every path without write access on the
-actual `/srv/quanthus/portable-ads` target. A build and deep semantic check that pass before this
+actual `/srv/quanthus/research-bundles` target. A build and deep semantic check that pass before this
 probe do not make the overall publisher command successful.
 
 After the original three return successfully, prove positive and negative access explicitly. A
@@ -223,17 +225,17 @@ recent-research publication additionally requires the development-role positive 
 
 ```bash
 sudo -u ubuntu test -r \
-  /srv/quanthus/portable-ads/development/strategy-replay-development-<revision>/manifest.json
+  /srv/quanthus/research-bundles/development/strategy-replay-development-<revision>/manifest.json
 sudo -u ubuntu test ! -r \
-  /srv/quanthus/portable-ads/arbitration/strategy-replay-arbitration-<revision>/manifest.json
+  /srv/quanthus/research-bundles/arbitration/strategy-replay-arbitration-<revision>/manifest.json
 sudo -u ubuntu test ! -r \
-  /srv/quanthus/portable-ads/permanent_blind/strategy-replay-permanent-blind-<revision>/manifest.json
+  /srv/quanthus/research-bundles/permanent_blind/strategy-replay-permanent-blind-<revision>/manifest.json
 sudo -u quanthus-arbitration test -r \
-  /srv/quanthus/portable-ads/arbitration/strategy-replay-arbitration-<revision>/manifest.json
+  /srv/quanthus/research-bundles/arbitration/strategy-replay-arbitration-<revision>/manifest.json
 sudo -u quanthus-blind test -r \
-  /srv/quanthus/portable-ads/permanent_blind/strategy-replay-permanent-blind-<revision>/manifest.json
+  /srv/quanthus/research-bundles/permanent_blind/strategy-replay-permanent-blind-<revision>/manifest.json
 sudo -u ubuntu test -r \
-  /srv/quanthus/portable-ads/recent_research/strategy-replay-recent-research-<revision>/manifest.json
+  /srv/quanthus/research-bundles/recent_research/strategy-replay-recent-research-<revision>/manifest.json
 ```
 
 Reproduce the frozen P3 portfolio only from the development bundle and compare its canonical trade
@@ -365,7 +367,10 @@ including excluded, superseded, duplicate, and unverifiable objects. A floating 
 path or digest, incomplete inventory, or portable bootstrap PIT claim is not an input.
 
 1. Confirm the exact Issue #48 DWD/DWS packages are published and independently verified. Record
-   their ids, manifest SHA-256 values, content digests, and the canonical generation ledger.
+   their ids, manifest SHA-256 values, content digests, current-descriptor file SHA-256 values, and
+   the canonical generation ledger. `preflight-operational-ads-base` must prove both current
+   descriptors have the complete supported shape, resolve to the exact plan-bound sealed package
+   manifests, and cross-bind the same recomputed pair before any staging is created.
 2. Freeze a build plan outside the package root. Classify every source and select table bytes only
    when schema, key, role, source generation, logical digest, and per-decision PIT equivalence are
    all bound. Otherwise select an exact accepted DWD/DWS/reference source for rebuild.
@@ -381,13 +386,23 @@ path or digest, incomplete inventory, or portable bootstrap PIT claim is not an 
    ```
 
    Replace `absent` with the exact current manifest SHA-256 when a descriptor exists. The operator
-   enforces root ownership and a clean checkout, builds in unique staging, deep-checks all declared
-   parts without producer paths, runs the existing bounded replay loader, then advances only
-   `BASE_CURRENT.json` under a locked compare-and-swap.
+   enforces root ownership and a clean checkout, runs the DWD/DWS descriptor preflight before
+   staging, builds from one sealed source part per table, seal-checks all declared parts without
+   producer paths, runs the existing bounded replay loader, reruns the preflight immediately before
+   promotion, then advances only `BASE_CURRENT.json` under a locked compare-and-swap. Multi-source
+   merge or deduplication is an upstream semantic normalization task and is not permitted in this
+   packaging command.
 4. Retain the exact plan, package manifest/`READY`, table counts and digests, semantic comparisons,
    replay report, elapsed time, peak resources, and descriptor bytes before and after. Re-run the
    verifier from a copied clean path with source nodes, producer paths, databases, and network
    unavailable before accepting Phase A.
+
+The provisional preflight target is at most 30 seconds; one 531 MiB package build and one-day
+replay smoke are each at most 5 minutes; normal seal check is at most 2 minutes; end-to-end
+publication is at most 15 minutes; and peak RSS is at most 4 GiB. Stop a build that reaches 10
+minutes and profile it before retrying. The normal publication path must not run Python
+logical-row hashing. Use `check-operational-ads-base --deep-logical-content` only as a separately
+authorized offline semantic audit, never as a repeated build, replay, copy, or promotion gate.
 
 After the July 31 close, create a new final plan and immutable `ads-base-202607-v1`. It must bind
 the provisional package plus the exact accepted July 31 daily ADS and final DWD/DWS manifests.
@@ -396,7 +411,7 @@ prior descriptor and all retained ADS, exports, upstream Bases, and daily releas
 
 `BASE_CURRENT.json` is an administrative historical-Base descriptor. It is not
 `release-set_CURRENT.json`, does not authorize a strategy or consumer publication, and must not be
-used to record `GO_FOR_CUTOVER`. Do not rename or clean up `/srv/quanthus/portable-ads` in this flow.
+used to record `GO_FOR_CUTOVER`. Do not rename or clean up `/srv/quanthus/research-bundles` in this flow.
 
 ## Copy-only migration order
 
@@ -410,7 +425,7 @@ rename, overwrite, or delete legacy ODS, OCI mirrors, DWD/DWS, ADS, logs, or poi
 4. Install environment and unit files disabled. Run the applicable doctor on all three nodes.
 5. Build, distribute, promote, and verify the common historical DWD/DWS base on both nodes; build
    each lane's logical history catalog through its latest candidate.
-6. Backfill and deep-check the three OCI portable strategy ADS bundles under the resource rules
+6. Backfill and deep-check the three OCI offline strategy-replay research bundles under the resource rules
    above, reproduce P3 from the development bundle, and retain the role-access probes.
 7. Rehearse epoch transfer, both candidate builds, OCI pull/arbitration, and target release-set
    publication for an explicit market date.
@@ -422,7 +437,7 @@ rename, overwrite, or delete legacy ODS, OCI mirrors, DWD/DWS, ADS, logs, or poi
 
 Never seed a target root by moving a legacy directory. When historical evidence is needed, copy it
 to a new staging path, verify the source and destination manifests/checksums, and retain both. The
-portable ADS layout is discovered through its manifest; operators must not create or consume a
+offline research-bundle layout is discovered through its manifest; operators must not create or consume a
 calendar-year directory convention outside that manifest.
 
 ## Manual scheduled-path rehearsal

@@ -10,7 +10,7 @@
 | Conditional boundary | C1 residual 4,173 is fail-closed under `p1-c1-conditional-20260725-v1` |
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
-| Dual-lane delivery | three-node shadow deployment and role-scoped historical ADS bootstrap accepted; qualification, catalog-native publication, and consumer cutover blocked pending evidence and `GO_FOR_CUTOVER` |
+| Dual-lane delivery | three-node shadow deployment, role-scoped historical ADS bootstrap, and provisional OCI operational ADS Base accepted; final Base, catalog-native consumer publication, and cutover remain blocked pending their own evidence and `GO_FOR_CUTOVER` |
 
 ## 1. Goal
 
@@ -59,7 +59,8 @@ new downstream snapshot id.
 
 The ODS Base packaging, source precedence, completeness boundary, and recovery lifecycle are
 owned by [`01-data-foundation/ods-base.md`](01-data-foundation/ods-base.md). It is separate from
-the DWD/DWS history seed and from portable ADS: the Base preserves accepted source evidence needed
+the DWD/DWS history seed and from offline research bundles: the Base preserves accepted source
+evidence needed
 to rebuild downstream layers, while those other packages expose normalized or consumer-facing
 data.
 
@@ -518,7 +519,7 @@ window cannot silently turn into an unplanned third observation.
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
 | Sealed DWD/DWS history seed and lane-local logical merge | `src/quanthus/pipelines/dual_lane_history.py`, `config/pipelines/dual-lane-history-base.v1.json`, `ops/bin/*dual-lane-history*` | `tests/unit/test_dual_lane_history.py`, ADR 0005, `docs/operations/dual-lane-data-platform-runbook.md` |
 | Monthly-complete DWD/DWS Base packages, guarded Base descriptors, and Base-aware lane catalogs | `src/quanthus/pipelines/dwd_dws_base.py`, `config/pipelines/dwd-dws-base-through-20260730.v2.json`, `ops/bin/*dwd-dws-base*` | `tests/unit/test_dwd_dws_base.py`, Issue #48, `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md` |
-| Portable strategy-replay ADS publication and role-scoped consumption | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `config/strategy-replay-ads.v2.json`, `ops/bin/publish-strategy-replay-ads` | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `01-data-foundation/strategy-replay-ads.md`, `docs/acceptance/issue-45-portable-ads-20260730.md`, `docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md` |
+| Offline strategy-replay research-bundle publication and role-scoped consumption | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `config/strategy-replay-ads.v2.json`, `ops/bin/publish-strategy-replay-ads` | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `01-data-foundation/strategy-replay-ads.md`, `docs/acceptance/issue-45-portable-ads-20260730.md`, `docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md` |
 | Hermes-authoritative ODS Base and checksum-identical CN01 mirror | `src/quanthus/pipelines/ods_base.py`, `config/pipelines/ods-base.v1.json`, `ops/bin/*ods-base` | `tests/unit/test_ods_base.py`, ADR 0005, `01-data-foundation/ods-base.md`, `docs/operations/ods-base-runbook.md`, GitHub issue #47 |
 | OCI operational ADS historical Base and replay loader | `src/quanthus/operational_ads_base.py`, `config/operational-ads-base.v1.json`, `ops/bin/publish-operational-ads-base` | `tests/unit/test_operational_ads_base.py`, `tests/contract/test_operational_ads_base_boundary.py`, `01-data-foundation/operational-ads-base.md`, `docs/acceptance/meta-data-base-003-ads-base-202607/` |
 
@@ -538,7 +539,7 @@ window cannot silently turn into an unplanned third observation.
 | P1-ACCEPT-001 | Run Chapter 01 acceptance suite | C1/C2/S1 and snapshot | D1/D2/D3 evidence bundle |
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | Accepted file-first platform | Open/closed-session rehearsals and durable run ledger |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | META-DATA-PIPE-001 accepted | Shadow run, explicit cutover, rollback, and no overlapping writers |
-| META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI arbitration, atomic release sets, and portable ADS | META-DATA-PIPE-001, ADR 0005 | Contract tests, shadow comparison, failure/recovery drills, and explicit cutover evidence |
+| META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI arbitration, atomic release sets, and offline research bundles | META-DATA-PIPE-001, ADR 0005 | Contract tests, shadow comparison, failure/recovery drills, and explicit cutover evidence |
 | META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | META-DATA-PIPE-001, ADR 0005 | Classified source inventory, deep verification, clean-path restore, and identical Hermes/CN01 package descriptors |
 | META-DATA-BASE-002 | Build authoritative DWD/DWS July Base packages from exact accepted lineage | META-DATA-BASE-001, META-DATA-PIPE-003, Issue #48 | Frozen ledger, semantic equivalence, identical three-node packages, catalog rebuilds, and restore evidence |
 | META-DATA-BASE-003 | Build the OCI-authoritative operational ADS July Base | META-DATA-BASE-002, META-DATA-PIPE-003, Issue #46 | Role/PIT isolation, clean replay, identical-input rebuild, and guarded Base descriptor |
@@ -587,13 +588,13 @@ The repository contract covers immutable epochs, daily bars/status/summary candi
 primary selection and fail-closed divergence, catalog and release-set construction, sealed
 historical DWD/DWS bases with lane-local logical catalogs, limited
 operational ADS, pre-CAS publication intent, fenced atomic `CURRENT`, idempotent retry, correction,
-revocation, rollback, accepted-ODS recovery evidence, and portable strategy-replay ADS. Unit
-coverage is implementation evidence only. Formal three-node shadow deployment, portable historical
-ADS bootstrap, role isolation, and development replay equivalence are accepted in
+revocation, rollback, accepted-ODS recovery evidence, and offline strategy-replay research bundles.
+Unit coverage is implementation evidence only. Formal three-node shadow deployment, historical
+research-bundle bootstrap, role isolation, and development replay equivalence are accepted in
 `docs/acceptance/issue-45-portable-ads-20260730.md`; shadow qualification, catalog-native
 publication, full target delivery, and production cutover remain open.
 
-The additive 2026 recent-research snapshot and portable ADS publication are accepted separately in
+The additive 2026 recent-research snapshot and offline research-bundle publication are accepted separately in
 `docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md`. This evidence extends the
 historical research input through the 2026-07-27 execution boundary without changing the original
 three scope bundles or opening production cutover.

@@ -97,7 +97,7 @@ schema or source-semantic drift, checksum failure, backward cutoffs, and abnorma
 changes. This transform belongs to the separate weekly pipeline; scheduler wiring is not part of
 the daily T-close critical path yet.
 
-After publication, audit the exact immutable snapshot as a portable-ADS source gate:
+After publication, audit the exact immutable snapshot as an offline research-bundle source gate:
 
 ```bash
 .venv/bin/python -m quanthus audit-historical-replay-frames \

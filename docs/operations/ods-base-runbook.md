@@ -101,11 +101,35 @@ new hidden staging child after diagnosing the source.
 
 ## Final July Base
 
-After the normal 2026-07-31 market, event, 1m, and 5m releases are `READY`, freeze a new inventory
-through July 31 and build `ods-base-202607-v1` with
-`--parent-base /srv/quanthus/ods/base/ods-base-through-20260730-v1`. Re-run all provisional gates,
-mirror and deep-verify it on CN01, then advance both ODS Base descriptors to the same final digest.
-Each final promotion must pass
+The close-release gate is expected to become runnable only after the final 5m job completes. Run it
+independently on Hermes and CN01 using each node's release root:
+
+```bash
+ops/bin/check-ods-base-release-gate \
+  --policy config/pipelines/ods-base.v1.json \
+  --release-root /root/work/astock/data/shadow/hermes-ods-v1/releases \
+  --base-current /srv/quanthus/ods/base/BASE_CURRENT.json \
+  --market-date 2026-07-31 \
+  --expected-parent-bundle-id ods-base-through-20260730-v1 \
+  --expected-parent-manifest-sha256 sha256:d38b8332ddd5427104bbc6f71bf89df1c81f85cca507a1f9a80ac58662b7352e \
+  --expected-parent-through-date 2026-07-30
+```
+
+CN01 substitutes `cn01-ods-v1` in `--release-root`. The command verifies the exact provisional
+Base pointer, market `CURRENT`, the latest eligible event/1m/5m releases, every artifact checksum,
+and free space. Its result deliberately sets `authorizes_base_promotion=false`: passing this gate
+authorizes freezing the Hermes inventory and constructing a final candidate, not publishing it.
+
+After both nodes pass, freeze a new Hermes inventory through July 31 and build
+`ods-base-202607-v1` with
+`--parent-base /srv/quanthus/ods/base/ods-base-through-20260730-v1`. Re-run the provisional build,
+deep-verification, clean-path, and identical-input gates, then stage and deep-verify the candidate
+on CN01.
+
+Final promotion remains blocked until Issue #47's expanded Phase B gates are accepted: standard
+`base/daily/weekly` publication, a checksum-bound node-local ODS catalog, the governed recurring
+source gaps or an explicit blocking disposition, the coverage matrix, and one normal daily and
+weekly cycle on both nodes. Once those gates are accepted, each final promotion must pass
 `--expected-current-manifest-sha256 <provisional-manifest-sha256>`; a missing or changed prior
 pointer blocks the compare-and-swap.
 

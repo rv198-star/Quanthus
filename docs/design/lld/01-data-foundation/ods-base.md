@@ -91,10 +91,14 @@ when identity changes, a new package id.
 ## 4. Package And Lifecycle
 
 ```text
-/srv/quanthus/ods/base/
-├── ods-base-through-20260730-v1/
-├── ods-base-202607-v1/
-└── BASE_CURRENT.json
+/srv/quanthus/ods/
+├── base/
+│   ├── ods-base-through-20260730-v1/
+│   ├── ods-base-202607-v1/
+│   └── BASE_CURRENT.json
+├── daily/
+├── weekly/
+└── CATALOG_CURRENT.json
 ```
 
 Packages are built in unique hidden staging directories, verified, and atomically renamed into an
@@ -103,10 +107,17 @@ verification and compare-and-swap validation. It does not change a legacy ODS po
 publication pointer.
 
 The provisional package ends at 2026-07-30. After the normal July 31 market, event, 1m, and 5m
-releases are accepted, the final July package is built as a child of the provisional package.
-Unchanged files may be hard-linked locally, but the final package receives a new manifest and
-content identity bound to the July 31 releases. The provisional Base and source daily release stay
-retained; deletion is outside this work item.
+releases are accepted on both nodes, the final July package may be built as a child of the
+provisional package. Unchanged files may be hard-linked locally, but the final package receives a
+new manifest and content identity bound to the July 31 releases. Passing this close-release gate
+authorizes candidate construction only. Final promotion also requires the standard daily/weekly
+publication surface, node-local ODS catalog, governed recurring-source completeness dispositions,
+coverage matrix, and accepted normal daily and weekly cycles defined by Issue #47 Phase B.
+
+The cadence tree is an ODS concern. DWD/DWS bind one exact verified ODS catalog and ADS normally
+binds one exact canonical DWD/DWS release set; neither derived layer independently reinterprets the
+precedence of Base, daily, weekly, or correction releases. The provisional Base and source releases
+stay retained; deletion is outside this work item.
 
 ## 5. Recovery Contract
 

@@ -1020,6 +1020,153 @@ def _selected_daily_date_releases(
     return annotate(market, "market"), annotate(events, "events"), inventory
 
 
+def audit_ods_base_release_gate(
+    *,
+    release_root: Path,
+    base_current: Path,
+    market_date: date,
+    policy: OdsBasePolicy,
+    expected_parent_bundle_id: str,
+    expected_parent_manifest_sha256: str,
+    expected_parent_through_date: date,
+    minimum_free_bytes: int = 1_073_741_824,
+) -> dict[str, Any]:
+    """Verify the close releases needed to construct, but not promote, a child Base."""
+
+    if not expected_parent_bundle_id or _RELEASE_ATTEMPT.fullmatch(
+        expected_parent_bundle_id
+    ) is None:
+        raise OdsBaseError("expected parent bundle id is unsafe")
+    if _SHA256.fullmatch(expected_parent_manifest_sha256) is None:
+        raise OdsBaseError("expected parent manifest SHA-256 is invalid")
+    if (
+        isinstance(minimum_free_bytes, bool)
+        or not isinstance(minimum_free_bytes, int)
+        or minimum_free_bytes < 0
+    ):
+        raise OdsBaseError("minimum free bytes must be a non-negative integer")
+
+    parent = load_ods_base_current(base_current, policy=policy, deep=False)
+    if (
+        parent.bundle_id != expected_parent_bundle_id
+        or parent.manifest_sha256 != expected_parent_manifest_sha256
+        or parent.through_date != expected_parent_through_date
+    ):
+        raise OdsBaseError("ODS Base parent pointer differs from the finalization precondition")
+    if expected_parent_through_date >= market_date:
+        raise OdsBaseError("ODS Base parent must end before the target market date")
+
+    release_root = release_root.resolve()
+    daily_date_root = release_root / "daily" / market_date.isoformat()
+    if not daily_date_root.is_dir() or daily_date_root.is_symlink():
+        raise OdsBaseError(f"daily ODS has no release root for {market_date}")
+
+    pointer = _object(daily_date_root / "CURRENT.json")
+    market_attempt = _text(pointer, "attempt_id")
+    if _RELEASE_ATTEMPT.fullmatch(market_attempt) is None:
+        raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
+    market = _ready_release(daily_date_root / market_attempt, market_date)
+    market_artifacts = set(policy.daily.market_required_artifacts)
+    event_artifacts = set(policy.daily.event_required_artifacts)
+    if (
+        pointer.get("schema_version") != 1
+        or pointer.get("schedule") != "daily"
+        or pointer.get("market_date") != market_date.isoformat()
+        or pointer.get("manifest_sha256") != market["manifest_sha256"]
+        or not market_artifacts.issubset(market["artifact_names"])
+        or event_artifacts.issubset(market["artifact_names"])
+    ):
+        raise OdsBaseError("daily ODS CURRENT does not bind the required market release")
+
+    def select_latest(
+        date_root: Path, required_artifacts: tuple[str, ...], role: str
+    ) -> dict[str, Any]:
+        if not date_root.is_dir() or date_root.is_symlink():
+            raise OdsBaseError(f"ODS {role} has no release root for {market_date}")
+        candidates: list[dict[str, Any]] = []
+        for attempt_root in sorted(date_root.iterdir()):
+            if not attempt_root.is_dir() or attempt_root.is_symlink():
+                continue
+            try:
+                candidate = _ready_release(attempt_root, market_date)
+            except OdsBaseError:
+                continue
+            if (
+                role == "events"
+                and market_artifacts.issubset(candidate["artifact_names"])
+                and event_artifacts.issubset(candidate["artifact_names"])
+            ):
+                raise OdsBaseError(
+                    f"daily ODS attempt has ambiguous market/events roles: {attempt_root}"
+                )
+            if set(required_artifacts).issubset(candidate["artifact_names"]):
+                candidates.append(candidate)
+        if not candidates:
+            raise OdsBaseError(f"no complete ODS {role} release for {market_date}")
+        return max(candidates, key=lambda item: (item["created_at"], item["attempt_id"]))
+
+    events = select_latest(
+        daily_date_root, policy.daily.event_required_artifacts, "events"
+    )
+    selected: list[tuple[str, dict[str, Any]]] = [
+        ("market", market),
+        ("events", events),
+    ]
+    for spec in sorted(policy.intraday, key=lambda item: item.frequency):
+        selected.append(
+            (
+                spec.frequency,
+                select_latest(
+                    release_root
+                    / "daily"
+                    / spec.frequency
+                    / market_date.isoformat(),
+                    spec.required_artifacts,
+                    spec.frequency,
+                ),
+            )
+        )
+
+    free_bytes = shutil.disk_usage(base_current.parent).free
+    if free_bytes < minimum_free_bytes:
+        raise OdsBaseError(
+            f"ODS Base filesystem has {free_bytes} free bytes; "
+            f"requires at least {minimum_free_bytes}"
+        )
+
+    return {
+        "schema_version": 1,
+        "gate": "ods_base_close_release_gate_v1",
+        "status": "ready",
+        "market_date": market_date.isoformat(),
+        "parent_base": {
+            "bundle_id": parent.bundle_id,
+            "manifest_sha256": parent.manifest_sha256,
+            "content_digest": parent.content_digest,
+            "through_date": parent.through_date.isoformat(),
+        },
+        "releases": [
+            {
+                "role": role,
+                "release_id": release["release_id"],
+                "attempt_id": release["attempt_id"],
+                "manifest_sha256": release["manifest_sha256"],
+                "created_at": release["created_at"],
+                "path": str(release["root"]),
+            }
+            for role, release in selected
+        ],
+        "filesystem": {
+            "path": str(base_current.parent.resolve()),
+            "free_bytes": free_bytes,
+            "minimum_free_bytes": minimum_free_bytes,
+        },
+        "authorizes_candidate_build": True,
+        "authorizes_base_promotion": False,
+        "remaining_gate": "issue_47_expanded_phase_b_scope",
+    }
+
+
 def _selection_calendar_path(
     astock_root: Path, policy: OdsBasePolicy, through_date: date
 ) -> Path:

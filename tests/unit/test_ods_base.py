@@ -19,6 +19,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised by the base dependen
 
 from quanthus.pipelines.ods_base import (
     OdsBaseError,
+    audit_ods_base_release_gate,
     audit_ods_base_sources,
     build_ods_base_bundle,
     load_ods_base_current,
@@ -754,6 +755,105 @@ class OdsBaseTests(unittest.TestCase):
             ).manifest_sha256,
             final_promoted.manifest_sha256,
         )
+
+    def test_close_release_gate_binds_parent_and_all_four_roles(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node" / "base"
+        current = base_root / "BASE_CURRENT.json"
+        parent = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current,
+            policy=self.policy,
+        )
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+
+        result = audit_ods_base_release_gate(
+            release_root=self._daily_root().parent,
+            base_current=current,
+            market_date=date(2026, 7, 31),
+            policy=self.policy,
+            expected_parent_bundle_id=parent.bundle_id,
+            expected_parent_manifest_sha256=parent.manifest_sha256,
+            expected_parent_through_date=date(2026, 7, 30),
+            minimum_free_bytes=0,
+        )
+
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(
+            [item["role"] for item in result["releases"]],
+            ["market", "events", "1m", "5m"],
+        )
+        self.assertTrue(result["authorizes_candidate_build"])
+        self.assertFalse(result["authorizes_base_promotion"])
+
+    def test_close_release_gate_fails_when_one_role_is_not_ready(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node" / "base"
+        current = base_root / "BASE_CURRENT.json"
+        parent = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current,
+            policy=self.policy,
+        )
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+        missing = (
+            self._daily_root()
+            / "5m"
+            / "2026-07-31"
+            / "intraday-5m-attempt"
+            / "READY"
+        )
+        missing.unlink()
+
+        with self.assertRaisesRegex(OdsBaseError, "no complete ODS 5m release"):
+            audit_ods_base_release_gate(
+                release_root=self._daily_root().parent,
+                base_current=current,
+                market_date=date(2026, 7, 31),
+                policy=self.policy,
+                expected_parent_bundle_id=parent.bundle_id,
+                expected_parent_manifest_sha256=parent.manifest_sha256,
+                expected_parent_through_date=date(2026, 7, 30),
+                minimum_free_bytes=0,
+            )
+
+    def test_close_release_gate_rejects_an_ambiguous_daily_attempt(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node" / "base"
+        current = base_root / "BASE_CURRENT.json"
+        parent = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current,
+            policy=self.policy,
+        )
+        target_date = date(2026, 7, 31)
+        self._write_sources([date(2026, 7, 30), target_date])
+        event_root = self._daily_root() / target_date.isoformat() / "event-attempt"
+        manifest_path = event_root / "release.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["artifacts"].extend(
+            self._artifact(event_root, name, target_date)
+            for name in ("bars", "status", "trading_calendar")
+        )
+        self._write_json(manifest_path, manifest)
+        (event_root / "READY").write_text(
+            f"{_sha256(manifest_path)}\n", encoding="ascii"
+        )
+
+        with self.assertRaisesRegex(OdsBaseError, "ambiguous market/events roles"):
+            audit_ods_base_release_gate(
+                release_root=self._daily_root().parent,
+                base_current=current,
+                market_date=target_date,
+                policy=self.policy,
+                expected_parent_bundle_id=parent.bundle_id,
+                expected_parent_manifest_sha256=parent.manifest_sha256,
+                expected_parent_through_date=date(2026, 7, 30),
+                minimum_free_bytes=0,
+            )
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ nodes.
   checksum, frame, and exception gates accept it for research replay without granting execution
   authority.
 - The additive 2026 research backfill uses snapshot
-  `p1-historical-replay-2026-through-20260727-v1`, corporate-action policy v3, and portable ADS
+  `p1-historical-replay-2026-through-20260727-v1`, corporate-action policy v3, and research-bundle
   policy v2. It covers decisions through 2026-07-24 with next-open execution context on 2026-07-27,
   remains readable only as `development_research`, and does not rewrite the original three bundles
   or any mutable pointer. Formal publication and 134-frame replay evidence are accepted in
@@ -138,7 +138,7 @@ gate is a conformance defect rather than an alternate project state.
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child, LLD 01 `strategy-replay-ads.md` | Exact strategy, authorized ADS bundle, and P2 execution evidence; load the legacy P1 snapshot only for frozen P3 reproduction |
 | P3 governed strategy implementation | root `AGENTS.md`, this map, selected `design/strategies/` card, LLD 03/04/05, accepted P2 interfaces | LLD 10 for decision/funnel evidence; exact feature, label, policy, and industry-map inputs |
-| P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | ADR 0005 and LLD 01 only when producing/consuming portable ADS; exact frozen candidate source, label cards, split policy, and P3 replay evidence |
+| P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | ADR 0005 and LLD 01 only when producing/consuming offline research bundles; exact frozen candidate source, label cards, split policy, and P3 replay evidence |
 
 ## Authority and conflicts
 

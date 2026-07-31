@@ -7,14 +7,14 @@ if [[ $# -ne 2 ]]; then
   exit 2
 fi
 if [[ ${EUID} -ne 0 ]]; then
-  echo "strategy-replay ADS publication must run as root" >&2
+  echo "strategy-replay research-bundle publication must run as root" >&2
   exit 2
 fi
 
 scope_id=$1
 bundle_id=$2
 repo_root=${QUANTHUS_REPO_ROOT:-/opt/quanthus/current}
-ads_root=${QUANTHUS_STRATEGY_ADS_ROOT:-/srv/quanthus/portable-ads}
+bundle_store_root=${QUANTHUS_RESEARCH_BUNDLE_ROOT:-/srv/quanthus/research-bundles}
 source_snapshot=${QUANTHUS_STRATEGY_ADS_SOURCE:-/home/ubuntu/data/quanthus/snapshots/p1-historical-replay-20260729-v1}
 benchmark=${QUANTHUS_STRATEGY_ADS_BENCHMARK:-/home/ubuntu/data/quanthus/benchmarks/csi300-sh000300-2012-2025.tencent-v1.json}
 industry_mapping=${QUANTHUS_STRATEGY_ADS_INDUSTRY_MAPPING:-/home/ubuntu/data/quanthus/research/p3-governed-industry-mapping-20260729/industry-mapping.json}
@@ -44,7 +44,7 @@ case "${scope_id}" in
     reader_role=development_research
     ;;
   *)
-    echo "unsupported strategy-replay ADS scope: ${scope_id}" >&2
+    echo "unsupported strategy-replay research-bundle scope: ${scope_id}" >&2
     exit 2
     ;;
 esac
@@ -65,22 +65,23 @@ code_revision=$(git -C "${repo_root}" rev-parse HEAD)
 git -C "${repo_root}" diff --quiet --ignore-submodules --
 git -C "${repo_root}" diff --cached --quiet --ignore-submodules --
 if [[ -n $(git -C "${repo_root}" status --porcelain --untracked-files=normal) ]]; then
-  echo "repository checkout must be clean before ADS publication" >&2
+  echo "repository checkout must be clean before research-bundle publication" >&2
   exit 2
 fi
 
-ads_parent=$(dirname -- "${ads_root}")
-if [[ ${ads_root} != /* || $(realpath -m -- "${ads_root}") != "${ads_root}" ]]; then
-  echo "strategy-replay ADS root must be an absolute canonical path" >&2
+bundle_store_parent=$(dirname -- "${bundle_store_root}")
+if [[ ${bundle_store_root} != /* \
+  || $(realpath -m -- "${bundle_store_root}") != "${bundle_store_root}" ]]; then
+  echo "strategy-replay research-bundle root must be an absolute canonical path" >&2
   exit 2
 fi
-if [[ ! -d ${ads_parent} ]]; then
-  install -d -o root -g root -m 0755 "${ads_parent}"
+if [[ ! -d ${bundle_store_parent} ]]; then
+  install -d -o root -g root -m 0755 "${bundle_store_parent}"
 fi
-[[ ! -L ${ads_parent} ]]
-install -d -o root -g root -m 0751 "${ads_root}"
-[[ ! -L ${ads_root} ]]
-scope_root=${ads_root}/${scope_id}
+[[ ! -L ${bundle_store_parent} ]]
+install -d -o root -g root -m 0751 "${bundle_store_root}"
+[[ ! -L ${bundle_store_root} ]]
+scope_root=${bundle_store_root}/${scope_id}
 install -d -o root -g "${scope_group}" -m 0750 "${scope_root}"
 [[ ! -L ${scope_root} ]]
 bundle_root=${scope_root}/${bundle_id}
@@ -114,13 +115,13 @@ runuser -u "${reader_user}" -- env -C / \
 reader_writable_path=$(runuser -u "${reader_user}" -- env -C / \
   find "${bundle_root}" -writable -print -quit)
 if [[ -n ${reader_writable_path} ]]; then
-  echo "${reader_user} can modify strategy-replay ADS path: ${reader_writable_path}" >&2
+  echo "${reader_user} can modify strategy-replay bundle path: ${reader_writable_path}" >&2
   exit 1
 fi
 
 if [[ ${scope_id} == arbitration || ${scope_id} == permanent_blind ]] \
   && runuser -u ubuntu -- test -r "${bundle_root}/manifest.json"; then
-  echo "development principal can read sealed ${scope_id} ADS" >&2
+  echo "development principal can read sealed ${scope_id} research bundle" >&2
   exit 1
 fi
 

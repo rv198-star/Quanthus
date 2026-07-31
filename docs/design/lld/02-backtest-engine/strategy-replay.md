@@ -6,7 +6,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | strategy-neutral replay accepted; three baseline suite accepted; governed five-unit development accepted; normal research boundary and formal historical bootstrap migrated to role-scoped portable ADS |
+| Implementation status | strategy-neutral replay accepted; three baseline suite accepted; governed five-unit development accepted; normal research boundary and formal historical bootstrap migrated to role-scoped offline research bundles |
 | Continuous corpus gate | accepted by `p1-historical-replay-20260729-v1` |
 | Governing work | `P3-REPLAY-001` |
 | Governing requirements | FR-BT-001/002/003/004/006, FR-AUDIT-001/002 |
@@ -240,7 +240,7 @@ matching engine or authority to access later validation partitions.
 | Backtest sanity diagnostics | `docs/acceptance/p3-backtest-sanity-diagnostics-20260729.md` |
 | Governed five-unit orchestration and metrics | `src/quanthus/backtest/portfolio_replay.py`, `tests/unit/test_portfolio_replay.py` |
 | Governed policy, labels, experts, industry input, and first development result | `config/p3-governed-strategy.research.v1.json`, `src/quanthus/governed_strategy.py`, `src/quanthus/industry_mapping.py`, `docs/acceptance/p3-governed-strategy-development-20260729.md` |
-| Portable ADS publication, role authorization, and normal replay boundary | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `../01-data-foundation/strategy-replay-ads.md` |
+| Offline research-bundle publication, role authorization, and normal replay boundary | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `../01-data-foundation/strategy-replay-ads.md` |
 
 The integration slice additionally publishes `StrategyReplayResult.audit_dict()` together with
 the immutable P2 run through `AuditEventStore.persist_strategy_replay`. The replay manifest binds

@@ -27,6 +27,11 @@ ADS Base package root and its administrative descriptor. No release set, schedul
 portable export, upstream Base, consumer pointer, execution authority, or `GO_FOR_CUTOVER` changed.
 No guessed path or digest was substituted for an exact accepted input.
 
+On 2026-07-31, a separately approved naming-only migration atomically renamed the derived offline
+bundle store from `/srv/quanthus/portable-ads` to `/srv/quanthus/research-bundles`. It changed no
+bundle bytes, manifests, roles, Base package, or authority. Historical evidence retains the path
+that existed when it was recorded. See `research-bundle-root-migration-20260731.md`.
+
 ## Evidence map
 
 | Evidence | Claim |
@@ -34,6 +39,7 @@ No guessed path or digest was substituted for an exact accepted input.
 | `provisional-base-acceptance-20260731.md` | Real Phase A build, replay, publication, and pointer evidence |
 | `repository-capability-20260730.md` | Code/config/CLI/operator/test boundary implemented |
 | `inventory-preflight-20260730.md` | Existing ADS/export objects measured and publication blockers identified |
+| `research-bundle-root-migration-20260731.md` | Offline bundle-store rename, identity preservation, and role-access evidence |
 | `docs/design/lld/01-data-foundation/operational-ads-base.md` | Approved package, role, replay, and failure semantics |
 | `docs/operations/dual-lane-data-platform-runbook.md` | OCI-only exact-input publication sequence |
 

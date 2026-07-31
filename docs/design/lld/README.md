@@ -13,8 +13,8 @@ index, and one active branch; expand to linked siblings only for a concrete inte
 6. `02-backtest-engine.md`: accepted daily execution/accounting interface and the
    `02-backtest-engine/strategy-replay.md` P3 orchestration child; load exact evidence only when
    changing that boundary.
-7. `01-data-foundation.md` and its `01-data-foundation/strategy-replay-ads.md` child for portable
-   replay inputs; `10-monitoring-attribution.md` only for the exact audit path.
+7. `01-data-foundation.md` and its `01-data-foundation/strategy-replay-ads.md` child for offline
+   replay research bundles; `10-monitoring-attribution.md` only for the exact audit path.
 
 For user-facing terminology and strategy-policy discussion, start with the non-governing
 `../p3-strategy-semantics-checklist.md` and expand only the LLD branch for the item being decided.

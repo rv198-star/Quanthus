@@ -75,7 +75,7 @@ OCI:
 - One release-set manifest binds the catalog, canonical inputs, and required operational ADS.
   `release-set_CURRENT.json` is the sole consumer publication pointer; compatibility dataset
   pointers are non-authoritative projections and cannot be joined independently.
-- Portable research ADS bundles are self-contained, immutable, manifest-bound inputs for replay,
+- Offline research bundles derived from ADS are self-contained, immutable, manifest-bound inputs for replay,
   P4 event research, and later P5 training. Initial bundles use semantic `tables[].parts[]` without
   mandatory calendar-year directories. Development, arbitration, blind, and forward scopes are
   issued as physically separate authorized bundles.

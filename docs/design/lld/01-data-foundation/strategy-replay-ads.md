@@ -1,4 +1,4 @@
-# Strategy Replay ADS
+# Strategy Replay Research Bundles
 
 | Field | Value |
 | --- | --- |
@@ -84,9 +84,9 @@ full logical digest cost on every run.
 
 ## 4. Access and replay interface
 
-Formal OCI bundles live below `/srv/quanthus/portable-ads/<scope>/<bundle-id>`. Publication runs as
+Formal OCI bundles live below `/srv/quanthus/research-bundles/<scope>/<bundle-id>`. Publication runs as
 root; development and recent research are group-readable by `ubuntu`, while arbitration and blind
-bundles use distinct locked system principals. There is no portable ADS `CURRENT` pointer. Every
+bundles use distinct locked system principals. There is no research-bundle `CURRENT` pointer. Every
 run names one immutable bundle id and its exact role.
 
 The semantic deep check runs in the root-owned publisher with the scope's locked logical reader
@@ -111,9 +111,14 @@ It is not a normal research entry point and may not be used by a new strategy or
 After an operational historical Base is published, the same three replay commands may receive one
 explicit `--operational-ads-base` instead. That path is governed by
 `operational-ads-base.md`, preserves per-date canonical generation/PIT lineage, and uses this
-profile's existing typed frame reader. Portable exports remain the physically scoped boundary for
+profile's existing typed frame reader. Offline research bundles remain the physically scoped boundary for
 arbitration, permanent-blind, and other authorized offline research; they are not alternate
 operational Base versions.
+
+The store root was renamed from `/srv/quanthus/portable-ads` on 2026-07-31 because the old name
+could imply a second ADS authority. The old root remains absent rather than becoming a compatibility
+symlink. Existing immutable bundle ids, manifests, and compatibility API identifiers retain their
+original bytes; the rename grants them no authority and changes no content identity.
 
 ## 5. Conformance
 

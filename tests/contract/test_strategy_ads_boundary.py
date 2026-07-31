@@ -7,6 +7,18 @@ from quanthus.policy import find_project_root
 
 
 class StrategyADSBoundaryContractTests(unittest.TestCase):
+    def test_publisher_uses_unambiguous_research_bundle_root(self) -> None:
+        publisher = (
+            Path(__file__).resolve().parents[2] / "ops" / "bin" / "publish-strategy-replay-ads"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "QUANTHUS_RESEARCH_BUNDLE_ROOT:-/srv/quanthus/research-bundles",
+            publisher,
+        )
+        self.assertNotIn("/srv/quanthus/portable-ads", publisher)
+        self.assertNotIn("QUANTHUS_STRATEGY_ADS_ROOT", publisher)
+
     def test_publisher_separates_semantic_check_from_os_role_probe(self) -> None:
         publisher = (
             Path(__file__).resolve().parents[2] / "ops" / "bin" / "publish-strategy-replay-ads"

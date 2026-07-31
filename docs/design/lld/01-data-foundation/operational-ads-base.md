@@ -14,7 +14,7 @@
 OCI owns the one authoritative operational ADS historical Base. It lives below
 `/srv/quanthus/ads/operational/base/`; immutable daily operational ADS revisions remain below the
 daily publication tree. Existing development, arbitration, permanent-blind, recent-research, and
-other portable exports are derived offline snapshots. Copying or comparing one does not promote it
+other offline research bundles are derived snapshots. Copying or comparing one does not promote it
 to operational authority.
 
 The provisional package is `ads-base-through-20260730-v1`. After the July 31 close and exact final

@@ -2174,6 +2174,7 @@ def _atomic_json(path: Path, value: Mapping[str, object]) -> None:
             temporary = Path(descriptor.name)
             json.dump(value, descriptor, ensure_ascii=True, indent=2, sort_keys=True)
             descriptor.write("\n")
+            os.fchmod(descriptor.fileno(), 0o640)
             descriptor.flush()
             os.fsync(descriptor.fileno())
         os.replace(temporary, path)

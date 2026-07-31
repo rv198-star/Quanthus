@@ -732,6 +732,7 @@ class OperationalADSBaseTests(unittest.TestCase):
             policy=self.policy,
         )
         self.assertEqual(current.manifest_sha256, promoted.manifest_sha256)
+        self.assertEqual((base_root / "BASE_CURRENT.json").stat().st_mode & 0o777, 0o640)
         descriptor = json.loads((base_root / "BASE_CURRENT.json").read_text(encoding="utf-8"))
         descriptor["manifest_sha256"] = f"sha256:{'9' * 64}"
         self._write_json(base_root / "BASE_CURRENT.json", descriptor)

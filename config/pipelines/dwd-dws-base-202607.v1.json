@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "contract_id": "dwd-dws-monthly-base-v1",
+  "phase": "final",
+  "through_date": "2026-07-31",
+  "open_sessions": [
+    "2026-07-27",
+    "2026-07-28",
+    "2026-07-29",
+    "2026-07-30",
+    "2026-07-31"
+  ],
+  "packages": {
+    "dwd": "dwd-base-202607-v1",
+    "dws": "dws-base-202607-v1",
+    "layout": "layer-manifest-members-v1",
+    "ready_written_last": true
+  },
+  "historical_seed": {
+    "bundle_id": "dual-lane-history-base-p1-20260725-v1",
+    "manifest_sha256": "sha256:1fa60f4c89aed7c8f80734e8d415b60a564ec6ca32fa8c07653bfd442a249f05",
+    "content_digest": "sha256:d894969cbb4394ca7d801ef49b6f042ea5515811ffb0b9ea15494dbe25c2785b"
+  },
+  "canonical_catalog": {
+    "catalog_id": "catalog-772e7c591fd9edb87c94",
+    "sha256": "sha256:74367140a0ab2e624628fb76178276b476595fe6931cff2b34db064dd2972cce"
+  },
+  "calendar": {
+    "calendar_id": "ods-trading-calendar-through-20260731",
+    "sha256": "sha256:da89de7ea74778126941c8629e948e47ee31a8c8ca71896c9bd0c42a65955e52"
+  },
+  "projection": {
+    "contract": "dws-from-exact-dwd-members-v1",
+    "source_equivalence": "exact_rows"
+  },
+  "upstream_ods_base": {
+    "binding_state": "bound",
+    "package_id": "ods-base-202607-v1",
+    "manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+    "content_digest": "sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1"
+  },
+  "authority": {
+    "historical_seed": "legacy_accepted_disclosed",
+    "daily_generations": "canonical_acceptance_only",
+    "row_or_lane_mixing": false
+  },
+  "retention": {
+    "migration_mode": "copy_only",
+    "delete_enabled": false,
+    "absorbed_sources_retained": true
+  }
+}

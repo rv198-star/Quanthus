@@ -382,7 +382,7 @@ def load_dwd_dws_base_policy(path: Path) -> DwdDwsBasePolicy:
     sessions = tuple(_parse_date(item, "open_sessions") for item in sessions_value)
     through_date = _parse_date(value.get("through_date"), "through_date")
     if (
-        phase != "provisional"
+        phase not in {"provisional", "final"}
         or sessions != tuple(sorted(set(sessions)))
         or sessions[-1] != through_date
         or authority.get("historical_seed") != "legacy_accepted_disclosed"
@@ -402,6 +402,8 @@ def load_dwd_dws_base_policy(path: Path) -> DwdDwsBasePolicy:
         upstream.get("issue") != 47 or upstream.get("required_for_final") is not True
     ):
         raise DwdDwsBaseError("pending ODS Base binding must identify the Issue #47 dependency")
+    if phase == "final" and upstream.get("binding_state") != "bound":
+        raise DwdDwsBaseError("final DWD/DWS Base policy requires a bound ODS Base")
     if upstream.get("binding_state") == "bound":
         if _SAFE_ID.fullmatch(_text(upstream, "package_id")) is None:
             raise DwdDwsBaseError("bound ODS Base package id is unsafe")

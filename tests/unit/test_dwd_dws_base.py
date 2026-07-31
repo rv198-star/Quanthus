@@ -122,6 +122,26 @@ class DwdDwsBaseTests(unittest.TestCase):
         self.assertEqual(policy.dwd_package_id, "dwd-base-through-20260730-v2")
         self.assertEqual(policy.dws_package_id, "dws-base-through-20260730-v2")
 
+    def test_repository_final_policy_binds_final_ods_base(self) -> None:
+        repository_root = Path(__file__).resolve().parents[2]
+        policy = load_dwd_dws_base_policy(
+            repository_root / "config/pipelines/dwd-dws-base-202607.v1.json"
+        )
+        self.assertEqual(policy.phase, "final")
+        self.assertEqual(policy.through_date, date(2026, 7, 31))
+        self.assertEqual(policy.dwd_package_id, "dwd-base-202607-v1")
+        self.assertEqual(policy.dws_package_id, "dws-base-202607-v1")
+        self.assertEqual(policy.upstream_ods_base["binding_state"], "bound")
+        self.assertEqual(policy.upstream_ods_base["package_id"], "ods-base-202607-v1")
+
+    def test_final_policy_rejects_pending_ods_base(self) -> None:
+        value = self._policy_payload()
+        value["phase"] = "final"
+        self._write_json(self.policy_path, value)
+
+        with self.assertRaisesRegex(DwdDwsBaseError, "requires a bound ODS Base"):
+            load_dwd_dws_base_policy(self.policy_path)
+
     def _freeze_fixture(self) -> tuple[HistoryBaseBundle, LaneCandidate, EpochInput]:
         history_root = self.root / "history-base-test-v1"
         history_dwd = history_root / "dwd" / "seed-v1"

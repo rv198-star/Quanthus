@@ -152,7 +152,10 @@ After both nodes pass, freeze a new Hermes inventory through July 31 and build
 `--parent-base /srv/quanthus/ods/base/ods-base-through-20260730-v1`, and
 `--parent-policy config/pipelines/ods-base.v1.json`. The final policy includes the bounded repair
 Parquet as canonical valuation history and preserves its receipts, metadata, and checkpoint parts
-as source evidence. Re-run the provisional build, deep-verification, clean-path, and
+as source evidence. It also selects the complete CN01 2026-07-31 weekly release from the explicit
+Hermes `data/revisions/cn01-weekly-gap-fill-20260731` copy. The archive exception must retain the
+original CN01 path, reason, and exact `release.json` SHA-256; both `READY` and every artifact must
+match that manifest. Re-run the provisional build, deep-verification, clean-path, and
 identical-input gates, then stage and deep-verify the candidate on CN01.
 
 Final promotion remains blocked until Issue #47's expanded Phase B gates are accepted: standard

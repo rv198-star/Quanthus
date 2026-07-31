@@ -548,6 +548,101 @@ class OdsBaseTests(unittest.TestCase):
         )
         self.assertIn("valuation_daily_delta", policy.daily.market_required_artifacts)
 
+    def test_archive_source_exception_is_bound_and_tamper_evident(self) -> None:
+        release_root = self.data / "revisions" / "cn01-weekly-gap-fill"
+        artifact = release_root / "artifacts" / "raw_f10.parquet"
+        artifact.parent.mkdir(parents=True)
+        assert pa is not None
+        assert pq is not None
+        pq.write_table(
+            pa.Table.from_pylist([{"stock_code": "000001", "raw": "fixture"}]),
+            artifact,
+        )
+        self._write_json(
+            release_root / "release.json",
+            {
+                "schema_version": 1,
+                "schedule": "weekly",
+                "status": "ready",
+                "artifacts": [
+                    {
+                        "name": "raw_f10",
+                        "relative_path": "artifacts/raw_f10.parquet",
+                        "sha256": _sha256(artifact),
+                        "size_bytes": artifact.stat().st_size,
+                    }
+                ],
+            },
+        )
+        release_digest = _sha256(release_root / "release.json")
+        (release_root / "READY").write_text(f"{release_digest}\n", encoding="ascii")
+        policy_value = json.loads(self.policy_path.read_text(encoding="utf-8"))
+        policy_value["source"]["archive_trees"].append(
+            {
+                "dataset_id": "cn01_weekly_gap_fill",
+                "source": "data/revisions/cn01-weekly-gap-fill",
+                "target": "payload/source-evidence/cn01-weekly-gap-fill",
+                "role": "retained_immutable_source_gap_fill",
+                "include_patterns": ["READY", "release.json", "artifacts/**"],
+                "minimum_files": 3,
+                "source_exception": {
+                    "source_node": "cn01",
+                    "source_path": "data/shadow/cn01-ods-v1/releases/weekly/2026-07-31/attempt",
+                    "reason": "Hermes did not retain the complete weekly release",
+                    "manifest_sha256": release_digest,
+                },
+            }
+        )
+        self._write_json(self.policy_path, policy_value)
+        policy = load_ods_base_policy(self.policy_path)
+
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=policy,
+        )
+        dataset = next(
+            item
+            for item in inventory["datasets"]
+            if item["dataset_id"] == "cn01_weekly_gap_fill"
+        )
+        self.assertEqual(dataset["source_exception"]["source_node"], "cn01")
+        self.assertEqual(
+            dataset["source_exception"]["manifest_sha256"], release_digest
+        )
+
+        artifact.write_bytes(b"tampered weekly fixture")
+        with self.assertRaisesRegex(OdsBaseError, "differs from manifest"):
+            audit_ods_base_sources(
+                astock_root=self.astock,
+                through_date=date(2026, 7, 30),
+                policy=policy,
+            )
+
+    def test_final_policy_closes_full_fundamentals_scope_gap(self) -> None:
+        policy = load_ods_base_policy(
+            REPOSITORY_ROOT
+            / "config"
+            / "pipelines"
+            / "ods-base-final-through-20260731.v2.json"
+        )
+        self.assertNotIn(
+            "raw_f10_and_full_financial_statements",
+            {item.dataset_family for item in policy.scope_gaps},
+        )
+        weekly = next(
+            item
+            for item in policy.archives
+            if item.dataset_id == "source_evidence_weekly_full_fundamentals_20260731"
+        )
+        self.assertIsNotNone(weekly.source_exception)
+        assert weekly.source_exception is not None
+        self.assertEqual(weekly.source_exception.source_node, "cn01")
+        self.assertEqual(
+            weekly.source_exception.manifest_sha256,
+            "sha256:074afad64b6c80e2f83f7265f360f13e04da2da5f15114d67de49a2b56a21b7f",
+        )
+
     def test_frozen_inventory_blocks_changed_sources(self) -> None:
         inventory = self._inventory(date(2026, 7, 30), "frozen.json")
         self._write_json(self.data / "meta.json", {"fixture": "changed"})

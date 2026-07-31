@@ -53,6 +53,14 @@ class OdsTreeSpec:
 
 
 @dataclass(frozen=True)
+class OdsArchiveSourceException:
+    source_node: str
+    source_path: str
+    reason: str
+    manifest_sha256: str
+
+
+@dataclass(frozen=True)
 class OdsArchiveSpec:
     dataset_id: str
     source: str
@@ -60,6 +68,7 @@ class OdsArchiveSpec:
     role: str
     include_patterns: tuple[str, ...]
     minimum_files: int
+    source_exception: OdsArchiveSourceException | None
 
 
 @dataclass(frozen=True)
@@ -314,6 +323,27 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
         )
         for pattern in patterns:
             _safe_relative(pattern, "archive_trees.include_patterns")
+        source_exception_value = item.get("source_exception")
+        source_exception = None
+        if source_exception_value is not None:
+            if not isinstance(source_exception_value, Mapping):
+                raise OdsBaseError("archive_trees.source_exception must be an object")
+            source_node = _text(source_exception_value, "source_node")
+            manifest_sha256 = _text(source_exception_value, "manifest_sha256")
+            if (
+                source_node not in {"hermes", "cn01"}
+                or _SHA256.fullmatch(manifest_sha256) is None
+            ):
+                raise OdsBaseError("archive source exception authority is invalid")
+            source_exception = OdsArchiveSourceException(
+                source_node=source_node,
+                source_path=_safe_relative(
+                    _text(source_exception_value, "source_path"),
+                    "archive_trees.source_exception.source_path",
+                ).as_posix(),
+                reason=_text(source_exception_value, "reason"),
+                manifest_sha256=manifest_sha256,
+            )
         archives.append(
             OdsArchiveSpec(
                 dataset_id=_text(item, "dataset_id"),
@@ -326,6 +356,7 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
                 role=_text(item, "role"),
                 include_patterns=patterns,
                 minimum_files=minimum_files,
+                source_exception=source_exception,
             )
         )
 
@@ -1370,7 +1401,66 @@ def _archive_paths(astock_root: Path, spec: OdsArchiveSpec) -> list[Path]:
             paths.append(source)
     if len(paths) < spec.minimum_files:
         raise OdsBaseError(f"ODS source evidence archive is incomplete: {spec.dataset_id}")
+    if spec.source_exception is not None:
+        _verify_archive_source_exception(source_root, spec.source_exception)
     return paths
+
+
+def _verify_archive_source_exception(
+    source_root: Path, exception: OdsArchiveSourceException
+) -> None:
+    manifest_path = source_root / "release.json"
+    ready_path = source_root / "READY"
+    if (
+        not manifest_path.is_file()
+        or manifest_path.is_symlink()
+        or not ready_path.is_file()
+        or ready_path.is_symlink()
+    ):
+        raise OdsBaseError("archive source exception release is not immutable")
+    manifest_sha256 = _sha256(manifest_path)
+    if (
+        manifest_sha256 != exception.manifest_sha256
+        or ready_path.read_text(encoding="ascii").strip() != manifest_sha256
+    ):
+        raise OdsBaseError("archive source exception manifest binding differs")
+    manifest = _object(manifest_path)
+    artifacts = manifest.get("artifacts")
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("schedule") != "weekly"
+        or manifest.get("status") != "ready"
+        or not isinstance(artifacts, list)
+        or not artifacts
+    ):
+        raise OdsBaseError("archive source exception release manifest is invalid")
+    seen: set[str] = set()
+    for artifact in artifacts:
+        if not isinstance(artifact, Mapping):
+            raise OdsBaseError("archive source exception artifact is invalid")
+        relative = _safe_relative(
+            _text(artifact, "relative_path"),
+            "archive source exception artifact path",
+        ).as_posix()
+        digest = _text(artifact, "sha256")
+        size = artifact.get("size_bytes")
+        if (
+            relative in seen
+            or _SHA256.fullmatch(digest) is None
+            or not isinstance(size, int)
+            or isinstance(size, bool)
+            or size < 0
+        ):
+            raise OdsBaseError("archive source exception artifact binding is invalid")
+        seen.add(relative)
+        source = _inside(source_root, relative, "archive source exception artifact path")
+        if (
+            not source.is_file()
+            or source.is_symlink()
+            or source.stat().st_size != size
+            or _sha256(source) != digest
+        ):
+            raise OdsBaseError("archive source exception artifact differs from manifest")
 
 
 def _archive_format(path: Path) -> str:
@@ -1451,6 +1541,7 @@ def _dataset_summary(
     role: str,
     parts: Sequence[dict[str, Any]],
     quality: Mapping[str, Any] | None,
+    source_exception: OdsArchiveSourceException | None = None,
 ) -> dict[str, Any]:
     value: dict[str, Any] = {
         "dataset_id": dataset_id,
@@ -1461,6 +1552,13 @@ def _dataset_summary(
     }
     if quality is not None:
         value["quality"] = dict(quality)
+    if source_exception is not None:
+        value["source_exception"] = {
+            "source_node": source_exception.source_node,
+            "source_path": source_exception.source_path,
+            "reason": source_exception.reason,
+            "manifest_sha256": source_exception.manifest_sha256,
+        }
     return value
 
 
@@ -1538,18 +1636,20 @@ def audit_ods_base_sources(
             )
         )
 
-    for spec in policy.archives:
-        source_root = _inside(astock_root, spec.source, "archive_trees.source")
+    for archive_spec in policy.archives:
+        source_root = _inside(
+            astock_root, archive_spec.source, "archive_trees.source"
+        )
         parts = []
         parquet_rows = 0
-        for source in _archive_paths(astock_root, spec):
+        for source in _archive_paths(astock_root, archive_spec):
             relative_name = source.relative_to(source_root).as_posix()
             file_format = _archive_format(source)
             part = _part_metadata(
                 source_relative=source.relative_to(astock_root).as_posix(),
-                target_relative=f"{spec.target}/{relative_name}",
-                dataset_id=spec.dataset_id,
-                role=spec.role,
+                target_relative=f"{archive_spec.target}/{relative_name}",
+                dataset_id=archive_spec.dataset_id,
+                role=archive_spec.role,
                 file_format=file_format,
                 digest=_sha256(source),
                 size_bytes=source.stat().st_size,
@@ -1561,13 +1661,14 @@ def audit_ods_base_sources(
             all_parts.append(part)
         datasets.append(
             _dataset_summary(
-                dataset_id=spec.dataset_id,
-                role=spec.role,
+                dataset_id=archive_spec.dataset_id,
+                role=archive_spec.role,
                 parts=parts,
                 quality={
                     "quality_source": "accepted source-evidence archive",
                     "parquet_row_count": parquet_rows,
                 },
+                source_exception=archive_spec.source_exception,
             )
         )
 
@@ -1852,15 +1953,17 @@ def build_ods_base_bundle(
             )
             all_parts.extend(parts)
 
-        for spec in policy.archives:
-            source_root = _inside(astock_root, spec.source, "archive_trees.source")
-            paths = _archive_paths(astock_root, spec)
+        for archive_spec in policy.archives:
+            source_root = _inside(
+                astock_root, archive_spec.source, "archive_trees.source"
+            )
+            paths = _archive_paths(astock_root, archive_spec)
             parts = []
             parquet_rows = 0
             for source in paths:
                 relative_name = source.relative_to(source_root).as_posix()
                 source_relative = source.relative_to(astock_root).as_posix()
-                target_relative = f"{spec.target}/{relative_name}"
+                target_relative = f"{archive_spec.target}/{relative_name}"
                 target = _inside(staging, target_relative, "archive_trees.target member")
                 digest, size, reused = _copy_or_reuse_file(
                     source=source,
@@ -1875,8 +1978,8 @@ def build_ods_base_bundle(
                 part = _part_metadata(
                     source_relative=source_relative,
                     target_relative=target_relative,
-                    dataset_id=spec.dataset_id,
-                    role=spec.role,
+                    dataset_id=archive_spec.dataset_id,
+                    role=archive_spec.role,
                     file_format=file_format,
                     digest=digest,
                     size_bytes=size,
@@ -1887,13 +1990,14 @@ def build_ods_base_bundle(
                 parts.append(part)
             datasets.append(
                 _dataset_summary(
-                    dataset_id=spec.dataset_id,
-                    role=spec.role,
+                    dataset_id=archive_spec.dataset_id,
+                    role=archive_spec.role,
                     parts=parts,
                     quality={
                         "quality_source": "accepted source-evidence archive",
                         "parquet_row_count": parquet_rows,
                     },
+                    source_exception=archive_spec.source_exception,
                 )
             )
             all_parts.extend(parts)

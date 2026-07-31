@@ -462,6 +462,20 @@
         "role": "retained_immutable_source_lineage",
         "include_patterns": ["READY", "release.json", "artifacts/**"],
         "minimum_files": 10
+      },
+      {
+        "dataset_id": "source_evidence_weekly_full_fundamentals_20260731",
+        "source": "data/revisions/cn01-weekly-gap-fill-20260731/releases/weekly/2026-07-31/20260731-20260731T133350427870Z",
+        "target": "payload/source-evidence/weekly-full-fundamentals/2026-07-31/20260731-20260731T133350427870Z",
+        "role": "retained_immutable_source_gap_fill",
+        "include_patterns": ["READY", "release.json", "artifacts/**"],
+        "minimum_files": 18,
+        "source_exception": {
+          "source_node": "cn01",
+          "source_path": "data/shadow/cn01-ods-v1/releases/weekly/2026-07-31/20260731-20260731T133350427870Z",
+          "reason": "Hermes did not complete the first full-market F10 and three-statement acquisition; CN01 retained the complete checksum-bound READY weekly release",
+          "manifest_sha256": "sha256:074afad64b6c80e2f83f7265f360f13e04da2da5f15114d67de49a2b56a21b7f"
+        }
       }
     ],
     "daily": {
@@ -542,14 +556,7 @@
         ]
       }
     ],
-    "scope_gaps": [
-      {
-        "dataset_family": "raw_f10_and_full_financial_statements",
-        "classification": "not_formally_acquired",
-        "reason": "Hermes currently retains a governed quarterly financial summary but no immutable raw F10 text or complete balance-sheet, income-statement, and cash-flow archive",
-        "downstream_impact": "The Base can reproduce the accepted financial_quarterly summary only; full-statement or F10 research requires a separately governed acquisition and a new Base revision"
-      }
-    ],
+    "scope_gaps": [],
     "exclusions": [
       {"pattern": "data/*.bak*", "classification": "excluded_backup", "reason": "superseded mutable-file backup"},
       {"pattern": "data/cutover", "classification": "excluded_cutover_evidence", "reason": "deployment evidence is not ODS payload"},

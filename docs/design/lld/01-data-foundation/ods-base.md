@@ -56,10 +56,10 @@ financial revision, so it cannot supersede the richer canonical files. The old
 older row counts and is not the Base catalog.
 
 The recurring schedule now defines governed collectors, schemas, restartable checkpoints, and
-per-security receipts for raw F10 and complete three-statement responses. This design change does
-not retroactively place those assets in the provisional Base. The final package must retain and
-verify a successful full-market acquisition before adding the new files and removing the existing
-scope gap; until then the accepted Base continues to describe the holdings honestly.
+per-security receipts for raw F10 and complete three-statement responses. CN01's immutable
+2026-07-31 weekly release is the first successful full-market acquisition. The final July policy
+retains a checksum-identical copy in an explicit Hermes gap-fill revision, binds its CN01 origin
+path and release-manifest digest, and therefore closes the provisional raw-fundamentals scope gap.
 
 The retained valuation history currently ends on 2026-07-18. The bounded July repair uses the
 repository-owned BaoStock range collector in `src/quanthus/providers/valuation_history.py`, not a
@@ -76,10 +76,10 @@ by a versioned reason. Mixed roots such as `data/revisions` and `data/shadow` ar
 each discovered source unit is explicitly included or inherits a reviewed exclusion; a broad
 `mixed` label cannot hide an unresolved child. Unknown members fail closed.
 
-The inventory also carries machine-readable source-family scope gaps. The current provisional
-policy still names raw F10 and full financial statements as `not_formally_acquired`; this remains
-true until the first accepted acquisition is retained, the policy selects those exact bytes, and a
-new Base revision passes the same gates. Merely merging collector code cannot close the gap.
+The inventory also carries machine-readable source-family scope gaps. The provisional policy still
+names raw F10 and full financial statements as `not_formally_acquired`. The final July policy
+removes that gap only because it selects and verifies the exact accepted CN01 weekly release bytes;
+merely merging collector code would not have closed it.
 
 Selected files bind source path, target path, byte size, SHA-256, format, schema hash, row count,
 null counts, and declared date bounds. Keyed Parquet datasets additionally require zero null keys
@@ -87,9 +87,9 @@ and zero duplicate keys across all parts. SQLite sources pass `PRAGMA integrity_
 intraday release bytes must match their immutable release manifests and `READY` digests.
 
 Hermes is the default source. An alternate retained Hermes revision or CN01 gap-fill is legal only
-for a specific intraday date and frequency named by policy. The exception binds the source node,
-safe source path, reason, and expected release-manifest digest. No row-level favorable merge or
-implicit fallback is allowed.
+when explicitly named by policy. Intraday exceptions bind a date and frequency; archive
+exceptions bind the retained local path, original source node and path, reason, and expected
+release-manifest digest. No row-level favorable merge or implicit fallback is allowed.
 
 The build re-evaluates the exact source selection after the inventory is frozen. Any byte,
 selection, schema, or policy change fails the inventory binding and requires a new inventory and,

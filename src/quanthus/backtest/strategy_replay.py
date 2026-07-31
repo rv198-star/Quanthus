@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from typing import Any, Protocol
@@ -37,6 +37,7 @@ from quanthus.contracts import SnapshotRef
 MONEY_QUANTUM = Decimal("0.01")
 RATE_QUANTUM = Decimal("0.00000001")
 TRADING_PERIODS_PER_YEAR = Decimal("252")
+NEXT_OPEN_TIME = time(9, 30)
 
 
 def _money(value: Decimal) -> Decimal:
@@ -228,8 +229,16 @@ class StrategyReplayFrame:
             raise ValueError("decision_at must be timezone-aware")
         if self.snapshot.knowledge_cutoff > self.decision_at:
             raise ValueError("frame decision cannot precede snapshot knowledge_cutoff")
-        if self.decision_at.astimezone(MARKET_TIMEZONE).date() != self.snapshot.market_date:
-            raise ValueError("frame decision date must equal snapshot market_date")
+        local_decision = self.decision_at.astimezone(MARKET_TIMEZONE)
+        same_session_decision = local_decision.date() == self.snapshot.market_date
+        overnight_pre_open_decision = (
+            local_decision.date() == self.execution_date
+            and local_decision.time() < NEXT_OPEN_TIME
+        )
+        if not (same_session_decision or overnight_pre_open_decision):
+            raise ValueError(
+                "frame decision must occur on the decision date or before the next open"
+            )
         if self.execution_date <= self.snapshot.market_date:
             raise ValueError("execution_date must follow the decision market date")
         security_codes: set[str] = set()

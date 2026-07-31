@@ -40,6 +40,12 @@ The backtest engine is profile-aware rather than maintaining separate daily and 
 Every Signal, OperatorActionAdvice, OrderIntent, simulated Order, notification, operator report,
 and run manifest carries the profile id and, for the target profile, a window id.
 
+For the active daily profile, the decision snapshot remains market session T. Its persisted
+`decision_at` may fall on T after close or on T+1 before the `09:30 Asia/Shanghai` open when the
+exact canonical input is published overnight. A T+1 timestamp at or after the open is too late and
+fails closed; it never changes the decision snapshot to T+1 or permits T+1 observations in the
+decision view.
+
 ## 3. Window policy contract
 
 The approved clock boundary decision is `two-window-0945-1015-1415-close-v1`:

@@ -101,6 +101,11 @@ The package content digest binds logical table content, schema, lineage, policy,
 identity; it excludes each generated part's encoding-dependent byte size and SHA-256. Those
 physical facts remain mandatory in the manifest and are bound by the manifest SHA-256 and `READY`.
 
+The generation ledger keeps market session T as the decision date. When canonical publication is
+only available overnight, its timezone-aware decision cutoff may be on T+1 but must remain before
+the `09:30 Asia/Shanghai` open. The replay frame retains the T snapshot and T+1 execution date; it
+does not relabel T+1 as the decision session or expose execution-day observations to the strategy.
+
 The deep verifier starts only from `manifest.json` and `READY`, checks the complete declared file
 set, recomputes table statistics and logical content, and reads no build-plan or producer path.
 An identical logical input rebuild must reproduce table and package content digests; `built_at` is

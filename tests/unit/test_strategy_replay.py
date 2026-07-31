@@ -105,6 +105,44 @@ class StrategyReplayTests(unittest.TestCase):
         self.policy = load_execution_policy(POLICY_PATH)
         self.engine = BacktestEngine(self.policy)
 
+    def test_frame_accepts_overnight_decision_before_next_open(self) -> None:
+        decision_date = date(2026, 5, 11)
+        execution_date = date(2026, 5, 12)
+        overnight_snapshot = SnapshotRef(
+            market_date=decision_date,
+            knowledge_cutoff=at(execution_date, 5),
+            source_revision="overnight-canonical-publication-v1",
+            snapshot_id="overnight-decision-snapshot-v1",
+        )
+
+        replay_frame = StrategyReplayFrame(
+            snapshot=overnight_snapshot,
+            decision_at=at(execution_date, 6),
+            execution_date=execution_date,
+            execution_sessions=(),
+        )
+
+        self.assertEqual(replay_frame.snapshot.market_date, decision_date)
+        self.assertEqual(replay_frame.decision_at, at(execution_date, 6))
+
+    def test_frame_rejects_overnight_decision_at_next_open(self) -> None:
+        decision_date = date(2026, 5, 11)
+        execution_date = date(2026, 5, 12)
+        overnight_snapshot = SnapshotRef(
+            market_date=decision_date,
+            knowledge_cutoff=at(execution_date, 5),
+            source_revision="overnight-canonical-publication-v1",
+            snapshot_id="overnight-decision-snapshot-v1",
+        )
+
+        with self.assertRaisesRegex(ValueError, "before the next open"):
+            StrategyReplayFrame(
+                snapshot=overnight_snapshot,
+                decision_at=at(execution_date, 9, 30),
+                execution_date=execution_date,
+                execution_sessions=(),
+            )
+
     def run_spec(
         self, frames: tuple[StrategyReplayFrame, ...], *, run_id: str
     ) -> StrategyReplaySpec:

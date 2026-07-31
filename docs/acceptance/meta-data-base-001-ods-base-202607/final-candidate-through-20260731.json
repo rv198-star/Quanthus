@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "work_item": "META-DATA-BASE-001",
+  "evidence_status": "final_candidate_built_mirrored_promotion_blocked",
+  "evidence_date_utc": "2026-07-31",
+  "code_revision": "7782e94ac4adf4ebf2f4fb0a9989ab63466b2a9f",
+  "policy": "config/pipelines/ods-base-final-through-20260731.v2.json",
+  "policy_sha256": "sha256:f61b5f7f06e587f59cf78ce9ad3d38a9e0b09923161bd11a458b421e04c61588",
+  "source_inventory": {
+    "node": "hermes",
+    "path": "/srv/quanthus/ods/base/.inventories/ods-base-202607-v1.source.json",
+    "sha256": "sha256:6095d26ae241b08a992be9bb3ef307f974a3f1747c367ea7bc61ea5743920a9c",
+    "through_date": "2026-07-31",
+    "file_count": 20946,
+    "size_bytes": 13285483256,
+    "selection_digest": "sha256:0e5da425a4955ed22059394f6f5f5ad5fb85190c4549867f0da4b2786b48d63c",
+    "scope_gaps": []
+  },
+  "weekly_gap_fill": {
+    "source_node": "cn01",
+    "source_path": "data/shadow/cn01-ods-v1/releases/weekly/2026-07-31/20260731-20260731T133350427870Z",
+    "retained_hermes_path": "data/revisions/cn01-weekly-gap-fill-20260731/releases/weekly/2026-07-31/20260731-20260731T133350427870Z",
+    "manifest_sha256": "sha256:074afad64b6c80e2f83f7265f360f13e04da2da5f15114d67de49a2b56a21b7f",
+    "file_count": 18,
+    "size_bytes": 2107601030,
+    "byte_identity": "passed"
+  },
+  "package": {
+    "bundle_id": "ods-base-202607-v1",
+    "through_date": "2026-07-31",
+    "file_count": 20946,
+    "size_bytes": 13285483256,
+    "content_digest": "sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1",
+    "manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+    "ready_sha256": "sha256:de8e4216bc80b61ad2fc1d611ab98cec9e0d091f05bd41dce22de6f859439e95",
+    "built_at": "2026-07-31T17:29:43.459999+00:00",
+    "parent_bundle_id": "ods-base-through-20260730-v1",
+    "reused_file_count": 20743,
+    "reused_size_bytes": 11145679742
+  },
+  "replicas": [
+    {
+      "node": "hermes",
+      "root": "/srv/quanthus/ods/base/ods-base-202607-v1",
+      "deep_verify": "passed",
+      "identical_input_verify": "passed",
+      "free_bytes_after": 21734641664
+    },
+    {
+      "node": "cn01",
+      "root": "/srv/quanthus/ods/base/ods-base-202607-v1",
+      "staging_deep_verify": "passed",
+      "formal_deep_verify": "passed",
+      "checksum_identity": "passed",
+      "free_bytes_after": 54107414528
+    }
+  ],
+  "pointer_state": {
+    "advanced": false,
+    "sha256_on_both_nodes": "sha256:51624f796dd3219cd8ff364ff55990c51b1781ce84a497ab057ee2a5a972f707",
+    "bundle_id_on_both_nodes": "ods-base-through-20260730-v1",
+    "hidden_ingress_remaining": false,
+    "go_for_cutover": false
+  },
+  "remaining_gate": {
+    "phase": "issue_47_expanded_phase_b_scope",
+    "status": "blocked_until_normal_dual_node_weekly_and_catalog_gates_pass"
+  }
+}

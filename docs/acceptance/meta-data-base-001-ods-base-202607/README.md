@@ -5,14 +5,29 @@
 | Work item | `META-DATA-BASE-001` |
 | Tracking issue | GitHub issue #47 |
 | Evidence date | 2026-07-31 UTC |
-| Evidence status | Phase A accepted through 2026-07-30; Phase B remains open |
-| Deployed revision | `4476361f6958f8c26b0df71e76074aae19198089` |
-| Policy | `config/pipelines/ods-base.v1.json` |
-| Package | `ods-base-through-20260730-v1` |
-| Machine summary | `provisional-through-20260730.json` |
+| Evidence status | Final July candidate built and mirrored; pointer promotion remains blocked |
+| Deployed revision | `7782e94ac4adf4ebf2f4fb0a9989ab63466b2a9f` |
+| Policies | `config/pipelines/ods-base.v1.json` and `config/pipelines/ods-base-final-through-20260731.v2.json` |
+| Packages | `ods-base-through-20260730-v1` and candidate `ods-base-202607-v1` |
+| Machine summaries | `provisional-through-20260730.json` and `final-candidate-through-20260731.json` |
 | Production cutover | blocked; no `GO_FOR_CUTOVER.json` was recorded |
 
 ## 1. Verdict
+
+The final `ods-base-202607-v1` candidate is present and independently deep-verified on Hermes and
+CN01. It contains 20,946 files and 13,285,483,256 logical bytes through 2026-07-31. Both nodes bind
+manifest `sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c`
+and content digest
+`sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1`.
+The CN01 full-fundamentals weekly release is retained as an explicit checksum-bound gap-fill, and
+the provisional raw F10/full-statements scope gap is closed in this candidate.
+
+Candidate construction is complete, but publication is not. Both node-local `BASE_CURRENT.json`
+files remain byte-identical on `ods-base-through-20260730-v1`; no `GO_FOR_CUTOVER.json` exists.
+Pointer promotion remains blocked until the normal dual-node weekly and catalog gates in Issue
+#47 pass.
+
+### Provisional Phase A Record
 
 The most complete currently governed Hermes ODS holdings through 2026-07-30 are frozen in one
 immutable Base package and published checksum-identically on Hermes and CN01. Both nodes expose
@@ -123,16 +138,16 @@ Hermes retains enough free space for the final July child because unchanged memb
 for same-filesystem hard-link reuse. The final build still has a preflight free-space gate and may
 not rely on that estimate without remeasurement.
 
-## 6. Remaining Phase B Gate
+## 6. Final Candidate Gate
 
-After the 2026-07-31 close:
+Completed after the 2026-07-31 close:
 
 1. Accept the normal market, events, 1m, and 5m ODS releases on both source lanes.
 2. Freeze a new through-2026-07-31 inventory and build `ods-base-202607-v1` with the provisional
    package as parent.
-3. Deep-verify, mirror, and publish the final package on Hermes and CN01 using the provisional
-   manifest SHA-256 as the compare-and-swap precondition.
+3. Deep-verify and mirror the final package on Hermes and CN01 without advancing either pointer.
 4. Re-run clean-path, idempotency, checksum identity, preservation, and no-cutover evidence.
 
-The provisional package and July 31 source releases remain immutable evidence. Cleanup is outside
-Issue #47 and requires explicit later authority.
+The remaining action is the compare-and-swap pointer promotion after the normal dual-node weekly
+and catalog gates pass. The provisional package, final candidate, and July 31 source releases
+remain immutable evidence. Cleanup is outside Issue #47 and requires explicit later authority.

@@ -70,8 +70,11 @@ publication begins. Publication advances `daily_market_CURRENT.json` and
 
 Weekly source jobs use the weekly example and preserve correction lookbacks. The node environment
 may select separate interpreters with `ASTOCK_FUNDAMENTALS_PYTHON` and `ASTOCK_TDX_PYTHON`; both
-inherit the checkout's exported `PYTHONPATH`. Raw F10 and complete three-statement jobs retain
-restartable per-date batch checkpoints under the lane shadow root. Operators must verify nonzero
+inherit the checkout's exported `PYTHONPATH` and must provide BaoStock `>=0.9.3,<0.10`. BaoStock
+0.8.9 is not an accepted runtime: its `query_stock_basic` transport can stall or fail, which blocks
+the after-hours ETF universe and therefore withholds that release's `READY`. Raw F10 and complete
+three-statement jobs retain restartable per-date batch checkpoints under the lane shadow root.
+Operators must verify nonzero
 F10, statement, quarterly, industry, and receipt artifacts, zero `failed` receipts, and an immutable
 READY release. A zero-row table, a missing security receipt, or a locally re-sliced historical
 Parquet is not successful upstream acquisition. Their OCI transforms are added as separate pipeline

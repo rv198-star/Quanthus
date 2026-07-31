@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "work_item": "META-DATA-BASE-001",
+  "evidence_status": "manual_dual_node_base_pointer_promotion_passed",
+  "evidence_time_utc": "2026-07-31T18:52:25Z",
+  "deployed_revision": "55269c2b5459bbc3d1eb13cb539d253ed4b146f1",
+  "authority": {
+    "kind": "explicit_operator_instruction",
+    "instruction": "now_switch",
+    "exception": "normal_dual_node_weekly_and_catalog_acceptance_no_longer_blocks_base_pointer_only"
+  },
+  "compare_and_swap": {
+    "prior_bundle_id": "ods-base-through-20260730-v1",
+    "prior_manifest_sha256": "sha256:d38b8332ddd5427104bbc6f71bf89df1c81f85cca507a1f9a80ac58662b7352e",
+    "target_bundle_id": "ods-base-202607-v1",
+    "target_manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+    "target_content_digest": "sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1",
+    "through_date": "2026-07-31",
+    "base_current_sha256": "sha256:5560ea8e0b5d385273bab2124f50d0183d8acce641f24cfe8d703274311cf36c",
+    "mode": "0640"
+  },
+  "nodes": [
+    {
+      "node": "hermes",
+      "promotion": "passed",
+      "pointer_identity": "passed",
+      "prior_base_preserved": true
+    },
+    {
+      "node": "cn01",
+      "promotion": "passed",
+      "pointer_identity": "passed",
+      "prior_base_preserved": true
+    }
+  ],
+  "preserved_boundaries": {
+    "catalog_current_exists": false,
+    "go_for_cutover": false,
+    "consumer_cutover": false,
+    "timer_change": false,
+    "legacy_pointer_change": false,
+    "data_deletion": false
+  },
+  "remaining_operational_evidence": [
+    "normal_dual_node_weekly_cycle",
+    "node_local_catalog_publication_and_acceptance"
+  ]
+}

@@ -5,11 +5,11 @@
 | Work item | `META-DATA-BASE-001` |
 | Tracking issue | GitHub issue #47 |
 | Evidence date | 2026-07-31 UTC |
-| Evidence status | Final July candidate built and mirrored; pointer promotion remains blocked |
-| Deployed revision | `7782e94ac4adf4ebf2f4fb0a9989ab63466b2a9f` |
+| Evidence status | Final July Base built, mirrored, and manually promoted on both Base holders |
+| Deployed revision | `55269c2b5459bbc3d1eb13cb539d253ed4b146f1` |
 | Policies | `config/pipelines/ods-base.v1.json` and `config/pipelines/ods-base-final-through-20260731.v2.json` |
 | Packages | `ods-base-through-20260730-v1` and candidate `ods-base-202607-v1` |
-| Machine summaries | `provisional-through-20260730.json` and `final-candidate-through-20260731.json` |
+| Machine summaries | `provisional-through-20260730.json`, `final-candidate-through-20260731.json`, and `manual-promotion-through-20260731.json` |
 | Production cutover | blocked; no `GO_FOR_CUTOVER.json` was recorded |
 
 ## 1. Verdict
@@ -22,10 +22,17 @@ and content digest
 The CN01 full-fundamentals weekly release is retained as an explicit checksum-bound gap-fill, and
 the provisional raw F10/full-statements scope gap is closed in this candidate.
 
-Candidate construction is complete, but publication is not. Both node-local `BASE_CURRENT.json`
-files remain byte-identical on `ods-base-through-20260730-v1`; no `GO_FOR_CUTOVER.json` exists.
-Pointer promotion remains blocked until the normal dual-node weekly and catalog gates in Issue
-#47 pass.
+At `2026-07-31T18:52:25Z`, explicit operator authority decoupled Base pointer publication from
+the still-open normal dual-node weekly and catalog acceptance gates. The supported locked
+promotion command independently deep-verified the target and the compare-and-swap precondition on
+each node. Both node-local `BASE_CURRENT.json` files now bind `ods-base-202607-v1` and are
+byte-identical at
+`sha256:5560ea8e0b5d385273bab2124f50d0183d8acce641f24cfe8d703274311cf36c`.
+
+This manual exception advances only the recovery-Base descriptor. The prior Base remains on both
+nodes, `CATALOG_CURRENT.json` remains absent, and no timer, consumer, legacy pointer, or
+`GO_FOR_CUTOVER` state changed. Normal weekly and catalog acceptance remains open as operational
+chain evidence, but no longer blocks the final July Base descriptor.
 
 ### Provisional Phase A Record
 
@@ -148,6 +155,8 @@ Completed after the 2026-07-31 close:
 3. Deep-verify and mirror the final package on Hermes and CN01 without advancing either pointer.
 4. Re-run clean-path, idempotency, checksum identity, preservation, and no-cutover evidence.
 
-The remaining action is the compare-and-swap pointer promotion after the normal dual-node weekly
-and catalog gates pass. The provisional package, final candidate, and July 31 source releases
-remain immutable evidence. Cleanup is outside Issue #47 and requires explicit later authority.
+The compare-and-swap pointer promotion completed on both nodes under the explicit manual exception
+recorded in `manual-promotion-through-20260731.json`. The normal dual-node weekly and catalog gates
+remain open as operational publication evidence. The provisional package, final package, and July
+31 source releases remain immutable evidence. Cleanup is outside Issue #47 and requires explicit
+later authority.

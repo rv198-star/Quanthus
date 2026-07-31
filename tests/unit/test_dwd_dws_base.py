@@ -111,6 +111,16 @@ class DwdDwsBaseTests(unittest.TestCase):
             },
         }
 
+    def test_repository_corrective_policy_uses_new_immutable_ids(self) -> None:
+        repository_root = Path(__file__).resolve().parents[2]
+        policy = load_dwd_dws_base_policy(
+            repository_root / "config/pipelines/dwd-dws-base-through-20260730.v2.json"
+        )
+        self.assertEqual(policy.phase, "provisional")
+        self.assertEqual(policy.through_date, date(2026, 7, 30))
+        self.assertEqual(policy.dwd_package_id, "dwd-base-through-20260730-v2")
+        self.assertEqual(policy.dws_package_id, "dws-base-through-20260730-v2")
+
     def _freeze_fixture(self) -> tuple[HistoryBaseBundle, LaneCandidate, EpochInput]:
         history_root = self.root / "history-base-test-v1"
         history_dwd = history_root / "dwd" / "seed-v1"

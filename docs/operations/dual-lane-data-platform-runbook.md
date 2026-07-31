@@ -351,7 +351,9 @@ including excluded, superseded, duplicate, and unverifiable objects. A floating 
 path or digest, incomplete inventory, or portable bootstrap PIT claim is not an input.
 
 1. Confirm the exact Issue #48 DWD/DWS packages are published and independently verified. Record
-   their ids, manifest SHA-256 values, content digests, and the canonical generation ledger.
+   their ids, manifest SHA-256 values, content digests, current-descriptor file SHA-256 values, and
+   the canonical generation ledger. `preflight-operational-ads-base` must prove both current
+   descriptors still match the plan and cross-bind the same pair before any staging is created.
 2. Freeze a build plan outside the package root. Classify every source and select table bytes only
    when schema, key, role, source generation, logical digest, and per-decision PIT equivalence are
    all bound. Otherwise select an exact accepted DWD/DWS/reference source for rebuild.
@@ -367,13 +369,22 @@ path or digest, incomplete inventory, or portable bootstrap PIT claim is not an 
    ```
 
    Replace `absent` with the exact current manifest SHA-256 when a descriptor exists. The operator
-   enforces root ownership and a clean checkout, builds in unique staging, deep-checks all declared
-   parts without producer paths, runs the existing bounded replay loader, then advances only
-   `BASE_CURRENT.json` under a locked compare-and-swap.
+   enforces root ownership and a clean checkout, reruns the DWD/DWS descriptor preflight, builds in
+   unique staging from one sealed source part per table, seal-checks all declared parts without
+   producer paths, runs the existing bounded replay loader, then advances only `BASE_CURRENT.json`
+   under a locked compare-and-swap. Multi-source merge or deduplication is an upstream semantic
+   normalization task and is not permitted in this packaging command.
 4. Retain the exact plan, package manifest/`READY`, table counts and digests, semantic comparisons,
    replay report, elapsed time, peak resources, and descriptor bytes before and after. Re-run the
    verifier from a copied clean path with source nodes, producer paths, databases, and network
    unavailable before accepting Phase A.
+
+The provisional preflight target is at most 30 seconds; one 531 MiB package build and one-day
+replay smoke are each at most 5 minutes; normal seal check is at most 2 minutes; end-to-end
+publication is at most 15 minutes; and peak RSS is at most 4 GiB. Stop a build that reaches 10
+minutes and profile it before retrying. The normal publication path must not run Python
+logical-row hashing. Use `check-operational-ads-base --deep-logical-content` only as a separately
+authorized offline semantic audit, never as a repeated build, replay, copy, or promotion gate.
 
 After the July 31 close, create a new final plan and immutable `ads-base-202607-v1`. It must bind
 the provisional package plus the exact accepted July 31 daily ADS and final DWD/DWS manifests.

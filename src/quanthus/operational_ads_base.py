@@ -587,10 +587,10 @@ def load_operational_ads_base_plan(
             name in table_by_name
             or name not in policy.tables
             or not isinstance(sources, list)
-            or not sources
+            or len(sources) != 1
         ):
             raise OperationalADSBaseError(
-                f"tables[{index}] is unknown, duplicated, or has no sources"
+                f"tables[{index}] must bind exactly one sealed semantic source"
             )
         contract = policy.tables[name]
         for source_index, source in enumerate(sources):
@@ -729,6 +729,70 @@ def load_operational_ads_base_plan(
     )
 
 
+def preflight_operational_ads_base_upstreams(
+    plan: OperationalADSBasePlan,
+    *,
+    dwd_current: Path,
+    dws_current: Path,
+) -> Mapping[str, object]:
+    """Fail closed when the mutable DWD/DWS Base descriptors drift from the plan."""
+
+    upstream_values = plan.raw.get("upstreams")
+    if not isinstance(upstream_values, list):
+        raise OperationalADSBaseError("operational ADS Base upstream preflight inputs are invalid")
+    upstreams = {
+        str(item["role"]): item
+        for item in upstream_values
+        if isinstance(item, dict) and isinstance(item.get("role"), str)
+    }
+    descriptors: dict[str, tuple[str, Path, Mapping[str, Any]]] = {}
+    for role, layer, path in (
+        ("dwd_base", "dwd", dwd_current),
+        ("dws_base", "dws", dws_current),
+    ):
+        upstream = upstreams.get(role)
+        current = path.resolve()
+        if upstream is None:
+            raise OperationalADSBaseError(f"operational ADS Base plan lacks {role}")
+        if path.is_symlink() or current != path or not current.is_file():
+            raise OperationalADSBaseError(f"operational ADS Base {layer} descriptor is not exact")
+        descriptor = _load_object(current)
+        if (
+            descriptor.get("kind") != "dwd_dws_base_current"
+            or descriptor.get("layer") != layer
+            or descriptor.get("package_id") != upstream.get("object_id")
+            or descriptor.get("manifest_sha256") != upstream.get("manifest_sha256")
+            or descriptor.get("content_digest") != upstream.get("content_digest")
+            or descriptor.get("through_date") != plan.through_date.isoformat()
+        ):
+            raise OperationalADSBaseError(
+                f"operational ADS Base {layer} descriptor drifted from the build plan"
+            )
+        descriptors[role] = (layer, current, descriptor)
+    dwd = descriptors["dwd_base"][2]
+    dws = descriptors["dws_base"][2]
+    if (
+        dwd.get("peer_package_id") != dws.get("package_id")
+        or dws.get("peer_package_id") != dwd.get("package_id")
+        or dwd.get("peer_manifest_sha256") != dws.get("manifest_sha256")
+        or dws.get("peer_manifest_sha256") != dwd.get("manifest_sha256")
+        or dwd.get("pair_digest") != dws.get("pair_digest")
+        or dwd.get("input_ledger_digest") != dws.get("input_ledger_digest")
+    ):
+        raise OperationalADSBaseError(
+            "operational ADS Base DWD/DWS current descriptors do not cross-bind"
+        )
+    return {
+        "status": "ready",
+        "plan_digest": plan.digest,
+        "through_date": plan.through_date.isoformat(),
+        "dwd_current_sha256": _sha256(descriptors["dwd_base"][1]),
+        "dws_current_sha256": _sha256(descriptors["dws_base"][1]),
+        "dwd_manifest_sha256": dwd["manifest_sha256"],
+        "dws_manifest_sha256": dws["manifest_sha256"],
+    }
+
+
 def _manifest_content_digest(value: Mapping[str, Any]) -> str | None:
     for key in (
         "content_digest",
@@ -743,7 +807,9 @@ def _manifest_content_digest(value: Mapping[str, Any]) -> str | None:
     return None
 
 
-def _verify_bound_manifest(value: Mapping[str, Any], field: str) -> dict[str, Any]:
+def _verify_bound_manifest(
+    value: Mapping[str, Any], field: str, *, require_ready: bool = False
+) -> dict[str, Any]:
     path = _source_manifest_path(value.get("manifest_path"), f"{field}.manifest_path")
     manifest_sha256 = _sha256(path) if path.is_file() else None
     if (
@@ -753,6 +819,14 @@ def _verify_bound_manifest(value: Mapping[str, Any], field: str) -> dict[str, An
         or manifest_sha256 != value.get("manifest_sha256")
     ):
         raise OperationalADSBaseError(f"{field} manifest integrity failed")
+    if require_ready:
+        ready = path.parent / "READY"
+        try:
+            ready_value = ready.read_text(encoding="ascii").strip()
+        except OSError as exc:
+            raise OperationalADSBaseError(f"{field} sealed READY is missing") from exc
+        if ready.is_symlink() or not ready.is_file() or ready_value != manifest_sha256:
+            raise OperationalADSBaseError(f"{field} sealed READY does not bind its manifest")
     manifest = _load_object(path)
     embedded_content_digest = _manifest_content_digest(manifest)
     content_identity = embedded_content_digest or manifest_sha256
@@ -821,10 +895,12 @@ def _source_parts(
     parts = table.get("parts")
     if (
         not isinstance(parts, list)
-        or not parts
+        or len(parts) != 1
         or any(not isinstance(item, dict) for item in parts)
     ):
-        raise OperationalADSBaseError(f"source table has no manifest parts: {table_name}")
+        raise OperationalADSBaseError(
+            f"source table must have exactly one sealed part: {table_name}"
+        )
     paths: list[Path] = []
     for index, part in enumerate(parts):
         assert isinstance(part, dict)
@@ -847,11 +923,6 @@ def _source_parts(
 
 def _sql_string(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
-
-
-def _read_parquet_expression(paths: Sequence[Path]) -> str:
-    values = ",".join(_sql_string(str(path)) for path in paths)
-    return f"read_parquet([{values}])"
 
 
 def _logical_value(value: object) -> object:
@@ -970,9 +1041,10 @@ def _runtime_identity() -> dict[str, object]:
 
 
 def _package_content_identity(value: Mapping[str, Any]) -> dict[str, object]:
-    """Return the logical package identity without Parquet encoding metadata."""
+    """Return logical identity without publisher or physical encoding metadata."""
 
     identity: dict[str, object] = dict(value)
+    identity.pop("publisher", None)
     raw_tables = value.get("tables")
     if not isinstance(raw_tables, list):
         raise OperationalADSBaseError("operational ADS Base content tables are invalid")
@@ -1008,12 +1080,92 @@ def _schema_sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(schema_bytes).hexdigest()}"
 
 
-def _null_counts(connection: Any, relation: str, columns: Sequence[str]) -> dict[str, int]:
-    projections = ", ".join(f'count(*) FILTER (WHERE "{column}" IS NULL)' for column in columns)
-    row = connection.execute(f"SELECT {projections} FROM {relation}").fetchone()
-    if row is None:
-        raise OperationalADSBaseError("table null-count query returned no row")
-    return {column: int(value) for column, value in zip(columns, row, strict=True)}
+def _parquet_quality(
+    connection: Any,
+    *,
+    relation: str,
+    contract: OperationalADSTableContract,
+) -> tuple[tuple[str, ...], tuple[dict[str, str], ...], dict[str, object]]:
+    description = connection.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
+    columns = tuple(str(item[0]) for item in description)
+    schema = _logical_schema(description)
+    missing = set(contract.business_key + contract.sort_keys) - set(columns)
+    if contract.date_column is not None and contract.date_column not in columns:
+        missing.add(contract.date_column)
+    if missing:
+        raise OperationalADSBaseError(
+            f"source table is missing contract columns {sorted(missing)}: {contract.name}"
+        )
+    primary = ", ".join(f'"{column}"' for column in contract.business_key)
+    distinct_key = (
+        f'"{contract.business_key[0]}"'
+        if len(contract.business_key) == 1
+        else f"row({primary})"
+    )
+    projections = [
+        "count(*) AS row_count",
+        f"count(*) - count(DISTINCT {distinct_key}) AS duplicate_business_key_count",
+    ]
+    if contract.date_column is not None:
+        projections.extend(
+            (
+                f'min(CAST("{contract.date_column}" AS DATE)) AS min_date',
+                f'max(CAST("{contract.date_column}" AS DATE)) AS max_date',
+            )
+        )
+    projections.extend(
+        f'count(*) FILTER (WHERE "{column}" IS NULL) AS "null_{index}"'
+        for index, column in enumerate(columns)
+    )
+    stats = connection.execute(f"SELECT {', '.join(projections)} FROM {relation}").fetchone()
+    if stats is None:
+        raise OperationalADSBaseError(f"operational ADS Base quality query failed: {contract.name}")
+    row_count = int(stats[0])
+    duplicate_count = int(stats[1])
+    offset = 2
+    min_date: date | None = None
+    max_date: date | None = None
+    if contract.date_column is not None:
+        min_date = stats[offset]
+        max_date = stats[offset + 1]
+        offset += 2
+    nulls = {
+        column: int(stats[offset + index]) for index, column in enumerate(columns)
+    }
+    return columns, schema, {
+        "row_count": row_count,
+        "null_counts": nulls,
+        "duplicate_business_key_count": duplicate_count,
+        "conflicting_business_key_count": 0,
+        "min_date": min_date.isoformat() if min_date is not None else None,
+        "max_date": max_date.isoformat() if max_date is not None else None,
+    }
+
+
+def _find_content_fingerprint(
+    value: object, *, content_digest: str, row_count: int
+) -> Mapping[str, object] | None:
+    if isinstance(value, Mapping):
+        if (
+            value.get("method") == CONTENT_DIGEST_METHOD
+            and value.get("logical_row_stream_sha256") == content_digest
+            and value.get("row_count") == row_count
+        ):
+            return dict(value)
+        for child in value.values():
+            found = _find_content_fingerprint(
+                child, content_digest=content_digest, row_count=row_count
+            )
+            if found is not None:
+                return found
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        for child in value:
+            found = _find_content_fingerprint(
+                child, content_digest=content_digest, row_count=row_count
+            )
+            if found is not None:
+                return found
+    return None
 
 
 def _build_parquet_table(
@@ -1023,94 +1175,60 @@ def _build_parquet_table(
     contract: OperationalADSTableContract,
     sources: Sequence[tuple[Mapping[str, Any], Mapping[str, Any], Path]],
 ) -> dict[str, object]:
-    expressions: list[str] = []
-    expected_columns: tuple[str, ...] | None = None
-    expected_schema: tuple[dict[str, str], ...] | None = None
-    for binding, table, manifest_path in sources:
-        paths = _source_parts(manifest_path=manifest_path, table=table, table_name=contract.name)
-        relation = _read_parquet_expression(paths)
-        description = connection.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
-        columns = tuple(str(item[0]) for item in description)
-        schema = _logical_schema(description)
-        missing = set(contract.business_key + contract.sort_keys) - set(columns)
-        if contract.date_column is not None:
-            missing.add(contract.date_column) if contract.date_column not in columns else None
-        if missing:
-            raise OperationalADSBaseError(
-                f"source table is missing contract columns {sorted(missing)}: {contract.name}"
-            )
-        if expected_columns is None:
-            expected_columns, expected_schema = columns, schema
-        elif columns != expected_columns or schema != expected_schema:
-            raise OperationalADSBaseError(f"source table schemas conflict: {contract.name}")
-        source_content, _source_fingerprint = _parquet_content_digest(
-            connection,
-            relation,
-            columns=columns,
-            schema=schema,
-            sort_keys=contract.sort_keys,
-        )
-        if source_content != binding.get("table_content_digest"):
-            raise OperationalADSBaseError(
-                f"source table logical content digest mismatch: {contract.name}"
-            )
-        primary = ", ".join(f'"{column}"' for column in contract.business_key)
-        duplicate = connection.execute(
-            f"SELECT count(*) FROM (SELECT {primary}, count(*) AS n FROM {relation} "
-            f"GROUP BY {primary} HAVING n <> 1)"
-        ).fetchone()
-        if duplicate is None or int(duplicate[0]):
-            raise OperationalADSBaseError(
-                f"source table has duplicate business keys: {contract.name}"
-            )
-        generation = _required_text(binding, "lineage_digest")
-        expressions.append(
-            f"SELECT *, {_sql_string(generation)} AS __source_generation FROM {relation}"
-        )
-    assert expected_columns is not None
-    assert expected_schema is not None
-    union = " UNION ALL ".join(expressions)
-    primary = ", ".join(f'"{column}"' for column in contract.business_key)
-    row_hash_columns = ", ".join(f'"{column}"' for column in expected_columns)
-    conflict = connection.execute(
-        f"SELECT count(*) FROM (SELECT {primary}, "
-        "count(DISTINCT __source_generation) AS generations, "
-        f"count(DISTINCT hash({row_hash_columns})) AS versions "
-        f"FROM ({union}) source GROUP BY {primary} HAVING generations <> 1 OR versions <> 1)"
-    ).fetchone()
-    if conflict is None or int(conflict[0]):
+    if len(sources) != 1:
         raise OperationalADSBaseError(
-            f"overlapping source generations conflict on business keys: {contract.name}"
+            f"Parquet table must bind exactly one sealed semantic source: {contract.name}"
         )
-    projection = ", ".join(f'"{column}"' for column in expected_columns)
-    ordering = ", ".join(f'"{column}"' for column in contract.sort_keys)
+    binding, table, manifest_path = sources[0]
+    paths = _source_parts(manifest_path=manifest_path, table=table, table_name=contract.name)
+    source = paths[0]
+    source_parts = table.get("parts")
+    assert isinstance(source_parts, list) and isinstance(source_parts[0], dict)
+    source_part = source_parts[0]
     target = staging / "tables" / f"{contract.name}.parquet"
-    connection.execute(
-        f"COPY (SELECT DISTINCT {projection} FROM ({union}) source ORDER BY {ordering}) "
-        f"TO {_sql_string(str(target))} (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 100000)"
-    )
+    shutil.copyfile(source, target)
+    if target.stat().st_size != source_part.get("size_bytes") or _sha256(target) != source_part.get(
+        "sha256"
+    ):
+        raise OperationalADSBaseError(f"copied source table bytes differ: {contract.name}")
     relation = f"read_parquet({_sql_string(str(target))})"
-    stats_projection = "count(*)"
-    if contract.date_column is not None:
-        stats_projection += (
-            f', min(CAST("{contract.date_column}" AS DATE)), '
-            f'max(CAST("{contract.date_column}" AS DATE))'
-        )
-    stats = connection.execute(f"SELECT {stats_projection} FROM {relation}").fetchone()
-    if stats is None or (int(stats[0]) == 0 and not contract.allow_empty):
+    columns, schema, quality = _parquet_quality(
+        connection, relation=relation, contract=contract
+    )
+    row_count_value = quality["row_count"]
+    duplicate_count = quality["duplicate_business_key_count"]
+    if not isinstance(row_count_value, int) or not isinstance(duplicate_count, int):
+        raise OperationalADSBaseError(f"source table quality metadata is invalid: {contract.name}")
+    row_count = row_count_value
+    if row_count == 0 and not contract.allow_empty:
         raise OperationalADSBaseError(f"operational ADS Base table is empty: {contract.name}")
-    nulls = _null_counts(connection, relation, expected_columns)
+    nulls = quality["null_counts"]
+    assert isinstance(nulls, dict)
     if any(nulls[column] for column in contract.business_key):
         raise OperationalADSBaseError(
             f"operational ADS Base business key contains nulls: {contract.name}"
         )
-    content_digest, fingerprint = _parquet_content_digest(
-        connection,
-        relation,
-        columns=expected_columns,
-        schema=expected_schema,
-        sort_keys=contract.sort_keys,
+    if duplicate_count:
+        raise OperationalADSBaseError(
+            f"source table has duplicate business keys: {contract.name}"
+        )
+    # Upstream schema ids may name a logical contract; ADS records the copied Arrow schema.
+    schema_sha256 = _schema_sha256(target)
+    if (
+        source_part.get("row_count") != row_count
+        or source_part.get("min_date") != quality["min_date"]
+        or source_part.get("max_date") != quality["max_date"]
+        or source_part.get("sort_keys") != list(contract.sort_keys)
+    ):
+        raise OperationalADSBaseError(f"sealed source table metadata mismatch: {contract.name}")
+    content_digest = _required_text(binding, "table_content_digest")
+    fingerprint = _find_content_fingerprint(
+        table, content_digest=content_digest, row_count=row_count
     )
+    if fingerprint is None:
+        raise OperationalADSBaseError(
+            f"sealed source table lacks its logical content fingerprint: {contract.name}"
+        )
     relative = target.relative_to(staging).as_posix()
     return {
         "name": contract.name,
@@ -1119,14 +1237,11 @@ def _build_parquet_table(
         "date_column": contract.date_column,
         "business_key": list(contract.business_key),
         "sort_keys": list(contract.sort_keys),
-        "logical_schema": [dict(item) for item in expected_schema],
+        "logical_schema": [dict(item) for item in schema],
         "table_content_digest": content_digest,
-        "content_fingerprint": fingerprint,
+        "content_fingerprint": dict(fingerprint),
         "quality": {
-            "row_count": int(stats[0]),
-            "null_counts": nulls,
-            "duplicate_business_key_count": 0,
-            "conflicting_business_key_count": 0,
+            key: value for key, value in quality.items() if key not in {"min_date", "max_date"}
         },
         "source_bindings": [dict(binding) for binding, _table, _path in sources],
         "source_lineage": [
@@ -1138,10 +1253,10 @@ def _build_parquet_table(
                 "path": relative,
                 "sha256": _sha256(target),
                 "size_bytes": target.stat().st_size,
-                "row_count": int(stats[0]),
-                "schema_sha256": _schema_sha256(target),
-                "min_date": stats[1].isoformat() if len(stats) > 1 and stats[1] else None,
-                "max_date": stats[2].isoformat() if len(stats) > 2 and stats[2] else None,
+                "row_count": row_count,
+                "schema_sha256": schema_sha256,
+                "min_date": quality["min_date"],
+                "max_date": quality["max_date"],
                 "sort_keys": list(contract.sort_keys),
             }
         ],
@@ -1170,23 +1285,21 @@ def _build_json_table(
         raise OperationalADSBaseError(
             f"JSON reference table must bind exactly one semantic source: {contract.name}"
         )
-    rows_by_key: dict[tuple[object, ...], tuple[dict[str, Any], str]] = {}
-    template: dict[str, Any] | None = None
+    rows_by_key: dict[tuple[object, ...], dict[str, Any]] = {}
+    source_path: Path | None = None
+    source_part: Mapping[str, Any] | None = None
     for binding, table, manifest_path in sources:
         parts = _source_parts(manifest_path=manifest_path, table=table, table_name=contract.name)
-        if len(parts) != 1:
-            raise OperationalADSBaseError(
-                f"JSON semantic table requires exactly one part: {contract.name}"
-            )
         payload = _load_object(parts[0])
         source_digest = payload.get("digest", payload.get("artifact_digest"))
         if source_digest != binding.get("table_content_digest"):
             raise OperationalADSBaseError(
                 f"JSON source logical content digest mismatch: {contract.name}"
             )
-        if template is None:
-            template = payload
-        generation = _required_text(binding, "lineage_digest")
+        source_path = parts[0]
+        raw_parts = table.get("parts")
+        assert isinstance(raw_parts, list) and isinstance(raw_parts[0], dict)
+        source_part = raw_parts[0]
         for row in _json_rows(payload, contract.row_path):
             try:
                 key = tuple(row[column] for column in contract.business_key)
@@ -1198,32 +1311,25 @@ def _build_json_table(
                 raise OperationalADSBaseError(
                     f"JSON semantic table business key contains nulls: {contract.name}"
                 )
-            existing = rows_by_key.get(key)
-            if existing is not None and (existing[0] != row or existing[1] != generation):
+            if key in rows_by_key:
                 raise OperationalADSBaseError(
-                    f"JSON semantic table has a conflicting business key: {contract.name}"
+                    f"JSON semantic table has duplicate business keys: {contract.name}"
                 )
-            rows_by_key[key] = (row, generation)
-    assert template is not None
+            rows_by_key[key] = row
+    assert source_path is not None
+    assert source_part is not None
     ordered = [
-        rows_by_key[key][0]
+        rows_by_key[key]
         for key in sorted(rows_by_key, key=lambda item: tuple(str(value) for value in item))
     ]
     if not ordered and not contract.allow_empty:
         raise OperationalADSBaseError(f"operational ADS Base table is empty: {contract.name}")
-    target_value = dict(template)
-    cursor: dict[str, Any] = target_value
-    row_path_parts = contract.row_path.split(".")
-    for part in row_path_parts[:-1]:
-        child = cursor.get(part)
-        if not isinstance(child, dict):
-            raise OperationalADSBaseError(
-                f"JSON row path cannot be materialized: {contract.row_path}"
-            )
-        cursor = child
-    cursor[row_path_parts[-1]] = ordered
     target = staging / "tables" / f"{contract.name}.json"
-    _write_json(target, target_value)
+    shutil.copyfile(source_path, target)
+    if target.stat().st_size != source_part.get("size_bytes") or _sha256(target) != source_part.get(
+        "sha256"
+    ):
+        raise OperationalADSBaseError(f"copied JSON source bytes differ: {contract.name}")
     columns = sorted({column for row in ordered for column in row})
     schema = tuple(
         {
@@ -1346,7 +1452,7 @@ def build_operational_ads_base(
     if target.name != plan.package_id:
         raise OperationalADSBaseError("operational ADS Base output directory must equal package id")
     if target.exists():
-        existing = verify_operational_ads_base(target, policy=policy, verify_logical_content=True)
+        existing = verify_operational_ads_base(target, policy=policy)
         if existing.plan_digest != plan.digest:
             raise OperationalADSBaseError(
                 "existing operational ADS Base used a different build plan"
@@ -1366,7 +1472,11 @@ def build_operational_ads_base(
     manifests: dict[str, tuple[Mapping[str, Any], Path]] = {}
     for index, item in enumerate(inventory):
         assert isinstance(item, dict)
-        source_manifest = _verify_bound_manifest(item, f"inventory[{index}]")
+        source_manifest = _verify_bound_manifest(
+            item,
+            f"inventory[{index}]",
+            require_ready=item.get("reuse_decision") == "reuse",
+        )
         manifests[_required_text(item, "object_id")] = (
             source_manifest,
             _source_manifest_path(item["manifest_path"], f"inventory[{index}].manifest_path"),
@@ -1490,7 +1600,7 @@ def build_operational_ads_base(
         raise
     finally:
         connection.close()
-    return verify_operational_ads_base(target, policy=policy, verify_logical_content=True)
+    return verify_operational_ads_base(target, policy=policy)
 
 
 def _verify_table_part(
@@ -1518,7 +1628,7 @@ def _verify_table_part(
         or len(parts) != 1
         or not isinstance(parts[0], dict)
         or not isinstance(source_bindings, list)
-        or not source_bindings
+        or len(source_bindings) != 1
         or any(not isinstance(item, dict) for item in source_bindings)
         or not isinstance(source_lineage, list)
         or len(source_lineage) != len(source_bindings)
@@ -1568,40 +1678,43 @@ def _verify_parquet_table(
         raise OperationalADSBaseError(
             f"operational ADS Base table schema mismatch: {contract.name}"
         )
-    primary = ", ".join(f'"{column}"' for column in contract.business_key)
-    stats_projection = "count(*)"
-    if contract.date_column is not None:
-        stats_projection += (
-            f', min(CAST("{contract.date_column}" AS DATE)), '
-            f'max(CAST("{contract.date_column}" AS DATE))'
-        )
-    stats = connection.execute(f"SELECT {stats_projection} FROM {relation}").fetchone()
-    duplicate = connection.execute(
-        f"SELECT count(*) FROM (SELECT {primary}, count(*) AS n FROM {relation} "
-        f"GROUP BY {primary} HAVING n <> 1)"
-    ).fetchone()
     quality = raw.get("quality")
+    fingerprint = raw.get("content_fingerprint")
     if (
-        stats is None
-        or duplicate is None
-        or int(duplicate[0])
-        or not isinstance(quality, dict)
-        or int(stats[0]) != part.get("row_count")
-        or int(stats[0]) != quality.get("row_count")
+        not isinstance(quality, dict)
+        or not isinstance(fingerprint, dict)
+        or quality.get("row_count") != part.get("row_count")
         or quality.get("duplicate_business_key_count") != 0
         or quality.get("conflicting_business_key_count") != 0
-        or quality.get("null_counts") != _null_counts(connection, relation, columns)
+        or not isinstance(quality.get("null_counts"), dict)
+        or set(quality["null_counts"]) != set(columns)
+        or any(
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+            for value in quality["null_counts"].values()
+        )
+        or fingerprint.get("method") != CONTENT_DIGEST_METHOD
+        or fingerprint.get("row_count") != part.get("row_count")
+        or fingerprint.get("logical_row_stream_sha256") != raw.get("table_content_digest")
     ):
         raise OperationalADSBaseError(
-            f"operational ADS Base table quality mismatch: {contract.name}"
-        )
-    min_date = stats[1].isoformat() if len(stats) > 1 and stats[1] else None
-    max_date = stats[2].isoformat() if len(stats) > 2 and stats[2] else None
-    if part.get("min_date") != min_date or part.get("max_date") != max_date:
-        raise OperationalADSBaseError(
-            f"operational ADS Base table date bounds mismatch: {contract.name}"
+            f"operational ADS Base sealed table metadata mismatch: {contract.name}"
         )
     if verify_logical_content:
+        checked_columns, checked_schema, checked_quality = _parquet_quality(
+            connection, relation=relation, contract=contract
+        )
+        if (
+            checked_columns != columns
+            or checked_schema != schema
+            or checked_quality.get("row_count") != quality.get("row_count")
+            or checked_quality.get("null_counts") != quality.get("null_counts")
+            or checked_quality.get("duplicate_business_key_count") != 0
+            or checked_quality.get("min_date") != part.get("min_date")
+            or checked_quality.get("max_date") != part.get("max_date")
+        ):
+            raise OperationalADSBaseError(
+                f"operational ADS Base table quality mismatch: {contract.name}"
+            )
         content, fingerprint = _parquet_content_digest(
             connection,
             relation,
@@ -1856,7 +1969,7 @@ def load_operational_ads_replay_reader(
 ) -> StrategyReplayADSFrameReader:
     """Open the existing typed replay reader from a clean verified Base package."""
 
-    bundle = verify_operational_ads_base(root, policy=policy, verify_logical_content=True)
+    bundle = verify_operational_ads_base(root, policy=policy)
     manifest = _load_object(bundle.root / "manifest.json")
     replay_contract = manifest.get("replay_contract")
     ranges = manifest.get("ranges")
@@ -2107,14 +2220,12 @@ def promote_operational_ads_base(
         expected_current_manifest_sha256
     ):
         raise OperationalADSBaseError("expected current digest must be sha256 or absent")
-    verified = verify_operational_ads_base(source, policy=policy, verify_logical_content=True)
+    verified = verify_operational_ads_base(source, policy=policy)
     root = base_root.resolve()
     root.mkdir(parents=True, exist_ok=True)
     destination = root / verified.package_id
     if destination.exists():
-        published = verify_operational_ads_base(
-            destination, policy=policy, verify_logical_content=True
-        )
+        published = verify_operational_ads_base(destination, policy=policy)
         if (
             published.content_digest != verified.content_digest
             or published.manifest_sha256 != verified.manifest_sha256
@@ -2125,9 +2236,7 @@ def promote_operational_ads_base(
         staging = staging_parent / verified.package_id
         try:
             shutil.copytree(verified.root, staging)
-            copied = verify_operational_ads_base(
-                staging, policy=policy, verify_logical_content=True
-            )
+            copied = verify_operational_ads_base(staging, policy=policy)
             if copied.content_digest != verified.content_digest:
                 raise OperationalADSBaseError("copied operational ADS Base content differs")
             os.replace(staging, destination)

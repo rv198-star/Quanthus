@@ -20,6 +20,8 @@ repo_root=${QUANTHUS_REPO_ROOT:-/opt/quanthus/current}
 base_root=${QUANTHUS_OPERATIONAL_ADS_BASE_ROOT:-/srv/quanthus/ads/operational/base}
 policy=${QUANTHUS_OPERATIONAL_ADS_BASE_POLICY:-${repo_root}/config/operational-ads-base.v1.json}
 python_bin=${QUANTHUS_OPERATIONAL_ADS_PYTHON:-${repo_root}/.venv/bin/python}
+dwd_current=${QUANTHUS_DWD_BASE_CURRENT:-/srv/quanthus/dwd/base/BASE_CURRENT.json}
+dws_current=${QUANTHUS_DWS_BASE_CURRENT:-/srv/quanthus/dws/base/BASE_CURRENT.json}
 
 for command in env git install realpath; do
   command -v "${command}" >/dev/null
@@ -27,6 +29,8 @@ done
 [[ -x ${python_bin} ]]
 [[ -f ${build_plan} ]]
 [[ -f ${policy} ]]
+[[ -f ${dwd_current} ]]
+[[ -f ${dws_current} ]]
 if [[ ${base_root} != /* || $(realpath -m -- "${base_root}") != "${base_root}" ]]; then
   echo "operational ADS Base root must be an absolute canonical path" >&2
   exit 2
@@ -49,6 +53,12 @@ install -d -o root -g root -m 0750 "${base_root}"
 bundle_root=${base_root}/${package_id}
 
 cd "${repo_root}"
+PYTHONPATH=src "${python_bin}" -m quanthus preflight-operational-ads-base \
+  --plan "${build_plan}" \
+  --policy "${policy}" \
+  --dwd-current "${dwd_current}" \
+  --dws-current "${dws_current}" >/dev/null
+
 PYTHONPATH=src "${python_bin}" -m quanthus build-operational-ads-base \
   --plan "${build_plan}" \
   --policy "${policy}" \

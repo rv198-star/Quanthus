@@ -24,6 +24,17 @@ class OperationalADSBaseBoundaryTests(unittest.TestCase):
         check = parser.parse_args(
             ["check-operational-ads-base", "--bundle", "/tmp/ads-base-test-v1"]
         )
+        preflight = parser.parse_args(
+            [
+                "preflight-operational-ads-base",
+                "--plan",
+                "/tmp/plan.json",
+                "--dwd-current",
+                "/tmp/dwd-current.json",
+                "--dws-current",
+                "/tmp/dws-current.json",
+            ]
+        )
         promote = parser.parse_args(
             [
                 "promote-operational-ads-base",
@@ -36,6 +47,7 @@ class OperationalADSBaseBoundaryTests(unittest.TestCase):
             ]
         )
         self.assertEqual(build.plan, Path("/tmp/plan.json"))
+        self.assertEqual(preflight.dwd_current, Path("/tmp/dwd-current.json"))
         self.assertEqual(check.bundle, Path("/tmp/ads-base-test-v1"))
         self.assertEqual(promote.base_root, Path("/tmp/base"))
         smoke = parser.parse_args(
@@ -56,7 +68,12 @@ class OperationalADSBaseBoundaryTests(unittest.TestCase):
             Path(__file__).resolve().parents[2] / "ops" / "bin" / "publish-operational-ads-base"
         ).read_text(encoding="utf-8")
         self.assertIn("repository checkout must be clean", publisher)
+        self.assertIn("preflight-operational-ads-base", publisher)
         self.assertIn("promote-operational-ads-base", publisher)
+        self.assertLess(
+            publisher.index("preflight-operational-ads-base"),
+            publisher.index("build-operational-ads-base"),
+        )
         self.assertLess(
             publisher.index("smoke-operational-ads-replay"),
             publisher.index("promote-operational-ads-base"),
@@ -103,7 +120,7 @@ class OperationalADSBaseBoundaryTests(unittest.TestCase):
         self.assertIn("BASE_CURRENT.json", design)
         self.assertIn("Operational ADS historical Base on OCI", runbook)
         self.assertLess(
-            runbook.index("deep-checks all declared"),
+            runbook.index("seal-checks all declared"),
             runbook.index("advances only"),
         )
         self.assertIn("Phase A and Phase B not accepted", evidence)

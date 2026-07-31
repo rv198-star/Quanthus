@@ -31,6 +31,7 @@ from quanthus.operational_ads_base import (
     load_operational_ads_base_policy,
     load_operational_ads_replay_reader,
     open_operational_ads_base,
+    preflight_operational_ads_base_upstreams,
     promote_operational_ads_base,
     smoke_operational_ads_replay,
     verify_operational_ads_base,
@@ -96,7 +97,7 @@ class OperationalADSBaseTests(unittest.TestCase):
                         "through_date": "2026-07-31",
                     },
                 },
-                "required_upstream_roles": ["canonical_catalog", "dwd_base"],
+                "required_upstream_roles": ["canonical_catalog", "dwd_base", "dws_base"],
                 "generation_ledger_calendar_table": "trading_calendar",
                 "tables": {
                     "benchmark_curve": {
@@ -212,21 +213,23 @@ class OperationalADSBaseTests(unittest.TestCase):
             },
         )
 
-    def _parquet_digest(self, path: Path, sort_keys: tuple[str, ...]) -> str:
+    def _parquet_identity(
+        self, path: Path, sort_keys: tuple[str, ...]
+    ) -> tuple[str, dict[str, object]]:
         assert duckdb is not None
         connection = duckdb.connect(":memory:")
         try:
             relation = f"read_parquet('{path}')"
             description = connection.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
             columns = tuple(str(item[0]) for item in description)
-            digest, _fingerprint = _parquet_content_digest(
+            digest, fingerprint = _parquet_content_digest(
                 connection,
                 relation,
                 columns=columns,
                 schema=_logical_schema(description),
                 sort_keys=sort_keys,
             )
-            return digest
+            return digest, fingerprint
         finally:
             connection.close()
 
@@ -348,11 +351,19 @@ class OperationalADSBaseTests(unittest.TestCase):
             }
             if contract.require_per_decision_pit:
                 lineage["pit_evidence_digest"] = PIT_EVIDENCE
+            content_digest, fingerprint = self._parquet_identity(path, contract.sort_keys)
+            schema_bytes = pq.ParquetFile(path).schema_arrow.serialize().to_pybytes()
+            date_values = (
+                [date.fromisoformat(str(row[contract.date_column])) for row in rows]
+                if contract.date_column is not None
+                else []
+            )
             table_values.append(
                 {
                     "name": name,
                     "role": contract.role,
-                    "table_content_digest": self._parquet_digest(path, contract.sort_keys),
+                    "table_content_digest": content_digest,
+                    "content_fingerprint": fingerprint,
                     "source_lineage": lineage,
                     "source_manifest": {
                         "manifest_id": "synthetic-export-v1-manifest",
@@ -364,6 +375,13 @@ class OperationalADSBaseTests(unittest.TestCase):
                             "path": path.name,
                             "sha256": _sha256(path),
                             "size_bytes": path.stat().st_size,
+                            "row_count": len(rows),
+                            "schema_sha256": (
+                                f"sha256:{hashlib.sha256(schema_bytes).hexdigest()}"
+                            ),
+                            "min_date": min(date_values).isoformat() if date_values else None,
+                            "max_date": max(date_values).isoformat() if date_values else None,
+                            "sort_keys": list(contract.sort_keys),
                         }
                     ],
                 }
@@ -454,6 +472,9 @@ class OperationalADSBaseTests(unittest.TestCase):
                 "profile_tables": profile_values,
             },
         )
+        (self.source / "READY").write_text(
+            _sha256(self.source / "manifest.json") + "\n", encoding="ascii"
+        )
 
     @staticmethod
     def _json_content_digest(value: object) -> str:
@@ -466,6 +487,7 @@ class OperationalADSBaseTests(unittest.TestCase):
         manifest_path = self.source / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest_sha256 = _sha256(manifest_path)
+        (self.source / "READY").write_text(manifest_sha256 + "\n", encoding="ascii")
         table_by_name = {
             item["name"]: item for item in [*manifest["tables"], *manifest["profile_tables"]]
         }
@@ -508,6 +530,13 @@ class OperationalADSBaseTests(unittest.TestCase):
                     },
                     {
                         "role": "canonical_catalog",
+                        "object_id": "synthetic-export-v1",
+                        "manifest_path": str(manifest_path),
+                        "manifest_sha256": manifest_sha256,
+                        "content_digest": SOURCE_CONTENT,
+                    },
+                    {
+                        "role": "dws_base",
                         "object_id": "synthetic-export-v1",
                         "manifest_path": str(manifest_path),
                         "manifest_sha256": manifest_sha256,
@@ -564,7 +593,7 @@ class OperationalADSBaseTests(unittest.TestCase):
                         "decision_cutoff": f"{market_date}T22:00:00+00:00",
                         "catalog_manifest_sha256": manifest_sha256,
                         "dwd_manifest_sha256": manifest_sha256,
-                        "dws_manifest_sha256": f"sha256:{'8' * 64}",
+                        "dws_manifest_sha256": manifest_sha256,
                     }
                     for market_date in ("2024-01-02",)
                 ],
@@ -590,6 +619,17 @@ class OperationalADSBaseTests(unittest.TestCase):
         second = self._build("second")
         self.assertEqual(first.content_digest, second.content_digest)
         self.assertEqual(first.plan_digest, second.plan_digest)
+        source_manifest = json.loads((self.source / "manifest.json").read_text(encoding="utf-8"))
+        source_parts = {
+            item["name"]: item["parts"][0]
+            for item in [*source_manifest["tables"], *source_manifest["profile_tables"]]
+        }
+        first_manifest = json.loads((first.root / "manifest.json").read_text(encoding="utf-8"))
+        for table in first_manifest["tables"]:
+            source_part = source_parts[table["name"]]
+            built_part = table["parts"][0]
+            self.assertEqual(built_part["sha256"], source_part["sha256"])
+            self.assertEqual(built_part["size_bytes"], source_part["size_bytes"])
         clean = self.root / "clean" / first.package_id
         clean.parent.mkdir()
         shutil.copytree(first.root, clean)
@@ -602,9 +642,10 @@ class OperationalADSBaseTests(unittest.TestCase):
         )
         self.assertEqual(verified.content_digest, first.content_digest)
 
-    def test_package_content_identity_excludes_only_part_encoding_metadata(self) -> None:
+    def test_package_content_identity_excludes_publisher_and_part_encoding_metadata(self) -> None:
         first = {
             "contract_id": "operational-ads-base-test-v1",
+            "publisher": {"code_revision": "a" * 40, "runtime": {"python_series": "3.11"}},
             "tables": [
                 {
                     "name": "daily_ohlcv_none",
@@ -622,6 +663,10 @@ class OperationalADSBaseTests(unittest.TestCase):
             ],
         }
         reencoded = json.loads(json.dumps(first))
+        reencoded["publisher"] = {
+            "code_revision": "b" * 40,
+            "runtime": {"python_series": "3.12"},
+        }
         reencoded["tables"][0]["parts"][0]["sha256"] = f"sha256:{'c' * 64}"
         reencoded["tables"][0]["parts"][0]["size_bytes"] = 120
 
@@ -634,6 +679,17 @@ class OperationalADSBaseTests(unittest.TestCase):
             _package_content_identity(first),
             _package_content_identity(reencoded),
         )
+
+    def test_publisher_revision_changes_manifest_but_not_logical_content(self) -> None:
+        first = self._build("publisher-a")
+        second = build_operational_ads_base(
+            plan=self._plan(),
+            policy=self.policy,
+            output=self.root / "publisher-b" / "ads-base-test-v1",
+            code_revision="b" * 40,
+        )
+        self.assertEqual(first.content_digest, second.content_digest)
+        self.assertNotEqual(first.manifest_sha256, second.manifest_sha256)
 
     def test_role_capabilities_isolate_decision_runner_and_outcome_tables(self) -> None:
         bundle = self._build()
@@ -707,6 +763,28 @@ class OperationalADSBaseTests(unittest.TestCase):
             )
         self.assertFalse(output.exists())
 
+    def test_plan_rejects_multiple_sources_before_staging(self) -> None:
+        value = json.loads(self.plan_path.read_text(encoding="utf-8"))
+        value["tables"][0]["sources"].append(dict(value["tables"][0]["sources"][0]))
+        self._write_json(self.plan_path, value)
+        with self.assertRaisesRegex(OperationalADSBaseError, "exactly one sealed"):
+            self._plan()
+        self.assertFalse((self.root / "multi-source").exists())
+
+    def test_tampered_source_part_is_rejected_before_publication(self) -> None:
+        source_part = self.source / "daily_ohlcv_none.parquet"
+        source_part.write_bytes(source_part.read_bytes() + b"tamper")
+        self._write_plan()
+        output = self.root / "source-tamper" / "ads-base-test-v1"
+        with self.assertRaisesRegex(OperationalADSBaseError, "source table part integrity"):
+            build_operational_ads_base(
+                plan=self._plan(),
+                policy=self.policy,
+                output=output,
+                code_revision="a" * 40,
+            )
+        self.assertFalse(output.exists())
+
     def test_interrupted_publish_exposes_no_target(self) -> None:
         output = self.root / "interrupted" / "ads-base-test-v1"
         with (
@@ -751,6 +829,51 @@ class OperationalADSBaseTests(unittest.TestCase):
         self._write_json(self.plan_path, value)
         with self.assertRaisesRegex(OperationalADSBaseError, "bound dwd_base"):
             self._plan()
+
+    def test_upstream_descriptor_drift_blocks_preflight(self) -> None:
+        plan = self._plan()
+        upstreams = {item["role"]: item for item in plan.raw["upstreams"]}
+        current_paths: dict[str, Path] = {}
+        pair_digest = f"sha256:{'6' * 64}"
+        ledger_digest = f"sha256:{'7' * 64}"
+        for role, layer, peer_role in (
+            ("dwd_base", "dwd", "dws_base"),
+            ("dws_base", "dws", "dwd_base"),
+        ):
+            upstream = upstreams[role]
+            peer = upstreams[peer_role]
+            path = self.root / f"{layer}-current.json"
+            self._write_json(
+                path,
+                {
+                    "kind": "dwd_dws_base_current",
+                    "layer": layer,
+                    "package_id": upstream["object_id"],
+                    "manifest_sha256": upstream["manifest_sha256"],
+                    "content_digest": upstream["content_digest"],
+                    "through_date": plan.through_date.isoformat(),
+                    "peer_package_id": peer["object_id"],
+                    "peer_manifest_sha256": peer["manifest_sha256"],
+                    "pair_digest": pair_digest,
+                    "input_ledger_digest": ledger_digest,
+                },
+            )
+            current_paths[layer] = path
+        report = preflight_operational_ads_base_upstreams(
+            plan,
+            dwd_current=current_paths["dwd"],
+            dws_current=current_paths["dws"],
+        )
+        self.assertEqual(report["status"], "ready")
+        descriptor = json.loads(current_paths["dwd"].read_text(encoding="utf-8"))
+        descriptor["manifest_sha256"] = f"sha256:{'9' * 64}"
+        self._write_json(current_paths["dwd"], descriptor)
+        with self.assertRaisesRegex(OperationalADSBaseError, "drifted"):
+            preflight_operational_ads_base_upstreams(
+                plan,
+                dwd_current=current_paths["dwd"],
+                dws_current=current_paths["dws"],
+            )
 
     def test_build_rejects_manifest_logical_identity_mismatch(self) -> None:
         manifest_path = self.source / "manifest.json"
@@ -866,3 +989,22 @@ class OperationalADSBaseTests(unittest.TestCase):
         )
         self.assertTrue(report["frame_audit"]["ready_for_strategy_replay"])
         self.assertFalse(report["execution_authorized"])
+
+    def test_replay_and_promotion_do_not_rehash_logical_rows(self) -> None:
+        bundle = self._build()
+        with mock.patch(
+            "quanthus.operational_ads_base._parquet_content_digest",
+            side_effect=AssertionError("logical row hashing must be explicit"),
+        ):
+            load_operational_ads_replay_reader(
+                bundle.root,
+                policy=self.policy,
+                corporate_action_policy=load_corporate_action_normalization_policy(),
+            )
+            promoted = promote_operational_ads_base(
+                source=bundle.root,
+                base_root=self.root / "fast-promotion",
+                policy=self.policy,
+                expected_current_manifest_sha256="absent",
+            )
+        self.assertEqual(promoted.content_digest, bundle.content_digest)

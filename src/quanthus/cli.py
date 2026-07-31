@@ -92,6 +92,7 @@ from quanthus.operational_ads_base import (
     load_operational_ads_base_plan,
     load_operational_ads_base_policy,
     load_operational_ads_replay_reader,
+    preflight_operational_ads_base_upstreams,
     promote_operational_ads_base,
     smoke_operational_ads_replay,
     verify_operational_ads_base,
@@ -410,12 +411,26 @@ def _parser() -> argparse.ArgumentParser:
     operational_ads_build.add_argument("--output", type=Path, required=True)
     operational_ads_build.add_argument("--code-revision", required=True)
 
+    operational_ads_preflight = subparsers.add_parser(
+        "preflight-operational-ads-base",
+        help="verify current DWD/DWS Base descriptors still match an exact ADS plan",
+    )
+    operational_ads_preflight.add_argument("--plan", type=Path, required=True)
+    operational_ads_preflight.add_argument("--policy", type=Path)
+    operational_ads_preflight.add_argument("--dwd-current", type=Path, required=True)
+    operational_ads_preflight.add_argument("--dws-current", type=Path, required=True)
+
     operational_ads_check = subparsers.add_parser(
         "check-operational-ads-base",
         help="deep-check an operational ADS Base without producer or mutable-pointer access",
     )
     operational_ads_check.add_argument("--bundle", type=Path, required=True)
     operational_ads_check.add_argument("--policy", type=Path)
+    operational_ads_check.add_argument(
+        "--deep-logical-content",
+        action="store_true",
+        help="explicitly recompute slow logical row digests after the seal check",
+    )
 
     operational_ads_promote = subparsers.add_parser(
         "promote-operational-ads-base",
@@ -1134,11 +1149,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 code_revision=args.code_revision,
             )
             print(json.dumps(operational_base.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "preflight-operational-ads-base":
+            operational_policy = load_operational_ads_base_policy(args.policy)
+            preflight_report = preflight_operational_ads_base_upstreams(
+                load_operational_ads_base_plan(args.plan, policy=operational_policy),
+                dwd_current=args.dwd_current,
+                dws_current=args.dws_current,
+            )
+            print(json.dumps(preflight_report, ensure_ascii=True, sort_keys=True))
         elif args.command == "check-operational-ads-base":
             operational_base = verify_operational_ads_base(
                 args.bundle,
                 policy=load_operational_ads_base_policy(args.policy),
-                verify_logical_content=True,
+                verify_logical_content=args.deep_logical_content,
             )
             print(json.dumps(operational_base.to_dict(), ensure_ascii=True, sort_keys=True))
         elif args.command == "promote-operational-ads-base":

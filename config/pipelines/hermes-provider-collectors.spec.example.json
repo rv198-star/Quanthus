@@ -29,6 +29,27 @@
       }
     },
     "weekly-corrections": {
+      "raw_f10": {
+        "argv": ["{tdx_python}", "-m", "quanthus.providers.fundamentals", "raw-f10", "--market-date", "{market_date}", "--stock-list", "{stock_list}", "--output", "{output}", "--receipts", "{receipts}", "--checkpoint-dir", "{provider_checkpoint}", "--batch-size", "200"],
+        "provider": "tdx.F10C+F10",
+        "receipt_contract": "per_security_v1",
+        "return_mode": "artifact",
+        "timeout_seconds": 19800
+      },
+      "financial_statements": {
+        "argv": ["{fundamentals_python}", "-m", "quanthus.providers.fundamentals", "financial-statements", "--market-date", "{market_date}", "--stock-list", "{stock_list}", "--output", "{output}", "--receipts", "{receipts}", "--quarterly-output", "{quarterly_output}", "--checkpoint-dir", "{statement_checkpoint}", "--statement-periods", "{statement_periods}", "--workers", "{statement_workers}", "--batch-size", "{statement_batch_size}"],
+        "provider": "sina.CompanyFinanceService.getFinanceReport2022",
+        "receipt_contract": "per_security_v1",
+        "return_mode": "artifact",
+        "timeout_seconds": 19800
+      },
+      "industry_membership": {
+        "argv": ["{fundamentals_python}", "-m", "quanthus.providers.fundamentals", "industry-membership", "--market-date", "{market_date}", "--stock-list", "{stock_list}", "--output", "{output}", "--receipts", "{receipts}"],
+        "provider": "baostock.query_stock_industry",
+        "receipt_contract": "per_security_v1",
+        "return_mode": "artifact",
+        "timeout_seconds": 3600
+      },
       "adjustment_evidence": {
         "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "adjustment-evidence", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.adjustment-evidence",
@@ -44,11 +65,6 @@
         "provider": "hermes.dividends",
         "timeout_seconds": 3600
       },
-      "financial_quarterly": {
-        "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "financial-quarterly", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
-        "provider": "hermes.financial-quarterly",
-        "timeout_seconds": 3600
-      },
       "shareholder_count": {
         "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "shareholder-count", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "hermes.shareholder-count",
@@ -58,6 +74,16 @@
         "argv": ["{python}", "-m", "quanthus.providers.ods_snapshot", "st-status", "--start", "{window_start}", "--end", "{market_date}", "--output", "{output}", "--home", "{home}"],
         "provider": "baostock.isST",
         "timeout_seconds": 3600
+      }
+    },
+    "intraday-archive": {
+      "after_hours_fixed_price_trades": {
+        "argv": ["{tdx_python}", "-m", "quanthus.providers.after_hours_tdx", "--market-date", "{market_date}", "--stock-list", "{stock_list}", "--output", "{output}", "--receipts", "{receipts}"],
+        "provider": "tdx.get_history_transaction_data",
+        "receipt_contract": "per_security_v1",
+        "allow_all_justified_empty": true,
+        "return_mode": "artifact",
+        "timeout_seconds": 14400
       }
     }
   }

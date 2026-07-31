@@ -12,7 +12,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from quanthus.pipelines import lane_runner
-from quanthus.providers import ods_snapshot, trading_calendar
+from quanthus.providers import after_hours_tdx, fundamentals, ods_snapshot, trading_calendar
 
 
 def _write_parquet(path: Path, rows: list[dict[str, object]]) -> None:
@@ -175,6 +175,178 @@ def test_provider_spec_supports_repository_python_entrypoint(
     assert meta["exit_code"] == 0
     assert meta["argv"][0]
     assert "quanthus.providers.ods_snapshot" in meta["argv"]
+
+
+def test_f10_collector_uses_dynamic_directory_and_per_security_receipts() -> None:
+    class Client:
+        def F10C(self, *, symbol: str):
+            return [{"name": "latest", "filename": f"{symbol}.txt", "start": 1, "length": 9}]
+
+        def F10(self, *, symbol: str, name: str):
+            assert name == "latest"
+            return f"{symbol} profile\nupdate date: none"
+
+    rows, receipts, metadata = fundamentals.collect_f10(
+        ["000001", "600519"],
+        date(2026, 7, 31),
+        client_factory=lambda: (Client(), "fixture:7709"),
+    )
+
+    assert [row["security_id"] for row in rows] == ["000001", "600519"]
+    assert {row["status"] for row in receipts} == {"success_nonempty"}
+    assert {row["response_rows"] for row in receipts} == {1}
+    assert metadata["server"] == "fixture:7709"
+
+
+def test_statement_bootstrap_is_checkpointed_and_derives_nonempty_quarterly(
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, paper_code: str, source: str) -> None:
+            self._body = {
+                "result": {
+                    "status": {"code": 0},
+                    "data": {
+                        "report_list": {
+                            "2026-06-30": {
+                                "publish_date": "2026-07-20",
+                                "update_time": "2026-07-20 12:00:00",
+                                "data": [
+                                    {"item_field": "BIZINCO", "item_value": "100"},
+                                    {"item_field": "NETPROFIT", "item_value": "10"},
+                                ],
+                            }
+                        }
+                    },
+                }
+            }
+            self.content = json.dumps(self._body).encode()
+            calls.append((paper_code, source))
+
+        def json(self):
+            return self._body
+
+    def get(_url: str, *, params: dict[str, str], **_kwargs: object) -> Response:
+        return Response(params["paperCode"], params["source"])
+
+    kwargs = {
+        "output": tmp_path / "financial_statements.parquet",
+        "receipts_path": tmp_path / "financial_statements.receipts.parquet",
+        "quarterly_output": tmp_path / "financial_quarterly.parquet",
+        "checkpoint_dir": tmp_path / "checkpoints",
+        "periods": 100,
+        "workers": 2,
+        "batch_size": 1,
+        "get": get,
+    }
+    first = fundamentals.collect_statements_checkpointed(
+        ["000001", "600519"], date(2026, 7, 31), **kwargs
+    )
+    second = fundamentals.collect_statements_checkpointed(
+        ["000001", "600519"], date(2026, 7, 31), **kwargs
+    )
+
+    assert first["statement_rows"] == 6
+    assert first["receipt_rows"] == 6
+    assert first["quarterly_rows"] == 2
+    assert first["failed_receipts"] == 0
+    assert second["reused_batches"] == 2
+    assert len(calls) == 6
+    quarterly = pq.read_table(kwargs["quarterly_output"]).to_pylist()
+    assert {row["revenue"] for row in quarterly} == {"100"}
+
+
+def test_statement_request_retries_once_before_success() -> None:
+    attempts = 0
+
+    class Response:
+        status_code = 200
+        content = b'{"result":{"status":{"code":0},"data":{"report_list":{}}}}'
+
+        @staticmethod
+        def json():
+            return json.loads(Response.content)
+
+    def get(*_args: object, **_kwargs: object) -> Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise TimeoutError("fixture timeout")
+        return Response()
+
+    _rows, receipts, _metadata = fundamentals.collect_statements(
+        ["000001"], date(2026, 7, 31), periods=8, workers=1, get=get
+    )
+
+    retried = next(row for row in receipts if '"source": "fzb"' in row["request_json"])
+    assert retried["status"] == "justified_empty"
+    assert retried["attempts"] == 2
+
+
+def test_industry_missing_membership_is_an_explicit_failure_receipt() -> None:
+    class Result:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self) -> None:
+            self._rows = iter([["2026-07-31", "sz.000001", "Ping An", "J66Bank", "sw"]])
+            self.current: list[str] | None = None
+
+        def next(self) -> bool:
+            self.current = next(self._rows, None)
+            return self.current is not None
+
+        def get_row_data(self) -> list[str]:
+            assert self.current is not None
+            return self.current
+
+    class BaoStock:
+        @staticmethod
+        def login():
+            return type("Login", (), {"error_code": "0", "error_msg": "ok"})()
+
+        @staticmethod
+        def query_stock_industry():
+            return Result()
+
+        @staticmethod
+        def logout() -> None:
+            return None
+
+    rows, receipts, _metadata = fundamentals.collect_industry(
+        ["000001", "600519"], date(2026, 7, 31), bs_module=BaoStock
+    )
+
+    assert [row["security_id"] for row in rows] == ["000001"]
+    failed = next(row for row in receipts if row["security_id"] == "600519")
+    assert failed["status"] == "failed"
+    assert failed["reason_code"] == "missing_industry_membership"
+
+
+def test_after_hours_collector_preserves_sparse_matches() -> None:
+    class Client:
+        @staticmethod
+        def transactions(**_kwargs: object):
+            return [
+                {"time": "15:29", "price": 10.0, "vol": 2, "buyorsell": 5},
+                {"time": "15:04", "price": 9.9, "vol": 1, "buyorsell": 1},
+            ]
+
+    rows, metadata = after_hours_tdx.collect_symbol(
+        Client(),
+        code="000001",
+        security_type="equity",
+        market_date=date(2026, 7, 31),
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["quantity_units"] == 200.0
+    assert rows[0]["buy_or_sell_code"] == 5
+    assert metadata["provider_rows"] == 2
 
 
 def test_minute_collector_defaults_to_repository_module(

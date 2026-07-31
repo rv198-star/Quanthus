@@ -2,7 +2,7 @@
 
 - Status: Accepted for the current ODS schedule; candidate-build boundary amended by ADR 0005
 - Date: 2026-07-25
-- Last reconciled: 2026-07-28
+- Last reconciled: 2026-07-31
 - Scope: Recurring acquisition and reconciliation on Hermes and CN01 ODS nodes
 - Contract: `config/schedules/hermes-ods-schedule.v1.json`
 - Migration tracking: GitHub issue #41
@@ -74,7 +74,8 @@ connection churn; only provider/network errors receive bounded reconnect retries
 process-global socket receives a 30-second timeout after every login. The stock scan performs one
 initial pass and one bounded retry of only the missing set, then fails closed on any residual gap.
 
-Contract revision `hermes-1730-window-gated-20260729` owns the v2 five-open-session A/B. Hermes
+Contract revision `hermes-full-ods-scope-20260731` retains the v2 five-open-session A/B and adds
+mandatory daily valuation, complete weekly fundamentals, and sparse after-hours acquisition. Hermes
 starts at 17:30 and scans at first provider readiness; CN01 starts at 19:00. The 2026-07-29 15:40
 Hermes sample remains v1 evidence and is not mixed into the v2 sample. Rendered node units set
 the node id and use timeouts aligned to the shared 19:46 completion deadline. Both attempts retain
@@ -99,9 +100,11 @@ streams have separate timers, locks, checkpoints, logs, attempts, manifests, and
 markers. 1m runs first because its upstream history is retained for only about three to four
 months. These provider bars cover the continuous-trading and closing-call-auction grid through
 15:00 only. `auction_session_complete` therefore does not imply coverage of sparse after-hours
-fixed-price matches from 15:05 through 15:30. Those matches belong to the separate
-`after_hours_fixed_price_trades.v1` contract. Minute consumers and intraday intervention remain
-deferred, but acquisition does not.
+fixed-price matches from 15:05 through 15:30. The 1m attempt therefore also acquires the separate
+`after_hours_fixed_price_trades.v1` sparse dataset and a receipt for every requested A-share and ETF.
+The trades may be globally empty only when every request completed successfully and carries an
+explicit justified-empty receipt. The 5m attempt does not repeat this acquisition. Minute consumers
+and intraday intervention remain deferred, but acquisition does not.
 
 Each minute timer first performs the same fresh attempt-local calendar refresh and then applies
 the same SSE/SZSE three-state preflight as the market daily lane. Both open permits direct
@@ -114,10 +117,15 @@ replacement proves continuous coverage through a controlled cutover.
 
 ### Weekly corrections
 
-Weekly primary acquisition covers shareholder counts, quarterly financials, corporate actions,
-dividends, adjustment evidence, detailed ST announcement history, security lifecycle, and
-industry membership. Daily-data reconciliation is bounded: 20 sessions for none bars and index
-bars, 90 days for status, and a full diff for the calendar and security master.
+Weekly primary acquisition covers shareholder counts, raw TDX F10 text, complete balance-sheet,
+income-statement and cash-flow provider responses, a quarterly projection derived from the complete
+income statements, real BaoStock industry membership, corporate actions, dividends, adjustment
+evidence, detailed ST announcement history, and security lifecycle. F10 and statement collectors
+checkpoint bounded security batches and stream the completed parts into Parquet so a retry neither
+restarts the whole market nor loads the full archive into memory. Every requested security/source
+has status `success_nonempty`, `justified_empty`, or `failed`; any failed receipt blocks READY.
+Daily-data reconciliation is bounded: 20 sessions for none bars and index bars, 90 days for status,
+and a full diff for the calendar and security master.
 
 Every compared key is classified as `same`, `missing_in_daily`, `changed_upstream`, or
 `conflict`. Weekly output is a new correction revision and never overwrites the daily release.

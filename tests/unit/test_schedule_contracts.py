@@ -28,7 +28,7 @@ class ScheduleContractTests(unittest.TestCase):
 
         self.assertEqual(contract.schedule_id, "hermes-ods-schedule-v1")
         self.assertEqual(
-            contract.contract_revision, "hermes-1730-window-gated-20260729"
+            contract.contract_revision, "hermes-full-ods-scope-20260731"
         )
         self.assertEqual(len(contract.lanes), 5)
 
@@ -181,6 +181,35 @@ class ScheduleContractTests(unittest.TestCase):
             lane["may_overwrite_daily"] = True
 
         with self.assertRaisesRegex(ScheduleContractError, "must not overwrite"):
+            load_schedule_contract(self._mutated(mutate))
+
+    def test_rejects_market_lane_without_valuation(self) -> None:
+        def mutate(payload: dict[str, object]) -> None:
+            lane = next(
+                lane for lane in payload["lanes"] if lane["id"] == "market-daily-core"
+            )
+            lane["datasets"].remove("valuation_daily_delta")
+
+        with self.assertRaisesRegex(ScheduleContractError, "daily valuation"):
+            load_schedule_contract(self._mutated(mutate))
+
+    def test_rejects_weekly_lane_without_complete_statements(self) -> None:
+        def mutate(payload: dict[str, object]) -> None:
+            lane = next(
+                lane for lane in payload["lanes"] if lane["id"] == "weekly-corrections"
+            )
+            lane["primary_datasets"].remove("financial_statements")
+
+        with self.assertRaisesRegex(ScheduleContractError, "complete fundamentals"):
+            load_schedule_contract(self._mutated(mutate))
+
+    def test_rejects_1m_lane_without_after_hours_receipts(self) -> None:
+        def mutate(payload: dict[str, object]) -> None:
+            lane = next(lane for lane in payload["lanes"] if lane["id"] == "intraday-archive")
+            stream = next(stream for stream in lane["streams"] if stream["bar_size"] == "1m")
+            stream["additional_datasets"].remove("after_hours_fixed_price_receipts")
+
+        with self.assertRaisesRegex(ScheduleContractError, "per-security receipts"):
             load_schedule_contract(self._mutated(mutate))
 
 

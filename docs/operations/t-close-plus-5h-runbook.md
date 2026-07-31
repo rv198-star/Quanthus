@@ -68,8 +68,14 @@ publication begins. Publication advances `daily_market_CURRENT.json` and
 `daily_market_summary_CURRENT.json` separately; consumers of the DWS pointer must validate its
 `dwd_revision` rather than assuming the two pointers form one atomic pair.
 
-Weekly source jobs use the weekly example and preserve correction lookbacks. Their OCI transforms
-are added as separate pipeline configurations rather than inserted into the daily critical path.
+Weekly source jobs use the weekly example and preserve correction lookbacks. The node environment
+may select separate interpreters with `ASTOCK_FUNDAMENTALS_PYTHON` and `ASTOCK_TDX_PYTHON`; both
+inherit the checkout's exported `PYTHONPATH`. Raw F10 and complete three-statement jobs retain
+restartable per-date batch checkpoints under the lane shadow root. Operators must verify nonzero
+F10, statement, quarterly, industry, and receipt artifacts, zero `failed` receipts, and an immutable
+READY release. A zero-row table, a missing security receipt, or a locally re-sliced historical
+Parquet is not successful upstream acquisition. Their OCI transforms are added as separate pipeline
+configurations rather than inserted into the daily critical path.
 
 ### Corporate-action replay revision
 

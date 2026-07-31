@@ -55,10 +55,11 @@ financial revision, so it cannot supersede the richer canonical files. The old
 `dataset_manifest.parquet` is also retained only as `legacy_source_lineage`; it is known to describe
 older row counts and is not the Base catalog.
 
-Current Hermes holdings do not contain a governed raw F10/full-statement archive. The Base includes
-the existing `financial_quarterly` summary but does not represent that summary as F10. Adding a
-formal F10 source requires a separate collector/schema/retention contract and then a new Base
-revision; this package must not invent that source during migration.
+The recurring schedule now defines governed collectors, schemas, restartable checkpoints, and
+per-security receipts for raw F10 and complete three-statement responses. This design change does
+not retroactively place those assets in the provisional Base. The final package must retain and
+verify a successful full-market acquisition before adding the new files and removing the existing
+scope gap; until then the accepted Base continues to describe the holdings honestly.
 
 ## 3. Selection And Quality Gates
 
@@ -68,11 +69,10 @@ by a versioned reason. Mixed roots such as `data/revisions` and `data/shadow` ar
 each discovered source unit is explicitly included or inherits a reviewed exclusion; a broad
 `mixed` label cannot hide an unresolved child. Unknown members fail closed.
 
-The inventory also carries machine-readable source-family scope gaps. The current policy names raw
-F10 and full financial statements as `not_formally_acquired`; this is a disclosure, not a claim of
-coverage. The Base is maximal over the governed source holdings that actually exist. It cannot be
-described as full-statement complete until a separately governed acquisition is retained and a new
-Base revision passes the same gates.
+The inventory also carries machine-readable source-family scope gaps. The current provisional
+policy still names raw F10 and full financial statements as `not_formally_acquired`; this remains
+true until the first accepted acquisition is retained, the policy selects those exact bytes, and a
+new Base revision passes the same gates. Merely merging collector code cannot close the gap.
 
 Selected files bind source path, target path, byte size, SHA-256, format, schema hash, row count,
 null counts, and declared date bounds. Keyed Parquet datasets additionally require zero null keys

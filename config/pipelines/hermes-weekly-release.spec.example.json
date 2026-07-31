@@ -20,10 +20,38 @@
       "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
     },
     {
-      "name": "financial_quarterly_revision",
-      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/financial_quarterly_revision.parquet",
-      "relative_path": "artifacts/financial_quarterly_revision.parquet",
-      "source_revision": "financial-quarterly-lookback-revision",
+      "name": "raw_f10",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/raw_f10.parquet",
+      "relative_path": "artifacts/raw_f10.parquet",
+      "source_revision": "tdx-f10-snapshot-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "financial_statements",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/financial_statements.parquet",
+      "relative_path": "artifacts/financial_statements.parquet",
+      "source_revision": "sina-complete-three-statement-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "financial_quarterly",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/financial_quarterly.parquet",
+      "relative_path": "artifacts/financial_quarterly.parquet",
+      "source_revision": "complete-income-statement-projection-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "industry_membership",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/industry_membership.parquet",
+      "relative_path": "artifacts/industry_membership.parquet",
+      "source_revision": "baostock-industry-membership-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
+      "name": "fundamentals_receipts",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/fundamentals_receipts.parquet",
+      "relative_path": "artifacts/fundamentals_receipts.parquet",
+      "source_revision": "per-security-receipts-v1",
       "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
     },
     {

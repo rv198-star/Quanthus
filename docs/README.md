@@ -104,8 +104,10 @@ nodes.
   hold the same 20,743-file, 11,145,679,742-byte package with manifest
   `sha256:d38b8332ddd5427104bbc6f71bf89df1c81f85cca507a1f9a80ac58662b7352e` and content digest
   `sha256:e51644929fb4c5fc20f30db0652aa469c6164ac27d1ffcb1c864c2c46119589d`.
-  The final July package remains blocked until accepted 2026-07-31 post-close releases exist; raw
-  F10 and full financial statements remain an explicit not-formally-acquired scope gap.
+  The final July package remains blocked until accepted 2026-07-31 post-close releases and the first
+  full-market fundamentals acquisition exist. Repository collectors and fail-closed schedules now
+  cover raw F10, complete three-statement responses, real industry membership, and per-security
+  receipts, but the Base scope gap remains open until those runtime assets are accepted.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional

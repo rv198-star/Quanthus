@@ -76,6 +76,7 @@ class OdsDailySpec:
     source: str
     increment_start: date
     market_required_artifacts: tuple[str, ...]
+    market_date_required_artifacts: tuple[tuple[date, tuple[str, ...]], ...]
     event_required_artifacts: tuple[str, ...]
 
 
@@ -415,12 +416,39 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
     if len({item.dataset_family for item in scope_gaps}) != len(scope_gaps):
         raise OdsBaseError("source.scope_gaps dataset families must be unique")
 
+    daily_increment_start = _parse_date(
+        daily_value.get("increment_start"), "daily.increment_start"
+    )
+    market_date_required_values = daily_value.get(
+        "market_date_required_artifacts", {}
+    )
+    if not isinstance(market_date_required_values, Mapping):
+        raise OdsBaseError("daily.market_date_required_artifacts must be an object")
+    market_date_required_artifacts: list[tuple[date, tuple[str, ...]]] = []
+    for market_date_value, artifact_values in market_date_required_values.items():
+        market_date = _parse_date(
+            market_date_value, "daily.market_date_required_artifacts date"
+        )
+        artifacts = _string_list(
+            artifact_values,
+            f"daily.market_date_required_artifacts.{market_date.isoformat()}",
+        )
+        market_date_required_artifacts.append((market_date, artifacts))
+    market_required_artifacts = _string_list(
+        daily_value.get("market_required_artifacts"),
+        "daily.market_required_artifacts",
+    )
+    if any(
+        market_date < daily_increment_start
+        or set(artifacts).intersection(market_required_artifacts)
+        for market_date, artifacts in market_date_required_artifacts
+    ):
+        raise OdsBaseError("daily date-specific market requirements are invalid")
     daily = OdsDailySpec(
         source=_safe_relative(_text(daily_value, "source"), "daily.source").as_posix(),
-        increment_start=_parse_date(daily_value.get("increment_start"), "daily.increment_start"),
-        market_required_artifacts=_string_list(
-            daily_value.get("market_required_artifacts"), "daily.market_required_artifacts"
-        ),
+        increment_start=daily_increment_start,
+        market_required_artifacts=market_required_artifacts,
+        market_date_required_artifacts=tuple(sorted(market_date_required_artifacts)),
         event_required_artifacts=_string_list(
             daily_value.get("event_required_artifacts"), "daily.event_required_artifacts"
         ),
@@ -968,7 +996,7 @@ def _selected_daily_date_releases(
     ):
         raise OdsBaseError(f"daily ODS CURRENT is inconsistent: {market_date}")
 
-    market_required = set(policy.daily.market_required_artifacts)
+    market_required = set(_market_required_artifacts(policy.daily, market_date))
     event_required = set(policy.daily.event_required_artifacts)
     market_candidates: list[dict[str, Any]] = []
     event_candidates: list[dict[str, Any]] = []
@@ -1051,6 +1079,20 @@ def _selected_daily_date_releases(
     return annotate(market, "market"), annotate(events, "events"), inventory
 
 
+def _market_required_artifacts(
+    spec: OdsDailySpec, market_date: date
+) -> tuple[str, ...]:
+    additional = next(
+        (
+            artifacts
+            for effective_date, artifacts in spec.market_date_required_artifacts
+            if effective_date == market_date
+        ),
+        (),
+    )
+    return (*spec.market_required_artifacts, *additional)
+
+
 def audit_ods_base_release_gate(
     *,
     release_root: Path,
@@ -1100,7 +1142,7 @@ def audit_ods_base_release_gate(
     if _RELEASE_ATTEMPT.fullmatch(market_attempt) is None:
         raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
     market = _ready_release(daily_date_root / market_attempt, market_date)
-    market_artifacts = set(policy.daily.market_required_artifacts)
+    market_artifacts = set(_market_required_artifacts(policy.daily, market_date))
     event_artifacts = set(policy.daily.event_required_artifacts)
     if (
         pointer.get("schema_version") != 1

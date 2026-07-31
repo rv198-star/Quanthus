@@ -66,7 +66,9 @@ repository-owned BaoStock range collector in `src/quanthus/providers/valuation_h
 slice of that retained Parquet. It records one receipt per requested security, checkpoints fixed
 security batches, and fails on provider errors, empty responses, identity/date drift, or an
 all-null valuation response. Normal post-repair valuation remains owned by the daily market lane;
-the repair collector is not a second recurring writer.
+the repair collector is not a second recurring writer. The final policy date-scopes the new
+`valuation_daily_delta` requirement to 2026-07-31 so earlier releases remain governed by the
+contract that produced them.
 
 ## 3. Selection And Quality Gates
 

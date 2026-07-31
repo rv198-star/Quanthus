@@ -488,9 +488,11 @@
         "stock_list",
         "trading_calendar",
         "index_daily_delta",
-        "valuation_daily_delta",
         "adjustment_evidence_delta"
       ],
+      "market_date_required_artifacts": {
+        "2026-07-31": ["valuation_daily_delta"]
+      },
       "event_required_artifacts": [
         "announcements_delta",
         "suspensions_delta",

@@ -546,7 +546,11 @@ class OdsBaseTests(unittest.TestCase):
         self.assertIn(
             "source_evidence_valuation_history_july_repair_checkpoints", datasets
         )
-        self.assertIn("valuation_daily_delta", policy.daily.market_required_artifacts)
+        self.assertNotIn("valuation_daily_delta", policy.daily.market_required_artifacts)
+        self.assertEqual(
+            policy.daily.market_date_required_artifacts,
+            ((date(2026, 7, 31), ("valuation_daily_delta",)),),
+        )
 
     def test_archive_source_exception_is_bound_and_tamper_evident(self) -> None:
         release_root = self.data / "revisions" / "cn01-weekly-gap-fill"
@@ -642,6 +646,28 @@ class OdsBaseTests(unittest.TestCase):
             weekly.source_exception.manifest_sha256,
             "sha256:074afad64b6c80e2f83f7265f360f13e04da2da5f15114d67de49a2b56a21b7f",
         )
+
+    def test_date_specific_market_requirement_does_not_reject_prior_dates(self) -> None:
+        policy_value = json.loads(self.policy_path.read_text(encoding="utf-8"))
+        policy_value["source"]["daily"]["market_date_required_artifacts"] = {
+            "2026-07-31": ["valuation_daily_delta"]
+        }
+        self._write_json(self.policy_path, policy_value)
+        policy = load_ods_base_policy(self.policy_path)
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+
+        prior = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=policy,
+        )
+        self.assertEqual(prior["through_date"], "2026-07-30")
+        with self.assertRaisesRegex(OdsBaseError, "market or event release is missing"):
+            audit_ods_base_sources(
+                astock_root=self.astock,
+                through_date=date(2026, 7, 31),
+                policy=policy,
+            )
 
     def test_frozen_inventory_blocks_changed_sources(self) -> None:
         inventory = self._inventory(date(2026, 7, 30), "frozen.json")

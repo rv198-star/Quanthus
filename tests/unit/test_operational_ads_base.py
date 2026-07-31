@@ -23,6 +23,7 @@ from quanthus.corporate_action_normalization import load_corporate_action_normal
 from quanthus.operational_ads_base import (
     OperationalADSBaseError,
     _logical_schema,
+    _package_content_identity,
     _parquet_content_digest,
     build_operational_ads_base,
     load_operational_ads_base_current,
@@ -600,6 +601,39 @@ class OperationalADSBaseTests(unittest.TestCase):
             verify_logical_content=True,
         )
         self.assertEqual(verified.content_digest, first.content_digest)
+
+    def test_package_content_identity_excludes_only_part_encoding_metadata(self) -> None:
+        first = {
+            "contract_id": "operational-ads-base-test-v1",
+            "tables": [
+                {
+                    "name": "daily_ohlcv_none",
+                    "table_content_digest": SOURCE_CONTENT,
+                    "parts": [
+                        {
+                            "path": "tables/daily_ohlcv_none.parquet",
+                            "sha256": f"sha256:{'a' * 64}",
+                            "size_bytes": 100,
+                            "row_count": 2,
+                            "schema_sha256": f"sha256:{'b' * 64}",
+                        }
+                    ],
+                }
+            ],
+        }
+        reencoded = json.loads(json.dumps(first))
+        reencoded["tables"][0]["parts"][0]["sha256"] = f"sha256:{'c' * 64}"
+        reencoded["tables"][0]["parts"][0]["size_bytes"] = 120
+
+        self.assertEqual(
+            _package_content_identity(first),
+            _package_content_identity(reencoded),
+        )
+        reencoded["tables"][0]["parts"][0]["path"] = "tables/other.parquet"
+        self.assertNotEqual(
+            _package_content_identity(first),
+            _package_content_identity(reencoded),
+        )
 
     def test_role_capabilities_isolate_decision_runner_and_outcome_tables(self) -> None:
         bundle = self._build()

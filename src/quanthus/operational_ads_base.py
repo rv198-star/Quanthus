@@ -969,6 +969,36 @@ def _runtime_identity() -> dict[str, object]:
     }
 
 
+def _package_content_identity(value: Mapping[str, Any]) -> dict[str, object]:
+    """Return the logical package identity without Parquet encoding metadata."""
+
+    identity: dict[str, object] = dict(value)
+    raw_tables = value.get("tables")
+    if not isinstance(raw_tables, list):
+        raise OperationalADSBaseError("operational ADS Base content tables are invalid")
+    tables: list[dict[str, object]] = []
+    for raw_table in raw_tables:
+        if not isinstance(raw_table, dict):
+            raise OperationalADSBaseError("operational ADS Base content table is invalid")
+        table: dict[str, object] = dict(raw_table)
+        raw_parts = raw_table.get("parts")
+        if not isinstance(raw_parts, list) or any(
+            not isinstance(part, dict) for part in raw_parts
+        ):
+            raise OperationalADSBaseError("operational ADS Base content parts are invalid")
+        table["parts"] = [
+            {
+                key: item
+                for key, item in part.items()
+                if key not in {"sha256", "size_bytes"}
+            }
+            for part in raw_parts
+        ]
+        tables.append(table)
+    identity["tables"] = tables
+    return identity
+
+
 def _schema_sha256(path: Path) -> str:
     try:
         import pyarrow.parquet as pq  # type: ignore[import-untyped]
@@ -1443,7 +1473,7 @@ def build_operational_ads_base(
             "research_only": True,
             "execution_authorized": False,
             **content_value,
-            "content_digest": _canonical_digest(content_value),
+            "content_digest": _canonical_digest(_package_content_identity(content_value)),
         }
         _write_json(staging / "manifest.json", manifest)
         (staging / "READY").write_text(_sha256(staging / "manifest.json") + "\n", encoding="ascii")
@@ -1694,7 +1724,7 @@ def verify_operational_ads_base(
         }
     }
     content_digest = _required_text(manifest, "content_digest")
-    if content_digest != _canonical_digest(content_value):
+    if content_digest != _canonical_digest(_package_content_identity(content_value)):
         raise OperationalADSBaseError("operational ADS Base content digest mismatch")
     raw_tables = manifest.get("tables")
     if not isinstance(raw_tables, list):

@@ -97,6 +97,9 @@ content digest, row and null counts, zero duplicate/conflict facts, date bounds,
 SHA-256, schema SHA-256, sort keys, path-free original lineage, exact upstreams, inventory,
 generation ledger, runtime, code revision, and plan digest. `manifest.json` follows all table
 parts; `READY` is written last and binds the exact manifest SHA-256 before one directory rename.
+The package content digest binds logical table content, schema, lineage, policy, and upstream
+identity; it excludes each generated part's encoding-dependent byte size and SHA-256. Those
+physical facts remain mandatory in the manifest and are bound by the manifest SHA-256 and `READY`.
 
 The deep verifier starts only from `manifest.json` and `READY`, checks the complete declared file
 set, recomputes table statistics and logical content, and reads no build-plan or producer path.

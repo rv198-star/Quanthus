@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 0027
+
+if [[ $# -ne 5 ]]; then
+  echo "usage: $0 <build-plan.json> <package-id> <expected-current-manifest-sha256|absent> <smoke-start> <smoke-end>" >&2
+  exit 2
+fi
+if [[ ${EUID} -ne 0 ]]; then
+  echo "operational ADS Base publication must run as root on OCI" >&2
+  exit 2
+fi
+
+build_plan=$1
+package_id=$2
+expected_current=$3
+smoke_start=$4
+smoke_end=$5
+repo_root=${QUANTHUS_REPO_ROOT:-/opt/quanthus/current}
+base_root=${QUANTHUS_OPERATIONAL_ADS_BASE_ROOT:-/srv/quanthus/ads/operational/base}
+policy=${QUANTHUS_OPERATIONAL_ADS_BASE_POLICY:-${repo_root}/config/operational-ads-base.v1.json}
+python_bin=${QUANTHUS_OPERATIONAL_ADS_PYTHON:-${repo_root}/.venv/bin/python}
+
+for command in env git install realpath; do
+  command -v "${command}" >/dev/null
+done
+[[ -x ${python_bin} ]]
+[[ -f ${build_plan} ]]
+[[ -f ${policy} ]]
+if [[ ${base_root} != /* || $(realpath -m -- "${base_root}") != "${base_root}" ]]; then
+  echo "operational ADS Base root must be an absolute canonical path" >&2
+  exit 2
+fi
+if [[ ! ${package_id} =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$ ]]; then
+  echo "operational ADS Base package id is unsafe" >&2
+  exit 2
+fi
+
+code_revision=$(git -C "${repo_root}" rev-parse HEAD)
+git -C "${repo_root}" diff --quiet --ignore-submodules --
+git -C "${repo_root}" diff --cached --quiet --ignore-submodules --
+if [[ -n $(git -C "${repo_root}" status --porcelain --untracked-files=normal) ]]; then
+  echo "repository checkout must be clean before operational ADS Base publication" >&2
+  exit 2
+fi
+
+install -d -o root -g root -m 0750 "${base_root}"
+[[ ! -L ${base_root} ]]
+bundle_root=${base_root}/${package_id}
+
+cd "${repo_root}"
+PYTHONPATH=src "${python_bin}" -m quanthus build-operational-ads-base \
+  --plan "${build_plan}" \
+  --policy "${policy}" \
+  --output "${bundle_root}" \
+  --code-revision "${code_revision}"
+
+PYTHONPATH=src "${python_bin}" -m quanthus check-operational-ads-base \
+  --bundle "${bundle_root}" \
+  --policy "${policy}" >/dev/null
+
+PYTHONPATH=src "${python_bin}" -m quanthus smoke-operational-ads-replay \
+  --bundle "${bundle_root}" \
+  --scope-start "${smoke_start}" \
+  --scope-end "${smoke_end}" \
+  --policy "${policy}" \
+  --corporate-action-policy "${repo_root}/config/p1-corporate-action-normalization.v3.json" \
+  >/dev/null
+
+PYTHONPATH=src "${python_bin}" -m quanthus promote-operational-ads-base \
+  --bundle "${bundle_root}" \
+  --base-root "${base_root}" \
+  --policy "${policy}" \
+  --expected-current-manifest-sha256 "${expected_current}"

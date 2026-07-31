@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "contract_id": "operational-ads-base-v1",
+  "profile": "strategy_replay_operational_v1",
+  "authority": {
+    "holder": "oci",
+    "research_only": true,
+    "execution_authorized": false
+  },
+  "roots": {
+    "base": "/srv/quanthus/ads/operational/base",
+    "daily": "/srv/quanthus/ads/operational/daily",
+    "descriptor": "/srv/quanthus/ads/operational/base/BASE_CURRENT.json"
+  },
+  "packages": {
+    "provisional": {
+      "package_id": "ads-base-through-20260730-v1",
+      "through_date": "2026-07-30"
+    },
+    "final": {
+      "package_id": "ads-base-202607-v1",
+      "through_date": "2026-07-31"
+    }
+  },
+  "required_upstream_roles": [
+    "calendar_reference",
+    "canonical_catalog",
+    "dwd_base",
+    "dws_base",
+    "identity_reference",
+    "pit"
+  ],
+  "generation_ledger_calendar_table": "trading_calendar",
+  "tables": {
+    "benchmark_curve": {
+      "role": "outcome_only",
+      "format": "json",
+      "row_path": "observations",
+      "date_column": "date",
+      "business_key": ["date"],
+      "sort_keys": ["date"],
+      "allow_empty": false,
+      "require_per_decision_pit": false
+    },
+    "corporate_action_exceptions": {
+      "role": "runner_only",
+      "format": "parquet",
+      "date_column": "blocked_from",
+      "business_key": ["exception_id"],
+      "sort_keys": ["blocked_from", "security_code", "exception_id"],
+      "allow_empty": true,
+      "require_per_decision_pit": false
+    },
+    "corporate_actions_normalized": {
+      "role": "runner_only",
+      "format": "parquet",
+      "date_column": "effective_date",
+      "business_key": ["action_id"],
+      "sort_keys": ["effective_date", "security_code", "action_id"],
+      "allow_empty": false,
+      "require_per_decision_pit": false
+    },
+    "daily_market_summary": {
+      "role": "decision_visible",
+      "format": "parquet",
+      "date_column": "market_date",
+      "business_key": ["market_date"],
+      "sort_keys": ["market_date"],
+      "allow_empty": false,
+      "require_per_decision_pit": true
+    },
+    "daily_ohlcv_none": {
+      "role": "decision_visible",
+      "format": "parquet",
+      "date_column": "date",
+      "business_key": ["date", "security_id"],
+      "sort_keys": ["date", "security_id"],
+      "allow_empty": false,
+      "require_per_decision_pit": true
+    },
+    "daily_universe": {
+      "role": "decision_visible",
+      "format": "parquet",
+      "date_column": "market_date",
+      "business_key": ["market_date", "security_id"],
+      "sort_keys": ["market_date", "security_id"],
+      "allow_empty": false,
+      "require_per_decision_pit": true
+    },
+    "price_limit_execution_daily": {
+      "role": "runner_only",
+      "format": "parquet",
+      "date_column": "execution_date",
+      "business_key": ["execution_date", "security_id"],
+      "sort_keys": ["execution_date", "security_id"],
+      "allow_empty": false,
+      "require_per_decision_pit": false
+    },
+    "security_code_validity": {
+      "role": "runner_only",
+      "format": "parquet",
+      "date_column": "valid_from",
+      "business_key": ["security_id", "stock_code", "valid_from"],
+      "sort_keys": ["valid_from", "security_id", "stock_code"],
+      "allow_empty": false,
+      "require_per_decision_pit": false
+    },
+    "static_industry_mapping": {
+      "role": "runner_policy_reference",
+      "format": "json",
+      "row_path": "memberships",
+      "date_column": null,
+      "business_key": ["security_id"],
+      "sort_keys": ["security_id"],
+      "allow_empty": false,
+      "require_per_decision_pit": false
+    },
+    "trading_calendar": {
+      "role": "runner_only",
+      "format": "parquet",
+      "date_column": "trade_date",
+      "business_key": ["trade_date", "exchange"],
+      "sort_keys": ["trade_date", "exchange"],
+      "allow_empty": false,
+      "require_per_decision_pit": false
+    }
+  },
+  "consumer_roles": {
+    "replay_decision_reader": ["decision_visible"],
+    "replay_evaluator": ["outcome_only"],
+    "replay_runner": [
+      "decision_visible",
+      "runner_only",
+      "runner_policy_reference"
+    ]
+  },
+  "publication": {
+    "artifact_discovery": "manifest_tables_parts",
+    "mandatory_year_partitioning": false,
+    "ready_written_last": true,
+    "descriptor_compare_and_swap": true,
+    "migration_mode": "copy_only",
+    "delete_enabled": false
+  }
+}

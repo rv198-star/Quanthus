@@ -9,10 +9,7 @@ from quanthus.policy import find_project_root
 class StrategyADSBoundaryContractTests(unittest.TestCase):
     def test_publisher_separates_semantic_check_from_os_role_probe(self) -> None:
         publisher = (
-            Path(__file__).resolve().parents[2]
-            / "ops"
-            / "bin"
-            / "publish-strategy-replay-ads"
+            Path(__file__).resolve().parents[2] / "ops" / "bin" / "publish-strategy-replay-ads"
         ).read_text(encoding="utf-8")
 
         semantic_check = '"${python_bin}" -m quanthus check-strategy-replay-ads'
@@ -33,10 +30,7 @@ class StrategyADSBoundaryContractTests(unittest.TestCase):
 
     def test_publisher_treats_recent_research_as_development_access(self) -> None:
         publisher = (
-            Path(__file__).resolve().parents[2]
-            / "ops"
-            / "bin"
-            / "publish-strategy-replay-ads"
+            Path(__file__).resolve().parents[2] / "ops" / "bin" / "publish-strategy-replay-ads"
         ).read_text(encoding="utf-8")
 
         self.assertIn("recent_research)", publisher)
@@ -59,6 +53,8 @@ class StrategyADSBoundaryContractTests(unittest.TestCase):
             destinations = {action.dest for action in command_parser._actions}
             self.assertIn("ads_bundle", destinations)
             self.assertIn("ads_role", destinations)
+            self.assertIn("operational_ads_base", destinations)
+            self.assertIn("operational_ads_policy", destinations)
             self.assertNotIn("snapshot_dir", destinations)
 
     def test_strategy_consumers_do_not_load_warehouse_or_legacy_snapshots(self) -> None:

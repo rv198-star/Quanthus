@@ -5,7 +5,7 @@
 | Parent | `../01-data-foundation.md` |
 | Work item | `META-DATA-PIPE-003` |
 | Design status | approved |
-| Delivery gate | accepted-conditional for the historical research bootstrap; catalog-native publication and sealed evaluation remain open |
+| Delivery gate | accepted-conditional for retained historical research exports; operational Base publication and sealed evaluation remain open |
 | Profile | `strategy_replay` |
 
 ## 1. Purpose and boundary
@@ -108,6 +108,13 @@ separate authorization record.
 The hidden legacy `--snapshot-dir` path remains only to reproduce frozen P3 acceptance artifacts.
 It is not a normal research entry point and may not be used by a new strategy or P4/P5 workflow.
 
+After an operational historical Base is published, the same three replay commands may receive one
+explicit `--operational-ads-base` instead. That path is governed by
+`operational-ads-base.md`, preserves per-date canonical generation/PIT lineage, and uses this
+profile's existing typed frame reader. Portable exports remain the physically scoped boundary for
+arbitration, permanent-blind, and other authorized offline research; they are not alternate
+operational Base versions.
+
 ## 5. Conformance
 
 | Concern | Governing path |
@@ -119,6 +126,7 @@ It is not a normal research entry point and may not be used by a new strategy or
 | Contract tests | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py` |
 | Operations | `docs/operations/dual-lane-data-platform-runbook.md` |
 | Deployment evidence | `docs/acceptance/issue-45-portable-ads-20260730.md`, `docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md`, `docs/acceptance/issue-45-2026-research-ads-refresh-20260730.md` |
+| Operational historical Base | `01-data-foundation/operational-ads-base.md`, `config/operational-ads-base.v1.json`, `docs/acceptance/meta-data-base-003-ads-base-202607/` |
 
 The original migration acceptance requires three formal bundles, deep checks, exact P3 development
 reproduction from the formal development bundle, role-permission probes, a dependency audit showing

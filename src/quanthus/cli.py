@@ -86,6 +86,16 @@ from quanthus.none_backfill import (
     write_none_current,
 )
 from quanthus.none_tail_repair import build_none_tail_repair_revision
+from quanthus.operational_ads_base import (
+    OperationalADSBaseError,
+    build_operational_ads_base,
+    load_operational_ads_base_plan,
+    load_operational_ads_base_policy,
+    load_operational_ads_replay_reader,
+    promote_operational_ads_base,
+    smoke_operational_ads_replay,
+    verify_operational_ads_base,
+)
 from quanthus.p1_acceptance import (
     AcceptanceEvidenceError,
     P1AcceptanceReport,
@@ -391,12 +401,52 @@ def _parser() -> argparse.ArgumentParser:
     replay_ads_check.add_argument("--ads-policy", type=Path)
     replay_ads_check.add_argument("--corporate-action-policy", type=Path)
 
+    operational_ads_build = subparsers.add_parser(
+        "build-operational-ads-base",
+        help="build one immutable OCI operational ADS historical Base from an exact plan",
+    )
+    operational_ads_build.add_argument("--plan", type=Path, required=True)
+    operational_ads_build.add_argument("--policy", type=Path)
+    operational_ads_build.add_argument("--output", type=Path, required=True)
+    operational_ads_build.add_argument("--code-revision", required=True)
+
+    operational_ads_check = subparsers.add_parser(
+        "check-operational-ads-base",
+        help="deep-check an operational ADS Base without producer or mutable-pointer access",
+    )
+    operational_ads_check.add_argument("--bundle", type=Path, required=True)
+    operational_ads_check.add_argument("--policy", type=Path)
+
+    operational_ads_promote = subparsers.add_parser(
+        "promote-operational-ads-base",
+        help="copy a verified immutable Base and compare-and-swap only BASE_CURRENT",
+    )
+    operational_ads_promote.add_argument("--bundle", type=Path, required=True)
+    operational_ads_promote.add_argument("--base-root", type=Path, required=True)
+    operational_ads_promote.add_argument("--policy", type=Path)
+    operational_ads_promote.add_argument(
+        "--expected-current-manifest-sha256",
+        required=True,
+        help="exact current manifest sha256, or 'absent' for first publication",
+    )
+
+    operational_ads_smoke = subparsers.add_parser(
+        "smoke-operational-ads-replay",
+        help="run a bounded existing replay-loader audit from a verified operational Base",
+    )
+    operational_ads_smoke.add_argument("--bundle", type=Path, required=True)
+    operational_ads_smoke.add_argument("--scope-start", type=date.fromisoformat, required=True)
+    operational_ads_smoke.add_argument("--scope-end", type=date.fromisoformat, required=True)
+    operational_ads_smoke.add_argument("--policy", type=Path)
+    operational_ads_smoke.add_argument("--corporate-action-policy", type=Path)
+
     replay_frames = subparsers.add_parser(
         "audit-historical-replay-frames",
         help="audit continuous PIT decision-to-execution frames from a verified bundle",
     )
     replay_frame_source = replay_frames.add_mutually_exclusive_group(required=True)
     replay_frame_source.add_argument("--ads-bundle", type=Path)
+    replay_frame_source.add_argument("--operational-ads-base", type=Path)
     replay_frame_source.add_argument(
         "--snapshot-dir",
         dest="legacy_snapshot_dir",
@@ -405,6 +455,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     replay_frames.add_argument("--ads-role")
     replay_frames.add_argument("--ads-policy", type=Path)
+    replay_frames.add_argument("--operational-ads-policy", type=Path)
     replay_frames.add_argument("--scope-start", type=date.fromisoformat, required=True)
     replay_frames.add_argument("--scope-end", type=date.fromisoformat, required=True)
     replay_frames.add_argument("--policy", type=Path)
@@ -416,6 +467,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     baseline_source = baseline_suite.add_mutually_exclusive_group(required=True)
     baseline_source.add_argument("--ads-bundle", type=Path)
+    baseline_source.add_argument("--operational-ads-base", type=Path)
     baseline_source.add_argument(
         "--snapshot-dir",
         dest="legacy_snapshot_dir",
@@ -424,6 +476,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     baseline_suite.add_argument("--ads-role")
     baseline_suite.add_argument("--ads-policy", type=Path)
+    baseline_suite.add_argument("--operational-ads-policy", type=Path)
     baseline_suite.add_argument("--scope-start", type=date.fromisoformat, required=True)
     baseline_suite.add_argument("--scope-end", type=date.fromisoformat, required=True)
     baseline_suite.add_argument("--feature-panel", type=Path, required=True)
@@ -442,6 +495,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     governed_source = governed_portfolio.add_mutually_exclusive_group(required=True)
     governed_source.add_argument("--ads-bundle", type=Path)
+    governed_source.add_argument("--operational-ads-base", type=Path)
     governed_source.add_argument(
         "--snapshot-dir",
         dest="legacy_snapshot_dir",
@@ -450,6 +504,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     governed_portfolio.add_argument("--ads-role")
     governed_portfolio.add_argument("--ads-policy", type=Path)
+    governed_portfolio.add_argument("--operational-ads-policy", type=Path)
     governed_portfolio.add_argument("--scope-start", type=date.fromisoformat, required=True)
     governed_portfolio.add_argument("--scope-end", type=date.fromisoformat, required=True)
     governed_portfolio.add_argument("--feature-panel", type=Path, required=True)
@@ -1070,9 +1125,50 @@ def main(argv: Sequence[str] | None = None) -> int:
                 verify_logical_content=True,
             )
             print(json.dumps(replay_ads.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "build-operational-ads-base":
+            operational_policy = load_operational_ads_base_policy(args.policy)
+            operational_base = build_operational_ads_base(
+                plan=load_operational_ads_base_plan(args.plan, policy=operational_policy),
+                policy=operational_policy,
+                output=args.output,
+                code_revision=args.code_revision,
+            )
+            print(json.dumps(operational_base.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "check-operational-ads-base":
+            operational_base = verify_operational_ads_base(
+                args.bundle,
+                policy=load_operational_ads_base_policy(args.policy),
+                verify_logical_content=True,
+            )
+            print(json.dumps(operational_base.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "promote-operational-ads-base":
+            operational_base = promote_operational_ads_base(
+                source=args.bundle,
+                base_root=args.base_root,
+                policy=load_operational_ads_base_policy(args.policy),
+                expected_current_manifest_sha256=args.expected_current_manifest_sha256,
+            )
+            print(json.dumps(operational_base.to_dict(), ensure_ascii=True, sort_keys=True))
+        elif args.command == "smoke-operational-ads-replay":
+            replay_smoke = smoke_operational_ads_replay(
+                args.bundle,
+                policy=load_operational_ads_base_policy(args.policy),
+                corporate_action_policy=load_corporate_action_normalization_policy(
+                    args.corporate_action_policy
+                ),
+                scope_start=args.scope_start,
+                scope_end=args.scope_end,
+            )
+            print(json.dumps(replay_smoke, ensure_ascii=True, sort_keys=True))
         elif args.command == "audit-historical-replay-frames":
             corporate_action_policy = load_corporate_action_normalization_policy(args.policy)
-            if args.ads_bundle is not None:
+            if args.operational_ads_base is not None:
+                opened_reader = load_operational_ads_replay_reader(
+                    args.operational_ads_base,
+                    policy=load_operational_ads_base_policy(args.operational_ads_policy),
+                    corporate_action_policy=corporate_action_policy,
+                )
+            elif args.ads_bundle is not None:
                 if args.ads_role is None:
                     raise StrategyReplayADSError("--ads-role is required with --ads-bundle")
                 opened_reader = load_strategy_replay_ads_reader(
@@ -1126,7 +1222,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             corporate_action_policy = load_corporate_action_normalization_policy(
                 args.corporate_action_policy
             )
-            if args.ads_bundle is not None:
+            if args.operational_ads_base is not None:
+                opened_reader = load_operational_ads_replay_reader(
+                    args.operational_ads_base,
+                    policy=load_operational_ads_base_policy(args.operational_ads_policy),
+                    corporate_action_policy=corporate_action_policy,
+                )
+                legacy_benchmark = None
+            elif args.ads_bundle is not None:
                 if args.ads_role is None:
                     raise StrategyReplayADSError("--ads-role is required with --ads-bundle")
                 opened_reader = load_strategy_replay_ads_reader(
@@ -1233,7 +1336,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             corporate_action_policy = load_corporate_action_normalization_policy(
                 args.corporate_action_policy
             )
-            if args.ads_bundle is not None:
+            if args.operational_ads_base is not None:
+                opened_reader = load_operational_ads_replay_reader(
+                    args.operational_ads_base,
+                    policy=load_operational_ads_base_policy(args.operational_ads_policy),
+                    corporate_action_policy=corporate_action_policy,
+                )
+                legacy_benchmark = None
+                legacy_industry = None
+            elif args.ads_bundle is not None:
                 if args.ads_role is None:
                     raise StrategyReplayADSError("--ads-role is required with --ads-bundle")
                 opened_reader = load_strategy_replay_ads_reader(
@@ -1695,6 +1806,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         PortfolioReplayError,
         StrategyPolicyError,
         StrategyReplayADSError,
+        OperationalADSBaseError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

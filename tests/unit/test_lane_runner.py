@@ -650,6 +650,83 @@ def test_baostock_query_keeps_reconnect_failure_bounded(
     ]
 
 
+def test_baostock_query_reconnects_when_row_iteration_breaks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Login:
+        error_code = "0"
+        error_msg = "ok"
+
+    class BrokenQuery:
+        error_code = "0"
+        error_msg = "ok"
+
+        @staticmethod
+        def next() -> bool:
+            raise ConnectionResetError("connection reset by peer")
+
+    class Query:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self) -> None:
+            self.pending = True
+
+        def next(self) -> bool:
+            pending, self.pending = self.pending, False
+            return pending
+
+        @staticmethod
+        def get_row_data() -> list[str]:
+            return ["2026-07-28", "sz.000001"]
+
+    class FakeBaostock:
+        login_calls = 0
+        logout_calls = 0
+        query_calls = 0
+
+        @classmethod
+        def login(cls) -> Login:
+            cls.login_calls += 1
+            return Login()
+
+        @classmethod
+        def logout(cls) -> None:
+            cls.logout_calls += 1
+
+        @classmethod
+        def query_history_k_data_plus(cls, *_args, **_kwargs):
+            cls.query_calls += 1
+            if cls.query_calls == 1:
+                return BrokenQuery()
+            return Query()
+
+    monkeypatch.setattr(lane_runner.time, "sleep", lambda _seconds: None)
+    rows, error_code, error_msg, attempts, retry_errors = (
+        lane_runner._baostock_query_day_with_retry(
+            FakeBaostock,
+            code="sz.000001",
+            fields="date,code",
+            day="2026-07-28",
+        )
+    )
+
+    assert rows == [["2026-07-28", "sz.000001"]]
+    assert error_code == "0"
+    assert error_msg == "ok"
+    assert attempts == 2
+    assert FakeBaostock.query_calls == 2
+    assert FakeBaostock.logout_calls == 1
+    assert FakeBaostock.login_calls == 1
+    assert retry_errors == [
+        {
+            "attempt": "1",
+            "error_code": "provider_exception",
+            "error_msg": "connection reset by peer",
+        }
+    ]
+
+
 def test_baostock_empty_response_does_not_reconnect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

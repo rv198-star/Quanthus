@@ -1037,6 +1037,7 @@ def _baostock_query_day_with_retry(
                 while response.next():
                     rows.append(response.get_row_data())
         except Exception as exc:  # noqa: BLE001
+            error_code = "provider_exception"
             error_msg = str(exc)
 
         if error_code == "0" and rows:

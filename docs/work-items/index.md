@@ -14,7 +14,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | active |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | planned |
 | META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and portable ADS | active; cutover blocked |
-| META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | active; provisional acceptance open |
+| META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | active; Phase A accepted, final July pending |
 
 `META-DATA-PIPE-003` is governed by ADR 0005 and GitHub issue #45. Implementation is limited to
 copy-only contract, shadow, comparison, recovery, and release-set work beside the legacy path. It
@@ -46,7 +46,10 @@ success trigger remains pending.
 `META-DATA-BASE-001` is governed by ADR 0005, the ODS Base child of LLD 01, and GitHub issue #47.
 It is copy-only and does not change a production schedule, legacy pointer, target cutover state, or
 OCI ODS retention. The 2026-07-30 package is provisional; final July completion requires accepted
-July 31 releases and matching final Base descriptors on Hermes and CN01.
+July 31 releases and matching final Base descriptors on Hermes and CN01. Phase A is accepted in
+`docs/acceptance/meta-data-base-001-ods-base-202607/README.md`: Hermes and CN01 hold the same
+20,743-file package, manifest, content digest, `READY`, and `BASE_CURRENT.json` bytes through
+2026-07-30, while raw F10 and full financial statements remain explicitly not formally acquired.
 
 ## P1 data foundation
 

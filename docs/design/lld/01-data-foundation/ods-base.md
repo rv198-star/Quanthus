@@ -5,12 +5,14 @@
 | Work item | `META-DATA-BASE-001` |
 | Design status | approved |
 | Delivery gate | open |
+| Provisional acceptance | accepted through 2026-07-30; final July package remains open |
 | Governing decision | ADR 0005 |
 | Executable policy | `config/pipelines/ods-base.v1.json` |
 | Implementation | `src/quanthus/pipelines/ods_base.py` |
 | Contract tests | `tests/unit/test_ods_base.py` |
 | Operations | `docs/operations/ods-base-runbook.md` |
 | Tracking | GitHub issue #47 |
+| Acceptance evidence | `docs/acceptance/meta-data-base-001-ods-base-202607/README.md` |
 
 ## 1. Purpose And Boundary
 

@@ -181,34 +181,55 @@ def collect_symbol(
     }
 
 
-def _etf_universe(bs_module: Any | None = None) -> list[str]:
+def _etf_universe(
+    bs_module: Any | None = None,
+    *,
+    max_attempts: int = 3,
+    retry_delay_seconds: float = 2.0,
+    sleep: Callable[[float], None] = time.sleep,
+) -> list[str]:
     if bs_module is None:
         import baostock as loaded_bs  # type: ignore[import-not-found]
 
         bs_module = loaded_bs
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be positive")
 
-    login = bs_module.login()
-    if str(login.error_code) != "0":
-        raise RuntimeError(f"baostock login failed: {login.error_msg}")
-    rows: list[list[str]] = []
-    try:
-        result = bs_module.query_stock_basic()
-        if str(result.error_code) != "0":
-            raise RuntimeError(f"baostock query_stock_basic failed: {result.error_msg}")
-        while result.next():
-            rows.append(result.get_row_data())
-    finally:
-        bs_module.logout()
-    return sorted(
-        {
-            code6(row[0])
-            for row in rows
-            if len(row) >= 6
-            and row[4] == "5"
-            and row[5] == "1"
-            and str(row[0]).startswith(("sh.", "sz."))
-        }
-    )
+    last_error: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        rows: list[list[str]] = []
+        try:
+            login = bs_module.login()
+            if str(login.error_code) != "0":
+                raise RuntimeError(f"baostock login failed: {login.error_msg}")
+            result = bs_module.query_stock_basic()
+            if str(result.error_code) != "0":
+                raise RuntimeError(
+                    f"baostock query_stock_basic failed: {result.error_msg}"
+                )
+            while result.next():
+                rows.append(result.get_row_data())
+            return sorted(
+                {
+                    code6(row[0])
+                    for row in rows
+                    if len(row) >= 6
+                    and row[4] == "5"
+                    and row[5] == "1"
+                    and str(row[0]).startswith(("sh.", "sz."))
+                }
+            )
+        except Exception as exc:  # noqa: BLE001 - bounded provider retry
+            last_error = exc
+        finally:
+            with contextlib.suppress(Exception):
+                bs_module.logout()
+        if attempt < max_attempts and retry_delay_seconds > 0:
+            sleep(retry_delay_seconds)
+
+    raise RuntimeError(
+        f"baostock ETF universe failed after {max_attempts} attempts: {last_error}"
+    ) from last_error
 
 
 def collect_after_hours(

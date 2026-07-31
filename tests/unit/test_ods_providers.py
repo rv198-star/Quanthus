@@ -349,6 +349,64 @@ def test_after_hours_collector_preserves_sparse_matches() -> None:
     assert metadata["provider_rows"] == 2
 
 
+def test_after_hours_etf_universe_retries_transient_login_failure() -> None:
+    class Result:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self) -> None:
+            self._rows = iter(
+                [
+                    ["sh.510300", "ETF", "", "", "5", "1"],
+                    ["sh.600000", "Equity", "", "", "1", "1"],
+                ]
+            )
+            self.current: list[str] | None = None
+
+        def next(self) -> bool:
+            self.current = next(self._rows, None)
+            return self.current is not None
+
+        def get_row_data(self) -> list[str]:
+            assert self.current is not None
+            return self.current
+
+    class BaoStock:
+        login_calls = 0
+        logout_calls = 0
+
+        @classmethod
+        def login(cls):
+            cls.login_calls += 1
+            code = "1" if cls.login_calls == 1 else "0"
+            return type(
+                "Login",
+                (),
+                {"error_code": code, "error_msg": "temporary network failure"},
+            )()
+
+        @staticmethod
+        def query_stock_basic() -> Result:
+            return Result()
+
+        @classmethod
+        def logout(cls) -> None:
+            cls.logout_calls += 1
+
+    sleeps: list[float] = []
+    codes = after_hours_tdx._etf_universe(
+        BaoStock,
+        max_attempts=3,
+        retry_delay_seconds=0.25,
+        sleep=sleeps.append,
+    )
+
+    assert codes == ["510300"]
+    assert BaoStock.login_calls == 2
+    assert BaoStock.logout_calls == 2
+    assert sleeps == [0.25]
+
+
 def test_minute_collector_defaults_to_repository_module(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

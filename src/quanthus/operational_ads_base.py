@@ -39,6 +39,7 @@ from quanthus.strategy_replay_ads import (
 BASE_SCHEMA_VERSION = 1
 BASE_KIND = "operational_ads_base"
 CONTENT_DIGEST_METHOD = "canonical_logical_row_stream_sha256_v1"
+APPEND_CONTENT_DIGEST_METHOD = "canonical_logical_append_chain_sha256_v1"
 JSON_CONTENT_DIGEST_METHOD = "canonical_json_rows_sha256_v1"
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _HEX_OBJECT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -433,8 +434,7 @@ def _validate_generation_ledger(
         )
         local_decision = decision.astimezone(MARKET_TIMEZONE)
         valid_decision_time = local_decision.date() == market_date or (
-            local_decision.date() > market_date
-            and local_decision.time() < _NEXT_OPEN_TIME
+            local_decision.date() > market_date and local_decision.time() < _NEXT_OPEN_TIME
         )
         if (
             market_date > through_date
@@ -768,9 +768,7 @@ def preflight_operational_ads_base_upstreams(
         for item in upstream_values
         if isinstance(item, dict) and isinstance(item.get("role"), str)
     }
-    descriptors: dict[
-        str, tuple[str, Path, Mapping[str, Any], Mapping[str, Any], str]
-    ] = {}
+    descriptors: dict[str, tuple[str, Path, Mapping[str, Any], Mapping[str, Any], str]] = {}
     for role, layer, path in (
         ("dwd_base", "dwd", dwd_current),
         ("dws_base", "dws", dws_current),
@@ -844,23 +842,23 @@ def preflight_operational_ads_base_upstreams(
         }
     )
     for role, peer_role in (("dwd_base", "dws_base"), ("dws_base", "dwd_base")):
-        layer, _current, descriptor, upstream, ledger_digest = descriptors[role]
+        layer, _current, current_descriptor, bound_upstream, ledger_digest = descriptors[role]
         peer = descriptors[peer_role][3]
         expected = {
             "schema_version": 1,
             "kind": "dwd_dws_base_current",
             "layer": layer,
-            "package_id": upstream["object_id"],
-            "package_path": upstream["object_id"],
-            "manifest_sha256": upstream["manifest_sha256"],
-            "content_digest": upstream["content_digest"],
+            "package_id": bound_upstream["object_id"],
+            "package_path": bound_upstream["object_id"],
+            "manifest_sha256": bound_upstream["manifest_sha256"],
+            "content_digest": bound_upstream["content_digest"],
             "through_date": plan.through_date.isoformat(),
             "input_ledger_digest": ledger_digest,
             "peer_package_id": peer["object_id"],
             "peer_manifest_sha256": peer["manifest_sha256"],
             "pair_digest": pair_digest,
         }
-        if descriptor != expected:
+        if current_descriptor != expected:
             raise OperationalADSBaseError(
                 f"operational ADS Base {layer} descriptor differs from its sealed package pair"
             )
@@ -890,9 +888,7 @@ def _verify_dwd_dws_input_ledger(
             f"operational ADS Base {layer} package input ledger binding is invalid"
         )
     binding_path = _required_text(binding, "path")
-    relative = _safe_relative(
-        binding_path, f"operational ADS Base {layer}.input_ledger.path"
-    )
+    relative = _safe_relative(binding_path, f"operational ADS Base {layer}.input_ledger.path")
     if binding_path != relative.as_posix():
         raise OperationalADSBaseError(
             f"operational ADS Base {layer} package input ledger path is not canonical"
@@ -1193,6 +1189,70 @@ def _parquet_content_digest(
     }
 
 
+def _append_content_digest(
+    *,
+    base_content_digest: str,
+    base_fingerprint: Mapping[str, object],
+    base_max_date: str,
+    delta_content_digest: str,
+    delta_fingerprint: Mapping[str, object],
+    delta_min_date: str,
+    delta_max_date: str,
+) -> tuple[str, dict[str, object]]:
+    """Bind an immutable logical base to a disjoint, date-ordered delta."""
+
+    for field, value in (
+        ("base_content_digest", base_content_digest),
+        ("delta_content_digest", delta_content_digest),
+    ):
+        if not isinstance(value, str) or not _SHA256.fullmatch(value):
+            raise OperationalADSBaseError(f"append fingerprint {field} is invalid")
+    for field, value in (
+        ("base_max_date", base_max_date),
+        ("delta_min_date", delta_min_date),
+        ("delta_max_date", delta_max_date),
+    ):
+        _parse_date(value, f"append_fingerprint.{field}")
+    if not (
+        _parse_date(base_max_date, "append_fingerprint.base_max_date")
+        < _parse_date(delta_min_date, "append_fingerprint.delta_min_date")
+        <= _parse_date(delta_max_date, "append_fingerprint.delta_max_date")
+    ):
+        raise OperationalADSBaseError("append fingerprint date ranges overlap or are unordered")
+    row_counts: list[int] = []
+    for field, fingerprint, digest in (
+        ("base_fingerprint", base_fingerprint, base_content_digest),
+        ("delta_fingerprint", delta_fingerprint, delta_content_digest),
+    ):
+        raw_row_count = fingerprint.get("row_count")
+        if (
+            fingerprint.get("method") != CONTENT_DIGEST_METHOD
+            or fingerprint.get("logical_row_stream_sha256") != digest
+            or not isinstance(raw_row_count, int)
+            or isinstance(raw_row_count, bool)
+            or raw_row_count <= 0
+        ):
+            raise OperationalADSBaseError(f"append fingerprint {field} is invalid")
+        row_counts.append(raw_row_count)
+    identity = {
+        "method": APPEND_CONTENT_DIGEST_METHOD,
+        "base": {
+            "content_digest": base_content_digest,
+            "fingerprint": dict(base_fingerprint),
+            "max_date": base_max_date,
+        },
+        "delta": {
+            "content_digest": delta_content_digest,
+            "fingerprint": dict(delta_fingerprint),
+            "min_date": delta_min_date,
+            "max_date": delta_max_date,
+        },
+        "row_count": sum(row_counts),
+    }
+    digest = _canonical_digest(identity)
+    return digest, {**identity, "logical_append_chain_sha256": digest}
+
+
 def _runtime_identity() -> dict[str, object]:
     packages: dict[str, str] = {}
     for package in ("duckdb", "pyarrow", "quanthus"):
@@ -1220,16 +1280,10 @@ def _package_content_identity(value: Mapping[str, Any]) -> dict[str, object]:
             raise OperationalADSBaseError("operational ADS Base content table is invalid")
         table: dict[str, object] = dict(raw_table)
         raw_parts = raw_table.get("parts")
-        if not isinstance(raw_parts, list) or any(
-            not isinstance(part, dict) for part in raw_parts
-        ):
+        if not isinstance(raw_parts, list) or any(not isinstance(part, dict) for part in raw_parts):
             raise OperationalADSBaseError("operational ADS Base content parts are invalid")
         table["parts"] = [
-            {
-                key: item
-                for key, item in part.items()
-                if key not in {"sha256", "size_bytes"}
-            }
+            {key: item for key, item in part.items() if key not in {"sha256", "size_bytes"}}
             for part in raw_parts
         ]
         tables.append(table)
@@ -1264,9 +1318,7 @@ def _parquet_quality(
         )
     primary = ", ".join(f'"{column}"' for column in contract.business_key)
     distinct_key = (
-        f'"{contract.business_key[0]}"'
-        if len(contract.business_key) == 1
-        else f"row({primary})"
+        f'"{contract.business_key[0]}"' if len(contract.business_key) == 1 else f"row({primary})"
     )
     projections = [
         "count(*) AS row_count",
@@ -1295,17 +1347,19 @@ def _parquet_quality(
         min_date = stats[offset]
         max_date = stats[offset + 1]
         offset += 2
-    nulls = {
-        column: int(stats[offset + index]) for index, column in enumerate(columns)
-    }
-    return columns, schema, {
-        "row_count": row_count,
-        "null_counts": nulls,
-        "duplicate_business_key_count": duplicate_count,
-        "conflicting_business_key_count": 0,
-        "min_date": min_date.isoformat() if min_date is not None else None,
-        "max_date": max_date.isoformat() if max_date is not None else None,
-    }
+    nulls = {column: int(stats[offset + index]) for index, column in enumerate(columns)}
+    return (
+        columns,
+        schema,
+        {
+            "row_count": row_count,
+            "null_counts": nulls,
+            "duplicate_business_key_count": duplicate_count,
+            "conflicting_business_key_count": 0,
+            "min_date": min_date.isoformat() if min_date is not None else None,
+            "max_date": max_date.isoformat() if max_date is not None else None,
+        },
+    )
 
 
 def _find_content_fingerprint(
@@ -1313,8 +1367,16 @@ def _find_content_fingerprint(
 ) -> Mapping[str, object] | None:
     if isinstance(value, Mapping):
         if (
-            value.get("method") == CONTENT_DIGEST_METHOD
-            and value.get("logical_row_stream_sha256") == content_digest
+            value.get("method")
+            in {
+                CONTENT_DIGEST_METHOD,
+                APPEND_CONTENT_DIGEST_METHOD,
+            }
+            and value.get(
+                "logical_row_stream_sha256",
+                value.get("logical_append_chain_sha256"),
+            )
+            == content_digest
             and value.get("row_count") == row_count
         ):
             return dict(value)
@@ -1332,6 +1394,48 @@ def _find_content_fingerprint(
             if found is not None:
                 return found
     return None
+
+
+def _validated_append_fingerprint(
+    value: Mapping[str, object], *, content_digest: str, row_count: int
+) -> dict[str, object]:
+    if set(value) != {
+        "method",
+        "base",
+        "delta",
+        "row_count",
+        "logical_append_chain_sha256",
+    }:
+        raise OperationalADSBaseError("append fingerprint shape is invalid")
+    base = value.get("base")
+    delta = value.get("delta")
+    if (
+        not isinstance(base, Mapping)
+        or set(base) != {"content_digest", "fingerprint", "max_date"}
+        or not isinstance(delta, Mapping)
+        or set(delta)
+        != {
+            "content_digest",
+            "fingerprint",
+            "min_date",
+            "max_date",
+        }
+        or not isinstance(base.get("fingerprint"), Mapping)
+        or not isinstance(delta.get("fingerprint"), Mapping)
+    ):
+        raise OperationalADSBaseError("append fingerprint components are invalid")
+    digest, expected = _append_content_digest(
+        base_content_digest=str(base.get("content_digest")),
+        base_fingerprint=base["fingerprint"],
+        base_max_date=str(base.get("max_date")),
+        delta_content_digest=str(delta.get("content_digest")),
+        delta_fingerprint=delta["fingerprint"],
+        delta_min_date=str(delta.get("min_date")),
+        delta_max_date=str(delta.get("max_date")),
+    )
+    if digest != content_digest or expected != dict(value) or value.get("row_count") != row_count:
+        raise OperationalADSBaseError("append fingerprint digest or row count is invalid")
+    return expected
 
 
 def _build_parquet_table(
@@ -1358,9 +1462,7 @@ def _build_parquet_table(
     ):
         raise OperationalADSBaseError(f"copied source table bytes differ: {contract.name}")
     relation = f"read_parquet({_sql_string(str(target))})"
-    columns, schema, quality = _parquet_quality(
-        connection, relation=relation, contract=contract
-    )
+    columns, schema, quality = _parquet_quality(connection, relation=relation, contract=contract)
     row_count_value = quality["row_count"]
     duplicate_count = quality["duplicate_business_key_count"]
     if not isinstance(row_count_value, int) or not isinstance(duplicate_count, int):
@@ -1375,9 +1477,7 @@ def _build_parquet_table(
             f"operational ADS Base business key contains nulls: {contract.name}"
         )
     if duplicate_count:
-        raise OperationalADSBaseError(
-            f"source table has duplicate business keys: {contract.name}"
-        )
+        raise OperationalADSBaseError(f"source table has duplicate business keys: {contract.name}")
     # Upstream schema ids may name a logical contract; ADS records the copied Arrow schema.
     schema_sha256 = _schema_sha256(target)
     if (
@@ -1637,9 +1737,7 @@ def _validate_calendar_ledger(
             f"WHERE {open_where} ORDER BY 1",
             [plan.ranges["decision_start"], plan.ranges["execution_end"]],
         ).fetchall()
-    _validate_ledger_decision_calendar(
-        ledger_value, tuple(row[0] for row in open_rows)
-    )
+    _validate_ledger_decision_calendar(ledger_value, tuple(row[0] for row in open_rows))
 
 
 def build_operational_ads_base(
@@ -1885,6 +1983,15 @@ def _verify_parquet_table(
         )
     quality = raw.get("quality")
     fingerprint = raw.get("content_fingerprint")
+    fingerprint_method = fingerprint.get("method") if isinstance(fingerprint, dict) else None
+    fingerprint_digest = (
+        fingerprint.get(
+            "logical_row_stream_sha256",
+            fingerprint.get("logical_append_chain_sha256"),
+        )
+        if isinstance(fingerprint, dict)
+        else None
+    )
     if (
         not isinstance(quality, dict)
         or not isinstance(fingerprint, dict)
@@ -1897,12 +2004,18 @@ def _verify_parquet_table(
             not isinstance(value, int) or isinstance(value, bool) or value < 0
             for value in quality["null_counts"].values()
         )
-        or fingerprint.get("method") != CONTENT_DIGEST_METHOD
+        or fingerprint_method not in {CONTENT_DIGEST_METHOD, APPEND_CONTENT_DIGEST_METHOD}
         or fingerprint.get("row_count") != part.get("row_count")
-        or fingerprint.get("logical_row_stream_sha256") != raw.get("table_content_digest")
+        or fingerprint_digest != raw.get("table_content_digest")
     ):
         raise OperationalADSBaseError(
             f"operational ADS Base sealed table metadata mismatch: {contract.name}"
+        )
+    if fingerprint_method == APPEND_CONTENT_DIGEST_METHOD:
+        _validated_append_fingerprint(
+            fingerprint,
+            content_digest=_required_text(raw, "table_content_digest"),
+            row_count=int(part["row_count"]),
         )
     if verify_logical_content:
         checked_columns, checked_schema, checked_quality = _parquet_quality(
@@ -1920,19 +2033,74 @@ def _verify_parquet_table(
             raise OperationalADSBaseError(
                 f"operational ADS Base table quality mismatch: {contract.name}"
             )
-        content, fingerprint = _parquet_content_digest(
-            connection,
-            relation,
-            columns=columns,
-            schema=schema,
-            sort_keys=contract.sort_keys,
-        )
-        if content != raw.get("table_content_digest") or fingerprint != raw.get(
-            "content_fingerprint"
-        ):
-            raise OperationalADSBaseError(
-                f"operational ADS Base table logical content mismatch: {contract.name}"
+        if fingerprint_method == APPEND_CONTENT_DIGEST_METHOD:
+            if contract.date_column is None:
+                raise OperationalADSBaseError(
+                    f"append fingerprint requires a dated table: {contract.name}"
+                )
+            base = fingerprint["base"]
+            delta = fingerprint["delta"]
+            assert isinstance(base, Mapping) and isinstance(delta, Mapping)
+            base_max = _parse_date(base.get("max_date"), f"tables.{contract.name}.base.max_date")
+            date_column = f'"{contract.date_column}"'
+            base_relation = (
+                f"(SELECT * FROM {relation} WHERE CAST({date_column} AS DATE) "
+                f"<= DATE {_sql_string(base_max.isoformat())})"
             )
+            delta_relation = (
+                f"(SELECT * FROM {relation} WHERE CAST({date_column} AS DATE) "
+                f"> DATE {_sql_string(base_max.isoformat())})"
+            )
+            base_digest, base_fingerprint = _parquet_content_digest(
+                connection,
+                base_relation,
+                columns=columns,
+                schema=schema,
+                sort_keys=contract.sort_keys,
+            )
+            delta_digest, delta_fingerprint = _parquet_content_digest(
+                connection,
+                delta_relation,
+                columns=columns,
+                schema=schema,
+                sort_keys=contract.sort_keys,
+            )
+            component_bounds = connection.execute(
+                f"SELECT max(CAST({date_column} AS DATE)) FROM {base_relation}"
+            ).fetchone()
+            delta_bounds = connection.execute(
+                f"SELECT min(CAST({date_column} AS DATE)), "
+                f"max(CAST({date_column} AS DATE)) FROM {delta_relation}"
+            ).fetchone()
+            actual_base_max = component_bounds[0] if component_bounds is not None else None
+            actual_delta_min = delta_bounds[0] if delta_bounds is not None else None
+            actual_delta_max = delta_bounds[1] if delta_bounds is not None else None
+            if (
+                base_digest != base.get("content_digest")
+                or base_fingerprint != base.get("fingerprint")
+                or delta_digest != delta.get("content_digest")
+                or delta_fingerprint != delta.get("fingerprint")
+                or actual_base_max != base_max
+                or actual_delta_min
+                != _parse_date(delta.get("min_date"), f"tables.{contract.name}.delta.min_date")
+                or actual_delta_max
+                != _parse_date(delta.get("max_date"), f"tables.{contract.name}.delta.max_date")
+            ):
+                raise OperationalADSBaseError(
+                    f"operational ADS Base append content mismatch: {contract.name}"
+                )
+        else:
+            content, checked_fingerprint = _parquet_content_digest(
+                connection,
+                relation,
+                columns=columns,
+                schema=schema,
+                sort_keys=contract.sort_keys,
+            )
+            if content != raw.get("table_content_digest") or checked_fingerprint != fingerprint:
+                raise OperationalADSBaseError(
+                    f"operational ADS Base table logical content mismatch: {contract.name}"
+                )
 
 
 def _verify_json_table(

@@ -109,6 +109,14 @@ The package content digest binds logical table content, schema, lineage, policy,
 identity; it excludes each generated part's encoding-dependent byte size and SHA-256. Those
 physical facts remain mandatory in the manifest and are bound by the manifest SHA-256 and `READY`.
 
+An append-only final table may use `canonical_logical_append_chain_sha256_v1` instead of
+rehashing its complete historical row stream. The chain binds the accepted Base logical digest
+and row count to one non-overlapping, date-ordered delta logical digest, row count, and date range.
+The normal build still materializes one complete table part and checks its full business-key
+cardinality and date bounds. Explicit deep verification recomputes both logical components from
+the complete part; the append chain does not permit replacement, overlap, or deduplication of the
+accepted Base rows.
+
 The generation ledger keeps market session T as the decision date. When canonical publication is
 only available overnight, its timezone-aware decision cutoff may be on T+1 but must remain before
 the `09:30 Asia/Shanghai` open. The replay frame retains the T snapshot and T+1 execution date; it

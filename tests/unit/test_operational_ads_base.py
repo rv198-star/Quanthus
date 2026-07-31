@@ -22,6 +22,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised by the P1 dependency
 from quanthus.corporate_action_normalization import load_corporate_action_normalization_policy
 from quanthus.operational_ads_base import (
     OperationalADSBaseError,
+    _append_content_digest,
     _logical_schema,
     _package_content_identity,
     _parquet_content_digest,
@@ -378,9 +379,7 @@ class OperationalADSBaseTests(unittest.TestCase):
                             "sha256": _sha256(path),
                             "size_bytes": path.stat().st_size,
                             "row_count": len(rows),
-                            "schema_sha256": (
-                                f"sha256:{hashlib.sha256(schema_bytes).hexdigest()}"
-                            ),
+                            "schema_sha256": (f"sha256:{hashlib.sha256(schema_bytes).hexdigest()}"),
                             "min_date": min(date_values).isoformat() if date_values else None,
                             "max_date": max(date_values).isoformat() if date_values else None,
                             "sort_keys": list(contract.sort_keys),
@@ -634,9 +633,7 @@ class OperationalADSBaseTests(unittest.TestCase):
                 "decision_cutoff": "2024-01-08T09:29:59+08:00",
             }
         ]
-        _validate_ledger_decision_calendar(
-            ledger, (date(2024, 1, 5), date(2024, 1, 8))
-        )
+        _validate_ledger_decision_calendar(ledger, (date(2024, 1, 5), date(2024, 1, 8)))
         ledger[0]["decision_cutoff"] = "2024-01-09T08:00:00+08:00"
         with self.assertRaisesRegex(OperationalADSBaseError, "next open session"):
             _validate_ledger_decision_calendar(
@@ -682,6 +679,78 @@ class OperationalADSBaseTests(unittest.TestCase):
             verify_logical_content=True,
         )
         self.assertEqual(verified.content_digest, first.content_digest)
+
+    def test_append_chain_fingerprint_builds_and_deep_verifies(self) -> None:
+        manifest_path = self.source / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        table = next(item for item in manifest["tables"] if item["name"] == "daily_ohlcv_none")
+        path = self.source / table["parts"][0]["path"]
+        assert duckdb is not None
+        connection = duckdb.connect(":memory:")
+        try:
+            relation = f"read_parquet('{path}')"
+            description = connection.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
+            columns = tuple(str(item[0]) for item in description)
+            schema = _logical_schema(description)
+            base_digest, base_fingerprint = _parquet_content_digest(
+                connection,
+                f"(SELECT * FROM {relation} WHERE date = DATE '2024-01-02')",
+                columns=columns,
+                schema=schema,
+                sort_keys=("date", "security_id"),
+            )
+            delta_digest, delta_fingerprint = _parquet_content_digest(
+                connection,
+                f"(SELECT * FROM {relation} WHERE date = DATE '2024-01-03')",
+                columns=columns,
+                schema=schema,
+                sort_keys=("date", "security_id"),
+            )
+        finally:
+            connection.close()
+        digest, fingerprint = _append_content_digest(
+            base_content_digest=base_digest,
+            base_fingerprint=base_fingerprint,
+            base_max_date="2024-01-02",
+            delta_content_digest=delta_digest,
+            delta_fingerprint=delta_fingerprint,
+            delta_min_date="2024-01-03",
+            delta_max_date="2024-01-03",
+        )
+        table["table_content_digest"] = digest
+        table["content_fingerprint"] = fingerprint
+        self._write_json(manifest_path, manifest)
+        self._write_plan()
+
+        built = self._build("append-chain")
+        verified = verify_operational_ads_base(
+            built.root,
+            policy=self.policy,
+            verify_logical_content=True,
+        )
+        self.assertEqual(verified.content_digest, built.content_digest)
+
+        wrong_digest, wrong_fingerprint = _append_content_digest(
+            base_content_digest=base_digest,
+            base_fingerprint=base_fingerprint,
+            base_max_date="2024-01-02",
+            delta_content_digest=delta_digest,
+            delta_fingerprint=delta_fingerprint,
+            delta_min_date="2024-01-03",
+            delta_max_date="2024-01-04",
+        )
+        table["table_content_digest"] = wrong_digest
+        table["content_fingerprint"] = wrong_fingerprint
+        self._write_json(manifest_path, manifest)
+        self._write_plan()
+
+        wrong_bounds = self._build("append-chain-wrong-bounds")
+        with self.assertRaisesRegex(OperationalADSBaseError, "append content mismatch"):
+            verify_operational_ads_base(
+                wrong_bounds.root,
+                policy=self.policy,
+                verify_logical_content=True,
+            )
 
     def test_package_content_identity_excludes_publisher_and_part_encoding_metadata(self) -> None:
         first = {
@@ -1029,9 +1098,7 @@ class OperationalADSBaseTests(unittest.TestCase):
         for name, descriptor in mutations.items():
             with self.subTest(name=name):
                 self._write_json(current_paths["dwd"], descriptor)
-                with self.assertRaisesRegex(
-                    OperationalADSBaseError, "unsupported|drifted|differs"
-                ):
+                with self.assertRaisesRegex(OperationalADSBaseError, "unsupported|drifted|differs"):
                     preflight_operational_ads_base_upstreams(
                         plan,
                         dwd_current=current_paths["dwd"],
@@ -1041,12 +1108,8 @@ class OperationalADSBaseTests(unittest.TestCase):
 
         dws_original = json.loads(current_paths["dws"].read_text(encoding="utf-8"))
         forged_pair_digest = f"sha256:{'9' * 64}"
-        self._write_json(
-            current_paths["dwd"], {**original, "pair_digest": forged_pair_digest}
-        )
-        self._write_json(
-            current_paths["dws"], {**dws_original, "pair_digest": forged_pair_digest}
-        )
+        self._write_json(current_paths["dwd"], {**original, "pair_digest": forged_pair_digest})
+        self._write_json(current_paths["dws"], {**dws_original, "pair_digest": forged_pair_digest})
         with self.assertRaisesRegex(OperationalADSBaseError, "differs"):
             preflight_operational_ads_base_upstreams(
                 plan,

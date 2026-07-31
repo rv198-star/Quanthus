@@ -235,6 +235,9 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
         )
     if lane.get("completion_deadline") != "19:46:00":
         raise ScheduleContractError("market-daily-core must use the provisional 19:46 deadline")
+    datasets = _string_set(lane.get("datasets"), field="market-daily-core.datasets")
+    if "valuation_daily_delta" not in datasets:
+        raise ScheduleContractError("market-daily-core must acquire daily valuation")
     timing_sla = _mapping(lane.get("timing_sla"), field="market-daily-core.timing_sla")
     observed = _positive_number(
         timing_sla.get("observed_max_duration_seconds"),
@@ -307,6 +310,17 @@ def _validate_intraday(lane: Mapping[str, Any]) -> None:
         raise ScheduleContractError("1m and 5m archives must both use direct acquisition")
     if streams["5m"].get("may_derive_from") is not None:
         raise ScheduleContractError("formal 5m data must not be synthesized from 1m")
+    after_hours = _string_set(
+        streams["1m"].get("additional_datasets"),
+        field="intraday 1m additional_datasets",
+    )
+    if after_hours != {
+        "after_hours_fixed_price_trades",
+        "after_hours_fixed_price_receipts",
+    }:
+        raise ScheduleContractError(
+            "1m publication must include sparse after-hours trades and per-security receipts"
+        )
     locks = {stream.get("lock") for stream in streams.values()}
     checkpoints = {stream.get("checkpoint") for stream in streams.values()}
     if None in locks or len(locks) != 2 or None in checkpoints or len(checkpoints) != 2:
@@ -339,3 +353,17 @@ def _validate_weekly(lane: Mapping[str, Any]) -> None:
     trigger = _mapping(lane.get("trigger"), field="weekly-corrections.trigger")
     if trigger.get("weekdays") != [6]:
         raise ScheduleContractError("weekly corrections must run on Saturday")
+    datasets = _string_set(
+        lane.get("primary_datasets"), field="weekly-corrections.primary_datasets"
+    )
+    required = {
+        "raw_f10",
+        "financial_statements",
+        "financial_quarterly",
+        "industry_membership",
+        "fundamentals_receipts",
+    }
+    if not required.issubset(datasets):
+        raise ScheduleContractError(
+            "weekly corrections must acquire complete fundamentals with receipts"
+        )

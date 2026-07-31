@@ -17,14 +17,20 @@ except ModuleNotFoundError:  # pragma: no cover - exercised by the base dependen
     pa = None
     pq = None
 
+from quanthus.pipelines import ods_base
 from quanthus.pipelines.ods_base import (
     OdsBaseError,
+    audit_ods_base_release_gate,
+    audit_ods_base_sources,
     build_ods_base_bundle,
     load_ods_base_current,
     load_ods_base_policy,
     promote_ods_base_bundle,
     verify_ods_base_bundle,
+    write_ods_base_source_inventory,
 )
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _sha256(path: Path) -> str:
@@ -144,10 +150,20 @@ class OdsBaseTests(unittest.TestCase):
             self._write_json(path, {"name": name, "date": market_date.isoformat()})
         else:
             path = root / "artifacts" / f"{name}.parquet"
+            rows = (
+                [
+                    {"trade_date": value, "is_open": 1, "exchange": "SSE"}
+                    for value in (
+                        [date(2026, 7, 30)]
+                        if market_date == date(2026, 7, 30)
+                        else [date(2026, 7, 30), market_date]
+                    )
+                ]
+                if name == "trading_calendar"
+                else [{"market_date": market_date, "artifact": name}]
+            )
             pq.write_table(
-                pa.Table.from_pylist(
-                    [{"market_date": market_date, "artifact": name}]
-                ),
+                pa.Table.from_pylist(rows),
                 path,
             )
         return {
@@ -163,7 +179,7 @@ class OdsBaseTests(unittest.TestCase):
         root = self._daily_root() / market_date.isoformat() / attempt
         root.mkdir(parents=True, exist_ok=True)
         required = (
-            ("bars", "status", "calendar")
+            ("bars", "status", "trading_calendar")
             if role == "market"
             else ("announcements", "actions")
         )
@@ -306,10 +322,22 @@ class OdsBaseTests(unittest.TestCase):
                             "minimum_files": 2,
                         }
                     ],
+                    "scope_gaps": [
+                        {
+                            "dataset_family": "fixture_unacquired_source",
+                            "classification": "not_formally_acquired",
+                            "reason": "fixture source family was never collected",
+                            "downstream_impact": "fixture consumers cannot use that family",
+                        }
+                    ],
                     "daily": {
                         "source": "data/shadow/hermes/releases/daily",
                         "increment_start": "2026-07-30",
-                        "market_required_artifacts": ["bars", "status", "calendar"],
+                        "market_required_artifacts": [
+                            "bars",
+                            "status",
+                            "trading_calendar",
+                        ],
                         "event_required_artifacts": ["announcements", "actions"],
                     },
                     "intraday_releases": [
@@ -329,12 +357,12 @@ class OdsBaseTests(unittest.TestCase):
                     "exclusions": [
                         {
                             "pattern": "data/revisions",
-                            "classification": "mixed",
+                            "classification": "excluded_superseded_revision",
                             "reason": "only accepted evidence descendants are included",
                         },
                         {
                             "pattern": "data/shadow",
-                            "classification": "mixed",
+                            "classification": "excluded_unselected_release_root",
                             "reason": "only selected releases are included",
                         },
                         {
@@ -357,8 +385,21 @@ class OdsBaseTests(unittest.TestCase):
             },
         )
 
+    def _inventory(self, through_date: date, name: str) -> Path:
+        path = self.root / "inventory" / name
+        write_ods_base_source_inventory(
+            path,
+            audit_ods_base_sources(
+                astock_root=self.astock,
+                through_date=through_date,
+                policy=self.policy,
+            ),
+        )
+        return path
+
     def _build(self, bundle_id: str = "ods-base-through-20260730-v1") -> Path:
         output = self.root / "build" / bundle_id
+        inventory = self._inventory(date(2026, 7, 30), f"{bundle_id}.json")
         result = build_ods_base_bundle(
             astock_root=self.astock,
             output=output,
@@ -366,6 +407,7 @@ class OdsBaseTests(unittest.TestCase):
             through_date=date(2026, 7, 30),
             policy=self.policy,
             code_revision="a" * 40,
+            source_inventory=inventory,
         )
         self.assertEqual(result.through_date, date(2026, 7, 30))
         return output
@@ -380,6 +422,9 @@ class OdsBaseTests(unittest.TestCase):
             through_date=date(2026, 7, 30),
             policy=self.policy,
             code_revision="a" * 40,
+            source_inventory=(
+                self.root / "inventory" / "ods-base-through-20260730-v1.json"
+            ),
         )
         self.assertEqual(first.content_digest, second.content_digest)
         self.assertFalse(any(output.rglob("acquisition_log.json")))
@@ -387,6 +432,10 @@ class OdsBaseTests(unittest.TestCase):
         manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
         lineages = manifest["content"]["daily_releases"]
         self.assertEqual(len(lineages), 4)
+        self.assertEqual(
+            manifest["content"]["scope_gaps"][0]["dataset_family"],
+            "fixture_unacquired_source",
+        )
         self.assertTrue(
             any(
                 artifact["name"] == "acquisition_log"
@@ -416,6 +465,224 @@ class OdsBaseTests(unittest.TestCase):
                 code_revision="a" * 40,
             )
 
+    def test_mixed_source_roots_are_classified_at_source_unit_depth(self) -> None:
+        excluded = self.data / "revisions" / "superseded-revision"
+        self._write_json(excluded / "META.json", {"superseded": True})
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=self.policy,
+        )
+        classifications = {
+            item["path"]: item["classification"]
+            for item in inventory["source_inventory"]
+        }
+        self.assertEqual(classifications["data/revisions"], "mixed")
+        self.assertEqual(
+            classifications["data/revisions/accepted-evidence"], "included"
+        )
+        self.assertEqual(
+            classifications["data/revisions/superseded-revision"],
+            "excluded_superseded_revision",
+        )
+
+    def test_production_policy_discloses_full_statement_scope_gap(self) -> None:
+        policy = load_ods_base_policy(
+            REPOSITORY_ROOT / "config" / "pipelines" / "ods-base.v1.json"
+        )
+        gaps = {item.dataset_family: item for item in policy.scope_gaps}
+        self.assertIn("raw_f10_and_full_financial_statements", gaps)
+        self.assertEqual(
+            gaps["raw_f10_and_full_financial_statements"].classification,
+            "not_formally_acquired",
+        )
+
+    def test_final_policy_includes_july_valuation_repair_and_evidence(self) -> None:
+        policy = load_ods_base_policy(
+            REPOSITORY_ROOT
+            / "config"
+            / "pipelines"
+            / "ods-base-final-through-20260731.v2.json"
+        )
+        repair = (
+            self.root
+            / "final-policy-source"
+            / "data"
+            / "backfill"
+            / "valuation"
+            / "2026-07-20_2026-07-30"
+        )
+        (repair / "checkpoints").mkdir(parents=True)
+        for name in (
+            "valuation_history.parquet",
+            "receipts.parquet",
+            "valuation_history.parquet.meta.json",
+        ):
+            (repair / name).write_bytes(b"fixture")
+        (repair / "checkpoints" / "part-00000.json").write_text(
+            "{}\n", encoding="utf-8"
+        )
+        (self.root / "final-policy-source" / "minute" / "data").mkdir(parents=True)
+
+        inventory = ods_base._classify_source_root(
+            self.root / "final-policy-source", policy
+        )
+        classifications = {item["path"]: item["classification"] for item in inventory}
+        self.assertEqual(classifications["data/backfill"], "mixed")
+        self.assertEqual(
+            classifications[
+                "data/backfill/valuation/2026-07-20_2026-07-30/valuation_history.parquet"
+            ],
+            "included",
+        )
+        self.assertEqual(
+            classifications[
+                "data/backfill/valuation/2026-07-20_2026-07-30/checkpoints"
+            ],
+            "included",
+        )
+        datasets = {item.dataset_id for item in (*policy.files, *policy.archives)}
+        self.assertIn("valuation_history_july_repair", datasets)
+        self.assertIn(
+            "source_evidence_valuation_history_july_repair_checkpoints", datasets
+        )
+        self.assertIn("valuation_daily_delta", policy.daily.market_required_artifacts)
+
+    def test_frozen_inventory_blocks_changed_sources(self) -> None:
+        inventory = self._inventory(date(2026, 7, 30), "frozen.json")
+        self._write_json(self.data / "meta.json", {"fixture": "changed"})
+        with self.assertRaisesRegex(OdsBaseError, "changed after"):
+            build_ods_base_bundle(
+                astock_root=self.astock,
+                output=self.root / "changed" / "changed-base",
+                bundle_id="changed-base",
+                through_date=date(2026, 7, 30),
+                policy=self.policy,
+                code_revision="a" * 40,
+                source_inventory=inventory,
+            )
+
+    def test_latest_accepted_release_extends_a_stale_base_calendar(self) -> None:
+        assert pa is not None
+        assert pq is not None
+        pq.write_table(
+            pa.Table.from_pylist(
+                [{"exchange": "SSE", "trade_date": date(2026, 7, 29), "is_open": 1}]
+            ),
+            self.data / "calendar.parquet",
+        )
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=self.policy,
+        )
+        self.assertEqual(inventory["through_date"], "2026-07-30")
+        self.assertEqual(len(inventory["daily_releases"]), 4)
+
+    def test_daily_current_may_authorize_the_event_role(self) -> None:
+        date_root = self._daily_root() / "2026-07-30"
+        event_release = date_root / "event-attempt" / "release.json"
+        self._write_json(
+            date_root / "CURRENT.json",
+            {
+                "schema_version": 1,
+                "schedule": "daily",
+                "market_date": "2026-07-30",
+                "attempt_id": "event-attempt",
+                "manifest_sha256": _sha256(event_release),
+            },
+        )
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=self.policy,
+        )
+        roles = {
+            item["release_role"]: item["attempt_id"]
+            for item in inventory["daily_releases"]
+            if item["release_role"] in {"market", "events"}
+        }
+        self.assertEqual(roles, {"market": "market-attempt", "events": "event-attempt"})
+
+    def test_intraday_gap_fill_may_use_an_explicit_hermes_revision(self) -> None:
+        policy_value = json.loads(self.policy_path.read_text(encoding="utf-8"))
+        for frequency in ("1m", "5m"):
+            source_attempt = (
+                self._daily_root()
+                / frequency
+                / "2026-07-30"
+                / f"intraday-{frequency}-attempt"
+            )
+            revision_root = self.data / "revisions" / "hermes-gap" / frequency
+            revision_attempt = revision_root / source_attempt.name
+            shutil.copytree(source_attempt, revision_attempt)
+            release_digest = _sha256(revision_attempt / "release.json")
+            item = next(
+                candidate
+                for candidate in policy_value["source"]["intraday_releases"]
+                if candidate["frequency"] == frequency
+            )
+            item["source_exceptions"] = [
+                {
+                    "market_date": "2026-07-30",
+                    "source_node": "hermes",
+                    "source": f"data/revisions/hermes-gap/{frequency}",
+                    "reason": "formal Hermes release was incomplete; retained revision is complete",
+                    "manifest_sha256": release_digest,
+                }
+            ]
+        self._write_json(self.policy_path, policy_value)
+        policy = load_ods_base_policy(self.policy_path)
+
+        inventory = audit_ods_base_sources(
+            astock_root=self.astock,
+            through_date=date(2026, 7, 30),
+            policy=policy,
+        )
+
+        intraday = [
+            item
+            for item in inventory["daily_releases"]
+            if item["release_role"].startswith("intraday_")
+        ]
+        self.assertEqual({item["source_node"] for item in intraday}, {"hermes"})
+        self.assertTrue(all(item["gap_fill"] is not None for item in intraday))
+
+    def test_production_legacy_manifest_is_not_a_canonical_base_member(self) -> None:
+        policy = load_ods_base_policy(
+            REPOSITORY_ROOT / "config" / "pipelines" / "ods-base.v1.json"
+        )
+        legacy = {
+            item.dataset_id: item
+            for item in policy.files
+            if item.dataset_id.startswith("legacy_dataset_manifest")
+        }
+
+        self.assertEqual(
+            set(legacy),
+            {"legacy_dataset_manifest", "legacy_dataset_manifest_metadata"},
+        )
+        self.assertTrue(
+            all(item.role == "legacy_source_lineage" for item in legacy.values())
+        )
+        self.assertTrue(
+            all(
+                item.target.startswith("payload/source-evidence/legacy-dataset-manifest/")
+                for item in legacy.values()
+            )
+        )
+
+    def test_production_dividend_identity_allows_a_missing_ex_date(self) -> None:
+        policy = load_ods_base_policy(
+            REPOSITORY_ROOT / "config" / "pipelines" / "ods-base.v1.json"
+        )
+        dividend = next(
+            item for item in policy.files if item.dataset_id == "dividend_history"
+        )
+
+        self.assertEqual(dividend.key_columns, ("stock_code", "announce_date"))
+        self.assertIn("ex_dividend_date", dividend.date_columns)
+
     def test_promote_and_load_current(self) -> None:
         output = self._build()
         base_root = self.root / "node" / "base"
@@ -430,6 +697,33 @@ class OdsBaseTests(unittest.TestCase):
         self.assertEqual(promoted.content_digest, loaded.content_digest)
         self.assertEqual(loaded.through_date, date(2026, 7, 30))
 
+    def test_hidden_transfer_staging_requires_explicit_verification_mode(self) -> None:
+        output = self._build()
+        base_root = self.root / "node" / "base"
+        base_root.mkdir(parents=True)
+        staging = base_root / f".incoming-{output.name}"
+        shutil.copytree(output, staging)
+
+        with self.assertRaisesRegex(OdsBaseError, "directory and bundle identity"):
+            verify_ods_base_bundle(staging, policy=self.policy, deep=True)
+        staged = verify_ods_base_bundle(
+            staging,
+            policy=self.policy,
+            deep=True,
+            allow_staging_name=True,
+        )
+        self.assertEqual(staged.bundle_id, output.name)
+
+        promoted = promote_ods_base_bundle(
+            ingress_bundle=staging,
+            base_root=base_root,
+            current_pointer=base_root / "BASE_CURRENT.json",
+            policy=self.policy,
+            move_ingress=True,
+        )
+        self.assertEqual(promoted.bundle_id, output.name)
+        self.assertFalse(staging.exists())
+
     def test_final_base_reuses_unchanged_parent_files(self) -> None:
         provisional = self._build()
         self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
@@ -442,6 +736,7 @@ class OdsBaseTests(unittest.TestCase):
             policy=self.policy,
             code_revision="b" * 40,
             parent_base=provisional,
+            source_inventory=self._inventory(date(2026, 7, 31), "final.json"),
         )
         self.assertEqual(result.through_date, date(2026, 7, 31))
         self.assertEqual(
@@ -454,6 +749,248 @@ class OdsBaseTests(unittest.TestCase):
             verify_ods_base_bundle(provisional, policy=self.policy).content_digest,
         )
         self.assertGreater(manifest["storage_reuse"]["file_count"], 0)
+
+    def test_policy_revision_can_reuse_and_replace_a_prior_policy_base(self) -> None:
+        provisional = self._build()
+        old_policy = self.policy
+        revised_value = json.loads(self.policy_path.read_text(encoding="utf-8"))
+        revised_value["contract_id"] = "ods-base-test-final-v2"
+        revised_path = self.root / "final-policy.json"
+        self._write_json(revised_path, revised_value)
+        revised_policy = load_ods_base_policy(revised_path)
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+        final = self.root / "build" / "ods-base-policy-transition-v2"
+        final_inventory = self.root / "inventory" / "policy-transition.json"
+        write_ods_base_source_inventory(
+            final_inventory,
+            audit_ods_base_sources(
+                astock_root=self.astock,
+                through_date=date(2026, 7, 31),
+                policy=revised_policy,
+            ),
+        )
+        built = build_ods_base_bundle(
+            astock_root=self.astock,
+            output=final,
+            bundle_id=final.name,
+            through_date=date(2026, 7, 31),
+            policy=revised_policy,
+            code_revision="b" * 40,
+            parent_base=provisional,
+            parent_policy=old_policy,
+            source_inventory=final_inventory,
+        )
+        base_root = self.root / "policy-transition-node" / "base"
+        current = base_root / "BASE_CURRENT.json"
+        prior = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current,
+            policy=old_policy,
+        )
+        promoted = promote_ods_base_bundle(
+            ingress_bundle=final,
+            base_root=base_root,
+            current_pointer=current,
+            policy=revised_policy,
+            current_policy=old_policy,
+            expected_current_manifest_sha256=prior.manifest_sha256,
+        )
+        self.assertEqual(promoted.manifest_sha256, built.manifest_sha256)
+        self.assertEqual(
+            load_ods_base_current(current, policy=revised_policy).bundle_id,
+            final.name,
+        )
+
+    def test_pointer_advance_requires_compare_and_swap_precondition(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node" / "base"
+        current_pointer = base_root / "BASE_CURRENT.json"
+        promoted = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current_pointer,
+            policy=self.policy,
+        )
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+        final = self.root / "build" / "ods-base-202607-v1"
+        build_ods_base_bundle(
+            astock_root=self.astock,
+            output=final,
+            bundle_id=final.name,
+            through_date=date(2026, 7, 31),
+            policy=self.policy,
+            code_revision="b" * 40,
+            parent_base=provisional,
+            source_inventory=self._inventory(date(2026, 7, 31), "cas-final.json"),
+        )
+
+        with self.assertRaisesRegex(OdsBaseError, "expected manifest"):
+            promote_ods_base_bundle(
+                ingress_bundle=final,
+                base_root=base_root,
+                current_pointer=current_pointer,
+                policy=self.policy,
+            )
+        with self.assertRaisesRegex(OdsBaseError, "precondition failed"):
+            promote_ods_base_bundle(
+                ingress_bundle=final,
+                base_root=base_root,
+                current_pointer=current_pointer,
+                policy=self.policy,
+                expected_current_manifest_sha256="sha256:" + "0" * 64,
+            )
+
+        final_promoted = promote_ods_base_bundle(
+            ingress_bundle=final,
+            base_root=base_root,
+            current_pointer=current_pointer,
+            policy=self.policy,
+            expected_current_manifest_sha256=promoted.manifest_sha256,
+        )
+        self.assertEqual(final_promoted.bundle_id, "ods-base-202607-v1")
+        self.assertEqual(
+            promote_ods_base_bundle(
+                ingress_bundle=final,
+                base_root=base_root,
+                current_pointer=current_pointer,
+                policy=self.policy,
+                expected_current_manifest_sha256=promoted.manifest_sha256,
+            ).manifest_sha256,
+            final_promoted.manifest_sha256,
+        )
+
+    def test_close_release_gate_binds_parent_and_all_four_roles(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node" / "base"
+        current = base_root / "BASE_CURRENT.json"
+        parent = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current,
+            policy=self.policy,
+        )
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+
+        result = audit_ods_base_release_gate(
+            release_root=self._daily_root().parent,
+            base_current=current,
+            market_date=date(2026, 7, 31),
+            policy=self.policy,
+            expected_parent_bundle_id=parent.bundle_id,
+            expected_parent_manifest_sha256=parent.manifest_sha256,
+            expected_parent_through_date=date(2026, 7, 30),
+            minimum_free_bytes=0,
+        )
+
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(
+            [item["role"] for item in result["releases"]],
+            ["market", "events", "1m", "5m"],
+        )
+        self.assertTrue(result["authorizes_candidate_build"])
+        self.assertFalse(result["authorizes_base_promotion"])
+
+    def test_final_release_policy_requires_valuation_with_old_parent_policy(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node-final-policy" / "base"
+        current = base_root / "BASE_CURRENT.json"
+        parent = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current,
+            policy=self.policy,
+        )
+        revised_value = json.loads(self.policy_path.read_text(encoding="utf-8"))
+        revised_value["contract_id"] = "ods-base-test-final-release-v2"
+        revised_value["source"]["daily"]["market_required_artifacts"].append(
+            "valuation_daily_delta"
+        )
+        revised_path = self.root / "final-release-policy.json"
+        self._write_json(revised_path, revised_value)
+        revised_policy = load_ods_base_policy(revised_path)
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+
+        with self.assertRaisesRegex(OdsBaseError, "required market release"):
+            audit_ods_base_release_gate(
+                release_root=self._daily_root().parent,
+                base_current=current,
+                market_date=date(2026, 7, 31),
+                policy=revised_policy,
+                parent_policy=self.policy,
+                expected_parent_bundle_id=parent.bundle_id,
+                expected_parent_manifest_sha256=parent.manifest_sha256,
+                expected_parent_through_date=date(2026, 7, 30),
+                minimum_free_bytes=0,
+            )
+
+    def test_close_release_gate_fails_when_one_role_is_not_ready(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node" / "base"
+        current = base_root / "BASE_CURRENT.json"
+        parent = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current,
+            policy=self.policy,
+        )
+        self._write_sources([date(2026, 7, 30), date(2026, 7, 31)])
+        missing = (
+            self._daily_root()
+            / "5m"
+            / "2026-07-31"
+            / "intraday-5m-attempt"
+            / "READY"
+        )
+        missing.unlink()
+
+        with self.assertRaisesRegex(OdsBaseError, "no complete ODS 5m release"):
+            audit_ods_base_release_gate(
+                release_root=self._daily_root().parent,
+                base_current=current,
+                market_date=date(2026, 7, 31),
+                policy=self.policy,
+                expected_parent_bundle_id=parent.bundle_id,
+                expected_parent_manifest_sha256=parent.manifest_sha256,
+                expected_parent_through_date=date(2026, 7, 30),
+                minimum_free_bytes=0,
+            )
+
+    def test_close_release_gate_rejects_an_ambiguous_daily_attempt(self) -> None:
+        provisional = self._build()
+        base_root = self.root / "node" / "base"
+        current = base_root / "BASE_CURRENT.json"
+        parent = promote_ods_base_bundle(
+            ingress_bundle=provisional,
+            base_root=base_root,
+            current_pointer=current,
+            policy=self.policy,
+        )
+        target_date = date(2026, 7, 31)
+        self._write_sources([date(2026, 7, 30), target_date])
+        event_root = self._daily_root() / target_date.isoformat() / "event-attempt"
+        manifest_path = event_root / "release.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["artifacts"].extend(
+            self._artifact(event_root, name, target_date)
+            for name in ("bars", "status", "trading_calendar")
+        )
+        self._write_json(manifest_path, manifest)
+        (event_root / "READY").write_text(
+            f"{_sha256(manifest_path)}\n", encoding="ascii"
+        )
+
+        with self.assertRaisesRegex(OdsBaseError, "ambiguous market/events roles"):
+            audit_ods_base_release_gate(
+                release_root=self._daily_root().parent,
+                base_current=current,
+                market_date=target_date,
+                policy=self.policy,
+                expected_parent_bundle_id=parent.bundle_id,
+                expected_parent_manifest_sha256=parent.manifest_sha256,
+                expected_parent_through_date=date(2026, 7, 30),
+                minimum_free_bytes=0,
+            )
 
 
 if __name__ == "__main__":

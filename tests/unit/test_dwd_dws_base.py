@@ -4,10 +4,12 @@ import hashlib
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from unittest import mock
 
+from quanthus.pipelines import dwd_dws_base
 from quanthus.pipelines.dual_lane import EpochInput, LaneCandidate
 from quanthus.pipelines.dual_lane_history import HistoryBaseBundle
 from quanthus.pipelines.dwd_dws_base import (
@@ -109,6 +111,16 @@ class DwdDwsBaseTests(unittest.TestCase):
                 "absorbed_sources_retained": True,
             },
         }
+
+    def test_repository_corrective_policy_uses_new_immutable_ids(self) -> None:
+        repository_root = Path(__file__).resolve().parents[2]
+        policy = load_dwd_dws_base_policy(
+            repository_root / "config/pipelines/dwd-dws-base-through-20260730.v2.json"
+        )
+        self.assertEqual(policy.phase, "provisional")
+        self.assertEqual(policy.through_date, date(2026, 7, 30))
+        self.assertEqual(policy.dwd_package_id, "dwd-base-through-20260730-v2")
+        self.assertEqual(policy.dws_package_id, "dws-base-through-20260730-v2")
 
     def _freeze_fixture(self) -> tuple[HistoryBaseBundle, LaneCandidate, EpochInput]:
         history_root = self.root / "history-base-test-v1"
@@ -335,6 +347,7 @@ class DwdDwsBaseTests(unittest.TestCase):
                     expected_dwd_current_sha256=f"sha256:{'a' * 64}",
                     expected_dws_current_sha256=None,
                 )
+
             self.assertFalse((dwd_base / "BASE_CURRENT.json").exists())
             self.assertFalse((dws_base / "BASE_CURRENT.json").exists())
             advance_dwd_dws_base_current(
@@ -359,6 +372,32 @@ class DwdDwsBaseTests(unittest.TestCase):
                     dws_pointer=dws_base / "BASE_CURRENT.json",
                     policy=self.policy,
                 )
+
+    def test_install_sets_clean_base_root_permissions(self) -> None:
+        ingress_root = self.root / "ingress" / self.policy.dwd_package_id
+        ingress_root.mkdir(parents=True)
+        ingress = self._pair(ingress_root, self.root / "unused-dws").dwd
+        base_root = self.root / "clean-node" / "dwd" / "base"
+        installed_root = base_root / ingress.package_id
+        installed_root.mkdir(parents=True)
+        with (
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base.verify_dwd_base_package",
+                return_value=replace(ingress, root=installed_root),
+            ),
+            mock.patch("quanthus.pipelines.dwd_dws_base._apply_permissions"),
+            mock.patch("quanthus.pipelines.dwd_dws_base.os.chown") as chown,
+        ):
+            installed = dwd_dws_base._install_one(
+                ingress=ingress,
+                base_root=base_root,
+                policy=self.policy,
+                owner_uid=0,
+                group_gid=1234,
+            )
+        self.assertEqual(installed.root, installed_root)
+        self.assertEqual(base_root.stat().st_mode & 0o777, 0o750)
+        chown.assert_called_once_with(base_root.resolve(), 0, 1234)
 
     def test_base_lane_catalog_allows_no_post_base_candidate_and_is_idempotent(self) -> None:
         platform_root = self.root / "platform"
@@ -418,6 +457,142 @@ class DwdDwsBaseTests(unittest.TestCase):
         self.assertEqual(current.read_bytes(), current_bytes)
         current_value = json.loads(current.read_text(encoding="utf-8"))
         self.assertEqual(current_value["kind"], "dwd_dws_base_lane_history_current")
+
+    def test_post_base_catalog_rejects_same_date_alternate_parent_branch(self) -> None:
+        platform_root = self.root / "platform"
+        dwd_base = platform_root / "dwd" / "base" / self.policy.dwd_package_id
+        dws_base = platform_root / "dws" / "base" / self.policy.dws_package_id
+        dwd_base.mkdir(parents=True)
+        dws_base.mkdir(parents=True)
+        pair = self._pair(dwd_base, dws_base)
+        _history, candidate_template, epoch_template = self._freeze_fixture()
+        tail_revision = "daily-dwd-20240103-v1"
+        tail_digest = f"sha256:{'1' * 64}"
+
+        first_root = platform_root / "candidates" / "2024-01-04" / "first"
+        first_dwd = first_root / "artifacts" / "daily-dwd-20240104-v1"
+        first_dws = first_root / "artifacts" / "daily-dws-20240104-v1"
+        first_parent = platform_root / "parents" / tail_revision
+        self._write_json(first_root / "manifest.json", {"epoch_id": "epoch-first"})
+        self._write_json(first_parent / "manifest.json", {"market_date": "2024-01-03"})
+        first_expected_parent = {
+            "kind": "daily_partition",
+            "revision": tail_revision,
+            "manifest_sha256": tail_digest,
+        }
+        self._write_json(
+            first_dwd / "manifest.json", {"lineage": {"parent": first_expected_parent}}
+        )
+        first_candidate = replace(
+            candidate_template,
+            root=first_root,
+            candidate_id="candidate-first",
+            market_date=date(2024, 1, 4),
+            dwd_root=first_dwd,
+            dws_root=first_dws,
+            epoch_manifest_sha256=f"sha256:{'2' * 64}",
+        )
+        first_epoch = replace(
+            epoch_template,
+            root=platform_root / "epochs" / "first",
+            epoch_id="epoch-first",
+            market_date=first_candidate.market_date,
+            manifest_sha256=first_candidate.epoch_manifest_sha256,
+            source_kind="daily_partition",
+            source_revision=tail_revision,
+            source_manifest_sha256=tail_digest,
+            source_path=first_parent,
+        )
+
+        second_root = platform_root / "candidates" / "2024-01-05" / "second"
+        second_dwd = second_root / "artifacts" / "daily-dwd-20240105-v1"
+        second_dws = second_root / "artifacts" / "daily-dws-20240105-v1"
+        alternate_parent = platform_root / "alternate" / "daily-dwd-20240104-other"
+        self._write_json(second_root / "manifest.json", {"epoch_id": "epoch-second"})
+        self._write_json(alternate_parent / "manifest.json", {"market_date": "2024-01-04"})
+        alternate_digest = _sha256(alternate_parent / "manifest.json")
+        second_expected_parent = {
+            "kind": "daily_partition",
+            "revision": alternate_parent.name,
+            "manifest_sha256": alternate_digest,
+        }
+        self._write_json(
+            second_dwd / "manifest.json", {"lineage": {"parent": second_expected_parent}}
+        )
+        second_candidate = replace(
+            candidate_template,
+            root=second_root,
+            candidate_id="candidate-second",
+            market_date=date(2024, 1, 5),
+            dwd_root=second_dwd,
+            dws_root=second_dws,
+            epoch_manifest_sha256=f"sha256:{'3' * 64}",
+        )
+        second_epoch = replace(
+            epoch_template,
+            root=platform_root / "epochs" / "second",
+            epoch_id="epoch-second",
+            market_date=second_candidate.market_date,
+            manifest_sha256=second_candidate.epoch_manifest_sha256,
+            source_kind="daily_partition",
+            source_revision=alternate_parent.name,
+            source_manifest_sha256=alternate_digest,
+            source_path=alternate_parent,
+        )
+
+        with (
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base._base_tail_identity",
+                return_value={"revision": tail_revision, "manifest_sha256": tail_digest},
+            ),
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base.verify_epoch_input",
+                side_effect=(first_epoch, second_epoch),
+            ),
+            self.assertRaisesRegex(DwdDwsBaseError, "parent identity is discontinuous"),
+        ):
+            dwd_dws_base._catalog_candidate_links(
+                platform_root=platform_root,
+                pair=pair,
+                candidates=(first_candidate, second_candidate),
+                policy=self.policy,
+            )
+
+    def test_projection_difference_materializes_the_dwd_projection_once(self) -> None:
+        dwd_root = self.root / "dwd"
+        dws_root = self.root / "dws"
+        dwd_root.mkdir()
+        dws_root.mkdir()
+        pair = self._pair(dwd_root, dws_root)
+        connection = mock.Mock()
+        connection.execute.side_effect = [
+            mock.Mock(),
+            mock.Mock(),
+            mock.Mock(fetchall=mock.Mock(return_value=[(1,), (1,)])),
+            mock.Mock(fetchall=mock.Mock(return_value=[(1,), (2,)])),
+        ]
+        with (
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base._dws_projection_query",
+                return_value="SELECT 1 AS market_date",
+            ),
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base._dataset_parts",
+                return_value=[{"path": "summary.parquet"}],
+            ),
+            mock.patch(
+                "quanthus.pipelines.dwd_dws_base._duckdb_connection",
+                return_value=connection,
+            ),
+        ):
+            difference = dwd_dws_base._projection_difference_rows(pair.dwd, pair.dws)
+        self.assertEqual(difference, 2)
+        self.assertEqual(connection.execute.call_count, 4)
+        executed_sql = " ".join(call.args[0] for call in connection.execute.call_args_list)
+        self.assertIn("CREATE TEMP TABLE projected_dws", executed_sql)
+        self.assertEqual(executed_sql.count("SELECT 1 AS market_date"), 1)
+        self.assertNotIn("EXCEPT", executed_sql)
+        connection.close.assert_called_once_with()
 
 
 if __name__ == "__main__":

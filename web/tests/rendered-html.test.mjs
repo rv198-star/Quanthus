@@ -71,6 +71,10 @@ function sha256(text) {
   return createHash("sha256").update(text).digest("hex");
 }
 
+function sha256Bytes(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
 function publicationFileFetcher(publicationRoot) {
   return async (input) => {
     const url = new URL(input);
@@ -83,7 +87,7 @@ function publicationFileFetcher(publicationRoot) {
       return new Response("Not found", { status: 404 });
     }
     try {
-      return new Response(await readFile(join(publicationRoot, relativePath), "utf8"), {
+      return new Response(await readFile(join(publicationRoot, relativePath)), {
         status: 200,
       });
     } catch {
@@ -349,6 +353,7 @@ test("loads only READY server publications and keeps their trust separate", asyn
     formal_strategy_evidence: false,
     workspace_digest: workspace.digest,
     digest: `sha256:${"3".repeat(64)}`,
+    note: "\uFFFD",
   };
   const releaseText = JSON.stringify(release);
   const checksumText = [
@@ -424,6 +429,62 @@ test("loads only READY server publications and keeps their trust separate", asyn
   );
   assert.equal(tampered.entries.length, 0);
   assert.match(tampered.errors[0], /校验账本不一致/);
+
+  responses.set(
+    `/data/attribution-releases/${releaseId}/workspace.json`,
+    text,
+  );
+  const releaseBytes = Buffer.from(releaseText, "utf8");
+  const replacementBytes = Buffer.from([0xef, 0xbf, 0xbd]);
+  const replacementIndex = releaseBytes.indexOf(replacementBytes);
+  assert.notEqual(replacementIndex, -1);
+  const collisionBytes = Buffer.concat([
+    releaseBytes.subarray(0, replacementIndex),
+    Buffer.from([0xff]),
+    releaseBytes.subarray(replacementIndex + replacementBytes.length),
+  ]);
+  responses.set(
+    `/data/attribution-releases/${releaseId}/release.json`,
+    collisionBytes,
+  );
+  const byteCollision = await publicationCatalog.loadPublishedWorkspaceCatalog(
+    fetcher,
+    "http://localhost/data/attribution-releases/catalog.json",
+  );
+  assert.equal(byteCollision.entries.length, 0);
+  assert.match(byteCollision.errors[0], /release\.json 与发布校验账本不一致/);
+  responses.set(
+    `/data/attribution-releases/${releaseId}/release.json`,
+    releaseText,
+  );
+
+  const invalidWorkspaceBytes = Buffer.concat([
+    Buffer.from(text.slice(0, -1), "utf8"),
+    Buffer.from([0xff]),
+    Buffer.from(text.slice(-1), "utf8"),
+  ]);
+  const invalidChecksumText = [
+    `${sha256(releaseText)}  release.json\n`,
+    `${sha256Bytes(invalidWorkspaceBytes)}  workspace.json\n`,
+  ].join("");
+  responses.set(
+    `/data/attribution-releases/${releaseId}/READY`,
+    `${sha256(invalidChecksumText)}\n`,
+  );
+  responses.set(
+    `/data/attribution-releases/${releaseId}/CHECKSUMS.sha256`,
+    invalidChecksumText,
+  );
+  responses.set(
+    `/data/attribution-releases/${releaseId}/workspace.json`,
+    invalidWorkspaceBytes,
+  );
+  const invalidUtf8 = await publicationCatalog.loadPublishedWorkspaceCatalog(
+    fetcher,
+    "http://localhost/data/attribution-releases/catalog.json",
+  );
+  assert.equal(invalidUtf8.entries.length, 0);
+  assert.match(invalidUtf8.errors[0], /不是有效的 UTF-8 文本/);
 });
 
 test(

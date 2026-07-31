@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "hermes-1730-window-gated-20260729",
+  "contract_revision": "hermes-full-ods-scope-20260731",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_and_standby_dwd_dws_candidate",
@@ -114,6 +114,7 @@
         "stock_list",
         "trading_calendar",
         "index_daily_delta",
+        "valuation_daily_delta",
         "adjustment_evidence_delta"
       ],
       "release_schedule": "daily"
@@ -168,6 +169,10 @@
           "trigger": {"kind": "timer", "weekdays": [1, 2, 3, 4, 5], "time": "20:30:00"},
           "lock": "intraday-1m.lock",
           "checkpoint": "intraday-1m.watermark.json",
+          "additional_datasets": [
+            "after_hours_fixed_price_trades",
+            "after_hours_fixed_price_receipts"
+          ],
           "priority": 1
         },
         {
@@ -190,13 +195,16 @@
       "resource_group": "pve_bulk_io",
       "primary_datasets": [
         "shareholder_count",
+        "raw_f10",
+        "financial_statements",
         "financial_quarterly",
         "corporate_actions",
         "dividends",
         "adjustment_evidence",
         "st_announcement_trail",
         "security_lifecycle",
-        "industry_membership"
+        "industry_membership",
+        "fundamentals_receipts"
       ],
       "reconciliation_windows": {
         "daily_ohlcv_none": "20_sessions",

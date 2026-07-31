@@ -12,7 +12,14 @@ import pyarrow.parquet as pq
 import pytest
 
 from quanthus.pipelines import lane_runner
-from quanthus.providers import ods_snapshot, trading_calendar
+from quanthus.providers import (
+    after_hours_tdx,
+    common,
+    fundamentals,
+    ods_snapshot,
+    trading_calendar,
+    valuation_history,
+)
 
 
 def _write_parquet(path: Path, rows: list[dict[str, object]]) -> None:
@@ -175,6 +182,447 @@ def test_provider_spec_supports_repository_python_entrypoint(
     assert meta["exit_code"] == 0
     assert meta["argv"][0]
     assert "quanthus.providers.ods_snapshot" in meta["argv"]
+
+
+def test_f10_collector_uses_dynamic_directory_and_per_security_receipts() -> None:
+    class Client:
+        def F10C(self, *, symbol: str):
+            return [{"name": "latest", "filename": f"{symbol}.txt", "start": 1, "length": 9}]
+
+        def F10(self, *, symbol: str, name: str):
+            assert name == "latest"
+            return f"{symbol} profile\nupdate date: none"
+
+    rows, receipts, metadata = fundamentals.collect_f10(
+        ["000001", "600519"],
+        date(2026, 7, 31),
+        client_factory=lambda: (Client(), "fixture:7709"),
+    )
+
+    assert [row["security_id"] for row in rows] == ["000001", "600519"]
+    assert {row["status"] for row in receipts} == {"success_nonempty"}
+    assert {row["response_rows"] for row in receipts} == {1}
+    assert metadata["server"] == "fixture:7709"
+
+
+def test_checkpoint_reuse_binds_metadata_revision_and_part_identity(tmp_path: Path) -> None:
+    schema = pa.schema([("value", pa.int64())])
+    part = tmp_path / "part.parquet"
+    common.write_parquet([{"value": 1}], part, schema)
+    parts = {"data": (part, schema)}
+    expected = {"provider_revision": "provider-v1"}
+    saved: dict[str, object] = {
+        **expected,
+        "failed_receipts": 0,
+        "parts": common.checkpoint_part_identities(parts),
+    }
+
+    assert common.checkpoint_parts_reusable(saved, expected, parts)
+    for malformed in (None, "0", 0.0, False):
+        assert not common.checkpoint_parts_reusable(
+            {**saved, "failed_receipts": malformed}, expected, parts
+        )
+    assert not common.checkpoint_parts_reusable(
+        saved, {"provider_revision": "provider-v2"}, parts
+    )
+
+    common.write_parquet([{"value": 2}], part, schema)
+    assert not common.checkpoint_parts_reusable(saved, expected, parts)
+
+
+def test_statement_bootstrap_is_checkpointed_and_derives_nonempty_quarterly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, paper_code: str, source: str) -> None:
+            self._body = {
+                "result": {
+                    "status": {"code": 0},
+                    "data": {
+                        "report_list": {
+                            "2026-06-30": {
+                                "publish_date": "2026-07-20",
+                                "update_time": "2026-07-20 12:00:00",
+                                "data": [
+                                    {"item_field": "BIZINCO", "item_value": "100"},
+                                    {"item_field": "NETPROFIT", "item_value": "10"},
+                                ],
+                            }
+                        }
+                    },
+                }
+            }
+            self.content = json.dumps(self._body).encode()
+            calls.append((paper_code, source))
+
+        def json(self):
+            return self._body
+
+    def get(_url: str, *, params: dict[str, str], **_kwargs: object) -> Response:
+        return Response(params["paperCode"], params["source"])
+
+    kwargs = {
+        "output": tmp_path / "financial_statements.parquet",
+        "receipts_path": tmp_path / "financial_statements.receipts.parquet",
+        "quarterly_output": tmp_path / "financial_quarterly.parquet",
+        "checkpoint_dir": tmp_path / "checkpoints",
+        "periods": 100,
+        "workers": 2,
+        "batch_size": 1,
+        "get": get,
+    }
+    first = fundamentals.collect_statements_checkpointed(
+        ["000001", "600519"], date(2026, 7, 31), **kwargs
+    )
+    second = fundamentals.collect_statements_checkpointed(
+        ["000001", "600519"], date(2026, 7, 31), **kwargs
+    )
+
+    assert first["statement_rows"] == 6
+    assert first["receipt_rows"] == 6
+    assert first["quarterly_rows"] == 2
+    assert first["failed_receipts"] == 0
+    assert second["reused_batches"] == 2
+    assert len(calls) == 6
+    (kwargs["checkpoint_dir"] / "part-00000.statements.parquet").write_bytes(b"tampered")
+    third = fundamentals.collect_statements_checkpointed(
+        ["000001", "600519"], date(2026, 7, 31), **kwargs
+    )
+    assert third["reused_batches"] == 1
+    assert len(calls) == 9
+    monkeypatch.setattr(
+        fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test"
+    )
+    fourth = fundamentals.collect_statements_checkpointed(
+        ["000001", "600519"], date(2026, 7, 31), **kwargs
+    )
+    assert fourth["reused_batches"] == 0
+    assert len(calls) == 15
+    quarterly = pq.read_table(kwargs["quarterly_output"]).to_pylist()
+    assert {row["revenue"] for row in quarterly} == {"100"}
+
+
+def test_statement_request_retries_once_before_success() -> None:
+    attempts = 0
+
+    class Response:
+        status_code = 200
+        content = b'{"result":{"status":{"code":0},"data":{"report_list":{}}}}'
+
+        @staticmethod
+        def json():
+            return json.loads(Response.content)
+
+    def get(*_args: object, **_kwargs: object) -> Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise TimeoutError("fixture timeout")
+        return Response()
+
+    _rows, receipts, _metadata = fundamentals.collect_statements(
+        ["000001"], date(2026, 7, 31), periods=8, workers=1, get=get
+    )
+
+    retried = next(row for row in receipts if '"source": "fzb"' in row["request_json"])
+    assert retried["status"] == "justified_empty"
+    assert retried["attempts"] == 2
+
+
+def test_industry_missing_membership_is_an_explicit_failure_receipt() -> None:
+    class Result:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self) -> None:
+            self._rows = iter([["2026-07-31", "sz.000001", "Ping An", "J66Bank", "sw"]])
+            self.current: list[str] | None = None
+
+        def next(self) -> bool:
+            self.current = next(self._rows, None)
+            return self.current is not None
+
+        def get_row_data(self) -> list[str]:
+            assert self.current is not None
+            return self.current
+
+    class BaoStock:
+        @staticmethod
+        def login():
+            return type("Login", (), {"error_code": "0", "error_msg": "ok"})()
+
+        @staticmethod
+        def query_stock_industry():
+            return Result()
+
+        @staticmethod
+        def logout() -> None:
+            return None
+
+    rows, receipts, _metadata = fundamentals.collect_industry(
+        ["000001", "600519"], date(2026, 7, 31), bs_module=BaoStock
+    )
+
+    assert [row["security_id"] for row in rows] == ["000001"]
+    failed = next(row for row in receipts if row["security_id"] == "600519")
+    assert failed["status"] == "failed"
+    assert failed["reason_code"] == "missing_industry_membership"
+
+
+def test_after_hours_collector_preserves_sparse_matches() -> None:
+    class Client:
+        @staticmethod
+        def transactions(**_kwargs: object):
+            return [
+                {"time": "15:29", "price": 10.0, "vol": 2, "buyorsell": 5},
+                {"time": "15:04", "price": 9.9, "vol": 1, "buyorsell": 1},
+            ]
+
+    rows, metadata = after_hours_tdx.collect_symbol(
+        Client(),
+        code="000001",
+        security_type="equity",
+        market_date=date(2026, 7, 31),
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["quantity_units"] == 200.0
+    assert rows[0]["buy_or_sell_code"] == 5
+    assert metadata["provider_rows"] == 2
+
+
+def test_after_hours_etf_universe_retries_transient_login_failure() -> None:
+    class Result:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self) -> None:
+            self._rows = iter(
+                [
+                    ["sh.510300", "ETF", "", "", "5", "1"],
+                    ["sh.600000", "Equity", "", "", "1", "1"],
+                ]
+            )
+            self.current: list[str] | None = None
+
+        def next(self) -> bool:
+            self.current = next(self._rows, None)
+            return self.current is not None
+
+        def get_row_data(self) -> list[str]:
+            assert self.current is not None
+            return self.current
+
+    class BaoStock:
+        login_calls = 0
+        logout_calls = 0
+
+        @classmethod
+        def login(cls):
+            cls.login_calls += 1
+            code = "1" if cls.login_calls == 1 else "0"
+            return type(
+                "Login",
+                (),
+                {"error_code": code, "error_msg": "temporary network failure"},
+            )()
+
+        @staticmethod
+        def query_stock_basic() -> Result:
+            return Result()
+
+        @classmethod
+        def logout(cls) -> None:
+            cls.logout_calls += 1
+
+    sleeps: list[float] = []
+    codes = after_hours_tdx._etf_universe(
+        BaoStock,
+        max_attempts=3,
+        retry_delay_seconds=0.25,
+        sleep=sleeps.append,
+    )
+
+    assert codes == ["510300"]
+    assert BaoStock.login_calls == 2
+    assert BaoStock.logout_calls == 2
+    assert sleeps == [0.25]
+
+
+def test_valuation_history_is_checkpointed_with_per_security_receipts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    class Result:
+        error_code = "0"
+        error_msg = "ok"
+
+        def __init__(self, code: str) -> None:
+            self._rows = iter(
+                [
+                    [
+                        "2026-07-20",
+                        code,
+                        "10.0",
+                        "1",
+                        "12.5",
+                        "1.4",
+                        "2.1",
+                        "9.0",
+                    ]
+                ]
+            )
+            self.current: list[str] | None = None
+
+        def next(self) -> bool:
+            self.current = next(self._rows, None)
+            return self.current is not None
+
+        def get_row_data(self) -> list[str]:
+            assert self.current is not None
+            return self.current
+
+    class BaoStock:
+        @staticmethod
+        def login():
+            return type("Login", (), {"error_code": "0", "error_msg": "ok"})()
+
+        @staticmethod
+        def logout() -> None:
+            return None
+
+        @staticmethod
+        def query_history_k_data_plus(code: str, *_args: object, **_kwargs: object):
+            calls.append(code)
+            return Result(code)
+
+    collector_kwargs = {
+        "bs_module": BaoStock,
+        "sleep": lambda _seconds: None,
+        "configure_timeout": lambda _seconds: True,
+    }
+    kwargs = {
+        "output": tmp_path / "valuation.parquet",
+        "receipts_path": tmp_path / "valuation.receipts.parquet",
+        "checkpoint_dir": tmp_path / "checkpoints",
+        "batch_size": 1,
+        "collector_kwargs": collector_kwargs,
+    }
+    first = valuation_history.collect_valuation_history_checkpointed(
+        ["000001", "600519"],
+        date(2026, 7, 20),
+        date(2026, 7, 30),
+        **kwargs,
+    )
+    second = valuation_history.collect_valuation_history_checkpointed(
+        ["000001", "600519"],
+        date(2026, 7, 20),
+        date(2026, 7, 30),
+        **kwargs,
+    )
+
+    assert first["row_count"] == 2
+    assert first["receipt_count"] == 2
+    assert first["failed_receipts"] == 0
+    assert second["reused_batches"] == 2
+    assert calls == ["sz.000001", "sh.600519"]
+    (kwargs["checkpoint_dir"] / "part-00000.valuation.parquet").write_bytes(b"tampered")
+    third = valuation_history.collect_valuation_history_checkpointed(
+        ["000001", "600519"],
+        date(2026, 7, 20),
+        date(2026, 7, 30),
+        **kwargs,
+    )
+    assert third["reused_batches"] == 1
+    assert calls == ["sz.000001", "sh.600519", "sz.000001"]
+    monkeypatch.setattr(
+        valuation_history, "PROVIDER_REVISION", "baostock-valuation-history-v2-test"
+    )
+    fourth = valuation_history.collect_valuation_history_checkpointed(
+        ["000001", "600519"],
+        date(2026, 7, 20),
+        date(2026, 7, 30),
+        **kwargs,
+    )
+    assert fourth["reused_batches"] == 0
+    assert calls[-2:] == ["sz.000001", "sh.600519"]
+    rows = pq.read_table(kwargs["output"]).to_pylist()
+    assert {row["pe_ttm"] for row in rows} == {12.5}
+    receipts = pq.read_table(kwargs["receipts_path"]).to_pylist()
+    assert {row["status"] for row in receipts} == {"success_nonempty"}
+
+
+def test_f10_checkpoint_invalidates_tampering_and_provider_revision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    factory_calls = 0
+
+    class Client:
+        client = type("Transport", (), {"disconnect": staticmethod(lambda: None)})()
+
+        @staticmethod
+        def F10C(*, symbol: str):
+            return [{"name": "latest", "filename": f"{symbol}.txt", "start": 0, "length": 1}]
+
+        @staticmethod
+        def F10(*, symbol: str, name: str):
+            return f"{symbol} {name} profile"
+
+    def client_factory():
+        nonlocal factory_calls
+        factory_calls += 1
+        return Client(), "fixture:7709"
+
+    kwargs = {
+        "output": tmp_path / "f10.parquet",
+        "receipts_path": tmp_path / "f10.receipts.parquet",
+        "checkpoint_dir": tmp_path / "checkpoints",
+        "batch_size": 1,
+        "client_factory": client_factory,
+    }
+    codes = ["000001", "600519"]
+    first = fundamentals.collect_f10_checkpointed(codes, date(2026, 7, 31), **kwargs)
+    second = fundamentals.collect_f10_checkpointed(codes, date(2026, 7, 31), **kwargs)
+    assert first["row_count"] == 2
+    assert second["reused_batches"] == 2
+    assert factory_calls == 2
+
+    (kwargs["checkpoint_dir"] / "part-00000.f10.parquet").write_bytes(b"tampered")
+    third = fundamentals.collect_f10_checkpointed(codes, date(2026, 7, 31), **kwargs)
+    assert third["reused_batches"] == 1
+    assert factory_calls == 3
+
+    monkeypatch.setattr(
+        fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test"
+    )
+    fourth = fundamentals.collect_f10_checkpointed(codes, date(2026, 7, 31), **kwargs)
+    assert fourth["reused_batches"] == 0
+    assert factory_calls == 5
+
+
+def test_checkpoint_receipt_identity_multiset_rejects_substitution(tmp_path: Path) -> None:
+    receipt_path = tmp_path / "receipts.parquet"
+    common.write_parquet(
+        [
+            {"dataset": "raw_f10", "security_id": "000001", "request_json": "request-a"},
+            {"dataset": "raw_f10", "security_id": "000001", "request_json": "request-a"},
+        ],
+        receipt_path,
+        common.receipt_schema(),
+    )
+    with pytest.raises(ValueError, match="receipt identities"):
+        common.verify_receipt_identities(
+            receipt_path,
+            [
+                ["raw_f10", "000001", "request-a"],
+                ["raw_f10", "600519", "request-b"],
+            ],
+        )
 
 
 def test_minute_collector_defaults_to_repository_module(

@@ -77,15 +77,15 @@ function isCatalogRelease(
   );
 }
 
-async function sha256Hex(text: string): Promise<string> {
+async function sha256Hex(value: ArrayBuffer): Promise<string> {
   if (!globalThis.crypto?.subtle) {
     throw new Error("当前环境不支持发布完整性校验");
   }
-  const value = await globalThis.crypto.subtle.digest(
+  const digest = await globalThis.crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(text),
+    value,
   );
-  return Array.from(new Uint8Array(value), (byte) =>
+  return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
 }
@@ -120,14 +120,22 @@ function parseChecksumLedger(text: string): Map<string, string> {
   return entries;
 }
 
-async function verifyChecksummedText(
+async function verifyChecksummedBytes(
   checksums: Map<string, string>,
   path: string,
-  text: string,
+  bytes: ArrayBuffer,
 ): Promise<void> {
   const expected = checksums.get(path);
-  if (!expected || (await sha256Hex(text)) !== expected) {
+  if (!expected || (await sha256Hex(bytes)) !== expected) {
     throw new Error(`${path} 与发布校验账本不一致`);
+  }
+}
+
+function decodeUtf8(bytes: ArrayBuffer, description: string): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error(`${description}不是有效的 UTF-8 文本`);
   }
 }
 
@@ -198,14 +206,14 @@ async function readRequiredResponse(
   fetcher: typeof fetch,
   url: URL,
   description: string,
-): Promise<string> {
+): Promise<ArrayBuffer> {
   const response = await fetcher(url, {
     headers: { accept: "application/json, text/plain" },
   });
   if (!response.ok) {
     throw new Error(`${description}不可读取（${response.status}）`);
   }
-  return response.text();
+  return response.arrayBuffer();
 }
 
 async function loadPublishedRelease(
@@ -224,31 +232,35 @@ async function loadPublishedRelease(
     catalogRelease.workspace_path,
   );
 
-  const readyText = await readRequiredResponse(
+  const readyBytes = await readRequiredResponse(
     fetcher,
     readyUrl,
     "发布完成标记",
   );
+  const readyText = decodeUtf8(readyBytes, "发布完成标记");
   if (!/^[0-9a-f]{64}\n?$/.test(readyText)) {
     throw new Error("发布完成标记格式无效");
   }
-  const checksumText = await readRequiredResponse(
+  const checksumBytes = await readRequiredResponse(
     fetcher,
     checksumUrl,
     "发布校验账本",
   );
-  if (`${await sha256Hex(checksumText)}\n` !== readyText) {
+  if (`${await sha256Hex(checksumBytes)}\n` !== readyText) {
     throw new Error("发布完成标记未绑定校验账本");
   }
+  const checksumText = decodeUtf8(checksumBytes, "发布校验账本");
   const checksums = parseChecksumLedger(checksumText);
-  const [releaseText, workspaceText] = await Promise.all([
+  const [releaseBytes, workspaceBytes] = await Promise.all([
     readRequiredResponse(fetcher, releaseUrl, "发布信封"),
     readRequiredResponse(fetcher, workspaceUrl, "归因工作区"),
   ]);
   await Promise.all([
-    verifyChecksummedText(checksums, "release.json", releaseText),
-    verifyChecksummedText(checksums, "workspace.json", workspaceText),
+    verifyChecksummedBytes(checksums, "release.json", releaseBytes),
+    verifyChecksummedBytes(checksums, "workspace.json", workspaceBytes),
   ]);
+  const releaseText = decodeUtf8(releaseBytes, "发布信封");
+  const workspaceText = decodeUtf8(workspaceBytes, "归因工作区");
   const release = parseReleaseManifest(releaseText);
   const workspace = parseWorkspaceArtifact(workspaceText);
   if (
@@ -285,11 +297,12 @@ export async function loadPublishedWorkspaceCatalog(
   const browserOrigin =
     typeof window === "undefined" ? "http://localhost" : window.location.origin;
   const catalogUrl = new URL(catalogLocation, browserOrigin);
-  const catalogText = await readRequiredResponse(
+  const catalogBytes = await readRequiredResponse(
     fetcher,
     catalogUrl,
     "归因发布目录",
   );
+  const catalogText = decodeUtf8(catalogBytes, "归因发布目录");
   const catalog = parsePublicationCatalog(catalogText);
   const loaded = await Promise.all(
     catalog.releases.map(async (release) => {

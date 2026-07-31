@@ -61,6 +61,7 @@ MANDATORY: dict[str, set[str]] = {
         "stock_list",
         "trading_calendar",
         "index_daily_delta",
+        "valuation_daily_delta",
         "adjustment_evidence_delta",
         "lane_status",
         "acquisition_log",
@@ -81,6 +82,8 @@ MANDATORY: dict[str, set[str]] = {
     },
     "weekly-corrections": {
         "shareholder_count",
+        "raw_f10",
+        "financial_statements",
         "financial_quarterly",
         "corporate_actions",
         "dividends",
@@ -88,6 +91,7 @@ MANDATORY: dict[str, set[str]] = {
         "st_announcement_trail",
         "security_lifecycle",
         "industry_membership",
+        "fundamentals_receipts",
         "reconciliation_summary",
         "reconciliation_keys",
         "lane_status",
@@ -501,12 +505,49 @@ def _run_configured_provider_collector(
         raise LaneRunError(f"provider argv must contain only strings: {lane_id}/{dataset}")
 
     output.parent.mkdir(parents=True, exist_ok=True)
+    receipts_output = output.with_suffix(output.suffix + ".receipts.parquet")
+    quarterly_output = output.with_name("financial_quarterly.parquet")
+    fundamentals_python = os.environ.get("ASTOCK_FUNDAMENTALS_PYTHON") or sys.executable
+    tdx_python = (
+        os.environ.get("ASTOCK_TDX_PYTHON")
+        or os.environ.get("ASTOCK_MINUTE_PYTHON")
+        or sys.executable
+    )
     values = {
         "output": str(output),
+        "receipts": str(receipts_output),
         "home": str(paths.home),
         "python": sys.executable,
+        "fundamentals_python": fundamentals_python,
+        "tdx_python": tdx_python,
+        "stock_list": str(paths.home / "stock_list.parquet"),
         "market_date": market_date.isoformat(),
         "window_start": window_start.isoformat(),
+        "statement_periods": (
+            os.environ.get("HERMES_ODS_STATEMENT_PERIODS") or "8"
+        ),
+        "statement_workers": (
+            os.environ.get("HERMES_ODS_STATEMENT_WORKERS") or "4"
+        ),
+        "statement_batch_size": (
+            os.environ.get("HERMES_ODS_STATEMENT_BATCH_SIZE") or "100"
+        ),
+        "statement_checkpoint": str(
+            paths.shadow_root
+            / "provider-checkpoints"
+            / lane_id
+            / dataset
+            / market_date.isoformat()
+            / f"periods-{os.environ.get('HERMES_ODS_STATEMENT_PERIODS') or '8'}"
+        ),
+        "provider_checkpoint": str(
+            paths.shadow_root
+            / "provider-checkpoints"
+            / lane_id
+            / dataset
+            / market_date.isoformat()
+        ),
+        "quarterly_output": str(quarterly_output),
     }
     try:
         argv = [item.format_map(values) for item in argv_template]
@@ -516,6 +557,15 @@ def _run_configured_provider_collector(
         ) from exc
     if "{output}" not in argv_template:
         raise LaneRunError(f"provider argv must include {{output}}: {lane_id}/{dataset}")
+    receipt_contract = collector.get("receipt_contract")
+    if receipt_contract is not None and receipt_contract != "per_security_v1":
+        raise LaneRunError(
+            f"unsupported provider receipt contract: {lane_id}/{dataset}={receipt_contract}"
+        )
+    if receipt_contract and "{receipts}" not in argv_template:
+        raise LaneRunError(
+            f"provider argv must include {{receipts}}: {lane_id}/{dataset}"
+        )
 
     import subprocess
 
@@ -549,8 +599,72 @@ def _run_configured_provider_collector(
         raise LaneRunError(
             f"provider collector produced no attempt output: {lane_id}/{dataset}"
         )
-    rows = _read_parquet(output)
-    meta["row_count"] = len(rows)
+    return_mode = str(collector.get("return_mode") or "rows")
+    if return_mode not in {"rows", "artifact"}:
+        raise LaneRunError(
+            f"unsupported provider return mode: {lane_id}/{dataset}={return_mode}"
+        )
+    try:
+        import pyarrow.parquet as pq
+
+        output_row_count = int(pq.ParquetFile(output).metadata.num_rows)
+    except Exception as exc:  # noqa: BLE001 - malformed parquet must block READY
+        raise LaneRunError(
+            f"provider collector produced invalid parquet: {lane_id}/{dataset}: {exc}"
+        ) from exc
+    rows = _read_parquet(output) if return_mode == "rows" else []
+    if receipt_contract:
+        if not receipts_output.is_file():
+            raise LaneRunError(
+                f"provider collector produced no receipts: {lane_id}/{dataset}"
+            )
+        receipts = _read_parquet(receipts_output)
+        if not receipts:
+            raise LaneRunError(
+                f"provider collector produced zero receipts: {lane_id}/{dataset}"
+            )
+        allowed_statuses = {"success_nonempty", "justified_empty", "failed"}
+        invalid = [
+            item for item in receipts if str(item.get("status")) not in allowed_statuses
+        ]
+        failed = [item for item in receipts if str(item.get("status")) == "failed"]
+        if invalid:
+            raise LaneRunError(
+                f"provider receipts contain invalid statuses: {lane_id}/{dataset}"
+            )
+        if failed:
+            raise LaneRunError(
+                f"provider receipts contain failures: {lane_id}/{dataset} "
+                f"failed={len(failed)}/{len(receipts)}"
+            )
+        if output_row_count == 0 and collector.get("allow_all_justified_empty") is not True:
+            raise LaneRunError(
+                f"provider collector returned zero rows without an allowed empty contract: "
+                f"{lane_id}/{dataset}"
+            )
+        meta["receipt_contract"] = receipt_contract
+        meta["receipts"] = str(receipts_output)
+        meta["receipt_count"] = len(receipts)
+        meta["justified_empty_count"] = sum(
+            1 for item in receipts if str(item.get("status")) == "justified_empty"
+        )
+        meta["receipt_sha256"] = _sha256(receipts_output)
+    metadata_path = output.with_suffix(output.suffix + ".meta.json")
+    if metadata_path.is_file():
+        try:
+            provider_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise LaneRunError(
+                f"invalid provider metadata {lane_id}/{dataset}: {exc}"
+            ) from exc
+        if not isinstance(provider_metadata, dict):
+            raise LaneRunError(
+                f"provider metadata must be an object: {lane_id}/{dataset}"
+            )
+        meta["provider_metadata"] = provider_metadata
+        meta["completed_at"] = provider_metadata.get("completed_at")
+    meta["return_mode"] = return_mode
+    meta["row_count"] = output_row_count
     meta["sha256"] = _sha256(output)
     return rows, meta
 
@@ -699,6 +813,7 @@ def _copy_dataset(
     watermark: str,
     relative_name: str | None = None,
     source_request: str | None = None,
+    require_rows: bool = False,
 ) -> DatasetStatus:
     started = time.monotonic()
     if not source.is_file():
@@ -716,9 +831,32 @@ def _copy_dataset(
     shutil.copy2(source, tmp)
     os.replace(tmp, dest)
     try:
-        row_count = len(_read_parquet(dest))
-    except Exception:
-        row_count = None
+        import pyarrow.parquet as pq
+
+        row_count = int(pq.ParquetFile(dest).metadata.num_rows)
+    except Exception as exc:  # noqa: BLE001 - malformed parquet must block READY
+        return DatasetStatus(
+            name=name,
+            status="failed",
+            detail=f"invalid parquet: {exc}",
+            duration_seconds=round(time.monotonic() - started, 3),
+            path=str(dest),
+            source_request=source_request,
+        )
+    if require_rows and row_count <= 0:
+        return DatasetStatus(
+            name=name,
+            status="failed",
+            row_count=row_count,
+            sha256=_sha256(dest),
+            source_revision=source_revision,
+            watermark=watermark,
+            knowledge_cutoff=knowledge_cutoff,
+            duration_seconds=round(time.monotonic() - started, 3),
+            detail="zero rows; READY withheld",
+            path=str(dest),
+            source_request=source_request,
+        )
     return DatasetStatus(
         name=name,
         status="ready",
@@ -729,6 +867,56 @@ def _copy_dataset(
         knowledge_cutoff=knowledge_cutoff,
         duration_seconds=round(time.monotonic() - started, 3),
         path=str(dest),
+        source_request=source_request,
+    )
+
+
+def _register_parquet_dataset(
+    *,
+    name: str,
+    path: Path,
+    source_revision: str,
+    knowledge_cutoff: str,
+    watermark: str,
+    source_request: str | None = None,
+    require_rows: bool = False,
+) -> DatasetStatus:
+    """Register an attempt-local provider artifact without loading or copying it."""
+
+    started = time.monotonic()
+    if not path.is_file():
+        return DatasetStatus(
+            name=name,
+            status="failed",
+            detail=f"missing provider artifact: {path}",
+            duration_seconds=round(time.monotonic() - started, 3),
+            source_request=source_request,
+        )
+    try:
+        import pyarrow.parquet as pq
+
+        row_count = int(pq.ParquetFile(path).metadata.num_rows)
+    except Exception as exc:  # noqa: BLE001 - malformed parquet must block READY
+        return DatasetStatus(
+            name=name,
+            status="failed",
+            detail=f"invalid parquet: {exc}",
+            duration_seconds=round(time.monotonic() - started, 3),
+            path=str(path),
+            source_request=source_request,
+        )
+    status = "failed" if require_rows and row_count <= 0 else "ready"
+    return DatasetStatus(
+        name=name,
+        status=status,
+        row_count=row_count,
+        sha256=_sha256(path),
+        source_revision=source_revision,
+        watermark=watermark,
+        knowledge_cutoff=knowledge_cutoff,
+        duration_seconds=round(time.monotonic() - started, 3),
+        detail="zero rows; READY withheld" if status == "failed" else None,
+        path=str(path),
         source_request=source_request,
     )
 
@@ -893,7 +1081,10 @@ def _baostock_fetch_day(
     login_attempts = _baostock_login_with_retry(
         bs, socket_timeout_seconds=socket_timeout_seconds
     )
-    fields = "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST"
+    fields = (
+        "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST,"
+        "peTTM,pbMRQ,psTTM,pcfNcfTTM"
+    )
     bars_by_code: dict[str, dict[str, Any]] = {}
     status_by_code: dict[str, dict[str, Any]] = {}
     log_rows: list[dict[str, Any]] = []
@@ -979,6 +1170,10 @@ def _baostock_fetch_day(
                     "source": "baostock.query_history_k_data_plus.adjustflag=3",
                     "acquired_at": acquired_at,
                     "built_at": acquired_at,
+                    "_valuation_pe_ttm": _fnum(raw[12] if len(raw) > 12 else None),
+                    "_valuation_pb": _fnum(raw[13] if len(raw) > 13 else None),
+                    "_valuation_ps_ttm": _fnum(raw[14] if len(raw) > 14 else None),
+                    "_valuation_pcf_ttm": _fnum(raw[15] if len(raw) > 15 else None),
                 }
                 status_by_code[code] = {
                     "security_id": code,
@@ -1240,6 +1435,13 @@ def _local_market_acquire(
             code = _code6(row.get("stock_code") or row.get("security_id"))
             if code:
                 st_by[code] = row
+    valuation_path = paths.home / "valuation_daily.parquet"
+    valuation_by: dict[str, Mapping[str, Any]] = {}
+    if valuation_path.is_file():
+        for row in _read_parquet_filter_date(valuation_path, market_date=market_date):
+            code = _code6(row.get("stock_code") or row.get("security_id"))
+            if code:
+                valuation_by[code] = row
     acquired_at = _now_sh_iso()
     bars: list[dict[str, Any]] = []
     status_rows: list[dict[str, Any]] = []
@@ -1269,6 +1471,7 @@ def _local_market_acquire(
             }
         )
         if bar is not None:
+            valuation = valuation_by.get(code, {})
             bars.append(
                 {
                     "security_id": code,
@@ -1288,6 +1491,12 @@ def _local_market_acquire(
                     "source": "local-sot.daily_ohlcv_none",
                     "acquired_at": acquired_at,
                     "built_at": str(bar.get("built_at") or acquired_at),
+                    "_valuation_pe_ttm": _fnum(valuation.get("pe_ttm")),
+                    "_valuation_pb": _fnum(valuation.get("pb")),
+                    "_valuation_ps_ttm": _fnum(valuation.get("ps_ttm")),
+                    "_valuation_pcf_ttm": _fnum(valuation.get("pcf_ttm")),
+                    "_valuation_total_share": _fnum(valuation.get("total_share")),
+                    "_valuation_total_mv": _fnum(valuation.get("total_mv")),
                 }
             )
         tradestatus = st.get("tradestatus")
@@ -1423,6 +1632,28 @@ def _build_market_open(
         index_rows,
         log_rows,
     )
+    valuation_rows: list[dict[str, Any]] = []
+    for bar in bars:
+        valuation_rows.append(
+            {
+                "security_id": bar["security_id"],
+                "stock_code": bar["stock_code"],
+                "market_date": watermark,
+                "date": watermark,
+                "pe_ttm": bar.pop("_valuation_pe_ttm", None),
+                "pb": bar.pop("_valuation_pb", None),
+                "ps_ttm": bar.pop("_valuation_ps_ttm", None),
+                "pcf_ttm": bar.pop("_valuation_pcf_ttm", None),
+                "total_share": bar.pop("_valuation_total_share", None),
+                "total_mv": bar.pop("_valuation_total_mv", None),
+                "source": (
+                    "baostock.query_history_k_data_plus.valuation"
+                    if mode == "provider"
+                    else "local-sot.valuation_daily"
+                ),
+                "acquired_at": bar.get("acquired_at"),
+            }
+        )
     datasets: list[DatasetStatus] = []
     datasets.append(
         _seal_dataset(
@@ -1463,6 +1694,40 @@ def _build_market_open(
         detail = status.detail or ""
         status.detail = f"{detail} tradestatus_1_without_bar={len(t1_without_bar)}".strip()
     datasets.append(status)
+
+    valuation = _seal_dataset(
+        name="valuation_daily_delta",
+        rows=valuation_rows,
+        landing=landing,
+        source_revision=f"valuation_daily_delta@{rev}",
+        knowledge_cutoff=knowledge_cutoff,
+        watermark=watermark,
+        source_request=json.dumps(
+            {
+                "provider": "baostock" if mode == "provider" else "local-sot",
+                "market_date": watermark,
+                "fields": ["peTTM", "pbMRQ", "psTTM", "pcfNcfTTM"],
+                "coverage_basis": "one valuation observation per returned daily bar",
+            },
+            sort_keys=True,
+        ),
+        require_rows=True,
+    )
+    valuation_codes = {str(row["security_id"]) for row in valuation_rows}
+    if valuation_codes != bar_codes:
+        valuation.status = "failed"
+        valuation.detail = (
+            f"valuation_bar_coverage_mismatch="
+            f"{len(valuation_codes.symmetric_difference(bar_codes))}"
+        )
+    valuation_fields = ("pe_ttm", "pb", "ps_ttm", "pcf_ttm", "total_mv")
+    if not any(
+        any(row.get(field) is not None for field in valuation_fields)
+        for row in valuation_rows
+    ):
+        valuation.status = "failed"
+        valuation.detail = "all valuation fields are null; READY withheld"
+    datasets.append(valuation)
 
     for name, source, artifact in (
         (
@@ -2293,6 +2558,137 @@ def _classify_keys(
     return out
 
 
+def _build_weekly_fundamentals(
+    *,
+    paths: LanePaths,
+    market_date: date,
+    landing: Path,
+    knowledge_cutoff: str,
+    source_revision: str,
+) -> list[DatasetStatus]:
+    watermark = market_date.isoformat()
+    mode = _acquire_mode()
+    datasets: list[DatasetStatus] = []
+    receipt_rows: list[dict[str, Any]] = []
+
+    if mode != "provider":
+        local_sources = {
+            "raw_f10": paths.home / "raw_f10.parquet",
+            "financial_statements": paths.home / "financial_statements.parquet",
+            "financial_quarterly": paths.home / "financial_quarterly.parquet",
+            "industry_membership": paths.home / "ref_industry_map.parquet",
+            "fundamentals_receipts": paths.home / "fundamentals_receipts.parquet",
+        }
+        for name, source in local_sources.items():
+            datasets.append(
+                _copy_dataset(
+                    name=name,
+                    source=source,
+                    landing=landing,
+                    source_revision=source_revision,
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                    relative_name=(
+                        "industry_membership_revision.parquet"
+                        if name == "industry_membership"
+                        else f"{name}.parquet"
+                    ),
+                    source_request=f"copy:{source.name}",
+                    require_rows=True,
+                )
+            )
+        return datasets
+
+    collector_meta: dict[str, dict[str, Any]] = {}
+    for name in ("raw_f10", "financial_statements", "industry_membership"):
+        output = landing / f"{name}.parquet"
+        try:
+            _rows, request = _run_configured_provider_collector(
+                lane_id="weekly-corrections",
+                dataset=name,
+                output=output,
+                paths=paths,
+                market_date=market_date,
+                window_start=market_date,
+            )
+            collector_meta[name] = request
+            receipt_rows.extend(_read_parquet(Path(str(request["receipts"]))))
+            datasets.append(
+                _register_parquet_dataset(
+                    name=name,
+                    path=output,
+                    source_revision=f"{name}@{source_revision}",
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                    source_request=json.dumps(request, sort_keys=True, default=str),
+                    require_rows=True,
+                )
+            )
+            if name == "financial_statements":
+                datasets.append(
+                    _register_parquet_dataset(
+                        name="financial_quarterly",
+                        path=landing / "financial_quarterly.parquet",
+                        source_revision=f"financial_quarterly@{source_revision}",
+                        knowledge_cutoff=knowledge_cutoff,
+                        watermark=watermark,
+                        source_request=(
+                            "derived from complete income-statement provider payloads; "
+                            f"statement_sha256={request['sha256']}"
+                        ),
+                        require_rows=True,
+                    )
+                )
+        except Exception as exc:  # noqa: BLE001 - each missing core asset blocks READY
+            datasets.append(
+                DatasetStatus(
+                    name=name,
+                    status="failed",
+                    detail=str(exc),
+                    source_revision=source_revision,
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                )
+            )
+            if name == "financial_statements":
+                datasets.append(
+                    DatasetStatus(
+                        name="financial_quarterly",
+                        status="failed",
+                        detail="full financial statement acquisition failed",
+                        source_revision=source_revision,
+                        knowledge_cutoff=knowledge_cutoff,
+                        watermark=watermark,
+                    )
+                )
+
+    datasets.append(
+        _seal_dataset(
+            name="fundamentals_receipts",
+            rows=receipt_rows,
+            landing=landing,
+            source_revision=f"per-security-receipts@{source_revision}",
+            knowledge_cutoff=knowledge_cutoff,
+            watermark=watermark,
+            source_request=json.dumps(
+                {
+                    "contract": "per_security_v1",
+                    "collectors": collector_meta,
+                    "status_semantics": [
+                        "success_nonempty",
+                        "justified_empty",
+                        "failed",
+                    ],
+                },
+                sort_keys=True,
+                default=str,
+            ),
+            require_rows=True,
+        )
+    )
+    return datasets
+
+
 def _build_weekly_corrections(
     *,
     paths: LanePaths,
@@ -2314,15 +2710,6 @@ def _build_weekly_corrections(
             "shareholder_count_revision.parquet",
             ("code", "end_date"),
             ("shareholder_count", "change_num"),
-        ),
-        (
-            "financial_quarterly",
-            paths.home / "financial_quarterly.parquet",
-            ("announce_date", "end_date", "date"),
-            400,
-            "financial_quarterly_revision.parquet",
-            ("stock_code", "end_date"),
-            ("revenue", "net_profit", "announce_date"),
         ),
         (
             "corporate_actions",
@@ -2497,9 +2884,18 @@ def _build_weekly_corrections(
             )
         )
 
+    datasets.extend(
+        _build_weekly_fundamentals(
+            paths=paths,
+            market_date=market_date,
+            landing=landing,
+            knowledge_cutoff=knowledge_cutoff,
+            source_revision=rev,
+        )
+    )
+
     for name, source in (
         ("security_lifecycle", paths.home / "ref_security_master.parquet"),
-        ("industry_membership", paths.home / "ref_industry_map.parquet"),
     ):
         if source.is_file():
             datasets.append(
@@ -2513,28 +2909,13 @@ def _build_weekly_corrections(
                 )
             )
         else:
-            # industry map may be absent: synthesize empty membership table with provenance
-            if name == "industry_membership":
-                datasets.append(
-                    _seal_dataset(
-                        name=name,
-                        rows=[],
-                        landing=landing,
-                        source_revision=rev,
-                        knowledge_cutoff=knowledge_cutoff,
-                        watermark=watermark,
-                        relative_name="industry_membership_revision.parquet",
-                    )
+            datasets.append(
+                DatasetStatus(
+                    name=name,
+                    status="failed",
+                    detail=f"missing {source.name}",
                 )
-                datasets[-1].detail = "source absent; empty revision sealed"
-            else:
-                datasets.append(
-                    DatasetStatus(
-                        name=name,
-                        status="failed",
-                        detail=f"missing {source.name}",
-                    )
-                )
+            )
 
     # Independent correction revision vs published daily revision (not same-file self-compare).
     session_days = _session_dates(paths.calendar, market_date, 20)
@@ -2872,13 +3253,14 @@ def _expected_bar_timestamps(market_date: date, bar_size: str) -> set[str]:
     return timestamps
 
 
-def _latest_market_status_artifact(
+def _latest_market_artifact(
     *,
     paths: LanePaths,
     market_date: date,
     available_at: datetime,
+    artifact_name: str,
 ) -> tuple[Path, dict[str, Any]] | None:
-    """Return same-day status evidence from the latest verified market release."""
+    """Return same-day evidence from the latest verified market release."""
 
     if available_at.tzinfo is None or available_at.utcoffset() is None:
         return None
@@ -2908,7 +3290,7 @@ def _latest_market_status_artifact(
             (
                 item
                 for item in release.artifacts
-                if item.name == "daily_status_observation_delta"
+                if item.name == artifact_name
             ),
             None,
         )
@@ -2933,6 +3315,24 @@ def _latest_market_status_artifact(
     return artifact_path, metadata
 
 
+def _first_iso_date(*values: Any) -> str:
+    """Return the first real ISO date, ignoring null-like temporal scalars."""
+
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text.lower() in {"", "nat", "nan", "none", "null", "<na>"}:
+            continue
+        candidate = text[:10]
+        try:
+            date.fromisoformat(candidate)
+        except ValueError:
+            continue
+        return candidate
+    return ""
+
+
 def _minute_no_data_evidence(
     *,
     paths: LanePaths,
@@ -2952,8 +3352,10 @@ def _minute_no_data_evidence(
             code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
             if code not in wanted:
                 continue
-            list_date = str(row.get("list_date") or row.get("ipo_date") or "")[:10]
-            delist_date = str(row.get("delist_date") or row.get("terminal_date") or "")[:10]
+            list_date = _first_iso_date(row.get("list_date"), row.get("ipo_date"))
+            delist_date = _first_iso_date(
+                row.get("delist_date"), row.get("terminal_date")
+            )
             if list_date and list_date > target:
                 evidence[code] = {
                     "reason": "not_yet_listed",
@@ -2971,10 +3373,11 @@ def _minute_no_data_evidence(
     status_path = paths.home / "daily_status_observation.parquet"
     if status_path.is_file():
         status_sources.append((status_path, {}))
-    market_status = _latest_market_status_artifact(
+    market_status = _latest_market_artifact(
         paths=paths,
         market_date=market_date,
         available_at=evidence_available_at,
+        artifact_name="daily_status_observation_delta",
     )
     if market_status is not None:
         status_sources.append(market_status)
@@ -3010,6 +3413,45 @@ def _minute_no_data_evidence(
                 **metadata,
             }
 
+    daily_sources: list[tuple[Path, dict[str, Any]]] = []
+    daily_path = paths.home / "daily_ohlcv_none.parquet"
+    if daily_path.is_file():
+        daily_sources.append((daily_path, {"source_sha256": _sha256(daily_path)}))
+    market_daily = _latest_market_artifact(
+        paths=paths,
+        market_date=market_date,
+        available_at=evidence_available_at,
+        artifact_name="daily_ohlcv_none_delta",
+    )
+    if market_daily is not None:
+        daily_sources.append(market_daily)
+
+    # A same-day accepted daily row with exactly zero volume and amount is
+    # structured evidence that no minute trades should exist. A verified
+    # immutable market release takes precedence over the mutable local SoT.
+    zero_turnover_rows: dict[str, tuple[Mapping[str, Any], Path, dict[str, Any]]] = {}
+    for candidate_path, metadata in daily_sources:
+        for row in _read_parquet_filter_date(candidate_path, market_date=market_date):
+            code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
+            if code not in wanted:
+                continue
+            volume = _fnum(row.get("volume"))
+            amount = _fnum(row.get("amount"))
+            if volume == 0.0 and amount == 0.0:
+                zero_turnover_rows[code] = (row, candidate_path, metadata)
+    for code, (row, candidate_path, metadata) in zero_turnover_rows.items():
+        if code in evidence:
+            continue
+        evidence[code] = {
+            "reason": "zero_turnover_daily_bar",
+            "source": candidate_path.name,
+            "evidence_date": target,
+            "volume": row.get("volume"),
+            "amount": row.get("amount"),
+            "close": row.get("close"),
+            **metadata,
+        }
+
     suspension_path = paths.home / "ref_suspensions.parquet"
     if not suspension_path.is_file():
         suspension_path = paths.home / "suspensions.parquet"
@@ -3018,27 +3460,24 @@ def _minute_no_data_evidence(
             code = _code6(row.get("security_id") or row.get("stock_code") or row.get("code"))
             if code not in wanted:
                 continue
-            start = str(
-                row.get("suspend_start") or row.get("start_date") or row.get("date") or ""
-            )[:10]
-            end = str(
-                row.get("suspend_end")
-                or row.get("resume_date")
-                or row.get("end_date")
-                or start
-            )[:10]
-            known = str(
-                row.get("knowledge_cutoff")
-                or row.get("announce_date")
-                or row.get("notice_date")
-                or ""
-            )[:10]
-            if start and start <= target <= (end or target) and known and known <= target:
+            start = _first_iso_date(
+                row.get("suspend_start"), row.get("start_date"), row.get("date")
+            )
+            end = _first_iso_date(
+                row.get("suspend_end"), row.get("resume_date"), row.get("end_date")
+            )
+            known = _first_iso_date(
+                row.get("knowledge_cutoff"),
+                row.get("announce_date"),
+                row.get("notice_date"),
+            )
+            active_on_target = bool(start and start <= target and (not end or target <= end))
+            if active_on_target and known and known <= target:
                 evidence[code] = {
                     "reason": "suspended",
                     "source": suspension_path.name,
                     "suspend_start": start,
-                    "suspend_end": end,
+                    "suspend_end": end or None,
                     "knowledge_cutoff": known,
                 }
     return evidence
@@ -3218,6 +3657,89 @@ def _run_minute_collector(
         "universe_size": len(symbols),
         "isolation": "attempt-local",
     }
+
+
+def _build_after_hours_fixed_price(
+    *,
+    paths: LanePaths,
+    market_date: date,
+    landing: Path,
+    knowledge_cutoff: str,
+    source_revision: str,
+) -> list[DatasetStatus]:
+    watermark = market_date.isoformat()
+    output = landing / "after_hours_fixed_price_trades.parquet"
+    if _acquire_mode() == "provider":
+        try:
+            _rows, request = _run_configured_provider_collector(
+                lane_id="intraday-archive",
+                dataset="after_hours_fixed_price_trades",
+                output=output,
+                paths=paths,
+                market_date=market_date,
+                window_start=market_date,
+            )
+        except Exception as exc:  # noqa: BLE001 - missing sparse evidence blocks 1m READY
+            return [
+                DatasetStatus(
+                    name="after_hours_fixed_price_trades",
+                    status="failed",
+                    detail=str(exc),
+                    source_revision=source_revision,
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                ),
+                DatasetStatus(
+                    name="after_hours_fixed_price_receipts",
+                    status="failed",
+                    detail="after-hours provider acquisition failed",
+                    source_revision=source_revision,
+                    knowledge_cutoff=knowledge_cutoff,
+                    watermark=watermark,
+                ),
+            ]
+        source_request = json.dumps(request, sort_keys=True, default=str)
+        return [
+            _register_parquet_dataset(
+                name="after_hours_fixed_price_trades",
+                path=output,
+                source_revision=source_revision,
+                knowledge_cutoff=knowledge_cutoff,
+                watermark=watermark,
+                source_request=source_request,
+                require_rows=False,
+            ),
+            _register_parquet_dataset(
+                name="after_hours_fixed_price_receipts",
+                path=Path(str(request["receipts"])),
+                source_revision=f"per-security-receipts@{source_revision}",
+                knowledge_cutoff=knowledge_cutoff,
+                watermark=watermark,
+                source_request=source_request,
+                require_rows=True,
+            ),
+        ]
+
+    return [
+        _copy_dataset(
+            name="after_hours_fixed_price_trades",
+            source=paths.home / "after_hours_fixed_price_trades.parquet",
+            landing=landing,
+            source_revision=source_revision,
+            knowledge_cutoff=knowledge_cutoff,
+            watermark=watermark,
+            require_rows=False,
+        ),
+        _copy_dataset(
+            name="after_hours_fixed_price_receipts",
+            source=paths.home / "after_hours_fixed_price_receipts.parquet",
+            landing=landing,
+            source_revision=f"per-security-receipts@{source_revision}",
+            knowledge_cutoff=knowledge_cutoff,
+            watermark=watermark,
+            require_rows=True,
+        ),
+    ]
 
 
 def _build_intraday_stream(
@@ -3709,6 +4231,16 @@ def _build_intraday_stream(
             ),
         ]
     )
+    if bar_size == "1m":
+        datasets.extend(
+            _build_after_hours_fixed_price(
+                paths=paths,
+                market_date=market_date,
+                landing=landing,
+                knowledge_cutoff=knowledge_cutoff,
+                source_revision=f"after-hours-fixed-price@{rev}",
+            )
+        )
     return datasets
 
 
@@ -3716,7 +4248,15 @@ def _mandatory_set(lane_id: str, *, closed: bool = False, stream: str | None = N
     if lane_id == "market-daily-core" and closed:
         return set(MANDATORY["market-daily-core-closed"])
     if lane_id == "intraday-archive":
-        return set(MANDATORY["intraday-archive"])
+        mandatory = set(MANDATORY["intraday-archive"])
+        if stream == "1m":
+            mandatory.update(
+                {
+                    "after_hours_fixed_price_trades",
+                    "after_hours_fixed_price_receipts",
+                }
+            )
+        return mandatory
     return set(MANDATORY.get(lane_id, set()))
 
 

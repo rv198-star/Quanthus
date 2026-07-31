@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Verify the close releases required to construct a final ODS Base candidate."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from datetime import date
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.ods_base import (
+    OdsBaseError,
+    audit_ods_base_release_gate,
+    load_ods_base_policy,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--parent-policy", type=Path)
+    parser.add_argument("--release-root", type=Path, required=True)
+    parser.add_argument("--base-current", type=Path, required=True)
+    parser.add_argument("--market-date", type=date.fromisoformat, required=True)
+    parser.add_argument("--expected-parent-bundle-id", required=True)
+    parser.add_argument("--expected-parent-manifest-sha256", required=True)
+    parser.add_argument(
+        "--expected-parent-through-date", type=date.fromisoformat, required=True
+    )
+    parser.add_argument("--minimum-free-bytes", type=int, default=1_073_741_824)
+    args = parser.parse_args()
+    try:
+        result = audit_ods_base_release_gate(
+            release_root=args.release_root,
+            base_current=args.base_current,
+            market_date=args.market_date,
+            policy=load_ods_base_policy(args.policy),
+            parent_policy=(
+                None
+                if args.parent_policy is None
+                else load_ods_base_policy(args.parent_policy)
+            ),
+            expected_parent_bundle_id=args.expected_parent_bundle_id,
+            expected_parent_manifest_sha256=args.expected_parent_manifest_sha256,
+            expected_parent_through_date=args.expected_parent_through_date,
+            minimum_free_bytes=args.minimum_free_bytes,
+        )
+    except (OdsBaseError, OSError) as exc:
+        print(f"ODS Base release gate failed: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, ensure_ascii=True, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

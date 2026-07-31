@@ -14,8 +14,8 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | active |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | planned |
 | META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and portable ADS | active; cutover blocked |
-| META-DATA-BASE-001 | Build Hermes-authoritative ODS July Base (Issue #47) | active |
-| META-DATA-BASE-002 | Build authoritative DWD/DWS July Base (Issue #48) | active; Phase A tooling implemented |
+| META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | active; Phase A accepted, final July pending |
+| META-DATA-BASE-002 | Build authoritative DWD/DWS July Base (Issue #48) | active; Phase A accepted, Phase B pending |
 | META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | active |
 
 `META-DATA-PIPE-003` is governed by ADR 0005 and GitHub issue #45. Implementation is limited to
@@ -45,20 +45,32 @@ idempotent node-local execution is accepted in
 `docs/acceptance/issue-45-daily-history-catalog-automation-20260730.md`; the first real scheduled
 success trigger remains pending.
 
+`META-DATA-BASE-001` is governed by ADR 0005, the ODS Base child of LLD 01, and GitHub issue #47.
+It is copy-only and does not change a production schedule, legacy pointer, target cutover state, or
+OCI ODS retention. The 2026-07-30 package is provisional; final July completion requires accepted
+July 31 releases and matching final Base descriptors on Hermes and CN01. Phase A is accepted in
+`docs/acceptance/meta-data-base-001-ods-base-202607/README.md`: Hermes and CN01 hold the same
+20,743-file package, manifest, content digest, `READY`, and `BASE_CURRENT.json` bytes through
+2026-07-30. Raw F10 and full financial statements remain outside that provisional package until
+the newly governed full-market collectors produce an accepted immutable acquisition.
+
 `META-DATA-BASE-002` is governed by ADR 0005, LLD 01, and GitHub issue #48. The repository now
 implements canonical input-ledger freeze, deterministic provisional DWD/DWS package construction,
-exact DWS reprojection, clean verification, copy-only installation, and SHA-preconditioned Base
-descriptors. OCI local dry-run evidence is recorded in
-`docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. Three-node publication, catalog
-rebuilds against the new Base, restore/rebuild evidence, and the final July pair remain open.
+exact DWS reprojection, clean verification, copy-only installation, SHA-preconditioned Base
+descriptors, and Base-aware lane catalogs. Phase A evidence is recorded in
+`docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`: corrective v2 packages are
+checksum-identical and active on OCI, CN01, and Hermes; clean rebuild and isolated restore passed;
+and both lane catalogs replay byte-idempotently against the new Base. Canonical, ADS, release-set,
+legacy, and consumer authority remained unchanged. Phase B and the final July pair remain open.
 
 `META-DATA-BASE-003` is governed by ADR 0005, the operational ADS Base LLD, and GitHub issue #46.
 The repository implements exact-plan validation, deterministic semantic packaging, deep clean-path
 verification, role-scoped access, the existing replay-reader adapter, and locked
 `BASE_CURRENT.json` compare-and-swap. Repository capability and the read-only OCI inventory
 preflight are recorded in `docs/acceptance/meta-data-base-003-ads-base-202607/README.md`. Neither
-the provisional nor final Base is accepted: Phase A waits for actual Issue #48 packages, while
-Phase B additionally waits for the accepted July 31 generation.
+the provisional nor final Base is accepted: Phase A now has the accepted Issue #48 v2 packages but
+still waits for an ADS Base build and acceptance, while Phase B additionally waits for the accepted
+July 31 generation.
 
 ## P1 data foundation
 

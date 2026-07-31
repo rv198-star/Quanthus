@@ -3,11 +3,12 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 --dwd-package PATH --dws-package PATH --remote-root PATH --host HOST --port PORT --user USER --key PATH --known-hosts PATH" >&2
+  echo "usage: $0 --dwd-package PATH --dws-package PATH --attempt-id ID --remote-root . --host HOST --port PORT --user USER --key PATH --known-hosts PATH" >&2
 }
 
 dwd_package=""
 dws_package=""
+attempt_id=""
 remote_root=""
 remote_host=""
 remote_port=""
@@ -19,6 +20,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dwd-package) dwd_package="${2:-}"; shift 2 ;;
     --dws-package) dws_package="${2:-}"; shift 2 ;;
+    --attempt-id) attempt_id="${2:-}"; shift 2 ;;
     --remote-root) remote_root="${2:-}"; shift 2 ;;
     --host) remote_host="${2:-}"; shift 2 ;;
     --port) remote_port="${2:-}"; shift 2 ;;
@@ -42,12 +44,12 @@ for package in "$dwd_package" "$dws_package"; do
     exit 2
   fi
 done
-if [[ -z "$remote_root" || ! "$remote_root" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-  echo "remote root must be a safe path" >&2
+if [[ "$remote_root" != "." ]]; then
+  echo "remote root must be . because the forced command is jailed at the dataset root" >&2
   exit 2
 fi
-if [[ "/${remote_root#/}/" == *"/../"* || "$remote_root" == ".." ]]; then
-  echo "remote root must not contain parent traversal" >&2
+if [[ ! "$attempt_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+  echo "attempt id is required and must contain only safe characters" >&2
   exit 2
 fi
 if [[ ! "$remote_host" =~ ^[A-Za-z0-9.-]+$ || ! "$remote_port" =~ ^[0-9]{1,5}$ ]]; then
@@ -88,9 +90,9 @@ sync_package() {
   local package="$2"
   local package_id="${package%/}"
   package_id="${package_id##*/}"
-  local destination="${remote_user}@${remote_host}:${remote_root%/}/dwd-dws-bases/${layer}/${package_id}/"
-  rsync "${common[@]}" --ignore-existing --exclude=/READY "${package%/}/" "$destination"
-  rsync "${common[@]}" --ignore-existing "${package%/}/READY" "${destination}READY"
+  local destination="${remote_user}@${remote_host}:${remote_root%/}/dwd-dws-bases/attempts/${attempt_id}/${layer}/${package_id}/"
+  rsync "${common[@]}" --exclude=/READY "${package%/}/" "$destination"
+  rsync "${common[@]}" "${package%/}/READY" "${destination}READY"
 }
 
 sync_package dwd "$dwd_package"

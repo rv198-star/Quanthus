@@ -104,6 +104,20 @@ def fixture_home(tmp_path: Path) -> Path:
     _write_parquet(home / "daily_ohlcv_none.parquet", none_rows)
     _write_parquet(home / "daily_status_observation.parquet", st_rows)
     _write_parquet(
+        home / "valuation_daily.parquet",
+        [
+            {
+                "stock_code": code,
+                "date": open_day.isoformat(),
+                "pe_ttm": 10.0,
+                "pb": 1.0,
+                "ps_ttm": 2.0,
+                "pcf_ttm": 3.0,
+            }
+            for code in codes
+        ],
+    )
+    _write_parquet(
         home / "index_daily.parquet",
         [
             {
@@ -180,6 +194,72 @@ def fixture_home(tmp_path: Path) -> Path:
                 }
             ],
         )
+
+    _write_parquet(
+        home / "raw_f10.parquet",
+        [
+            {
+                "security_id": "000001",
+                "category": "company_profile",
+                "content": "fixture F10",
+                "market_date": open_day.isoformat(),
+            }
+        ],
+    )
+    _write_parquet(
+        home / "financial_statements.parquet",
+        [
+            {
+                "security_id": "000001",
+                "statement_type": "balance_sheet",
+                "market_date": open_day.isoformat(),
+                "raw_payload_gzip": b"fixture",
+            }
+        ],
+    )
+    _write_parquet(
+        home / "fundamentals_receipts.parquet",
+        [
+            {
+                "dataset": "raw_f10",
+                "security_id": "000001",
+                "status": "success_nonempty",
+            },
+            {
+                "dataset": "financial_statements",
+                "security_id": "000001",
+                "status": "success_nonempty",
+            },
+            {
+                "dataset": "industry_membership",
+                "security_id": "000001",
+                "status": "success_nonempty",
+            },
+        ],
+    )
+    _write_parquet(
+        home / "after_hours_fixed_price_trades.parquet",
+        [
+            {
+                "security_id": "000001",
+                "market_date": open_day.isoformat(),
+                "match_time": f"{open_day.isoformat()}T15:06:00+08:00",
+                "price": 10.0,
+                "quantity_units": 100.0,
+            }
+        ],
+    )
+    _write_parquet(
+        home / "after_hours_fixed_price_receipts.parquet",
+        [
+            {
+                "dataset": "after_hours_fixed_price_trades",
+                "security_id": code,
+                "status": "success_nonempty" if code == "000001" else "justified_empty",
+            }
+            for code in codes
+        ],
+    )
 
     # Complete A-share minute grids for both intraday streams.
     minute = tmp_path / "minute" / "data"
@@ -415,6 +495,10 @@ def test_baostock_daily_fetch_preserves_dwd_fields(
                     "-0.5",
                     "1",
                     "0",
+                    "12.3",
+                    "1.4",
+                    "2.5",
+                    "3.6",
                 ]
             )
 
@@ -426,12 +510,15 @@ def test_baostock_daily_fetch_preserves_dwd_fields(
     bars, statuses, logs = lane_runner._baostock_fetch_day(["000001"], date(2026, 7, 27))
 
     assert FakeBaostock.fields == [
-        "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST"
+        "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST,"
+        "peTTM,pbMRQ,psTTM,pcfNcfTTM"
     ]
     assert FakeBaostock.logged_out
     assert logs[0]["response_error_code"] == "0"
     assert bars[0]["turnover_rate"] == 1.2
     assert bars[0]["pct_change"] == -0.5
+    assert bars[0]["_valuation_pe_ttm"] == 12.3
+    assert bars[0]["_valuation_pb"] == 1.4
     assert bars[0]["adj_version"] == "baostock.adjustflag=3.v1"
     assert bars[0]["built_at"] == bars[0]["acquired_at"]
     assert statuses[0]["date"] == "2026-07-27"
@@ -866,6 +953,36 @@ def test_provider_market_requires_the_complete_index_contract(
     assert (result.attempt_dir / "landing" / "provider_readiness.json").is_file()
 
 
+def test_all_null_daily_valuation_blocks_ready(fixture_home: Path, tmp_path: Path) -> None:
+    _write_parquet(
+        fixture_home / "valuation_daily.parquet",
+        [
+            {
+                "stock_code": code,
+                "date": "2026-07-24",
+                "pe_ttm": None,
+                "pb": None,
+                "ps_ttm": None,
+                "pcf_ttm": None,
+            }
+            for code in ("000001", "600519")
+        ],
+    )
+
+    result = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+        force_preflight="both_open",
+    )
+
+    valuation = next(item for item in result.datasets if item.name == "valuation_daily_delta")
+    assert valuation.status == "failed"
+    assert "all valuation fields are null" in (valuation.detail or "")
+    assert result.release_dir is None
+
+
 def test_manual_recovery_uses_absolute_deadline_and_is_excluded_from_experiment(
     fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1181,14 +1298,14 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     assert attempt["schedule_id"] == "hermes-ods-schedule-v1"
     assert (
         attempt["schedule_contract_revision"]
-        == "hermes-1730-window-gated-20260729"
+        == "hermes-full-ods-scope-20260731"
     )
     assert attempt["schedule_config_sha256"] == expected_schedule_sha
     release = json.loads((result.release_dir / "release.json").read_text(encoding="utf-8"))
     assert release["schedule_contract_id"] == "hermes-ods-schedule-v1"
     assert (
         release["schedule_contract_revision"]
-        == "hermes-1730-window-gated-20260729"
+        == "hermes-full-ods-scope-20260731"
     )
     assert release["schedule_config_sha256"] == expected_schedule_sha
     meta_dataset = next(item for item in result.datasets if item.name == "intraday_meta")
@@ -1380,6 +1497,94 @@ def test_intraday_unexplained_missing_blocks_ready(
     assert not list(shadow.rglob("READY"))
     bars = next(d for d in result.datasets if d.name == "intraday_bars")
     assert bars.status == "failed"
+
+
+def test_intraday_open_ended_suspension_justifies_no_bars(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    _write_parquet(
+        fixture_home / "ref_suspensions.parquet",
+        [
+            {
+                "stock_code": "600519",
+                "suspend_start": "2026-07-23",
+                "suspend_end": None,
+                "announce_date": "2026-07-23",
+            }
+        ],
+    )
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    (minute / "600519_5m.parquet").unlink()
+
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+
+    assert result.status == "ready"
+    coverage = next(d for d in result.datasets if d.name == "intraday_coverage")
+    rows = pq.read_table(Path(coverage.path)).to_pylist()
+    suspended = next(row for row in rows if row["security_id"] == "600519")
+    assert suspended == {
+        "security_id": "600519",
+        "status": "justified_no_data",
+        "row_count": 0,
+        "observed_maximum": None,
+        "reason": "suspended",
+        "source": "ref_suspensions.parquet",
+        "suspend_start": "2026-07-23",
+        "suspend_end": None,
+        "knowledge_cutoff": "2026-07-23",
+    }
+
+
+def test_intraday_zero_turnover_daily_bar_justifies_no_bars(
+    fixture_home: Path, tmp_path: Path
+) -> None:
+    daily_path = fixture_home / "daily_ohlcv_none.parquet"
+    daily_rows = pq.read_table(daily_path).to_pylist()
+    for row in daily_rows:
+        if row["stock_code"] == "600519" and str(row["date"])[:10] == "2026-07-24":
+            row.update(
+                {
+                    "open": 10.5,
+                    "high": 10.5,
+                    "low": 10.5,
+                    "close": 10.5,
+                    "volume": 0.0,
+                    "amount": 0.0,
+                }
+            )
+    _write_parquet(daily_path, daily_rows)
+    minute = Path(os.environ["ASTOCK_MINUTE_ROOT"]) / "data" / "prod_5m"
+    (minute / "600519_5m.parquet").unlink()
+
+    result = run_lane(
+        lane_id="intraday-archive",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=_paths(fixture_home, tmp_path / "shadow"),
+        stream="5m",
+        force_preflight="both_open",
+        symbols=["000001", "600519"],
+    )
+
+    assert result.status == "ready"
+    coverage = next(d for d in result.datasets if d.name == "intraday_coverage")
+    rows = pq.read_table(Path(coverage.path)).to_pylist()
+    zero_turnover = next(row for row in rows if row["security_id"] == "600519")
+    assert zero_turnover["status"] == "justified_no_data"
+    assert zero_turnover["reason"] == "zero_turnover_daily_bar"
+    assert zero_turnover["source"] == "daily_ohlcv_none.parquet"
+    assert zero_turnover["volume"] == 0.0
+    assert zero_turnover["amount"] == 0.0
+    assert zero_turnover["source_sha256"].startswith("sha256:")
+    assert len(zero_turnover["source_sha256"]) == len("sha256:") + 64
 
 
 def test_intraday_missing_middle_bar_blocks_ready(

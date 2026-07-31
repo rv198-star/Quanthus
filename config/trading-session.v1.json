@@ -23,7 +23,7 @@
     "included_in_final_daily_volume_and_amount": true,
     "final_daily_totals_not_before": "15:30:00",
     "dataset_contract": "after_hours_fixed_price_trades.v1",
-    "acquisition_status": "contract_only_not_yet_acquired"
+    "acquisition_status": "scheduled_fail_closed_collector_pending_first_accepted_release"
   },
   "risk_warning_daily_buy_cap": {
     "shares": 500000,

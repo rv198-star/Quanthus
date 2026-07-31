@@ -13,11 +13,12 @@ import tempfile
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from quanthus.backtest.contracts import MARKET_TIMEZONE
 from quanthus.backtest.historical_bundle import (
     REQUIRED_HISTORICAL_REPLAY_DATASETS,
     HistoricalReplayBundle,
@@ -60,6 +61,7 @@ _CLASSIFICATIONS = {
     "out_of_scope",
 }
 _REUSE_DECISIONS = {"reuse", "rebuild", "exclude", "evidence_only"}
+_NEXT_OPEN_TIME = time(9, 30)
 
 
 class OperationalADSBaseError(RuntimeError):
@@ -413,11 +415,16 @@ def _validate_generation_ledger(
         decision = _parse_datetime(
             item["decision_cutoff"], f"generation_ledger[{index}].decision_cutoff"
         )
+        local_decision = decision.astimezone(MARKET_TIMEZONE)
+        valid_decision_time = local_decision.date() == market_date or (
+            local_decision.date() > market_date
+            and local_decision.time() < _NEXT_OPEN_TIME
+        )
         if (
             market_date > through_date
             or not (ranges["decision_start"] <= market_date <= ranges["decision_end"])
             or knowledge > decision
-            or decision.date() != market_date
+            or not valid_decision_time
             or not _SAFE_ID.fullmatch(_required_text(item, "source_generation_id"))
             or _required_text(item, "source_lane") not in {"cn01", "hermes", "legacy_accepted"}
             or any(
@@ -1289,6 +1296,28 @@ def _build_json_table(
     }
 
 
+def _validate_ledger_decision_calendar(
+    ledger: Sequence[Mapping[str, object]], open_dates: Sequence[date]
+) -> None:
+    ordered_open_dates = tuple(sorted(set(open_dates)))
+    for index, item in enumerate(ledger):
+        market_date = _parse_date(
+            item.get("market_date"), f"generation_ledger[{index}].market_date"
+        )
+        decision = _parse_datetime(
+            item.get("decision_cutoff"), f"generation_ledger[{index}].decision_cutoff"
+        ).astimezone(MARKET_TIMEZONE)
+        if decision.date() == market_date:
+            continue
+        next_open = next(
+            (candidate for candidate in ordered_open_dates if candidate > market_date), None
+        )
+        if next_open is None or decision.date() != next_open or decision.time() >= _NEXT_OPEN_TIME:
+            raise OperationalADSBaseError(
+                f"generation_ledger[{index}] decision cutoff is not before the next open session"
+            )
+
+
 def _validate_calendar_ledger(
     connection: Any,
     *,
@@ -1329,6 +1358,23 @@ def _validate_calendar_ledger(
         raise OperationalADSBaseError(
             "generation ledger does not cover the decision calendar exactly"
         )
+    open_where = f'CAST("{contract.date_column}" AS DATE) BETWEEN ? AND ?'
+    if {"exchange", "is_open"}.issubset(columns):
+        open_rows = connection.execute(
+            f'SELECT CAST("{contract.date_column}" AS DATE) FROM {relation} '
+            f"WHERE {open_where} AND exchange IN ('SSE', 'SZSE') AND is_open = 1 "
+            "GROUP BY 1 HAVING count(DISTINCT exchange) = 2 ORDER BY 1",
+            [plan.ranges["decision_start"], plan.ranges["execution_end"]],
+        ).fetchall()
+    else:
+        open_rows = connection.execute(
+            f'SELECT DISTINCT CAST("{contract.date_column}" AS DATE) FROM {relation} '
+            f"WHERE {open_where} ORDER BY 1",
+            [plan.ranges["decision_start"], plan.ranges["execution_end"]],
+        ).fetchall()
+    _validate_ledger_decision_calendar(
+        ledger_value, tuple(row[0] for row in open_rows)
+    )
 
 
 def build_operational_ads_base(

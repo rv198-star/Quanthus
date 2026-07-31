@@ -5,8 +5,8 @@
 | Design status | approved |
 | Delivery gate | not-applicable |
 | Current phase | P4 implementation open |
-| Version | 0.8 |
-| Effective date | 2026-07-29 |
+| Version | 0.9 |
+| Effective date | 2026-07-30 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
 
@@ -82,6 +82,11 @@ OCI:
 - Daily acquisition remains provider-readiness gated. Both lanes require the complete target-date
   sentinel-index set before scanning stocks, bounded socket/retry behavior, and no `READY` on any
   coverage gap. Contract-defined activation grace rejects elapsed-window timer replays.
+- Hermes owns the governed historical ODS reconstruction seed. It publishes one immutable,
+  manifest-bound ODS Base and CN01 retains one checksum-identical recovery mirror; OCI does not
+  retain the target-chain ODS Base. The Base is the complete accepted set of currently governed
+  ODS sources, selected increments, and retained source evidence, not a claim that unacquired
+  source families exist. Its member and recovery contract is owned by LLD 01's ODS Base child.
 - Canonical and derived artifacts are versioned Parquet with portable relative-path manifests.
   DuckDB, Polars, and PyArrow provide local query, typed transformation, and validation.
 - PostgreSQL contains indexed, rebuildable serving projections. It is not a canonical system of
@@ -98,8 +103,11 @@ ODS restore evidence, full PIT/tradability candidate families, and portable `eve
 lacks per-decision publication proof; its 2025 output is not a genuine unopened blind evaluation.
 The repository also contains the provisional monthly-complete DWD/DWS Base contract: it freezes
 canonical inputs, preserves schema-distinct members under one manifest per layer, reprojects DWS
-from the exact DWD package, and separates package installation from Base-descriptor advancement.
-This contract is not three-node publication evidence and does not change the consumer release set.
+from the exact DWD package, separates package installation from Base-descriptor advancement, and
+rebuilds each lane's logical catalog from the new pair plus only post-Base candidates. The contract
+alone is not publication evidence; Issue #48 Phase A separately records accepted three-node v2
+packages, descriptors, rebuild/restore, and lane catalogs. It does not change the consumer release
+set.
 
 The legacy OCI full-ODS pull/build path remains live until ADR 0005's shadow, fencing, recovery,
 rollback, and explicit `GO_FOR_CUTOVER` gates pass. Target work is copy-only and uses separate

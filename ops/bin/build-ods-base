@@ -27,6 +27,8 @@ def main() -> int:
     parser.add_argument("--through-date", type=date.fromisoformat, required=True)
     parser.add_argument("--code-revision", required=True)
     parser.add_argument("--parent-base", type=Path)
+    parser.add_argument("--parent-policy", type=Path)
+    parser.add_argument("--source-inventory", type=Path, required=True)
     args = parser.parse_args()
     try:
         result = build_ods_base_bundle(
@@ -37,6 +39,12 @@ def main() -> int:
             policy=load_ods_base_policy(args.policy),
             code_revision=args.code_revision,
             parent_base=args.parent_base,
+            parent_policy=(
+                None
+                if args.parent_policy is None
+                else load_ods_base_policy(args.parent_policy)
+            ),
+            source_inventory=args.source_inventory,
         )
     except (OdsBaseError, FileExistsError, OSError) as exc:
         print(f"ODS Base build failed: {exc}", file=sys.stderr)

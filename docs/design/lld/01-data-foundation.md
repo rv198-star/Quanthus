@@ -52,9 +52,16 @@ keys from independently checksummed raw evidence.
 | Canonical catalog | Immutable | OCI acceptance records and a market-date to generation mapping |
 | Operational ADS | Immutable | Release-profile output bound to an exact catalog and generation subset |
 | Research bundle | Immutable | Self-contained, scope-authorized semantic tables for replay or training |
+| ODS Base | Immutable | Hermes-authoritative reconstruction seed with one checksum-identical CN01 mirror |
 
 Raw files never receive in-place corrections. A source correction creates a new revision and
 new downstream snapshot id.
+
+The ODS Base packaging, source precedence, completeness boundary, and recovery lifecycle are
+owned by [`01-data-foundation/ods-base.md`](01-data-foundation/ods-base.md). It is separate from
+the DWD/DWS history seed and from portable ADS: the Base preserves accepted source evidence needed
+to rebuild downstream layers, while those other packages expose normalized or consumer-facing
+data.
 
 The curated daily view filters the versioned universe but retains an in-scope raw row that
 violates a market-data invariant with `data_valid=false`. Downstream new-entry logic fails
@@ -419,11 +426,16 @@ attempt time but includes the frozen ledger, policy, code/runtime, member facts,
 Publication is two-stage. `install-dwd-dws-base` copies and verifies both packages without a
 descriptor. Only after OCI, CN01, and Hermes prove identical bytes may
 `advance-dwd-dws-base-current` write the new layer-local `BASE_CURRENT.json` files under explicit
-old-pointer SHA preconditions. The descriptors cross-bind the peer layer and pair digest. Rebuild
-lane logical catalogs against the new Base separately; do not alter canonical catalogs, ADS,
-release-set `CURRENT`, schedules, or retained source artifacts. The provisional through-2026-07-30
-contract is implemented; final July publication remains blocked on the actual Issue #47 ODS Base
-and the accepted 2026-07-31 generation.
+old-pointer SHA preconditions. The descriptors cross-bind the peer layer and pair digest. The
+candidate-success catalog runner detects the complete active pair, builds a Base-aware lane catalog
+with zero or more exact post-Base candidates, and rejects any first-parent mismatch against the
+absorbed canonical tail. It retains the old history-catalog path until both Base descriptors exist.
+Do not alter canonical catalogs, ADS, release-set `CURRENT`, schedules, or retained source
+artifacts. The provisional through-2026-07-30 contract is implemented; final July publication
+remains blocked on the actual Issue #47 ODS Base and the accepted 2026-07-31 generation. Corrective
+policy v2 owns the active provisional package ids after two pre-activation builds bound different
+code revisions to the original v1 ids; all v1 artifacts remain retained evidence and are never
+overwritten or relabeled.
 
 ## 6. Snapshot interface
 
@@ -505,8 +517,9 @@ window cannot silently turn into an unplanned third observation.
 | Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
 | Sealed DWD/DWS history seed and lane-local logical merge | `src/quanthus/pipelines/dual_lane_history.py`, `config/pipelines/dual-lane-history-base.v1.json`, `ops/bin/*dual-lane-history*` | `tests/unit/test_dual_lane_history.py`, ADR 0005, `docs/operations/dual-lane-data-platform-runbook.md` |
-| Monthly-complete DWD/DWS Base packages and guarded Base descriptors | `src/quanthus/pipelines/dwd_dws_base.py`, `config/pipelines/dwd-dws-base-through-20260730.v1.json`, `ops/bin/*dwd-dws-base*` | `tests/unit/test_dwd_dws_base.py`, Issue #48, `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md` |
+| Monthly-complete DWD/DWS Base packages, guarded Base descriptors, and Base-aware lane catalogs | `src/quanthus/pipelines/dwd_dws_base.py`, `config/pipelines/dwd-dws-base-through-20260730.v2.json`, `ops/bin/*dwd-dws-base*` | `tests/unit/test_dwd_dws_base.py`, Issue #48, `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md` |
 | Portable strategy-replay ADS publication and role-scoped consumption | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `config/strategy-replay-ads.v2.json`, `ops/bin/publish-strategy-replay-ads` | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `01-data-foundation/strategy-replay-ads.md`, `docs/acceptance/issue-45-portable-ads-20260730.md`, `docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md` |
+| Hermes-authoritative ODS Base and checksum-identical CN01 mirror | `src/quanthus/pipelines/ods_base.py`, `config/pipelines/ods-base.v1.json`, `ops/bin/*ods-base` | `tests/unit/test_ods_base.py`, ADR 0005, `01-data-foundation/ods-base.md`, `docs/operations/ods-base-runbook.md`, GitHub issue #47 |
 | OCI operational ADS historical Base and replay loader | `src/quanthus/operational_ads_base.py`, `config/operational-ads-base.v1.json`, `ops/bin/publish-operational-ads-base` | `tests/unit/test_operational_ads_base.py`, `tests/contract/test_operational_ads_base_boundary.py`, `01-data-foundation/operational-ads-base.md`, `docs/acceptance/meta-data-base-003-ads-base-202607/` |
 
 ## 8. Work items
@@ -526,7 +539,7 @@ window cannot silently turn into an unplanned third observation.
 | META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | Accepted file-first platform | Open/closed-session rehearsals and durable run ledger |
 | META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | META-DATA-PIPE-001 accepted | Shadow run, explicit cutover, rollback, and no overlapping writers |
 | META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI arbitration, atomic release sets, and portable ADS | META-DATA-PIPE-001, ADR 0005 | Contract tests, shadow comparison, failure/recovery drills, and explicit cutover evidence |
-| META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and redundant CN01 mirror | META-DATA-PIPE-003, Issue #47 | Deterministic inventory/package, identical node digests, clean restore, and guarded Base descriptors |
+| META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | META-DATA-PIPE-001, ADR 0005 | Classified source inventory, deep verification, clean-path restore, and identical Hermes/CN01 package descriptors |
 | META-DATA-BASE-002 | Build authoritative DWD/DWS July Base packages from exact accepted lineage | META-DATA-BASE-001, META-DATA-PIPE-003, Issue #48 | Frozen ledger, semantic equivalence, identical three-node packages, catalog rebuilds, and restore evidence |
 | META-DATA-BASE-003 | Build the OCI-authoritative operational ADS July Base | META-DATA-BASE-002, META-DATA-PIPE-003, Issue #46 | Role/PIT isolation, clean replay, identical-input rebuild, and guarded Base descriptor |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |

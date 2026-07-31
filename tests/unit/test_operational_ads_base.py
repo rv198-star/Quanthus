@@ -25,6 +25,7 @@ from quanthus.operational_ads_base import (
     _logical_schema,
     _package_content_identity,
     _parquet_content_digest,
+    _validate_ledger_decision_calendar,
     build_operational_ads_base,
     load_operational_ads_base_current,
     load_operational_ads_base_plan,
@@ -584,6 +585,33 @@ class OperationalADSBaseTests(unittest.TestCase):
             output=output,
             code_revision="a" * 40,
         )
+
+    def test_generation_ledger_accepts_next_open_preopen_and_rejects_open(self) -> None:
+        value = json.loads(self.plan_path.read_text(encoding="utf-8"))
+        value["generation_ledger"][0]["decision_cutoff"] = "2024-01-03T09:29:59+08:00"
+        self._write_json(self.plan_path, value)
+        self._plan()
+
+        value["generation_ledger"][0]["decision_cutoff"] = "2024-01-03T09:30:00+08:00"
+        self._write_json(self.plan_path, value)
+        with self.assertRaisesRegex(OperationalADSBaseError, "PIT or lineage"):
+            self._plan()
+
+    def test_generation_ledger_uses_next_open_across_a_weekend(self) -> None:
+        ledger = [
+            {
+                "market_date": "2024-01-05",
+                "decision_cutoff": "2024-01-08T09:29:59+08:00",
+            }
+        ]
+        _validate_ledger_decision_calendar(
+            ledger, (date(2024, 1, 5), date(2024, 1, 8))
+        )
+        ledger[0]["decision_cutoff"] = "2024-01-09T08:00:00+08:00"
+        with self.assertRaisesRegex(OperationalADSBaseError, "next open session"):
+            _validate_ledger_decision_calendar(
+                ledger, (date(2024, 1, 5), date(2024, 1, 8), date(2024, 1, 9))
+            )
 
     def test_build_is_reproducible_and_verifies_without_source_paths(self) -> None:
         first = self._build("first")

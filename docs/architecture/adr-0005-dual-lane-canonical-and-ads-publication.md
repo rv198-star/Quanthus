@@ -258,12 +258,32 @@ acceptance, lane, ODS release, epoch parent, shared reference, cutoff, transform
 identity in a deterministic ledger, and rejects a chain gap or conflicting business key. DWD may
 retain separate manifest-discovered members when schemas differ; DWS binds the exact DWD package
 manifest/content digests and must reproduce the prior projection row-for-row. All three nodes
-install and verify identical package bytes before any new Base descriptor is advanced. The old
-seed, absorbed daily candidates, lane catalogs, and consumer release-set pointer remain unchanged.
+install and verify identical package bytes before any new Base descriptor is advanced. Base-aware
+lane catalogs then join that pair to only post-Base candidates while retaining their original
+canonical parent lineage. The old seed, absorbed daily candidates, old lane catalogs, and consumer
+release-set pointer remain unchanged.
 
 Recovery is proved in layers: retained canonical inputs rebuild ADS without live lanes; retained
 DWD rebuilds DWS; and exact ODS, epoch parent/base, references, runtime, and transform rebuild the
 same DWD content digest on a clean path.
+
+The exact ODS recovery basis is one immutable Hermes-authoritative ODS Base with one
+checksum-identical CN01 mirror. OCI does not retain the target-chain ODS Base. The package contains
+multiple schema-appropriate members discovered only through its own manifest; "one Base" does not
+mean concatenating heterogeneous datasets into one Parquet file. Hermes source gaps may use a
+Hermes retained revision, and CN01 may fill a proven Hermes gap, only through an explicit
+dataset/date exception with source node, reason, and expected immutable manifest digest. A Base
+build classifies every top-level source and recursively expands mixed roots to explicit source
+units, binds a frozen source-selection digest, discloses unacquired source-family gaps, verifies
+member checksums and data-quality metadata, and publishes `READY` last. A legacy source-side dataset
+manifest is retained only as historical lineage evidence; the Base `manifest.json` is the package
+authority.
+
+July migration uses a provisional package through 2026-07-30 and creates a new final package after
+the accepted 2026-07-31 close releases exist. The final package may hard-link unchanged provisional
+members on the same filesystem, but it remains a distinct immutable identity. Neither the
+provisional package nor the absorbed daily release is deleted by this decision. Detailed source
+membership and operation are owned by LLD 01's ODS Base child and the ODS Base runbook.
 
 ## Transition and delivery gates
 

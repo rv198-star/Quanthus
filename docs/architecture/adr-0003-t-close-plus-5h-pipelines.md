@@ -129,15 +129,18 @@ The daily v1 release requires:
 - `stock_list`: the current acquisition universe; historical master rows alone must not resurrect
   inactive codes into T coverage;
 - `trading_calendar`: complete SSE/SZSE evidence for T.
+- `valuation_daily_delta`: T-day PE/PB/PS/PCF observations aligned one-for-one with returned daily
+  bars; an all-null valuation response blocks READY.
 
 On a known closed weekday, Hermes publishes a calendar-only daily release. OCI verifies it, records
 `skipped_closed_session`, and does not invoke build, gate, or publication. Missing calendar evidence
 is an error and is never treated as a holiday.
 
-The recurring acquisition lane may also emit daily index, valuation, calendar, suspension, and
-status deltas. They become required only when their OCI transformations and acceptance gates are
-versioned. Weekly releases carry bounded revisions for financial statements, corporate actions,
-adjustment evidence, shareholder counts, and ST observations. Shareholder-count acquisition keeps
+The recurring acquisition lane also emits daily index, calendar, suspension, and status deltas.
+Daily valuation is mandatory ODS evidence even while downstream transformations remain separately
+gated. Weekly releases carry raw F10, complete three-statement responses, their nonempty quarterly
+projection, real industry membership, per-security receipts, and bounded revisions for corporate
+actions, adjustment evidence, shareholder counts, and ST observations. Shareholder-count acquisition keeps
 the approved disclosure-date watermark, at least a 90-day lookback, and revision history rather
 than overwriting an earlier disclosure.
 

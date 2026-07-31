@@ -22,7 +22,7 @@ doctor:
 	PYTHONPATH=src $(PYTHON) -m quanthus doctor
 
 test:
-	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -t . -v
+	PYTHONPATH=src $(PYTHON) -m pytest -q
 
 compile:
 	PYTHONPATH=src $(PYTHON) -m compileall -q src tests

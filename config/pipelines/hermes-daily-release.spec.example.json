@@ -20,6 +20,13 @@
       "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
     },
     {
+      "name": "valuation_daily_delta",
+      "source_path": "/root/work/astock/data/landing/YYYY-MM-DD/valuation_daily_delta.parquet",
+      "relative_path": "artifacts/valuation_daily_delta.parquet",
+      "source_revision": "baostock-daily-valuation-attempt-revision",
+      "knowledge_cutoff": "YYYY-MM-DDTHH:MM:SS+08:00"
+    },
+    {
       "name": "security_master",
       "source_path": "/root/work/astock/data/ref_security_master.parquet",
       "relative_path": "artifacts/ref_security_master.parquet",

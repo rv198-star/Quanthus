@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import fnmatch
 import hashlib
 import json
@@ -70,11 +71,21 @@ class OdsDailySpec:
 
 
 @dataclass(frozen=True)
+class OdsIntradayException:
+    market_date: date
+    source_node: str
+    source: str
+    reason: str
+    manifest_sha256: str
+
+
+@dataclass(frozen=True)
 class OdsIntradaySpec:
     frequency: str
     source: str
     increment_start: date
     required_artifacts: tuple[str, ...]
+    source_exceptions: tuple[OdsIntradayException, ...]
 
 
 @dataclass(frozen=True)
@@ -82,6 +93,14 @@ class OdsExclusion:
     pattern: str
     classification: str
     reason: str
+
+
+@dataclass(frozen=True)
+class OdsScopeGap:
+    dataset_family: str
+    classification: str
+    reason: str
+    downstream_impact: str
 
 
 @dataclass(frozen=True)
@@ -96,6 +115,7 @@ class OdsBasePolicy:
     daily: OdsDailySpec
     intraday: tuple[OdsIntradaySpec, ...]
     exclusions: tuple[OdsExclusion, ...]
+    scope_gaps: tuple[OdsScopeGap, ...]
     path: Path
     digest: str
 
@@ -238,6 +258,7 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
     daily_value = source.get("daily")
     intraday_values = source.get("intraday_releases")
     exclusion_values = source.get("exclusions")
+    scope_gap_values = source.get("scope_gaps", [])
     if (
         not isinstance(file_values, list)
         or not file_values
@@ -250,6 +271,7 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
         or not intraday_values
         or not isinstance(exclusion_values, list)
         or not exclusion_values
+        or not isinstance(scope_gap_values, list)
     ):
         raise OdsBaseError("ODS Base source policy is incomplete")
 
@@ -347,6 +369,21 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
             )
         )
 
+    scope_gaps: list[OdsScopeGap] = []
+    for item in scope_gap_values:
+        if not isinstance(item, Mapping):
+            raise OdsBaseError("source.scope_gaps entries must be objects")
+        scope_gaps.append(
+            OdsScopeGap(
+                dataset_family=_text(item, "dataset_family"),
+                classification=_text(item, "classification"),
+                reason=_text(item, "reason"),
+                downstream_impact=_text(item, "downstream_impact"),
+            )
+        )
+    if len({item.dataset_family for item in scope_gaps}) != len(scope_gaps):
+        raise OdsBaseError("source.scope_gaps dataset families must be unique")
+
     daily = OdsDailySpec(
         source=_safe_relative(_text(daily_value, "source"), "daily.source").as_posix(),
         increment_start=_parse_date(daily_value.get("increment_start"), "daily.increment_start"),
@@ -364,6 +401,36 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
         frequency = _text(item, "frequency")
         if frequency not in {"1m", "5m"}:
             raise OdsBaseError("intraday release frequency must be 1m or 5m")
+        exception_values = item.get("source_exceptions", [])
+        if not isinstance(exception_values, list):
+            raise OdsBaseError("intraday source_exceptions must be an array")
+        exceptions: list[OdsIntradayException] = []
+        for exception in exception_values:
+            if not isinstance(exception, Mapping):
+                raise OdsBaseError("intraday source exception must be an object")
+            market_date = _parse_date(
+                exception.get("market_date"), "source_exceptions.market_date"
+            )
+            source_node = _text(exception, "source_node")
+            manifest_sha256 = _text(exception, "manifest_sha256")
+            if (
+                source_node not in {"hermes", "cn01"}
+                or _SHA256.fullmatch(manifest_sha256) is None
+            ):
+                raise OdsBaseError("intraday source exception authority is invalid")
+            exceptions.append(
+                OdsIntradayException(
+                    market_date=market_date,
+                    source_node=source_node,
+                    source=_safe_relative(
+                        _text(exception, "source"), "source_exceptions.source"
+                    ).as_posix(),
+                    reason=_text(exception, "reason"),
+                    manifest_sha256=manifest_sha256,
+                )
+            )
+        if len({exception.market_date for exception in exceptions}) != len(exceptions):
+            raise OdsBaseError("intraday source exception dates must be unique")
         intraday.append(
             OdsIntradaySpec(
                 frequency=frequency,
@@ -377,10 +444,17 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
                     item.get("required_artifacts"),
                     "intraday_releases.required_artifacts",
                 ),
+                source_exceptions=tuple(exceptions),
             )
         )
     if tuple(sorted(item.frequency for item in intraday)) != ("1m", "5m"):
         raise OdsBaseError("intraday release policy must define exactly 1m and 5m")
+    if any(
+        exception.market_date < item.increment_start
+        for item in intraday
+        for exception in item.source_exceptions
+    ):
+        raise OdsBaseError("intraday source exception predates its increment start")
 
     dataset_ids = (
         [item.dataset_id for item in files]
@@ -415,6 +489,7 @@ def load_ods_base_policy(path: Path) -> OdsBasePolicy:
         daily=daily,
         intraday=tuple(intraday),
         exclusions=tuple(exclusions),
+        scope_gaps=tuple(scope_gaps),
         path=path,
         digest=_sha256(path),
     )
@@ -428,42 +503,66 @@ def _classify_source_root(astock_root: Path, policy: OdsBasePolicy) -> list[dict
         | {item.source for item in policy.intraday}
     )
     included.add(policy.daily.source)
+    included.update(
+        exception.source
+        for item in policy.intraday
+        for exception in item.source_exceptions
+    )
     inventory: list[dict[str, str]] = []
     unresolved: list[str] = []
+
+    def inherited_exclusion(relative: str) -> OdsExclusion | None:
+        candidates: list[tuple[int, OdsExclusion]] = []
+        path = PurePosixPath(relative)
+        for exclusion in policy.exclusions:
+            for ancestor in (path, *path.parents):
+                if ancestor.as_posix() == ".":
+                    continue
+                if fnmatch.fnmatchcase(ancestor.as_posix(), exclusion.pattern):
+                    candidates.append((len(ancestor.parts), exclusion))
+                    break
+        return max(candidates, key=lambda item: item[0])[1] if candidates else None
+
+    def classify(path: Path) -> None:
+        relative = path.relative_to(astock_root).as_posix()
+        if path.is_symlink():
+            raise OdsBaseError(f"symbolic links are forbidden in ODS sources: {relative}")
+        direct = relative in included
+        ancestor = any(item.startswith(relative + "/") for item in included)
+        exclusion = inherited_exclusion(relative)
+        if direct:
+            classification = "included"
+            reason = "explicit policy member"
+        elif ancestor:
+            classification = "mixed"
+            reason = "expanded below because only explicit policy descendants are included"
+        elif exclusion is not None:
+            classification = exclusion.classification
+            reason = exclusion.reason
+        else:
+            unresolved.append(relative)
+            return
+        inventory.append(
+            {
+                "path": relative,
+                "classification": classification,
+                "reason": reason,
+            }
+        )
+        if ancestor and not direct:
+            if not path.is_dir():
+                raise OdsBaseError(f"mixed ODS source path is not a directory: {relative}")
+            for child in sorted(path.iterdir()):
+                classify(child)
+
     for root_name in ("data", "minute/data"):
         root = astock_root / root_name
         if not root.is_dir() or root.is_symlink():
             raise OdsBaseError(f"required source inventory root is invalid: {root_name}")
         for child in sorted(root.iterdir()):
-            relative = child.relative_to(astock_root).as_posix()
-            if child.is_symlink():
-                raise OdsBaseError(f"symbolic links are forbidden in ODS sources: {relative}")
-            direct = relative in included
-            ancestor = any(item.startswith(relative + "/") for item in included)
-            exclusions = [
-                item for item in policy.exclusions if fnmatch.fnmatchcase(relative, item.pattern)
-            ]
-            if direct:
-                classification = "included"
-                reason = "explicit policy member"
-            elif ancestor:
-                classification = "mixed"
-                reason = "only explicit policy descendants are included"
-            elif exclusions:
-                classification = exclusions[0].classification
-                reason = exclusions[0].reason
-            else:
-                unresolved.append(relative)
-                continue
-            inventory.append(
-                {
-                    "path": relative,
-                    "classification": classification,
-                    "reason": reason,
-                }
-            )
+            classify(child)
     if unresolved:
-        raise OdsBaseError(f"unclassified top-level ODS sources: {', '.join(unresolved)}")
+        raise OdsBaseError(f"unclassified ODS sources: {', '.join(unresolved)}")
     return inventory
 
 
@@ -642,6 +741,7 @@ def _part_metadata(
     target: Path,
     date_columns: Sequence[str] = (),
     knowledge_cutoff: str | None = None,
+    source_node: str | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "dataset_id": dataset_id,
@@ -654,6 +754,8 @@ def _part_metadata(
     }
     if knowledge_cutoff is not None:
         result["knowledge_cutoff"] = knowledge_cutoff
+    if source_node is not None:
+        result["source_node"] = source_node
     if file_format == "parquet":
         result.update(_parquet_metadata(target, date_columns))
     elif file_format == "sqlite":
@@ -776,6 +878,7 @@ def _ready_release(root: Path, market_date: date) -> dict[str, Any]:
         )
     return {
         "root": root,
+        "market_date": market_date,
         "attempt_id": root.name,
         "release_id": _text(value, "release_id"),
         "created_at": _text(value, "created_at"),
@@ -814,12 +917,293 @@ def _trading_calendar_path(astock_root: Path, policy: OdsBasePolicy) -> Path:
     return _inside(astock_root, matches[0].source, "trading_calendar.source")
 
 
+def _selected_daily_date_releases(
+    astock_root: Path, policy: OdsBasePolicy, market_date: date
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, str]]]:
+    daily_root = _inside(astock_root, policy.daily.source, "daily.source")
+    date_root = daily_root / market_date.isoformat()
+    if not date_root.is_dir() or date_root.is_symlink():
+        raise OdsBaseError(f"daily ODS has no release root for {market_date}")
+    pointer = _object(date_root / "CURRENT.json")
+    attempt_id = _text(pointer, "attempt_id")
+    if _RELEASE_ATTEMPT.fullmatch(attempt_id) is None:
+        raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
+    current = _ready_release(date_root / attempt_id, market_date)
+    if (
+        pointer.get("schema_version") != 1
+        or pointer.get("market_date") != market_date.isoformat()
+        or pointer.get("schedule") != "daily"
+        or pointer.get("manifest_sha256") != current["manifest_sha256"]
+    ):
+        raise OdsBaseError(f"daily ODS CURRENT is inconsistent: {market_date}")
+
+    market_required = set(policy.daily.market_required_artifacts)
+    event_required = set(policy.daily.event_required_artifacts)
+    market_candidates: list[dict[str, Any]] = []
+    event_candidates: list[dict[str, Any]] = []
+    inventory: list[dict[str, str]] = []
+    for attempt_root in sorted(date_root.iterdir()):
+        if not attempt_root.is_dir():
+            continue
+        try:
+            candidate = (
+                current
+                if attempt_root.name == attempt_id
+                else _ready_release(attempt_root, market_date)
+            )
+        except OdsBaseError:
+            inventory.append(
+                {
+                    "path": attempt_root.relative_to(astock_root).as_posix(),
+                    "classification": "excluded_failed_or_incomplete_attempt",
+                    "reason": "attempt did not pass immutable READY and artifact verification",
+                }
+            )
+            continue
+        is_market = market_required.issubset(candidate["artifact_names"])
+        is_events = event_required.issubset(candidate["artifact_names"])
+        if is_market and is_events:
+            raise OdsBaseError(f"daily ODS attempt has ambiguous roles: {attempt_root}")
+        if is_market:
+            market_candidates.append(candidate)
+        elif is_events:
+            event_candidates.append(candidate)
+        else:
+            inventory.append(
+                {
+                    "path": attempt_root.relative_to(astock_root).as_posix(),
+                    "classification": "excluded_unclassified_complete_attempt",
+                    "reason": "complete attempt satisfies neither Base release role",
+                }
+            )
+    if not market_candidates or not event_candidates:
+        raise OdsBaseError(f"daily market or event release is missing for {market_date}")
+
+    def select_role(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        current_role = [item for item in candidates if item["attempt_id"] == attempt_id]
+        if current_role:
+            return current_role[0]
+        return max(candidates, key=lambda item: (item["created_at"], item["attempt_id"]))
+
+    market = select_role(market_candidates)
+    events = select_role(event_candidates)
+    selected = ((market, "market"), (events, "events"))
+    for candidate, role in selected:
+        inventory.append(
+            {
+                "path": candidate["root"].relative_to(astock_root).as_posix(),
+                "classification": "included_selected_daily_release",
+                "reason": f"selected {role} release under CURRENT-or-latest-role policy",
+            }
+        )
+    selected_roots = {market["root"], events["root"]}
+    for candidate in (*market_candidates, *event_candidates):
+        if candidate["root"] in selected_roots:
+            continue
+        inventory.append(
+            {
+                "path": candidate["root"].relative_to(astock_root).as_posix(),
+                "classification": "excluded_superseded_daily_attempt",
+                "reason": "superseded under CURRENT-or-latest-role policy",
+            }
+        )
+
+    def annotate(release: dict[str, Any], role: str) -> dict[str, Any]:
+        return {
+            **release,
+            "release_role": role,
+            "source_node": "hermes",
+            "source_path": date_root.relative_to(astock_root).as_posix(),
+            "gap_fill": None,
+        }
+
+    return annotate(market, "market"), annotate(events, "events"), inventory
+
+
+def audit_ods_base_release_gate(
+    *,
+    release_root: Path,
+    base_current: Path,
+    market_date: date,
+    policy: OdsBasePolicy,
+    parent_policy: OdsBasePolicy | None = None,
+    expected_parent_bundle_id: str,
+    expected_parent_manifest_sha256: str,
+    expected_parent_through_date: date,
+    minimum_free_bytes: int = 1_073_741_824,
+) -> dict[str, Any]:
+    """Verify the close releases needed to construct, but not promote, a child Base."""
+
+    if not expected_parent_bundle_id or _RELEASE_ATTEMPT.fullmatch(
+        expected_parent_bundle_id
+    ) is None:
+        raise OdsBaseError("expected parent bundle id is unsafe")
+    if _SHA256.fullmatch(expected_parent_manifest_sha256) is None:
+        raise OdsBaseError("expected parent manifest SHA-256 is invalid")
+    if (
+        isinstance(minimum_free_bytes, bool)
+        or not isinstance(minimum_free_bytes, int)
+        or minimum_free_bytes < 0
+    ):
+        raise OdsBaseError("minimum free bytes must be a non-negative integer")
+
+    parent = load_ods_base_current(
+        base_current, policy=parent_policy or policy, deep=False
+    )
+    if (
+        parent.bundle_id != expected_parent_bundle_id
+        or parent.manifest_sha256 != expected_parent_manifest_sha256
+        or parent.through_date != expected_parent_through_date
+    ):
+        raise OdsBaseError("ODS Base parent pointer differs from the finalization precondition")
+    if expected_parent_through_date >= market_date:
+        raise OdsBaseError("ODS Base parent must end before the target market date")
+
+    release_root = release_root.resolve()
+    daily_date_root = release_root / "daily" / market_date.isoformat()
+    if not daily_date_root.is_dir() or daily_date_root.is_symlink():
+        raise OdsBaseError(f"daily ODS has no release root for {market_date}")
+
+    pointer = _object(daily_date_root / "CURRENT.json")
+    market_attempt = _text(pointer, "attempt_id")
+    if _RELEASE_ATTEMPT.fullmatch(market_attempt) is None:
+        raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
+    market = _ready_release(daily_date_root / market_attempt, market_date)
+    market_artifacts = set(policy.daily.market_required_artifacts)
+    event_artifacts = set(policy.daily.event_required_artifacts)
+    if (
+        pointer.get("schema_version") != 1
+        or pointer.get("schedule") != "daily"
+        or pointer.get("market_date") != market_date.isoformat()
+        or pointer.get("manifest_sha256") != market["manifest_sha256"]
+        or not market_artifacts.issubset(market["artifact_names"])
+        or event_artifacts.issubset(market["artifact_names"])
+    ):
+        raise OdsBaseError("daily ODS CURRENT does not bind the required market release")
+
+    def select_latest(
+        date_root: Path, required_artifacts: tuple[str, ...], role: str
+    ) -> dict[str, Any]:
+        if not date_root.is_dir() or date_root.is_symlink():
+            raise OdsBaseError(f"ODS {role} has no release root for {market_date}")
+        candidates: list[dict[str, Any]] = []
+        for attempt_root in sorted(date_root.iterdir()):
+            if not attempt_root.is_dir() or attempt_root.is_symlink():
+                continue
+            try:
+                candidate = _ready_release(attempt_root, market_date)
+            except OdsBaseError:
+                continue
+            if (
+                role == "events"
+                and market_artifacts.issubset(candidate["artifact_names"])
+                and event_artifacts.issubset(candidate["artifact_names"])
+            ):
+                raise OdsBaseError(
+                    f"daily ODS attempt has ambiguous market/events roles: {attempt_root}"
+                )
+            if set(required_artifacts).issubset(candidate["artifact_names"]):
+                candidates.append(candidate)
+        if not candidates:
+            raise OdsBaseError(f"no complete ODS {role} release for {market_date}")
+        return max(candidates, key=lambda item: (item["created_at"], item["attempt_id"]))
+
+    events = select_latest(
+        daily_date_root, policy.daily.event_required_artifacts, "events"
+    )
+    selected: list[tuple[str, dict[str, Any]]] = [
+        ("market", market),
+        ("events", events),
+    ]
+    for spec in sorted(policy.intraday, key=lambda item: item.frequency):
+        selected.append(
+            (
+                spec.frequency,
+                select_latest(
+                    release_root
+                    / "daily"
+                    / spec.frequency
+                    / market_date.isoformat(),
+                    spec.required_artifacts,
+                    spec.frequency,
+                ),
+            )
+        )
+
+    free_bytes = shutil.disk_usage(base_current.parent).free
+    if free_bytes < minimum_free_bytes:
+        raise OdsBaseError(
+            f"ODS Base filesystem has {free_bytes} free bytes; "
+            f"requires at least {minimum_free_bytes}"
+        )
+
+    return {
+        "schema_version": 1,
+        "gate": "ods_base_close_release_gate_v1",
+        "status": "ready",
+        "release_policy_sha256": policy.digest,
+        "parent_policy_sha256": (parent_policy or policy).digest,
+        "market_date": market_date.isoformat(),
+        "parent_base": {
+            "bundle_id": parent.bundle_id,
+            "manifest_sha256": parent.manifest_sha256,
+            "content_digest": parent.content_digest,
+            "through_date": parent.through_date.isoformat(),
+        },
+        "releases": [
+            {
+                "role": role,
+                "release_id": release["release_id"],
+                "attempt_id": release["attempt_id"],
+                "manifest_sha256": release["manifest_sha256"],
+                "created_at": release["created_at"],
+                "path": str(release["root"]),
+            }
+            for role, release in selected
+        ],
+        "filesystem": {
+            "path": str(base_current.parent.resolve()),
+            "free_bytes": free_bytes,
+            "minimum_free_bytes": minimum_free_bytes,
+        },
+        "authorizes_candidate_build": True,
+        "authorizes_base_promotion": False,
+        "remaining_gate": "issue_47_expanded_phase_b_scope",
+    }
+
+
+def _selection_calendar_path(
+    astock_root: Path, policy: OdsBasePolicy, through_date: date
+) -> Path:
+    canonical = _trading_calendar_path(astock_root, policy)
+    earliest = min(
+        policy.daily.increment_start,
+        *(item.increment_start for item in policy.intraday),
+    )
+    canonical_dates = _open_dates(canonical, earliest, through_date)
+    if canonical_dates and canonical_dates[-1] == through_date:
+        return canonical
+
+    release, _, _ = _selected_daily_date_releases(astock_root, policy, through_date)
+    calendars = [
+        item for item in release["artifacts"] if item["name"] == "trading_calendar"
+    ]
+    if len(calendars) != 1:
+        raise OdsBaseError("through-date market release has no unique trading calendar")
+    calendar_path = _inside(
+        release["root"], calendars[0]["relative_path"], "trading_calendar artifact"
+    )
+    release_dates = _open_dates(calendar_path, earliest, through_date)
+    if not release_dates or release_dates[-1] != through_date:
+        raise OdsBaseError("through_date is absent from the accepted release calendar")
+    return calendar_path
+
+
 def _selected_daily_releases(
     astock_root: Path, policy: OdsBasePolicy, through_date: date
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    daily_root = _inside(astock_root, policy.daily.source, "daily.source")
     dates = _open_dates(
-        _trading_calendar_path(astock_root, policy),
+        _selection_calendar_path(astock_root, policy, through_date),
         policy.daily.increment_start,
         through_date,
     )
@@ -828,67 +1212,11 @@ def _selected_daily_releases(
     selected: list[dict[str, Any]] = []
     attempt_inventory: list[dict[str, str]] = []
     for market_date in dates:
-        date_root = daily_root / market_date.isoformat()
-        pointer = _object(date_root / "CURRENT.json")
-        attempt_id = _text(pointer, "attempt_id")
-        if _RELEASE_ATTEMPT.fullmatch(attempt_id) is None:
-            raise OdsBaseError("daily ODS CURRENT attempt id is unsafe")
-        market = _ready_release(date_root / attempt_id, market_date)
-        if (
-            pointer.get("market_date") != market_date.isoformat()
-            or pointer.get("schedule") != "daily"
-            or pointer.get("manifest_sha256") != market["manifest_sha256"]
-            or not set(policy.daily.market_required_artifacts).issubset(market["artifact_names"])
-        ):
-            raise OdsBaseError(f"daily market CURRENT is incomplete or inconsistent: {market_date}")
-        selected.append({**market, "release_role": "market"})
-
-        event_candidates: list[dict[str, Any]] = []
-        for attempt_root in sorted(date_root.iterdir()):
-            if not attempt_root.is_dir() or attempt_root.name == attempt_id:
-                continue
-            try:
-                candidate = _ready_release(attempt_root, market_date)
-            except OdsBaseError:
-                attempt_inventory.append(
-                    {
-                        "path": attempt_root.relative_to(astock_root).as_posix(),
-                        "classification": "excluded_failed_or_incomplete_attempt",
-                        "reason": "attempt did not pass immutable READY and artifact verification",
-                    }
-                )
-                continue
-            if set(policy.daily.event_required_artifacts).issubset(candidate["artifact_names"]):
-                event_candidates.append(candidate)
-            else:
-                attempt_inventory.append(
-                    {
-                        "path": attempt_root.relative_to(astock_root).as_posix(),
-                        "classification": "excluded_superseded_market_attempt",
-                        "reason": "market authority is the date-local CURRENT descriptor",
-                    }
-                )
-        if not event_candidates:
-            raise OdsBaseError(f"no complete daily event release for {market_date}")
-        event_candidates.sort(key=lambda item: (item["created_at"], item["attempt_id"]))
-        event = event_candidates[-1]
-        selected.append({**event, "release_role": "events"})
-        for candidate in event_candidates[:-1]:
-            attempt_inventory.append(
-                {
-                    "path": candidate["root"].relative_to(astock_root).as_posix(),
-                    "classification": "excluded_superseded_event_attempt",
-                    "reason": "latest complete READY event release wins under policy",
-                }
-            )
-        attempt_inventory.extend(
-            {
-                "path": item["root"].relative_to(astock_root).as_posix(),
-                "classification": "included_selected_daily_release",
-                "reason": f"selected {item['release_role']} release",
-            }
-            for item in (selected[-2], selected[-1])
+        market, events, inventory = _selected_daily_date_releases(
+            astock_root, policy, market_date
         )
+        selected.extend((market, events))
+        attempt_inventory.extend(inventory)
     return selected, attempt_inventory
 
 
@@ -897,16 +1225,22 @@ def _selected_intraday_releases(
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     selected: list[dict[str, Any]] = []
     attempt_inventory: list[dict[str, str]] = []
-    calendar_path = _trading_calendar_path(astock_root, policy)
+    calendar_path = _selection_calendar_path(astock_root, policy, through_date)
     for spec in policy.intraday:
         release_root = _inside(astock_root, spec.source, "intraday_releases.source")
+        exceptions = {item.market_date: item for item in spec.source_exceptions}
         dates = _open_dates(calendar_path, spec.increment_start, through_date)
         if not dates or dates[-1] != through_date:
             raise OdsBaseError(
                 f"intraday {spec.frequency} through_date is absent from the source calendar"
             )
         for market_date in dates:
-            date_root = release_root / market_date.isoformat()
+            exception = exceptions.get(market_date)
+            date_root = (
+                release_root / market_date.isoformat()
+                if exception is None
+                else _inside(astock_root, exception.source, "source_exceptions.source")
+            )
             if not date_root.is_dir() or date_root.is_symlink():
                 raise OdsBaseError(
                     f"intraday {spec.frequency} has no release root for {market_date}"
@@ -941,13 +1275,40 @@ def _selected_intraday_releases(
                     f"no complete intraday {spec.frequency} release for {market_date}"
                 )
             candidates.sort(key=lambda item: (item["created_at"], item["attempt_id"]))
-            winner = {**candidates[-1], "release_role": f"intraday_{spec.frequency}"}
+            if (
+                exception is not None
+                and candidates[-1]["manifest_sha256"] != exception.manifest_sha256
+            ):
+                raise OdsBaseError(
+                    f"intraday {spec.frequency} gap-fill digest differs for {market_date}"
+                )
+            winner = {
+                **candidates[-1],
+                "release_role": f"intraday_{spec.frequency}",
+                "source_node": "hermes" if exception is None else exception.source_node,
+                "source_path": date_root.relative_to(astock_root).as_posix(),
+                "gap_fill": (
+                    None
+                    if exception is None
+                    else {
+                        "reason": exception.reason,
+                        "expected_manifest_sha256": exception.manifest_sha256,
+                    }
+                ),
+            }
             selected.append(winner)
             attempt_inventory.append(
                 {
                     "path": winner["root"].relative_to(astock_root).as_posix(),
                     "classification": "included_selected_intraday_release",
-                    "reason": f"latest complete READY {spec.frequency} release",
+                    "reason": (
+                        f"latest complete READY {spec.frequency} release"
+                        if exception is None
+                        else (
+                            f"explicit {exception.source_node} gap-fill "
+                            f"for {spec.frequency}"
+                        )
+                    ),
                 }
             )
             for candidate in candidates[:-1]:
@@ -959,6 +1320,129 @@ def _selected_intraday_releases(
                     }
                 )
     return selected, attempt_inventory
+
+
+def _selected_source_state(
+    astock_root: Path, policy: OdsBasePolicy, through_date: date
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    source_inventory = _classify_source_root(astock_root, policy)
+    releases, attempt_inventory = _selected_daily_releases(
+        astock_root, policy, through_date
+    )
+    intraday_releases, intraday_inventory = _selected_intraday_releases(
+        astock_root, policy, through_date
+    )
+    releases.extend(intraday_releases)
+    source_inventory.extend(attempt_inventory)
+    source_inventory.extend(intraday_inventory)
+    source_inventory.sort(key=lambda item: item["path"])
+    return source_inventory, releases
+
+
+def _tree_paths(astock_root: Path, spec: OdsTreeSpec) -> list[Path]:
+    source_root = _inside(astock_root, spec.source, "trees.source")
+    if not source_root.is_dir() or source_root.is_symlink():
+        raise OdsBaseError(f"ODS Base tree root is invalid: {spec.dataset_id}")
+    paths = sorted(source_root.glob(spec.pattern))
+    if (
+        len(paths) < spec.minimum_parts
+        or any(not item.is_file() or item.is_symlink() for item in paths)
+    ):
+        raise OdsBaseError(f"ODS Base tree is incomplete: {spec.dataset_id}")
+    return paths
+
+
+def _archive_paths(astock_root: Path, spec: OdsArchiveSpec) -> list[Path]:
+    source_root = _inside(astock_root, spec.source, "archive_trees.source")
+    if not source_root.is_dir() or source_root.is_symlink():
+        raise OdsBaseError(f"ODS source evidence archive is invalid: {spec.dataset_id}")
+    paths: list[Path] = []
+    for source in sorted(source_root.rglob("*")):
+        if source.is_symlink():
+            raise OdsBaseError(f"symbolic link in source evidence archive: {source}")
+        if not source.is_file():
+            continue
+        relative_name = source.relative_to(source_root).as_posix()
+        if any(
+            fnmatch.fnmatchcase(relative_name, pattern)
+            for pattern in spec.include_patterns
+        ):
+            paths.append(source)
+    if len(paths) < spec.minimum_files:
+        raise OdsBaseError(f"ODS source evidence archive is incomplete: {spec.dataset_id}")
+    return paths
+
+
+def _archive_format(path: Path) -> str:
+    return {
+        ".csv": "csv",
+        ".json": "json",
+        ".md": "text",
+        ".parquet": "parquet",
+        ".sha256": "text",
+        ".txt": "text",
+    }.get(path.suffix.lower(), "binary")
+
+
+def _release_market_date(release: Mapping[str, Any]) -> date:
+    value = release.get("market_date")
+    if not isinstance(value, date):
+        raise OdsBaseError("selected release market_date is invalid")
+    return value
+
+
+def _release_lineage_entry(release: Mapping[str, Any]) -> dict[str, Any]:
+    artifacts = release.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise OdsBaseError("selected release artifacts are invalid")
+    return {
+        "market_date": _release_market_date(release).isoformat(),
+        "release_role": str(release["release_role"]),
+        "source_node": str(release["source_node"]),
+        "source_path": str(release["source_path"]),
+        "gap_fill": release["gap_fill"],
+        "attempt_id": str(release["attempt_id"]),
+        "release_id": str(release["release_id"]),
+        "manifest_sha256": str(release["manifest_sha256"]),
+        "producer": str(release["producer"]),
+        "created_at": str(release["created_at"]),
+        "artifacts": [
+            {
+                **artifact,
+                "included_in_base": artifact["name"] not in _EXCLUDED_RELEASE_ARTIFACTS,
+            }
+            for artifact in artifacts
+        ],
+    }
+
+
+def _selection_digest(
+    *,
+    source_inventory: Sequence[Mapping[str, Any]],
+    release_lineage: Sequence[Mapping[str, Any]],
+    files: Sequence[Mapping[str, Any]],
+    scope_gaps: Sequence[Mapping[str, Any]],
+) -> str:
+    return _canonical_digest(
+        {
+            "source_inventory": list(source_inventory),
+            "daily_releases": list(release_lineage),
+            "files": list(files),
+            "scope_gaps": list(scope_gaps),
+        }
+    )
+
+
+def _scope_gap_inventory(policy: OdsBasePolicy) -> list[dict[str, str]]:
+    return [
+        {
+            "dataset_family": item.dataset_family,
+            "classification": item.classification,
+            "reason": item.reason,
+            "downstream_impact": item.downstream_impact,
+        }
+        for item in policy.scope_gaps
+    ]
 
 
 def _dataset_summary(
@@ -980,6 +1464,243 @@ def _dataset_summary(
     return value
 
 
+def audit_ods_base_sources(
+    *, astock_root: Path, through_date: date, policy: OdsBasePolicy
+) -> dict[str, Any]:
+    """Deep-audit the exact source selection without copying package payload."""
+    if through_date < policy.daily.increment_start:
+        raise OdsBaseError("through_date predates the configured daily increment start")
+    astock_root = astock_root.resolve()
+    source_inventory, releases = _selected_source_state(
+        astock_root, policy, through_date
+    )
+    datasets: list[dict[str, Any]] = []
+    all_parts: list[dict[str, Any]] = []
+
+    for spec in policy.files:
+        source = _inside(astock_root, spec.source, "files.source")
+        if not source.is_file() or source.is_symlink():
+            raise OdsBaseError(f"ODS Base source file is invalid: {spec.dataset_id}")
+        part = _part_metadata(
+            source_relative=spec.source,
+            target_relative=spec.target,
+            dataset_id=spec.dataset_id,
+            role=spec.role,
+            file_format=spec.file_format,
+            digest=_sha256(source),
+            size_bytes=source.stat().st_size,
+            target=source,
+            date_columns=spec.date_columns,
+        )
+        quality = None
+        if spec.file_format == "parquet" and spec.key_columns:
+            quality = _parquet_quality([source], spec.key_columns, spec.date_columns)
+            if quality["duplicate_key_count"] or quality["null_key_count"]:
+                raise OdsBaseError(f"ODS Base key gate failed for {spec.dataset_id}")
+        datasets.append(
+            _dataset_summary(
+                dataset_id=spec.dataset_id,
+                role=spec.role,
+                parts=[part],
+                quality=quality,
+            )
+        )
+        all_parts.append(part)
+
+    for spec in policy.trees:
+        source_root = _inside(astock_root, spec.source, "trees.source")
+        paths = _tree_paths(astock_root, spec)
+        parts: list[dict[str, Any]] = []
+        for source in paths:
+            relative_name = source.relative_to(source_root).as_posix()
+            part = _part_metadata(
+                source_relative=source.relative_to(astock_root).as_posix(),
+                target_relative=f"{spec.target}/{relative_name}",
+                dataset_id=spec.dataset_id,
+                role=spec.role,
+                file_format="parquet",
+                digest=_sha256(source),
+                size_bytes=source.stat().st_size,
+                target=source,
+                date_columns=spec.date_columns,
+            )
+            parts.append(part)
+            all_parts.append(part)
+        quality = _parquet_quality(paths, spec.key_columns, spec.date_columns)
+        if quality["duplicate_key_count"] or quality["null_key_count"]:
+            raise OdsBaseError(f"ODS Base key gate failed for {spec.dataset_id}")
+        datasets.append(
+            _dataset_summary(
+                dataset_id=spec.dataset_id,
+                role=spec.role,
+                parts=parts,
+                quality=quality,
+            )
+        )
+
+    for spec in policy.archives:
+        source_root = _inside(astock_root, spec.source, "archive_trees.source")
+        parts = []
+        parquet_rows = 0
+        for source in _archive_paths(astock_root, spec):
+            relative_name = source.relative_to(source_root).as_posix()
+            file_format = _archive_format(source)
+            part = _part_metadata(
+                source_relative=source.relative_to(astock_root).as_posix(),
+                target_relative=f"{spec.target}/{relative_name}",
+                dataset_id=spec.dataset_id,
+                role=spec.role,
+                file_format=file_format,
+                digest=_sha256(source),
+                size_bytes=source.stat().st_size,
+                target=source,
+            )
+            if file_format == "parquet":
+                parquet_rows += int(part["row_count"])
+            parts.append(part)
+            all_parts.append(part)
+        datasets.append(
+            _dataset_summary(
+                dataset_id=spec.dataset_id,
+                role=spec.role,
+                parts=parts,
+                quality={
+                    "quality_source": "accepted source-evidence archive",
+                    "parquet_row_count": parquet_rows,
+                },
+            )
+        )
+
+    daily_parts: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    release_lineage: list[dict[str, Any]] = []
+    for release in releases:
+        release_role = str(release["release_role"])
+        market_date = _release_market_date(release)
+        release_root = release["root"]
+        if not isinstance(release_root, Path):
+            raise OdsBaseError("selected release root is invalid")
+        base_target = f"payload/daily/{market_date.isoformat()}/{release_role}"
+        for name, file_format in (("release.json", "json"), ("READY", "text")):
+            source = release_root / name
+            part = _part_metadata(
+                source_relative=source.relative_to(astock_root).as_posix(),
+                target_relative=f"{base_target}/{name}",
+                dataset_id="daily_release_metadata",
+                role="lineage",
+                file_format=file_format,
+                digest=_sha256(source),
+                size_bytes=source.stat().st_size,
+                target=source,
+                source_node=str(release["source_node"]),
+            )
+            daily_parts[("daily_release_metadata", "lineage")].append(part)
+            all_parts.append(part)
+        for artifact in release["artifacts"]:
+            if artifact["name"] in _EXCLUDED_RELEASE_ARTIFACTS:
+                continue
+            source = _inside(
+                release_root, artifact["relative_path"], "daily artifact path"
+            )
+            file_format = "parquet" if source.suffix.lower() == ".parquet" else "json"
+            dataset_id = f"daily_{release_role}_{artifact['name']}"
+            part = _part_metadata(
+                source_relative=source.relative_to(astock_root).as_posix(),
+                target_relative=(
+                    f"{base_target}/artifacts/{Path(artifact['relative_path']).name}"
+                ),
+                dataset_id=dataset_id,
+                role="increment",
+                file_format=file_format,
+                digest=str(artifact["sha256"]),
+                size_bytes=int(artifact["size_bytes"]),
+                target=source,
+                knowledge_cutoff=str(artifact["knowledge_cutoff"]),
+                source_node=str(release["source_node"]),
+            )
+            daily_parts[(dataset_id, "increment")].append(part)
+            all_parts.append(part)
+        release_lineage.append(_release_lineage_entry(release))
+    for (dataset_id, role), parts in sorted(daily_parts.items()):
+        datasets.append(
+            _dataset_summary(
+                dataset_id=dataset_id,
+                role=role,
+                parts=parts,
+                quality={"quality_source": "verified immutable source release"},
+            )
+        )
+
+    all_parts.sort(key=lambda item: str(item["path"]))
+    datasets.sort(key=lambda item: str(item["dataset_id"]))
+    release_lineage.sort(key=lambda item: (item["market_date"], item["release_role"]))
+    selection_digest = _selection_digest(
+        source_inventory=source_inventory,
+        release_lineage=release_lineage,
+        files=all_parts,
+        scope_gaps=_scope_gap_inventory(policy),
+    )
+    return {
+        "schema_version": 1,
+        "kind": "quanthus_ods_base_source_inventory",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "contract_id": policy.contract_id,
+        "policy_sha256": policy.digest,
+        "source_node": policy.source_node,
+        "source_root": str(astock_root),
+        "through_date": through_date.isoformat(),
+        "increment_start": policy.daily.increment_start.isoformat(),
+        "selection_digest": selection_digest,
+        "estimated_package": {
+            "file_count": len(all_parts),
+            "size_bytes": sum(int(item["size_bytes"]) for item in all_parts),
+        },
+        "gates": {
+            "classified_source_inventory": "pass",
+            "declared_source_scope_gaps": "pass",
+            "immutable_release_integrity": "pass",
+            "parquet_schema_and_key_quality": "pass",
+            "sqlite_integrity": "pass",
+        },
+        "source_inventory": source_inventory,
+        "scope_gaps": _scope_gap_inventory(policy),
+        "daily_releases": release_lineage,
+        "datasets": datasets,
+        "files": all_parts,
+    }
+
+
+def write_ods_base_source_inventory(path: Path, inventory: Mapping[str, Any]) -> None:
+    if path.exists():
+        raise FileExistsError(path)
+    _atomic_json(path.resolve(), inventory)
+
+
+def _inventory_selection_digest(
+    path: Path, *, policy: OdsBasePolicy, through_date: date
+) -> str:
+    value = _object(path.resolve())
+    digest = _text(value, "selection_digest")
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != "quanthus_ods_base_source_inventory"
+        or value.get("contract_id") != policy.contract_id
+        or value.get("policy_sha256") != policy.digest
+        or value.get("source_node") != policy.source_node
+        or value.get("through_date") != through_date.isoformat()
+        or _SHA256.fullmatch(digest) is None
+    ):
+        raise OdsBaseError("ODS Base source inventory binding is invalid")
+    calculated = _selection_digest(
+        source_inventory=value.get("source_inventory", []),
+        release_lineage=value.get("daily_releases", []),
+        files=value.get("files", []),
+        scope_gaps=value.get("scope_gaps", []),
+    )
+    if calculated != digest:
+        raise OdsBaseError("ODS Base source inventory selection digest is invalid")
+    return digest
+
+
 def build_ods_base_bundle(
     *,
     astock_root: Path,
@@ -989,6 +1710,8 @@ def build_ods_base_bundle(
     policy: OdsBasePolicy,
     code_revision: str,
     parent_base: Path | None = None,
+    parent_policy: OdsBasePolicy | None = None,
+    source_inventory: Path | None = None,
 ) -> OdsBaseBundle:
     if _SAFE_ID.fullmatch(bundle_id) is None:
         raise OdsBaseError("ODS Base bundle id contains unsupported characters")
@@ -996,6 +1719,15 @@ def build_ods_base_bundle(
         raise OdsBaseError("code_revision must be a full Git object id")
     if through_date < policy.daily.increment_start:
         raise OdsBaseError("through_date predates the configured daily increment start")
+    if parent_policy is not None and parent_base is None:
+        raise OdsBaseError("parent_policy requires parent_base")
+    expected_selection_digest = (
+        None
+        if source_inventory is None
+        else _inventory_selection_digest(
+            source_inventory, policy=policy, through_date=through_date
+        )
+    )
     astock_root = astock_root.resolve()
     output = output.resolve()
     if output.name != bundle_id:
@@ -1004,24 +1736,32 @@ def build_ods_base_bundle(
         existing = verify_ods_base_bundle(output, policy=policy)
         if existing.through_date != through_date:
             raise OdsBaseError("existing ODS Base has a different through_date")
+        manifest = _object(output / "manifest.json")
+        content = manifest.get("content")
+        if (
+            expected_selection_digest is not None
+            and (
+                not isinstance(content, Mapping)
+                or content.get("source_inventory_selection_digest")
+                != expected_selection_digest
+            )
+        ):
+            raise OdsBaseError("existing ODS Base differs from the bound source inventory")
         return existing
 
     parent = (
         None
         if parent_base is None
-        else verify_ods_base_bundle(parent_base, policy=policy, deep=True)
+        else verify_ods_base_bundle(
+            parent_base, policy=parent_policy or policy, deep=True
+        )
     )
     if parent is not None and parent.through_date >= through_date:
         raise OdsBaseError("parent ODS Base must end before the requested through_date")
     reusable = _parent_parts(parent)
-    source_inventory = _classify_source_root(astock_root, policy)
-    releases, attempt_inventory = _selected_daily_releases(astock_root, policy, through_date)
-    intraday_releases, intraday_inventory = _selected_intraday_releases(
+    source_classification, releases = _selected_source_state(
         astock_root, policy, through_date
     )
-    releases.extend(intraday_releases)
-    source_inventory.extend(attempt_inventory)
-    source_inventory.extend(intraday_inventory)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{bundle_id}.", dir=output.parent))
     datasets: list[dict[str, Any]] = []
@@ -1069,9 +1809,7 @@ def build_ods_base_bundle(
 
         for spec in policy.trees:
             source_root = _inside(astock_root, spec.source, "trees.source")
-            paths = sorted(source_root.glob(spec.pattern))
-            if len(paths) < spec.minimum_parts or any(not item.is_file() for item in paths):
-                raise OdsBaseError(f"ODS Base tree is incomplete: {spec.dataset_id}")
+            paths = _tree_paths(astock_root, spec)
             parts: list[dict[str, Any]] = []
             targets: list[Path] = []
             for source in paths:
@@ -1116,24 +1854,7 @@ def build_ods_base_bundle(
 
         for spec in policy.archives:
             source_root = _inside(astock_root, spec.source, "archive_trees.source")
-            if not source_root.is_dir() or source_root.is_symlink():
-                raise OdsBaseError(f"ODS source evidence archive is invalid: {spec.dataset_id}")
-            paths: list[Path] = []
-            for source in sorted(source_root.rglob("*")):
-                if source.is_symlink():
-                    raise OdsBaseError(
-                        f"symbolic link in source evidence archive: {source}"
-                    )
-                if not source.is_file():
-                    continue
-                relative_name = source.relative_to(source_root).as_posix()
-                if any(
-                    fnmatch.fnmatchcase(relative_name, pattern)
-                    for pattern in spec.include_patterns
-                ):
-                    paths.append(source)
-            if len(paths) < spec.minimum_files:
-                raise OdsBaseError(f"ODS source evidence archive is incomplete: {spec.dataset_id}")
+            paths = _archive_paths(astock_root, spec)
             parts = []
             parquet_rows = 0
             for source in paths:
@@ -1150,15 +1871,7 @@ def build_ods_base_bundle(
                 if reused:
                     reused_bytes += size
                     reused_files += 1
-                suffix = source.suffix.lower()
-                file_format = {
-                    ".csv": "csv",
-                    ".json": "json",
-                    ".md": "text",
-                    ".parquet": "parquet",
-                    ".sha256": "text",
-                    ".txt": "text",
-                }.get(suffix, "binary")
+                file_format = _archive_format(source)
                 part = _part_metadata(
                     source_relative=source_relative,
                     target_relative=target_relative,
@@ -1189,9 +1902,7 @@ def build_ods_base_bundle(
         release_lineage: list[dict[str, Any]] = []
         for release in releases:
             release_role = str(release["release_role"])
-            market_date = _parse_date(
-                release["root"].parent.name, "selected release market_date"
-            )
+            market_date = _release_market_date(release)
             base_target = f"payload/daily/{market_date.isoformat()}/{release_role}"
             metadata_members = (("release.json", "json"), ("READY", "text"))
             for name, file_format in metadata_members:
@@ -1217,14 +1928,13 @@ def build_ods_base_bundle(
                     digest=digest,
                     size_bytes=size,
                     target=target,
+                    source_node=str(release["source_node"]),
                 )
                 daily_parts[("daily_release_metadata", "lineage")].append(part)
                 all_parts.append(part)
 
-            declared_artifacts: list[dict[str, Any]] = []
             for artifact in release["artifacts"]:
                 included = artifact["name"] not in _EXCLUDED_RELEASE_ARTIFACTS
-                declared_artifacts.append({**artifact, "included_in_base": included})
                 if not included:
                     continue
                 source = _inside(
@@ -1257,21 +1967,11 @@ def build_ods_base_bundle(
                     size_bytes=size,
                     target=target,
                     knowledge_cutoff=artifact["knowledge_cutoff"],
+                    source_node=str(release["source_node"]),
                 )
                 daily_parts[(dataset_id, "increment")].append(part)
                 all_parts.append(part)
-            release_lineage.append(
-                {
-                    "market_date": market_date.isoformat(),
-                    "release_role": release_role,
-                    "attempt_id": release["attempt_id"],
-                    "release_id": release["release_id"],
-                    "manifest_sha256": release["manifest_sha256"],
-                    "producer": release["producer"],
-                    "created_at": release["created_at"],
-                    "artifacts": declared_artifacts,
-                }
-            )
+            release_lineage.append(_release_lineage_entry(release))
         for (dataset_id, role), parts in sorted(daily_parts.items()):
             datasets.append(
                 _dataset_summary(
@@ -1284,8 +1984,18 @@ def build_ods_base_bundle(
 
         all_parts.sort(key=lambda item: str(item["path"]))
         datasets.sort(key=lambda item: str(item["dataset_id"]))
-        source_inventory.sort(key=lambda item: item["path"])
         release_lineage.sort(key=lambda item: (item["market_date"], item["release_role"]))
+        selection_digest = _selection_digest(
+            source_inventory=source_classification,
+            release_lineage=release_lineage,
+            files=all_parts,
+            scope_gaps=_scope_gap_inventory(policy),
+        )
+        if (
+            expected_selection_digest is not None
+            and selection_digest != expected_selection_digest
+        ):
+            raise OdsBaseError("ODS sources changed after the bound inventory was frozen")
         content = {
             "contract_id": policy.contract_id,
             "policy_sha256": policy.digest,
@@ -1309,7 +2019,9 @@ def build_ods_base_bundle(
                     "through_date": parent.through_date.isoformat(),
                 }
             ),
-            "source_inventory": source_inventory,
+            "source_inventory_selection_digest": selection_digest,
+            "source_inventory": source_classification,
+            "scope_gaps": _scope_gap_inventory(policy),
             "daily_releases": release_lineage,
             "datasets": datasets,
             "files": all_parts,
@@ -1344,7 +2056,11 @@ def build_ods_base_bundle(
 
 
 def verify_ods_base_bundle(
-    root: Path, *, policy: OdsBasePolicy | None = None, deep: bool = False
+    root: Path,
+    *,
+    policy: OdsBasePolicy | None = None,
+    deep: bool = False,
+    allow_staging_name: bool = False,
 ) -> OdsBaseBundle:
     root = root.resolve()
     manifest_path = root / "manifest.json"
@@ -1363,7 +2079,10 @@ def verify_ods_base_bundle(
     ):
         raise OdsBaseError("unsupported ODS Base manifest")
     bundle_id = _text(manifest, "bundle_id")
-    if _SAFE_ID.fullmatch(bundle_id) is None or root.name != bundle_id:
+    valid_root_name = root.name == bundle_id or (
+        allow_staging_name and root.name == f".incoming-{bundle_id}"
+    )
+    if _SAFE_ID.fullmatch(bundle_id) is None or not valid_root_name:
         raise OdsBaseError("ODS Base directory and bundle identity differ")
     content = manifest.get("content")
     if (
@@ -1451,19 +2170,56 @@ def _apply_permissions(root: Path, owner_uid: int, group_gid: int) -> None:
         path.chmod(0o750 if path.is_dir() else 0o640)
 
 
-def promote_ods_base_bundle(
+def _promote_ods_base_bundle_locked(
     *,
     ingress_bundle: Path,
     base_root: Path,
     current_pointer: Path,
     policy: OdsBasePolicy,
+    current_policy: OdsBasePolicy | None = None,
     owner_uid: int | None = None,
     group_gid: int | None = None,
     move_ingress: bool = False,
+    expected_current_manifest_sha256: str | None = None,
 ) -> OdsBaseBundle:
-    source = verify_ods_base_bundle(ingress_bundle, policy=policy, deep=True)
+    source = verify_ods_base_bundle(
+        ingress_bundle,
+        policy=policy,
+        deep=True,
+        allow_staging_name=move_ingress,
+    )
     base_root = base_root.resolve()
     base_root.mkdir(parents=True, exist_ok=True)
+    current_pointer = current_pointer.resolve()
+    current = None
+    if current_pointer.exists():
+        try:
+            current = load_ods_base_current(current_pointer, policy=policy, deep=True)
+        except OdsBaseError:
+            if current_policy is None or current_policy.digest == policy.digest:
+                raise
+            try:
+                current = load_ods_base_current(
+                    current_pointer, policy=current_policy, deep=True
+                )
+            except OdsBaseError as migration_error:
+                raise OdsBaseError(
+                    "ODS BASE_CURRENT differs from the active and migration policies"
+                ) from migration_error
+    is_idempotent = current is not None and (
+        current.manifest_sha256 == source.manifest_sha256
+        and current.content_digest == source.content_digest
+    )
+    if not is_idempotent:
+        if current is None and expected_current_manifest_sha256 is not None:
+            raise OdsBaseError("ODS BASE_CURRENT is absent but an expected manifest was supplied")
+        if current is not None and expected_current_manifest_sha256 is None:
+            raise OdsBaseError("ODS BASE_CURRENT advance requires its expected manifest")
+        if (
+            current is not None
+            and current.manifest_sha256 != expected_current_manifest_sha256
+        ):
+            raise OdsBaseError("ODS BASE_CURRENT compare-and-swap precondition failed")
     destination = base_root / source.bundle_id
     if destination.exists():
         promoted = verify_ods_base_bundle(destination, policy=policy, deep=True)
@@ -1511,6 +2267,44 @@ def promote_ods_base_bundle(
     if owner_uid is not None and group_gid is not None:
         os.chown(current_pointer.resolve(), owner_uid, group_gid)
     return promoted
+
+
+def promote_ods_base_bundle(
+    *,
+    ingress_bundle: Path,
+    base_root: Path,
+    current_pointer: Path,
+    policy: OdsBasePolicy,
+    current_policy: OdsBasePolicy | None = None,
+    owner_uid: int | None = None,
+    group_gid: int | None = None,
+    move_ingress: bool = False,
+    expected_current_manifest_sha256: str | None = None,
+) -> OdsBaseBundle:
+    if (
+        expected_current_manifest_sha256 is not None
+        and _SHA256.fullmatch(expected_current_manifest_sha256) is None
+    ):
+        raise OdsBaseError("expected ODS BASE_CURRENT manifest is invalid")
+    base_root = base_root.resolve()
+    current_pointer = current_pointer.resolve()
+    if current_pointer.parent != base_root:
+        raise OdsBaseError("ODS BASE_CURRENT must be located directly under base_root")
+    base_root.mkdir(parents=True, exist_ok=True)
+    lock_path = base_root / ".BASE_CURRENT.lock"
+    with lock_path.open("a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        return _promote_ods_base_bundle_locked(
+            ingress_bundle=ingress_bundle,
+            base_root=base_root,
+            current_pointer=current_pointer,
+            policy=policy,
+            current_policy=current_policy,
+            owner_uid=owner_uid,
+            group_gid=group_gid,
+            move_ingress=move_ingress,
+            expected_current_manifest_sha256=expected_current_manifest_sha256,
+        )
 
 
 def load_ods_base_current(

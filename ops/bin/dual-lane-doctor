@@ -125,7 +125,7 @@ if [[ "$role" == "node" ]]; then
   history_base_current="${QUANTHUS_DUAL_LANE_HISTORY_BASE_CURRENT:?set history-base CURRENT}"
   history_catalog_root="${QUANTHUS_DUAL_LANE_HISTORY_CATALOG_ROOT:?set lane-history catalog root}"
   platform_root="${QUANTHUS_PLATFORM_ROOT:-/srv/quanthus}"
-  monthly_base_policy="${QUANTHUS_DWD_DWS_BASE_POLICY:-${repo_root}/config/pipelines/dwd-dws-base-through-20260730.v1.json}"
+  monthly_base_policy="${QUANTHUS_DWD_DWS_BASE_POLICY:-${repo_root}/config/pipelines/dwd-dws-base-through-20260730.v2.json}"
   dwd_base_root="${QUANTHUS_DWD_BASE_ROOT:-/srv/quanthus/dwd/base}"
   dws_base_root="${QUANTHUS_DWS_BASE_ROOT:-/srv/quanthus/dws/base}"
   dwd_base_current="${QUANTHUS_DWD_BASE_CURRENT:-${dwd_base_root}/BASE_CURRENT.json}"

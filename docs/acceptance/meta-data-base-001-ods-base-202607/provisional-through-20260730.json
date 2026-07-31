@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "work_item": "META-DATA-BASE-001",
+  "evidence_status": "phase_a_accepted_phase_b_open",
+  "evidence_date_utc": "2026-07-31",
+  "code_revision": "4476361f6958f8c26b0df71e76074aae19198089",
+  "policy": "config/pipelines/ods-base.v1.json",
+  "source_inventory": {
+    "node": "hermes",
+    "path": "/srv/quanthus/ods/base/.inventories/ods-base-through-20260730-v1.source.json",
+    "through_date": "2026-07-30",
+    "file_count": 20743,
+    "size_bytes": 11145679742,
+    "selection_digest": "sha256:33daefbc761abed2516fa64aa83d7bd0c147727d47e6c80544f25c596d817c3d",
+    "unclassified_required_sources": 0,
+    "unexplained_intraday_parts": 0,
+    "scope_gaps": [
+      {
+        "dataset_family": "raw_f10_and_full_financial_statements",
+        "classification": "not_formally_acquired"
+      }
+    ]
+  },
+  "package": {
+    "bundle_id": "ods-base-through-20260730-v1",
+    "through_date": "2026-07-30",
+    "file_count": 20743,
+    "size_bytes": 11145679742,
+    "content_digest": "sha256:e51644929fb4c5fc20f30db0652aa469c6164ac27d1ffcb1c864c2c46119589d",
+    "manifest_sha256": "sha256:d38b8332ddd5427104bbc6f71bf89df1c81f85cca507a1f9a80ac58662b7352e",
+    "ready_sha256": "sha256:fcf541a7dfe3cc070c9e8dbabe920575dc921b739404371afabf718a9412b998",
+    "current_sha256": "sha256:51624f796dd3219cd8ff364ff55990c51b1781ce84a497ab057ee2a5a972f707",
+    "built_at": "2026-07-31T00:03:50.407416+00:00"
+  },
+  "minute_coverage": {
+    "governed_parts_per_frequency": 4992,
+    "frequencies": ["1m", "5m"],
+    "repaired_market_date": "2026-07-24",
+    "ready_parts_per_frequency": 4988,
+    "justified_suspensions_per_frequency": 3,
+    "justified_zero_turnover_daily_bars_per_frequency": 1,
+    "unexplained_parts_per_frequency": 0
+  },
+  "daily_release_coverage": {
+    "start": "2026-07-27",
+    "end": "2026-07-30",
+    "roles_per_open_session": ["market", "events", "intraday_1m", "intraday_5m"]
+  },
+  "replicas": [
+    {
+      "node": "hermes",
+      "root": "/srv/quanthus/ods/base",
+      "deep_verify": "passed",
+      "pointer_verify": "passed",
+      "idempotent_promotion": "passed",
+      "free_bytes_after": 11266015232
+    },
+    {
+      "node": "cn01",
+      "root": "/srv/quanthus/ods/base",
+      "deep_verify": "passed",
+      "clean_path_verify": "passed",
+      "pointer_verify": "passed",
+      "idempotent_promotion": "passed",
+      "free_bytes_after": 61803806720
+    }
+  ],
+  "preservation": {
+    "copy_only": true,
+    "deletions": false,
+    "timer_changes": false,
+    "legacy_pointer_changes": false,
+    "go_for_cutover": false,
+    "oci_ods_base": false,
+    "hidden_ingress_remaining": false
+  },
+  "remaining_gate": {
+    "phase": "phase_b_final_july",
+    "required_market_date": "2026-07-31",
+    "bundle_id": "ods-base-202607-v1",
+    "status": "blocked_until_accepted_post_close_releases"
+  }
+}

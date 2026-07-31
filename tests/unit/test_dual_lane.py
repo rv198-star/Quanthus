@@ -5,6 +5,7 @@ import json
 import multiprocessing
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
@@ -1903,7 +1904,42 @@ class DualLaneTests(unittest.TestCase):
                 helper = (project_root / "ops/bin" / name).read_text(encoding="utf-8")
                 self.assertNotIn("--protect-args", helper)
                 self.assertNotIn("--delete", helper)
-                self.assertIn("--ignore-existing", helper)
+                if name == "sync-dwd-dws-base":
+                    self.assertNotIn("--ignore-existing", helper)
+                    self.assertIn("--attempt-id", helper)
+                    self.assertIn("dwd-dws-bases/attempts/${attempt_id}", helper)
+                    self.assertIn('[[ "$remote_root" != "." ]]', helper)
+                else:
+                    self.assertIn("--ignore-existing", helper)
+
+    def test_dwd_dws_transfer_rejects_host_absolute_rrsync_root(self) -> None:
+        project_root = Path(__file__).resolve().parents[2]
+        dwd_package = self.root / "dwd-package"
+        dws_package = self.root / "dws-package"
+        for package in (dwd_package, dws_package):
+            package.mkdir()
+            (package / "manifest.json").write_text("{}\n", encoding="utf-8")
+            (package / "READY").write_text("ready\n", encoding="utf-8")
+
+        result = subprocess.run(
+            [
+                project_root / "ops/bin/sync-dwd-dws-base",
+                "--dwd-package",
+                dwd_package,
+                "--dws-package",
+                dws_package,
+                "--attempt-id",
+                "test-attempt-v1",
+                "--remote-root",
+                "/root/work/astock/data",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("forced command is jailed", result.stderr)
 
     def test_daily_history_catalog_refresh_is_success_triggered_and_independent(self) -> None:
         project_root = Path(__file__).resolve().parents[2]

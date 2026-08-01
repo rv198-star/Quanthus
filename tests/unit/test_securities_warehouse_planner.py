@@ -112,6 +112,12 @@ class SecuritiesWarehousePlannerTests(unittest.TestCase):
             first_plan["plan"]["domain_plan"]["affected_dwd_domains"],
             ["listed_company", "security_market_observation", "tradability_state"],
         )
+        self.assertEqual(
+            first_plan["plan"]["source_precedence"]["calendar_history"],
+            json.loads(MODEL.read_text(encoding="utf-8"))["build_input_contract"][
+                "calendar_history_precedence"
+            ],
+        )
         receipt = json.loads((first.root / "run-receipt.json").read_text(encoding="utf-8"))
         self.assertEqual(receipt["semantic_digest"], first.plan_digest)
         self.assertEqual(receipt["row_counts"]["source_records"], 3)

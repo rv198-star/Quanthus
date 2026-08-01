@@ -1082,7 +1082,16 @@ def build_input_plan(
         },
         "input": input_identity,
         "domain_plan": domain_plan,
-        "source_precedence": model["build_input_contract"]["overlay_precedence"],
+        "source_precedence": {
+            **_mapping(
+                model["build_input_contract"]["overlay_precedence"],
+                "build_input_contract.overlay_precedence",
+            ),
+            "calendar_history": _mapping(
+                model["build_input_contract"]["calendar_history_precedence"],
+                "build_input_contract.calendar_history_precedence",
+            ),
+        },
         "source_ledger_digest": _canonical_digest(ledger),
         "coverage_matrix_digest": _canonical_digest(coverage),
         "capacity_requirement_digest": capacity["requirement_digest"],

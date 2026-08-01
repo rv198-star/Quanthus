@@ -15,6 +15,7 @@ from quanthus.pipelines.securities_warehouse import listed_company as listed_com
 from quanthus.pipelines.securities_warehouse.trading_calendar import (
     TradingCalendarBuildError,
     build_trading_calendar,
+    verify_trading_calendar_candidate,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -639,6 +640,23 @@ class TradingCalendarBuildTests(unittest.TestCase):
         )
         with self.assertRaises(TradingCalendarBuildError):
             self._build()
+
+    def test_public_candidate_verifier_exposes_deep_verified_rows(self) -> None:
+        result = self._build()
+        receipt = json.loads(
+            (self.output / "receipts/trading-calendar-build.json").read_text()
+        )
+        verified = verify_trading_calendar_candidate(
+            self.output,
+            run_id=self.run_id,
+            input_plan_digest=receipt["input_plan_digest"],
+            model_sha256=receipt["model_sha256"],
+            upstream_semantic_digest=receipt["upstream_semantic_digest"],
+            upstream_manifest_sha256=receipt["upstream_manifest_sha256"],
+        )
+        self.assertEqual(verified.semantic_digest, result.semantic_digest)
+        self.assertEqual(len(verified.calendar_rows), result.row_count)
+        self.assertEqual(verified.manifest_sha256, _sha256(self.output / "manifest.json"))
 
     def test_bse_pre_venue_rows_are_explicitly_excluded(self) -> None:
         self.bse_effective_from = datetime(2026, 1, 2, 16, tzinfo=timezone.utc)

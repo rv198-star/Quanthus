@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Build the four-object Issue #58 market-observation DWD candidate."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.securities_warehouse.market_observation import (  # noqa: E402
+    MarketObservationBuildError,
+    build_market_observation,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ods-package", type=Path, required=True)
+    parser.add_argument("--input-plan", type=Path, required=True)
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--listed-company-candidate", type=Path, required=True)
+    parser.add_argument("--trading-calendar-candidate", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--run-id", required=True)
+    args = parser.parse_args()
+    try:
+        result = build_market_observation(
+            ods_package=args.ods_package,
+            input_plan=args.input_plan,
+            model_path=args.model,
+            listed_company_candidate=args.listed_company_candidate,
+            trading_calendar_candidate=args.trading_calendar_candidate,
+            output=args.output,
+            run_id=args.run_id,
+        )
+    except (MarketObservationBuildError, OSError) as exc:
+        print(f"market-observation DWD build failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "output": str(result.root),
+                "partition_counts": result.partition_counts,
+                "row_counts": result.row_counts,
+                "semantic_digest": result.semantic_digest,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

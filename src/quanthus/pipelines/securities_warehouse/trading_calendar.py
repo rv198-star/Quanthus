@@ -34,6 +34,14 @@ class TradingCalendarBuildResult:
     selected_source: str
 
 
+@dataclass(frozen=True)
+class TradingCalendarCandidateVerification:
+    root: Path
+    manifest_sha256: str
+    semantic_digest: str
+    calendar_rows: tuple[dict[str, Any], ...]
+
+
 _SHA256 = "sha256:"
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 _OWNED_TABLE = "dwd_trading_calendar"
@@ -915,6 +923,108 @@ def _verify_existing_output(
         "table_digest"
     ):
         raise TradingCalendarBuildError("existing output table semantic digest differs")
+
+
+def verify_trading_calendar_candidate(
+    root: Path,
+    *,
+    run_id: str,
+    input_plan_digest: str,
+    model_sha256: str,
+    upstream_semantic_digest: str,
+    upstream_manifest_sha256: str,
+) -> TradingCalendarCandidateVerification:
+    """Deep-verify a sealed #72 candidate for same-run downstream use."""
+
+    receipt = _object(root / "receipts/trading-calendar-build.json")
+    partition_digests = _mapping(
+        receipt.get("partition_digests"), "calendar partition digests"
+    )
+    years = sorted(partition_digests)
+    expected_files = {
+        "checkpoint.json",
+        "receipts/trading-calendar-build.json",
+        "reconciliation/source-row-reconciliation.json",
+        *{
+            _partition_path(Path("."), int(year)).as_posix().removeprefix("./")
+            for year in years
+        },
+    }
+    manifest = _verify_manifest_package(
+        root,
+        expected_files=expected_files,
+        expected_kind="dwd_trading_calendar_candidate",
+    )
+    reconciliation = _object(root / "reconciliation/source-row-reconciliation.json")
+    checkpoint = _object(root / "checkpoint.json")
+    completed = _mapping(checkpoint.get("completed_years"), "completed years")
+    row_counts = _mapping(receipt.get("row_counts"), "calendar row counts")
+    if (
+        manifest.get("run_id") != run_id
+        or manifest.get("input_plan_digest") != input_plan_digest
+        or manifest.get("owned_tables") != [_OWNED_TABLE]
+        or manifest.get("row_counts") != dict(row_counts)
+        or manifest.get("upstream_semantic_digest") != upstream_semantic_digest
+        or manifest.get("upstream_manifest_sha256") != upstream_manifest_sha256
+        or receipt.get("schema_version") != 1
+        or receipt.get("kind") != "dwd_trading_calendar_build_receipt"
+        or receipt.get("status") != "built"
+        or receipt.get("run_id") != run_id
+        or receipt.get("input_plan_digest") != input_plan_digest
+        or receipt.get("model_sha256") != model_sha256
+        or receipt.get("semantic_digest") != manifest.get("semantic_digest")
+        or receipt.get("upstream_semantic_digest") != upstream_semantic_digest
+        or receipt.get("upstream_manifest_sha256") != upstream_manifest_sha256
+        or checkpoint.get("schema_version") != 1
+        or checkpoint.get("kind") != "dwd_trading_calendar_checkpoint"
+        or checkpoint.get("run_id") != run_id
+        or checkpoint.get("semantic_digest") != manifest.get("semantic_digest")
+        or checkpoint.get("input_plan_digest") != input_plan_digest
+        or set(completed) != set(years)
+        or reconciliation.get("schema_version") != 1
+        or reconciliation.get("run_id") != run_id
+        or reconciliation.get("conflicting_rows") != 0
+        or reconciliation.get("unaccounted_selected_rows") != 0
+    ):
+        raise TradingCalendarBuildError("calendar candidate identity is inconsistent")
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise TradingCalendarBuildError("pyarrow is required for candidate verification") from exc
+    schema = _calendar_schema()
+    tables = []
+    for year in years:
+        path = _partition_path(root, int(year))
+        table = pq.ParquetFile(path).read()
+        rows = table.to_pylist()
+        state = _mapping(completed.get(year), f"completed year {year}")
+        if (
+            not table.schema.equals(schema, check_metadata=True)
+            or state.get("path") != path.relative_to(root).as_posix()
+            or state.get("row_count") != table.num_rows
+            or state.get("schema_digest") != _canonical_digest(str(schema))
+            or state.get("semantic_digest") != _canonical_digest(rows)
+            or state.get("sha256") != _sha256(path)
+            or partition_digests[year] != _canonical_digest(rows)
+        ):
+            raise TradingCalendarBuildError(
+                f"calendar candidate partition failed verification: {year}"
+            )
+        tables.append(table)
+    combined = pa.concat_tables(tables)
+    combined_rows = combined.to_pylist()
+    if (
+        combined.num_rows != row_counts.get(_OWNED_TABLE)
+        or _canonical_digest(combined_rows) != receipt.get("table_digest")
+    ):
+        raise TradingCalendarBuildError("calendar candidate table digest differs")
+    return TradingCalendarCandidateVerification(
+        root=root.resolve(),
+        manifest_sha256=_sha256(root / "manifest.json"),
+        semantic_digest=_text(manifest, "semantic_digest"),
+        calendar_rows=tuple(combined_rows),
+    )
 
 
 def _build_locked(

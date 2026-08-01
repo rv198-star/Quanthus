@@ -457,9 +457,46 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
         self.assertFalse(
             self.model["build_input_contract"]["existing_dwd_or_ads_read_allowed"]
         )
+        self.assertFalse(
+            self.model["build_input_contract"][
+                "historical_or_current_warehouse_package_read_allowed"
+            ]
+        )
+        self.assertTrue(
+            self.model["build_input_contract"]["same_run_upstream_candidate_read_allowed"]
+        )
         self.assertNotIn("legacy_compatibility", self.model)
         self.assertIn("ods_to_dwd_source_and_row_coverage_report", self.model["build_gates"])
         self.assertIn("dwd_to_dws_grain_and_reconciliation_report", self.model["build_gates"])
+
+    def test_script_dag_breaks_market_tradability_cycle(self) -> None:
+        execution = self.model["build_execution_contract"]
+        ownership = execution["dwd_script_ownership"]
+        self.assertEqual(execution["script_count"], 17)
+        self.assertEqual(execution["calendar_backbone_issue"], 72)
+        self.assertEqual(ownership["72"], ["dwd_trading_calendar"])
+        self.assertNotIn("dwd_trading_calendar", ownership["59"])
+        self.assertEqual(len(ownership["59"]), 5)
+        self.assertEqual(
+            execution["required_dependency_edges"][:4],
+            [[56, 57], [57, 72], [72, 58], [58, 59]],
+        )
+        owned = [table for tables in ownership.values() for table in tables]
+        self.assertEqual(len(owned), 33)
+        self.assertEqual(set(owned), set(self.tables))
+
+    def test_price_limit_regime_is_a_prioritized_rule_scope(self) -> None:
+        regime = self.tables["dwd_price_limit_regime"]
+        columns = _resolved_columns(self.model, regime)
+        self.assertEqual(
+            regime["business_key"], ["price_limit_regime_id", "effective_from"]
+        )
+        self.assertEqual(columns["venue_id"], "string")
+        self.assertEqual(columns["listing_id"], "string?")
+        self.assertEqual(columns["board_code"], "string?")
+        self.assertEqual(columns["security_status"], "string?")
+        self.assertEqual(columns["priority"], "int32")
+        self.assertIn("scope_must_resolve_by_priority", regime["constraints"])
 
     def test_new_build_is_bound_to_the_exact_final_ods_base(self) -> None:
         build_input = self.model["build_input_contract"]
@@ -504,7 +541,8 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
         self.assertIn("Design status | implementation-approved", lld)
         self.assertIn("DWS fact constellation", lld)
         self.assertIn("53 static source ids", lld)
-        self.assertIn("existing DWD/ADS tables", lld)
+        self.assertIn("historical DWD/ADS tables", lld)
+        self.assertIn("#72 trading-calendar backbone", lld)
         self.assertIn("Exact immutable self-contained `ods-base-202607-v1.1`", lld)
         self.assertIn("Issue #69", adr)
         self.assertIn("publication", adr)

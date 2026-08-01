@@ -34,6 +34,12 @@ acceptance evidence. The new DWD Base starts from the exact immutable ODS Base a
 immutable Hotfix children whose manifests bind that exact parent. A Hotfix is a fill-only evidence
 overlay, not a replacement Base and not authority to mutate or advance the parent pointer.
 
+This prohibition applies to historical packages, prior Bases, and mutable pointers. It does not
+forbid one script from consuming an explicitly declared predecessor candidate produced in the
+same frozen build run. Such a candidate supplies referential identities, not new business
+evidence, and must match the run id, input-plan digest, knowledge cutoff, manifest, and semantic
+digest before any row is read.
+
 ## Decision
 
 ### 1. Seven first-class business domains
@@ -184,6 +190,19 @@ the DWD/DWS v2 scripts against immutable candidate paths. It does not authorize 
 publication, deployment, pointer change, or cleanup. Paired publication remains fail-closed until
 Issue #69 passes its independent release gate.
 
+### 8. Acyclic script execution
+
+Physical script ownership follows a directed acyclic graph even when two objects remain in one
+business domain. `dwd_trading_calendar` is therefore built by the independent Issue #72 calendar
+backbone after Issue #57 venue identity and before Issue #58 market observations. Issue #59 then
+builds the remaining tradability objects from the sealed same-run identity, calendar, and market
+candidates. This preserves all 33 DWD objects and seven domains while removing the former runtime
+cycle between market observations and tradability.
+
+Price-limit regimes are effective prioritized rule scopes. A rule binds a venue and may further
+scope by board, security status, IPO phase, or an optional listing override. It is not expanded
+into one duplicated rule row per listing. Ambiguous equal-priority matches fail the build.
+
 ## Consequences
 
 Positive consequences:
@@ -199,6 +218,8 @@ Costs and constraints:
 
 - DWD still requires effective-dated security/listing identity and calendar structures even though
   they are not first-class domains;
+- script orchestration must verify exact same-run predecessor packages and cannot substitute a
+  historical DWD package or mutable pointer;
 - the same business subject may require different DWS dimension versions at different knowledge
   cutoffs;
 - source-native financial facts and detailed ownership positions require explicit parsers and

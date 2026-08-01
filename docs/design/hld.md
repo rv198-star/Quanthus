@@ -118,9 +118,10 @@ and event terms remain internal supporting structures only where association or 
 requires them. DWD keeps atomic detail and governed business state; DWS defines ten conformed
 dimensions and thirteen grain-distinct facts bound to one exact DWD snapshot. FIBO, FIX, XBRL/CAS,
 and ISO references constrain semantics but do not own product scope. The exact immutable
-self-contained `ods-base-202607-v1.1` rollup is the sole new-build input; existing DWD/ADS packages
-are retained but are not read as
-sources, migration targets, reconciliation baselines, or acceptance evidence. Decoder, parser,
+self-contained `ods-base-202607-v1.1` rollup is the sole business-evidence input. Explicit
+same-run predecessor candidates may provide manifest-verified referential identities; historical
+DWD/ADS packages and mutable pointers are retained but are not read as sources, migration targets,
+reconciliation baselines, or acceptance evidence. Decoder, parser,
 mapping, and normalization work belongs to the new DWD construction and does not create a source
 gap. The detailed design is approved for scripted transformation against immutable candidate
 paths; package publication and pointer changes remain unauthorized until Issue #69 passes.

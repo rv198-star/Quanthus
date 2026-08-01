@@ -80,9 +80,11 @@ thirteen DWS facts, grains, and bus matrix are approved for scripted implementat
 references constrain semantics but do not determine scope. The machine contract reconciles all 53
 static final-ODS-Base sources, all 17 named daily/intraday artifacts, and all 33 Hotfix-origin
 dataset ids consolidated into V1.1. The exact immutable self-contained `ods-base-202607-v1.1`
-rollup is the sole build input; existing DWD/ADS packages remain retained but cannot serve as sources, migration
-targets, reconciliation baselines, or acceptance evidence. Transformation code, package
-construction, three-node installation, and any pointer advancement have not started.
+rollup is the sole business-evidence input; same-run predecessors may supply only declared,
+manifest-verified referential identities. Historical DWD/ADS packages and mutable pointers remain
+retained but cannot serve as sources, migration targets, reconciliation baselines, or acceptance
+evidence. Issue #57 identity is accepted; Issue #72 now owns the calendar prerequisite for #58.
+Paired installation and every pointer advancement remain blocked by Issue #69.
 
 ## P1 data foundation
 

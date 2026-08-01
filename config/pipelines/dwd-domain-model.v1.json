@@ -116,7 +116,40 @@
     },
     "source_gap_definition": "required_business_evidence_absent_from_the_exact_self_contained_rollup_manifest",
     "parser_mapping_or_normalization_work_is_a_source_gap": false,
-    "existing_dwd_or_ads_read_allowed": false
+    "existing_dwd_or_ads_read_allowed": false,
+    "same_run_upstream_candidate_read_allowed": true,
+    "same_run_upstream_candidate_policy": "only_explicit_dag_predecessors_with_exact_run_id_manifest_semantic_digest_and_knowledge_cutoff",
+    "historical_or_current_warehouse_package_read_allowed": false
+  },
+  "build_execution_contract": {
+    "script_count": 17,
+    "calendar_backbone_issue": 72,
+    "candidate_input_policy": {
+      "business_evidence_source": "exact_immutable_self_contained_ods_base_rollup_only",
+      "same_run_upstream_candidates": "referential_inputs_only_after_exact_package_verification",
+      "historical_dwd_dws_ads_or_current": "forbidden"
+    },
+    "dwd_script_ownership": {
+      "57": ["dwd_listed_company", "dwd_company_identifier", "dwd_security", "dwd_security_identifier", "dwd_listing", "dwd_trading_venue"],
+      "72": ["dwd_trading_calendar"],
+      "58": ["dwd_security_bar", "dwd_security_valuation", "dwd_adjustment_factor", "dwd_adjustment_factor_input", "dwd_market_index", "dwd_index_bar"],
+      "59": ["dwd_security_status_interval", "dwd_listing_status_interval", "dwd_price_limit_regime", "dwd_tradability_state", "dwd_observation_gap"],
+      "60": ["dwd_disclosure", "dwd_disclosure_subject", "dwd_corporate_action", "dwd_corporate_action_term"],
+      "61": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"],
+      "62": ["dwd_industry_scheme", "dwd_industry_node", "dwd_company_industry_membership"],
+      "63": ["dwd_share_capital_observation", "dwd_shareholder_count_observation", "dwd_shareholding_change", "dwd_shareholding_observation"],
+      "64": ["dwd_quality_exception"]
+    },
+    "required_dependency_edges": [
+      [56, 57],
+      [57, 72],
+      [72, 58],
+      [58, 59],
+      [57, 61],
+      [57, 62],
+      [57, 63],
+      [61, 60]
+    ]
   },
   "transform_contracts": {
     "financial_reporting": {
@@ -491,14 +524,18 @@
       "domain": "tradability_state",
       "object_role": "supporting_structure",
       "kind": "effective_relationship",
-      "grain": "one effective price-limit rule for one listing",
+      "grain": "one effective prioritized price-limit rule scope with optional listing override",
       "delivery_state": "source_available",
       "time_profile": "effective_interval",
       "inherits": ["lineage"],
-      "columns": {"price_limit_regime_id": "string", "listing_id": "string", "regime_type": "string", "upper_limit_ratio": "decimal_18_12?", "lower_limit_ratio": "decimal_18_12?", "reference_price_method": "string", "ipo_phase": "string?"},
-      "business_key": ["listing_id", "regime_type", "effective_from"],
-      "row_key": ["listing_id", "regime_type", "effective_from", "knowledge_from"],
-      "foreign_keys": [{"column": "listing_id", "table": "dwd_listing", "reference_column": "listing_id", "nullable": false}],
+      "columns": {"price_limit_regime_id": "string", "venue_id": "string", "board_code": "string?", "security_status": "string?", "ipo_phase": "string?", "priority": "int32", "listing_id": "string?", "regime_type": "string", "upper_limit_ratio": "decimal_18_12?", "lower_limit_ratio": "decimal_18_12?", "reference_price_method": "string"},
+      "business_key": ["price_limit_regime_id", "effective_from"],
+      "row_key": ["price_limit_regime_id", "effective_from", "knowledge_from"],
+      "constraints": ["scope_must_resolve_by_priority", "listing_id_is_optional_override"],
+      "foreign_keys": [
+        {"column": "venue_id", "table": "dwd_trading_venue", "reference_column": "venue_id", "nullable": false},
+        {"column": "listing_id", "table": "dwd_listing", "reference_column": "listing_id", "nullable": true}
+      ],
       "partition_by": []
     },
     {

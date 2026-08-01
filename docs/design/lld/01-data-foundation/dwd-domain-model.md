@@ -30,8 +30,9 @@ This design does not:
 - model issuance, underwriting, brokerage, clearing, settlement, or legal-registry operations;
 - let current strategy features define DWD facts;
 - treat every FIBO concept as a Quanthus warehouse domain; or
-- read existing DWD/ADS tables as build inputs, migration targets, reconciliation baselines, or
-  acceptance evidence. Those packages remain retained but outside this rebuild.
+- read historical DWD/ADS tables, prior Bases, or mutable pointers as business-data inputs,
+  migration targets, reconciliation baselines, or acceptance evidence. Explicit same-run
+  predecessor candidates may supply verified referential identities only.
 
 ## 2. Business-domain map
 
@@ -126,11 +127,27 @@ ADS
   strategy, research, serving, and offline-package projections
 ```
 
+The DWD script DAG is:
+
+```text
+#56 plan
+  -> #57 listed-company identity and venue
+  -> #72 trading-calendar backbone
+  -> #58 market observations
+  -> #59 remaining tradability state and gaps
+```
+
+Other company-bound domains may start after #57 according to the machine contract. A downstream
+script may read only an explicitly declared same-run predecessor candidate after verifying its run
+id, input-plan digest, knowledge cutoff, manifest, semantic digest, table ownership, and physical
+inventory. Existing DWD/DWS Bases and every `CURRENT` pointer remain forbidden inputs.
+
 ### 4.1 DWD rules
 
-- Read the exact accepted ODS Base and its explicitly bound immutable Hotfixes, and read no
-  existing DWD/ADS package. A source gap exists only when required business evidence is absent
-  from both the parent manifest and every bound Hotfix manifest.
+- Read business evidence only from the exact accepted ODS Base and its explicitly bound immutable
+  Hotfixes. Read same-run predecessor candidates only for declared referential dependencies, and
+  read no historical DWD/ADS package or mutable pointer. A source gap exists only when required
+  business evidence is absent from both the parent manifest and every bound Hotfix manifest.
 - Apply each Hotfix as an overlay, never as a replacement: the parent Base wins every overlapping
   business key, an overlap-value mismatch fails the build, and a Hotfix may populate only a key
   absent from the parent and every earlier accepted overlay.
@@ -202,13 +219,17 @@ adjusted projection reproducible without loading adjusted ODS bars as competing 
 | `dwd_trading_calendar` | Support | One venue, trade date, and session type | Source available |
 | `dwd_security_status_interval` | Support | One typed security status interval | Source available |
 | `dwd_listing_status_interval` | Support | One typed listing status interval | Source available |
-| `dwd_price_limit_regime` | Support | One effective listing price-limit rule | Source available |
+| `dwd_price_limit_regime` | Support | One effective prioritized venue/board/status/IPO rule scope, optionally overridden by listing | Source available |
 | `dwd_tradability_state` | Core object | One listing and trading session decision-state observation | Source available |
 | `dwd_observation_gap` | Support | One expected interval without a market observation | Source available |
 
 ST is represented separately from listing suspension/delisting evidence, but both are inputs to the
 same consumer-facing tradability state. The state stores `is_tradable`, `can_buy`, `can_sell`,
 reason, applicable limits, and an exact input-revision digest. Unknown gap reason fails the build.
+The calendar object is physically owned by Issue #72; Issue #59 owns the other five rows in this
+domain. Price-limit rules resolve by venue, optional board/status/IPO scopes, priority, and optional
+listing override. Equal-priority ambiguity fails rather than duplicating one generic rule across
+every listing.
 
 ### 5.4 Disclosures and company events
 
@@ -465,14 +486,15 @@ Recommended implementation sequence after design approval:
 1. Verify the exact parent Base and bound Hotfix manifests, compile their dataset/key precedence
    plan, and prove the resulting listed SSE/SZSE scope is 5,201 without an overlap mismatch.
 2. Build listed-company identity and its security/listing/venue support bridge.
-3. Build unadjusted security/index bars, valuation, calendar, status, limit, tradability, and gap
-   objects.
-4. Build disclosures, company actions/terms, adjustment factors/inputs, industry membership,
+3. Build the independent trading-calendar backbone from the accepted venue identity.
+4. Build unadjusted security/index bars and valuation against that calendar, then build status,
+   limit, tradability, and gap objects from the same-run identity, calendar, and market candidates.
+5. Build disclosures, company actions/terms, adjustment factors/inputs, industry membership,
    shareholder count, and holding changes.
-5. Decode and expand provider-native financial facts; parse F10 capital and top-holder history;
+6. Decode and expand provider-native financial facts; parse F10 capital and top-holder history;
    account for every eligible source row with a business row or explicit quality exception.
-6. Freeze one complete DWD snapshot and build all 10 DWS dimensions and 13 facts from it.
-7. Produce independent CN01 and Hermes candidates, compare semantic identities, and only then
+7. Freeze one complete DWD snapshot and build all 10 DWS dimensions and 13 facts from it.
+8. Produce independent CN01 and Hermes candidates, compare semantic identities, and only then
    install an accepted immutable pair on the three nodes under existing publication authority.
 
 Mandatory gates include:
@@ -498,7 +520,7 @@ Mandatory gates include:
 
 | ID | Work | Current state | Acceptance evidence |
 | --- | --- | --- | --- |
-| `META-DATA-DWD-002` | Implement the product-bounded seven-domain DWD/DWS v2 scripts under Issue #55 | Model accepted; scripted implementation active; paired publication blocked | Script-level tests, data evaluation, deterministic packages, reconciliation, restore, and three-node evidence |
+| `META-DATA-DWD-002` | Implement the product-bounded seven-domain DWD/DWS v2 through 17 scripts under Issue #55 | Model accepted; scripted implementation active; paired publication blocked | Script-level tests, data evaluation, deterministic packages, reconciliation, restore, and three-node evidence |
 
 The model has explicit review acceptance and implementation proceeds issue by issue under #55.
 A green contract test proves structural consistency, not semantic or publication acceptance.

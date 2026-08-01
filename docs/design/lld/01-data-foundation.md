@@ -37,10 +37,11 @@ business domains follow the Quanthus research objective; security/listing identi
 calendar, report concepts, and similar structures remain internal support rather than additional
 domains. It does not retroactively add financial statements, minute features, or other later
 content to the accepted P1 scope. The exact immutable self-contained `ods-base-202607-v1.1`
-rollup is its sole build input; parent and Hotfix identities remain embedded lineage rather than
-required external roots.
-Existing DWD/ADS packages remain retained but cannot be read as sources, migration targets,
-reconciliation baselines, or acceptance evidence for the new Base.
+rollup is its sole business-evidence input; parent and Hotfix identities remain embedded lineage
+rather than required external roots. An exact same-run predecessor candidate may supply declared
+referential identities after full package verification. Historical DWD/ADS packages and mutable
+pointers remain retained but cannot be read as sources, migration targets, reconciliation
+baselines, or acceptance evidence for the new Base.
 
 P1 acceptance establishes deterministic replay and fail-closed behavior. The initial S3 full build
 exposed 276 securities with incomplete normalized unadjusted-price history and 639,009 affected

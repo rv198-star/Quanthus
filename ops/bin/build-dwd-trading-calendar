@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""Build the one-object trading-calendar DWD candidate."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.securities_warehouse.trading_calendar import (  # noqa: E402
+    TradingCalendarBuildError,
+    build_trading_calendar,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ods-package", type=Path, required=True)
+    parser.add_argument("--input-plan", type=Path, required=True)
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--upstream-candidate", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--run-id", required=True)
+    args = parser.parse_args()
+    try:
+        result = build_trading_calendar(
+            ods_package=args.ods_package,
+            input_plan=args.input_plan,
+            model_path=args.model,
+            upstream_candidate=args.upstream_candidate,
+            output=args.output,
+            run_id=args.run_id,
+        )
+    except (TradingCalendarBuildError, OSError) as exc:
+        print(f"trading-calendar DWD build failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "output": str(result.root),
+                "row_count": result.row_count,
+                "selected_source": result.selected_source,
+                "semantic_digest": result.semantic_digest,
+                "year_count": result.year_count,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

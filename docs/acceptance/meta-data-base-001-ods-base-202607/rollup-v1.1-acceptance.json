@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "work_item": "META-DATA-BASE-001",
+  "evidence_status": "self_contained_v1_1_built_independently_deep_verified_and_activated_on_both_ods_base_holders",
+  "evidence_date_utc": "2026-08-01",
+  "build_revision": "f2de5ea9b8471f4fe7134868729e7626df7d933d",
+  "policy": {
+    "path": "config/pipelines/ods-base-final-through-20260731.v2.json",
+    "contract_id": "hermes-authoritative-ods-base-final-20260731-v2",
+    "sha256": "sha256:f61b5f7f06e587f59cf78ce9ad3d38a9e0b09923161bd11a458b421e04c61588"
+  },
+  "sources": {
+    "parent": {
+      "bundle_id": "ods-base-202607-v1",
+      "manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+      "content_digest": "sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1",
+      "file_count": 20946,
+      "size_bytes": 13285483256
+    },
+    "hotfix": {
+      "hotfix_id": "ods-base-202607-v1-hotfix-001",
+      "manifest_sha256": "sha256:c2fae9116e74f13b921f8cbf192d546b4f9ffd14c181dad7ca5b84bb0ccbd30a",
+      "content_digest": "sha256:31453165b0eafd00f94357638fad7029ab0687d3c836269b843358ecfd933cac",
+      "file_count": 449,
+      "size_bytes": 358106691,
+      "scope_count": 209,
+      "application_mode": "fill_absent_keys_only",
+      "overlap_rows": 832,
+      "overlap_mismatches": 0
+    }
+  },
+  "source_inventory": {
+    "authority": "embedded_in_v1_1_manifest",
+    "selection_digest": "sha256:a261bdcfbec3abf5d5a7a21923bf02c1a832c97902926d558fd5e90bcebbf6bb",
+    "scope_gaps": []
+  },
+  "package": {
+    "bundle_id": "ods-base-202607-v1.1",
+    "built_at": "2026-08-01T10:09:16+00:00",
+    "through_date": "2026-07-31",
+    "file_count": 21395,
+    "size_bytes": 13643589947,
+    "manifest_size_bytes": 49329538,
+    "manifest_sha256": "sha256:3a031118af4421b90df7aca8a96bd617a49dba2ef7e49a2074206104991e956e",
+    "content_digest": "sha256:86372a3e0237c3bba3ff36e575ab041e1a0a01223587b629e7125b5ac1ba76da",
+    "ready_file_sha256": "sha256:ee2767c83b32d3a9afa81d9fd04865eeb0e0a4d6d9f1ac8fe3dab189cccea2ff",
+    "storage_mode": "hard_link",
+    "source_paths_preserved": true,
+    "source_packages_required_after_build": false
+  },
+  "gates": {
+    "parent_and_hotfix_target_path_overlap_count": 0,
+    "parent_and_hotfix_dataset_id_overlap_count": 0,
+    "all_declared_business_key_overlap_mismatches": 0,
+    "hermes_deep_verify": "passed",
+    "cn01_deep_verify": "passed",
+    "manifest_byte_identity": "passed",
+    "content_identity": "passed",
+    "hardlink_identity": {
+      "checked_files_per_node": 21395,
+      "mismatches_per_node": 0
+    },
+    "hidden_staging_remaining_per_node": 0
+  },
+  "pointer_transition": {
+    "mode": "exact_old_pointer_file_sha256_compare_and_swap",
+    "old_bundle_id": "ods-base-202607-v1",
+    "old_pointer_sha256": "sha256:5560ea8e0b5d385273bab2124f50d0183d8acce641f24cfe8d703274311cf36c",
+    "new_bundle_id": "ods-base-202607-v1.1",
+    "new_pointer_sha256": "sha256:67865278565f0657a4bd5412574e83dfec50382986cff2201c2112416759afe5",
+    "hermes": "passed",
+    "cn01": "passed",
+    "pointer_bytes_identical": true
+  },
+  "capacity": {
+    "logical_payload_bytes": 13643589947,
+    "physical_increment_bytes_per_node": 50700288,
+    "hermes_free_bytes_before": 21061742592,
+    "hermes_free_bytes_after": 21011042304,
+    "cn01_free_bytes_before": 51508318208,
+    "cn01_free_bytes_after": 51457617920,
+    "explanation": "payload blocks are shared through node-local hard links; the physical increment is primarily the V1.1 manifest and directory entries"
+  },
+  "preservation": {
+    "parent_directory_retained": true,
+    "hotfix_directory_retained": true,
+    "parent_or_hotfix_deletion_authorized": false,
+    "dwd_pointer_changed": false,
+    "dws_pointer_changed": false,
+    "ads_pointer_changed": false,
+    "consumer_pointer_changed": false,
+    "go_for_cutover": false
+  }
+}

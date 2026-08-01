@@ -1,0 +1,1109 @@
+{
+  "schema_version": 1,
+  "contract_id": "quanthus-product-bounded-a-share-dwd-dws-model-v1",
+  "governing_work_item": "META-DATA-DWD-001",
+  "governing_decision": "ADR-0006",
+  "status": "draft_review_required_build_not_authorized",
+  "scope": {
+    "product": "Quanthus A-share quantitative research and decision platform",
+    "initial_market": "China A-share listed companies, their securities, and governed benchmarks",
+    "coverage_claim": "logical_and_physical_design_contract_only",
+    "physical_build_started": false,
+    "domain_scope_owner": "quanthus_product_objective",
+    "source_availability_owner": "governed_ods_inventory_and_semantics",
+    "semantic_reference_owner": "bounded_industry_references",
+    "existing_dwd_used_as_model_input": false,
+    "existing_dwd_role": "retained_outside_new_build_not_read_or_reconciled",
+    "existing_ads_used_as_model_input": false,
+    "new_base_input": "exact_immutable_self_contained_ods_base_rollup_only"
+  },
+  "industry_references": [
+    {
+      "id": "fibo",
+      "name": "Financial Industry Business Ontology",
+      "version": "git:119fa8c091aa4beece7d22aefa6fe138021a4355",
+      "use": "bounded_company_security_listing_event_and_ownership_semantics",
+      "scope_authority": false
+    },
+    {
+      "id": "kimball_bus_matrix",
+      "name": "Kimball dimensional modeling and bus matrix",
+      "version": "Data Warehouse Toolkit, Third Edition",
+      "use": "dws_fact_constellation_and_conformed_dimensions",
+      "scope_authority": false
+    },
+    {
+      "id": "fix",
+      "name": "FIX Protocol",
+      "version": "mapping_version_must_be_pinned_before_physical_build",
+      "use": "market_interval_and_status_vocabulary",
+      "scope_authority": false
+    },
+    {
+      "id": "xbrl_cas",
+      "name": "XBRL and China Accounting Standards taxonomy",
+      "version": "optional_versioned_mapping_after_provider_native_financial_facts",
+      "use": "optional_standardized_concept_enrichment_without_blocking_provider-native facts",
+      "scope_authority": false
+    },
+    {
+      "id": "iso_10383",
+      "name": "Market Identifier Codes",
+      "version": "official_mic_snapshot_must_be_pinned_before_venue_seed",
+      "use": "trading_venue_identification",
+      "scope_authority": false
+    },
+    {
+      "id": "iso_20022_seev",
+      "name": "ISO 20022 Securities Events",
+      "version": "mapping_version_must_be_pinned_before_corporate_action_population",
+      "use": "corporate_action_event_and_term_vocabulary",
+      "scope_authority": false
+    }
+  ],
+  "model_patterns": {
+    "dwd": "product_bounded_normalized_snowflake_with_atomic_detail",
+    "dws": "kimball_fact_constellation_with_conformed_dimensions",
+    "ads": "consumer_specific_projection",
+    "atomic_price_basis": "unadjusted",
+    "adjusted_price_disposition": "downstream_reproducible_projection_only",
+    "effective_interval_semantics": "half_open",
+    "foreign_key_resolution": "target_effective_and_knowledge_intervals_must_contain_referencing_coordinates",
+    "unknown_identity_policy": "retain_source_identity_and_fail_closed",
+    "governance_sidecars_are_business_domains": false
+  },
+  "build_input_contract": {
+    "kind": "immutable_self_contained_ods_base_rollup",
+    "bundle_id": "ods-base-202607-v1.1",
+    "through_date": "2026-07-31",
+    "manifest_sha256": "sha256:3a031118af4421b90df7aca8a96bd617a49dba2ef7e49a2074206104991e956e",
+    "content_digest": "sha256:86372a3e0237c3bba3ff36e575ab041e1a0a01223587b629e7125b5ac1ba76da",
+    "self_contained": true,
+    "source_packages_required_after_build": false,
+    "rollup_lineage": {
+      "parent": {
+        "bundle_id": "ods-base-202607-v1",
+        "manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+        "content_digest": "sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1"
+      },
+      "hotfixes": [
+        {
+          "hotfix_id": "ods-base-202607-v1-hotfix-001",
+          "manifest_sha256": "sha256:c2fae9116e74f13b921f8cbf192d546b4f9ffd14c181dad7ca5b84bb0ccbd30a",
+          "content_digest": "sha256:31453165b0eafd00f94357638fad7029ab0687d3c836269b843358ecfd933cac",
+          "parent_manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+          "scope_count": 209,
+          "application_mode": "fill_absent_keys_only"
+        }
+      ]
+    },
+    "overlay_precedence": {
+      "default": "parent_base_wins_on_overlapping_business_keys_hotfix_fills_absent_keys_only",
+      "business_keys": {
+        "daily_ohlcv_none_hotfix": ["stock_code", "date"],
+        "daily_status_observation_hotfix": ["stock_code", "date"],
+        "minute_1m_hotfix": ["stock_code", "ts"],
+        "minute_5m_hotfix": ["stock_code", "ts"],
+        "valuation_history_hotfix": ["stock_code", "date"],
+        "fundamentals_financial_statements_parquet": ["stock_code", "statement_type"],
+        "fundamentals_financial_quarterly_parquet": ["stock_code", "report_date"],
+        "fundamentals_raw_f10_parquet": ["stock_code", "category"],
+        "fundamentals_industry_membership_parquet": ["stock_code", "market_date"]
+      },
+      "overlap_mismatch_policy": "fail_build",
+      "expected_sse_szse_listed_scope_after_overlay": 5201,
+      "bse_policy": "BSE_PARTIAL_NONBLOCKING"
+    },
+    "source_gap_definition": "required_business_evidence_absent_from_the_exact_self_contained_rollup_manifest",
+    "parser_mapping_or_normalization_work_is_a_source_gap": false,
+    "existing_dwd_or_ads_read_allowed": false
+  },
+  "transform_contracts": {
+    "financial_reporting": {
+      "source_artifacts": ["financial_statements", "financial_quarterly"],
+      "initial_semantics": "provider_native_concepts_in_versioned_source_namespace",
+      "requirements": [
+        "unwrap_the_retained_byte_literal_without_loss_and_verify_raw_payload_sha256",
+        "emit_every_nonheading_statement_item_as_a_source_namespace_concept_and_fact_or_an_explicit_quality_exception",
+        "preserve_report_period_publish_time_statement_scope_currency_raw_value_and_source_revision",
+        "apply_xbrl_or_cas_identity_only_when_an_explicit_versioned_mapping_exists"
+      ]
+    },
+    "share_capital": {
+      "source_artifacts": ["raw_f10"],
+      "source_categories": ["股本结构"],
+      "requirements": [
+        "parse_dated_capital_structure_and_change_tables",
+        "normalize_股_万_亿_to_shares_while_preserving_source_value_and_unit_evidence",
+        "emit_every_eligible_source_record_or_an_explicit_quality_exception"
+      ]
+    },
+    "shareholding_position": {
+      "source_artifacts": ["raw_f10"],
+      "source_categories": ["股东研究"],
+      "requirements": [
+        "parse_dated_top_shareholder_and_top_float_shareholder_observations",
+        "retain_shareholder_source_name_as_the_required_identity_and_allow_canonical_shareholder_id_to_remain_null",
+        "normalize_quantity_and_percentage_while_preserving_source_value_and_unit_evidence",
+        "do_not_claim_full_share_register_coverage_from_top_holder_tables"
+      ]
+    }
+  },
+  "domain_catalog": [
+    {
+      "id": "listed_company",
+      "name": "Listed company",
+      "core_objects": ["dwd_listed_company"],
+      "question": "Which listed company is the subject across providers and code changes?"
+    },
+    {
+      "id": "security_market_observation",
+      "name": "Security market observations",
+      "core_objects": ["dwd_security_bar", "dwd_security_valuation", "dwd_index_bar"],
+      "question": "What was observed for a governed security or benchmark interval?"
+    },
+    {
+      "id": "tradability_state",
+      "name": "Tradability state",
+      "core_objects": ["dwd_tradability_state"],
+      "question": "Could the security be acted on at the declared time, and why?"
+    },
+    {
+      "id": "disclosure_company_event",
+      "name": "Disclosures and company events",
+      "core_objects": ["dwd_disclosure", "dwd_corporate_action"],
+      "question": "What did the company disclose or declare, and when was it knowable and effective?"
+    },
+    {
+      "id": "financial_reporting",
+      "name": "Financial reporting",
+      "core_objects": ["dwd_financial_report", "dwd_financial_fact"],
+      "question": "What did the company report for a period, scope, concept, and unit?"
+    },
+    {
+      "id": "industry_classification",
+      "name": "Industry classification",
+      "core_objects": ["dwd_company_industry_membership"],
+      "question": "Which governed industry membership applied at the effective and knowledge time?"
+    },
+    {
+      "id": "ownership_capital",
+      "name": "Ownership and capital",
+      "core_objects": [
+        "dwd_share_capital_observation",
+        "dwd_shareholder_count_observation",
+        "dwd_shareholding_change",
+        "dwd_shareholding_observation"
+      ],
+      "question": "What capital, holder count, holding, or holding change was observed?"
+    }
+  ],
+  "deferred_objects": [
+    {"id": "legal_registry_entity", "reason": "outside quantitative research product boundary"},
+    {"id": "security_issuance_and_underwriting", "reason": "outside quantitative research product boundary"},
+    {"id": "order_and_trade_event", "reason": "order-level and trade-by-trade facts are not required by the current product and are absent from the final ODS Base"},
+    {"id": "brokerage_account_position", "reason": "brokerage and customer-account warehouse scope is not authorized"},
+    {"id": "clearing_and_settlement", "reason": "post-trade operations are outside product scope"},
+    {"id": "index_constituent_membership", "reason": "no current product gate or governed dated source requires this v1 object"}
+  ],
+  "column_sets": {
+    "lineage": {
+      "record_source": "string",
+      "source_record_id": "string",
+      "source_revision": "string",
+      "source_artifact_sha256": "string",
+      "knowledge_from": "timestamp_us_utc",
+      "knowledge_to": "timestamp_us_utc?"
+    }
+  },
+  "time_profiles": {
+    "effective_interval": {
+      "effective_from": "timestamp_us_utc",
+      "effective_to": "timestamp_us_utc?"
+    },
+    "effective_event": {
+      "effective_at": "timestamp_us_utc",
+      "announced_at": "timestamp_us_utc?"
+    },
+    "market_observation": {
+      "observation_start": "timestamp_us_utc",
+      "observation_end": "timestamp_us_utc?"
+    },
+    "reporting_period": {
+      "period_start": "date32?",
+      "period_end": "date32",
+      "published_at": "timestamp_us_utc?"
+    },
+    "governance_event": {
+      "affected_effective_at": "timestamp_us_utc",
+      "detected_at": "timestamp_us_utc"
+    }
+  },
+  "delivery_states": ["source_available", "reference_seed", "source_gap"],
+  "object_roles": ["core_object", "supporting_structure", "governance_sidecar"],
+  "tables": [
+    {
+      "name": "dwd_listed_company",
+      "domain": "listed_company",
+      "object_role": "core_object",
+      "kind": "entity",
+      "grain": "one recognized listed-company identity version",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"company_id": "string", "display_name": "string", "company_type": "string", "resolution_scope": "string"},
+      "business_key": ["company_id", "effective_from"],
+      "row_key": ["company_id", "effective_from", "knowledge_from"],
+      "foreign_keys": [],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_company_identifier",
+      "domain": "listed_company",
+      "object_role": "supporting_structure",
+      "kind": "effective_relationship",
+      "grain": "one namespace-qualified company identifier interval",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"company_id": "string", "identifier_namespace": "string", "identifier_value": "string", "identifier_authority": "string"},
+      "business_key": ["identifier_namespace", "identifier_value", "effective_from"],
+      "row_key": ["identifier_namespace", "identifier_value", "effective_from", "knowledge_from"],
+      "foreign_keys": [{"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false}],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_security",
+      "domain": "listed_company",
+      "object_role": "supporting_structure",
+      "kind": "entity_relationship",
+      "grain": "one security definition and listed-company association version",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"security_id": "string", "company_id": "string", "instrument_type": "string", "instrument_currency": "string"},
+      "business_key": ["security_id", "effective_from"],
+      "row_key": ["security_id", "effective_from", "knowledge_from"],
+      "foreign_keys": [{"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false}],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_security_identifier",
+      "domain": "listed_company",
+      "object_role": "supporting_structure",
+      "kind": "effective_relationship",
+      "grain": "one namespace-qualified security identifier interval",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"security_id": "string", "identifier_namespace": "string", "identifier_value": "string", "venue_id": "string?"},
+      "business_key": ["identifier_namespace", "identifier_value", "effective_from"],
+      "row_key": ["identifier_namespace", "identifier_value", "effective_from", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": false},
+        {"column": "venue_id", "table": "dwd_trading_venue", "reference_column": "venue_id", "nullable": true}
+      ],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_listing",
+      "domain": "listed_company",
+      "object_role": "supporting_structure",
+      "kind": "effective_relationship",
+      "grain": "one interval admitting a security to a venue under a listing code",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"listing_id": "string", "security_id": "string", "venue_id": "string", "listing_code": "string", "board_code": "string", "listing_currency": "string", "lot_size": "int64?"},
+      "business_key": ["listing_id", "effective_from"],
+      "row_key": ["listing_id", "effective_from", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": false},
+        {"column": "venue_id", "table": "dwd_trading_venue", "reference_column": "venue_id", "nullable": false}
+      ],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_trading_venue",
+      "domain": "listed_company",
+      "object_role": "supporting_structure",
+      "kind": "reference_entity",
+      "grain": "one effective trading-venue reference version",
+      "delivery_state": "reference_seed",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"venue_id": "string", "mic_code": "string", "venue_name": "string", "country_code": "string", "timezone": "string"},
+      "business_key": ["venue_id", "effective_from"],
+      "row_key": ["venue_id", "effective_from", "knowledge_from"],
+      "foreign_keys": [],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_security_bar",
+      "domain": "security_market_observation",
+      "object_role": "core_object",
+      "kind": "atomic_observation",
+      "grain": "one listing interval and unadjusted price basis",
+      "delivery_state": "source_available",
+      "time_profile": "market_observation",
+      "inherits": ["lineage"],
+      "columns": {"listing_id": "string", "calendar_session_id": "string", "interval_size": "string", "price_basis": "string", "currency": "string", "open": "decimal_38_10", "high": "decimal_38_10", "low": "decimal_38_10", "close": "decimal_38_10", "volume": "decimal_38_10?", "turnover": "decimal_38_10?", "trade_count": "int64?"},
+      "business_key": ["listing_id", "observation_start", "interval_size", "price_basis"],
+      "row_key": ["listing_id", "observation_start", "interval_size", "price_basis", "knowledge_from"],
+      "constraints": ["price_basis_equals_unadjusted"],
+      "foreign_keys": [
+        {"column": "listing_id", "table": "dwd_listing", "reference_column": "listing_id", "nullable": false},
+        {"column": "calendar_session_id", "table": "dwd_trading_calendar", "reference_column": "calendar_session_id", "nullable": false}
+      ],
+      "partition_by": ["interval_size", "observation_start_year", "observation_start_month"]
+    },
+    {
+      "name": "dwd_security_valuation",
+      "domain": "security_market_observation",
+      "object_role": "core_object",
+      "kind": "atomic_observation",
+      "grain": "one security valuation measure and methodology at one observation time",
+      "delivery_state": "source_available",
+      "time_profile": "market_observation",
+      "inherits": ["lineage"],
+      "columns": {"security_id": "string", "listing_id": "string?", "measure_type": "string", "measure_value": "decimal_38_10?", "currency": "string?", "methodology": "string", "fiscal_basis": "string?"},
+      "business_key": ["security_id", "observation_start", "measure_type", "methodology"],
+      "row_key": ["security_id", "observation_start", "measure_type", "methodology", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": false},
+        {"column": "listing_id", "table": "dwd_listing", "reference_column": "listing_id", "nullable": true}
+      ],
+      "partition_by": ["observation_start_year", "observation_start_month"]
+    },
+    {
+      "name": "dwd_adjustment_factor",
+      "domain": "security_market_observation",
+      "object_role": "supporting_structure",
+      "kind": "derived_reference_observation",
+      "grain": "one security effective-date adjustment method and revision",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"adjustment_factor_id": "string", "security_id": "string", "adjustment_method": "string", "adjustment_direction": "string", "factor_value": "decimal_38_18", "anchor_date": "date32", "evidence_set_digest": "string"},
+      "business_key": ["adjustment_factor_id", "effective_from"],
+      "row_key": ["adjustment_factor_id", "effective_from", "knowledge_from"],
+      "foreign_keys": [{"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": false}],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_adjustment_factor_input",
+      "domain": "security_market_observation",
+      "object_role": "supporting_structure",
+      "kind": "lineage_relationship",
+      "grain": "one accepted corporate-action or source-evidence input to one adjustment-factor revision",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"adjustment_factor_id": "string", "input_type": "string", "corporate_action_id": "string?", "input_evidence_digest": "string", "input_revision": "string"},
+      "business_key": ["adjustment_factor_id", "input_type", "input_evidence_digest", "effective_from"],
+      "row_key": ["adjustment_factor_id", "input_type", "input_evidence_digest", "effective_from", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "adjustment_factor_id", "table": "dwd_adjustment_factor", "reference_column": "adjustment_factor_id", "nullable": false},
+        {"column": "corporate_action_id", "table": "dwd_corporate_action", "reference_column": "corporate_action_id", "nullable": true}
+      ],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_market_index",
+      "domain": "security_market_observation",
+      "object_role": "supporting_structure",
+      "kind": "reference_entity",
+      "grain": "one effective benchmark-index definition version",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"index_id": "string", "index_code": "string", "index_name": "string", "base_currency": "string", "methodology_version": "string?"},
+      "business_key": ["index_id", "effective_from"],
+      "row_key": ["index_id", "effective_from", "knowledge_from"],
+      "foreign_keys": [],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_index_bar",
+      "domain": "security_market_observation",
+      "object_role": "core_object",
+      "kind": "atomic_observation",
+      "grain": "one market-index interval",
+      "delivery_state": "source_available",
+      "time_profile": "market_observation",
+      "inherits": ["lineage"],
+      "columns": {"index_id": "string", "calendar_session_id": "string?", "interval_size": "string", "currency": "string", "open": "decimal_38_10", "high": "decimal_38_10", "low": "decimal_38_10", "close": "decimal_38_10", "volume": "decimal_38_10?", "turnover": "decimal_38_10?"},
+      "business_key": ["index_id", "observation_start", "interval_size"],
+      "row_key": ["index_id", "observation_start", "interval_size", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "index_id", "table": "dwd_market_index", "reference_column": "index_id", "nullable": false},
+        {"column": "calendar_session_id", "table": "dwd_trading_calendar", "reference_column": "calendar_session_id", "nullable": true}
+      ],
+      "partition_by": ["interval_size", "observation_start_year", "observation_start_month"]
+    },
+    {
+      "name": "dwd_trading_calendar",
+      "domain": "tradability_state",
+      "object_role": "supporting_structure",
+      "kind": "reference_observation",
+      "grain": "one venue trade date and session type",
+      "delivery_state": "source_available",
+      "time_profile": "market_observation",
+      "inherits": ["lineage"],
+      "columns": {"calendar_session_id": "string", "venue_id": "string", "trade_date": "date32", "session_type": "string", "is_open": "bool", "open_at": "timestamp_us_utc?", "close_at": "timestamp_us_utc?", "calendar_reason": "string?"},
+      "business_key": ["venue_id", "trade_date", "session_type"],
+      "row_key": ["venue_id", "trade_date", "session_type", "knowledge_from"],
+      "foreign_keys": [{"column": "venue_id", "table": "dwd_trading_venue", "reference_column": "venue_id", "nullable": false}],
+      "partition_by": ["trade_date_year"]
+    },
+    {
+      "name": "dwd_security_status_interval",
+      "domain": "tradability_state",
+      "object_role": "supporting_structure",
+      "kind": "effective_relationship",
+      "grain": "one typed status interval for one security",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"security_status_id": "string", "security_id": "string", "status_type": "string", "status_value": "string", "reason_code": "string?"},
+      "business_key": ["security_id", "status_type", "effective_from"],
+      "row_key": ["security_id", "status_type", "effective_from", "knowledge_from"],
+      "foreign_keys": [{"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": false}],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_listing_status_interval",
+      "domain": "tradability_state",
+      "object_role": "supporting_structure",
+      "kind": "effective_relationship",
+      "grain": "one typed status interval for one listing",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"listing_status_id": "string", "listing_id": "string", "status_type": "string", "status_value": "string", "reason_code": "string?"},
+      "business_key": ["listing_id", "status_type", "effective_from"],
+      "row_key": ["listing_id", "status_type", "effective_from", "knowledge_from"],
+      "foreign_keys": [{"column": "listing_id", "table": "dwd_listing", "reference_column": "listing_id", "nullable": false}],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_price_limit_regime",
+      "domain": "tradability_state",
+      "object_role": "supporting_structure",
+      "kind": "effective_relationship",
+      "grain": "one effective price-limit rule for one listing",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"price_limit_regime_id": "string", "listing_id": "string", "regime_type": "string", "upper_limit_ratio": "decimal_18_12?", "lower_limit_ratio": "decimal_18_12?", "reference_price_method": "string", "ipo_phase": "string?"},
+      "business_key": ["listing_id", "regime_type", "effective_from"],
+      "row_key": ["listing_id", "regime_type", "effective_from", "knowledge_from"],
+      "foreign_keys": [{"column": "listing_id", "table": "dwd_listing", "reference_column": "listing_id", "nullable": false}],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_tradability_state",
+      "domain": "tradability_state",
+      "object_role": "core_object",
+      "kind": "governed_derived_observation",
+      "grain": "one listing and trading-session decision-state observation",
+      "delivery_state": "source_available",
+      "time_profile": "market_observation",
+      "inherits": ["lineage"],
+      "columns": {"listing_id": "string", "calendar_session_id": "string", "is_tradable": "bool", "can_buy": "bool", "can_sell": "bool", "reason_code": "string", "upper_price": "decimal_38_10?", "lower_price": "decimal_38_10?", "input_revision_digest": "string"},
+      "business_key": ["listing_id", "calendar_session_id", "observation_start"],
+      "row_key": ["listing_id", "calendar_session_id", "observation_start", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "listing_id", "table": "dwd_listing", "reference_column": "listing_id", "nullable": false},
+        {"column": "calendar_session_id", "table": "dwd_trading_calendar", "reference_column": "calendar_session_id", "nullable": false}
+      ],
+      "partition_by": ["observation_start_year", "observation_start_month"]
+    },
+    {
+      "name": "dwd_observation_gap",
+      "domain": "tradability_state",
+      "object_role": "supporting_structure",
+      "kind": "governance_fact",
+      "grain": "one expected listing interval without a market observation",
+      "delivery_state": "source_available",
+      "time_profile": "governance_event",
+      "inherits": ["lineage"],
+      "columns": {"gap_id": "string", "listing_id": "string", "calendar_session_id": "string", "interval_size": "string", "gap_reason": "string", "is_expected": "bool", "evidence_digest": "string"},
+      "business_key": ["listing_id", "calendar_session_id", "interval_size", "affected_effective_at"],
+      "row_key": ["listing_id", "calendar_session_id", "interval_size", "affected_effective_at", "knowledge_from"],
+      "constraints": ["gap_reason_must_not_be_unknown"],
+      "foreign_keys": [
+        {"column": "listing_id", "table": "dwd_listing", "reference_column": "listing_id", "nullable": false},
+        {"column": "calendar_session_id", "table": "dwd_trading_calendar", "reference_column": "calendar_session_id", "nullable": false}
+      ],
+      "partition_by": ["affected_effective_at_year", "affected_effective_at_month"]
+    },
+    {
+      "name": "dwd_disclosure",
+      "domain": "disclosure_company_event",
+      "object_role": "core_object",
+      "kind": "atomic_event",
+      "grain": "one company disclosure document or event identity and revision",
+      "delivery_state": "source_available",
+      "time_profile": "effective_event",
+      "inherits": ["lineage"],
+      "columns": {"disclosure_id": "string", "company_id": "string", "disclosure_type": "string", "source_document_id": "string", "title": "string", "document_uri": "string?", "language": "string"},
+      "business_key": ["disclosure_id", "effective_at"],
+      "row_key": ["disclosure_id", "effective_at", "knowledge_from"],
+      "foreign_keys": [{"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false}],
+      "partition_by": ["effective_at_year", "effective_at_month"]
+    },
+    {
+      "name": "dwd_disclosure_subject",
+      "domain": "disclosure_company_event",
+      "object_role": "supporting_structure",
+      "kind": "event_relationship",
+      "grain": "one typed subject relationship from one disclosure",
+      "delivery_state": "source_available",
+      "time_profile": "effective_event",
+      "inherits": ["lineage"],
+      "columns": {"disclosure_subject_id": "string", "disclosure_id": "string", "subject_type": "string", "security_id": "string?", "corporate_action_id": "string?", "financial_report_id": "string?"},
+      "business_key": ["disclosure_id", "disclosure_subject_id", "effective_at"],
+      "row_key": ["disclosure_id", "disclosure_subject_id", "effective_at", "knowledge_from"],
+      "constraints": ["exactly_one_subject_identifier_is_non_null"],
+      "foreign_keys": [
+        {"column": "disclosure_id", "table": "dwd_disclosure", "reference_column": "disclosure_id", "nullable": false},
+        {"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": true},
+        {"column": "corporate_action_id", "table": "dwd_corporate_action", "reference_column": "corporate_action_id", "nullable": true},
+        {"column": "financial_report_id", "table": "dwd_financial_report", "reference_column": "financial_report_id", "nullable": true}
+      ],
+      "partition_by": ["effective_at_year", "effective_at_month"]
+    },
+    {
+      "name": "dwd_corporate_action",
+      "domain": "disclosure_company_event",
+      "object_role": "core_object",
+      "kind": "atomic_event",
+      "grain": "one declared corporate-action identity and revision",
+      "delivery_state": "source_available",
+      "time_profile": "effective_event",
+      "inherits": ["lineage"],
+      "columns": {"corporate_action_id": "string", "company_id": "string", "security_id": "string", "action_type": "string", "action_status": "string", "record_date": "date32?", "ex_date": "date32?", "payment_date": "date32?"},
+      "business_key": ["corporate_action_id", "effective_at"],
+      "row_key": ["corporate_action_id", "effective_at", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false},
+        {"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": false}
+      ],
+      "partition_by": ["effective_at_year", "effective_at_month"]
+    },
+    {
+      "name": "dwd_corporate_action_term",
+      "domain": "disclosure_company_event",
+      "object_role": "supporting_structure",
+      "kind": "atomic_event_term",
+      "grain": "one typed term or option within one corporate action",
+      "delivery_state": "source_available",
+      "time_profile": "effective_event",
+      "inherits": ["lineage"],
+      "columns": {"corporate_action_term_id": "string", "corporate_action_id": "string", "term_type": "string", "option_id": "string?", "currency": "string?", "amount_per_share": "decimal_38_10?", "ratio_numerator": "decimal_38_10?", "ratio_denominator": "decimal_38_10?", "subscription_price": "decimal_38_10?"},
+      "business_key": ["corporate_action_id", "corporate_action_term_id", "effective_at"],
+      "row_key": ["corporate_action_id", "corporate_action_term_id", "effective_at", "knowledge_from"],
+      "foreign_keys": [{"column": "corporate_action_id", "table": "dwd_corporate_action", "reference_column": "corporate_action_id", "nullable": false}],
+      "partition_by": ["effective_at_year"]
+    },
+    {
+      "name": "dwd_financial_report",
+      "domain": "financial_reporting",
+      "object_role": "core_object",
+      "kind": "report_entity",
+      "grain": "one company reporting period statement scope and revision",
+      "delivery_state": "source_available",
+      "time_profile": "reporting_period",
+      "inherits": ["lineage"],
+      "columns": {"financial_report_id": "string", "company_id": "string", "report_type": "string", "statement_scope": "string", "accounting_standard": "string", "audit_status": "string?", "restatement_flag": "bool"},
+      "business_key": ["financial_report_id", "period_end"],
+      "row_key": ["financial_report_id", "period_end", "knowledge_from"],
+      "foreign_keys": [{"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false}],
+      "partition_by": ["period_end_year"]
+    },
+    {
+      "name": "dwd_financial_concept",
+      "domain": "financial_reporting",
+      "object_role": "supporting_structure",
+      "kind": "reference_entity",
+      "grain": "one taxonomy or declared source concept version",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"financial_concept_id": "string", "taxonomy_namespace": "string", "taxonomy_version": "string", "concept_code": "string", "concept_name": "string", "statement_type": "string", "data_type": "string", "period_type": "string", "balance_type": "string?"},
+      "business_key": ["financial_concept_id", "taxonomy_version", "effective_from"],
+      "row_key": ["financial_concept_id", "taxonomy_version", "effective_from", "knowledge_from"],
+      "foreign_keys": [],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_financial_fact",
+      "domain": "financial_reporting",
+      "object_role": "core_object",
+      "kind": "atomic_report_fact",
+      "grain": "one report context concept unit dimensional coordinate and revision",
+      "delivery_state": "source_available",
+      "time_profile": "reporting_period",
+      "inherits": ["lineage"],
+      "columns": {"financial_fact_id": "string", "financial_report_id": "string", "financial_concept_id": "string", "unit_code": "string", "value_decimal": "decimal_38_10?", "value_text": "string?", "dimensions_json": "string", "context_hash": "string", "decimals": "int32?", "is_nil": "bool"},
+      "business_key": ["financial_report_id", "financial_concept_id", "unit_code", "context_hash", "period_end"],
+      "row_key": ["financial_report_id", "financial_concept_id", "unit_code", "context_hash", "period_end", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "financial_report_id", "table": "dwd_financial_report", "reference_column": "financial_report_id", "nullable": false},
+        {"column": "financial_concept_id", "table": "dwd_financial_concept", "reference_column": "financial_concept_id", "nullable": false}
+      ],
+      "partition_by": ["period_end_year"]
+    },
+    {
+      "name": "dwd_industry_scheme",
+      "domain": "industry_classification",
+      "object_role": "supporting_structure",
+      "kind": "reference_entity",
+      "grain": "one effective industry-classification scheme version",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"industry_scheme_id": "string", "scheme_version": "string", "scheme_name": "string", "scheme_owner": "string"},
+      "business_key": ["industry_scheme_id", "scheme_version", "effective_from"],
+      "row_key": ["industry_scheme_id", "scheme_version", "effective_from", "knowledge_from"],
+      "foreign_keys": [],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_industry_node",
+      "domain": "industry_classification",
+      "object_role": "supporting_structure",
+      "kind": "reference_entity",
+      "grain": "one effective node version in an industry scheme",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"industry_node_id": "string", "industry_scheme_id": "string", "parent_node_id": "string?", "node_code": "string", "node_name": "string", "node_level": "int32"},
+      "business_key": ["industry_node_id", "effective_from"],
+      "row_key": ["industry_node_id", "effective_from", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "industry_scheme_id", "table": "dwd_industry_scheme", "reference_column": "industry_scheme_id", "nullable": false},
+        {"column": "parent_node_id", "table": "dwd_industry_node", "reference_column": "industry_node_id", "nullable": true}
+      ],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_company_industry_membership",
+      "domain": "industry_classification",
+      "object_role": "core_object",
+      "kind": "effective_relationship",
+      "grain": "one listed-company membership interval in one industry node",
+      "delivery_state": "source_available",
+      "time_profile": "effective_interval",
+      "inherits": ["lineage"],
+      "columns": {"company_id": "string", "industry_node_id": "string", "membership_type": "string", "confidence": "decimal_9_6?", "source_declared_as_of": "date32"},
+      "business_key": ["company_id", "industry_node_id", "effective_from"],
+      "row_key": ["company_id", "industry_node_id", "effective_from", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false},
+        {"column": "industry_node_id", "table": "dwd_industry_node", "reference_column": "industry_node_id", "nullable": false}
+      ],
+      "partition_by": []
+    },
+    {
+      "name": "dwd_share_capital_observation",
+      "domain": "ownership_capital",
+      "object_role": "core_object",
+      "kind": "atomic_observation",
+      "grain": "one security capital type observation date and revision",
+      "delivery_state": "source_available",
+      "time_profile": "market_observation",
+      "inherits": ["lineage"],
+      "columns": {"security_id": "string", "capital_type": "string", "share_quantity": "decimal_38_10", "unit_code": "string"},
+      "business_key": ["security_id", "capital_type", "observation_start"],
+      "row_key": ["security_id", "capital_type", "observation_start", "knowledge_from"],
+      "foreign_keys": [{"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": false}],
+      "partition_by": ["observation_start_year"]
+    },
+    {
+      "name": "dwd_shareholder_count_observation",
+      "domain": "ownership_capital",
+      "object_role": "core_object",
+      "kind": "atomic_report_fact",
+      "grain": "one company and optional security holder-count period-end revision",
+      "delivery_state": "source_available",
+      "time_profile": "reporting_period",
+      "inherits": ["lineage"],
+      "columns": {"shareholder_count_observation_id": "string", "company_id": "string", "security_id": "string?", "observation_scope": "string", "holder_count": "int64", "average_holding": "decimal_38_10?"},
+      "business_key": ["shareholder_count_observation_id", "period_end"],
+      "row_key": ["shareholder_count_observation_id", "period_end", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false},
+        {"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": true}
+      ],
+      "partition_by": ["period_end_year"]
+    },
+    {
+      "name": "dwd_shareholding_change",
+      "domain": "ownership_capital",
+      "object_role": "core_object",
+      "kind": "atomic_event",
+      "grain": "one disclosed holder-change event and revision",
+      "delivery_state": "source_available",
+      "time_profile": "effective_event",
+      "inherits": ["lineage"],
+      "columns": {"shareholding_change_id": "string", "company_id": "string", "security_id": "string?", "shareholder_source_name": "string", "shareholder_id": "string?", "change_type": "string", "share_change": "decimal_38_10?", "percentage_change": "decimal_18_12?", "post_holding": "decimal_38_10?", "post_percentage": "decimal_18_12?", "disclosure_id": "string?"},
+      "business_key": ["shareholding_change_id", "effective_at"],
+      "row_key": ["shareholding_change_id", "effective_at", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false},
+        {"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": true},
+        {"column": "disclosure_id", "table": "dwd_disclosure", "reference_column": "disclosure_id", "nullable": true}
+      ],
+      "partition_by": ["effective_at_year", "effective_at_month"]
+    },
+    {
+      "name": "dwd_shareholding_observation",
+      "domain": "ownership_capital",
+      "object_role": "core_object",
+      "kind": "atomic_observation",
+      "grain": "one holder and security position observation date and revision",
+      "delivery_state": "source_available",
+      "time_profile": "market_observation",
+      "inherits": ["lineage"],
+      "columns": {"company_id": "string", "security_id": "string", "shareholder_source_name": "string", "shareholder_id": "string?", "holding_quantity": "decimal_38_10?", "holding_percentage": "decimal_18_12?", "holding_type": "string"},
+      "business_key": ["company_id", "security_id", "shareholder_source_name", "holding_type", "observation_start"],
+      "row_key": ["company_id", "security_id", "shareholder_source_name", "holding_type", "observation_start", "knowledge_from"],
+      "foreign_keys": [
+        {"column": "company_id", "table": "dwd_listed_company", "reference_column": "company_id", "nullable": false},
+        {"column": "security_id", "table": "dwd_security", "reference_column": "security_id", "nullable": false}
+      ],
+      "partition_by": ["observation_start_year"]
+    },
+    {
+      "name": "dwd_quality_exception",
+      "domain": "governance_sidecar",
+      "object_role": "governance_sidecar",
+      "kind": "governance_fact",
+      "grain": "one accepted quality-rule result for one affected business key and revision",
+      "delivery_state": "source_available",
+      "time_profile": "governance_event",
+      "inherits": ["lineage"],
+      "columns": {"quality_exception_id": "string", "affected_table": "string", "affected_business_key_json": "string", "rule_id": "string", "classification": "string", "severity": "string", "authority": "string", "evidence_digest": "string", "resolution_state": "string"},
+      "business_key": ["affected_table", "affected_business_key_json", "rule_id", "affected_effective_at"],
+      "row_key": ["affected_table", "affected_business_key_json", "rule_id", "affected_effective_at", "knowledge_from"],
+      "foreign_keys": [],
+      "partition_by": ["detected_at_year"]
+    }
+  ],
+  "dws_model": {
+    "snapshot_binding": "every_fact_row_references_one_immutable_snapshot_key",
+    "dimensions": [
+      {"name": "dws_dim_snapshot", "grain": "one exact DWD package and knowledge cutoff", "source_tables": [], "key": "snapshot_key", "version_behavior": "immutable", "delivery_state": "source_available"},
+      {"name": "dws_dim_date", "grain": "one Gregorian calendar date across the governed warehouse range", "source_tables": ["dwd_trading_calendar"], "key": "date_key", "version_behavior": "static_with_governed_market_calendar_attributes", "generation_policy": "complete_date_spine_not_trading_days_only", "delivery_state": "source_available"},
+      {"name": "dws_dim_interval", "grain": "one interval-size and session-coordinate vocabulary member", "source_tables": ["dwd_security_bar", "dwd_index_bar", "dwd_trading_calendar"], "key": "interval_key", "version_behavior": "versioned_reference", "delivery_state": "reference_seed"},
+      {"name": "dws_dim_company", "grain": "one effective and knowledge version of a listed company", "source_tables": ["dwd_listed_company", "dwd_company_identifier"], "key": "company_key", "version_behavior": "bitemporal_type2", "delivery_state": "source_available"},
+      {"name": "dws_dim_security", "grain": "one effective and knowledge version of a security", "source_tables": ["dwd_security", "dwd_security_identifier"], "key": "security_key", "version_behavior": "bitemporal_type2", "delivery_state": "source_available"},
+      {"name": "dws_dim_listing", "grain": "one effective and knowledge version of a listing", "source_tables": ["dwd_listing", "dwd_trading_venue"], "key": "listing_key", "version_behavior": "bitemporal_type2_denormalized_with_venue", "delivery_state": "source_available"},
+      {"name": "dws_dim_industry", "grain": "one effective industry node version", "source_tables": ["dwd_industry_scheme", "dwd_industry_node"], "key": "industry_key", "version_behavior": "bitemporal_type2", "delivery_state": "source_available"},
+      {"name": "dws_dim_financial_concept", "grain": "one taxonomy/source concept version", "source_tables": ["dwd_financial_concept"], "key": "financial_concept_key", "version_behavior": "provider_namespace_versioned_with_optional_standard_mapping", "delivery_state": "source_available"},
+      {"name": "dws_dim_market_index", "grain": "one effective benchmark definition version", "source_tables": ["dwd_market_index"], "key": "market_index_key", "version_behavior": "bitemporal_type2", "delivery_state": "source_available"},
+      {"name": "dws_dim_event_type", "grain": "one governed disclosure action or ownership event type version", "source_tables": [], "key": "event_type_key", "version_behavior": "versioned_reference", "delivery_state": "reference_seed"}
+    ],
+    "facts": [
+      {
+        "name": "dws_fact_security_market_interval",
+        "grain": "one snapshot listing interval-start interval-size and price-basis",
+        "source_tables": ["dwd_security_bar"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_interval", "dws_dim_company", "dws_dim_security", "dws_dim_listing"],
+        "optional_dimensions": [],
+        "degenerate_keys": [],
+        "measures": {"open": "non_additive", "high": "non_additive", "low": "non_additive", "close": "non_additive", "volume": "additive_non_overlapping_intervals_only", "turnover": "additive_non_overlapping_intervals_only", "trade_count": "additive_non_overlapping_intervals_only"},
+        "delivery_state": "source_available",
+        "partition_by": ["interval_size", "market_year", "market_month"]
+      },
+      {
+        "name": "dws_fact_index_market_interval",
+        "grain": "one snapshot market-index interval-start and interval-size",
+        "source_tables": ["dwd_index_bar"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_interval", "dws_dim_market_index"],
+        "optional_dimensions": [],
+        "degenerate_keys": [],
+        "measures": {"open": "non_additive", "high": "non_additive", "low": "non_additive", "close": "non_additive", "volume": "additive_non_overlapping_intervals_only", "turnover": "additive_non_overlapping_intervals_only"},
+        "delivery_state": "source_available",
+        "partition_by": ["interval_size", "market_year", "market_month"]
+      },
+      {
+        "name": "dws_fact_security_daily_state",
+        "grain": "one snapshot listing trade-date and session",
+        "source_tables": ["dwd_tradability_state", "dwd_security_status_interval", "dwd_listing_status_interval", "dwd_price_limit_regime", "dwd_observation_gap"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_security", "dws_dim_listing"],
+        "optional_dimensions": [],
+        "degenerate_keys": ["reason_code", "gap_reason"],
+        "measures": {"is_tradable": "non_additive_state", "can_buy": "non_additive_state", "can_sell": "non_additive_state", "upper_price": "non_additive", "lower_price": "non_additive"},
+        "delivery_state": "source_available",
+        "partition_by": ["market_year", "market_month"]
+      },
+      {
+        "name": "dws_fact_security_valuation",
+        "grain": "one snapshot security-listing date measure-type and methodology",
+        "source_tables": ["dwd_security_valuation"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_security"],
+        "optional_dimensions": ["dws_dim_listing"],
+        "degenerate_keys": ["measure_type", "methodology", "fiscal_basis"],
+        "measures": {"measure_value": "non_additive"},
+        "delivery_state": "source_available",
+        "partition_by": ["market_year", "market_month"]
+      },
+      {
+        "name": "dws_fact_adjustment_factor",
+        "grain": "one snapshot security effective-date adjustment method and direction",
+        "source_tables": ["dwd_adjustment_factor", "dwd_adjustment_factor_input"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_security"],
+        "optional_dimensions": [],
+        "degenerate_keys": ["adjustment_factor_id", "adjustment_method", "adjustment_direction", "anchor_date", "evidence_set_digest"],
+        "measures": {"factor_value": "non_additive_effective_factor"},
+        "delivery_state": "source_available",
+        "partition_by": ["effective_year"]
+      },
+      {
+        "name": "dws_fact_disclosure_event",
+        "grain": "one snapshot disclosure and subject relationship",
+        "source_tables": ["dwd_disclosure", "dwd_disclosure_subject"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_event_type"],
+        "optional_dimensions": ["dws_dim_security"],
+        "degenerate_keys": ["disclosure_id", "source_document_id"],
+        "measures": {"event_count": "additive_count"},
+        "delivery_state": "source_available",
+        "partition_by": ["published_year", "published_month"]
+      },
+      {
+        "name": "dws_fact_corporate_action_term",
+        "grain": "one snapshot corporate-action and typed term",
+        "source_tables": ["dwd_corporate_action", "dwd_corporate_action_term"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_security", "dws_dim_event_type"],
+        "optional_dimensions": [],
+        "degenerate_keys": ["corporate_action_id", "corporate_action_term_id", "term_type"],
+        "measures": {"amount_per_share": "non_additive_across_term_types", "ratio_numerator": "non_additive", "ratio_denominator": "non_additive", "subscription_price": "non_additive"},
+        "delivery_state": "source_available",
+        "partition_by": ["effective_year", "effective_month"]
+      },
+      {
+        "name": "dws_fact_financial_metric",
+        "grain": "one snapshot report concept unit and dimensional coordinate",
+        "source_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_financial_concept"],
+        "optional_dimensions": [],
+        "degenerate_keys": ["financial_report_id", "unit_code", "context_hash"],
+        "measures": {"value_decimal": "concept_declared_flow_or_stock_semantics"},
+        "delivery_state": "source_available",
+        "partition_by": ["period_end_year"]
+      },
+      {
+        "name": "dws_fact_company_industry_membership",
+        "grain": "one snapshot company industry-node and effective interval",
+        "source_tables": ["dwd_company_industry_membership"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_industry"],
+        "optional_dimensions": [],
+        "degenerate_keys": ["membership_type"],
+        "measures": {},
+        "delivery_state": "source_available",
+        "partition_by": []
+      },
+      {
+        "name": "dws_fact_share_capital",
+        "grain": "one snapshot security date and capital type",
+        "source_tables": ["dwd_share_capital_observation"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_security"],
+        "optional_dimensions": [],
+        "degenerate_keys": ["capital_type", "unit_code"],
+        "measures": {"share_quantity": "semi_additive_over_time"},
+        "delivery_state": "source_available",
+        "partition_by": ["observation_year"]
+      },
+      {
+        "name": "dws_fact_shareholder_count",
+        "grain": "one snapshot company optional-security and period end",
+        "source_tables": ["dwd_shareholder_count_observation"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company"],
+        "optional_dimensions": ["dws_dim_security"],
+        "degenerate_keys": [],
+        "measures": {"holder_count": "semi_additive_over_time", "average_holding": "non_additive"},
+        "delivery_state": "source_available",
+        "partition_by": ["period_end_year"]
+      },
+      {
+        "name": "dws_fact_shareholding_change",
+        "grain": "one snapshot holder-change event",
+        "source_tables": ["dwd_shareholding_change"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_event_type"],
+        "optional_dimensions": ["dws_dim_security"],
+        "degenerate_keys": ["shareholding_change_id", "shareholder_id", "shareholder_source_name", "change_type"],
+        "measures": {"share_change": "additive_compatible_units_only", "percentage_change": "non_additive", "post_holding": "semi_additive_over_time", "post_percentage": "non_additive"},
+        "delivery_state": "source_available",
+        "partition_by": ["effective_year", "effective_month"]
+      },
+      {
+        "name": "dws_fact_shareholding_position",
+        "grain": "one snapshot holder security and observation date",
+        "source_tables": ["dwd_shareholding_observation"],
+        "dimensions": ["dws_dim_snapshot", "dws_dim_date", "dws_dim_company", "dws_dim_security"],
+        "optional_dimensions": [],
+        "degenerate_keys": ["shareholder_id", "shareholder_source_name", "holding_type"],
+        "measures": {"holding_quantity": "semi_additive_over_time", "holding_percentage": "non_additive"},
+        "delivery_state": "source_available",
+        "partition_by": ["observation_year"]
+      }
+    ]
+  },
+  "ods_source_contract": {
+    "policy": "config/pipelines/ods-base-final-through-20260731.v2.json",
+    "static_source_count": 53,
+    "release_artifact_count": 17,
+    "allowed_dispositions": ["modeled", "ods_only", "superseded", "source_gap", "deferred"],
+    "static_sources": [
+      {"source_id": "adjustment_contract_qfq", "disposition": "ods_only", "target_tables": [], "reason": "derivation contract rather than business fact"},
+      {"source_id": "adjustment_contract_quanthus", "disposition": "ods_only", "target_tables": [], "reason": "derivation contract rather than business fact"},
+      {"source_id": "adjustment_factors_pit", "disposition": "modeled", "target_tables": ["dwd_adjustment_factor", "dwd_adjustment_factor_input"], "reason": "effective-dated factor and input evidence"},
+      {"source_id": "announcement_archive", "disposition": "modeled", "target_tables": ["dwd_disclosure", "dwd_disclosure_subject"], "reason": "company disclosures and subjects"},
+      {"source_id": "announcement_orgid_map", "disposition": "modeled", "target_tables": ["dwd_listed_company", "dwd_company_identifier"], "reason": "provider-scoped listed-company identity"},
+      {"source_id": "corporate_actions", "disposition": "modeled", "target_tables": ["dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor_input"], "reason": "company actions terms and factor inputs"},
+      {"source_id": "daily_ohlcv_adjusted", "disposition": "superseded", "target_tables": ["dwd_security_bar"], "reason": "adjusted prices are downstream projections"},
+      {"source_id": "daily_ohlcv_unadjusted", "disposition": "modeled", "target_tables": ["dwd_security_bar"], "reason": "atomic daily market observations"},
+      {"source_id": "legacy_dataset_manifest", "disposition": "ods_only", "target_tables": [], "reason": "legacy lineage evidence"},
+      {"source_id": "legacy_dataset_manifest_metadata", "disposition": "ods_only", "target_tables": [], "reason": "legacy lineage metadata"},
+      {"source_id": "delist_boundary_exceptions", "disposition": "modeled", "target_tables": ["dwd_observation_gap", "dwd_quality_exception"], "reason": "accepted boundary and quality evidence"},
+      {"source_id": "dividend_history", "disposition": "modeled", "target_tables": ["dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor_input"], "reason": "dividend events terms and factor inputs"},
+      {"source_id": "factor_pit_exceptions", "disposition": "modeled", "target_tables": ["dwd_quality_exception"], "reason": "accepted factor exception ledger"},
+      {"source_id": "financial_quarterly", "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "provider-native quarterly projection and report evidence; standardized equivalence is optional enrichment"},
+      {"source_id": "index_daily", "disposition": "modeled", "target_tables": ["dwd_market_index", "dwd_index_bar"], "reason": "governed benchmark identity and observations"},
+      {"source_id": "index_daily_metadata", "disposition": "modeled", "target_tables": ["dwd_market_index"], "reason": "benchmark definition and lineage"},
+      {"source_id": "reference_build_metadata", "disposition": "ods_only", "target_tables": [], "reason": "reference-build lineage"},
+      {"source_id": "price_limit_regime", "disposition": "modeled", "target_tables": ["dwd_price_limit_regime", "dwd_tradability_state"], "reason": "effective rule and governed state input"},
+      {"source_id": "security_master", "disposition": "modeled", "target_tables": ["dwd_listed_company", "dwd_security", "dwd_security_identifier", "dwd_listing", "dwd_listing_status_interval"], "reason": "minimum listed-company security and listing bridge"},
+      {"source_id": "shareholder_count", "disposition": "modeled", "target_tables": ["dwd_shareholder_count_observation"], "reason": "periodic holder-count observations"},
+      {"source_id": "stock_list", "disposition": "superseded", "target_tables": ["dwd_security"], "reason": "acquisition universe is superseded by effective security master"},
+      {"source_id": "st_status_pit", "disposition": "modeled", "target_tables": ["dwd_security_status_interval", "dwd_tradability_state"], "reason": "effective and knowledge-dated special-treatment state"},
+      {"source_id": "suspensions", "disposition": "modeled", "target_tables": ["dwd_listing_status_interval", "dwd_tradability_state"], "reason": "listing suspension evidence"},
+      {"source_id": "trading_calendar", "disposition": "modeled", "target_tables": ["dwd_trading_venue", "dwd_trading_calendar", "dwd_tradability_state"], "reason": "venue calendar and governed state input"},
+      {"source_id": "valuation_daily", "disposition": "modeled", "target_tables": ["dwd_security_valuation"], "reason": "daily valuation measures"},
+      {"source_id": "valuation_history_july_repair", "disposition": "modeled", "target_tables": ["dwd_security_valuation"], "reason": "explicit valuation correction revision"},
+      {"source_id": "valuation_history_july_repair_receipts", "disposition": "ods_only", "target_tables": [], "reason": "acquisition receipts"},
+      {"source_id": "valuation_history_july_repair_metadata", "disposition": "ods_only", "target_tables": [], "reason": "acquisition lineage"},
+      {"source_id": "minute_1m_research_archive", "disposition": "modeled", "target_tables": ["dwd_security_bar"], "reason": "one-minute atomic observations"},
+      {"source_id": "minute_5m_formal_archive", "disposition": "modeled", "target_tables": ["dwd_security_bar"], "reason": "five-minute atomic observations"},
+      {"source_id": "source_evidence_valuation_history_july_repair_checkpoints", "disposition": "ods_only", "target_tables": [], "reason": "collector checkpoints and lineage"},
+      {"source_id": "source_evidence_adjustment_factor_pit_v1", "disposition": "ods_only", "target_tables": [], "reason": "retained factor-build lineage"},
+      {"source_id": "source_evidence_adjustment_factor_pit", "disposition": "ods_only", "target_tables": [], "reason": "supplementary factor evidence"},
+      {"source_id": "source_evidence_adjustment_factor_exceptions", "disposition": "modeled", "target_tables": ["dwd_quality_exception"], "reason": "factor exception evidence"},
+      {"source_id": "source_evidence_baostock_none_reference", "disposition": "ods_only", "target_tables": [], "reason": "supplementary price-source evidence"},
+      {"source_id": "source_evidence_delist_boundaries", "disposition": "modeled", "target_tables": ["dwd_observation_gap", "dwd_quality_exception"], "reason": "delisting boundary evidence"},
+      {"source_id": "source_evidence_delisted_coverage", "disposition": "ods_only", "target_tables": [], "reason": "aggregate coverage audit evidence"},
+      {"source_id": "source_evidence_invalid_ohlc", "disposition": "modeled", "target_tables": ["dwd_quality_exception"], "reason": "invalid-observation evidence"},
+      {"source_id": "source_evidence_missing_none_history", "disposition": "ods_only", "target_tables": [], "reason": "repair-source evidence represented by canonical bars"},
+      {"source_id": "source_evidence_delisted_history_decisions", "disposition": "modeled", "target_tables": ["dwd_quality_exception"], "reason": "accepted per-security repair decisions"},
+      {"source_id": "source_evidence_volume_amount_null_decision", "disposition": "modeled", "target_tables": ["dwd_quality_exception"], "reason": "accepted null-field decision"},
+      {"source_id": "source_evidence_delist_placeholder_decisions", "disposition": "modeled", "target_tables": ["dwd_quality_exception"], "reason": "accepted placeholder-observation decision"},
+      {"source_id": "source_evidence_none_tail_repairs", "disposition": "ods_only", "target_tables": [], "reason": "repair-source evidence represented by canonical bars"},
+      {"source_id": "source_evidence_p1_formal_pack", "disposition": "ods_only", "target_tables": [], "reason": "accepted package lineage"},
+      {"source_id": "source_evidence_price_limit_regime", "disposition": "ods_only", "target_tables": [], "reason": "supplementary regime-build evidence"},
+      {"source_id": "source_evidence_st_pit_accepted", "disposition": "ods_only", "target_tables": [], "reason": "accepted ST-build lineage"},
+      {"source_id": "source_evidence_shareholder_export", "disposition": "ods_only", "target_tables": [], "reason": "shareholder export lineage and samples"},
+      {"source_id": "source_evidence_st_baostock_raw", "disposition": "ods_only", "target_tables": [], "reason": "raw provider evidence represented by canonical status intervals"},
+      {"source_id": "source_evidence_st_semantics_audit", "disposition": "modeled", "target_tables": ["dwd_quality_exception"], "reason": "accepted status-semantics exceptions"},
+      {"source_id": "source_evidence_suspension_repairs", "disposition": "ods_only", "target_tables": [], "reason": "repair evidence represented by canonical listing status"},
+      {"source_id": "source_evidence_tradability_c2_s1", "disposition": "modeled", "target_tables": ["dwd_observation_gap", "dwd_quality_exception"], "reason": "classified gap and tradability evidence"},
+      {"source_id": "source_evidence_weekly_corrections_20260724", "disposition": "ods_only", "target_tables": [], "reason": "immutable release container with separately mapped artifacts"},
+      {"source_id": "source_evidence_weekly_full_fundamentals_20260731", "disposition": "ods_only", "target_tables": [], "reason": "immutable release container with separately mapped artifacts"}
+    ],
+    "release_artifacts": [
+      {"artifact": "adjustment_evidence_delta", "disposition": "modeled", "target_tables": ["dwd_adjustment_factor", "dwd_adjustment_factor_input", "dwd_quality_exception"]},
+      {"artifact": "announcements_delta", "disposition": "modeled", "target_tables": ["dwd_disclosure", "dwd_disclosure_subject"]},
+      {"artifact": "corporate_actions_delta", "disposition": "modeled", "target_tables": ["dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor_input"]},
+      {"artifact": "daily_ohlcv_none_delta", "disposition": "modeled", "target_tables": ["dwd_security_bar"]},
+      {"artifact": "daily_status_observation_delta", "disposition": "modeled", "target_tables": ["dwd_tradability_state"]},
+      {"artifact": "dividends_delta", "disposition": "modeled", "target_tables": ["dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor_input"]},
+      {"artifact": "factor_evidence_delta", "disposition": "modeled", "target_tables": ["dwd_adjustment_factor", "dwd_adjustment_factor_input", "dwd_quality_exception"]},
+      {"artifact": "financial_disclosures_delta", "disposition": "modeled", "target_tables": ["dwd_disclosure", "dwd_disclosure_subject", "dwd_financial_report", "dwd_shareholding_change"]},
+      {"artifact": "index_daily_delta", "disposition": "modeled", "target_tables": ["dwd_market_index", "dwd_index_bar"]},
+      {"artifact": "intraday_bars", "disposition": "modeled", "target_tables": ["dwd_security_bar"]},
+      {"artifact": "intraday_coverage", "disposition": "modeled", "target_tables": ["dwd_observation_gap", "dwd_quality_exception"]},
+      {"artifact": "intraday_meta", "disposition": "ods_only", "target_tables": []},
+      {"artifact": "security_master", "disposition": "modeled", "target_tables": ["dwd_listed_company", "dwd_security", "dwd_security_identifier", "dwd_listing", "dwd_listing_status_interval"]},
+      {"artifact": "stock_list", "disposition": "superseded", "target_tables": ["dwd_security"]},
+      {"artifact": "suspensions_delta", "disposition": "modeled", "target_tables": ["dwd_listing_status_interval", "dwd_tradability_state"]},
+      {"artifact": "trading_calendar", "disposition": "modeled", "target_tables": ["dwd_trading_venue", "dwd_trading_calendar", "dwd_tradability_state"]},
+      {"artifact": "valuation_daily_delta", "disposition": "modeled", "target_tables": ["dwd_security_valuation"]}
+    ],
+    "weekly_artifacts": [
+      {"artifact": "shareholder_count", "aliases": ["shareholder_count_revision"], "disposition": "modeled", "target_tables": ["dwd_shareholder_count_observation"]},
+      {"artifact": "raw_f10", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_share_capital_observation", "dwd_shareholding_observation"], "reason": "retained dated capital and top-holder evidence is parsed during the new DWD build"},
+      {"artifact": "financial_statements", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "complete three-statement payloads are decoded and expanded into provider-native facts during the new DWD build"},
+      {"artifact": "financial_quarterly", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "quarterly projection is retained as report and reconciliation evidence"},
+      {"artifact": "corporate_actions", "aliases": ["corporate_actions_revision"], "disposition": "modeled", "target_tables": ["dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor_input"]},
+      {"artifact": "dividends", "aliases": ["dividends_revision"], "disposition": "modeled", "target_tables": ["dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor_input"]},
+      {"artifact": "adjustment_evidence", "aliases": ["adjustment_evidence_revision"], "disposition": "modeled", "target_tables": ["dwd_adjustment_factor", "dwd_adjustment_factor_input", "dwd_quality_exception"]},
+      {"artifact": "st_announcement_trail", "aliases": ["st_status_observation_revision"], "disposition": "modeled", "target_tables": ["dwd_disclosure", "dwd_security_status_interval", "dwd_tradability_state"]},
+      {"artifact": "security_lifecycle", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_listed_company", "dwd_security", "dwd_security_identifier", "dwd_listing", "dwd_listing_status_interval"]},
+      {"artifact": "industry_membership", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_industry_scheme", "dwd_industry_node", "dwd_company_industry_membership"]},
+      {"artifact": "fundamentals_receipts", "aliases": [], "disposition": "ods_only", "target_tables": []}
+    ],
+    "hotfix_artifact_count": 33,
+    "hotfix_artifacts": [
+      {"artifact": "coverage_report", "disposition": "ods_only", "target_tables": [], "reason": "Hotfix coverage evidence"},
+      {"artifact": "daily_assembly_summary", "disposition": "ods_only", "target_tables": [], "reason": "daily merge evidence"},
+      {"artifact": "daily_ohlcv_none_hotfix", "disposition": "modeled", "target_tables": ["dwd_security_bar"], "reason": "unadjusted daily rows applied only to parent-absent business keys"},
+      {"artifact": "daily_provider_metadata", "disposition": "ods_only", "target_tables": [], "reason": "provider lineage"},
+      {"artifact": "daily_provider_receipts", "disposition": "ods_only", "target_tables": [], "reason": "provider receipts"},
+      {"artifact": "daily_provider_status", "disposition": "superseded", "target_tables": ["dwd_security_status_interval", "dwd_tradability_state"], "reason": "raw provider status is reconciled into the assembled Hotfix status artifact"},
+      {"artifact": "daily_provider_window", "disposition": "superseded", "target_tables": ["dwd_security_bar"], "reason": "raw provider window is reconciled into the assembled Hotfix daily artifact"},
+      {"artifact": "daily_source_reconciliation", "disposition": "ods_only", "target_tables": [], "reason": "source-key reconciliation evidence"},
+      {"artifact": "daily_status_observation_hotfix", "disposition": "modeled", "target_tables": ["dwd_security_status_interval", "dwd_tradability_state"], "reason": "daily status rows applied only to parent-absent business keys"},
+      {"artifact": "fundamentals_financial_quarterly_parquet", "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "quarterly projections for the audited 209-security scope"},
+      {"artifact": "fundamentals_financial_statements_parquet", "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "three-statement wrappers for the audited 209-security scope"},
+      {"artifact": "fundamentals_financial_statements_parquet_meta_json", "disposition": "ods_only", "target_tables": [], "reason": "financial collector lineage"},
+      {"artifact": "fundamentals_financial_statements_parquet_receipts_parquet", "disposition": "ods_only", "target_tables": [], "reason": "financial collector receipts"},
+      {"artifact": "fundamentals_industry_membership_parquet", "disposition": "modeled", "target_tables": ["dwd_industry_scheme", "dwd_industry_node", "dwd_company_industry_membership"], "reason": "first-defensible industry snapshot for the audited 209-security scope"},
+      {"artifact": "fundamentals_industry_membership_parquet_meta_json", "disposition": "ods_only", "target_tables": [], "reason": "industry collector lineage"},
+      {"artifact": "fundamentals_industry_membership_parquet_receipts_parquet", "disposition": "ods_only", "target_tables": [], "reason": "industry collector receipts"},
+      {"artifact": "fundamentals_raw_f10_parquet", "disposition": "modeled", "target_tables": ["dwd_share_capital_observation", "dwd_shareholding_observation"], "reason": "F10 capital and top-holder evidence for the audited 209-security scope"},
+      {"artifact": "fundamentals_raw_f10_parquet_meta_json", "disposition": "ods_only", "target_tables": [], "reason": "F10 collector lineage"},
+      {"artifact": "fundamentals_raw_f10_parquet_receipts_parquet", "disposition": "ods_only", "target_tables": [], "reason": "F10 collector receipts"},
+      {"artifact": "minute_1m_checkpoint", "disposition": "ods_only", "target_tables": [], "reason": "one-minute collector checkpoint"},
+      {"artifact": "minute_1m_hotfix", "disposition": "modeled", "target_tables": ["dwd_security_bar"], "reason": "one-minute observations for the audited 209-security scope"},
+      {"artifact": "minute_1m_status", "disposition": "ods_only", "target_tables": [], "reason": "one-minute collector status"},
+      {"artifact": "minute_5m_checkpoint", "disposition": "ods_only", "target_tables": [], "reason": "five-minute collector checkpoint"},
+      {"artifact": "minute_5m_hotfix", "disposition": "modeled", "target_tables": ["dwd_security_bar"], "reason": "five-minute observations for the audited 209-security scope"},
+      {"artifact": "minute_5m_status", "disposition": "ods_only", "target_tables": [], "reason": "five-minute collector status"},
+      {"artifact": "parent_repair_lineage", "disposition": "ods_only", "target_tables": [], "reason": "parent repair provenance retained by the assembled Hotfix"},
+      {"artifact": "security_gap_audit", "disposition": "ods_only", "target_tables": [], "reason": "audited scope evidence"},
+      {"artifact": "security_hotfix_scope", "disposition": "ods_only", "target_tables": [], "reason": "Hotfix request scope rather than identity authority"},
+      {"artifact": "security_hotfix_stock_list", "disposition": "superseded", "target_tables": ["dwd_security"], "reason": "collection universe is superseded by the parent security master"},
+      {"artifact": "source_precedence", "disposition": "ods_only", "target_tables": [], "reason": "machine-readable fill-only merge contract"},
+      {"artifact": "valuation_history_hotfix", "disposition": "modeled", "target_tables": ["dwd_security_valuation"], "reason": "valuation observations for the audited 209-security scope"},
+      {"artifact": "valuation_history_metadata", "disposition": "ods_only", "target_tables": [], "reason": "valuation collector lineage"},
+      {"artifact": "valuation_history_receipts", "disposition": "ods_only", "target_tables": [], "reason": "valuation collector receipts"}
+    ]
+  },
+  "build_gates": [
+    "explicit_design_review_acceptance_before_build",
+    "exact_ods_base_catalog_and_source_disposition",
+    "zero_null_or_duplicate_row_keys",
+    "zero_orphan_effective_and_knowledge_foreign_keys",
+    "no_effective_interval_overlap_per_business_key",
+    "no_knowledge_interval_overlap_per_business_key",
+    "listed_company_security_listing_code_venue_reconciliation",
+    "atomic_security_bars_are_unadjusted_only",
+    "adjustment_factor_inputs_resolve_to_exact_action_or_evidence_revision",
+    "adjusted_price_reproduction_binds_exact_factor_and_action_inputs",
+    "complete_security_calendar_tradability_and_gap_classification",
+    "no_industry_membership_before_first_defensible_snapshot",
+    "financial_wrapper_decode_and_raw_payload_digest_validation",
+    "provider_native_financial_concept_context_unit_and_duplicate_coordinate_validation",
+    "xbrl_or_cas_mapping_required_only_for_rows_claiming_standard_equivalence",
+    "f10_capital_and_shareholding_parse_coverage_with_no_silent_source_record_drop",
+    "dws_measure_additivity_contract_for_every_measure",
+    "every_dws_fact_binds_exact_snapshot_and_dimension_versions",
+    "ods_to_dwd_source_and_row_coverage_report",
+    "dwd_to_dws_grain_and_reconciliation_report",
+    "deterministic_clean_rebuild",
+    "isolated_restore",
+    "new_package_identity_without_implicit_pointer_advancement"
+  ]
+}

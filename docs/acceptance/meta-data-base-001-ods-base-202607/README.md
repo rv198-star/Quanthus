@@ -4,12 +4,15 @@
 | --- | --- |
 | Work item | `META-DATA-BASE-001` |
 | Tracking issue | GitHub issue #47 |
-| Evidence date | 2026-07-31 UTC |
-| Evidence status | Final July Base built, mirrored, and manually promoted on both Base holders |
+| Evidence date | 2026-08-01 UTC |
+| Evidence status | Self-contained V1.1 built, independently deep-verified, and activated on both ODS Base holders |
 | Deployed revision | `55269c2b5459bbc3d1eb13cb539d253ed4b146f1` |
+| Hotfix build revision | `edc5242951b6881c3d65a64669877d93f280317a+ods-hotfix-worktree` |
+| V1.1 rollup revision | `f2de5ea9b8471f4fe7134868729e7626df7d933d` |
 | Policies | `config/pipelines/ods-base.v1.json` and `config/pipelines/ods-base-final-through-20260731.v2.json` |
-| Packages | `ods-base-through-20260730-v1` and candidate `ods-base-202607-v1` |
-| Machine summaries | `provisional-through-20260730.json`, `final-candidate-through-20260731.json`, and `manual-promotion-through-20260731.json` |
+| Active package | `ods-base-202607-v1.1` |
+| Retained source packages | `ods-base-202607-v1` and `ods-base-202607-v1-hotfix-001` |
+| Machine summaries | `provisional-through-20260730.json`, `final-candidate-through-20260731.json`, `manual-promotion-through-20260731.json`, `hotfix-001-209-security-gap.json`, and `rollup-v1.1-acceptance.json` |
 | Production cutover | blocked; no `GO_FOR_CUTOVER.json` was recorded |
 
 ## 1. Verdict
@@ -25,14 +28,24 @@ the provisional raw F10/full-statements scope gap is closed in this candidate.
 At `2026-07-31T18:52:25Z`, explicit operator authority decoupled Base pointer publication from
 the still-open normal dual-node weekly and catalog acceptance gates. The supported locked
 promotion command independently deep-verified the target and the compare-and-swap precondition on
-each node. Both node-local `BASE_CURRENT.json` files now bind `ods-base-202607-v1` and are
-byte-identical at
+each node. At that promotion, both node-local `BASE_CURRENT.json` files bound
+`ods-base-202607-v1` and were byte-identical at
 `sha256:5560ea8e0b5d385273bab2124f50d0183d8acce641f24cfe8d703274311cf36c`.
 
 This manual exception advances only the recovery-Base descriptor. The prior Base remains on both
 nodes, `CATALOG_CURRENT.json` remains absent, and no timer, consumer, legacy pointer, or
 `GO_FOR_CUTOVER` state changed. Normal weekly and catalog acceptance remains open as operational
 chain evidence, but no longer blocks the final July Base descriptor.
+
+On 2026-08-01, a separate audit proved that the parent security master contains 5,201 currently
+listed SSE/SZSE securities while the normal collection stock list contains 4,992. The excluded 209
+securities were repaired in immutable child `ods-base-202607-v1-hotfix-001`. Hermes and CN01 hold
+checksum-identical 449-file, 358,106,691-byte copies at manifest
+`sha256:c2fae9116e74f13b921f8cbf192d546b4f9ffd14c181dad7ca5b84bb0ccbd30a` and content digest
+`sha256:31453165b0eafd00f94357638fad7029ab0687d3c836269b843358ecfd933cac`.
+The parent Base was not modified. At Hotfix acceptance time, both `BASE_CURRENT.json` files remained
+byte-identical and pointed to `ods-base-202607-v1`; section 8 records the later V1.1 rollup and
+pointer transition.
 
 ### Provisional Phase A Record
 
@@ -160,3 +173,44 @@ recorded in `manual-promotion-through-20260731.json`. The normal dual-node weekl
 remain open as operational publication evidence. The provisional package, final package, and July
 31 source releases remain immutable evidence. Cleanup is outside Issue #47 and requires explicit
 later authority.
+
+## 7. 209-Security Hotfix
+
+The gap audit classified 83 SSE and 126 SZSE listings as excluded by collection scope. Parent raw
+repair evidence covers 208 of them through 2026-07-24; new listing `688806` had no parent repair
+history. Targeted acquisition completed with zero failed receipts for daily, valuation, three
+financial statements, F10, industry, 1-minute, and 5-minute data. Daily assembly retained 670,286
+parent-repair rows, added 1,049 provider-only keys, cross-checked 832 overlaps with zero mismatch,
+and emitted 671,335 rows.
+
+The child is fill-only. Parent business keys always win, overlap-value disagreement blocks use,
+and the Hotfix does not replace the parent package. Hermes built and deep-verified the package.
+OCI independently reverified all 449 files during transfer. CN01 received non-`READY` members into
+a hidden incoming directory, received `READY` last, passed a node-local deep verification, then
+atomically renamed the directory and passed the same verification under its formal identity. No
+hidden ingress remains. Detailed machine evidence is in
+`hotfix-001-209-security-gap.json`.
+
+## 8. Self-Contained V1.1 Rollup
+
+On 2026-08-01, Hermes and CN01 independently built `ods-base-202607-v1.1` from the exact V1 and
+Hotfix identities above. The package preserves all 20,946 parent files and 449 Hotfix files at
+their original package-relative paths, records the source package for every file, and freezes the
+fill-only precedence contract. Parent business keys win, Hotfix data fills absent keys, and the
+accepted Hotfix evidence reports 832 overlapping daily observations with zero mismatch.
+
+Both nodes independently deep-verified the resulting 21,395-file, 13,643,589,947-byte logical
+package. They returned byte-identical manifest
+`sha256:3a031118af4421b90df7aca8a96bd617a49dba2ef7e49a2074206104991e956e`
+and content digest
+`sha256:86372a3e0237c3bba3ff36e575ab041e1a0a01223587b629e7125b5ac1ba76da`.
+An all-file inode audit found zero hard-link mismatches on either node.
+
+After both deep verifications, the two ODS `BASE_CURRENT.json` files advanced under exact old-file
+SHA compare-and-swap from V1 to V1.1. Their new byte identity is
+`sha256:67865278565f0657a4bd5412574e83dfec50382986cff2201c2112416759afe5`.
+No DWD, DWS, ADS, catalog, consumer, or execution pointer changed. V1 and the Hotfix remain present;
+deletion was not authorized. Because V1.1 uses node-local hard links, it added only 50,700,288
+physical bytes per node, primarily its 49,329,538-byte manifest and directory entries. Removing
+the older directory names later would therefore recover little payload space and is a separate
+operator decision.

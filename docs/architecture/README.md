@@ -19,6 +19,7 @@ a parallel current-state architecture.
 | `adr-0003-t-close-plus-5h-pipelines.md` | Daily immutable ODS-to-DWD/DWS path | Changing post-close acquisition, cleaning, gates, publication, or alerts |
 | `adr-0004-hermes-ods-scheduler-v1.md` | Repository-owned ODS lane schedule | Changing collectors, timers, cutover, or release states |
 | `adr-0005-dual-lane-canonical-and-ads-publication.md` | Dual-lane candidates, OCI canonical authority, atomic release sets, and offline research bundles | Changing daily candidate ownership, arbitration, canonical catalogs, research-bundle portability, or target cutover |
+| `adr-0006-industry-aligned-dwd-domain-model.md` | Proposed product-bounded seven-domain DWD/DWS model, internal support boundary, PIT rules, and fact constellation | Changing DWD domains, supporting structures, grains, dimensions/facts, identities, or source disposition |
 
 ## Topic contracts
 

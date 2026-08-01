@@ -11,6 +11,7 @@
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
 | Dual-lane delivery | three-node shadow deployment, role-scoped historical ADS bootstrap, and final OCI operational ADS Base accepted; catalog-native consumer publication and cutover remain blocked pending their own evidence and `GO_FOR_CUTOVER` |
+| Product-bounded DWD/DWS model | ADR 0006, `META-DATA-DWD-001`, `01-data-foundation/dwd-domain-model.md`; seven-domain boundary agreed, detailed model under review, physical build blocked |
 
 ## 1. Goal
 
@@ -30,6 +31,16 @@ exclusions with reasons rather than silently dropping them. Official 5-minute da
 2024-07 and its consumption is deferred until event-window work; acquisition continues to retain
 recoverable history. One-minute data beginning 2026-03 is continuously acquired as archive-only
 research data because its upstream retention window is short.
+
+The DWD/DWS child proposes a product-bounded target model over the governed ODS corpus. Its seven
+business domains follow the Quanthus research objective; security/listing identity, venue,
+calendar, report concepts, and similar structures remain internal support rather than additional
+domains. It does not retroactively add financial statements, minute features, or other later
+content to the accepted P1 scope. The exact immutable self-contained `ods-base-202607-v1.1`
+rollup is its sole build input; parent and Hotfix identities remain embedded lineage rather than
+required external roots.
+Existing DWD/ADS packages remain retained but cannot be read as sources, migration targets,
+reconciliation baselines, or acceptance evidence for the new Base.
 
 P1 acceptance establishes deterministic replay and fail-closed behavior. The initial S3 full build
 exposed 276 securities with incomplete normalized unadjusted-price history and 639,009 affected
@@ -519,8 +530,9 @@ window cannot silently turn into an unplanned third observation.
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
 | Sealed DWD/DWS history seed and lane-local logical merge | `src/quanthus/pipelines/dual_lane_history.py`, `config/pipelines/dual-lane-history-base.v1.json`, `ops/bin/*dual-lane-history*` | `tests/unit/test_dual_lane_history.py`, ADR 0005, `docs/operations/dual-lane-data-platform-runbook.md` |
 | Monthly-complete DWD/DWS Base packages, guarded Base descriptors, and Base-aware lane catalogs | `src/quanthus/pipelines/dwd_dws_base.py`, `config/pipelines/dwd-dws-base-through-20260730.v2.json`, `ops/bin/*dwd-dws-base*` | `tests/unit/test_dwd_dws_base.py`, Issue #48, `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md` |
+| Product-bounded seven-domain DWD/DWS model contract | `config/pipelines/dwd-domain-model.v1.json`, ADR 0006, `01-data-foundation/dwd-domain-model.md` | `tests/contract/test_dwd_domain_model.py`; detailed design review and physical build remain blocked |
 | Offline strategy-replay research-bundle publication and role-scoped consumption | `src/quanthus/strategy_replay_ads.py`, `config/strategy-replay-ads.v1.json`, `config/strategy-replay-ads.v2.json`, `ops/bin/publish-strategy-replay-ads` | `tests/unit/test_strategy_replay_ads.py`, `tests/contract/test_strategy_ads_boundary.py`, `01-data-foundation/strategy-replay-ads.md`, `docs/acceptance/issue-45-portable-ads-20260730.md`, `docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md` |
-| Hermes-authoritative ODS Base and checksum-identical CN01 mirror | `src/quanthus/pipelines/ods_base.py`, `config/pipelines/ods-base.v1.json`, `ops/bin/*ods-base` | `tests/unit/test_ods_base.py`, ADR 0005, `01-data-foundation/ods-base.md`, `docs/operations/ods-base-runbook.md`, GitHub issue #47 |
+| Hermes-authoritative ODS Base, self-contained rollup, and checksum-identical CN01 mirror | `src/quanthus/pipelines/ods_base.py`, `src/quanthus/pipelines/ods_base_rollup.py`, `config/pipelines/ods-base.v1.json`, `ops/bin/*ods-base*` | `tests/unit/test_ods_base.py`, `tests/unit/test_ods_base_rollup.py`, ADR 0005, `01-data-foundation/ods-base.md`, `docs/operations/ods-base-runbook.md`, GitHub issue #47 |
 | OCI operational ADS historical Base and replay loader | `src/quanthus/operational_ads_base.py`, `config/operational-ads-base.v1.json`, `ops/bin/publish-operational-ads-base` | `tests/unit/test_operational_ads_base.py`, `tests/contract/test_operational_ads_base_boundary.py`, `01-data-foundation/operational-ads-base.md`, `docs/acceptance/meta-data-base-003-ads-base-202607/` |
 
 ## 8. Work items
@@ -543,6 +555,7 @@ window cannot silently turn into an unplanned third observation.
 | META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | META-DATA-PIPE-001, ADR 0005 | Classified source inventory, deep verification, clean-path restore, and identical Hermes/CN01 package descriptors |
 | META-DATA-BASE-002 | Build authoritative DWD/DWS July Base packages from exact accepted lineage | META-DATA-BASE-001, META-DATA-PIPE-003, Issue #48 | Frozen ledger, semantic equivalence, identical three-node packages, catalog rebuilds, and restore evidence |
 | META-DATA-BASE-003 | Build the OCI-authoritative operational ADS July Base | META-DATA-BASE-002, META-DATA-PIPE-003, Issue #46 | Role/PIT isolation, clean replay, identical-input rebuild, and guarded Base descriptor |
+| META-DATA-DWD-001 | Define and implement the product-bounded seven-domain DWD/DWS model | META-DATA-BASE-001, ADR 0006 | Domain and dimensional-model review first; later packages, reconciliation, deterministic rebuild, and three-node evidence |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |
 | P1-DATA-004 | Normalize mixed-unit corporate actions for continuous historical replay | C1, S4, P1-SNAPSHOT-001 | Deterministic authority audit, fully versioned per-security exceptions, and immutable replay input bundle |

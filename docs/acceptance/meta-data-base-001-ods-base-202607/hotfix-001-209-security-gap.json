@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "work_item": "META-DATA-BASE-001",
+  "evidence_status": "immutable_hotfix_built_mirrored_and_deep_verified_without_pointer_change",
+  "evidence_date_utc": "2026-08-01",
+  "code_revision": "edc5242951b6881c3d65a64669877d93f280317a+ods-hotfix-worktree",
+  "audit": {
+    "parent_listed_sse_szse_count": 5201,
+    "normal_collection_scope_count": 4992,
+    "excluded_security_count": 209,
+    "exchange_counts": {
+      "SSE": 83,
+      "SZSE": 126
+    },
+    "parent_repair_security_count": 208,
+    "truly_absent_security_count": 1,
+    "truly_absent_security": "688806",
+    "root_cause": "normal_collection_stock_list_exclusion",
+    "provider_unavailability": false,
+    "evidence_path": "payload/evidence/security-gap-audit.json",
+    "evidence_sha256": "sha256:a39de7ac21ea10c98c19ceb317e5f2a61012de3764f716a095d9e491d739ff68"
+  },
+  "parent": {
+    "bundle_id": "ods-base-202607-v1",
+    "through_date": "2026-07-31",
+    "manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+    "content_digest": "sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1",
+    "mutated": false
+  },
+  "package": {
+    "hotfix_id": "ods-base-202607-v1-hotfix-001",
+    "built_at": "2026-08-01T08:51:07.884953+00:00",
+    "scope_count": 209,
+    "file_count": 449,
+    "size_bytes": 358106691,
+    "manifest_sha256": "sha256:c2fae9116e74f13b921f8cbf192d546b4f9ffd14c181dad7ca5b84bb0ccbd30a",
+    "content_digest": "sha256:31453165b0eafd00f94357638fad7029ab0687d3c836269b843358ecfd933cac",
+    "ready_sha256": "sha256:0555291ac69c0b445b4d5a17e7e45cd722d499ce1eafed66f54163572476e176",
+    "application_mode": "fill_absent_keys_only",
+    "overlap_policy": "parent_wins_and_value_mismatch_fails",
+    "coverage_report_sha256": "sha256:352b52d28c74d52ee02a3040761d1ee887da695c0b3e279bda6bd26050bb076f",
+    "source_precedence_sha256": "sha256:cc7b4923ce53050cd4a12527eec3b55992853c737bc23597f150405cf7100306"
+  },
+  "coverage": {
+    "daily": {
+      "provider_rows": 1881,
+      "parent_repair_rows": 670286,
+      "provider_fill_rows": 1049,
+      "output_rows": 671335,
+      "overlap_rows": 832,
+      "overlap_mismatches": 0,
+      "successful_receipts": 209,
+      "failed_receipts": 0
+    },
+    "minute_1m": {
+      "security_count": 209,
+      "row_count": 4716720,
+      "failed_securities": 0
+    },
+    "minute_5m": {
+      "security_count": 209,
+      "row_count": 4942128,
+      "failed_securities": 0
+    },
+    "valuation": {
+      "security_count": 209,
+      "row_count": 671335,
+      "failed_securities": 0
+    },
+    "financial_statements": {
+      "security_count": 209,
+      "request_count": 627,
+      "wrapper_count": 627,
+      "quarterly_projection_rows": 14832,
+      "failed_requests": 0
+    },
+    "raw_f10": {
+      "security_count": 209,
+      "row_count": 3344,
+      "failed_securities": 0
+    },
+    "industry_membership": {
+      "security_count": 209,
+      "row_count": 209,
+      "failed_securities": 0
+    },
+    "bse_policy": "BSE_PARTIAL_NONBLOCKING"
+  },
+  "overlay_key_validation": {
+    "all_declared_keys_unique": true,
+    "duplicate_counts": {
+      "daily_stock_code_date": 0,
+      "status_stock_code_date": 0,
+      "minute_1m_stock_code_ts": 0,
+      "minute_5m_stock_code_ts": 0,
+      "valuation_stock_code_date": 0,
+      "financial_statements_stock_code_statement_type": 0,
+      "financial_quarterly_stock_code_report_date": 0,
+      "raw_f10_stock_code_category": 0,
+      "industry_stock_code_market_date": 0
+    }
+  },
+  "replicas": [
+    {
+      "node": "hermes",
+      "root": "/srv/quanthus/ods/base-hotfixes/ods-base-202607-v1-hotfix-001",
+      "deep_verify": "passed",
+      "free_bytes_after": 21063655424
+    },
+    {
+      "node": "cn01",
+      "root": "/srv/quanthus/ods/base-hotfixes/ods-base-202607-v1-hotfix-001",
+      "staging_deep_verify": "passed",
+      "formal_deep_verify": "passed",
+      "checksum_identity": "passed",
+      "free_bytes_after": 51510706176
+    }
+  ],
+  "publication_state": {
+    "ready_transferred_last": true,
+    "hidden_ingress_remaining": false,
+    "base_current_advanced": false,
+    "base_current_sha256_on_both_nodes": "sha256:5560ea8e0b5d385273bab2124f50d0183d8acce641f24cfe8d703274311cf36c",
+    "base_current_bundle_id_on_both_nodes": "ods-base-202607-v1",
+    "dwd_dws_or_consumer_pointer_changed": false,
+    "go_for_cutover": false
+  }
+}

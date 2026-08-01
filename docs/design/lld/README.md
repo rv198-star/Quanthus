@@ -15,7 +15,9 @@ index, and one active branch; expand to linked siblings only for a concrete inte
    changing that boundary.
 7. `01-data-foundation.md` and its `01-data-foundation/strategy-replay-ads.md` child for offline
    replay research bundles or `01-data-foundation/operational-ads-base.md` for the OCI historical
-   Base; `10-monitoring-attribution.md` only for the exact audit path.
+   Base. Use `01-data-foundation/dwd-domain-model.md` for the product-bounded seven-domain catalog,
+   DWD objects, DWS dimensions/facts, grains, time semantics, or ODS coverage; `10-monitoring-attribution.md`
+   only for the exact audit path.
 
 For user-facing terminology and strategy-policy discussion, start with the non-governing
 `../p3-strategy-semantics-checklist.md` and expand only the LLD branch for the item being decided.

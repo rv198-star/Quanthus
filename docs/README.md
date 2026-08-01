@@ -122,6 +122,14 @@ nodes.
   2026-07-31 are checksum-identical and active on OCI, CN01, and Hermes; deterministic rebuild,
   exact-SHA descriptor advancement, idempotent lane-catalog replay, and both node doctors passed.
   Canonical, ADS, release-set, legacy, and consumer authority remained unchanged.
+- ADR 0006 proposes the product-bounded DWD/DWS model under `META-DATA-DWD-001`. The agreed boundary
+  has seven first-class business domains; security/listing identity, venue, calendar, report
+  concept, and similar structures remain internal support. The draft contract defines 33 DWD
+  objects, ten shared DWS dimensions, and thirteen facts while reconciling every final ODS Base
+  source. The exact immutable self-contained `ods-base-202607-v1.1` rollup is the sole build input;
+  its manifest retains the parent and 209-security Hotfix lineage without requiring either older
+  directory name. Existing DWD/ADS packages are retained but never read or used as acceptance
+  baselines. Detailed review and physical build remain blocked.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional
@@ -148,6 +156,7 @@ gate is a conformance defect rather than an alternate project state.
 | --- | --- | --- |
 | P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
 | P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004/0005, relevant acceptance file |
+| Product-bounded DWD/DWS modeling or coverage | this map, HLD, ADR 0006, LLD 01 and `design/lld/01-data-foundation/dwd-domain-model.md` | Exact ODS Base policy, `config/pipelines/dwd-domain-model.v1.json`, and its contract test; draft consistency is not build authority |
 | ODS or daily operations | this map, architecture index, ADR 0003/0004/0005, selected runbook | Exact config, service, and contract tests |
 | Dual-lane candidate or ADS publication | root `AGENTS.md`, this map, HLD, ADR 0005, LLD 01 and its exact ADS child | Use `operational-ads-base.md` for the OCI historical Base or `strategy-replay-ads.md` for offline research bundles; load exact config/tests and the dual-lane runbook; cutover remains separately gated |
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
+import stat
 import tempfile
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -602,9 +604,11 @@ def _remove_orphaned_temporaries(work: Path) -> None:
         partial.unlink(missing_ok=True)
 
 
-def _work_directory(output: Path, run_id: str) -> Path:
-    run_digest = hashlib.sha256(run_id.encode("utf-8")).hexdigest()
-    return output.parent / f".{output.name}.{run_digest}.work"
+def _work_directory(output: Path, run_id: str, semantic_digest: str) -> Path:
+    identity_digest = _canonical_digest(
+        {"run_id": run_id, "semantic_digest": semantic_digest}
+    ).removeprefix(_SHA256)
+    return output.parent / f".{output.name}.{identity_digest}.work"
 
 
 def _initialize_unowned_work(
@@ -697,8 +701,60 @@ def _verify_existing_output(
     if physical_directories != _OUTPUT_DIRECTORIES:
         raise ListedCompanyBuildError("existing output directory inventory is not exact")
 
+    checkpoint = _object(output / "checkpoint.json")
+    receipt = _object(output / "receipts" / "listed-company-build.json")
+    completed = _mapping(checkpoint.get("completed_tables"), "completed tables")
+    declared_table_digests = _mapping(receipt.get("table_digests"), "table digests")
+    if (
+        checkpoint.get("schema_version") != 1
+        or checkpoint.get("run_id") != run_id
+        or checkpoint.get("semantic_digest") != semantic_digest
+        or set(completed) != set(_OWNED_TABLES)
+        or receipt.get("schema_version") != 1
+        or receipt.get("kind") != "dwd_listed_company_build_receipt"
+        or receipt.get("run_id") != run_id
+        or receipt.get("semantic_digest") != semantic_digest
+        or receipt.get("row_counts") != dict(row_counts)
+        or set(declared_table_digests) != set(_OWNED_TABLES)
+    ):
+        raise ListedCompanyBuildError("output checkpoint or receipt identity is inconsistent")
+    try:
+        import pyarrow.parquet as pq  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise ListedCompanyBuildError("pyarrow is required for output verification") from exc
+    actual_table_digests: dict[str, str] = {}
+    schemas = _table_schemas()
+    for table in _OWNED_TABLES:
+        relative = f"payload/listed_company/{table}.parquet"
+        path = output / relative
+        table_value = pq.read_table(path)
+        actual_digest = _canonical_digest(table_value.to_pylist())
+        actual_table_digests[table] = actual_digest
+        table_checkpoint = _mapping(completed.get(table), f"checkpoint {table}")
+        if (
+            table_value.num_rows != row_counts[table]
+            or actual_digest != declared_table_digests[table]
+            or table_checkpoint.get("path") != relative
+            or table_checkpoint.get("row_count") != row_counts[table]
+            or table_checkpoint.get("schema_digest") != _canonical_digest(str(schemas[table]))
+            or table_checkpoint.get("semantic_digest") != actual_digest
+            or table_checkpoint.get("sha256") != _sha256(path)
+        ):
+            raise ListedCompanyBuildError(f"output table semantic verification failed: {table}")
+    recomputed_semantic_digest = _canonical_digest(
+        {
+            "input_plan_digest": receipt.get("input_plan_digest"),
+            "model_sha256": receipt.get("model_sha256"),
+            "reference_seed_sha256": receipt.get("reference_seed_sha256"),
+            "code_validity_sha256": receipt.get("code_validity_sha256"),
+            "table_digests": actual_table_digests,
+        }
+    )
+    if recomputed_semantic_digest != semantic_digest:
+        raise ListedCompanyBuildError("output semantic digest does not match its payload")
 
-def build_listed_company(
+
+def _build_listed_company_locked(
     *,
     ods_package: Path,
     input_plan: Path,
@@ -779,7 +835,7 @@ def build_listed_company(
 
     try:
         import pyarrow as pa
-        import pyarrow.parquet as pq  # type: ignore[import-untyped]
+        import pyarrow.parquet as pq
     except ModuleNotFoundError as exc:
         raise ListedCompanyBuildError("pyarrow is required for DWD construction") from exc
 
@@ -1300,7 +1356,7 @@ def build_listed_company(
             bse_listed_count=listed_counts["BSE"],
         )
 
-    work = _work_directory(output, run_id)
+    work = _work_directory(output, run_id, semantic_digest)
     checkpoint_identity = {
         "schema_version": 1,
         "run_id": run_id,
@@ -1325,6 +1381,10 @@ def build_listed_company(
         _initialize_unowned_work(work, checkpoint_path, checkpoint_identity)
 
     checkpoint = _object(checkpoint_path)
+    if any(
+        checkpoint.get(key) != checkpoint_identity[key] for key in ("run_id", "semantic_digest")
+    ):
+        raise ListedCompanyBuildError(f"checkpoint belongs to another build: {work}")
     completed = dict(_mapping(checkpoint.get("completed_tables"), "completed tables"))
     schemas = _table_schemas()
     for table in _OWNED_TABLES:
@@ -1427,3 +1487,50 @@ def build_listed_company(
         primary_listed_count=primary_count,
         bse_listed_count=listed_counts["BSE"],
     )
+
+
+def build_listed_company(
+    *,
+    ods_package: Path,
+    input_plan: Path,
+    model_path: Path,
+    reference_seed_path: Path,
+    code_validity_path: Path,
+    output: Path,
+    run_id: str,
+) -> ListedCompanyBuildResult:
+    """Build six deterministic listed-company DWD objects from one sealed Base plan."""
+
+    if output.is_symlink():
+        raise ListedCompanyBuildError("candidate output path must not be a symbolic link")
+    normalized_output = output.resolve()
+    normalized_output.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = normalized_output.parent / f".{normalized_output.name}.lock"
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(lock_path, flags, 0o640)
+    except OSError as exc:
+        raise ListedCompanyBuildError(f"cannot open build lock: {lock_path}") from exc
+    locked = False
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ListedCompanyBuildError("build lock must be a physical file")
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        locked = True
+        return _build_listed_company_locked(
+            ods_package=ods_package,
+            input_plan=input_plan,
+            model_path=model_path,
+            reference_seed_path=reference_seed_path,
+            code_validity_path=code_validity_path,
+            output=normalized_output,
+            run_id=run_id,
+        )
+    finally:
+        if locked:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)

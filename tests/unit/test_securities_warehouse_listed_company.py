@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import tempfile
+import threading
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -290,19 +293,26 @@ class ListedCompanyBuildTests(unittest.TestCase):
             f"{_sha256(self.plan / 'manifest.json')}\n", encoding="ascii"
         )
 
-    def _build(self, output: Path | None = None, reference_seed: Path | None = None):
+    def _build(
+        self,
+        output: Path | None = None,
+        reference_seed: Path | None = None,
+        code_validity: Path | None = None,
+    ):
         return build_listed_company(
             ods_package=self.ods,
             input_plan=self.plan,
             model_path=MODEL,
             reference_seed_path=reference_seed or REFERENCE_SEED,
-            code_validity_path=self.validity,
+            code_validity_path=code_validity or self.validity,
             output=output or self.output,
             run_id=self.run_id,
         )
 
-    def _work(self, *, run_id: str | None = None) -> Path:
-        return listed_company_module._work_directory(self.output.resolve(), run_id or self.run_id)
+    def _work(self) -> Path:
+        matches = sorted(self.output.parent.glob(f".{self.output.name}.*.work"))
+        self.assertEqual(len(matches), 1)
+        return matches[0]
 
     def _set_plan_run_id(self, run_id: str) -> None:
         plan_path = self.plan / "input-plan.json"
@@ -757,11 +767,10 @@ class ListedCompanyBuildTests(unittest.TestCase):
         self.assertFalse(work.exists())
 
     def test_retry_recovers_after_ready_before_directory_publish(self) -> None:
-        work = self._work()
         real_replace = listed_company_module.os.replace
 
         def interrupt_publish(source: object, destination: object) -> None:
-            if Path(source) == work and Path(destination) == self.output:
+            if Path(source).name.endswith(".work") and Path(destination) == self.output:
                 raise OSError("fixture publish interruption")
             real_replace(source, destination)
 
@@ -770,6 +779,7 @@ class ListedCompanyBuildTests(unittest.TestCase):
             self.assertRaisesRegex(OSError, "fixture publish interruption"),
         ):
             self._build()
+        work = self._work()
         self.assertTrue((work / "READY").is_file())
 
         result = self._build()
@@ -833,6 +843,87 @@ class ListedCompanyBuildTests(unittest.TestCase):
         self.assertTrue((result.root / "READY").is_file())
         self.assertTrue(first_work.is_dir())
         self.assertEqual(orphan.read_text(encoding="ascii"), "partial")
+
+    def test_concurrent_same_semantic_builds_are_serialized_and_idempotent(self) -> None:
+        real_build = listed_company_module._build_listed_company_locked
+        guard = threading.Lock()
+        active = 0
+        max_active = 0
+
+        def observed_build(**kwargs: object):
+            nonlocal active, max_active
+            with guard:
+                active += 1
+                max_active = max(max_active, active)
+            try:
+                time.sleep(0.05)
+                return real_build(**kwargs)
+            finally:
+                with guard:
+                    active -= 1
+
+        with (
+            mock.patch.object(
+                listed_company_module,
+                "_build_listed_company_locked",
+                side_effect=observed_build,
+            ),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            results = list(executor.map(lambda _index: self._build(), range(2)))
+
+        self.assertEqual(max_active, 1)
+        self.assertEqual(results[0].semantic_digest, results[1].semantic_digest)
+        self.assertTrue((self.output / "READY").is_file())
+
+    def test_concurrent_different_semantics_fail_before_mixing_payloads(self) -> None:
+        alternative_validity = self.root / "security-code-validity-alternative.json"
+        validity = json.loads(self.validity.read_text(encoding="utf-8"))
+        validity["source_revision"] = "fixture-code-validity-source-v2"
+        self._write_json(alternative_validity, validity)
+
+        def build(validity_path: Path):
+            try:
+                return validity_path, self._build(code_validity=validity_path)
+            except ListedCompanyBuildError as exc:
+                return validity_path, exc
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            outcomes = list(executor.map(build, (self.validity, alternative_validity)))
+
+        results = [value for value in outcomes if not isinstance(value[1], Exception)]
+        errors = [value for value in outcomes if isinstance(value[1], Exception)]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("another run or semantic build", str(errors[0][1]))
+        winning_validity, winner = results[0]
+        self.assertEqual(
+            self._build(code_validity=winning_validity).semantic_digest,
+            winner.semantic_digest,
+        )
+
+    def test_rehashed_manifest_cannot_hide_semantic_payload_tampering(self) -> None:
+        result = self._build()
+        table_path = result.root / "payload" / "listed_company" / "dwd_listed_company.parquet"
+        table = pq.read_table(table_path)
+        rows = table.to_pylist()
+        rows[0]["display_name"] = "TAMPERED COMPANY"
+        pq.write_table(pa.Table.from_pylist(rows, schema=table.schema), table_path)
+        checkpoint_path = result.root / "checkpoint.json"
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        checkpoint["completed_tables"]["dwd_listed_company"]["sha256"] = _sha256(table_path)
+        self._write_json(checkpoint_path, checkpoint)
+        manifest_path = result.root / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for item in manifest["files"]:
+            path = result.root / item["path"]
+            item["sha256"] = _sha256(path)
+            item["size_bytes"] = path.stat().st_size
+        self._write_json(manifest_path, manifest)
+        (result.root / "READY").write_text(f"{_sha256(manifest_path)}\n", encoding="ascii")
+
+        with self.assertRaisesRegex(ListedCompanyBuildError, "semantic verification failed"):
+            self._build()
 
 
 if __name__ == "__main__":

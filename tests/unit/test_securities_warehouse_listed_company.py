@@ -301,6 +301,23 @@ class ListedCompanyBuildTests(unittest.TestCase):
             run_id=self.run_id,
         )
 
+    def _work(self, *, run_id: str | None = None) -> Path:
+        return listed_company_module._work_directory(self.output.resolve(), run_id or self.run_id)
+
+    def _set_plan_run_id(self, run_id: str) -> None:
+        plan_path = self.plan / "input-plan.json"
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        plan["run_id"] = run_id
+        self._write_json(plan_path, plan)
+        manifest_path = self.plan / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        plan_entry = next(item for item in manifest["files"] if item["path"] == plan_path.name)
+        plan_entry["sha256"] = _sha256(plan_path)
+        plan_entry["size_bytes"] = plan_path.stat().st_size
+        self._write_json(manifest_path, manifest)
+        (self.plan / "READY").write_text(f"{_sha256(manifest_path)}\n", encoding="ascii")
+        self.run_id = run_id
+
     @staticmethod
     def _rows(output: Path, table: str) -> list[dict[str, object]]:
         return pq.read_table(output / "payload" / "listed_company" / f"{table}.parquet").to_pylist()
@@ -727,7 +744,7 @@ class ListedCompanyBuildTests(unittest.TestCase):
             self.assertRaisesRegex(OSError, "fixture interruption"),
         ):
             self._build()
-        work = self.output.parent / f".{self.output.name}.work"
+        work = self._work()
         checkpoint = json.loads((work / "checkpoint.json").read_text(encoding="utf-8"))
         self.assertEqual(list(checkpoint["completed_tables"]), ["dwd_listed_company"])
         (work / ".checkpoint.json.orphan").write_text("partial", encoding="ascii")
@@ -740,7 +757,7 @@ class ListedCompanyBuildTests(unittest.TestCase):
         self.assertFalse(work.exists())
 
     def test_retry_recovers_after_ready_before_directory_publish(self) -> None:
-        work = self.output.parent / f".{self.output.name}.work"
+        work = self._work()
         real_replace = listed_company_module.os.replace
 
         def interrupt_publish(source: object, destination: object) -> None:
@@ -759,6 +776,63 @@ class ListedCompanyBuildTests(unittest.TestCase):
 
         self.assertTrue((result.root / "READY").is_file())
         self.assertFalse(work.exists())
+
+    def test_retry_initializes_after_interruption_before_first_checkpoint(self) -> None:
+        real_write = listed_company_module._write_json_atomic
+        interrupted = False
+
+        def interrupt_initial_checkpoint(path: Path, value: object) -> None:
+            nonlocal interrupted
+            if path.name == "checkpoint.json" and not interrupted:
+                interrupted = True
+                raise OSError("fixture initial checkpoint interruption")
+            real_write(path, value)
+
+        with (
+            mock.patch.object(
+                listed_company_module,
+                "_write_json_atomic",
+                side_effect=interrupt_initial_checkpoint,
+            ),
+            self.assertRaisesRegex(OSError, "fixture initial checkpoint interruption"),
+        ):
+            self._build()
+        work = self._work()
+        self.assertTrue(work.is_dir())
+        self.assertFalse((work / "checkpoint.json").exists())
+        (work / ".checkpoint.json.interrupted").write_text("partial", encoding="ascii")
+
+        result = self._build()
+
+        self.assertTrue((result.root / "READY").is_file())
+        self.assertFalse(work.exists())
+
+    def test_different_run_does_not_clean_existing_run_temporaries(self) -> None:
+        real_write = pq.write_table
+        calls = 0
+
+        def fail_second_write(*args: object, **kwargs: object) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("fixture interruption")
+            real_write(*args, **kwargs)
+
+        with (
+            mock.patch("pyarrow.parquet.write_table", side_effect=fail_second_write),
+            self.assertRaisesRegex(OSError, "fixture interruption"),
+        ):
+            self._build()
+        first_work = self._work()
+        orphan = first_work / ".checkpoint.json.orphan"
+        orphan.write_text("partial", encoding="ascii")
+
+        self._set_plan_run_id("listed-company-fixture-v2")
+        result = self._build()
+
+        self.assertTrue((result.root / "READY").is_file())
+        self.assertTrue(first_work.is_dir())
+        self.assertEqual(orphan.read_text(encoding="ascii"), "partial")
 
 
 if __name__ == "__main__":

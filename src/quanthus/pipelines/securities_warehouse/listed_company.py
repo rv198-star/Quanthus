@@ -602,6 +602,42 @@ def _remove_orphaned_temporaries(work: Path) -> None:
         partial.unlink(missing_ok=True)
 
 
+def _work_directory(output: Path, run_id: str) -> Path:
+    run_digest = hashlib.sha256(run_id.encode("utf-8")).hexdigest()
+    return output.parent / f".{output.name}.{run_digest}.work"
+
+
+def _initialize_unowned_work(
+    work: Path, checkpoint_path: Path, checkpoint_identity: Mapping[str, Any]
+) -> None:
+    allowed_directories = {
+        Path("payload"),
+        Path("payload/listed_company"),
+        Path("receipts"),
+        Path("reconciliation"),
+    }
+    if work.exists():
+        if work.is_symlink() or not work.is_dir():
+            raise ListedCompanyBuildError("build work path must be a physical directory")
+        for path in work.rglob("*"):
+            relative = path.relative_to(work)
+            if path.is_symlink():
+                raise ListedCompanyBuildError("uninitialized work contains a symbolic link")
+            if path.is_dir() and relative in allowed_directories:
+                continue
+            if path.is_file() and path.parent == work and path.name.startswith(".checkpoint.json."):
+                continue
+            raise ListedCompanyBuildError(
+                f"uninitialized work contains an unexpected path: {relative}"
+            )
+        _remove_orphaned_temporaries(work)
+    else:
+        work.mkdir(mode=0o750)
+    for relative in sorted(allowed_directories, key=lambda value: len(value.parts)):
+        (work / relative).mkdir(exist_ok=True)
+    _write_json_atomic(checkpoint_path, checkpoint_identity)
+
+
 def _verify_existing_output(
     output: Path,
     run_id: str,
@@ -1264,7 +1300,7 @@ def build_listed_company(
             bse_listed_count=listed_counts["BSE"],
         )
 
-    work = output.parent / f".{output.name}.work"
+    work = _work_directory(output, run_id)
     checkpoint_identity = {
         "schema_version": 1,
         "run_id": run_id,
@@ -1273,18 +1309,20 @@ def build_listed_company(
     }
     checkpoint_path = work / "checkpoint.json"
     if work.exists():
-        _remove_orphaned_temporaries(work)
-        checkpoint = _object(checkpoint_path)
-        if any(
-            checkpoint.get(key) != checkpoint_identity[key] for key in ("run_id", "semantic_digest")
-        ):
-            raise ListedCompanyBuildError(f"checkpoint belongs to another build: {work}")
+        if checkpoint_path.is_file() and not checkpoint_path.is_symlink():
+            checkpoint = _object(checkpoint_path)
+            if any(
+                checkpoint.get(key) != checkpoint_identity[key]
+                for key in ("run_id", "semantic_digest")
+            ):
+                raise ListedCompanyBuildError(f"checkpoint belongs to another build: {work}")
+            _remove_orphaned_temporaries(work)
+        elif checkpoint_path.exists():
+            raise ListedCompanyBuildError("checkpoint must be a physical file")
+        else:
+            _initialize_unowned_work(work, checkpoint_path, checkpoint_identity)
     else:
-        work.mkdir(mode=0o750)
-        (work / "payload" / "listed_company").mkdir(parents=True)
-        (work / "receipts").mkdir()
-        (work / "reconciliation").mkdir()
-        _write_json_atomic(checkpoint_path, checkpoint_identity)
+        _initialize_unowned_work(work, checkpoint_path, checkpoint_identity)
 
     checkpoint = _object(checkpoint_path)
     completed = dict(_mapping(checkpoint.get("completed_tables"), "completed tables"))

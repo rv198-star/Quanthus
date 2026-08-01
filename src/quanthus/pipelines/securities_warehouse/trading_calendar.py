@@ -462,7 +462,8 @@ def _load_calendar_snapshots(
         if isinstance(raw, Mapping)
         and raw.get("record_type") == "file"
         and raw.get("disposition") == "modeled"
-        and raw.get("mapping_identity") == "trading_calendar"
+        and raw.get("mapping_identity")
+        in {"trading_calendar", "trading_calendar_history_hotfix"}
         and _OWNED_TABLE in raw.get("target_tables", [])
     ]
     if not records:

@@ -220,7 +220,7 @@ class TradingCalendarBuildTests(unittest.TestCase):
                 "dataset_id": "trading_calendar_history_hotfix",
                 "record_type": "file",
                 "disposition": "modeled",
-                "mapping_identity": "trading_calendar",
+                "mapping_identity": "trading_calendar_history_hotfix",
                 "path": relative,
                 "sha256": _sha256(path),
                 "size_bytes": path.stat().st_size,

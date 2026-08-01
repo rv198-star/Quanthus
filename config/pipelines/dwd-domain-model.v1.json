@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "contract_id": "quanthus-product-bounded-a-share-dwd-dws-model-v1",
-  "governing_work_item": "META-DATA-DWD-001",
+  "governing_work_item": "META-DATA-DWD-002",
   "governing_decision": "ADR-0006",
-  "status": "draft_review_required_build_not_authorized",
+  "status": "approved_for_scripted_build_implementation",
   "scope": {
     "product": "Quanthus A-share quantitative research and decision platform",
     "initial_market": "China A-share listed companies, their securities, and governed benchmarks",
-    "coverage_claim": "logical_and_physical_design_contract_only",
-    "physical_build_started": false,
+    "coverage_claim": "approved_model_contract_with_build_evidence_still_required",
+    "physical_build_started": true,
     "domain_scope_owner": "quanthus_product_objective",
     "source_availability_owner": "governed_ods_inventory_and_semantics",
     "semantic_reference_owner": "bounded_industry_references",
@@ -1031,18 +1031,43 @@
       {"artifact": "trading_calendar", "disposition": "modeled", "target_tables": ["dwd_trading_venue", "dwd_trading_calendar", "dwd_tradability_state"]},
       {"artifact": "valuation_daily_delta", "disposition": "modeled", "target_tables": ["dwd_security_valuation"]}
     ],
+    "release_auxiliary_artifacts": [
+      {"artifact": "acquisition_log", "aliases": [], "disposition": "ods_only", "target_tables": [], "reason": "collector execution evidence is not a DWD business fact"},
+      {"artifact": "lane_status", "aliases": [], "disposition": "ods_only", "target_tables": [], "reason": "lane execution state is not a DWD business fact"},
+      {"artifact": "after_hours_fixed_price_receipts", "aliases": [], "disposition": "ods_only", "target_tables": [], "reason": "collector receipts are retained only as ODS evidence"},
+      {"artifact": "after_hours_fixed_price_trades", "aliases": [], "disposition": "deferred", "target_tables": [], "reason": "trade-by-trade observations are outside the approved warehouse scope"},
+      {"artifact": "release_metadata", "aliases": [], "disposition": "ods_only", "target_tables": [], "reason": "release envelope and READY binding are ODS lineage"}
+    ],
     "weekly_artifacts": [
       {"artifact": "shareholder_count", "aliases": ["shareholder_count_revision"], "disposition": "modeled", "target_tables": ["dwd_shareholder_count_observation"]},
       {"artifact": "raw_f10", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_share_capital_observation", "dwd_shareholding_observation"], "reason": "retained dated capital and top-holder evidence is parsed during the new DWD build"},
       {"artifact": "financial_statements", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "complete three-statement payloads are decoded and expanded into provider-native facts during the new DWD build"},
-      {"artifact": "financial_quarterly", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "quarterly projection is retained as report and reconciliation evidence"},
+      {"artifact": "financial_quarterly", "aliases": ["financial_quarterly_revision"], "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "quarterly projection is retained as report and reconciliation evidence"},
       {"artifact": "corporate_actions", "aliases": ["corporate_actions_revision"], "disposition": "modeled", "target_tables": ["dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor_input"]},
       {"artifact": "dividends", "aliases": ["dividends_revision"], "disposition": "modeled", "target_tables": ["dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor_input"]},
       {"artifact": "adjustment_evidence", "aliases": ["adjustment_evidence_revision"], "disposition": "modeled", "target_tables": ["dwd_adjustment_factor", "dwd_adjustment_factor_input", "dwd_quality_exception"]},
       {"artifact": "st_announcement_trail", "aliases": ["st_status_observation_revision"], "disposition": "modeled", "target_tables": ["dwd_disclosure", "dwd_security_status_interval", "dwd_tradability_state"]},
       {"artifact": "security_lifecycle", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_listed_company", "dwd_security", "dwd_security_identifier", "dwd_listing", "dwd_listing_status_interval"]},
       {"artifact": "industry_membership", "aliases": [], "disposition": "modeled", "target_tables": ["dwd_industry_scheme", "dwd_industry_node", "dwd_company_industry_membership"]},
-      {"artifact": "fundamentals_receipts", "aliases": [], "disposition": "ods_only", "target_tables": []}
+      {"artifact": "fundamentals_receipts", "aliases": [], "disposition": "ods_only", "target_tables": []},
+      {"artifact": "weekly_correction_revision", "aliases": [], "disposition": "superseded", "target_tables": ["dwd_security_bar"], "reason": "retained reconciliation revision matches canonical daily keys and is not a competing bar authority"},
+      {"artifact": "weekly_correction_meta", "aliases": [], "disposition": "ods_only", "target_tables": [], "reason": "weekly correction build lineage"},
+      {"artifact": "reconciliation_keys", "aliases": [], "disposition": "ods_only", "target_tables": [], "reason": "key-level reconciliation evidence"},
+      {"artifact": "reconciliation_summary", "aliases": [], "disposition": "ods_only", "target_tables": [], "reason": "weekly reconciliation summary"},
+      {"artifact": "lane_status", "aliases": [], "disposition": "ods_only", "target_tables": [], "reason": "weekly lane execution state"}
+    ],
+    "container_member_count": 10,
+    "container_members": [
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "announcements", "disposition": "modeled", "target_tables": ["dwd_disclosure", "dwd_disclosure_subject"], "reason": "company disclosures and typed subjects"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "crawl_progress", "disposition": "ods_only", "target_tables": [], "reason": "announcement collector checkpoint"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "fin_abstract", "disposition": "modeled", "target_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"], "reason": "provider-native reported financial indicators"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "fin_progress", "disposition": "ods_only", "target_tables": [], "reason": "financial collector checkpoint"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "holder_changes", "disposition": "modeled", "target_tables": ["dwd_shareholding_change"], "reason": "disclosed holder change events"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "holder_progress", "disposition": "ods_only", "target_tables": [], "reason": "holder-change collector checkpoint"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "info_meta", "disposition": "ods_only", "target_tables": [], "reason": "container metadata"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "shareholder_count", "disposition": "superseded", "target_tables": ["dwd_shareholder_count_observation"], "reason": "reconciled against the canonical shareholder-count Parquet authority"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "shareholder_count_progress", "disposition": "ods_only", "target_tables": [], "reason": "shareholder-count collector checkpoint"},
+      {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "shareholder_count_revision", "disposition": "ods_only", "target_tables": [], "reason": "empty revision ledger retained as ODS evidence"}
     ],
     "hotfix_artifact_count": 33,
     "hotfix_artifacts": [

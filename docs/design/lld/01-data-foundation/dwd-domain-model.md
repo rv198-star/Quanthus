@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Governing work | `META-DATA-DWD-001` |
+| Governing work | `META-DATA-DWD-002` / Issue #55 |
 | Governing decision | ADR 0006 |
-| Design status | draft |
-| Delivery gate | blocked pending domain and dimensional-model review |
+| Design status | implementation-approved |
+| Delivery gate | script implementation open; paired publication remains blocked by Issue #69 |
 | Machine contract | `config/pipelines/dwd-domain-model.v1.json` |
 | Build input | Exact immutable self-contained `ods-base-202607-v1.1` rollup |
 | Modeling inputs | Quanthus product objective, governed ODS inventory/semantics, and bounded industry references |
@@ -26,7 +26,7 @@ The design intentionally separates three decisions:
 
 This design does not:
 
-- start a DWD/DWS build or authorize a pointer change;
+- authorize a DWD/DWS publication or pointer change before Issue #69 passes;
 - model issuance, underwriting, brokerage, clearing, settlement, or legal-registry operations;
 - let current strategy features define DWD facts;
 - treat every FIBO concept as a Quanthus warehouse domain; or
@@ -498,8 +498,8 @@ Mandatory gates include:
 
 | ID | Work | Current state | Acceptance evidence |
 | --- | --- | --- | --- |
-| `META-DATA-DWD-001` | Define and implement the product-bounded seven-domain DWD/DWS model | Domain boundary agreed; detailed DWD/DWS design under review; build blocked | Reviewed model contract first; later deterministic packages, reconciliation, restore, and three-node evidence |
+| `META-DATA-DWD-002` | Implement the product-bounded seven-domain DWD/DWS v2 scripts under Issue #55 | Model accepted; scripted implementation active; paired publication blocked | Script-level tests, data evaluation, deterministic packages, reconciliation, restore, and three-node evidence |
 
-The current increment is a design proposal. A green contract test proves structural consistency,
-not semantic approval. Physical implementation starts only after the domain catalog, DWD object
-catalog, DWS dimensions, fact grains, and bus matrix receive explicit review acceptance.
+The model has explicit review acceptance and implementation proceeds issue by issue under #55.
+A green contract test proves structural consistency, not semantic or publication acceptance.
+Package publication and pointer movement remain blocked until Issue #69 passes independently.

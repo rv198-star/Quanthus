@@ -69,8 +69,11 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
             self.model["scope"]["source_availability_owner"],
             "governed_ods_inventory_and_semantics",
         )
-        self.assertFalse(self.model["scope"]["physical_build_started"])
-        self.assertIn("review_required", self.model["status"])
+        self.assertTrue(self.model["scope"]["physical_build_started"])
+        self.assertEqual(
+            self.model["status"],
+            "approved_for_scripted_build_implementation",
+        )
         self.assertEqual(
             self.model["scope"]["new_base_input"],
             "exact_immutable_self_contained_ods_base_rollup_only",
@@ -309,6 +312,50 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
         )
         self._assert_source_mappings_are_valid(mappings)
 
+    def test_container_members_and_release_auxiliary_artifacts_are_explicit(self) -> None:
+        contract = self.model["ods_source_contract"]
+        members = contract["container_members"]
+        self.assertEqual(contract["container_member_count"], 10)
+        self.assertEqual(
+            {item["member"] for item in members},
+            {
+                "announcements",
+                "crawl_progress",
+                "fin_abstract",
+                "fin_progress",
+                "holder_changes",
+                "holder_progress",
+                "info_meta",
+                "shareholder_count",
+                "shareholder_count_progress",
+                "shareholder_count_revision",
+            },
+        )
+        self.assertEqual(
+            next(item for item in members if item["member"] == "fin_abstract")[
+                "disposition"
+            ],
+            "modeled",
+        )
+        self.assertEqual(
+            next(item for item in members if item["member"] == "holder_changes")[
+                "target_tables"
+            ],
+            ["dwd_shareholding_change"],
+        )
+        auxiliary = contract["release_auxiliary_artifacts"]
+        self.assertEqual(
+            {item["artifact"] for item in auxiliary},
+            {
+                "acquisition_log",
+                "after_hours_fixed_price_receipts",
+                "after_hours_fixed_price_trades",
+                "lane_status",
+                "release_metadata",
+            },
+        )
+        self._assert_source_mappings_are_valid(auxiliary)
+
     def test_rollup_is_self_contained_and_hotfix_lineage_is_fill_only(self) -> None:
         build_input = self.model["build_input_contract"]
         self.assertEqual(
@@ -429,7 +476,7 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
         }
         self.assertNotIn("blocked", dispositions)
 
-    def test_docs_expose_draft_review_state_and_do_not_claim_a_build(self) -> None:
+    def test_docs_expose_implementation_authority_but_keep_publication_gated(self) -> None:
         adr = (
             ROOT / "docs" / "architecture" / "adr-0006-industry-aligned-dwd-domain-model.md"
         ).read_text(encoding="utf-8")
@@ -442,13 +489,14 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
             / "dwd-domain-model.md"
         ).read_text(encoding="utf-8")
         self.assertIn("Seven first-class business domains", adr)
-        self.assertIn("Status: Proposed", adr)
-        self.assertIn("Design status | draft", lld)
+        self.assertIn("Status: Accepted", adr)
+        self.assertIn("Design status | implementation-approved", lld)
         self.assertIn("DWS fact constellation", lld)
         self.assertIn("53 static source ids", lld)
         self.assertIn("existing DWD/ADS tables", lld)
         self.assertIn("Exact immutable self-contained `ods-base-202607-v1.1`", lld)
-        self.assertIn("authorize no physical build", adr)
+        self.assertIn("Issue #69", adr)
+        self.assertIn("publication", adr)
 
     def _assert_source_mappings_are_valid(self, mappings: list[dict[str, Any]]) -> None:
         allowed = set(self.model["ods_source_contract"]["allowed_dispositions"])

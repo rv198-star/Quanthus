@@ -1,10 +1,10 @@
 # ADR 0006: Product-Bounded Securities DWD/DWS Model
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-01
-- Decision id: `META-DATA-DWD-001`
-- Design status: draft
-- Delivery gate: blocked pending domain and dimensional-model review
+- Decision id: `META-DATA-DWD-002`
+- Design status: implementation-approved
+- Delivery gate: script implementation open under Issue #55; publication remains gated by Issue #69
 - Supersedes: the unimplemented full-industry object proposal recorded earlier under this ADR
 
 ## Context
@@ -179,9 +179,10 @@ source name with a null canonical holder id.
 Objects outside the seven-domain boundary are classified as ODS-only or deferred rather than
 materialized as empty DWD tables.
 
-This ADR and its contract authorize no physical build, package publication, deployment, pointer
-change, or cleanup. Build authority begins only after the detailed DWD/DWS model is reviewed and
-its delivery gate is explicitly opened.
+The detailed model review is complete and Issue #55 opens authority to implement, audit, and run
+the DWD/DWS v2 scripts against immutable candidate paths. It does not authorize package
+publication, deployment, pointer change, or cleanup. Paired publication remains fail-closed until
+Issue #69 passes its independent release gate.
 
 ## Consequences
 

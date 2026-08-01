@@ -17,7 +17,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | accepted; self-contained V1.1 active on both Base holders |
 | META-DATA-BASE-002 | Build authoritative DWD/DWS July Base (Issue #48) | active; Phase A accepted, Phase B pending |
 | META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | accepted |
-| META-DATA-DWD-001 | Define and implement the product-bounded seven-domain DWD/DWS model | active; domain boundary agreed, detailed design review and build pending |
+| META-DATA-DWD-002 | Implement the product-bounded seven-domain DWD/DWS v2 scripts under Issue #55 | active; scripted build open, paired publication gated by Issue #69 |
 
 `META-DATA-PIPE-003` is governed by ADR 0005 and GitHub issue #45. Implementation is limited to
 copy-only contract, shadow, comparison, recovery, and release-set work beside the legacy path. It
@@ -74,10 +74,10 @@ accepted DWD/DWS pair and July 31 daily ADS, reproduces two independently verifi
 sets, passes bounded replay, and is active through the administrative Base descriptor. Consumer
 release-set publication and cutover remain separate authority gates.
 
-`META-DATA-DWD-001` is governed by proposed ADR 0006 and the DWD/DWS model child of LLD 01. The
-seven business-domain boundary is agreed; the detailed 33-object DWD catalog, ten conformed DWS
-dimensions, thirteen DWS facts, grains, and bus matrix remain under review. Industry references
-constrain semantics but do not determine scope. The draft machine contract reconciles all 53
+`META-DATA-DWD-002` is governed by accepted ADR 0006, Issue #55, and the DWD/DWS model child of LLD 01. The
+seven business-domain boundary, detailed 33-object DWD catalog, ten conformed DWS dimensions,
+thirteen DWS facts, grains, and bus matrix are approved for scripted implementation. Industry
+references constrain semantics but do not determine scope. The machine contract reconciles all 53
 static final-ODS-Base sources, all 17 named daily/intraday artifacts, and all 33 Hotfix-origin
 dataset ids consolidated into V1.1. The exact immutable self-contained `ods-base-202607-v1.1`
 rollup is the sole build input; existing DWD/ADS packages remain retained but cannot serve as sources, migration

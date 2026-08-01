@@ -110,7 +110,7 @@ alone is not publication evidence; Issue #48 records accepted three-node provisi
 July v1 packages, descriptors, deterministic rebuilds, and idempotent lane catalogs. It does not
 change the consumer release set.
 
-ADR 0006 now proposes a product-bounded DWD/DWS model rather than a full-industry object graph.
+ADR 0006 now accepts a product-bounded DWD/DWS model rather than a full-industry object graph.
 Its agreed scope contains seven first-class business domains: listed company, security market
 observations, tradability state, disclosures/company events, financial reporting, industry
 classification, and ownership/capital. Security, listing code, venue, calendar, report concept,
@@ -122,8 +122,8 @@ self-contained `ods-base-202607-v1.1` rollup is the sole new-build input; existi
 are retained but are not read as
 sources, migration targets, reconciliation baselines, or acceptance evidence. Decoder, parser,
 mapping, and normalization work belongs to the new DWD construction and does not create a source
-gap. The detailed design is draft, and no new transformation, package, or pointer change is
-authorized.
+gap. The detailed design is approved for scripted transformation against immutable candidate
+paths; package publication and pointer changes remain unauthorized until Issue #69 passes.
 
 The legacy OCI full-ODS pull/build path remains live until ADR 0005's shadow, fencing, recovery,
 rollback, and explicit `GO_FOR_CUTOVER` gates pass. Target work is copy-only and uses separate

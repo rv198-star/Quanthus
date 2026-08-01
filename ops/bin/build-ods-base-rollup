@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Build one deterministic self-contained ODS Base rollup."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.ods_base import load_ods_base_policy
+from quanthus.pipelines.ods_base_rollup import (
+    OdsBaseRollupError,
+    build_ods_base_rollup,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--parent-base", type=Path, required=True)
+    parser.add_argument("--hotfix-bundle", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--bundle-id", required=True)
+    parser.add_argument("--code-revision", required=True)
+    parser.add_argument("--built-at", required=True)
+    parser.add_argument("--expected-parent-manifest-sha256", required=True)
+    parser.add_argument("--expected-parent-content-digest", required=True)
+    parser.add_argument("--expected-hotfix-manifest-sha256", required=True)
+    parser.add_argument("--expected-hotfix-content-digest", required=True)
+    args = parser.parse_args()
+    try:
+        result = build_ods_base_rollup(
+            parent_base=args.parent_base,
+            hotfix_bundle=args.hotfix_bundle,
+            output=args.output,
+            bundle_id=args.bundle_id,
+            policy=load_ods_base_policy(args.policy),
+            code_revision=args.code_revision,
+            built_at=args.built_at,
+            expected_parent_manifest_sha256=args.expected_parent_manifest_sha256,
+            expected_parent_content_digest=args.expected_parent_content_digest,
+            expected_hotfix_manifest_sha256=args.expected_hotfix_manifest_sha256,
+            expected_hotfix_content_digest=args.expected_hotfix_content_digest,
+        )
+    except (OdsBaseRollupError, FileExistsError, OSError) as exc:
+        print(f"ODS Base rollup build failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "bundle_id": result.bundle_id,
+                "content_digest": result.content_digest,
+                "file_count": result.file_count,
+                "manifest_sha256": result.manifest_sha256,
+                "output": str(result.root),
+                "size_bytes": result.size_bytes,
+                "through_date": result.through_date.isoformat(),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

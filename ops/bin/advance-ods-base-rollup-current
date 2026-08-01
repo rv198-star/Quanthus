@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""CAS an installed ODS BASE_CURRENT to a verified rollup."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.ods_base import _sha256, load_ods_base_policy
+from quanthus.pipelines.ods_base_rollup import (
+    OdsBaseRollupError,
+    advance_ods_base_rollup_current,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--bundle", type=Path, required=True)
+    parser.add_argument("--current", type=Path, required=True)
+    parser.add_argument("--expected-current-pointer-sha256", required=True)
+    parser.add_argument("--expected-current-bundle-id", required=True)
+    parser.add_argument("--expected-target-manifest-sha256", required=True)
+    parser.add_argument("--expected-target-content-digest", required=True)
+    parser.add_argument("--deep", action="store_true")
+    args = parser.parse_args()
+    try:
+        result = advance_ods_base_rollup_current(
+            bundle=args.bundle,
+            current_pointer=args.current,
+            policy=load_ods_base_policy(args.policy),
+            expected_current_pointer_sha256=args.expected_current_pointer_sha256,
+            expected_current_bundle_id=args.expected_current_bundle_id,
+            expected_target_manifest_sha256=args.expected_target_manifest_sha256,
+            expected_target_content_digest=args.expected_target_content_digest,
+            deep=args.deep,
+        )
+    except (OdsBaseRollupError, OSError) as exc:
+        print(f"ODS Base rollup pointer advancement failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "bundle_id": result.bundle_id,
+                "content_digest": result.content_digest,
+                "current": str(args.current.resolve()),
+                "current_sha256": _sha256(args.current.resolve()),
+                "manifest_sha256": result.manifest_sha256,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -24,7 +24,7 @@ def _digest(value: str) -> str:
 
 @unittest.skipUnless(P1_STACK_AVAILABLE, "P1 optional dependencies are not installed")
 class IdentityNormalizationTests(unittest.TestCase):
-    def test_default_mapping_has_the_three_evidenced_non_overlapping_aliases(self) -> None:
+    def test_default_mapping_has_the_four_evidenced_non_overlapping_aliases(self) -> None:
         mapping = load_code_validity_mapping()
 
         actual = {
@@ -41,6 +41,8 @@ class IdentityNormalizationTests(unittest.TestCase):
                 ("SZSE-000043", "001914", date(2019, 12, 17), None),
                 ("SZSE-300114", "300114", date(2010, 8, 27), date(2025, 2, 17)),
                 ("SZSE-300114", "302132", date(2025, 2, 18), None),
+                ("SSE-600849", "600849", date(1994, 3, 24), date(2010, 3, 4)),
+                ("SSE-600849", "601607", date(2010, 3, 5), None),
             },
         )
 

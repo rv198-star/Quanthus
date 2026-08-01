@@ -64,6 +64,18 @@ _PLAN_FILES = {
     "run-receipt.json",
     "source-disposition-ledger.json",
 }
+_OUTPUT_FILES = {
+    "checkpoint.json",
+    "reconciliation/source-row-reconciliation.json",
+    "receipts/listed-company-build.json",
+    *{f"payload/listed_company/{table}.parquet" for table in _OWNED_TABLES},
+}
+_OUTPUT_DIRECTORIES = {
+    "payload",
+    "payload/listed_company",
+    "receipts",
+    "reconciliation",
+}
 
 
 def _object(path: Path) -> dict[str, Any]:
@@ -176,7 +188,17 @@ def _safe_file(root: Path, relative: object) -> Path:
 
 
 def _verify_plan_package(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    if root.is_symlink():
+        raise ListedCompanyBuildError("input plan package must not be a symbolic link")
     root = root.resolve()
+    if not root.is_dir():
+        raise ListedCompanyBuildError("input plan package must be a directory")
+    expected_physical = _PLAN_FILES | {"manifest.json", "READY"}
+    entries = list(root.iterdir())
+    if {entry.name for entry in entries} != expected_physical or any(
+        entry.is_symlink() or not entry.is_file() for entry in entries
+    ):
+        raise ListedCompanyBuildError("input plan package physical inventory is not exact")
     manifest_path = root / "manifest.json"
     manifest = _object(manifest_path)
     try:
@@ -198,20 +220,14 @@ def _verify_plan_package(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         declared.add(relative)
         path = root / relative
         if (
-            not path.is_file()
+            path.is_symlink()
+            or not path.is_file()
             or path.stat().st_size != item.get("size_bytes")
             or _sha256(path) != item.get("sha256")
         ):
             raise ListedCompanyBuildError(f"input plan file failed verification: {relative}")
     if declared != _PLAN_FILES:
         raise ListedCompanyBuildError("input plan package must declare the exact five plan files")
-    physical = {
-        path.name
-        for path in root.iterdir()
-        if path.is_file() and path.name not in {"manifest.json", "READY"}
-    }
-    if physical != _PLAN_FILES:
-        raise ListedCompanyBuildError("input plan package physical inventory is not exact")
     plan = _object(root / "input-plan.json")
     ledger = _object(root / "source-disposition-ledger.json")
     if (
@@ -247,7 +263,7 @@ def _verify_source(record: Mapping[str, Any], ods_root: Path) -> Path:
     return path
 
 
-def _seed_contract(path: Path) -> tuple[dict[str, Any], str]:
+def _seed_contract(path: Path) -> tuple[dict[str, Any], str, datetime]:
     seed = _object(path)
     if (
         seed.get("schema_version") != 1
@@ -261,7 +277,9 @@ def _seed_contract(path: Path) -> tuple[dict[str, Any], str]:
     }
     if exchanges != {"SSE", "SZSE", "BSE"}:
         raise ListedCompanyBuildError("reference seed must own SSE, SZSE, and BSE")
-    return seed, _sha256(path)
+    snapshot = _mapping(seed.get("source_snapshot"), "reference seed source snapshot")
+    retrieved_at = _timestamp(snapshot.get("retrieved_at"), "reference seed retrieved_at")
+    return seed, _sha256(path), retrieved_at
 
 
 def _board(seed: Mapping[str, Any], exchange: str, code: str) -> str:
@@ -559,7 +577,39 @@ def _write_text_atomic(path: Path, value: str) -> None:
         raise
 
 
-def _verify_existing_output(output: Path, run_id: str, semantic_digest: str) -> None:
+def _fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _remove_orphaned_temporaries(work: Path) -> None:
+    final_paths = {work / relative for relative in _OUTPUT_FILES | {"manifest.json", "READY"}}
+    for final_path in sorted(final_paths):
+        for candidate in final_path.parent.glob(f".{final_path.name}.*"):
+            if candidate.is_dir() and not candidate.is_symlink():
+                raise ListedCompanyBuildError(f"orphaned temporary path is not a file: {candidate}")
+            candidate.unlink(missing_ok=True)
+    for table in _OWNED_TABLES:
+        partial = work / "payload" / "listed_company" / f"{table}.parquet.partial"
+        if partial.is_dir() and not partial.is_symlink():
+            raise ListedCompanyBuildError(f"partial table path is not a file: {partial}")
+        partial.unlink(missing_ok=True)
+
+
+def _verify_existing_output(
+    output: Path,
+    run_id: str,
+    semantic_digest: str,
+    row_counts: Mapping[str, int],
+) -> None:
+    if output.is_symlink() or not output.is_dir():
+        raise ListedCompanyBuildError("existing output must be a physical directory")
     manifest_path = output / "manifest.json"
     manifest = _object(manifest_path)
     try:
@@ -568,18 +618,48 @@ def _verify_existing_output(output: Path, run_id: str, semantic_digest: str) -> 
         raise ListedCompanyBuildError("existing output READY is unreadable") from exc
     if ready != _sha256(manifest_path):
         raise ListedCompanyBuildError("existing output READY does not match manifest")
-    if manifest.get("run_id") != run_id or manifest.get("semantic_digest") != semantic_digest:
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("kind") != "dwd_listed_company_candidate"
+        or manifest.get("run_id") != run_id
+        or manifest.get("semantic_digest") != semantic_digest
+        or manifest.get("owned_tables") != list(_OWNED_TABLES)
+        or manifest.get("row_counts") != dict(row_counts)
+    ):
         raise ListedCompanyBuildError("existing output belongs to another run or semantic build")
+    declared: set[str] = set()
     for raw in _sequence(manifest.get("files"), "output manifest files"):
         item = _mapping(raw, "output manifest file")
         relative = _text(item, "path")
+        if relative in declared:
+            raise ListedCompanyBuildError("existing output manifest has duplicate files")
+        declared.add(relative)
         path = _safe_file(output, relative)
         if (
-            not path.is_file()
+            path.is_symlink()
+            or not path.is_file()
             or path.stat().st_size != item.get("size_bytes")
             or _sha256(path) != item.get("sha256")
         ):
             raise ListedCompanyBuildError(f"existing output file failed verification: {relative}")
+    if declared != _OUTPUT_FILES:
+        raise ListedCompanyBuildError("existing output manifest file inventory is not exact")
+    physical_files: set[str] = set()
+    physical_directories: set[str] = set()
+    for path in output.rglob("*"):
+        relative = path.relative_to(output).as_posix()
+        if path.is_symlink():
+            raise ListedCompanyBuildError("existing output contains a symbolic link")
+        if path.is_file():
+            physical_files.add(relative)
+        elif path.is_dir():
+            physical_directories.add(relative)
+        else:
+            raise ListedCompanyBuildError("existing output contains an unsupported file type")
+    if physical_files != _OUTPUT_FILES | {"manifest.json", "READY"}:
+        raise ListedCompanyBuildError("existing output physical file inventory is not exact")
+    if physical_directories != _OUTPUT_DIRECTORIES:
+        raise ListedCompanyBuildError("existing output directory inventory is not exact")
 
 
 def build_listed_company(
@@ -608,7 +688,9 @@ def build_listed_company(
     ):
         raise ListedCompanyBuildError("model contract differs from the sealed input plan")
     knowledge_cutoff = _timestamp(semantic_plan.get("knowledge_cutoff"), "knowledge_cutoff")
-    seed, seed_sha = _seed_contract(reference_seed_path)
+    seed, seed_sha, seed_knowledge_from = _seed_contract(reference_seed_path)
+    if seed_knowledge_from > knowledge_cutoff:
+        raise ListedCompanyBuildError("reference seed exceeds the plan knowledge cutoff")
     code_validity_sha = _sha256(code_validity_path)
     try:
         code_validity = load_code_validity_mapping(code_validity_path)
@@ -690,12 +772,14 @@ def build_listed_company(
         master_by_key[key] = row
 
     reconciliation: list[dict[str, Any]] = []
+    quality_exceptions: list[dict[str, Any]] = []
     for relative, path in sorted(verified_paths.items()):
         record = by_path[relative]
         name = PurePosixPath(relative).name
         if name not in {"ref_security_master.parquet", "security_lifecycle.parquet"}:
             continue
         snapshot_rows = pq.read_table(path).to_pylist()
+        bse_conflicts: list[str] = []
         for raw in snapshot_rows:
             row = dict(raw)
             key = (str(row.get("exchange")), str(row.get("stock_code")))
@@ -703,18 +787,38 @@ def build_listed_company(
             if canonical is None or any(
                 canonical.get(field) != row.get(field) for field in business_fields
             ):
+                if key[0] == "BSE":
+                    bse_conflicts.append(key[1])
+                    continue
                 raise ListedCompanyBuildError(
                     f"security-master snapshot conflicts with canonical row: {key}"
                 )
+        if bse_conflicts:
+            quality_exceptions.append(
+                {
+                    "code": "BSE_SECURITY_MASTER_SNAPSHOT_DIFFERENCE",
+                    "policy": "BSE_PARTIAL_NONBLOCKING",
+                    "path": relative,
+                    "affected_rows": len(bse_conflicts),
+                    "sample_stock_codes": sorted(bse_conflicts)[:20],
+                    "resolution": "canonical_base_authority_retained",
+                }
+            )
         reconciliation.append(
             {
                 "dataset_id": record.get("dataset_id"),
                 "path": relative,
                 "source_rows": len(snapshot_rows),
-                "outcome": "selected_authority"
-                if relative == master_relative
-                else "corroborated_snapshot",
-                "unmatched_rows": 0,
+                "outcome": (
+                    "selected_authority"
+                    if relative == master_relative
+                    else (
+                        "corroborated_snapshot_with_bse_exception"
+                        if bse_conflicts
+                        else "corroborated_snapshot"
+                    )
+                ),
+                "unmatched_rows": len(bse_conflicts),
             }
         )
 
@@ -729,8 +833,7 @@ def build_listed_company(
     missing_primary_org = sorted(
         str(row["stock_code"])
         for row in master_rows
-        if row.get("exchange") in {"SSE", "SZSE"}
-        and not org_map.get(str(row["stock_code"]))
+        if row.get("exchange") in {"SSE", "SZSE"} and not org_map.get(str(row["stock_code"]))
     )
     if missing_primary_org:
         raise ListedCompanyBuildError(
@@ -741,7 +844,6 @@ def build_listed_company(
         for row in master_rows
         if row.get("exchange") == "BSE" and not org_map.get(str(row["stock_code"]))
     )
-    quality_exceptions: list[dict[str, Any]] = []
     if missing_bse_org:
         quality_exceptions.append(
             {
@@ -757,9 +859,7 @@ def build_listed_company(
             "path": org_relative,
             "source_rows": len(org_map),
             "outcome": "selected_company_identity_map",
-            "matched_rows": sum(
-                bool(org_map.get(str(row["stock_code"]))) for row in master_rows
-            ),
+            "matched_rows": sum(bool(org_map.get(str(row["stock_code"]))) for row in master_rows),
             "unmatched_bse_rows": len(missing_bse_org),
             "filtered_non_security_master_rows": len(
                 set(org_map) - {str(row["stock_code"]) for row in master_rows}
@@ -820,8 +920,6 @@ def build_listed_company(
             )
         validity_by_code[key].append(interval)
 
-    security_groups: dict[str, list[_IdentityMember]] = defaultdict(list)
-    company_groups: dict[tuple[str, str], list[_IdentityMember]] = defaultdict(list)
     members: list[_IdentityMember] = []
     for key, row in sorted(master_by_key.items()):
         intervals: Sequence[CodeValidityInterval | None] = validity_by_code.get(key, ())
@@ -860,26 +958,39 @@ def build_listed_company(
                 company_group=company_group,
                 effective_from=start,
                 effective_to=end,
-                knowledge_from=(
+                knowledge_from=max(
+                    knowledge_cutoff,
                     validity.knowledge_cutoff.astimezone(timezone.utc)
                     if validity is not None
-                    else knowledge_cutoff
+                    else knowledge_cutoff,
                 ),
                 validity=validity,
             )
             members.append(member)
-            security_groups[security_group].append(member)
-            company_groups[company_group].append(member)
 
-    company_ids = {
-        group: _stable_id("company", group[0], group[1]) for group in company_groups
-    }
+    security_groups: dict[str, list[_IdentityMember]] = defaultdict(list)
+    company_groups: dict[tuple[str, str], list[_IdentityMember]] = defaultdict(list)
+    for member in members:
+        security_groups[member.security_group].append(member)
+        company_groups[member.company_group].append(member)
+
+    company_ids = {group: _stable_id("company", group[0], group[1]) for group in company_groups}
     security_ids = {
         group: _stable_id("security", "ECONOMIC_SECURITY", group) for group in security_groups
     }
     venue_ids = {
         exchange: _stable_id("venue", str(venue["mic_code"]))
         for exchange, venue in venue_seed.items()
+    }
+    venue_knowledge_from = {
+        exchange: max(
+            seed_knowledge_from,
+            max(
+                (member.knowledge_from for member in members if member.key[0] == exchange),
+                default=seed_knowledge_from,
+            ),
+        )
+        for exchange in venue_seed
     }
     master_record = by_path[master_relative]
     master_sha = _text(master_record, "sha256")
@@ -919,7 +1030,7 @@ def build_listed_company(
                 ),
                 "source_revision": f"{seed_revision}:{code_validity.version}",
                 "source_artifact_sha256": org_sha,
-                "knowledge_from": min(member.knowledge_from for member in active),
+                "knowledge_from": max(member.knowledge_from for member in active),
                 "knowledge_to": None,
                 "effective_from": start,
                 "effective_to": end,
@@ -963,6 +1074,19 @@ def build_listed_company(
         ):
             source_member = active[0]
             mapped = any(member.validity is not None for member in active)
+            company_matches = [
+                company_active
+                for company_start, company_end, company_active in company_segments[company_group]
+                if _interval_contains(company_start, company_end, start, end)
+            ]
+            if len(company_matches) != 1:
+                raise ListedCompanyBuildError(
+                    f"security interval must resolve one company segment: {group}"
+                )
+            security_knowledge_from = max(
+                max(member.knowledge_from for member in active),
+                max(member.knowledge_from for member in company_matches[0]),
+            )
             rows["dwd_security"].append(
                 {
                     "record_source": "ref_security_master+security_code_validity",
@@ -972,7 +1096,7 @@ def build_listed_company(
                     ),
                     "source_revision": code_validity.version if mapped else master_revision,
                     "source_artifact_sha256": code_validity_sha if mapped else master_sha,
-                    "knowledge_from": min(member.knowledge_from for member in active),
+                    "knowledge_from": security_knowledge_from,
                     "knowledge_to": None,
                     "effective_from": start,
                     "effective_to": end,
@@ -1008,7 +1132,11 @@ def build_listed_company(
                         if member_validity is not None
                         else master_sha
                     ),
-                    "knowledge_from": member.knowledge_from,
+                    "knowledge_from": max(
+                        member.knowledge_from,
+                        security_knowledge_from,
+                        venue_knowledge_from[key[0]],
+                    ),
                     "knowledge_to": None,
                     "effective_from": start,
                     "effective_to": end,
@@ -1035,9 +1163,7 @@ def build_listed_company(
                 identifiers = [
                     (f"CN_STOCK_CODE:{key[0]}", key[1]),
                     (
-                        "AKSHARE_BSE_SECURITY_ID"
-                        if key[0] == "BSE"
-                        else "BAOSTOCK_SECURITY_ID",
+                        "AKSHARE_BSE_SECURITY_ID" if key[0] == "BSE" else "BAOSTOCK_SECURITY_ID",
                         str(source_row["security_id"]),
                     ),
                 ]
@@ -1075,10 +1201,7 @@ def build_listed_company(
                 "source_record_id": f"{reference_seed_path.name}#exchange_code={exchange}",
                 "source_revision": seed_revision,
                 "source_artifact_sha256": seed_sha,
-                "knowledge_from": min(
-                    (member.knowledge_from for member in exchange_members),
-                    default=knowledge_cutoff,
-                ),
+                "knowledge_from": venue_knowledge_from[exchange],
                 "knowledge_to": None,
                 "effective_from": min(
                     (member.effective_from for member in exchange_members),
@@ -1127,10 +1250,12 @@ def build_listed_company(
             "table_digests": table_digests,
         }
     )
+    if output.is_symlink():
+        raise ListedCompanyBuildError("candidate output path must not be a symbolic link")
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
-        _verify_existing_output(output, run_id, semantic_digest)
+        _verify_existing_output(output, run_id, semantic_digest, row_counts)
         return ListedCompanyBuildResult(
             root=output,
             semantic_digest=semantic_digest,
@@ -1148,6 +1273,7 @@ def build_listed_company(
     }
     checkpoint_path = work / "checkpoint.json"
     if work.exists():
+        _remove_orphaned_temporaries(work)
         checkpoint = _object(checkpoint_path)
         if any(
             checkpoint.get(key) != checkpoint_identity[key] for key in ("run_id", "semantic_digest")
@@ -1188,6 +1314,8 @@ def build_listed_company(
             use_dictionary=False,
             write_statistics=True,
         )
+        with temporary.open("rb") as stream:
+            os.fsync(stream.fileno())
         os.replace(temporary, target)
         completed[table] = {**expected, "path": relative, "sha256": _sha256(target)}
         checkpoint["completed_tables"] = completed
@@ -1227,10 +1355,10 @@ def build_listed_company(
     }
     _write_json_atomic(work / "receipts" / "listed-company-build.json", receipt)
     files = []
-    for path in sorted(item for item in work.rglob("*") if item.is_file()):
-        relative = path.relative_to(work).as_posix()
-        if relative in {"manifest.json", "READY"}:
-            continue
+    for relative in sorted(_OUTPUT_FILES):
+        path = work / relative
+        if path.is_symlink() or not path.is_file():
+            raise ListedCompanyBuildError(f"candidate output file is missing: {relative}")
         files.append({"path": relative, "sha256": _sha256(path), "size_bytes": path.stat().st_size})
     manifest = {
         "schema_version": 1,
@@ -1244,10 +1372,15 @@ def build_listed_company(
     }
     _write_json_atomic(work / "manifest.json", manifest)
     _write_text_atomic(work / "READY", f"{_sha256(work / 'manifest.json')}\n")
+    _verify_existing_output(work, run_id, semantic_digest, row_counts)
+    for relative in sorted(_OUTPUT_DIRECTORIES, key=lambda value: value.count("/"), reverse=True):
+        _fsync_directory(work / relative)
+    _fsync_directory(work)
     try:
         os.replace(work, output)
     except FileExistsError:
-        _verify_existing_output(output, run_id, semantic_digest)
+        _verify_existing_output(output, run_id, semantic_digest, row_counts)
+    _fsync_directory(output.parent)
 
     return ListedCompanyBuildResult(
         root=output,

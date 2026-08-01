@@ -203,6 +203,15 @@ class ListedCompanyBuildTests(unittest.TestCase):
                 ["dwd_listed_company", "dwd_company_identifier"],
             ),
         ]
+        snapshot_relative = "payload/weekly/test/ref_security_master.parquet"
+        if (self.ods / snapshot_relative).is_file():
+            source_specs.append(
+                (
+                    "weekly_test_security_master",
+                    snapshot_relative,
+                    ["dwd_listed_company", "dwd_security", "dwd_listing"],
+                )
+            )
         records = []
         for dataset_id, relative, targets in source_specs:
             path = self.ods / relative
@@ -220,15 +229,21 @@ class ListedCompanyBuildTests(unittest.TestCase):
                 }
             )
         ledger = {"schema_version": 1, "records": records}
+        master_rows = pq.read_table(
+            self.ods / "payload" / "canonical" / "ref_security_master.parquet"
+        ).to_pylist()
+        expected_primary = sum(
+            row["exchange"] in {"SSE", "SZSE"} and row["status"] == "listed" for row in master_rows
+        )
         semantic_plan = {
             "schema_version": 1,
             "mode": "base",
-            "knowledge_cutoff": "2026-08-01T00:00:00+00:00",
+            "knowledge_cutoff": "2026-08-02T00:00:00+00:00",
             "model": {
                 "contract_id": json.loads(MODEL.read_text(encoding="utf-8"))["contract_id"],
                 "sha256": _sha256(MODEL),
             },
-            "source_precedence": {"expected_sse_szse_listed_scope_after_overlay": 2},
+            "source_precedence": {"expected_sse_szse_listed_scope_after_overlay": expected_primary},
             "source_ledger_digest": _digest(ledger),
         }
         plan_digest = _digest(semantic_plan)
@@ -275,12 +290,12 @@ class ListedCompanyBuildTests(unittest.TestCase):
             f"{_sha256(self.plan / 'manifest.json')}\n", encoding="ascii"
         )
 
-    def _build(self, output: Path | None = None):
+    def _build(self, output: Path | None = None, reference_seed: Path | None = None):
         return build_listed_company(
             ods_package=self.ods,
             input_plan=self.plan,
             model_path=MODEL,
-            reference_seed_path=REFERENCE_SEED,
+            reference_seed_path=reference_seed or REFERENCE_SEED,
             code_validity_path=self.validity,
             output=output or self.output,
             run_id=self.run_id,
@@ -325,16 +340,15 @@ class ListedCompanyBuildTests(unittest.TestCase):
         companies = self._rows(result.root, "dwd_listed_company")
         self.assertEqual(len(companies), 4)
         port_history = sorted(
-            (
-                row
-                for row in companies
-                if row["display_name"] in {"OLD PORT", "NEW PORT"}
-            ),
+            (row for row in companies if row["display_name"] in {"OLD PORT", "NEW PORT"}),
             key=lambda row: row["effective_from"],
         )
         self.assertEqual([row["display_name"] for row in port_history], ["OLD PORT", "NEW PORT"])
         self.assertEqual(port_history[0]["effective_to"], port_history[1]["effective_from"])
-        self.assertLess(port_history[0]["knowledge_from"], port_history[1]["knowledge_from"])
+        self.assertEqual(
+            {row["knowledge_from"].isoformat() for row in port_history},
+            {"2026-08-02T00:00:00+00:00"},
+        )
         self.assertEqual(
             sum(
                 row["resolution_scope"] == "CNINFO_ORG_ID:BSE_PARTIAL_NONBLOCKING"
@@ -376,9 +390,7 @@ class ListedCompanyBuildTests(unittest.TestCase):
             1,
         )
         receipt = json.loads(
-            (result.root / "receipts" / "listed-company-build.json").read_text(
-                encoding="utf-8"
-            )
+            (result.root / "receipts" / "listed-company-build.json").read_text(encoding="utf-8")
         )
         self.assertEqual(receipt["quality_exceptions"][0]["code"], "BSE_COMPANY_IDENTITY_PARTIAL")
 
@@ -408,11 +420,137 @@ class ListedCompanyBuildTests(unittest.TestCase):
             {"XSHG", "XSHE", "BJSE"},
         )
         receipt = json.loads(
-            (result.root / "receipts" / "listed-company-build.json").read_text(
+            (result.root / "receipts" / "listed-company-build.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(receipt["quality_exceptions"][0]["code"], "BSE_BUSINESS_COVERAGE_EMPTY")
+
+    def test_bse_snapshot_difference_is_a_nonblocking_quality_exception(self) -> None:
+        canonical = self.ods / "payload" / "canonical" / "ref_security_master.parquet"
+        snapshot = self.ods / "payload" / "weekly" / "test" / "ref_security_master.parquet"
+        snapshot.parent.mkdir(parents=True)
+        rows = pq.read_table(canonical).to_pylist()
+        next(row for row in rows if row["exchange"] == "BSE")["name"] = "STALE BJ NAME"
+        pq.write_table(pa.Table.from_pylist(rows), snapshot)
+        self._write_plan()
+
+        result = self._build()
+
+        receipt = json.loads(
+            (result.root / "receipts" / "listed-company-build.json").read_text(encoding="utf-8")
+        )
+        exception = next(
+            item
+            for item in receipt["quality_exceptions"]
+            if item["code"] == "BSE_SECURITY_MASTER_SNAPSHOT_DIFFERENCE"
+        )
+        self.assertEqual(exception["affected_rows"], 1)
+        reconciliation = json.loads(
+            (result.root / "reconciliation" / "source-row-reconciliation.json").read_text(
                 encoding="utf-8"
             )
         )
-        self.assertEqual(receipt["quality_exceptions"][0]["code"], "BSE_BUSINESS_COVERAGE_EMPTY")
+        weekly = next(
+            item
+            for item in reconciliation["sources"]
+            if item["dataset_id"] == "weekly_test_security_master"
+        )
+        self.assertEqual(weekly["outcome"], "corroborated_snapshot_with_bse_exception")
+
+    def test_evidenced_code_change_overrides_inherited_successor_list_date(self) -> None:
+        canonical = self.ods / "payload" / "canonical"
+        master_path = canonical / "ref_security_master.parquet"
+        master_rows = pq.read_table(master_path).to_pylist()
+        master_rows.extend(
+            [
+                {
+                    "security_id": "sh.600849",
+                    "stock_code": "600849",
+                    "exchange": "SSE",
+                    "name": "OLD PHARMA",
+                    "list_date": "1994-03-24",
+                    "delist_date": "2010-03-05",
+                    "status": "delisted",
+                    "bs_code": "sh.600849",
+                    "source": "fixture",
+                    "as_of": "2026-07-31",
+                },
+                {
+                    "security_id": "sh.601607",
+                    "stock_code": "601607",
+                    "exchange": "SSE",
+                    "name": "NEW PHARMA",
+                    "list_date": "1994-03-24",
+                    "delist_date": None,
+                    "status": "listed",
+                    "bs_code": "sh.601607",
+                    "source": "fixture",
+                    "as_of": "2026-07-31",
+                },
+            ]
+        )
+        pq.write_table(pa.Table.from_pylist(master_rows), master_path)
+        stock_path = canonical / "stock_list.parquet"
+        stock_rows = pq.read_table(stock_path).to_pylist()
+        stock_rows.append({"stock_code": "601607"})
+        pq.write_table(pa.Table.from_pylist(stock_rows), stock_path)
+        org_path = canonical / "cninfo_orgid_map.json"
+        org_map = json.loads(org_path.read_text(encoding="utf-8"))
+        org_map.update({"600849": "ORG-PHARMA", "601607": "ORG-PHARMA"})
+        self._write_json(org_path, org_map)
+        validity = json.loads(self.validity.read_text(encoding="utf-8"))
+        validity["intervals"].extend(
+            [
+                {
+                    "security_id": "SSE-600849",
+                    "stock_code": "600849",
+                    "exchange": "SSE",
+                    "valid_from": "1994-03-24",
+                    "valid_to": "2010-03-04",
+                    "source": "fixture exchange notice",
+                    "evidence_locator": "fixture://cninfo-57644871",
+                    "evidence_sha256": f"sha256:{'c' * 64}",
+                    "source_revision": "cninfo-57644871",
+                    "knowledge_cutoff": "2010-03-03T23:59:59+08:00",
+                },
+                {
+                    "security_id": "SSE-600849",
+                    "stock_code": "601607",
+                    "exchange": "SSE",
+                    "valid_from": "2010-03-05",
+                    "valid_to": None,
+                    "source": "fixture exchange notice",
+                    "evidence_locator": "fixture://cninfo-57644871",
+                    "evidence_sha256": f"sha256:{'c' * 64}",
+                    "source_revision": "cninfo-57644871",
+                    "knowledge_cutoff": "2010-03-03T23:59:59+08:00",
+                },
+            ]
+        )
+        self._write_json(self.validity, validity)
+        self._write_plan()
+
+        result = self._build()
+
+        history = sorted(
+            (
+                row
+                for row in self._rows(result.root, "dwd_listed_company")
+                if row["display_name"] in {"OLD PHARMA", "NEW PHARMA"}
+            ),
+            key=lambda row: row["effective_from"],
+        )
+        self.assertEqual([row["display_name"] for row in history], ["OLD PHARMA", "NEW PHARMA"])
+        self.assertEqual(history[0]["effective_to"], history[1]["effective_from"])
+        listings = [
+            row
+            for row in self._rows(result.root, "dwd_listing")
+            if row["listing_code"] in {"600849", "601607"}
+        ]
+        self.assertEqual(len(listings), 2)
+        self.assertEqual(
+            {row["security_id"] for row in listings},
+            {listings[0]["security_id"]},
+        )
 
     def test_output_keys_foreign_keys_and_intervals_are_valid(self) -> None:
         result = self._build()
@@ -439,6 +577,14 @@ class ListedCompanyBuildTests(unittest.TestCase):
         )
         self.assertTrue(all(row["security_id"] in securities for row in tables["dwd_listing"]))
         self.assertTrue(all(row["venue_id"] in venues for row in tables["dwd_listing"]))
+        self.assertEqual(
+            {
+                row["knowledge_from"].isoformat()
+                for table_rows in tables.values()
+                for row in table_rows
+            },
+            {"2026-08-02T00:00:00+00:00"},
+        )
         for rows in tables.values():
             for row in rows:
                 self.assertIsNotNone(row["knowledge_from"])
@@ -452,6 +598,24 @@ class ListedCompanyBuildTests(unittest.TestCase):
         with self.assertRaisesRegex(ListedCompanyBuildError, "ODS source failed verification"):
             self._build()
         self.assertFalse(self.output.exists())
+
+    def test_plan_package_rejects_extra_entries_and_symbolic_links(self) -> None:
+        (self.plan / "unexpected").mkdir()
+        with self.assertRaisesRegex(ListedCompanyBuildError, "physical inventory is not exact"):
+            self._build()
+        (self.plan / "unexpected").rmdir()
+        (self.plan / "alias.json").symlink_to(self.plan / "input-plan.json")
+        with self.assertRaisesRegex(ListedCompanyBuildError, "physical inventory is not exact"):
+            self._build()
+
+    def test_reference_seed_must_not_exceed_plan_cutoff(self) -> None:
+        seed = json.loads(REFERENCE_SEED.read_text(encoding="utf-8"))
+        seed["source_snapshot"]["retrieved_at"] = "2026-08-03T00:00:00+00:00"
+        late_seed = self.root / "late-seed.json"
+        self._write_json(late_seed, seed)
+
+        with self.assertRaisesRegex(ListedCompanyBuildError, "reference seed exceeds"):
+            self._build(reference_seed=late_seed)
 
     def test_plan_digest_is_recomputed_after_manifest_verification(self) -> None:
         plan_path = self.plan / "input-plan.json"
@@ -491,6 +655,13 @@ class ListedCompanyBuildTests(unittest.TestCase):
         payload = first.root / "payload" / "listed_company" / "dwd_listing.parquet"
         payload.write_bytes(b"tampered")
         with self.assertRaisesRegex(ListedCompanyBuildError, "failed verification"):
+            self._build()
+
+    def test_existing_output_rejects_undeclared_physical_files(self) -> None:
+        result = self._build()
+        (result.root / "unexpected.tmp").write_text("stale\n", encoding="ascii")
+
+        with self.assertRaisesRegex(ListedCompanyBuildError, "physical file inventory"):
             self._build()
 
     def test_clean_rebuild_has_identical_manifest_and_receipt_bytes(self) -> None:
@@ -559,6 +730,9 @@ class ListedCompanyBuildTests(unittest.TestCase):
         work = self.output.parent / f".{self.output.name}.work"
         checkpoint = json.loads((work / "checkpoint.json").read_text(encoding="utf-8"))
         self.assertEqual(list(checkpoint["completed_tables"]), ["dwd_listed_company"])
+        (work / ".checkpoint.json.orphan").write_text("partial", encoding="ascii")
+        partial = work / "payload" / "listed_company" / "dwd_security.parquet.partial"
+        partial.write_text("partial", encoding="ascii")
 
         result = self._build()
 
@@ -575,9 +749,7 @@ class ListedCompanyBuildTests(unittest.TestCase):
             real_replace(source, destination)
 
         with (
-            mock.patch.object(
-                listed_company_module.os, "replace", side_effect=interrupt_publish
-            ),
+            mock.patch.object(listed_company_module.os, "replace", side_effect=interrupt_publish),
             self.assertRaisesRegex(OSError, "fixture publish interruption"),
         ):
             self._build()

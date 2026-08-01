@@ -2,8 +2,8 @@
 
 - Status: Implemented OCI child revision; not yet promoted
 - Tracking issue: [#36](https://github.com/rv198-star/Quanthus/issues/36)
-- Mapping: `config/security-code-validity.v1.json`
-- OCI mapping revision: `security_code_validity_v1_oci_20260725`
+- Current mapping: `config/security-code-validity.v1.json` (`security-code-validity.v1.1`)
+- Historical OCI mapping revision: `security_code_validity_v1_oci_20260725` (v1)
 - OCI candidate child: `st_status_pit_v2_baostock_code_validity_v1_1_20260725`
 
 ## Problem
@@ -20,17 +20,20 @@ inclusive `valid_from` / `valid_to` interval. The frozen mapping records the exc
 evidence locator and SHA-256, source revision, and a point-in-time `knowledge_cutoff` per interval.
 The loader rejects overlapping intervals both for an economic identity and for a reused code.
 
-The initial mappings are:
+The evidenced mappings are:
 
 | Economic identity | Old code through | Successor from | Official evidence |
 | --- | --- | --- | --- |
 | `SZSE-000022` | `000022` through 2018-12-26 | `001872` from 2018-12-27 | CNInfo `1205690369` |
 | `SZSE-000043` | `000043` through 2019-12-16 | `001914` from 2019-12-17 | CNInfo `1207164397` |
 | `SZSE-300114` | `300114` through 2025-02-17 | `302132` from 2025-02-18 | CNInfo `1222544408` |
+| `SSE-600849` | `600849` through 2010-03-04 | `601607` from 2010-03-05 | CNInfo `57644871` |
 
 The original public PDFs are archived outside Git in
-`/home/ubuntu/data/astock/revisions/security_code_validity_evidence_v1_oci_20260725/`; their
-checksums are locked in the mapping. Git holds only the contract and evidence locators.
+the controlled evidence archive; their checksums are locked in the mapping. Git holds only the
+contract and evidence locators. CNInfo announcement `57644871` explicitly states that the code
+changes from `600849` to `601607` on 2010-03-05; its locked PDF digest is
+`sha256:02c3aa51877e94c0ce25f16a3dc553fd3fc6d47c5b4124f1211a245186a084fe`.
 
 ## Build
 
@@ -43,11 +46,14 @@ checksums are locked in the mapping. Git holds only the contract and evidence lo
    `(security_id, market_date)`, if alias intervals overlap, or if a S2 interval cannot account for
    every normalized S2 daily row exactly once.
 
-The current child revision contains 13,802,529 normalized `none` rows, 13,800,992 daily universe
+The historical v1 child revision contains 13,802,529 normalized `none` rows, 13,800,992 daily universe
 rows, 13,806,154 normalized S2 rows, and 7,449 S2 intervals. Its full audit found zero duplicate
 economic-date keys, zero S2 interval overlap, zero uncovered S2 rows, and zero S2 state mismatches.
 The former three successor-code calendar gaps disappeared; the remaining 39 gaps exactly match the
 existing terminal-boundary ledger, leaving zero unexplained calendar gaps.
+
+Those OCI counts have not been recomputed with v1.1. The new `SSE-600849` mapping is first consumed
+by the DWD v2 listed-company build and does not retroactively change the historical OCI child.
 
 `st_status_pit_v2_baostock_code_validity_v1_20260725` is a non-promoted draft created while the
 interval compressor was too granular. It has no pointer, manifest, PG publication, or gate effect.

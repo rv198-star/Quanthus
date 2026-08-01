@@ -675,13 +675,25 @@ def _normalize_outputs(table: str, raw_root: Path, work: Path) -> list[dict[str,
     )
     if not raw_files:
         raise MarketObservationBuildError(f"{table} produced no parquet files")
-    states = []
-    seen_parents: set[Path] = set()
+    grouped: dict[Path, list[Path]] = {}
     for raw in raw_files:
-        if raw.parent in seen_parents:
-            raise MarketObservationBuildError(f"{table} produced multiple files per partition")
-        seen_parents.add(raw.parent)
-        final = raw if table == "dwd_market_index" else raw.parent / "part-00000.parquet"
+        grouped.setdefault(raw.parent, []).append(raw)
+    states = []
+    for parent in sorted(grouped):
+        partition_files = sorted(
+            grouped[parent],
+            key=lambda path: (
+                int(path.stem.rsplit("-", 1)[-1])
+                if path.stem.rsplit("-", 1)[-1].isdigit()
+                else 0,
+                path.name,
+            ),
+        )
+        final = (
+            partition_files[0]
+            if table == "dwd_market_index"
+            else parent / "part-00000.parquet"
+        )
         partial = final.with_suffix(".parquet.partial")
         writer = pq.ParquetWriter(
             partial,
@@ -694,31 +706,36 @@ def _normalize_outputs(table: str, raw_root: Path, work: Path) -> list[dict[str,
         )
         rows = 0
         try:
-            for batch in pq.ParquetFile(raw).iter_batches(batch_size=122_880):
-                value = pa.Table.from_batches([batch])
-                if "interval_size" in schema.names and "interval_size" not in value.column_names:
-                    interval = next(
-                        (
-                            part.removeprefix("interval_size=")
-                            for part in raw.parts
-                            if part.startswith("interval_size=")
-                        ),
-                        None,
-                    )
-                    if interval is None:
-                        raise MarketObservationBuildError(
-                            f"{table} partition is missing interval_size"
+            for raw in partition_files:
+                for batch in pq.ParquetFile(raw).iter_batches(batch_size=122_880):
+                    value = pa.Table.from_batches([batch])
+                    if (
+                        "interval_size" in schema.names
+                        and "interval_size" not in value.column_names
+                    ):
+                        interval = next(
+                            (
+                                part.removeprefix("interval_size=")
+                                for part in raw.parts
+                                if part.startswith("interval_size=")
+                            ),
+                            None,
                         )
-                    value = value.append_column(
-                        "interval_size", pa.array([interval] * value.num_rows)
-                    )
-                value = value.select(schema.names).cast(schema)
-                writer.write_table(value, row_group_size=122_880)
-                rows += value.num_rows
+                        if interval is None:
+                            raise MarketObservationBuildError(
+                                f"{table} partition is missing interval_size"
+                            )
+                        value = value.append_column(
+                            "interval_size", pa.array([interval] * value.num_rows)
+                        )
+                    value = value.select(schema.names).cast(schema)
+                    writer.write_table(value, row_group_size=122_880)
+                    rows += value.num_rows
         finally:
             writer.close()
-        if raw != final:
-            raw.unlink()
+        for raw in partition_files:
+            if raw != final:
+                raw.unlink()
         os.chmod(partial, 0o640)
         _fsync_file(partial)
         os.replace(partial, final)

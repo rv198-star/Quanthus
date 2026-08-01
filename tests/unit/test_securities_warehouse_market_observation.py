@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import duckdb
@@ -333,6 +334,67 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         self.assertFalse(schemas["dwd_security_bar"].field("listing_id").nullable)
         self.assertTrue(schemas["dwd_security_valuation"].field("measure_value").nullable)
+
+    def test_normalize_outputs_merges_multiple_files_in_one_partition(self) -> None:
+        work = self.root / "work"
+        partition = (
+            work
+            / "payload/security_market_observation/dwd_security_bar"
+            / "interval_size=1m/observation_start_year=2026/observation_start_month=1"
+        )
+        partition.mkdir(parents=True)
+        schema = _schemas()["dwd_security_bar"]
+        raw_schema = schema.remove(schema.get_field_index("interval_size"))
+        for number, minute in enumerate((31, 32)):
+            row = {
+                "record_source": "minute_1m_research_archive",
+                "source_record_id": f"000001:2026-01-02T09:{minute}:00",
+                "source_revision": "fixture",
+                "source_artifact_sha256": "sha256:" + str(number) * 64,
+                "knowledge_from": datetime.fromisoformat(self.cutoff),
+                "knowledge_to": None,
+                "observation_start": datetime(
+                    2026, 1, 2, 1, minute - 1, tzinfo=timezone.utc
+                ),
+                "observation_end": datetime(
+                    2026, 1, 2, 1, minute, tzinfo=timezone.utc
+                ),
+                "listing_id": "listing-1",
+                "calendar_session_id": "session-2026-01-02",
+                "price_basis": "UNADJUSTED",
+                "currency": "CNY",
+                "open": Decimal("10.0000000000"),
+                "high": Decimal("11.0000000000"),
+                "low": Decimal("9.0000000000"),
+                "close": Decimal("10.5000000000"),
+                "volume": Decimal("100.0000000000"),
+                "turnover": Decimal("1000.0000000000"),
+                "trade_count": None,
+            }
+            pq.write_table(
+                pa.Table.from_pylist([row], schema=raw_schema),
+                partition / f"part-{number}.parquet",
+            )
+
+        states = _normalize_outputs(
+            "dwd_security_bar",
+            work / "payload/security_market_observation/dwd_security_bar",
+            work,
+        )
+
+        final = partition / "part-00000.parquet"
+        self.assertEqual(len(states), 1)
+        self.assertEqual(states[0]["row_count"], 2)
+        self.assertEqual(list(partition.glob("*.parquet")), [final])
+        rows = pq.ParquetFile(final).read().to_pylist()
+        self.assertEqual([row["interval_size"] for row in rows], ["1m", "1m"])
+        self.assertEqual(
+            [row["source_record_id"] for row in rows],
+            [
+                "000001:2026-01-02T09:31:00",
+                "000001:2026-01-02T09:32:00",
+            ],
+        )
 
     def test_source_key_reconciliation_matches_selected_rows(self) -> None:
         for identity, day in (

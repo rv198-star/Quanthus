@@ -15,6 +15,11 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from quanthus.pipelines.securities_warehouse.listed_company import (
+    ListedCompanyBuildError,
+    verify_listed_company_candidate,
+)
+
 
 class TradingCalendarBuildError(RuntimeError):
     """Raised when a calendar candidate cannot be built without ambiguity."""
@@ -38,23 +43,6 @@ _PLAN_FILES = {
     "input-plan.json",
     "run-receipt.json",
     "source-disposition-ledger.json",
-}
-_UPSTREAM_TABLES = (
-    "dwd_listed_company",
-    "dwd_company_identifier",
-    "dwd_security",
-    "dwd_security_identifier",
-    "dwd_listing",
-    "dwd_trading_venue",
-)
-_UPSTREAM_FILES = {
-    "checkpoint.json",
-    "receipts/listed-company-build.json",
-    "reconciliation/source-row-reconciliation.json",
-    *{
-        f"payload/listed_company/{table}.parquet"
-        for table in _UPSTREAM_TABLES
-    },
 }
 _MIC_TO_EXCHANGE = {"XSHG": "SSE", "XSHE": "SZSE", "BJSE": "BSE"}
 _SESSION_TYPE = "REGULAR_DAY"
@@ -246,6 +234,7 @@ def _verify_plan_package(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     )
     plan = _object(root / "input-plan.json")
     ledger = _object(root / "source-disposition-ledger.json")
+    receipt = _object(root / "run-receipt.json")
     if (
         plan.get("schema_version") != 1
         or plan.get("kind") != "dwd_dws_input_plan"
@@ -253,10 +242,20 @@ def _verify_plan_package(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     ):
         raise TradingCalendarBuildError("input plan has an unsupported contract")
     semantic_plan = _mapping(plan.get("plan"), "input plan")
+    model_identity = _mapping(semantic_plan.get("model"), "input plan model")
+    input_identity = _mapping(semantic_plan.get("input"), "input plan ODS identity")
     if (
         manifest.get("plan_digest") != plan.get("plan_digest")
         or plan.get("plan_digest") != _canonical_digest(semantic_plan)
         or semantic_plan.get("source_ledger_digest") != _canonical_digest(ledger)
+        or receipt.get("schema_version") != 1
+        or receipt.get("kind") != "dwd_dws_input_plan_receipt"
+        or receipt.get("status") != "planned"
+        or receipt.get("run_id") != plan.get("run_id")
+        or receipt.get("semantic_digest") != plan.get("plan_digest")
+        or receipt.get("schema_digest") != model_identity.get("sha256")
+        or receipt.get("input_manifest_sha256")
+        != input_identity.get("manifest_sha256")
     ):
         raise TradingCalendarBuildError("input plan package identity is inconsistent")
     return plan, ledger
@@ -395,86 +394,21 @@ def _verify_upstream_candidate(
     model_sha256: str,
     knowledge_cutoff: datetime,
 ) -> tuple[dict[str, Mapping[str, Any]], str, str]:
-    manifest = _verify_manifest_package(
-        root,
-        expected_files=_UPSTREAM_FILES,
-        expected_kind="dwd_listed_company_candidate",
-    )
-    receipt = _object(root / "receipts/listed-company-build.json")
-    checkpoint = _object(root / "checkpoint.json")
-    reconciliation = _object(root / "reconciliation/source-row-reconciliation.json")
-    table_digests = _mapping(receipt.get("table_digests"), "upstream table digests")
-    row_counts = _mapping(receipt.get("row_counts"), "upstream row counts")
-    completed = _mapping(checkpoint.get("completed_tables"), "upstream completed tables")
-    if (
-        manifest.get("run_id") != run_id
-        or manifest.get("input_plan_digest") != input_plan_digest
-        or manifest.get("owned_tables") != list(_UPSTREAM_TABLES)
-        or manifest.get("row_counts") != dict(row_counts)
-        or receipt.get("schema_version") != 1
-        or receipt.get("kind") != "dwd_listed_company_build_receipt"
-        or receipt.get("status") != "built"
-        or receipt.get("run_id") != run_id
-        or receipt.get("input_plan_digest") != input_plan_digest
-        or receipt.get("model_sha256") != model_sha256
-        or receipt.get("semantic_digest") != manifest.get("semantic_digest")
-        or set(table_digests) != set(_UPSTREAM_TABLES)
-        or set(row_counts) != set(_UPSTREAM_TABLES)
-        or checkpoint.get("schema_version") != 1
-        or checkpoint.get("run_id") != run_id
-        or checkpoint.get("semantic_digest") != manifest.get("semantic_digest")
-        or set(completed) != set(_UPSTREAM_TABLES)
-        or reconciliation.get("schema_version") != 1
-        or reconciliation.get("input_plan_digest") != input_plan_digest
-    ):
-        raise TradingCalendarBuildError(
-            "upstream candidate differs from the same-run sealed dependency"
-        )
-    recomputed = _canonical_digest(
-        {
-            "input_plan_digest": input_plan_digest,
-            "model_sha256": model_sha256,
-            "reference_seed_sha256": receipt.get("reference_seed_sha256"),
-            "code_validity_sha256": receipt.get("code_validity_sha256"),
-            "table_digests": dict(table_digests),
-        }
-    )
-    if recomputed != manifest.get("semantic_digest"):
-        raise TradingCalendarBuildError("upstream semantic identity is inconsistent")
-    manifest_files = {
-        _text(_mapping(raw, "upstream manifest file"), "path"): _mapping(
-            raw, "upstream manifest file"
-        )
-        for raw in _sequence(manifest.get("files"), "upstream manifest files")
-    }
-    for table in _UPSTREAM_TABLES:
-        relative = f"payload/listed_company/{table}.parquet"
-        state = _mapping(completed.get(table), f"upstream checkpoint {table}")
-        file_record = manifest_files[relative]
-        if (
-            state.get("path") != relative
-            or state.get("row_count") != row_counts[table]
-            or state.get("semantic_digest") != table_digests[table]
-            or state.get("sha256") != file_record.get("sha256")
-            or not isinstance(state.get("schema_digest"), str)
-        ):
-            raise TradingCalendarBuildError(
-                f"upstream checkpoint identity is inconsistent: {table}"
-            )
-
     try:
-        import pyarrow.parquet as pq  # type: ignore[import-untyped]
-    except ModuleNotFoundError as exc:
-        raise TradingCalendarBuildError("pyarrow is required for DWD construction") from exc
-    venue_path = root / "payload/listed_company/dwd_trading_venue.parquet"
-    venue_table = pq.read_table(venue_path)
-    venue_rows = venue_table.to_pylist()
-    if _canonical_digest(venue_rows) != table_digests.get("dwd_trading_venue"):
-        raise TradingCalendarBuildError("upstream venue semantic digest is invalid")
+        verified = verify_listed_company_candidate(
+            root,
+            run_id=run_id,
+            input_plan_digest=input_plan_digest,
+            model_sha256=model_sha256,
+        )
+    except ListedCompanyBuildError as exc:
+        raise TradingCalendarBuildError(
+            f"upstream candidate failed deep verification: {exc}"
+        ) from exc
     venues: dict[str, Mapping[str, Any]] = {}
-    for row in venue_rows:
+    for row in verified.venue_rows:
         mic = row.get("mic_code")
-        exchange = _MIC_TO_EXCHANGE.get(mic)
+        exchange = _MIC_TO_EXCHANGE.get(mic) if isinstance(mic, str) else None
         if exchange is None or exchange in venues:
             raise TradingCalendarBuildError("upstream venue set is ambiguous")
         if row.get("timezone") != "Asia/Shanghai":
@@ -493,8 +427,8 @@ def _verify_upstream_candidate(
         raise TradingCalendarBuildError("upstream must contain SSE, SZSE, and BSE venues")
     return (
         venues,
-        _text(manifest, "semantic_digest"),
-        _sha256(root / "manifest.json"),
+        verified.semantic_digest,
+        verified.manifest_sha256,
     )
 
 
@@ -519,7 +453,7 @@ def _load_calendar_snapshots(
     ledger: Mapping[str, Any], ods_root: Path, knowledge_cutoff: datetime
 ) -> tuple[_CalendarSnapshot, list[dict[str, Any]]]:
     try:
-        import pyarrow.parquet as pq
+        import pyarrow.parquet as pq  # type: ignore[import-untyped]
     except ModuleNotFoundError as exc:
         raise TradingCalendarBuildError("pyarrow is required for DWD construction") from exc
     records = [
@@ -833,9 +767,16 @@ def _prepare_work(
             )
     else:
         work.mkdir(mode=0o750)
+        _fsync_directory(work)
+        _fsync_directory(work.parent)
         checkpoint = None
     for relative in sorted(expected_directories, key=lambda value: len(Path(value).parts)):
-        (work / relative).mkdir(exist_ok=True)
+        directory = work / relative
+        existed = directory.exists()
+        directory.mkdir(exist_ok=True)
+        if not existed:
+            _fsync_directory(directory)
+            _fsync_directory(directory.parent)
     if checkpoint is None:
         checkpoint = dict(checkpoint_identity)
         _write_json_atomic(checkpoint_path, checkpoint)
@@ -881,6 +822,7 @@ def _verify_existing_output(
         or manifest.get("semantic_digest") != semantic_digest
         or manifest.get("owned_tables") != [_OWNED_TABLE]
         or manifest.get("row_counts") != {_OWNED_TABLE: row_count}
+        or manifest.get("partition_by") != ["trade_date_year"]
         or manifest.get("input_plan_digest") != expected_receipt.get("input_plan_digest")
         or manifest.get("upstream_semantic_digest")
         != expected_receipt.get("upstream_semantic_digest")
@@ -901,9 +843,12 @@ def _verify_existing_output(
         expected_receipt.get("partition_digests"), "partition digests"
     )
     if (
-        checkpoint.get("kind") != "dwd_trading_calendar_checkpoint"
+        checkpoint.get("schema_version") != 1
+        or checkpoint.get("kind") != "dwd_trading_calendar_checkpoint"
         or checkpoint.get("run_id") != run_id
         or checkpoint.get("semantic_digest") != semantic_digest
+        or checkpoint.get("input_plan_digest")
+        != expected_receipt.get("input_plan_digest")
         or set(completed) != set(partition_digests)
     ):
         raise TradingCalendarBuildError("existing output checkpoint is inconsistent")
@@ -922,6 +867,8 @@ def _verify_existing_output(
         if (
             not table.schema.equals(schema, check_metadata=True)
             or table.num_rows != state.get("row_count")
+            or state.get("path") != path.relative_to(output).as_posix()
+            or state.get("schema_digest") != _canonical_digest(str(schema))
             or _canonical_digest(rows) != partition_digests[year_key]
             or state.get("semantic_digest") != partition_digests[year_key]
             or state.get("sha256") != _sha256(path)

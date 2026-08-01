@@ -11,6 +11,7 @@ from unittest import mock
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from quanthus.pipelines.securities_warehouse import listed_company as listed_company_module
 from quanthus.pipelines.securities_warehouse.trading_calendar import (
     TradingCalendarBuildError,
     build_trading_calendar,
@@ -250,8 +251,20 @@ class TradingCalendarBuildTests(unittest.TestCase):
             },
         )
         self._write_json(self.plan / "source-disposition-ledger.json", ledger)
-        for name in ("capacity-estimate.json", "coverage-matrix.json", "run-receipt.json"):
+        for name in ("capacity-estimate.json", "coverage-matrix.json"):
             self._write_json(self.plan / name, {"schema_version": 1})
+        self._write_json(
+            self.plan / "run-receipt.json",
+            {
+                "schema_version": 1,
+                "kind": "dwd_dws_input_plan_receipt",
+                "status": "planned",
+                "run_id": self.run_id,
+                "semantic_digest": plan_digest,
+                "schema_digest": _sha256(self.model),
+                "input_manifest_sha256": self.ods_identity["manifest_sha256"],
+            },
+        )
         files = [
             "capacity-estimate.json",
             "coverage-matrix.json",
@@ -264,29 +277,6 @@ class TradingCalendarBuildTests(unittest.TestCase):
             kind="dwd_dws_input_plan_package",
             files=files,
             extra_manifest={"plan_digest": plan_digest},
-        )
-
-    @staticmethod
-    def _venue_schema() -> pa.Schema:
-        common = [
-            pa.field("record_source", pa.string(), nullable=False),
-            pa.field("source_record_id", pa.string(), nullable=False),
-            pa.field("source_revision", pa.string(), nullable=False),
-            pa.field("source_artifact_sha256", pa.string(), nullable=False),
-            pa.field("knowledge_from", pa.timestamp("us", tz="UTC"), nullable=False),
-            pa.field("knowledge_to", pa.timestamp("us", tz="UTC"), nullable=True),
-            pa.field("effective_from", pa.timestamp("us", tz="UTC"), nullable=False),
-            pa.field("effective_to", pa.timestamp("us", tz="UTC"), nullable=True),
-        ]
-        return pa.schema(
-            common
-            + [
-                pa.field("venue_id", pa.string(), nullable=False),
-                pa.field("mic_code", pa.string(), nullable=False),
-                pa.field("venue_name", pa.string(), nullable=False),
-                pa.field("country_code", pa.string(), nullable=False),
-                pa.field("timezone", pa.string(), nullable=False),
-            ]
         )
 
     def _write_upstream(self) -> None:
@@ -322,12 +312,13 @@ class TradingCalendarBuildTests(unittest.TestCase):
         table_digests: dict[str, str] = {}
         row_counts: dict[str, int] = {}
         checkpoint_tables: dict[str, dict[str, object]] = {}
+        schemas = listed_company_module._table_schemas()
         for table in UPSTREAM_TABLES:
             path = payload / f"{table}.parquet"
             if table == "dwd_trading_venue":
-                value = pa.Table.from_pylist(venue_rows, schema=self._venue_schema())
+                value = pa.Table.from_pylist(venue_rows, schema=schemas[table])
             else:
-                value = pa.table({"placeholder": pa.array([], type=pa.string())})
+                value = pa.Table.from_pylist([], schema=schemas[table])
             pq.write_table(value, path)
             table_digests[table] = _digest(value.to_pylist())
             row_counts[table] = value.num_rows
@@ -518,7 +509,37 @@ class TradingCalendarBuildTests(unittest.TestCase):
         (self.upstream / "READY").write_text(
             f"{_sha256(manifest_path)}\n", encoding="ascii"
         )
-        with self.assertRaisesRegex(TradingCalendarBuildError, "same-run"):
+        with self.assertRaisesRegex(TradingCalendarBuildError, "deep verification"):
+            self._build()
+
+    def test_rejects_resealed_upstream_table_with_wrong_physical_schema(self) -> None:
+        table_path = self.upstream / "payload/listed_company/dwd_security.parquet"
+        invalid_table = pa.table({"placeholder": pa.array([], type=pa.string())})
+        pq.write_table(invalid_table, table_path)
+        checkpoint_path = self.upstream / "checkpoint.json"
+        checkpoint = json.loads(checkpoint_path.read_text())
+        checkpoint["completed_tables"]["dwd_security"].update(
+            {
+                "schema_digest": _digest(str(invalid_table.schema)),
+                "sha256": _sha256(table_path),
+            }
+        )
+        self._write_json(checkpoint_path, checkpoint)
+        manifest_path = self.upstream / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        for item in manifest["files"]:
+            path = self.upstream / item["path"]
+            if item["path"] in {
+                "checkpoint.json",
+                "payload/listed_company/dwd_security.parquet",
+            }:
+                item["sha256"] = _sha256(path)
+                item["size_bytes"] = path.stat().st_size
+        self._write_json(manifest_path, manifest)
+        (self.upstream / "READY").write_text(
+            f"{_sha256(manifest_path)}\n", encoding="ascii"
+        )
+        with self.assertRaisesRegex(TradingCalendarBuildError, "semantic verification"):
             self._build()
 
     def test_rejects_ods_manifest_outside_the_sealed_plan(self) -> None:

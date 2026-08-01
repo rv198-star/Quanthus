@@ -38,6 +38,14 @@ class ListedCompanyBuildResult:
 
 
 @dataclass(frozen=True)
+class ListedCompanyCandidateVerification:
+    root: Path
+    manifest_sha256: str
+    semantic_digest: str
+    venue_rows: tuple[dict[str, Any], ...]
+
+
+@dataclass(frozen=True)
 class _IdentityMember:
     key: tuple[str, str]
     row: Mapping[str, Any]
@@ -759,6 +767,141 @@ def _verify_existing_output(
     )
     if recomputed_semantic_digest != semantic_digest:
         raise ListedCompanyBuildError("output semantic digest does not match its payload")
+
+
+def verify_listed_company_candidate(
+    root: Path,
+    *,
+    run_id: str,
+    input_plan_digest: str,
+    model_sha256: str,
+) -> ListedCompanyCandidateVerification:
+    """Deep-verify a sealed #57 candidate and expose only its venue rows."""
+
+    if root.is_symlink() or not root.is_dir():
+        raise ListedCompanyBuildError("listed-company candidate must be a physical directory")
+    manifest_path = root / "manifest.json"
+    manifest = _object(manifest_path)
+    try:
+        ready = (root / "READY").read_text(encoding="ascii").strip()
+    except OSError as exc:
+        raise ListedCompanyBuildError("listed-company candidate READY is unreadable") from exc
+    if ready != _sha256(manifest_path):
+        raise ListedCompanyBuildError("listed-company candidate READY does not match manifest")
+    receipt = _object(root / "receipts/listed-company-build.json")
+    reconciliation = _object(root / "reconciliation/source-row-reconciliation.json")
+    checkpoint = _object(root / "checkpoint.json")
+    row_counts = _mapping(receipt.get("row_counts"), "listed-company row counts")
+    table_digests = _mapping(receipt.get("table_digests"), "listed-company table digests")
+    completed = _mapping(checkpoint.get("completed_tables"), "listed-company checkpoint")
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("kind") != "dwd_listed_company_candidate"
+        or manifest.get("run_id") != run_id
+        or manifest.get("input_plan_digest") != input_plan_digest
+        or manifest.get("owned_tables") != list(_OWNED_TABLES)
+        or manifest.get("row_counts") != dict(row_counts)
+        or receipt.get("schema_version") != 1
+        or receipt.get("kind") != "dwd_listed_company_build_receipt"
+        or receipt.get("status") != "built"
+        or receipt.get("run_id") != run_id
+        or receipt.get("input_plan_digest") != input_plan_digest
+        or receipt.get("model_sha256") != model_sha256
+        or receipt.get("semantic_digest") != manifest.get("semantic_digest")
+        or set(row_counts) != set(_OWNED_TABLES)
+        or set(table_digests) != set(_OWNED_TABLES)
+        or checkpoint.get("schema_version") != 1
+        or checkpoint.get("run_id") != run_id
+        or checkpoint.get("semantic_digest") != manifest.get("semantic_digest")
+        or set(completed) != set(_OWNED_TABLES)
+        or reconciliation.get("schema_version") != 1
+        or reconciliation.get("input_plan_digest") != input_plan_digest
+    ):
+        raise ListedCompanyBuildError("listed-company candidate identity is inconsistent")
+
+    declared: dict[str, Mapping[str, Any]] = {}
+    for raw in _sequence(manifest.get("files"), "listed-company manifest files"):
+        item = _mapping(raw, "listed-company manifest file")
+        relative = _text(item, "path")
+        if relative in declared:
+            raise ListedCompanyBuildError("listed-company manifest has duplicate files")
+        declared[relative] = item
+        path = _safe_file(root, relative)
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or path.stat().st_size != item.get("size_bytes")
+            or _sha256(path) != item.get("sha256")
+        ):
+            raise ListedCompanyBuildError(
+                f"listed-company candidate file failed verification: {relative}"
+            )
+    if set(declared) != _OUTPUT_FILES:
+        raise ListedCompanyBuildError("listed-company candidate file inventory is not exact")
+    physical_files: set[str] = set()
+    physical_directories: set[str] = set()
+    for path in root.rglob("*"):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            raise ListedCompanyBuildError("listed-company candidate contains a symbolic link")
+        if path.is_file():
+            physical_files.add(relative)
+        elif path.is_dir():
+            physical_directories.add(relative)
+        else:
+            raise ListedCompanyBuildError("listed-company candidate has an unsupported file")
+    if physical_files != _OUTPUT_FILES | {"manifest.json", "READY"}:
+        raise ListedCompanyBuildError("listed-company physical file inventory is not exact")
+    if physical_directories != _OUTPUT_DIRECTORIES:
+        raise ListedCompanyBuildError("listed-company directory inventory is not exact")
+
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise ListedCompanyBuildError("pyarrow is required for candidate verification") from exc
+    schemas = _table_schemas()
+    rows: dict[str, list[dict[str, Any]]] = {}
+    actual_table_digests: dict[str, str] = {}
+    for table in _OWNED_TABLES:
+        relative = f"payload/listed_company/{table}.parquet"
+        path = root / relative
+        value = pq.read_table(path)
+        table_rows = value.to_pylist()
+        actual_digest = _canonical_digest(table_rows)
+        state = _mapping(completed.get(table), f"listed-company checkpoint {table}")
+        if (
+            not value.schema.equals(schemas[table], check_metadata=True)
+            or value.num_rows != row_counts[table]
+            or actual_digest != table_digests[table]
+            or state.get("path") != relative
+            or state.get("row_count") != row_counts[table]
+            or state.get("schema_digest") != _canonical_digest(str(schemas[table]))
+            or state.get("semantic_digest") != actual_digest
+            or state.get("sha256") != declared[relative].get("sha256")
+        ):
+            raise ListedCompanyBuildError(
+                f"listed-company table semantic verification failed: {table}"
+            )
+        rows[table] = table_rows
+        actual_table_digests[table] = actual_digest
+    _validate_rows(rows)
+    recomputed_semantic_digest = _canonical_digest(
+        {
+            "input_plan_digest": input_plan_digest,
+            "model_sha256": model_sha256,
+            "reference_seed_sha256": receipt.get("reference_seed_sha256"),
+            "code_validity_sha256": receipt.get("code_validity_sha256"),
+            "table_digests": actual_table_digests,
+        }
+    )
+    if recomputed_semantic_digest != manifest.get("semantic_digest"):
+        raise ListedCompanyBuildError("listed-company semantic digest differs from payload")
+    return ListedCompanyCandidateVerification(
+        root=root.resolve(),
+        manifest_sha256=_sha256(manifest_path),
+        semantic_digest=recomputed_semantic_digest,
+        venue_rows=tuple(rows["dwd_trading_venue"]),
+    )
 
 
 def _build_listed_company_locked(

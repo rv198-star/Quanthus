@@ -10,6 +10,7 @@ from unittest import mock
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from quanthus.pipelines.securities_warehouse import listed_company as listed_company_module
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
     build_listed_company,
@@ -22,6 +23,11 @@ REFERENCE_SEED = ROOT / "config" / "pipelines" / "securities-warehouse-reference
 
 def _sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def _digest(value: object) -> str:
+    encoded = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return f"sha256:{hashlib.sha256(encoded.encode('ascii')).hexdigest()}"
 
 
 class ListedCompanyBuildTests(unittest.TestCase):
@@ -146,6 +152,11 @@ class ListedCompanyBuildTests(unittest.TestCase):
                         "exchange": "SZSE",
                         "valid_from": "1993-05-05",
                         "valid_to": "2018-12-26",
+                        "source": "fixture exchange notice",
+                        "evidence_locator": "fixture://old-port",
+                        "evidence_sha256": f"sha256:{'a' * 64}",
+                        "source_revision": "fixture-old-port-v1",
+                        "knowledge_cutoff": "1993-05-05T00:00:00+08:00",
                     },
                     {
                         "security_id": "SZSE-ECONOMIC-PORT",
@@ -153,8 +164,14 @@ class ListedCompanyBuildTests(unittest.TestCase):
                         "exchange": "SZSE",
                         "valid_from": "2018-12-27",
                         "valid_to": None,
+                        "source": "fixture exchange notice",
+                        "evidence_locator": "fixture://new-port",
+                        "evidence_sha256": f"sha256:{'b' * 64}",
+                        "source_revision": "fixture-new-port-v1",
+                        "knowledge_cutoff": "2018-12-26T23:59:59+08:00",
                     },
                 ],
+                "source_revision": "fixture-code-validity-source-v1",
             },
         )
 
@@ -202,7 +219,9 @@ class ListedCompanyBuildTests(unittest.TestCase):
                     "target_tables": targets,
                 }
             )
+        ledger = {"schema_version": 1, "records": records}
         semantic_plan = {
+            "schema_version": 1,
             "mode": "base",
             "knowledge_cutoff": "2026-08-01T00:00:00+00:00",
             "model": {
@@ -210,17 +229,14 @@ class ListedCompanyBuildTests(unittest.TestCase):
                 "sha256": _sha256(MODEL),
             },
             "source_precedence": {"expected_sse_szse_listed_scope_after_overlay": 2},
+            "source_ledger_digest": _digest(ledger),
         }
-        plan_digest = (
-            "sha256:"
-            + hashlib.sha256(
-                json.dumps(semantic_plan, sort_keys=True, separators=(",", ":")).encode("ascii")
-            ).hexdigest()
-        )
+        plan_digest = _digest(semantic_plan)
         self._write_json(
             self.plan / "input-plan.json",
             {
                 "schema_version": 1,
+                "kind": "dwd_dws_input_plan",
                 "run_id": self.run_id,
                 "plan_digest": plan_digest,
                 "plan": semantic_plan,
@@ -228,15 +244,32 @@ class ListedCompanyBuildTests(unittest.TestCase):
         )
         self._write_json(
             self.plan / "source-disposition-ledger.json",
-            {"schema_version": 1, "records": records},
+            ledger,
+        )
+        self._write_json(self.plan / "capacity-estimate.json", {"schema_version": 1})
+        self._write_json(self.plan / "coverage-matrix.json", {"schema_version": 1})
+        self._write_json(
+            self.plan / "run-receipt.json",
+            {"schema_version": 1, "kind": "dwd_dws_input_plan_receipt"},
         )
         files = []
-        for name in ("input-plan.json", "source-disposition-ledger.json"):
+        for name in (
+            "capacity-estimate.json",
+            "coverage-matrix.json",
+            "input-plan.json",
+            "run-receipt.json",
+            "source-disposition-ledger.json",
+        ):
             path = self.plan / name
             files.append({"path": name, "sha256": _sha256(path), "size_bytes": path.stat().st_size})
         self._write_json(
             self.plan / "manifest.json",
-            {"schema_version": 1, "plan_digest": plan_digest, "files": files},
+            {
+                "schema_version": 1,
+                "kind": "dwd_dws_input_plan_package",
+                "plan_digest": plan_digest,
+                "files": files,
+            },
         )
         (self.plan / "READY").write_text(
             f"{_sha256(self.plan / 'manifest.json')}\n", encoding="ascii"
@@ -263,9 +296,9 @@ class ListedCompanyBuildTests(unittest.TestCase):
         self.assertEqual(
             result.row_counts,
             {
-                "dwd_listed_company": 3,
-                "dwd_company_identifier": 3,
-                "dwd_security": 3,
+                "dwd_listed_company": 4,
+                "dwd_company_identifier": 4,
+                "dwd_security": 4,
                 "dwd_security_identifier": 11,
                 "dwd_listing": 4,
                 "dwd_trading_venue": 3,
@@ -290,6 +323,18 @@ class ListedCompanyBuildTests(unittest.TestCase):
         venues = self._rows(result.root, "dwd_trading_venue")
         self.assertEqual({row["mic_code"] for row in venues}, {"XSHG", "XSHE", "BJSE"})
         companies = self._rows(result.root, "dwd_listed_company")
+        self.assertEqual(len(companies), 4)
+        port_history = sorted(
+            (
+                row
+                for row in companies
+                if row["display_name"] in {"OLD PORT", "NEW PORT"}
+            ),
+            key=lambda row: row["effective_from"],
+        )
+        self.assertEqual([row["display_name"] for row in port_history], ["OLD PORT", "NEW PORT"])
+        self.assertEqual(port_history[0]["effective_to"], port_history[1]["effective_from"])
+        self.assertLess(port_history[0]["knowledge_from"], port_history[1]["knowledge_from"])
         self.assertEqual(
             sum(
                 row["resolution_scope"] == "CNINFO_ORG_ID:BSE_PARTIAL_NONBLOCKING"
@@ -312,6 +357,62 @@ class ListedCompanyBuildTests(unittest.TestCase):
             source for source in reconciliation["sources"] if source["dataset_id"] == "stock_list"
         )
         self.assertEqual(stock_list["outcome"], "corroborated_collection_scope")
+
+    def test_bse_missing_company_identity_is_recorded_without_blocking(self) -> None:
+        org_path = self.ods / "payload" / "canonical" / "cninfo_orgid_map.json"
+        org_map = json.loads(org_path.read_text(encoding="utf-8"))
+        del org_map["920001"]
+        self._write_json(org_path, org_map)
+        self._write_plan()
+
+        result = self._build()
+
+        companies = self._rows(result.root, "dwd_listed_company")
+        self.assertEqual(
+            sum(
+                row["resolution_scope"] == "SOURCE_SECURITY_ID:BSE_PARTIAL_NONBLOCKING"
+                for row in companies
+            ),
+            1,
+        )
+        receipt = json.loads(
+            (result.root / "receipts" / "listed-company-build.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(receipt["quality_exceptions"][0]["code"], "BSE_COMPANY_IDENTITY_PARTIAL")
+
+    def test_empty_bse_business_coverage_retains_seeded_venue(self) -> None:
+        canonical = self.ods / "payload" / "canonical"
+        master_path = canonical / "ref_security_master.parquet"
+        master_rows = [
+            row for row in pq.read_table(master_path).to_pylist() if row["exchange"] != "BSE"
+        ]
+        pq.write_table(pa.Table.from_pylist(master_rows), master_path)
+        stock_path = canonical / "stock_list.parquet"
+        stock_rows = [
+            row for row in pq.read_table(stock_path).to_pylist() if row["stock_code"] != "920001"
+        ]
+        pq.write_table(pa.Table.from_pylist(stock_rows), stock_path)
+        org_path = canonical / "cninfo_orgid_map.json"
+        org_map = json.loads(org_path.read_text(encoding="utf-8"))
+        del org_map["920001"]
+        self._write_json(org_path, org_map)
+        self._write_plan()
+
+        result = self._build()
+
+        self.assertEqual(result.bse_listed_count, 0)
+        self.assertEqual(
+            {row["mic_code"] for row in self._rows(result.root, "dwd_trading_venue")},
+            {"XSHG", "XSHE", "BJSE"},
+        )
+        receipt = json.loads(
+            (result.root / "receipts" / "listed-company-build.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(receipt["quality_exceptions"][0]["code"], "BSE_BUSINESS_COVERAGE_EMPTY")
 
     def test_output_keys_foreign_keys_and_intervals_are_valid(self) -> None:
         result = self._build()
@@ -352,6 +453,33 @@ class ListedCompanyBuildTests(unittest.TestCase):
             self._build()
         self.assertFalse(self.output.exists())
 
+    def test_plan_digest_is_recomputed_after_manifest_verification(self) -> None:
+        plan_path = self.plan / "input-plan.json"
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        plan["plan"]["knowledge_cutoff"] = "2026-07-31T23:59:59+00:00"
+        self._write_json(plan_path, plan)
+        manifest_path = self.plan / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for item in manifest["files"]:
+            path = self.plan / item["path"]
+            item["sha256"] = _sha256(path)
+            item["size_bytes"] = path.stat().st_size
+        self._write_json(manifest_path, manifest)
+        (self.plan / "READY").write_text(f"{_sha256(manifest_path)}\n", encoding="ascii")
+
+        with self.assertRaisesRegex(ListedCompanyBuildError, "plan digest differs"):
+            self._build()
+
+    def test_code_validity_requires_evidence_and_knowledge_contract(self) -> None:
+        validity = json.loads(self.validity.read_text(encoding="utf-8"))
+        del validity["intervals"][0]["evidence_sha256"]
+        self._write_json(self.validity, validity)
+
+        with self.assertRaisesRegex(
+            ListedCompanyBuildError, "invalid security-code validity mapping"
+        ):
+            self._build()
+
     def test_same_run_is_idempotent_and_existing_output_is_verified(self) -> None:
         first = self._build()
         manifest_mtime = (first.root / "manifest.json").stat().st_mtime_ns
@@ -364,6 +492,53 @@ class ListedCompanyBuildTests(unittest.TestCase):
         payload.write_bytes(b"tampered")
         with self.assertRaisesRegex(ListedCompanyBuildError, "failed verification"):
             self._build()
+
+    def test_clean_rebuild_has_identical_manifest_and_receipt_bytes(self) -> None:
+        first = self._build(self.root / "candidate-one")
+        second = self._build(self.root / "candidate-two")
+
+        self.assertEqual(
+            (first.root / "manifest.json").read_bytes(),
+            (second.root / "manifest.json").read_bytes(),
+        )
+        self.assertEqual(
+            (first.root / "receipts" / "listed-company-build.json").read_bytes(),
+            (second.root / "receipts" / "listed-company-build.json").read_bytes(),
+        )
+
+    def test_temporal_fk_and_overlap_gates_fail_closed(self) -> None:
+        result = self._build()
+        tables = {
+            table: self._rows(result.root, table)
+            for table in (
+                "dwd_listed_company",
+                "dwd_company_identifier",
+                "dwd_security",
+                "dwd_security_identifier",
+                "dwd_listing",
+                "dwd_trading_venue",
+            )
+        }
+        tables["dwd_security_identifier"][0]["venue_id"] = "missing-venue"
+        with self.assertRaisesRegex(ListedCompanyBuildError, "temporal foreign key"):
+            listed_company_module._validate_rows(tables)
+
+        tables = {
+            table: self._rows(result.root, table)
+            for table in (
+                "dwd_listed_company",
+                "dwd_company_identifier",
+                "dwd_security",
+                "dwd_security_identifier",
+                "dwd_listing",
+                "dwd_trading_venue",
+            )
+        }
+        duplicate = dict(tables["dwd_listed_company"][0])
+        duplicate["knowledge_from"] = duplicate["knowledge_from"].replace(microsecond=1)
+        tables["dwd_listed_company"].append(duplicate)
+        with self.assertRaisesRegex(ListedCompanyBuildError, "bitemporal versions overlap"):
+            listed_company_module._validate_rows(tables)
 
     def test_retry_resumes_a_verified_table_checkpoint(self) -> None:
         real_write = pq.write_table
@@ -384,6 +559,29 @@ class ListedCompanyBuildTests(unittest.TestCase):
         work = self.output.parent / f".{self.output.name}.work"
         checkpoint = json.loads((work / "checkpoint.json").read_text(encoding="utf-8"))
         self.assertEqual(list(checkpoint["completed_tables"]), ["dwd_listed_company"])
+
+        result = self._build()
+
+        self.assertTrue((result.root / "READY").is_file())
+        self.assertFalse(work.exists())
+
+    def test_retry_recovers_after_ready_before_directory_publish(self) -> None:
+        work = self.output.parent / f".{self.output.name}.work"
+        real_replace = listed_company_module.os.replace
+
+        def interrupt_publish(source: object, destination: object) -> None:
+            if Path(source) == work and Path(destination) == self.output:
+                raise OSError("fixture publish interruption")
+            real_replace(source, destination)
+
+        with (
+            mock.patch.object(
+                listed_company_module.os, "replace", side_effect=interrupt_publish
+            ),
+            self.assertRaisesRegex(OSError, "fixture publish interruption"),
+        ):
+            self._build()
+        self.assertTrue((work / "READY").is_file())
 
         result = self._build()
 

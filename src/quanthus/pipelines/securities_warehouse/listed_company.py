@@ -5,9 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import resource
 import tempfile
-import time
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -16,6 +14,12 @@ from datetime import time as datetime_time
 from pathlib import Path, PurePosixPath
 from typing import Any
 from zoneinfo import ZoneInfo
+
+from quanthus.code_validity import (
+    CodeValidityError,
+    CodeValidityInterval,
+    load_code_validity_mapping,
+)
 
 
 class ListedCompanyBuildError(RuntimeError):
@@ -31,6 +35,18 @@ class ListedCompanyBuildResult:
     bse_listed_count: int
 
 
+@dataclass(frozen=True)
+class _IdentityMember:
+    key: tuple[str, str]
+    row: Mapping[str, Any]
+    security_group: str
+    company_group: tuple[str, str]
+    effective_from: datetime
+    effective_to: datetime | None
+    knowledge_from: datetime
+    validity: CodeValidityInterval | None
+
+
 _OWNED_TABLES = (
     "dwd_listed_company",
     "dwd_company_identifier",
@@ -41,6 +57,13 @@ _OWNED_TABLES = (
 )
 _SHA256 = "sha256:"
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
+_PLAN_FILES = {
+    "capacity-estimate.json",
+    "coverage-matrix.json",
+    "input-plan.json",
+    "run-receipt.json",
+    "source-disposition-ledger.json",
+}
 
 
 def _object(path: Path) -> dict[str, Any]:
@@ -162,6 +185,10 @@ def _verify_plan_package(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         raise ListedCompanyBuildError("input plan READY is unreadable") from exc
     if ready != _sha256(manifest_path):
         raise ListedCompanyBuildError("input plan READY does not match manifest")
+    if manifest.get("schema_version") != 1 or manifest.get("kind") != (
+        "dwd_dws_input_plan_package"
+    ):
+        raise ListedCompanyBuildError("input plan manifest has an unsupported contract")
     declared: set[str] = set()
     for raw in _sequence(manifest.get("files"), "plan manifest files"):
         item = _mapping(raw, "plan manifest file")
@@ -176,13 +203,32 @@ def _verify_plan_package(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
             or _sha256(path) != item.get("sha256")
         ):
             raise ListedCompanyBuildError(f"input plan file failed verification: {relative}")
-    required = {"input-plan.json", "source-disposition-ledger.json"}
-    if not required.issubset(declared):
-        raise ListedCompanyBuildError("input plan package is missing required files")
+    if declared != _PLAN_FILES:
+        raise ListedCompanyBuildError("input plan package must declare the exact five plan files")
+    physical = {
+        path.name
+        for path in root.iterdir()
+        if path.is_file() and path.name not in {"manifest.json", "READY"}
+    }
+    if physical != _PLAN_FILES:
+        raise ListedCompanyBuildError("input plan package physical inventory is not exact")
     plan = _object(root / "input-plan.json")
     ledger = _object(root / "source-disposition-ledger.json")
-    if manifest.get("plan_digest") != plan.get("plan_digest"):
+    if (
+        plan.get("schema_version") != 1
+        or plan.get("kind") != "dwd_dws_input_plan"
+        or ledger.get("schema_version") != 1
+    ):
+        raise ListedCompanyBuildError("input plan or source ledger has an unsupported contract")
+    semantic_plan = _mapping(plan.get("plan"), "input plan")
+    recalculated_plan_digest = _canonical_digest(semantic_plan)
+    if (
+        manifest.get("plan_digest") != plan.get("plan_digest")
+        or plan.get("plan_digest") != recalculated_plan_digest
+    ):
         raise ListedCompanyBuildError("input plan digest differs from package manifest")
+    if semantic_plan.get("source_ledger_digest") != _canonical_digest(ledger):
+        raise ListedCompanyBuildError("source ledger digest differs from the sealed input plan")
     return plan, ledger
 
 
@@ -330,28 +376,156 @@ def _row_key(table: str, row: Mapping[str, Any]) -> tuple[object, ...]:
     return tuple(row[key] for key in keys)
 
 
+def _identity_key(table: str, row: Mapping[str, Any]) -> tuple[object, ...]:
+    keys = {
+        "dwd_listed_company": ("company_id",),
+        "dwd_company_identifier": ("identifier_namespace", "identifier_value"),
+        "dwd_security": ("security_id",),
+        "dwd_security_identifier": ("identifier_namespace", "identifier_value"),
+        "dwd_listing": ("listing_id",),
+        "dwd_trading_venue": ("venue_id",),
+    }[table]
+    return tuple(row[key] for key in keys)
+
+
+def _interval_overlaps(
+    left_start: datetime,
+    left_end: datetime | None,
+    right_start: datetime,
+    right_end: datetime | None,
+) -> bool:
+    return (right_end is None or left_start < right_end) and (
+        left_end is None or right_start < left_end
+    )
+
+
+def _interval_contains(
+    parent_start: datetime,
+    parent_end: datetime | None,
+    child_start: datetime,
+    child_end: datetime | None,
+) -> bool:
+    if parent_start > child_start:
+        return False
+    if parent_end is None:
+        return True
+    return child_end is not None and child_end <= parent_end
+
+
+def _temporally_contains(parent: Mapping[str, Any], child: Mapping[str, Any]) -> bool:
+    return _interval_contains(
+        parent["effective_from"],
+        parent.get("effective_to"),
+        child["effective_from"],
+        child.get("effective_to"),
+    ) and _interval_contains(
+        parent["knowledge_from"],
+        parent.get("knowledge_to"),
+        child["knowledge_from"],
+        child.get("knowledge_to"),
+    )
+
+
+def _active_segments(
+    members: Sequence[_IdentityMember],
+    *,
+    additional_boundaries: Sequence[datetime] = (),
+) -> list[tuple[datetime, datetime | None, tuple[_IdentityMember, ...]]]:
+    boundaries = sorted(
+        {*additional_boundaries}
+        | {
+            boundary
+            for member in members
+            for boundary in (member.effective_from, member.effective_to)
+            if boundary is not None
+        }
+    )
+    segments: list[tuple[datetime, datetime | None, tuple[_IdentityMember, ...]]] = []
+    for index, start in enumerate(boundaries):
+        active = tuple(
+            sorted(
+                (
+                    member
+                    for member in members
+                    if member.effective_from <= start
+                    and (member.effective_to is None or start < member.effective_to)
+                ),
+                key=lambda member: (
+                    member.key,
+                    member.security_group,
+                    member.knowledge_from,
+                ),
+            )
+        )
+        if not active:
+            continue
+        end = boundaries[index + 1] if index + 1 < len(boundaries) else None
+        segments.append((start, end, active))
+    return segments
+
+
 def _validate_rows(rows: Mapping[str, list[dict[str, Any]]]) -> None:
     for table, values in rows.items():
         keys = [_row_key(table, row) for row in values]
         if len(keys) != len(set(keys)):
             raise ListedCompanyBuildError(f"duplicate row key in {table}")
         for row in values:
-            end = row.get("effective_to")
-            if end is not None and end <= row["effective_from"]:
+            effective_end = row.get("effective_to")
+            if effective_end is not None and effective_end <= row["effective_from"]:
                 raise ListedCompanyBuildError(f"invalid effective interval in {table}")
-    companies = {str(row["company_id"]) for row in rows["dwd_listed_company"]}
-    securities = {str(row["security_id"]) for row in rows["dwd_security"]}
-    venues = {str(row["venue_id"]) for row in rows["dwd_trading_venue"]}
-    if any(row["company_id"] not in companies for row in rows["dwd_company_identifier"]):
-        raise ListedCompanyBuildError("orphan company identifier")
-    if any(row["company_id"] not in companies for row in rows["dwd_security"]):
-        raise ListedCompanyBuildError("orphan security company")
-    if any(row["security_id"] not in securities for row in rows["dwd_security_identifier"]):
-        raise ListedCompanyBuildError("orphan security identifier")
-    if any(row["security_id"] not in securities for row in rows["dwd_listing"]):
-        raise ListedCompanyBuildError("orphan listing security")
-    if any(row["venue_id"] not in venues for row in rows["dwd_listing"]):
-        raise ListedCompanyBuildError("orphan listing venue")
+            knowledge_end = row.get("knowledge_to")
+            if knowledge_end is not None and knowledge_end <= row["knowledge_from"]:
+                raise ListedCompanyBuildError(f"invalid knowledge interval in {table}")
+        grouped: dict[tuple[object, ...], list[Mapping[str, Any]]] = defaultdict(list)
+        for row in values:
+            grouped[_identity_key(table, row)].append(row)
+        for identity, versions in grouped.items():
+            for index, left in enumerate(versions):
+                for right in versions[index + 1 :]:
+                    if _interval_overlaps(
+                        left["effective_from"],
+                        left.get("effective_to"),
+                        right["effective_from"],
+                        right.get("effective_to"),
+                    ) and _interval_overlaps(
+                        left["knowledge_from"],
+                        left.get("knowledge_to"),
+                        right["knowledge_from"],
+                        right.get("knowledge_to"),
+                    ):
+                        raise ListedCompanyBuildError(
+                            f"bitemporal versions overlap in {table}: {identity}"
+                        )
+
+    foreign_keys = (
+        ("dwd_company_identifier", "company_id", "dwd_listed_company", "company_id", False),
+        ("dwd_security", "company_id", "dwd_listed_company", "company_id", False),
+        (
+            "dwd_security_identifier",
+            "security_id",
+            "dwd_security",
+            "security_id",
+            False,
+        ),
+        ("dwd_security_identifier", "venue_id", "dwd_trading_venue", "venue_id", True),
+        ("dwd_listing", "security_id", "dwd_security", "security_id", False),
+        ("dwd_listing", "venue_id", "dwd_trading_venue", "venue_id", False),
+    )
+    for source_table, source_column, target_table, target_column, nullable in foreign_keys:
+        for row in rows[source_table]:
+            value = row.get(source_column)
+            if value is None and nullable:
+                continue
+            matches = [
+                target
+                for target in rows[target_table]
+                if target.get(target_column) == value and _temporally_contains(target, row)
+            ]
+            if len(matches) != 1:
+                raise ListedCompanyBuildError(
+                    "temporal foreign key must resolve exactly once: "
+                    f"{source_table}.{source_column}->{target_table}.{target_column}"
+                )
 
 
 def _write_json_atomic(path: Path, value: object) -> None:
@@ -362,6 +536,21 @@ def _write_json_atomic(path: Path, value: object) -> None:
             os.fchmod(stream.fileno(), 0o640)
             json.dump(value, stream, ensure_ascii=True, indent=2, sort_keys=True)
             stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _write_text_atomic(path: Path, value: str) -> None:
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+            os.fchmod(stream.fileno(), 0o640)
+            stream.write(value)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
@@ -405,8 +594,6 @@ def build_listed_company(
 ) -> ListedCompanyBuildResult:
     """Build six deterministic listed-company DWD objects from an exact Base plan."""
 
-    started_at = datetime.now(timezone.utc)
-    started_ns = time.perf_counter_ns()
     plan, ledger = _verify_plan_package(input_plan)
     semantic_plan = _mapping(plan.get("plan"), "input plan")
     if semantic_plan.get("mode") != "base":
@@ -420,12 +607,20 @@ def build_listed_company(
         "contract_id"
     ):
         raise ListedCompanyBuildError("model contract differs from the sealed input plan")
-    knowledge_from = _timestamp(semantic_plan.get("knowledge_cutoff"), "knowledge_cutoff")
+    knowledge_cutoff = _timestamp(semantic_plan.get("knowledge_cutoff"), "knowledge_cutoff")
     seed, seed_sha = _seed_contract(reference_seed_path)
-    code_validity = _object(code_validity_path)
     code_validity_sha = _sha256(code_validity_path)
-    if code_validity.get("status") != "frozen":
-        raise ListedCompanyBuildError("security-code validity mapping is not frozen")
+    try:
+        code_validity = load_code_validity_mapping(code_validity_path)
+    except CodeValidityError as exc:
+        raise ListedCompanyBuildError(f"invalid security-code validity mapping: {exc}") from exc
+    late_validity = [
+        interval
+        for interval in code_validity.intervals
+        if interval.knowledge_cutoff.astimezone(timezone.utc) > knowledge_cutoff
+    ]
+    if late_validity:
+        raise ListedCompanyBuildError("code-validity evidence exceeds the plan knowledge cutoff")
 
     ledger_records = [
         _mapping(raw, "source ledger record")
@@ -531,18 +726,41 @@ def build_listed_company(
     ):
         raise ListedCompanyBuildError("CNINFO organization map is invalid")
     org_map = {str(key): str(value) for key, value in org_map_raw.items()}
-    missing_org = sorted(
-        str(row["stock_code"]) for row in master_rows if not org_map.get(str(row["stock_code"]))
+    missing_primary_org = sorted(
+        str(row["stock_code"])
+        for row in master_rows
+        if row.get("exchange") in {"SSE", "SZSE"}
+        and not org_map.get(str(row["stock_code"]))
     )
-    if missing_org:
-        raise ListedCompanyBuildError("security master has rows without CNINFO organization id")
+    if missing_primary_org:
+        raise ListedCompanyBuildError(
+            "SSE/SZSE security master has rows without CNINFO organization id"
+        )
+    missing_bse_org = sorted(
+        str(row["stock_code"])
+        for row in master_rows
+        if row.get("exchange") == "BSE" and not org_map.get(str(row["stock_code"]))
+    )
+    quality_exceptions: list[dict[str, Any]] = []
+    if missing_bse_org:
+        quality_exceptions.append(
+            {
+                "code": "BSE_COMPANY_IDENTITY_PARTIAL",
+                "policy": "BSE_PARTIAL_NONBLOCKING",
+                "affected_rows": len(missing_bse_org),
+                "resolution": "provider_security_identity_retained",
+            }
+        )
     reconciliation.append(
         {
             "dataset_id": by_path[org_relative].get("dataset_id"),
             "path": org_relative,
             "source_rows": len(org_map),
             "outcome": "selected_company_identity_map",
-            "matched_rows": len({str(row["stock_code"]) for row in master_rows}),
+            "matched_rows": sum(
+                bool(org_map.get(str(row["stock_code"]))) for row in master_rows
+            ),
+            "unmatched_bse_rows": len(missing_bse_org),
             "filtered_non_security_master_rows": len(
                 set(org_map) - {str(row["stock_code"]) for row in master_rows}
             ),
@@ -593,48 +811,68 @@ def build_listed_company(
             }
         )
 
-    validity_by_code: dict[tuple[str, str], dict[str, Any]] = {}
-    group_by_code: dict[tuple[str, str], str] = {}
-    for raw in _sequence(code_validity.get("intervals"), "code validity intervals"):
-        item = dict(_mapping(raw, "code validity interval"))
-        key = (_text(item, "exchange"), _text(item, "stock_code"))
-        if key in validity_by_code:
-            raise ListedCompanyBuildError(f"duplicate code-validity interval: {key}")
+    validity_by_code: dict[tuple[str, str], list[CodeValidityInterval]] = defaultdict(list)
+    for interval in code_validity.intervals:
+        key = (interval.exchange, interval.stock_code)
         if key not in master_by_key:
             raise ListedCompanyBuildError(
                 f"code-validity interval references unknown master row: {key}"
             )
-        validity_by_code[key] = item
-        group_by_code[key] = _text(item, "security_id")
+        validity_by_code[key].append(interval)
 
-    security_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    intervals_by_key: dict[tuple[str, str], tuple[datetime, datetime | None]] = {}
+    security_groups: dict[str, list[_IdentityMember]] = defaultdict(list)
+    company_groups: dict[tuple[str, str], list[_IdentityMember]] = defaultdict(list)
+    members: list[_IdentityMember] = []
     for key, row in sorted(master_by_key.items()):
-        validity = validity_by_code.get(key)
-        raw_security_id = _text(row, "security_id")
-        group = group_by_code.get(key, f"{key[0]}:{raw_security_id}")
-        start = _effective_start(
-            _date_value(validity.get("valid_from"), "valid_from")
-            if validity
-            else _date_value(row.get("list_date"), "list_date")
-        )
-        end = _effective_end(
-            _date_value(validity.get("valid_to"), "valid_to")
-            if validity and validity.get("valid_to") is not None
-            else (
-                _date_value(row.get("delist_date"), "delist_date")
-                if row.get("delist_date") is not None
-                else None
+        intervals: Sequence[CodeValidityInterval | None] = validity_by_code.get(key, ())
+        if not intervals:
+            intervals = (None,)
+        for validity in intervals:
+            raw_security_id = _text(row, "security_id")
+            security_group = (
+                validity.security_id if validity is not None else f"{key[0]}:{raw_security_id}"
             )
-        )
-        intervals_by_key[key] = (start, end)
-        security_groups[group].append(row)
+            start = _effective_start(
+                validity.valid_from
+                if validity is not None
+                else _date_value(row.get("list_date"), "list_date")
+            )
+            end = _effective_end(
+                validity.valid_to
+                if validity is not None
+                else (
+                    _date_value(row.get("delist_date"), "delist_date")
+                    if row.get("delist_date") is not None
+                    else None
+                )
+            )
+            org_id = org_map.get(key[1])
+            if org_id:
+                company_group = ("CNINFO_ORG_ID", org_id)
+            elif key[0] == "BSE":
+                company_group = ("BSE_SOURCE_SECURITY_ID", security_group)
+            else:  # guarded by missing_primary_org above
+                raise ListedCompanyBuildError(f"unresolved primary company identity: {key}")
+            member = _IdentityMember(
+                key=key,
+                row=row,
+                security_group=security_group,
+                company_group=company_group,
+                effective_from=start,
+                effective_to=end,
+                knowledge_from=(
+                    validity.knowledge_cutoff.astimezone(timezone.utc)
+                    if validity is not None
+                    else knowledge_cutoff
+                ),
+                validity=validity,
+            )
+            members.append(member)
+            security_groups[security_group].append(member)
+            company_groups[company_group].append(member)
 
-    company_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in master_rows:
-        company_groups[org_map[str(row["stock_code"])]].append(row)
     company_ids = {
-        org_id: _stable_id("company", "CNINFO_ORG_ID", org_id) for org_id in company_groups
+        group: _stable_id("company", group[0], group[1]) for group in company_groups
     }
     security_ids = {
         group: _stable_id("security", "ECONOMIC_SECURITY", group) for group in security_groups
@@ -650,149 +888,186 @@ def build_listed_company(
     seed_revision = _text(seed, "seed_id")
 
     rows: dict[str, list[dict[str, Any]]] = {table: [] for table in _OWNED_TABLES}
-    for org_id, members in sorted(company_groups.items()):
-        starts = [
-            intervals_by_key[(str(row["exchange"]), str(row["stock_code"]))][0] for row in members
-        ]
-        ends = [
-            intervals_by_key[(str(row["exchange"]), str(row["stock_code"]))][1] for row in members
-        ]
-        company_end = None if any(end is None for end in ends) else max(end for end in ends if end)
-        display = max(
-            members,
-            key=lambda row: (
-                str(row.get("status")) == "listed",
-                _date_value(row.get("list_date"), "list_date"),
-                str(row.get("stock_code")),
-            ),
-        )
-        exchanges = {str(row["exchange"]) for row in members}
-        scope = (
-            "CNINFO_ORG_ID:BSE_PARTIAL_NONBLOCKING"
-            if exchanges == {"BSE"}
-            else "CNINFO_ORG_ID:PRIMARY"
-        )
-        common = {
-            "record_source": "cninfo_orgid_map+ref_security_master",
-            "source_record_id": f"{org_relative}#org_id={org_id}",
-            "source_revision": f"{seed_revision}:ods-base-v1.1",
-            "source_artifact_sha256": org_sha,
-            "knowledge_from": knowledge_from,
-            "knowledge_to": None,
-            "effective_from": min(starts),
-            "effective_to": company_end,
-        }
-        rows["dwd_listed_company"].append(
-            {
-                **common,
-                "company_id": company_ids[org_id],
-                "display_name": str(display["name"]).strip(),
-                "company_type": "provider_scoped_listed_company",
-                "resolution_scope": scope,
-            }
-        )
-        rows["dwd_company_identifier"].append(
-            {
-                **common,
-                "company_id": company_ids[org_id],
-                "identifier_namespace": "CNINFO_ORG_ID",
-                "identifier_value": org_id,
-                "identifier_authority": "CNINFO",
-            }
-        )
-
-    for group, members in sorted(security_groups.items()):
-        member_keys = [(str(row["exchange"]), str(row["stock_code"])) for row in members]
-        org_ids = {org_map[key[1]] for key in member_keys}
-        if len(org_ids) != 1:
-            raise ListedCompanyBuildError(
-                f"one economic security resolves to multiple companies: {group}"
+    company_segments: dict[
+        tuple[str, str], list[tuple[datetime, datetime | None, tuple[_IdentityMember, ...]]]
+    ] = {}
+    for company_group, group_members in sorted(company_groups.items()):
+        segments = _active_segments(group_members)
+        company_segments[company_group] = segments
+        for start, end, active in segments:
+            names = {str(member.row["name"]).strip() for member in active}
+            if len(names) != 1:
+                raise ListedCompanyBuildError(
+                    f"concurrent company names are ambiguous: {company_group}"
+                )
+            exchanges = {member.key[0] for member in active}
+            namespace, identifier = company_group
+            scope = (
+                "CNINFO_ORG_ID:BSE_PARTIAL_NONBLOCKING"
+                if namespace == "CNINFO_ORG_ID" and exchanges == {"BSE"}
+                else (
+                    "CNINFO_ORG_ID:PRIMARY"
+                    if namespace == "CNINFO_ORG_ID"
+                    else "SOURCE_SECURITY_ID:BSE_PARTIAL_NONBLOCKING"
+                )
             )
-        starts = [intervals_by_key[key][0] for key in member_keys]
-        ends = [intervals_by_key[key][1] for key in member_keys]
-        security_end = None if any(end is None for end in ends) else max(end for end in ends if end)
-        source_row = min(members, key=lambda row: (str(row["exchange"]), str(row["stock_code"])))
-        rows["dwd_security"].append(
-            {
-                "record_source": "ref_security_master+security_code_validity",
+            active_keys = ",".join(f"{member.key[0]}:{member.key[1]}" for member in active)
+            common = {
+                "record_source": "cninfo_orgid_map+ref_security_master+security_code_validity",
                 "source_record_id": (
-                    f"{master_relative}#exchange={source_row['exchange']}&stock_code={source_row['stock_code']}"
+                    f"{org_relative}#{namespace}={identifier}&members={active_keys}"
                 ),
-                "source_revision": master_revision,
-                "source_artifact_sha256": master_sha,
-                "knowledge_from": knowledge_from,
-                "knowledge_to": None,
-                "effective_from": min(starts),
-                "effective_to": security_end,
-                "security_id": security_ids[group],
-                "company_id": company_ids[next(iter(org_ids))],
-                "instrument_type": "common_equity",
-                "instrument_currency": "CNY",
-            }
-        )
-        for row in sorted(
-            members, key=lambda item: (str(item["exchange"]), str(item["stock_code"]))
-        ):
-            key = (str(row["exchange"]), str(row["stock_code"]))
-            start, end = intervals_by_key[key]
-            venue_id = venue_ids[key[0]]
-            validity = validity_by_code.get(key)
-            source_sha = code_validity_sha if validity else master_sha
-            revision = _text(code_validity, "mapping_version") if validity else master_revision
-            source_record_id = (
-                f"{code_validity_path.name}#exchange={key[0]}&stock_code={key[1]}"
-                if validity
-                else f"{master_relative}#exchange={key[0]}&stock_code={key[1]}"
-            )
-            lineage = {
-                "record_source": "security_code_validity" if validity else "ref_security_master",
-                "source_record_id": source_record_id,
-                "source_revision": revision,
-                "source_artifact_sha256": source_sha,
-                "knowledge_from": knowledge_from,
+                "source_revision": f"{seed_revision}:{code_validity.version}",
+                "source_artifact_sha256": org_sha,
+                "knowledge_from": min(member.knowledge_from for member in active),
                 "knowledge_to": None,
                 "effective_from": start,
                 "effective_to": end,
             }
-            rows["dwd_listing"].append(
+            rows["dwd_listed_company"].append(
                 {
-                    **lineage,
-                    "listing_id": _stable_id(
-                        "listing", security_ids[group], venue_id, key[1], start.isoformat()
-                    ),
-                    "security_id": security_ids[group],
-                    "venue_id": venue_id,
-                    "listing_code": key[1],
-                    "board_code": _board(seed, key[0], key[1]),
-                    "listing_currency": "CNY",
-                    "lot_size": 100,
+                    **common,
+                    "company_id": company_ids[company_group],
+                    "display_name": next(iter(names)),
+                    "company_type": "provider_scoped_listed_company",
+                    "resolution_scope": scope,
                 }
             )
-            identifiers = [
-                (f"CN_STOCK_CODE:{key[0]}", key[1]),
-                (
-                    "AKSHARE_BSE_SECURITY_ID" if key[0] == "BSE" else "BAOSTOCK_SECURITY_ID",
-                    str(row["security_id"]),
-                ),
-            ]
-            if row.get("bs_code"):
-                identifiers.append(("BAOSTOCK_CODE", str(row["bs_code"])))
-            for namespace, value in identifiers:
-                rows["dwd_security_identifier"].append(
+            rows["dwd_company_identifier"].append(
+                {
+                    **common,
+                    "company_id": company_ids[company_group],
+                    "identifier_namespace": namespace,
+                    "identifier_value": identifier,
+                    "identifier_authority": "CNINFO"
+                    if namespace == "CNINFO_ORG_ID"
+                    else "SOURCE_PROVIDER",
+                }
+            )
+
+    for group, group_members in sorted(security_groups.items()):
+        resolved_companies = {member.company_group for member in group_members}
+        if len(resolved_companies) != 1:
+            raise ListedCompanyBuildError(
+                f"one economic security resolves to multiple companies: {group}"
+            )
+        company_group = next(iter(resolved_companies))
+        company_boundaries = [
+            boundary
+            for start, end, _active in company_segments[company_group]
+            for boundary in (start, end)
+            if boundary is not None
+        ]
+        for start, end, active in _active_segments(
+            group_members, additional_boundaries=company_boundaries
+        ):
+            source_member = active[0]
+            mapped = any(member.validity is not None for member in active)
+            rows["dwd_security"].append(
+                {
+                    "record_source": "ref_security_master+security_code_validity",
+                    "source_record_id": (
+                        f"{master_relative}#exchange={source_member.key[0]}"
+                        f"&stock_code={source_member.key[1]}"
+                    ),
+                    "source_revision": code_validity.version if mapped else master_revision,
+                    "source_artifact_sha256": code_validity_sha if mapped else master_sha,
+                    "knowledge_from": min(member.knowledge_from for member in active),
+                    "knowledge_to": None,
+                    "effective_from": start,
+                    "effective_to": end,
+                    "security_id": security_ids[group],
+                    "company_id": company_ids[company_group],
+                    "instrument_type": "common_equity",
+                    "instrument_currency": "CNY",
+                }
+            )
+            for member in active:
+                source_row = member.row
+                key = member.key
+                venue_id = venue_ids[key[0]]
+                member_validity = member.validity
+                lineage = {
+                    "record_source": (
+                        "security_code_validity"
+                        if member_validity is not None
+                        else "ref_security_master"
+                    ),
+                    "source_record_id": (
+                        f"{code_validity_path.name}#exchange={key[0]}&stock_code={key[1]}"
+                        if member_validity is not None
+                        else f"{master_relative}#exchange={key[0]}&stock_code={key[1]}"
+                    ),
+                    "source_revision": (
+                        member_validity.source_revision
+                        if member_validity is not None
+                        else master_revision
+                    ),
+                    "source_artifact_sha256": (
+                        member_validity.evidence_sha256
+                        if member_validity is not None
+                        else master_sha
+                    ),
+                    "knowledge_from": member.knowledge_from,
+                    "knowledge_to": None,
+                    "effective_from": start,
+                    "effective_to": end,
+                }
+                listing_id = _stable_id(
+                    "listing",
+                    security_ids[group],
+                    venue_id,
+                    key[1],
+                    member.effective_from.isoformat(),
+                )
+                rows["dwd_listing"].append(
                     {
                         **lineage,
+                        "listing_id": listing_id,
                         "security_id": security_ids[group],
-                        "identifier_namespace": namespace,
-                        "identifier_value": value,
                         "venue_id": venue_id,
+                        "listing_code": key[1],
+                        "board_code": _board(seed, key[0], key[1]),
+                        "listing_currency": "CNY",
+                        "lot_size": 100,
                     }
                 )
+                identifiers = [
+                    (f"CN_STOCK_CODE:{key[0]}", key[1]),
+                    (
+                        "AKSHARE_BSE_SECURITY_ID"
+                        if key[0] == "BSE"
+                        else "BAOSTOCK_SECURITY_ID",
+                        str(source_row["security_id"]),
+                    ),
+                ]
+                if source_row.get("bs_code"):
+                    identifiers.append(("BAOSTOCK_CODE", str(source_row["bs_code"])))
+                for namespace, value in identifiers:
+                    rows["dwd_security_identifier"].append(
+                        {
+                            **lineage,
+                            "security_id": security_ids[group],
+                            "identifier_namespace": namespace,
+                            "identifier_value": value,
+                            "venue_id": venue_id,
+                        }
+                    )
 
     for exchange, venue in sorted(venue_seed.items()):
-        exchange_rows = [row for row in master_rows if row["exchange"] == exchange]
-        if not exchange_rows:
+        exchange_members = [member for member in members if member.key[0] == exchange]
+        if not exchange_members and exchange != "BSE":
             raise ListedCompanyBuildError(
-                f"security master has no rows for seeded venue {exchange}"
+                f"security master has no rows for primary venue {exchange}"
+            )
+        if not exchange_members:
+            quality_exceptions.append(
+                {
+                    "code": "BSE_BUSINESS_COVERAGE_EMPTY",
+                    "policy": "BSE_PARTIAL_NONBLOCKING",
+                    "affected_rows": 0,
+                    "resolution": "venue_seed_retained_without_business_coverage_claim",
+                }
             )
         rows["dwd_trading_venue"].append(
             {
@@ -800,11 +1075,14 @@ def build_listed_company(
                 "source_record_id": f"{reference_seed_path.name}#exchange_code={exchange}",
                 "source_revision": seed_revision,
                 "source_artifact_sha256": seed_sha,
-                "knowledge_from": knowledge_from,
+                "knowledge_from": min(
+                    (member.knowledge_from for member in exchange_members),
+                    default=knowledge_cutoff,
+                ),
                 "knowledge_to": None,
                 "effective_from": min(
-                    _effective_start(_date_value(row["list_date"], "list_date"))
-                    for row in exchange_rows
+                    (member.effective_from for member in exchange_members),
+                    default=knowledge_cutoff,
                 ),
                 "effective_to": None,
                 "venue_id": venue_ids[exchange],
@@ -933,8 +1211,6 @@ def build_listed_company(
         "kind": "dwd_listed_company_build_receipt",
         "run_id": run_id,
         "status": "built",
-        "started_at": started_at.isoformat(),
-        "elapsed_ms": max(0, (time.perf_counter_ns() - started_ns) // 1_000_000),
         "input_plan_digest": plan["plan_digest"],
         "model_sha256": model_sha,
         "reference_seed_sha256": seed_sha,
@@ -947,10 +1223,7 @@ def build_listed_company(
             "primary_sse_szse_listed": primary_count,
             "bse_policy": coverage_policy["BSE"],
         },
-        "quality_exceptions": [],
-        "resource_use": {
-            "process_peak_rss_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
-        },
+        "quality_exceptions": quality_exceptions,
     }
     _write_json_atomic(work / "receipts" / "listed-company-build.json", receipt)
     files = []
@@ -970,11 +1243,7 @@ def build_listed_company(
         "files": files,
     }
     _write_json_atomic(work / "manifest.json", manifest)
-    with (work / "READY").open("x", encoding="ascii") as stream:
-        os.fchmod(stream.fileno(), 0o640)
-        stream.write(f"{_sha256(work / 'manifest.json')}\n")
-        stream.flush()
-        os.fsync(stream.fileno())
+    _write_text_atomic(work / "READY", f"{_sha256(work / 'manifest.json')}\n")
     try:
         os.replace(work, output)
     except FileExistsError:

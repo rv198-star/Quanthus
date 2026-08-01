@@ -121,6 +121,17 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
     def test_dwd_tables_have_valid_keys_time_foreign_keys_and_roles(self) -> None:
         self.assertEqual(len(self.model["tables"]), len(self.tables), "duplicate table name")
         self.assertEqual(len(self.tables), 33)
+        self.assertEqual(
+            {
+                role: sum(table["object_role"] == role for table in self.tables.values())
+                for role in self.model["object_roles"]
+            },
+            {
+                "core_object": 14,
+                "supporting_structure": 18,
+                "governance_sidecar": 1,
+            },
+        )
         delivery_states = set(self.model["delivery_states"])
         self.assertNotIn("blocked", delivery_states)
 

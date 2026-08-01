@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import json
 import os
+import stat
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -400,17 +401,31 @@ def _verify_upstream_candidate(
         expected_kind="dwd_listed_company_candidate",
     )
     receipt = _object(root / "receipts/listed-company-build.json")
+    checkpoint = _object(root / "checkpoint.json")
+    reconciliation = _object(root / "reconciliation/source-row-reconciliation.json")
     table_digests = _mapping(receipt.get("table_digests"), "upstream table digests")
+    row_counts = _mapping(receipt.get("row_counts"), "upstream row counts")
+    completed = _mapping(checkpoint.get("completed_tables"), "upstream completed tables")
     if (
         manifest.get("run_id") != run_id
         or manifest.get("input_plan_digest") != input_plan_digest
         or manifest.get("owned_tables") != list(_UPSTREAM_TABLES)
+        or manifest.get("row_counts") != dict(row_counts)
+        or receipt.get("schema_version") != 1
         or receipt.get("kind") != "dwd_listed_company_build_receipt"
+        or receipt.get("status") != "built"
         or receipt.get("run_id") != run_id
         or receipt.get("input_plan_digest") != input_plan_digest
         or receipt.get("model_sha256") != model_sha256
         or receipt.get("semantic_digest") != manifest.get("semantic_digest")
         or set(table_digests) != set(_UPSTREAM_TABLES)
+        or set(row_counts) != set(_UPSTREAM_TABLES)
+        or checkpoint.get("schema_version") != 1
+        or checkpoint.get("run_id") != run_id
+        or checkpoint.get("semantic_digest") != manifest.get("semantic_digest")
+        or set(completed) != set(_UPSTREAM_TABLES)
+        or reconciliation.get("schema_version") != 1
+        or reconciliation.get("input_plan_digest") != input_plan_digest
     ):
         raise TradingCalendarBuildError(
             "upstream candidate differs from the same-run sealed dependency"
@@ -426,6 +441,26 @@ def _verify_upstream_candidate(
     )
     if recomputed != manifest.get("semantic_digest"):
         raise TradingCalendarBuildError("upstream semantic identity is inconsistent")
+    manifest_files = {
+        _text(_mapping(raw, "upstream manifest file"), "path"): _mapping(
+            raw, "upstream manifest file"
+        )
+        for raw in _sequence(manifest.get("files"), "upstream manifest files")
+    }
+    for table in _UPSTREAM_TABLES:
+        relative = f"payload/listed_company/{table}.parquet"
+        state = _mapping(completed.get(table), f"upstream checkpoint {table}")
+        file_record = manifest_files[relative]
+        if (
+            state.get("path") != relative
+            or state.get("row_count") != row_counts[table]
+            or state.get("semantic_digest") != table_digests[table]
+            or state.get("sha256") != file_record.get("sha256")
+            or not isinstance(state.get("schema_digest"), str)
+        ):
+            raise TradingCalendarBuildError(
+                f"upstream checkpoint identity is inconsistent: {table}"
+            )
 
     try:
         import pyarrow.parquet as pq  # type: ignore[import-untyped]
@@ -552,16 +587,10 @@ def _load_calendar_snapshots(
             _text(item.record, "path"),
         ),
     )
-    selected_business = {
-        key: (bool(row["is_open"]), str(row["source"]))
-        for key, row in selected.rows.items()
-    }
+    selected_business = {key: bool(row["is_open"]) for key, row in selected.rows.items()}
     reconciliation: list[dict[str, Any]] = []
     for snapshot in sorted(snapshots, key=lambda item: _text(item.record, "path")):
-        business = {
-            key: (bool(row["is_open"]), str(row["source"]))
-            for key, row in snapshot.rows.items()
-        }
+        business = {key: bool(row["is_open"]) for key, row in snapshot.rows.items()}
         if any(selected_business.get(key) != value for key, value in business.items()):
             raise TradingCalendarBuildError("calendar snapshots conflict on a business key")
         if not set(business).issubset(selected_business):
@@ -700,6 +729,7 @@ def _write_json_atomic(path: Path, value: object) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        _fsync_directory(path.parent)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
@@ -715,6 +745,7 @@ def _write_text_atomic(path: Path, value: str) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        _fsync_directory(path.parent)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
@@ -727,6 +758,88 @@ def _fsync_directory(path: Path) -> None:
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+def _fsync_file(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _remove_orphaned_temporaries(work: Path, output_files: set[str]) -> None:
+    final_paths = {
+        work / relative for relative in output_files | {"manifest.json", "READY"}
+    }
+    for final_path in sorted(final_paths):
+        if final_path.parent.is_dir():
+            for candidate in final_path.parent.glob(f".{final_path.name}.*"):
+                if candidate.is_dir() and not candidate.is_symlink():
+                    raise TradingCalendarBuildError(
+                        f"orphaned temporary path is not a file: {candidate}"
+                    )
+                candidate.unlink(missing_ok=True)
+    for partial in work.glob(
+        f"payload/tradability_state/{_OWNED_TABLE}/trade_date_year=*/"
+        "part-00000.parquet.partial"
+    ):
+        if partial.is_dir() and not partial.is_symlink():
+            raise TradingCalendarBuildError(
+                f"orphaned partition temporary is not a file: {partial}"
+            )
+        partial.unlink(missing_ok=True)
+
+
+def _prepare_work(
+    work: Path,
+    checkpoint_path: Path,
+    checkpoint_identity: Mapping[str, Any],
+    output_files: set[str],
+) -> dict[str, Any]:
+    expected_files = output_files | {"manifest.json", "READY"}
+    expected_directories = {
+        parent.as_posix()
+        for relative in expected_files
+        for parent in PurePosixPath(relative).parents
+        if parent.as_posix() != "."
+    }
+    if work.exists():
+        if work.is_symlink() or not work.is_dir():
+            raise TradingCalendarBuildError("build work path must be a physical directory")
+        checkpoint = _object(checkpoint_path) if checkpoint_path.is_file() else None
+        if checkpoint is not None and any(
+            checkpoint.get(key) != checkpoint_identity[key]
+            for key in (
+                "schema_version",
+                "kind",
+                "run_id",
+                "semantic_digest",
+                "input_plan_digest",
+            )
+        ):
+            raise TradingCalendarBuildError("checkpoint belongs to another build")
+        _remove_orphaned_temporaries(work, output_files)
+        for path in work.rglob("*"):
+            relative = path.relative_to(work).as_posix()
+            if path.is_symlink():
+                raise TradingCalendarBuildError("build work contains a symbolic link")
+            if path.is_dir() and relative in expected_directories:
+                continue
+            if path.is_file() and relative in expected_files:
+                continue
+            raise TradingCalendarBuildError(
+                f"build work contains an unexpected path: {relative}"
+            )
+    else:
+        work.mkdir(mode=0o750)
+        checkpoint = None
+    for relative in sorted(expected_directories, key=lambda value: len(Path(value).parts)):
+        (work / relative).mkdir(exist_ok=True)
+    if checkpoint is None:
+        checkpoint = dict(checkpoint_identity)
+        _write_json_atomic(checkpoint_path, checkpoint)
+    return checkpoint
 
 
 def _partition_path(root: Path, year: int) -> Path:
@@ -951,11 +1064,6 @@ def _build_locked(
         {"run_id": run_id, "semantic_digest": semantic_digest}
     ).removeprefix(_SHA256)
     work = output.parent / f".{output.name}.{work_identity}.work"
-    if work.is_symlink():
-        raise TradingCalendarBuildError("build work path must not be a symbolic link")
-    work.mkdir(mode=0o750, exist_ok=True)
-    for relative in ("payload/tradability_state", "receipts", "reconciliation"):
-        (work / relative).mkdir(parents=True, exist_ok=True)
     checkpoint_path = work / "checkpoint.json"
     checkpoint_identity = {
         "schema_version": 1,
@@ -965,12 +1073,9 @@ def _build_locked(
         "input_plan_digest": plan["plan_digest"],
         "completed_years": {},
     }
-    checkpoint = _object(checkpoint_path) if checkpoint_path.is_file() else checkpoint_identity
-    if any(
-        checkpoint.get(key) != checkpoint_identity[key]
-        for key in ("schema_version", "kind", "run_id", "semantic_digest", "input_plan_digest")
-    ):
-        raise TradingCalendarBuildError("checkpoint belongs to another build")
+    checkpoint = _prepare_work(
+        work, checkpoint_path, checkpoint_identity, output_files
+    )
     completed = dict(_mapping(checkpoint.get("completed_years"), "completed years"))
 
     try:
@@ -1012,7 +1117,9 @@ def _build_locked(
             write_statistics=True,
         )
         os.chmod(partial, 0o640)
+        _fsync_file(partial)
         os.replace(partial, partition)
+        _fsync_directory(partition.parent)
         completed[year_key] = {
             "path": partition.relative_to(work).as_posix(),
             "row_count": len(by_year[year]),
@@ -1084,16 +1191,35 @@ def build_trading_calendar(
 ) -> TradingCalendarBuildResult:
     """Build one immutable, idempotent Issue #72 calendar candidate."""
 
-    output = output.absolute()
+    if output.is_symlink():
+        raise TradingCalendarBuildError("candidate output path must not be a symbolic link")
     output.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = output.parent / f".{output.name}.lock"
-    with lock_path.open("a+b") as lock:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+    normalized_output = output.resolve()
+    lock_path = normalized_output.parent / f".{normalized_output.name}.lock"
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(lock_path, flags, 0o640)
+    except OSError as exc:
+        raise TradingCalendarBuildError(f"cannot open build lock: {lock_path}") from exc
+    locked = False
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise TradingCalendarBuildError("build lock must be a physical file")
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        locked = True
         return _build_locked(
             ods_package=ods_package,
             input_plan=input_plan,
             model_path=model_path,
             upstream_candidate=upstream_candidate,
-            output=output,
+            output=normalized_output,
             run_id=run_id,
         )
+    finally:
+        if locked:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)

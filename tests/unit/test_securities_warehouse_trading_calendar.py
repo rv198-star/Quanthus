@@ -320,6 +320,8 @@ class TradingCalendarBuildTests(unittest.TestCase):
                 }
             )
         table_digests: dict[str, str] = {}
+        row_counts: dict[str, int] = {}
+        checkpoint_tables: dict[str, dict[str, object]] = {}
         for table in UPSTREAM_TABLES:
             path = payload / f"{table}.parquet"
             if table == "dwd_trading_venue":
@@ -328,6 +330,14 @@ class TradingCalendarBuildTests(unittest.TestCase):
                 value = pa.table({"placeholder": pa.array([], type=pa.string())})
             pq.write_table(value, path)
             table_digests[table] = _digest(value.to_pylist())
+            row_counts[table] = value.num_rows
+            checkpoint_tables[table] = {
+                "path": f"payload/listed_company/{table}.parquet",
+                "row_count": value.num_rows,
+                "schema_digest": _digest(str(value.schema)),
+                "semantic_digest": table_digests[table],
+                "sha256": _sha256(path),
+            }
         reference_seed_sha = f"sha256:{'b' * 64}"
         code_validity_sha = f"sha256:{'c' * 64}"
         plan_digest = json.loads((self.plan / "input-plan.json").read_text())["plan_digest"]
@@ -343,19 +353,29 @@ class TradingCalendarBuildTests(unittest.TestCase):
         receipt = {
             "schema_version": 1,
             "kind": "dwd_listed_company_build_receipt",
+            "status": "built",
             "run_id": self.run_id,
             "input_plan_digest": plan_digest,
             "model_sha256": _sha256(self.model),
             "reference_seed_sha256": reference_seed_sha,
             "code_validity_sha256": code_validity_sha,
             "table_digests": table_digests,
+            "row_counts": row_counts,
             "semantic_digest": semantic_digest,
         }
         self._write_json(self.upstream / "receipts/listed-company-build.json", receipt)
-        self._write_json(self.upstream / "checkpoint.json", {"schema_version": 1})
+        self._write_json(
+            self.upstream / "checkpoint.json",
+            {
+                "schema_version": 1,
+                "run_id": self.run_id,
+                "semantic_digest": semantic_digest,
+                "completed_tables": checkpoint_tables,
+            },
+        )
         self._write_json(
             self.upstream / "reconciliation/source-row-reconciliation.json",
-            {"schema_version": 1},
+            {"schema_version": 1, "input_plan_digest": plan_digest},
         )
         files = [
             "checkpoint.json",
@@ -371,6 +391,7 @@ class TradingCalendarBuildTests(unittest.TestCase):
                 "run_id": self.run_id,
                 "input_plan_digest": plan_digest,
                 "owned_tables": list(UPSTREAM_TABLES),
+                "row_counts": row_counts,
                 "semantic_digest": semantic_digest,
             },
         )
@@ -460,6 +481,26 @@ class TradingCalendarBuildTests(unittest.TestCase):
         self._write_upstream()
         with self.assertRaisesRegex(TradingCalendarBuildError, "snapshots conflict"):
             self._build()
+
+    def test_lineage_source_difference_does_not_create_business_conflict(self) -> None:
+        record = next(
+            item
+            for item in self.records
+            if item["dataset_id"] == "daily_intraday_5m_trading_calendar"
+        )
+        path = self.ods / str(record["path"])
+        rows = self._calendar_rows(
+            date(2026, 1, 4),
+            datetime(2026, 1, 4, 9, tzinfo=timezone.utc),
+        )
+        for row in rows:
+            row["source"] = "fixture.corrobating_source"
+        pq.write_table(pa.Table.from_pylist(rows), path)
+        record["sha256"] = _sha256(path)
+        record["size_bytes"] = path.stat().st_size
+        self._write_plan()
+        self._write_upstream()
+        self.assertEqual(self._build().row_count, 12)
 
     def test_rejects_upstream_from_another_run_even_when_resealed(self) -> None:
         receipt_path = self.upstream / "receipts/listed-company-build.json"
@@ -574,9 +615,25 @@ class TradingCalendarBuildTests(unittest.TestCase):
         ):
             self._build()
         self.assertFalse(self.output.exists())
+        work = next(self.root.glob(".calendar-candidate.*.work"))
+        (work / ".checkpoint.json.orphan").write_text("orphan", encoding="ascii")
+        partial = (
+            work
+            / "payload/tradability_state/dwd_trading_calendar/"
+            "trade_date_year=2026/part-00000.parquet.partial"
+        )
+        partial.write_bytes(b"orphan")
         result = self._build()
         self.assertEqual(result.year_count, 2)
         self.assertEqual(result.row_count, 6)
+
+    def test_rejects_symbolic_link_lock(self) -> None:
+        target = self.root / "unrelated-lock-target"
+        target.write_bytes(b"")
+        lock = self.output.parent / f".{self.output.name}.lock"
+        lock.symlink_to(target)
+        with self.assertRaisesRegex(TradingCalendarBuildError, "cannot open build lock"):
+            self._build()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "seed_id": "securities-warehouse-reference-seeds-v1",
+  "status": "frozen",
+  "source_snapshot": {
+    "authority": "ISO 10383 Registration Authority",
+    "retrieved_at": "2026-08-01T11:58:00+00:00",
+    "sha256": "sha256:d04443b3fc68639e0b7808bb4ad8c6b7174189f767d603dc346857a024bef61c",
+    "url": "https://www.iso20022.org/sites/default/files/ISO10383_MIC/ISO10383_MIC.csv"
+  },
+  "venues": [
+    {
+      "country_code": "CN",
+      "exchange_code": "SSE",
+      "mic_code": "XSHG",
+      "timezone": "Asia/Shanghai",
+      "venue_name": "SHANGHAI STOCK EXCHANGE"
+    },
+    {
+      "country_code": "CN",
+      "exchange_code": "SZSE",
+      "mic_code": "XSHE",
+      "timezone": "Asia/Shanghai",
+      "venue_name": "SHENZHEN STOCK EXCHANGE"
+    },
+    {
+      "country_code": "CN",
+      "exchange_code": "BSE",
+      "mic_code": "BJSE",
+      "timezone": "Asia/Shanghai",
+      "venue_name": "BEIJING STOCK EXCHANGE"
+    }
+  ],
+  "board_rules": [
+    {"exchange_code": "SSE", "prefixes": ["688", "689"], "board_code": "STAR"},
+    {"exchange_code": "SSE", "prefixes": ["*"], "board_code": "SSE_main"},
+    {"exchange_code": "SZSE", "prefixes": ["300", "301", "302"], "board_code": "ChiNext"},
+    {"exchange_code": "SZSE", "prefixes": ["*"], "board_code": "SZ_main"},
+    {"exchange_code": "BSE", "prefixes": ["*"], "board_code": "BSE_main"}
+  ],
+  "coverage_policy": {
+    "BSE": "BSE_PARTIAL_NONBLOCKING",
+    "SSE": "PRIMARY",
+    "SZSE": "PRIMARY"
+  }
+}

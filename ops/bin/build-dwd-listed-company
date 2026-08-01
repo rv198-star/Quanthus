@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Build the six-object listed-company DWD candidate."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.securities_warehouse.listed_company import (  # noqa: E402
+    ListedCompanyBuildError,
+    build_listed_company,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ods-package", type=Path, required=True)
+    parser.add_argument("--input-plan", type=Path, required=True)
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--reference-seed", type=Path, required=True)
+    parser.add_argument("--code-validity", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--run-id", required=True)
+    args = parser.parse_args()
+    try:
+        result = build_listed_company(
+            ods_package=args.ods_package,
+            input_plan=args.input_plan,
+            model_path=args.model,
+            reference_seed_path=args.reference_seed,
+            code_validity_path=args.code_validity,
+            output=args.output,
+            run_id=args.run_id,
+        )
+    except (ListedCompanyBuildError, OSError) as exc:
+        print(f"listed-company DWD build failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "bse_listed_count": result.bse_listed_count,
+                "output": str(result.root),
+                "primary_listed_count": result.primary_listed_count,
+                "row_counts": result.row_counts,
+                "semantic_digest": result.semantic_digest,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

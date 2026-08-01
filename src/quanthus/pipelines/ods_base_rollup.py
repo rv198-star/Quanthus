@@ -69,6 +69,31 @@ OVERLAY_PRECEDENCE: dict[str, Any] = {
     "overlap_mismatch_policy": "fail_build",
 }
 
+CALENDAR_HISTORY_BUSINESS_KEYS: dict[str, list[str]] = {
+    "trading_calendar_history_hotfix": ["exchange", "trade_date", "session"],
+}
+
+CALENDAR_HISTORY_APPLICATION: dict[str, Any] = {
+    "business_keys": CALENDAR_HISTORY_BUSINESS_KEYS,
+    "current_switch": False,
+    "mode": "add_absent_business_keys_only",
+    "parent_mutation": False,
+}
+
+
+def _direct_hotfix_precedence(application: Mapping[str, Any]) -> dict[str, Any]:
+    mode = application.get("mode")
+    if mode == "fill_absent_keys_only":
+        return copy.deepcopy(OVERLAY_PRECEDENCE)
+    if mode == "add_absent_business_keys_only":
+        return {
+            "application_mode": mode,
+            "business_keys": copy.deepcopy(CALENDAR_HISTORY_BUSINESS_KEYS),
+            "default": "parent_base_wins_hotfix_adds_absent_business_keys_only",
+            "overlap_mismatch_policy": "fail_build",
+        }
+    raise OdsBaseRollupError("Hotfix application mode is unsupported")
+
 
 def _object(path: Path) -> dict[str, Any]:
     try:
@@ -229,6 +254,8 @@ def _load_parent(
     ):
         raise OdsBaseRollupError("parent ODS Base policy or authority binding is invalid")
     files = _file_inventory(root.resolve(), content.get("files"), source_label="parent")
+    if content.get("rollup") is not None:
+        _verify_rollup_contract(root.resolve(), manifest, content)
     return manifest, content, files, manifest_sha
 
 
@@ -251,19 +278,46 @@ def _load_hotfix(
     if manifest.get("parent") != dict(parent_identity):
         raise OdsBaseRollupError("Hotfix is not bound to the exact parent Base")
     application = _mapping(manifest.get("application"), "hotfix.application")
-    if application != {
+    application_mode = application.get("mode")
+    legacy_application = {
         "current_switch": False,
         "mode": "fill_absent_keys_only",
         "parent_mutation": False,
-    }:
-        raise OdsBaseRollupError("Hotfix application contract is not fill-only")
+    }
+    if application_mode == "fill_absent_keys_only":
+        if application != legacy_application:
+            raise OdsBaseRollupError("Hotfix application contract is not fill-only")
+    elif application_mode == "add_absent_business_keys_only":
+        if application != CALENDAR_HISTORY_APPLICATION:
+            raise OdsBaseRollupError("calendar-history Hotfix application contract is invalid")
+    else:
+        raise OdsBaseRollupError("Hotfix application mode is unsupported")
     scope = _mapping(manifest.get("scope"), "hotfix.scope")
-    if (
-        not isinstance(scope.get("security_count"), int)
-        or int(scope["security_count"]) <= 0
-        or scope.get("through_date") != parent_identity["through_date"]
-    ):
+    if scope.get("through_date") != parent_identity["through_date"]:
         raise OdsBaseRollupError("Hotfix scope is invalid")
+    if application_mode == "fill_absent_keys_only":
+        if (
+            not isinstance(scope.get("security_count"), int)
+            or isinstance(scope.get("security_count"), bool)
+            or int(scope["security_count"]) <= 0
+        ):
+            raise OdsBaseRollupError("Hotfix scope is invalid")
+    else:
+        if (
+            scope.get("kind") != "calendar_history"
+            or scope.get("venues") != ["SSE", "SZSE"]
+            or not isinstance(scope.get("calendar_date_count"), int)
+            or isinstance(scope.get("calendar_date_count"), bool)
+            or int(scope["calendar_date_count"]) <= 0
+        ):
+            raise OdsBaseRollupError("calendar-history Hotfix scope is invalid")
+        try:
+            minimum_date = date.fromisoformat(str(scope.get("minimum_date")))
+            maximum_date = date.fromisoformat(str(scope.get("maximum_date")))
+        except ValueError as exc:
+            raise OdsBaseRollupError("calendar-history Hotfix date scope is invalid") from exc
+        if minimum_date > maximum_date:
+            raise OdsBaseRollupError("calendar-history Hotfix date scope is reversed")
     _digest(scope.get("scope_digest"), "hotfix.scope.scope_digest")
     content = _mapping(manifest.get("content"), "hotfix.content")
     files = _file_inventory(root.resolve(), content.get("files"), source_label="hotfix")
@@ -279,13 +333,24 @@ def _load_hotfix(
     ):
         raise OdsBaseRollupError("Hotfix content digest is invalid or unexpected")
     coverage = _mapping(content.get("coverage"), "hotfix.content.coverage")
-    daily = _mapping(coverage.get("daily"), "hotfix.content.coverage.daily")
-    if daily.get("overlap_mismatches") != 0:
-        raise OdsBaseRollupError("Hotfix overlap mismatch gate did not pass")
     dataset_ids = {str(item["dataset_id"]) for item in files}
-    missing = sorted(set(OVERLAY_BUSINESS_KEYS) - dataset_ids)
-    if missing:
-        raise OdsBaseRollupError(f"Hotfix is missing overlay datasets: {missing}")
+    if application_mode == "fill_absent_keys_only":
+        daily = _mapping(coverage.get("daily"), "hotfix.content.coverage.daily")
+        if daily.get("overlap_mismatches") != 0:
+            raise OdsBaseRollupError("Hotfix overlap mismatch gate did not pass")
+        missing = sorted(set(OVERLAY_BUSINESS_KEYS) - dataset_ids)
+        if missing:
+            raise OdsBaseRollupError(f"Hotfix is missing overlay datasets: {missing}")
+    else:
+        calendar = _mapping(coverage.get("calendar"), "hotfix.content.coverage.calendar")
+        if (
+            dataset_ids != set(CALENDAR_HISTORY_BUSINESS_KEYS)
+            or calendar.get("overlap_business_keys") != 0
+            or calendar.get("conflicting_business_keys") != 0
+            or calendar.get("venues") != ["SSE", "SZSE"]
+            or calendar.get("calendar_date_count") != scope.get("calendar_date_count")
+        ):
+            raise OdsBaseRollupError("calendar-history Hotfix coverage gate did not pass")
     return manifest, content, files, manifest_sha
 
 
@@ -522,6 +587,9 @@ def build_ods_base_rollup(
         )
         parent_source["rollup_file_inventory_digest"] = _canonical_digest(parent_rollup_files)
         parent_source["parent_base"] = copy.deepcopy(parent_content.get("parent_base"))
+        if parent_content.get("rollup") is not None:
+            parent_source["rollup"] = copy.deepcopy(parent_content["rollup"])
+            parent_source["rollup_digest"] = _canonical_digest(parent_content["rollup"])
         hotfix_source = _source_identity(
             hotfix_manifest,
             _mapping(hotfix_manifest.get("scope"), "hotfix.scope"),
@@ -546,14 +614,21 @@ def build_ods_base_rollup(
             files=combined_files,
             scope_gaps=_sequence(content.get("scope_gaps"), "scope_gaps"),
         )
+        chained = parent_content.get("rollup") is not None
+        application = _mapping(hotfix_manifest.get("application"), "hotfix.application")
+        use_chained_contract = chained or application.get("mode") != "fill_absent_keys_only"
         content["rollup"] = {
-            "schema_version": 1,
-            "mode": "self_contained_fill_only_rollup",
+            "schema_version": 2 if use_chained_contract else 1,
+            "mode": (
+                "self_contained_chained_rollup"
+                if use_chained_contract
+                else "self_contained_fill_only_rollup"
+            ),
             "source_paths_preserved": True,
             "source_packages_required_after_build": False,
             "parent": parent_source,
             "hotfixes": [hotfix_source],
-            "precedence": copy.deepcopy(OVERLAY_PRECEDENCE),
+            "precedence": _direct_hotfix_precedence(application),
             "validated_overlap_mismatches": 0,
             "combined_file_inventory_digest": _canonical_digest(combined_files),
         }
@@ -623,12 +698,17 @@ def _verify_rollup_contract(
     if paths != sorted(paths) or len(paths) != len(set(paths)):
         raise OdsBaseRollupError("rollup file inventory must be unique and path-sorted")
     rollup = _mapping(content.get("rollup"), "content.rollup")
+    schema_version = rollup.get("schema_version")
+    expected_modes: dict[object, str] = {
+        1: "self_contained_fill_only_rollup",
+        2: "self_contained_chained_rollup",
+    }
+    expected_mode = expected_modes.get(schema_version)
     if (
-        rollup.get("schema_version") != 1
-        or rollup.get("mode") != "self_contained_fill_only_rollup"
+        expected_mode is None
+        or rollup.get("mode") != expected_mode
         or rollup.get("source_paths_preserved") is not True
         or rollup.get("source_packages_required_after_build") is not False
-        or rollup.get("precedence") != OVERLAY_PRECEDENCE
         or rollup.get("validated_overlap_mismatches") != 0
         or rollup.get("combined_file_inventory_digest") != _canonical_digest(files)
     ):
@@ -660,6 +740,16 @@ def _verify_rollup_contract(
     labels = {str(item.get("rollup_source")) for item in files}
     if labels != {parent_id, hotfix_id}:
         raise OdsBaseRollupError("rollup file source labels are invalid")
+    if schema_version == 1:
+        if rollup.get("precedence") != OVERLAY_PRECEDENCE or "rollup" in parent:
+            raise OdsBaseRollupError("legacy rollup precedence or parent lineage is invalid")
+    else:
+        parent_rollup = _mapping(parent.get("rollup"), "rollup.parent.rollup")
+        if (
+            parent.get("rollup_digest") != _canonical_digest(parent_rollup)
+            or parent_rollup.get("schema_version") not in {1, 2}
+        ):
+            raise OdsBaseRollupError("chained rollup parent lineage is invalid")
     parent_identity = {
         "bundle_id": parent_id,
         "manifest_sha256": parent["manifest_sha256"],
@@ -670,11 +760,26 @@ def _verify_rollup_contract(
         raise OdsBaseRollupError("rollup parent lineage is inconsistent")
     application = _mapping(hotfix.get("application"), "rollup.hotfix.application")
     coverage = _mapping(hotfix.get("coverage"), "rollup.hotfix.coverage")
-    daily = _mapping(coverage.get("daily"), "rollup.hotfix.coverage.daily")
+    if application.get("mode") == "fill_absent_keys_only":
+        daily = _mapping(coverage.get("daily"), "rollup.hotfix.coverage.daily")
+        valid_precedence = rollup.get("precedence") == OVERLAY_PRECEDENCE
+        valid_coverage = daily.get("overlap_mismatches") == 0
+    elif application.get("mode") == "add_absent_business_keys_only":
+        calendar = _mapping(coverage.get("calendar"), "rollup.hotfix.coverage.calendar")
+        valid_precedence = rollup.get("precedence") == _direct_hotfix_precedence(application)
+        valid_coverage = (
+            application == CALENDAR_HISTORY_APPLICATION
+            and calendar.get("overlap_business_keys") == 0
+            and calendar.get("conflicting_business_keys") == 0
+        )
+    else:
+        valid_precedence = False
+        valid_coverage = False
     if (
-        application.get("mode") != "fill_absent_keys_only"
-        or application.get("parent_mutation") is not False
-        or daily.get("overlap_mismatches") != 0
+        application.get("parent_mutation") is not False
+        or application.get("current_switch") is not False
+        or not valid_precedence
+        or not valid_coverage
     ):
         raise OdsBaseRollupError("rollup Hotfix precedence evidence is invalid")
 

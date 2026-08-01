@@ -198,6 +198,40 @@ class TradingCalendarBuildTests(unittest.TestCase):
             )
         return records
 
+    def _add_calendar_history_hotfix(self) -> None:
+        relative = "payload/hotfix/calendar/ref_trading_calendar_1990_2010.parquet"
+        path = self.ods / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        rows = [
+            {
+                "exchange": exchange,
+                "trade_date": trade_date,
+                "is_open": 1,
+                "session": "day",
+                "source": "baostock.query_trade_dates",
+                "built_at": datetime(2026, 8, 1, tzinfo=timezone.utc),
+            }
+            for trade_date in (date(2025, 12, 30), date(2025, 12, 31))
+            for exchange in ("SSE", "SZSE")
+        ]
+        pq.write_table(pa.Table.from_pylist(rows), path)
+        self.records.append(
+            {
+                "dataset_id": "trading_calendar_history_hotfix",
+                "record_type": "file",
+                "disposition": "modeled",
+                "mapping_identity": "trading_calendar",
+                "path": relative,
+                "sha256": _sha256(path),
+                "size_bytes": path.stat().st_size,
+                "target_tables": [
+                    "dwd_trading_venue",
+                    "dwd_trading_calendar",
+                    "dwd_tradability_state",
+                ],
+            }
+        )
+
     def _seal_package(
         self,
         root: Path,
@@ -492,6 +526,41 @@ class TradingCalendarBuildTests(unittest.TestCase):
         self._write_plan()
         self._write_upstream()
         self.assertEqual(self._build().row_count, 12)
+
+    def test_merges_nonconflicting_sse_szse_history_with_row_level_lineage(self) -> None:
+        self._add_calendar_history_hotfix()
+        self._write_ods_contract()
+        self._write_plan()
+        self._write_upstream()
+
+        result = self._build()
+        self.assertEqual(result.row_count, 16)
+        self.assertEqual(result.year_count, 2)
+        history = pq.ParquetFile(
+            self.output
+            / "payload/tradability_state/dwd_trading_calendar/"
+            "trade_date_year=2025/part-00000.parquet"
+        ).read().to_pylist()
+        self.assertEqual({row["venue_id"] for row in history}, {"venue_sse", "venue_szse"})
+        self.assertTrue(
+            all(row["record_source"] == "baostock.query_trade_dates" for row in history)
+        )
+        self.assertTrue(
+            all(
+                row["source_revision"].startswith("trading_calendar_history_hotfix@")
+                for row in history
+            )
+        )
+        reconciliation = json.loads(
+            (self.output / "reconciliation/source-row-reconciliation.json").read_text()
+        )
+        source = next(
+            item
+            for item in reconciliation["sources"]
+            if item["dataset_id"] == "trading_calendar_history_hotfix"
+        )
+        self.assertEqual(source["contributed_rows"], 4)
+        self.assertEqual(source["outcome"], "merged_nonconflicting_history")
 
     def test_rejects_upstream_from_another_run_even_when_resealed(self) -> None:
         receipt_path = self.upstream / "receipts/listed-company-build.json"

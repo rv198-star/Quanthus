@@ -495,11 +495,17 @@ def _load_calendar_snapshots(
                 raise TradingCalendarBuildError("calendar source has a duplicate business key")
             row["trade_date"] = trade_date
             row["built_at"] = built_at
+            row["_source_record"] = record
             rows[key] = row
         if not rows:
             raise TradingCalendarBuildError("calendar source is empty")
         exchanges = {key[0] for key in rows}
-        if exchanges != {"SSE", "SZSE", "BSE"}:
+        expected_exchanges = (
+            {"SSE", "SZSE"}
+            if record.get("dataset_id") == "trading_calendar_history_hotfix"
+            else {"SSE", "SZSE", "BSE"}
+        )
+        if exchanges != expected_exchanges:
             raise TradingCalendarBuildError("calendar snapshot has incomplete venue coverage")
         venue_coordinates = {
             exchange: {(key[1], key[2]) for key in rows if key[0] == exchange}
@@ -513,7 +519,7 @@ def _load_calendar_snapshots(
             _CalendarSnapshot(record=record, rows=rows, maximum_date=max(k[1] for k in rows))
         )
 
-    selected = max(
+    primary = max(
         snapshots,
         key=lambda item: (
             item.maximum_date,
@@ -521,14 +527,24 @@ def _load_calendar_snapshots(
             _text(item.record, "path"),
         ),
     )
-    selected_business = {key: bool(row["is_open"]) for key, row in selected.rows.items()}
+    if {key[0] for key in primary.rows} != {"SSE", "SZSE", "BSE"}:
+        raise TradingCalendarBuildError("latest calendar snapshot has incomplete venue coverage")
+    merged_rows: dict[tuple[str, date, str], Mapping[str, Any]] = dict(primary.rows)
     reconciliation: list[dict[str, Any]] = []
     for snapshot in sorted(snapshots, key=lambda item: _text(item.record, "path")):
         business = {key: bool(row["is_open"]) for key, row in snapshot.rows.items()}
-        if any(selected_business.get(key) != value for key, value in business.items()):
+        conflicting = [
+            key
+            for key, value in business.items()
+            if key in merged_rows and bool(merged_rows[key]["is_open"]) != value
+        ]
+        if conflicting:
             raise TradingCalendarBuildError("calendar snapshots conflict on a business key")
-        if not set(business).issubset(selected_business):
-            raise TradingCalendarBuildError("selected calendar does not contain prior evidence")
+        contributed = 0
+        for key, evidence_row in snapshot.rows.items():
+            if key not in merged_rows:
+                merged_rows[key] = evidence_row
+                contributed += 1
         reconciliation.append(
             {
                 "dataset_id": snapshot.record.get("dataset_id"),
@@ -537,19 +553,31 @@ def _load_calendar_snapshots(
                 "minimum_date": min(key[1] for key in snapshot.rows).isoformat(),
                 "maximum_date": snapshot.maximum_date.isoformat(),
                 "source_sha256": snapshot.record.get("sha256"),
+                "contributed_rows": contributed,
                 "outcome": (
                     "selected_latest_market_authority"
-                    if snapshot is selected
+                    if snapshot is primary
                     else (
                         "corroborated_identical_snapshot"
-                        if set(business) == set(selected_business)
-                        else "corroborated_consistent_prefix"
+                        if contributed == 0 and set(business) == set(primary.rows)
+                        else (
+                            "corroborated_consistent_overlap"
+                            if contributed == 0
+                            else "merged_nonconflicting_history"
+                        )
                     )
                 ),
                 "conflicting_rows": 0,
             }
         )
-    return selected, reconciliation
+    return (
+        _CalendarSnapshot(
+            record=primary.record,
+            rows=merged_rows,
+            maximum_date=max(key[1] for key in merged_rows),
+        ),
+        reconciliation,
+    )
 
 
 def _session_rows(
@@ -557,11 +585,6 @@ def _session_rows(
     venues: Mapping[str, Mapping[str, Any]],
     knowledge_cutoff: datetime,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    source_path = _text(snapshot.record, "path")
-    source_sha = _text(snapshot.record, "sha256")
-    source_revision = (
-        f"{_text(snapshot.record, 'dataset_id')}@{source_sha.removeprefix(_SHA256)[:16]}"
-    )
     result: list[dict[str, Any]] = []
     excluded_bse_dates: list[date] = []
     ordered_source_rows = sorted(
@@ -569,6 +592,15 @@ def _session_rows(
         key=lambda item: (item[0][1], item[0][0], item[0][2]),
     )
     for (exchange, trade_date, _session), source_row in ordered_source_rows:
+        source_record = _mapping(
+            source_row.get("_source_record"), "calendar row source record"
+        )
+        source_path = _text(source_record, "path")
+        source_sha = _text(source_record, "sha256")
+        source_revision = (
+            f"{_text(source_record, 'dataset_id')}@"
+            f"{source_sha.removeprefix(_SHA256)[:16]}"
+        )
         venue = venues[exchange]
         venue_id = _text(venue, "venue_id")
         start = datetime.combine(trade_date, time.min, _SHANGHAI).astimezone(timezone.utc)
@@ -930,13 +962,14 @@ def _build_locked(
     schema = _calendar_schema()
     table_digest = _canonical_digest(rows)
     selected_path = _text(selected.record, "path")
+    source_set_digest = _canonical_digest(source_reconciliation)
     semantic_digest = _canonical_digest(
         {
             "input_plan_digest": plan["plan_digest"],
             "model_sha256": model_sha,
             "upstream_semantic_digest": upstream_digest,
             "upstream_manifest_sha256": upstream_manifest_sha,
-            "selected_source_sha256": selected.record.get("sha256"),
+            "calendar_source_set_digest": source_set_digest,
             "table_digest": table_digest,
         }
     )
@@ -957,6 +990,7 @@ def _build_locked(
         "upstream_manifest_sha256": upstream_manifest_sha,
         "selected_calendar_source": selected_path,
         "selected_calendar_source_sha256": selected.record.get("sha256"),
+        "calendar_source_set_digest": source_set_digest,
         "knowledge_cutoff": knowledge_cutoff.isoformat(),
         "row_counts": {_OWNED_TABLE: len(rows)},
         "year_count": len(years),

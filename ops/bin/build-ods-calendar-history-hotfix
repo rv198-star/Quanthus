@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Acquire and seal the bounded BaoStock 1990-2010 calendar Hotfix."""
+
+from __future__ import annotations
+
+import argparse
+import importlib.metadata
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.ods_base import load_ods_base_policy
+from quanthus.pipelines.ods_calendar_history_hotfix import (
+    OdsCalendarHistoryHotfixError,
+    build_ods_calendar_history_hotfix,
+)
+
+
+def _query_baostock() -> tuple[list[dict[str, str]], dict[str, Any]]:
+    try:
+        import baostock as bs
+    except ModuleNotFoundError as exc:
+        raise OdsCalendarHistoryHotfixError("baostock is required") from exc
+
+    acquired_at = datetime.now(timezone.utc).isoformat()
+    login = bs.login()
+    if login.error_code != "0":
+        raise OdsCalendarHistoryHotfixError(
+            f"BaoStock login failed: {login.error_code}/{login.error_msg}"
+        )
+    try:
+        result = bs.query_trade_dates(start_date="1990-01-01", end_date="2010-12-31")
+        rows: list[dict[str, str]] = []
+        while result.error_code == "0" and result.next():
+            rows.append(dict(zip(result.fields, result.get_row_data(), strict=True)))
+        if result.error_code != "0":
+            raise OdsCalendarHistoryHotfixError(
+                f"BaoStock calendar query failed: {result.error_code}/{result.error_msg}"
+            )
+        receipt = {
+            "provider": "baostock",
+            "provider_version": importlib.metadata.version("baostock"),
+            "function": "query_trade_dates",
+            "request": {"start_date": "1990-01-01", "end_date": "2010-12-31"},
+            "retrieved_at": acquired_at,
+            "login_error_code": login.error_code,
+            "login_error_msg": login.error_msg,
+            "query_error_code": result.error_code,
+            "query_error_msg": result.error_msg,
+            "fields": list(result.fields),
+            "raw_row_count": len(rows),
+        }
+        return rows, receipt
+    finally:
+        bs.logout()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--parent-base", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--hotfix-id", required=True)
+    parser.add_argument("--code-revision", required=True)
+    parser.add_argument("--built-at")
+    args = parser.parse_args()
+    built_at = args.built_at or datetime.now(timezone.utc).isoformat()
+    try:
+        provider_rows, provider_receipt = _query_baostock()
+        result = build_ods_calendar_history_hotfix(
+            parent_base=args.parent_base,
+            output=args.output,
+            hotfix_id=args.hotfix_id,
+            policy=load_ods_base_policy(args.policy),
+            code_revision=args.code_revision,
+            built_at=built_at,
+            provider_rows=provider_rows,
+            provider_receipt=provider_receipt,
+        )
+    except (OdsCalendarHistoryHotfixError, FileExistsError, OSError) as exc:
+        print(f"ODS calendar-history Hotfix build failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "calendar_date_count": result.calendar_date_count,
+                "content_digest": result.content_digest,
+                "hotfix_id": result.hotfix_id,
+                "manifest_sha256": result.manifest_sha256,
+                "open_date_count": result.open_date_count,
+                "output": str(result.root),
+                "row_count": result.row_count,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

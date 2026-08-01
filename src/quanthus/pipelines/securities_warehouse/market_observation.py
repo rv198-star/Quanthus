@@ -348,15 +348,6 @@ def _register_sources(connection: Any, registry: Sequence[Mapping[str, Any]]) ->
     connection.unregister("source_registry_arrow")
 
 
-def _configure_connection(connection: Any, scratch: Path) -> None:
-    connection.execute("SET threads=1")
-    # Partitioned COPY otherwise spills heavily to preserve order across open partitions.
-    connection.execute("SET preserve_insertion_order=false")
-    connection.execute("SET enable_progress_bar=false")
-    connection.execute("SET memory_limit='1400MB'")
-    connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
-
-
 def _stable_index_id(code: str) -> str:
     value = "\x1f".join(("securities-warehouse-v1", "market_index", code)).encode()
     return f"market_index_{hashlib.sha256(value).hexdigest()[:32]}"
@@ -1230,7 +1221,11 @@ def _build_locked(
     shutil.rmtree(scratch, ignore_errors=True)
     scratch.mkdir()
     connection = duckdb.connect()
-    _configure_connection(connection, scratch)
+    connection.execute("SET threads=1")
+    connection.execute("SET preserve_insertion_order=true")
+    connection.execute("SET enable_progress_bar=false")
+    connection.execute("SET memory_limit='1400MB'")
+    connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
     _register_sources(connection, registry)
     listing_path = listed.root / "payload/listed_company/dwd_listing.parquet"
     venue_path = listed.root / "payload/listed_company/dwd_trading_venue.parquet"

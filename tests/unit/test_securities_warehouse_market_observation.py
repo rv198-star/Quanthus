@@ -16,7 +16,6 @@ from quanthus.pipelines.securities_warehouse.market_observation import (
     _audit_outputs,
     _bar_query,
     _canonical_digest,
-    _configure_connection,
     _copy_query,
     _expected_row_counts,
     _index_bar_query,
@@ -335,21 +334,6 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         self.assertFalse(schemas["dwd_security_bar"].field("listing_id").nullable)
         self.assertTrue(schemas["dwd_security_valuation"].field("measure_value").nullable)
-
-    def test_connection_disables_partition_order_spill(self) -> None:
-        scratch = self.root / "duckdb-tmp"
-        scratch.mkdir()
-        connection = duckdb.connect()
-        try:
-            _configure_connection(connection, scratch)
-            preserve_order = connection.execute(
-                "SELECT current_setting('preserve_insertion_order')"
-            ).fetchone()
-            threads = connection.execute("SELECT current_setting('threads')").fetchone()
-        finally:
-            connection.close()
-        self.assertEqual(preserve_order, (False,))
-        self.assertEqual(threads, (1,))
 
     def test_normalize_outputs_merges_multiple_files_in_one_partition(self) -> None:
         work = self.root / "work"

@@ -193,6 +193,30 @@ class SecuritiesWarehousePlannerTests(unittest.TestCase):
         with self.assertRaisesRegex(WarehousePlanningError, "14 core objects"):
             _model_contract(invalid_model)
 
+    def test_model_contract_rejects_missing_cross_owner_foreign_key_edge(self) -> None:
+        model = json.loads(MODEL.read_text(encoding="utf-8"))
+        model["build_execution_contract"]["cross_owner_foreign_key_edges"].remove(
+            [60, 63]
+        )
+        invalid_model = self.root / "missing-cross-owner-edge.json"
+        self._write_json(invalid_model, model)
+
+        with self.assertRaisesRegex(
+            WarehousePlanningError, "cross-owner foreign-key edges do not match"
+        ):
+            _model_contract(invalid_model)
+
+    def test_model_contract_rejects_cyclic_script_dependencies(self) -> None:
+        model = json.loads(MODEL.read_text(encoding="utf-8"))
+        model["build_execution_contract"]["required_dependency_edges"].append(
+            [59, 57]
+        )
+        invalid_model = self.root / "cyclic-dependencies.json"
+        self._write_json(invalid_model, model)
+
+        with self.assertRaisesRegex(WarehousePlanningError, "contain a cycle"):
+            _model_contract(invalid_model)
+
     def test_base_coverage_requires_every_domain_object_and_governance(self) -> None:
         coverage = {
             "domains": [

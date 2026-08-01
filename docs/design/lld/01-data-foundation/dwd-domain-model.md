@@ -142,6 +142,13 @@ script may read only an explicitly declared same-run predecessor candidate after
 id, input-plan digest, knowledge cutoff, manifest, semantic digest, table ownership, and physical
 inventory. Existing DWD/DWS Bases and every `CURRENT` pointer remain forbidden inputs.
 
+Physical script ownership may cross a business-domain boundary when it is required to keep this
+graph acyclic. In particular, #60 builds `dwd_adjustment_factor` and
+`dwd_adjustment_factor_input` together with the corporate actions and evidence they reference;
+both objects remain members of the security-market-observation domain. #58 therefore owns only
+unadjusted bars, valuations, market-index definitions, and index bars. The machine contract lists
+every cross-owner foreign-key edge and contract tests derive those edges from the table catalog.
+
 ### 4.1 DWD rules
 
 - Read business evidence only from the exact accepted ODS Base and its explicitly bound immutable
@@ -489,8 +496,9 @@ Recommended implementation sequence after design approval:
 3. Build the independent trading-calendar backbone from the accepted venue identity.
 4. Build unadjusted security/index bars and valuation against that calendar, then build status,
    limit, tradability, and gap objects from the same-run identity, calendar, and market candidates.
-5. Build disclosures, company actions/terms, adjustment factors/inputs, industry membership,
-   shareholder count, and holding changes.
+5. Build disclosures and company actions/terms together with their adjustment factors/inputs;
+   build industry membership, shareholder count, and holding changes after their declared
+   same-run predecessors.
 6. Decode and expand provider-native financial facts; parse F10 capital and top-holder history;
    account for every eligible source row with a business row or explicit quality exception.
 7. Freeze one complete DWD snapshot and build all 10 DWS dimensions and 13 facts from it.

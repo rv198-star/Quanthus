@@ -199,6 +199,14 @@ builds the remaining tradability objects from the sealed same-run identity, cale
 candidates. This preserves all 33 DWD objects and seven domains while removing the former runtime
 cycle between market observations and tradability.
 
+The same rule assigns physical construction of `dwd_adjustment_factor` and
+`dwd_adjustment_factor_input` to Issue #60. They remain security-market-observation support
+objects, but are sealed with the corporate-action identities and evidence links they reference.
+This prevents a reverse Issue #60 to #58 dependency while preserving the accepted
+`#57 -> #72 -> #58 -> #59` market/tradability mainline. The machine contract must enumerate every
+cross-owner foreign-key edge, including optional foreign keys whenever a populated value requires
+same-run referential verification.
+
 Price-limit regimes are effective prioritized rule scopes. A rule binds a venue and may further
 scope by board, security status, IPO phase, or an optional listing override. It is not expanded
 into one duplicated rule row per listing. Ambiguous equal-priority matches fail the build.

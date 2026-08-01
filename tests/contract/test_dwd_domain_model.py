@@ -478,12 +478,58 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
         self.assertNotIn("dwd_trading_calendar", ownership["59"])
         self.assertEqual(len(ownership["59"]), 5)
         self.assertEqual(
+            ownership["58"],
+            [
+                "dwd_security_bar",
+                "dwd_security_valuation",
+                "dwd_market_index",
+                "dwd_index_bar",
+            ],
+        )
+        self.assertEqual(
+            ownership["60"],
+            [
+                "dwd_disclosure",
+                "dwd_disclosure_subject",
+                "dwd_corporate_action",
+                "dwd_corporate_action_term",
+                "dwd_adjustment_factor",
+                "dwd_adjustment_factor_input",
+            ],
+        )
+        self.assertEqual(
             execution["required_dependency_edges"][:4],
             [[56, 57], [57, 72], [72, 58], [58, 59]],
         )
         owned = [table for tables in ownership.values() for table in tables]
         self.assertEqual(len(owned), 33)
         self.assertEqual(set(owned), set(self.tables))
+
+    def test_machine_dag_covers_every_cross_owner_foreign_key(self) -> None:
+        execution = self.model["build_execution_contract"]
+        ownership = execution["dwd_script_ownership"]
+        owner_by_table = {
+            table: int(issue)
+            for issue, tables in ownership.items()
+            for table in tables
+        }
+        derived_edges = {
+            (owner_by_table[foreign_key["table"]], owner_by_table[table_name])
+            for table_name, table in self.tables.items()
+            for foreign_key in table["foreign_keys"]
+            if owner_by_table[foreign_key["table"]] != owner_by_table[table_name]
+        }
+        declared_edges = {
+            tuple(edge) for edge in execution["cross_owner_foreign_key_edges"]
+        }
+
+        self.assertEqual(declared_edges, derived_edges)
+        self.assertTrue(
+            declared_edges.issubset(
+                {tuple(edge) for edge in execution["required_dependency_edges"]}
+            )
+        )
+        self.assertNotIn((60, 58), declared_edges)
 
     def test_price_limit_regime_is_a_prioritized_rule_scope(self) -> None:
         regime = self.tables["dwd_price_limit_regime"]

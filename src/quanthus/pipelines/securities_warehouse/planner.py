@@ -169,6 +169,101 @@ def _validate_mapping(
     return item
 
 
+def _dependency_edges(value: object, field: str) -> set[tuple[int, int]]:
+    edges: set[tuple[int, int]] = set()
+    for index, raw in enumerate(_sequence(value, field)):
+        edge = _sequence(raw, f"{field}[{index}]")
+        if (
+            len(edge) != 2
+            or not all(isinstance(issue, int) and not isinstance(issue, bool) for issue in edge)
+            or edge[0] == edge[1]
+        ):
+            raise WarehousePlanningError(
+                f"{field}[{index}] must be a directed pair of distinct issue numbers"
+            )
+        pair = (edge[0], edge[1])
+        if pair in edges:
+            raise WarehousePlanningError(f"{field} contains a duplicate edge")
+        edges.add(pair)
+    return edges
+
+
+def _validate_build_execution_contract(
+    model: Mapping[str, Any],
+    tables: Sequence[Any],
+    table_names: set[str],
+) -> None:
+    execution = _mapping(
+        model.get("build_execution_contract"), "model.build_execution_contract"
+    )
+    raw_ownership = _mapping(
+        execution.get("dwd_script_ownership"),
+        "build_execution_contract.dwd_script_ownership",
+    )
+    owner_by_table: dict[str, int] = {}
+    for raw_issue, raw_tables in raw_ownership.items():
+        if not isinstance(raw_issue, str) or not raw_issue.isdigit():
+            raise WarehousePlanningError("DWD script owner must be an issue number")
+        issue = int(raw_issue)
+        for table_name in _sequence(raw_tables, f"dwd_script_ownership.{raw_issue}"):
+            if not isinstance(table_name, str) or table_name not in table_names:
+                raise WarehousePlanningError("DWD script ownership references an unknown table")
+            if table_name in owner_by_table:
+                raise WarehousePlanningError("DWD table has more than one script owner")
+            owner_by_table[table_name] = issue
+    if set(owner_by_table) != table_names:
+        raise WarehousePlanningError("every DWD table must have exactly one script owner")
+
+    derived_cross_owner_edges: set[tuple[int, int]] = set()
+    for raw in tables:
+        table = _mapping(raw, "model.tables[]")
+        table_name = _text(table, "name")
+        for index, raw_foreign_key in enumerate(
+            _sequence(table.get("foreign_keys"), f"{table_name}.foreign_keys")
+        ):
+            foreign_key = _mapping(
+                raw_foreign_key, f"{table_name}.foreign_keys[{index}]"
+            )
+            referenced_table = _text(foreign_key, "table")
+            if referenced_table not in table_names:
+                raise WarehousePlanningError(
+                    f"DWD foreign key references an unknown table: {referenced_table}"
+                )
+            source_owner = owner_by_table[referenced_table]
+            target_owner = owner_by_table[table_name]
+            if source_owner != target_owner:
+                derived_cross_owner_edges.add((source_owner, target_owner))
+
+    declared_cross_owner_edges = _dependency_edges(
+        execution.get("cross_owner_foreign_key_edges"),
+        "build_execution_contract.cross_owner_foreign_key_edges",
+    )
+    if declared_cross_owner_edges != derived_cross_owner_edges:
+        raise WarehousePlanningError(
+            "cross-owner foreign-key edges do not match DWD ownership and table contracts"
+        )
+
+    required_edges = _dependency_edges(
+        execution.get("required_dependency_edges"),
+        "build_execution_contract.required_dependency_edges",
+    )
+    if not declared_cross_owner_edges.issubset(required_edges):
+        raise WarehousePlanningError(
+            "required dependency edges omit a cross-owner foreign-key edge"
+        )
+
+    remaining_edges = set(required_edges)
+    remaining_nodes = {issue for edge in required_edges for issue in edge}
+    while remaining_edges:
+        roots = remaining_nodes.difference(target for _, target in remaining_edges)
+        if not roots:
+            raise WarehousePlanningError("required dependency edges contain a cycle")
+        remaining_edges = {
+            edge for edge in remaining_edges if edge[0] not in roots
+        }
+        remaining_nodes.difference_update(roots)
+
+
 def _model_contract(path: Path) -> tuple[dict[str, Any], str]:
     model = _object(path)
     if model.get("schema_version") != 1 or model.get("status") not in _MODEL_STATUSES:
@@ -242,6 +337,7 @@ def _model_contract(path: Path) -> tuple[dict[str, Any], str]:
         )
     if declared_core != actual_core:
         raise WarehousePlanningError("domain core object declarations do not match DWD table roles")
+    _validate_build_execution_contract(model, tables, table_names)
 
     delivery_states = set(_sequence(model.get("delivery_states"), "delivery_states"))
     for raw in dimensions:

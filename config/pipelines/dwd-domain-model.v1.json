@@ -132,23 +132,41 @@
     "dwd_script_ownership": {
       "57": ["dwd_listed_company", "dwd_company_identifier", "dwd_security", "dwd_security_identifier", "dwd_listing", "dwd_trading_venue"],
       "72": ["dwd_trading_calendar"],
-      "58": ["dwd_security_bar", "dwd_security_valuation", "dwd_adjustment_factor", "dwd_adjustment_factor_input", "dwd_market_index", "dwd_index_bar"],
+      "58": ["dwd_security_bar", "dwd_security_valuation", "dwd_market_index", "dwd_index_bar"],
       "59": ["dwd_security_status_interval", "dwd_listing_status_interval", "dwd_price_limit_regime", "dwd_tradability_state", "dwd_observation_gap"],
-      "60": ["dwd_disclosure", "dwd_disclosure_subject", "dwd_corporate_action", "dwd_corporate_action_term"],
+      "60": ["dwd_disclosure", "dwd_disclosure_subject", "dwd_corporate_action", "dwd_corporate_action_term", "dwd_adjustment_factor", "dwd_adjustment_factor_input"],
       "61": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"],
       "62": ["dwd_industry_scheme", "dwd_industry_node", "dwd_company_industry_membership"],
       "63": ["dwd_share_capital_observation", "dwd_shareholder_count_observation", "dwd_shareholding_change", "dwd_shareholding_observation"],
       "64": ["dwd_quality_exception"]
     },
+    "cross_owner_foreign_key_edges": [
+      [57, 58],
+      [57, 59],
+      [57, 60],
+      [57, 61],
+      [57, 62],
+      [57, 63],
+      [57, 72],
+      [60, 63],
+      [61, 60],
+      [72, 58],
+      [72, 59]
+    ],
     "required_dependency_edges": [
       [56, 57],
       [57, 72],
       [72, 58],
       [58, 59],
+      [57, 58],
+      [57, 59],
+      [57, 60],
       [57, 61],
       [57, 62],
       [57, 63],
-      [61, 60]
+      [60, 63],
+      [61, 60],
+      [72, 59]
     ]
   },
   "transform_contracts": {

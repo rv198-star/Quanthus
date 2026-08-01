@@ -15,7 +15,7 @@ ODS_ACCEPTANCE_PATH = (
     / "docs"
     / "acceptance"
     / "meta-data-base-001-ods-base-202607"
-    / "rollup-v1.1-acceptance.json"
+    / "rollup-v1.2-acceptance.json"
 )
 
 
@@ -367,24 +367,37 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
         )
         self._assert_source_mappings_are_valid(auxiliary)
 
-    def test_rollup_is_self_contained_and_hotfix_lineage_is_fill_only(self) -> None:
+    def test_rollup_is_self_contained_and_chained_hotfix_lineage_is_explicit(self) -> None:
         build_input = self.model["build_input_contract"]
         self.assertEqual(
             build_input["kind"], "immutable_self_contained_ods_base_rollup"
         )
-        self.assertEqual(build_input["bundle_id"], "ods-base-202607-v1.1")
+        self.assertEqual(build_input["bundle_id"], "ods-base-202607-v1.2")
         self.assertTrue(build_input["self_contained"])
         self.assertFalse(build_input["source_packages_required_after_build"])
         lineage = build_input["rollup_lineage"]
         self.assertEqual(len(lineage["hotfixes"]), 1)
         hotfix = lineage["hotfixes"][0]
-        self.assertEqual(hotfix["hotfix_id"], "ods-base-202607-v1-hotfix-001")
+        self.assertEqual(
+            hotfix["hotfix_id"],
+            "ods-base-202607-v1.1-calendar-history-hotfix-001",
+        )
         self.assertEqual(
             hotfix["parent_manifest_sha256"],
             lineage["parent"]["manifest_sha256"],
         )
-        self.assertEqual(hotfix["scope_count"], 209)
-        self.assertEqual(hotfix["application_mode"], "fill_absent_keys_only")
+        self.assertEqual(hotfix["scope_count"], 7318)
+        self.assertEqual(
+            hotfix["application_mode"], "add_absent_business_keys_only"
+        )
+        inherited = lineage["parent"]["inherited_rollup"]
+        self.assertEqual(inherited["parent"]["bundle_id"], "ods-base-202607-v1")
+        self.assertEqual(len(inherited["hotfixes"]), 1)
+        self.assertEqual(inherited["hotfixes"][0]["scope_count"], 209)
+        self.assertEqual(
+            inherited["hotfixes"][0]["application_mode"],
+            "fill_absent_keys_only",
+        )
 
         precedence = build_input["overlay_precedence"]
         self.assertIn("parent_base_wins", precedence["default"])
@@ -414,15 +427,33 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
                 ],
             },
         )
+        calendar_precedence = build_input["calendar_history_precedence"]
+        self.assertEqual(
+            calendar_precedence["business_keys"],
+            {
+                "trading_calendar_history_hotfix": [
+                    "exchange",
+                    "trade_date",
+                    "session",
+                ]
+            },
+        )
+        self.assertEqual(calendar_precedence["overlap_mismatch_policy"], "fail_build")
+        self.assertEqual(calendar_precedence["venues"], ["SSE", "SZSE"])
+        self.assertEqual(calendar_precedence["bse_policy"], "not_fabricated")
 
         mappings = self.model["ods_source_contract"]["hotfix_artifacts"]
         mapped_ids = [item["artifact"] for item in mappings]
-        self.assertEqual(self.model["ods_source_contract"]["hotfix_artifact_count"], 33)
-        self.assertEqual(len(mapped_ids), 33)
+        self.assertEqual(self.model["ods_source_contract"]["hotfix_artifact_count"], 34)
+        self.assertEqual(len(mapped_ids), 34)
         self.assertEqual(len(mapped_ids), len(set(mapped_ids)))
         self._assert_source_mappings_are_valid(mappings)
 
         by_name = {item["artifact"]: item for item in mappings}
+        self.assertEqual(
+            by_name["trading_calendar_history_hotfix"]["target_tables"],
+            ["dwd_trading_venue", "dwd_trading_calendar", "dwd_tradability_state"],
+        )
         self.assertEqual(by_name["daily_ohlcv_none_hotfix"]["disposition"], "modeled")
         self.assertEqual(by_name["minute_1m_hotfix"]["target_tables"], ["dwd_security_bar"])
         self.assertEqual(by_name["minute_5m_hotfix"]["target_tables"], ["dwd_security_bar"])

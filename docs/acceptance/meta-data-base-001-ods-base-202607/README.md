@@ -5,14 +5,15 @@
 | Work item | `META-DATA-BASE-001` |
 | Tracking issue | GitHub issue #47 |
 | Evidence date | 2026-08-01 UTC |
-| Evidence status | Self-contained V1.1 built, independently deep-verified, and activated on both ODS Base holders |
+| Evidence status | V1.1 active on both holders; additive V1.2 calendar-history candidate deep-verified on CN01 only |
 | Deployed revision | `55269c2b5459bbc3d1eb13cb539d253ed4b146f1` |
 | Hotfix build revision | `edc5242951b6881c3d65a64669877d93f280317a+ods-hotfix-worktree` |
 | V1.1 rollup revision | `f2de5ea9b8471f4fe7134868729e7626df7d933d` |
 | Policies | `config/pipelines/ods-base.v1.json` and `config/pipelines/ods-base-final-through-20260731.v2.json` |
 | Active package | `ods-base-202607-v1.1` |
+| DWD rebuild candidate input | `ods-base-202607-v1.2` on CN01; not active through `BASE_CURRENT.json` |
 | Retained source packages | `ods-base-202607-v1` and `ods-base-202607-v1-hotfix-001` |
-| Machine summaries | `provisional-through-20260730.json`, `final-candidate-through-20260731.json`, `manual-promotion-through-20260731.json`, `hotfix-001-209-security-gap.json`, and `rollup-v1.1-acceptance.json` |
+| Machine summaries | `provisional-through-20260730.json`, `final-candidate-through-20260731.json`, `manual-promotion-through-20260731.json`, `hotfix-001-209-security-gap.json`, `rollup-v1.1-acceptance.json`, and `rollup-v1.2-acceptance.json` |
 | Production cutover | blocked; no `GO_FOR_CUTOVER.json` was recorded |
 
 ## 1. Verdict
@@ -214,3 +215,23 @@ deletion was not authorized. Because V1.1 uses node-local hard links, it added o
 physical bytes per node, primarily its 49,329,538-byte manifest and directory entries. Removing
 the older directory names later would therefore recover little payload space and is a separate
 operator decision.
+
+## 9. Additive V1.2 Calendar-History Candidate
+
+The new DWD build found that governed unadjusted daily bars begin on 1990-12-19 while every calendar
+snapshot retained by V1.1 begins in 2011. A non-null calendar foreign key therefore could not cover
+676,991 pre-2011 daily observations without either dropping real bars or fabricating sessions.
+BaoStock `query_trade_dates` returned a continuous 7,318-date spine from 1990-12-19 through
+2010-12-31 with 4,911 open dates. The immutable Hotfix expands that evidence only to SSE and SZSE,
+emits no BSE history, and has zero business-key overlap or conflict with V1.1.
+
+CN01 built `ods-base-202607-v1.2` as a chained self-contained rollup with 21,396 files and
+13,643,600,642 logical bytes. Independent deep verification returned manifest
+`sha256:090d6a50aac7007337229588e9cd1586a50f09811332e6024d08f28ddc4b6e05` and content digest
+`sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01`.
+All 21,395 parent files and the single Hotfix file preserve their source inode through hard links.
+The V1.2 contract retains the complete nested V1.1 lineage.
+
+This is bounded build-input evidence, not an ODS publication. CN01 `BASE_CURRENT.json` remains at
+V1.1, no pointer transition was attempted, and Hermes has not received or independently verified
+V1.2. Exact machine evidence is in `rollup-v1.2-acceptance.json`.

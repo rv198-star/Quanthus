@@ -74,26 +74,43 @@
   },
   "build_input_contract": {
     "kind": "immutable_self_contained_ods_base_rollup",
-    "bundle_id": "ods-base-202607-v1.1",
+    "bundle_id": "ods-base-202607-v1.2",
     "through_date": "2026-07-31",
-    "manifest_sha256": "sha256:3a031118af4421b90df7aca8a96bd617a49dba2ef7e49a2074206104991e956e",
-    "content_digest": "sha256:86372a3e0237c3bba3ff36e575ab041e1a0a01223587b629e7125b5ac1ba76da",
+    "manifest_sha256": "sha256:090d6a50aac7007337229588e9cd1586a50f09811332e6024d08f28ddc4b6e05",
+    "content_digest": "sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01",
     "self_contained": true,
     "source_packages_required_after_build": false,
     "rollup_lineage": {
       "parent": {
-        "bundle_id": "ods-base-202607-v1",
-        "manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
-        "content_digest": "sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1"
+        "bundle_id": "ods-base-202607-v1.1",
+        "manifest_sha256": "sha256:3a031118af4421b90df7aca8a96bd617a49dba2ef7e49a2074206104991e956e",
+        "content_digest": "sha256:86372a3e0237c3bba3ff36e575ab041e1a0a01223587b629e7125b5ac1ba76da",
+        "inherited_rollup": {
+          "parent": {
+            "bundle_id": "ods-base-202607-v1",
+            "manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+            "content_digest": "sha256:91fb3be70e7b80cb22eaa800c00bb267a9a89202b83a14614c31b9d7a2f5d4d1"
+          },
+          "hotfixes": [
+            {
+              "hotfix_id": "ods-base-202607-v1-hotfix-001",
+              "manifest_sha256": "sha256:c2fae9116e74f13b921f8cbf192d546b4f9ffd14c181dad7ca5b84bb0ccbd30a",
+              "content_digest": "sha256:31453165b0eafd00f94357638fad7029ab0687d3c836269b843358ecfd933cac",
+              "parent_manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
+              "scope_count": 209,
+              "application_mode": "fill_absent_keys_only"
+            }
+          ]
+        }
       },
       "hotfixes": [
         {
-          "hotfix_id": "ods-base-202607-v1-hotfix-001",
-          "manifest_sha256": "sha256:c2fae9116e74f13b921f8cbf192d546b4f9ffd14c181dad7ca5b84bb0ccbd30a",
-          "content_digest": "sha256:31453165b0eafd00f94357638fad7029ab0687d3c836269b843358ecfd933cac",
-          "parent_manifest_sha256": "sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c",
-          "scope_count": 209,
-          "application_mode": "fill_absent_keys_only"
+          "hotfix_id": "ods-base-202607-v1.1-calendar-history-hotfix-001",
+          "manifest_sha256": "sha256:5682a93443b187384b6abf169267d301c9e5b15af450a61478cae3acb7a98ff7",
+          "content_digest": "sha256:45703037d6faf513c2ecbadd37dfa1bbc4dc9bb2b559a5f8162ebd6635e2d141",
+          "parent_manifest_sha256": "sha256:3a031118af4421b90df7aca8a96bd617a49dba2ef7e49a2074206104991e956e",
+          "scope_count": 7318,
+          "application_mode": "add_absent_business_keys_only"
         }
       ]
     },
@@ -113,6 +130,15 @@
       "overlap_mismatch_policy": "fail_build",
       "expected_sse_szse_listed_scope_after_overlay": 5201,
       "bse_policy": "BSE_PARTIAL_NONBLOCKING"
+    },
+    "calendar_history_precedence": {
+      "default": "parent_base_wins_hotfix_adds_absent_business_keys_only",
+      "business_keys": {
+        "trading_calendar_history_hotfix": ["exchange", "trade_date", "session"]
+      },
+      "overlap_mismatch_policy": "fail_build",
+      "venues": ["SSE", "SZSE"],
+      "bse_policy": "not_fabricated"
     },
     "source_gap_definition": "required_business_evidence_absent_from_the_exact_self_contained_rollup_manifest",
     "parser_mapping_or_normalization_work_is_a_source_gap": false,
@@ -1124,8 +1150,9 @@
       {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "shareholder_count_progress", "disposition": "ods_only", "target_tables": [], "reason": "shareholder-count collector checkpoint"},
       {"container_source_id": "announcement_archive", "member_type": "sqlite_table", "member": "shareholder_count_revision", "disposition": "ods_only", "target_tables": [], "reason": "empty revision ledger retained as ODS evidence"}
     ],
-    "hotfix_artifact_count": 33,
+    "hotfix_artifact_count": 34,
     "hotfix_artifacts": [
+      {"artifact": "trading_calendar_history_hotfix", "disposition": "modeled", "target_tables": ["dwd_trading_venue", "dwd_trading_calendar", "dwd_tradability_state"], "reason": "bounded BaoStock 1990-2010 SSE/SZSE calendar history required by pre-2011 market observations"},
       {"artifact": "coverage_report", "disposition": "ods_only", "target_tables": [], "reason": "Hotfix coverage evidence"},
       {"artifact": "daily_assembly_summary", "disposition": "ods_only", "target_tables": [], "reason": "daily merge evidence"},
       {"artifact": "daily_ohlcv_none_hotfix", "disposition": "modeled", "target_tables": ["dwd_security_bar"], "reason": "unadjusted daily rows applied only to parent-absent business keys"},

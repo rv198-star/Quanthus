@@ -126,12 +126,13 @@ nodes.
   has seven first-class business domains; security/listing identity, venue, calendar, report
   concept, and similar structures remain internal support. The approved contract defines 33 DWD
   objects, ten shared DWS dimensions, and thirteen facts while reconciling every final ODS Base
-  source. The exact immutable self-contained `ods-base-202607-v1.1` rollup is the sole
+  source. The exact immutable self-contained `ods-base-202607-v1.2` candidate rollup is the sole
   business-evidence input; exact same-run predecessor candidates may supply declared referential
   identities after package verification. Issue #72 owns the calendar backbone between #57 and
   #58, removing the former #58/#59 execution cycle;
-  its manifest retains the parent and 209-security Hotfix lineage without requiring either older
-  directory name. Historical DWD/ADS packages and mutable pointers are retained but never read or
+  its manifest retains the V1.1 parent, inherited 209-security Hotfix, and additive 1990-2010
+  SSE/SZSE calendar-history lineage without requiring an older directory name. V1.2 is deep-verified
+  on CN01 for this rebuild but is not active through the ODS pointer. Historical DWD/ADS packages and mutable pointers are retained but never read or
   used as acceptance baselines. Script implementation is open; paired publication remains blocked
   by Issue #69.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.

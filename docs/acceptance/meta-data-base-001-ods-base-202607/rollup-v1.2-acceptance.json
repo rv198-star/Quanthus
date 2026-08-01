@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "work_item": "META-DATA-BASE-001",
+  "evidence_status": "self_contained_v1_2_candidate_built_and_deep_verified_on_cn01_not_activated",
+  "evidence_date_utc": "2026-08-01",
+  "build_revision": "d6d32f2791a4ffb833bf85424bb630fd070c1957",
+  "policy": {
+    "path": "config/pipelines/ods-base-final-through-20260731.v2.json",
+    "contract_id": "hermes-authoritative-ods-base-final-20260731-v2",
+    "sha256": "sha256:f61b5f7f06e587f59cf78ce9ad3d38a9e0b09923161bd11a458b421e04c61588"
+  },
+  "sources": {
+    "parent": {
+      "bundle_id": "ods-base-202607-v1.1",
+      "manifest_sha256": "sha256:3a031118af4421b90df7aca8a96bd617a49dba2ef7e49a2074206104991e956e",
+      "content_digest": "sha256:86372a3e0237c3bba3ff36e575ab041e1a0a01223587b629e7125b5ac1ba76da",
+      "file_count": 21395,
+      "size_bytes": 13643589947
+    },
+    "hotfix": {
+      "hotfix_id": "ods-base-202607-v1.1-calendar-history-hotfix-001",
+      "manifest_sha256": "sha256:5682a93443b187384b6abf169267d301c9e5b15af450a61478cae3acb7a98ff7",
+      "content_digest": "sha256:45703037d6faf513c2ecbadd37dfa1bbc4dc9bb2b559a5f8162ebd6635e2d141",
+      "file_count": 1,
+      "size_bytes": 10695,
+      "calendar_date_count": 7318,
+      "open_date_count": 4911,
+      "expanded_row_count": 14636,
+      "venues": ["SSE", "SZSE"],
+      "application_mode": "add_absent_business_keys_only",
+      "overlap_business_keys": 0,
+      "conflicting_business_keys": 0
+    }
+  },
+  "source_inventory": {
+    "authority": "embedded_in_v1_2_manifest",
+    "selection_digest": "sha256:7841552d31ac5fd8543c737f5cb55f9d0277128b5616a49475d23010b2eed8f4",
+    "scope_gaps": []
+  },
+  "package": {
+    "bundle_id": "ods-base-202607-v1.2",
+    "built_at": "2026-08-01T17:55:22+00:00",
+    "through_date": "2026-07-31",
+    "file_count": 21396,
+    "size_bytes": 13643600642,
+    "manifest_size_bytes": 49413623,
+    "manifest_sha256": "sha256:090d6a50aac7007337229588e9cd1586a50f09811332e6024d08f28ddc4b6e05",
+    "content_digest": "sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01",
+    "ready_file_sha256": "sha256:e00c3dd59c34cca2ad091fa46eac0a4276d05c63653dcb9287752bf799af9f56",
+    "storage_mode": "hard_link",
+    "source_paths_preserved": true,
+    "source_packages_required_after_build": false
+  },
+  "gates": {
+    "parent_and_hotfix_target_path_overlap_count": 0,
+    "parent_and_hotfix_dataset_id_overlap_count": 0,
+    "calendar_business_key_overlap_count": 0,
+    "calendar_business_key_conflict_count": 0,
+    "cn01_deep_verify": "passed",
+    "parent_hardlink_identity": {
+      "checked_files": 21395,
+      "mismatches": 0
+    },
+    "hotfix_hardlink_identity": "passed",
+    "nested_rollup_lineage": "passed",
+    "hidden_staging_remaining": 0
+  },
+  "pointer_state": {
+    "transition_attempted": false,
+    "current_bundle_id": "ods-base-202607-v1.1",
+    "current_pointer_sha256": "sha256:67865278565f0657a4bd5412574e83dfec50382986cff2201c2112416759afe5",
+    "v1_2_activated": false
+  },
+  "capacity": {
+    "logical_payload_bytes": 13643600642,
+    "cn01_free_bytes_after": 63500369920,
+    "explanation": "all parent payload members and the Hotfix member are node-local hard links; the physical increment is primarily the V1.2 manifest and directory entries"
+  },
+  "preservation": {
+    "parent_directory_retained": true,
+    "hotfix_directory_retained": true,
+    "parent_or_hotfix_deletion_authorized": false,
+    "ods_pointer_changed": false,
+    "dwd_pointer_changed": false,
+    "dws_pointer_changed": false,
+    "ads_pointer_changed": false,
+    "consumer_pointer_changed": false,
+    "go_for_cutover": false
+  }
+}

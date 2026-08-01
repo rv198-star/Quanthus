@@ -647,6 +647,8 @@ def _verify_existing_output(
     run_id: str,
     semantic_digest: str,
     row_counts: Mapping[str, int],
+    expected_receipt: Mapping[str, Any],
+    expected_reconciliation: Mapping[str, Any],
 ) -> None:
     if output.is_symlink() or not output.is_dir():
         raise ListedCompanyBuildError("existing output must be a physical directory")
@@ -703,6 +705,7 @@ def _verify_existing_output(
 
     checkpoint = _object(output / "checkpoint.json")
     receipt = _object(output / "receipts" / "listed-company-build.json")
+    reconciliation = _object(output / "reconciliation" / "source-row-reconciliation.json")
     completed = _mapping(checkpoint.get("completed_tables"), "completed tables")
     declared_table_digests = _mapping(receipt.get("table_digests"), "table digests")
     if (
@@ -716,6 +719,9 @@ def _verify_existing_output(
         or receipt.get("semantic_digest") != semantic_digest
         or receipt.get("row_counts") != dict(row_counts)
         or set(declared_table_digests) != set(_OWNED_TABLES)
+        or receipt != expected_receipt
+        or reconciliation != expected_reconciliation
+        or manifest.get("input_plan_digest") != receipt.get("input_plan_digest")
     ):
         raise ListedCompanyBuildError("output checkpoint or receipt identity is inconsistent")
     try:
@@ -733,6 +739,7 @@ def _verify_existing_output(
         table_checkpoint = _mapping(completed.get(table), f"checkpoint {table}")
         if (
             table_value.num_rows != row_counts[table]
+            or not table_value.schema.equals(schemas[table], check_metadata=True)
             or actual_digest != declared_table_digests[table]
             or table_checkpoint.get("path") != relative
             or table_checkpoint.get("row_count") != row_counts[table]
@@ -1342,12 +1349,48 @@ def _build_listed_company_locked(
             "table_digests": table_digests,
         }
     )
+    reconciliation_value = {
+        "schema_version": 1,
+        "input_plan_digest": plan["plan_digest"],
+        "sources": reconciliation,
+        "summary": {
+            "source_file_count": len(reconciliation),
+            "source_row_count": sum(int(item["source_rows"]) for item in reconciliation),
+            "unmatched_rows": sum(int(item.get("unmatched_rows", 0)) for item in reconciliation),
+        },
+    }
+    receipt = {
+        "schema_version": 1,
+        "kind": "dwd_listed_company_build_receipt",
+        "run_id": run_id,
+        "status": "built",
+        "input_plan_digest": plan["plan_digest"],
+        "model_sha256": model_sha,
+        "reference_seed_sha256": seed_sha,
+        "code_validity_sha256": code_validity_sha,
+        "semantic_digest": semantic_digest,
+        "table_digests": table_digests,
+        "row_counts": row_counts,
+        "coverage": {
+            "listed_by_exchange": listed_counts,
+            "primary_sse_szse_listed": primary_count,
+            "bse_policy": coverage_policy["BSE"],
+        },
+        "quality_exceptions": quality_exceptions,
+    }
     if output.is_symlink():
         raise ListedCompanyBuildError("candidate output path must not be a symbolic link")
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
-        _verify_existing_output(output, run_id, semantic_digest, row_counts)
+        _verify_existing_output(
+            output,
+            run_id,
+            semantic_digest,
+            row_counts,
+            receipt,
+            reconciliation_value,
+        )
         return ListedCompanyBuildResult(
             root=output,
             semantic_digest=semantic_digest,
@@ -1419,38 +1462,9 @@ def _build_listed_company_locked(
         checkpoint["completed_tables"] = completed
         _write_json_atomic(checkpoint_path, checkpoint)
 
-    reconciliation_value = {
-        "schema_version": 1,
-        "input_plan_digest": plan["plan_digest"],
-        "sources": reconciliation,
-        "summary": {
-            "source_file_count": len(reconciliation),
-            "source_row_count": sum(int(item["source_rows"]) for item in reconciliation),
-            "unmatched_rows": sum(int(item.get("unmatched_rows", 0)) for item in reconciliation),
-        },
-    }
     _write_json_atomic(
         work / "reconciliation" / "source-row-reconciliation.json", reconciliation_value
     )
-    receipt = {
-        "schema_version": 1,
-        "kind": "dwd_listed_company_build_receipt",
-        "run_id": run_id,
-        "status": "built",
-        "input_plan_digest": plan["plan_digest"],
-        "model_sha256": model_sha,
-        "reference_seed_sha256": seed_sha,
-        "code_validity_sha256": code_validity_sha,
-        "semantic_digest": semantic_digest,
-        "table_digests": table_digests,
-        "row_counts": row_counts,
-        "coverage": {
-            "listed_by_exchange": listed_counts,
-            "primary_sse_szse_listed": primary_count,
-            "bse_policy": coverage_policy["BSE"],
-        },
-        "quality_exceptions": quality_exceptions,
-    }
     _write_json_atomic(work / "receipts" / "listed-company-build.json", receipt)
     files = []
     for relative in sorted(_OUTPUT_FILES):
@@ -1470,14 +1484,28 @@ def _build_listed_company_locked(
     }
     _write_json_atomic(work / "manifest.json", manifest)
     _write_text_atomic(work / "READY", f"{_sha256(work / 'manifest.json')}\n")
-    _verify_existing_output(work, run_id, semantic_digest, row_counts)
+    _verify_existing_output(
+        work,
+        run_id,
+        semantic_digest,
+        row_counts,
+        receipt,
+        reconciliation_value,
+    )
     for relative in sorted(_OUTPUT_DIRECTORIES, key=lambda value: value.count("/"), reverse=True):
         _fsync_directory(work / relative)
     _fsync_directory(work)
     try:
         os.replace(work, output)
     except FileExistsError:
-        _verify_existing_output(output, run_id, semantic_digest, row_counts)
+        _verify_existing_output(
+            output,
+            run_id,
+            semantic_digest,
+            row_counts,
+            receipt,
+            reconciliation_value,
+        )
     _fsync_directory(output.parent)
 
     return ListedCompanyBuildResult(

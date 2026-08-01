@@ -332,6 +332,16 @@ class ListedCompanyBuildTests(unittest.TestCase):
     def _rows(output: Path, table: str) -> list[dict[str, object]]:
         return pq.read_table(output / "payload" / "listed_company" / f"{table}.parquet").to_pylist()
 
+    def _resign_manifest(self, output: Path) -> None:
+        manifest_path = output / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for item in manifest["files"]:
+            path = output / item["path"]
+            item["sha256"] = _sha256(path)
+            item["size_bytes"] = path.stat().st_size
+        self._write_json(manifest_path, manifest)
+        (output / "READY").write_text(f"{_sha256(manifest_path)}\n", encoding="ascii")
+
     def test_builds_six_tables_with_stable_identity_and_bse_policy(self) -> None:
         result = self._build()
 
@@ -913,16 +923,52 @@ class ListedCompanyBuildTests(unittest.TestCase):
         checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
         checkpoint["completed_tables"]["dwd_listed_company"]["sha256"] = _sha256(table_path)
         self._write_json(checkpoint_path, checkpoint)
+        self._resign_manifest(result.root)
+
+        with self.assertRaisesRegex(ListedCompanyBuildError, "semantic verification failed"):
+            self._build()
+
+    def test_rehashed_manifest_cannot_hide_physical_schema_tampering(self) -> None:
+        result = self._build()
+        table_path = result.root / "payload" / "listed_company" / "dwd_listed_company.parquet"
+        table = pq.read_table(table_path)
+        field_index = table.schema.get_field_index("display_name")
+        fields = list(table.schema)
+        fields[field_index] = pa.field("display_name", pa.large_string(), nullable=False)
+        arrays = list(table.columns)
+        arrays[field_index] = arrays[field_index].cast(pa.large_string())
+        pq.write_table(pa.Table.from_arrays(arrays, schema=pa.schema(fields)), table_path)
+        checkpoint_path = result.root / "checkpoint.json"
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        checkpoint["completed_tables"]["dwd_listed_company"]["sha256"] = _sha256(table_path)
+        self._write_json(checkpoint_path, checkpoint)
+        self._resign_manifest(result.root)
+
+        with self.assertRaisesRegex(ListedCompanyBuildError, "semantic verification failed"):
+            self._build()
+
+    def test_rehashed_manifest_cannot_hide_receipt_tampering(self) -> None:
+        result = self._build()
+        receipt_path = result.root / "receipts" / "listed-company-build.json"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["status"] = "failed"
+        receipt["coverage"]["primary_sse_szse_listed"] = 999
+        receipt["quality_exceptions"] = [{"reason_code": "INVENTED"}]
+        self._write_json(receipt_path, receipt)
+        self._resign_manifest(result.root)
+
+        with self.assertRaisesRegex(ListedCompanyBuildError, "receipt identity is inconsistent"):
+            self._build()
+
+    def test_ready_binds_manifest_and_receipt_input_plan_identity(self) -> None:
+        result = self._build()
         manifest_path = result.root / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        for item in manifest["files"]:
-            path = result.root / item["path"]
-            item["sha256"] = _sha256(path)
-            item["size_bytes"] = path.stat().st_size
+        manifest["input_plan_digest"] = f"sha256:{'f' * 64}"
         self._write_json(manifest_path, manifest)
         (result.root / "READY").write_text(f"{_sha256(manifest_path)}\n", encoding="ascii")
 
-        with self.assertRaisesRegex(ListedCompanyBuildError, "semantic verification failed"):
+        with self.assertRaisesRegex(ListedCompanyBuildError, "receipt identity is inconsistent"):
             self._build()
 
 

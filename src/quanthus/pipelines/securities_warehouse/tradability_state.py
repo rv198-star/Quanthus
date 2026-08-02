@@ -1586,8 +1586,10 @@ def _build_locked(
             + _read_output_sql(work, "dwd_listing_status_interval")
         )
         connection.execute("CREATE TEMP VIEW state_base AS " + _state_base_query())
+        # Reuse the expensive security-session/rule join across ambiguity checks,
+        # resolution, and output instead of recomputing it for every view scan.
         connection.execute(
-            "CREATE TEMP VIEW state_rule_candidates AS " + _state_rule_candidates_query()
+            "CREATE TEMP TABLE state_rule_candidates AS " + _state_rule_candidates_query()
         )
         ambiguous_rules = int(
             connection.execute(
@@ -1605,7 +1607,7 @@ def _build_locked(
             raise TradabilityStateBuildError(
                 f"equal-priority applicable price rules are ambiguous: {ambiguous_rules}"
             )
-        connection.execute("CREATE TEMP VIEW state_resolved AS " + _state_resolved_query())
+        connection.execute("CREATE TEMP TABLE state_resolved AS " + _state_resolved_query())
         missing_post_rule = int(
             connection.execute(
                 """

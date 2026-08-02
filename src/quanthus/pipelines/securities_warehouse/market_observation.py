@@ -418,20 +418,52 @@ def _bar_query(
     listing_path: Path,
     calendar_paths: Sequence[Path],
     cutoff: str,
+    *,
+    minute_start: str | None = None,
+    minute_end: str | None = None,
+    minute_interval: str | None = None,
 ) -> str:
     daily = _scan(
         registry,
         {"daily_ohlcv_unadjusted", "daily_ohlcv_none_delta", "daily_ohlcv_none_hotfix"},
     )
-    minute = _scan(
-        registry,
-        {
-            "minute_1m_research_archive",
-            "minute_1m_hotfix",
-            "minute_5m_formal_archive",
-            "minute_5m_hotfix",
-            "intraday_bars",
-        },
+    minute_identities = {
+        "minute_1m_research_archive",
+        "minute_1m_hotfix",
+        "minute_5m_formal_archive",
+        "minute_5m_hotfix",
+        "intraday_bars",
+    }
+    if minute_interval == "1m":
+        minute_identities -= {"minute_5m_formal_archive", "minute_5m_hotfix"}
+    elif minute_interval == "5m":
+        minute_identities -= {"minute_1m_research_archive", "minute_1m_hotfix"}
+    elif minute_interval is not None:
+        raise MarketObservationBuildError("minute query interval must be 1m or 5m")
+    minute = _scan(registry, minute_identities)
+    normalized_interval = """CASE
+           WHEN r.mapping_identity IN ('minute_1m_research_archive','minute_1m_hotfix')
+             THEN '1m'
+           WHEN r.mapping_identity IN ('minute_5m_formal_archive','minute_5m_hotfix')
+             THEN '5m'
+           ELSE b.bar_size END"""
+    minute_predicates = []
+    if minute_start is not None:
+        minute_predicates.append(
+            "CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) >= "
+            f"TIMESTAMP {_sql_literal(minute_start)}"
+        )
+    if minute_end is not None:
+        minute_predicates.append(
+            "CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) < "
+            f"TIMESTAMP {_sql_literal(minute_end)}"
+        )
+    if minute_interval is not None:
+        minute_predicates.append(
+            f"({normalized_interval})={_sql_literal(minute_interval)}"
+        )
+    minute_where = (
+        "\n  WHERE " + " AND ".join(minute_predicates) if minute_predicates else ""
     )
     listings = _reference_scan([listing_path])
     calendars = _reference_scan(calendar_paths)
@@ -452,21 +484,8 @@ WITH daily_raw AS (
 ), minute_raw AS (
   SELECT b.*, r.relative_path, r.dataset_id, r.mapping_identity, r.source_sha256,
          CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) AS interval_label,
-         CASE WHEN r.mapping_identity IN ('minute_1m_research_archive','minute_1m_hotfix')
-              THEN '1m'
-              WHEN r.mapping_identity IN ('minute_5m_formal_archive','minute_5m_hotfix')
-              THEN '5m'
-              ELSE b.bar_size END AS normalized_interval
-  FROM {minute} b JOIN source_registry r ON b.filename=r.absolute_path
-), minute_labeled AS (
-  SELECT *, max(CASE
-           WHEN normalized_interval='1m'
-            AND CAST(interval_label AS TIME)=TIME '13:00:00' THEN 1 ELSE 0 END
-         ) OVER (
-           PARTITION BY stock_code, CAST(interval_label AS DATE), normalized_interval,
-                        relative_path, source_sha256
-         ) AS afternoon_start_labeled
-  FROM minute_raw
+         {normalized_interval} AS normalized_interval
+  FROM {minute} b JOIN source_registry r ON b.filename=r.absolute_path{minute_where}
 ), source_rows AS (
   SELECT stock_code, trade_date,
          timezone('Asia/Shanghai', CAST(trade_date AS TIMESTAMP)) AS local_day_start,
@@ -480,14 +499,14 @@ WITH daily_raw AS (
   UNION ALL
   SELECT stock_code, CAST(interval_label AS DATE), NULL::TIMESTAMPTZ,
          timezone('Asia/Shanghai', CASE
-           WHEN normalized_interval='1m' AND afternoon_start_labeled=1
-            AND CAST(interval_label AS TIME)>=TIME '13:00:00'
-             THEN interval_label + INTERVAL 1 MINUTE
+           WHEN normalized_interval='1m'
+            AND CAST(interval_label AS TIME)=TIME '13:00:00'
+             THEN interval_label - INTERVAL 90 MINUTE
            ELSE interval_label END) AS minute_end,
          interval_label AS source_label,
          normalized_interval, open, high, low, close, volume, amount,
          dataset_id, relative_path, mapping_identity, source_sha256
-  FROM minute_labeled
+  FROM minute_raw
 ), resolved AS (
   SELECT s.*, l.listing_id, l.venue_id, c.calendar_session_id, c.open_at, c.close_at,
          CASE s.interval_size WHEN '1d' THEN c.open_at
@@ -774,7 +793,7 @@ def _normalize_outputs(table: str, raw_root: Path, work: Path) -> list[dict[str,
     return sorted(states, key=lambda item: item["path"])
 
 
-def _repair_july_2026_start_labeled_minutes(
+def _repair_july_2026_minute_labels(
     connection: Any,
     work: Path,
     partitions: Sequence[Mapping[str, Any]],
@@ -807,9 +826,9 @@ def _repair_july_2026_start_labeled_minutes(
     path = _safe_file(work, prior["path"])
     legacy_markers = connection.execute(
         """SELECT count(*) FROM read_parquet(?) WHERE interval_size='1m'
-        AND CAST(observation_end AT TIME ZONE 'Asia/Shanghai' AS TIME)=TIME '13:00:00'
         AND source_record_id LIKE '%&ts=2026-07-%'
-        AND ends_with(source_record_id,'T13:00:00')""",
+        AND ends_with(source_record_id,'T13:00:00')
+        AND CAST(observation_end AT TIME ZONE 'Asia/Shanghai' AS TIME)<>TIME '11:30:00'""",
         [str(path)],
     ).fetchone()[0]
     if not legacy_markers:
@@ -1489,11 +1508,20 @@ def _build_locked(
                 for name, partitions in states.items()
             }
             _write_json_atomic(work / "checkpoint.json", checkpoint)
-        repaired = _repair_july_2026_start_labeled_minutes(
+        repair_query = _bar_query(
+            registry,
+            listing_path,
+            calendar_paths,
+            cutoff.isoformat(),
+            minute_start="2026-07-01 00:00:00",
+            minute_end="2026-08-01 00:00:00",
+            minute_interval="1m",
+        )
+        repaired = _repair_july_2026_minute_labels(
             connection,
             work,
             states["dwd_security_bar"],
-            security_bar_query,
+            repair_query,
         )
         if repaired is not None:
             states["dwd_security_bar"] = repaired

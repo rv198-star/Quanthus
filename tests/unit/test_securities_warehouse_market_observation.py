@@ -25,7 +25,7 @@ from quanthus.pipelines.securities_warehouse.market_observation import (
     _normalize_outputs,
     _partition_digest,
     _register_sources,
-    _repair_july_2026_start_labeled_minutes,
+    _repair_july_2026_minute_labels,
     _schemas,
     _stable_index_id,
     _table_digest,
@@ -233,7 +233,7 @@ class MarketObservationQueryTests(unittest.TestCase):
         self.assertEqual(start_utc.minute, 30)
         self.assertEqual(end_utc.minute, 31)
 
-    def test_bar_query_normalizes_partial_day_start_labeled_afternoon(self) -> None:
+    def test_bar_query_normalizes_mislabeled_midday_boundary(self) -> None:
         self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])
         self._write_source(
             "minute_1m_research_archive",
@@ -245,8 +245,9 @@ class MarketObservationQueryTests(unittest.TestCase):
             [
                 self._minute_row("2026-07-23 13:00:00", bar_size="1m"),
                 self._minute_row("2026-07-23 13:01:00", bar_size="1m"),
+                self._minute_row("2026-07-23 15:00:00", bar_size="1m"),
             ],
-            name="partial-start-labeled",
+            name="midday-boundary-mislabeled",
         )
         connection = self._connection()
         try:
@@ -271,21 +272,59 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         self.assertEqual(
             [row["source_record_id"].rsplit("&ts=", 1)[1] for row in partial],
-            ["2026-07-23T13:00:00", "2026-07-23T13:01:00"],
+            [
+                "2026-07-23T13:00:00",
+                "2026-07-23T13:01:00",
+                "2026-07-23T15:00:00",
+            ],
         )
         self.assertEqual(
-            [row["observation_start"].astimezone(timezone.utc).minute for row in partial],
-            [0, 1],
+            [row["observation_start"].astimezone(timezone.utc) for row in partial],
+            [
+                datetime(2026, 7, 23, 3, 29, tzinfo=timezone.utc),
+                datetime(2026, 7, 23, 5, 0, tzinfo=timezone.utc),
+                datetime(2026, 7, 23, 6, 59, tzinfo=timezone.utc),
+            ],
         )
         self.assertEqual(
-            [row["observation_end"].astimezone(timezone.utc).minute for row in partial],
-            [1, 2],
+            [row["observation_end"].astimezone(timezone.utc) for row in partial],
+            [
+                datetime(2026, 7, 23, 3, 30, tzinfo=timezone.utc),
+                datetime(2026, 7, 23, 5, 1, tzinfo=timezone.utc),
+                datetime(2026, 7, 23, 7, 0, tzinfo=timezone.utc),
+            ],
         )
         business_keys = {
             (row["listing_id"], row["observation_start"], row["interval_size"])
             for row in rows
         }
         self.assertEqual(len(business_keys), len(rows))
+
+    def test_recovery_query_pushes_july_scope_into_1m_source_scan(self) -> None:
+        self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])
+        one_minute = self._write_source(
+            "minute_1m_research_archive",
+            [self._minute_row("2026-07-23 13:00:00", bar_size="1m")],
+        )
+        five_minute = self._write_source(
+            "minute_5m_formal_archive",
+            [self._minute_row("2026-07-23 13:05:00", bar_size="5m")],
+        )
+
+        query = _bar_query(
+            self.registry,
+            self.listing,
+            [self.calendar],
+            self.cutoff,
+            minute_start="2026-07-01 00:00:00",
+            minute_end="2026-08-01 00:00:00",
+            minute_interval="1m",
+        )
+
+        self.assertIn(str(one_minute.resolve()), query)
+        self.assertNotIn(str(five_minute.resolve()), query)
+        self.assertIn("TIMESTAMP '2026-07-01 00:00:00'", query)
+        self.assertIn("TIMESTAMP '2026-08-01 00:00:00'", query)
 
     def test_checkpoint_repair_rebuilds_only_legacy_july_1m_partition(self) -> None:
         self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])
@@ -294,23 +333,38 @@ class MarketObservationQueryTests(unittest.TestCase):
             [
                 self._minute_row("2026-07-23 13:00:00", bar_size="1m"),
                 self._minute_row("2026-07-23 13:01:00", bar_size="1m"),
+                self._minute_row("2026-07-23 15:00:00", bar_size="1m"),
             ],
         )
         connection = self._connection()
-        query = _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
+        query = _bar_query(
+            self.registry,
+            self.listing,
+            [self.calendar],
+            self.cutoff,
+            minute_start="2026-07-01 00:00:00",
+            minute_end="2026-08-01 00:00:00",
+            minute_interval="1m",
+        )
         corrected = [
             row
             for row in connection.execute(query).to_arrow_table().to_pylist()
             if row["interval_size"] == "1m"
         ]
-        legacy = [
-            {
-                **row,
-                "observation_start": row["observation_start"] - timedelta(minutes=1),
-                "observation_end": row["observation_end"] - timedelta(minutes=1),
-            }
-            for row in corrected
-        ]
+        local_timezone = timezone(timedelta(hours=8))
+        legacy = []
+        for row in corrected:
+            raw_label = datetime.fromisoformat(
+                row["source_record_id"].rsplit("&ts=", 1)[1]
+            ).replace(tzinfo=local_timezone)
+            observation_start = raw_label.astimezone(timezone.utc)
+            legacy.append(
+                {
+                    **row,
+                    "observation_start": observation_start,
+                    "observation_end": observation_start + timedelta(minutes=1),
+                }
+            )
         work = self.root / "work"
         path = (
             work
@@ -332,27 +386,33 @@ class MarketObservationQueryTests(unittest.TestCase):
             }
         ]
         try:
-            repaired = _repair_july_2026_start_labeled_minutes(
+            repaired = _repair_july_2026_minute_labels(
                 connection, work, partitions, query
             )
             self.assertIsNotNone(repaired)
             assert repaired is not None
             repaired_rows = pq.ParquetFile(path).read().to_pylist()
             self.assertEqual(
-                [row["observation_end"].astimezone(timezone.utc).minute for row in repaired_rows],
-                [1, 2],
+                [row["observation_end"].astimezone(timezone.utc) for row in repaired_rows],
+                [
+                    datetime(2026, 7, 23, 3, 30, tzinfo=timezone.utc),
+                    datetime(2026, 7, 23, 5, 1, tzinfo=timezone.utc),
+                    datetime(2026, 7, 23, 7, 0, tzinfo=timezone.utc),
+                ],
             )
             self.assertEqual(
                 [
                     row["source_record_id"].rsplit("&ts=", 1)[1]
                     for row in repaired_rows
                 ],
-                ["2026-07-23T13:00:00", "2026-07-23T13:01:00"],
+                [
+                    "2026-07-23T13:00:00",
+                    "2026-07-23T13:01:00",
+                    "2026-07-23T15:00:00",
+                ],
             )
             self.assertIsNone(
-                _repair_july_2026_start_labeled_minutes(
-                    connection, work, repaired, query
-                )
+                _repair_july_2026_minute_labels(connection, work, repaired, query)
             )
         finally:
             connection.close()

@@ -5,7 +5,7 @@ import json
 import shutil
 import tempfile
 import unittest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -25,6 +25,7 @@ from quanthus.pipelines.securities_warehouse.market_observation import (
     _normalize_outputs,
     _partition_digest,
     _register_sources,
+    _repair_july_2026_start_labeled_minutes,
     _schemas,
     _stable_index_id,
     _table_digest,
@@ -106,6 +107,7 @@ class MarketObservationQueryTests(unittest.TestCase):
             date(2026, 1, 5),
             date(2026, 1, 6),
             date(2026, 1, 7),
+            date(2026, 7, 23),
         ):
             calendar_rows.append(
                 {
@@ -230,6 +232,130 @@ class MarketObservationQueryTests(unittest.TestCase):
         self.assertEqual(start_utc.hour, 1)
         self.assertEqual(start_utc.minute, 30)
         self.assertEqual(end_utc.minute, 31)
+
+    def test_bar_query_normalizes_partial_day_start_labeled_afternoon(self) -> None:
+        self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])
+        self._write_source(
+            "minute_1m_research_archive",
+            [self._minute_row("2026-01-05 13:01:00", bar_size="1m")],
+            name="standard-end-labeled",
+        )
+        self._write_source(
+            "minute_1m_research_archive",
+            [
+                self._minute_row("2026-07-23 13:00:00", bar_size="1m"),
+                self._minute_row("2026-07-23 13:01:00", bar_size="1m"),
+            ],
+            name="partial-start-labeled",
+        )
+        connection = self._connection()
+        try:
+            rows = connection.execute(
+                _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
+            ).to_arrow_table().to_pylist()
+        finally:
+            connection.close()
+
+        standard = next(row for row in rows if "2026-01-05" in row["source_record_id"])
+        self.assertEqual(
+            standard["observation_start"].astimezone(timezone.utc),
+            datetime(2026, 1, 5, 5, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            standard["observation_end"].astimezone(timezone.utc),
+            datetime(2026, 1, 5, 5, 1, tzinfo=timezone.utc),
+        )
+        partial = sorted(
+            (row for row in rows if "2026-07-23" in row["source_record_id"]),
+            key=lambda row: row["source_record_id"],
+        )
+        self.assertEqual(
+            [row["source_record_id"].rsplit("&ts=", 1)[1] for row in partial],
+            ["2026-07-23T13:00:00", "2026-07-23T13:01:00"],
+        )
+        self.assertEqual(
+            [row["observation_start"].astimezone(timezone.utc).minute for row in partial],
+            [0, 1],
+        )
+        self.assertEqual(
+            [row["observation_end"].astimezone(timezone.utc).minute for row in partial],
+            [1, 2],
+        )
+        business_keys = {
+            (row["listing_id"], row["observation_start"], row["interval_size"])
+            for row in rows
+        }
+        self.assertEqual(len(business_keys), len(rows))
+
+    def test_checkpoint_repair_rebuilds_only_legacy_july_1m_partition(self) -> None:
+        self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])
+        self._write_source(
+            "minute_1m_research_archive",
+            [
+                self._minute_row("2026-07-23 13:00:00", bar_size="1m"),
+                self._minute_row("2026-07-23 13:01:00", bar_size="1m"),
+            ],
+        )
+        connection = self._connection()
+        query = _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
+        corrected = [
+            row
+            for row in connection.execute(query).to_arrow_table().to_pylist()
+            if row["interval_size"] == "1m"
+        ]
+        legacy = [
+            {
+                **row,
+                "observation_start": row["observation_start"] - timedelta(minutes=1),
+                "observation_end": row["observation_end"] - timedelta(minutes=1),
+            }
+            for row in corrected
+        ]
+        work = self.root / "work"
+        path = (
+            work
+            / "payload/security_market_observation/dwd_security_bar"
+            / "interval_size=1m/observation_start_year=2026/observation_start_month=07"
+            / "part-00000.parquet"
+        )
+        path.parent.mkdir(parents=True)
+        schema = _schemas()["dwd_security_bar"]
+        pq.write_table(pa.Table.from_pylist(legacy, schema=schema), path)
+        digest, rows = _partition_digest(path, schema)
+        partitions = [
+            {
+                "path": path.relative_to(work).as_posix(),
+                "row_count": rows,
+                "semantic_digest": digest,
+                "schema_digest": _canonical_digest(str(schema)),
+                "sha256": "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        ]
+        try:
+            repaired = _repair_july_2026_start_labeled_minutes(
+                connection, work, partitions, query
+            )
+            self.assertIsNotNone(repaired)
+            assert repaired is not None
+            repaired_rows = pq.ParquetFile(path).read().to_pylist()
+            self.assertEqual(
+                [row["observation_end"].astimezone(timezone.utc).minute for row in repaired_rows],
+                [1, 2],
+            )
+            self.assertEqual(
+                [
+                    row["source_record_id"].rsplit("&ts=", 1)[1]
+                    for row in repaired_rows
+                ],
+                ["2026-07-23T13:00:00", "2026-07-23T13:01:00"],
+            )
+            self.assertIsNone(
+                _repair_july_2026_start_labeled_minutes(
+                    connection, work, repaired, query
+                )
+            )
+        finally:
+            connection.close()
 
     def test_zero_trade_daily_invalid_ohlc_is_retained_as_quality_exception(self) -> None:
         self._write_source(

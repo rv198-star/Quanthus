@@ -458,10 +458,20 @@ WITH daily_raw AS (
               THEN '5m'
               ELSE b.bar_size END AS normalized_interval
   FROM {minute} b JOIN source_registry r ON b.filename=r.absolute_path
+), minute_labeled AS (
+  SELECT *, max(CASE
+           WHEN normalized_interval='1m'
+            AND CAST(interval_label AS TIME)=TIME '13:00:00' THEN 1 ELSE 0 END
+         ) OVER (
+           PARTITION BY stock_code, CAST(interval_label AS DATE), normalized_interval,
+                        relative_path, source_sha256
+         ) AS afternoon_start_labeled
+  FROM minute_raw
 ), source_rows AS (
   SELECT stock_code, trade_date,
          timezone('Asia/Shanghai', CAST(trade_date AS TIMESTAMP)) AS local_day_start,
          NULL::TIMESTAMPTZ AS minute_end,
+         NULL::TIMESTAMP AS source_label,
          '1d' AS interval_size,
          open, high, low, close, volume, amount,
          dataset_id AS record_source,
@@ -469,10 +479,15 @@ WITH daily_raw AS (
   FROM daily_ranked WHERE source_rank=1 AND lower(adj_mode)='none'
   UNION ALL
   SELECT stock_code, CAST(interval_label AS DATE), NULL::TIMESTAMPTZ,
-         timezone('Asia/Shanghai', interval_label) AS minute_end,
+         timezone('Asia/Shanghai', CASE
+           WHEN normalized_interval='1m' AND afternoon_start_labeled=1
+            AND CAST(interval_label AS TIME)>=TIME '13:00:00'
+             THEN interval_label + INTERVAL 1 MINUTE
+           ELSE interval_label END) AS minute_end,
+         interval_label AS source_label,
          normalized_interval, open, high, low, close, volume, amount,
          dataset_id, relative_path, mapping_identity, source_sha256
-  FROM minute_raw
+  FROM minute_labeled
 ), resolved AS (
   SELECT s.*, l.listing_id, l.venue_id, c.calendar_session_id, c.open_at, c.close_at,
          CASE s.interval_size WHEN '1d' THEN c.open_at
@@ -494,7 +509,7 @@ SELECT record_source,
        relative_path || '#stock_code=' || stock_code ||
          CASE WHEN interval_size='1d' THEN '&date=' || CAST(trade_date AS VARCHAR)
               ELSE '&ts=' || strftime(
-                minute_end AT TIME ZONE 'Asia/Shanghai','%Y-%m-%dT%H:%M:%S'
+                source_label,'%Y-%m-%dT%H:%M:%S'
               ) END
          AS source_record_id,
        mapping_identity || '@' ||
@@ -757,6 +772,103 @@ def _normalize_outputs(table: str, raw_root: Path, work: Path) -> list[dict[str,
             }
         )
     return sorted(states, key=lambda item: item["path"])
+
+
+def _repair_july_2026_start_labeled_minutes(
+    connection: Any,
+    work: Path,
+    partitions: Sequence[Mapping[str, Any]],
+    corrected_query: str,
+) -> list[dict[str, Any]] | None:
+    """Replace only the legacy July 1m partition when its 13:00 label is unnormalized."""
+
+    candidates = []
+    for index, raw in enumerate(partitions):
+        item = dict(raw)
+        parts = Path(str(item["path"])).parts
+        values = {
+            key: value
+            for part in parts
+            if "=" in part
+            for key, value in [part.split("=", 1)]
+        }
+        if (
+            values.get("interval_size") == "1m"
+            and int(values.get("observation_start_year", "0")) == 2026
+            and int(values.get("observation_start_month", "0")) == 7
+        ):
+            candidates.append((index, item))
+    if not candidates:
+        return None
+    if len(candidates) != 1:
+        raise MarketObservationBuildError("July 2026 1m checkpoint has multiple partitions")
+
+    index, prior = candidates[0]
+    path = _safe_file(work, prior["path"])
+    legacy_markers = connection.execute(
+        """SELECT count(*) FROM read_parquet(?) WHERE interval_size='1m'
+        AND CAST(observation_end AT TIME ZONE 'Asia/Shanghai' AS TIME)=TIME '13:00:00'
+        AND source_record_id LIKE '%&ts=2026-07-%'
+        AND ends_with(source_record_id,'T13:00:00')""",
+        [str(path)],
+    ).fetchone()[0]
+    if not legacy_markers:
+        return None
+
+    schema = _schemas()["dwd_security_bar"]
+    partial = path.with_suffix(".parquet.partial")
+    writer = None
+    rows = 0
+    scoped_query = f"""SELECT * EXCLUDE (
+      observation_start_year, observation_start_month
+    ) FROM ({corrected_query}) corrected
+    WHERE interval_size='1m' AND observation_start_year='2026'
+      AND observation_start_month='07'"""
+    try:
+        try:
+            reader = connection.execute(scoped_query).to_arrow_reader(batch_size=122_880)
+            _, pa, pq = _dependencies()
+            writer = pq.ParquetWriter(
+                partial,
+                schema,
+                compression="zstd",
+                version="2.6",
+                data_page_version="2.0",
+                use_dictionary=True,
+                write_statistics=True,
+            )
+            for batch in reader:
+                value = pa.Table.from_batches([batch]).select(schema.names).cast(schema)
+                writer.write_table(value, row_group_size=122_880)
+                rows += value.num_rows
+        finally:
+            if writer is not None:
+                writer.close()
+    except Exception:
+        partial.unlink(missing_ok=True)
+        raise
+    if rows != int(prior["row_count"]):
+        partial.unlink(missing_ok=True)
+        raise MarketObservationBuildError(
+            "July 2026 1m targeted repair changed the checkpoint row count"
+        )
+    os.chmod(partial, 0o640)
+    _fsync_file(partial)
+    semantic_digest, verified_rows = _partition_digest(partial, schema)
+    if verified_rows != rows:
+        partial.unlink(missing_ok=True)
+        raise MarketObservationBuildError("July 2026 1m targeted repair lost rows")
+    os.replace(partial, path)
+    _fsync_directory(path.parent)
+    updated = list(dict(item) for item in partitions)
+    updated[index] = {
+        "path": path.relative_to(work).as_posix(),
+        "row_count": rows,
+        "semantic_digest": semantic_digest,
+        "schema_digest": _canonical_digest(str(schema)),
+        "sha256": _sha256(path),
+    }
+    return updated
 
 
 def _audit_outputs(
@@ -1344,6 +1456,9 @@ def _build_locked(
             }
             _write_json_atomic(work / "checkpoint.json", checkpoint)
 
+        security_bar_query = _bar_query(
+            registry, listing_path, calendar_paths, cutoff.isoformat()
+        )
         table_specs = (
             (
                 "dwd_index_bar",
@@ -1353,7 +1468,7 @@ def _build_locked(
             ),
             (
                 "dwd_security_bar",
-                _bar_query(registry, listing_path, calendar_paths, cutoff.isoformat()),
+                security_bar_query,
             ),
             (
                 "dwd_security_valuation",
@@ -1372,6 +1487,19 @@ def _build_locked(
                     "partitions": partitions,
                 }
                 for name, partitions in states.items()
+            }
+            _write_json_atomic(work / "checkpoint.json", checkpoint)
+        repaired = _repair_july_2026_start_labeled_minutes(
+            connection,
+            work,
+            states["dwd_security_bar"],
+            security_bar_query,
+        )
+        if repaired is not None:
+            states["dwd_security_bar"] = repaired
+            checkpoint["completed_tables"]["dwd_security_bar"] = {
+                "table_digest": _table_digest(repaired),
+                "partitions": repaired,
             }
             _write_json_atomic(work / "checkpoint.json", checkpoint)
         quality_exceptions = _audit_outputs(

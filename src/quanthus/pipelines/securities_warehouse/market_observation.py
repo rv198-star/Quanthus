@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import json
 import os
 import shutil
 import stat
@@ -766,7 +767,8 @@ def _audit_outputs(
     listing_path: Path,
     index_path: Path,
     calendar_paths: Sequence[Path],
-) -> None:
+) -> list[dict[str, Any]]:
+    quality_exceptions: list[dict[str, Any]] = []
     keys = {
         "dwd_security_bar": "listing_id,observation_start,interval_size,price_basis",
         "dwd_security_valuation": "security_id,observation_start,measure_type,methodology",
@@ -797,12 +799,75 @@ def _audit_outputs(
                 invalid = connection.execute(
                     """SELECT count(*) FROM read_parquet(?) WHERE
                     open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL OR
-                    high < greatest(open,close,low) OR low > least(open,close,high) OR
                     volume < 0 OR turnover < 0 OR observation_end <= observation_start""",
                     [str(path)],
                 ).fetchone()[0]
                 if invalid:
                     raise MarketObservationBuildError(f"{table} has {invalid} invalid bars")
+                invalid_envelope = connection.execute(
+                    """SELECT count(*) FROM read_parquet(?) WHERE
+                    high < greatest(open,close,low) OR low > least(open,close,high)""",
+                    [str(path)],
+                ).fetchone()[0]
+                if invalid_envelope and table != "dwd_security_bar":
+                    raise MarketObservationBuildError(
+                        f"{table} has {invalid_envelope} invalid bars"
+                    )
+                if invalid_envelope:
+                    accepted = connection.execute(
+                        """SELECT record_source, source_record_id, source_revision,
+                        source_artifact_sha256, listing_id, calendar_session_id,
+                        CAST(observation_start AS VARCHAR), interval_size,
+                        CAST(open AS VARCHAR), CAST(high AS VARCHAR),
+                        CAST(low AS VARCHAR), CAST(close AS VARCHAR),
+                        CAST(volume AS VARCHAR), CAST(turnover AS VARCHAR)
+                        FROM read_parquet(?) WHERE
+                        (high < greatest(open,close,low) OR low > least(open,close,high))
+                        AND interval_size='1d' AND volume=0 AND turnover=0
+                        ORDER BY listing_id, observation_start, source_record_id""",
+                        [str(path)],
+                    ).fetchall()
+                    if len(accepted) != invalid_envelope:
+                        raise MarketObservationBuildError(
+                            f"{table} has {invalid_envelope - len(accepted)} "
+                            "unaccepted invalid bars"
+                        )
+                    for row in accepted:
+                        business_key = {
+                            "listing_id": row[4],
+                            "observation_start": row[6],
+                            "interval_size": row[7],
+                            "price_basis": "UNADJUSTED",
+                        }
+                        quality_exceptions.append(
+                            {
+                                "code": "INVALID_OHLC_ZERO_TRADE_RETAINED",
+                                "affected_table": "dwd_security_bar",
+                                "affected_business_key_json": json.dumps(
+                                    business_key,
+                                    sort_keys=True,
+                                    separators=(",", ":"),
+                                ),
+                                "rule_id": "DWD_SECURITY_BAR_OHLC_ENVELOPE_V1",
+                                "classification": "ZERO_TRADE_INVALID_OHLC",
+                                "severity": "ERROR",
+                                "authority": "ODS_SOURCE_PRESERVED",
+                                "evidence_digest": row[3],
+                                "resolution_state": "OPEN",
+                                "record_source": row[0],
+                                "source_record_id": row[1],
+                                "source_revision": row[2],
+                                "calendar_session_id": row[5],
+                                "observed_values": {
+                                    "open": row[8],
+                                    "high": row[9],
+                                    "low": row[10],
+                                    "close": row[11],
+                                    "volume": row[12],
+                                    "turnover": row[13],
+                                },
+                            }
+                        )
             if table == "dwd_security_bar":
                 invalid = connection.execute(
                     """SELECT count(*) FROM read_parquet(?) WHERE listing_id IS NULL OR
@@ -896,6 +961,10 @@ def _audit_outputs(
                     raise MarketObservationBuildError(
                         f"index bars have {invalid} unresolved identities"
                     )
+    return sorted(
+        quality_exceptions,
+        key=lambda item: (item["affected_business_key_json"], item["source_record_id"]),
+    )
 
 
 def _expected_row_counts(
@@ -1305,7 +1374,7 @@ def _build_locked(
                 for name, partitions in states.items()
             }
             _write_json_atomic(work / "checkpoint.json", checkpoint)
-        _audit_outputs(
+        quality_exceptions = _audit_outputs(
             connection,
             work,
             states,
@@ -1361,6 +1430,7 @@ def _build_locked(
         "conflicting_business_keys": 0,
         "duplicate_business_keys": 0,
         "unresolved_foreign_keys": 0,
+        "accepted_quality_exceptions": len(quality_exceptions),
     }
     receipt = {
         "schema_version": 1,
@@ -1372,7 +1442,7 @@ def _build_locked(
         "partition_counts": partition_counts,
         "table_digests": table_digests,
         "semantic_digest": semantic_digest,
-        "quality_exceptions": [],
+        "quality_exceptions": quality_exceptions,
     }
     _write_json_atomic(work / "reconciliation/source-row-reconciliation.json", reconciliation)
     _write_json_atomic(work / "receipts/market-observation-build.json", receipt)

@@ -14,6 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from quanthus.pipelines.securities_warehouse.market_observation import (
+    MarketObservationBuildError,
     _audit_outputs,
     _bar_query,
     _canonical_digest,
@@ -203,7 +204,7 @@ class MarketObservationQueryTests(unittest.TestCase):
                 ("interval_size", "observation_start_year", "observation_start_month"),
             )
             states = _normalize_outputs("dwd_security_bar", raw_root, work)
-            _audit_outputs(
+            exceptions = _audit_outputs(
                 connection,
                 work,
                 {"dwd_security_bar": states},
@@ -214,6 +215,7 @@ class MarketObservationQueryTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(len(rows), 8)
+        self.assertEqual(exceptions, [])
         self.assertEqual(sum(state["row_count"] for state in states), 8)
         self.assertEqual(len(states), 3)
         self.assertEqual({row["price_basis"] for row in rows}, {"UNADJUSTED"})
@@ -226,6 +228,93 @@ class MarketObservationQueryTests(unittest.TestCase):
         self.assertEqual(first["observation_start"].hour, 1)
         self.assertEqual(first["observation_start"].minute, 30)
         self.assertEqual(first["observation_end"].minute, 31)
+
+    def test_zero_trade_daily_invalid_ohlc_is_retained_as_quality_exception(self) -> None:
+        self._write_source(
+            "daily_ohlcv_unadjusted",
+            [
+                self._bar_row(
+                    "2026-01-02",
+                    open=51.82,
+                    high=51.82,
+                    low=51.82,
+                    close=49.05,
+                    volume=0.0,
+                    amount=0.0,
+                )
+            ],
+        )
+        self._write_source(
+            "minute_1m_research_archive",
+            [self._minute_row("2026-01-02 09:31:00", bar_size="1m")],
+        )
+        connection = self._connection()
+        try:
+            query = _bar_query(
+                self.registry, self.listing, [self.calendar], self.cutoff
+            )
+            work = self.root / "work"
+            raw_root = work / "payload/security_market_observation/dwd_security_bar"
+            _copy_query(
+                connection,
+                query,
+                raw_root,
+                ("interval_size", "observation_start_year", "observation_start_month"),
+            )
+            states = _normalize_outputs("dwd_security_bar", raw_root, work)
+            exceptions = _audit_outputs(
+                connection,
+                work,
+                {"dwd_security_bar": states},
+                listing_path=self.listing,
+                index_path=self.listing,
+                calendar_paths=[self.calendar],
+            )
+        finally:
+            connection.close()
+        self.assertEqual(len(exceptions), 1)
+        self.assertEqual(exceptions[0]["code"], "INVALID_OHLC_ZERO_TRADE_RETAINED")
+        self.assertIn(
+            "stock_code=000001&date=2026-01-02",
+            exceptions[0]["source_record_id"],
+        )
+
+    def test_traded_daily_invalid_ohlc_still_fails(self) -> None:
+        self._write_source(
+            "daily_ohlcv_unadjusted",
+            [self._bar_row("2026-01-02", low=11.0, close=10.5)],
+        )
+        self._write_source(
+            "minute_1m_research_archive",
+            [self._minute_row("2026-01-02 09:31:00", bar_size="1m")],
+        )
+        connection = self._connection()
+        try:
+            query = _bar_query(
+                self.registry, self.listing, [self.calendar], self.cutoff
+            )
+            work = self.root / "work"
+            raw_root = work / "payload/security_market_observation/dwd_security_bar"
+            _copy_query(
+                connection,
+                query,
+                raw_root,
+                ("interval_size", "observation_start_year", "observation_start_month"),
+            )
+            states = _normalize_outputs("dwd_security_bar", raw_root, work)
+            with self.assertRaisesRegex(
+                MarketObservationBuildError, "unaccepted invalid bars"
+            ):
+                _audit_outputs(
+                    connection,
+                    work,
+                    {"dwd_security_bar": states},
+                    listing_path=self.listing,
+                    index_path=self.listing,
+                    calendar_paths=[self.calendar],
+                )
+        finally:
+            connection.close()
 
     def test_valuation_query_expands_and_normalizes_provider_units(self) -> None:
         base = {

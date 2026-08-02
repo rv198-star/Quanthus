@@ -51,6 +51,15 @@ class MarketObservationBuildResult:
     partition_counts: dict[str, int]
 
 
+@dataclass(frozen=True)
+class MarketObservationCandidateVerification:
+    root: Path
+    manifest_sha256: str
+    semantic_digest: str
+    row_counts: dict[str, int]
+    partition_counts: dict[str, int]
+
+
 _OWNED_TABLES = (
     "dwd_security_bar",
     "dwd_security_valuation",
@@ -484,21 +493,15 @@ def _bar_query(
         minute_predicates.append(code_predicate)
     if minute_start is not None:
         minute_predicates.append(
-            "CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) >= "
-            f"TIMESTAMP {_sql_literal(minute_start)}"
+            f"CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) >= TIMESTAMP {_sql_literal(minute_start)}"
         )
     if minute_end is not None:
         minute_predicates.append(
-            "CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) < "
-            f"TIMESTAMP {_sql_literal(minute_end)}"
+            f"CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) < TIMESTAMP {_sql_literal(minute_end)}"
         )
     if minute_interval is not None:
-        minute_predicates.append(
-            f"({normalized_interval})={_sql_literal(minute_interval)}"
-        )
-    minute_where = (
-        "\n  WHERE " + " AND ".join(minute_predicates) if minute_predicates else ""
-    )
+        minute_predicates.append(f"({normalized_interval})={_sql_literal(minute_interval)}")
+    minute_where = "\n  WHERE " + " AND ".join(minute_predicates) if minute_predicates else ""
     daily_where = f"\n  WHERE {code_predicate}" if code_predicate else ""
     listings = _reference_scan([listing_path])
     calendars = _reference_scan(calendar_paths)
@@ -845,11 +848,7 @@ def _partition_digest(path: Path, schema: Any) -> tuple[str, int]:
 def _normalize_outputs(table: str, raw_root: Path, work: Path) -> list[dict[str, Any]]:
     _, pa, pq = _dependencies()
     schema = _schemas()[table]
-    raw_files = (
-        [raw_root]
-        if table == "dwd_market_index"
-        else sorted(raw_root.rglob("*.parquet"))
-    )
+    raw_files = [raw_root] if table == "dwd_market_index" else sorted(raw_root.rglob("*.parquet"))
     if not raw_files:
         raise MarketObservationBuildError(f"{table} produced no parquet files")
     grouped: dict[Path, list[Path]] = {}
@@ -860,17 +859,11 @@ def _normalize_outputs(table: str, raw_root: Path, work: Path) -> list[dict[str,
         partition_files = sorted(
             grouped[parent],
             key=lambda path: (
-                int(path.stem.rsplit("-", 1)[-1])
-                if path.stem.rsplit("-", 1)[-1].isdigit()
-                else 0,
+                int(path.stem.rsplit("-", 1)[-1]) if path.stem.rsplit("-", 1)[-1].isdigit() else 0,
                 path.name,
             ),
         )
-        final = (
-            partition_files[0]
-            if table == "dwd_market_index"
-            else parent / "part-00000.parquet"
-        )
+        final = partition_files[0] if table == "dwd_market_index" else parent / "part-00000.parquet"
         partial = final.with_suffix(".parquet.partial")
         writer = pq.ParquetWriter(
             partial,
@@ -950,10 +943,7 @@ def _repair_july_2026_minute_labels(
         item = dict(raw)
         parts = Path(str(item["path"])).parts
         values = {
-            key: value
-            for part in parts
-            if "=" in part
-            for key, value in [part.split("=", 1)]
+            key: value for part in parts if "=" in part for key, value in [part.split("=", 1)]
         }
         if (
             values.get("interval_size") == interval_size
@@ -1022,9 +1012,7 @@ def _repair_july_2026_minute_labels(
     semantic_digest, verified_rows = _partition_digest(partial, schema)
     if verified_rows != rows:
         partial.unlink(missing_ok=True)
-        raise MarketObservationBuildError(
-            f"July 2026 {interval_size} targeted repair lost rows"
-        )
+        raise MarketObservationBuildError(f"July 2026 {interval_size} targeted repair lost rows")
     os.replace(partial, path)
     _fsync_directory(path.parent)
     updated = list(dict(item) for item in partitions)
@@ -1112,7 +1100,7 @@ def _merge_checkpoint_overlay(
                 f"""SELECT o.* FROM {registered} o
                 LEFT JOIN read_parquet(?) e ON {conditions}
                 WHERE e.{key_columns[0]} IS NULL
-                ORDER BY {','.join(f'o.{column}' for column in key_columns)},
+                ORDER BY {",".join(f"o.{column}" for column in key_columns)},
                          o.source_record_id""",
                 [str(path)],
             ).to_arrow_table()
@@ -1429,9 +1417,7 @@ def _expected_row_counts(
             "overlap_rows": int(overlap_rows),
             "conflicting_business_keys": int(conflicting_keys),
         }
-    conflicting = sum(
-        value["conflicting_business_keys"] for value in source_key_audit.values()
-    )
+    conflicting = sum(value["conflicting_business_keys"] for value in source_key_audit.values())
     if conflicting:
         raise MarketObservationBuildError(
             f"source precedence found {conflicting} conflicting business keys"
@@ -1455,10 +1441,7 @@ def _expected_row_counts(
             - folded_bar_alias_rows
         ),
         "dwd_security_valuation": int(
-            (
-                source_key_audit["valuation"]["selected_business_keys"]
-                - folded_valuation_alias_keys
-            )
+            (source_key_audit["valuation"]["selected_business_keys"] - folded_valuation_alias_keys)
             * 6
         ),
         "dwd_market_index": 3,
@@ -1597,9 +1580,7 @@ def _historical_alias_reconciliation(
             "folded_alias_rows": folded,
         }
 
-    direct_valuation = _valuation_query(
-        registry, listing_path, cutoff, stock_codes=alias_codes
-    )
+    direct_valuation = _valuation_query(registry, listing_path, cutoff, stock_codes=alias_codes)
     candidate_valuation = _valuation_query(
         registry,
         listing_path,
@@ -1748,6 +1729,41 @@ def _verify_existing_output(
     return MarketObservationBuildResult(root.resolve(), semantic, row_counts, partition_counts)
 
 
+def verify_market_observation_candidate(
+    root: Path,
+    *,
+    run_id: str,
+    input_plan_digest: str,
+    model_sha256: str,
+    listed_company_semantic_digest: str,
+    listed_company_manifest_sha256: str,
+    trading_calendar_semantic_digest: str,
+    trading_calendar_manifest_sha256: str,
+) -> MarketObservationCandidateVerification:
+    """Deep-verify a sealed #58 candidate for a same-run downstream builder."""
+
+    receipt = _object(root / "receipts/market-observation-build.json")
+    source_set_digest = _text(receipt, "source_set_digest")
+    result = _verify_existing_output(
+        root,
+        run_id=run_id,
+        input_plan_digest=input_plan_digest,
+        model_sha256=model_sha256,
+        source_set_digest=source_set_digest,
+        listed_company_semantic_digest=listed_company_semantic_digest,
+        listed_company_manifest_sha256=listed_company_manifest_sha256,
+        trading_calendar_semantic_digest=trading_calendar_semantic_digest,
+        trading_calendar_manifest_sha256=trading_calendar_manifest_sha256,
+    )
+    return MarketObservationCandidateVerification(
+        root=result.root,
+        manifest_sha256=_sha256(root / "manifest.json"),
+        semantic_digest=result.semantic_digest,
+        row_counts=result.row_counts,
+        partition_counts=result.partition_counts,
+    )
+
+
 def _prepare_work(
     work: Path, identity: Mapping[str, str]
 ) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
@@ -1794,8 +1810,7 @@ def _prepare_work(
                 rows != partition.get("row_count")
                 or digest != partition.get("semantic_digest")
                 or _sha256(path) != partition.get("sha256")
-                or partition.get("schema_digest")
-                != _canonical_digest(str(schemas[table]))
+                or partition.get("schema_digest") != _canonical_digest(str(schemas[table]))
             ):
                 raise MarketObservationBuildError(
                     f"checkpoint partition failed verification: {partition.get('path')}"
@@ -1808,9 +1823,7 @@ def _prepare_work(
     for table in _OWNED_TABLES:
         if table in states:
             continue
-        path = base / (
-            "dwd_market_index.parquet" if table == "dwd_market_index" else table
-        )
+        path = base / ("dwd_market_index.parquet" if table == "dwd_market_index" else table)
         if path.is_dir():
             shutil.rmtree(path)
         elif path.exists():
@@ -1829,9 +1842,7 @@ def _prepare_work(
     return checkpoint, states
 
 
-def _create_scratch_directory(
-    output: Path, build_identity: str, scratch_root: Path | None
-) -> Path:
+def _create_scratch_directory(output: Path, build_identity: str, scratch_root: Path | None) -> Path:
     scratch_parent = output.parent if scratch_root is None else scratch_root
     if scratch_parent.is_symlink() or not scratch_parent.is_dir():
         raise MarketObservationBuildError("scratch root must be a physical directory")
@@ -1937,9 +1948,7 @@ def _build_locked(
                 ods_package=ods_package,
                 knowledge_cutoff=cutoff,
             )
-            states["dwd_market_index"] = _normalize_outputs(
-                "dwd_market_index", index_path, work
-            )
+            states["dwd_market_index"] = _normalize_outputs("dwd_market_index", index_path, work)
             checkpoint["completed_tables"] = {
                 name: {
                     "table_digest": _table_digest(partitions),
@@ -1949,9 +1958,7 @@ def _build_locked(
             }
             _write_json_atomic(work / "checkpoint.json", checkpoint)
 
-        security_bar_query = _bar_query(
-            registry, listing_path, calendar_paths, cutoff.isoformat()
-        )
+        security_bar_query = _bar_query(registry, listing_path, calendar_paths, cutoff.isoformat())
         alias_bar_query = (
             _bar_query(
                 registry,
@@ -1980,8 +1987,7 @@ def _build_locked(
         valuation_build_query = valuation_query
         if alias_bar_query is not None:
             security_bar_build_query = (
-                f"SELECT * FROM ({security_bar_query}) UNION ALL "
-                f"SELECT * FROM ({alias_bar_query})"
+                f"SELECT * FROM ({security_bar_query}) UNION ALL SELECT * FROM ({alias_bar_query})"
             )
         if alias_valuation_query is not None:
             valuation_build_query = (
@@ -2091,16 +2097,11 @@ def _build_locked(
         expected_row_counts, source_key_audit = _expected_row_counts(
             connection,
             registry,
-            folded_bar_alias_rows=int(
-                alias_reconciliation["folded_bar_alias_rows"]
-            ),
-            folded_valuation_alias_keys=int(
-                alias_reconciliation["folded_valuation_alias_keys"]
-            ),
+            folded_bar_alias_rows=int(alias_reconciliation["folded_bar_alias_rows"]),
+            folded_valuation_alias_keys=int(alias_reconciliation["folded_valuation_alias_keys"]),
         )
         actual_row_counts = {
-            table: sum(int(item["row_count"]) for item in states[table])
-            for table in _OWNED_TABLES
+            table: sum(int(item["row_count"]) for item in states[table]) for table in _OWNED_TABLES
         }
         if actual_row_counts != expected_row_counts:
             raise MarketObservationBuildError(
@@ -2112,8 +2113,7 @@ def _build_locked(
         shutil.rmtree(scratch, ignore_errors=True)
 
     row_counts = {
-        table: sum(int(item["row_count"]) for item in states[table])
-        for table in _OWNED_TABLES
+        table: sum(int(item["row_count"]) for item in states[table]) for table in _OWNED_TABLES
     }
     partition_counts = {table: len(states[table]) for table in _OWNED_TABLES}
     table_digests = {table: _table_digest(states[table]) for table in _OWNED_TABLES}

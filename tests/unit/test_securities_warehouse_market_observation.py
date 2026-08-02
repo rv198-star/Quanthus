@@ -35,6 +35,7 @@ from quanthus.pipelines.securities_warehouse.market_observation import (
     _valuation_query,
     _verify_existing_output,
     _write_index_seed,
+    verify_market_observation_candidate,
 )
 
 
@@ -169,9 +170,7 @@ class MarketObservationQueryTests(unittest.TestCase):
     def test_scratch_directory_uses_explicit_physical_root(self) -> None:
         scratch_root = self.root / "scratch"
         scratch_root.mkdir()
-        scratch = _create_scratch_directory(
-            self.root / "candidate", "build-identity", scratch_root
-        )
+        scratch = _create_scratch_directory(self.root / "candidate", "build-identity", scratch_root)
         try:
             self.assertEqual(scratch.parent, scratch_root.resolve())
             self.assertTrue(scratch.name.endswith(".duckdb-tmp"))
@@ -182,13 +181,9 @@ class MarketObservationQueryTests(unittest.TestCase):
         self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])
         self._write_source("daily_ohlcv_none_delta", [self._bar_row("2026-01-05")])
         self._write_source("daily_ohlcv_none_hotfix", [self._bar_row("2026-01-06")])
-        self._write_source(
-            "minute_1m_research_archive", [self._minute_row("2026-01-02 09:31:00")]
-        )
+        self._write_source("minute_1m_research_archive", [self._minute_row("2026-01-02 09:31:00")])
         self._write_source("minute_1m_hotfix", [self._minute_row("2026-01-02 09:32:00")])
-        self._write_source(
-            "minute_5m_formal_archive", [self._minute_row("2026-01-02 09:35:00")]
-        )
+        self._write_source("minute_5m_formal_archive", [self._minute_row("2026-01-02 09:35:00")])
         self._write_source("minute_5m_hotfix", [self._minute_row("2026-01-02 09:40:00")])
         self._write_source(
             "intraday_bars",
@@ -196,9 +191,7 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         connection = self._connection()
         try:
-            query = _bar_query(
-                self.registry, self.listing, [self.calendar], self.cutoff
-            )
+            query = _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
             rows = connection.execute(query).to_arrow_table().to_pylist()
             work = self.root / "work"
             raw_root = work / "payload/security_market_observation/dwd_security_bar"
@@ -227,8 +220,7 @@ class MarketObservationQueryTests(unittest.TestCase):
         first = next(
             row
             for row in rows
-            if row["interval_size"] == "1m"
-            and row["source_record_id"].endswith("09:31:00")
+            if row["interval_size"] == "1m" and row["source_record_id"].endswith("09:31:00")
         )
         start_utc = first["observation_start"].astimezone(timezone.utc)
         end_utc = first["observation_end"].astimezone(timezone.utc)
@@ -276,11 +268,7 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         self._write_source(
             "minute_1m_research_archive",
-            [
-                self._minute_row(
-                    "2026-01-02 09:31:00", stock_code="000001", bar_size="1m"
-                )
-            ],
+            [self._minute_row("2026-01-02 09:31:00", stock_code="000001", bar_size="1m")],
         )
         valuation = {
             "stock_code": "000002",
@@ -305,15 +293,19 @@ class MarketObservationQueryTests(unittest.TestCase):
                 historical_alias_winners_only=True,
             )
             bar_rows = connection.execute(bar_overlay_query).to_arrow_table().to_pylist()
-            valuation_rows = connection.execute(
-                _valuation_query(
-                    self.registry,
-                    self.listing,
-                    self.cutoff,
-                    stock_codes=aliases,
-                    historical_alias_winners_only=True,
+            valuation_rows = (
+                connection.execute(
+                    _valuation_query(
+                        self.registry,
+                        self.listing,
+                        self.cutoff,
+                        stock_codes=aliases,
+                        historical_alias_winners_only=True,
+                    )
                 )
-            ).to_arrow_table().to_pylist()
+                .to_arrow_table()
+                .to_pylist()
+            )
             reconciliation = _historical_alias_reconciliation(
                 connection,
                 self.registry,
@@ -410,9 +402,13 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         connection = self._connection()
         try:
-            rows = connection.execute(
-                _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
-            ).to_arrow_table().to_pylist()
+            rows = (
+                connection.execute(
+                    _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
+                )
+                .to_arrow_table()
+                .to_pylist()
+            )
         finally:
             connection.close()
 
@@ -454,8 +450,7 @@ class MarketObservationQueryTests(unittest.TestCase):
             ],
         )
         business_keys = {
-            (row["listing_id"], row["observation_start"], row["interval_size"])
-            for row in rows
+            (row["listing_id"], row["observation_start"], row["interval_size"]) for row in rows
         }
         self.assertEqual(len(business_keys), len(rows))
 
@@ -608,9 +603,7 @@ class MarketObservationQueryTests(unittest.TestCase):
             }
         ]
         try:
-            repaired = _repair_july_2026_minute_labels(
-                connection, work, partitions, query
-            )
+            repaired = _repair_july_2026_minute_labels(connection, work, partitions, query)
             self.assertIsNotNone(repaired)
             assert repaired is not None
             repaired_rows = pq.ParquetFile(path).read().to_pylist()
@@ -623,19 +616,14 @@ class MarketObservationQueryTests(unittest.TestCase):
                 ],
             )
             self.assertEqual(
-                [
-                    row["source_record_id"].rsplit("&ts=", 1)[1]
-                    for row in repaired_rows
-                ],
+                [row["source_record_id"].rsplit("&ts=", 1)[1] for row in repaired_rows],
                 [
                     "2026-07-23T13:00:00",
                     "2026-07-23T13:01:00",
                     "2026-07-23T15:00:00",
                 ],
             )
-            self.assertIsNone(
-                _repair_july_2026_minute_labels(connection, work, repaired, query)
-            )
+            self.assertIsNone(_repair_july_2026_minute_labels(connection, work, repaired, query))
         finally:
             connection.close()
 
@@ -673,8 +661,7 @@ class MarketObservationQueryTests(unittest.TestCase):
                 ).replace(tzinfo=local_timezone)
                 row = {
                     **row,
-                    "observation_start": raw_end.astimezone(timezone.utc)
-                    - timedelta(minutes=5),
+                    "observation_start": raw_end.astimezone(timezone.utc) - timedelta(minutes=5),
                     "observation_end": raw_end.astimezone(timezone.utc),
                 }
             legacy.append(row)
@@ -718,10 +705,7 @@ class MarketObservationQueryTests(unittest.TestCase):
                 ],
             )
             self.assertEqual(
-                [
-                    row["source_record_id"].rsplit("&ts=", 1)[1]
-                    for row in repaired_rows
-                ],
+                [row["source_record_id"].rsplit("&ts=", 1)[1] for row in repaired_rows],
                 [
                     "2026-07-23T13:00:00",
                     "2026-07-23T13:05:00",
@@ -761,9 +745,7 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         connection = self._connection()
         try:
-            query = _bar_query(
-                self.registry, self.listing, [self.calendar], self.cutoff
-            )
+            query = _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
             work = self.root / "work"
             raw_root = work / "payload/security_market_observation/dwd_security_bar"
             _copy_query(
@@ -801,9 +783,7 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         connection = self._connection()
         try:
-            query = _bar_query(
-                self.registry, self.listing, [self.calendar], self.cutoff
-            )
+            query = _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
             work = self.root / "work"
             raw_root = work / "payload/security_market_observation/dwd_security_bar"
             _copy_query(
@@ -813,9 +793,7 @@ class MarketObservationQueryTests(unittest.TestCase):
                 ("interval_size", "observation_start_year", "observation_start_month"),
             )
             states = _normalize_outputs("dwd_security_bar", raw_root, work)
-            with self.assertRaisesRegex(
-                MarketObservationBuildError, "unaccepted invalid bars"
-            ):
+            with self.assertRaisesRegex(MarketObservationBuildError, "unaccepted invalid bars"):
                 _audit_outputs(
                     connection,
                     work,
@@ -849,18 +827,18 @@ class MarketObservationQueryTests(unittest.TestCase):
             self._write_source(identity, [row])
         connection = self._connection()
         try:
-            rows = connection.execute(
-                _valuation_query(self.registry, self.listing, self.cutoff)
-            ).to_arrow_table().to_pylist()
+            rows = (
+                connection.execute(_valuation_query(self.registry, self.listing, self.cutoff))
+                .to_arrow_table()
+                .to_pylist()
+            )
         finally:
             connection.close()
         self.assertEqual(len(rows), 24)
         self.assertEqual({row["security_id"] for row in rows}, {"security-1"})
         self.assertEqual({row["listing_id"] for row in rows}, {"listing-1"})
         share = next(row for row in rows if row["measure_type"] == "TOTAL_SHARE")
-        market_value = next(
-            row for row in rows if row["measure_type"] == "TOTAL_MARKET_VALUE"
-        )
+        market_value = next(row for row in rows if row["measure_type"] == "TOTAL_MARKET_VALUE")
         self.assertEqual(str(share["measure_value"]), "50000.0000000000")
         self.assertEqual(str(market_value["measure_value"]), "60000.0000000000")
         self.assertEqual(market_value["currency"], "CNY")
@@ -925,15 +903,19 @@ class MarketObservationQueryTests(unittest.TestCase):
         )
         connection = self._connection()
         try:
-            rows = connection.execute(
-                _index_bar_query(
-                    self.registry,
-                    index_path,
-                    self.venue,
-                    [self.calendar],
-                    self.cutoff,
+            rows = (
+                connection.execute(
+                    _index_bar_query(
+                        self.registry,
+                        index_path,
+                        self.venue,
+                        [self.calendar],
+                        self.cutoff,
+                    )
                 )
-            ).to_arrow_table().to_pylist()
+                .to_arrow_table()
+                .to_pylist()
+            )
         finally:
             connection.close()
         self.assertEqual(len(rows), 2)
@@ -972,12 +954,8 @@ class MarketObservationQueryTests(unittest.TestCase):
                 "source_artifact_sha256": "sha256:" + str(number) * 64,
                 "knowledge_from": datetime.fromisoformat(self.cutoff),
                 "knowledge_to": None,
-                "observation_start": datetime(
-                    2026, 1, 2, 1, minute - 1, tzinfo=timezone.utc
-                ),
-                "observation_end": datetime(
-                    2026, 1, 2, 1, minute, tzinfo=timezone.utc
-                ),
+                "observation_start": datetime(2026, 1, 2, 1, minute - 1, tzinfo=timezone.utc),
+                "observation_end": datetime(2026, 1, 2, 1, minute, tzinfo=timezone.utc),
                 "listing_id": "listing-1",
                 "calendar_session_id": "session-2026-01-02",
                 "price_basis": "UNADJUSTED",
@@ -1082,9 +1060,7 @@ class MarketObservationQueryTests(unittest.TestCase):
                 "dwd_index_bar": 2,
             },
         )
-        self.assertTrue(
-            all(value["conflicting_business_keys"] == 0 for value in audit.values())
-        )
+        self.assertTrue(all(value["conflicting_business_keys"] == 0 for value in audit.values()))
 
     def test_existing_candidate_identity_contract_is_deep_verified(self) -> None:
         candidate = self.root / "candidate"
@@ -1114,9 +1090,7 @@ class MarketObservationQueryTests(unittest.TestCase):
             "trading_calendar_semantic_digest": "sha256:" + "6" * 64,
             "trading_calendar_manifest_sha256": "sha256:" + "7" * 64,
         }
-        table_digests = {
-            table: _table_digest(values) for table, values in partitions.items()
-        }
+        table_digests = {table: _table_digest(values) for table, values in partitions.items()}
         row_counts = {table: 0 for table in partitions}
         semantic = _canonical_digest({**identity, "table_digests": table_digests})
         checkpoint = {
@@ -1147,9 +1121,7 @@ class MarketObservationQueryTests(unittest.TestCase):
             path = candidate / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
-        files = sorted(
-            [state[0]["path"] for state in partitions.values()] + list(metadata)
-        )
+        files = sorted([state[0]["path"] for state in partitions.values()] + list(metadata))
         manifest = {
             "schema_version": 1,
             "kind": "dwd_market_observation_candidate",
@@ -1167,9 +1139,7 @@ class MarketObservationQueryTests(unittest.TestCase):
             ],
         }
         manifest_path = candidate / "manifest.json"
-        manifest_path.write_text(
-            json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
         (candidate / "READY").write_text(
             "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest() + "\n",
             encoding="ascii",
@@ -1177,6 +1147,21 @@ class MarketObservationQueryTests(unittest.TestCase):
         result = _verify_existing_output(candidate, **identity)
         self.assertEqual(result.semantic_digest, semantic)
         self.assertEqual(result.row_counts, row_counts)
+        verified = verify_market_observation_candidate(
+            candidate,
+            run_id=identity["run_id"],
+            input_plan_digest=identity["input_plan_digest"],
+            model_sha256=identity["model_sha256"],
+            listed_company_semantic_digest=identity["listed_company_semantic_digest"],
+            listed_company_manifest_sha256=identity["listed_company_manifest_sha256"],
+            trading_calendar_semantic_digest=identity["trading_calendar_semantic_digest"],
+            trading_calendar_manifest_sha256=identity["trading_calendar_manifest_sha256"],
+        )
+        self.assertEqual(verified.semantic_digest, semantic)
+        self.assertEqual(
+            verified.manifest_sha256,
+            "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        )
 
 
 if __name__ == "__main__":

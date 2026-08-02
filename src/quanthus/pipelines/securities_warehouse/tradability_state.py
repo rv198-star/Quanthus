@@ -501,9 +501,17 @@ def _listing_status_query() -> str:
     cutoff = "build_cutoff()"
     return f"""
 WITH suspension_raw AS (
-  SELECT *, 20 AS source_priority FROM src_suspensions_delta
+  SELECT * REPLACE(
+    try_cast(suspend_start AS DATE) AS suspend_start,
+    try_cast(suspend_end AS DATE) AS suspend_end,
+    try_cast(knowledge_cutoff AS DATE) AS knowledge_cutoff
+  ), 20 AS source_priority FROM src_suspensions_delta
   UNION ALL BY NAME
-  SELECT *, 10 AS source_priority FROM src_suspensions
+  SELECT * REPLACE(
+    try_cast(suspend_start AS DATE) AS suspend_start,
+    try_cast(suspend_end AS DATE) AS suspend_end,
+    try_cast(knowledge_cutoff AS DATE) AS knowledge_cutoff
+  ), 10 AS source_priority FROM src_suspensions
 ), suspension_ranked AS (
   SELECT *, row_number() OVER (
     PARTITION BY suspension_id ORDER BY source_priority DESC,__relative_path

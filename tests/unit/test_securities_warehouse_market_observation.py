@@ -225,9 +225,11 @@ class MarketObservationQueryTests(unittest.TestCase):
             if row["interval_size"] == "1m"
             and row["source_record_id"].endswith("09:31:00")
         )
-        self.assertEqual(first["observation_start"].hour, 1)
-        self.assertEqual(first["observation_start"].minute, 30)
-        self.assertEqual(first["observation_end"].minute, 31)
+        start_utc = first["observation_start"].astimezone(timezone.utc)
+        end_utc = first["observation_end"].astimezone(timezone.utc)
+        self.assertEqual(start_utc.hour, 1)
+        self.assertEqual(start_utc.minute, 30)
+        self.assertEqual(end_utc.minute, 31)
 
     def test_zero_trade_daily_invalid_ohlc_is_retained_as_quality_exception(self) -> None:
         self._write_source(

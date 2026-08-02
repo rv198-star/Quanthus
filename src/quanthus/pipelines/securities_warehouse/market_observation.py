@@ -499,7 +499,7 @@ WITH daily_raw AS (
   UNION ALL
   SELECT stock_code, CAST(interval_label AS DATE), NULL::TIMESTAMPTZ,
          timezone('Asia/Shanghai', CASE
-           WHEN normalized_interval='1m'
+           WHEN normalized_interval IN ('1m','5m')
             AND CAST(interval_label AS TIME)=TIME '13:00:00'
              THEN interval_label - INTERVAL 90 MINUTE
            ELSE interval_label END) AS minute_end,
@@ -798,8 +798,13 @@ def _repair_july_2026_minute_labels(
     work: Path,
     partitions: Sequence[Mapping[str, Any]],
     corrected_query: str,
+    *,
+    interval_size: str = "1m",
 ) -> list[dict[str, Any]] | None:
-    """Replace only the legacy July 1m partition when its 13:00 label is unnormalized."""
+    """Replace one legacy July minute partition when its 13:00 label is unnormalized."""
+
+    if interval_size not in {"1m", "5m"}:
+        raise MarketObservationBuildError("minute repair interval must be 1m or 5m")
 
     candidates = []
     for index, raw in enumerate(partitions):
@@ -812,7 +817,7 @@ def _repair_july_2026_minute_labels(
             for key, value in [part.split("=", 1)]
         }
         if (
-            values.get("interval_size") == "1m"
+            values.get("interval_size") == interval_size
             and int(values.get("observation_start_year", "0")) == 2026
             and int(values.get("observation_start_month", "0")) == 7
         ):
@@ -820,16 +825,18 @@ def _repair_july_2026_minute_labels(
     if not candidates:
         return None
     if len(candidates) != 1:
-        raise MarketObservationBuildError("July 2026 1m checkpoint has multiple partitions")
+        raise MarketObservationBuildError(
+            f"July 2026 {interval_size} checkpoint has multiple partitions"
+        )
 
     index, prior = candidates[0]
     path = _safe_file(work, prior["path"])
     legacy_markers = connection.execute(
-        """SELECT count(*) FROM read_parquet(?) WHERE interval_size='1m'
+        """SELECT count(*) FROM read_parquet(?) WHERE interval_size=?
         AND source_record_id LIKE '%&ts=2026-07-%'
         AND ends_with(source_record_id,'T13:00:00')
         AND CAST(observation_end AT TIME ZONE 'Asia/Shanghai' AS TIME)<>TIME '11:30:00'""",
-        [str(path)],
+        [str(path), interval_size],
     ).fetchone()[0]
     if not legacy_markers:
         return None
@@ -841,7 +848,7 @@ def _repair_july_2026_minute_labels(
     scoped_query = f"""SELECT * EXCLUDE (
       observation_start_year, observation_start_month
     ) FROM ({corrected_query}) corrected
-    WHERE interval_size='1m' AND observation_start_year='2026'
+    WHERE interval_size={_sql_literal(interval_size)} AND observation_start_year='2026'
       AND observation_start_month='07'"""
     try:
         try:
@@ -869,14 +876,16 @@ def _repair_july_2026_minute_labels(
     if rows != int(prior["row_count"]):
         partial.unlink(missing_ok=True)
         raise MarketObservationBuildError(
-            "July 2026 1m targeted repair changed the checkpoint row count"
+            f"July 2026 {interval_size} targeted repair changed the checkpoint row count"
         )
     os.chmod(partial, 0o640)
     _fsync_file(partial)
     semantic_digest, verified_rows = _partition_digest(partial, schema)
     if verified_rows != rows:
         partial.unlink(missing_ok=True)
-        raise MarketObservationBuildError("July 2026 1m targeted repair lost rows")
+        raise MarketObservationBuildError(
+            f"July 2026 {interval_size} targeted repair lost rows"
+        )
     os.replace(partial, path)
     _fsync_directory(path.parent)
     updated = list(dict(item) for item in partitions)
@@ -1508,28 +1517,30 @@ def _build_locked(
                 for name, partitions in states.items()
             }
             _write_json_atomic(work / "checkpoint.json", checkpoint)
-        repair_query = _bar_query(
-            registry,
-            listing_path,
-            calendar_paths,
-            cutoff.isoformat(),
-            minute_start="2026-07-01 00:00:00",
-            minute_end="2026-08-01 00:00:00",
-            minute_interval="1m",
-        )
-        repaired = _repair_july_2026_minute_labels(
-            connection,
-            work,
-            states["dwd_security_bar"],
-            repair_query,
-        )
-        if repaired is not None:
-            states["dwd_security_bar"] = repaired
-            checkpoint["completed_tables"]["dwd_security_bar"] = {
-                "table_digest": _table_digest(repaired),
-                "partitions": repaired,
-            }
-            _write_json_atomic(work / "checkpoint.json", checkpoint)
+        for minute_interval in ("1m", "5m"):
+            repair_query = _bar_query(
+                registry,
+                listing_path,
+                calendar_paths,
+                cutoff.isoformat(),
+                minute_start="2026-07-01 00:00:00",
+                minute_end="2026-08-01 00:00:00",
+                minute_interval=minute_interval,
+            )
+            repaired = _repair_july_2026_minute_labels(
+                connection,
+                work,
+                states["dwd_security_bar"],
+                repair_query,
+                interval_size=minute_interval,
+            )
+            if repaired is not None:
+                states["dwd_security_bar"] = repaired
+                checkpoint["completed_tables"]["dwd_security_bar"] = {
+                    "table_digest": _table_digest(repaired),
+                    "partitions": repaired,
+                }
+                _write_json_atomic(work / "checkpoint.json", checkpoint)
         quality_exceptions = _audit_outputs(
             connection,
             work,

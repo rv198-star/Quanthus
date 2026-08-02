@@ -342,6 +342,34 @@ def _reference_scan(paths: Sequence[Path]) -> str:
     return f"read_parquet([{','.join(_sql_literal(str(path)) for path in paths)}])"
 
 
+def _historical_alias_codes(connection: Any, listing_path: Path, cutoff: str) -> list[str]:
+    """Return codes that share one PIT-valid security identity on one venue."""
+
+    listings = _reference_scan([listing_path])
+    rows = connection.execute(
+        f"""WITH known AS (
+          SELECT DISTINCT listing_code, security_id, venue_id
+          FROM {listings}
+          WHERE knowledge_from <= TIMESTAMPTZ {_sql_literal(cutoff)}
+            AND (knowledge_to IS NULL OR
+                 TIMESTAMPTZ {_sql_literal(cutoff)} < knowledge_to)
+        )
+        SELECT DISTINCT a.listing_code
+        FROM known a JOIN known b
+          ON b.security_id=a.security_id AND b.venue_id=a.venue_id
+         AND b.listing_code<>a.listing_code
+        ORDER BY a.listing_code"""
+    ).fetchall()
+    return [str(row[0]) for row in rows]
+
+
+def _code_filter(column: str, stock_codes: Sequence[str] | None) -> str:
+    if not stock_codes:
+        return ""
+    values = ",".join(_sql_literal(code) for code in sorted(set(stock_codes)))
+    return f"{column} IN ({values})"
+
+
 def _register_sources(connection: Any, registry: Sequence[Mapping[str, Any]]) -> None:
     _, pa, _ = _dependencies()
     value = pa.Table.from_pylist(list(registry))
@@ -422,6 +450,9 @@ def _bar_query(
     minute_start: str | None = None,
     minute_end: str | None = None,
     minute_interval: str | None = None,
+    stock_codes: Sequence[str] | None = None,
+    historical_alias_winners_only: bool = False,
+    historical_alias_all_candidates: bool = False,
 ) -> str:
     daily = _scan(
         registry,
@@ -448,6 +479,9 @@ def _bar_query(
              THEN '5m'
            ELSE b.bar_size END"""
     minute_predicates = []
+    code_predicate = _code_filter("b.stock_code", stock_codes)
+    if code_predicate:
+        minute_predicates.append(code_predicate)
     if minute_start is not None:
         minute_predicates.append(
             "CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) >= "
@@ -465,8 +499,71 @@ def _bar_query(
     minute_where = (
         "\n  WHERE " + " AND ".join(minute_predicates) if minute_predicates else ""
     )
+    daily_where = f"\n  WHERE {code_predicate}" if code_predicate else ""
     listings = _reference_scan([listing_path])
     calendars = _reference_scan(calendar_paths)
+    if historical_alias_winners_only and historical_alias_all_candidates:
+        raise MarketObservationBuildError("historical alias query mode is ambiguous")
+    if (historical_alias_winners_only or historical_alias_all_candidates) and not stock_codes:
+        raise MarketObservationBuildError("historical alias query requires bounded stock codes")
+    resolution_ctes = f""", resolved AS (
+  SELECT s.*, l.listing_id, l.venue_id, c.calendar_session_id, c.open_at, c.close_at,
+         CASE s.interval_size WHEN '1d' THEN c.open_at
+              WHEN '1m' THEN s.minute_end - INTERVAL 1 MINUTE
+              ELSE s.minute_end - INTERVAL 5 MINUTE END AS observation_start,
+         CASE s.interval_size WHEN '1d' THEN c.close_at ELSE s.minute_end END AS observation_end
+  FROM source_rows s
+  JOIN {listings} l ON l.listing_code=s.stock_code
+  JOIN {calendars} c ON c.venue_id=l.venue_id AND c.trade_date=s.trade_date
+       AND c.session_type='REGULAR_DAY' AND c.is_open
+  WHERE l.effective_from <= CASE WHEN s.interval_size='1d' THEN c.open_at ELSE s.minute_end END
+    AND (l.effective_to IS NULL OR
+         CASE WHEN s.interval_size='1d' THEN c.open_at ELSE s.minute_end END
+           < l.effective_to)
+    AND l.knowledge_from <= TIMESTAMPTZ {_sql_literal(cutoff)}
+    AND (l.knowledge_to IS NULL OR TIMESTAMPTZ {_sql_literal(cutoff)} < l.knowledge_to)
+)"""
+    if historical_alias_winners_only or historical_alias_all_candidates:
+        resolved_alias_sql = """SELECT * EXCLUDE (target_listing_code)
+  FROM resolved_candidates WHERE stock_code<>target_listing_code"""
+        if historical_alias_winners_only:
+            resolved_alias_sql = """SELECT * EXCLUDE (alias_rank, target_listing_code) FROM (
+    SELECT *, row_number() OVER (
+      PARTITION BY listing_id, observation_start, interval_size
+      ORDER BY CASE WHEN stock_code=target_listing_code THEN 0 ELSE 1 END,
+               source_priority DESC, relative_path, stock_code
+    ) AS alias_rank
+    FROM resolved_candidates
+  )
+  WHERE alias_rank=1 AND stock_code<>target_listing_code"""
+        resolution_ctes = f""", code_identity AS (
+  SELECT listing_code, min(security_id) AS security_id, min(venue_id) AS venue_id
+  FROM {listings}
+  WHERE knowledge_from <= TIMESTAMPTZ {_sql_literal(cutoff)}
+    AND (knowledge_to IS NULL OR TIMESTAMPTZ {_sql_literal(cutoff)} < knowledge_to)
+  GROUP BY listing_code
+  HAVING count(DISTINCT security_id)=1 AND count(DISTINCT venue_id)=1
+), resolved_candidates AS (
+  SELECT s.*, l.listing_id, l.listing_code AS target_listing_code, l.venue_id,
+         c.calendar_session_id, c.open_at, c.close_at,
+         CASE s.interval_size WHEN '1d' THEN c.open_at
+              WHEN '1m' THEN s.minute_end - INTERVAL 1 MINUTE
+              ELSE s.minute_end - INTERVAL 5 MINUTE END AS observation_start,
+         CASE s.interval_size WHEN '1d' THEN c.close_at ELSE s.minute_end END AS observation_end
+  FROM source_rows s
+  JOIN code_identity i ON i.listing_code=s.stock_code
+  JOIN {listings} l ON l.security_id=i.security_id AND l.venue_id=i.venue_id
+  JOIN {calendars} c ON c.venue_id=l.venue_id AND c.trade_date=s.trade_date
+       AND c.session_type='REGULAR_DAY' AND c.is_open
+  WHERE l.effective_from <= CASE WHEN s.interval_size='1d' THEN c.open_at ELSE s.minute_end END
+    AND (l.effective_to IS NULL OR
+         CASE WHEN s.interval_size='1d' THEN c.open_at ELSE s.minute_end END
+           < l.effective_to)
+    AND l.knowledge_from <= TIMESTAMPTZ {_sql_literal(cutoff)}
+    AND (l.knowledge_to IS NULL OR TIMESTAMPTZ {_sql_literal(cutoff)} < l.knowledge_to)
+), resolved AS (
+  {resolved_alias_sql}
+)"""
     return f"""
 WITH daily_raw AS (
   SELECT b.*, r.relative_path, r.dataset_id, r.mapping_identity, r.source_sha256,
@@ -475,7 +572,7 @@ WITH daily_raw AS (
            WHEN 'daily_ohlcv_unadjusted' THEN 30
            WHEN 'daily_ohlcv_none_delta' THEN 20
            ELSE 10 END AS source_priority
-  FROM {daily} b JOIN source_registry r ON b.filename=r.absolute_path
+  FROM {daily} b JOIN source_registry r ON b.filename=r.absolute_path{daily_where}
 ), daily_ranked AS (
   SELECT *, row_number() OVER (
     PARTITION BY stock_code, trade_date ORDER BY source_priority DESC, relative_path
@@ -493,7 +590,7 @@ WITH daily_raw AS (
          NULL::TIMESTAMP AS source_label,
          '1d' AS interval_size,
          open, high, low, close, volume, amount,
-         dataset_id AS record_source,
+         dataset_id AS record_source, source_priority,
          relative_path, mapping_identity, source_sha256
   FROM daily_ranked WHERE source_rank=1 AND lower(adj_mode)='none'
   UNION ALL
@@ -505,25 +602,14 @@ WITH daily_raw AS (
            ELSE interval_label END) AS minute_end,
          interval_label AS source_label,
          normalized_interval, open, high, low, close, volume, amount,
-         dataset_id, relative_path, mapping_identity, source_sha256
+         dataset_id,
+         CASE mapping_identity
+           WHEN 'minute_1m_research_archive' THEN 30
+           WHEN 'minute_5m_formal_archive' THEN 30
+           WHEN 'intraday_bars' THEN 20 ELSE 10 END,
+         relative_path, mapping_identity, source_sha256
   FROM minute_raw
-), resolved AS (
-  SELECT s.*, l.listing_id, l.venue_id, c.calendar_session_id, c.open_at, c.close_at,
-         CASE s.interval_size WHEN '1d' THEN c.open_at
-              WHEN '1m' THEN s.minute_end - INTERVAL 1 MINUTE
-              ELSE s.minute_end - INTERVAL 5 MINUTE END AS observation_start,
-         CASE s.interval_size WHEN '1d' THEN c.close_at ELSE s.minute_end END AS observation_end
-  FROM source_rows s
-  JOIN {listings} l ON l.listing_code=s.stock_code
-  JOIN {calendars} c ON c.venue_id=l.venue_id AND c.trade_date=s.trade_date
-       AND c.session_type='REGULAR_DAY' AND c.is_open
-  WHERE l.effective_from <= CASE WHEN s.interval_size='1d' THEN c.open_at ELSE s.minute_end END
-    AND (l.effective_to IS NULL OR
-         CASE WHEN s.interval_size='1d' THEN c.open_at ELSE s.minute_end END
-           < l.effective_to)
-    AND l.knowledge_from <= TIMESTAMPTZ {_sql_literal(cutoff)}
-    AND (l.knowledge_to IS NULL OR TIMESTAMPTZ {_sql_literal(cutoff)} < l.knowledge_to)
-)
+){resolution_ctes}
 SELECT record_source,
        relative_path || '#stock_code=' || stock_code ||
          CASE WHEN interval_size='1d' THEN '&date=' || CAST(trade_date AS VARCHAR)
@@ -548,7 +634,13 @@ FROM resolved
 
 
 def _valuation_query(
-    registry: Sequence[Mapping[str, Any]], listing_path: Path, cutoff: str
+    registry: Sequence[Mapping[str, Any]],
+    listing_path: Path,
+    cutoff: str,
+    *,
+    stock_codes: Sequence[str] | None = None,
+    historical_alias_winners_only: bool = False,
+    historical_alias_all_candidates: bool = False,
 ) -> str:
     sources = _scan(
         registry,
@@ -560,20 +652,13 @@ def _valuation_query(
         },
     )
     listings = _reference_scan([listing_path])
-    return f"""
-WITH raw AS (
-  SELECT v.*, r.relative_path, r.dataset_id, r.mapping_identity, r.source_sha256,
-         CAST(CAST(v.date AS VARCHAR) AS DATE) AS trade_date,
-         CASE r.mapping_identity WHEN 'valuation_daily' THEN 40
-              WHEN 'valuation_history_july_repair' THEN 30
-              WHEN 'valuation_daily_delta' THEN 20 ELSE 10 END AS source_priority
-  FROM {sources} v JOIN source_registry r ON v.filename=r.absolute_path
-), ranked AS (
-  SELECT *, row_number() OVER (
-    PARTITION BY stock_code, trade_date ORDER BY source_priority DESC, relative_path
-  ) AS source_rank
-  FROM raw
-), resolved AS (
+    code_predicate = _code_filter("v.stock_code", stock_codes)
+    source_where = f"\n  WHERE {code_predicate}" if code_predicate else ""
+    if historical_alias_winners_only and historical_alias_all_candidates:
+        raise MarketObservationBuildError("historical alias query mode is ambiguous")
+    if (historical_alias_winners_only or historical_alias_all_candidates) and not stock_codes:
+        raise MarketObservationBuildError("historical alias query requires bounded stock codes")
+    resolution_ctes = f""", resolved AS (
   SELECT r.*, l.security_id AS resolved_security_id,
          l.listing_id AS resolved_listing_id,
          timezone('Asia/Shanghai', CAST(trade_date AS TIMESTAMP) + INTERVAL 15 HOUR)
@@ -588,7 +673,61 @@ WITH raw AS (
     ) < l.effective_to)
     AND l.knowledge_from <= TIMESTAMPTZ {_sql_literal(cutoff)}
     AND (l.knowledge_to IS NULL OR TIMESTAMPTZ {_sql_literal(cutoff)} < l.knowledge_to)
-), measures AS (
+)"""
+    if historical_alias_winners_only or historical_alias_all_candidates:
+        resolved_alias_sql = """SELECT * EXCLUDE (target_listing_code)
+  FROM resolved_candidates WHERE stock_code<>target_listing_code"""
+        if historical_alias_winners_only:
+            resolved_alias_sql = """SELECT * EXCLUDE (alias_rank, target_listing_code) FROM (
+    SELECT *, row_number() OVER (
+      PARTITION BY resolved_security_id, observation_start
+      ORDER BY CASE WHEN stock_code=target_listing_code THEN 0 ELSE 1 END,
+               source_priority DESC, relative_path, stock_code
+    ) AS alias_rank
+    FROM resolved_candidates
+  )
+  WHERE alias_rank=1 AND stock_code<>target_listing_code"""
+        resolution_ctes = f""", code_identity AS (
+  SELECT listing_code, min(security_id) AS security_id, min(venue_id) AS venue_id
+  FROM {listings}
+  WHERE knowledge_from <= TIMESTAMPTZ {_sql_literal(cutoff)}
+    AND (knowledge_to IS NULL OR TIMESTAMPTZ {_sql_literal(cutoff)} < knowledge_to)
+  GROUP BY listing_code
+  HAVING count(DISTINCT security_id)=1 AND count(DISTINCT venue_id)=1
+), resolved_candidates AS (
+  SELECT r.*, l.security_id AS resolved_security_id,
+         l.listing_id AS resolved_listing_id,
+         l.listing_code AS target_listing_code,
+         timezone('Asia/Shanghai', CAST(trade_date AS TIMESTAMP) + INTERVAL 15 HOUR)
+           AS observation_start
+  FROM ranked r JOIN code_identity i ON i.listing_code=r.stock_code
+  JOIN {listings} l ON l.security_id=i.security_id AND l.venue_id=i.venue_id
+  WHERE source_rank=1
+    AND l.effective_from <= timezone(
+      'Asia/Shanghai', CAST(trade_date AS TIMESTAMP) + INTERVAL 15 HOUR
+    )
+    AND (l.effective_to IS NULL OR timezone(
+      'Asia/Shanghai', CAST(trade_date AS TIMESTAMP) + INTERVAL 15 HOUR
+    ) < l.effective_to)
+    AND l.knowledge_from <= TIMESTAMPTZ {_sql_literal(cutoff)}
+    AND (l.knowledge_to IS NULL OR TIMESTAMPTZ {_sql_literal(cutoff)} < l.knowledge_to)
+), resolved AS (
+  {resolved_alias_sql}
+)"""
+    return f"""
+WITH raw AS (
+  SELECT v.*, r.relative_path, r.dataset_id, r.mapping_identity, r.source_sha256,
+         CAST(CAST(v.date AS VARCHAR) AS DATE) AS trade_date,
+         CASE r.mapping_identity WHEN 'valuation_daily' THEN 40
+              WHEN 'valuation_history_july_repair' THEN 30
+              WHEN 'valuation_daily_delta' THEN 20 ELSE 10 END AS source_priority
+  FROM {sources} v JOIN source_registry r ON v.filename=r.absolute_path{source_where}
+), ranked AS (
+  SELECT *, row_number() OVER (
+    PARTITION BY stock_code, trade_date ORDER BY source_priority DESC, relative_path
+  ) AS source_rank
+  FROM raw
+){resolution_ctes}, measures AS (
   SELECT *, unnest([
     'PE_TTM','PB_MRQ','PS_TTM','PCF_NCF_TTM','TOTAL_SHARE','TOTAL_MARKET_VALUE'
   ]) AS measure_type,
@@ -899,6 +1038,140 @@ def _repair_july_2026_minute_labels(
     return updated
 
 
+def _merge_checkpoint_overlay(
+    connection: Any,
+    work: Path,
+    partitions: Sequence[Mapping[str, Any]],
+    overlay_query: str,
+    *,
+    table: str,
+) -> list[dict[str, Any]] | None:
+    """Append bounded code-history winners without rebuilding completed tables."""
+
+    if table not in {"dwd_security_bar", "dwd_security_valuation"}:
+        raise MarketObservationBuildError("historical overlay has an unsupported table")
+    _, pa, pq = _dependencies()
+    schema = _schemas()[table]
+    overlay = connection.execute(overlay_query).to_arrow_table()
+    if overlay.num_rows == 0:
+        return None
+    partition_columns = _PARTITIONED_TABLES[table]
+    rows_by_partition: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for row in overlay.to_pylist():
+        key = tuple(str(row[column]) for column in partition_columns)
+        rows_by_partition.setdefault(key, []).append(row)
+
+    def partition_key(item: Mapping[str, Any]) -> tuple[str, ...]:
+        values = {
+            key: value
+            for part in Path(str(item["path"])).parts
+            if "=" in part
+            for key, value in [part.split("=", 1)]
+        }
+        return tuple(values[column] for column in partition_columns)
+
+    states = [dict(item) for item in partitions]
+    state_by_key = {partition_key(item): (index, item) for index, item in enumerate(states)}
+    key_columns = {
+        "dwd_security_bar": (
+            "listing_id",
+            "observation_start",
+            "interval_size",
+            "price_basis",
+        ),
+        "dwd_security_valuation": (
+            "security_id",
+            "observation_start",
+            "measure_type",
+            "methodology",
+        ),
+    }[table]
+    changed = False
+    for key in sorted(rows_by_partition):
+        candidate = pa.Table.from_pylist(rows_by_partition[key]).select(schema.names).cast(schema)
+        registered = f"historical_alias_{table}"
+        connection.register(registered, candidate)
+        state_entry = state_by_key.get(key)
+        if state_entry is None:
+            relative = Path(f"payload/security_market_observation/{table}")
+            for column, value in zip(partition_columns, key, strict=True):
+                relative /= f"{column}={value}"
+            relative /= "part-00000.parquet"
+            path = work / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            missing = connection.execute(
+                f"SELECT * FROM {registered} ORDER BY {','.join(key_columns)}, source_record_id"
+            ).to_arrow_table()
+            prior_rows = 0
+            index = len(states)
+        else:
+            index, state = state_entry
+            path = _safe_file(work, state["path"])
+            conditions = " AND ".join(f"e.{column}=o.{column}" for column in key_columns)
+            missing = connection.execute(
+                f"""SELECT o.* FROM {registered} o
+                LEFT JOIN read_parquet(?) e ON {conditions}
+                WHERE e.{key_columns[0]} IS NULL
+                ORDER BY {','.join(f'o.{column}' for column in key_columns)},
+                         o.source_record_id""",
+                [str(path)],
+            ).to_arrow_table()
+            prior_rows = int(state["row_count"])
+        connection.unregister(registered)
+        if missing.num_rows == 0:
+            continue
+        partial = path.with_suffix(".parquet.partial")
+        writer = pq.ParquetWriter(
+            partial,
+            schema,
+            compression="zstd",
+            version="2.6",
+            data_page_version="2.0",
+            use_dictionary=True,
+            write_statistics=True,
+        )
+        try:
+            if path.exists():
+                for batch in pq.ParquetFile(path).iter_batches(batch_size=122_880):
+                    writer.write_table(pa.Table.from_batches([batch]).select(schema.names))
+            writer.write_table(missing.select(schema.names).cast(schema), row_group_size=122_880)
+        finally:
+            writer.close()
+        duplicate = connection.execute(
+            f"SELECT 1 FROM read_parquet(?) GROUP BY {','.join(key_columns)} "
+            "HAVING count(*)>1 LIMIT 1",
+            [str(partial)],
+        ).fetchone()
+        if duplicate is not None:
+            partial.unlink(missing_ok=True)
+            raise MarketObservationBuildError(
+                f"{table} historical-code overlay creates a duplicate business key"
+            )
+        os.chmod(partial, 0o640)
+        _fsync_file(partial)
+        os.replace(partial, path)
+        _fsync_directory(path.parent)
+        semantic_digest, verified_rows = _partition_digest(path, schema)
+        expected_rows = prior_rows + missing.num_rows
+        if verified_rows != expected_rows:
+            raise MarketObservationBuildError(
+                f"{table} historical-code overlay changed the partition row count"
+            )
+        updated = {
+            "path": path.relative_to(work).as_posix(),
+            "row_count": verified_rows,
+            "semantic_digest": semantic_digest,
+            "schema_digest": _canonical_digest(str(schema)),
+            "sha256": _sha256(path),
+        }
+        if state_entry is None:
+            states.append(updated)
+        else:
+            states[index] = updated
+        changed = True
+    return sorted(states, key=lambda item: item["path"]) if changed else None
+
+
 def _audit_outputs(
     connection: Any,
     work: Path,
@@ -1108,7 +1381,11 @@ def _audit_outputs(
 
 
 def _expected_row_counts(
-    connection: Any, registry: Sequence[Mapping[str, Any]]
+    connection: Any,
+    registry: Sequence[Mapping[str, Any]],
+    *,
+    folded_bar_alias_rows: int = 0,
+    folded_valuation_alias_keys: int = 0,
 ) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
     daily = _scan(
         registry,
@@ -1175,14 +1452,201 @@ def _expected_row_counts(
         "dwd_security_bar": int(
             source_key_audit["daily_security_bar"]["selected_business_keys"]
             + minute_rows
+            - folded_bar_alias_rows
         ),
         "dwd_security_valuation": int(
-            source_key_audit["valuation"]["selected_business_keys"] * 6
+            (
+                source_key_audit["valuation"]["selected_business_keys"]
+                - folded_valuation_alias_keys
+            )
+            * 6
         ),
         "dwd_market_index": 3,
         "dwd_index_bar": source_key_audit["index_bar"]["selected_business_keys"],
     }
     return expected, source_key_audit
+
+
+def _historical_alias_reconciliation(
+    connection: Any,
+    registry: Sequence[Mapping[str, Any]],
+    listing_path: Path,
+    calendar_paths: Sequence[Path],
+    cutoff: str,
+    alias_codes: Sequence[str],
+) -> dict[str, Any]:
+    if not alias_codes:
+        return {
+            "alias_codes": [],
+            "bar": {},
+            "valuation": {
+                "raw_source_keys": 0,
+                "direct_output_keys": 0,
+                "resolved_alias_candidates": 0,
+                "emitted_alias_keys": 0,
+                "folded_alias_keys": 0,
+            },
+            "folded_bar_alias_rows": 0,
+            "folded_valuation_alias_keys": 0,
+        }
+    daily = _scan(
+        registry,
+        {"daily_ohlcv_unadjusted", "daily_ohlcv_none_delta", "daily_ohlcv_none_hotfix"},
+    )
+    minute = _scan(
+        registry,
+        {
+            "minute_1m_research_archive",
+            "minute_1m_hotfix",
+            "minute_5m_formal_archive",
+            "minute_5m_hotfix",
+            "intraday_bars",
+        },
+    )
+    valuation = _scan(
+        registry,
+        {
+            "valuation_daily",
+            "valuation_history_july_repair",
+            "valuation_daily_delta",
+            "valuation_history_hotfix",
+        },
+    )
+    code_filter = _code_filter("b.stock_code", alias_codes)
+    raw_bar_rows = dict(
+        connection.execute(
+            f"""SELECT interval_size, count(*) FROM (
+              SELECT '1d' AS interval_size
+              FROM {daily} b WHERE {code_filter}
+              GROUP BY b.stock_code, CAST(CAST(b.date AS VARCHAR) AS DATE)
+              UNION ALL
+              SELECT CASE
+                WHEN r.mapping_identity IN
+                  ('minute_1m_research_archive','minute_1m_hotfix') THEN '1m'
+                WHEN r.mapping_identity IN
+                  ('minute_5m_formal_archive','minute_5m_hotfix') THEN '5m'
+                ELSE b.bar_size END AS interval_size
+              FROM {minute} b JOIN source_registry r ON b.filename=r.absolute_path
+              WHERE {code_filter}
+            ) GROUP BY interval_size ORDER BY interval_size"""
+        ).fetchall()
+    )
+    raw_valuation_keys = int(
+        connection.execute(
+            f"""SELECT count(*) FROM (
+              SELECT b.stock_code, CAST(CAST(b.date AS VARCHAR) AS DATE)
+              FROM {valuation} b WHERE {code_filter} GROUP BY 1,2
+            )"""
+        ).fetchone()[0]
+    )
+
+    direct_bar = _bar_query(
+        registry,
+        listing_path,
+        calendar_paths,
+        cutoff,
+        stock_codes=alias_codes,
+    )
+    candidate_bar = _bar_query(
+        registry,
+        listing_path,
+        calendar_paths,
+        cutoff,
+        stock_codes=alias_codes,
+        historical_alias_all_candidates=True,
+    )
+    winner_bar = _bar_query(
+        registry,
+        listing_path,
+        calendar_paths,
+        cutoff,
+        stock_codes=alias_codes,
+        historical_alias_winners_only=True,
+    )
+
+    def bar_counts(query: str) -> dict[str, int]:
+        return {
+            str(interval): int(count)
+            for interval, count in connection.execute(
+                f"SELECT interval_size,count(*) FROM ({query}) GROUP BY interval_size"
+            ).fetchall()
+        }
+
+    direct_bar_rows = bar_counts(direct_bar)
+    candidate_bar_rows = bar_counts(candidate_bar)
+    winner_bar_rows = bar_counts(winner_bar)
+    bar_audit: dict[str, dict[str, int]] = {}
+    folded_bar_alias_rows = 0
+    for interval in sorted(set(raw_bar_rows) | set(direct_bar_rows) | set(candidate_bar_rows)):
+        raw = int(raw_bar_rows.get(interval, 0))
+        direct = int(direct_bar_rows.get(interval, 0))
+        candidates = int(candidate_bar_rows.get(interval, 0))
+        emitted = int(winner_bar_rows.get(interval, 0))
+        if raw - direct != candidates or emitted > candidates:
+            raise MarketObservationBuildError(
+                f"historical code aliases do not reconcile for {interval}: "
+                f"raw={raw}, direct={direct}, candidates={candidates}, emitted={emitted}"
+            )
+        folded = candidates - emitted
+        folded_bar_alias_rows += folded
+        bar_audit[interval] = {
+            "raw_source_rows": raw,
+            "direct_output_rows": direct,
+            "resolved_alias_candidates": candidates,
+            "emitted_alias_rows": emitted,
+            "folded_alias_rows": folded,
+        }
+
+    direct_valuation = _valuation_query(
+        registry, listing_path, cutoff, stock_codes=alias_codes
+    )
+    candidate_valuation = _valuation_query(
+        registry,
+        listing_path,
+        cutoff,
+        stock_codes=alias_codes,
+        historical_alias_all_candidates=True,
+    )
+    winner_valuation = _valuation_query(
+        registry,
+        listing_path,
+        cutoff,
+        stock_codes=alias_codes,
+        historical_alias_winners_only=True,
+    )
+
+    def valuation_keys(query: str) -> int:
+        rows = int(connection.execute(f"SELECT count(*) FROM ({query})").fetchone()[0])
+        if rows % 6:
+            raise MarketObservationBuildError("historical valuation aliases lost measure grain")
+        return rows // 6
+
+    direct_valuation_keys = valuation_keys(direct_valuation)
+    candidate_valuation_keys = valuation_keys(candidate_valuation)
+    winner_valuation_keys = valuation_keys(winner_valuation)
+    if (
+        raw_valuation_keys - direct_valuation_keys != candidate_valuation_keys
+        or winner_valuation_keys > candidate_valuation_keys
+    ):
+        raise MarketObservationBuildError(
+            "historical valuation aliases do not reconcile: "
+            f"raw={raw_valuation_keys}, direct={direct_valuation_keys}, "
+            f"candidates={candidate_valuation_keys}, emitted={winner_valuation_keys}"
+        )
+    folded_valuation_alias_keys = candidate_valuation_keys - winner_valuation_keys
+    return {
+        "alias_codes": list(alias_codes),
+        "bar": bar_audit,
+        "valuation": {
+            "raw_source_keys": raw_valuation_keys,
+            "direct_output_keys": direct_valuation_keys,
+            "resolved_alias_candidates": candidate_valuation_keys,
+            "emitted_alias_keys": winner_valuation_keys,
+            "folded_alias_keys": folded_valuation_alias_keys,
+        },
+        "folded_bar_alias_rows": folded_bar_alias_rows,
+        "folded_valuation_alias_keys": folded_valuation_alias_keys,
+    }
 
 
 def _table_digest(partitions: Sequence[Mapping[str, Any]]) -> str:
@@ -1460,6 +1924,7 @@ def _build_locked(
             "payload/tradability_state/dwd_trading_calendar/trade_date_year=*/part-00000.parquet"
         )
     )
+    alias_codes = _historical_alias_codes(connection, listing_path, cutoff.isoformat())
     try:
         index_record = next(
             record for record in records if record.get("mapping_identity") == "index_daily_metadata"
@@ -1487,6 +1952,42 @@ def _build_locked(
         security_bar_query = _bar_query(
             registry, listing_path, calendar_paths, cutoff.isoformat()
         )
+        alias_bar_query = (
+            _bar_query(
+                registry,
+                listing_path,
+                calendar_paths,
+                cutoff.isoformat(),
+                stock_codes=alias_codes,
+                historical_alias_winners_only=True,
+            )
+            if alias_codes
+            else None
+        )
+        valuation_query = _valuation_query(registry, listing_path, cutoff.isoformat())
+        alias_valuation_query = (
+            _valuation_query(
+                registry,
+                listing_path,
+                cutoff.isoformat(),
+                stock_codes=alias_codes,
+                historical_alias_winners_only=True,
+            )
+            if alias_codes
+            else None
+        )
+        security_bar_build_query = security_bar_query
+        valuation_build_query = valuation_query
+        if alias_bar_query is not None:
+            security_bar_build_query = (
+                f"SELECT * FROM ({security_bar_query}) UNION ALL "
+                f"SELECT * FROM ({alias_bar_query})"
+            )
+        if alias_valuation_query is not None:
+            valuation_build_query = (
+                f"SELECT * FROM ({valuation_query}) UNION ALL "
+                f"SELECT * FROM ({alias_valuation_query})"
+            )
         table_specs = (
             (
                 "dwd_index_bar",
@@ -1496,11 +1997,11 @@ def _build_locked(
             ),
             (
                 "dwd_security_bar",
-                security_bar_query,
+                security_bar_build_query,
             ),
             (
                 "dwd_security_valuation",
-                _valuation_query(registry, listing_path, cutoff.isoformat()),
+                valuation_build_query,
             ),
         )
         for table, query in table_specs:
@@ -1541,6 +2042,36 @@ def _build_locked(
                     "partitions": repaired,
                 }
                 _write_json_atomic(work / "checkpoint.json", checkpoint)
+        if alias_bar_query is not None:
+            repaired = _merge_checkpoint_overlay(
+                connection,
+                work,
+                states["dwd_security_bar"],
+                alias_bar_query,
+                table="dwd_security_bar",
+            )
+            if repaired is not None:
+                states["dwd_security_bar"] = repaired
+                checkpoint["completed_tables"]["dwd_security_bar"] = {
+                    "table_digest": _table_digest(repaired),
+                    "partitions": repaired,
+                }
+                _write_json_atomic(work / "checkpoint.json", checkpoint)
+        if alias_valuation_query is not None:
+            repaired = _merge_checkpoint_overlay(
+                connection,
+                work,
+                states["dwd_security_valuation"],
+                alias_valuation_query,
+                table="dwd_security_valuation",
+            )
+            if repaired is not None:
+                states["dwd_security_valuation"] = repaired
+                checkpoint["completed_tables"]["dwd_security_valuation"] = {
+                    "table_digest": _table_digest(repaired),
+                    "partitions": repaired,
+                }
+                _write_json_atomic(work / "checkpoint.json", checkpoint)
         quality_exceptions = _audit_outputs(
             connection,
             work,
@@ -1549,8 +2080,23 @@ def _build_locked(
             index_path=index_path,
             calendar_paths=calendar_paths,
         )
+        alias_reconciliation = _historical_alias_reconciliation(
+            connection,
+            registry,
+            listing_path,
+            calendar_paths,
+            cutoff.isoformat(),
+            alias_codes,
+        )
         expected_row_counts, source_key_audit = _expected_row_counts(
-            connection, registry
+            connection,
+            registry,
+            folded_bar_alias_rows=int(
+                alias_reconciliation["folded_bar_alias_rows"]
+            ),
+            folded_valuation_alias_keys=int(
+                alias_reconciliation["folded_valuation_alias_keys"]
+            ),
         )
         actual_row_counts = {
             table: sum(int(item["row_count"]) for item in states[table])
@@ -1592,6 +2138,7 @@ def _build_locked(
         "source_set_digest": source_set_digest,
         "sources": source_counts,
         "source_key_audit": source_key_audit,
+        "historical_code_alias_reconciliation": alias_reconciliation,
         "expected_output_rows": expected_row_counts,
         "output_rows": row_counts,
         "conflicting_business_keys": 0,
@@ -1610,6 +2157,7 @@ def _build_locked(
         "table_digests": table_digests,
         "semantic_digest": semantic_digest,
         "quality_exceptions": quality_exceptions,
+        "historical_code_alias_reconciliation": alias_reconciliation,
     }
     _write_json_atomic(work / "reconciliation/source-row-reconciliation.json", reconciliation)
     _write_json_atomic(work / "receipts/market-observation-build.json", receipt)

@@ -21,7 +21,10 @@ from quanthus.pipelines.securities_warehouse.market_observation import (
     _copy_query,
     _create_scratch_directory,
     _expected_row_counts,
+    _historical_alias_codes,
+    _historical_alias_reconciliation,
     _index_bar_query,
+    _merge_checkpoint_overlay,
     _normalize_outputs,
     _partition_digest,
     _register_sources,
@@ -232,6 +235,162 @@ class MarketObservationQueryTests(unittest.TestCase):
         self.assertEqual(start_utc.hour, 1)
         self.assertEqual(start_utc.minute, 30)
         self.assertEqual(end_utc.minute, 31)
+
+    def test_historical_code_alias_overlay_prefers_direct_code_and_fills_absence(
+        self,
+    ) -> None:
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "listing_id": "listing-old",
+                        "security_id": "security-1",
+                        "venue_id": "venue-sh",
+                        "listing_code": "000001",
+                        "effective_from": datetime(1990, 1, 1, tzinfo=timezone.utc),
+                        "effective_to": datetime(2026, 1, 5, tzinfo=timezone.utc),
+                        "knowledge_from": datetime.fromisoformat(self.cutoff),
+                        "knowledge_to": None,
+                    },
+                    {
+                        "listing_id": "listing-new",
+                        "security_id": "security-1",
+                        "venue_id": "venue-sh",
+                        "listing_code": "000002",
+                        "effective_from": datetime(2026, 1, 5, tzinfo=timezone.utc),
+                        "effective_to": None,
+                        "knowledge_from": datetime.fromisoformat(self.cutoff),
+                        "knowledge_to": None,
+                    },
+                ]
+            ),
+            self.listing,
+        )
+        self._write_source(
+            "daily_ohlcv_unadjusted",
+            [
+                self._bar_row("2026-01-02", stock_code="000001", close=10.5),
+                self._bar_row("2026-01-02", stock_code="000002", close=99.0),
+                self._bar_row("2026-01-05", stock_code="000001", close=11.0),
+            ],
+        )
+        self._write_source(
+            "minute_1m_research_archive",
+            [
+                self._minute_row(
+                    "2026-01-02 09:31:00", stock_code="000001", bar_size="1m"
+                )
+            ],
+        )
+        valuation = {
+            "stock_code": "000002",
+            "date": "2026-01-02",
+            "pe_ttm": 1.0,
+            "pb": 2.0,
+            "ps_ttm": 3.0,
+            "pcf_ttm": 4.0,
+            "total_share": 5.0,
+            "total_mv": 6.0,
+        }
+        self._write_source("valuation_daily", [valuation])
+        connection = self._connection()
+        try:
+            aliases = _historical_alias_codes(connection, self.listing, self.cutoff)
+            bar_overlay_query = _bar_query(
+                self.registry,
+                self.listing,
+                [self.calendar],
+                self.cutoff,
+                stock_codes=aliases,
+                historical_alias_winners_only=True,
+            )
+            bar_rows = connection.execute(bar_overlay_query).to_arrow_table().to_pylist()
+            valuation_rows = connection.execute(
+                _valuation_query(
+                    self.registry,
+                    self.listing,
+                    self.cutoff,
+                    stock_codes=aliases,
+                    historical_alias_winners_only=True,
+                )
+            ).to_arrow_table().to_pylist()
+            reconciliation = _historical_alias_reconciliation(
+                connection,
+                self.registry,
+                self.listing,
+                [self.calendar],
+                self.cutoff,
+                aliases,
+            )
+            work = self.root / "alias-work"
+            raw_root = work / "payload/security_market_observation/dwd_security_bar"
+            _copy_query(
+                connection,
+                _bar_query(
+                    self.registry,
+                    self.listing,
+                    [self.calendar],
+                    self.cutoff,
+                ),
+                raw_root,
+                ("interval_size", "observation_start_year", "observation_start_month"),
+            )
+            direct_states = _normalize_outputs("dwd_security_bar", raw_root, work)
+            merged_states = _merge_checkpoint_overlay(
+                connection,
+                work,
+                direct_states,
+                bar_overlay_query,
+                table="dwd_security_bar",
+            )
+            assert merged_states is not None
+            merged_again = _merge_checkpoint_overlay(
+                connection,
+                work,
+                merged_states,
+                bar_overlay_query,
+                table="dwd_security_bar",
+            )
+        finally:
+            connection.close()
+
+        self.assertEqual(aliases, ["000001", "000002"])
+        self.assertEqual(len(bar_rows), 1)
+        self.assertEqual(bar_rows[0]["listing_id"], "listing-new")
+        self.assertIn("stock_code=000001", bar_rows[0]["source_record_id"])
+        self.assertEqual(bar_rows[0]["close"], Decimal("11.0000000000"))
+        self.assertEqual(len(valuation_rows), 6)
+        self.assertEqual({row["listing_id"] for row in valuation_rows}, {"listing-old"})
+        self.assertEqual({row["security_id"] for row in valuation_rows}, {"security-1"})
+        self.assertTrue(
+            all("stock_code=000002" in row["source_record_id"] for row in valuation_rows)
+        )
+        self.assertEqual(
+            reconciliation["bar"]["1d"],
+            {
+                "raw_source_rows": 3,
+                "direct_output_rows": 1,
+                "resolved_alias_candidates": 2,
+                "emitted_alias_rows": 1,
+                "folded_alias_rows": 1,
+            },
+        )
+        self.assertEqual(reconciliation["folded_bar_alias_rows"], 1)
+        self.assertEqual(
+            sum(item["row_count"] for item in merged_states),
+            sum(item["row_count"] for item in direct_states) + 1,
+        )
+        self.assertIsNone(merged_again)
+        self.assertEqual(
+            reconciliation["valuation"],
+            {
+                "raw_source_keys": 1,
+                "direct_output_keys": 0,
+                "resolved_alias_candidates": 1,
+                "emitted_alias_keys": 1,
+                "folded_alias_keys": 0,
+            },
+        )
 
     def test_bar_query_normalizes_mislabeled_midday_boundary(self) -> None:
         self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])

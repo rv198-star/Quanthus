@@ -483,14 +483,16 @@ WITH canonical AS (
   FROM canonical WHERE mapping_rank=1
   UNION ALL BY NAME
   SELECT dataset_id AS record_source,
-         relative_path || '#security_id=' || security_id || '&start=' || CAST(start_date AS VARCHAR),
-         'provider-daily-status-v1', source_sha256, {cutoff}, NULL::TIMESTAMPTZ,
-         {_utc_date_sql("start_date")},
-         coalesce({_utc_date_sql("next_date")}, listing_effective_to),
-         'security_status_' || substr(sha256('PROVIDER_DAILY_STATE' || chr(31) || security_id || chr(31) || CAST(start_date AS VARCHAR)),1,32),
-         security_id, 'PROVIDER_DAILY_STATE',
-         CASE WHEN is_st='1' THEN 'ST' ELSE 'NORMAL' END,
-         CASE WHEN trade_status='0' THEN 'PROVIDER_NOT_TRADING' ELSE 'PROVIDER_TRADING' END
+         relative_path || '#security_id=' || security_id || '&start=' || CAST(start_date AS VARCHAR) AS source_record_id,
+         'provider-daily-status-v1' AS source_revision,
+         source_sha256 AS source_artifact_sha256,
+         {cutoff} AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to,
+         {_utc_date_sql("start_date")} AS effective_from,
+         coalesce({_utc_date_sql("next_date")}, listing_effective_to) AS effective_to,
+         'security_status_' || substr(sha256('PROVIDER_DAILY_STATE' || chr(31) || security_id || chr(31) || CAST(start_date AS VARCHAR)),1,32) AS security_status_id,
+         security_id, 'PROVIDER_DAILY_STATE' AS status_type,
+         CASE WHEN is_st='1' THEN 'ST' ELSE 'NORMAL' END AS status_value,
+         CASE WHEN trade_status='0' THEN 'PROVIDER_NOT_TRADING' ELSE 'PROVIDER_TRADING' END AS reason_code
   FROM provider
 )
 SELECT * FROM rows ORDER BY security_id,status_type,effective_from,knowledge_from
@@ -541,16 +543,17 @@ WITH suspension_raw AS (
          'ACCEPTED_LISTING_INTERVAL' AS reason_code
   FROM ref_listing
   UNION ALL BY NAME
-  SELECT __dataset_id,
-         __relative_path || '#suspension_id=' || suspension_id,
-         coalesce(CAST(knowledge_cutoff AS VARCHAR),'suspension-source-v1'),
-         __source_sha256, {cutoff}, NULL::TIMESTAMPTZ,
-         {_utc_date_sql("suspend_start")},
+  SELECT __dataset_id AS record_source,
+         __relative_path || '#suspension_id=' || suspension_id AS source_record_id,
+         coalesce(CAST(knowledge_cutoff AS VARCHAR),'suspension-source-v1') AS source_revision,
+         __source_sha256 AS source_artifact_sha256,
+         {cutoff} AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to,
+         {_utc_date_sql("suspend_start")} AS effective_from,
          CASE WHEN suspend_end IS NULL THEN NULL
-              ELSE {_utc_date_sql("suspend_end + INTERVAL '1 day'")} END,
-         'listing_status_' || substr(sha256('SUSPENSION' || chr(31) || listing_id || chr(31) || CAST(suspend_start AS VARCHAR)),1,32),
-         listing_id, 'SUSPENSION', 'SUSPENDED',
-         coalesce(nullif(reason,''),'SOURCE_REPORTED_SUSPENSION')
+              ELSE {_utc_date_sql("suspend_end + INTERVAL '1 day'")} END AS effective_to,
+         'listing_status_' || substr(sha256('SUSPENSION' || chr(31) || listing_id || chr(31) || CAST(suspend_start AS VARCHAR)),1,32) AS listing_status_id,
+         listing_id, 'SUSPENSION' AS status_type, 'SUSPENDED' AS status_value,
+         coalesce(nullif(reason,''),'SOURCE_REPORTED_SUSPENSION') AS reason_code
   FROM suspension_mapped WHERE mapping_rank=1
 )
 SELECT * FROM rows ORDER BY listing_id,status_type,effective_from,knowledge_from

@@ -7,6 +7,7 @@ import hashlib
 import os
 import shutil
 import stat
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -1155,6 +1156,21 @@ def _prepare_work(
     return checkpoint, states
 
 
+def _create_scratch_directory(
+    output: Path, build_identity: str, scratch_root: Path | None
+) -> Path:
+    scratch_parent = output.parent if scratch_root is None else scratch_root
+    if scratch_parent.is_symlink() or not scratch_parent.is_dir():
+        raise MarketObservationBuildError("scratch root must be a physical directory")
+    return Path(
+        tempfile.mkdtemp(
+            prefix=f".{output.name}.{build_identity}.",
+            suffix=".duckdb-tmp",
+            dir=scratch_parent.resolve(),
+        )
+    )
+
+
 def _build_locked(
     *,
     ods_package: Path,
@@ -1164,6 +1180,7 @@ def _build_locked(
     trading_calendar_candidate: Path,
     output: Path,
     run_id: str,
+    scratch_root: Path | None,
 ) -> MarketObservationBuildResult:
     try:
         plan, ledger = _verify_plan_package(input_plan)
@@ -1219,9 +1236,7 @@ def _build_locked(
     work = output.parent / f".{output.name}.{build_identity}.work"
     checkpoint, states = _prepare_work(work, identity)
     duckdb, _, _ = _dependencies()
-    scratch = output.parent / f".{output.name}.{build_identity}.duckdb-tmp"
-    shutil.rmtree(scratch, ignore_errors=True)
-    scratch.mkdir()
+    scratch = _create_scratch_directory(output, build_identity, scratch_root)
     connection = duckdb.connect()
     connection.execute("SET threads=1")
     connection.execute("SET preserve_insertion_order=true")
@@ -1398,6 +1413,7 @@ def build_market_observation(
     trading_calendar_candidate: Path,
     output: Path,
     run_id: str,
+    scratch_root: Path | None = None,
 ) -> MarketObservationBuildResult:
     """Build one immutable, idempotent Issue #58 candidate without publishing it."""
 
@@ -1429,6 +1445,7 @@ def build_market_observation(
             trading_calendar_candidate=trading_calendar_candidate,
             output=normalized,
             run_id=run_id,
+            scratch_root=scratch_root,
         )
     finally:
         if locked:

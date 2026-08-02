@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import tempfile
 import unittest
 from datetime import date, datetime, timezone
@@ -17,6 +18,7 @@ from quanthus.pipelines.securities_warehouse.market_observation import (
     _bar_query,
     _canonical_digest,
     _copy_query,
+    _create_scratch_directory,
     _expected_row_counts,
     _index_bar_query,
     _normalize_outputs,
@@ -157,6 +159,18 @@ class MarketObservationQueryTests(unittest.TestCase):
         connection.execute("SET threads=1")
         _register_sources(connection, self.registry)
         return connection
+
+    def test_scratch_directory_uses_explicit_physical_root(self) -> None:
+        scratch_root = self.root / "scratch"
+        scratch_root.mkdir()
+        scratch = _create_scratch_directory(
+            self.root / "candidate", "build-identity", scratch_root
+        )
+        try:
+            self.assertEqual(scratch.parent, scratch_root.resolve())
+            self.assertTrue(scratch.name.endswith(".duckdb-tmp"))
+        finally:
+            shutil.rmtree(scratch)
 
     def test_bar_query_normalizes_daily_and_minute_intervals(self) -> None:
         self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])

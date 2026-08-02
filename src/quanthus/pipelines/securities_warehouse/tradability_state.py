@@ -369,6 +369,14 @@ def _prepare_relations(
     )
     connection.execute(f"CREATE VIEW ref_bar AS SELECT * FROM {_read_parquet_sql(bar_paths)}")
     connection.execute(
+        """
+        CREATE VIEW code_listing_resolution AS
+        SELECT c.listing_code AS source_code,l.*
+        FROM (SELECT listing_code,security_id FROM ref_listing GROUP BY 1,2) c
+        JOIN ref_listing l USING (security_id)
+        """
+    )
+    connection.execute(
         f"CREATE OR REPLACE MACRO build_cutoff() AS TIMESTAMPTZ {_sql_literal(cutoff)}"
     )
 
@@ -405,12 +413,26 @@ SELECT * EXCLUDE(source_rank) FROM ranked WHERE source_rank=1
 """
 
 
+def _daily_status_mapped_query() -> str:
+    return f"""
+SELECT d.*,r.security_id,r.listing_id,r.effective_to AS listing_effective_to,
+       row_number() OVER (
+         PARTITION BY d.stock_code,d.status_date
+         ORDER BY CASE WHEN r.listing_code=d.stock_code THEN 0 ELSE 1 END,
+                  r.effective_from DESC
+       ) AS mapping_rank,
+       count(*) OVER (PARTITION BY d.stock_code,d.status_date) AS mapping_count
+FROM daily_status_resolved d
+JOIN code_listing_resolution r ON r.source_code=d.stock_code
+ AND {_utc_date_sql("d.status_date")} >= r.effective_from
+ AND (r.effective_to IS NULL OR {_utc_date_sql("d.status_date")} < r.effective_to)
+"""
+
+
 def _security_status_query() -> str:
     cutoff = "build_cutoff()"
     return f"""
-WITH code_security AS (
-  SELECT listing_code,security_id FROM ref_listing GROUP BY listing_code,security_id
-), canonical AS (
+WITH canonical AS (
   SELECT s.*, l.security_id, l.listing_id,
          {_utc_date_sql("s.effective_start")} AS start_at,
          CASE WHEN s.effective_end IS NULL THEN NULL
@@ -422,29 +444,15 @@ WITH code_security AS (
          ) AS mapping_rank,
          count(*) OVER (PARTITION BY s.interval_id) AS mapping_count
   FROM src_st_status_pit s
-  LEFT JOIN code_security a ON a.listing_code=s.stock_code
-  JOIN ref_listing l ON (l.listing_code=s.stock_code OR l.security_id=a.security_id)
+  JOIN code_listing_resolution l ON l.source_code=s.stock_code
    AND l.venue_id=(SELECT venue_id FROM ref_venue WHERE mic_code=
         CASE s.exchange WHEN 'SSE' THEN 'XSHG' WHEN 'SZSE' THEN 'XSHE' ELSE 'BJSE' END)
    AND {_utc_date_sql("s.effective_start")} >= l.effective_from
    AND (l.effective_to IS NULL OR {_utc_date_sql("s.effective_start")} < l.effective_to)
-), daily_mapped AS (
-  SELECT d.*, l.security_id, l.effective_to AS listing_effective_to,
-         row_number() OVER (
-           PARTITION BY d.stock_code,d.status_date
-           ORDER BY CASE WHEN l.listing_code=d.stock_code THEN 0 ELSE 1 END,
-                    l.effective_from DESC
-         ) AS mapping_rank,
-         count(*) OVER (PARTITION BY d.stock_code,d.status_date) AS mapping_count
-  FROM daily_status_resolved d
-  LEFT JOIN code_security a ON a.listing_code=d.stock_code
-  JOIN ref_listing l ON (l.listing_code=d.stock_code OR l.security_id=a.security_id)
-   AND {_utc_date_sql("d.status_date")} >= l.effective_from
-   AND (l.effective_to IS NULL OR {_utc_date_sql("d.status_date")} < l.effective_to)
 ), daily_changes AS (
   SELECT *, CASE WHEN lag(is_st) OVER w=is_st AND lag(trade_status) OVER w=trade_status
                   THEN 0 ELSE 1 END AS changed
-  FROM daily_mapped WHERE mapping_rank=1
+  FROM daily_status_mapped WHERE mapping_rank=1
   WINDOW w AS (PARTITION BY security_id ORDER BY status_date)
 ), daily_groups AS (
   SELECT *, sum(changed) OVER (
@@ -492,9 +500,7 @@ SELECT * FROM rows ORDER BY security_id,status_type,effective_from,knowledge_fro
 def _listing_status_query() -> str:
     cutoff = "build_cutoff()"
     return f"""
-WITH code_security AS (
-  SELECT listing_code,security_id FROM ref_listing GROUP BY listing_code,security_id
-), suspension_raw AS (
+WITH suspension_raw AS (
   SELECT *, 20 AS source_priority FROM src_suspensions_delta
   UNION ALL BY NAME
   SELECT *, 10 AS source_priority FROM src_suspensions
@@ -512,8 +518,7 @@ WITH code_security AS (
          ) AS mapping_rank,
          count(*) OVER (PARTITION BY s.suspension_id) AS mapping_count
   FROM suspension_ranked s
-  LEFT JOIN code_security a ON a.listing_code=s.stock_code
-  JOIN ref_listing l ON (l.listing_code=s.stock_code OR l.security_id=a.security_id)
+  JOIN code_listing_resolution l ON l.source_code=s.stock_code
    AND {_utc_date_sql("s.suspend_start")} >= l.effective_from
    AND (l.effective_to IS NULL OR {_utc_date_sql("s.suspend_start")} < l.effective_to)
   WHERE source_rank=1
@@ -556,8 +561,8 @@ WITH mapped AS (
   FROM src_price_limit_regime r
   JOIN ref_venue v ON v.mic_code=CASE r.exchange
     WHEN 'SSE' THEN 'XSHG' WHEN 'SZSE' THEN 'XSHE' ELSE 'BJSE' END
-  LEFT JOIN ref_listing l ON r.stock_code IS NOT NULL
-   AND l.listing_code=r.stock_code AND l.venue_id=v.venue_id
+  LEFT JOIN code_listing_resolution l ON r.stock_code IS NOT NULL
+   AND l.source_code=r.stock_code AND l.venue_id=v.venue_id
    AND {_utc_date_sql("r.effective_start")} >= l.effective_from
    AND (l.effective_to IS NULL OR {_utc_date_sql("r.effective_start")} < l.effective_to)
 ), normalized AS (
@@ -642,8 +647,9 @@ WITH listing_sessions AS (
   ) cs ON true
   LEFT JOIN LATERAL (
     SELECT d.is_st,d.trade_status,d.__source_sha256
-    FROM daily_status_resolved d
-    WHERE d.stock_code=s.listing_code AND d.status_date=s.trade_date
+    FROM daily_status_mapped d
+    WHERE d.listing_id=s.listing_id AND d.status_date=s.trade_date
+      AND d.mapping_rank=1
     ORDER BY d.source_priority DESC LIMIT 1
   ) pd ON true
   LEFT JOIN LATERAL (
@@ -776,7 +782,7 @@ WITH source_rows AS (
          row_number() OVER (
            PARTITION BY e.stock_code,e.trade_date ORDER BY l.effective_from DESC
          ) AS mapping_rank
-  FROM source_rows e JOIN ref_listing l ON l.listing_code=e.stock_code
+  FROM source_rows e JOIN code_listing_resolution l ON l.source_code=e.stock_code
    AND {_utc_date_sql("e.trade_date")} >= l.effective_from
    AND (l.effective_to IS NULL OR {_utc_date_sql("e.trade_date")} < l.effective_to)
 )
@@ -791,8 +797,8 @@ WITH mapped AS (
          row_number() OVER (
            PARTITION BY e.stock_code,e.market_date ORDER BY l.effective_from DESC
          ) AS mapping_rank
-  FROM src_delist_boundary_exceptions e JOIN ref_listing l
-    ON l.listing_code=e.stock_code
+  FROM src_delist_boundary_exceptions e JOIN code_listing_resolution l
+    ON l.source_code=e.stock_code
    AND {_utc_date_sql("e.market_date")} >= l.effective_from
    AND (l.effective_to IS NULL OR {_utc_date_sql("e.market_date")} < l.effective_to)
 )
@@ -1129,20 +1135,16 @@ def _validate_source_resolution(connection: Any) -> dict[str, int]:
           SELECT count(*) FROM src_st_status_pit s WHERE
           (s.stock_code LIKE '00%' OR s.stock_code LIKE '30%' OR
            s.stock_code LIKE '60%' OR s.stock_code LIKE '68%')
-          AND NOT EXISTS (SELECT 1 FROM ref_listing l WHERE
-            (l.listing_code=s.stock_code OR l.security_id IN (
-              SELECT security_id FROM ref_listing WHERE listing_code=s.stock_code))
+          AND NOT EXISTS (SELECT 1 FROM code_listing_resolution l
+            WHERE l.source_code=s.stock_code
             AND {_utc_date_sql("s.effective_start")} >= l.effective_from
             AND (l.effective_to IS NULL OR {_utc_date_sql("s.effective_start")} < l.effective_to))
         """,
         "daily_status_keys": "SELECT count(*) FROM daily_status_resolved",
-        "daily_status_unresolved": f"""
+        "daily_status_unresolved": """
           SELECT count(*) FROM daily_status_resolved d WHERE NOT EXISTS (
-            SELECT 1 FROM ref_listing l WHERE
-             (l.listing_code=d.stock_code OR l.security_id IN (
-               SELECT security_id FROM ref_listing WHERE listing_code=d.stock_code))
-             AND {_utc_date_sql("d.status_date")} >= l.effective_from
-             AND (l.effective_to IS NULL OR {_utc_date_sql("d.status_date")} < l.effective_to))
+            SELECT 1 FROM daily_status_mapped m
+            WHERE m.stock_code=d.stock_code AND m.status_date=d.status_date)
         """,
         "suspension_rows": "SELECT count(*) FROM (SELECT suspension_id FROM src_suspensions UNION SELECT suspension_id FROM src_suspensions_delta)",
         "suspension_unresolved_in_scope": f"""
@@ -1152,9 +1154,8 @@ def _validate_source_resolution(connection: Any) -> dict[str, int]:
           ) s WHERE
           (s.stock_code LIKE '00%' OR s.stock_code LIKE '30%' OR
            s.stock_code LIKE '60%' OR s.stock_code LIKE '68%')
-          AND NOT EXISTS (SELECT 1 FROM ref_listing l WHERE
-            (l.listing_code=s.stock_code OR l.security_id IN (
-              SELECT security_id FROM ref_listing WHERE listing_code=s.stock_code))
+          AND NOT EXISTS (SELECT 1 FROM code_listing_resolution l
+            WHERE l.source_code=s.stock_code
             AND {_utc_date_sql("s.suspend_start")} >= l.effective_from
             AND (l.effective_to IS NULL OR {_utc_date_sql("s.suspend_start")} < l.effective_to))
         """,
@@ -1523,6 +1524,9 @@ def _build_locked(
         )
         connection.execute(
             "CREATE TEMP VIEW daily_status_resolved AS " + _daily_status_relation_query()
+        )
+        connection.execute(
+            "CREATE TEMP VIEW daily_status_mapped AS " + _daily_status_mapped_query()
         )
         overlap_conflicts = int(
             connection.execute(

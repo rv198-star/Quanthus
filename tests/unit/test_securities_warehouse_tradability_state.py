@@ -92,6 +92,7 @@ class TradabilityStateQueryTests(unittest.TestCase):
             [
                 {
                     "listing_id": "listing-1",
+                    "security_id": "security-1",
                     "listing_code": "300001",
                     "venue_id": "venue-sz",
                     "effective_from": at,
@@ -133,6 +134,14 @@ class TradabilityStateQueryTests(unittest.TestCase):
                     "lower_limit_pct": None,
                 },
             ],
+        )
+        self.connection.execute(
+            """
+            CREATE VIEW code_listing_resolution AS
+            SELECT c.listing_code AS source_code,l.*
+            FROM (SELECT listing_code,security_id FROM ref_listing GROUP BY 1,2) c
+            JOIN ref_listing l USING (security_id)
+            """
         )
         rows = self.connection.execute(_price_regime_internal_query()).fetchall()
         columns = [item[0] for item in self.connection.description]

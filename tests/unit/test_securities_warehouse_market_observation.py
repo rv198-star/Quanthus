@@ -229,7 +229,10 @@ class MarketObservationQueryTests(unittest.TestCase):
             ("valuation_daily_delta", "2026-01-06"),
             ("valuation_history_hotfix", "2026-01-07"),
         ):
-            self._write_source(identity, [{**base, "date": day}])
+            row = {**base, "date": day}
+            if identity != "valuation_daily":
+                row["security_id"] = None
+            self._write_source(identity, [row])
         connection = self._connection()
         try:
             rows = connection.execute(
@@ -238,6 +241,8 @@ class MarketObservationQueryTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(len(rows), 24)
+        self.assertEqual({row["security_id"] for row in rows}, {"security-1"})
+        self.assertEqual({row["listing_id"] for row in rows}, {"listing-1"})
         share = next(row for row in rows if row["measure_type"] == "TOTAL_SHARE")
         market_value = next(
             row for row in rows if row["measure_type"] == "TOTAL_MARKET_VALUE"

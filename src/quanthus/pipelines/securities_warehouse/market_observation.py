@@ -538,7 +538,8 @@ WITH raw AS (
   ) AS source_rank
   FROM raw
 ), resolved AS (
-  SELECT r.*, l.security_id, l.listing_id,
+  SELECT r.*, l.security_id AS resolved_security_id,
+         l.listing_id AS resolved_listing_id,
          timezone('Asia/Shanghai', CAST(trade_date AS TIMESTAMP) + INTERVAL 15 HOUR)
            AS observation_start
   FROM ranked r JOIN {listings} l ON l.listing_code=r.stock_code
@@ -565,7 +566,8 @@ SELECT dataset_id AS record_source,
          substr(replace(source_sha256,'sha256:',''),1,16) AS source_revision,
        source_sha256 AS source_artifact_sha256,
        TIMESTAMPTZ {_sql_literal(cutoff)} AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to,
-       observation_start, NULL::TIMESTAMPTZ AS observation_end, security_id, listing_id,
+       observation_start, NULL::TIMESTAMPTZ AS observation_end,
+       resolved_security_id AS security_id, resolved_listing_id AS listing_id,
        measure_type, CAST(raw_value AS DECIMAL(38,10)) AS measure_value,
        CASE WHEN measure_type='TOTAL_MARKET_VALUE' THEN 'CNY' ELSE NULL END AS currency,
        CASE measure_type WHEN 'PE_TTM' THEN 'BAOSTOCK_PE_TTM'

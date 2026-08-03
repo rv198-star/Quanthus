@@ -12,6 +12,7 @@ from quanthus.pipelines.securities_warehouse.disclosure_event import (
     _load_vocabulary,
     _provider_timestamp,
     _select_sources,
+    close_adjustment_factor_intervals,
     disclosure_event_schemas,
     materialize_adjustment_factor_rows,
     materialize_announcement_rows,
@@ -235,6 +236,25 @@ class DisclosureEventTests(unittest.TestCase):
                 for row in rows["dwd_adjustment_factor_input"]
             )
         )
+
+    def test_factor_intervals_close_at_the_next_effective_date(self) -> None:
+        first = {
+            "adjustment_factor_id": "factor-1",
+            "effective_from": _provider_timestamp("2026-06-01", "first"),
+            "effective_to": None,
+        }
+        second = {
+            "adjustment_factor_id": "factor-1",
+            "effective_from": _provider_timestamp("2026-07-01", "second"),
+            "effective_to": None,
+        }
+        inputs = [dict(first), dict(second)]
+
+        close_adjustment_factor_intervals([second, first], inputs)
+
+        self.assertEqual(first["effective_to"], second["effective_from"])
+        self.assertIsNone(second["effective_to"])
+        self.assertEqual(inputs[0]["effective_to"], second["effective_from"])
 
 
 if __name__ == "__main__":

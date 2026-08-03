@@ -788,6 +788,25 @@ def materialize_adjustment_factor_rows(
     return {"dwd_adjustment_factor": factors, "dwd_adjustment_factor_input": inputs}
 
 
+def close_adjustment_factor_intervals(
+    factors: list[dict[str, Any]], inputs: list[dict[str, Any]]
+) -> None:
+    """Close each factor revision at its next effective coordinate in place."""
+
+    by_id: dict[str, list[dict[str, Any]]] = {}
+    for row in factors:
+        by_id.setdefault(str(row["adjustment_factor_id"]), []).append(row)
+    closes: dict[tuple[str, datetime], datetime | None] = {}
+    for factor_id, rows in by_id.items():
+        rows.sort(key=lambda row: row["effective_from"])
+        for index, row in enumerate(rows):
+            next_from = rows[index + 1]["effective_from"] if index + 1 < len(rows) else None
+            row["effective_to"] = next_from
+            closes[(factor_id, row["effective_from"])] = next_from
+    for row in inputs:
+        row["effective_to"] = closes[(str(row["adjustment_factor_id"]), row["effective_from"])]
+
+
 def _write_json_immutable(path: Path, value: Mapping[str, Any]) -> None:
     payload = (json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True) + "\n").encode(
         "ascii"
@@ -1303,6 +1322,10 @@ def _build_disclosure_event_locked(
                 )
                 for table, values in expanded.items():
                     rows[table].extend(values)
+        close_adjustment_factor_intervals(
+            rows["dwd_adjustment_factor"],
+            rows["dwd_adjustment_factor_input"],
+        )
         event_counts: dict[str, int] = {}
         files: list[str] = []
         for table, values in rows.items():

@@ -272,6 +272,17 @@ def build_daily_domain_increment(
     announcements_path, announcements_artifact = _artifact(
         selected, "calendar_daily_events", "announcements_delta"
     )
+    deferred_daily_artifacts = [
+        (lane, name, _artifact(selected, lane, name)[0])
+        for lane, name in (
+            ("market_daily_core", "adjustment_evidence_delta"),
+            ("calendar_daily_events", "suspensions_delta"),
+            ("calendar_daily_events", "corporate_actions_delta"),
+            ("calendar_daily_events", "dividends_delta"),
+            ("calendar_daily_events", "factor_evidence_delta"),
+            ("calendar_daily_events", "financial_disclosures_delta"),
+        )
+    ]
 
     listing_files = _base_files(base_root, base_manifest, "dwd_listing")
     security_files = _base_files(base_root, base_manifest, "dwd_security")
@@ -286,6 +297,15 @@ def build_daily_domain_increment(
     connection.execute("SET preserve_insertion_order=false")
     connection.execute("SET memory_limit='2GB'")
     try:
+        for lane, name, path in deferred_daily_artifacts:
+            row_count = connection.execute(
+                "SELECT count(*) FROM read_parquet(?)", [str(path)]
+            ).fetchone()[0]
+            if row_count:
+                raise DailyDomainBuildError(
+                    f"non-empty daily artifact has no daily DWD handler: {lane}/{name} "
+                    f"({row_count} rows)"
+                )
         connection.execute(
             f"CREATE VIEW base_listing AS SELECT * FROM {_path_relation(listing_files)}"
         )
@@ -528,7 +548,14 @@ def build_daily_domain_increment(
             "dwd_tradability_state": connection.execute(
                 "SELECT count(*) FROM read_parquet(?)", [str(status_path)]
             ).fetchone()[0],
+            "dwd_disclosure": connection.execute(
+                """SELECT count(*) FROM read_parquet(?)
+                WHERE CAST(announce_date AS DATE)>CAST(? AS DATE)
+                  AND CAST(announce_date AS DATE)<=CAST(? AS DATE)""",
+                [str(announcements_path), covered_after.isoformat(), market_date.isoformat()],
+            ).fetchone()[0],
         }
+        expected["dwd_disclosure_subject"] = expected["dwd_disclosure"]
         for table, count in expected.items():
             if row_counts[table] != count:
                 raise DailyDomainBuildError(

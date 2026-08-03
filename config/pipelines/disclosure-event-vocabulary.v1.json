@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "kind": "quanthus_disclosure_event_vocabulary",
+  "mapping_version": "quanthus-cn-disclosure-event-v1",
+  "date_only_availability": "asia_shanghai_end_of_day_then_utc",
+  "corporate_action_reference": {
+    "authority": "ISO 20022 seev bounded semantic reference",
+    "version": "2025 bounded mapping reviewed 2026-08-03"
+  },
+  "action_types": {
+    "bonus": "BONUS_SHARE_DISTRIBUTION",
+    "cash_div": "CASH_DIVIDEND",
+    "mixed": "MIXED_DISTRIBUTION",
+    "transfer": "CAPITAL_RESERVE_TRANSFER"
+  },
+  "action_statuses": {
+    "不分配": "NO_DISTRIBUTION",
+    "实施": "IMPLEMENTED",
+    "预案": "PROPOSED"
+  },
+  "term_types": {
+    "bonus_shares": "BONUS_SHARES_PER_SHARE",
+    "cash_per_share": "CASH_AMOUNT_PER_SHARE",
+    "transfer_shares": "TRANSFER_SHARES_PER_SHARE"
+  },
+  "factor_methods": {
+    "adjust_factor": {"direction": "PROVIDER_NATIVE", "method": "PROVIDER_ADJUST_FACTOR"},
+    "back_adjust_factor": {"direction": "BACKWARD", "method": "BACK_ADJUSTMENT"},
+    "fore_adjust_factor": {"direction": "FORWARD", "method": "FORWARD_ADJUSTMENT"}
+  }
+}

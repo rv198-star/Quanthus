@@ -2749,6 +2749,32 @@ def _verify_existing_financial_candidate(
     )
 
 
+def verify_financial_reporting_candidate(
+    output: Path, *, run_id: str, input_plan_digest: str, model_sha256: str
+) -> FinancialReportingBuildResult:
+    """Deeply verify a same-run #61 predecessor for downstream domain builders."""
+
+    manifest = _read_json_object(output / "manifest.json", "financial candidate manifest")
+    if (
+        manifest.get("run_id") != run_id
+        or manifest.get("input_plan_digest") != input_plan_digest
+        or manifest.get("model_sha256") != model_sha256
+    ):
+        raise FinancialReportingBuildError("financial predecessor binding differs")
+    identity_fields = (
+        "run_id",
+        "input_plan_digest",
+        "model_sha256",
+        "source_audit_sha256",
+        "builder_contract",
+        "listed_company_manifest_sha256",
+        "listed_company_semantic_digest",
+        "source_sha256",
+    )
+    identity = {field: manifest.get(field) for field in identity_fields}
+    return _verify_existing_financial_candidate(output, identity=identity)
+
+
 def _build_financial_reporting_locked(
     *,
     ods_package: Path,

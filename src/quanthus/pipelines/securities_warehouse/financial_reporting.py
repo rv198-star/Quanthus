@@ -1213,7 +1213,13 @@ def expand_financial_envelope(
         accounting_standard = _provider_text(report.get("data_source"), _UNSPECIFIED_STANDARD)
         audit_status = _provider_text(report.get("is_audit"), "") or None
         report_id = _stable_id(
-            "financial_report", company.company_id, statement_type, period, statement_scope
+            "financial_report",
+            _TAXONOMY_NAMESPACE,
+            company.company_id,
+            stock_code,
+            statement_type,
+            period,
+            statement_scope,
         )
         report_record_id = (
             f"{source.relative_path}#stock_code={stock_code}&statement_type={statement_type}"
@@ -1553,6 +1559,7 @@ def expand_financial_native_row(
         "financial_report",
         namespace,
         company.company_id,
+        stock_code,
         report_type,
         period_end.isoformat(),
     )
@@ -1872,9 +1879,6 @@ _OWNED_TABLES = (
     "dwd_financial_fact",
 )
 _PARTITIONED_TABLES = ("dwd_financial_report", "dwd_financial_fact")
-_FULL_FINANCIAL_BUILD_ENABLED = False
-
-
 @dataclass(frozen=True)
 class FinancialReportingBuildResult:
     """A sealed, non-published financial-reporting candidate."""
@@ -2922,10 +2926,6 @@ def build_financial_reporting(
 ) -> FinancialReportingBuildResult:
     """Build a checkpointed Issue #61 candidate without changing publication state."""
 
-    if not _FULL_FINANCIAL_BUILD_ENABLED:
-        raise FinancialReportingBuildError(
-            "financial full build is disabled until native sources are integrated"
-        )
     if output.is_symlink():
         raise FinancialReportingBuildError("financial candidate output must not be a symbolic link")
     output.parent.mkdir(parents=True, exist_ok=True)

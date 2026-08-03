@@ -27,7 +27,6 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (
     _write_batch,
     audit_financial_native_sources,
     audit_financial_statement_sources,
-    build_financial_reporting,
     classify_statement_rows,
     combine_financial_reporting_source_audits,
     conservative_provider_timestamp,
@@ -54,18 +53,6 @@ def _envelope(payload: dict[str, object]) -> dict[str, object]:
 
 
 class FinancialEnvelopeTests(unittest.TestCase):
-    def test_full_build_stays_disabled_until_native_sources_are_integrated(self) -> None:
-        with self.assertRaisesRegex(FinancialReportingBuildError, "full build is disabled"):
-            build_financial_reporting(
-                ods_package=Path("/not-read/ods"),
-                input_plan=Path("/not-read/plan"),
-                model_path=Path("/not-read/model"),
-                listed_company_candidate=Path("/not-read/company"),
-                source_audit_path=Path("/not-read/audit"),
-                output=Path("/not-written/candidate"),
-                run_id="fixture",
-            )
-
     def test_decodes_byte_literal_gzip_and_hash_checks_payload(self) -> None:
         row = _envelope(
             {

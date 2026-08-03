@@ -55,8 +55,15 @@ def _stable_id(kind: str, *parts: str) -> str:
 def _timestamp(value: object, field: str) -> datetime:
     if not isinstance(value, str) or not value:
         raise QualityGovernanceBuildError(f"{field} must be an ISO-8601 timestamp")
+    normalized = value.replace("Z", "+00:00")
+    if (
+        len(normalized) >= 3
+        and normalized[-3] in {"+", "-"}
+        and normalized[-2:].isdigit()
+    ):
+        normalized += ":00"
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(normalized)
     except ValueError as exc:
         raise QualityGovernanceBuildError(f"{field} must be an ISO-8601 timestamp") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:

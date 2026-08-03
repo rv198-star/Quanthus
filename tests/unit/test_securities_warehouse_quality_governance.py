@@ -79,6 +79,21 @@ def _receipt() -> dict[str, object]:
 
 
 class QualityGovernanceTests(unittest.TestCase):
+    def test_quality_rows_normalize_iso_hour_timezone_offset(self) -> None:
+        receipt = _receipt()
+        receipt["exceptions"][0]["affected_effective_at"] = (  # type: ignore[index]
+            "2007-12-26 09:30:00+08"
+        )
+
+        rows = quality_exception_rows(
+            [receipt],
+            contract=_CONTRACT,
+            run_id="run-1",
+            input_plan_digest="sha256:plan",
+        )
+
+        self.assertEqual(rows[0]["affected_effective_at"].utcoffset().total_seconds(), 0)
+
     def test_receipt_requires_source_row_conservation(self) -> None:
         receipt = _receipt()
         receipt["sources"][0]["modeled"] = 2  # type: ignore[index]

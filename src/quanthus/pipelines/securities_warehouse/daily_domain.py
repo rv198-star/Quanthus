@@ -253,8 +253,11 @@ def build_daily_domain_increment(
 
     try:
         import duckdb
+        import pyarrow.parquet as pq
     except ModuleNotFoundError as exc:
-        raise DailyDomainBuildError("duckdb is required for daily DWD construction") from exc
+        raise DailyDomainBuildError(
+            "duckdb and pyarrow are required for daily DWD construction"
+        ) from exc
 
     daily_path, daily_artifact = _artifact(selected, "market_daily_core", "daily_ohlcv_none_delta")
     valuation_path, valuation_artifact = _artifact(
@@ -298,9 +301,7 @@ def build_daily_domain_increment(
     connection.execute("SET memory_limit='2GB'")
     try:
         for lane, name, path in deferred_daily_artifacts:
-            row_count = connection.execute(
-                "SELECT count(*) FROM read_parquet(?)", [str(path)]
-            ).fetchone()[0]
+            row_count = pq.ParquetFile(path).metadata.num_rows
             if row_count:
                 raise DailyDomainBuildError(
                     f"non-empty daily artifact has no daily DWD handler: {lane}/{name} "

@@ -314,10 +314,13 @@ def build_daily_domain_increment(
                 {raw_start} AS observation_start, {raw_end} AS observation_end,
                 l.listing_id, c.calendar_session_id, {_sql(interval)}::VARCHAR interval_size,
                 'none'::VARCHAR price_basis, l.listing_currency AS currency,
-                CAST(o.open AS DECIMAL(38,10)) open, CAST(o.high AS DECIMAL(38,10)) high,
-                CAST(o.low AS DECIMAL(38,10)) low, CAST(o.close AS DECIMAL(38,10)) close,
-                CAST(o.volume AS DECIMAL(38,10)) volume, CAST(o.amount AS DECIMAL(38,10)) turnover,
-                NULL::BIGINT trade_count
+                CAST(o.open AS DECIMAL(38,10)) AS "open",
+                CAST(o.high AS DECIMAL(38,10)) AS "high",
+                CAST(o.low AS DECIMAL(38,10)) AS "low",
+                CAST(o.close AS DECIMAL(38,10)) AS "close",
+                CAST(o.volume AS DECIMAL(38,10)) AS volume,
+                CAST(o.amount AS DECIMAL(38,10)) AS turnover,
+                NULL::BIGINT AS trade_count
                 FROM ({source}) o JOIN base_listing l ON o.stock_code=l.listing_code
                 AND CAST(o.market_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
                 AND (l.effective_to IS NULL OR CAST(o.market_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
@@ -362,10 +365,12 @@ def build_daily_domain_increment(
             CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' observation_start,
             (CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai')+INTERVAL 1 DAY observation_end,
             i.index_id, NULL::VARCHAR calendar_session_id, '1d'::VARCHAR interval_size,
-            i.base_currency currency, CAST(o.open AS DECIMAL(38,10)) open,
-            CAST(o.high AS DECIMAL(38,10)) high, CAST(o.low AS DECIMAL(38,10)) low,
-            CAST(o.close AS DECIMAL(38,10)) close, CAST(o.volume AS DECIMAL(38,10)) volume,
-            CAST(o.amount AS DECIMAL(38,10)) turnover
+            i.base_currency currency, CAST(o.open AS DECIMAL(38,10)) AS "open",
+            CAST(o.high AS DECIMAL(38,10)) AS "high",
+            CAST(o.low AS DECIMAL(38,10)) AS "low",
+            CAST(o.close AS DECIMAL(38,10)) AS "close",
+            CAST(o.volume AS DECIMAL(38,10)) AS volume,
+            CAST(o.amount AS DECIMAL(38,10)) AS turnover
             FROM ({index_source}) o JOIN base_market_index i ON o.index_code=i.index_code""",
             index_output,
         )

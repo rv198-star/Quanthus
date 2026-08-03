@@ -496,7 +496,12 @@ WITH canonical AS (
          CASE WHEN trade_status='0' THEN 'PROVIDER_NOT_TRADING' ELSE 'PROVIDER_TRADING' END AS reason_code
   FROM provider
 )
-SELECT * FROM rows ORDER BY security_id,status_type,effective_from,knowledge_from
+SELECT * FROM rows
+QUALIFY row_number() OVER (
+  PARTITION BY security_status_id,status_value,reason_code,effective_to,knowledge_from
+  ORDER BY source_record_id
+)=1
+ORDER BY security_id,status_type,effective_from,knowledge_from
 """
 
 
@@ -1592,41 +1597,41 @@ def _build_locked(
             + _read_output_sql(work, "dwd_listing_status_interval")
         )
         connection.execute("CREATE TEMP VIEW state_base AS " + _state_base_query())
-        connection.execute(
-            "CREATE TEMP VIEW state_rule_candidates AS " + _state_rule_candidates_query()
-        )
-        ambiguous_rules = int(
-            connection.execute(
-                """
-                SELECT count(*) FROM (
-                  SELECT listing_id,calendar_session_id,priority,count(*) n
-                  FROM state_rule_candidates
-                  WHERE price_limit_regime_id IS NOT NULL AND priority=best_priority
-                  GROUP BY listing_id,calendar_session_id,priority HAVING n>1
-                )
-                """
-            ).fetchone()[0]
-        )
-        if ambiguous_rules:
-            raise TradabilityStateBuildError(
-                f"equal-priority applicable price rules are ambiguous: {ambiguous_rules}"
-            )
-        connection.execute("CREATE TEMP VIEW state_resolved AS " + _state_resolved_query())
-        missing_post_rule = int(
-            connection.execute(
-                """
-                SELECT count(*) FROM state_resolved s JOIN ref_venue v USING (venue_id)
-                WHERE price_limit_regime_id IS NULL
-                  AND trade_date >= DATE '1996-12-16'
-                  AND v.mic_code IN ('XSHG','XSHE')
-                """
-            ).fetchone()[0]
-        )
-        if missing_post_rule:
-            raise TradabilityStateBuildError(
-                f"SSE/SZSE sessions have no applicable price rule: {missing_post_rule}"
-            )
         if "dwd_tradability_state" not in states:
+            connection.execute(
+                "CREATE TEMP VIEW state_rule_candidates AS " + _state_rule_candidates_query()
+            )
+            ambiguous_rules = int(
+                connection.execute(
+                    """
+                    SELECT count(*) FROM (
+                      SELECT listing_id,calendar_session_id,priority,count(*) n
+                      FROM state_rule_candidates
+                      WHERE price_limit_regime_id IS NOT NULL AND priority=best_priority
+                      GROUP BY listing_id,calendar_session_id,priority HAVING n>1
+                    )
+                    """
+                ).fetchone()[0]
+            )
+            if ambiguous_rules:
+                raise TradabilityStateBuildError(
+                    f"equal-priority applicable price rules are ambiguous: {ambiguous_rules}"
+                )
+            connection.execute("CREATE TEMP VIEW state_resolved AS " + _state_resolved_query())
+            missing_post_rule = int(
+                connection.execute(
+                    """
+                    SELECT count(*) FROM state_resolved s JOIN ref_venue v USING (venue_id)
+                    WHERE price_limit_regime_id IS NULL
+                      AND trade_date >= DATE '1996-12-16'
+                      AND v.mic_code IN ('XSHG','XSHE')
+                    """
+                ).fetchone()[0]
+            )
+            if missing_post_rule:
+                raise TradabilityStateBuildError(
+                    f"SSE/SZSE sessions have no applicable price rule: {missing_post_rule}"
+                )
             partitions = _build_table(
                 connection,
                 work=work,
@@ -1639,6 +1644,10 @@ def _build_locked(
             )
             states["dwd_tradability_state"] = partitions
             _write_checkpoint(work, checkpoint, "dwd_tradability_state", partitions)
+        else:
+            # State checkpoints are written only after both rule gates pass.
+            ambiguous_rules = 0
+            missing_post_rule = 0
         connection.execute(
             "CREATE TEMP VIEW built_state AS SELECT * FROM "
             + _read_output_sql(work, "dwd_tradability_state")

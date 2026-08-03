@@ -12,6 +12,7 @@ from quanthus.pipelines.securities_warehouse.tradability_state import (
     _daily_status_relation_query,
     _price_regime_internal_query,
     _schemas,
+    _security_status_query,
     _state_resolved_query,
     _state_rule_candidates_query,
     _verify_model_contract,
@@ -186,6 +187,57 @@ class TradabilityStateQueryTests(unittest.TestCase):
         )
         self.assertEqual(generic_st["priority"], 20)
         self.assertEqual(chinext_st["priority"], 19)
+
+    def test_security_status_deduplicates_identical_canonical_facts(self) -> None:
+        at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        source = {
+            "stock_code": "000001",
+            "exchange": "SZSE",
+            "effective_start": at,
+            "effective_end": datetime(2026, 12, 31, tzinfo=timezone.utc),
+            "source_revision": "v1",
+            "__relative_path": "status.parquet",
+            "__source_sha256": "sha256:status",
+            "status_label": "unknown",
+            "is_st": 0,
+            "confidence": "not_proven",
+            "event_kind": "baseline",
+        }
+        self._register(
+            "src_st_status_pit",
+            [{**source, "interval_id": "a"}, {**source, "interval_id": "b"}],
+        )
+        self._register("ref_venue", [{"venue_id": "venue-sz", "mic_code": "XSHE"}])
+        self._register(
+            "code_listing_resolution",
+            [
+                {
+                    "source_code": "000001",
+                    "listing_code": "000001",
+                    "security_id": "security-1",
+                    "listing_id": "listing-1",
+                    "venue_id": "venue-sz",
+                    "effective_from": datetime(2025, 1, 1, tzinfo=timezone.utc),
+                    "effective_to": None,
+                }
+            ],
+        )
+        self.connection.execute(
+            """
+            CREATE TABLE daily_status_mapped (
+              mapping_rank INTEGER, security_id VARCHAR, status_date DATE,
+              is_st VARCHAR, trade_status VARCHAR, __dataset_id VARCHAR,
+              __relative_path VARCHAR, __source_sha256 VARCHAR,
+              listing_effective_to TIMESTAMPTZ
+            )
+            """
+        )
+        rows = self.connection.execute(_security_status_query()).fetchall()
+        columns = [item[0] for item in self.connection.description]
+        self.assertEqual(len(rows), 1)
+        value = dict(zip(columns, rows[0], strict=True))
+        self.assertTrue(value["source_record_id"].endswith("#interval_id=a"))
+        self.assertEqual(value["status_value"], "UNKNOWN")
 
     def test_rule_resolution_selects_lowest_priority_and_exposes_ties(self) -> None:
         self.connection.execute(

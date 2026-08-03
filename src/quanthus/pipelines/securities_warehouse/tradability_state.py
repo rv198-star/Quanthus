@@ -65,6 +65,7 @@ class TradabilityStateCandidateVerification:
     partition_counts: dict[str, int]
 
 
+_BUILDER_REVISION = "tradability-state-v2"
 _OWNED_TABLES = (
     "dwd_security_status_interval",
     "dwd_listing_status_interval",
@@ -599,7 +600,10 @@ SELECT __dataset_id AS record_source,
        'price_limit_regime_' || substr(sha256(interval_id),1,32) AS price_limit_regime_id,
        venue_id, normalized_board AS board_code,
        normalized_status AS security_status, normalized_ipo AS ipo_phase,
-       CAST(priority AS INTEGER) AS priority, listing_id,
+       CASE WHEN rule_basis='ST' AND board='ST_overlay_ChiNext'
+            THEN CAST(priority AS INTEGER) - 1
+            ELSE CAST(priority AS INTEGER) END AS priority,
+       listing_id,
        CASE WHEN upper_limit_pct IS NULL AND lower_limit_pct IS NULL
             THEN 'NO_LIMIT' ELSE 'PERCENT_LIMIT' END AS regime_type,
        CAST(upper_limit_pct / 100.0 AS DECIMAL(18,12)) AS upper_limit_ratio,
@@ -1505,7 +1509,9 @@ def _build_locked(
     }
     if output.exists():
         return _verify_existing_output(output, **identity)
-    build_identity = _canonical_digest(identity).removeprefix("sha256:")
+    build_identity = _canonical_digest(
+        {**identity, "builder_revision": _BUILDER_REVISION}
+    ).removeprefix("sha256:")
     work = output.parent / f".{output.name}.{build_identity}.work"
     checkpoint, states = _prepare_work(work, identity)
     duckdb, _, _ = _dependencies()

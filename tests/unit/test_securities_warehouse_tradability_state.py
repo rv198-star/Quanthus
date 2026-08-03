@@ -133,6 +133,22 @@ class TradabilityStateQueryTests(unittest.TestCase):
                     "upper_limit_pct": None,
                     "lower_limit_pct": None,
                 },
+                {
+                    **base,
+                    "interval_id": "st-general",
+                    "board": "ST_overlay",
+                    "rule_basis": "ST",
+                    "priority": 20,
+                    "upper_limit_pct": 5.0,
+                    "lower_limit_pct": 5.0,
+                },
+                {
+                    **base,
+                    "interval_id": "st-chinext",
+                    "board": "ST_overlay_ChiNext",
+                    "rule_basis": "ST",
+                    "priority": 20,
+                },
             ],
         )
         self.connection.execute(
@@ -158,6 +174,18 @@ class TradabilityStateQueryTests(unittest.TestCase):
         self.assertEqual(ipo_row["listing_id"], "listing-1")
         self.assertEqual(ipo_row["ipo_phase"], "INITIAL_LISTING_WINDOW")
         self.assertEqual(ipo_row["regime_type"], "NO_LIMIT")
+        generic_st = next(
+            value
+            for value in by_id.values()
+            if value["security_status"] == "ST" and value["board_code"] is None
+        )
+        chinext_st = next(
+            value
+            for value in by_id.values()
+            if value["security_status"] == "ST" and value["board_code"] == "ChiNext"
+        )
+        self.assertEqual(generic_st["priority"], 20)
+        self.assertEqual(chinext_st["priority"], 19)
 
     def test_rule_resolution_selects_lowest_priority_and_exposes_ties(self) -> None:
         self.connection.execute(

@@ -239,11 +239,16 @@ def build_daily_domain_increment(
     """Build and audit one Base-seeded daily DWD package without mutating Base."""
 
     output = output.resolve()
+    release_root = release_root.resolve()
+    base_root = base_root.resolve()
+    for source_root, label in ((release_root, "ODS"), (base_root, "DWD Base")):
+        if output == source_root or output.is_relative_to(source_root):
+            raise DailyDomainBuildError(f"daily output must be outside the {label} root")
     if output.exists():
         return verify_daily_domain_increment(output)
-    catalog, selected = _read_catalog(catalog_root.resolve(), release_root.resolve())
+    catalog, selected = _read_catalog(catalog_root.resolve(), release_root)
     market_date = date.fromisoformat(catalog["market_date"])
-    base_manifest, config = _verify_base(base_root.resolve(), release_config.resolve())
+    base_manifest, config = _verify_base(base_root, release_config.resolve())
     base_through = date.fromisoformat(str(config["through_date"]))
     covered_after, prior = _prior_binding(prior_pointer, market_date, base_through)
     if market_date <= covered_after:

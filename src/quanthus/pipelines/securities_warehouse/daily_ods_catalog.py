@@ -98,6 +98,8 @@ def build_daily_ods_catalog(
 
     release_root = release_root.resolve()
     output = output.resolve()
+    if output == release_root or output.is_relative_to(release_root):
+        raise DailyOdsCatalogError("catalog output must be outside the ODS release root")
     if output.exists():
         return verify_daily_ods_catalog(output)
     selected = {lane: _select_lane(release_root, market_date, lane) for lane in _LANES}

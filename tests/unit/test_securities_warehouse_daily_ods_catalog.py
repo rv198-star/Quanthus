@@ -95,6 +95,14 @@ class DailyOdsCatalogTest(unittest.TestCase):
                 output=self.root / "catalog",
             )
 
+    def test_rejects_catalog_output_inside_ods_root(self) -> None:
+        with self.assertRaisesRegex(DailyOdsCatalogError, "outside the ODS"):
+            build_daily_ods_catalog(
+                release_root=self.release_root,
+                market_date=date(2026, 8, 3),
+                output=self.release_root / "catalog",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

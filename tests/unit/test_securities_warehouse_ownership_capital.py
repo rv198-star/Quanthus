@@ -9,6 +9,7 @@ from quanthus.pipelines.securities_warehouse.ownership_capital import (
     OwnershipCapitalBuildError,
     _file_source,
     _single_record,
+    materialize_shareholder_count_row,
     ownership_capital_schemas,
     parse_f10_capital_structure,
     parse_f10_shareholding_tables,
@@ -16,6 +17,26 @@ from quanthus.pipelines.securities_warehouse.ownership_capital import (
 
 
 class OwnershipCapitalTests(unittest.TestCase):
+    def test_structured_holder_count_preserves_raw_values(self) -> None:
+        row = materialize_shareholder_count_row(
+            {
+                "code": "000001",
+                "end_date": "2026-03-31",
+                "shareholder_count": 457610.0,
+                "avg_hold_num": 42406.25,
+                "knowledge_cutoff": "2026-04-24",
+                "fetched_at": "2026-07-24T07:42:00Z",
+                "source": "eastmoney",
+            },
+            company_id="company-1",
+            security_id="security-1",
+            source_sha256="sha256:holder-count",
+        )
+
+        self.assertEqual(row["holder_count"], 457610)
+        self.assertEqual(row["raw_holder_count"], "457610")
+        self.assertEqual(row["raw_unit"], "HOLDER_ACCOUNT;SHARE_PER_HOLDER")
+
     def test_v11_schemas_cover_four_owned_objects(self) -> None:
         schemas = ownership_capital_schemas()
 
@@ -28,9 +49,7 @@ class OwnershipCapitalTests(unittest.TestCase):
                 "dwd_shareholding_observation",
             },
         )
-        self.assertIn(
-            "holder_match_key", schemas["dwd_shareholding_observation"].names
-        )
+        self.assertIn("holder_match_key", schemas["dwd_shareholding_observation"].names)
         self.assertIn("parser_version", schemas["dwd_shareholding_change"].names)
 
     def test_capital_matrix_expands_dates_and_units(self) -> None:

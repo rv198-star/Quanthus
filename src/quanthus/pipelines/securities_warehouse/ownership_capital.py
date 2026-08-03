@@ -358,6 +358,202 @@ def _stable_holder_key(name: str) -> str:
     return "holder_match_" + hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:32]
 
 
+def _stable_id(kind: str, *parts: str) -> str:
+    payload = "\x1f".join(("securities-warehouse-v1", kind, *parts)).encode("utf-8")
+    return f"{kind}_{hashlib.sha256(payload).hexdigest()[:32]}"
+
+
+def _utc_timestamp(value: object, field: str) -> datetime:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str) and value:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            parsed = datetime.combine(
+                date.fromisoformat(value), time(23, 59, 59, 999999), _SHANGHAI
+            )
+            return parsed.astimezone(timezone.utc)
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise OwnershipCapitalBuildError(f"{field} is not a timestamp") from exc
+    else:
+        raise OwnershipCapitalBuildError(f"{field} is empty")
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        parsed = parsed.replace(tzinfo=_SHANGHAI)
+    return parsed.astimezone(timezone.utc)
+
+
+def _raw_number(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, float):
+        return format(value, ".17g")
+    return str(value)
+
+
+def materialize_shareholder_count_row(
+    row: Mapping[str, Any],
+    *,
+    company_id: str,
+    security_id: str,
+    source_sha256: str,
+) -> dict[str, Any]:
+    """Convert one canonical holder-count row with raw numeric evidence."""
+
+    stock_code = _text(row.get("code"), "shareholder_count code")
+    period_end = _report_date(row.get("end_date"), "shareholder_count end_date")
+    raw_count = _raw_number(row.get("shareholder_count"))
+    if raw_count is None:
+        raise OwnershipCapitalBuildError("shareholder_count is empty")
+    holder_count = Decimal(raw_count)
+    if holder_count != holder_count.to_integral_value():
+        raise OwnershipCapitalBuildError("shareholder_count is not integral")
+    raw_average = _raw_number(row.get("avg_hold_num"))
+    published_at = _utc_timestamp(
+        row.get("knowledge_cutoff") or row.get("hold_notice_date"),
+        "shareholder_count knowledge_cutoff",
+    )
+    source_record_id = f"stock_code={stock_code}&period_end={period_end.isoformat()}"
+    return {
+        "record_source": str(row.get("source") or "shareholder_count"),
+        "source_record_id": source_record_id,
+        "source_revision": str(row.get("fetched_at") or "ods-base-v1.2"),
+        "source_artifact_sha256": source_sha256,
+        "knowledge_from": published_at,
+        "knowledge_to": None,
+        "period_start": None,
+        "period_end": period_end,
+        "published_at": published_at,
+        "shareholder_count_observation_id": _stable_id(
+            "shareholder_count", company_id, stock_code, period_end.isoformat()
+        ),
+        "company_id": company_id,
+        "security_id": security_id,
+        "observation_scope": "COMPANY_SECURITY_HOLDER_ACCOUNTS",
+        "holder_count": int(holder_count),
+        "average_holding": Decimal(raw_average) if raw_average is not None else None,
+        "raw_holder_count": raw_count,
+        "raw_average_holding": raw_average,
+        "raw_unit": "HOLDER_ACCOUNT;SHARE_PER_HOLDER",
+        "parser_version": "quanthus-structured-shareholder-count-v1",
+    }
+
+
+def materialize_holder_change_row(
+    row: Mapping[str, Any],
+    *,
+    company_id: str,
+    security_id: str,
+    source_sha256: str,
+    source_revision: str,
+) -> dict[str, Any]:
+    """Convert one SQLite holder-change event with explicit unit semantics."""
+
+    row_key = _text(row.get("row_key"), "holder_change row_key")
+    holder = _text(row.get("person") or row.get("actor"), "holder_change shareholder")
+    changed = _report_date(
+        row.get("change_date") or row.get("disclosure_date"), "holder_change date"
+    )
+    disclosed = (
+        _report_date(row["disclosure_date"], "holder_change disclosure_date")
+        if row.get("disclosure_date")
+        else None
+    )
+    raw_change = _raw_number(row.get("change_shares"))
+    raw_ratio = _raw_number(row.get("change_ratio"))
+    raw_after = _raw_number(row.get("shares_after"))
+    knowledge = _effective_start(disclosed or changed)
+    return {
+        "record_source": "announcement_archive.holder_changes",
+        "source_record_id": row_key,
+        "source_revision": source_revision,
+        "source_artifact_sha256": source_sha256,
+        "knowledge_from": knowledge,
+        "knowledge_to": None,
+        "effective_at": _effective_start(changed),
+        "announced_at": _effective_start(disclosed) if disclosed else None,
+        "shareholding_change_id": _stable_id("shareholding_change", row_key),
+        "company_id": company_id,
+        "security_id": security_id,
+        "shareholder_source_name": holder,
+        "shareholder_id": None,
+        "change_type": str(row.get("reason") or "UNSPECIFIED_CHANGE"),
+        "share_change": Decimal(raw_change) if raw_change is not None else None,
+        "percentage_change": Decimal(raw_ratio) if raw_ratio is not None else None,
+        "post_holding": Decimal(raw_after) if raw_after is not None else None,
+        "post_percentage": None,
+        "disclosure_id": None,
+        "holder_match_key": _stable_holder_key(holder),
+        "raw_share_change": raw_change,
+        "share_change_unit": "SHARE" if raw_change is not None else None,
+        "raw_percentage_change": raw_ratio,
+        "percentage_change_unit": "PERCENT" if raw_ratio is not None else None,
+        "raw_post_holding": raw_after,
+        "post_holding_unit": "SHARE" if raw_after is not None else None,
+        "raw_post_percentage": None,
+        "post_percentage_unit": None,
+        "parser_version": "quanthus-sqlite-holder-change-v1",
+    }
+
+
+def materialize_f10_rows(
+    row: Mapping[str, Any],
+    *,
+    company_id: str,
+    security_id: str,
+    source_sha256: str,
+) -> dict[str, list[dict[str, Any]]]:
+    """Attach governed lineage and identities to parsed F10 ownership rows."""
+
+    category = _text(row.get("category"), "F10 category")
+    content = _text(row.get("content"), "F10 content")
+    stock_code = _text(row.get("stock_code"), "F10 stock_code")
+    source_record_id = (
+        f"stock_code={stock_code}&category={category}&content_sha256="
+        f"{_text(row.get('content_sha256'), 'F10 content_sha256')}"
+    )
+    knowledge = _utc_timestamp(row.get("acquired_at"), "F10 acquired_at")
+    common = {
+        "record_source": str(row.get("source") or "tdx_f10"),
+        "source_record_id": source_record_id,
+        "source_revision": str(row.get("source_revision") or "provider-native"),
+        "source_artifact_sha256": source_sha256,
+        "knowledge_from": knowledge,
+        "knowledge_to": None,
+    }
+    result = {
+        "dwd_share_capital_observation": [],
+        "dwd_shareholding_observation": [],
+    }
+    if category == "股本结构":
+        for parsed in parse_f10_capital_structure(content):
+            result["dwd_share_capital_observation"].append(
+                {
+                    **common,
+                    "observation_start": _effective_start(parsed["observation_date"]),
+                    "observation_end": None,
+                    "security_id": security_id,
+                    **{key: value for key, value in parsed.items() if key != "observation_date"},
+                }
+            )
+    elif category == "股东研究":
+        for parsed in parse_f10_shareholding_tables(content):
+            result["dwd_shareholding_observation"].append(
+                {
+                    **common,
+                    "observation_start": _effective_start(parsed["observation_date"]),
+                    "observation_end": None,
+                    "company_id": company_id,
+                    "security_id": security_id,
+                    "shareholder_id": None,
+                    **{key: value for key, value in parsed.items() if key != "observation_date"},
+                }
+            )
+    else:
+        raise OwnershipCapitalBuildError(f"unsupported ownership F10 category: {category}")
+    return result
+
+
 def _single_record(
     records: Sequence[Mapping[str, Any]],
     *,

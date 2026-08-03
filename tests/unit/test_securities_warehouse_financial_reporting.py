@@ -23,6 +23,7 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (
     _audit_financial_candidate,
     _batch_rows,
     _finalize_concepts,
+    _reporting_batch_rows,
     _write_batch,
     audit_financial_native_sources,
     audit_financial_statement_sources,
@@ -1029,6 +1030,53 @@ class FinancialEnvelopeTests(unittest.TestCase):
         self.assertIsNotNone(resolved)
         self.assertEqual(resolved.company_id, "company-1")
         self.assertEqual(reason, "BETWEEN_LISTED_COMPANY_IDENTITY_INTERVALS")
+
+    def test_reporting_batch_materializes_native_rows_and_quality_counts(self) -> None:
+        source = FinancialReportingSource(
+            source_id="canonical_financial_quarterly",
+            source_kind="quarterly_projection",
+            ledger_identity="financial_quarterly",
+            path=Path("/fixture/canonical.parquet"),
+            relative_path="payload/canonical/financial_quarterly.parquet",
+            source_sha256="sha256:" + "a" * 64,
+            source_revision="ods-base-v1.2",
+            precedence="independent",
+        )
+        resolver = FinancialCompanyResolver(
+            [
+                FinancialCompanyIdentity(
+                    stock_code="000001",
+                    security_id="security-1",
+                    company_id="company-1",
+                    effective_from=datetime(1991, 1, 1, tzinfo=timezone.utc),
+                    effective_to=None,
+                )
+            ]
+        )
+
+        rows_by_year, concepts, counts, exceptions = _reporting_batch_rows(
+            [
+                {
+                    "stock_code": "000001",
+                    "report_date": datetime(1990, 12, 31),
+                    "roe": 1.0,
+                    "revenue": 2.0,
+                    "net_profit": 3.0,
+                    "revenue_growth_yoy": 4.0,
+                    "profit_growth_yoy": 5.0,
+                }
+            ],
+            source=source,
+            resolver=resolver,
+            knowledge_cutoff=datetime(2026, 8, 1, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(counts["dwd_financial_report"], 1)
+        self.assertEqual(counts["dwd_financial_fact"], 5)
+        self.assertEqual(counts["dwd_financial_concept"], 5)
+        self.assertEqual(len(concepts), 5)
+        self.assertEqual(len(rows_by_year["dwd_financial_fact"][1990]), 5)
+        self.assertEqual(exceptions, {"BEFORE_FIRST_LISTED_COMPANY_IDENTITY": 1})
 
     def test_writes_partitioned_rows_and_runs_external_key_audit(self) -> None:
         row = {

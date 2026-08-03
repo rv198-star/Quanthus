@@ -2226,7 +2226,7 @@ def _batch_rows(
     rows_by_year: dict[str, dict[int, list[dict[str, Any]]]] = {
         table: defaultdict(list) for table in _PARTITIONED_TABLES
     }
-    concepts: list[dict[str, Any]] = []
+    concepts_by_id: dict[str, dict[str, Any]] = {}
     row_counts = {table: 0 for table in _OWNED_TABLES}
     for row in rows:
         expanded = expand_financial_envelope(row, source=source, company_resolver=resolver)
@@ -2234,10 +2234,12 @@ def _batch_rows(
             rows_by_year["dwd_financial_report"][report["period_end"].year].append(report)
         for fact in expanded.facts:
             rows_by_year["dwd_financial_fact"][fact["period_end"].year].append(fact)
-        concepts.extend(expanded.concepts)
+        for concept in expanded.concepts:
+            concepts_by_id.setdefault(str(concept["financial_concept_id"]), concept)
         row_counts["dwd_financial_report"] += len(expanded.reports)
-        row_counts["dwd_financial_concept"] += len(expanded.concepts)
         row_counts["dwd_financial_fact"] += len(expanded.facts)
+    concepts = [concepts_by_id[key] for key in sorted(concepts_by_id)]
+    row_counts["dwd_financial_concept"] = len(concepts)
     return rows_by_year, concepts, row_counts
 
 
@@ -2258,7 +2260,7 @@ def _reporting_batch_rows(
     rows_by_year: dict[str, dict[int, list[dict[str, Any]]]] = {
         table: defaultdict(list) for table in _PARTITIONED_TABLES
     }
-    concepts: list[dict[str, Any]] = []
+    concepts_by_id: dict[str, dict[str, Any]] = {}
     row_counts = {table: 0 for table in _OWNED_TABLES}
     exception_counts: Counter[str] = Counter()
     statement_source = (
@@ -2291,13 +2293,15 @@ def _reporting_batch_rows(
             )
         for fact in expanded.facts:
             rows_by_year["dwd_financial_fact"][fact["period_end"].year].append(fact)
-        concepts.extend(expanded.concepts)
+        for concept in expanded.concepts:
+            concepts_by_id.setdefault(str(concept["financial_concept_id"]), concept)
         row_counts["dwd_financial_report"] += len(expanded.reports)
-        row_counts["dwd_financial_concept"] += len(expanded.concepts)
         row_counts["dwd_financial_fact"] += len(expanded.facts)
         exception_counts.update(
             str(exception["code"]) for exception in expanded.quality_exceptions
         )
+    concepts = [concepts_by_id[key] for key in sorted(concepts_by_id)]
+    row_counts["dwd_financial_concept"] = len(concepts)
     return rows_by_year, concepts, row_counts, dict(sorted(exception_counts.items()))
 
 

@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Build the Issue #64 quality-governance DWD candidate."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.securities_warehouse.quality_governance import (  # noqa: E402
+    QualityGovernanceBuildError,
+    build_quality_governance,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ods-package", type=Path, required=True)
+    parser.add_argument("--input-plan", type=Path, required=True)
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--model-extension", type=Path, required=True)
+    parser.add_argument("--accounting-contract", type=Path, required=True)
+    for name in (
+        "listed-company",
+        "trading-calendar",
+        "market-observation",
+        "tradability-state",
+        "disclosure-event",
+        "financial-reporting",
+        "industry-classification",
+        "ownership-capital",
+    ):
+        parser.add_argument(f"--{name}-candidate", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--run-id", required=True)
+    args = parser.parse_args()
+    candidates = {
+        "listed_company": args.listed_company_candidate,
+        "trading_calendar": args.trading_calendar_candidate,
+        "security_market_observation": args.market_observation_candidate,
+        "tradability_state": args.tradability_state_candidate,
+        "disclosure_company_event": args.disclosure_event_candidate,
+        "financial_reporting": args.financial_reporting_candidate,
+        "industry_classification": args.industry_classification_candidate,
+        "ownership_capital": args.ownership_capital_candidate,
+    }
+    try:
+        result = build_quality_governance(
+            ods_package=args.ods_package,
+            input_plan=args.input_plan,
+            model_path=args.model,
+            model_extension_path=args.model_extension,
+            accounting_contract_path=args.accounting_contract,
+            candidates=candidates,
+            output=args.output,
+            run_id=args.run_id,
+        )
+    except (QualityGovernanceBuildError, OSError) as exc:
+        print(f"quality-governance DWD failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "output": str(result.root),
+                "semantic_digest": result.semantic_digest,
+                "row_count": result.row_count,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

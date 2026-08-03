@@ -1048,6 +1048,8 @@ class FinancialCompanyResolver:
                 f"stock_code={stock_code} period_end={period_end.isoformat()}"
             )
         candidate_companies = {identity.company_id for identity in code_identities}
+        if not candidate_companies:
+            return None, "NO_LISTED_COMPANY_IDENTITY"
         if len(candidate_companies) != 1:
             raise FinancialReportingBuildError(
                 "financial report has no unambiguous company bridge: "

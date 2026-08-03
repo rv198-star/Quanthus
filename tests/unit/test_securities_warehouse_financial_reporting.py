@@ -1041,6 +1041,16 @@ class FinancialEnvelopeTests(unittest.TestCase):
         self.assertEqual(resolved.company_id, "company-1")
         self.assertEqual(reason, "BETWEEN_LISTED_COMPANY_IDENTITY_INTERVALS")
 
+    def test_company_resolver_classifies_an_uncovered_code(self) -> None:
+        resolver = FinancialCompanyResolver([])
+
+        resolved, reason = resolver.resolve_for_report(
+            "920258", period_end=datetime(2026, 7, 31, tzinfo=timezone.utc).date()
+        )
+
+        self.assertIsNone(resolved)
+        self.assertEqual(reason, "NO_LISTED_COMPANY_IDENTITY")
+
     def test_reporting_batch_materializes_native_rows_and_quality_counts(self) -> None:
         source = FinancialReportingSource(
             source_id="canonical_financial_quarterly",

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "contract_id": "quanthus-product-bounded-a-share-dwd-dws-model-v1.1-extension",
+  "base_contract_id": "quanthus-product-bounded-a-share-dwd-dws-model-v1",
+  "base_model_sha256": "sha256:7ccfbebbe8f06622363228cfa85abca23adb1b4ff8f5fff8c6c07cbc8d633dd7",
+  "compatibility": "additive_columns_on_unbuilt_issue_63_and_64_objects_only",
+  "allowed_issue_owners": [63, 64],
+  "table_extensions": {
+    "dwd_share_capital_observation": {
+      "columns": {
+        "raw_value": "string",
+        "raw_unit": "string",
+        "parser_version": "string"
+      }
+    },
+    "dwd_shareholder_count_observation": {
+      "columns": {
+        "raw_holder_count": "string",
+        "raw_average_holding": "string?",
+        "raw_unit": "string",
+        "parser_version": "string"
+      }
+    },
+    "dwd_shareholding_change": {
+      "columns": {
+        "holder_match_key": "string",
+        "raw_share_change": "string?",
+        "share_change_unit": "string?",
+        "raw_percentage_change": "string?",
+        "percentage_change_unit": "string?",
+        "raw_post_holding": "string?",
+        "post_holding_unit": "string?",
+        "raw_post_percentage": "string?",
+        "post_percentage_unit": "string?",
+        "parser_version": "string"
+      }
+    },
+    "dwd_shareholding_observation": {
+      "columns": {
+        "holder_match_key": "string",
+        "table_kind": "string",
+        "holder_rank": "int32",
+        "holder_category": "string?",
+        "share_nature": "string?",
+        "raw_holding_quantity": "string?",
+        "holding_quantity_unit": "string?",
+        "raw_holding_percentage": "string?",
+        "holding_percentage_unit": "string?",
+        "parser_version": "string"
+      }
+    },
+    "dwd_quality_exception": {
+      "columns": {
+        "rule_version": "string",
+        "affected_domain": "string",
+        "disposition": "string"
+      }
+    }
+  },
+  "vocabularies": {
+    "table_kind": ["TOP_SHAREHOLDERS", "TOP_FLOATING_SHAREHOLDERS"],
+    "normalized_share_unit": ["SHARE"],
+    "normalized_percentage_unit": ["PERCENT"],
+    "quality_disposition": [
+      "ACCEPTED_LIMITATION",
+      "DEFERRED",
+      "EXCLUDED",
+      "FAILED",
+      "QUARANTINED"
+    ]
+  }
+}

@@ -997,10 +997,25 @@ class FinancialCompanyResolver:
             return sorted(active_company, key=lambda item: item.security_id)[0], None
         if coordinate < min(identity.effective_from for identity in company_identities):
             return None, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY"
-        raise FinancialReportingBuildError(
-            "financial report falls in an unresolved company identity interval: "
-            f"stock_code={stock_code} period_end={period_end.isoformat()}"
+        prior = [
+            identity for identity in company_identities if identity.effective_from <= coordinate
+        ]
+        if not prior:
+            raise FinancialReportingBuildError(
+                "financial company identity interval classification is inconsistent"
+            )
+        resolved = sorted(
+            prior, key=lambda item: (item.effective_from, item.security_id)
+        )[-1]
+        later = [
+            identity for identity in company_identities if identity.effective_from > coordinate
+        ]
+        reason = (
+            "BETWEEN_LISTED_COMPANY_IDENTITY_INTERVALS"
+            if later
+            else "AFTER_LAST_LISTED_COMPANY_IDENTITY"
         )
+        return resolved, reason
 
     def resolve(
         self, stock_code: str, *, period_end: date, published_at: datetime | None
@@ -1109,6 +1124,19 @@ def expand_financial_envelope(
                 }
             )
             continue
+        if resolution_reason is not None:
+            quality_exceptions.append(
+                {
+                    "code": resolution_reason,
+                    "stock_code": stock_code,
+                    "period_end": period_end.isoformat(),
+                    "source_record_id": (
+                        f"{source.relative_path}#stock_code={stock_code}"
+                        f"&statement_type={statement_type}&period_end={period}"
+                    ),
+                    "source_artifact_sha256": source.source_sha256,
+                }
+            )
         statement_scope = _provider_text(report.get("rType"), _UNSPECIFIED_SCOPE)
         accounting_standard = _provider_text(report.get("data_source"), _UNSPECIFIED_STANDARD)
         audit_status = _provider_text(report.get("is_audit"), "") or None
@@ -1424,6 +1452,17 @@ def expand_financial_native_row(
                 },
             ),
         )
+    quality_exceptions: tuple[dict[str, Any], ...] = ()
+    if resolution_reason is not None:
+        quality_exceptions = (
+            {
+                "code": resolution_reason,
+                "stock_code": stock_code,
+                "period_end": period_end.isoformat(),
+                "source_record_id": source_record_id,
+                "source_artifact_sha256": source.source_sha256,
+            },
+        )
     acquired_at = row.get("acquired_at")
     knowledge_from = (
         _utc_timestamp(acquired_at, "native financial acquired_at")
@@ -1538,7 +1577,9 @@ def expand_financial_native_row(
                 "is_nil": is_nil,
             }
         )
-    return FinancialEnvelopeRows((report,), tuple(concepts), tuple(facts))
+    return FinancialEnvelopeRows(
+        (report,), tuple(concepts), tuple(facts), quality_exceptions
+    )
 
 
 def _iter_financial_native_rows(

@@ -941,6 +941,34 @@ class FinancialEnvelopeTests(unittest.TestCase):
         self.assertIsNone(outside)
         self.assertEqual(reason, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY")
 
+    def test_company_resolver_classifies_report_between_listing_intervals(self) -> None:
+        resolver = FinancialCompanyResolver(
+            [
+                FinancialCompanyIdentity(
+                    stock_code="000765",
+                    security_id="security-old",
+                    company_id="company-1",
+                    effective_from=datetime(1997, 11, 3, tzinfo=timezone.utc),
+                    effective_to=datetime(2005, 7, 5, tzinfo=timezone.utc),
+                ),
+                FinancialCompanyIdentity(
+                    stock_code="001267",
+                    security_id="security-new",
+                    company_id="company-1",
+                    effective_from=datetime(2021, 11, 17, tzinfo=timezone.utc),
+                    effective_to=None,
+                ),
+            ]
+        )
+
+        resolved, reason = resolver.resolve_for_report(
+            "001267", period_end=datetime(2011, 3, 31, tzinfo=timezone.utc).date()
+        )
+
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.company_id, "company-1")
+        self.assertEqual(reason, "BETWEEN_LISTED_COMPANY_IDENTITY_INTERVALS")
+
     def test_writes_partitioned_rows_and_runs_external_key_audit(self) -> None:
         row = {
             **_envelope(

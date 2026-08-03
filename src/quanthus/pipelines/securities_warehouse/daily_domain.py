@@ -38,6 +38,7 @@ class DailyDomainResult:
 
 
 _TABLE_KEYS = {
+    "dwd_trading_calendar": ("venue_id", "trade_date", "session_type"),
     "dwd_security_bar": ("listing_id", "observation_start", "interval_size", "price_basis"),
     "dwd_security_valuation": (
         "security_id",
@@ -263,6 +264,9 @@ def build_daily_domain_increment(
     status_path, status_artifact = _artifact(
         selected, "market_daily_core", "daily_status_observation_delta"
     )
+    trading_calendar_path, trading_calendar_artifact = _artifact(
+        selected, "market_daily_core", "trading_calendar"
+    )
     minute_path, minute_artifact = _artifact(selected, "intraday_1m", "intraday_bars")
     five_path, five_artifact = _artifact(selected, "intraday_5m", "intraday_bars")
     announcements_path, announcements_artifact = _artifact(
@@ -273,6 +277,7 @@ def build_daily_domain_increment(
     security_files = _base_files(base_root, base_manifest, "dwd_security")
     calendar_files = _base_files(base_root, base_manifest, "dwd_trading_calendar")
     market_index_files = _base_files(base_root, base_manifest, "dwd_market_index")
+    venue_files = _base_files(base_root, base_manifest, "dwd_trading_venue")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
@@ -292,6 +297,41 @@ def build_daily_domain_increment(
         )
         connection.execute(
             f"CREATE VIEW base_market_index AS SELECT * FROM {_path_relation(market_index_files)}"
+        )
+        connection.execute(
+            f"CREATE VIEW base_venue AS SELECT * FROM {_path_relation(venue_files)}"
+        )
+
+        calendar_session_id = _stable_id_sql(
+            "calendar_session", "v.venue_id", "CAST(o.trade_date AS VARCHAR)", _sql("day")
+        )
+        calendar_output = (
+            work
+            / f"payload/tradability_state/dwd_trading_calendar/market_date={market_date}/part-00000.parquet"
+        )
+        _copy(
+            connection,
+            f"""SELECT o.source::VARCHAR AS record_source,
+            concat({_sql(trading_calendar_path.name)},'#exchange=',o.exchange,
+                   '&trade_date=',CAST(o.trade_date AS VARCHAR),'&session=day') AS source_record_id,
+            {_sql(trading_calendar_artifact.source_revision)}::VARCHAR AS source_revision,
+            {_sql(trading_calendar_artifact.sha256)}::VARCHAR AS source_artifact_sha256,
+            CAST(o.built_at AS TIMESTAMPTZ) AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to,
+            o.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS observation_start,
+            (o.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai')+INTERVAL 1 DAY AS observation_end,
+            {calendar_session_id} AS calendar_session_id, v.venue_id, o.trade_date,
+            'day'::VARCHAR AS session_type, CAST(o.is_open AS BOOLEAN) AS is_open,
+            CASE WHEN o.is_open=1 THEN (o.trade_date+TIME '09:30:00') AT TIME ZONE 'Asia/Shanghai' END AS open_at,
+            CASE WHEN o.is_open=1 THEN (o.trade_date+TIME '15:00:00') AT TIME ZONE 'Asia/Shanghai' END AS close_at,
+            CASE WHEN o.is_open=1 THEN NULL ELSE 'SCHEDULED_CLOSED' END::VARCHAR AS calendar_reason
+            FROM read_parquet({_sql(str(trading_calendar_path))}) o JOIN base_venue v
+              ON v.mic_code=CASE o.exchange WHEN 'SSE' THEN 'XSHG'
+                 WHEN 'SZSE' THEN 'XSHE' WHEN 'BSE' THEN 'XBSE' END
+            WHERE o.trade_date={_sql(market_date.isoformat())}::DATE""",
+            calendar_output,
+        )
+        connection.execute(
+            f"CREATE VIEW daily_calendar AS SELECT * FROM read_parquet({_sql(str(calendar_output))})"
         )
 
         bar_parts = []
@@ -324,7 +364,7 @@ def build_daily_domain_increment(
                 FROM ({source}) o JOIN base_listing l ON o.stock_code=l.listing_code
                 AND CAST(o.market_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
                 AND (l.effective_to IS NULL OR CAST(o.market_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
-                JOIN base_calendar c ON c.venue_id=l.venue_id AND c.trade_date=CAST(o.market_date AS DATE)
+                JOIN daily_calendar c ON c.venue_id=l.venue_id AND c.trade_date=CAST(o.market_date AS DATE)
                 AND c.session_type='day'"""
             )
         bar_output = (
@@ -391,7 +431,7 @@ def build_daily_domain_increment(
             NULL::DECIMAL(38,10) upper_price, NULL::DECIMAL(38,10) lower_price,
             {_sql(catalog["catalog_digest"])}::VARCHAR input_revision_digest
             FROM ({status_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
-            JOIN base_calendar c ON c.venue_id=l.venue_id AND c.trade_date=CAST(o.market_date AS DATE)
+            JOIN daily_calendar c ON c.venue_id=l.venue_id AND c.trade_date=CAST(o.market_date AS DATE)
             AND c.session_type='day'""",
             status_output,
         )
@@ -442,6 +482,7 @@ def build_daily_domain_increment(
         )
 
         outputs = {
+            "dwd_trading_calendar": calendar_output,
             "dwd_security_bar": bar_output,
             "dwd_security_valuation": valuation_output,
             "dwd_index_bar": index_output,
@@ -470,6 +511,10 @@ def build_daily_domain_increment(
                 }
             )
         expected = {
+            "dwd_trading_calendar": connection.execute(
+                "SELECT count(*) FROM read_parquet(?) WHERE trade_date=cast(? AS DATE)",
+                [str(trading_calendar_path), market_date.isoformat()],
+            ).fetchone()[0],
             "dwd_security_bar": connection.execute(
                 "SELECT (SELECT count(*) FROM read_parquet(?))+(SELECT count(*) FROM read_parquet(?))+(SELECT count(*) FROM read_parquet(?))",
                 [str(daily_path), str(minute_path), str(five_path)],

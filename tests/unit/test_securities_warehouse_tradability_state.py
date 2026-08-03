@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,8 +10,10 @@ import duckdb
 import pyarrow as pa
 
 from quanthus.pipelines.securities_warehouse.tradability_state import (
+    _audit_outputs,
     _configure_connection,
     _daily_status_relation_query,
+    _expected_tradability_rows,
     _price_regime_internal_query,
     _schemas,
     _security_status_query,
@@ -41,7 +44,81 @@ class TradabilityStateQueryTests(unittest.TestCase):
                    current_setting('temp_directory')
             """
         ).fetchone()
-        self.assertEqual(settings, (1, False, "2.3 GiB", str(scratch)))
+        self.assertEqual(settings, (1, False, "1.4 GiB", str(scratch)))
+
+    def test_expected_rows_uses_only_listing_calendar_cardinality(self) -> None:
+        self.connection.execute(
+            """
+            CREATE TABLE ref_listing AS SELECT
+              'listing-1' listing_id,'venue-1' venue_id,
+              TIMESTAMPTZ '2026-01-01T00:00:00Z' effective_from,
+              TIMESTAMPTZ '2026-01-03T00:00:00Z' effective_to
+            """
+        )
+        self.connection.execute(
+            """
+            CREATE TABLE ref_calendar AS SELECT * FROM (VALUES
+              ('venue-1','REGULAR_DAY',true,TIMESTAMPTZ '2026-01-02T01:30:00Z'),
+              ('venue-1','REGULAR_DAY',true,TIMESTAMPTZ '2026-01-03T01:30:00Z'),
+              ('venue-1','REGULAR_DAY',false,TIMESTAMPTZ '2026-01-02T01:30:00Z')
+            ) t(venue_id,session_type,is_open,open_at)
+            """
+        )
+        self.assertEqual(_expected_tradability_rows(self.connection), 1)
+
+    def test_output_audit_is_partition_bounded_and_never_rebuilds_state_base(self) -> None:
+        class Result:
+            def __init__(self, *, rows: list[tuple[object, ...]] | None = None) -> None:
+                self.rows = rows or []
+
+            def fetchone(self) -> tuple[int]:
+                return (0,)
+
+            def fetchall(self) -> list[tuple[object, ...]]:
+                return self.rows
+
+        class AuditConnection:
+            def __init__(self) -> None:
+                self.queries: list[str] = []
+
+            def execute(self, query: str) -> Result:
+                self.queries.append(query)
+                if "state_base" in query:
+                    raise AssertionError("audit must not rebuild state_base")
+                if "gap_reason,count(*)" in query:
+                    return Result(rows=[("NO_SOURCE_OBSERVATION", 2)])
+                return Result()
+
+        tables = (
+            "dwd_security_status_interval",
+            "dwd_listing_status_interval",
+            "dwd_price_limit_regime",
+            "dwd_tradability_state",
+            "dwd_observation_gap",
+        )
+        with tempfile.TemporaryDirectory() as raw_root:
+            work = Path(raw_root)
+            states = {}
+            for table in tables:
+                path = work / f"{table}.parquet"
+                path.touch()
+                states[table] = [
+                    {
+                        "path": path.relative_to(work).as_posix(),
+                        "row_count": 7 if table == "dwd_tradability_state" else 2,
+                    }
+                ]
+            connection = AuditConnection()
+            audit = _audit_outputs(
+                connection,
+                work,
+                states,
+                expected_state_rows=7,
+            )
+        self.assertEqual(audit["expected_tradability_rows"], 7)
+        self.assertEqual(audit["actual_tradability_rows"], 7)
+        self.assertEqual(audit["gap_reason_counts"], {"NO_SOURCE_OBSERVATION": 2})
+        self.assertEqual(len(connection.queries), 11)
 
     def _register(self, name: str, rows: list[dict[str, object]]) -> None:
         self.connection.register(name, pa.Table.from_pylist(rows))
@@ -182,7 +259,11 @@ class TradabilityStateQueryTests(unittest.TestCase):
             )
             for row in rows
         }
-        base_row = next(value for value in by_id.values() if value["source_stock_code"] is None)
+        base_row = next(
+            value
+            for value in by_id.values()
+            if value["source_stock_code"] is None and value["priority"] == 60
+        )
         ipo_row = next(value for value in by_id.values() if value["source_stock_code"] == "300001")
         self.assertIsNone(base_row["listing_id"])
         self.assertEqual(base_row["board_code"], "ChiNext")
@@ -344,3 +425,4 @@ class TradabilityStateQueryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+    _expected_tradability_rows,

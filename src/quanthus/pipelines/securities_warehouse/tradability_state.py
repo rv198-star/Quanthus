@@ -1194,7 +1194,28 @@ def _validate_source_resolution(connection: Any) -> dict[str, int]:
     return result
 
 
-def _audit_outputs(connection: Any, work: Path) -> dict[str, Any]:
+def _expected_tradability_rows(connection: Any) -> int:
+    return int(
+        connection.execute(
+            """
+            SELECT count(*)
+            FROM ref_listing l
+            JOIN ref_calendar c ON c.venue_id=l.venue_id
+             AND c.session_type='REGULAR_DAY' AND c.is_open
+             AND c.open_at >= l.effective_from
+             AND (l.effective_to IS NULL OR c.open_at < l.effective_to)
+            """
+        ).fetchone()[0]
+    )
+
+
+def _audit_outputs(
+    connection: Any,
+    work: Path,
+    states: Mapping[str, Sequence[Mapping[str, Any]]],
+    *,
+    expected_state_rows: int,
+) -> dict[str, Any]:
     keys = {
         "dwd_security_status_interval": ("security_id,status_type,effective_from,knowledge_from"),
         "dwd_listing_status_interval": ("listing_id,status_type,effective_from,knowledge_from"),
@@ -1209,37 +1230,47 @@ def _audit_outputs(connection: Any, work: Path) -> dict[str, Any]:
     duplicates: dict[str, int] = {}
     null_keys: dict[str, int] = {}
     for table, key in keys.items():
-        source = _read_output_sql(work, table)
-        duplicates[table] = int(
-            connection.execute(
-                f"SELECT count(*) FROM (SELECT {key},count(*) n FROM {source} GROUP BY {key} HAVING n>1)"
-            ).fetchone()[0]
-        )
+        duplicates[table] = 0
+        null_keys[table] = 0
         columns = key.split(",")
-        null_keys[table] = int(
-            connection.execute(
-                f"SELECT count(*) FROM {source} WHERE "
-                + " OR ".join(f"{column} IS NULL" for column in columns)
-            ).fetchone()[0]
-        )
+        for partition in states[table]:
+            try:
+                path = _safe_file(work, partition.get("path"))
+            except TradingCalendarBuildError as exc:
+                raise TradabilityStateBuildError(str(exc)) from exc
+            source = _read_parquet_sql([path])
+            duplicates[table] += int(
+                connection.execute(
+                    f"SELECT count(*) FROM (SELECT {key},count(*) n FROM {source} GROUP BY {key} HAVING n>1)"
+                ).fetchone()[0]
+            )
+            null_keys[table] += int(
+                connection.execute(
+                    f"SELECT count(*) FROM {source} WHERE "
+                    + " OR ".join(f"{column} IS NULL" for column in columns)
+                ).fetchone()[0]
+            )
     if any(duplicates.values()) or any(null_keys.values()):
         raise TradabilityStateBuildError(
             f"output key audit failed: duplicates={duplicates}, nulls={null_keys}"
         )
-    state_rows = int(
-        connection.execute(
-            f"SELECT count(*) FROM {_read_output_sql(work, 'dwd_tradability_state')}"
-        ).fetchone()[0]
+    state_rows = sum(
+        int(partition["row_count"]) for partition in states["dwd_tradability_state"]
     )
-    expected_state_rows = int(connection.execute("SELECT count(*) FROM state_base").fetchone()[0])
     if state_rows != expected_state_rows:
         raise TradabilityStateBuildError("tradability state did not cover every listing session")
-    gap_reason_counts = {
-        str(reason): int(count)
+    gap_reason_counts: dict[str, int] = {}
+    for partition in states["dwd_observation_gap"]:
+        try:
+            path = _safe_file(work, partition.get("path"))
+        except TradingCalendarBuildError as exc:
+            raise TradabilityStateBuildError(str(exc)) from exc
+        source = _read_parquet_sql([path])
         for reason, count in connection.execute(
-            f"SELECT gap_reason,count(*) FROM {_read_output_sql(work, 'dwd_observation_gap')} GROUP BY gap_reason"
-        ).fetchall()
-    }
+            f"SELECT gap_reason,count(*) FROM {source} GROUP BY gap_reason"
+        ).fetchall():
+            name = str(reason)
+            gap_reason_counts[name] = gap_reason_counts.get(name, 0) + int(count)
     if any(not reason or "UNKNOWN" in reason for reason in gap_reason_counts):
         raise TradabilityStateBuildError("observation gap has an unknown reason")
     return {
@@ -1268,7 +1299,7 @@ def _configure_connection(connection: Any, scratch: Path) -> None:
     connection.execute("SET threads=1")
     connection.execute("SET preserve_insertion_order=false")
     connection.execute("SET enable_progress_bar=false")
-    connection.execute("SET memory_limit='2500MB'")
+    connection.execute("SET memory_limit='1600MB'")
     connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
 
 
@@ -1548,6 +1579,22 @@ def _build_locked(
             market_root=market.root,
             cutoff=cutoff.isoformat(),
         )
+        raw_expectations = checkpoint.get("audit_expectations")
+        if raw_expectations is None:
+            expected_state_rows = _expected_tradability_rows(connection)
+            checkpoint["audit_expectations"] = {
+                "tradability_rows": expected_state_rows,
+            }
+            _write_json_atomic(work / "checkpoint.json", checkpoint)
+        else:
+            expectations = _mapping(raw_expectations, "audit expectations")
+            expected_state_rows = expectations.get("tradability_rows")
+            if (
+                not isinstance(expected_state_rows, int)
+                or isinstance(expected_state_rows, bool)
+                or expected_state_rows < 0
+            ):
+                raise TradabilityStateBuildError("checkpoint audit expectation is invalid")
         connection.execute(
             "CREATE TEMP VIEW daily_status_resolved AS " + _daily_status_relation_query()
         )
@@ -1673,7 +1720,12 @@ def _build_locked(
             )
             states["dwd_observation_gap"] = partitions
             _write_checkpoint(work, checkpoint, "dwd_observation_gap", partitions)
-        audit = _audit_outputs(connection, work)
+        audit = _audit_outputs(
+            connection,
+            work,
+            states,
+            expected_state_rows=expected_state_rows,
+        )
         reconciliation = {
             "source_resolution": source_resolution,
             "daily_status_overlap_conflicts": overlap_conflicts,

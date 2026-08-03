@@ -749,7 +749,7 @@ class FinancialEnvelopeTests(unittest.TestCase):
             company_resolver=resolver,
             knowledge_cutoff=cutoff,
         )
-        self.assertEqual(len(before_listing.reports), 0)
+        self.assertEqual(len(before_listing.reports), 1)
         self.assertEqual(
             before_listing.quality_exceptions[0]["code"],
             "BEFORE_FIRST_LISTED_COMPANY_IDENTITY",
@@ -931,8 +931,8 @@ class FinancialEnvelopeTests(unittest.TestCase):
             self.assertEqual(
                 audit.report["candidate_size_calibration"],
                 {
-                    "dwd_financial_report_rows": 4,
-                    "dwd_financial_fact_rows": 39,
+                    "dwd_financial_report_rows": 5,
+                    "dwd_financial_fact_rows": 44,
                     "dwd_financial_concept_count": 36,
                     "quality_exception_rows": 1,
                 },
@@ -998,7 +998,8 @@ class FinancialEnvelopeTests(unittest.TestCase):
         outside, reason = resolver.resolve_for_report(
             "001872", period_end=datetime(1990, 12, 31, tzinfo=timezone.utc).date()
         )
-        self.assertIsNone(outside)
+        self.assertIsNotNone(outside)
+        self.assertEqual(outside.company_id, "company-1")
         self.assertEqual(reason, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY")
 
     def test_company_resolver_classifies_report_between_listing_intervals(self) -> None:

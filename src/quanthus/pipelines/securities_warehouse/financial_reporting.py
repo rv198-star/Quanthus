@@ -1064,7 +1064,11 @@ class FinancialCompanyResolver:
         if active_company:
             return sorted(active_company, key=lambda item: item.security_id)[0], None
         if coordinate < min(identity.effective_from for identity in company_identities):
-            return None, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY"
+            resolved = sorted(
+                company_identities,
+                key=lambda item: (item.effective_from, item.security_id),
+            )[0]
+            return resolved, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY"
         prior = [
             identity for identity in company_identities if identity.effective_from <= coordinate
         ]
@@ -2031,9 +2035,10 @@ def _candidate_identity(
     run_id: str,
 ) -> tuple[
     dict[str, Any],
-    tuple[FinancialStatementSource, FinancialStatementSource],
+    FinancialReportingSourceInventory,
     FinancialCompanyResolver,
     dict[str, Any],
+    datetime,
 ]:
     """Verify all governed inputs before any financial candidate write."""
 
@@ -2082,19 +2087,29 @@ def _candidate_identity(
         _plan_mapping(value, "source ledger record")
         for value in _plan_sequence(ledger.get("records"), "source ledger records")
     ]
-    sources = select_financial_statement_sources(records, ods_package)
+    inventory = select_financial_reporting_sources(records, ods_package)
     audit, audit_sha = _verify_financial_source_audit(source_audit_path)
-    identity = {
-        "schema_version": 1,
+    expected_bindings = {
         "run_id": run_id,
         "input_plan_digest": input_plan_digest,
         "model_sha256": model_sha,
-        "source_audit_sha256": audit_sha,
         "listed_company_manifest_sha256": upstream.manifest_sha256,
         "listed_company_semantic_digest": upstream.semantic_digest,
-        "source_sha256": {source.label: source.source_sha256 for source in sources},
+        "source_sha256": {
+            source.source_id: source.source_sha256 for source in inventory.sources
+        },
     }
-    return identity, sources, resolver, audit
+    if any(audit.get(field) != value for field, value in expected_bindings.items()):
+        raise FinancialReportingBuildError("financial combined audit binding differs")
+    identity = {
+        "schema_version": 1,
+        **expected_bindings,
+        "source_audit_sha256": audit_sha,
+    }
+    cutoff = _utc_timestamp(
+        semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff"
+    )
+    return identity, inventory, resolver, audit, cutoff
 
 
 def audit_financial_native_source_package(
@@ -2224,6 +2239,91 @@ def _batch_rows(
         row_counts["dwd_financial_concept"] += len(expanded.concepts)
         row_counts["dwd_financial_fact"] += len(expanded.facts)
     return rows_by_year, concepts, row_counts
+
+
+def _reporting_batch_rows(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    source: FinancialReportingSource,
+    resolver: FinancialCompanyResolver,
+    knowledge_cutoff: datetime,
+) -> tuple[
+    dict[str, dict[int, list[dict[str, Any]]]],
+    list[dict[str, Any]],
+    dict[str, int],
+    dict[str, int],
+]:
+    """Materialize one checkpoint batch from any of the six governed sources."""
+
+    rows_by_year: dict[str, dict[int, list[dict[str, Any]]]] = {
+        table: defaultdict(list) for table in _PARTITIONED_TABLES
+    }
+    concepts: list[dict[str, Any]] = []
+    row_counts = {table: 0 for table in _OWNED_TABLES}
+    exception_counts: Counter[str] = Counter()
+    statement_source = (
+        FinancialStatementSource(
+            label=source.ledger_identity,
+            path=source.path,
+            relative_path=source.relative_path,
+            source_sha256=source.source_sha256,
+            source_revision=source.source_revision,
+            precedence=source.precedence,
+        )
+        if source.source_kind == "statement_envelope"
+        else None
+    )
+    for row in rows:
+        if statement_source is not None:
+            expanded = expand_financial_envelope(
+                row, source=statement_source, company_resolver=resolver
+            )
+        else:
+            expanded = expand_financial_native_row(
+                row,
+                source=source,
+                company_resolver=resolver,
+                knowledge_cutoff=knowledge_cutoff,
+            )
+        for report in expanded.reports:
+            rows_by_year["dwd_financial_report"][report["period_end"].year].append(
+                report
+            )
+        for fact in expanded.facts:
+            rows_by_year["dwd_financial_fact"][fact["period_end"].year].append(fact)
+        concepts.extend(expanded.concepts)
+        row_counts["dwd_financial_report"] += len(expanded.reports)
+        row_counts["dwd_financial_concept"] += len(expanded.concepts)
+        row_counts["dwd_financial_fact"] += len(expanded.facts)
+        exception_counts.update(
+            str(exception["code"]) for exception in expanded.quality_exceptions
+        )
+    return rows_by_year, concepts, row_counts, dict(sorted(exception_counts.items()))
+
+
+def _iter_reporting_source_batches(
+    source: FinancialReportingSource, *, statement_batch_size: int, native_batch_size: int
+) -> Iterator[list[dict[str, Any]]]:
+    if source.source_kind == "statement_envelope":
+        try:
+            import pyarrow.parquet as pq
+        except ModuleNotFoundError as exc:
+            raise FinancialReportingBuildError(
+                "pyarrow is required for financial DWD rows"
+            ) from exc
+        for batch in pq.ParquetFile(source.path).iter_batches(
+            batch_size=statement_batch_size
+        ):
+            yield [dict(row) for row in batch.to_pylist()]
+        return
+    batch: list[dict[str, Any]] = []
+    for row in _iter_financial_native_rows(source, batch_size=native_batch_size):
+        batch.append(row)
+        if len(batch) == native_batch_size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
 
 
 def _write_batch(
@@ -2553,10 +2653,11 @@ def _build_financial_reporting_locked(
     output: Path,
     run_id: str,
     source_batch_size: int,
+    native_batch_size: int,
 ) -> FinancialReportingBuildResult:
-    if source_batch_size < 1:
-        raise FinancialReportingBuildError("financial source batch size must be positive")
-    identity, sources, resolver, source_audit = _candidate_identity(
+    if source_batch_size < 1 or native_batch_size < 1:
+        raise FinancialReportingBuildError("financial source batch sizes must be positive")
+    identity, inventory, resolver, source_audit, knowledge_cutoff = _candidate_identity(
         ods_package=ods_package,
         input_plan=input_plan,
         model_path=model_path,
@@ -2570,43 +2671,106 @@ def _build_financial_reporting_locked(
     if work.exists() and (work.is_symlink() or not work.is_dir()):
         raise FinancialReportingBuildError("financial work directory must be physical")
     work.mkdir(parents=True, exist_ok=True)
-    checkpoint_identity = {**identity, "source_batch_size": source_batch_size}
+    checkpoint_identity = {
+        **identity,
+        "source_batch_size": source_batch_size,
+        "native_batch_size": native_batch_size,
+    }
     checkpoint = _load_or_initialize_checkpoint(work, checkpoint_identity)
     schemas = financial_reporting_schemas()
     parent_payloads: dict[tuple[str, str], str] = {}
     hotfix_keys: set[tuple[str, str]] = set()
+    parent_quarterly: dict[tuple[str, date], str] = {}
+    hotfix_quarterly_keys: set[tuple[str, date]] = set()
     totals = {table: 0 for table in _OWNED_TABLES}
-    selected_envelopes = 0
-    try:
-        import pyarrow.parquet as pq
-    except ModuleNotFoundError as exc:
-        raise FinancialReportingBuildError("pyarrow is required for financial DWD rows") from exc
-    for source_index, source in enumerate(sources):
-        source_batches = pq.ParquetFile(source.path).iter_batches(batch_size=source_batch_size)
-        for batch_index, batch in enumerate(source_batches):
-            raw_rows = [dict(row) for row in batch.to_pylist()]
+    selected_source_rows = 0
+    quality_exceptions: Counter[str] = Counter()
+
+    def quarterly_digest(row: Mapping[str, Any]) -> str:
+        payload = {
+            field: row.get(field)
+            for field in (
+                "stock_code",
+                "report_date",
+                "publish_date",
+                "update_time",
+                *_SINA_QUARTERLY_FIELDS,
+                "currency",
+                "is_audit",
+                "audit_opinion",
+                "source",
+                "source_revision",
+            )
+        }
+        return hashlib.sha256(
+            json.dumps(payload, ensure_ascii=True, sort_keys=True, default=str).encode(
+                "utf-8"
+            )
+        ).hexdigest()
+
+    for source_index, source in enumerate(inventory.sources):
+        source_batches = _iter_reporting_source_batches(
+            source,
+            statement_batch_size=source_batch_size,
+            native_batch_size=native_batch_size,
+        )
+        for batch_index, raw_rows in enumerate(source_batches):
             selected_rows: list[dict[str, Any]] = []
             for row in raw_rows:
-                key = _row_identity(row)
-                payload_digest = _text(row.get("raw_payload_sha256"), "raw_payload_sha256")
-                if source.precedence == "parent":
-                    if key in parent_payloads:
+                if source.source_kind == "statement_envelope":
+                    key = _row_identity(row)
+                    payload_digest = _text(
+                        row.get("raw_payload_sha256"), "raw_payload_sha256"
+                    )
+                    if source.precedence == "parent":
+                        if key in parent_payloads:
+                            raise FinancialReportingBuildError(
+                                "duplicate parent financial statement key"
+                            )
+                        parent_payloads[key] = payload_digest
+                        selected_rows.append(row)
+                        continue
+                    if key in hotfix_keys:
                         raise FinancialReportingBuildError(
-                            "duplicate parent financial statement key"
+                            "duplicate Hotfix financial statement key"
                         )
-                    parent_payloads[key] = payload_digest
+                    hotfix_keys.add(key)
+                    parent_digest = parent_payloads.get(key)
+                    if parent_digest is not None:
+                        if parent_digest != payload_digest:
+                            raise FinancialReportingBuildError(
+                                "financial statement parent/Hotfix overlap has "
+                                "different raw payload"
+                            )
+                        continue
                     selected_rows.append(row)
                     continue
-                if key in hotfix_keys:
-                    raise FinancialReportingBuildError("duplicate Hotfix financial statement key")
-                hotfix_keys.add(key)
-                parent_digest = parent_payloads.get(key)
-                if parent_digest is not None:
-                    if parent_digest != payload_digest:
-                        raise FinancialReportingBuildError(
-                            "financial statement parent/Hotfix overlap has different raw payload"
-                        )
-                    continue
+                if source.source_id in {
+                    "weekly_full_financial_quarterly",
+                    "hotfix_financial_quarterly",
+                }:
+                    stock_code = _provider_text(row.get("stock_code"), "")
+                    key = (stock_code, _native_report_date(row.get("report_date")))
+                    digest = quarterly_digest(row)
+                    if source.precedence == "parent":
+                        if key in parent_quarterly:
+                            raise FinancialReportingBuildError(
+                                "duplicate parent financial quarterly key"
+                            )
+                        parent_quarterly[key] = digest
+                    else:
+                        if key in hotfix_quarterly_keys:
+                            raise FinancialReportingBuildError(
+                                "duplicate Hotfix financial quarterly key"
+                            )
+                        hotfix_quarterly_keys.add(key)
+                        parent_digest = parent_quarterly.get(key)
+                        if parent_digest is not None and parent_digest != digest:
+                            raise FinancialReportingBuildError(
+                                "financial quarterly parent/Hotfix overlap differs"
+                            )
+                        if parent_digest is not None:
+                            continue
                 selected_rows.append(row)
             batch_id = f"{source_index:02d}-{batch_index:06d}"
             completed = checkpoint["completed_batches"].get(batch_id)
@@ -2614,16 +2778,23 @@ def _build_financial_reporting_locked(
                 if not isinstance(completed, Mapping):
                     raise FinancialReportingBuildError("financial checkpoint batch is invalid")
                 counts = completed.get("row_counts")
-                if not isinstance(counts, Mapping):
+                exceptions = completed.get("quality_exceptions", {})
+                if not isinstance(counts, Mapping) or not isinstance(exceptions, Mapping):
                     raise FinancialReportingBuildError(
-                        "financial checkpoint batch counts are invalid"
+                        "financial checkpoint batch accounting is invalid"
                     )
                 for table in _OWNED_TABLES:
                     totals[table] += int(counts.get(table, 0))
-                selected_envelopes += int(completed.get("selected_envelopes", 0))
+                quality_exceptions.update(
+                    {str(key): int(value) for key, value in exceptions.items()}
+                )
+                selected_source_rows += int(completed.get("selected_source_rows", 0))
                 continue
-            rows_by_year, concepts, counts = _batch_rows(
-                selected_rows, source=source, resolver=resolver
+            rows_by_year, concepts, counts, exceptions = _reporting_batch_rows(
+                selected_rows,
+                source=source,
+                resolver=resolver,
+                knowledge_cutoff=knowledge_cutoff,
             )
             files = _write_batch(
                 work=work,
@@ -2633,23 +2804,23 @@ def _build_financial_reporting_locked(
                 schemas=schemas,
             )
             checkpoint["completed_batches"][batch_id] = {
-                "source": source.label,
-                "selected_envelopes": len(selected_rows),
+                "source": source.source_id,
+                "selected_source_rows": len(selected_rows),
                 "row_counts": counts,
+                "quality_exceptions": exceptions,
                 "files": files,
             }
             _write_json_atomic(work / "checkpoint.json", checkpoint)
             for table in _OWNED_TABLES:
                 totals[table] += counts[table]
-            selected_envelopes += len(selected_rows)
+            quality_exceptions.update(exceptions)
+            selected_source_rows += len(selected_rows)
     calibration = _plan_mapping(
         source_audit.get("candidate_size_calibration"), "financial source audit calibration"
     )
-    overlay = _plan_mapping(source_audit.get("overlay"), "financial source audit overlay")
     if (
-        selected_envelopes != overlay.get("selected_envelope_rows")
-        or totals["dwd_financial_report"] != calibration.get("dwd_financial_report_rows")
-        or totals["dwd_financial_fact"] != calibration.get("dwd_financial_fact_upper_bound")
+        totals["dwd_financial_report"] != calibration.get("dwd_financial_report_rows")
+        or totals["dwd_financial_fact"] != calibration.get("dwd_financial_fact_rows")
     ):
         raise FinancialReportingBuildError("financial build does not reconcile to source audit")
     concept_count = _finalize_concepts(work, checkpoint, schemas)
@@ -2661,9 +2832,10 @@ def _build_financial_reporting_locked(
     )
     if row_counts["dwd_financial_concept"] != concept_count:
         raise FinancialReportingBuildError("financial concept audit count differs from output")
-    reconciliation["selected_envelopes"] = selected_envelopes
+    reconciliation["selected_source_rows"] = selected_source_rows
     reconciliation["source_audit_sha256"] = identity["source_audit_sha256"]
     reconciliation["concept_staging_rows"] = totals["dwd_financial_concept"]
+    reconciliation["quality_exceptions"] = dict(sorted(quality_exceptions.items()))
     _write_json_atomic(work / "reconciliation/source-row-reconciliation.json", reconciliation)
     audit_copy = work / "audits/financial-source-audit.json"
     audit_copy.parent.mkdir(parents=True, exist_ok=True)
@@ -2691,7 +2863,7 @@ def _build_financial_reporting_locked(
         "semantic_digest": semantic_digest,
         "row_counts": row_counts,
         "table_digests": table_digests,
-        "quality_exceptions": [],
+        "quality_exceptions": dict(sorted(quality_exceptions.items())),
         "resource_policy": "partitioned_write_and_duckdb_external_audit_v1",
     }
     _write_json_atomic(work / "receipts/financial-reporting-build.json", receipt)
@@ -2742,6 +2914,7 @@ def build_financial_reporting(
     output: Path,
     run_id: str,
     source_batch_size: int = 32,
+    native_batch_size: int = 4096,
 ) -> FinancialReportingBuildResult:
     """Build a checkpointed Issue #61 candidate without changing publication state."""
 
@@ -2774,6 +2947,7 @@ def build_financial_reporting(
             output=normalized,
             run_id=run_id,
             source_batch_size=source_batch_size,
+            native_batch_size=native_batch_size,
         )
     finally:
         if locked:

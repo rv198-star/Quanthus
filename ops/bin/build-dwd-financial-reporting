@@ -42,6 +42,7 @@ def main() -> int:
     build_parser.add_argument("--source-audit", type=Path, required=True)
     build_parser.add_argument("--output", type=Path, required=True)
     build_parser.add_argument("--source-batch-size", type=int, default=32)
+    build_parser.add_argument("--native-batch-size", type=int, default=4096)
     args = parser.parse_args()
     try:
         if args.command == "combine-audits":
@@ -96,6 +97,7 @@ def main() -> int:
             output=args.output,
             run_id=args.run_id,
             source_batch_size=args.source_batch_size,
+            native_batch_size=args.native_batch_size,
         )
     except (FinancialReportingBuildError, OSError) as exc:
         print(f"financial-reporting DWD build failed: {exc}", file=sys.stderr)

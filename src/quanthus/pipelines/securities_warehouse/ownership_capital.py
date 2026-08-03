@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 import sqlite3
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +64,174 @@ class _Source:
 
 
 _F10_CATEGORIES = {"股本结构", "股东研究"}
+_F10_PARSER_VERSION = "quanthus-tdx-f10-table-v1"
+
+
+def _table_cells(line: str) -> list[str]:
+    if "｜" not in line:
+        return []
+    return [cell.strip() for cell in line.strip().strip("｜").split("｜")]
+
+
+def _normalized_number(raw: str, *, percentage: bool = False) -> Decimal | None:
+    text = raw.strip().replace(",", "")
+    if not text or text == "-":
+        return None
+    matched = re.search(r"[-+]?\d+(?:\.\d+)?", text)
+    if matched is None:
+        return None
+    try:
+        value = Decimal(matched.group(0))
+    except InvalidOperation as exc:
+        raise OwnershipCapitalBuildError(f"F10 number is invalid: {raw}") from exc
+    if not percentage:
+        if "亿" in text:
+            value *= Decimal("100000000")
+        elif "万" in text:
+            value *= Decimal("10000")
+    return value
+
+
+def parse_f10_capital_structure(content: str) -> list[dict[str, Any]]:
+    """Expand the governed F10 capital matrix into dated atomic observations."""
+
+    in_section = False
+    dates: list[date] = []
+    rows: list[dict[str, Any]] = []
+    for line in content.splitlines():
+        if "【1.股本结构】" in line:
+            in_section = True
+            continue
+        if in_section and re.match(r"【[2-9]", line.strip()):
+            break
+        if not in_section:
+            continue
+        cells = _table_cells(line)
+        if not cells:
+            continue
+        if cells[0].startswith("单位"):
+            dates = []
+            for value in cells[1:]:
+                try:
+                    dates.append(date.fromisoformat(value))
+                except ValueError as exc:
+                    raise OwnershipCapitalBuildError(
+                        f"F10 capital header date is invalid: {value}"
+                    ) from exc
+            continue
+        if not dates or len(cells) != len(dates) + 1:
+            continue
+        capital_type = re.sub(r"\s+", "", cells[0])
+        if not capital_type:
+            continue
+        for observed, raw_value in zip(dates, cells[1:], strict=True):
+            normalized = _normalized_number(raw_value)
+            if normalized is None:
+                continue
+            unit = "亿股" if "亿" in raw_value else "万股" if "万" in raw_value else "股"
+            rows.append(
+                {
+                    "observation_date": observed,
+                    "capital_type": capital_type,
+                    "share_quantity": normalized,
+                    "unit_code": "SHARE",
+                    "raw_value": raw_value,
+                    "raw_unit": unit,
+                    "parser_version": _F10_PARSER_VERSION,
+                }
+            )
+    return rows
+
+
+def parse_f10_shareholding_tables(content: str) -> list[dict[str, Any]]:
+    """Parse dated top-holder tables, including holder-name continuation rows."""
+
+    header = re.compile(r"截至日期：(\d{4}-\d{2}-\d{2})\s+十大(流通)?股东情况")
+    current_date: date | None = None
+    table_kind: str | None = None
+    in_table = False
+    pending: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
+
+    def flush() -> None:
+        nonlocal pending
+        for rank, row in enumerate(pending, start=1):
+            row["holder_rank"] = rank
+            rows.append(row)
+        pending = []
+
+    for line in content.splitlines():
+        matched = header.search(line)
+        if matched:
+            flush()
+            current_date = date.fromisoformat(matched.group(1))
+            table_kind = "TOP_FLOATING_SHAREHOLDERS" if matched.group(2) else "TOP_SHAREHOLDERS"
+            in_table = False
+            continue
+        cells = _table_cells(line)
+        if current_date is None or table_kind is None:
+            continue
+        if cells and cells[0] == "股东名称":
+            in_table = True
+            continue
+        if in_table and line.strip().startswith("└"):
+            flush()
+            in_table = False
+            current_date = None
+            table_kind = None
+            continue
+        if not in_table or not cells:
+            continue
+        if len(cells) == 1 and cells[0] and pending:
+            pending[-1]["shareholder_source_name"] += cells[0]
+            pending[-1]["holder_match_key"] = _stable_holder_key(
+                pending[-1]["shareholder_source_name"]
+            )
+            continue
+        if len(cells) < 4:
+            continue
+        holder_name, raw_quantity, raw_percentage, classification = cells[:4]
+        if holder_name and not raw_quantity and pending:
+            pending[-1]["shareholder_source_name"] += holder_name
+            pending[-1]["holder_match_key"] = _stable_holder_key(
+                pending[-1]["shareholder_source_name"]
+            )
+            continue
+        quantity = _normalized_number(raw_quantity)
+        percentage = _normalized_number(raw_percentage, percentage=True)
+        if not holder_name or quantity is None:
+            continue
+        pending.append(
+            {
+                "observation_date": current_date,
+                "table_kind": table_kind,
+                "shareholder_source_name": holder_name,
+                "holder_match_key": _stable_holder_key(holder_name),
+                "holder_category": (
+                    classification or None if table_kind == "TOP_FLOATING_SHAREHOLDERS" else None
+                ),
+                "share_nature": (
+                    classification or None if table_kind == "TOP_SHAREHOLDERS" else None
+                ),
+                "holding_quantity": quantity,
+                "holding_percentage": percentage,
+                "holding_type": table_kind,
+                "raw_holding_quantity": raw_quantity,
+                "holding_quantity_unit": (
+                    "亿股" if "亿" in raw_quantity else "万股" if "万" in raw_quantity else "股"
+                ),
+                "raw_holding_percentage": raw_percentage,
+                "holding_percentage_unit": "PERCENT" if percentage is not None else None,
+                "parser_version": _F10_PARSER_VERSION,
+            }
+        )
+    flush()
+    return rows
+
+
+def _stable_holder_key(name: str) -> str:
+    normalized = re.sub(r"\s+", "", name).casefold()
+    return "holder_match_" + hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:32]
 
 
 def _single_record(
@@ -115,9 +287,7 @@ def _file_source(
     return _Source(source_id, path, relative, sha256, rows)
 
 
-def _select_sources(
-    records: Sequence[Mapping[str, Any]], ods_package: Path
-) -> dict[str, _Source]:
+def _select_sources(records: Sequence[Mapping[str, Any]], ods_package: Path) -> dict[str, _Source]:
     sources = {
         "shareholder_count": _file_source(
             records,
@@ -235,9 +405,7 @@ def _audit_holder_changes(source: _Source, resolver: Any) -> dict[str, Any]:
     quality: Counter[str] = Counter()
     rows = 0
     try:
-        columns = {
-            str(row[1]) for row in connection.execute("PRAGMA table_info(holder_changes)")
-        }
+        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(holder_changes)")}
         if not required.issubset(columns):
             raise OwnershipCapitalBuildError("holder_changes schema is incomplete")
         duplicate = connection.execute(
@@ -271,9 +439,7 @@ def _audit_holder_changes(source: _Source, resolver: Any) -> dict[str, Any]:
     }
 
 
-def _audit_f10_sources(
-    parent: _Source, hotfix: _Source, resolver: Any
-) -> dict[str, Any]:
+def _audit_f10_sources(parent: _Source, hotfix: _Source, resolver: Any) -> dict[str, Any]:
     try:
         import pyarrow.parquet as pq
     except ModuleNotFoundError as exc:
@@ -361,9 +527,7 @@ def audit_ownership_capital_source_package(
         semantic_plan = _mapping(plan.get("plan"), "input plan")
         model = _object(model_path)
         _verify_ods_binding(ods_package, semantic_plan, model)
-        extension, extension_sha = verify_additive_model_extension(
-            model_path, model_extension_path
-        )
+        extension, extension_sha = verify_additive_model_extension(model_path, model_extension_path)
     except (TradingCalendarBuildError, ModelExtensionError) as exc:
         raise OwnershipCapitalBuildError("ownership input verification failed") from exc
     if plan.get("run_id") != run_id or semantic_plan.get("mode") != "base":
@@ -394,19 +558,11 @@ def audit_ownership_capital_source_package(
         "model_extension_sha256": extension_sha,
         "model_extension_contract": extension["contract_id"],
         "listed_company_semantic_digest": listed.semantic_digest,
-        "source_sha256": {
-            key: value.sha256 for key, value in sorted(sources.items())
-        },
+        "source_sha256": {key: value.sha256 for key, value in sorted(sources.items())},
         "source_rows": {
-            "shareholder_count": _audit_shareholder_count(
-                sources["shareholder_count"], resolver
-            ),
-            "holder_changes": _audit_holder_changes(
-                sources["holder_changes"], resolver
-            ),
-            "f10": _audit_f10_sources(
-                sources["parent_f10"], sources["hotfix_f10"], resolver
-            ),
+            "shareholder_count": _audit_shareholder_count(sources["shareholder_count"], resolver),
+            "holder_changes": _audit_holder_changes(sources["holder_changes"], resolver),
+            "f10": _audit_f10_sources(sources["parent_f10"], sources["hotfix_f10"], resolver),
         },
         "build_gate": {
             "requires_same_run_issue60_candidate": True,

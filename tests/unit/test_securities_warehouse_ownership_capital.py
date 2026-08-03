@@ -9,10 +9,51 @@ from quanthus.pipelines.securities_warehouse.ownership_capital import (
     OwnershipCapitalBuildError,
     _file_source,
     _single_record,
+    parse_f10_capital_structure,
+    parse_f10_shareholding_tables,
 )
 
 
 class OwnershipCapitalTests(unittest.TestCase):
+    def test_capital_matrix_expands_dates_and_units(self) -> None:
+        rows = parse_f10_capital_structure(
+            """
+【1.股本结构】
+｜单位(股)｜2026-03-09｜2024-12-31｜
+｜总股本｜194.0592亿｜31.7545万｜
+【2.股本变化】
+"""
+        )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["share_quantity"], 19_405_920_000)
+        self.assertEqual(rows[0]["raw_unit"], "亿股")
+        self.assertEqual(rows[1]["share_quantity"], 317_545)
+
+    def test_holder_parser_keeps_table_kind_rank_and_continuation(self) -> None:
+        rows = parse_f10_shareholding_tables(
+            """
+截至日期：2026-03-31 十大流通股东情况 A股户数:45万
+｜股东名称｜持股数(股)｜占流通股比(%)｜股东性质｜增减情况(股)｜
+｜中国工商银行－华泰柏瑞沪深300交易型开放式｜7808.7233万｜0.40 占A股｜基金｜未变｜
+｜指数证券投资基金｜｜｜｜｜
+｜香港中央结算有限公司｜5.7077亿｜2.94 占A股｜其他｜未变｜
+└────┘
+截至日期：2026-03-31 十大股东情况 A股户数:45万
+｜股东名称｜持股数(股)｜占总股本比(%)｜股份性质｜增减情况(股)｜
+｜香港中央结算有限公司｜5.7077亿｜2.94｜无限售A股｜未变｜
+└────┘
+"""
+        )
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0]["holder_rank"], 1)
+        self.assertTrue(rows[0]["shareholder_source_name"].endswith("指数证券投资基金"))
+        self.assertEqual(rows[0]["table_kind"], "TOP_FLOATING_SHAREHOLDERS")
+        self.assertEqual(rows[0]["holder_category"], "基金")
+        self.assertEqual(rows[2]["table_kind"], "TOP_SHAREHOLDERS")
+        self.assertEqual(rows[2]["share_nature"], "无限售A股")
+
     def test_single_record_rejects_ambiguous_authority(self) -> None:
         records = [
             {

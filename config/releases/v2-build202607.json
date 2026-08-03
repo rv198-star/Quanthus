@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "quanthus_base_build_release",
+  "build_id": "V2-Build202607",
+  "display_name": "V2 Build202607",
+  "through_date": "2026-07-31",
+  "layers": {
+    "ods": {
+      "package_id": "ods-base-202607-v1.2",
+      "manifest_sha256": "sha256:090d6a50aac7007337229588e9cd1586a50f09811332e6024d08f28ddc4b6e05",
+      "content_digest": "sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01",
+      "logical_role": "ODS Base V2 Build202607"
+    },
+    "dwd": {
+      "package_id": "dwd-base-202607-v2",
+      "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+      "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+      "logical_role": "DWD Base V2 Build202607"
+    }
+  },
+  "storage_policy": {
+    "online_base_format": "unpacked_checksum_bound_package",
+    "cold_archive_format": "tar.zst",
+    "cold_archive_zstd_level": 10,
+    "cold_archive_local_retention": "delete_after_verified_external_transfer"
+  },
+  "etl_policy": {
+    "seed_build_id": "V2-Build202607",
+    "daily_output_mode": "immutable_incremental_partition",
+    "weekly_output_mode": "immutable_correction_partition",
+    "base_mutation": "forbidden"
+  }
+}

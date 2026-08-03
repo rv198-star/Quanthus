@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "contract_id": "quanthus-dwd-domain-source-accounting-receipt-v1",
+  "conservation_rule": "eligible_rows_equals_sum_of_all_terminal_dispositions",
+  "terminal_dispositions": [
+    "modeled",
+    "reconciliation_only",
+    "ods_only",
+    "deferred",
+    "quality_exception"
+  ],
+  "exception_required_fields": [
+    "source_identity",
+    "rule_id",
+    "rule_version",
+    "affected_domain",
+    "affected_table",
+    "affected_business_key",
+    "affected_effective_at",
+    "detected_at",
+    "classification",
+    "severity",
+    "authority",
+    "source_record_id",
+    "source_revision",
+    "source_artifact_sha256",
+    "evidence_digest",
+    "disposition",
+    "resolution_state"
+  ],
+  "blocking_dispositions": ["FAILED"],
+  "retained_dispositions": [
+    "ACCEPTED_LIMITATION",
+    "DEFERRED",
+    "EXCLUDED",
+    "QUARANTINED"
+  ]
+}

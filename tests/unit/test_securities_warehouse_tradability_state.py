@@ -9,6 +9,7 @@ import duckdb
 import pyarrow as pa
 
 from quanthus.pipelines.securities_warehouse.tradability_state import (
+    _configure_connection,
     _daily_status_relation_query,
     _price_regime_internal_query,
     _schemas,
@@ -28,6 +29,19 @@ class TradabilityStateQueryTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.connection.close()
+
+    def test_connection_uses_bounded_spill_friendly_settings(self) -> None:
+        scratch = Path("/tmp/tradability-state-test-scratch")
+        _configure_connection(self.connection, scratch)
+        settings = self.connection.execute(
+            """
+            SELECT current_setting('threads'),
+                   current_setting('preserve_insertion_order'),
+                   current_setting('memory_limit'),
+                   current_setting('temp_directory')
+            """
+        ).fetchone()
+        self.assertEqual(settings, (1, False, "2.3 GiB", str(scratch)))
 
     def _register(self, name: str, rows: list[dict[str, object]]) -> None:
         self.connection.register(name, pa.Table.from_pylist(rows))

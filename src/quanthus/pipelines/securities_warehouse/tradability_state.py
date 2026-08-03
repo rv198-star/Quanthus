@@ -1264,6 +1264,14 @@ def _create_scratch_directory(output: Path, build_identity: str, scratch_root: P
     )
 
 
+def _configure_connection(connection: Any, scratch: Path) -> None:
+    connection.execute("SET threads=1")
+    connection.execute("SET preserve_insertion_order=false")
+    connection.execute("SET enable_progress_bar=false")
+    connection.execute("SET memory_limit='2500MB'")
+    connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
+
+
 def _verify_existing_output(
     root: Path,
     *,
@@ -1522,11 +1530,7 @@ def _build_locked(
     duckdb, _, _ = _dependencies()
     scratch = _create_scratch_directory(output, build_identity, scratch_root)
     connection = duckdb.connect()
-    connection.execute("SET threads=1")
-    connection.execute("SET preserve_insertion_order=true")
-    connection.execute("SET enable_progress_bar=false")
-    connection.execute("SET memory_limit='1600MB'")
-    connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
+    _configure_connection(connection, scratch)
     predecessor_digest = _canonical_digest(
         {
             "listed": [listed.semantic_digest, listed.manifest_sha256],

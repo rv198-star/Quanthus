@@ -296,8 +296,8 @@ def build_daily_domain_increment(
     output.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
     connection = duckdb.connect()
-    connection.execute("SET threads=4")
-    connection.execute("SET preserve_insertion_order=false")
+    connection.execute("SET threads=1")
+    connection.execute("SET preserve_insertion_order=true")
     connection.execute("SET memory_limit='2GB'")
     try:
         for lane, name, path in deferred_daily_artifacts:
@@ -583,7 +583,10 @@ def build_daily_domain_increment(
                 }
             )
         content_digest = "sha256:" + hashlib.sha256(_canonical_bytes(files)).hexdigest()
-        package_id = f"dwd-daily-{market_date.strftime('%Y%m%d')}-{catalog['catalog_digest'][7:19]}"
+        package_id = (
+            f"dwd-daily-{market_date.strftime('%Y%m%d')}-"
+            f"{catalog['catalog_digest'][7:19]}-{code_revision[:7]}"
+        )
         manifest = {
             "schema_version": 1,
             "kind": "cn01_daily_dwd_domain_increment",

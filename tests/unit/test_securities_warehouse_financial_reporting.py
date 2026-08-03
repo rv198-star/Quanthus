@@ -5,6 +5,7 @@ import hashlib
 import json
 import unittest
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -12,12 +13,16 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from quanthus.pipelines.securities_warehouse.financial_reporting import (
+    FinancialCompanyIdentity,
+    FinancialCompanyResolver,
     FinancialReportingBuildError,
     FinancialStatementSource,
     audit_financial_statement_sources,
     classify_statement_rows,
     conservative_provider_timestamp,
     decode_financial_envelope,
+    expand_financial_envelope,
+    financial_reporting_schemas,
     iter_statement_reports,
     select_financial_statement_sources,
     write_financial_reporting_source_audit,
@@ -244,6 +249,92 @@ class FinancialEnvelopeTests(unittest.TestCase):
             self.assertEqual(selected_hotfix.precedence, "hotfix")
             self.assertEqual(parent.path, full)
             self.assertEqual(selected_hotfix.path, hotfix)
+
+    def test_expands_lossless_envelope_into_three_typed_dwd_row_sets(self) -> None:
+        row = {
+            **_envelope(
+                {
+                    "result": {
+                        "data": {
+                            "report_list": {
+                                "20251231": {
+                                    "rType": "consolidated",
+                                    "rCurrency": "CNY",
+                                    "data_source": "provider-native",
+                                    "is_audit": "audited",
+                                    "publish_date": "2026-04-30",
+                                    "update_time": 123,
+                                    "data": [
+                                        {"item_display_type": 1, "item_field": ""},
+                                        {
+                                            "item_field": "CASH",
+                                            "item_title": "Cash",
+                                            "item_value": "12.500000",
+                                            "item_precision": "f2",
+                                            "item_group_no": 1,
+                                        },
+                                        {
+                                            "item_field": "NOTE",
+                                            "item_title": "Note",
+                                            "item_value": "not-numeric",
+                                        },
+                                        {
+                                            "item_field": "DEBT",
+                                            "item_title": "Debt",
+                                            "item_value": "",
+                                        },
+                                    ],
+                                }
+                            }
+                        }
+                    }
+                }
+            ),
+            "security_id": "000001",
+            "stock_code": "000001",
+            "statement_type": "balance_sheet",
+            "source": "sina.CompanyFinanceService.getFinanceReport2022",
+            "source_revision": "provider-v1",
+            "acquired_at": "2026-07-31T23:12:41+08:00",
+        }
+        source = FinancialStatementSource(
+            "financial_statements",
+            Path("/fixture/full.parquet"),
+            "payload/full.parquet",
+            "sha256:" + "a" * 64,
+            "",
+            "parent",
+        )
+        resolver = FinancialCompanyResolver(
+            [
+                FinancialCompanyIdentity(
+                    stock_code="000001",
+                    security_id="security-1",
+                    company_id="company-1",
+                    effective_from=datetime(1991, 1, 1, tzinfo=timezone.utc),
+                    effective_to=None,
+                )
+            ]
+        )
+        expanded = expand_financial_envelope(row, source=source, company_resolver=resolver)
+        self.assertEqual(len(expanded.reports), 1)
+        self.assertEqual(len(expanded.concepts), 3)
+        self.assertEqual(len(expanded.facts), 3)
+        self.assertEqual(expanded.reports[0]["company_id"], "company-1")
+        self.assertEqual(expanded.facts[0]["value_decimal"], Decimal("12.500000"))
+        self.assertEqual(expanded.facts[0]["value_text"], "12.500000")
+        self.assertIsNone(expanded.facts[1]["value_decimal"])
+        self.assertTrue(expanded.facts[2]["is_nil"])
+        schemas = financial_reporting_schemas()
+        for table, rows in (
+            ("dwd_financial_report", expanded.reports),
+            ("dwd_financial_concept", expanded.concepts),
+            ("dwd_financial_fact", expanded.facts),
+        ):
+            self.assertTrue(
+                pa.Table.from_pylist(list(rows), schema=schemas[table])
+                .schema.equals(schemas[table], check_metadata=True)
+            )
 
 
 if __name__ == "__main__":

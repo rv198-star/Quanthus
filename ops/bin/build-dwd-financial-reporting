@@ -14,6 +14,7 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (  # noq
     FinancialReportingBuildError,
     audit_financial_native_source_package,
     build_financial_reporting,
+    combine_financial_reporting_source_audits,
 )
 
 
@@ -32,6 +33,10 @@ def main() -> int:
     _common_inputs(audit_parser)
     audit_parser.add_argument("--output", type=Path, required=True)
     audit_parser.add_argument("--batch-size", type=int, default=4096)
+    combine_parser = subcommands.add_parser("combine-audits")
+    combine_parser.add_argument("--statement-audit", type=Path, required=True)
+    combine_parser.add_argument("--native-audit", type=Path, required=True)
+    combine_parser.add_argument("--output", type=Path, required=True)
     build_parser = subcommands.add_parser("build")
     _common_inputs(build_parser)
     build_parser.add_argument("--source-audit", type=Path, required=True)
@@ -39,6 +44,25 @@ def main() -> int:
     build_parser.add_argument("--source-batch-size", type=int, default=32)
     args = parser.parse_args()
     try:
+        if args.command == "combine-audits":
+            audit = combine_financial_reporting_source_audits(
+                statement_audit_path=args.statement_audit,
+                native_audit_path=args.native_audit,
+                output=args.output,
+            )
+            print(
+                json.dumps(
+                    {
+                        "output": str(args.output.resolve()),
+                        "candidate_size_calibration": audit.report[
+                            "candidate_size_calibration"
+                        ],
+                    },
+                    ensure_ascii=True,
+                    sort_keys=True,
+                )
+            )
+            return 0
         if args.command == "audit-native":
             audit = audit_financial_native_source_package(
                 ods_package=args.ods_package,

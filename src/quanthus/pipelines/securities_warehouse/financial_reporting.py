@@ -797,6 +797,74 @@ def write_financial_reporting_source_audit(
     return output.resolve()
 
 
+def combine_financial_reporting_source_audits(
+    *, statement_audit_path: Path, native_audit_path: Path, output: Path
+) -> FinancialReportingSourceAudit:
+    """Seal statement and native-source evidence into the only buildable audit."""
+
+    statement = _read_json_object(statement_audit_path, "financial statement source audit")
+    native = _read_json_object(native_audit_path, "financial native source audit")
+    statement_calibration = statement.get("candidate_size_calibration")
+    native_calibration = native.get("candidate_size_calibration")
+    if (
+        statement.get("schema_version") != 1
+        or statement.get("kind") != "dwd_financial_reporting_source_audit"
+        or not isinstance(statement_calibration, Mapping)
+        or native.get("schema_version") != 1
+        or native.get("kind") != "dwd_financial_reporting_native_source_audit"
+        or not isinstance(native_calibration, Mapping)
+    ):
+        raise FinancialReportingBuildError("financial source audits cannot be combined")
+    statement_reports = statement_calibration.get("dwd_financial_report_rows")
+    statement_facts = statement_calibration.get("dwd_financial_fact_upper_bound")
+    native_reports = native_calibration.get("dwd_financial_report_rows")
+    native_facts = native_calibration.get("dwd_financial_fact_rows")
+    if not all(
+        isinstance(value, int) and not isinstance(value, bool) and value >= 0
+        for value in (statement_reports, statement_facts, native_reports, native_facts)
+    ):
+        raise FinancialReportingBuildError("financial source audit counts are invalid")
+    required_bindings = (
+        "run_id",
+        "input_plan_digest",
+        "model_sha256",
+        "listed_company_manifest_sha256",
+        "listed_company_semantic_digest",
+        "source_sha256",
+    )
+    if any(native.get(field) in (None, "", {}) for field in required_bindings):
+        raise FinancialReportingBuildError("native financial audit lacks build bindings")
+    report = {
+        "schema_version": 1,
+        "kind": "dwd_financial_reporting_combined_source_audit",
+        **{field: native[field] for field in required_bindings},
+        "component_audits": {
+            "statement": {
+                "path": str(statement_audit_path.resolve()),
+                "sha256": _sha256(statement_audit_path),
+                "audit": statement,
+            },
+            "native": {
+                "path": str(native_audit_path.resolve()),
+                "sha256": _sha256(native_audit_path),
+                "audit": native,
+            },
+        },
+        "candidate_size_calibration": {
+            "dwd_financial_report_rows": statement_reports + native_reports,
+            "dwd_financial_fact_rows": statement_facts + native_facts,
+            "statement_report_rows": statement_reports,
+            "statement_fact_rows": statement_facts,
+            "native_report_rows": native_reports,
+            "native_fact_rows": native_facts,
+        },
+        "quality_exceptions": native.get("quality_exceptions", {}),
+    }
+    audit = FinancialReportingSourceAudit(report=report)
+    write_financial_reporting_source_audit(output, audit)
+    return audit
+
+
 def financial_reporting_schemas() -> dict[str, Any]:
     """Return the physical schemas for the three Issue #61-owned DWD tables."""
 

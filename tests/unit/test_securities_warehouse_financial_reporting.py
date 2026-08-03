@@ -28,6 +28,7 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (
     audit_financial_statement_sources,
     build_financial_reporting,
     classify_statement_rows,
+    combine_financial_reporting_source_audits,
     conservative_provider_timestamp,
     decode_financial_envelope,
     expand_financial_envelope,
@@ -239,6 +240,65 @@ class FinancialEnvelopeTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(FinancialReportingBuildError, "overlap has different"):
                 audit_financial_statement_sources(sources)
+
+    def test_combines_statement_and_native_audits_with_build_bindings(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            statement_path = root / "statement.json"
+            native_path = root / "native.json"
+            output = root / "combined.json"
+            statement_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "dwd_financial_reporting_source_audit",
+                        "candidate_size_calibration": {
+                            "dwd_financial_report_rows": 10,
+                            "dwd_financial_fact_upper_bound": 100,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            native_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "dwd_financial_reporting_native_source_audit",
+                        "run_id": "run-1",
+                        "input_plan_digest": "plan-1",
+                        "model_sha256": "sha256:model",
+                        "listed_company_manifest_sha256": "sha256:manifest",
+                        "listed_company_semantic_digest": "semantic-1",
+                        "source_sha256": {"source": "sha256:source"},
+                        "candidate_size_calibration": {
+                            "dwd_financial_report_rows": 3,
+                            "dwd_financial_fact_rows": 30,
+                        },
+                        "quality_exceptions": {"BEFORE_FIRST": 2},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            audit = combine_financial_reporting_source_audits(
+                statement_audit_path=statement_path,
+                native_audit_path=native_path,
+                output=output,
+            )
+
+            self.assertEqual(
+                audit.report["candidate_size_calibration"],
+                {
+                    "dwd_financial_report_rows": 13,
+                    "dwd_financial_fact_rows": 130,
+                    "statement_report_rows": 10,
+                    "statement_fact_rows": 100,
+                    "native_report_rows": 3,
+                    "native_fact_rows": 30,
+                },
+            )
+            self.assertTrue(output.is_file())
 
     def test_selects_exact_parent_and_fill_only_hotfix_from_ledger(self) -> None:
         with TemporaryDirectory() as temporary:

@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Publish the complete 33-object domain-modeled DWD Base."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.securities_warehouse.domain_base import (  # noqa: E402
+    DomainBaseError,
+    publish_domain_base,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--candidate-root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--current", type=Path, required=True)
+    parser.add_argument("--package-id", required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--input-plan-digest", required=True)
+    parser.add_argument("--ods-package-id", required=True)
+    parser.add_argument("--ods-manifest-sha256", required=True)
+    parser.add_argument("--ods-content-digest", required=True)
+    parser.add_argument("--model-sha256", required=True)
+    parser.add_argument("--model-extension-sha256", required=True)
+    parser.add_argument("--code-revision", required=True)
+    args = parser.parse_args()
+    run = args.run_id
+    selected = {
+        "listed_company": f"{run}-issue57",
+        "trading_calendar": f"{run}-issue72",
+        "security_market_observation": f"{run}-issue58",
+        "tradability_state": f"{run}-issue59",
+        "disclosure_company_event": f"{run}-issue60-v2",
+        "financial_reporting": f"{run}-issue61",
+        "industry_classification": f"{run}-issue62",
+        "ownership_capital": f"{run}-issue63-v2",
+        "governance_sidecar": f"{run}-issue64",
+    }
+    try:
+        result = publish_domain_base(
+            candidates={key: args.candidate_root / value for key, value in selected.items()},
+            output=args.output,
+            current=args.current,
+            package_id=args.package_id,
+            run_id=run,
+            input_plan_digest=args.input_plan_digest,
+            ods_base={
+                "package_id": args.ods_package_id,
+                "manifest_sha256": args.ods_manifest_sha256,
+                "content_digest": args.ods_content_digest,
+            },
+            model_sha256=args.model_sha256,
+            model_extension_sha256=args.model_extension_sha256,
+            code_revision=args.code_revision,
+        )
+    except (DomainBaseError, OSError) as exc:
+        print(f"DWD domain Base publication failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "root": str(result.root),
+                "package_id": result.package_id,
+                "manifest_sha256": result.manifest_sha256,
+                "content_digest": result.content_digest,
+                "table_count": result.table_count,
+                "row_count": result.row_count,
+                "payload_bytes": result.payload_bytes,
+                "payload_file_count": result.payload_file_count,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

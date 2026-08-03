@@ -18,6 +18,7 @@ from quanthus.pipelines.ods_base_rollup import (
     OdsBaseRollupError,
     advance_ods_base_rollup_current,
     build_ods_base_rollup,
+    republish_ods_base_identity,
     verify_ods_base_rollup,
 )
 from quanthus.pipelines.ods_calendar_history_hotfix import (
@@ -309,9 +310,7 @@ class OdsBaseRollupTests(unittest.TestCase):
             expected_hotfix_manifest_sha256=hotfix_manifest_sha,
             expected_hotfix_content_digest=hotfix_content_digest,
         )
-        manifest = json.loads(
-            (self.chained_output / "manifest.json").read_text(encoding="utf-8")
-        )
+        manifest = json.loads((self.chained_output / "manifest.json").read_text(encoding="utf-8"))
         rollup = manifest["content"]["rollup"]
         self.assertEqual(rollup["schema_version"], 2)
         self.assertEqual(rollup["mode"], "self_contained_chained_rollup")
@@ -331,13 +330,33 @@ class OdsBaseRollupTests(unittest.TestCase):
 
         shutil.rmtree(self.output)
         shutil.rmtree(self.calendar_hotfix)
-        verified = verify_ods_base_rollup(
-            self.chained_output, policy=self.policy, deep=True
-        )
+        verified = verify_ods_base_rollup(self.chained_output, policy=self.policy, deep=True)
         self.assertEqual(
             verified.content_digest,
             result.content_digest,
         )
+
+    def test_identity_republish_preserves_content_and_hard_links(self) -> None:
+        source = self._build()
+        target = self.base_root / "ods-base-parent-v2"
+        result = republish_ods_base_identity(
+            source_bundle=self.output,
+            output=target,
+            bundle_id=target.name,
+            policy=self.policy,
+            code_revision="e" * 40,
+            built_at="2026-08-01T05:00:00Z",
+            expected_source_manifest_sha256=source.manifest_sha256,
+            expected_source_content_digest=source.content_digest,
+        )
+        self.assertEqual(result.bundle_id, target.name)
+        self.assertEqual(result.content_digest, source.content_digest)
+        self.assertNotEqual(result.manifest_sha256, source.manifest_sha256)
+        self.assertEqual(
+            (self.output / "payload/canonical/parent.json").stat().st_ino,
+            (target / "payload/canonical/parent.json").stat().st_ino,
+        )
+        self.assertEqual(verify_ods_base_rollup(target, policy=self.policy, deep=True), result)
 
     def test_pointer_advance_uses_exact_old_pointer_sha(self) -> None:
         result = self._build()

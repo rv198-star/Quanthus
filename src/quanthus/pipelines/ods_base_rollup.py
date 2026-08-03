@@ -687,6 +687,111 @@ def build_ods_base_rollup(
         raise
 
 
+def republish_ods_base_identity(
+    *,
+    source_bundle: Path,
+    output: Path,
+    bundle_id: str,
+    policy: OdsBasePolicy,
+    code_revision: str,
+    built_at: str,
+    expected_source_manifest_sha256: str,
+    expected_source_content_digest: str,
+) -> OdsBaseBundle:
+    """Republish one verified rollup under a new immutable bundle identity.
+
+    This is deliberately a content-preserving operation: every governed member is
+    hard-linked from the source bundle and the canonical content is unchanged.
+    """
+
+    source_bundle = source_bundle.resolve()
+    output = output.resolve()
+    if output.exists():
+        raise FileExistsError(f"refusing to overwrite ODS Base republish: {output}")
+    if output.name != bundle_id or _SAFE_ID.fullmatch(bundle_id) is None:
+        raise OdsBaseRollupError("republish output path and bundle identity differ")
+    if _REVISION.fullmatch(code_revision) is None:
+        raise OdsBaseRollupError("code_revision must be a full Git object id")
+    if source_bundle.parent != output.parent:
+        raise OdsBaseRollupError("identity republish must remain under one Base root")
+    normalized_built_at = _normalize_built_at(built_at)
+    source = verify_ods_base_rollup(source_bundle, policy=policy, deep=False)
+    if source.manifest_sha256 != _digest(
+        expected_source_manifest_sha256, "expected source manifest"
+    ) or source.content_digest != _digest(
+        expected_source_content_digest, "expected source content"
+    ):
+        raise OdsBaseRollupError("identity republish source differs from expected identity")
+    source_manifest, source_manifest_sha = _read_envelope(source_bundle)
+    content = copy.deepcopy(dict(_mapping(source_manifest.get("content"), "content")))
+    files = _file_inventory(source_bundle, content.get("files"), source_label="rollup")
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging_parent = Path(tempfile.mkdtemp(prefix=f".{bundle_id}.", dir=output.parent))
+    staging = staging_parent / bundle_id
+    staging.mkdir()
+    try:
+        for item in files:
+            relative = str(item["path"])
+            _link_member(
+                _inside(source_bundle, relative, "source.files.path"),
+                _inside(staging, relative, "republish.files.path"),
+                expected_size=int(item["size_bytes"]),
+            )
+        manifest = copy.deepcopy(source_manifest)
+        manifest.update(
+            {
+                "bundle_id": bundle_id,
+                "built_at": normalized_built_at,
+                "code_revision": code_revision,
+                "content_digest": source.content_digest,
+                "storage_reuse": {
+                    "method": "hard_link",
+                    "file_count": len(files),
+                    "size_bytes": sum(int(item["size_bytes"]) for item in files),
+                    "sources": [
+                        {
+                            "bundle_id": source.bundle_id,
+                            "manifest_sha256": source_manifest_sha,
+                            "content_digest": source.content_digest,
+                            "file_count": len(files),
+                            "size_bytes": sum(int(item["size_bytes"]) for item in files),
+                        }
+                    ],
+                },
+            }
+        )
+        _write_json_new(staging / "manifest.json", manifest)
+        with (staging / "READY").open("x", encoding="ascii") as stream:
+            os.fchmod(stream.fileno(), 0o640)
+            stream.write(f"{_sha256(staging / 'manifest.json')}\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        for path in sorted(staging.rglob("*")):
+            if path.is_dir():
+                path.chmod(0o750)
+        staging.chmod(0o750)
+        result = verify_ods_base_rollup(staging, policy=policy, deep=False)
+        if result.content_digest != source.content_digest:
+            raise OdsBaseRollupError("identity republish changed canonical content")
+        os.replace(staging, output)
+        staging_parent.rmdir()
+        return OdsBaseBundle(
+            root=output,
+            bundle_id=result.bundle_id,
+            manifest_sha256=result.manifest_sha256,
+            content_digest=result.content_digest,
+            through_date=result.through_date,
+            increment_start=result.increment_start,
+            source_node=result.source_node,
+            size_bytes=result.size_bytes,
+            file_count=result.file_count,
+        )
+    except BaseException:
+        shutil.rmtree(staging_parent, ignore_errors=True)
+        raise
+
+
 def _verify_rollup_contract(
     root: Path, manifest: Mapping[str, Any], content: Mapping[str, Any]
 ) -> None:
@@ -745,10 +850,9 @@ def _verify_rollup_contract(
             raise OdsBaseRollupError("legacy rollup precedence or parent lineage is invalid")
     else:
         parent_rollup = _mapping(parent.get("rollup"), "rollup.parent.rollup")
-        if (
-            parent.get("rollup_digest") != _canonical_digest(parent_rollup)
-            or parent_rollup.get("schema_version") not in {1, 2}
-        ):
+        if parent.get("rollup_digest") != _canonical_digest(parent_rollup) or parent_rollup.get(
+            "schema_version"
+        ) not in {1, 2}:
             raise OdsBaseRollupError("chained rollup parent lineage is invalid")
     parent_identity = {
         "bundle_id": parent_id,

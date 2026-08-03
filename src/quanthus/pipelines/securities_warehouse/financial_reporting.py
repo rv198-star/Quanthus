@@ -1305,6 +1305,7 @@ def expand_financial_envelope(
                     "item_display": item.get("item_display"),
                     "item_display_type": item.get("item_display_type"),
                     "item_group_no": item.get("item_group_no"),
+                    "provider_item_index": item_index,
                     "item_precision": item.get("item_precision"),
                     "item_source": item.get("item_source"),
                     "item_tongbi": item.get("item_tongbi"),

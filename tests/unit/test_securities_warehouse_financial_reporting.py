@@ -22,6 +22,7 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (
     conservative_provider_timestamp,
     decode_financial_envelope,
     expand_financial_envelope,
+    financial_company_resolver_from_listed_company_rows,
     financial_reporting_schemas,
     iter_statement_reports,
     select_financial_statement_sources,
@@ -335,6 +336,29 @@ class FinancialEnvelopeTests(unittest.TestCase):
                 pa.Table.from_pylist(list(rows), schema=schemas[table])
                 .schema.equals(schemas[table], check_metadata=True)
             )
+
+    def test_company_resolver_accepts_multiple_same_company_security_versions(self) -> None:
+        resolver = financial_company_resolver_from_listed_company_rows(
+            [
+                {"security_id": "security-1", "company_id": "company-1"},
+                {"security_id": "security-1", "company_id": "company-1"},
+            ],
+            [
+                {
+                    "security_id": "security-1",
+                    "identifier_namespace": "CN_STOCK_CODE:SSE",
+                    "identifier_value": "600000",
+                    "effective_from": datetime(1999, 1, 1, tzinfo=timezone.utc),
+                    "effective_to": None,
+                }
+            ],
+        )
+        resolved = resolver.resolve(
+            "600000",
+            period_end=datetime(2025, 12, 31, tzinfo=timezone.utc).date(),
+            published_at=None,
+        )
+        self.assertEqual(resolved.company_id, "company-1")
 
 
 if __name__ == "__main__":

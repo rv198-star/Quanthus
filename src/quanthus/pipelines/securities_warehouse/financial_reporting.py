@@ -755,8 +755,11 @@ def financial_company_resolver_from_listed_company_rows(
             raise FinancialReportingBuildError("#57 security row has no security_id")
         if not isinstance(company_id, str) or not company_id:
             raise FinancialReportingBuildError("#57 security row has no company_id")
-        if security_id in securities:
-            raise FinancialReportingBuildError(f"duplicate #57 security_id: {security_id}")
+        prior = securities.get(security_id)
+        if prior is not None and prior.get("company_id") != company_id:
+            raise FinancialReportingBuildError(
+                f"#57 security_id resolves to more than one company: {security_id}"
+            )
         securities[security_id] = row
     identities: list[FinancialCompanyIdentity] = []
     for row in identifier_rows:

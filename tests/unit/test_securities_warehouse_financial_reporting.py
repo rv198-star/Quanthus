@@ -489,6 +489,13 @@ class FinancialEnvelopeTests(unittest.TestCase):
                                             "item_group_no": 1,
                                         },
                                         {
+                                            "item_field": "CASH",
+                                            "item_title": "Cash and equivalents",
+                                            "item_value": "12.500000",
+                                            "item_precision": "f2",
+                                            "item_group_no": 1,
+                                        },
+                                        {
                                             "item_field": "NOTE",
                                             "item_title": "Note",
                                             "item_value": "not-numeric",
@@ -540,16 +547,22 @@ class FinancialEnvelopeTests(unittest.TestCase):
         )
         expanded = expand_financial_envelope(row, source=source, company_resolver=resolver)
         self.assertEqual(len(expanded.reports), 1)
-        self.assertEqual(len(expanded.concepts), 3)
-        self.assertEqual(len(expanded.facts), 4)
+        self.assertEqual(len(expanded.concepts), 4)
+        self.assertEqual(len(expanded.facts), 5)
         self.assertEqual(expanded.reports[0]["company_id"], "company-1")
         self.assertEqual(expanded.facts[0]["value_decimal"], Decimal("12.500000"))
         self.assertEqual(expanded.facts[0]["value_text"], "12.500000")
-        self.assertIsNone(expanded.facts[1]["value_decimal"])
-        self.assertTrue(expanded.facts[2]["is_nil"])
+        self.assertIsNone(expanded.facts[2]["value_decimal"])
+        self.assertTrue(expanded.facts[3]["is_nil"])
         self.assertNotEqual(
-            expanded.facts[0]["context_hash"], expanded.facts[3]["context_hash"]
+            expanded.facts[0]["context_hash"], expanded.facts[4]["context_hash"]
         )
+        cash_concepts = {
+            concept["financial_concept_id"]
+            for concept in expanded.concepts
+            if concept["concept_code"] == "CASH"
+        }
+        self.assertEqual(len(cash_concepts), 2)
         schemas = financial_reporting_schemas()
         for table, rows in (
             ("dwd_financial_report", expanded.reports),

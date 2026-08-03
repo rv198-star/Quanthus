@@ -1266,12 +1266,15 @@ def expand_financial_envelope(
                 source_revision,
                 statement_type,
                 concept_code,
+                concept_name,
             )
             prior_concept = concepts.get(concept_id)
             concept_row = {
                 "record_source": source_name,
                 "source_record_id": (
-                    f"{source.relative_path}#statement_type={statement_type}&concept={concept_code}"
+                    f"{source.relative_path}#statement_type={statement_type}"
+                    f"&concept={concept_code}"
+                    f"&concept_name_sha256={hashlib.sha256(concept_name.encode('utf-8')).hexdigest()}"
                 ),
                 "source_revision": source_revision,
                 "source_artifact_sha256": source.source_sha256,
@@ -1880,7 +1883,7 @@ _OWNED_TABLES = (
     "dwd_financial_fact",
 )
 _PARTITIONED_TABLES = ("dwd_financial_report", "dwd_financial_fact")
-_FINANCIAL_BUILDER_CONTRACT = "financial-reporting-six-source-v1"
+_FINANCIAL_BUILDER_CONTRACT = "financial-reporting-six-source-v2"
 @dataclass(frozen=True)
 class FinancialReportingBuildResult:
     """A sealed, non-published financial-reporting candidate."""

@@ -1880,6 +1880,7 @@ _OWNED_TABLES = (
     "dwd_financial_fact",
 )
 _PARTITIONED_TABLES = ("dwd_financial_report", "dwd_financial_fact")
+_FINANCIAL_BUILDER_CONTRACT = "financial-reporting-six-source-v1"
 @dataclass(frozen=True)
 class FinancialReportingBuildResult:
     """A sealed, non-published financial-reporting candidate."""
@@ -2110,6 +2111,7 @@ def _candidate_identity(
         "schema_version": 1,
         **expected_bindings,
         "source_audit_sha256": audit_sha,
+        "builder_contract": _FINANCIAL_BUILDER_CONTRACT,
     }
     cutoff = _utc_timestamp(
         semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff"
@@ -2605,6 +2607,7 @@ def _verify_existing_financial_candidate(
         or manifest.get("input_plan_digest") != identity.get("input_plan_digest")
         or manifest.get("model_sha256") != identity.get("model_sha256")
         or manifest.get("source_audit_sha256") != identity.get("source_audit_sha256")
+        or manifest.get("builder_contract") != identity.get("builder_contract")
         or manifest.get("listed_company_manifest_sha256")
         != identity.get("listed_company_manifest_sha256")
         or manifest.get("listed_company_semantic_digest")
@@ -2891,6 +2894,7 @@ def _build_financial_reporting_locked(
         "input_plan_digest": identity["input_plan_digest"],
         "model_sha256": identity["model_sha256"],
         "source_audit_sha256": identity["source_audit_sha256"],
+        "builder_contract": identity["builder_contract"],
         "listed_company_manifest_sha256": identity["listed_company_manifest_sha256"],
         "listed_company_semantic_digest": identity["listed_company_semantic_digest"],
         "source_sha256": identity["source_sha256"],

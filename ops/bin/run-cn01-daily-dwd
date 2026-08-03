@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Run the complete CN01 four-lane ODS to Base-seeded DWD daily workflow."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+
+from quanthus.pipelines.securities_warehouse import (  # noqa: E402
+    DailyDomainBuildError,
+    DailyOdsCatalogError,
+    advance_daily_current,
+    build_daily_domain_increment,
+    build_daily_ods_catalog,
+    verify_daily_domain_increment,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--market-date")
+    parser.add_argument("--release-root", type=Path, required=True)
+    parser.add_argument("--base", type=Path, required=True)
+    parser.add_argument("--release-config", type=Path, required=True)
+    parser.add_argument("--daily-root", type=Path, required=True)
+    args = parser.parse_args()
+    market_date = (
+        datetime.strptime(args.market_date, "%Y-%m-%d").date()
+        if args.market_date
+        else datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    )
+    try:
+        current = args.daily_root / "CURRENT.json"
+        if current.exists():
+            descriptor = json.loads(current.read_text(encoding="ascii"))
+            if descriptor.get("market_date") == market_date.isoformat():
+                manifest = (current.parent / descriptor["manifest_path"]).resolve()
+                result = verify_daily_domain_increment(manifest.parent)
+                print(json.dumps(result.__dict__, default=str, sort_keys=True))
+                return 0
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        catalog = build_daily_ods_catalog(
+            release_root=args.release_root,
+            market_date=market_date,
+            output=args.daily_root / "catalogs" / market_date.isoformat(),
+        )
+        output = (
+            args.daily_root
+            / "packages"
+            / market_date.isoformat()
+            / f"{catalog.catalog_digest.removeprefix('sha256:')[:12]}-{revision[:7]}"
+        )
+        result = build_daily_domain_increment(
+            catalog_root=catalog.root,
+            release_root=args.release_root,
+            base_root=args.base,
+            release_config=args.release_config,
+            output=output,
+            code_revision=revision,
+            prior_pointer=current,
+        )
+        advance_daily_current(package=result.root, pointer=current)
+    except (
+        DailyDomainBuildError,
+        DailyOdsCatalogError,
+        OSError,
+        ValueError,
+        subprocess.CalledProcessError,
+    ) as exc:
+        print(f"CN01 daily ODS->DWD workflow failed: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result.__dict__, default=str, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

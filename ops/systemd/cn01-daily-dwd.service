@@ -1,0 +1,16 @@
+[Unit]
+Description=Quanthus CN01 Base-seeded daily ODS to DWD
+After=network-online.target cn01-ods-intraday-5m.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/work/Quanthus
+EnvironmentFile=-/etc/quanthus/cn01-daily-dwd.env
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python /root/work/Quanthus/ops/bin/run-cn01-daily-dwd --release-root ${QUANTHUS_CN01_ODS_RELEASE_ROOT} --base ${QUANTHUS_DWD_BASE} --release-config ${QUANTHUS_V2_RELEASE_CONFIG} --daily-root ${QUANTHUS_DWD_DAILY_ROOT}
+TimeoutStartSec=30min
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

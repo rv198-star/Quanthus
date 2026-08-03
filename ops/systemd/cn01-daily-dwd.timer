@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Quanthus CN01 daily ODS to DWD after the 5m ODS lane
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 23:20:00 Asia/Shanghai
+Persistent=true
+AccuracySec=1min
+Unit=cn01-daily-dwd.service
+
+[Install]
+WantedBy=timers.target

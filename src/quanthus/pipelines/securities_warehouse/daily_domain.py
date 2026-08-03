@@ -418,7 +418,11 @@ def build_daily_domain_increment(
             o.ann_id AS source_document_id, o.title AS title,
             o.url AS document_uri, 'zh-CN'::VARCHAR AS "language"
             FROM ({ann_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
-            JOIN base_security s ON s.security_id=l.security_id""",
+            AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+            AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
+            JOIN base_security s ON s.security_id=l.security_id
+            AND CAST(o.announce_date AS DATE)>=CAST(s.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+            AND (s.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(s.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))""",
             disclosure_output,
         )
         subject_output = (
@@ -431,7 +435,9 @@ def build_daily_domain_increment(
             {effective} effective_at, {effective} announced_at, {subject_id} disclosure_subject_id,
             {disclosure_id} disclosure_id, 'SECURITY'::VARCHAR subject_type, l.security_id,
             NULL::VARCHAR corporate_action_id, NULL::VARCHAR financial_report_id
-            FROM ({ann_source}) o JOIN base_listing l ON o.stock_code=l.listing_code""",
+            FROM ({ann_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
+            AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+            AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))""",
             subject_output,
         )
 

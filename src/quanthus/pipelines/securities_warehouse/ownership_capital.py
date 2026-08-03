@@ -96,7 +96,7 @@ def parse_f10_capital_structure(content: str) -> list[dict[str, Any]]:
     """Expand the governed F10 capital matrix into dated atomic observations."""
 
     in_section = False
-    dates: list[date] = []
+    dates: list[date | None] = []
     rows: list[dict[str, Any]] = []
     for line in content.splitlines():
         if "【1.股本结构】" in line:
@@ -112,6 +112,9 @@ def parse_f10_capital_structure(content: str) -> list[dict[str, Any]]:
         if cells[0].startswith("单位"):
             dates = []
             for value in cells[1:]:
+                if value in {"", "-"}:
+                    dates.append(None)
+                    continue
                 try:
                     dates.append(date.fromisoformat(value))
                 except ValueError as exc:
@@ -125,6 +128,8 @@ def parse_f10_capital_structure(content: str) -> list[dict[str, Any]]:
         if not capital_type:
             continue
         for observed, raw_value in zip(dates, cells[1:], strict=True):
+            if observed is None:
+                continue
             normalized = _normalized_number(raw_value)
             if normalized is None:
                 continue

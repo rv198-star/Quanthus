@@ -343,7 +343,7 @@ class OdsBaseRollupTests(unittest.TestCase):
             source_bundle=self.output,
             output=target,
             bundle_id=target.name,
-            policy=self.policy,
+            policy=None,
             code_revision="e" * 40,
             built_at="2026-08-01T05:00:00Z",
             expected_source_manifest_sha256=source.manifest_sha256,

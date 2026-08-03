@@ -10,7 +10,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from quanthus.pipelines.ods_base import load_ods_base_policy  # noqa: E402
 from quanthus.pipelines.ods_base_rollup import (  # noqa: E402
     OdsBaseRollupError,
     republish_ods_base_identity,
@@ -19,7 +18,6 @@ from quanthus.pipelines.ods_base_rollup import (  # noqa: E402
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--policy", type=Path, required=True)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--bundle-id", required=True)
@@ -33,7 +31,7 @@ def main() -> int:
             source_bundle=args.source,
             output=args.output,
             bundle_id=args.bundle_id,
-            policy=load_ods_base_policy(args.policy),
+            policy=None,
             code_revision=args.code_revision,
             built_at=args.built_at,
             expected_source_manifest_sha256=args.expected_source_manifest_sha256,

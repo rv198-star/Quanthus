@@ -227,7 +227,7 @@ def _file_inventory(root: Path, files_value: object, *, source_label: str) -> li
 def _load_parent(
     root: Path,
     *,
-    policy: OdsBasePolicy,
+    policy: OdsBasePolicy | None,
     expected_manifest_sha256: str,
     expected_content_digest: str,
 ) -> tuple[dict[str, Any], Mapping[str, Any], list[dict[str, Any]], str]:
@@ -692,7 +692,7 @@ def republish_ods_base_identity(
     source_bundle: Path,
     output: Path,
     bundle_id: str,
-    policy: OdsBasePolicy,
+    policy: OdsBasePolicy | None,
     code_revision: str,
     built_at: str,
     expected_source_manifest_sha256: str,
@@ -978,7 +978,7 @@ def advance_ods_base_rollup_current(
     *,
     bundle: Path,
     current_pointer: Path,
-    policy: OdsBasePolicy,
+    policy: OdsBasePolicy | None,
     expected_current_pointer_sha256: str,
     expected_current_bundle_id: str,
     expected_target_manifest_sha256: str,

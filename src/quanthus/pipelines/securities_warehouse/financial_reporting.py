@@ -2490,77 +2490,167 @@ def _audit_financial_candidate(
     scratch.mkdir(exist_ok=True)
     connection = duckdb.connect(database=":memory:")
     try:
-        connection.execute("SET memory_limit='2GB'")
-        connection.execute("SET threads=2")
+        connection.execute("SET memory_limit='1536MB'")
+        connection.execute("SET threads=1")
+        connection.execute("SET preserve_insertion_order=false")
         escaped_scratch = str(scratch).replace("'", "''")
         connection.execute(f"SET temp_directory='{escaped_scratch}'")
-        for table, values in paths.items():
-            connection.from_parquet([str(path) for path in values]).create_view(table)
+
+        def year_partitions(values: Sequence[Path], table: str) -> dict[int, list[Path]]:
+            partitions: dict[int, list[Path]] = defaultdict(list)
+            for path in values:
+                matched = re.fullmatch(r"period_end_year=(\d{4})", path.parent.name)
+                if matched is None:
+                    raise FinancialReportingBuildError(
+                        f"financial output has an invalid year partition: {table} {path}"
+                    )
+                partitions[int(matched.group(1))].append(path)
+            return dict(sorted(partitions.items()))
+
+        report_partitions = year_partitions(
+            paths["dwd_financial_report"], "dwd_financial_report"
+        )
+        fact_partitions = year_partitions(
+            paths["dwd_financial_fact"], "dwd_financial_fact"
+        )
+        missing_report_years = sorted(set(fact_partitions).difference(report_partitions))
+        if missing_report_years:
+            raise FinancialReportingBuildError(
+                "financial fact partitions have no report partition: "
+                + ",".join(str(year) for year in missing_report_years)
+            )
+        connection.from_parquet(
+            [str(path) for path in paths["dwd_financial_concept"]]
+        ).create_view("dwd_financial_concept")
         null_counts = {
-            "dwd_financial_report": connection.execute(
-                """
-                SELECT COUNT(*) FROM dwd_financial_report
-                WHERE financial_report_id IS NULL OR company_id IS NULL
-                  OR period_end IS NULL OR knowledge_from IS NULL
-                """
-            ).fetchone()[0],
-            "dwd_financial_concept": connection.execute(
-                """
-                SELECT COUNT(*) FROM dwd_financial_concept
-                WHERE financial_concept_id IS NULL OR knowledge_from IS NULL
-                  OR effective_from IS NULL
-                """
-            ).fetchone()[0],
-            "dwd_financial_fact": connection.execute(
-                """
-                SELECT COUNT(*) FROM dwd_financial_fact
-                WHERE financial_fact_id IS NULL OR financial_report_id IS NULL
-                  OR financial_concept_id IS NULL OR period_end IS NULL
-                  OR knowledge_from IS NULL
-                """
-            ).fetchone()[0],
+            "dwd_financial_report": 0,
+            "dwd_financial_concept": int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM dwd_financial_concept
+                    WHERE financial_concept_id IS NULL OR knowledge_from IS NULL
+                      OR effective_from IS NULL
+                    """
+                ).fetchone()[0]
+            ),
+            "dwd_financial_fact": 0,
         }
-        duplicate_reports = connection.execute(
-            """
-            SELECT COUNT(*) FROM (
-              SELECT financial_report_id, period_end, knowledge_from
-              FROM dwd_financial_report GROUP BY ALL HAVING COUNT(*) > 1
+        duplicate_reports = 0
+        duplicate_concepts = int(
+            connection.execute(
+                """
+                SELECT COUNT(*) FROM (
+                  SELECT financial_concept_id, taxonomy_version, effective_from, knowledge_from
+                  FROM dwd_financial_concept GROUP BY ALL HAVING COUNT(*) > 1
+                )
+                """
+            ).fetchone()[0]
+        )
+        duplicate_facts = 0
+        orphan_reports = 0
+        orphan_concepts = 0
+        partition_audit: dict[str, dict[str, int]] = {}
+        for year, report_paths in report_partitions.items():
+            connection.from_parquet([str(path) for path in report_paths]).create_view(
+                "financial_report_partition", replace=True
             )
-            """
-        ).fetchone()[0]
-        duplicate_concepts = connection.execute(
-            """
-            SELECT COUNT(*) FROM (
-              SELECT financial_concept_id, taxonomy_version, effective_from, knowledge_from
-              FROM dwd_financial_concept GROUP BY ALL HAVING COUNT(*) > 1
+            report_nulls = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM financial_report_partition
+                    WHERE financial_report_id IS NULL OR company_id IS NULL
+                      OR period_end IS NULL OR knowledge_from IS NULL
+                    """
+                ).fetchone()[0]
             )
-            """
-        ).fetchone()[0]
-        duplicate_facts = connection.execute(
-            """
-            SELECT COUNT(*) FROM (
-              SELECT financial_report_id, financial_concept_id, unit_code, context_hash,
-                period_end, knowledge_from
-              FROM dwd_financial_fact GROUP BY ALL HAVING COUNT(*) > 1
+            report_duplicates = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM (
+                      SELECT financial_report_id, period_end, knowledge_from
+                      FROM financial_report_partition GROUP BY ALL HAVING COUNT(*) > 1
+                    )
+                    """
+                ).fetchone()[0]
             )
-            """
-        ).fetchone()[0]
-        orphan_reports = connection.execute(
-            """
-            SELECT COUNT(*) FROM dwd_financial_fact AS fact
-            LEFT JOIN dwd_financial_report AS report
-              ON fact.financial_report_id = report.financial_report_id
-            WHERE report.financial_report_id IS NULL
-            """
-        ).fetchone()[0]
-        orphan_concepts = connection.execute(
-            """
-            SELECT COUNT(*) FROM dwd_financial_fact AS fact
-            LEFT JOIN dwd_financial_concept AS concept
-              ON fact.financial_concept_id = concept.financial_concept_id
-            WHERE concept.financial_concept_id IS NULL
-            """
-        ).fetchone()[0]
+            null_counts["dwd_financial_report"] += report_nulls
+            duplicate_reports += report_duplicates
+            partition_audit[str(year)] = {
+                "report_rows": sum(
+                    pq.ParquetFile(path).metadata.num_rows for path in report_paths
+                ),
+                "fact_rows": 0,
+                "null_report_keys": report_nulls,
+                "null_fact_keys": 0,
+                "duplicate_report_keys": report_duplicates,
+                "duplicate_fact_keys": 0,
+                "orphan_report_ids": 0,
+                "orphan_concept_ids": 0,
+            }
+        for year, fact_paths in fact_partitions.items():
+            connection.from_parquet([str(path) for path in fact_paths]).create_view(
+                "financial_fact_partition", replace=True
+            )
+            connection.from_parquet(
+                [str(path) for path in report_partitions[year]]
+            ).create_view("financial_report_partition", replace=True)
+            fact_nulls = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM financial_fact_partition
+                    WHERE financial_fact_id IS NULL OR financial_report_id IS NULL
+                      OR financial_concept_id IS NULL OR period_end IS NULL
+                      OR knowledge_from IS NULL
+                    """
+                ).fetchone()[0]
+            )
+            fact_duplicates = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM (
+                      SELECT financial_report_id, financial_concept_id, unit_code,
+                        context_hash, period_end, knowledge_from
+                      FROM financial_fact_partition GROUP BY ALL HAVING COUNT(*) > 1
+                    )
+                    """
+                ).fetchone()[0]
+            )
+            report_orphans = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM financial_fact_partition AS fact
+                    LEFT JOIN financial_report_partition AS report
+                      ON fact.financial_report_id = report.financial_report_id
+                    WHERE report.financial_report_id IS NULL
+                    """
+                ).fetchone()[0]
+            )
+            concept_orphans = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM financial_fact_partition AS fact
+                    LEFT JOIN dwd_financial_concept AS concept
+                      ON fact.financial_concept_id = concept.financial_concept_id
+                    WHERE concept.financial_concept_id IS NULL
+                    """
+                ).fetchone()[0]
+            )
+            null_counts["dwd_financial_fact"] += fact_nulls
+            duplicate_facts += fact_duplicates
+            orphan_reports += report_orphans
+            orphan_concepts += concept_orphans
+            year_audit = partition_audit[str(year)]
+            year_audit.update(
+                {
+                    "fact_rows": sum(
+                        pq.ParquetFile(path).metadata.num_rows for path in fact_paths
+                    ),
+                    "null_fact_keys": fact_nulls,
+                    "duplicate_fact_keys": fact_duplicates,
+                    "orphan_report_ids": report_orphans,
+                    "orphan_concept_ids": concept_orphans,
+                }
+            )
     finally:
         connection.close()
     if any(null_counts.values()) or any(
@@ -2585,7 +2675,8 @@ def _audit_financial_candidate(
             "financial_report_id": orphan_reports,
             "financial_concept_id": orphan_concepts,
         },
-        "audit_policy": "duckdb_partitioned_external_audit_v1",
+        "year_partitions": partition_audit,
+        "audit_policy": "duckdb_year_partitioned_external_audit_v2",
     }
     return metadata_counts, audit
 

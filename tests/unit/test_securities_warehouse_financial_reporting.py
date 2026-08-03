@@ -1169,6 +1169,11 @@ class FinancialEnvelopeTests(unittest.TestCase):
                 "dwd_financial_fact": 0,
             },
         )
+        self.assertEqual(
+            audit["audit_policy"], "duckdb_year_partitioned_external_audit_v2"
+        )
+        self.assertEqual(audit["year_partitions"]["2025"]["report_rows"], 1)
+        self.assertEqual(audit["year_partitions"]["2025"]["fact_rows"], 2)
 
 
 if __name__ == "__main__":

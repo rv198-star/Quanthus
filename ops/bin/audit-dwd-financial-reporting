@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Stream and seal Issue #61 financial-reporting source-audit evidence."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.securities_warehouse.financial_reporting import (  # noqa: E402
+    FinancialReportingBuildError,
+    audit_financial_statement_sources,
+    select_financial_statement_sources,
+    write_financial_reporting_source_audit,
+)
+from quanthus.pipelines.securities_warehouse.trading_calendar import (  # noqa: E402
+    TradingCalendarBuildError,
+    _mapping,
+    _object,
+    _sequence,
+    _verify_ods_binding,
+    _verify_plan_package,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ods-package", type=Path, required=True)
+    parser.add_argument("--input-plan", type=Path, required=True)
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--batch-size", type=int, default=4)
+    args = parser.parse_args()
+    try:
+        plan, ledger = _verify_plan_package(args.input_plan)
+        semantic_plan = _mapping(plan.get("plan"), "input plan")
+        model = _object(args.model)
+        _verify_ods_binding(args.ods_package, semantic_plan, model)
+        if plan.get("run_id") != args.run_id or semantic_plan.get("mode") != "base":
+            raise FinancialReportingBuildError("source audit must match one sealed Base run")
+        records = [
+            _mapping(value, "source ledger record")
+            for value in _sequence(ledger.get("records"), "source ledger records")
+        ]
+        sources = select_financial_statement_sources(records, args.ods_package)
+        audit = audit_financial_statement_sources(sources, batch_size=args.batch_size)
+        output = write_financial_reporting_source_audit(args.output, audit)
+    except (FinancialReportingBuildError, TradingCalendarBuildError, OSError) as exc:
+        print(f"financial-reporting source audit failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "all_source_accounting": audit.report["all_source_accounting"],
+                "candidate_size_calibration": audit.report["candidate_size_calibration"],
+                "output": str(output),
+                "overlay": audit.report["overlay"],
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

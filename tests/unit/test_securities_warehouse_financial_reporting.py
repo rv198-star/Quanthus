@@ -5,13 +5,22 @@ import hashlib
 import json
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from quanthus.pipelines.securities_warehouse.financial_reporting import (
     FinancialReportingBuildError,
+    FinancialStatementSource,
+    audit_financial_statement_sources,
     classify_statement_rows,
     conservative_provider_timestamp,
     decode_financial_envelope,
     iter_statement_reports,
+    select_financial_statement_sources,
+    write_financial_reporting_source_audit,
 )
 
 
@@ -85,6 +94,156 @@ class FinancialEnvelopeTests(unittest.TestCase):
         reports = iter_statement_reports(decode_financial_envelope(row))
         periods = [period for period, _report, _accounting in reports]
         self.assertEqual(periods, ["20251231", "20260331"])
+
+    def test_stream_audit_keeps_matching_parent_overlap_and_hotfix_fill(self) -> None:
+        parent_envelope = _envelope(
+            {
+                "result": {
+                    "data": {
+                        "report_list": {
+                            "20251231": {
+                                "data": [
+                                    {"item_display_type": 1, "item_field": "", "item_value": ""},
+                                    {"item_field": "CASH", "item_value": "12.5"},
+                                    {"item_field": "DEBT", "item_value": ""},
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        )
+        fill_envelope = _envelope(
+            {
+                "result": {
+                    "data": {
+                        "report_list": {
+                            "20251231": {
+                                "data": [{"item_field": "PROFIT", "item_value": "4"}]
+                            }
+                        }
+                    }
+                }
+            }
+        )
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            parent = root / "parent.parquet"
+            hotfix = root / "hotfix.parquet"
+            parent_row = {
+                **parent_envelope,
+                "security_id": "000001",
+                "stock_code": "000001",
+                "statement_type": "balance_sheet",
+            }
+            pq.write_table(pa.Table.from_pylist([parent_row]), parent)
+            pq.write_table(
+                pa.Table.from_pylist(
+                    [
+                        parent_row,
+                        {
+                            **fill_envelope,
+                            "security_id": "000002",
+                            "stock_code": "000002",
+                            "statement_type": "income_statement",
+                        },
+                    ]
+                ),
+                hotfix,
+            )
+            sources = (
+                FinancialStatementSource(
+                    "financial_statements",
+                    parent,
+                    "payload/full.parquet",
+                    "sha256:parent",
+                    "parent-r1",
+                    "parent",
+                ),
+                FinancialStatementSource(
+                    "fundamentals_financial_statements_parquet",
+                    hotfix,
+                    "payload/hotfix.parquet",
+                    "sha256:hotfix",
+                    "hotfix-r1",
+                    "hotfix",
+                ),
+            )
+            audit = audit_financial_statement_sources(sources, batch_size=1)
+            self.assertEqual(audit.report["overlay"]["parent_overlap_rows"], 1)
+            self.assertEqual(audit.report["overlay"]["hotfix_fill_rows"], 1)
+            self.assertEqual(audit.report["overlay"]["selected_envelope_rows"], 2)
+            self.assertEqual(
+                audit.report["candidate_size_calibration"]["dwd_financial_fact_upper_bound"],
+                3,
+            )
+            output = write_financial_reporting_source_audit(root / "audit.json", audit)
+            self.assertEqual(output.read_text(encoding="ascii"), output.read_text(encoding="ascii"))
+
+    def test_stream_audit_rejects_different_parent_hotfix_overlap(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            parent = root / "parent.parquet"
+            hotfix = root / "hotfix.parquet"
+            base = {"security_id": "000001", "stock_code": "000001", "statement_type": "cash_flow"}
+            pq.write_table(
+                pa.Table.from_pylist(
+                    [{**base, **_envelope({"result": {"data": {"report_list": {}}}})}]
+                ),
+                parent,
+            )
+            pq.write_table(
+                pa.Table.from_pylist(
+                    [
+                        {
+                            **base,
+                            **_envelope(
+                                {"result": {"data": {"report_list": {"20251231": {"data": []}}}}}
+                            ),
+                        }
+                    ]
+                ),
+                hotfix,
+            )
+            sources = (
+                FinancialStatementSource("parent", parent, "parent", "sha256:parent", "", "parent"),
+                FinancialStatementSource("hotfix", hotfix, "hotfix", "sha256:hotfix", "", "hotfix"),
+            )
+            with self.assertRaisesRegex(FinancialReportingBuildError, "overlap has different"):
+                audit_financial_statement_sources(sources)
+
+    def test_selects_exact_parent_and_fill_only_hotfix_from_ledger(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            full = root / "payload" / "source-evidence" / "financial_statements.parquet"
+            hotfix = root / "payload" / "fundamentals" / "financial_statements.parquet"
+            full.parent.mkdir(parents=True)
+            hotfix.parent.mkdir(parents=True)
+            full.write_bytes(b"full")
+            hotfix.write_bytes(b"hotfix")
+            records = [
+                {
+                    "record_type": "file",
+                    "disposition": "modeled",
+                    "mapping_identity": "financial_statements",
+                    "role": "retained_immutable_source_gap_fill",
+                    "path": full.relative_to(root).as_posix(),
+                    "sha256": "sha256:" + hashlib.sha256(b"full").hexdigest(),
+                },
+                {
+                    "record_type": "file",
+                    "disposition": "modeled",
+                    "mapping_identity": "fundamentals_financial_statements_parquet",
+                    "role": "provider_source_evidence",
+                    "path": hotfix.relative_to(root).as_posix(),
+                    "sha256": "sha256:" + hashlib.sha256(b"hotfix").hexdigest(),
+                },
+            ]
+            parent, selected_hotfix = select_financial_statement_sources(records, root)
+            self.assertEqual(parent.precedence, "parent")
+            self.assertEqual(selected_hotfix.precedence, "hotfix")
+            self.assertEqual(parent.path, full)
+            self.assertEqual(selected_hotfix.path, hotfix)
 
 
 if __name__ == "__main__":

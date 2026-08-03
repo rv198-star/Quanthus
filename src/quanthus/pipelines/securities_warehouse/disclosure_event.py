@@ -15,7 +15,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -104,15 +104,19 @@ def _stable_id(kind: str, *parts: str) -> str:
     return f"{kind}_{hashlib.sha256(payload).hexdigest()[:32]}"
 
 
-def _decimal(value: object, field: str) -> Decimal | None:
+def _decimal(value: object, field: str, *, scale: int = 10) -> Decimal | None:
     if value in (None, ""):
         return None
     try:
         parsed = Decimal(str(value))
     except InvalidOperation as exc:
         raise DisclosureEventBuildError(f"{field} is not decimal") from exc
-    if not parsed.is_finite() or parsed.as_tuple().exponent < -10:
-        raise DisclosureEventBuildError(f"{field} exceeds decimal_38_10")
+    if not parsed.is_finite():
+        raise DisclosureEventBuildError(f"{field} is not finite")
+    if parsed.as_tuple().exponent < -scale:
+        if not isinstance(value, float):
+            raise DisclosureEventBuildError(f"{field} exceeds decimal scale {scale}")
+        parsed = parsed.quantize(Decimal(1).scaleb(-scale), rounding=ROUND_HALF_EVEN)
     return parsed
 
 
@@ -715,7 +719,7 @@ def materialize_adjustment_factor_rows(
     factors: list[dict[str, Any]] = []
     inputs: list[dict[str, Any]] = []
     for field, raw_mapping in vocabulary["factor_methods"].items():
-        value = _decimal(row.get(field), f"factor {field}")
+        value = _decimal(row.get(field), f"factor {field}", scale=18)
         if value is None:
             continue
         mapping = _mapping(raw_mapping, f"factor mapping {field}")

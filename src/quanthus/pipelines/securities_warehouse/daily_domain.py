@@ -326,7 +326,7 @@ def build_daily_domain_increment(
             CASE WHEN o.is_open=1 THEN NULL ELSE 'SCHEDULED_CLOSED' END::VARCHAR AS calendar_reason
             FROM read_parquet({_sql(str(trading_calendar_path))}) o JOIN base_venue v
               ON v.mic_code=CASE o.exchange WHEN 'SSE' THEN 'XSHG'
-                 WHEN 'SZSE' THEN 'XSHE' WHEN 'BSE' THEN 'XBSE' END
+                 WHEN 'SZSE' THEN 'XSHE' WHEN 'BSE' THEN 'BJSE' END
             WHERE o.trade_date={_sql(market_date.isoformat())}::DATE""",
             calendar_output,
         )

@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from quanthus.pipelines.securities_warehouse.ownership_capital import (  # noqa: E402
     OwnershipCapitalBuildError,
     audit_ownership_capital_source_package,
+    build_ownership_capital,
 )
 
 
@@ -27,26 +28,57 @@ def main() -> int:
     audit.add_argument("--listed-company-candidate", type=Path, required=True)
     audit.add_argument("--output", type=Path, required=True)
     audit.add_argument("--run-id", required=True)
+    build = subcommands.add_parser("build")
+    build.add_argument("--ods-package", type=Path, required=True)
+    build.add_argument("--input-plan", type=Path, required=True)
+    build.add_argument("--model", type=Path, required=True)
+    build.add_argument("--model-extension", type=Path, required=True)
+    build.add_argument("--listed-company-candidate", type=Path, required=True)
+    build.add_argument("--disclosure-event-candidate", type=Path, required=True)
+    build.add_argument("--source-audit", type=Path, required=True)
+    build.add_argument("--output", type=Path, required=True)
+    build.add_argument("--run-id", required=True)
+    build.add_argument("--batch-size", type=int, default=8192)
     args = parser.parse_args()
     try:
-        result = audit_ownership_capital_source_package(
-            ods_package=args.ods_package,
-            input_plan=args.input_plan,
-            model_path=args.model,
-            model_extension_path=args.model_extension,
-            listed_company_candidate=args.listed_company_candidate,
-            output=args.output,
-            run_id=args.run_id,
-        )
+        if args.command == "audit-sources":
+            result = audit_ownership_capital_source_package(
+                ods_package=args.ods_package,
+                input_plan=args.input_plan,
+                model_path=args.model,
+                model_extension_path=args.model_extension,
+                listed_company_candidate=args.listed_company_candidate,
+                output=args.output,
+                run_id=args.run_id,
+            )
+            response = {
+                "output": str(args.output.resolve()),
+                "source_rows": result.report["source_rows"],
+            }
+        else:
+            result = build_ownership_capital(
+                ods_package=args.ods_package,
+                input_plan=args.input_plan,
+                model_path=args.model,
+                model_extension_path=args.model_extension,
+                listed_company_candidate=args.listed_company_candidate,
+                disclosure_event_candidate=args.disclosure_event_candidate,
+                source_audit_path=args.source_audit,
+                output=args.output,
+                run_id=args.run_id,
+                batch_size=args.batch_size,
+            )
+            response = {
+                "output": str(result.root),
+                "semantic_digest": result.semantic_digest,
+                "row_counts": result.row_counts,
+            }
     except (OwnershipCapitalBuildError, OSError) as exc:
         print(f"ownership-capital DWD failed: {exc}", file=sys.stderr)
         return 2
     print(
         json.dumps(
-            {
-                "output": str(args.output.resolve()),
-                "source_rows": result.report["source_rows"],
-            },
+            response,
             ensure_ascii=True,
             sort_keys=True,
         )

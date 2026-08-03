@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
+import os
 import re
+import shutil
 import sqlite3
+import stat
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -15,15 +19,25 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from quanthus.pipelines.securities_warehouse.disclosure_event import (
+    DisclosureEventBuildError,
     _load_company_resolver,
     _report_date,
     _sha256,
     _source_path,
     _text,
     _write_json_immutable,
+    verify_disclosure_event_candidate,
 )
 from quanthus.pipelines.securities_warehouse.disclosure_event import (
     _select_sources as _select_disclosure_sources,
+)
+from quanthus.pipelines.securities_warehouse.industry_classification import (
+    _digest,
+    _file_record,
+    _fsync_directory,
+    _write_json_atomic,
+    _write_parquet_atomic,
+    _write_text_atomic,
 )
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
@@ -52,6 +66,15 @@ class OwnershipCapitalSourceAudit:
     """Checksum-bound preflight evidence for the Issue #63 build."""
 
     report: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class OwnershipCapitalBuildResult:
+    """A sealed, non-published four-object Issue #63 candidate."""
+
+    root: Path
+    semantic_digest: str
+    row_counts: Mapping[str, int]
 
 
 @dataclass(frozen=True)
@@ -897,3 +920,376 @@ def audit_ownership_capital_source_package(
     }
     _write_json_immutable(output, report)
     return OwnershipCapitalSourceAudit(report)
+
+
+_OWNED_TABLES = (
+    "dwd_share_capital_observation",
+    "dwd_shareholder_count_observation",
+    "dwd_shareholding_change",
+    "dwd_shareholding_observation",
+)
+
+
+def _year_for_row(table: str, row: Mapping[str, Any]) -> int:
+    if table == "dwd_shareholder_count_observation":
+        return row["period_end"].year
+    if table == "dwd_shareholding_change":
+        return row["effective_at"].year
+    return row["observation_start"].year
+
+
+def _write_ownership_rows(
+    work: Path,
+    table: str,
+    rows: Sequence[Mapping[str, Any]],
+    schema: Any,
+    batch_id: str,
+) -> list[str]:
+    try:
+        import pyarrow as pa
+    except ModuleNotFoundError as exc:
+        raise OwnershipCapitalBuildError("pyarrow is required for ownership writes") from exc
+    grouped: dict[int, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(_year_for_row(table, row), []).append(row)
+    files: list[str] = []
+    for year, values in sorted(grouped.items()):
+        path = (
+            work
+            / "payload/ownership_capital"
+            / table
+            / f"year={year:04d}"
+            / f"part-{batch_id}.parquet"
+        )
+        _write_parquet_atomic(path, pa.Table.from_pylist(values, schema=schema))
+        files.append(path.relative_to(work).as_posix())
+    return files
+
+
+def _verify_ownership_candidate(
+    output: Path, identity: Mapping[str, Any]
+) -> OwnershipCapitalBuildResult:
+    if output.is_symlink() or not output.is_dir():
+        raise OwnershipCapitalBuildError("ownership candidate must be physical")
+    manifest = _object(output / "manifest.json")
+    if (output / "READY").read_text(encoding="ascii").strip() != _sha256(output / "manifest.json"):
+        raise OwnershipCapitalBuildError("ownership READY differs")
+    if any(manifest.get(field) != value for field, value in identity.items()):
+        raise OwnershipCapitalBuildError("ownership candidate identity differs")
+    if manifest.get("owned_tables") != list(_OWNED_TABLES):
+        raise OwnershipCapitalBuildError("ownership candidate table scope differs")
+    declared = {str(item["path"]): item for item in manifest.get("files", [])}
+    for relative, item in declared.items():
+        path = output / relative
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or path.stat().st_size != item.get("size_bytes")
+            or _sha256(path) != item.get("sha256")
+        ):
+            raise OwnershipCapitalBuildError(f"ownership file differs: {relative}")
+    physical = {
+        path.relative_to(output).as_posix()
+        for path in output.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    }
+    if physical != set(declared) | {"manifest.json", "READY"}:
+        raise OwnershipCapitalBuildError("ownership inventory differs")
+    return OwnershipCapitalBuildResult(
+        output.resolve(),
+        str(manifest["semantic_digest"]),
+        {str(key): int(value) for key, value in manifest["row_counts"].items()},
+    )
+
+
+def _build_ownership_capital_locked(
+    *,
+    ods_package: Path,
+    input_plan: Path,
+    model_path: Path,
+    model_extension_path: Path,
+    listed_company_candidate: Path,
+    disclosure_event_candidate: Path,
+    source_audit_path: Path,
+    output: Path,
+    run_id: str,
+    batch_size: int,
+) -> OwnershipCapitalBuildResult:
+    try:
+        plan, ledger = _verify_plan_package(input_plan)
+        semantic_plan = _mapping(plan.get("plan"), "input plan")
+        model = _object(model_path)
+        _verify_ods_binding(ods_package, semantic_plan, model)
+        _, extension_sha = verify_additive_model_extension(model_path, model_extension_path)
+    except (TradingCalendarBuildError, ModelExtensionError) as exc:
+        raise OwnershipCapitalBuildError("ownership build input verification failed") from exc
+    plan_digest = _text(plan.get("plan_digest"), "input plan digest")
+    model_sha = _sha256(model_path)
+    if plan.get("run_id") != run_id:
+        raise OwnershipCapitalBuildError("ownership run differs from plan")
+    listed = verify_listed_company_candidate(
+        listed_company_candidate,
+        run_id=run_id,
+        input_plan_digest=plan_digest,
+        model_sha256=model_sha,
+    )
+    try:
+        disclosure = verify_disclosure_event_candidate(
+            disclosure_event_candidate,
+            run_id=run_id,
+            input_plan_digest=plan_digest,
+            model_sha256=model_sha,
+        )
+    except DisclosureEventBuildError as exc:
+        raise OwnershipCapitalBuildError("ownership #60 predecessor differs") from exc
+    audit = _object(source_audit_path)
+    audit_sha = _sha256(source_audit_path)
+    expected_audit = {
+        "run_id": run_id,
+        "input_plan_digest": plan_digest,
+        "model_sha256": model_sha,
+        "model_extension_sha256": extension_sha,
+        "listed_company_semantic_digest": listed.semantic_digest,
+    }
+    if audit.get("kind") != "dwd_ownership_capital_source_audit" or any(
+        audit.get(field) != value for field, value in expected_audit.items()
+    ):
+        raise OwnershipCapitalBuildError("ownership source audit differs")
+    records = [
+        _mapping(raw, "source ledger record")
+        for raw in _sequence(ledger.get("records"), "source ledger records")
+    ]
+    sources = _select_sources(records, ods_package)
+    identity = {
+        "run_id": run_id,
+        "input_plan_digest": plan_digest,
+        "model_sha256": model_sha,
+        "model_extension_sha256": extension_sha,
+        "source_audit_sha256": audit_sha,
+        "listed_company_semantic_digest": listed.semantic_digest,
+        "disclosure_event_semantic_digest": disclosure.semantic_digest,
+    }
+    if output.exists():
+        return _verify_ownership_candidate(output, identity)
+    work = output.parent / f".{output.name}.work"
+    work.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = work / "checkpoint.json"
+    checkpoint = (
+        _object(checkpoint_path)
+        if checkpoint_path.exists()
+        else {"schema_version": 1, "identity": identity, "batches": {}}
+    )
+    if checkpoint.get("identity") != identity:
+        raise OwnershipCapitalBuildError("ownership checkpoint differs")
+    schemas = ownership_capital_schemas()
+    resolver = _load_company_resolver(listed_company_candidate)
+    quality: Counter[str] = Counter()
+
+    def commit_batch(
+        batch_id: str, rows: Mapping[str, Sequence[Mapping[str, Any]]], notes: Counter[str]
+    ) -> None:
+        if batch_id in checkpoint["batches"]:
+            return
+        files: list[str] = []
+        counts: dict[str, int] = {}
+        for table, values in rows.items():
+            counts[table] = len(values)
+            files.extend(_write_ownership_rows(work, table, values, schemas[table], batch_id))
+        checkpoint["batches"][batch_id] = {
+            "row_counts": counts,
+            "quality_exceptions": dict(sorted(notes.items())),
+            "files": files,
+        }
+        _write_json_atomic(checkpoint_path, checkpoint)
+
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise OwnershipCapitalBuildError("pyarrow is required for ownership build") from exc
+    for index, batch in enumerate(
+        pq.ParquetFile(sources["shareholder_count"].path).iter_batches(batch_size=batch_size)
+    ):
+        batch_id = f"count-{index:06d}"
+        if batch_id in checkpoint["batches"]:
+            continue
+        values: list[dict[str, Any]] = []
+        notes: Counter[str] = Counter()
+        for raw in batch.to_pylist():
+            coordinate = _report_date(raw.get("end_date"), "holder count date")
+            company, reason = resolver.resolve_for_report(
+                str(raw.get("code")), period_end=coordinate
+            )
+            if company is None:
+                notes[str(reason)] += 1
+                continue
+            values.append(
+                materialize_shareholder_count_row(
+                    raw,
+                    company_id=company.company_id,
+                    security_id=company.security_id,
+                    source_sha256=sources["shareholder_count"].sha256,
+                )
+            )
+            if reason is not None:
+                notes[str(reason)] += 1
+        commit_batch(batch_id, {"dwd_shareholder_count_observation": values}, notes)
+    connection = sqlite3.connect(f"file:{sources['holder_changes'].path}?mode=ro", uri=True)
+    connection.row_factory = sqlite3.Row
+    try:
+        cursor = connection.execute("SELECT * FROM holder_changes ORDER BY rowid")
+        index = 0
+        while True:
+            batch = cursor.fetchmany(batch_size)
+            if not batch:
+                break
+            batch_id = f"change-{index:06d}"
+            if batch_id not in checkpoint["batches"]:
+                values = []
+                notes = Counter()
+                for item in batch:
+                    raw = dict(item)
+                    coordinate = _report_date(
+                        raw.get("change_date") or raw.get("disclosure_date"),
+                        "holder change date",
+                    )
+                    company, reason = resolver.resolve_for_report(
+                        str(raw.get("code")), period_end=coordinate
+                    )
+                    if company is None:
+                        notes[str(reason)] += 1
+                        continue
+                    values.append(
+                        materialize_holder_change_row(
+                            raw,
+                            company_id=company.company_id,
+                            security_id=company.security_id,
+                            source_sha256=sources["holder_changes"].sha256,
+                            source_revision=run_id,
+                        )
+                    )
+                    if reason is not None:
+                        notes[str(reason)] += 1
+                commit_batch(batch_id, {"dwd_shareholding_change": values}, notes)
+            index += 1
+    finally:
+        connection.close()
+    selected: set[tuple[str, str]] = set()
+    for source_index, source_id in enumerate(("parent_f10", "hotfix_f10")):
+        source = sources[source_id]
+        for index, batch in enumerate(pq.ParquetFile(source.path).iter_batches(batch_size=256)):
+            batch_id = f"f10-{source_index}-{index:06d}"
+            rows = {
+                "dwd_share_capital_observation": [],
+                "dwd_shareholding_observation": [],
+            }
+            notes = Counter()
+            for raw in batch.to_pylist():
+                category = str(raw.get("category"))
+                if category not in _F10_CATEGORIES:
+                    continue
+                key = (str(raw.get("stock_code")), category)
+                if key in selected:
+                    continue
+                selected.add(key)
+                if batch_id in checkpoint["batches"]:
+                    continue
+                coordinate = _report_date(
+                    raw.get("market_date") or raw.get("provider_updated_date"),
+                    "F10 date",
+                )
+                company, reason = resolver.resolve_for_report(key[0], period_end=coordinate)
+                if company is None:
+                    notes[str(reason)] += 1
+                    continue
+                expanded = materialize_f10_rows(
+                    raw,
+                    company_id=company.company_id,
+                    security_id=company.security_id,
+                    source_sha256=source.sha256,
+                )
+                for table, values in expanded.items():
+                    rows[table].extend(values)
+                if not any(expanded.values()):
+                    notes[f"EMPTY_F10_{category}"] += 1
+            if batch_id not in checkpoint["batches"]:
+                commit_batch(batch_id, rows, notes)
+    totals = {table: 0 for table in _OWNED_TABLES}
+    for batch in checkpoint["batches"].values():
+        for table, count in batch["row_counts"].items():
+            totals[table] += int(count)
+        quality.update(batch.get("quality_exceptions", {}))
+    reconciliation = {
+        "schema_version": 1,
+        "kind": "dwd_ownership_capital_reconciliation",
+        "row_counts": totals,
+        "quality_exceptions": dict(sorted(quality.items())),
+    }
+    _write_json_atomic(work / "reconciliation/source-row-reconciliation.json", reconciliation)
+    shutil.copyfile(source_audit_path, work / "source-audit.json")
+    files = sorted(
+        path
+        for path in work.rglob("*")
+        if path.is_file() and path.name not in {"manifest.json", "READY"}
+    )
+    semantic_digest = _digest({**identity, "files": [_file_record(work, path) for path in files]})
+    manifest = {
+        "schema_version": 1,
+        "kind": "dwd_ownership_capital_candidate",
+        **identity,
+        "semantic_digest": semantic_digest,
+        "owned_tables": list(_OWNED_TABLES),
+        "row_counts": totals,
+        "quality_exceptions": dict(sorted(quality.items())),
+        "files": [_file_record(work, path) for path in files],
+    }
+    _write_json_atomic(work / "manifest.json", manifest)
+    _write_text_atomic(work / "READY", _sha256(work / "manifest.json") + "\n")
+    _fsync_directory(work)
+    _verify_ownership_candidate(work, identity)
+    os.replace(work, output)
+    _fsync_directory(output.parent)
+    return _verify_ownership_candidate(output, identity)
+
+
+def build_ownership_capital(
+    *,
+    ods_package: Path,
+    input_plan: Path,
+    model_path: Path,
+    model_extension_path: Path,
+    listed_company_candidate: Path,
+    disclosure_event_candidate: Path,
+    source_audit_path: Path,
+    output: Path,
+    run_id: str,
+    batch_size: int = 8192,
+) -> OwnershipCapitalBuildResult:
+    """Build a checkpointed Issue #63 candidate without advancing CURRENT."""
+
+    if batch_size < 1 or output.is_symlink():
+        raise OwnershipCapitalBuildError("invalid ownership build arguments")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = output.parent / f".{output.name}.lock"
+    descriptor = os.open(
+        lock_path,
+        os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+        0o640,
+    )
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise OwnershipCapitalBuildError("ownership lock is not physical")
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        return _build_ownership_capital_locked(
+            ods_package=ods_package,
+            input_plan=input_plan,
+            model_path=model_path,
+            model_extension_path=model_extension_path,
+            listed_company_candidate=listed_company_candidate,
+            disclosure_event_candidate=disclosure_event_candidate,
+            source_audit_path=source_audit_path,
+            output=output,
+            run_id=run_id,
+            batch_size=batch_size,
+        )
+    finally:
+        os.close(descriptor)

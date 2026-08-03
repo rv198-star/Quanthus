@@ -1054,6 +1054,37 @@ def _verify_candidate(output: Path, identity: Mapping[str, Any]) -> DisclosureEv
     )
 
 
+def verify_disclosure_event_candidate(
+    output: Path,
+    *,
+    run_id: str,
+    input_plan_digest: str,
+    model_sha256: str,
+) -> DisclosureEventBuildResult:
+    """Deeply verify a same-run #60 predecessor for downstream builders."""
+
+    manifest = _object(output / "manifest.json")
+    if (
+        manifest.get("run_id") != run_id
+        or manifest.get("input_plan_digest") != input_plan_digest
+        or manifest.get("model_sha256") != model_sha256
+    ):
+        raise DisclosureEventBuildError("disclosure predecessor binding differs")
+    identity = {
+        field: manifest.get(field)
+        for field in (
+            "run_id",
+            "input_plan_digest",
+            "model_sha256",
+            "source_audit_sha256",
+            "vocabulary_sha256",
+            "listed_company_semantic_digest",
+            "financial_reporting_semantic_digest",
+        )
+    }
+    return _verify_candidate(output, identity)
+
+
 def _build_disclosure_event_locked(
     *,
     ods_package: Path,

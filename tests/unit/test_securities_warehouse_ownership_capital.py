@@ -9,12 +9,30 @@ from quanthus.pipelines.securities_warehouse.ownership_capital import (
     OwnershipCapitalBuildError,
     _file_source,
     _single_record,
+    ownership_capital_schemas,
     parse_f10_capital_structure,
     parse_f10_shareholding_tables,
 )
 
 
 class OwnershipCapitalTests(unittest.TestCase):
+    def test_v11_schemas_cover_four_owned_objects(self) -> None:
+        schemas = ownership_capital_schemas()
+
+        self.assertEqual(
+            set(schemas),
+            {
+                "dwd_share_capital_observation",
+                "dwd_shareholder_count_observation",
+                "dwd_shareholding_change",
+                "dwd_shareholding_observation",
+            },
+        )
+        self.assertIn(
+            "holder_match_key", schemas["dwd_shareholding_observation"].names
+        )
+        self.assertIn("parser_version", schemas["dwd_shareholding_change"].names)
+
     def test_capital_matrix_expands_dates_and_units(self) -> None:
         rows = parse_f10_capital_structure(
             """

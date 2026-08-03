@@ -8,10 +8,11 @@ import sqlite3
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, time, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from quanthus.pipelines.securities_warehouse.disclosure_event import (
     _load_company_resolver,
@@ -65,6 +66,124 @@ class _Source:
 
 _F10_CATEGORIES = {"股本结构", "股东研究"}
 _F10_PARSER_VERSION = "quanthus-tdx-f10-table-v1"
+_SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+
+def _effective_start(value: date) -> datetime:
+    return datetime.combine(value, time.min, _SHANGHAI).astimezone(timezone.utc)
+
+
+def ownership_capital_schemas() -> dict[str, Any]:
+    """Return v1 + additive v1.1 physical schemas for Issue #63."""
+
+    try:
+        import pyarrow as pa
+    except ModuleNotFoundError as exc:
+        raise OwnershipCapitalBuildError("pyarrow is required for ownership DWD rows") from exc
+    lineage = [
+        pa.field("record_source", pa.string(), nullable=False),
+        pa.field("source_record_id", pa.string(), nullable=False),
+        pa.field("source_revision", pa.string(), nullable=False),
+        pa.field("source_artifact_sha256", pa.string(), nullable=False),
+        pa.field("knowledge_from", pa.timestamp("us", tz="UTC"), nullable=False),
+        pa.field("knowledge_to", pa.timestamp("us", tz="UTC"), nullable=True),
+    ]
+    market = [
+        pa.field("observation_start", pa.timestamp("us", tz="UTC"), nullable=False),
+        pa.field("observation_end", pa.timestamp("us", tz="UTC"), nullable=True),
+    ]
+    reporting = [
+        pa.field("period_start", pa.date32(), nullable=True),
+        pa.field("period_end", pa.date32(), nullable=False),
+        pa.field("published_at", pa.timestamp("us", tz="UTC"), nullable=True),
+    ]
+    event = [
+        pa.field("effective_at", pa.timestamp("us", tz="UTC"), nullable=False),
+        pa.field("announced_at", pa.timestamp("us", tz="UTC"), nullable=True),
+    ]
+    d3810 = pa.decimal128(38, 10)
+    d1812 = pa.decimal128(18, 12)
+    return {
+        "dwd_share_capital_observation": pa.schema(
+            lineage
+            + market
+            + [
+                pa.field("security_id", pa.string(), nullable=False),
+                pa.field("capital_type", pa.string(), nullable=False),
+                pa.field("share_quantity", d3810, nullable=False),
+                pa.field("unit_code", pa.string(), nullable=False),
+                pa.field("raw_value", pa.string(), nullable=False),
+                pa.field("raw_unit", pa.string(), nullable=False),
+                pa.field("parser_version", pa.string(), nullable=False),
+            ]
+        ),
+        "dwd_shareholder_count_observation": pa.schema(
+            lineage
+            + reporting
+            + [
+                pa.field("shareholder_count_observation_id", pa.string(), nullable=False),
+                pa.field("company_id", pa.string(), nullable=False),
+                pa.field("security_id", pa.string(), nullable=True),
+                pa.field("observation_scope", pa.string(), nullable=False),
+                pa.field("holder_count", pa.int64(), nullable=False),
+                pa.field("average_holding", d3810, nullable=True),
+                pa.field("raw_holder_count", pa.string(), nullable=False),
+                pa.field("raw_average_holding", pa.string(), nullable=True),
+                pa.field("raw_unit", pa.string(), nullable=False),
+                pa.field("parser_version", pa.string(), nullable=False),
+            ]
+        ),
+        "dwd_shareholding_change": pa.schema(
+            lineage
+            + event
+            + [
+                pa.field("shareholding_change_id", pa.string(), nullable=False),
+                pa.field("company_id", pa.string(), nullable=False),
+                pa.field("security_id", pa.string(), nullable=True),
+                pa.field("shareholder_source_name", pa.string(), nullable=False),
+                pa.field("shareholder_id", pa.string(), nullable=True),
+                pa.field("change_type", pa.string(), nullable=False),
+                pa.field("share_change", d3810, nullable=True),
+                pa.field("percentage_change", d1812, nullable=True),
+                pa.field("post_holding", d3810, nullable=True),
+                pa.field("post_percentage", d1812, nullable=True),
+                pa.field("disclosure_id", pa.string(), nullable=True),
+                pa.field("holder_match_key", pa.string(), nullable=False),
+                pa.field("raw_share_change", pa.string(), nullable=True),
+                pa.field("share_change_unit", pa.string(), nullable=True),
+                pa.field("raw_percentage_change", pa.string(), nullable=True),
+                pa.field("percentage_change_unit", pa.string(), nullable=True),
+                pa.field("raw_post_holding", pa.string(), nullable=True),
+                pa.field("post_holding_unit", pa.string(), nullable=True),
+                pa.field("raw_post_percentage", pa.string(), nullable=True),
+                pa.field("post_percentage_unit", pa.string(), nullable=True),
+                pa.field("parser_version", pa.string(), nullable=False),
+            ]
+        ),
+        "dwd_shareholding_observation": pa.schema(
+            lineage
+            + market
+            + [
+                pa.field("company_id", pa.string(), nullable=False),
+                pa.field("security_id", pa.string(), nullable=False),
+                pa.field("shareholder_source_name", pa.string(), nullable=False),
+                pa.field("shareholder_id", pa.string(), nullable=True),
+                pa.field("holding_quantity", d3810, nullable=True),
+                pa.field("holding_percentage", d1812, nullable=True),
+                pa.field("holding_type", pa.string(), nullable=False),
+                pa.field("holder_match_key", pa.string(), nullable=False),
+                pa.field("table_kind", pa.string(), nullable=False),
+                pa.field("holder_rank", pa.int32(), nullable=False),
+                pa.field("holder_category", pa.string(), nullable=True),
+                pa.field("share_nature", pa.string(), nullable=True),
+                pa.field("raw_holding_quantity", pa.string(), nullable=True),
+                pa.field("holding_quantity_unit", pa.string(), nullable=True),
+                pa.field("raw_holding_percentage", pa.string(), nullable=True),
+                pa.field("holding_percentage_unit", pa.string(), nullable=True),
+                pa.field("parser_version", pa.string(), nullable=False),
+            ]
+        ),
+    }
 
 
 def _table_cells(line: str) -> list[str]:

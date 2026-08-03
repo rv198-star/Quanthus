@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from quanthus.pipelines.securities_warehouse.disclosure_event import (  # noqa: E402
     DisclosureEventBuildError,
     audit_disclosure_event_source_package,
+    build_disclosure_event,
 )
 
 
@@ -28,29 +29,60 @@ def main() -> int:
     audit.add_argument("--vocabulary", type=Path, required=True)
     audit.add_argument("--output", type=Path, required=True)
     audit.add_argument("--run-id", required=True)
+    build = subcommands.add_parser("build")
+    build.add_argument("--ods-package", type=Path, required=True)
+    build.add_argument("--input-plan", type=Path, required=True)
+    build.add_argument("--model", type=Path, required=True)
+    build.add_argument("--listed-company-candidate", type=Path, required=True)
+    build.add_argument("--financial-reporting-candidate", type=Path, required=True)
+    build.add_argument("--vocabulary", type=Path, required=True)
+    build.add_argument("--source-audit", type=Path, required=True)
+    build.add_argument("--output", type=Path, required=True)
+    build.add_argument("--run-id", required=True)
+    build.add_argument("--announcement-batch-size", type=int, default=50000)
     args = parser.parse_args()
     try:
-        result = audit_disclosure_event_source_package(
-            ods_package=args.ods_package,
-            input_plan=args.input_plan,
-            model_path=args.model,
-            listed_company_candidate=args.listed_company_candidate,
-            financial_reporting_candidate=args.financial_reporting_candidate,
-            vocabulary_path=args.vocabulary,
-            output=args.output,
-            run_id=args.run_id,
-        )
+        if args.command == "audit-sources":
+            result = audit_disclosure_event_source_package(
+                ods_package=args.ods_package,
+                input_plan=args.input_plan,
+                model_path=args.model,
+                listed_company_candidate=args.listed_company_candidate,
+                financial_reporting_candidate=args.financial_reporting_candidate,
+                vocabulary_path=args.vocabulary,
+                output=args.output,
+                run_id=args.run_id,
+            )
+            response = {
+                "output": str(args.output.resolve()),
+                "candidate_size_calibration": result.report[
+                    "candidate_size_calibration"
+                ],
+            }
+        else:
+            result = build_disclosure_event(
+                ods_package=args.ods_package,
+                input_plan=args.input_plan,
+                model_path=args.model,
+                listed_company_candidate=args.listed_company_candidate,
+                financial_reporting_candidate=args.financial_reporting_candidate,
+                vocabulary_path=args.vocabulary,
+                source_audit_path=args.source_audit,
+                output=args.output,
+                run_id=args.run_id,
+                announcement_batch_size=args.announcement_batch_size,
+            )
+            response = {
+                "output": str(result.root),
+                "semantic_digest": result.semantic_digest,
+                "row_counts": result.row_counts,
+            }
     except (DisclosureEventBuildError, OSError) as exc:
         print(f"disclosure-event DWD failed: {exc}", file=sys.stderr)
         return 2
     print(
         json.dumps(
-            {
-                "output": str(args.output.resolve()),
-                "candidate_size_calibration": result.report[
-                    "candidate_size_calibration"
-                ],
-            },
+            response,
             ensure_ascii=True,
             sort_keys=True,
         )

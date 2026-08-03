@@ -12,10 +12,27 @@ from quanthus.pipelines.securities_warehouse.disclosure_event import (
     _load_vocabulary,
     _provider_timestamp,
     _select_sources,
+    disclosure_event_schemas,
+    materialize_adjustment_factor_rows,
+    materialize_announcement_rows,
+    materialize_corporate_action_rows,
 )
 
 
 class DisclosureEventTests(unittest.TestCase):
+    def test_physical_schemas_cover_all_six_owned_tables(self) -> None:
+        self.assertEqual(
+            set(disclosure_event_schemas()),
+            {
+                "dwd_disclosure",
+                "dwd_disclosure_subject",
+                "dwd_corporate_action",
+                "dwd_corporate_action_term",
+                "dwd_adjustment_factor",
+                "dwd_adjustment_factor_input",
+            },
+        )
+
     def test_date_only_availability_uses_shanghai_end_of_day(self) -> None:
         value = _provider_timestamp(date(2026, 7, 31), "published_at")
 
@@ -112,6 +129,112 @@ class DisclosureEventTests(unittest.TestCase):
                 selected["announcements"].path,
                 selected["announcement_archive"].path,
             )
+
+    def test_announcement_has_security_and_report_subjects(self) -> None:
+        rows = materialize_announcement_rows(
+            {
+                "ann_id": "ann-1",
+                "publish_time": "2026-07-31",
+                "title": "2026年半年度报告",
+                "url": "https://example.invalid/ann-1",
+                "category": "定期报告",
+            },
+            company_id="company-1",
+            security_id="security-1",
+            source_sha256="sha256:archive",
+            source_revision="ods-base-v1.2",
+            financial_report_ids=["report-1"],
+        )
+
+        self.assertEqual(len(rows["dwd_disclosure"]), 1)
+        subjects = rows["dwd_disclosure_subject"]
+        self.assertEqual(
+            {row["subject_type"] for row in subjects},
+            {"SECURITY", "FINANCIAL_REPORT"},
+        )
+        self.assertTrue(
+            all(
+                sum(
+                    value is not None
+                    for value in (
+                        row["security_id"],
+                        row["corporate_action_id"],
+                        row["financial_report_id"],
+                    )
+                )
+                == 1
+                for row in subjects
+            )
+        )
+
+    def test_action_terms_preserve_cash_and_share_roles(self) -> None:
+        vocabulary = {
+            "action_types": {"mixed": "MIXED_DISTRIBUTION"},
+            "action_statuses": {"实施": "IMPLEMENTED"},
+            "term_types": {
+                "cash_per_share": "CASH_AMOUNT_PER_SHARE",
+                "bonus_shares": "BONUS_SHARES_PER_SHARE",
+                "transfer_shares": "TRANSFER_SHARES_PER_SHARE",
+            },
+        }
+        rows = materialize_corporate_action_rows(
+            {
+                "action_id": "action-1",
+                "stock_code": "000001",
+                "announce_date": "2026-06-01",
+                "ex_date": "2026-06-12",
+                "action_type": "mixed",
+                "progress": "实施",
+                "cash_per_share": 0.36,
+                "bonus_shares": 0.1,
+                "built_at": "2026-06-01T12:00:00Z",
+            },
+            source_id="corporate_actions",
+            source_sha256="sha256:actions",
+            source_revision="v1",
+            company_id="company-1",
+            security_id="security-1",
+            vocabulary=vocabulary,
+        )
+
+        terms = rows["dwd_corporate_action_term"]
+        self.assertEqual(len(terms), 2)
+        self.assertEqual(
+            {row["term_type"] for row in terms},
+            {"CASH_AMOUNT_PER_SHARE", "BONUS_SHARES_PER_SHARE"},
+        )
+
+    def test_factor_has_one_explicit_evidence_input_per_method(self) -> None:
+        rows = materialize_adjustment_factor_rows(
+            {
+                "stock_code": "000001",
+                "effective_date": "2026-06-12",
+                "fore_adjust_factor": 1.2,
+                "back_adjust_factor": 0.8,
+                "adjust_factor": 1.0,
+                "adj_version": "v3",
+                "knowledge_cutoff": "2026-07-31T00:00:00Z",
+                "source_revision": "r3",
+            },
+            source_sha256="sha256:factors",
+            company_security_id="security-1",
+            vocabulary={
+                "factor_methods": {
+                    "adjust_factor": {"direction": "PROVIDER_NATIVE", "method": "PROVIDER"},
+                    "back_adjust_factor": {"direction": "BACKWARD", "method": "BACK"},
+                    "fore_adjust_factor": {"direction": "FORWARD", "method": "FORE"},
+                }
+            },
+        )
+
+        self.assertEqual(len(rows["dwd_adjustment_factor"]), 3)
+        self.assertEqual(len(rows["dwd_adjustment_factor_input"]), 3)
+        self.assertTrue(
+            all(
+                row["input_type"] == "SOURCE_EVIDENCE"
+                for row in rows["dwd_adjustment_factor_input"]
+            )
+        )
 
 
 if __name__ == "__main__":

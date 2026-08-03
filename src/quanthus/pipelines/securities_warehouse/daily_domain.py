@@ -412,9 +412,11 @@ def build_daily_domain_increment(
         _copy(
             connection,
             f"""SELECT {_lineage(announcements_path, announcements_artifact, "o")},
-            {effective} effective_at, {effective} announced_at, {disclosure_id} disclosure_id,
-            s.company_id, 'announcement'::VARCHAR disclosure_type, o.ann_id source_document_id,
-            o.title, o.url document_uri, 'zh-CN'::VARCHAR language
+            {effective} AS effective_at, {effective} AS announced_at,
+            {disclosure_id} AS disclosure_id, s.company_id AS company_id,
+            'announcement'::VARCHAR AS disclosure_type,
+            o.ann_id AS source_document_id, o.title AS title,
+            o.url AS document_uri, 'zh-CN'::VARCHAR AS "language"
             FROM ({ann_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
             JOIN base_security s ON s.security_id=l.security_id""",
             disclosure_output,

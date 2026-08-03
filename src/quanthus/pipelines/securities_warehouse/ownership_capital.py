@@ -391,6 +391,12 @@ def _raw_number(value: object) -> str | None:
     return str(value)
 
 
+def _bounded_decimal(raw: str | None, scale: int) -> Decimal | None:
+    if raw is None:
+        return None
+    return Decimal(raw).quantize(Decimal(1).scaleb(-scale))
+
+
 def materialize_shareholder_count_row(
     row: Mapping[str, Any],
     *,
@@ -431,7 +437,7 @@ def materialize_shareholder_count_row(
         "security_id": security_id,
         "observation_scope": "COMPANY_SECURITY_HOLDER_ACCOUNTS",
         "holder_count": int(holder_count),
-        "average_holding": Decimal(raw_average) if raw_average is not None else None,
+        "average_holding": _bounded_decimal(raw_average, 10),
         "raw_holder_count": raw_count,
         "raw_average_holding": raw_average,
         "raw_unit": "HOLDER_ACCOUNT;SHARE_PER_HOLDER",
@@ -478,9 +484,9 @@ def materialize_holder_change_row(
         "shareholder_source_name": holder,
         "shareholder_id": None,
         "change_type": str(row.get("reason") or "UNSPECIFIED_CHANGE"),
-        "share_change": Decimal(raw_change) if raw_change is not None else None,
-        "percentage_change": Decimal(raw_ratio) if raw_ratio is not None else None,
-        "post_holding": Decimal(raw_after) if raw_after is not None else None,
+        "share_change": _bounded_decimal(raw_change, 10),
+        "percentage_change": _bounded_decimal(raw_ratio, 12),
+        "post_holding": _bounded_decimal(raw_after, 10),
         "post_percentage": None,
         "disclosure_id": None,
         "holder_match_key": _stable_holder_key(holder),

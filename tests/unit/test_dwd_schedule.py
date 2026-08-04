@@ -59,6 +59,30 @@ class DwdScheduleTest(unittest.TestCase):
         manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="ascii")
         (root / "READY").write_text(_sha(manifest_path) + "\n", encoding="ascii")
 
+    def test_ods_bundle_id_is_accepted_as_package_identity(self) -> None:
+        manifest_path = self.ods_base / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="ascii"))
+        manifest["bundle_id"] = manifest.pop("package_id")
+        manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="ascii")
+        (self.ods_base / "READY").write_text(_sha(manifest_path) + "\n", encoding="ascii")
+        config = json.loads(self.config.read_text(encoding="ascii"))
+        config["layers"]["ods"]["manifest_sha256"] = _sha(manifest_path)
+        self.config.write_text(json.dumps(config, sort_keys=True), encoding="ascii")
+        self._weekly_release()
+
+        result = prepare_dwd_schedule_run(
+            mode="weekly",
+            market_date=date(2026, 8, 1),
+            release_root=self.release_root,
+            ods_base=self.ods_base,
+            dwd_base=self.dwd_base,
+            release_config=self.config,
+            output=self.root / "runs" / "bundle-id",
+            run_id="bundle-id",
+            code_revision="a" * 40,
+        )
+        self.assertEqual(result.status, "prepared")
+
     def _weekly_release(self) -> None:
         release = self.release_root / "weekly" / "2026-08-01" / "r1"
         artifacts = release / "artifacts"

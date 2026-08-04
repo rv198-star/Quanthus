@@ -175,13 +175,17 @@ def _verify_base(
         raise DwdScheduleError(f"{layer} Base READY is unreadable: {ready_path}") from exc
     if ready != manifest_sha:
         raise DwdScheduleError(f"{layer} Base READY does not match its manifest")
-    for field in ("package_id", "content_digest"):
-        if expected.get(field) != manifest.get(field) and expected.get(field) is not None:
-            raise DwdScheduleError(f"{layer} Base {field} differs from the release contract")
+    package_id = manifest.get("package_id", manifest.get("bundle_id"))
+    if expected.get("package_id") != package_id and expected.get("package_id") is not None:
+        raise DwdScheduleError(f"{layer} Base package_id differs from the release contract")
+    if expected.get("content_digest") != manifest.get("content_digest") and expected.get(
+        "content_digest"
+    ) is not None:
+        raise DwdScheduleError(f"{layer} Base content_digest differs from the release contract")
     if expected.get("manifest_sha256") not in (None, manifest_sha):
         raise DwdScheduleError(f"{layer} Base manifest checksum differs from the release contract")
     return {
-        "package_id": str(manifest.get("package_id", "")),
+        "package_id": str(package_id or ""),
         "manifest_sha256": manifest_sha,
         "content_digest": str(manifest.get("content_digest", "")),
         "root": str(root),

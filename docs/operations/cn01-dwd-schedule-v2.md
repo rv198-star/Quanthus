@@ -12,6 +12,14 @@ manifest and `READY` under the CN01 shadow root. A lane, catalog, or DWD failure
 success marker and does not advance an ODS or Base pointer. The catalog and DWD input run are
 both outside the ODS Base and DWD Base packages.
 
+The actual Base-seeded daily DWD cleaning is a separate CN01 timer at `19:30`:
+`cn01-dwd-daily.timer` invokes `ops/bin/run-cn01-daily-dwd`, which selects the four verified ODS
+lanes for the market date, builds an immutable daily DWD increment under
+`QUANTHUS_DWD_DAILY_ROOT`, audits lineage and source-row conservation, and advances only the
+daily DWD `CURRENT.json` after verification. It never mutates ODS Base, DWD Base, or the ODS
+release tree. The current daily builder covers the market, tradability, calendar, and disclosure
+daily-changing objects; weekly/static domain corrections remain on the weekly path.
+
 The v2 CN01 schedule also has one independent weekly input-preparation lane:
 
 - `cn01-dwd-weekly-input.timer` starts a bounded wait and seals one weekly ODS correction release
@@ -26,9 +34,9 @@ The run manifest exposes eight logical DWD owners (`#57` through `#64`). The tra
 backbone is an internal step of `#59`, so it is not a ninth scheduled business script. DWS remains
 disabled by policy.
 
-The existing `cn01-daily-dwd.service` is the obsolete seven-table path. Both that service and its
-timer now require `/etc/quanthus/legacy-dwd-enabled`; without that explicit sentinel they are
-skipped. The four former CN01 daily ODS lane timers are rendered as rollback units and require
+The existing `cn01-daily-dwd.service` remains the obsolete rollback path and its timer requires
+`/etc/quanthus/legacy-dwd-enabled`; without that explicit sentinel it is skipped. The four former
+CN01 daily ODS lane timers are rendered as rollback units and require
 `/etc/quanthus/cn01-ods-legacy-timers-enabled`; they are therefore inactive after the orchestrator
 cutover. The former `cn01-dwd-daily-input.timer` similarly requires
 `/etc/quanthus/cn01-dwd-daily-timer-enabled` and is not part of the normal path.

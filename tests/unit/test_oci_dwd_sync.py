@@ -128,7 +128,7 @@ def test_oci_sync_units_define_2030_pull_and_two_notifications() -> None:
         encoding="ascii"
     )
     assert "sync-cn01-dwd-daily" in service
-    assert "${QUANTHUS_PYTHON}" in service
+    assert "/opt/quanthus/current/.venv/bin/python" in service
     assert (
         "OnSuccess=oci-dwd-cn01-notification.service oci-dwd-sync-notification.service" in service
     )

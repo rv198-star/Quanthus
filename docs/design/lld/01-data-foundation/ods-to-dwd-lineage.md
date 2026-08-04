@@ -215,7 +215,7 @@ F10 raw content + content_sha256 + source offsets
 | daily status | `dwd_tradability_state` |
 | announcements delta | `dwd_disclosure`, `dwd_disclosure_subject` |
 
-这条日更链不等于全量 8-builder DAG。当前未实现日增量 handler 的 artifact 是：
+这条日更链不等于全量 9-builder DAG。当前未实现日增量 handler 的 artifact 是：
 
 - `adjustment_evidence_delta`；
 - `suspensions_delta`；

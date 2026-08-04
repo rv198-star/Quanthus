@@ -94,6 +94,7 @@ class WarehouseDocumentationContractTest(unittest.TestCase):
         self.assertEqual(len(ownership), 9)
         self.assertEqual(set(ownership), {"57", "58", "59", "60", "61", "62", "63", "64", "72"})
         self.assertIn("9 个物理 DWD builder", self.lineage)
+        self.assertNotIn("8-builder", self.lineage)
 
         daily = self.lineage.split("## 6. 当前日更血缘（实际部署）", 1)[1].split(
             "## 7. 当前周更血缘", 1

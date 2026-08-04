@@ -29,6 +29,7 @@ oci-dwd-daily-sync.timer
 oci-dwd-daily-sync.service
 oci-dwd-cn01-notification.service
 oci-dwd-sync-notification.service
+oci-dwd-sync-failure-notification.service
 ```
 
 The sync stages the remote package, downloads `READY` last, runs the same deep DWD manifest and
@@ -36,10 +37,28 @@ content checks as CN01, and atomically installs the package and OCI `CURRENT.jso
 packages are immutable: a same-date digest mismatch fails closed. A receipt is written under
 `$QUANTHUS_OCI_DWD_LOCAL_ROOT/receipts/<market-date>/`.
 
+When no `--market-date` is supplied, the sync requires CN01 `CURRENT.json` to be today's
+`Asia/Shanghai` date. A stale pointer is a failure rather than silently reusing yesterday's
+package. Source-date failures are marked with `cn01_source_failure=true`; transport, local disk,
+and local immutability failures are attributed to OCI only.
+
 After a successful sync, the two `OnSuccess` units send distinct idempotent Resend emails:
 
 - `cn01_dwd_completed`: CN01's package was verified and handed off.
 - `oci_dwd_sync_completed`: OCI installed and advanced its local DWD pointer.
 
+When the sync fails, it first writes
+`$QUANTHUS_OCI_DWD_LOCAL_ROOT/failures/<market-date>/latest.json` and the atomic pointer
+`failures/LATEST.json`. `oci-dwd-sync-failure-notification.service` then sends:
+
+- `oci_dwd_sync_failed`: the OCI synchronization attempt failed;
+- `cn01_dwd_failed`: additionally, when the receipt proves the already-read CN01 current/package
+  is stale or invalid. An SSH/rsync transport error is kept as an OCI failure and is not
+  misattributed to CN01.
+
 Notification state is stored under `QUANTHUS_NOTIFICATION_STATE_ROOT`; retries for the same
-event/date/manifest digest do not create duplicate emails.
+event/date/manifest or bounded-failure digest do not create duplicate accepted emails. Resend
+HTTP, network, and timeout failures are retried up to `QUANTHUS_RESEND_RETRIES`; after the final
+attempt the notifier writes a receipt under `QUANTHUS_NOTIFICATION_STATE_ROOT/failures/` and
+returns nonzero. A provider outage cannot generate a second email about itself, so the local
+failure receipt and systemd journal remain the authoritative evidence for that case.

@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Send the OCI DWD failure notification(s) recorded by the sync wrapper."""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+
+from quanthus.warehouse_notifications import send_failure_events  # noqa: E402
+
+
+def main() -> int:
+    daily_root = Path(
+        os.environ.get("QUANTHUS_OCI_DWD_LOCAL_ROOT", "/home/ubuntu/data/quanthus/dwd-daily")
+    )
+    state_root = Path(
+        os.environ.get("QUANTHUS_NOTIFICATION_STATE_ROOT", "/var/lib/quanthus/notifications")
+    )
+    receipt = Path(
+        os.environ.get(
+            "QUANTHUS_DWD_FAILURE_RECEIPT", str(daily_root / "failures" / "LATEST.json")
+        )
+    )
+    try:
+        result = send_failure_events(
+            failure_receipt=receipt, daily_root=daily_root, state_root=state_root
+        )
+    except Exception as exc:
+        print(f"warehouse failure notification failed: {exc}", file=sys.stderr)
+        return 2
+    import json
+
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -23,6 +24,10 @@ from quanthus.pipelines.securities_warehouse import (
 
 class WarehouseSyncError(RuntimeError):
     """Raised when a CN01 DWD package cannot be copied and sealed."""
+
+    def __init__(self, message: str, *, code: str = "sync_failed") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -129,11 +134,12 @@ def _run_rsync(*, source: str, destination: Path, ssh: str, extra: Sequence[str]
     try:
         completed = subprocess.run(command, check=False, capture_output=True, text=True)
     except OSError as exc:
-        raise WarehouseSyncError(f"rsync could not start: {exc}") from exc
+        raise WarehouseSyncError(f"rsync could not start: {exc}", code="transfer_failed") from exc
     if completed.returncode:
         detail = (completed.stderr or completed.stdout).strip()
         raise WarehouseSyncError(
-            f"rsync failed with exit code {completed.returncode}: {detail[-1000:]}"
+            f"rsync failed with exit code {completed.returncode}: {detail[-1000:]}",
+            code="transfer_failed",
         )
 
 
@@ -197,6 +203,7 @@ def _ensure_monotonic(
 def sync_latest(*, local_root: Path, market_date: date | None = None) -> WarehouseSyncResult:
     local_root = local_root.resolve()
     local_root.mkdir(parents=True, exist_ok=True)
+    expected_date = market_date or datetime.now(ZoneInfo("Asia/Shanghai")).date()
     _, _, remote_user, _, _, ssh = _ssh_command()
     remote_host = os.environ["QUANTHUS_CN01_DWD_HOST"]
     with (local_root / ".sync.lock").open("a+", encoding="ascii") as lock_stream:
@@ -204,45 +211,80 @@ def sync_latest(*, local_root: Path, market_date: date | None = None) -> Warehou
         staging = Path(tempfile.mkdtemp(prefix=".cn01-dwd-sync-", dir=local_root))
         try:
             remote_current = staging / "CURRENT.json"
-            _run_rsync(
-                source=f"{remote_user}@{remote_host}:{_remote_path('CURRENT.json')}",
-                destination=remote_current,
-                ssh=ssh,
-            )
-            pointer = _object(remote_current)
+            try:
+                _run_rsync(
+                    source=f"{remote_user}@{remote_host}:{_remote_path('CURRENT.json')}",
+                    destination=remote_current,
+                    ssh=ssh,
+                )
+            except WarehouseSyncError as exc:
+                raise WarehouseSyncError(
+                    f"CN01 DWD CURRENT transfer failed: {exc}",
+                    code="transfer_failed",
+                ) from exc
+            try:
+                pointer = _object(remote_current)
+            except WarehouseSyncError as exc:
+                raise WarehouseSyncError(
+                    f"CN01 DWD CURRENT is invalid: {exc}", code="source_current_invalid"
+                ) from exc
             raw_date = pointer.get("market_date")
             if not isinstance(raw_date, str):
-                raise WarehouseSyncError("remote DWD CURRENT market_date is invalid")
+                raise WarehouseSyncError(
+                    "remote DWD CURRENT market_date is invalid", code="source_current_invalid"
+                )
             try:
                 source_date = date.fromisoformat(raw_date)
             except ValueError as exc:
-                raise WarehouseSyncError("remote DWD CURRENT market_date is invalid") from exc
-            if market_date is not None and source_date != market_date:
+                raise WarehouseSyncError(
+                    "remote DWD CURRENT market_date is invalid", code="source_current_invalid"
+                ) from exc
+            if source_date != expected_date:
+                code = (
+                    "source_market_date_stale"
+                    if source_date < expected_date
+                    else "source_market_date_future"
+                )
                 raise WarehouseSyncError(
                     "remote DWD CURRENT is "
-                    f"{source_date.isoformat()}, expected {market_date.isoformat()}"
+                    f"{source_date.isoformat()}, expected {expected_date.isoformat()}",
+                    code=code,
                 )
-            package_relative, package_id = _validate_pointer(pointer, source_date)
+            try:
+                package_relative, package_id = _validate_pointer(pointer, source_date)
+            except WarehouseSyncError as exc:
+                raise WarehouseSyncError(
+                    f"CN01 DWD CURRENT package binding is invalid: {exc}",
+                    code="source_current_invalid",
+                ) from exc
             staged_package = staging / package_relative
             staged_package.mkdir(parents=True, exist_ok=True)
             remote_package = (
                 f"{remote_user}@{remote_host}:{_remote_path(package_relative.as_posix())}/"
             )
-            _run_rsync(
-                source=remote_package,
-                destination=staged_package,
-                ssh=ssh,
-                extra=("--exclude=READY",),
-            )
-            _run_rsync(
-                source=f"{remote_package}READY",
-                destination=staged_package / "READY",
-                ssh=ssh,
-            )
+            try:
+                _run_rsync(
+                    source=remote_package,
+                    destination=staged_package,
+                    ssh=ssh,
+                    extra=("--exclude=READY",),
+                )
+                _run_rsync(
+                    source=f"{remote_package}READY",
+                    destination=staged_package / "READY",
+                    ssh=ssh,
+                )
+            except WarehouseSyncError as exc:
+                raise WarehouseSyncError(
+                    f"CN01 DWD package transfer failed: {exc}", code="transfer_failed"
+                ) from exc
             try:
                 result = verify_daily_domain_increment(staged_package)
             except (DailyDomainBuildError, OSError, ValueError) as exc:
-                raise WarehouseSyncError(f"CN01 DWD package failed verification: {exc}") from exc
+                raise WarehouseSyncError(
+                    f"CN01 DWD package failed verification: {exc}",
+                    code="source_package_invalid",
+                ) from exc
             if (
                 pointer.get("package_id") != result.package_id
                 or pointer.get("manifest_sha256") != result.manifest_sha256
@@ -307,17 +349,51 @@ def _parse_market_date(value: str | None) -> date | None:
         raise WarehouseSyncError("market date must use YYYY-MM-DD") from exc
 
 
+def _write_failure_receipt(
+    *, local_root: Path, market_date: date, error: WarehouseSyncError
+) -> None:
+    receipt = {
+        "schema_version": 1,
+        "kind": "oci_cn01_dwd_daily_sync_failure",
+        "market_date": market_date.isoformat(),
+        "error_code": error.code,
+        "error": str(error)[:2000],
+        "stage": "oci_dwd_sync",
+        "node": os.environ.get("QUANTHUS_NODE", "OCI"),
+        "unit": os.environ.get("QUANTHUS_SYSTEMD_UNIT", "oci-dwd-daily-sync.service"),
+        "run_path": os.environ.get("QUANTHUS_DWD_RUN_ROOT", ""),
+        "cn01_source_failure": error.code.startswith("source_"),
+        "failed_at": datetime.now(ZoneInfo("UTC")).isoformat(),
+    }
+    payload = json.dumps(receipt, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode(
+        "ascii"
+    ) + b"\n"
+    _atomic_bytes(local_root / "failures" / market_date.isoformat() / "latest.json", payload)
+    _atomic_bytes(local_root / "failures" / "LATEST.json", payload)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--local-root", type=Path, required=True)
     parser.add_argument("--market-date")
     args = parser.parse_args(argv)
+    local_root = args.local_root.resolve()
+    try:
+        requested_date = _parse_market_date(args.market_date)
+    except WarehouseSyncError as exc:
+        print(f"CN01 DWD sync failed: {exc}", file=sys.stderr)
+        return 2
+    expected_date = requested_date or datetime.now(ZoneInfo("Asia/Shanghai")).date()
     try:
         result = sync_latest(
-            local_root=args.local_root, market_date=_parse_market_date(args.market_date)
+            local_root=local_root, market_date=expected_date
         )
     except WarehouseSyncError as exc:
-        print(f"CN01 DWD sync failed: {exc}", file=os.sys.stderr)
+        try:
+            _write_failure_receipt(local_root=local_root, market_date=expected_date, error=exc)
+        except OSError as receipt_error:
+            print(f"could not write sync failure receipt: {receipt_error}", file=sys.stderr)
+        print(f"CN01 DWD sync failed: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(result.__dict__, default=str, ensure_ascii=False, sort_keys=True))
     return 0

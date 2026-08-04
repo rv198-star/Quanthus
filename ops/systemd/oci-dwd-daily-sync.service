@@ -2,7 +2,7 @@
 Description=Pull and verify the latest CN01 DWD daily increment on OCI
 After=network-online.target
 Wants=network-online.target
-OnFailure=quanthus-pipeline-failure@%n.service
+OnFailure=oci-dwd-sync-failure-notification.service quanthus-pipeline-failure@%n.service
 OnSuccess=oci-dwd-cn01-notification.service oci-dwd-sync-notification.service
 
 [Service]
@@ -19,6 +19,9 @@ Environment=QUANTHUS_CN01_DWD_KEY=/home/ubuntu/.ssh/cn01_candidate_ro
 Environment=QUANTHUS_CN01_DWD_KNOWN_HOSTS=/home/ubuntu/.ssh/known_hosts_cn01_dual_lane
 Environment=QUANTHUS_CN01_DWD_REMOTE_ROOT=.
 Environment=QUANTHUS_NOTIFICATION_STATE_ROOT=/home/ubuntu/data/quanthus/notifications
+Environment=QUANTHUS_DWD_FAILURE_RECEIPT=/home/ubuntu/data/quanthus/dwd-daily/failures/LATEST.json
+Environment=QUANTHUS_NODE=OCI
+Environment=QUANTHUS_SYSTEMD_UNIT=oci-dwd-daily-sync.service
 WorkingDirectory=/opt/quanthus/current
 ExecStart=/opt/quanthus/current/.venv/bin/python /opt/quanthus/current/ops/bin/sync-cn01-dwd-daily
 TimeoutStartSec=30min

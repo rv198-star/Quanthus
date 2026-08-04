@@ -16,6 +16,8 @@ index, and one active branch; expand to linked siblings only for a concrete inte
 7. `01-data-foundation.md` and its `01-data-foundation/strategy-replay-ads.md` child for offline
    replay research bundles or `01-data-foundation/operational-ads-base.md` for the OCI historical
    Base. Use `01-data-foundation/dwd-domain-model.md` for the product-bounded seven-domain catalog,
+   `01-data-foundation/ods-dwd-data-dictionary.md` for ODS/DWD fields and physical inventory, and
+   `01-data-foundation/ods-to-dwd-lineage.md` for source mappings, build DAG, and recurring coverage,
    DWD objects, DWS dimensions/facts, grains, time semantics, or ODS coverage; `10-monitoring-attribution.md`
    only for the exact audit path.
 

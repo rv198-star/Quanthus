@@ -11,7 +11,8 @@
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
 | Dual-lane delivery | three-node shadow deployment, role-scoped historical ADS bootstrap, and final OCI operational ADS Base accepted; catalog-native consumer publication and cutover remain blocked pending their own evidence and `GO_FOR_CUTOVER` |
-| Product-bounded DWD/DWS model | ADR 0006, `META-DATA-DWD-002`, Issue #55, `01-data-foundation/dwd-domain-model.md`; seven-domain model approved for scripted implementation, paired publication blocked until Issue #69 |
+| Product-bounded DWD model | ADR 0006/0007, `META-DATA-DWD-002`, `01-data-foundation/dwd-domain-model.md`; all 33 objects accepted in `dwd-base-202607-v2`, daily maintenance active, weekly DWD corrections open, generic DWS deferred |
+| ODS/DWD reference | `01-data-foundation/ods-dwd-data-dictionary.md` and `01-data-foundation/ods-to-dwd-lineage.md` |
 
 ## 1. Goal
 
@@ -32,15 +33,17 @@ exclusions with reasons rather than silently dropping them. Official 5-minute da
 recoverable history. One-minute data beginning 2026-03 is continuously acquired as archive-only
 research data because its upstream retention window is short.
 
-The DWD/DWS child proposes a product-bounded target model over the governed ODS corpus. Its seven
+The DWD child defines a product-bounded model over the governed ODS corpus. Its seven
 business domains follow the Quanthus research objective; security/listing identity, venue,
 calendar, report concepts, and similar structures remain internal support rather than additional
 domains. It does not retroactively add financial statements, minute features, or other later
-content to the accepted P1 scope. The exact immutable self-contained `ods-base-202607-v1.1`
-rollup is its sole business-evidence input; parent and Hotfix identities remain embedded lineage
-rather than required external roots. An exact same-run predecessor candidate may supply declared
-referential identities after full package verification. Historical DWD/ADS packages and mutable
-pointers remain retained but cannot be read as sources, migration targets, reconciliation
+content to the accepted P1 scope. The current immutable `V2 Build202607` identities are bound by
+`config/releases/v2-build202607.json`. The DWD build manifest retains its direct ODS build-time
+identity (`ods-base-202607-v1.2`); the current `ods-base-202607-v2` name has the same content digest
+and a new manifest after the naming migration. Parent and Hotfix identities remain embedded
+lineage rather than required external roots. An exact same-run predecessor candidate may supply
+declared referential identities after full package verification. Historical DWD/ADS packages and
+mutable pointers remain retained but cannot be read as sources, migration targets, reconciliation
 baselines, or acceptance evidence for the new Base.
 
 P1 acceptance establishes deterministic replay and fail-closed behavior. The initial S3 full build

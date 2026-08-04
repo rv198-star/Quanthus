@@ -242,6 +242,9 @@ def _run_command(
             return completed.returncode, str(log_path)
         except subprocess.TimeoutExpired:
             return 124, str(log_path)
+        except OSError as exc:
+            stream.write(f"command failed to start: {exc}\n".encode())
+            return 127, str(log_path)
 
 
 def _write_run_state(run_root: Path, state: dict[str, Any], *, ready: bool) -> None:
@@ -497,11 +500,13 @@ def main() -> int:
         state["dwd"] = {"status": "sla_exceeded"}
 
     state["finished_at"] = _iso(_now())
+    catalog_state = state.get("catalog") or {}
+    dwd_state = state.get("dwd") or {}
     state["status"] = (
         "ready"
         if lane_success
-        and state.get("catalog", {}).get("status") == "ready"
-        and state.get("dwd", {}).get("status") == "ready"
+        and catalog_state.get("status") == "ready"
+        and dwd_state.get("status") == "ready"
         else "failed"
     )
     _write_run_state(run_root, state, ready=state["status"] == "ready")

@@ -124,3 +124,45 @@ def test_cn01_orchestrator_units_define_one_hour_control_plane() -> None:
     assert "TimeoutStartSec=70min" in service
     assert "OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai" in timer
     assert "Persistent=false" in timer
+
+
+def test_cn01_orchestrator_keeps_failure_evidence_when_catalog_command_is_missing(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    _write_executable(
+        runner,
+        """#!/usr/bin/env python3
+raise SystemExit(0)
+""",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "HERMES_ODS_NODE_ID": "cn01",
+            "HERMES_ODS_ENV_FILE": str(tmp_path / "missing.env"),
+            "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+            "ASTOCK_HOME": str(tmp_path / "home"),
+            "HERMES_ODS_RUNNER": str(runner),
+            "HERMES_ODS_CATALOG_BUILDER": str(tmp_path / "missing-catalog"),
+            "HERMES_ODS_DAILY_SLA_SECONDS": "20",
+            "HERMES_ODS_ORCHESTRATOR_POLL_SECONDS": "0.1",
+        }
+    )
+    completed = subprocess.run(
+        [str(ORCHESTRATOR), "--market-date", "2026-08-04"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    state = json.loads(completed.stdout)
+    assert state["status"] == "failed"
+    assert state["catalog"]["status"] == "failed"
+    assert state["catalog"]["returncode"] == 127
+    assert state["dwd"] is None
+    run_roots = list((tmp_path / "shadow" / "orchestrator" / "daily" / "2026-08-04").iterdir())
+    assert len(run_roots) == 1
+    assert not (run_roots[0] / "READY").exists()

@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync the CN01 DWD daily increment to OCI at 20:30
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 20:30:00 Asia/Shanghai
+Persistent=true
+AccuracySec=1min
+Unit=oci-dwd-daily-sync.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=Email the OCI DWD synchronization completion notification
+After=oci-dwd-daily-sync.service
+OnFailure=quanthus-pipeline-failure@%n.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+EnvironmentFile=/etc/quanthus/oci-dwd-sync.env
+WorkingDirectory=/opt/quanthus/current
+ExecStart=/opt/quanthus/current/ops/bin/notify-dwd-event --event oci_dwd_sync_completed
+TimeoutStartSec=2min
+NoNewPrivileges=true
+UMask=0027

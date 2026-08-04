@@ -9,6 +9,7 @@ def test_cn01_dwd_daily_cleaning_runs_at_1930_from_base_seed() -> None:
 
     assert "run-cn01-daily-dwd" in service
     assert "QUANTHUS_DWD_DAILY_ROOT" in service
+    assert "Group=quanthus-dwd-ro" in service
     assert "TimeoutStartSec=60min" in service
     assert "cn01-ods-daily-orchestrator.service" in service
     assert "OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai" in timer

@@ -7,7 +7,7 @@ OnFailure=quanthus-pipeline-failure@%n.service
 [Service]
 Type=oneshot
 User=root
-Group=root
+Group=quanthus-dwd-ro
 EnvironmentFile=-/etc/quanthus/cn01-dwd.env
 WorkingDirectory=/root/work/Quanthus
 ExecStart=/root/work/Quanthus/.venv-p1/bin/python /root/work/Quanthus/ops/bin/run-cn01-daily-dwd --release-root ${QUANTHUS_CN01_ODS_RELEASE_ROOT} --base ${QUANTHUS_DWD_BASE} --release-config ${QUANTHUS_V2_RELEASE_CONFIG} --daily-root ${QUANTHUS_DWD_DAILY_ROOT}

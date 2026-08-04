@@ -10,9 +10,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
 
-from quanthus.pipelines.contracts import OdsReleaseError, verify_ods_release
+from quanthus.pipelines.contracts import (
+    OdsReleaseError,
+    OdsVerificationResult,
+    verify_ods_release,
+)
 
 
 class DailyOdsCatalogError(RuntimeError):
@@ -66,7 +69,7 @@ def _write_atomic(path: Path, payload: bytes) -> None:
         raise
 
 
-def _select_lane(release_root: Path, market_date: date, lane: str) -> Any:
+def _select_lane(release_root: Path, market_date: date, lane: str) -> OdsVerificationResult:
     relative_root, release_prefix = _LANES[lane]
     date_root = release_root.joinpath(*relative_root.split("/"), market_date.isoformat())
     candidates = []
@@ -89,6 +92,20 @@ def _select_lane(release_root: Path, market_date: date, lane: str) -> Any:
         raise DailyOdsCatalogError(f"required ODS lane is absent or not READY: {lane}")
     candidates.sort(key=lambda item: (item.release.created_at, item.release.release_id))
     return candidates[-1]
+
+
+def find_ready_daily_ods_lanes(
+    *, release_root: Path, market_date: date
+) -> dict[str, OdsVerificationResult]:
+    """Return the newest verified release for each daily lane already complete."""
+
+    ready: dict[str, OdsVerificationResult] = {}
+    for lane in _LANES:
+        try:
+            ready[lane] = _select_lane(release_root, market_date, lane)
+        except DailyOdsCatalogError:
+            continue
+    return ready
 
 
 def build_daily_ods_catalog(
@@ -131,7 +148,7 @@ def build_daily_ods_catalog(
         )
     semantic = {
         "schema_version": 1,
-        "kind": "cn01_daily_ods_input_catalog",
+        "kind": "daily_ods_input_catalog",
         "market_date": market_date.isoformat(),
         "schedule_contract": {
             "id": next(iter(lineages))[0],
@@ -163,7 +180,10 @@ def verify_daily_ods_catalog(root: Path) -> DailyOdsCatalogResult:
         ready = (root / "READY").read_text(encoding="ascii").strip()
     except (OSError, json.JSONDecodeError) as exc:
         raise DailyOdsCatalogError("daily ODS catalog is unreadable") from exc
-    if not isinstance(catalog, Mapping) or catalog.get("kind") != "cn01_daily_ods_input_catalog":
+    if not isinstance(catalog, Mapping) or catalog.get("kind") not in {
+        "cn01_daily_ods_input_catalog",
+        "daily_ods_input_catalog",
+    }:
         raise DailyOdsCatalogError("daily ODS catalog kind is invalid")
     if ready != _sha256(root / "catalog.json"):
         raise DailyOdsCatalogError("daily ODS catalog READY differs")

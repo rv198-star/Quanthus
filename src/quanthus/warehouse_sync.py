@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -365,9 +366,12 @@ def _write_failure_receipt(
         "cn01_source_failure": error.code.startswith("source_"),
         "failed_at": datetime.now(ZoneInfo("UTC")).isoformat(),
     }
-    payload = json.dumps(receipt, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode(
-        "ascii"
-    ) + b"\n"
+    payload = (
+        json.dumps(receipt, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode(
+            "ascii"
+        )
+        + b"\n"
+    )
     _atomic_bytes(local_root / "failures" / market_date.isoformat() / "latest.json", payload)
     _atomic_bytes(local_root / "failures" / "LATEST.json", payload)
 
@@ -376,7 +380,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--local-root", type=Path, required=True)
     parser.add_argument("--market-date")
+    parser.add_argument("--wait-seconds", type=int, default=0)
+    parser.add_argument("--poll-seconds", type=int, default=60)
     args = parser.parse_args(argv)
+    if args.wait_seconds < 0 or args.poll_seconds < 1:
+        parser.error("wait seconds must be nonnegative and poll seconds must be positive")
     local_root = args.local_root.resolve()
     try:
         requested_date = _parse_market_date(args.market_date)
@@ -384,17 +392,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"CN01 DWD sync failed: {exc}", file=sys.stderr)
         return 2
     expected_date = requested_date or datetime.now(ZoneInfo("Asia/Shanghai")).date()
-    try:
-        result = sync_latest(
-            local_root=local_root, market_date=expected_date
-        )
-    except WarehouseSyncError as exc:
+    deadline = time.monotonic() + args.wait_seconds
+    failure: WarehouseSyncError | None = None
+    result: WarehouseSyncResult | None = None
+    while True:
         try:
-            _write_failure_receipt(local_root=local_root, market_date=expected_date, error=exc)
+            result = sync_latest(local_root=local_root, market_date=expected_date)
+            break
+        except WarehouseSyncError as exc:
+            # The OCI wall clock is only a start time. A stale prior-day pointer is an
+            # expected wait condition until CN01 publishes today's READY-gated DWD package.
+            if exc.code != "source_market_date_stale" or time.monotonic() >= deadline:
+                failure = exc
+                break
+            time.sleep(min(args.poll_seconds, max(1, int(deadline - time.monotonic()))))
+    if failure is not None:
+        try:
+            _write_failure_receipt(
+                local_root=local_root,
+                market_date=expected_date,
+                error=failure,
+            )
         except OSError as receipt_error:
             print(f"could not write sync failure receipt: {receipt_error}", file=sys.stderr)
-        print(f"CN01 DWD sync failed: {exc}", file=sys.stderr)
+        print(f"CN01 DWD sync failed: {failure}", file=sys.stderr)
         return 2
+    if result is None:
+        raise AssertionError("sync loop reached no terminal result")
     print(json.dumps(result.__dict__, default=str, ensure_ascii=False, sort_keys=True))
     return 0
 

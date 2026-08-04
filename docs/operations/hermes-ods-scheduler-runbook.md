@@ -44,12 +44,13 @@ sudo systemctl daemon-reload
 The rendered directory includes the generic `quanthus-pipeline-failure@.service` handler. Node
 renaming changes unit names, the protected environment-file path, and the market-window metadata,
 but the repository-owned launcher remains `ops/bin/run-hermes-ods-lane` for each individual lane.
-Hermes keeps the five independent lane timers. CN01 additionally renders
-`cn01-ods-daily-orchestrator.{service,timer}` at 18:30 with a 70-minute systemd bound; the
-orchestrator starts the four daily lanes, retries shared market-resource lock contention, seals
-the daily catalog, and invokes the DWD input handoff. CN01's former four daily lane timers are rendered with
-`ConditionPathExists=/etc/quanthus/cn01-ods-legacy-timers-enabled` as rollback units and must not
-be enabled alongside the orchestrator. Do not hand-edit installed timers.
+CN01 and Hermes both render one `<node>-ods-daily-orchestrator.{service,timer}` at 18:30 with a
+130-minute systemd bound. The controller reuses verified same-date READY releases, starts only
+missing lanes, seals the daily catalog, and builds the node-local DWD increment after all four
+lanes pass. The former four daily lane timers are rendered with
+`ConditionPathExists=/etc/quanthus/<node>-ods-legacy-timers-enabled` as rollback units and must not
+be enabled alongside the controller. Weekly corrections retain their independent Saturday timer.
+Do not hand-edit installed timers.
 
 4. Start timers without manually starting services. The market service first runs
    `check-ods-collection-window`; an elapsed same-day event presented after a timer restart is
@@ -120,8 +121,9 @@ launchers. OCI publication is a separate job and credential.
 ## Shadow deployment
 
 Implement the five lanes without modifying old crontab entries. `bootstrap` is a manual command
-and receives no timer. Install new timers disabled, then enable only shadow output paths. On CN01,
-enable the daily orchestrator and leave the four rendered rollback timers condition-skipped.
+and receives no timer. Install new timers disabled, then enable only shadow output paths. On both
+CN01 and Hermes, enable the daily controller and leave the four rendered rollback timers
+condition-skipped.
 
 ### Phase B launchers (repository)
 
@@ -132,7 +134,7 @@ enable the daily orchestrator and leave the four rendered rollback timers condit
 | weekly-corrections | `ops/bin/run-hermes-ods-lane --lane weekly-corrections` | `ops/systemd/hermes-ods-weekly-corrections.{service,timer}` |
 | intraday 1m | `ops/bin/run-hermes-ods-lane --lane intraday-archive --stream 1m` | `ops/systemd/hermes-ods-intraday-1m.{service,timer}` |
 | intraday 5m | `ops/bin/run-hermes-ods-lane --lane intraday-archive --stream 5m` | `ops/systemd/hermes-ods-intraday-5m.{service,timer}` |
-| CN01 daily control plane | `ops/bin/run-cn01-ods-daily` | `ops/systemd/hermes-ods-daily-orchestrator.{service,timer}` (CN01 render) |
+| CN01/Hermes daily control plane | `ops/bin/run-cn01-ods-daily` | `ops/systemd/hermes-ods-daily-orchestrator.{service,timer}` (node render) |
 | bootstrap | manual only; runner refuses automatic execution | no timer |
 | matrix | `ops/bin/run-hermes-ods-shadow-matrix` | `ops/systemd/hermes-ods-shadow-matrix.service` |
 

@@ -39,22 +39,38 @@ class WarehouseNotificationError(RuntimeError):
 
 EVENTS = {
     "cn01_dwd_completed": {
-        "subject": "CN01 DWD 清洗完成",
-        "heading": "CN01 DWD 清洗完成",
+        "node": "CN01",
+        "stage": "DWD构建",
+        "heading": "CN01 DWD 构建完成",
         "failure": False,
     },
     "cn01_dwd_failed": {
-        "subject": "CN01 DWD 清洗失败",
-        "heading": "CN01 DWD 清洗失败",
+        "node": "CN01",
+        "stage": "DWD构建",
+        "heading": "CN01 DWD 构建失败",
+        "failure": True,
+    },
+    "hermes_dwd_completed": {
+        "node": "Hermes",
+        "stage": "DWD构建",
+        "heading": "Hermes DWD 构建完成",
+        "failure": False,
+    },
+    "hermes_dwd_failed": {
+        "node": "Hermes",
+        "stage": "DWD构建",
+        "heading": "Hermes DWD 构建失败",
         "failure": True,
     },
     "oci_dwd_sync_completed": {
-        "subject": "OCI DWD 增量同步完成",
+        "node": "OCI",
+        "stage": "DWD同步",
         "heading": "OCI DWD 增量同步完成",
         "failure": False,
     },
     "oci_dwd_sync_failed": {
-        "subject": "OCI DWD 增量同步失败",
+        "node": "OCI",
+        "stage": "DWD同步",
         "heading": "OCI DWD 增量同步失败",
         "failure": True,
     },
@@ -174,7 +190,11 @@ def _email_html(
     error: str | None,
     context: Mapping[str, object],
 ) -> str:
+    node = str(context.get("node") or EVENTS[event]["node"])
+    stage = str(context.get("stage") or EVENTS[event]["stage"])
     details: list[tuple[str, str]] = [
+        ("节点", node),
+        ("阶段", stage),
         ("交易日", market_date.isoformat()),
         ("状态", "失败" if EVENTS[event]["failure"] else "成功"),
     ]
@@ -192,8 +212,6 @@ def _email_html(
     if error:
         details.append(("错误", error))
     context_labels = {
-        "stage": "阶段",
-        "node": "节点",
         "unit": "systemd unit",
         "run_path": "运行路径",
         "error_code": "错误分类",
@@ -244,7 +262,11 @@ def _send_resend(
         {
             "from": sender,
             "to": list(_recipients()),
-            "subject": f"[Quanthus] {market_date.isoformat()} {EVENTS[event]['subject']}",
+            "subject": (
+                f"[Quanthus][{EVENTS[event]['node']}][{EVENTS[event]['stage']}] "
+                f"{market_date.isoformat()} "
+                f"{'失败' if EVENTS[event]['failure'] else '成功'}"
+            ),
             "html": _email_html(
                 event=event,
                 market_date=market_date,
@@ -434,12 +456,13 @@ def send_daily_event(
                     "content_digest": result.content_digest,
                 }
             )
+        if event_context:
+            record["context"] = event_context
         if failure_error is not None:
             record.update(
                 {
                     "delivery_status": "sent",
                     "error": failure_error,
-                    "context": event_context,
                 }
             )
         _atomic_json(state_path, record)
@@ -449,10 +472,10 @@ def send_daily_event(
 def send_failure_events(
     *, failure_receipt: Path, daily_root: Path, state_root: Path
 ) -> dict[str, object]:
-    """Send the OCI failure alert and, when the source is at fault, a CN01 alert."""
+    """Send the OCI synchronization failure alert."""
 
     try:
-        receipt = _object(failure_receipt)
+        _object(failure_receipt)
     except WarehouseNotificationError as exc:
         # A full sync failure can include a disk error before its receipt is written.  Keep a
         # generic OCI alert possible in that case; the journal still contains the detailed cause.
@@ -469,21 +492,14 @@ def send_failure_events(
             },
         )
         return {"status": "sent", "events": [record]}
-    events = ["oci_dwd_sync_failed"]
-    if receipt.get("cn01_source_failure") is True:
-        events.append("cn01_dwd_failed")
-    records: list[dict[str, object]] = []
-    for event in events:
-        records.append(
-            send_daily_event(
-                event=event,
-                daily_root=daily_root,
-                market_date=None,
-                state_root=state_root,
-                failure_receipt=failure_receipt,
-            )
-        )
-    return {"status": "sent", "events": records}
+    record = send_daily_event(
+        event="oci_dwd_sync_failed",
+        daily_root=daily_root,
+        market_date=None,
+        state_root=state_root,
+        failure_receipt=failure_receipt,
+    )
+    return {"status": "sent", "events": [record]}
 
 
 def _parse_market_date(value: str | None) -> date:

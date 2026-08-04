@@ -28,44 +28,36 @@ mkdir -p "$OUTPUT"
 UNITS=(
   hermes-ods-weekly-corrections.service
   hermes-ods-weekly-corrections.timer
+  hermes-ods-daily-orchestrator.service
+  hermes-ods-daily-orchestrator.timer
+  hermes-dwd-success-notification.service
+  hermes-dwd-failure-notification.service
 )
 
-if [[ "$NODE_ID" == "cn01" ]]; then
-  # CN01 owns one daily control-plane timer.  The old lane timers are still rendered
-  # as explicit rollback units, but are disabled unless the operator creates this marker.
-  UNITS+=(
-    hermes-ods-daily-orchestrator.service
-    hermes-ods-daily-orchestrator.timer
-    hermes-ods-market-daily-core.service
-    hermes-ods-market-daily-core.timer
-    hermes-ods-calendar-daily-events.service
-    hermes-ods-calendar-daily-events.timer
-    hermes-ods-intraday-1m.service
-    hermes-ods-intraday-1m.timer
-    hermes-ods-intraday-5m.service
-    hermes-ods-intraday-5m.timer
-  )
-else
-  UNITS+=(
-    hermes-ods-market-daily-core.service
-    hermes-ods-market-daily-core.timer
-    hermes-ods-calendar-daily-events.service
-    hermes-ods-calendar-daily-events.timer
-    hermes-ods-intraday-1m.service
-    hermes-ods-intraday-1m.timer
-    hermes-ods-intraday-5m.service
-    hermes-ods-intraday-5m.timer
-  )
-fi
+# Both nodes use one daily control plane. Individual lane timers remain as
+# disabled rollback units and require a node-local marker before they can run.
+UNITS+=(
+  hermes-ods-market-daily-core.service
+  hermes-ods-market-daily-core.timer
+  hermes-ods-calendar-daily-events.service
+  hermes-ods-calendar-daily-events.timer
+  hermes-ods-intraday-1m.service
+  hermes-ods-intraday-1m.timer
+  hermes-ods-intraday-5m.service
+  hermes-ods-intraday-5m.timer
+)
 
 UNITS+=(quanthus-pipeline-failure@.service)
 
 for unit in "${UNITS[@]}"; do
   source_path="${SOURCE_DIR}/${unit}"
   target_name="${unit/hermes-ods/${NODE_ID}-ods}"
+  target_name="${target_name/hermes-dwd/${NODE_ID}-dwd}"
   target_path="${OUTPUT}/${target_name}"
   tmp_path="${target_path}.tmp.$$"
   sed "s/hermes-ods/${NODE_ID}-ods/g" "$source_path" > "$tmp_path"
+  sed -i "s/hermes-dwd/${NODE_ID}-dwd/g" "$tmp_path"
+  sed -i "s/hermes_dwd/${NODE_ID}_dwd/g" "$tmp_path"
   sed -i "s/run-${NODE_ID}-ods-lane/run-hermes-ods-lane/g" "$tmp_path"
   sed -i "s/HERMES_ODS_NODE_ID=hermes/HERMES_ODS_NODE_ID=${NODE_ID}/g" "$tmp_path"
   sed -i "s/--node-id hermes/--node-id ${NODE_ID}/g" "$tmp_path"
@@ -75,8 +67,11 @@ for unit in "${UNITS[@]}"; do
   if [[ "$NODE_ID" == "cn01" && "$unit" == "hermes-ods-market-daily-core.service" ]]; then
     sed -i "s/TimeoutStartSec=4h10min/TimeoutStartSec=80min/g" "$tmp_path"
   fi
-  if [[ "$NODE_ID" == "cn01" && "$unit" =~ ^hermes-ods-(market-daily-core|calendar-daily-events|intraday-1m|intraday-5m)\.(service|timer)$ ]]; then
-    sed -i '0,/^\[Unit\]$/s//[Unit]\nConditionPathExists=\/etc\/quanthus\/cn01-ods-legacy-timers-enabled/' "$tmp_path"
+  if [[ "$NODE_ID" == "cn01" && "$unit" =~ ^hermes-dwd-.*\.service$ ]]; then
+    sed -i 's/Hermes/CN01/g' "$tmp_path"
+  fi
+  if [[ "$unit" =~ ^hermes-ods-(market-daily-core|calendar-daily-events|intraday-1m|intraday-5m)\.(service|timer)$ ]]; then
+    sed -i "0,/^\[Unit\]$/s//[Unit]\nConditionPathExists=\/etc\/quanthus\/${NODE_ID}-ods-legacy-timers-enabled/" "$tmp_path"
   fi
   chmod 0644 "$tmp_path"
   mv "$tmp_path" "$target_path"

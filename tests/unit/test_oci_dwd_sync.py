@@ -157,7 +157,7 @@ def test_failure_event_does_not_require_a_dwd_package(tmp_path: Path, monkeypatc
     assert calls[0]["error"] == "CN01 CURRENT is still 2026-08-03"
 
 
-def test_source_failure_sends_oci_and_cn01_events(tmp_path: Path, monkeypatch) -> None:
+def test_source_failure_is_reported_as_an_oci_sync_event(tmp_path: Path, monkeypatch) -> None:
     receipt = tmp_path / "failure.json"
     receipt.write_bytes(
         _canonical(
@@ -184,12 +184,10 @@ def test_source_failure_sends_oci_and_cn01_events(tmp_path: Path, monkeypatch) -
         state_root=tmp_path / "notifications",
     )
     assert result["status"] == "sent"
-    assert events == ["oci_dwd_sync_failed", "cn01_dwd_failed"]
+    assert events == ["oci_dwd_sync_failed"]
 
 
-def test_resend_terminal_failure_writes_receipt_and_can_retry(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_resend_terminal_failure_writes_receipt_and_can_retry(tmp_path: Path, monkeypatch) -> None:
     receipt = tmp_path / "failure.json"
     receipt.write_bytes(
         _canonical(
@@ -278,12 +276,11 @@ def test_resend_success_uses_bearer_idempotency_and_retries_network_errors(
     assert sent_request.get_header("Idempotency-key") == "idempotency-key-1"
     payload = json.loads(sent_request.data)
     assert payload["to"] == ["ops@example.com"]
+    assert payload["subject"].startswith("[Quanthus][OCI][DWD同步]")
     assert "失败" in payload["subject"]
 
 
-def test_sync_rejects_a_stale_remote_current(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_sync_rejects_a_stale_remote_current(tmp_path: Path, monkeypatch) -> None:
     remote = tmp_path / "remote"
     _write_package(remote, market_date="2026-08-04")
     key = tmp_path / "key"
@@ -325,9 +322,7 @@ def test_sync_main_persists_failure_receipt_for_operator_notification(
         ),
     )
     local = tmp_path / "local"
-    exit_code = warehouse_sync.main(
-        ["--local-root", str(local), "--market-date", "2026-08-04"]
-    )
+    exit_code = warehouse_sync.main(["--local-root", str(local), "--market-date", "2026-08-04"])
     assert exit_code == 2
     assert "sync failed" in capsys.readouterr().err
     saved = json.loads((local / "failures/LATEST.json").read_text(encoding="ascii"))
@@ -335,13 +330,52 @@ def test_sync_main_persists_failure_receipt_for_operator_notification(
     assert saved["cn01_source_failure"] is False
 
 
+def test_sync_main_waits_for_the_ready_gated_cn01_pointer(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    attempts = 0
+
+    def fake_sync_latest(*, local_root: Path, market_date: date):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise warehouse_sync.WarehouseSyncError(
+                "remote DWD CURRENT is 2026-08-03",
+                code="source_market_date_stale",
+            )
+        return warehouse_sync.WarehouseSyncResult(
+            market_date=market_date,
+            package_id="dwd-daily-20260804-test",
+            manifest_sha256="sha256:" + "1" * 64,
+            content_digest="sha256:" + "2" * 64,
+            payload_bytes=10,
+            changed=True,
+            local_package=local_root / "package",
+        )
+
+    monkeypatch.setattr(warehouse_sync, "sync_latest", fake_sync_latest)
+    monkeypatch.setattr(warehouse_sync.time, "sleep", lambda seconds: None)
+    result = warehouse_sync.main(
+        [
+            "--local-root",
+            str(tmp_path / "local"),
+            "--market-date",
+            "2026-08-04",
+            "--wait-seconds",
+            "1",
+            "--poll-seconds",
+            "1",
+        ]
+    )
+    assert result == 0
+    assert attempts == 2
+    assert "dwd-daily-20260804-test" in capsys.readouterr().out
+
+
 def test_oci_sync_units_define_2030_pull_and_success_and_failure_notifications() -> None:
     root = Path(__file__).resolve().parents[2]
     service = (root / "ops/systemd/oci-dwd-daily-sync.service").read_text(encoding="ascii")
     timer = (root / "ops/systemd/oci-dwd-daily-sync.timer").read_text(encoding="ascii")
-    cn01_notification = (root / "ops/systemd/oci-dwd-cn01-notification.service").read_text(
-        encoding="ascii"
-    )
     oci_notification = (root / "ops/systemd/oci-dwd-sync-notification.service").read_text(
         encoding="ascii"
     )
@@ -351,13 +385,12 @@ def test_oci_sync_units_define_2030_pull_and_success_and_failure_notifications()
     assert "sync-cn01-dwd-daily" in service
     assert "/opt/quanthus/current/.venv/bin/python" in service
     assert "EnvironmentFile=/etc/quanthus/t-close-plus-5h.env" in service
-    assert (
-        "OnSuccess=oci-dwd-cn01-notification.service oci-dwd-sync-notification.service" in service
-    )
+    assert "OnSuccess=oci-dwd-sync-notification.service" in service
+    assert "oci-dwd-cn01-notification.service" not in service
     assert "OnFailure=oci-dwd-sync-failure-notification.service" in service
+    assert "--wait-seconds 5400 --poll-seconds 60" in service
     assert "OnCalendar=Mon..Fri *-*-* 20:30:00 Asia/Shanghai" in timer
     assert "Persistent=true" in timer
-    assert "--event cn01_dwd_completed" in cn01_notification
     assert "--event oci_dwd_sync_completed" in oci_notification
     assert "notify-dwd-failure" in failure_notification
     assert "LATEST.json" in failure_notification

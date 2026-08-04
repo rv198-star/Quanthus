@@ -18,9 +18,22 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+
+from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (  # noqa: E402
+    find_ready_daily_ods_lanes,
+)
+
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
 _ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+_CATALOG_LANES = {
+    "market-daily-core": "market_daily_core",
+    "calendar-daily-events": "calendar_daily_events",
+    "intraday-1m": "intraday_1m",
+    "intraday-5m": "intraday_5m",
+}
 
 
 def _load_env_file(path: Path) -> None:
@@ -262,15 +275,22 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--market-date", type=date.fromisoformat)
     parser.add_argument("--sla-seconds", type=int)
+    parser.add_argument("--dwd-sla-seconds", type=int)
     parser.add_argument("--poll-seconds", type=float)
     args = parser.parse_args()
 
+    node_id = os.environ.get("HERMES_ODS_NODE_ID", "cn01").strip().lower()
+    if re.fullmatch(r"[a-z][a-z0-9-]*", node_id) is None:
+        parser.error("HERMES_ODS_NODE_ID must be a normalized node id")
     market_date = args.market_date or datetime.now(SHANGHAI).date()
     sla_seconds = args.sla_seconds or int(os.environ.get("HERMES_ODS_DAILY_SLA_SECONDS", "3600"))
+    dwd_sla_seconds = args.dwd_sla_seconds or int(
+        os.environ.get("QUANTHUS_DWD_DAILY_SLA_SECONDS", "3600")
+    )
     poll_seconds = args.poll_seconds or float(
         os.environ.get("HERMES_ODS_ORCHESTRATOR_POLL_SECONDS", "15")
     )
-    if sla_seconds <= 0 or poll_seconds <= 0:
+    if sla_seconds <= 0 or dwd_sla_seconds <= 0 or poll_seconds <= 0:
         parser.error("SLA and poll intervals must be positive")
 
     astock_root = Path(os.environ.get("ASTOCK_ROOT", "/root/work/astock"))
@@ -298,7 +318,9 @@ def main() -> int:
         )
     )
     dwd_runner = Path(
-        os.environ.get("QUANTHUS_DWD_RUNNER", str(ROOT / "ops/bin/run-cn01-dwd"))
+        os.environ.get("QUANTHUS_DWD_DAILY_RUNNER")
+        or os.environ.get("QUANTHUS_DWD_RUNNER")
+        or str(ROOT / "ops/bin/run-cn01-daily-dwd")
     )
     dwd_python = Path(
         os.environ.get("QUANTHUS_DWD_PYTHON", str(ROOT / ".venv-p1/bin/python"))
@@ -318,20 +340,24 @@ def main() -> int:
         )
     )
     run_root.mkdir(parents=True, exist_ok=False)
-    os.environ["HERMES_ODS_NODE_ID"] = "cn01"
-    os.environ.setdefault("HERMES_ODS_ENV_FILE", "/etc/quanthus/cn01-ods-lane.env")
+    os.environ["HERMES_ODS_NODE_ID"] = node_id
+    os.environ.setdefault(
+        "HERMES_ODS_ENV_FILE", f"/etc/quanthus/{node_id}-ods-lane.env"
+    )
 
     common = {
         "runner": str(runner),
         "market_date": market_date.isoformat(),
         "shadow_root": str(shadow_root),
         "release_root": str(release_root),
-        "sla_seconds": sla_seconds,
+        "ods_sla_seconds": sla_seconds,
+        "dwd_sla_seconds": dwd_sla_seconds,
         "started_at": _iso(started),
     }
     state: dict[str, Any] = {
         "schema_version": 1,
-        "kind": "cn01_ods_daily_orchestration",
+        "kind": "ods_daily_orchestration",
+        "node": node_id,
         **common,
         "status": "acquiring",
         "lanes": {},
@@ -404,9 +430,30 @@ def main() -> int:
         ),
     ]
     if time.monotonic() < deadline:
-        state["lanes"].update(
-            _run_group(daily_group, deadline=deadline, poll_seconds=poll_seconds)
+        existing = find_ready_daily_ods_lanes(
+            release_root=release_root,
+            market_date=market_date,
         )
+        pending: list[LaneJob] = []
+        for job in daily_group:
+            verified = existing.get(_CATALOG_LANES[job.lane])
+            if verified is None:
+                pending.append(job)
+                continue
+            state["lanes"][job.lane] = {
+                "status": "ready",
+                "returncode": 0,
+                "attempts": 0,
+                "logs": [],
+                "source": "existing_ready_release",
+                "release_id": verified.release.release_id,
+                "release_path": str(verified.release_dir),
+                "manifest_sha256": verified.manifest_sha256,
+            }
+        if pending:
+            state["lanes"].update(
+                _run_group(pending, deadline=deadline, poll_seconds=poll_seconds)
+            )
     else:
         for job in daily_group:
             state["lanes"][job.lane] = {
@@ -417,7 +464,8 @@ def main() -> int:
             }
 
     lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
-    if lane_success and time.monotonic() < deadline:
+    if lane_success:
+        dwd_deadline = time.monotonic() + dwd_sla_seconds
         catalog_command = [
             str(catalog_builder),
             "--release-root",
@@ -430,7 +478,7 @@ def main() -> int:
         catalog_rc, catalog_log = _run_command(
             catalog_command,
             log_path=log_root / "catalog.log",
-            timeout=_duration(deadline),
+            timeout=_duration(dwd_deadline),
         )
         state["catalog"] = {
             "status": "ready" if catalog_rc == 0 else "failed",
@@ -445,59 +493,46 @@ def main() -> int:
                     "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2",
                 )
             )
-            ods_base = Path(
-                os.environ.get(
-                    "QUANTHUS_ODS_BASE", "/srv/quanthus/ods/base/ods-base-202607-v2"
-                )
-            )
             release_config = Path(
                 os.environ.get(
                     "QUANTHUS_V2_RELEASE_CONFIG",
                     str(ROOT / "config/releases/v2-build202607.json"),
                 )
             )
-            dwd_run_root = Path(
-                os.environ.get("QUANTHUS_DWD_RUN_ROOT", "/srv/quanthus/dwd-dws-v2/runs")
+            dwd_daily_root = Path(
+                os.environ.get(
+                    "QUANTHUS_DWD_DAILY_ROOT",
+                    "/srv/quanthus/dwd-dws-v2/daily",
+                )
             )
             dwd_command = [
                 str(dwd_python),
                 str(dwd_runner),
-                "--mode",
-                "daily",
                 "--market-date",
                 market_date.isoformat(),
                 "--release-root",
                 str(release_root),
-                "--ods-base",
-                str(ods_base),
-                "--dwd-base",
+                "--base",
                 str(dwd_base),
                 "--release-config",
                 str(release_config),
-                "--run-root",
-                str(dwd_run_root),
-                "--wait-seconds",
-                "0",
-                "--poll-seconds",
-                str(max(1, int(poll_seconds))),
+                "--daily-root",
+                str(dwd_daily_root),
             ]
             dwd_rc, dwd_log = _run_command(
                 dwd_command,
-                log_path=log_root / "dwd-daily-input.log",
-                timeout=_duration(deadline),
+                log_path=log_root / "dwd-daily-build.log",
+                timeout=_duration(dwd_deadline),
             )
             state["dwd"] = {
                 "status": "ready" if dwd_rc == 0 else "failed",
                 "returncode": dwd_rc,
                 "log": dwd_log,
-                "run_root": str(dwd_run_root),
+                "daily_root": str(dwd_daily_root),
             }
     elif not lane_success:
         state["catalog"] = {"status": "blocked_by_lane_failure"}
         state["dwd"] = {"status": "blocked_by_lane_failure"}
-    else:
-        state["catalog"] = {"status": "sla_exceeded"}
-        state["dwd"] = {"status": "sla_exceeded"}
 
     state["finished_at"] = _iso(_now())
     catalog_state = state.get("catalog") or {}

@@ -1,5 +1,6 @@
 [Unit]
-Description=Run Quanthus CN01 Base-seeded DWD daily cleaning at 19:30
+Description=Disabled-by-default CN01 fixed-time DWD fallback
+ConditionPathExists=/etc/quanthus/cn01-dwd-fixed-timer-enabled
 
 [Timer]
 OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai

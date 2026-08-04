@@ -27,15 +27,17 @@ class OdsUnitRendererTests(unittest.TestCase):
         output = self._render("cn01")
 
         units = sorted(output.iterdir())
-        self.assertEqual(len(units), 13)
+        self.assertEqual(len(units), 15)
         node_units = [path for path in units if path.name != "quanthus-pipeline-failure@.service"]
-        self.assertTrue(all(path.name.startswith("cn01-ods-") for path in node_units))
+        self.assertTrue(
+            all(path.name.startswith(("cn01-ods-", "cn01-dwd-")) for path in node_units)
+        )
         self.assertTrue(all(path.stat().st_mode & 0o777 == 0o644 for path in units))
 
         orchestrator_timer = (output / "cn01-ods-daily-orchestrator.timer").read_text()
         orchestrator_service = (output / "cn01-ods-daily-orchestrator.service").read_text()
         self.assertIn("OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai", orchestrator_timer)
-        self.assertIn("one-hour SLA", orchestrator_timer)
+        self.assertIn("READY-gated", orchestrator_timer)
         self.assertIn("Unit=cn01-ods-daily-orchestrator.service", orchestrator_timer)
         self.assertIn("run-cn01-ods-daily", orchestrator_service)
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", orchestrator_service)
@@ -44,7 +46,14 @@ class OdsUnitRendererTests(unittest.TestCase):
             "Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/cn01-ods-lane.env",
             orchestrator_service,
         )
-        self.assertIn("TimeoutStartSec=70min", orchestrator_service)
+        self.assertIn("TimeoutStartSec=130min", orchestrator_service)
+        self.assertIn("OnSuccess=cn01-dwd-success-notification.service", orchestrator_service)
+
+        success_notification = (output / "cn01-dwd-success-notification.service").read_text()
+        failure_notification = (output / "cn01-dwd-failure-notification.service").read_text()
+        self.assertIn("--event cn01_dwd_completed", success_notification)
+        self.assertIn("--node CN01", success_notification)
+        self.assertIn("--event cn01_dwd_failed", failure_notification)
 
         market_timer = (output / "cn01-ods-market-daily-core.timer").read_text()
         market_service = (output / "cn01-ods-market-daily-core.service").read_text()
@@ -77,12 +86,19 @@ class OdsUnitRendererTests(unittest.TestCase):
             (ROOT / "ops/systemd/quanthus-pipeline-failure@.service").read_bytes(),
         )
 
-    def test_hermes_render_is_byte_identical_to_repository_unit(self) -> None:
+    def test_hermes_render_uses_the_same_orchestrator_and_gates_lane_timers(self) -> None:
         output = self._render("hermes")
 
-        rendered = (output / "hermes-ods-market-daily-core.timer").read_bytes()
-        source = (ROOT / "ops/systemd/hermes-ods-market-daily-core.timer").read_bytes()
-        self.assertEqual(rendered, source)
+        rendered = (output / "hermes-ods-market-daily-core.timer").read_text()
+        orchestrator = (output / "hermes-ods-daily-orchestrator.timer").read_text()
+        success_notification = (output / "hermes-dwd-success-notification.service").read_text()
+        self.assertIn(
+            "ConditionPathExists=/etc/quanthus/hermes-ods-legacy-timers-enabled",
+            rendered,
+        )
+        self.assertIn("OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai", orchestrator)
+        self.assertIn("--event hermes_dwd_completed", success_notification)
+        self.assertIn("--node Hermes", success_notification)
 
     def test_collection_window_checker_enforces_each_node_start(self) -> None:
         config = ROOT / "config/schedules/hermes-ods-schedule.v1.json"

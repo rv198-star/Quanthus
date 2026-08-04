@@ -1,6 +1,6 @@
 [Unit]
-Description=Quanthus CN01 Base-seeded DWD daily cleaning (19:30)
-After=network-online.target cn01-ods-daily-orchestrator.service
+Description=Quanthus CN01 Base-seeded DWD daily cleaning (manual fallback)
+After=network-online.target
 Wants=network-online.target
 OnFailure=quanthus-pipeline-failure@%n.service
 

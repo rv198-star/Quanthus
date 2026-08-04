@@ -17,8 +17,10 @@ if __name__ == "__main__":
         main(
             [
                 "--daily-root",
-                os.environ.get(
-                    "QUANTHUS_OCI_DWD_LOCAL_ROOT", "/home/ubuntu/data/quanthus/dwd-daily"
+                os.environ.get("QUANTHUS_DWD_DAILY_ROOT")
+                or os.environ.get(
+                    "QUANTHUS_OCI_DWD_LOCAL_ROOT",
+                    "/home/ubuntu/data/quanthus/dwd-daily",
                 ),
                 *sys.argv[1:],
             ]

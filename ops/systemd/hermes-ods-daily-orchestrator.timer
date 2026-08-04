@@ -1,5 +1,5 @@
 [Unit]
-Description=CN01 ODS daily four-lane orchestrator (contract 18:30, one-hour SLA)
+Description=Quanthus ODS-to-DWD daily orchestrator (18:30, READY-gated)
 
 [Timer]
 OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai

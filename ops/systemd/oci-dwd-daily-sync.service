@@ -9,7 +9,16 @@ OnSuccess=oci-dwd-cn01-notification.service oci-dwd-sync-notification.service
 Type=oneshot
 User=ubuntu
 Group=ubuntu
-EnvironmentFile=/etc/quanthus/oci-dwd-sync.env
+EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
+EnvironmentFile=-/etc/quanthus/oci-dwd-sync.env
+Environment=QUANTHUS_OCI_DWD_LOCAL_ROOT=/home/ubuntu/data/quanthus/dwd-daily
+Environment=QUANTHUS_CN01_DWD_HOST=39.98.85.149
+Environment=QUANTHUS_CN01_DWD_PORT=22
+Environment=QUANTHUS_CN01_DWD_USER=quanthus-dwd-ro
+Environment=QUANTHUS_CN01_DWD_KEY=/home/ubuntu/.ssh/cn01_candidate_ro
+Environment=QUANTHUS_CN01_DWD_KNOWN_HOSTS=/home/ubuntu/.ssh/known_hosts_cn01_dual_lane
+Environment=QUANTHUS_CN01_DWD_REMOTE_ROOT=.
+Environment=QUANTHUS_NOTIFICATION_STATE_ROOT=/home/ubuntu/data/quanthus/notifications
 WorkingDirectory=/opt/quanthus/current
 ExecStart=/opt/quanthus/current/.venv/bin/python /opt/quanthus/current/ops/bin/sync-cn01-dwd-daily
 TimeoutStartSec=30min

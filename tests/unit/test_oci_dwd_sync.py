@@ -129,6 +129,7 @@ def test_oci_sync_units_define_2030_pull_and_two_notifications() -> None:
     )
     assert "sync-cn01-dwd-daily" in service
     assert "/opt/quanthus/current/.venv/bin/python" in service
+    assert "EnvironmentFile=/etc/quanthus/t-close-plus-5h.env" in service
     assert (
         "OnSuccess=oci-dwd-cn01-notification.service oci-dwd-sync-notification.service" in service
     )

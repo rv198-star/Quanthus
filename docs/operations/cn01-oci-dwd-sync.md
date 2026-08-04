@@ -21,8 +21,8 @@ normalization once during deployment.
 
 ## OCI sync
 
-Install `ops/systemd/oci-dwd-sync.env.example` as `/etc/quanthus/oci-dwd-sync.env` with the OCI
-Resend key and the pinned CN01 host key. Install and enable:
+The units reuse the protected Resend key in `/etc/quanthus/t-close-plus-5h.env`; an optional
+`/etc/quanthus/oci-dwd-sync.env` may override non-sensitive settings. Install and enable:
 
 ```text
 oci-dwd-daily-sync.timer

@@ -7,7 +7,10 @@ OnFailure=quanthus-pipeline-failure@%n.service
 Type=oneshot
 User=ubuntu
 Group=ubuntu
-EnvironmentFile=/etc/quanthus/oci-dwd-sync.env
+EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
+EnvironmentFile=-/etc/quanthus/oci-dwd-sync.env
+Environment=QUANTHUS_OCI_DWD_LOCAL_ROOT=/home/ubuntu/data/quanthus/dwd-daily
+Environment=QUANTHUS_NOTIFICATION_STATE_ROOT=/home/ubuntu/data/quanthus/notifications
 WorkingDirectory=/opt/quanthus/current
 ExecStart=/opt/quanthus/current/.venv/bin/python /opt/quanthus/current/ops/bin/notify-dwd-event --event cn01_dwd_completed
 TimeoutStartSec=2min

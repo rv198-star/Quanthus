@@ -46,8 +46,8 @@ renaming changes unit names, the protected environment-file path, and the market
 but the repository-owned launcher remains `ops/bin/run-hermes-ods-lane` for each individual lane.
 Hermes keeps the five independent lane timers. CN01 additionally renders
 `cn01-ods-daily-orchestrator.{service,timer}` at 18:30 with a 70-minute systemd bound; the
-orchestrator starts the four daily lanes, retries minute resource-lock contention, seals the daily
-catalog, and invokes the DWD input handoff. CN01's former four daily lane timers are rendered with
+orchestrator starts the four daily lanes, retries shared market-resource lock contention, seals
+the daily catalog, and invokes the DWD input handoff. CN01's former four daily lane timers are rendered with
 `ConditionPathExists=/etc/quanthus/cn01-ods-legacy-timers-enabled` as rollback units and must not
 be enabled alongside the orchestrator. Do not hand-edit installed timers.
 

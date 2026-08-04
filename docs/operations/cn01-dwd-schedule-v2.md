@@ -1,10 +1,10 @@
 # CN01 ODS/DWD v2 schedule control
 
-The v2 CN01 daily path has one control-plane timer at 18:30 Asia/Shanghai. It starts the market
-daily and calendar event lanes together, then starts the 1m and 5m lanes. The two minute lanes
-share the existing `pve_market_api` resource lock; a lock-busy result is retried until the same
-one-hour orchestration deadline. This preserves the market-daily critical path while avoiding
-provider contention.
+The v2 CN01 daily path has one control-plane timer at 18:30 Asia/Shanghai. It starts all four
+lanes together. The market, 1m, and 5m lanes share the existing `pve_market_api` resource lock;
+a lock-busy result is retried until the same one-hour orchestration deadline. The calendar lane
+uses its independent event resource group. This preserves the market-daily critical path while
+using the available parallelism without provider contention.
 
 The controller waits for all four immutable ODS releases to be `READY`, seals a four-lane catalog,
 and immediately invokes the daily DWD input preparation. A successful run writes a controller

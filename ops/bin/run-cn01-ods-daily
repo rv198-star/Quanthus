@@ -336,7 +336,7 @@ def main() -> int:
         "dwd": None,
     }
 
-    first_group = [
+    daily_group = [
         LaneJob(
             lane="market-daily-core",
             command=_lane_command(
@@ -350,6 +350,8 @@ def main() -> int:
                 config=config,
             ),
             log_root=log_root,
+            retry_on_busy=True,
+            poll_seconds=poll_seconds,
         ),
         LaneJob(
             lane="calendar-daily-events",
@@ -365,10 +367,6 @@ def main() -> int:
             ),
             log_root=log_root,
         ),
-    ]
-    state["lanes"].update(_run_group(first_group, deadline=deadline, poll_seconds=poll_seconds))
-
-    minute_group = [
         LaneJob(
             lane="intraday-1m",
             command=_lane_command(
@@ -404,10 +402,10 @@ def main() -> int:
     ]
     if time.monotonic() < deadline:
         state["lanes"].update(
-            _run_group(minute_group, deadline=deadline, poll_seconds=poll_seconds)
+            _run_group(daily_group, deadline=deadline, poll_seconds=poll_seconds)
         )
     else:
-        for job in minute_group:
+        for job in daily_group:
             state["lanes"][job.lane] = {
                 "status": "sla_exceeded",
                 "returncode": None,

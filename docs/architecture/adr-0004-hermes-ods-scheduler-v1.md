@@ -119,8 +119,9 @@ legacy combined 16:00 minute job remains active during shadowing; it is disabled
 replacement proves continuous coverage through a controlled cutover.
 
 CN01 uses `hermes-ods-daily-orchestrator.{service,timer}` as its daily control plane. The
-orchestrator starts the market and event lanes together, then starts both minute streams with
-retry-on-lock-busy behavior for the shared `pve_market_api` group. It seals the four-lane daily
+orchestrator starts all four daily lanes together. The market and minute lanes use
+retry-on-lock-busy behavior for the shared `pve_market_api` group, while the event lane has its
+own resource group. It seals the four-lane daily
 catalog and invokes the CN01 DWD input handoff only after every lane is `READY`. The controller's
 one-hour SLA is an operational deadline; it does not alter the lane's 19:46 provider completion
 deadline or the immutable release contract. The CN01 event snapshot begins at 18:30 and relies on

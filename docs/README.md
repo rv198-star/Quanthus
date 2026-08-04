@@ -72,69 +72,21 @@ nodes.
   supplies their missing semantic input. They are not reasons to extend the frozen P3 fixture.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
   evidence; forward email transport remains P6 work. P4 and later keep their existing gates.
-- ADR 0005 accepts the dual-lane data-platform target under `META-DATA-PIPE-003`: CN01 produces the
-  fixed-primary DWD/DWS candidate, Hermes produces the standby candidate, and OCI alone owns epoch
-  arbitration, canonical catalogs, operational ADS, and the sole consumer release-set `CURRENT`.
-  Repository contracts now cover exact ODS-attempt selection, trusted Shanghai-time windows,
-  fenced lease tokens and SHA-precondition pointer CAS, cutover gating, immutable correction and
-  revocation records, fenced rollback, accepted-ODS recovery receipts, and one self-contained
-  `strategy_replay` ADS profile. The repository now also defines a sealed historical DWD/DWS seed
-  and lane-local logical catalogs that join the common seed to each node's daily candidate chain
-  without rewriting either. Three-node deployment, the three physically separate historical
-  bootstrap bundles, role probes, and development-bundle replay equivalence are accepted in
-  `acceptance/issue-45-portable-ads-20260730.md`; conditional two-build OCI resource qualification
-  is recorded separately in `acceptance/issue-45-ads-parallelism-20260730.md`; normal strategy
-  replay now uses an explicit immutable ADS bundle. Catalog-native publication, independent
-  restore evidence, full PIT/tradability candidate families, and production cutover remain open.
-  Bounded daily shadow timers for OCI epoch, both lane candidates, and OCI arbitration were
-  activated in `acceptance/issue-45-shadow-timer-activation-20260730.md`. Their first scheduled
-  cycle completed after a recovered ODS pointer-ownership defect and is recorded in
-  `acceptance/issue-45-first-scheduled-cycle-20260730.md`; corrective revision `7c99724c` is
-  deployed on all three nodes, but a later clean unattended session is still required. The legacy
-  OCI full-ODS pull/build path stays live until an explicit cutover gate passes. Migration is copy-only;
-  no existing data or evidence may be deleted. Portable bundles use manifest-discovered semantic
-  parts without mandatory annual directories. The historical 2025 bootstrap is physically isolated
-  for migration, but because its source was already visible to the development principal it is not
-  evidence of a genuinely unopened blind evaluation.
-  The copy-only historical DWD/DWS migration is accepted through 2026-07-30 in
-  `acceptance/issue-45-historical-dwd-dws-completion-20260730.md`: OCI, CN01, and Hermes hold the
-  same sealed base bytes, and both lane-local logical catalogs join it to four daily candidates
-  without physical concatenation or cleanup authority.
-  The provisional and final OCI operational ADS historical Bases are accepted in
-  `acceptance/meta-data-base-003-ads-base-202607/README.md`. Final `ads-base-202607-v1` binds the
-  accepted July DWD/DWS pair and July 31 operational daily ADS, reproduces two verified candidate
-  table sets byte-for-byte, passes bounded replay, and is active through its administrative
-  `BASE_CURRENT.json`. It remains research-only; every consumer-visible release/cutover gate is
-  separate and remains open.
-  Candidate-success-driven daily lane-history refresh is deployed on both producer nodes in
-  `acceptance/issue-45-daily-history-catalog-automation-20260730.md`; installation and idempotent
-  execution are accepted, while the first real scheduled `OnSuccess` observation remains pending.
-- The Hermes-authoritative provisional ODS Base through 2026-07-30 is accepted under
-  `META-DATA-BASE-001` in `acceptance/meta-data-base-001-ods-base-202607/README.md`. Hermes and CN01
-  hold the same 20,743-file, 11,145,679,742-byte package with manifest
-  `sha256:d38b8332ddd5427104bbc6f71bf89df1c81f85cca507a1f9a80ac58662b7352e` and content digest
-  `sha256:e51644929fb4c5fc20f30db0652aa469c6164ac27d1ffcb1c864c2c46119589d`.
-  The final `ods-base-202607-v1` is checksum-identical and active on Hermes and CN01 at manifest
-  `sha256:553665772eb9746dcbca3318ae15f1c9b421f351c6e734f8e475ee8309a71d4c`; normal weekly and
-  catalog qualification remains separate operational evidence.
-- Issue #48 Phase A and final July Phase B are accepted in
-  `acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`. The final DWD/DWS Bases through
-  2026-07-31 are checksum-identical and active on OCI, CN01, and Hermes; deterministic rebuild,
-  exact-SHA descriptor advancement, idempotent lane-catalog replay, and both node doctors passed.
-  Canonical, ADS, release-set, legacy, and consumer authority remained unchanged.
-- ADR 0006 accepts the product-bounded DWD/DWS model under `META-DATA-DWD-002` and Issue #55. The agreed boundary
-  has seven first-class business domains; security/listing identity, venue, calendar, report
-  concept, and similar structures remain internal support. The approved contract defines 33 DWD
-  objects, ten shared DWS dimensions, and thirteen facts while reconciling every final ODS Base
-  source. The exact immutable self-contained `ods-base-202607-v1.2` candidate rollup is the sole
-  business-evidence input; exact same-run predecessor candidates may supply declared referential
-  identities after package verification. Issue #72 owns the calendar backbone between #57 and
-  #58, removing the former #58/#59 execution cycle;
-  its manifest retains the V1.1 parent, inherited 209-security Hotfix, and additive 1990-2010
-  SSE/SZSE calendar-history lineage without requiring an older directory name. V1.2 is deep-verified
-  on CN01 for this rebuild but is not active through the ODS pointer. Historical DWD/ADS packages and mutable pointers are retained but never read or
-  used as acceptance baselines. Script implementation is open; paired publication remains blocked
-  by Issue #69.
+- ADR 0007 defines the current data operating path. CN01 and Hermes each run one 18:30
+  `Asia/Shanghai` four-lane ODS controller, gate DWD on four verified READY releases, and emit
+  node-specific success or failure notifications. OCI mirrors CN01's verified immutable DWD
+  increment. The former epoch arbitration, paired DWD/DWS publication, old operational ADS, and
+  release-set path are retained only as ADR 0005 migration evidence.
+- `config/releases/v2-build202607.json` is the Base identity authority. It binds read-only
+  `ods-base-202607-v2` and `dwd-base-202607-v2` through 2026-07-31. The DWD package contains all 33
+  ADR 0006 objects, 468,268,180 rows, and 14,842,590,066 payload bytes. Daily and weekly processing
+  writes immutable increments or corrections and never mutates either Base.
+- Generic DWS is deferred until a concrete cross-domain consumer needs the retained ten-dimension,
+  thirteen-fact constellation. P4 is not blocked by DWS: it consumes an exact DWD snapshot and
+  produces a purpose-specific, manifest-bound `event_library` projection.
+- The old Base, DWS, ADS, dual-lane, and portable research packages remain immutable historical
+  evidence under their acceptance records. They are not current transformation inputs or current
+  operating authority and are not deleted by this stage transition.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional
@@ -161,9 +113,9 @@ gate is a conformance defect rather than an alternate project state.
 | --- | --- | --- |
 | P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
 | P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004/0005, relevant acceptance file |
-| Product-bounded DWD/DWS modeling or coverage | this map, HLD, ADR 0006, LLD 01 and `design/lld/01-data-foundation/dwd-domain-model.md` | Exact ODS Base policy, `config/pipelines/dwd-domain-model.v1.json`, Issue #55, and its contract test; Issue #69 remains publication authority |
-| ODS or daily operations | this map, architecture index, ADR 0003/0004/0005, selected runbook | Exact config, service, and contract tests |
-| Dual-lane candidate or ADS publication | root `AGENTS.md`, this map, HLD, ADR 0005, LLD 01 and its exact ADS child | Use `operational-ads-base.md` for the OCI historical Base or `strategy-replay-ads.md` for offline research bundles; load exact config/tests and the dual-lane runbook; cutover remains separately gated |
+| Product-bounded DWD modeling or coverage | this map, HLD, ADR 0006/0007, LLD 01 and `design/lld/01-data-foundation/dwd-domain-model.md` | `config/releases/v2-build202607.json`, exact Base manifest, machine model contract, and focused tests |
+| ODS or daily operations | this map, architecture index, ADR 0003/0004/0007, selected runbook | Exact config, service, and contract tests |
+| Historical dual-lane or ADS evidence | root `AGENTS.md`, this map, ADR 0005 and the exact acceptance record | Treat packages as retained historical evidence, not current operating authority |
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |

@@ -601,7 +601,7 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
         }
         self.assertNotIn("blocked", dispositions)
 
-    def test_docs_expose_implementation_authority_but_keep_publication_gated(self) -> None:
+    def test_docs_expose_accepted_dwd_and_demand_gate_generic_dws(self) -> None:
         adr = (
             ROOT / "docs" / "architecture" / "adr-0006-industry-aligned-dwd-domain-model.md"
         ).read_text(encoding="utf-8")
@@ -613,6 +613,9 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
             / "01-data-foundation"
             / "dwd-domain-model.md"
         ).read_text(encoding="utf-8")
+        handoff = (
+            ROOT / "docs" / "architecture" / "adr-0007-dwd-maintenance-and-p4-handoff.md"
+        ).read_text(encoding="utf-8")
         self.assertIn("Seven first-class business domains", adr)
         self.assertIn("Status: Accepted", adr)
         self.assertIn("Design status | implementation-approved", lld)
@@ -620,9 +623,11 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
         self.assertIn("53 static source ids", lld)
         self.assertIn("historical DWD/ADS tables", lld)
         self.assertIn("#72 trading-calendar backbone", lld)
-        self.assertIn("Exact immutable self-contained `ods-base-202607-v1.1`", lld)
-        self.assertIn("Issue #69", adr)
-        self.assertIn("publication", adr)
+        self.assertIn("Exact immutable `ods-base-202607-v2`", lld)
+        self.assertIn("DWD implementation accepted", adr)
+        self.assertIn("generic DWS demand-gated by ADR 0007", adr)
+        self.assertIn("P4 becomes the product-development mainline", handoff)
+        self.assertIn("Generic DWS is demand-gated", handoff)
 
     def _assert_source_mappings_are_valid(self, mappings: list[dict[str, Any]]) -> None:
         allowed = set(self.model["ods_source_contract"]["allowed_dispositions"])

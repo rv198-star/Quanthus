@@ -4,7 +4,8 @@
 - Date: 2026-08-01
 - Decision id: `META-DATA-DWD-002`
 - Design status: implementation-approved
-- Delivery gate: script implementation open under Issue #55; publication remains gated by Issue #69
+- Delivery gate: DWD implementation accepted; generic DWS demand-gated by ADR 0007
+- Amended by: ADR 0007 for current delivery and operating topology
 - Supersedes: the unimplemented full-industry object proposal recorded earlier under this ADR
 
 ## Context
@@ -185,10 +186,9 @@ source name with a null canonical holder id.
 Objects outside the seven-domain boundary are classified as ODS-only or deferred rather than
 materialized as empty DWD tables.
 
-The detailed model review is complete and Issue #55 opens authority to implement, audit, and run
-the DWD/DWS v2 scripts against immutable candidate paths. It does not authorize package
-publication, deployment, pointer change, or cleanup. Paired publication remains fail-closed until
-Issue #69 passes its independent release gate.
+The detailed model review authorized the Issue #55 implementation program. The resulting 33-object
+DWD Base V2 is accepted. ADR 0007 now owns delivery state: generic DWS is deferred until a concrete
+consumer requirement reactivates its retained constellation design.
 
 ### 8. Acyclic script execution
 

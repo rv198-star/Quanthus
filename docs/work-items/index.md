@@ -11,80 +11,29 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DOC-001 | Maintain approved PRD/HLD/LLD baseline | active |
 | META-TRACE-001 | Maintain requirement-to-issue traceability | active |
 | META-GATE-001 | Automate release gate reporting | planned |
-| META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | active |
-| META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | planned |
-| META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and offline research bundles | active; cutover blocked |
-| META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | accepted; self-contained V1.1 active on both Base holders |
-| META-DATA-BASE-002 | Build authoritative DWD/DWS July Base (Issue #48) | active; Phase A accepted, Phase B pending |
-| META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | accepted |
-| META-DATA-DWD-002 | Implement the product-bounded seven-domain DWD/DWS v2 scripts under Issue #55 | active; scripted build open, paired publication gated by Issue #69 |
+| META-DATA-PIPE-001 | Operate Hermes ODS releases and OCI T+5h publication | superseded by Base V2 node-local ODS-to-DWD path |
+| META-DATA-PIPE-002 | Retire the legacy weekly monolith and split Hermes ODS schedules | maintenance observation; weekly DWD correction still open |
+| META-DATA-PIPE-003 | Build dual-lane DWD/DWS candidates, OCI canonical release sets, and offline research bundles | superseded as current topology; evidence retained |
+| META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | accepted; renamed `ods-base-202607-v2` |
+| META-DATA-BASE-002 | Build authoritative DWD/DWS July trial Base (Issue #48) | accepted historical trial slice |
+| META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | accepted historical trial slice |
+| META-DATA-DWD-002 | Build the product-bounded seven-domain DWD Base V2 | accepted; 33 DWD objects; daily maintenance active; generic DWS deferred |
 
-`META-DATA-PIPE-003` is governed by ADR 0005 and GitHub issue #45. Implementation is limited to
-copy-only contract, shadow, comparison, recovery, and release-set work beside the legacy path. It
-does not authorize a live `CURRENT` change, data deletion, retention cleanup, or access to sealed
-research partitions. Production cutover requires its separate evidence gate and explicit
-`GO_FOR_CUTOVER`.
+ADR 0007 is the current topology authority. `config/releases/v2-build202607.json` binds immutable
+`ods-base-202607-v2` and `dwd-base-202607-v2`. CN01 and Hermes run the same READY-gated ODS-to-DWD
+daily path; OCI mirrors CN01's verified DWD increments. The Base packages are read-only. Weekly
+DWD corrections remain maintenance work until separately accepted.
 
-The repository contract now includes offline `strategy_replay` research bundles, fenced publication and
-rollback, correction/revocation records, accepted-ODS recovery evidence, and a copy-only historical
-DWD/DWS base with lane-local logical catalogs. Formal three-node
-deployment, the three historical bootstrap bundles, role isolation, and development replay
-equivalence are accepted in `docs/acceptance/issue-45-portable-ads-20260730.md`. Catalog-native ADS
-publication, independent restore qualification, and consumer migration remain active work. The
-additive 2026 recent-research backfill is accepted in
-`docs/acceptance/issue-45-2026-research-ads-backfill-20260730.md`; it changes no existing bundle or
-consumer pointer. Its through-2026-07-30 v3 refresh is accepted in
-`docs/acceptance/issue-45-2026-research-ads-refresh-20260730.md`. The first scheduled dual-lane
-cycle completed with an operator-recovered ODS pointer-ownership defect and is recorded in
-`docs/acceptance/issue-45-first-scheduled-cycle-20260730.md`; it is not a clean unattended
-qualification session. Copy-only DWD/DWS historical completion through 2026-07-30, including the
-identical three-node sealed base and both lane-local logical catalogs, is accepted in
-`docs/acceptance/issue-45-historical-dwd-dws-completion-20260730.md`. The historical 2025 bootstrap
-proves physical role separation only; prior developer visibility prevents it from serving as
-genuine unopened blind evidence. Daily candidate-success catalog automation is deployed and its
-idempotent node-local execution is accepted in
-`docs/acceptance/issue-45-daily-history-catalog-automation-20260730.md`; the first real scheduled
-success trigger remains pending.
+ADR 0005 and Issues #39, #45-#48 retain the old pull, arbitration, paired DWD/DWS, ADS, and
+research-bundle acceptance history. Their artifacts are not deleted, but their incomplete future
+gates no longer define current delivery. The final trial packages remain evidence of their own
+bounded scopes and must not be confused with the product-bounded DWD Base V2.
 
-`META-DATA-BASE-001` is governed by ADR 0005, the ODS Base child of LLD 01, and GitHub issue #47.
-It is copy-only and does not change a production schedule, legacy pointer, target cutover state, or
-OCI ODS retention. The 2026-07-30 package remains the retained provisional parent; final July
-completion and matching final Base descriptors on Hermes and CN01 are accepted in
-`docs/acceptance/meta-data-base-001-ods-base-202607/README.md`: Hermes and CN01 hold the same final
-`ods-base-202607-v1` package and active `BASE_CURRENT.json` bytes through 2026-07-31. The package
-binds the accepted full-market fundamentals gap-fill; normal weekly and catalog qualification
-remains separate operational evidence.
-
-`META-DATA-BASE-002` is governed by ADR 0005, LLD 01, and GitHub issue #48. The repository now
-implements canonical input-ledger freeze, deterministic DWD/DWS package construction,
-exact DWS reprojection, clean verification, copy-only installation, SHA-preconditioned Base
-descriptors, and Base-aware lane catalogs. Phase A evidence is recorded in
-`docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md`: corrective v2 packages are
-checksum-identical and active on OCI, CN01, and Hermes; clean rebuild and isolated restore passed;
-and both lane catalogs replay byte-idempotently against the new Base. Canonical, ADS, release-set,
-legacy, and consumer authority remained unchanged. Final July Phase B is accepted with the same
-three-node, deterministic rebuild, descriptor, catalog, and doctor gates.
-
-`META-DATA-BASE-003` is governed by ADR 0005, the operational ADS Base LLD, and GitHub issue #46.
-The repository implements exact-plan validation, deterministic semantic packaging, deep clean-path
-verification, role-scoped access, the existing replay-reader adapter, and locked
-`BASE_CURRENT.json` compare-and-swap. The provisional and final July Bases are accepted in
-`docs/acceptance/meta-data-base-003-ads-base-202607/README.md`. The final package binds the exact
-accepted DWD/DWS pair and July 31 daily ADS, reproduces two independently verified candidate table
-sets, passes bounded replay, and is active through the administrative Base descriptor. Consumer
-release-set publication and cutover remain separate authority gates.
-
-`META-DATA-DWD-002` is governed by accepted ADR 0006, Issue #55, and the DWD/DWS model child of LLD 01. The
-seven business-domain boundary, detailed 33-object DWD catalog, ten conformed DWS dimensions,
-thirteen DWS facts, grains, and bus matrix are approved for scripted implementation. Industry
-references constrain semantics but do not determine scope. The machine contract reconciles all 53
-static final-ODS-Base sources, all 17 named daily/intraday artifacts, and all 33 Hotfix-origin
-dataset ids consolidated into V1.1. The exact immutable self-contained `ods-base-202607-v1.1`
-rollup is the sole business-evidence input; same-run predecessors may supply only declared,
-manifest-verified referential identities. Historical DWD/ADS packages and mutable pointers remain
-retained but cannot serve as sources, migration targets, reconciliation baselines, or acceptance
-evidence. Issue #57 identity is accepted; Issue #72 now owns the calendar prerequisite for #58.
-Paired installation and every pointer advancement remain blocked by Issue #69.
+`META-DATA-DWD-002` remains governed semantically by ADR 0006. The accepted DWD Base V2 contains
+all 33 objects across seven business domains and binds the exact ODS Base V2 source identity. The
+ten-dimension, thirteen-fact DWS design remains available but is deferred until a concrete
+cross-domain consumer exists. P4 consumes DWD directly through a purpose-specific, manifest-bound
+event-library projection.
 
 ## P1 data foundation
 

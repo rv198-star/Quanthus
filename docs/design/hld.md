@@ -57,91 +57,37 @@ outside automated execution; no broker adapter exists in the near-term profile.
 
 ## 3. Data platform and storage design
 
-The approved target is a file-first analytical architecture distributed across CN01, Hermes, and
-OCI:
+The current file-first analytical architecture is distributed across CN01, Hermes, and OCI and is
+governed by ADR 0007:
 
-- CN01 is the fixed-primary daily lane and Hermes is a continuously exercised standby. Each owns
-  its immutable raw/ODS evidence and builds one complete DWD/DWS candidate family from its own ODS
-  against the exact epoch parent and shared reference set supplied by OCI. Neither lane can publish
-  canonical data, ADS, PostgreSQL projections, or consumer pointers. After a candidate succeeds,
-  an independently monitored node-local service advances that lane's immutable logical history
-  catalog; it has no canonical or consumer-publication authority.
-- OCI owns arbitration epochs, independent candidate gates, cross-lane comparison, canonical
-  acceptance/catalogs, ADS builds, atomic release sets, and serving publication. CN01 remains
-  primary regardless of readiness order or favorable output. Hermes may replace it only after an
-  independently established primary failure; unresolved material divergence blocks both lanes.
-- A canonical acceptance record selects one complete lane family without mixing DWD, DWS, or
-  lane-bound PIT artifacts. A versioned catalog snapshot maps market dates to accepted generations.
-  Operational ADS is built from an exact catalog snapshot and required generation subset.
-- One release-set manifest binds the catalog, canonical inputs, and required operational ADS.
-  `release-set_CURRENT.json` is the sole consumer publication pointer; compatibility dataset
-  pointers are non-authoritative projections and cannot be joined independently.
-- Offline research bundles derived from ADS are self-contained, immutable, manifest-bound inputs for replay,
-  P4 event research, and later P5 training. Initial bundles use semantic `tables[].parts[]` without
-  mandatory calendar-year directories. Development, arbitration, blind, and forward scopes are
-  issued as physically separate authorized bundles.
-- Daily acquisition remains provider-readiness gated. Both lanes require the complete target-date
-  sentinel-index set before scanning stocks, bounded socket/retry behavior, and no `READY` on any
-  coverage gap. Contract-defined activation grace rejects elapsed-window timer replays.
-- Hermes owns the governed historical ODS reconstruction seed. It publishes one immutable,
-  manifest-bound ODS Base and CN01 retains one checksum-identical recovery mirror; OCI does not
-  retain the target-chain ODS Base. The Base is the complete accepted set of currently governed
-  ODS sources, selected increments, and retained source evidence, not a claim that unacquired
-  source families exist. Its member and recovery contract is owned by LLD 01's ODS Base child.
+- `V2 Build202607` binds immutable, read-only `ods-base-202607-v2` and
+  `dwd-base-202607-v2` packages through 2026-07-31. Daily and weekly work creates immutable
+  increments or corrections and never rewrites either Base.
+- CN01 and Hermes run the same four-lane ODS controller. A DWD daily build starts only after all
+  four target-date ODS releases pass manifest, content, and READY verification; a fixed wall-clock
+  time alone is not the data gate.
+- Each acquisition node builds and notifies its own Base-seeded DWD increment. CN01 is the source
+  for OCI's current DWD mirror; OCI pulls, deeply verifies, and atomically installs only that
+  immutable DWD increment.
+- OCI does not currently acquire ODS or build generic DWS or ADS. The earlier epoch arbitration,
+  paired DWD/DWS publication, operational ADS, and release-set path are retained as historical
+  migration evidence under ADR 0005, not current operating authority.
 - Canonical and derived artifacts are versioned Parquet with portable relative-path manifests.
   DuckDB, Polars, and PyArrow provide local query, typed transformation, and validation.
-- PostgreSQL contains indexed, rebuildable serving projections. It is not a canonical system of
-  record and is not the execution venue for full-history transformations.
+- PostgreSQL remains an optional rebuildable serving projection. It is not canonical storage and
+  is not a prerequisite for P4 research.
 
-This is the approved target boundary, not a claim that every listed surface is deployed. The
-current repository contract covers DWD daily bars, DWD daily status observations, one DWS daily
-market summary, fixed-primary arbitration, a limited research-only operational ADS, trusted
-Shanghai-time arbitration windows, fenced publication and rollback, immutable correction and
-revocation state, accepted-ODS recovery evidence, and the self-contained portable
-`strategy_replay` ADS profile. Runtime qualification, real NTP/clock evidence, independent accepted-
-ODS restore evidence, full PIT/tradability candidate families, and portable `event_library` and
-`ml_training` profiles remain open gates. The historical strategy ADS bootstrap records that it
-lacks per-decision publication proof; its 2025 output is not a genuine unopened blind evaluation.
-The repository also contains the monthly-complete DWD/DWS Base contract: it freezes
-canonical inputs, preserves schema-distinct members under one manifest per layer, reprojects DWS
-from the exact DWD package, separates package installation from Base-descriptor advancement, and
-rebuilds each lane's logical catalog from the new pair plus only post-Base candidates. The contract
-alone is not publication evidence; Issue #48 records accepted three-node provisional v2 and final
-July v1 packages, descriptors, deterministic rebuilds, and idempotent lane catalogs. It does not
-change the consumer release set.
+ADR 0006 owns the seven-domain, 33-object DWD semantic boundary. The accepted
+`dwd-base-202607-v2` contains all 14 core objects, 18 internal support objects, and one quality
+governance sidecar. Its manifest records 468,268,180 rows and 14,842,590,066 payload bytes. The
+retained ten-dimension, thirteen-fact DWS constellation is demand-gated: it will be implemented
+only when a concrete cross-domain consumer requires it.
 
-ADR 0006 now accepts a product-bounded DWD/DWS model rather than a full-industry object graph.
-Its agreed scope contains seven first-class business domains: listed company, security market
-observations, tradability state, disclosures/company events, financial reporting, industry
-classification, and ownership/capital. Security, listing code, venue, calendar, report concept,
-and event terms remain internal supporting structures only where association or historical replay
-requires them. DWD keeps atomic detail and governed business state; DWS defines ten conformed
-dimensions and thirteen grain-distinct facts bound to one exact DWD snapshot. FIBO, FIX, XBRL/CAS,
-and ISO references constrain semantics but do not own product scope. The exact immutable
-self-contained `ods-base-202607-v1.1` rollup is the sole business-evidence input. Explicit
-same-run predecessor candidates may provide manifest-verified referential identities; historical
-DWD/ADS packages and mutable pointers are retained but are not read as sources, migration targets,
-reconciliation baselines, or acceptance evidence. Decoder, parser,
-mapping, and normalization work belongs to the new DWD construction and does not create a source
-gap. The detailed design is approved for scripted transformation against immutable candidate
-paths; package publication and pointer changes remain unauthorized until Issue #69 passes.
-
-The legacy OCI full-ODS pull/build path remains live until ADR 0005's shadow, fencing, recovery,
-rollback, and explicit `GO_FOR_CUTOVER` gates pass. Target work is copy-only and uses separate
-roots; no existing ODS, DWD/DWS, ADS, pointer, log, or evidence may be deleted or reused as staging.
-
-P1/P2 computation and replay do not depend on PostgreSQL availability once bound to an accepted
-snapshot or self-contained research bundle. OCI publishes accepted release-set projections to PG;
-Hermes may directly append only small ODS landing tables. Notebooks never own canonical
-transformation logic.
-
-PostgreSQL may remain on PVE initially. If it later moves, OCI is the writable primary and PVE
-is a read-only streaming standby, while Hermes retains the internal raw-evidence copy.
-Replication is not a backup, so independent base backups, WAL archiving, PITR, and restore
-drills are required. Detailed PostgreSQL, network, and recovery boundaries remain in
-`docs/architecture/adr-0002-hermes-oci-data-platform.md`; dual-lane ownership, canonical
-publication, and ADS portability are governed by
-`docs/architecture/adr-0005-dual-lane-canonical-and-ads-publication.md`.
+P4 consumes an exact manifest-bound DWD snapshot directly and builds its own purpose-specific
+`event_library` projection. The event library is not generic DWS and does not reuse the retained
+strategy-specific ADS as its authority. P1/P2 replay likewise does not depend on PostgreSQL once
+bound to an accepted snapshot or self-contained research bundle. Notebooks never own canonical
+transformation or event-label logic.
 
 ## 4. Canonical daily sequence
 
@@ -349,9 +295,10 @@ contracts are indexed by `docs/design/lld/README.md` and defined under
 Stable work-item ids connect each design section to code, tests, acceptance evidence, and GitHub
 issues.
 
-The data-foundation target topology and transition authority are decided by
-`docs/architecture/adr-0005-dual-lane-canonical-and-ads-publication.md`; LLD 01 owns its manifests,
-state transitions, failure behavior, and module acceptance.
+The current data-foundation topology and P4 handoff are decided by
+`docs/architecture/adr-0007-dwd-maintenance-and-p4-handoff.md`; ADR 0005 retains the superseded
+dual-lane migration history, and LLD 01 owns manifests, state transitions, failure behavior, and
+module acceptance.
 
 The attribution publication and read-only report boundary is refined by
 `docs/architecture/strategy-attribution-publication.md`; LLD 10 owns its adapter, planning,

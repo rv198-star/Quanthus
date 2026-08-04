@@ -2,12 +2,12 @@
 
 | Field | Value |
 | --- | --- |
-| Governing work | `META-DATA-DWD-002` / Issue #55 |
+| Governing work | `META-DATA-DWD-002` / archived Issue #55 |
 | Governing decision | ADR 0006 |
 | Design status | implementation-approved |
-| Delivery gate | script implementation open; paired publication remains blocked by Issue #69 |
+| Delivery gate | DWD Base accepted and recurring daily maintenance active; generic DWS deferred |
 | Machine contract | `config/pipelines/dwd-domain-model.v1.json` |
-| Build input | Exact immutable self-contained `ods-base-202607-v1.1` rollup |
+| Build input | Exact immutable `ods-base-202607-v2` (`V2 Build202607`) |
 | Modeling inputs | Quanthus product objective, governed ODS inventory/semantics, and bounded industry references |
 
 ## 1. Purpose and boundary
@@ -26,7 +26,7 @@ The design intentionally separates three decisions:
 
 This design does not:
 
-- authorize a DWD/DWS publication or pointer change before Issue #69 passes;
+- authorize a generic DWS build or publication without the consumer gate in ADR 0007;
 - model issuance, underwriting, brokerage, clearing, settlement, or legal-registry operations;
 - let current strategy features define DWD facts;
 - treat every FIBO concept as a Quanthus warehouse domain; or
@@ -528,8 +528,9 @@ Mandatory gates include:
 
 | ID | Work | Current state | Acceptance evidence |
 | --- | --- | --- | --- |
-| `META-DATA-DWD-002` | Implement the product-bounded seven-domain DWD/DWS v2 through 17 scripts under Issue #55 | Model accepted; scripted implementation active; paired publication blocked | Script-level tests, data evaluation, deterministic packages, reconciliation, restore, and three-node evidence |
+| `META-DATA-DWD-002` | Build the product-bounded seven-domain DWD Base V2 | 33 DWD objects accepted; recurring daily maintenance active; generic DWS deferred | `config/releases/v2-build202607.json`, package manifest, script tests, and build receipts |
 
-The model has explicit review acceptance and implementation proceeds issue by issue under #55.
-A green contract test proves structural consistency, not semantic or publication acceptance.
-Package publication and pointer movement remain blocked until Issue #69 passes independently.
+The 33-object DWD implementation and Base build are complete. The retained DWS constellation is a
+reviewed design, not a current delivery claim; ADR 0007 requires a concrete consumer before its
+implementation is reactivated. A green contract test proves structural consistency, not runtime
+or publication acceptance.

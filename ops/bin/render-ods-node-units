@@ -26,18 +26,39 @@ SOURCE_DIR="${ROOT}/ops/systemd"
 mkdir -p "$OUTPUT"
 
 UNITS=(
-  hermes-ods-market-daily-core.service
-  hermes-ods-market-daily-core.timer
-  hermes-ods-calendar-daily-events.service
-  hermes-ods-calendar-daily-events.timer
-  hermes-ods-intraday-1m.service
-  hermes-ods-intraday-1m.timer
-  hermes-ods-intraday-5m.service
-  hermes-ods-intraday-5m.timer
   hermes-ods-weekly-corrections.service
   hermes-ods-weekly-corrections.timer
-  quanthus-pipeline-failure@.service
 )
+
+if [[ "$NODE_ID" == "cn01" ]]; then
+  # CN01 owns one daily control-plane timer.  The old lane timers are still rendered
+  # as explicit rollback units, but are disabled unless the operator creates this marker.
+  UNITS+=(
+    hermes-ods-daily-orchestrator.service
+    hermes-ods-daily-orchestrator.timer
+    hermes-ods-market-daily-core.service
+    hermes-ods-market-daily-core.timer
+    hermes-ods-calendar-daily-events.service
+    hermes-ods-calendar-daily-events.timer
+    hermes-ods-intraday-1m.service
+    hermes-ods-intraday-1m.timer
+    hermes-ods-intraday-5m.service
+    hermes-ods-intraday-5m.timer
+  )
+else
+  UNITS+=(
+    hermes-ods-market-daily-core.service
+    hermes-ods-market-daily-core.timer
+    hermes-ods-calendar-daily-events.service
+    hermes-ods-calendar-daily-events.timer
+    hermes-ods-intraday-1m.service
+    hermes-ods-intraday-1m.timer
+    hermes-ods-intraday-5m.service
+    hermes-ods-intraday-5m.timer
+  )
+fi
+
+UNITS+=(quanthus-pipeline-failure@.service)
 
 for unit in "${UNITS[@]}"; do
   source_path="${SOURCE_DIR}/${unit}"
@@ -53,6 +74,9 @@ for unit in "${UNITS[@]}"; do
   fi
   if [[ "$NODE_ID" == "cn01" && "$unit" == "hermes-ods-market-daily-core.service" ]]; then
     sed -i "s/TimeoutStartSec=4h10min/TimeoutStartSec=80min/g" "$tmp_path"
+  fi
+  if [[ "$NODE_ID" == "cn01" && "$unit" =~ ^hermes-ods-(market-daily-core|calendar-daily-events|intraday-1m|intraday-5m)\.(service|timer)$ ]]; then
+    sed -i '0,/^\[Unit\]$/s//[Unit]\nConditionPathExists=\/etc\/quanthus\/cn01-ods-legacy-timers-enabled/' "$tmp_path"
   fi
   chmod 0644 "$tmp_path"
   mv "$tmp_path" "$target_path"

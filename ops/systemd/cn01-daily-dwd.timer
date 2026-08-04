@@ -1,5 +1,6 @@
 [Unit]
-Description=Run Quanthus CN01 daily ODS to DWD after the 5m ODS lane
+Description=Legacy CN01 daily ODS to DWD timer (requires explicit legacy enablement)
+ConditionPathExists=/etc/quanthus/legacy-dwd-enabled
 
 [Timer]
 OnCalendar=Mon..Fri *-*-* 23:20:00 Asia/Shanghai

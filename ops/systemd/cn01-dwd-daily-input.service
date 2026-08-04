@@ -1,0 +1,19 @@
+[Unit]
+Description=Quanthus CN01 prepare daily ODS to DWD v2 input run
+After=network-online.target cn01-ods-intraday-5m.service
+Wants=network-online.target cn01-ods-intraday-5m.service
+OnFailure=quanthus-pipeline-failure@%n.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=-/etc/quanthus/cn01-dwd.env
+WorkingDirectory=/root/work/Quanthus
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python /root/work/Quanthus/ops/bin/run-cn01-dwd --mode daily --release-root ${QUANTHUS_CN01_ODS_RELEASE_ROOT} --ods-base ${QUANTHUS_ODS_BASE} --dwd-base ${QUANTHUS_DWD_BASE} --release-config ${QUANTHUS_V2_RELEASE_CONFIG} --run-root ${QUANTHUS_DWD_RUN_ROOT} --wait-seconds ${QUANTHUS_DWD_DAILY_WAIT_SECONDS} --poll-seconds ${QUANTHUS_DWD_INPUT_POLL_SECONDS}
+TimeoutStartSec=30min
+Nice=5
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

@@ -39,7 +39,7 @@ misrepresenting the 2026 final-trading-time update as a new lane topology.
 | --- | --- | --- | --- |
 | `bootstrap` | Manual, issue-bound | Initialization and historical backfill | Immutable raw revision; never recurring |
 | `market-daily-core` | Hermes Mon-Fri 17:30 first-ready; CN01 Mon-Fri 18:30 throughput-budgeted window | Final daily bars after the 15:30 trading boundary, binary status observation, market references and index/adjustment deltas | Daily ODS; READY by 19:46, then OCI completion by 20:30 |
-| `calendar-daily-events` | Every day 19:30 | Announcements and disclosure-driven events | Natural-day ODS; never creates a market session |
+| `calendar-daily-events` | Hermes every day 19:30; CN01 starts from the 18:30 daily orchestrator | Announcements and disclosure-driven events | Natural-day ODS; never creates a market session |
 | `intraday-archive` | 1m Mon-Fri 20:30; 5m Mon-Fri 23:00 | Preserve direct minute archives while sources retain them | Independent streams outside the T+5H path |
 | `weekly-corrections` | Saturday 08:00 | Low-frequency primary acquisition and bounded reconciliation | Independent correction revision |
 
@@ -117,6 +117,14 @@ evidence fails before any minute-provider call or READY marker.
 Minute work starts after the ready-gated daily market deadline and does not block daily DWD publication. The
 legacy combined 16:00 minute job remains active during shadowing; it is disabled only after the
 replacement proves continuous coverage through a controlled cutover.
+
+CN01 uses `hermes-ods-daily-orchestrator.{service,timer}` as its daily control plane. The
+orchestrator starts the market and event lanes together, then starts both minute streams with
+retry-on-lock-busy behavior for the shared `pve_market_api` group. It seals the four-lane daily
+catalog and invokes the CN01 DWD input handoff only after every lane is `READY`. The controller's
+one-hour SLA is an operational deadline; it does not alter the lane's 19:46 provider completion
+deadline or the immutable release contract. The CN01 event snapshot begins at 18:30 and relies on
+the existing seven-day lookback to capture later disclosures on a subsequent natural-day run.
 
 ### Weekly corrections
 

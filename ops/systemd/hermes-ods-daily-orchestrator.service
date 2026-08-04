@@ -1,0 +1,24 @@
+[Unit]
+Description=CN01 ODS daily four-lane orchestrator (18:30 SLA-gated)
+After=network-online.target
+Wants=network-online.target
+OnFailure=quanthus-pipeline-failure@%n.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=-/etc/quanthus/hermes-ods-lane.env
+EnvironmentFile=-/etc/quanthus/cn01-dwd.env
+Environment=HERMES_ODS_NODE_ID=hermes
+Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/hermes-ods-lane.env
+WorkingDirectory=/root/work/Quanthus
+ExecStart=/root/work/Quanthus/ops/bin/run-cn01-ods-daily
+TimeoutStartSec=70min
+Nice=5
+UMask=0027
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=CN01 ODS daily four-lane orchestrator (contract 18:30, one-hour SLA)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=hermes-ods-daily-orchestrator.service
+
+[Install]
+WantedBy=timers.target

@@ -27,13 +27,35 @@ class OdsUnitRendererTests(unittest.TestCase):
         output = self._render("cn01")
 
         units = sorted(output.iterdir())
-        self.assertEqual(len(units), 11)
+        self.assertEqual(len(units), 13)
         node_units = [path for path in units if path.name != "quanthus-pipeline-failure@.service"]
         self.assertTrue(all(path.name.startswith("cn01-ods-") for path in node_units))
         self.assertTrue(all(path.stat().st_mode & 0o777 == 0o644 for path in units))
 
+        orchestrator_timer = (output / "cn01-ods-daily-orchestrator.timer").read_text()
+        orchestrator_service = (output / "cn01-ods-daily-orchestrator.service").read_text()
+        self.assertIn("OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai", orchestrator_timer)
+        self.assertIn("one-hour SLA", orchestrator_timer)
+        self.assertIn("Unit=cn01-ods-daily-orchestrator.service", orchestrator_timer)
+        self.assertIn("run-cn01-ods-daily", orchestrator_service)
+        self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", orchestrator_service)
+        self.assertIn("Environment=HERMES_ODS_NODE_ID=cn01", orchestrator_service)
+        self.assertIn(
+            "Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/cn01-ods-lane.env",
+            orchestrator_service,
+        )
+        self.assertIn("TimeoutStartSec=70min", orchestrator_service)
+
         market_timer = (output / "cn01-ods-market-daily-core.timer").read_text()
         market_service = (output / "cn01-ods-market-daily-core.service").read_text()
+        self.assertIn(
+            "ConditionPathExists=/etc/quanthus/cn01-ods-legacy-timers-enabled",
+            market_timer,
+        )
+        self.assertIn(
+            "ConditionPathExists=/etc/quanthus/cn01-ods-legacy-timers-enabled",
+            market_service,
+        )
         self.assertIn("OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai", market_timer)
         self.assertIn("contract 18:30", market_timer)
         self.assertIn("Description=CN01 ODS", market_timer)

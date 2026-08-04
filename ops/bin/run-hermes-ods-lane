@@ -5,10 +5,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
 
-if [[ -f /etc/quanthus/hermes-ods-lane.env ]]; then
-  # shellcheck disable=SC1091
+NODE_ID_FOR_ENV="${HERMES_ODS_NODE_ID:-hermes}"
+DEFAULT_ENV_NAME="hermes-ods-lane.env"
+if [[ "$NODE_ID_FOR_ENV" == "cn01" ]]; then
+  DEFAULT_ENV_NAME="cn01-ods-lane.env"
+fi
+ENV_FILE="${HERMES_ODS_ENV_FILE:-/etc/quanthus/${DEFAULT_ENV_NAME}}"
+if [[ -f "$ENV_FILE" ]]; then
+  # shellcheck disable=SC1090
   set -a
-  source /etc/quanthus/hermes-ods-lane.env
+  source "$ENV_FILE"
   set +a
 fi
 

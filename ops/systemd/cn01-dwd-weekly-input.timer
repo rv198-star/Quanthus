@@ -1,0 +1,11 @@
+[Unit]
+Description=Prepare Quanthus CN01 weekly ODS correction to DWD v2 input after ODS weekly READY
+
+[Timer]
+OnCalendar=Sat *-*-* 09:00:00 Asia/Shanghai
+Persistent=false
+AccuracySec=1min
+Unit=cn01-dwd-weekly-input.service
+
+[Install]
+WantedBy=timers.target

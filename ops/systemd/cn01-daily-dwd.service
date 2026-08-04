@@ -1,5 +1,6 @@
 [Unit]
-Description=Quanthus CN01 Base-seeded daily ODS to DWD
+Description=Quanthus legacy CN01 seven-table ODS to DWD (disabled by default)
+ConditionPathExists=/etc/quanthus/legacy-dwd-enabled
 After=network-online.target cn01-ods-intraday-5m.service
 Wants=network-online.target
 

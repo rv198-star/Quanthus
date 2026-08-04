@@ -1,0 +1,12 @@
+[Unit]
+Description=Prepare Quanthus CN01 daily ODS to DWD v2 input after ODS lanes
+ConditionPathExists=/etc/quanthus/cn01-dwd-daily-timer-enabled
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 23:20:00 Asia/Shanghai
+Persistent=true
+AccuracySec=1min
+Unit=cn01-dwd-daily-input.service
+
+[Install]
+WantedBy=timers.target

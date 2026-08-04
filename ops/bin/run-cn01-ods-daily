@@ -1,0 +1,515 @@
+#!/usr/bin/env python3
+"""Run the CN01 daily ODS lanes and hand off a sealed input to DWD."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parents[2]
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+UTC = timezone.utc
+_ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _load_env_file(path: Path) -> None:
+    """Load the simple KEY=VALUE env files used by the systemd units."""
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not _ENV_KEY.fullmatch(key):
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
+def _load_node_environment() -> None:
+    node_id = os.environ.get("HERMES_ODS_NODE_ID", "cn01")
+    default_name = "cn01-ods-lane.env" if node_id == "cn01" else "hermes-ods-lane.env"
+    env_file = Path(os.environ.get("HERMES_ODS_ENV_FILE", f"/etc/quanthus/{default_name}"))
+    _load_env_file(env_file)
+    dwd_env = os.environ.get("QUANTHUS_DWD_ENV_FILE")
+    if dwd_env:
+        _load_env_file(Path(dwd_env))
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _iso(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _atomic_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, indent=2) + "\n",
+        encoding="ascii",
+    )
+    os.replace(temporary, path)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
+
+
+def _duration(deadline: float) -> float:
+    return max(1.0, deadline - time.monotonic())
+
+
+@dataclass
+class LaneJob:
+    lane: str
+    command: list[str]
+    log_root: Path
+    retry_on_busy: bool = False
+    poll_seconds: float = 15.0
+    attempt: int = 0
+    process: subprocess.Popen[bytes] | None = None
+    log_handle: Any = None
+    next_start_at: float = 0.0
+    logs: list[str] = field(default_factory=list)
+
+    def start(self) -> None:
+        self.attempt += 1
+        log_path = self.log_root / f"{self.lane.replace('/', '-')}-{self.attempt}.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        self.log_handle = log_path.open("wb")
+        self.process = subprocess.Popen(
+            self.command,
+            stdout=self.log_handle,
+            stderr=subprocess.STDOUT,
+            env=os.environ.copy(),
+        )
+        self.logs.append(str(log_path))
+
+    def poll(self) -> tuple[str, int | None]:
+        if self.process is None:
+            return "waiting", None
+        returncode = self.process.poll()
+        if returncode is None:
+            return "running", None
+        if self.log_handle is not None:
+            self.log_handle.close()
+            self.log_handle = None
+        log_text = Path(self.logs[-1]).read_text(encoding="utf-8", errors="replace")
+        self.process = None
+        if (
+            returncode != 0
+            and self.retry_on_busy
+            and "lock busy" in log_text.lower()
+        ):
+            return "retry", returncode
+        return "done", returncode
+
+    def terminate(self) -> None:
+        if self.process is None:
+            return
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait(timeout=10)
+        self.process = None
+        if self.log_handle is not None:
+            self.log_handle.close()
+            self.log_handle = None
+
+
+def _lane_command(
+    runner: Path,
+    lane: str,
+    market_date: date,
+    *,
+    stream: str | None,
+    home: Path,
+    shadow_root: Path,
+    calendar: Path,
+    config: Path,
+) -> list[str]:
+    command = [
+        str(runner),
+        "--lane",
+        lane,
+        "--market-date",
+        market_date.isoformat(),
+        "--home",
+        str(home),
+        "--shadow-root",
+        str(shadow_root),
+        "--calendar",
+        str(calendar),
+        "--config",
+        str(config),
+    ]
+    if stream:
+        command.extend(["--stream", stream])
+    return command
+
+
+def _run_group(
+    jobs: list[LaneJob],
+    *,
+    deadline: float,
+    poll_seconds: float,
+) -> dict[str, dict[str, Any]]:
+    for job in jobs:
+        job.start()
+    pending = list(jobs)
+    results: dict[str, dict[str, Any]] = {}
+    while pending:
+        if time.monotonic() >= deadline:
+            for job in pending:
+                job.terminate()
+                results[job.lane] = {
+                    "status": "sla_exceeded",
+                    "returncode": None,
+                    "attempts": job.attempt,
+                    "logs": job.logs,
+                }
+            break
+        now = time.monotonic()
+        for job in list(pending):
+            if job.process is None:
+                if now < job.next_start_at:
+                    continue
+                job.start()
+                continue
+            state, returncode = job.poll()
+            if state == "running":
+                continue
+            if state == "retry" and time.monotonic() < deadline:
+                job.next_start_at = time.monotonic() + min(poll_seconds, job.poll_seconds)
+                continue
+            pending.remove(job)
+            status = "ready" if returncode == 0 else "failed"
+            results[job.lane] = {
+                "status": status,
+                "returncode": returncode,
+                "attempts": job.attempt,
+                "logs": job.logs,
+            }
+        if pending:
+            time.sleep(min(1.0, _duration(deadline)))
+    return results
+
+
+def _run_command(
+    command: list[str],
+    *,
+    log_path: Path,
+    timeout: float,
+) -> tuple[int, str]:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("wb") as stream:
+        try:
+            completed = subprocess.run(
+                command,
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+                env=os.environ.copy(),
+                timeout=max(1.0, timeout),
+                check=False,
+            )
+            return completed.returncode, str(log_path)
+        except subprocess.TimeoutExpired:
+            return 124, str(log_path)
+
+
+def _write_run_state(run_root: Path, state: dict[str, Any], *, ready: bool) -> None:
+    manifest = run_root / "run.json"
+    _atomic_json(manifest, state)
+    ready_path = run_root / "READY"
+    if ready:
+        ready_path.write_text(_sha256(manifest) + "\n", encoding="ascii")
+    else:
+        ready_path.unlink(missing_ok=True)
+
+
+def main() -> int:
+    _load_node_environment()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--market-date", type=date.fromisoformat)
+    parser.add_argument("--sla-seconds", type=int)
+    parser.add_argument("--poll-seconds", type=float)
+    args = parser.parse_args()
+
+    market_date = args.market_date or datetime.now(SHANGHAI).date()
+    sla_seconds = args.sla_seconds or int(os.environ.get("HERMES_ODS_DAILY_SLA_SECONDS", "3600"))
+    poll_seconds = args.poll_seconds or float(
+        os.environ.get("HERMES_ODS_ORCHESTRATOR_POLL_SECONDS", "15")
+    )
+    if sla_seconds <= 0 or poll_seconds <= 0:
+        parser.error("SLA and poll intervals must be positive")
+
+    astock_root = Path(os.environ.get("ASTOCK_ROOT", "/root/work/astock"))
+    home = Path(os.environ.get("ASTOCK_HOME", str(astock_root / "data")))
+    shadow_root = Path(
+        os.environ.get("HERMES_ODS_SHADOW_ROOT", str(home / "shadow/cn01-ods-v1"))
+    )
+    release_root = Path(
+        os.environ.get("HERMES_ODS_RELEASE_ROOT", str(shadow_root / "releases"))
+    )
+    calendar = Path(
+        os.environ.get("HERMES_ODS_CALENDAR", str(home / "ref_trading_calendar.parquet"))
+    )
+    config = Path(
+        os.environ.get(
+            "HERMES_ODS_SCHEDULE", str(ROOT / "config/schedules/hermes-ods-schedule.v1.json")
+        )
+    )
+    runner = Path(
+        os.environ.get("HERMES_ODS_RUNNER", str(ROOT / "ops/bin/run-hermes-ods-lane"))
+    )
+    catalog_builder = Path(
+        os.environ.get(
+            "HERMES_ODS_CATALOG_BUILDER", str(ROOT / "ops/bin/build-cn01-daily-ods-catalog")
+        )
+    )
+    dwd_runner = Path(
+        os.environ.get("QUANTHUS_DWD_RUNNER", str(ROOT / "ops/bin/run-cn01-dwd"))
+    )
+    dwd_python = Path(
+        os.environ.get("QUANTHUS_DWD_PYTHON", str(ROOT / ".venv-p1/bin/python"))
+    )
+    if not dwd_python.is_file():
+        dwd_python = Path(sys.executable)
+
+    started = _now()
+    deadline = time.monotonic() + sla_seconds
+    run_id = started.strftime("%Y%m%dT%H%M%S%fZ")
+    run_root = shadow_root / "orchestrator" / "daily" / market_date.isoformat() / run_id
+    log_root = run_root / "logs"
+    catalog_root = Path(
+        os.environ.get(
+            "HERMES_ODS_DAILY_CATALOG_ROOT",
+            str(shadow_root / "catalogs/daily" / market_date.isoformat() / run_id),
+        )
+    )
+    run_root.mkdir(parents=True, exist_ok=False)
+    os.environ["HERMES_ODS_NODE_ID"] = "cn01"
+    os.environ.setdefault("HERMES_ODS_ENV_FILE", "/etc/quanthus/cn01-ods-lane.env")
+
+    common = {
+        "runner": str(runner),
+        "market_date": market_date.isoformat(),
+        "shadow_root": str(shadow_root),
+        "release_root": str(release_root),
+        "sla_seconds": sla_seconds,
+        "started_at": _iso(started),
+    }
+    state: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "cn01_ods_daily_orchestration",
+        **common,
+        "status": "acquiring",
+        "lanes": {},
+        "catalog": None,
+        "dwd": None,
+    }
+
+    first_group = [
+        LaneJob(
+            lane="market-daily-core",
+            command=_lane_command(
+                runner,
+                "market-daily-core",
+                market_date,
+                stream=None,
+                home=home,
+                shadow_root=shadow_root,
+                calendar=calendar,
+                config=config,
+            ),
+            log_root=log_root,
+        ),
+        LaneJob(
+            lane="calendar-daily-events",
+            command=_lane_command(
+                runner,
+                "calendar-daily-events",
+                market_date,
+                stream=None,
+                home=home,
+                shadow_root=shadow_root,
+                calendar=calendar,
+                config=config,
+            ),
+            log_root=log_root,
+        ),
+    ]
+    state["lanes"].update(_run_group(first_group, deadline=deadline, poll_seconds=poll_seconds))
+
+    minute_group = [
+        LaneJob(
+            lane="intraday-1m",
+            command=_lane_command(
+                runner,
+                "intraday-archive",
+                market_date,
+                stream="1m",
+                home=home,
+                shadow_root=shadow_root,
+                calendar=calendar,
+                config=config,
+            ),
+            log_root=log_root,
+            retry_on_busy=True,
+            poll_seconds=poll_seconds,
+        ),
+        LaneJob(
+            lane="intraday-5m",
+            command=_lane_command(
+                runner,
+                "intraday-archive",
+                market_date,
+                stream="5m",
+                home=home,
+                shadow_root=shadow_root,
+                calendar=calendar,
+                config=config,
+            ),
+            log_root=log_root,
+            retry_on_busy=True,
+            poll_seconds=poll_seconds,
+        ),
+    ]
+    if time.monotonic() < deadline:
+        state["lanes"].update(
+            _run_group(minute_group, deadline=deadline, poll_seconds=poll_seconds)
+        )
+    else:
+        for job in minute_group:
+            state["lanes"][job.lane] = {
+                "status": "sla_exceeded",
+                "returncode": None,
+                "attempts": 0,
+                "logs": [],
+            }
+
+    lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
+    if lane_success and time.monotonic() < deadline:
+        catalog_command = [
+            str(catalog_builder),
+            "--release-root",
+            str(release_root),
+            "--market-date",
+            market_date.isoformat(),
+            "--output",
+            str(catalog_root),
+        ]
+        catalog_rc, catalog_log = _run_command(
+            catalog_command,
+            log_path=log_root / "catalog.log",
+            timeout=_duration(deadline),
+        )
+        state["catalog"] = {
+            "status": "ready" if catalog_rc == 0 else "failed",
+            "returncode": catalog_rc,
+            "root": str(catalog_root),
+            "log": catalog_log,
+        }
+        if catalog_rc == 0:
+            dwd_base = Path(
+                os.environ.get(
+                    "QUANTHUS_DWD_BASE",
+                    "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2",
+                )
+            )
+            ods_base = Path(
+                os.environ.get(
+                    "QUANTHUS_ODS_BASE", "/srv/quanthus/ods/base/ods-base-202607-v2"
+                )
+            )
+            release_config = Path(
+                os.environ.get(
+                    "QUANTHUS_V2_RELEASE_CONFIG",
+                    str(ROOT / "config/releases/v2-build202607.json"),
+                )
+            )
+            dwd_run_root = Path(
+                os.environ.get("QUANTHUS_DWD_RUN_ROOT", "/srv/quanthus/dwd-dws-v2/runs")
+            )
+            dwd_command = [
+                str(dwd_python),
+                str(dwd_runner),
+                "--mode",
+                "daily",
+                "--market-date",
+                market_date.isoformat(),
+                "--release-root",
+                str(release_root),
+                "--ods-base",
+                str(ods_base),
+                "--dwd-base",
+                str(dwd_base),
+                "--release-config",
+                str(release_config),
+                "--run-root",
+                str(dwd_run_root),
+                "--wait-seconds",
+                "0",
+                "--poll-seconds",
+                str(max(1, int(poll_seconds))),
+            ]
+            dwd_rc, dwd_log = _run_command(
+                dwd_command,
+                log_path=log_root / "dwd-daily-input.log",
+                timeout=_duration(deadline),
+            )
+            state["dwd"] = {
+                "status": "ready" if dwd_rc == 0 else "failed",
+                "returncode": dwd_rc,
+                "log": dwd_log,
+                "run_root": str(dwd_run_root),
+            }
+    elif not lane_success:
+        state["catalog"] = {"status": "blocked_by_lane_failure"}
+        state["dwd"] = {"status": "blocked_by_lane_failure"}
+    else:
+        state["catalog"] = {"status": "sla_exceeded"}
+        state["dwd"] = {"status": "sla_exceeded"}
+
+    state["finished_at"] = _iso(_now())
+    state["status"] = (
+        "ready"
+        if lane_success
+        and state.get("catalog", {}).get("status") == "ready"
+        and state.get("dwd", {}).get("status") == "ready"
+        else "failed"
+    )
+    _write_run_state(run_root, state, ready=state["status"] == "ready")
+    print(json.dumps(state, ensure_ascii=True, sort_keys=True))
+    return 0 if state["status"] == "ready" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -46,7 +46,7 @@ class OdsUnitRendererTests(unittest.TestCase):
             "Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/cn01-ods-lane.env",
             orchestrator_service,
         )
-        self.assertIn("TimeoutStartSec=130min", orchestrator_service)
+        self.assertIn("TimeoutStartSec=160min", orchestrator_service)
         self.assertIn("OnSuccess=cn01-dwd-success-notification.service", orchestrator_service)
 
         success_notification = (output / "cn01-dwd-success-notification.service").read_text()
@@ -54,6 +54,8 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("--event cn01_dwd_completed", success_notification)
         self.assertIn("--node CN01", success_notification)
         self.assertIn("--event cn01_dwd_failed", failure_notification)
+        self.assertIn("--failure-receipt", failure_notification)
+        self.assertIn("shadow/cn01-ods-v1", failure_notification)
 
         market_timer = (output / "cn01-ods-market-daily-core.timer").read_text()
         market_service = (output / "cn01-ods-market-daily-core.service").read_text()

@@ -283,7 +283,7 @@ def main() -> int:
     if re.fullmatch(r"[a-z][a-z0-9-]*", node_id) is None:
         parser.error("HERMES_ODS_NODE_ID must be a normalized node id")
     market_date = args.market_date or datetime.now(SHANGHAI).date()
-    sla_seconds = args.sla_seconds or int(os.environ.get("HERMES_ODS_DAILY_SLA_SECONDS", "3600"))
+    sla_seconds = args.sla_seconds or int(os.environ.get("HERMES_ODS_DAILY_SLA_SECONDS", "5400"))
     dwd_sla_seconds = args.dwd_sla_seconds or int(
         os.environ.get("QUANTHUS_DWD_DAILY_SLA_SECONDS", "3600")
     )
@@ -344,6 +344,21 @@ def main() -> int:
     os.environ.setdefault(
         "HERMES_ODS_ENV_FILE", f"/etc/quanthus/{node_id}-ods-lane.env"
     )
+    notification_context_path = shadow_root / "orchestrator/daily/notification-context.json"
+    notification_context: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "ods_daily_orchestration_notification_context",
+        "market_date": market_date.isoformat(),
+        "node": "CN01" if node_id == "cn01" else node_id.title(),
+        "stage": "ods_to_dwd_build",
+        "unit": f"{node_id}-ods-daily-orchestrator.service",
+        "run_path": str(run_root),
+        "error_code": "orchestrator_failed",
+        "error": "ODS-to-DWD orchestrator did not reach READY",
+        "started_at": _iso(started),
+        "status": "running",
+    }
+    _atomic_json(notification_context_path, notification_context)
 
     common = {
         "runner": str(runner),
@@ -450,10 +465,19 @@ def main() -> int:
                 "release_path": str(verified.release_dir),
                 "manifest_sha256": verified.manifest_sha256,
             }
-        if pending:
-            state["lanes"].update(
-                _run_group(pending, deadline=deadline, poll_seconds=poll_seconds)
-            )
+        pending_by_lane = {job.lane: job for job in pending}
+        # Only the event lane is independent. The market and minute lanes share
+        # pve_market_api, so run them in a deliberate order instead of lock racing.
+        for lane_group in (
+            ("market-daily-core", "calendar-daily-events"),
+            ("intraday-5m",),
+            ("intraday-1m",),
+        ):
+            jobs = [pending_by_lane[lane] for lane in lane_group if lane in pending_by_lane]
+            if jobs:
+                state["lanes"].update(
+                    _run_group(jobs, deadline=deadline, poll_seconds=poll_seconds)
+                )
     else:
         for job in daily_group:
             state["lanes"][job.lane] = {
@@ -545,6 +569,16 @@ def main() -> int:
         else "failed"
     )
     _write_run_state(run_root, state, ready=state["status"] == "ready")
+    notification_context.update(
+        {
+            "status": state["status"],
+            "finished_at": state["finished_at"],
+        }
+    )
+    if state["status"] == "ready":
+        notification_context["error_code"] = None
+        notification_context["error"] = None
+    _atomic_json(notification_context_path, notification_context)
     print(json.dumps(state, ensure_ascii=True, sort_keys=True))
     return 0 if state["status"] == "ready" else 2
 

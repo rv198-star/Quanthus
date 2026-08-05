@@ -386,7 +386,8 @@ def send_daily_event(
         result = None
         key_material = (
             f"quanthus-warehouse-v1\x1f{event}\x1f{market_date}\x1f"
-            f"{event_context.get('stage', '')}\x1f{_failure_digest(failure_error)}"
+            f"{event_context.get('stage', '')}\x1f{event_context.get('run_path', '')}\x1f"
+            f"{_failure_digest(failure_error)}"
         )
     else:
         if market_date is None:

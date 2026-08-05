@@ -15,7 +15,7 @@ Environment=HERMES_ODS_NODE_ID=hermes
 Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/hermes-ods-lane.env
 WorkingDirectory=/root/work/Quanthus
 ExecStart=/root/work/Quanthus/ops/bin/run-cn01-ods-daily
-TimeoutStartSec=130min
+TimeoutStartSec=160min
 SuccessExitStatus=0
 Nice=5
 UMask=0027

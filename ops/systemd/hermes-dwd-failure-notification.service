@@ -10,10 +10,11 @@ Group=root
 EnvironmentFile=-/etc/quanthus/hermes-dwd.env
 EnvironmentFile=/etc/quanthus/dwd-notification.env
 Environment=QUANTHUS_NOTIFICATION_STATE_ROOT=/srv/quanthus/dwd-dws-v2/notifications
+Environment=QUANTHUS_ODS_FAILURE_RECEIPT=/root/work/astock/data/shadow/hermes-ods-v1/orchestrator/daily/notification-context.json
 Environment=QUANTHUS_NODE=Hermes
 Environment=QUANTHUS_SYSTEMD_UNIT=hermes-ods-daily-orchestrator.service
 WorkingDirectory=/root/work/Quanthus
-ExecStart=/root/work/Quanthus/.venv-p1/bin/python /root/work/Quanthus/ops/bin/notify-dwd-event --event hermes_dwd_failed --error "ODS-to-DWD orchestrator failed; inspect the node journal" --node Hermes --stage ods_to_dwd_build --unit hermes-ods-daily-orchestrator.service
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python /root/work/Quanthus/ops/bin/notify-dwd-event --event hermes_dwd_failed --failure-receipt ${QUANTHUS_ODS_FAILURE_RECEIPT} --node Hermes --stage ods_to_dwd_build --unit hermes-ods-daily-orchestrator.service
 TimeoutStartSec=2min
 NoNewPrivileges=true
 UMask=0027

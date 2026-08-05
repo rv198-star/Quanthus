@@ -150,15 +150,26 @@ raise SystemExit(0)
     assert "--lane calendar-daily-events" in called
     assert "--stream 1m" in called
     assert called.count("--stream 5m") == 2
+    assert called.index("--lane market-daily-core") < called.index("--stream 5m")
+    assert called.index("--stream 5m") < called.index("--stream 1m")
+    context = json.loads(
+        (tmp_path / "shadow/orchestrator/daily/notification-context.json").read_text(
+            encoding="ascii"
+        )
+    )
+    assert context["market_date"] == "2026-08-04"
+    assert context["node"] == "CN01"
+    assert context["status"] == "ready"
+    assert context["run_path"] == str(run_roots[0])
 
 
-def test_cn01_orchestrator_units_define_one_hour_control_plane() -> None:
+def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     service = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.service").read_text(
         encoding="ascii"
     )
     timer = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.timer").read_text(encoding="ascii")
     assert "run-cn01-ods-daily" in service
-    assert "TimeoutStartSec=130min" in service
+    assert "TimeoutStartSec=160min" in service
     assert "SuccessExitStatus=0" in service
     assert "OnSuccess=hermes-dwd-success-notification.service" in service
     assert "OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai" in timer
@@ -279,3 +290,11 @@ raise SystemExit(0)
     run_roots = list((tmp_path / "shadow" / "orchestrator" / "daily" / "2026-08-04").iterdir())
     assert len(run_roots) == 1
     assert not (run_roots[0] / "READY").exists()
+    context = json.loads(
+        (tmp_path / "shadow/orchestrator/daily/notification-context.json").read_text(
+            encoding="ascii"
+        )
+    )
+    assert context["status"] == "failed"
+    assert context["market_date"] == "2026-08-04"
+    assert context["run_path"] == str(run_roots[0])

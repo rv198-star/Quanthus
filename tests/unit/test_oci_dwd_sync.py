@@ -157,6 +157,49 @@ def test_failure_event_does_not_require_a_dwd_package(tmp_path: Path, monkeypatc
     assert calls[0]["error"] == "CN01 CURRENT is still 2026-08-03"
 
 
+def test_failure_idempotency_is_scoped_to_orchestrator_run(tmp_path: Path, monkeypatch) -> None:
+    receipt = tmp_path / "failure.json"
+    state_root = tmp_path / "notifications"
+    calls: list[str] = []
+
+    def fake_send(**kwargs):
+        calls.append(str(kwargs["context"]["run_path"]))
+        return {"provider": "test", "status": "sent", "attempts": 1}
+
+    monkeypatch.setattr(warehouse_notifications, "_send_resend", fake_send)
+
+    def send(run_path: str) -> dict[str, object]:
+        receipt.write_bytes(
+            _canonical(
+                {
+                    "market_date": "2026-08-04",
+                    "error": "ODS-to-DWD orchestrator did not reach READY",
+                    "stage": "ods_to_dwd_build",
+                    "run_path": run_path,
+                }
+            )
+            + b"\n"
+        )
+        return warehouse_notifications.send_daily_event(
+            event="hermes_dwd_failed",
+            daily_root=tmp_path / "no-package",
+            market_date=None,
+            state_root=state_root,
+            failure_receipt=receipt,
+        )
+
+    first = send("/shadow/orchestrator/daily/2026-08-04/run-1")
+    second = send("/shadow/orchestrator/daily/2026-08-04/run-2")
+    duplicate = send("/shadow/orchestrator/daily/2026-08-04/run-2")
+    assert first["status"] == "sent"
+    assert second["status"] == "sent"
+    assert duplicate["status"] == "skipped"
+    assert calls == [
+        "/shadow/orchestrator/daily/2026-08-04/run-1",
+        "/shadow/orchestrator/daily/2026-08-04/run-2",
+    ]
+
+
 def test_source_failure_is_reported_as_an_oci_sync_event(tmp_path: Path, monkeypatch) -> None:
     receipt = tmp_path / "failure.json"
     receipt.write_bytes(

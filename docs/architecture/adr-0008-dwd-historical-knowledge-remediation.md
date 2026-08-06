@@ -1,10 +1,10 @@
 # ADR 0008: DWD Historical Knowledge Remediation
 
-- Status: Proposed
+- Status: Proposed; successor identity/range boundary accepted, source semantics pending
 - Date: 2026-08-06
 - Decision id: `META-DATA-PIT-001`
-- Design status: investigation; not approved
-- Delivery gate: blocked pending physical Base and mirror audit
+- Design status: partial decision recorded; final remediation not approved
+- Delivery gate: blocked pending Hermes ODS mirror confirmation, physical DWD audits, and availability-contract approval
 - Affects: ADR 0006/0007 DWD Base V2 historical PIT authority; does not supersede their current operational topology
 
 ## Context
@@ -20,15 +20,26 @@ substitution. The code audit classifies the 33 tables as follows:
 | Code disposition | Tables | Meaning |
 | --- | ---: | --- |
 | `build_timestamp_substituted` | 17 | The builder demonstrably writes a Base build/acquisition timestamp where historical source or derived availability is required |
-| `ambiguous_source_insufficient` | 3 | Financial source families mix provider publication evidence, acquisition timestamps, and fallback Base cutoffs; one universal rewrite is not justified |
-| `source_derived_historical` | 6 | The table already uses a source publication or source knowledge timestamp, although corrected parent identities may still require a rebuild |
+| `ambiguous_source_insufficient` | 4 | Financial source families and holder-change rows mix defensible publication evidence with acquisition/business-date fallbacks; one universal rewrite is not justified |
+| `source_derived_historical` | 5 | The table already uses a source publication or source knowledge timestamp, although corrected parent identities may still require a rebuild |
 | `forward_operational` | 7 | The object is correctly knowable only from its Base acquisition/detection point and must not be projected backward |
 
-The machine matrix is `config/audits/dwd-pit-semantics.v1.json`. The code classification alone is
-not package acceptance evidence. The physical bytes on Hermes, CN01, and OCI still require deep
-verification and complete row-distribution scans.
+The machine matrix is `config/audits/dwd-pit-semantics.v1.json`. CN01's exact ODS V2 package has now
+passed deep verification and source-family scans. The physical DWD bytes on Hermes, CN01, and OCI,
+and checksum equality of the Hermes ODS mirror, still require completion.
 
-## Proposed Decision
+## Recorded Decisions And Remaining Proposal
+
+The following boundaries are accepted for the remediation design:
+
+- the successor is a new immutable package named `dwd-base-202607-v2.1`;
+- its data cutoff remains exactly 2026-07-31, matching V2;
+- no 2026-08-01-or-later Daily data is folded into the V2.1 Base; and
+- post-Base Daily data is cleaned, rebuilt against corrected identities and PIT rules, and
+  published through a separate migration/replay decision.
+
+Table/source availability rules, additive ODS evidence package identities, and the final V2.1
+semantic digest remain pending approval.
 
 ### 1. Keep V2 immutable and historically blocked
 
@@ -43,8 +54,9 @@ V2 and does not inherit authority from a later fix.
 
 ### 2. Use a successor immutable DWD Base, not an in-place repair
 
-The preferred remediation is a new package identity, provisionally DWD Base V3. It must be built
-from exact immutable inputs and receive a new manifest SHA-256 and content digest. The successor
+The successor package identity is `dwd-base-202607-v2.1`. It is a new immutable package, not a
+revision of bytes under the V2 directory. It must be built from exact immutable inputs, retain the
+same through-date of 2026-07-31, and receive a new manifest SHA-256 and content digest. The successor
 must cover all 33 tables so identity, foreign keys, row keys, lineage, and knowledge intervals are
 validated as one graph.
 
@@ -60,34 +72,60 @@ that equivalence.
 separately sealed additive evidence packages. It must not edit ODS rows or claim that business time
 alone proves historical availability.
 
-The table-specific policy is:
+The source-family audit is frozen in `config/audits/ods-pit-sufficiency.v1.json`. On CN01, the exact
+`ods-base-202607-v2` package passed READY/manifest/file deep verification: 112 datasets, 21,396
+files, 13,643,600,642 bytes, manifest
+`sha256:7f74a7655f3f86982b4e662f55b12aff4fa2f28ee23cf9b5db530f9f2aa0955b`, and content digest
+`sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01`.
+The exact-source findings are:
 
-- bars, index bars, trading sessions, source ST, price-limit rules, factors, disclosures,
-  shareholder counts, and disclosed holder changes can be reconstructed from existing ODS under
-  reviewed conservative availability contracts;
-- identity, venue, benchmark definition, and some valuation history require additive evidence or
-  fail-closed exclusions;
-- financial reports, concepts, and facts require source-family classification. Provider publication
-  evidence may be used only where it is present and semantically defensible; missing publication
-  evidence remains unavailable rather than being inferred from period end or filing deadline; and
-- industry snapshots, F10 ownership snapshots, observation-gap detections, and quality exceptions
-  remain forward-only.
+- stable security/listing/code joins are complete: all 5,329 historical bar codes and all 5,316
+  valuation codes resolve to the 5,868-row master or the eight explicit code-validity intervals;
+  historical display names and other current-snapshot attributes still require an explicit
+  contract or remain unavailable;
+- bars and index bars require versioned observation-completion rules; realized calendar rows may
+  use a conservative session/date-end rule without granting earlier future-schedule authority;
+- valuation has no historical publication/acquisition field and still requires provider-semantic
+  evidence or fail-closed exclusion; benchmark definitions likewise require a static/versioned
+  reference contract or additive evidence;
+- ST has 1,492 proven event rows and 5,538 explicitly not-proven rows. The latter remain
+  fail-closed. Suspensions, price-limit rules, announcements, and shareholder counts retain direct
+  source knowledge/publication evidence;
+- all 46,649 adjustment factors have cutoffs, including the retained 4,173 fail-closed visibility
+  exceptions;
+- all 40,594 corporate-action rows and all 54,509 dividend rows have announcement dates, so the
+  domain is reconstructable under a conservative end-of-announcement-date rule rather than the
+  current 2026 `built_at` value;
+- all 852,497 decoded full-statement report versions have valid `publish_date` and `update_time`.
+  Eighty-six versions are dated 2026-08-01 and are excluded from V2.1 into Daily cleaning. Legacy
+  canonical-quarterly and `fin_abstract` sources still have respectively 10,091 and 19,840
+  coordinates without matched actual-publication evidence;
+- 69,648 of 194,322 holder-change rows carry `disclosure_date`; the remaining 124,674 require an
+  additive mapping or fail closed; and
+- industry and F10 snapshots remain forward-only from their 2026-07-31 acquisition time, as do
+  observation-gap and quality detections.
 
-Each availability rule is versioned by table/source family and is included in the successor
+Hermes still needs checksum-identical ODS verification, but the CN01 package is sufficient to freeze
+these source-content dispositions. Each availability rule remains separately approval-gated.
+
+Each accepted availability rule is versioned by table/source family and included in the successor
 semantic digest.
 
 ### 4. Rebuild dependent increments and consumers explicitly
 
 After successor Base acceptance:
 
-1. rebuild or rebase all DWD daily increments after 2026-07-31 against the successor identity and
-   reference graph;
-2. do not activate weekly DWD corrections until they use the same successor contracts;
-3. publish new CN01/Hermes node-local Base identities and a checksum-identical OCI mirror before
+1. keep `dwd-base-202607-v2.1` bounded through 2026-07-31 and exclude every later Daily package from
+   its Base payload;
+2. clean post-2026-07-31 Daily source artifacts separately, rebuild them against the V2.1 identity
+   and availability graph, and publish new immutable increments rather than carrying V2-bound DWD
+   rows forward;
+3. do not activate weekly DWD corrections until they use the same successor contracts;
+4. publish new CN01/Hermes node-local Base identities and a checksum-identical OCI mirror before
    moving any consumer pointer;
-4. revise and reapprove the P4 physical-source policy and candidate input contract if table fields,
+5. revise and reapprove the P4 physical-source policy and candidate input contract if table fields,
    availability rules, or package identity change; and
-5. leave legacy DWS/ADS/research bundles retained but unauthorized. They cannot provide historical
+6. leave legacy DWS/ADS/research bundles retained but unauthorized. They cannot provide historical
    knowledge evidence or serve as migration inputs.
 
 Generic DWS remains demand-gated. This remediation does not activate it.
@@ -107,15 +145,18 @@ This proposal may become accepted only after all of the following are attached t
   identity, and cross-mirror equality checks;
 - all 33 tables have actual row counts, representative schemas, min/max knowledge and business
   coordinates, 2012-2021 and 2026 distributions, and representative future-knowledge samples;
-- ODS sufficiency is confirmed against physical source schemas and rows, not only builder code;
+- CN01 ODS sufficiency evidence is retained and the Hermes `ods-base-202607-v2` mirror is confirmed
+  checksum-identical to the same manifest/content identity;
 - daily, weekly, DWS, ADS, event-library, and other consumer dependencies are enumerated with
   migration dispositions;
 - focused tests prove corrected semantics and reject future leakage, missing evidence, timestamp
   substitution, mixed Base identities, and in-place mutation; and
 - a human approves the exact successor policy and semantic digests.
 
-The read-only audit command is `ops/bin/audit-dwd-pit-semantics`; its operation is documented in
-`docs/operations/dwd-base-pit-audit.md`.
+The DWD read-only audit command is `ops/bin/audit-dwd-pit-semantics`; its operation is documented in
+`docs/operations/dwd-base-pit-audit.md`. The ODS read-only audit command is
+`ops/bin/audit-ods-pit-sufficiency`; its operation is documented in
+`docs/operations/ods-base-pit-sufficiency-audit.md`.
 
 ## Rejected Alternatives
 
@@ -154,8 +195,9 @@ Positive consequences:
 
 Costs and constraints:
 
-- the physical three-node audit and successor rebuild require privileged read-only data access;
+- the physical three-node DWD audit and Hermes ODS mirror confirmation still require approved read-only access;
 - some history may remain unavailable when source publication evidence cannot be recovered;
-- post-Base daily increments require replay or explicit retirement; and
+- post-Base Daily data requires a separate clean/rebuild/rebase migration and cannot be absorbed into
+  the V2.1 Base; and
 - P4 Stage B remains blocked until its source package and exact availability contracts are
   reapproved.

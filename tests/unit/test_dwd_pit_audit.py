@@ -34,17 +34,17 @@ class DwdPitAuditTests(unittest.TestCase):
             Counter(item.disposition for item in policy.tables),
             {
                 "build_timestamp_substituted": 17,
-                "ambiguous_source_insufficient": 3,
-                "source_derived_historical": 6,
+                "ambiguous_source_insufficient": 4,
+                "source_derived_historical": 5,
                 "forward_operational": 7,
             },
         )
         self.assertEqual(
             Counter(item.ods_sufficiency for item in policy.tables),
             {
-                "reconstructable_existing_ods": 12,
-                "partially_reconstructable_fail_closed_remainder": 6,
-                "requires_additive_evidence_or_fail_closed": 8,
+                "reconstructable_existing_ods": 16,
+                "partially_reconstructable_fail_closed_remainder": 8,
+                "requires_additive_evidence_or_fail_closed": 2,
                 "forward_only_not_historical": 7,
             },
         )

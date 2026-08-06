@@ -1,0 +1,536 @@
+{
+  "schema_version": 1,
+  "kind": "ods_pit_sufficiency_audit",
+  "policy_id": "meta-data-pit-001.ods-base-v2",
+  "policy_version": "1.1.0",
+  "status": "cn01_exact_base_deep_verified_hermes_mirror_pending",
+  "governing_issue": 78,
+  "ods_base": {
+    "package_id": "ods-base-202607-v2",
+    "manifest_sha256": "sha256:7f74a7655f3f86982b4e662f55b12aff4fa2f28ee23cf9b5db530f9f2aa0955b",
+    "content_digest": "sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01",
+    "through_date": "2026-07-31",
+    "physical_holders": ["hermes", "cn01"],
+    "oci_ods_enabled": false
+  },
+  "successor_dwd_boundary": {
+    "package_id": "dwd-base-202607-v2.1",
+    "through_date": "2026-07-31",
+    "publication_mode": "new_immutable_complete_33_table_base",
+    "v2_mutation": "forbidden",
+    "daily_after": "2026-07-31",
+    "daily_disposition": "excluded_from_v2_1_base_and_cleaned_rebuilt_rebased_separately"
+  },
+  "evidence_scope": {
+    "repository_contract_review": "complete",
+    "accepted_ods_package_evidence_review": "complete",
+    "cn01_exact_ods_base_bytes": "deep_verified",
+    "cn01_source_schema_and_distribution_review": "complete_for_required_families",
+    "cn01_full_financial_envelope_publish_audit": "complete",
+    "exact_hermes_ods_base_bytes": "pending_read_only_access",
+    "authoritative_conclusion_rule": "CN01 proves the package content and source sufficiency facts; closure still requires checksum-identical Hermes verification and approval of each versioned availability rule."
+  },
+  "cn01_physical_verification": {
+    "host": "CN01",
+    "root": "/srv/quanthus/ods/base/ods-base-202607-v2",
+    "observed_at": "2026-08-06",
+    "deep_verify": "passed",
+    "deep_verify_exit_status": 0,
+    "elapsed_seconds": "378.97",
+    "max_rss_kb": 304616,
+    "bundle_id": "ods-base-202607-v2",
+    "manifest_sha256": "sha256:7f74a7655f3f86982b4e662f55b12aff4fa2f28ee23cf9b5db530f9f2aa0955b",
+    "content_digest": "sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01",
+    "through_date": "2026-07-31",
+    "dataset_count": 112,
+    "file_count": 21396,
+    "size_bytes": 13643600642,
+    "ready_matches_manifest": true,
+    "current_pointer_matches_package": true,
+    "mutation_performed": false
+  },
+  "oci_source_mirror": {
+    "root": "/home/ubuntu/data/astock",
+    "authority": "non_authoritative_read_only_source_mirror",
+    "observed_at": "2026-08-06",
+    "note": "Retained only as a preliminary comparison. Final counts and dispositions use the deep-verified CN01 ODS V2 package."
+  },
+  "source_families": [
+    {
+      "source_family": "security_company_listing_identity",
+      "datasets": ["security_master", "announcement_orgid_map", "stock_list"],
+      "mapped_dwd_tables": ["dwd_listed_company", "dwd_company_identifier", "dwd_security", "dwd_security_identifier", "dwd_listing", "dwd_trading_venue"],
+      "observed_evidence": {
+        "security_master_rows": 5868,
+        "security_id_distinct": 5868,
+        "exchange_code_key_distinct": 5868,
+        "duplicate_exchange_code_rows": 0,
+        "list_date_min": "1990-12-10",
+        "list_date_max": "2026-07-24",
+        "as_of_distinct": 1,
+        "as_of": "2026-07-25",
+        "built_at_distinct": 3,
+        "daily_bar_distinct_codes": 5329,
+        "daily_bar_unresolved_codes": 0,
+        "valuation_distinct_codes": 5316,
+        "valuation_unresolved_codes": 0,
+        "orgid_map_entries": 6217,
+        "master_codes_without_orgid": 0,
+        "code_validity_evidence_intervals": 8
+      },
+      "sufficiency": "business_identity_complete_historical_attribute_contract_required",
+      "reason": "The exact package resolves every historical bar and valuation code and has complete stable keys and organization mapping, but it is a current 2026 snapshot and does not prove historical display-name or reference-attribute availability.",
+      "v2_1_rule": "Use existing ODS for stable security/listing/code joins under a versioned conservative identity contract. Keep unevidenced historical attributes unavailable or forward-only."
+    },
+    {
+      "source_family": "security_market_bars",
+      "datasets": ["daily_ohlcv_unadjusted", "minute_1m_research_archive", "minute_5m_formal_archive"],
+      "mapped_dwd_tables": ["dwd_security_bar"],
+      "observed_evidence": {
+        "daily_rows": 13815115,
+        "daily_date_min": "1990-12-19",
+        "daily_date_max": "2026-07-24",
+        "daily_built_at_distinct": 6,
+        "daily_built_at_min": "2026-07-24T09:44:02.699005+08:00",
+        "daily_built_at_max": "2026-07-25T10:07:16.933786+08:00",
+        "daily_rows_built_after_observation": 13815115,
+        "minute_archives_deep_verified_as_package_members": true
+      },
+      "sufficiency": "existing_values_require_versioned_economic_availability_rule",
+      "reason": "Historical acquisition time is absent, but the completed observation interval is intrinsic to the fact and the package bytes are verified.",
+      "v2_1_rule": "Daily bars become knowable no earlier than governed session close; minute bars no earlier than interval end."
+    },
+    {
+      "source_family": "security_valuation",
+      "datasets": ["valuation_daily", "valuation_history_july_repair"],
+      "mapped_dwd_tables": ["dwd_security_valuation"],
+      "observed_evidence": {
+        "rows": 11416988,
+        "date_min": "2011-04-01",
+        "date_max": "2026-07-18",
+        "historical_publication_or_acquisition_column": false
+      },
+      "sufficiency": "provider_semantics_required_or_fail_closed",
+      "reason": "The exact source retains trade date and values but no historical publication or acquisition timestamp.",
+      "v2_1_rule": "Approve a provider-specific as-of rule backed by receipts or exclude historical valuation rows."
+    },
+    {
+      "source_family": "market_index_definition",
+      "datasets": ["index_daily_metadata"],
+      "mapped_dwd_tables": ["dwd_market_index"],
+      "observed_evidence": {
+        "historical_definition_versions": false,
+        "historical_publication_timestamp": false,
+        "current_metadata_package_verified": true
+      },
+      "sufficiency": "additive_reference_evidence_or_static_contract_required",
+      "reason": "Current metadata does not prove historical definition, name, or methodology versions.",
+      "v2_1_rule": "Bind a versioned static benchmark identity contract or additive reference evidence."
+    },
+    {
+      "source_family": "market_index_bars",
+      "datasets": ["index_daily"],
+      "mapped_dwd_tables": ["dwd_index_bar"],
+      "observed_evidence": {
+        "rows": 23242,
+        "date_min": "1990-12-19",
+        "date_max": "2026-07-24",
+        "historical_publication_or_acquisition_column": false
+      },
+      "sufficiency": "existing_values_require_versioned_economic_availability_rule",
+      "reason": "The completed interval is intrinsic evidence but fetch time is absent.",
+      "v2_1_rule": "Use session close after benchmark identity is evidenced."
+    },
+    {
+      "source_family": "trading_calendar",
+      "datasets": ["trading_calendar", "trading_calendar_history_hotfix"],
+      "mapped_dwd_tables": ["dwd_trading_calendar"],
+      "observed_evidence": {
+        "canonical_rows": 17055,
+        "trade_date_min": "2011-01-01",
+        "trade_date_max": "2026-07-25",
+        "built_at_distinct": 1,
+        "built_at": "2026-07-25T12:11:10.717285+08:00",
+        "hotfix_expanded_rows": 14636,
+        "hotfix_business_key_conflicts": 0
+      },
+      "sufficiency": "realized_session_rule_required_no_future_schedule_authority",
+      "reason": "The package proves realized open/closed history but not when future schedules were announced.",
+      "v2_1_rule": "Historical sessions become knowable conservatively by represented local session/date end and never authorize future schedules earlier."
+    },
+    {
+      "source_family": "st_status",
+      "datasets": ["st_status_pit", "daily_market_daily_status_observation_delta"],
+      "mapped_dwd_tables": ["dwd_security_status_interval", "dwd_tradability_state"],
+      "observed_evidence": {
+        "canonical_rows": 7030,
+        "knowledge_cutoff_null_rows": 0,
+        "knowledge_cutoff_min": "1990-12-10",
+        "knowledge_cutoff_max": "2026-07-25",
+        "proven_rows": 1492,
+        "not_proven_rows": 5538,
+        "baseline_unknown_rows": 505,
+        "no_proven_event_rows": 5033
+      },
+      "sufficiency": "source_timestamp_sufficient_for_proven_subset_fail_closed_remainder",
+      "reason": "Every row has a cutoff, but 5,538 rows explicitly lack proven event evidence.",
+      "v2_1_rule": "Use source cutoff for 1,492 proven rows; preserve all 5,538 not-proven rows as fail-closed."
+    },
+    {
+      "source_family": "suspensions",
+      "datasets": ["suspensions", "daily_events_suspensions_delta"],
+      "mapped_dwd_tables": ["dwd_listing_status_interval", "dwd_tradability_state"],
+      "observed_evidence": {
+        "canonical_rows": 2745,
+        "knowledge_cutoff_null_rows": 0,
+        "knowledge_cutoff_min": "2018-01-02",
+        "knowledge_cutoff_max": "2026-07-23",
+        "knowledge_after_suspend_start_rows": 543
+      },
+      "sufficiency": "source_timestamp_sufficient",
+      "reason": "Explicit source knowledge exists; 543 rows correctly become known after suspension start.",
+      "v2_1_rule": "Use exact source cutoff and never project those 543 rows backward."
+    },
+    {
+      "source_family": "price_limit_regime",
+      "datasets": ["price_limit_regime"],
+      "mapped_dwd_tables": ["dwd_price_limit_regime", "dwd_tradability_state"],
+      "observed_evidence": {
+        "rows": 2750,
+        "announcement_date_null_rows": 0,
+        "knowledge_cutoff_null_rows": 0,
+        "knowledge_cutoff_min": "1996-12-16",
+        "knowledge_cutoff_max": "2026-07-21"
+      },
+      "sufficiency": "source_timestamp_sufficient",
+      "reason": "Every rule has announcement and knowledge evidence.",
+      "v2_1_rule": "Use source cutoff and corrected venue/listing identities."
+    },
+    {
+      "source_family": "adjustment_factors",
+      "datasets": ["adjustment_factors_pit"],
+      "mapped_dwd_tables": ["dwd_adjustment_factor", "dwd_adjustment_factor_input"],
+      "observed_evidence": {
+        "rows": 46649,
+        "knowledge_cutoff_null_rows": 0,
+        "knowledge_cutoff_min": "2011-01-31",
+        "knowledge_cutoff_max": "2026-07-24",
+        "corp_action_announcement_rows": 39739,
+        "provider_notice_rows": 2737,
+        "fail_closed_exception_rows": 4173
+      },
+      "sufficiency": "source_timestamp_sufficient_with_existing_fail_closed_exceptions",
+      "reason": "All factors have cutoffs; 4,173 explicitly lack provable announcement evidence.",
+      "v2_1_rule": "Retain exact cutoff and keep all 4,173 exceptions fail-closed."
+    },
+    {
+      "source_family": "announcements",
+      "datasets": ["announcement_archive", "daily_events_announcements_delta"],
+      "mapped_dwd_tables": ["dwd_disclosure", "dwd_disclosure_subject"],
+      "observed_evidence": {
+        "rows": 6395198,
+        "publish_time_null_rows": 0,
+        "publish_time_min": "2011-01-01T06:30:00",
+        "publish_time_max": "2026-07-25T00:00:00"
+      },
+      "sufficiency": "source_timestamp_sufficient",
+      "reason": "Every announcement retains provider publish time.",
+      "v2_1_rule": "Use provider publish time and corrected relationships."
+    },
+    {
+      "source_family": "corporate_actions_and_terms",
+      "datasets": ["corporate_actions", "dividend_history"],
+      "mapped_dwd_tables": ["dwd_corporate_action", "dwd_corporate_action_term"],
+      "observed_evidence": {
+        "corporate_action_rows": 40594,
+        "corporate_action_announce_null_rows": 0,
+        "corporate_action_announce_min": "2011-04-01",
+        "corporate_action_announce_max": "2026-07-18",
+        "dividend_rows": 54509,
+        "dividend_announce_null_rows": 0,
+        "dividend_announce_min": "2011-04-01",
+        "dividend_announce_max": "2026-07-25",
+        "corporate_action_built_at_distinct": 1
+      },
+      "sufficiency": "explicit_announcement_date_sufficient_under_conservative_rule",
+      "reason": "Both source families have non-null announcement dates; the builder incorrectly prefers one 2026 acquisition timestamp.",
+      "v2_1_rule": "Use end of announcement date in the declared source timezone and do not use built_at."
+    },
+    {
+      "source_family": "financial_reporting",
+      "datasets": ["source_evidence_weekly_full_fundamentals_20260731", "fundamentals_financial_statements_parquet", "fundamentals_financial_quarterly_parquet", "financial_quarterly", "announcement_archive|sqlite_table|fin_abstract"],
+      "mapped_dwd_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"],
+      "observed_evidence": {
+        "canonical_financial_quarterly_rows": 243164,
+        "canonical_coordinates_matched_to_actual_publish_source": 233073,
+        "canonical_coordinates_unmatched": 10091,
+        "fin_abstract_rows": 307328,
+        "fin_abstract_coordinates_matched_to_actual_publish_source": 287488,
+        "fin_abstract_coordinates_unmatched": 19840,
+        "full_statement_envelopes": 14976,
+        "full_statement_decoded_reports": 852497,
+        "full_statement_publish_date_missing": 0,
+        "full_statement_publish_date_invalid": 0,
+        "full_statement_update_time_missing": 0,
+        "full_statement_publish_date_min": "1996-08-26",
+        "full_statement_publish_date_max": "2026-08-01",
+        "post_cutoff_report_versions": 86,
+        "post_cutoff_envelopes": 39,
+        "post_cutoff_publish_date": "2026-08-01",
+        "weekly_quarterly_rows": 287552,
+        "weekly_quarterly_publish_date_null_rows": 0
+      },
+      "sufficiency": "source_family_partial_existing_ods_with_explicit_exclusions",
+      "reason": "Full statements and weekly quarterly rows carry publication dates. Legacy source coordinates remain unmatched, and 86 report versions are dated after the V2.1 cutoff.",
+      "v2_1_rule": "Use actual publish_date for full and weekly sources; move 86 post-cutoff versions to Daily cleaning; fail closed or add mapping for 10,091 canonical and 19,840 abstract unmatched coordinates."
+    },
+    {
+      "source_family": "industry_snapshot",
+      "datasets": ["source_evidence_weekly_full_fundamentals_20260731"],
+      "mapped_dwd_tables": ["dwd_industry_scheme", "dwd_industry_node", "dwd_company_industry_membership"],
+      "observed_evidence": {
+        "rows": 4992,
+        "provider_update_date": "2026-07-27",
+        "market_date": "2026-07-31",
+        "acquired_at": "2026-07-31T23:42:30+08:00"
+      },
+      "sufficiency": "forward_only_from_acquisition",
+      "reason": "The exact package contains one current snapshot only.",
+      "v2_1_rule": "Retain acquired_at and grant no historical membership authority before it."
+    },
+    {
+      "source_family": "f10_capital_and_holdings",
+      "datasets": ["source_evidence_weekly_full_fundamentals_20260731"],
+      "mapped_dwd_tables": ["dwd_share_capital_observation", "dwd_shareholding_observation"],
+      "observed_evidence": {
+        "rows": 79872,
+        "category_count": 17,
+        "market_date": "2026-07-31",
+        "acquired_at_min": "2026-07-31T21:34:12+08:00",
+        "acquired_at_max": "2026-07-31T23:12:17+08:00",
+        "provider_updated_date_min": "2025-12-24",
+        "provider_updated_date_max": "2026-07-31"
+      },
+      "sufficiency": "forward_only_from_acquisition",
+      "reason": "Reported dates do not establish public availability before acquisition.",
+      "v2_1_rule": "Retain acquired_at and do not backfill."
+    },
+    {
+      "source_family": "shareholder_count",
+      "datasets": ["shareholder_count"],
+      "mapped_dwd_tables": ["dwd_shareholder_count_observation"],
+      "observed_evidence": {
+        "rows": 411318,
+        "knowledge_cutoff_null_rows": 0,
+        "hold_notice_date_null_rows": 0,
+        "knowledge_cutoff_min": "2013-01-19",
+        "knowledge_cutoff_max": "2026-07-25"
+      },
+      "sufficiency": "source_timestamp_sufficient",
+      "reason": "Every row retains knowledge and notice date.",
+      "v2_1_rule": "Use source cutoff and corrected identity bindings."
+    },
+    {
+      "source_family": "shareholding_changes",
+      "datasets": ["announcement_archive|sqlite_table|holder_changes"],
+      "mapped_dwd_tables": ["dwd_shareholding_change"],
+      "observed_evidence": {
+        "rows": 194322,
+        "disclosure_date_present_rows": 69648,
+        "disclosure_date_null_rows": 124674,
+        "change_date_null_rows": 0,
+        "disclosure_date_min": "2006-12-13",
+        "disclosure_date_max": "2026-07-24"
+      },
+      "sufficiency": "partial_disclosure_evidence_fail_closed_remainder",
+      "reason": "Only 69,648 rows have disclosure evidence; change date is business time.",
+      "v2_1_rule": "Use disclosure date where present and add mapping or fail closed for 124,674 rows."
+    },
+    {
+      "source_family": "governance_detections",
+      "datasets": ["source_exception_evidence", "source_quality_evidence"],
+      "mapped_dwd_tables": ["dwd_observation_gap", "dwd_quality_exception"],
+      "observed_evidence": {"historical_business_time_is_not_knowledge_time": true},
+      "sufficiency": "forward_only_from_detection",
+      "reason": "These rows record when the warehouse detected or classified a condition.",
+      "v2_1_rule": "Retain actual detection time and never project it backward."
+    }
+  ],
+  "physical_checks": [
+    {
+      "check_id": "security_master",
+      "dataset_id": "security_master",
+      "format": "parquet",
+      "required_columns": ["security_id", "stock_code", "exchange", "name", "list_date", "delist_date", "as_of", "built_at"],
+      "business_time_fields": ["list_date", "delist_date"],
+      "knowledge_fields": ["as_of", "built_at"]
+    },
+    {
+      "check_id": "announcement_orgid_map",
+      "dataset_id": "announcement_orgid_map",
+      "format": "json",
+      "required_columns": [],
+      "business_time_fields": [],
+      "knowledge_fields": []
+    },
+    {
+      "check_id": "daily_ohlcv_unadjusted",
+      "dataset_id": "daily_ohlcv_unadjusted",
+      "format": "parquet",
+      "required_columns": ["stock_code", "date", "open", "high", "low", "close", "volume", "amount", "built_at"],
+      "business_time_fields": ["date"],
+      "knowledge_fields": ["built_at"]
+    },
+    {
+      "check_id": "valuation_daily",
+      "dataset_id": "valuation_daily",
+      "format": "parquet",
+      "required_columns": ["stock_code", "date", "pe_ttm", "pb", "ps_ttm", "pcf_ttm", "total_share", "total_mv"],
+      "business_time_fields": ["date"],
+      "knowledge_fields": []
+    },
+    {
+      "check_id": "index_daily",
+      "dataset_id": "index_daily",
+      "format": "parquet",
+      "required_columns": ["index_code", "date", "open", "high", "low", "close", "volume", "amount"],
+      "business_time_fields": ["date"],
+      "knowledge_fields": []
+    },
+    {
+      "check_id": "index_daily_metadata",
+      "dataset_id": "index_daily_metadata",
+      "format": "json",
+      "required_columns": [],
+      "business_time_fields": [],
+      "knowledge_fields": []
+    },
+    {
+      "check_id": "trading_calendar",
+      "dataset_id": "trading_calendar",
+      "format": "parquet",
+      "required_columns": ["exchange", "trade_date", "is_open", "session", "source", "built_at"],
+      "business_time_fields": ["trade_date"],
+      "knowledge_fields": ["built_at"]
+    },
+    {
+      "check_id": "st_status_pit",
+      "dataset_id": "st_status_pit",
+      "format": "parquet",
+      "required_columns": ["interval_id", "stock_code", "effective_start", "effective_end", "announcement_date", "knowledge_cutoff"],
+      "business_time_fields": ["effective_start", "effective_end"],
+      "knowledge_fields": ["announcement_date", "knowledge_cutoff"]
+    },
+    {
+      "check_id": "suspensions",
+      "dataset_id": "suspensions",
+      "format": "parquet",
+      "required_columns": ["suspension_id", "stock_code", "suspend_start", "suspend_end", "knowledge_cutoff"],
+      "business_time_fields": ["suspend_start", "suspend_end"],
+      "knowledge_fields": ["knowledge_cutoff"]
+    },
+    {
+      "check_id": "price_limit_regime",
+      "dataset_id": "price_limit_regime",
+      "format": "parquet",
+      "required_columns": ["interval_id", "effective_start", "effective_end", "announcement_date", "knowledge_cutoff"],
+      "business_time_fields": ["effective_start", "effective_end"],
+      "knowledge_fields": ["announcement_date", "knowledge_cutoff"]
+    },
+    {
+      "check_id": "adjustment_factors_pit",
+      "dataset_id": "adjustment_factors_pit",
+      "format": "parquet",
+      "required_columns": ["stock_code", "effective_date", "adjust_factor", "adj_version", "knowledge_cutoff"],
+      "business_time_fields": ["effective_date"],
+      "knowledge_fields": ["knowledge_cutoff"]
+    },
+    {
+      "check_id": "corporate_actions",
+      "dataset_id": "corporate_actions",
+      "format": "parquet",
+      "required_columns": ["action_id", "stock_code", "announce_date", "ex_date", "action_type", "built_at"],
+      "business_time_fields": ["ex_date"],
+      "knowledge_fields": ["announce_date", "built_at"]
+    },
+    {
+      "check_id": "financial_quarterly",
+      "dataset_id": "financial_quarterly",
+      "format": "parquet",
+      "required_columns": ["stock_code", "report_date", "publish_deadline"],
+      "business_time_fields": ["report_date"],
+      "knowledge_fields": ["publish_deadline"]
+    },
+    {
+      "check_id": "shareholder_count",
+      "dataset_id": "shareholder_count",
+      "format": "parquet",
+      "required_columns": ["code", "end_date", "hold_notice_date", "knowledge_cutoff", "fetched_at"],
+      "business_time_fields": ["end_date"],
+      "knowledge_fields": ["hold_notice_date", "knowledge_cutoff", "fetched_at"]
+    },
+    {
+      "check_id": "announcements",
+      "dataset_id": "announcement_archive",
+      "format": "sqlite",
+      "member": "announcements",
+      "required_columns": ["code", "publish_time", "ann_id", "category"],
+      "business_time_fields": [],
+      "knowledge_fields": ["publish_time"]
+    },
+    {
+      "check_id": "fin_abstract",
+      "dataset_id": "announcement_archive",
+      "format": "sqlite",
+      "member": "fin_abstract",
+      "required_columns": ["code", "report_date"],
+      "business_time_fields": ["report_date"],
+      "knowledge_fields": []
+    },
+    {
+      "check_id": "holder_changes",
+      "dataset_id": "announcement_archive",
+      "format": "sqlite",
+      "member": "holder_changes",
+      "required_columns": ["code", "change_date", "disclosure_date", "row_key"],
+      "business_time_fields": ["change_date"],
+      "knowledge_fields": ["disclosure_date"]
+    },
+    {
+      "check_id": "weekly_financial_quarterly",
+      "dataset_id": "source_evidence_weekly_full_fundamentals_20260731",
+      "path_suffix": "artifacts/financial_quarterly.parquet",
+      "format": "parquet",
+      "required_columns": ["security_id", "stock_code", "report_date", "publish_date", "source_revision", "acquired_at"],
+      "business_time_fields": ["report_date"],
+      "knowledge_fields": ["publish_date", "acquired_at"]
+    },
+    {
+      "check_id": "full_financial_statements",
+      "dataset_id": "source_evidence_weekly_full_fundamentals_20260731",
+      "path_suffix": "artifacts/financial_statements.parquet",
+      "format": "parquet",
+      "required_columns": ["security_id", "stock_code", "statement_type", "latest_publish_date", "latest_update_time", "raw_payload_gzip", "raw_payload_sha256", "raw_payload_bytes", "source_revision", "acquired_at"],
+      "business_time_fields": ["latest_publish_date", "latest_update_time"],
+      "knowledge_fields": ["acquired_at"]
+    },
+    {
+      "check_id": "industry_membership_snapshot",
+      "dataset_id": "source_evidence_weekly_full_fundamentals_20260731",
+      "path_suffix": "artifacts/industry_membership.parquet",
+      "format": "parquet",
+      "required_columns": ["security_id", "stock_code", "industry_code", "provider_update_date", "market_date", "source_revision", "acquired_at"],
+      "business_time_fields": ["provider_update_date", "market_date"],
+      "knowledge_fields": ["acquired_at"]
+    },
+    {
+      "check_id": "raw_f10_snapshot",
+      "dataset_id": "source_evidence_weekly_full_fundamentals_20260731",
+      "path_suffix": "artifacts/raw_f10.parquet",
+      "format": "parquet",
+      "required_columns": ["security_id", "stock_code", "category", "content_sha256", "provider_updated_date", "market_date", "source_revision", "acquired_at"],
+      "business_time_fields": ["provider_updated_date", "market_date"],
+      "knowledge_fields": ["acquired_at"]
+    }
+  ]
+}

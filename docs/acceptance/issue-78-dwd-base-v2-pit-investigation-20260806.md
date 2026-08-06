@@ -2,13 +2,14 @@
 
 | Field | Value |
 | --- | --- |
-| Evidence status | blocked finding; code, CN01 ODS, and CN01+NFS topology audits complete; physical DWD, Hermes ODS mirror, and V2.1 build incomplete |
+| Evidence status | blocked finding; code, CN01 ODS, and CN01+NFS topology audits complete; full DWD pre-rebuild audit, Hermes ODS mirror, and V2.1 acceptance incomplete |
 | Evidence date | 2026-08-06 |
 | Governing work | `META-DATA-PIT-001` / GitHub Issue #78 |
 | Investigated package | `dwd-base-202607-v2` |
 | Manifest SHA-256 | `sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f` |
 | Content digest | `sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9` |
-| DWD audit policy | `config/audits/dwd-pit-semantics.v1.json` / `sha256:9023edddad38b8a933dfc9c6150a71a285d7fa8fd441a1074f5ab4c4382cd1b0` |
+| DWD PIT audit policy | `config/audits/dwd-pit-semantics.v1.json` / `sha256:9023edddad38b8a933dfc9c6150a71a285d7fa8fd441a1074f5ab4c4382cd1b0` |
+| Full pre-rebuild audit policy | `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` / `sha256:cd9b9e49f2c2fee76d4e13f5206c5bdb3a7e2dc82ac14f66fe97c2c55e74fc84` |
 | ODS sufficiency policy | `config/audits/ods-pit-sufficiency.v1.json` / `sha256:170f4557c43202e82c6951f6a1516b2fee228b38b4b94766495ac1a232fafa4d` |
 | Successor boundary | new `dwd-base-202607-v2.1`, through 2026-07-31; CN01-only NFS build; later Daily excluded and cleaned separately |
 | Proposed remediation | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` |
@@ -25,10 +26,18 @@ acquisition/detection. The ambiguous objects are `dwd_disclosure`, `dwd_disclosu
 changes lack `disclosure_date`. The three financial tables move to forward-only because ODS V2
 contains current values without immutable report-revision history.
 
-This evidence does not close Issue #78. The physical package bytes and installed Hermes, CN01, and
-OCI mirrors have not all been read by the current principal. The sealed V2 package therefore remains
-blocked for historical PIT consumers. No historical scan, timestamp override, legacy fallback,
-Base mutation, package republish, or pointer movement is authorized.
+This evidence does not close Issue #78. On 2026-08-06, the project explicitly expanded the Issue
+from a PIT-focused investigation into a full DWD Base V2 pre-rebuild audit and one-time remediation
+window. The expensive V2.1 reconstruction may start only after all 33 tables and physical
+partitions complete package/schema, field-level PIT, identity, referential, key/version, temporal,
+coverage, numeric, lineage, deterministic replay, downstream compatibility, and rebuild-readiness
+audits; every finding must have a measured impact and approved disposition, and the exact findings,
+remediation, builder-contract, and semantic digests must be approved.
+
+The physical package bytes and installed Hermes, CN01, and OCI mirrors have not all been read by the
+current principal. The sealed V2 package therefore remains blocked for historical PIT consumers.
+No V2.1 builder, candidate assembly, historical scan, timestamp override, legacy fallback, Base
+mutation, package republish, or pointer movement is authorized.
 
 ## 2. Mirror Inventory And Physical Access
 
@@ -78,13 +87,18 @@ build and does not permit a local-scratch fallback. The complete NFS candidate i
 then copied manifest-by-manifest into a hidden local ingress and deeply verified again before local
 atomic installation. No pointer changes during build or installation.
 
-The missing physical evidence is explicit:
+The missing pre-rebuild evidence is explicit:
 
 - READY/manifest binding and every declared file SHA-256 on all three installed copies;
 - cross-mirror manifest/content equality;
-- actual table schemas and row counts;
-- minimum/maximum and year distributions of `knowledge_from`;
-- representative 2012-2021 rows whose knowledge is in 2026; and
+- partition-level schemas, nullability, types, timezone/decimal/enum domains, and path values;
+- row- and field-level PIT availability, identity graph, time-aware foreign keys, keys/versions,
+  temporal intervals, and authorized lineage for all 33 tables;
+- expected-versus-actual coverage, numeric/domain invariants, and reason-coded exclusions;
+- deterministic real-partition replay for every derived builder;
+- Daily/weekly/consumer compatibility and one-time remediation impact;
+- minimum/maximum and year distributions of `knowledge_from` and representative 2012-2021 future
+  knowledge samples; and
 - checksum-identical verification of the Hermes ODS V2 mirror.
 
 ## 3. Complete 33-Table Code And Source Matrix
@@ -215,17 +229,20 @@ replay or explicit retirement under an approved cutover plan.
 
 | Asset | Purpose |
 | --- | --- |
-| `config/audits/dwd-pit-semantics.v1.json` | exact 33-table code/source classification, reference fields, ODS sufficiency, and remediation notes |
+| `config/audits/dwd-pit-semantics.v1.json` | exact 33-table code/source PIT classification, reference fields, ODS sufficiency, and remediation notes |
+| `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` | hard gate, exact 33-table scope, 13 audit dimensions, finding model, six execution phases, required outputs, and Issue #78/V2.1 closure rules |
 | `config/audits/ods-pit-sufficiency.v1.json` | 18-source-family ODS evidence matrix, 21 physical checks, CN01 exact-package statistics, accepted V2.1/Daily boundary, and CN01-only NFS rebuild topology |
 | `src/quanthus/pipelines/dwd_pit_audit.py` | read-only DWD package verification, mirror comparison, and table-distribution scanner |
 | `src/quanthus/pipelines/ods_pit_audit.py` | read-only Hermes/CN01 ODS package verification and required Parquet/SQLite source-field scanner |
 | `ops/bin/audit-dwd-pit-semantics` | CLI for manifest-only and full three-mirror DWD evidence |
 | `ops/bin/audit-ods-pit-sufficiency` | CLI for manifest-only and full two-mirror ODS source evidence |
-| `docs/operations/dwd-base-pit-audit.md` | DWD permission, execution, interpretation, and failure runbook |
+| `docs/operations/dwd-base-pit-audit.md` | DWD PIT permission, execution, interpretation, and failure runbook |
+| `docs/operations/dwd-base-v2-pre-rebuild-audit.md` | full physical/semantic/structural/replay audit and one-time remediation-freeze runbook |
 | `docs/operations/ods-base-pit-sufficiency-audit.md` | ODS package/source audit and post-Base Daily boundary runbook |
 | `docs/operations/dwd-v2-1-cn01-nfs-rebuild.md` | CN01-only NFS build, capacity, cross-filesystem installation, cutover, and rollback runbook |
 | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` | proposed immutable successor-Base remediation; not yet approved |
-| `tests/unit/test_dwd_pit_audit.py` | policy completeness, file mapping, output isolation, access failure, and future-knowledge scan tests |
+| `tests/unit/test_dwd_pit_audit.py` | PIT policy completeness, file mapping, output isolation, access failure, and future-knowledge scan tests |
+| `tests/unit/test_dwd_base_pre_rebuild_audit_policy.py` | exact 33-table full-audit scope, hard builder gate, required dimensions/outputs, finding classification, and Issue #78 closure tests |
 | `tests/unit/test_ods_pit_sufficiency_policy.py` | all-33-table source coverage, CN01/Hermes authority boundary, compound-dataset path selection, and V2.1/Daily decision tests |
 
 The audit implementation reuses `verify_domain_base`, which verifies the READY/manifest binding,
@@ -253,8 +270,10 @@ manifest-declared Parquet paths accessed. Output paths inside a supplied mirror 
 - CN01 storage preflight proved local reconstruction capacity insufficient and `/personal` NFS
   mandatory; NFS write, atomic rename, same-mount hard link, and CN01-local lock probes passed and
   left no persistent probe artifact.
-- Repository `make check` passed environment doctor, compilation, 897 tests, and GitHub planning
-  synchronization after the CN01 evidence update.
+- The full pre-rebuild audit scope is frozen but not yet executed; no claim of DWD physical,
+  structural, replay, or full semantic conformance is made by this evidence.
+- Repository `make check` passed environment doctor, compilation, 903 tests, and GitHub planning
+  synchronization after the full pre-rebuild audit scope was frozen.
 
 GitHub publication is recorded in the Issue #78 implementation change after branch review.
 
@@ -263,14 +282,22 @@ GitHub publication is recorded in the Issue #78 implementation change after bran
 Issue #78 remains open until:
 
 1. approved read-only access permits the Hermes/CN01/OCI physical DWD audit;
-2. full mode completes all 33 DWD table scans on all three mirrors with matching package identities
-   and manifest row counts;
-3. the Hermes ODS V2 mirror is confirmed checksum-identical to the deep-verified CN01 package;
-4. identity, observation-completion, valuation, benchmark, financial, and holder-change rules are
-   frozen, with every uncovered row explicitly fail-closed or bound to additive immutable evidence;
-5. the proposed ADR is explicitly approved;
-6. corrected availability contracts and the final V2.1 semantic digest receive human approval;
-7. the CN01 partition pilots freeze builder memory/spill bounds and the full NFS build completes;
-8. the NFS candidate and copied local ingress both pass complete deep verification;
-9. the separate post-2026-07-31 Daily cleaning/rebuild/rebase plan is accepted; and
-10. downstream cutover, rollback, and P4 reapproval plans are accepted.
+2. the complete policy in `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` executes across all
+   33 tables and all required audit dimensions;
+3. all three mirrors have matching package identity and every manifest part has physical/schema
+   disposition;
+4. every PIT/field, identity, relationship, key/version, temporal, coverage, numeric, lineage,
+   deterministic replay, downstream, and rebuild-readiness finding is measured and classified;
+5. no critical finding or unknown disposition remains, and every fail-closed exclusion and repair
+   has a reason, count, regression test, and V2.1 acceptance check;
+6. the exact findings ledger, one-time remediation scope, builder contracts, and semantic digests
+   receive human approval before the V2.1 builder gate opens;
+7. the Hermes ODS V2 mirror is confirmed checksum-identical to the deep-verified CN01 package;
+8. the proposed ADR and table/source availability contracts are explicitly approved;
+9. the CN01 partition pilots freeze builder memory/spill bounds and the full NFS build completes;
+10. the complete 33-table NFS candidate and copied local ingress both pass deep and finding-closure
+    verification;
+11. CN01 installs V2.1, Hermes/OCI successor mirrors are checksum-identical, and consumer cutover/
+    rollback are accepted; and
+12. the post-2026-07-31 Daily migration may remain separately executed, but its compatibility and
+    migration disposition are frozen under Issue #78.

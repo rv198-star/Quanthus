@@ -1,0 +1,355 @@
+{
+  "schema_version": 1,
+  "kind": "dwd_base_pre_rebuild_audit_policy",
+  "policy_id": "meta-data-pit-001.dwd-base-v2-pre-rebuild",
+  "policy_version": "1.0.0",
+  "status": "scope_frozen_execution_pending",
+  "governing_issue": 78,
+  "objective": "Complete one evidence-backed physical, semantic, structural, temporal, lineage, coverage, reproducibility, and consumer-impact audit of DWD Base V2 before authorizing the expensive V2.1 reconstruction, then freeze one complete remediation scope so known and discoverable Base defects are corrected in a single successor build window.",
+  "hard_gate": {
+    "dwd_v2_1_builder_execution_authorized": false,
+    "dwd_v2_1_candidate_assembly_authorized": false,
+    "dwd_v2_1_pointer_cutover_authorized": false,
+    "reason": "The full pre-rebuild audit, findings ledger, remediation scope, and exact semantic digests are not yet accepted.",
+    "no_partial_rebuild_escape": true,
+    "consumer_specific_timestamp_override": "forbidden"
+  },
+  "base_release": {
+    "package_id": "dwd-base-202607-v2",
+    "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+    "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+    "through_date": "2026-07-31",
+    "expected_table_count": 33
+  },
+  "successor_boundary": {
+    "package_id": "dwd-base-202607-v2.1",
+    "through_date": "2026-07-31",
+    "publication_mode": "new_immutable_complete_33_table_base",
+    "execution_node": "CN01",
+    "build_storage": "mandatory_external_nfs",
+    "execution_topology_policy": "config/audits/ods-pit-sufficiency.v1.json#cn01_rebuild_execution_topology",
+    "v2_mutation": "forbidden",
+    "post_2026_07_31_daily": "separate_clean_rebuild_rebase_migration"
+  },
+  "analysis_windows": {
+    "full_history": true,
+    "development_window": {
+      "start": "2012-01-01",
+      "end": "2021-12-31"
+    },
+    "recent_window": {
+      "start": "2026-01-01",
+      "end": "2026-07-31"
+    },
+    "july_tail": {
+      "start": "2026-07-24",
+      "end": "2026-07-31"
+    }
+  },
+  "required_mirror_labels": [
+    "hermes",
+    "cn01",
+    "oci"
+  ],
+  "table_scope": [
+    "dwd_listed_company",
+    "dwd_company_identifier",
+    "dwd_security",
+    "dwd_security_identifier",
+    "dwd_listing",
+    "dwd_trading_venue",
+    "dwd_security_bar",
+    "dwd_security_valuation",
+    "dwd_adjustment_factor",
+    "dwd_adjustment_factor_input",
+    "dwd_market_index",
+    "dwd_index_bar",
+    "dwd_trading_calendar",
+    "dwd_security_status_interval",
+    "dwd_listing_status_interval",
+    "dwd_price_limit_regime",
+    "dwd_tradability_state",
+    "dwd_observation_gap",
+    "dwd_disclosure",
+    "dwd_disclosure_subject",
+    "dwd_corporate_action",
+    "dwd_corporate_action_term",
+    "dwd_financial_report",
+    "dwd_financial_concept",
+    "dwd_financial_fact",
+    "dwd_industry_scheme",
+    "dwd_industry_node",
+    "dwd_company_industry_membership",
+    "dwd_share_capital_observation",
+    "dwd_shareholder_count_observation",
+    "dwd_shareholding_change",
+    "dwd_shareholding_observation",
+    "dwd_quality_exception"
+  ],
+  "audit_dimensions": [
+    {
+      "dimension_id": "package_integrity_and_mirror_equality",
+      "purpose": "Prove the exact installed bytes and enumerate every divergence before semantic conclusions are drawn.",
+      "required_checks": [
+        "READY and manifest binding",
+        "package id, manifest SHA-256, content digest, and through-date",
+        "manifest-declared file size and SHA-256 for every member",
+        "physical file inventory equality",
+        "cross-mirror byte identity for Hermes, CN01, and OCI"
+      ]
+    },
+    {
+      "dimension_id": "schema_and_partition_contract",
+      "purpose": "Detect partition-level schema drift and contract mismatches hidden by package-level row counts.",
+      "required_checks": [
+        "every Parquet part schema versus manifest/model contract",
+        "nullable and logical-type consistency",
+        "decimal precision, timestamp timezone, and enum/domain consistency",
+        "partition key values versus physical paths",
+        "zero-row and zero-column part classification"
+      ]
+    },
+    {
+      "dimension_id": "pit_and_field_availability",
+      "purpose": "Audit historical availability at table and field level, not only the row-level knowledge timestamp.",
+      "required_checks": [
+        "knowledge_from and knowledge_to interval validity",
+        "knowledge time versus observation, effective, announcement, publication, acquisition, and detection time",
+        "field-level future leakage for mutable attributes",
+        "mixed timestamp precision classification",
+        "forward-only and fail-closed boundaries"
+      ]
+    },
+    {
+      "dimension_id": "identity_and_entity_graph",
+      "purpose": "Prove stable entity identity and prevent future identity knowledge from leaking into historical joins.",
+      "required_checks": [
+        "security and company identity stability",
+        "stock-code reuse and identifier validity intervals",
+        "listing, delisting, relisting, venue, and company lifecycle",
+        "current-snapshot attribute leakage",
+        "identity graph consistency across all dependent tables"
+      ]
+    },
+    {
+      "dimension_id": "referential_integrity",
+      "purpose": "Validate every declared relationship at the relevant business and knowledge coordinate.",
+      "required_checks": [
+        "orphan foreign keys",
+        "future parent references",
+        "cross-version parent mismatches",
+        "relationship validity interval containment",
+        "cross-domain dependency closure"
+      ]
+    },
+    {
+      "dimension_id": "business_keys_row_keys_and_versions",
+      "purpose": "Detect duplicates, unstable identifiers, overwritten revisions, and events without explicit version identity.",
+      "required_checks": [
+        "primary and business-key uniqueness",
+        "row-key determinism and stability",
+        "source revision and knowledge-version uniqueness",
+        "duplicate coordinates with conflicting values",
+        "late corrections represented as new immutable versions"
+      ]
+    },
+    {
+      "dimension_id": "temporal_interval_integrity",
+      "purpose": "Detect overlapping, inverted, impossible, or unjustified temporal intervals.",
+      "required_checks": [
+        "start before end",
+        "non-overlap where the model requires exclusivity",
+        "gap classification where continuity is required",
+        "effective interval versus listing and calendar bounds",
+        "derived interval maximum-input-knowledge rule"
+      ]
+    },
+    {
+      "dimension_id": "completeness_and_coverage",
+      "purpose": "Measure whether the Base covers its declared universe and periods without silent deletion or unsupported inference.",
+      "required_checks": [
+        "expected versus actual security/date and entity/period coordinates",
+        "missing intervals and unexplained tails",
+        "pre-listing and post-delisting exclusions",
+        "2012-2021 development-window coverage",
+        "2026 and July-tail reconciliation",
+        "explicit exclusion ledger for every fail-closed row"
+      ]
+    },
+    {
+      "dimension_id": "numeric_and_domain_invariants",
+      "purpose": "Detect semantically impossible values that pass schema and checksum verification.",
+      "required_checks": [
+        "OHLC ordering and nonnegative volume/amount constraints",
+        "factor positivity and continuity checks",
+        "valuation and share-capital domain constraints",
+        "price-limit and tradability consistency",
+        "financial fact units, currencies, and concept-value compatibility",
+        "bounded categorical-domain values"
+      ]
+    },
+    {
+      "dimension_id": "lineage_and_source_authority",
+      "purpose": "Prove every DWD row is traceable only to authorized immutable inputs and accepted derivations.",
+      "required_checks": [
+        "source path and source revision resolvability",
+        "manifest and input-plan identity binding",
+        "builder code revision and policy digest binding",
+        "absence of legacy DWS, ADS, release-set, mutable-pointer, or hidden local-state inputs",
+        "complete reason-coded lineage for exclusions and corrections"
+      ]
+    },
+    {
+      "dimension_id": "derived_replay_determinism",
+      "purpose": "Prove derived tables can be reproduced without hidden current state, environment-dependent ordering, or nondeterministic joins.",
+      "required_checks": [
+        "two independently named reruns over representative real partitions",
+        "byte or declared semantic digest equality",
+        "stable ordering and partitioning",
+        "no network, mutable database, wall-clock, file-mtime, or ambient-current dependency",
+        "reconciliation from exact ODS inputs to DWD outputs"
+      ]
+    },
+    {
+      "dimension_id": "downstream_and_increment_compatibility",
+      "purpose": "Prevent a correct Base from being paired with incompatible increments or consumers.",
+      "required_checks": [
+        "post-Base Daily lineage and identity compatibility",
+        "weekly correction compatibility",
+        "P4 and other historical PIT consumer field requirements",
+        "mirror, restore, deployment, and rollback behavior",
+        "explicit migration disposition for every bound consumer and retained artifact"
+      ]
+    },
+    {
+      "dimension_id": "rebuild_publication_and_rollback_readiness",
+      "purpose": "Prove the accepted remediation can be executed once on CN01 without creating a second unsafe migration.",
+      "required_checks": [
+        "CN01 and NFS topology preflight",
+        "partition pilot capacity and memory bounds",
+        "complete one-time remediation ledger",
+        "NFS assembly and local ingress double verification",
+        "compare-and-swap pointer cutover",
+        "V2 retention and tested rollback"
+      ]
+    }
+  ],
+  "finding_model": {
+    "severity_levels": [
+      "critical",
+      "high",
+      "medium",
+      "low",
+      "informational"
+    ],
+    "allowed_dispositions": [
+      "fix_in_v2_1",
+      "retain_with_approved_contract",
+      "forward_only",
+      "fail_closed_exclusion",
+      "add_immutable_evidence_then_fix_in_v2_1",
+      "no_change_proven"
+    ],
+    "required_fields": [
+      "finding_id",
+      "dimension_id",
+      "table_or_cross_table_scope",
+      "severity",
+      "evidence",
+      "root_cause",
+      "affected_rows_or_partitions",
+      "disposition",
+      "builder_or_contract_change",
+      "tests",
+      "v2_1_acceptance_check"
+    ],
+    "unknown_or_unclassified_disposition": "forbidden_at_scope_freeze"
+  },
+  "execution_phases": [
+    {
+      "phase_id": "A",
+      "name": "scope_and_inventory_freeze",
+      "exit": "Exact package identities, mirrors, 33-table scope, dimensions, commands, code revision, and output paths are frozen."
+    },
+    {
+      "phase_id": "B",
+      "name": "physical_schema_and_partition_audit",
+      "exit": "All mirrors and every manifest-declared part have integrity and schema dispositions."
+    },
+    {
+      "phase_id": "C",
+      "name": "semantic_identity_temporal_and_lineage_audit",
+      "exit": "Every table and field family has PIT, identity, relationship, key, interval, and lineage evidence."
+    },
+    {
+      "phase_id": "D",
+      "name": "coverage_numeric_replay_and_consumer_audit",
+      "exit": "Coverage, domain invariants, real-partition reruns, and downstream compatibility are measured and reason-coded."
+    },
+    {
+      "phase_id": "E",
+      "name": "findings_and_one_time_remediation_freeze",
+      "exit": "The complete findings ledger and V2.1 remediation scope contain no unknown or unclassified item."
+    },
+    {
+      "phase_id": "F",
+      "name": "human_approval_to_build",
+      "exit": "Exact audit report, remediation ledger, builder contracts, semantic digests, and CN01 execution plan are approved; only then may the V2.1 builder gate open."
+    }
+  ],
+  "required_outputs": {
+    "root": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit",
+    "artifacts": [
+      "audit-plan.json",
+      "mirror-and-package-inventory.json",
+      "table-and-partition-profile.json",
+      "field-availability-matrix.json",
+      "identity-graph-audit.json",
+      "referential-integrity-audit.json",
+      "key-version-and-duplicate-ledger.json",
+      "temporal-interval-audit.json",
+      "coverage-and-exclusion-matrix.json",
+      "numeric-domain-invariant-audit.json",
+      "lineage-authority-audit.json",
+      "replay-determinism-audit.json",
+      "downstream-and-increment-impact.json",
+      "findings-ledger.json",
+      "v2.1-remediation-scope.json",
+      "v2.1-build-contract.json",
+      "audit-summary.md"
+    ],
+    "all_json_outputs_require_canonical_digest": true,
+    "all_outputs_are_read_only_evidence_until_human_approval": true
+  },
+  "audit_closure_gate": {
+    "all_33_tables_profiled": true,
+    "all_dimensions_complete": true,
+    "all_required_mirrors_verified": true,
+    "all_findings_classified": true,
+    "unresolved_critical_findings_allowed": 0,
+    "high_findings_require_approved_disposition": true,
+    "every_fail_closed_exclusion_requires_reason_and_count": true,
+    "every_fix_requires_test_and_v2_1_acceptance_check": true,
+    "findings_ledger_digest_approved": true,
+    "remediation_scope_digest_approved": true,
+    "builder_contract_digests_approved": true,
+    "dwd_v2_1_builder_gate_opens_only_after_closure": true
+  },
+  "issue_closure_gate": {
+    "pre_rebuild_audit_accepted": true,
+    "v2_1_complete_33_table_package_accepted": true,
+    "cn01_local_package_installed_and_verified": true,
+    "hermes_and_oci_successor_mirrors_checksum_identical": true,
+    "consumer_cutover_and_rollback_accepted": true,
+    "post_2026_07_31_daily_migration_may_remain_separate": true
+  },
+  "forbidden_actions": [
+    "start_v2_1_domain_builders_before_audit_closure",
+    "repair_only_the_original_pit_findings_without_full_audit",
+    "mutate_dwd_v2_or_ods_v2",
+    "silently_drop_rows_or_partitions",
+    "use_business_time_as_knowledge_time_without_approved_contract",
+    "use_legacy_dws_ads_release_sets_or_mutable_pointers_as_authority",
+    "close_issue_78_after_scope_freeze_but_before_v2_1_acceptance"
+  ]
+}

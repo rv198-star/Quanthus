@@ -4,15 +4,36 @@
 | --- | --- |
 | Governing work | `META-DATA-PIT-001` / Issue #78 |
 | Governing decision | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` |
+| Pre-rebuild audit gate | `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` |
 | Machine topology | `config/audits/ods-pit-sufficiency.v1.json` → `cn01_rebuild_execution_topology` |
 | Execution node | CN01 only |
 | Build storage | mandatory `/personal` NFS |
 | Successor | `dwd-base-202607-v2.1` through 2026-07-31 |
-| Delivery gate | blocked until builders, semantic digests, full build, and acceptance complete |
+| Delivery gate | blocked until the full pre-rebuild audit, findings/remediation digests, builders, full build, and acceptance complete |
 
 This runbook freezes the storage, execution, installation, and rollback topology for the V2.1
 reconstruction. It does not approve table availability semantics or authorize a full build before
-the exact semantic digests are accepted.
+the exact pre-rebuild audit, findings ledger, remediation scope, builder contracts, and semantic
+digests are accepted.
+
+## Mandatory Pre-Rebuild Audit Gate
+
+The complete audit in `docs/operations/dwd-base-v2-pre-rebuild-audit.md` runs before this rebuild.
+The known PIT findings are not sufficient authorization to begin a partial repair. The builder gate
+remains closed until all 33 tables and every required audit dimension are complete, all findings
+have an approved disposition, no critical finding remains open, and the exact canonical digests of
+these artifacts are approved:
+
+- `findings-ledger.json`;
+- `v2.1-remediation-scope.json`;
+- `v2.1-build-contract.json`;
+- table/source availability contracts; and
+- the audit summary that binds every supporting report.
+
+The accepted remediation scope is an immutable input to planning. A domain builder must reject a
+plan that omits an approved finding assigned to its table/domain or uses a different audit/remediation
+digest. New material findings discovered during a pilot or full build close the builder gate again;
+they are added to the ledger and require scope reapproval rather than being patched informally.
 
 ## Fixed Inputs And Outputs
 
@@ -119,20 +140,21 @@ The build sequence is deterministic:
 2. verify Git revision and clean node-local checkout;
 3. verify ODS V2 and DWD V2 immutable identities;
 4. verify NFS mount, capacity, probes, and empty/non-conflicting workspace identity;
-5. freeze the complete V2.1 input plan and semantic digests on NFS;
-6. run partition pilots and record memory/spill bounds;
-7. build the nine domain candidates sequentially on NFS;
-8. clean and reconcile the July tail through 2026-07-31 on NFS;
-9. assemble the complete 33-table package on NFS using same-filesystem hard links;
-10. deep-verify package inventory, READY, manifest, every file SHA, schemas, row counts, cross-table
-    identities, PIT distributions, and V2 business-row differences;
-11. check local installation capacity;
-12. copy the manifest-declared package into the hidden local ingress;
-13. deep-verify the local ingress byte-for-byte and semantically;
-14. atomically rename the ingress to the installed V2.1 path without changing `BASE_CURRENT.json`;
-15. obtain human approval for the exact manifest and semantic digests;
-16. compare-and-swap `BASE_CURRENT.json` from the exact V2 manifest to V2.1; and
-17. verify consumers and retain V2 as the immediate rollback target.
+5. verify the accepted pre-rebuild audit, findings ledger, one-time remediation scope, and builder-contract digests;
+6. freeze the complete V2.1 input plan and semantic digests on NFS, binding those audit/remediation digests;
+7. run partition pilots and record memory/spill bounds;
+8. build the nine domain candidates sequentially on NFS;
+9. clean and reconcile the July tail through 2026-07-31 on NFS;
+10. assemble the complete 33-table package on NFS using same-filesystem hard links;
+11. deep-verify package inventory, READY, manifest, every file SHA, schemas, row counts, cross-table
+    identities, PIT distributions, audit-finding closure, and V2 business-row differences;
+12. check local installation capacity;
+13. copy the manifest-declared package into the hidden local ingress;
+14. deep-verify the local ingress byte-for-byte and semantically;
+15. atomically rename the ingress to the installed V2.1 path without changing `BASE_CURRENT.json`;
+16. obtain human approval for the exact manifest, closed findings ledger, and semantic digests;
+17. compare-and-swap `BASE_CURRENT.json` from the exact V2 manifest to V2.1; and
+18. verify consumers and retain V2 as the immediate rollback target.
 
 ## Capacity Gates
 
@@ -190,6 +212,8 @@ Post-2026-07-31 Daily migration has its own rollback and is not part of the Base
 
 ## Forbidden Actions
 
+- start a V2.1 builder or candidate assembly before the full pre-rebuild audit closes;
+- omit, defer, or silently reclassify an approved finding from the one-time remediation scope;
 - build V2.1 on Hermes or OCI;
 - mutate ODS V2, DWD V2, or existing Daily packages;
 - place lock authority, `BASE_CURRENT.json`, or another operational pointer on NFS;

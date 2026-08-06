@@ -133,8 +133,8 @@ def _command(
     *,
     repository: Path,
     dwd_root: Path,
-    ods_root: Path,
-    plan_root: Path,
+    ods_root: Path | None,
+    plan_root: Path | None,
     report: Path,
     scratch: Path,
     checkpoint: Path,
@@ -166,6 +166,10 @@ def _command(
             str(report),
         ]
     if step.name == "lineage_authority":
+        if ods_root is None or plan_root is None:
+            raise DwdPreRebuildAuditBatchError(
+                "lineage authority audit requires ODS and input-plan roots"
+            )
         return [
             sys.executable,
             str(executable / "audit-dwd-lineage-authority"),
@@ -224,8 +228,8 @@ def run_audit_batch(
     *,
     repository: Path,
     dwd_root: Path,
-    ods_root: Path,
-    plan_root: Path,
+    ods_root: Path | None,
+    plan_root: Path | None,
     output_root: Path,
     batch_id: str,
     package_id: str,
@@ -257,8 +261,12 @@ def run_audit_batch(
 
     repository = repository.resolve()
     dwd_root = dwd_root.resolve()
-    ods_root = ods_root.resolve()
-    plan_root = plan_root.resolve()
+    ods_root = ods_root.resolve() if ods_root is not None else None
+    plan_root = plan_root.resolve() if plan_root is not None else None
+    if "lineage_authority" in selected_steps and (ods_root is None or plan_root is None):
+        raise DwdPreRebuildAuditBatchError(
+            "lineage authority audit requires ODS and input-plan roots"
+        )
     output_root = output_root.resolve()
     if required_output_ancestor is not None:
         ancestor = required_output_ancestor.resolve()
@@ -266,10 +274,9 @@ def run_audit_batch(
             raise DwdPreRebuildAuditBatchError(
                 f"batch output must remain under mandatory audit storage: {ancestor}"
             )
-    if any(
-        output_root == root or output_root.is_relative_to(root)
-        for root in (dwd_root, ods_root, plan_root)
-    ):
+    sealed_roots = [dwd_root]
+    sealed_roots.extend(root for root in (ods_root, plan_root) if root is not None)
+    if any(output_root == root or output_root.is_relative_to(root) for root in sealed_roots):
         raise DwdPreRebuildAuditBatchError("batch output must remain outside sealed packages")
 
     batch_root = output_root / batch_id

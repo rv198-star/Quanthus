@@ -127,6 +127,23 @@ class DwdPreRebuildAuditBatchTests(unittest.TestCase):
                     evidence={},
                 )
 
+    def test_lineage_requires_its_additional_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaisesRegex(DwdPreRebuildAuditBatchError, "lineage authority"):
+                run_audit_batch(
+                    repository=root / "repo",
+                    dwd_root=root / "dwd",
+                    ods_root=None,
+                    plan_root=None,
+                    output_root=root / "output",
+                    batch_id="fixture",
+                    package_id="dwd-base-202607-v2",
+                    code_revision="a" * 40,
+                    selected_steps=["lineage_authority"],
+                    evidence={},
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

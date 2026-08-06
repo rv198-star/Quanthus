@@ -1,10 +1,10 @@
 # ADR 0008: DWD Historical Knowledge Remediation
 
-- Status: Proposed; successor identity/range boundary accepted, source semantics pending
+- Status: Proposed; successor identity/range and CN01+NFS execution topology accepted, source semantics pending
 - Date: 2026-08-06
 - Decision id: `META-DATA-PIT-001`
 - Design status: partial decision recorded; final remediation not approved
-- Delivery gate: blocked pending Hermes ODS mirror confirmation, physical DWD audits, and availability-contract approval
+- Delivery gate: blocked pending Hermes ODS mirror confirmation, physical DWD audits, builder implementation, and availability-contract approval
 - Affects: ADR 0006/0007 DWD Base V2 historical PIT authority; does not supersede their current operational topology
 
 ## Context
@@ -36,10 +36,13 @@ The following boundaries are accepted for the remediation design:
 - its data cutoff remains exactly 2026-07-31, matching V2;
 - no 2026-08-01-or-later Daily data is folded into the V2.1 Base; and
 - post-Base Daily data is cleaned, rebuilt against corrected identities and PIT rules, and
-  published through a separate migration/replay decision.
+  published through a separate migration/replay decision;
+- the complete V2.1 reconstruction runs only on CN01; and
+- `/personal` NFS is mandatory build storage for plans, candidates, spill, checkpoints, July-tail
+  cleaning, complete-package assembly, and acceptance evidence.
 
-Table/source availability rules, additive ODS evidence package identities, and the final V2.1
-semantic digest remain pending approval.
+Table/source availability rules, additive ODS evidence package identities, builder implementation,
+and the final V2.1 semantic digest remain pending approval.
 
 ### 1. Keep V2 immutable and historically blocked
 
@@ -128,7 +131,60 @@ these source-content dispositions. Each availability rule remains separately app
 Each accepted availability rule is versioned by table/source family and included in the successor
 semantic digest.
 
-### 4. Rebuild dependent increments and consumers explicitly
+### 4. Execute the rebuild only on CN01 with mandatory NFS build storage
+
+The V2.1 reconstruction has one execution authority: CN01. Hermes and OCI may verify or mirror the
+accepted package later, but neither may build it. Repository code reaches CN01 only through the
+normal GitHub `pull --ff-only` path.
+
+CN01's local filesystem had 37,807,775,744 free bytes during the topology audit. The installed V2
+package occupies 14,913,159,818 bytes, while the prior Base planner estimated 100,290,327,430 bytes
+for final outputs, largest stage/spill, and margin. Local disk is therefore not a valid candidate or
+spill root. The mounted `/personal` NFS had more than 11 PB reported free and passed controlled
+write, atomic rename, same-mount hard-link, and CN01-local `flock` probes. The probe directory was
+removed after verification.
+
+The accepted path contract is:
+
+| Role | Path | Filesystem |
+| --- | --- | --- |
+| Immutable ODS input | `/srv/quanthus/ods/base/ods-base-202607-v2` | CN01 local |
+| Immutable DWD V2 comparison input | `/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2` | CN01 local |
+| Local coordination root | `/srv/quanthus/dwd-dws-v2/v2.1-rebuild` | CN01 local |
+| Single-writer lock | `/srv/quanthus/dwd-dws-v2/v2.1-rebuild/locks/rebuild.lock` | CN01 local |
+| NFS workspace | `/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1` | NFS |
+| Hidden local ingress | `/srv/quanthus/dwd-dws-v2/base/.incoming-dwd-base-202607-v2.1` | CN01 local |
+| Installed successor | `/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1` | CN01 local |
+| Active pointer | `/srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json` | CN01 local |
+
+The NFS mount uses NFSv3 with `hard`, `proto=tcp`, `noresvport`, and `nolock`, and is root-squashed.
+Therefore CN01 is the only writer, no cross-host lock is trusted, and builders must not depend on
+`chown`. If NFS is absent, read-only, remounted with incompatible options, below 120 GiB free, or
+fails an atomic-rename/hard-link probe, the rebuild stops. It never falls back to local scratch.
+
+All domain builders run sequentially because CN01 has two CPUs and about 3.9 GB RAM. A partition
+pilot must freeze the per-builder memory limit before the full run. DuckDB temp/spill, checkpoints,
+domain candidates, July-tail cleaning, package assembly, and evidence all remain on NFS. Lock and
+pointer authority remain local.
+
+Because the current domain publisher assembles packages with hard links, all domain candidates and
+the complete V2.1 candidate are assembled on the same NFS mount and deeply verified there. NFS is
+not an operational Base catalog. Installation is a cross-filesystem, manifest-driven copy into the
+hidden local ingress, followed by a second local deep verification. Only then may the ingress be
+atomically renamed to the installed V2.1 path. The local free-space gate is:
+
+`free_bytes >= sealed_candidate_bytes + 17,179,869,184`.
+
+No pointer moves during build or installation. After human approval, `BASE_CURRENT.json` advances
+with compare-and-swap against V2 manifest
+`sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f`.
+Rollback restores the V2 pointer without modifying or deleting either immutable package.
+
+The exact topology, observed capacity, probes, paths, forbidden actions, and execution phases are
+machine-readable under `cn01_rebuild_execution_topology` in
+`config/audits/ods-pit-sufficiency.v1.json`.
+
+### 5. Rebuild dependent increments and consumers explicitly
 
 After successor Base acceptance:
 
@@ -147,7 +203,7 @@ After successor Base acceptance:
 
 Generic DWS remains demand-gated. This remediation does not activate it.
 
-### 5. Fail closed by table and source family
+### 6. Fail closed by table and source family
 
 A row without independently defensible historical availability is excluded with an explicit reason
 code. No package-wide constant, observation-date shortcut, or current-identity join may fill a
@@ -214,6 +270,8 @@ Costs and constraints:
 
 - the physical three-node DWD audit and Hermes ODS mirror confirmation still require approved read-only access;
 - some history may remain unavailable when source publication evidence cannot be recovered;
+- the build requires continuous CN01 access to the external NFS and a cross-filesystem installation
+  copy after NFS verification;
 - post-Base Daily data requires a separate clean/rebuild/rebase migration and cannot be absorbed into
   the V2.1 Base; and
 - P4 Stage B remains blocked until its source package and exact availability contracts are

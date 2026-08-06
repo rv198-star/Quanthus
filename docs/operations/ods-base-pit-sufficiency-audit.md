@@ -18,9 +18,10 @@ promote, or mutate an ODS or DWD package.
 | Later Daily | excluded from V2.1 and cleaned/rebuilt/rebased separately |
 
 The machine policy is `config/audits/ods-pit-sufficiency.v1.json`. It defines 18 source families,
-21 physical checks, all 33 mapped DWD tables, the accepted successor boundary, and the remaining
-source-semantic decisions. CN01's package completed this deep verification on 2026-08-06; Hermes
-still requires the same check and checksum comparison.
+21 physical checks, all 33 mapped DWD tables, the accepted successor boundary, the CN01-only NFS
+rebuild topology, and the remaining source-semantic decisions. CN01's package completed this deep
+verification on 2026-08-06; Hermes still requires the same check and checksum comparison. The build
+and installation procedure is `docs/operations/dwd-v2-1-cn01-nfs-rebuild.md`.
 
 ## Safety Rules
 
@@ -124,6 +125,14 @@ resolved:
 
 The audit report must be attached to Issue #78 together with the exact command, code revision,
 policy SHA, mount mapping, and operator identity.
+
+## Rebuild Topology Boundary
+
+The V2.1 build runs only on CN01. `/personal` NFS is mandatory for plans, candidates, DuckDB spill,
+checkpoints, July-tail cleaning, assembled candidates, and evidence. The authoritative lock,
+hidden final ingress, installed package, and `BASE_CURRENT.json` remain on CN01 local storage. NFS
+failure blocks the build; local scratch fallback is forbidden. See
+`docs/operations/dwd-v2-1-cn01-nfs-rebuild.md` for capacity gates, paths, installation, and rollback.
 
 ## Daily Boundary
 

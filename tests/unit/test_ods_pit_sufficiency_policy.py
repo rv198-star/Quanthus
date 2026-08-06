@@ -55,6 +55,38 @@ class OdsPitSufficiencyPolicyTests(unittest.TestCase):
         )
         self.assertEqual(mapped_tables, expected_tables)
 
+    def test_cn01_nfs_rebuild_topology_is_single_writer_and_fail_closed(self) -> None:
+        policy = json.loads(POLICY.read_text(encoding="utf-8"))
+        topology = policy["cn01_rebuild_execution_topology"]
+        local = topology["local_state"]
+        nfs = topology["nfs"]
+        publication = topology["publication"]
+
+        self.assertEqual(policy["policy_version"], "1.3.0")
+        self.assertEqual(topology["execution_node"], "CN01")
+        self.assertTrue(topology["single_writer"])
+        self.assertEqual(topology["execution_limits"]["max_parallel_domain_builders"], 1)
+        self.assertEqual(nfs["mount_point"], "/personal")
+        self.assertGreaterEqual(nfs["minimum_free_bytes"], 100290327430)
+        self.assertGreater(nfs["observed_free_bytes"], nfs["minimum_free_bytes"])
+        self.assertEqual(nfs["fallback_to_local_scratch"], "forbidden")
+        self.assertEqual(nfs["cross_host_locking"], "forbidden")
+        self.assertTrue(local["lock_path"].startswith("/srv/quanthus/"))
+        self.assertFalse(local["lock_path"].startswith(nfs["mount_point"] + "/"))
+        self.assertTrue(local["ingress_path"].startswith(local["base_root"] + "/."))
+        self.assertEqual(
+            publication["expected_current_manifest_sha256"],
+            policy["successor_dwd_boundary"]["predecessor_manifest_sha256"],
+        )
+        self.assertEqual(
+            publication["cross_filesystem_install"],
+            "manifest_driven_copy_to_hidden_local_ingress",
+        )
+        self.assertIn(
+            "place_current_pointer_or_lock_authority_on_nfs",
+            topology["forbidden_actions"],
+        )
+
     def test_policy_records_cn01_deep_verification_and_keeps_hermes_pending(self) -> None:
         policy = json.loads(POLICY.read_text(encoding="utf-8"))
         scope = policy["evidence_scope"]

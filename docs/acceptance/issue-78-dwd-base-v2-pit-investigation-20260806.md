@@ -2,15 +2,15 @@
 
 | Field | Value |
 | --- | --- |
-| Evidence status | blocked finding; code and CN01 ODS audits complete, physical DWD and Hermes ODS mirror audits incomplete |
+| Evidence status | blocked finding; code, CN01 ODS, and CN01+NFS topology audits complete; physical DWD, Hermes ODS mirror, and V2.1 build incomplete |
 | Evidence date | 2026-08-06 |
 | Governing work | `META-DATA-PIT-001` / GitHub Issue #78 |
 | Investigated package | `dwd-base-202607-v2` |
 | Manifest SHA-256 | `sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f` |
 | Content digest | `sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9` |
 | DWD audit policy | `config/audits/dwd-pit-semantics.v1.json` / `sha256:9023edddad38b8a933dfc9c6150a71a285d7fa8fd441a1074f5ab4c4382cd1b0` |
-| ODS sufficiency policy | `config/audits/ods-pit-sufficiency.v1.json` / `sha256:dbf79326f4ee4629b6b003ba2c14704aca8de24d6866a3879a6fcab5a9f52314` |
-| Successor boundary | new `dwd-base-202607-v2.1`, through 2026-07-31; later Daily excluded and cleaned separately |
+| ODS sufficiency policy | `config/audits/ods-pit-sufficiency.v1.json` / `sha256:170f4557c43202e82c6951f6a1516b2fee228b38b4b94766495ac1a232fafa4d` |
+| Successor boundary | new `dwd-base-202607-v2.1`, through 2026-07-31; CN01-only NFS build; later Daily excluded and cleaned separately |
 | Proposed remediation | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` |
 | Consequence | V2 historical PIT use remains blocked; no Base or consumer pointer changed |
 
@@ -62,6 +62,21 @@ CN01 was then audited through temporary, explicitly authorized root access. The 
 READY and `BASE_CURRENT.json` matched that identity. The run took 378.97 seconds and recorded no
 package, service, or pointer mutation. The temporary public key and `/tmp` audit files were removed
 afterward.
+
+The V2.1 execution topology was then audited on CN01. Local storage had 37,807,775,744 free bytes;
+the installed V2 package occupied 14,913,159,818 bytes, while the prior Base planner required
+100,290,327,430 bytes. Local candidate/spill construction is therefore impossible under the
+accepted capacity margin. `/personal` NFS reported 11,258,750,132,289,536 free bytes and passed
+controlled write, atomic-rename, same-mount hard-link, and CN01-local `flock` probes. The mount is
+NFSv3, root-squashed, and `nolock`; the probe directory was removed after verification.
+
+The accepted execution boundary is CN01-only, single-writer reconstruction. Plans, candidates,
+DuckDB spill, checkpoints, July-tail cleaning, complete-package assembly, and evidence live under
+`/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1`. Lock authority, hidden final ingress,
+installed packages, and `BASE_CURRENT.json` remain on CN01 local storage. NFS failure blocks the
+build and does not permit a local-scratch fallback. The complete NFS candidate is deeply verified,
+then copied manifest-by-manifest into a hidden local ingress and deeply verified again before local
+atomic installation. No pointer changes during build or installation.
 
 The missing physical evidence is explicit:
 
@@ -201,13 +216,14 @@ replay or explicit retirement under an approved cutover plan.
 | Asset | Purpose |
 | --- | --- |
 | `config/audits/dwd-pit-semantics.v1.json` | exact 33-table code/source classification, reference fields, ODS sufficiency, and remediation notes |
-| `config/audits/ods-pit-sufficiency.v1.json` | 18-source-family ODS evidence matrix, 21 physical checks, CN01 exact-package statistics, remaining gaps, and the accepted V2.1/Daily boundary |
+| `config/audits/ods-pit-sufficiency.v1.json` | 18-source-family ODS evidence matrix, 21 physical checks, CN01 exact-package statistics, accepted V2.1/Daily boundary, and CN01-only NFS rebuild topology |
 | `src/quanthus/pipelines/dwd_pit_audit.py` | read-only DWD package verification, mirror comparison, and table-distribution scanner |
 | `src/quanthus/pipelines/ods_pit_audit.py` | read-only Hermes/CN01 ODS package verification and required Parquet/SQLite source-field scanner |
 | `ops/bin/audit-dwd-pit-semantics` | CLI for manifest-only and full three-mirror DWD evidence |
 | `ops/bin/audit-ods-pit-sufficiency` | CLI for manifest-only and full two-mirror ODS source evidence |
 | `docs/operations/dwd-base-pit-audit.md` | DWD permission, execution, interpretation, and failure runbook |
 | `docs/operations/ods-base-pit-sufficiency-audit.md` | ODS package/source audit and post-Base Daily boundary runbook |
+| `docs/operations/dwd-v2-1-cn01-nfs-rebuild.md` | CN01-only NFS build, capacity, cross-filesystem installation, cutover, and rollback runbook |
 | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` | proposed immutable successor-Base remediation; not yet approved |
 | `tests/unit/test_dwd_pit_audit.py` | policy completeness, file mapping, output isolation, access failure, and future-knowledge scan tests |
 | `tests/unit/test_ods_pit_sufficiency_policy.py` | all-33-table source coverage, CN01/Hermes authority boundary, compound-dataset path selection, and V2.1/Daily decision tests |
@@ -234,6 +250,9 @@ manifest-declared Parquet paths accessed. Output paths inside a supplied mirror 
 - Announcement precision audit classified 5,413,404 midnight and 205,275 fixed-06:30 source times.
 - July-tail row counts reconciled exactly to every audited manifest part, including verified
   zero-row/zero-column empty increments.
+- CN01 storage preflight proved local reconstruction capacity insufficient and `/personal` NFS
+  mandatory; NFS write, atomic rename, same-mount hard link, and CN01-local lock probes passed and
+  left no persistent probe artifact.
 - Repository `make check` passed environment doctor, compilation, 897 tests, and GitHub planning
   synchronization after the CN01 evidence update.
 
@@ -251,5 +270,7 @@ Issue #78 remains open until:
    frozen, with every uncovered row explicitly fail-closed or bound to additive immutable evidence;
 5. the proposed ADR is explicitly approved;
 6. corrected availability contracts and the final V2.1 semantic digest receive human approval;
-7. the separate post-2026-07-31 Daily cleaning/rebuild/rebase plan is accepted; and
-8. downstream cutover, rollback, and P4 reapproval plans are accepted.
+7. the CN01 partition pilots freeze builder memory/spill bounds and the full NFS build completes;
+8. the NFS candidate and copied local ingress both pass complete deep verification;
+9. the separate post-2026-07-31 Daily cleaning/rebuild/rebase plan is accepted; and
+10. downstream cutover, rollback, and P4 reapproval plans are accepted.

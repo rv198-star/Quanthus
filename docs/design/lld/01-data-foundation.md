@@ -11,7 +11,7 @@
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
 | Dual-lane delivery | three-node shadow deployment, role-scoped historical ADS bootstrap, and final OCI operational ADS Base accepted; catalog-native consumer publication and cutover remain blocked pending their own evidence and `GO_FOR_CUTOVER` |
-| Product-bounded DWD model | ADR 0006/0007, `META-DATA-DWD-002`, `01-data-foundation/dwd-domain-model.md`; all 33 objects accepted in `dwd-base-202607-v2`, daily maintenance active, weekly DWD corrections open, generic DWS deferred |
+| Product-bounded DWD model | ADR 0006/0007, `META-DATA-DWD-002`, `01-data-foundation/dwd-domain-model.md`; all 33 objects accepted in `dwd-base-202607-v2`; Issue #78 blocks its historical PIT authority and prepares CN01-only NFS-built V2.1, while daily maintenance evidence remains immutable and generic DWS deferred |
 | ODS/DWD reference | `01-data-foundation/ods-dwd-data-dictionary.md` and `01-data-foundation/ods-to-dwd-lineage.md` |
 
 ## 1. Goal
@@ -45,6 +45,16 @@ lineage rather than required external roots. An exact same-run predecessor candi
 declared referential identities after full package verification. Historical DWD/ADS packages and
 mutable pointers remain retained but cannot be read as sources, migration targets, reconciliation
 baselines, or acceptance evidence for the new Base.
+
+Issue #78 defines the bounded successor `dwd-base-202607-v2.1`. It is reconstructed only on CN01
+from immutable ODS V2 and retained evidence. CN01 local storage owns the single-writer lock, final
+hidden ingress, installed Base directory, and `BASE_CURRENT.json`; mandatory `/personal` NFS owns
+plans, candidates, spill, checkpoints, July-tail cleaning, complete-package assembly, and build
+evidence. NFS is root-squashed and mounted without distributed locking, so no cross-host lock or
+production pointer may live there. NFS loss or capacity failure blocks the build rather than
+falling back to local scratch. The NFS candidate is deeply verified, copied manifest-by-manifest to
+a local hidden ingress, deeply verified again, and installed without changing the pointer. Pointer
+cutover and rollback remain separately approved compare-and-swap actions.
 
 P1 acceptance establishes deterministic replay and fail-closed behavior. The initial S3 full build
 exposed 276 securities with incomplete normalized unadjusted-price history and 639,009 affected

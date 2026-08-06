@@ -62,7 +62,9 @@ governed by ADR 0007:
 
 - `V2 Build202607` binds immutable, read-only `ods-base-202607-v2` and
   `dwd-base-202607-v2` packages through 2026-07-31. Daily and weekly work creates immutable
-  increments or corrections and never rewrites either Base.
+  increments or corrections and never rewrites either Base. Issue #78 keeps V2 historically
+  blocked while a new `dwd-base-202607-v2.1` is prepared; the successor has the same cutoff and
+  never mutates either V2 input.
 - CN01 and Hermes run the same four-lane ODS controller. A DWD daily build starts only after all
   four target-date ODS releases pass manifest, content, and READY verification; a fixed wall-clock
   time alone is not the data gate.
@@ -76,6 +78,11 @@ governed by ADR 0007:
   DuckDB, Polars, and PyArrow provide local query, typed transformation, and validation.
 - PostgreSQL remains an optional rebuildable serving projection. It is not canonical storage and
   is not a prerequisite for P4 research.
+- The V2.1 remediation build has one execution authority: CN01. Its plans, candidates, spill,
+  checkpoints, July-tail cleaning, assembled package, and evidence use mandatory `/personal` NFS;
+  CN01 local storage retains the single-writer lock, hidden final ingress, installed Base packages,
+  and `BASE_CURRENT.json`. NFS is never a production pointer/catalog, and NFS loss fails closed
+  without local-scratch fallback. This topology is frozen by ADR 0008 but does not activate V2.1.
 
 ADR 0006 owns the seven-domain, 33-object DWD semantic boundary. The accepted
 `dwd-base-202607-v2` contains all 14 core objects, 18 internal support objects, and one quality

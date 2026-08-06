@@ -2,8 +2,8 @@
   "schema_version": 1,
   "kind": "ods_pit_sufficiency_audit",
   "policy_id": "meta-data-pit-001.ods-base-v2",
-  "policy_version": "1.2.0",
-  "status": "cn01_exact_base_byte_verified_source_semantics_frozen_hermes_mirror_pending",
+  "policy_version": "1.3.0",
+  "status": "cn01_nfs_rebuild_topology_frozen_hermes_mirror_and_v2_1_build_pending",
   "governing_issue": 78,
   "ods_base": {
     "package_id": "ods-base-202607-v2",
@@ -17,9 +17,98 @@
     "package_id": "dwd-base-202607-v2.1",
     "through_date": "2026-07-31",
     "publication_mode": "new_immutable_complete_33_table_base",
+    "predecessor_manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
     "v2_mutation": "forbidden",
     "daily_after": "2026-07-31",
     "daily_disposition": "excluded_from_v2_1_base_and_cleaned_rebuilt_rebased_separately"
+  },
+  "cn01_rebuild_execution_topology": {
+    "decision_status": "accepted_for_v2_1_rebuild",
+    "execution_node": "CN01",
+    "single_writer": true,
+    "code_distribution": "github_pull_ff_only",
+    "inputs": {
+      "ods_base": "/srv/quanthus/ods/base/ods-base-202607-v2",
+      "dwd_base_v2": "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2"
+    },
+    "local_state": {
+      "coordination_root": "/srv/quanthus/dwd-dws-v2/v2.1-rebuild",
+      "lock_path": "/srv/quanthus/dwd-dws-v2/v2.1-rebuild/locks/rebuild.lock",
+      "base_root": "/srv/quanthus/dwd-dws-v2/base",
+      "ingress_path": "/srv/quanthus/dwd-dws-v2/base/.incoming-dwd-base-202607-v2.1",
+      "installed_path": "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1",
+      "current_pointer": "/srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json",
+      "observed_free_bytes": 37807775744,
+      "reference_v2_installed_bytes": 14913159818,
+      "install_safety_margin_bytes": 17179869184,
+      "capacity_rule": "free_bytes_must_be_at_least_sealed_candidate_bytes_plus_install_safety_margin"
+    },
+    "nfs": {
+      "mount_point": "/personal",
+      "source": "9b7fc480d7-tqn18.cn-zhangjiakou.nas.aliyuncs.com:/4467464/3IJ8Z5uBnQ/personal",
+      "filesystem_type": "nfs",
+      "version": 3,
+      "required_options": ["rw", "hard", "proto=tcp", "noresvport"],
+      "observed_options": ["rw", "hard", "nolock", "noresvport", "proto=tcp"],
+      "workspace_root": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1",
+      "minimum_free_bytes": 128849018880,
+      "observed_free_bytes": 11258750132289536,
+      "root_squash": true,
+      "write_probe": "passed",
+      "atomic_rename_probe": "passed",
+      "same_mount_hardlink_probe": "passed",
+      "cn01_local_flock_probe": "passed",
+      "cross_host_locking": "forbidden",
+      "authoritative_pointer": "forbidden",
+      "fallback_to_local_scratch": "forbidden"
+    },
+    "workspace_roles": {
+      "plans": "nfs",
+      "runs": "nfs",
+      "domain_candidates": "nfs",
+      "duckdb_spill_and_temp": "nfs",
+      "july_tail_clean_lane": "nfs",
+      "assembled_candidate": "nfs",
+      "verification_evidence": "nfs",
+      "coordination_and_lock": "local",
+      "final_ingress_install_and_current_pointer": "local"
+    },
+    "execution_limits": {
+      "observed_cpu_count": 2,
+      "observed_memory_bytes": 3900575744,
+      "observed_swap_bytes": 4294963200,
+      "max_parallel_domain_builders": 1,
+      "builder_memory_limit": "must_be_set_by_partition_pilot_before_full_build",
+      "nfs_unavailable_action": "stop_fail_closed"
+    },
+    "publication": {
+      "nfs_assembly": "same_filesystem_hardlink_then_deep_verify",
+      "cross_filesystem_install": "manifest_driven_copy_to_hidden_local_ingress",
+      "local_deep_verify_before_atomic_rename": true,
+      "pointer_update": "compare_and_swap",
+      "expected_current_manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+      "rollback": "restore_v2_pointer_without_mutating_or_deleting_either_package"
+    },
+    "phases": [
+      "preflight_and_local_lock",
+      "freeze_plan_on_nfs",
+      "sequential_domain_builds_on_nfs",
+      "clean_and_merge_july_tail_on_nfs",
+      "assemble_and_deep_verify_complete_v2_1_on_nfs",
+      "verify_local_capacity",
+      "copy_to_hidden_local_ingress_and_deep_verify",
+      "atomic_install_without_pointer_change",
+      "human_approval_and_compare_and_swap_current",
+      "post_cutover_verify_and_retain_v2_rollback"
+    ],
+    "forbidden_actions": [
+      "build_on_hermes_or_oci",
+      "mutate_v2_or_ods_v2",
+      "place_current_pointer_or_lock_authority_on_nfs",
+      "fallback_to_local_candidate_or_spill_storage",
+      "cross_filesystem_hardlink",
+      "delete_v2_or_original_daily_evidence"
+    ]
   },
   "evidence_scope": {
     "repository_contract_review": "complete",
@@ -30,6 +119,7 @@
     "cn01_announcement_time_precision_audit": "complete",
     "cn01_july_daily_tail_audit": "complete",
     "cn01_valuation_receipt_coverage_audit": "complete",
+    "cn01_nfs_rebuild_topology_preflight": "complete",
     "exact_hermes_ods_base_bytes": "pending_read_only_access",
     "authoritative_conclusion_rule": "CN01 proves the package content and source sufficiency facts; closure still requires checksum-identical Hermes verification and approval of each versioned availability rule."
   },

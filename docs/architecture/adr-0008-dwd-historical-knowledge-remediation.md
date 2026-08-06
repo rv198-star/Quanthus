@@ -20,9 +20,9 @@ substitution. The code audit classifies the 33 tables as follows:
 | Code disposition | Tables | Meaning |
 | --- | ---: | --- |
 | `build_timestamp_substituted` | 17 | The builder demonstrably writes a Base build/acquisition timestamp where historical source or derived availability is required |
-| `ambiguous_source_insufficient` | 4 | Financial source families and holder-change rows mix defensible publication evidence with acquisition/business-date fallbacks; one universal rewrite is not justified |
-| `source_derived_historical` | 5 | The table already uses a source publication or source knowledge timestamp, although corrected parent identities may still require a rebuild |
-| `forward_operational` | 7 | The object is correctly knowable only from its Base acquisition/detection point and must not be projected backward |
+| `ambiguous_source_insufficient` | 3 | Disclosure timestamps mix precise and placeholder times, while holder-change rows mix disclosure evidence with an unsafe business-date fallback |
+| `source_derived_historical` | 3 | Adjustment factors/inputs and shareholder counts already use defensible source knowledge timestamps |
+| `forward_operational` | 10 | Seven original operational/governance objects plus all three financial tables are knowable only from immutable acquisition/detection without a revision archive |
 
 The machine matrix is `config/audits/dwd-pit-semantics.v1.json`. CN01's exact ODS V2 package has now
 passed deep verification and source-family scans. The physical DWD bytes on Hermes, CN01, and OCI,
@@ -85,25 +85,42 @@ The exact-source findings are:
   contract or remain unavailable;
 - bars and index bars require versioned observation-completion rules; realized calendar rows may
   use a conservative session/date-end rule without granting earlier future-schedule authority;
-- valuation has no historical publication/acquisition field and still requires provider-semantic
-  evidence or fail-closed exclusion; benchmark definitions likewise require a static/versioned
-  reference contract or additive evidence;
+- valuation has no historical publication/acquisition field. Full-history receipts cover only 209
+  securities and were collected after the Base cutoff; 4,992-security receipts cover only the
+  2026-07-20 through 2026-07-30 repair window. Canonical historical valuation therefore remains
+  forward-only from independently evidenced acquisition. Benchmark definitions likewise require a
+  static/versioned reference contract or additive evidence;
 - ST has 1,492 proven event rows and 5,538 explicitly not-proven rows. The latter remain
-  fail-closed. Suspensions, price-limit rules, announcements, and shareholder counts retain direct
-  source knowledge/publication evidence;
+  fail-closed. Suspension rows retain exact cutoffs, but canonical coverage starts in 2016 and the
+  12,145-row supplementary status ledger covers only 347 codes from late 2018 onward. Price-limit
+  rules and shareholder counts retain direct source knowledge evidence;
 - all 46,649 adjustment factors have cutoffs, including the retained 4,173 fail-closed visibility
   exceptions;
+- 6,395,198 announcements all have `publish_time`, but 5,413,404 are exactly midnight and 205,275
+  are exactly 06:30:00. The field therefore mixes precise timestamps with date-level/normalized
+  placeholders. V2.1 may use exact time only where precision is proven; otherwise availability is
+  conservative announcement-day end or the later immutable artifact cutoff;
 - all 40,594 corporate-action rows and all 54,509 dividend rows have announcement dates, so the
   domain is reconstructable under a conservative end-of-announcement-date rule rather than the
   current 2026 `built_at` value;
-- all 852,497 decoded full-statement report versions have valid `publish_date` and `update_time`.
-  Eighty-six versions are dated 2026-08-01 and are excluded from V2.1 into Daily cleaning. Legacy
-  canonical-quarterly and `fin_abstract` sources still have respectively 10,091 and 19,840
-  coordinates without matched actual-publication evidence;
+- the full-statement snapshot decodes to 852,497 reports and all carry `publish_date`, but the
+  ten-digit provider `update_time` is shared across many reports and falls after publication for
+  roughly half the rows and before it for the remainder. The package does not preserve report-level
+  value revisions, so current reports/concepts/facts are forward-only from acquisition rather than
+  historically available at original publication. Eighty-six report versions dated 2026-08-01 are
+  excluded from V2.1. In 2012-2021, 4,879 canonical quarterly coordinates and 4,976 abstract rows
+  additionally lack a match to the publish-date source;
 - 69,648 of 194,322 holder-change rows carry `disclosure_date`; the remaining 124,674 require an
   additive mapping or fail closed; and
 - industry and F10 snapshots remain forward-only from their 2026-07-31 acquisition time, as do
   observation-gap and quality detections.
+
+The July tail inside ODS V2 also reconciles exactly to its manifest: 24,960 daily bars, 24,960 daily
+status rows, 15 index rows, 4,992 valuation rows, 31,190 announcements, 21 suspensions, 175 factor
+rows, 358 dividend rows, 7,179,120 one-minute bars, and 1,435,824 five-minute bars. Some July 27-28
+facts were not acquired until July 29-30, so V2.1 must preserve each artifact cutoff. Five
+corporate-action and five financial-disclosure deltas, plus one factor delta, are verified zero-row,
+zero-column Parquet parts and must be handled as valid empty increments rather than schema failures.
 
 Hermes still needs checksum-identical ODS verification, but the CN01 package is sufficient to freeze
 these source-content dispositions. Each availability rule remains separately approval-gated.

@@ -114,10 +114,11 @@ resolved:
 | --- | --- |
 | Identity/company/listing/venue | approve stable-key/listing reconstruction from complete ODS coverage; keep unevidenced historical display/reference attributes unavailable or add evidence |
 | Security/index bars | approve interval/session-completion availability rules |
-| Valuation | approve provider-specific availability evidence or exclude history |
+| Valuation | retain canonical history forward-only from evidenced acquisition; no observation-date or generic provider-as-of inference |
 | Realized calendar | approve conservative end-of-date/session knowledge without future-schedule authority |
+| Announcements/disclosures | classify exact versus placeholder time; use conservative day-end/artifact cutoff when timestamp precision is not proven |
 | Corporate actions | approve end-of-announcement-date rule for date-granular source evidence |
-| Financial reports/facts/concepts | use actual publication dates for full/weekly sources; exclude 86 post-cutoff versions and augment or fail close unmatched legacy coordinates |
+| Financial reports/facts/concepts | retain current snapshot forward-only from acquisition; publication date is descriptive until an immutable value-revision archive exists; exclude 86 post-cutoff versions |
 | Holder changes | use disclosure date where present; augment or exclude rows without disclosure evidence |
 | Industry/F10/governance | retain forward-only acquisition/detection semantics |
 
@@ -128,6 +129,11 @@ policy SHA, mount mapping, and operator identity.
 
 The V2.1 Base ends on 2026-07-31. No Daily ODS or DWD package dated 2026-08-01 or later is included
 in the Base build.
+
+The July tail already inside ODS V2 is part of the V2.1 input boundary. Reconcile every manifest row
+count, preserve each artifact cutoff, and explicitly accept verified zero-row/zero-column Parquet
+parts as empty increments rather than schema failures. Facts acquired after their market date must
+not be moved back to observation time.
 
 Later Daily handling is a separate migration:
 

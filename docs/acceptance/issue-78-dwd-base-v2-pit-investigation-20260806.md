@@ -8,8 +8,8 @@
 | Investigated package | `dwd-base-202607-v2` |
 | Manifest SHA-256 | `sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f` |
 | Content digest | `sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9` |
-| DWD audit policy | `config/audits/dwd-pit-semantics.v1.json` / `sha256:9593aa765b0681e36560ec52820b4b8f13158d54e7c7b9b595bd630eecb4d7ab` |
-| ODS sufficiency policy | `config/audits/ods-pit-sufficiency.v1.json` / `sha256:1dc04ea312a4600bc9a4c62e6d594f5c557b6d6688bfcfbff2b31980a6d9d8d5` |
+| DWD audit policy | `config/audits/dwd-pit-semantics.v1.json` / `sha256:9023edddad38b8a933dfc9c6150a71a285d7fa8fd441a1074f5ab4c4382cd1b0` |
+| ODS sufficiency policy | `config/audits/ods-pit-sufficiency.v1.json` / `sha256:dbf79326f4ee4629b6b003ba2c14704aca8de24d6866a3879a6fcab5a9f52314` |
 | Successor boundary | new `dwd-base-202607-v2.1`, through 2026-07-31; later Daily excluded and cleaned separately |
 | Proposed remediation | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` |
 | Consequence | V2 historical PIT use remains blocked; no Base or consumer pointer changed |
@@ -18,11 +18,12 @@
 
 The Stage B P4 blocker is a package-wide DWD authority issue, not a P4 reader defect. Code inspection
 confirms that 17 of 33 tables substitute a Base build/acquisition timestamp for historical
-availability, four tables have source-family or row-level historical availability ambiguity, five
-tables already use source-derived historical timestamps, and seven tables are correctly
-forward-only operational/governance objects. The fourth ambiguous table is
-`dwd_shareholding_change`: 124,674 of 194,322 exact ODS rows lack `disclosure_date`, so the
-builder's fallback to business `change_date` cannot be accepted as historical knowledge.
+availability, three tables have source precision or row-level ambiguity, three tables already use
+defensible source-derived historical timestamps, and ten tables are forward-only from immutable
+acquisition/detection. The ambiguous objects are `dwd_disclosure`, `dwd_disclosure_subject`, and
+`dwd_shareholding_change`: announcement time precision is mixed, while 124,674 of 194,322 holder
+changes lack `disclosure_date`. The three financial tables move to forward-only because ODS V2
+contains current values without immutable report-revision history.
 
 This evidence does not close Issue #78. The physical package bytes and installed Hermes, CN01, and
 OCI mirrors have not all been read by the current principal. The sealed V2 package therefore remains
@@ -85,7 +86,7 @@ The exact evidence statements and remediation notes are machine-readable in the 
 | `dwd_listing` | build timestamp substituted | blocked | stable listing intervals reconstructable under approved identity rule | pending |
 | `dwd_trading_venue` | build timestamp substituted | blocked | versioned static venue contract required | pending |
 | `dwd_security_bar` | build timestamp substituted | blocked | reconstructable from completed observation interval under a new contract | pending |
-| `dwd_security_valuation` | build timestamp substituted | blocked | provider-availability evidence required or fail closed | pending |
+| `dwd_security_valuation` | build timestamp substituted | no historical authority | canonical history is forward-only from acquisition; July 31 tail uses exact artifact cutoff | pending |
 | `dwd_adjustment_factor` | source-derived historical | conditional on corrected parent identity | existing ODS knowledge cutoff is sufficient | pending |
 | `dwd_adjustment_factor_input` | source-derived historical | conditional on corrected parent identity | existing ODS knowledge cutoff is sufficient | pending |
 | `dwd_market_index` | build timestamp substituted | blocked | versioned benchmark evidence or fail closed | pending |
@@ -96,13 +97,13 @@ The exact evidence statements and remediation notes are machine-readable in the 
 | `dwd_price_limit_regime` | build timestamp substituted | blocked | source knowledge cutoff is available | pending |
 | `dwd_tradability_state` | build timestamp substituted | blocked | recomputable from corrected inputs and observation completion | pending |
 | `dwd_observation_gap` | forward operational | not historical authority | correctly retained from detection time | pending |
-| `dwd_disclosure` | source-derived historical | conditional on corrected parent identity | provider publication time is available | pending |
-| `dwd_disclosure_subject` | source-derived historical | conditional on corrected parent dependencies | provider publication time is available | pending |
+| `dwd_disclosure` | source-time precision ambiguity | blocked until precision classification | 5,413,404 midnight and 205,275 fixed-06:30 timestamps require conservative handling | pending |
+| `dwd_disclosure_subject` | parent source-time ambiguity | blocked until parent correction | inherits corrected disclosure availability | pending |
 | `dwd_corporate_action` | build/acquisition timestamp substituted | blocked | exact ODS has announcement date for all 40,594 action rows and 54,509 dividend rows | pending |
 | `dwd_corporate_action_term` | build/acquisition timestamp substituted | blocked | inherits corrected announcement-date timing | pending |
-| `dwd_financial_report` | source-family ambiguity | blocked pending classification | partially reconstructable; remainder fails closed | pending |
-| `dwd_financial_concept` | source-family ambiguity | blocked pending classification | earliest defensible published use required | pending |
-| `dwd_financial_fact` | source-family ambiguity | blocked pending classification | partially reconstructable; remainder fails closed | pending |
+| `dwd_financial_report` | forward operational | forward-only from envelope acquisition | publication remains descriptive; no immutable revision history | pending |
+| `dwd_financial_concept` | forward operational | forward-only from envelope acquisition | current concept/taxonomy snapshot only | pending |
+| `dwd_financial_fact` | forward operational | forward-only from envelope acquisition | current value version cannot be assigned to original publication | pending |
 | `dwd_industry_scheme` | forward operational | not historical authority | current evidenced scheme only | pending |
 | `dwd_industry_node` | forward operational | not historical authority | current evidenced hierarchy only | pending |
 | `dwd_company_industry_membership` | forward operational | not historical authority | first defensible snapshot only | pending |
@@ -123,11 +124,14 @@ The exact evidence statements and remediation notes are machine-readable in the 
 - `tradability_state.py` writes `build_cutoff()` into security/listing status, price-limit regimes,
   derived tradability, and gap detections. Gap detections are correctly forward governance events;
   the other four objects require historical reconstruction.
-- `disclosure_event.py` correctly uses announcement publish time and factor source cutoff, but
-  corporate actions prefer source `built_at` over `announce_date`.
-- `financial_reporting.py` uses `acquired_at` or a Base-cutoff fallback even though the exact full
-  statement source has valid `publish_date` on all 852,497 decoded report versions. Canonical
-  quarterly and `fin_abstract` still have unmatched coordinates without actual publication time.
+- `disclosure_event.py` treats all announcement `publish_time` values as exact even though the
+  source mixes precise times with 5,413,404 midnight and 205,275 fixed-06:30 values. Factor source
+  cutoffs are valid, while corporate actions incorrectly prefer source `built_at` over
+  `announce_date`.
+- `financial_reporting.py` correctly uses acquisition for the current envelope snapshot, but its
+  prose/consumer interpretation must not treat `published_at` as authority for the current fact
+  value. All 852,497 reports carry publication dates, while the shared provider update epoch does
+  not preserve report-level revision history. Reports, concepts, and facts remain forward-only.
 - `industry_classification.py`, F10 ownership parsing, and quality governance intentionally preserve
   first acquisition/detection time and must remain forward-only.
 - shareholder counts retain source-derived historical timestamps. Holder changes are only
@@ -142,18 +146,18 @@ The following facts come from the deep-verified CN01 ODS V2 package, not the OCI
 | --- | --- | --- |
 | Security/company/listing identity | 5,868 unique master rows; all 5,329 bar codes and 5,316 valuation codes resolve; 6,217 org ids; 8 historical code-validity intervals | stable joins reconstructable under a conservative identity contract; historical display/reference attributes remain unavailable unless evidenced |
 | Daily/minute security bars | 13,815,115 daily rows through 2026-07-24; historical rows have only 2026 `built_at`; minute archives passed package deep verification | use versioned session/interval-completion knowledge rules |
-| Daily valuation | 11,416,988 rows through 2026-07-18; no historical publication/acquisition field | provider-semantic evidence required or history fails closed |
+| Daily valuation | 11,416,988 rows through 2026-07-18; no historical publication/acquisition field; full-history receipts cover only 209 securities and were acquired after cutoff | no historical PIT authority; forward-only from independently evidenced acquisition |
 | Benchmark definitions | current metadata only | static/versioned benchmark contract or additive evidence required |
 | Index bars | 23,242 rows through 2026-07-24; no historical fetch time | use session-close rule after benchmark identity approval |
 | Trading calendar | 17,055 canonical rows through 2026-07-25 with one 2026 build time; non-conflicting historical Hotfix retained | realized sessions may use conservative session/date end; no earlier future-schedule authority |
 | ST and daily provider state | 7,030 rows, all with cutoff; only 1,492 have proven events and 5,538 are explicitly not proven | use proven rows; keep not-proven rows fail closed; daily state uses session completion |
-| Suspensions | 2,745 rows, all with cutoff; 543 become known after suspension start | use exact cutoff without backward projection |
+| Suspensions | 2,745 rows, all with cutoff; 543 become known after suspension start; coverage begins in 2016 | use exact cutoff for observed rows; missing/pre-2016 history remains fail closed |
 | Price-limit regimes | 2,750 rows, all with announcement and cutoff | source timing sufficient |
 | Adjustment factors | 46,649 rows with cutoff: 39,739 action-announcement, 2,737 provider-notice, 4,173 no-provable-announcement exceptions | source timing sufficient; retain all 4,173 fail-closed exceptions |
-| Announcements | 6,395,198 rows, no null `publish_time` | source timing sufficient |
+| Announcements | 6,395,198 rows; 5,413,404 exactly midnight and 205,275 exactly 06:30:00 | classify precision; exact only where proven, otherwise conservative day-end/artifact cutoff |
 | Corporate actions/dividends | 40,594 action rows and 54,509 dividend rows, no null announcement dates | reconstruct with conservative end-of-announcement-date rule, never 2026 `built_at` |
-| Full financial statements | 14,976 envelopes decode to exactly 852,497 reports; every report has valid publish/update time | use actual publication date; exclude 86 report versions dated 2026-08-01 from V2.1 into Daily cleaning |
-| Quarterly/abstract financial sources | 233,073 of 243,164 canonical quarterly coordinates and 287,488 of 307,328 abstract rows match an actual-publish source | 10,091 quarterly and 19,840 abstract unmatched coordinates need additive mapping or fail closed |
+| Full financial statements | 14,976 envelopes decode to 852,497 reports; all have publish date, but shared 10-digit update epochs do not identify value revisions | reports/concepts/facts are forward-only from acquisition; 86 versions dated 2026-08-01 are excluded |
+| Quarterly/abstract financial sources | in 2012-2021, 139,915 of 144,794 quarterly coordinates and 139,915 of 144,891 abstract rows match the publish-date source | 4,879 quarterly and 4,976 abstract development rows are unmatched; none obtain historical value authority without revision evidence |
 | Industry membership | 4,992-row snapshot, market/acquisition date 2026-07-31 | forward-only from acquisition |
 | F10 capital/holdings | 79,872 rows in 17 categories, acquired on 2026-07-31 | forward-only from acquisition |
 | Shareholder count | 411,318 rows; no null notice or cutoff | source timing sufficient |
@@ -165,9 +169,15 @@ findings; Hermes still must prove checksum-identical package identity. A success
 read the exact ODS Base plus separately sealed additive evidence only where the table-specific
 rules above identify a genuine gap.
 
-The accepted successor boundary is a new `dwd-base-202607-v2.1` through exactly 2026-07-31. Daily
-source and DWD packages after that date are excluded from the Base and handled through a separate
-clean/rebuild/rebase migration.
+The accepted successor boundary is a new `dwd-base-202607-v2.1` through exactly 2026-07-31. Its
+July tail must be rebuilt from the manifest-bound ODS releases rather than from V2 DWD rows. Exact
+reconciliation passed for 24,960 daily bars, 24,960 status rows, 15 index rows, 4,992 valuation
+rows, 31,190 announcements, 21 suspensions, 175 factor rows, 358 dividend rows, 7,179,120 one-minute
+bars, and 1,435,824 five-minute bars. Each artifact retains its actual cutoff; some July 27-28
+market facts were acquired only on July 29-30. Five corporate-action and five financial-disclosure
+parts, plus one factor part, are verified zero-row/zero-column Parquet and must be accepted as empty
+increments rather than schema failures. Daily source and DWD packages after 2026-07-31 are excluded
+from the Base and handled through a separate clean/rebuild/rebase migration.
 
 ## 5. Downstream And Increment Impact
 
@@ -218,9 +228,12 @@ manifest-declared Parquet paths accessed. Output paths inside a supplied mirror 
 - No DWD Parquet file was read during the current investigation.
 - CN01 ODS V2 deep verification passed all 21,396 declared package files and 13,643,600,642 bytes
   with exit status 0. Focused exact-source scans covered the listed Parquet/SQLite families.
-- Full financial decoding reconciled all 14,976 envelopes to 852,497 report versions, with no
-  missing/invalid publish date or update time; 86 post-cutoff versions were identified explicitly.
-- Temporary CN01 root authorization and `/tmp` audit outputs were removed after the audit.
+- Full financial decoding reconciled all 14,976 envelopes to 852,497 report versions. Publication
+  dates were present, but the shared 10-digit provider update epochs proved insufficient for
+  report-level value revision history; 86 post-cutoff versions were identified explicitly.
+- Announcement precision audit classified 5,413,404 midnight and 205,275 fixed-06:30 source times.
+- July-tail row counts reconciled exactly to every audited manifest part, including verified
+  zero-row/zero-column empty increments.
 - Repository `make check` passed environment doctor, compilation, 897 tests, and GitHub planning
   synchronization after the CN01 evidence update.
 

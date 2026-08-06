@@ -2,8 +2,8 @@
   "schema_version": 1,
   "kind": "dwd_pit_semantics_audit_policy",
   "policy_id": "meta-data-pit-001.dwd-base-v2",
-  "policy_version": "1.0.0",
-  "status": "investigation_gate",
+  "policy_version": "1.1.0",
+  "status": "cn01_ods_semantics_frozen_dwd_physical_audit_pending",
   "governing_issue": 78,
   "base_release": {
     "package_id": "dwd-base-202607-v2",
@@ -124,14 +124,14 @@
       "disposition": "build_timestamp_substituted",
       "historical_pit_authority": "blocked",
       "reference_field": "observation_start",
-      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "ods_sufficiency": "forward_only_not_historical",
       "builder_path": "src/quanthus/pipelines/securities_warehouse/market_observation.py",
       "knowledge_rule": "all historical valuation measures write the Base builder cutoff",
       "evidence": [
         "_valuation_query selects TIMESTAMPTZ cutoff AS knowledge_from",
-        "source rows expose trade date but no accepted provider publication timestamp"
+        "the 11,416,988-row canonical source has no historical publication/acquisition column; full-history receipts cover only 209 securities and were acquired after the Base cutoff"
       ],
-      "remediation_note": "Add or approve a conservative provider-availability rule; otherwise exclude affected valuation history."
+      "remediation_note": "Grant no historical PIT authority to canonical valuation history. Retain only forward snapshots from independently evidenced acquisition; the July 31 tail uses its exact artifact cutoff."
     },
     {
       "table": "dwd_adjustment_factor",
@@ -275,31 +275,31 @@
     },
     {
       "table": "dwd_disclosure",
-      "disposition": "source_derived_historical",
-      "historical_pit_authority": "source_derived_but_parent_identity_must_be_rebuilt",
+      "disposition": "ambiguous_source_insufficient",
+      "historical_pit_authority": "blocked_until_timestamp_precision_classification",
       "reference_field": "effective_at",
-      "ods_sufficiency": "reconstructable_existing_ods",
+      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
       "builder_path": "src/quanthus/pipelines/securities_warehouse/disclosure_event.py",
-      "knowledge_rule": "announcement knowledge equals provider publish_time",
+      "knowledge_rule": "announcement knowledge currently equals provider publish_time without checking timestamp precision",
       "evidence": [
-        "materialize_announcement_rows parses publish_time",
-        "knowledge_from, effective_at, and announced_at share the publication timestamp"
+        "materialize_announcement_rows treats publish_time as exact",
+        "5,413,404 of 6,395,198 source rows are exactly 00:00:00 and another 205,275 are exactly 06:30:00, proving mixed precise and normalized/date-level semantics"
       ],
-      "remediation_note": "Retain publication time and rebind company identity in the successor build."
+      "remediation_note": "Classify timestamp precision by source. Use exact time only where independently proven; otherwise use conservative Shanghai announcement-day end or the later immutable artifact cutoff."
     },
     {
       "table": "dwd_disclosure_subject",
-      "disposition": "source_derived_historical",
-      "historical_pit_authority": "source_derived_but_parent_dependencies_must_be_rebuilt",
+      "disposition": "ambiguous_source_insufficient",
+      "historical_pit_authority": "blocked_until_parent_timestamp_precision_classification",
       "reference_field": "effective_at",
-      "ods_sufficiency": "reconstructable_existing_ods",
+      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
       "builder_path": "src/quanthus/pipelines/securities_warehouse/disclosure_event.py",
-      "knowledge_rule": "subject relationships inherit the announcement publication timestamp",
+      "knowledge_rule": "subject relationships inherit the unclassified announcement publication timestamp",
       "evidence": [
         "disclosure subject rows copy announcement common lineage",
-        "common lineage uses provider publish_time"
+        "the parent announcement field contains 5,413,404 midnight and 205,275 fixed-06:30 timestamps whose exactness is not established"
       ],
-      "remediation_note": "Retain timing; rebuild referenced security, action, and financial-report identities consistently."
+      "remediation_note": "Inherit the corrected parent disclosure availability and rebuild referenced security, action, and financial-report relationships consistently."
     },
     {
       "table": "dwd_corporate_action",
@@ -331,45 +331,45 @@
     },
     {
       "table": "dwd_financial_report",
-      "disposition": "ambiguous_source_insufficient",
-      "historical_pit_authority": "blocked_until_source_classification",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_from_acquisition",
       "reference_field": "period_end",
-      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "ods_sufficiency": "forward_only_not_historical",
       "builder_path": "src/quanthus/pipelines/securities_warehouse/financial_reporting.py",
-      "knowledge_rule": "reports use acquired_at or the Base cutoff while published_at is separately retained when available",
+      "knowledge_rule": "reports use acquired_at or the Base cutoff while published_at is descriptive evidence",
       "evidence": [
-        "expand_financial_envelope sets knowledge_from from acquired_at",
-        "native rows fall back to the Base cutoff when acquired_at is absent"
+        "the exact package contains a current 2026 snapshot of 852,497 decoded report versions",
+        "provider update_time is a shared ten-digit epoch, later than publication for roughly half the rows and earlier for the remainder, so report-level revision history cannot be reconstructed"
       ],
-      "remediation_note": "Use actual publish_date for the 852,497 decoded full-statement versions and the weekly quarterly source; exclude 86 versions dated 2026-08-01, and fail closed or add mapping for 10,091 unmatched canonical-quarterly and 19,840 unmatched fin_abstract coordinates."
+      "remediation_note": "Materialize report identity forward-only from immutable acquisition. Preserve publish_date descriptively, exclude 86 versions dated 2026-08-01, and grant historical PIT authority only from a separately sealed report-revision archive."
     },
     {
       "table": "dwd_financial_concept",
-      "disposition": "ambiguous_source_insufficient",
-      "historical_pit_authority": "blocked_until_source_classification",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_from_acquisition",
       "reference_field": "effective_from",
-      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "ods_sufficiency": "forward_only_not_historical",
       "builder_path": "src/quanthus/pipelines/securities_warehouse/financial_reporting.py",
       "knowledge_rule": "concept versions use source acquisition time as both effective and knowledge time",
       "evidence": [
-        "provider concept rows set effective_from=knowledge_from=acquired_at",
-        "the first report publication carrying a concept is not used as its current availability bound"
+        "provider concept rows are derived from the current 2026 envelope snapshot",
+        "no immutable taxonomy/report-revision history proves which concept version was visible at earlier publication dates"
       ],
-      "remediation_note": "Version each concept from its earliest accepted published report use; no acquisition timestamp, period end, or filing deadline may establish earlier knowledge."
+      "remediation_note": "Retain concept versions forward-only from envelope acquisition. Earlier concept authority requires a separately sealed revision/taxonomy archive."
     },
     {
       "table": "dwd_financial_fact",
-      "disposition": "ambiguous_source_insufficient",
-      "historical_pit_authority": "blocked_until_source_classification",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_from_acquisition",
       "reference_field": "period_end",
-      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "ods_sufficiency": "forward_only_not_historical",
       "builder_path": "src/quanthus/pipelines/securities_warehouse/financial_reporting.py",
-      "knowledge_rule": "facts use acquired_at or the Base cutoff despite separately retained published_at when available",
+      "knowledge_rule": "facts use acquired_at because the package retains only the current envelope value version",
       "evidence": [
-        "financial fact rows copy report acquisition knowledge",
-        "all 852,497 decoded full-statement report versions have valid publish_date, while 10,091 canonical-quarterly and 19,840 fin_abstract coordinates lack a matched actual-publication source"
+        "all 852,497 decoded report versions have publish_date, but their current values may incorporate later updates not preserved as immutable revisions",
+        "the 2012-2021 window additionally leaves 4,879 canonical quarterly coordinates and 4,976 abstract rows unmatched to the publish-date source"
       ],
-      "remediation_note": "Use actual publication dates for full and weekly sources; exclude 86 report versions dated 2026-08-01 to Daily cleaning, and fail closed or add mapping for unmatched legacy coordinates."
+      "remediation_note": "Publish facts forward-only from immutable acquisition. Do not assign current values to original publication dates; historical facts require a separately sealed value-revision archive."
     },
     {
       "table": "dwd_industry_scheme",

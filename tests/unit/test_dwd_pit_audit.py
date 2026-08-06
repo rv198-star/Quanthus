@@ -34,21 +34,33 @@ class DwdPitAuditTests(unittest.TestCase):
             Counter(item.disposition for item in policy.tables),
             {
                 "build_timestamp_substituted": 17,
-                "ambiguous_source_insufficient": 4,
-                "source_derived_historical": 5,
-                "forward_operational": 7,
+                "ambiguous_source_insufficient": 3,
+                "source_derived_historical": 3,
+                "forward_operational": 10,
             },
         )
         self.assertEqual(
             Counter(item.ods_sufficiency for item in policy.tables),
             {
-                "reconstructable_existing_ods": 16,
-                "partially_reconstructable_fail_closed_remainder": 8,
-                "requires_additive_evidence_or_fail_closed": 2,
-                "forward_only_not_historical": 7,
+                "reconstructable_existing_ods": 14,
+                "partially_reconstructable_fail_closed_remainder": 7,
+                "requires_additive_evidence_or_fail_closed": 1,
+                "forward_only_not_historical": 11,
             },
         )
         self.assertEqual(policy.required_mirror_labels, ("hermes", "cn01", "oci"))
+        by_table = {item.table: item for item in policy.tables}
+        self.assertEqual(
+            by_table["dwd_financial_fact"].disposition, "forward_operational"
+        )
+        self.assertEqual(
+            by_table["dwd_disclosure"].disposition,
+            "ambiguous_source_insufficient",
+        )
+        self.assertEqual(
+            by_table["dwd_security_valuation"].ods_sufficiency,
+            "forward_only_not_historical",
+        )
 
     def test_manifest_payload_files_map_flat_and_partitioned_tables(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

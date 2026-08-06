@@ -2,8 +2,8 @@
   "schema_version": 1,
   "kind": "ods_pit_sufficiency_audit",
   "policy_id": "meta-data-pit-001.ods-base-v2",
-  "policy_version": "1.1.0",
-  "status": "cn01_exact_base_deep_verified_hermes_mirror_pending",
+  "policy_version": "1.2.0",
+  "status": "cn01_exact_base_byte_verified_source_semantics_frozen_hermes_mirror_pending",
   "governing_issue": 78,
   "ods_base": {
     "package_id": "ods-base-202607-v2",
@@ -26,7 +26,10 @@
     "accepted_ods_package_evidence_review": "complete",
     "cn01_exact_ods_base_bytes": "deep_verified",
     "cn01_source_schema_and_distribution_review": "complete_for_required_families",
-    "cn01_full_financial_envelope_publish_audit": "complete",
+    "cn01_full_financial_envelope_publish_and_update_audit": "complete",
+    "cn01_announcement_time_precision_audit": "complete",
+    "cn01_july_daily_tail_audit": "complete",
+    "cn01_valuation_receipt_coverage_audit": "complete",
     "exact_hermes_ods_base_bytes": "pending_read_only_access",
     "authoritative_conclusion_rule": "CN01 proves the package content and source sufficiency facts; closure still requires checksum-identical Hermes verification and approval of each versioned availability rule."
   },
@@ -48,6 +51,30 @@
     "ready_matches_manifest": true,
     "current_pointer_matches_package": true,
     "mutation_performed": false
+  },
+  "july_daily_tail": {
+    "base_inclusion_rule": "only_manifest_bound_releases_through_2026_07_31",
+    "market_release_start": "2026-07-27",
+    "intraday_release_start": "2026-07-24",
+    "market_release_end": "2026-07-31",
+    "manifest_row_count_reconciliation": "passed_for_all_audited_datasets",
+    "daily_ohlcv_rows": 24960,
+    "daily_status_rows": 24960,
+    "index_rows": 15,
+    "valuation_rows": 4992,
+    "announcement_rows": 31190,
+    "suspension_rows": 21,
+    "factor_evidence_rows": 175,
+    "dividend_rows": 358,
+    "intraday_1m_rows": 7179120,
+    "intraday_5m_rows": 1435824,
+    "verified_empty_zero_column_parts": {
+      "corporate_actions_delta": 5,
+      "financial_disclosures_delta": 5,
+      "factor_evidence_delta": 1
+    },
+    "knowledge_rule": "Preserve each immutable artifact knowledge_cutoff. Some July 27-28 market facts were acquired on July 29-30 and must not be moved back to observation time.",
+    "post_base_rule": "Every source artifact after 2026-07-31 is excluded from V2.1 and cleaned, rebuilt, and rebased separately."
   },
   "oci_source_mirror": {
     "root": "/home/ubuntu/data/astock",
@@ -108,11 +135,19 @@
         "rows": 11416988,
         "date_min": "2011-04-01",
         "date_max": "2026-07-18",
-        "historical_publication_or_acquisition_column": false
+        "historical_publication_or_acquisition_column": false,
+        "full_history_receipt_security_count": 209,
+        "full_history_receipt_rows": 671335,
+        "full_history_receipt_acquired_on": "2026-08-01",
+        "july_repair_receipt_security_count": 4992,
+        "july_repair_rows": 44928,
+        "july_repair_start": "2026-07-20",
+        "july_repair_end": "2026-07-30",
+        "july_repair_acquired_on": "2026-07-31"
       },
-      "sufficiency": "provider_semantics_required_or_fail_closed",
-      "reason": "The exact source retains trade date and values but no historical publication or acquisition timestamp.",
-      "v2_1_rule": "Approve a provider-specific as-of rule backed by receipts or exclude historical valuation rows."
+      "sufficiency": "historical_pit_unavailable_forward_only_from_acquisition",
+      "reason": "The exact source retains trade date and values but no historical publication or acquisition timestamp. Full-history receipts cover only 209 securities and were acquired after the Base cutoff; the 4,992-security receipts cover only the July 2026 repair window.",
+      "v2_1_rule": "Grant no historical PIT authority to canonical valuation history. Retain values only as forward snapshots from independently evidenced acquisition, with the July 31 Daily valuation part using its exact artifact cutoff."
     },
     {
       "source_family": "market_index_definition",
@@ -185,11 +220,17 @@
         "knowledge_cutoff_null_rows": 0,
         "knowledge_cutoff_min": "2018-01-02",
         "knowledge_cutoff_max": "2026-07-23",
-        "knowledge_after_suspend_start_rows": 543
+        "knowledge_after_suspend_start_rows": 543,
+        "suspend_start_min": "2016-09-14",
+        "maximum_positive_knowledge_lag_days": 1500,
+        "supplementary_gap_status_rows": 12145,
+        "supplementary_gap_status_code_count": 347,
+        "supplementary_gap_status_start": "2018-12-28",
+        "supplementary_gap_status_end": "2025-01-07"
       },
-      "sufficiency": "source_timestamp_sufficient",
-      "reason": "Explicit source knowledge exists; 543 rows correctly become known after suspension start.",
-      "v2_1_rule": "Use exact source cutoff and never project those 543 rows backward."
+      "sufficiency": "source_timestamp_sufficient_for_observed_rows_fail_closed_missing_history",
+      "reason": "Explicit source knowledge exists for observed suspension rows, and 543 rows correctly become known after suspension start. Canonical coverage begins in 2016, while the 12,145-row supplementary status ledger covers only 347 codes from late 2018 onward and is not a complete historical state source.",
+      "v2_1_rule": "Use exact source cutoff for observed rows and never project the 543 late-known rows backward. Missing periods, codes, and pre-2016 history remain fail-closed unless separately evidenced."
     },
     {
       "source_family": "price_limit_regime",
@@ -231,11 +272,16 @@
         "rows": 6395198,
         "publish_time_null_rows": 0,
         "publish_time_min": "2011-01-01T06:30:00",
-        "publish_time_max": "2026-07-25T00:00:00"
+        "publish_time_max": "2026-07-25T00:00:00",
+        "midnight_placeholder_rows": 5413404,
+        "fixed_063000_rows": 205275,
+        "midnight_placeholder_ratio": "0.8465",
+        "distinct_publish_timestamps": 358946,
+        "distinct_announcement_ids": 6395198
       },
-      "sufficiency": "source_timestamp_sufficient",
-      "reason": "Every announcement retains provider publish time.",
-      "v2_1_rule": "Use provider publish time and corrected relationships."
+      "sufficiency": "mixed_precision_timestamp_conservative_rule_required",
+      "reason": "Every announcement has a value, but 5,413,404 rows are exactly midnight and 205,275 are exactly 06:30:00. The field mixes precise timestamps with date-level or normalized placeholders and cannot uniformly authorize same-day use.",
+      "v2_1_rule": "Apply a versioned source-precision classifier. Use an exact timestamp only where precision is independently proven; otherwise make the announcement knowable at conservative Shanghai announcement-day end or the later immutable artifact cutoff."
     },
     {
       "source_family": "corporate_actions_and_terms",
@@ -262,27 +308,37 @@
       "mapped_dwd_tables": ["dwd_financial_report", "dwd_financial_concept", "dwd_financial_fact"],
       "observed_evidence": {
         "canonical_financial_quarterly_rows": 243164,
-        "canonical_coordinates_matched_to_actual_publish_source": 233073,
-        "canonical_coordinates_unmatched": 10091,
+        "canonical_development_coordinates": 144794,
+        "canonical_development_coordinates_matched_to_publish_source": 139915,
+        "canonical_development_coordinates_unmatched": 4879,
+        "canonical_development_unmatched_code_count": 317,
         "fin_abstract_rows": 307328,
-        "fin_abstract_coordinates_matched_to_actual_publish_source": 287488,
-        "fin_abstract_coordinates_unmatched": 19840,
+        "fin_abstract_development_rows": 144891,
+        "fin_abstract_development_rows_matched_to_publish_source": 139915,
+        "fin_abstract_development_rows_unmatched": 4976,
+        "fin_abstract_development_unmatched_code_count": 319,
         "full_statement_envelopes": 14976,
         "full_statement_decoded_reports": 852497,
         "full_statement_publish_date_missing": 0,
         "full_statement_publish_date_invalid": 0,
         "full_statement_update_time_missing": 0,
-        "full_statement_publish_date_min": "1996-08-26",
-        "full_statement_publish_date_max": "2026-08-01",
-        "post_cutoff_report_versions": 86,
+        "balance_sheet_update_after_publish": 150448,
+        "balance_sheet_update_before_publish": 128688,
+        "income_statement_update_after_publish": 145345,
+        "income_statement_update_before_publish": 142207,
+        "cash_flow_update_after_publish": 143733,
+        "cash_flow_update_before_publish": 142076,
+        "update_time_semantics": "ten_digit_unix_epoch_shared_across_many_reports_not_a_reliable_per_report_revision_coordinate",
+        "post_acquisition_publish_report_versions": 273,
+        "post_cutoff_publish_date_report_versions": 86,
         "post_cutoff_envelopes": 39,
         "post_cutoff_publish_date": "2026-08-01",
         "weekly_quarterly_rows": 287552,
         "weekly_quarterly_publish_date_null_rows": 0
       },
-      "sufficiency": "source_family_partial_existing_ods_with_explicit_exclusions",
-      "reason": "Full statements and weekly quarterly rows carry publication dates. Legacy source coordinates remain unmatched, and 86 report versions are dated after the V2.1 cutoff.",
-      "v2_1_rule": "Use actual publish_date for full and weekly sources; move 86 post-cutoff versions to Daily cleaning; fail closed or add mapping for 10,091 canonical and 19,840 abstract unmatched coordinates."
+      "sufficiency": "forward_only_from_acquisition_without_revision_archive",
+      "reason": "All decoded reports carry publication dates, but the package stores a current 2026 snapshot. The provider update epoch is shared across many historical reports and is later than publication for roughly half the rows and earlier for the other half, so it cannot reconstruct report-level revision history. Current fact values therefore cannot be assigned to original publication dates. Development coverage also leaves 4,879 canonical quarterly coordinates and 4,976 abstract rows unmatched to the publish-date source.",
+      "v2_1_rule": "Materialize reports, concepts, and facts as forward-only from the immutable envelope acquisition time. Preserve provider publish_date as descriptive evidence, exclude the 86 versions dated 2026-08-01 from V2.1, and grant historical PIT authority only after a separately sealed revision archive proves the exact value version visible at each publication."
     },
     {
       "source_family": "industry_snapshot",

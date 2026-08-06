@@ -100,15 +100,40 @@ class OdsPitSufficiencyPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             by_name["financial_reporting"]["observed_evidence"][
-                "post_cutoff_report_versions"
+                "post_cutoff_publish_date_report_versions"
             ],
             86,
         )
-        self.assertGreaterEqual(dispositions["source_timestamp_sufficient"], 4)
+        self.assertEqual(
+            by_name["financial_reporting"]["sufficiency"],
+            "forward_only_from_acquisition_without_revision_archive",
+        )
+        self.assertEqual(
+            by_name["announcements"]["observed_evidence"][
+                "midnight_placeholder_rows"
+            ],
+            5413404,
+        )
+        self.assertEqual(
+            by_name["announcements"]["sufficiency"],
+            "mixed_precision_timestamp_conservative_rule_required",
+        )
+        self.assertEqual(
+            by_name["security_valuation"]["sufficiency"],
+            "historical_pit_unavailable_forward_only_from_acquisition",
+        )
+        self.assertGreaterEqual(dispositions["source_timestamp_sufficient"], 2)
         checks = {item.check_id: item for item in load_ods_pit_audit_policy(POLICY).checks}
         self.assertEqual(
             checks["full_financial_statements"].path_suffix,
             "artifacts/financial_statements.parquet",
+        )
+        self.assertEqual(policy["july_daily_tail"]["daily_ohlcv_rows"], 24960)
+        self.assertEqual(
+            policy["july_daily_tail"]["verified_empty_zero_column_parts"][
+                "corporate_actions_delta"
+            ],
+            5,
         )
 
     def test_output_inside_ods_mirror_is_rejected(self) -> None:

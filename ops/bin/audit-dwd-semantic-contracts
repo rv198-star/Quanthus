@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Audit DWD keys, intervals, foreign keys, lineage, and explicit invariants."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.dwd_semantic_contract_audit import (  # noqa: E402
+    DwdSemanticContractAuditError,
+    audit_dwd_semantic_contracts,
+    write_semantic_contract_report,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument(
+        "--model",
+        type=Path,
+        default=Path("config/pipelines/dwd-domain-model.v1.json"),
+    )
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--scratch", type=Path, required=True)
+    parser.add_argument("--checkpoint", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        report = audit_dwd_semantic_contracts(
+            root=args.root,
+            model_path=args.model,
+            scratch=args.scratch,
+            checkpoint_path=args.checkpoint,
+        )
+        write_semantic_contract_report(args.output, report, sealed_roots=(args.root,))
+    except (DwdSemanticContractAuditError, OSError) as exc:
+        print(f"DWD Phase C semantic audit failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "status": report["summary"]["status"],
+                "canonical_digest": report["canonical_digest"],
+                "semantic_digest": report["semantic_digest"],
+                "output": str(args.output.resolve()),
+            },
+            sort_keys=True,
+        )
+    )
+    return 0 if report["summary"]["status"] == "verified" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -613,7 +613,7 @@ def audit_dwd_semantic_contracts(
     model_path: Path,
     scratch: Path,
     checkpoint_path: Path,
-    memory_limit: str = "2GB",
+    memory_limit: str = "1GB",
 ) -> dict[str, Any]:
     """Execute keys, intervals, lineage, FK, and explicit invariant checks for all tables."""
 

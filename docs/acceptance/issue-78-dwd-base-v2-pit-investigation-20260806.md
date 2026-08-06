@@ -58,6 +58,14 @@ A `2GB` calibration still drove approximately 2 GiB of host swap while scanning 
 relationship, so the CN01-safe default and canonical run limit are `1GB`. Each calibration uses a
 new evidence directory and does not transplant an earlier checkpoint.
 
+The CN01-only lineage-authority audit at revision
+`bdf2f6491eb23741d153852acea963352b1b00bf` verified the exact input-plan package, all five declared
+member digests, the semantic plan digest, 21,406 source-disposition records, coverage and capacity
+digests, the DWD model SHA, and both plan and package-assembly Git revisions. The DWD-bound ODS
+V1.2 identity resolves through the installed ODS V2 manifest's exact content-preserving
+`storage_reuse` source. No lineage-authority finding was produced. The canonical report digest is
+`sha256:7e5f8f8c90cde41313aea5e52845ffff0aa79e43c15ef321f8965b469a09c4c9`.
+
 CN01 package bytes have now been fully read and independently verified. An earlier supplementary
 OCI copy comparison exposed an audit-tool timezone dependency; the reviewed UTC fix and reruns
 closed that tool defect. No Hermes or OCI scan is required for the pre-rebuild audit. The sealed V2

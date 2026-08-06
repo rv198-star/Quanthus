@@ -76,6 +76,35 @@ depending on swap. The limit is part of the checkpoint identity and final report
 with a different limit uses a new immutable run directory; checkpoints are never transplanted
 between auditor revisions or resource configurations.
 
+### Sequential batch execution
+
+Use `ops/bin/run-dwd-pre-rebuild-audit-batch` to execute registered read-only auditors in a fixed
+order. The batch writes an atomic `batch-state.json`, a per-step log, a checkpoint for the semantic
+scan, and one immutable report per step. Re-running the same batch id resumes the semantic
+checkpoint and accepts an existing report only after its kind, package id, read-only marker, and
+canonical digest validate.
+
+An auditor exit caused by findings is recorded as `completed_with_findings`; it does not stop later
+auditors. Missing, malformed, wrong-package, mutation-ambiguous, or digest-invalid evidence fails
+the batch. A single-writer lock prevents two processes from using the same batch directory. Child
+auditors run with the exact Python interpreter that started the batch, and the state binds the exact
+Git revision. The production command rejects output outside the mandatory CN01 `/personal` audit
+root.
+
+Previously completed immutable reports can be adopted without repeating their scans:
+
+```text
+--evidence schema_partitions=/absolute/table-and-partition-profile.json
+--evidence semantic_contracts=/absolute/semantic-contract-audit.json
+--evidence lineage_authority=/absolute/lineage-authority-audit.json
+```
+
+The current registry covers schema/partition, semantic contract, lineage authority, and domain
+invariant auditors. Its `remaining_audit_scope` state remains nonempty until the coverage/exclusion,
+representative replay, downstream compatibility, rebuild-readiness, and remediation-freeze tools
+are implemented and executed. Therefore a `verified` batch is not the Phase F human approval and
+never opens the V2.1 builder gate.
+
 ## Audit Dimensions
 
 ### 1. Canonical package integrity

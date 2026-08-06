@@ -302,6 +302,7 @@ replay or explicit retirement under an approved cutover plan.
 | `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` | hard gate, exact 33-table scope, 13 audit dimensions, finding model, six execution phases, required outputs, and Issue #78/V2.1 closure rules |
 | `config/audits/ods-pit-sufficiency.v1.json` | 18-source-family ODS evidence matrix, 21 physical checks, CN01 exact-package statistics, accepted V2.1/Daily boundary, and CN01-only NFS rebuild topology |
 | `src/quanthus/pipelines/dwd_pit_audit.py` | read-only DWD package verification, mirror comparison, and table-distribution scanner |
+| `src/quanthus/pipelines/dwd_lineage_authority_audit.py` | exact CN01 DWD-to-plan-to-ODS identity, component-digest, model, and Git-revision closure |
 | `src/quanthus/pipelines/ods_pit_audit.py` | read-only Hermes/CN01 ODS package verification and required Parquet/SQLite source-field scanner |
 | `ops/bin/audit-dwd-pit-semantics` | CLI for manifest-only and full canonical DWD evidence; legacy replica comparison is supplementary only |
 | `ops/bin/audit-ods-pit-sufficiency` | CLI for manifest-only and full canonical ODS source evidence |
@@ -311,6 +312,7 @@ replay or explicit retirement under an approved cutover plan.
 | `docs/operations/dwd-v2-1-cn01-nfs-rebuild.md` | CN01-only NFS build, capacity, cross-filesystem installation, cutover, and rollback runbook |
 | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` | proposed immutable successor-Base remediation; not yet approved |
 | `tests/unit/test_dwd_pit_audit.py` | PIT policy completeness, file mapping, output isolation, access failure, and future-knowledge scan tests |
+| `tests/unit/test_dwd_lineage_authority_audit.py` | content-preserving ODS republish closure, plan-member tamper rejection, and sealed-output isolation |
 | `tests/unit/test_dwd_base_pre_rebuild_audit_policy.py` | exact 33-table full-audit scope, hard builder gate, required dimensions/outputs, finding classification, and Issue #78 closure tests |
 | `tests/unit/test_ods_pit_sufficiency_policy.py` | all-33-table source coverage, CN01/Hermes authority boundary, compound-dataset path selection, and V2.1/Daily decision tests |
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,9 @@ from quanthus.pipelines.securities_warehouse.domain_base import DomainBaseError,
 
 class DwdDomainInvariantAuditError(RuntimeError):
     """Raised when the explicit invariant audit cannot produce complete evidence."""
+
+
+_MEMORY_LIMIT_PATTERN = re.compile(r"[1-9][0-9]*(?:MB|GB)")
 
 
 def _object(path: Path, label: str) -> dict[str, Any]:
@@ -32,6 +36,74 @@ def _canonical_digest(value: object) -> str:
         "ascii"
     )
     return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _validated_memory_limit(value: str) -> str:
+    normalized = value.strip().upper()
+    if _MEMORY_LIMIT_PATTERN.fullmatch(normalized) is None:
+        raise DwdDomainInvariantAuditError(
+            "memory limit must be a positive whole number followed by MB or GB"
+        )
+    return normalized
+
+
+def _outside_sealed(root: Path, path: Path, label: str) -> Path:
+    sealed = root.resolve()
+    resolved = path.resolve()
+    if resolved == sealed or resolved.is_relative_to(sealed) or path.is_symlink():
+        raise DwdDomainInvariantAuditError(
+            f"audit {label} must remain outside sealed package: {resolved}"
+        )
+    return resolved
+
+
+def _write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.partial")
+    temporary.write_text(
+        json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+        encoding="ascii",
+    )
+    temporary.chmod(0o640)
+    temporary.replace(path)
+
+
+def _checkpoint_value(
+    identity: Mapping[str, Any], table_reports: Mapping[str, Any]
+) -> dict[str, Any]:
+    value: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "dwd_base_v2_domain_invariant_audit_checkpoint",
+        "identity": dict(identity),
+        "completed_table_count": len(table_reports),
+        "tables": dict(table_reports),
+        "mutation_performed": False,
+    }
+    value["canonical_digest"] = _canonical_digest(value)
+    return value
+
+
+def _load_checkpoint(
+    path: Path, *, identity: Mapping[str, Any], allowed_tables: set[str]
+) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    value = _object(path, "Phase D invariant checkpoint")
+    supplied_digest = value.pop("canonical_digest", None)
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != "dwd_base_v2_domain_invariant_audit_checkpoint"
+        or value.get("identity") != dict(identity)
+        or value.get("mutation_performed") is not False
+        or supplied_digest != _canonical_digest(value)
+    ):
+        raise DwdDomainInvariantAuditError("Phase D invariant checkpoint identity differs")
+    tables = value.get("tables")
+    if not isinstance(tables, dict) or not set(tables).issubset(allowed_tables):
+        raise DwdDomainInvariantAuditError("Phase D invariant checkpoint table scope differs")
+    if value.get("completed_table_count") != len(tables):
+        raise DwdDomainInvariantAuditError("Phase D invariant checkpoint count differs")
+    return tables
 
 
 def invariant_predicates() -> dict[str, dict[str, str]]:
@@ -117,7 +189,13 @@ def invariant_predicates() -> dict[str, dict[str, str]]:
     }
 
 
-def audit_dwd_domain_invariants(*, root: Path) -> dict[str, Any]:
+def audit_dwd_domain_invariants(
+    *,
+    root: Path,
+    scratch: Path,
+    checkpoint_path: Path,
+    memory_limit: str = "2GB",
+) -> dict[str, Any]:
     """Count every explicit violation over all manifest parts for governed tables."""
 
     try:
@@ -125,6 +203,12 @@ def audit_dwd_domain_invariants(*, root: Path) -> dict[str, Any]:
     except ModuleNotFoundError as exc:
         raise DwdDomainInvariantAuditError("duckdb is required for Phase D") from exc
     root = root.resolve()
+    scratch = _outside_sealed(root, scratch, "scratch")
+    scratch.mkdir(parents=True, exist_ok=True)
+    if not scratch.is_dir():
+        raise DwdDomainInvariantAuditError(f"audit scratch is not a directory: {scratch}")
+    checkpoint_path = _outside_sealed(root, checkpoint_path, "checkpoint")
+    memory_limit = _validated_memory_limit(memory_limit)
     try:
         verified = verify_domain_base(root)
     except DomainBaseError as exc:
@@ -132,12 +216,30 @@ def audit_dwd_domain_invariants(*, root: Path) -> dict[str, Any]:
     manifest = _object(root / "manifest.json", "DWD manifest")
     predicates = invariant_predicates()
     paths = _manifest_payload_files(root, manifest, table_names=sorted(predicates))
+    audit_identity = {
+        "package_id": verified.package_id,
+        "manifest_sha256": verified.manifest_sha256,
+        "content_digest": verified.content_digest,
+        "auditor_sha256": "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "memory_limit": memory_limit,
+        "threads": 1,
+    }
+    tables = _load_checkpoint(
+        checkpoint_path,
+        identity=audit_identity,
+        allowed_tables=set(predicates),
+    )
     connection = duckdb.connect(":memory:")
     connection.execute("SET TimeZone='UTC'")
-    connection.execute("SET memory_limit='1GB'")
-    tables: dict[str, Any] = {}
+    connection.execute("SET threads=1")
+    escaped_scratch = str(scratch).replace("'", "''")
+    connection.execute(f"SET temp_directory='{escaped_scratch}'")
+    connection.execute(f"SET memory_limit='{memory_limit}'")
+    connection.execute("SET preserve_insertion_order=false")
     try:
         for table, rules in predicates.items():
+            if table in tables:
+                continue
             source = _parquet_source(paths[table])
             names = list(rules)
             select = ", ".join(
@@ -154,6 +256,10 @@ def audit_dwd_domain_invariants(*, root: Path) -> dict[str, Any]:
                 "violation_count": violation_count,
                 "status": "verified" if violation_count == 0 else "finding",
             }
+            _write_json_atomic(
+                checkpoint_path,
+                _checkpoint_value(audit_identity, tables),
+            )
     except Exception as exc:
         if isinstance(exc, DwdDomainInvariantAuditError):
             raise
@@ -170,6 +276,13 @@ def audit_dwd_domain_invariants(*, root: Path) -> dict[str, Any]:
             "manifest_sha256": verified.manifest_sha256,
             "content_digest": verified.content_digest,
         },
+        "auditor_sha256": audit_identity["auditor_sha256"],
+        "execution": {
+            "memory_limit": memory_limit,
+            "scratch": str(scratch),
+            "threads": 1,
+        },
+        "checkpoint_path": str(checkpoint_path),
         "summary": {
             "status": "verified" if not finding_tables else "finding",
             "audited_table_count": len(tables),

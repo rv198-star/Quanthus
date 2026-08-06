@@ -1,14 +1,42 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from quanthus.pipelines.dwd_domain_invariant_audit import (
+    _checkpoint_value,
+    _load_checkpoint,
+    _validated_memory_limit,
     invariant_predicates,
     write_domain_invariant_report,
 )
 
 
 class DwdDomainInvariantAuditTests(unittest.TestCase):
+    def test_resource_contract_and_checkpoint_identity(self) -> None:
+        self.assertEqual(_validated_memory_limit("2gb"), "2GB")
+        with self.assertRaisesRegex(RuntimeError, "memory limit"):
+            _validated_memory_limit("2GB; DROP TABLE x")
+        identity = {"package_id": "fixture", "memory_limit": "2GB", "threads": 1}
+        tables = {"dwd_financial_fact": {"status": "verified"}}
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "checkpoint.json"
+            path.write_text(json.dumps(_checkpoint_value(identity, tables)))
+            self.assertEqual(
+                _load_checkpoint(
+                    path,
+                    identity=identity,
+                    allowed_tables={"dwd_financial_fact"},
+                ),
+                tables,
+            )
+            with self.assertRaisesRegex(RuntimeError, "identity"):
+                _load_checkpoint(
+                    path,
+                    identity={**identity, "memory_limit": "1GB"},
+                    allowed_tables={"dwd_financial_fact"},
+                )
+
     def test_predicates_cover_cross_field_model_constraints(self) -> None:
         predicates = invariant_predicates()
 

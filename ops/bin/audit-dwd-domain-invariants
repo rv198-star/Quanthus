@@ -21,9 +21,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--scratch", type=Path, required=True)
+    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--memory-limit", default="2GB")
     args = parser.parse_args()
     try:
-        report = audit_dwd_domain_invariants(root=args.root)
+        report = audit_dwd_domain_invariants(
+            root=args.root,
+            scratch=args.scratch,
+            checkpoint_path=args.checkpoint,
+            memory_limit=args.memory_limit,
+        )
         write_domain_invariant_report(args.output, report, sealed_roots=(args.root,))
     except (DwdDomainInvariantAuditError, OSError) as exc:
         print(f"DWD domain invariant audit failed: {exc}", file=sys.stderr)

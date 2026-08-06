@@ -190,6 +190,12 @@ def _command(
             str(executable / "audit-dwd-domain-invariants"),
             "--root",
             str(dwd_root),
+            "--scratch",
+            str(scratch),
+            "--checkpoint",
+            str(checkpoint),
+            "--memory-limit",
+            memory_limit,
             "--output",
             str(report),
         ]

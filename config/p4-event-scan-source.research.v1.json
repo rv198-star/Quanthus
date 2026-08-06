@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "p4-event-source.new-chain-dwd-base",
+  "policy_version": "1.0.0",
+  "status": "approved",
+  "authority": "new_chain_cn01_dwd_mirror",
+  "runtime_root_env": "QUANTHUS_P4_DWD_BASE",
+  "base_release": {
+    "package_id": "dwd-base-202607-v2",
+    "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+    "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+    "kind": "dwd_domain_base_package",
+    "through_date": "2026-07-31"
+  },
+  "development_partition": {
+    "start": "2012-01-01",
+    "end": "2021-12-31"
+  },
+  "historical_visibility": {
+    "status": "blocked",
+    "required_projection": "versioned_economic_availability_projection",
+    "forbidden_shortcuts": [
+      "use_dwd_build_cutoff_as_historical_knowledge",
+      "replace_knowledge_from_with_observation_time_without_versioned_approval",
+      "reuse_legacy_ads_or_historical_bundle"
+    ]
+  },
+  "daily_increment_mode": "disabled_for_initial_development_scan",
+  "forbidden_sources": [
+    "legacy_dual_lane_dwd",
+    "legacy_dual_lane_dws",
+    "legacy_operational_ads",
+    "legacy_strategy_or_portable_ads",
+    "legacy_release_set",
+    "mutable_current_pointer"
+  ],
+  "required_tables": [
+    "dwd_security",
+    "dwd_listing",
+    "dwd_trading_calendar",
+    "dwd_security_bar",
+    "dwd_tradability_state",
+    "dwd_price_limit_regime",
+    "dwd_adjustment_factor"
+  ],
+  "decision_reference": "https://github.com/rv198-star/Quanthus/issues/74#issuecomment-5199608030",
+  "semantic_digest": "sha256:83bad7aee6332fc5bd6b41726a92936cbcdc0b6c748391f17f684bdf41d2c946"
+}

@@ -613,7 +613,7 @@ def audit_dwd_semantic_contracts(
     model_path: Path,
     scratch: Path,
     checkpoint_path: Path,
-    memory_limit: str = "1GB",
+    memory_limit: str = "2GB",
 ) -> dict[str, Any]:
     """Execute keys, intervals, lineage, FK, and explicit invariant checks for all tables."""
 
@@ -646,6 +646,7 @@ def audit_dwd_semantic_contracts(
         "model_sha256": model_sha256,
         "auditor_sha256": "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "memory_limit": memory_limit,
+        "threads": 1,
     }
     table_reports = _load_checkpoint(
         checkpoint_path,
@@ -655,6 +656,7 @@ def audit_dwd_semantic_contracts(
 
     connection = duckdb.connect(":memory:")
     connection.execute("SET TimeZone='UTC'")
+    connection.execute("SET threads=1")
     escaped_scratch = str(scratch).replace("'", "''")
     connection.execute(f"SET temp_directory='{escaped_scratch}'")
     connection.execute(f"SET memory_limit='{memory_limit}'")
@@ -748,6 +750,7 @@ def audit_dwd_semantic_contracts(
         "execution": {
             "memory_limit": memory_limit,
             "scratch": str(scratch),
+            "threads": 1,
         },
         "checkpoint_path": str(checkpoint_path),
         "summary": {

@@ -30,8 +30,8 @@ def main() -> int:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument(
         "--memory-limit",
-        default="1GB",
-        help="DuckDB memory limit (positive whole MB or GB; default: 1GB)",
+        default="2GB",
+        help="DuckDB memory limit (positive whole MB or GB; default: 2GB)",
     )
     args = parser.parse_args()
     try:

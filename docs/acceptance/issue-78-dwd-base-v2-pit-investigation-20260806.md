@@ -54,9 +54,12 @@ to a `12GB` memory limit on a CN01 host with approximately 3.6 GiB RAM and 4 GiB
 stopped after seven atomically checkpointed tables when swap use reached approximately 3.8 GiB; its
 checkpoint remains retained as failed-method evidence. Revision `a9ee58e773ed4e437d01852eecfb828bf1ef3e06`
 adds a validated explicit memory limit and binds it into checkpoint identity and the final report.
-A `2GB` calibration still drove approximately 2 GiB of host swap while scanning the first large
-relationship, so the CN01-safe default and canonical run limit are `1GB`. Each calibration uses a
-new evidence directory and does not transplant an earlier checkpoint.
+A `1GB` single-run calibration successfully forced NFS spill and kept host swap low, but later
+failed closed on the 89,622,402-row `dwd_financial_fact` table when DuckDB could not pin another
+256 KiB block at approximately 953.6 MiB usage. The final CN01 resource contract is therefore a
+`2GB` memory limit with one DuckDB worker thread: enough operator headroom without parallel-memory
+multiplication. Each calibration uses a new evidence directory and does not transplant an earlier
+checkpoint.
 
 The CN01-only lineage-authority audit at revision
 `bdf2f6491eb23741d153852acea963352b1b00bf` verified the exact input-plan package, all five declared

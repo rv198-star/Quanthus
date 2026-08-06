@@ -3,6 +3,8 @@ import re
 import unittest
 from pathlib import Path
 
+from quanthus.event_library.rule_card import load_candidate_rule_card
+from quanthus.event_library.splits import load_split_policy
 from quanthus.gates import load_gate_report, load_p2_gate_report, load_p3_gate_report
 from quanthus.policy import find_project_root
 from scripts.sync_github_planning import CHAPTERS, work_items
@@ -860,6 +862,41 @@ class DocumentTraceabilityTests(unittest.TestCase):
         for blocker_id in load_p2_gate_report().open_activation_blockers:
             self.assertIn(f"`{blocker_id}`", content)
         self.assertIn("does not close these blockers or automatically activate", content)
+
+    def test_p4_event_contract_slice_is_traceable_and_stage_b_approved(self) -> None:
+        root = find_project_root()
+        lld = (root / "docs" / "design" / "lld" / "06-event-library.md").read_text(
+            encoding="utf-8"
+        )
+        card = load_candidate_rule_card(
+            root / "config" / "p4-candidate-price-volume-transition.research.v1.json"
+        )
+        split = load_split_policy(
+            root / "config" / "p4-event-split-policy.research.v1.json"
+        )
+
+        self.assertIn("`P4-EVENT-001` Stage A contracts implemented and human-approved", lld)
+        self.assertIn("`CandidateRuleCard.require_stage_b_authority()`", lld)
+        self.assertEqual(card.lifecycle, "approved")
+        self.assertEqual(card.governance.approval_state, "approved")
+        self.assertEqual(split.lifecycle, "approved")
+        self.assertEqual(split.governance.approval_state, "approved")
+        self.assertEqual(card.governance.decision_reference, split.governance.decision_reference)
+        self.assertIn("#issuecomment-5196483760", card.governance.decision_reference)
+        self.assertTrue((root / "src" / "quanthus" / "event_library" / "contracts.py").is_file())
+        self.assertTrue((root / "src" / "quanthus" / "event_library" / "rule_card.py").is_file())
+        self.assertTrue((root / "src" / "quanthus" / "event_library" / "splits.py").is_file())
+        self.assertTrue(
+            (root / "tests" / "unit" / "test_event_library_contracts.py").is_file()
+        )
+        self.assertTrue((root / "tests" / "unit" / "test_event_rule_card.py").is_file())
+        self.assertTrue((root / "tests" / "unit" / "test_event_splits.py").is_file())
+        acceptance_path = root / "docs" / "acceptance" / "p4-event-contract-freeze-20260806.md"
+        self.assertTrue(acceptance_path.is_file())
+        acceptance = acceptance_path.read_text(encoding="utf-8")
+        self.assertIn(card.semantic_digest, acceptance)
+        self.assertIn(split.semantic_digest, acceptance)
+        self.assertIn("no market-data partition was read", acceptance)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

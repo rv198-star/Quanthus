@@ -1,0 +1,304 @@
+{
+  "schema_version": "1.0.0",
+  "rule_id": "p4-event.price-volume-state-transition",
+  "rule_version": "1.0.0",
+  "lifecycle": "approved",
+  "owner": "P4-EVENT-001",
+  "hypothesis": "A direction-neutral transition from jointly quiet intraday range and turnover activity into jointly active intraday range and turnover activity defines a reproducible comparison cohort without using later outcomes in candidate selection.",
+  "intended_research_use": "Create the first outcome-blind P4 event cohort for later comparison of continuation, failure, neutral, and not-executable outcomes while preserving T-close point-in-time semantics.",
+  "falsification_conditions": [
+    "Identical rule-card, snapshot, and runtime inputs do not reproduce identical candidate membership and event identities.",
+    "Changing future returns or future labels changes candidate membership, isolation, concentration sampling, or split assignment.",
+    "The frozen cohort does not achieve adequate independent coverage across years and static level-one industries in the authorized development partition."
+  ],
+  "non_claims": [
+    "The event is not a buy signal or execution instruction.",
+    "The event does not assert trend continuation, mean reversion, excess return, or profitability.",
+    "The event does not select or promote a strategy family, factor, model, expert, or target.",
+    "The event does not define positive, neutral, failure, or not-executable label thresholds."
+  ],
+  "inputs": [
+    {
+      "table": "dwd_security_bar",
+      "usage": "candidate_signal_input",
+      "fields": [
+        "listing_id",
+        "calendar_session_id",
+        "observation_start",
+        "interval_size",
+        "price_basis",
+        "open",
+        "high",
+        "low",
+        "close",
+        "turnover",
+        "knowledge_from"
+      ],
+      "row_filter": "interval_size == '1d' and price_basis == 'UNADJUSTED'",
+      "knowledge_cutoff": "knowledge_from <= T close",
+      "unit_contract": [
+        "open/high/low/close are CNY per share decimal_38_10",
+        "turnover is traded amount in CNY decimal_38_10",
+        "observation_start and knowledge_from are UTC timestamps"
+      ]
+    },
+    {
+      "table": "dwd_listing",
+      "usage": "eligibility_input",
+      "fields": [
+        "listing_id",
+        "security_id",
+        "venue_id",
+        "effective_from",
+        "effective_to",
+        "knowledge_from"
+      ],
+      "row_filter": "listing interval is effective at T close",
+      "knowledge_cutoff": "knowledge_from <= T close",
+      "unit_contract": [
+        "effective_from/effective_to and knowledge_from are UTC timestamps",
+        "listing_id/security_id/venue_id are governed string identifiers"
+      ]
+    },
+    {
+      "table": "dwd_security",
+      "usage": "eligibility_input",
+      "fields": [
+        "security_id",
+        "company_id",
+        "instrument_type",
+        "effective_from",
+        "effective_to",
+        "knowledge_from"
+      ],
+      "row_filter": "security interval is effective at T close and instrument_type == 'common_equity'",
+      "knowledge_cutoff": "knowledge_from <= T close",
+      "unit_contract": [
+        "effective_from/effective_to and knowledge_from are UTC timestamps",
+        "security_id/company_id/instrument_type are governed strings"
+      ]
+    },
+    {
+      "table": "dwd_tradability_state",
+      "usage": "eligibility_input",
+      "fields": [
+        "listing_id",
+        "calendar_session_id",
+        "observation_start",
+        "is_tradable",
+        "reason_code",
+        "knowledge_from"
+      ],
+      "row_filter": "calendar session is T or T-1",
+      "knowledge_cutoff": "knowledge_from <= T close",
+      "unit_contract": [
+        "is_tradable is boolean",
+        "observation_start and knowledge_from are UTC timestamps",
+        "reason_code is a governed string"
+      ]
+    },
+    {
+      "table": "dwd_adjustment_factor",
+      "usage": "eligibility_input",
+      "fields": [
+        "security_id",
+        "effective_from",
+        "adjustment_method",
+        "adjustment_direction",
+        "factor_value",
+        "knowledge_from"
+      ],
+      "row_filter": "factor interval intersects T-1 through T",
+      "knowledge_cutoff": "knowledge_from <= T close",
+      "unit_contract": [
+        "factor_value is a dimensionless decimal_38_18",
+        "effective_from and knowledge_from are UTC timestamps"
+      ]
+    },
+    {
+      "table": "static_industry_mapping",
+      "usage": "static_non_pit_concentration_only",
+      "fields": [
+        "security_id",
+        "level1_industry_id",
+        "mapping_version",
+        "artifact_digest"
+      ],
+      "row_filter": "usage == 'static_non_pit_concentration_only' and complete candidate-security coverage is required",
+      "knowledge_cutoff": "not_applicable_static_non_pit_concentration_only",
+      "unit_contract": [
+        "security_id and level1_industry_id are governed string identifiers",
+        "mapping_version is immutable and artifact_digest is lowercase sha256"
+      ]
+    }
+  ],
+  "transforms": [
+    {
+      "transform_id": "intraday_range_fraction",
+      "formula": "(high - low) / open",
+      "required_fields": [
+        "open",
+        "high",
+        "low"
+      ],
+      "lookback_sessions": 1,
+      "includes_current_session": true,
+      "output_unit": "dimensionless_ratio",
+      "missing_data_policy": "reject_candidate_and_emit_reason_code"
+    },
+    {
+      "transform_id": "prior_20_median_intraday_range_fraction",
+      "formula": "median(intraday_range_fraction over the previous 20 eligible sessions excluding the current session)",
+      "required_fields": [
+        "intraday_range_fraction"
+      ],
+      "lookback_sessions": 20,
+      "includes_current_session": false,
+      "output_unit": "dimensionless_ratio",
+      "missing_data_policy": "reject_candidate_and_emit_reason_code"
+    },
+    {
+      "transform_id": "prior_20_median_turnover",
+      "formula": "median(turnover over the previous 20 eligible sessions excluding the current session)",
+      "required_fields": [
+        "turnover"
+      ],
+      "lookback_sessions": 20,
+      "includes_current_session": false,
+      "output_unit": "CNY",
+      "missing_data_policy": "reject_candidate_and_emit_reason_code"
+    },
+    {
+      "transform_id": "intraday_range_activity_ratio",
+      "formula": "intraday_range_fraction / prior_20_median_intraday_range_fraction",
+      "required_fields": [
+        "intraday_range_fraction",
+        "prior_20_median_intraday_range_fraction"
+      ],
+      "lookback_sessions": 20,
+      "includes_current_session": true,
+      "output_unit": "dimensionless_ratio",
+      "missing_data_policy": "reject_candidate_and_emit_reason_code"
+    },
+    {
+      "transform_id": "turnover_activity_ratio",
+      "formula": "turnover / prior_20_median_turnover",
+      "required_fields": [
+        "turnover",
+        "prior_20_median_turnover"
+      ],
+      "lookback_sessions": 20,
+      "includes_current_session": true,
+      "output_unit": "dimensionless_ratio",
+      "missing_data_policy": "reject_candidate_and_emit_reason_code"
+    }
+  ],
+  "states": {
+    "quiet_state_definition": "At date d, intraday_range_activity_ratio <= quiet_range_ratio_max and turnover_activity_ratio <= quiet_turnover_ratio_max.",
+    "active_state_definition": "At date d, intraday_range_activity_ratio >= active_range_ratio_min and turnover_activity_ratio >= active_turnover_ratio_min.",
+    "transition_edge_definition": "A candidate edge occurs only when T-1 and T are both eligible, quiet_state(T-1) is true, active_state(T) is true, and the frozen cooldown, isolation, deduplication, and concentration rules retain the event."
+  },
+  "thresholds": [
+    {
+      "threshold_id": "quiet_range_ratio_max",
+      "operator": "<=",
+      "value": "0.80",
+      "unit": "dimensionless_ratio",
+      "rationale_class": "unit_consistency",
+      "rationale": "A value below one denotes compression relative to the security's own prior-20-session median; 0.80 requires a visible 20 percent contraction without using any later outcome.",
+      "calibration_procedure": null
+    },
+    {
+      "threshold_id": "quiet_turnover_ratio_max",
+      "operator": "<=",
+      "value": "0.80",
+      "unit": "dimensionless_ratio",
+      "rationale_class": "unit_consistency",
+      "rationale": "A value below one denotes turnover compression relative to the security's own prior-20-session median; 0.80 applies the same unit-free quiet-state margin as price range.",
+      "calibration_procedure": null
+    },
+    {
+      "threshold_id": "active_range_ratio_min",
+      "operator": ">=",
+      "value": "1.50",
+      "unit": "dimensionless_ratio",
+      "rationale_class": "market_mechanics",
+      "rationale": "A 50 percent expansion above the prior-20-session median is a material activity change while remaining direction-neutral and independent of future performance.",
+      "calibration_procedure": null
+    },
+    {
+      "threshold_id": "active_turnover_ratio_min",
+      "operator": ">=",
+      "value": "1.50",
+      "unit": "dimensionless_ratio",
+      "rationale_class": "market_mechanics",
+      "rationale": "A 50 percent turnover expansion requires participation to confirm the range expansion without ranking or selecting on any future statistic.",
+      "calibration_procedure": null
+    }
+  ],
+  "eligibility": {
+    "allowed_venues": [
+      "SSE",
+      "SZSE"
+    ],
+    "instrument_types": [
+      "common_equity"
+    ],
+    "minimum_listing_sessions": 120,
+    "minimum_history_sessions": 22,
+    "required_t_close_conditions": [
+      "T and T-1 are open sessions with one valid daily unadjusted bar each.",
+      "T and T-1 tradability states are present and is_tradable is true.",
+      "All OHLC values are positive, high is not below open/close/low, and low is not above open/close/high.",
+      "Turnover is present and strictly positive for every session used by the state calculations.",
+      "Every consumed knowledge_from is no later than T close."
+    ],
+    "rationale": "The 120-session listing floor avoids IPO mechanics and sparse early history; 22 eligible sessions are the exact minimum required to evaluate the T-1 quiet state and T active state against separate prior-20-session medians."
+  },
+  "exclusions": [
+    "BSE and non-common-equity instruments are excluded.",
+    "Any missing, null, invalid, duplicated, or conflicting input blocks candidate creation and emits an explicit reason code.",
+    "Any observation gap inside the required 22-session history blocks candidate creation.",
+    "A factor effective on T-1 or T excludes the edge so that corporate-action mechanics cannot create the first event family.",
+    "Historical concept membership is neither required nor inferred."
+  ],
+  "missing_data_policy": "reject_candidate_and_emit_reason_code",
+  "suspension_policy": "A missing or non-tradable T-1 or T session rejects the candidate; suspension is not treated as a structural outcome and never forces a sale.",
+  "listing_policy": "Require an effective SSE or SZSE common-equity listing with at least 120 prior open listing sessions at T.",
+  "corporate_action_policy": "Use only same-session unadjusted intraday range and CNY turnover ratios; do not compute close-to-close return. Reject an edge when an accepted adjustment factor becomes effective on T-1 or T.",
+  "isolation": {
+    "cooldown_sessions": 22,
+    "same_security_minimum_separation_sessions": 22,
+    "deduplication_key": [
+      "security_id",
+      "signal_date",
+      "candidate_rule_id",
+      "candidate_rule_version",
+      "snapshot_id"
+    ],
+    "rationale": "A 22-session same-security separation covers the complete T-21 through T transition feature span, preventing overlapping event windows without consulting outcomes."
+  },
+  "concentration": {
+    "grouping_field": "static_level1_industry_id",
+    "wave_sessions": 5,
+    "maximum_events_per_group_per_wave": 50,
+    "maximum_events_per_signal_date": 500,
+    "deterministic_ranking_key": "sha256(candidate_rule_digest|snapshot_id|signal_date|security_id)",
+    "rationale": "The five-session wave and fixed caps limit one static industry or market-wide burst from dominating the study cohort. Ranking is deterministic and outcome-blind; the caps are operational cohort-balance controls, not performance-tuned parameters."
+  },
+  "bindings": {
+    "p0_policy_version": "p0-2026-07-23",
+    "p3_gate_version": "p3-2026-07-29.1",
+    "dwd_model_version": "1.0.0",
+    "industry_mapping_version": "static-level1-concentration-research-v1",
+    "industry_mapping_usage": "static_non_pit_concentration_only",
+    "accepted_profile": "close-to-next-open-v1",
+    "snapshot_binding": "exact_manifest_bound_dwd_snapshot"
+  },
+  "governance": {
+    "approval_state": "approved",
+    "approval_authority": "human",
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/73#issuecomment-5196483760"
+  },
+  "semantic_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50"
+}

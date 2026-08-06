@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "p4-event-date-split",
+  "policy_version": "1.0.0",
+  "lifecycle": "approved",
+  "owner": "P4-EVENT-001",
+  "accepted_profile": "close-to-next-open-v1",
+  "partitions": [
+    {
+      "name": "development",
+      "start": "2012-01-01",
+      "end": "2021-12-31"
+    },
+    {
+      "name": "arbitration",
+      "start": "2022-01-01",
+      "end": "2024-12-31"
+    },
+    {
+      "name": "permanent_blind",
+      "start": "2025-01-01",
+      "end": "2025-12-31"
+    }
+  ],
+  "purge_sessions": 22,
+  "embargo_sessions": 22,
+  "maximum_overlap_sessions": 22,
+  "allowed_read_partitions": [
+    "development"
+  ],
+  "manifest_binding": "exact_dwd_snapshot_and_split_policy_digest_required",
+  "governance": {
+    "approval_state": "approved",
+    "approval_authority": "human",
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/73#issuecomment-5196483760"
+  },
+  "semantic_digest": "sha256:10c58c9f402327b2c1e9e3ba9782cce909216b795018b89586bc5a9b210fb684"
+}

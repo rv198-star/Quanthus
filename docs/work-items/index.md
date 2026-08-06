@@ -214,7 +214,7 @@ panel, result, and scoreboard byte-identically. The bounded conformance review t
 
 | ID | Title | Phase |
 | --- | --- | --- |
-| P4-EVENT-001 | Define event, isolation, and split schemas | P4 |
+| P4-EVENT-001 | Freeze first research question and event/split contracts | P4 |
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4 |
 | P4-LABEL-001 | Freeze outcome and structural-break cards | P4 |
 | P4-REPORT-001 | Produce daily group comparison report | P4 |

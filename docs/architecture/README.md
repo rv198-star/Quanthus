@@ -22,6 +22,12 @@ a parallel current-state architecture.
 | `adr-0006-industry-aligned-dwd-domain-model.md` | Product-bounded seven-domain DWD model and retained demand-gated DWS constellation | Changing DWD domains, supporting structures, grains, dimensions/facts, identities, or source disposition |
 | `adr-0007-dwd-maintenance-and-p4-handoff.md` | Current Base V2 maintenance topology, generic-DWS deferral, and P4 handoff | Changing current node responsibilities, Base/increment policy, DWS activation, or the P4 data boundary |
 
+## Proposals under investigation
+
+| Node | Scope | Load when |
+| --- | --- | --- |
+| `adr-0008-dwd-historical-knowledge-remediation.md` | Proposed immutable successor-Base response to Issue #78; not approved while physical mirror evidence is incomplete | Auditing Base V2 historical PIT semantics, planning additive ODS evidence, successor rebuild, increment replay, or P4 source reapproval |
+
 ## Topic contracts
 
 | Node | Scope | Governing design |

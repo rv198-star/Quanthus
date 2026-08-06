@@ -1,0 +1,487 @@
+{
+  "schema_version": 1,
+  "kind": "dwd_pit_semantics_audit_policy",
+  "policy_id": "meta-data-pit-001.dwd-base-v2",
+  "policy_version": "1.0.0",
+  "status": "investigation_gate",
+  "governing_issue": 78,
+  "base_release": {
+    "package_id": "dwd-base-202607-v2",
+    "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+    "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+    "through_date": "2026-07-31"
+  },
+  "required_mirror_labels": [
+    "hermes",
+    "cn01",
+    "oci"
+  ],
+  "development_window": {
+    "start": "2012-01-01",
+    "end": "2021-12-31"
+  },
+  "tables": [
+    {
+      "table": "dwd_listed_company",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/listed_company.py",
+      "knowledge_rule": "identity members force max(Base build cutoff, code-validity cutoff)",
+      "evidence": [
+        "_IdentityMember.knowledge_from is initialized from the Base plan cutoff",
+        "company segments inherit the maximum active member knowledge timestamp"
+      ],
+      "remediation_note": "Rebuild from versioned company-identity evidence; do not infer historical identity availability from list_date alone."
+    },
+    {
+      "table": "dwd_company_identifier",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/listed_company.py",
+      "knowledge_rule": "company identifier rows reuse the Base-cutoff company segment lineage",
+      "evidence": [
+        "company identifier rows copy the common company segment knowledge_from",
+        "CNINFO organization mapping has no independently modeled historical availability interval"
+      ],
+      "remediation_note": "Bind each identifier version to source publication or acquisition evidence; unresolved history remains unavailable."
+    },
+    {
+      "table": "dwd_security",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/listed_company.py",
+      "knowledge_rule": "security knowledge is the maximum of Base-cutoff identity members and company identity",
+      "evidence": [
+        "security_knowledge_from is computed from member and company segment knowledge",
+        "member knowledge is never earlier than the Base build cutoff"
+      ],
+      "remediation_note": "Rebuild security identity versions from governed source availability evidence."
+    },
+    {
+      "table": "dwd_security_identifier",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/listed_company.py",
+      "knowledge_rule": "identifier lineage takes the maximum of member, security, and venue Base-cutoff knowledge",
+      "evidence": [
+        "security identifier rows reuse listing lineage",
+        "listing lineage includes Base-cutoff identity and venue timestamps"
+      ],
+      "remediation_note": "Preserve effective code intervals but add defensible knowledge intervals for every namespace."
+    },
+    {
+      "table": "dwd_listing",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/listed_company.py",
+      "knowledge_rule": "listing lineage takes the maximum of member, security, and venue Base-cutoff knowledge",
+      "evidence": [
+        "listing rows copy the shared identifier lineage",
+        "shared lineage knowledge_from cannot precede the Base plan cutoff"
+      ],
+      "remediation_note": "Rebuild listing knowledge from exchange lifecycle evidence; list and delist dates remain business time only."
+    },
+    {
+      "table": "dwd_trading_venue",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/listed_company.py",
+      "knowledge_rule": "venue knowledge is the maximum of the seed timestamp and Base-cutoff exchange members",
+      "evidence": [
+        "venue_knowledge_from includes member knowledge",
+        "member knowledge is initialized no earlier than the Base plan cutoff"
+      ],
+      "remediation_note": "Version the venue reference seed with explicit effective and knowledge dates."
+    },
+    {
+      "table": "dwd_security_bar",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "observation_end",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/market_observation.py",
+      "knowledge_rule": "all historical daily and intraday bars write the Base builder cutoff",
+      "evidence": [
+        "_bar_query selects TIMESTAMPTZ cutoff AS knowledge_from",
+        "source observation interval is already materialized independently"
+      ],
+      "remediation_note": "A successor contract may use the completed observation interval as a conservative availability bound."
+    },
+    {
+      "table": "dwd_security_valuation",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "observation_start",
+      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/market_observation.py",
+      "knowledge_rule": "all historical valuation measures write the Base builder cutoff",
+      "evidence": [
+        "_valuation_query selects TIMESTAMPTZ cutoff AS knowledge_from",
+        "source rows expose trade date but no accepted provider publication timestamp"
+      ],
+      "remediation_note": "Add or approve a conservative provider-availability rule; otherwise exclude affected valuation history."
+    },
+    {
+      "table": "dwd_adjustment_factor",
+      "disposition": "source_derived_historical",
+      "historical_pit_authority": "source_derived_but_parent_identity_must_be_rebuilt",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/disclosure_event.py",
+      "knowledge_rule": "factor knowledge comes from ODS adjustment_factors_pit.knowledge_cutoff",
+      "evidence": [
+        "materialize_adjustment_factor_rows parses source knowledge_cutoff",
+        "the factor and its evidence input retain the same source timestamp"
+      ],
+      "remediation_note": "Retain source knowledge timestamps; rebind only to corrected security identity versions."
+    },
+    {
+      "table": "dwd_adjustment_factor_input",
+      "disposition": "source_derived_historical",
+      "historical_pit_authority": "source_derived_but_parent_identity_must_be_rebuilt",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/disclosure_event.py",
+      "knowledge_rule": "factor input knowledge comes from ODS adjustment_factors_pit.knowledge_cutoff",
+      "evidence": [
+        "factor input rows copy the factor common lineage",
+        "common lineage uses the source knowledge_cutoff rather than the Base cutoff"
+      ],
+      "remediation_note": "Retain source timing and rebuild foreign-key bindings with the successor identity layer."
+    },
+    {
+      "table": "dwd_market_index",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "requires_additive_evidence_or_fail_closed",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/market_observation.py",
+      "knowledge_rule": "benchmark definitions write the Base builder cutoff",
+      "evidence": [
+        "_write_index_seed assigns knowledge_from=knowledge_cutoff",
+        "index metadata does not model a historical publication interval"
+      ],
+      "remediation_note": "Version benchmark definitions from an authoritative reference or fail closed before the evidenced version."
+    },
+    {
+      "table": "dwd_index_bar",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "observation_end",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/market_observation.py",
+      "knowledge_rule": "all historical index bars write the Base builder cutoff",
+      "evidence": [
+        "_index_bar_query selects TIMESTAMPTZ cutoff AS knowledge_from",
+        "the completed index observation interval is independently present"
+      ],
+      "remediation_note": "Use a reviewed conservative observation-completion rule in a successor Base."
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "observation_end",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/trading_calendar.py",
+      "knowledge_rule": "calendar rows take max(Base cutoff, source built_at, venue knowledge)",
+      "evidence": [
+        "_session_rows includes knowledge_cutoff in every historical row maximum",
+        "the session date and open/close interval remain available as business-time evidence"
+      ],
+      "remediation_note": "Define a conservative session-availability contract, including closed-session handling, and rebuild."
+    },
+    {
+      "table": "dwd_security_status_interval",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/tradability_state.py",
+      "knowledge_rule": "ST and provider daily status rows write build_cutoff(), ignoring source knowledge fields",
+      "evidence": [
+        "_security_status_query writes build_cutoff() for both source branches",
+        "st_status_pit already carries knowledge_cutoff and daily status carries a session date"
+      ],
+      "remediation_note": "Use ST source knowledge and a reviewed daily-observation availability rule after identity correction."
+    },
+    {
+      "table": "dwd_listing_status_interval",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/tradability_state.py",
+      "knowledge_rule": "listing lifecycle and suspension rows write build_cutoff(), ignoring suspension knowledge_cutoff",
+      "evidence": [
+        "_listing_status_query assigns build cutoff to both lifecycle and suspension rows",
+        "suspension source rows retain their own knowledge_cutoff"
+      ],
+      "remediation_note": "Recover suspension timing from ODS; lifecycle timing remains dependent on corrected identity evidence."
+    },
+    {
+      "table": "dwd_price_limit_regime",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/tradability_state.py",
+      "knowledge_rule": "price-limit regimes write build_cutoff(), ignoring source knowledge_cutoff",
+      "evidence": [
+        "_price_regime_internal_query assigns build cutoff",
+        "price_limit_regime ODS rows include knowledge_cutoff and announcement_date"
+      ],
+      "remediation_note": "Rebuild regimes from their source knowledge timestamps and corrected listing identities."
+    },
+    {
+      "table": "dwd_tradability_state",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "observation_end",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/tradability_state.py",
+      "knowledge_rule": "derived session state writes build_cutoff() rather than the maximum corrected input availability",
+      "evidence": [
+        "_tradability_state_query assigns build_cutoff()",
+        "input_revision_digest already identifies the contributing upstream evidence"
+      ],
+      "remediation_note": "Recompute knowledge_from as the maximum of corrected input knowledge and observation completion."
+    },
+    {
+      "table": "dwd_observation_gap",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_not_historical",
+      "reference_field": "detected_at",
+      "ods_sufficiency": "forward_only_not_historical",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/tradability_state.py",
+      "knowledge_rule": "gap knowledge equals the actual Base detection cutoff",
+      "evidence": [
+        "_observation_gap_query sets knowledge_from and detected_at to build_cutoff()",
+        "the table is a governance observation discovered by the Base build"
+      ],
+      "remediation_note": "Retain as forward governance evidence; never reinterpret it as what was known on the affected market date."
+    },
+    {
+      "table": "dwd_disclosure",
+      "disposition": "source_derived_historical",
+      "historical_pit_authority": "source_derived_but_parent_identity_must_be_rebuilt",
+      "reference_field": "effective_at",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/disclosure_event.py",
+      "knowledge_rule": "announcement knowledge equals provider publish_time",
+      "evidence": [
+        "materialize_announcement_rows parses publish_time",
+        "knowledge_from, effective_at, and announced_at share the publication timestamp"
+      ],
+      "remediation_note": "Retain publication time and rebind company identity in the successor build."
+    },
+    {
+      "table": "dwd_disclosure_subject",
+      "disposition": "source_derived_historical",
+      "historical_pit_authority": "source_derived_but_parent_dependencies_must_be_rebuilt",
+      "reference_field": "effective_at",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/disclosure_event.py",
+      "knowledge_rule": "subject relationships inherit the announcement publication timestamp",
+      "evidence": [
+        "disclosure subject rows copy announcement common lineage",
+        "common lineage uses provider publish_time"
+      ],
+      "remediation_note": "Retain timing; rebuild referenced security, action, and financial-report identities consistently."
+    },
+    {
+      "table": "dwd_corporate_action",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_at",
+      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/disclosure_event.py",
+      "knowledge_rule": "corporate actions prefer ODS built_at over announce_date",
+      "evidence": [
+        "materialize_corporate_action_rows uses built_at when present",
+        "announce_date is modeled separately but does not control knowledge_from"
+      ],
+      "remediation_note": "Use defensible announcement evidence; rows without an announcement remain unavailable until a conservative evidenced bound."
+    },
+    {
+      "table": "dwd_corporate_action_term",
+      "disposition": "build_timestamp_substituted",
+      "historical_pit_authority": "blocked",
+      "reference_field": "effective_at",
+      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/disclosure_event.py",
+      "knowledge_rule": "action terms inherit the action built_at-preferred common lineage",
+      "evidence": [
+        "corporate action term rows copy action common lineage",
+        "the common lineage prefers built_at over announce_date"
+      ],
+      "remediation_note": "Rebuild terms with the corrected parent action knowledge interval."
+    },
+    {
+      "table": "dwd_financial_report",
+      "disposition": "ambiguous_source_insufficient",
+      "historical_pit_authority": "blocked_until_source_classification",
+      "reference_field": "period_end",
+      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/financial_reporting.py",
+      "knowledge_rule": "reports use acquired_at or the Base cutoff while published_at is separately retained when available",
+      "evidence": [
+        "expand_financial_envelope sets knowledge_from from acquired_at",
+        "native rows fall back to the Base cutoff when acquired_at is absent"
+      ],
+      "remediation_note": "Classify each source family; use provider publication evidence where defensible and fail closed for missing publication evidence."
+    },
+    {
+      "table": "dwd_financial_concept",
+      "disposition": "ambiguous_source_insufficient",
+      "historical_pit_authority": "blocked_until_source_classification",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/financial_reporting.py",
+      "knowledge_rule": "concept versions use source acquisition time as both effective and knowledge time",
+      "evidence": [
+        "provider concept rows set effective_from=knowledge_from=acquired_at",
+        "the first report publication carrying a concept is not used as its current availability bound"
+      ],
+      "remediation_note": "Version concepts from the earliest defensible source publication carrying that taxonomy revision."
+    },
+    {
+      "table": "dwd_financial_fact",
+      "disposition": "ambiguous_source_insufficient",
+      "historical_pit_authority": "blocked_until_source_classification",
+      "reference_field": "period_end",
+      "ods_sufficiency": "partially_reconstructable_fail_closed_remainder",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/financial_reporting.py",
+      "knowledge_rule": "facts use acquired_at or the Base cutoff despite separately retained published_at when available",
+      "evidence": [
+        "financial fact rows copy report acquisition knowledge",
+        "provider publication timestamps are present only for some source families"
+      ],
+      "remediation_note": "Rebuild source family by source family; no period-end or deadline inference may replace absent publication evidence."
+    },
+    {
+      "table": "dwd_industry_scheme",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_not_historical",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "forward_only_not_historical",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/industry_classification.py",
+      "knowledge_rule": "the hierarchy reference is intentionally introduced at the Base cutoff",
+      "evidence": [
+        "reference_common assigns knowledge_from=cutoff",
+        "the accepted design forbids backfilling the current industry snapshot into history"
+      ],
+      "remediation_note": "Retain as the evidenced forward classification scheme; historical classifications require new snapshots."
+    },
+    {
+      "table": "dwd_industry_node",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_not_historical",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "forward_only_not_historical",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/industry_classification.py",
+      "knowledge_rule": "hierarchy nodes inherit the Base-cutoff reference lineage",
+      "evidence": [
+        "industry node rows copy reference_common",
+        "reference_common intentionally uses the Base cutoff"
+      ],
+      "remediation_note": "Retain forward-only nodes; add historical hierarchy versions only from new authoritative evidence."
+    },
+    {
+      "table": "dwd_company_industry_membership",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_not_historical",
+      "reference_field": "effective_from",
+      "ods_sufficiency": "forward_only_not_historical",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/industry_classification.py",
+      "knowledge_rule": "membership knowledge is max(Base cutoff, acquired_at, identifier knowledge) from the first defensible snapshot",
+      "evidence": [
+        "membership rows use max(cutoff, acquired_at, identifier_knowledge)",
+        "the design explicitly prohibits projecting the snapshot backward"
+      ],
+      "remediation_note": "Retain forward-only membership; historical industry membership remains unavailable."
+    },
+    {
+      "table": "dwd_share_capital_observation",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_not_historical",
+      "reference_field": "observation_start",
+      "ods_sufficiency": "forward_only_not_historical",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/ownership_capital.py",
+      "knowledge_rule": "parsed F10 capital rows use the actual source acquired_at",
+      "evidence": [
+        "materialize_f10_rows sets common knowledge from acquired_at",
+        "observation dates describe source content and do not prove historical availability"
+      ],
+      "remediation_note": "Retain as forward evidence; historical capital availability needs archived publication evidence."
+    },
+    {
+      "table": "dwd_shareholder_count_observation",
+      "disposition": "source_derived_historical",
+      "historical_pit_authority": "source_derived_but_parent_identity_must_be_rebuilt",
+      "reference_field": "period_end",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/ownership_capital.py",
+      "knowledge_rule": "holder-count knowledge uses source knowledge_cutoff or hold_notice_date",
+      "evidence": [
+        "materialize_shareholder_count_row parses source knowledge_cutoff",
+        "hold_notice_date is the explicit fallback rather than the Base cutoff"
+      ],
+      "remediation_note": "Retain source timing and rebuild company/security identity bindings."
+    },
+    {
+      "table": "dwd_shareholding_change",
+      "disposition": "source_derived_historical",
+      "historical_pit_authority": "source_derived_but_parent_identity_must_be_rebuilt",
+      "reference_field": "effective_at",
+      "ods_sufficiency": "reconstructable_existing_ods",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/ownership_capital.py",
+      "knowledge_rule": "holder-change knowledge uses disclosure_date, falling back to change_date",
+      "evidence": [
+        "materialize_holder_change_row derives knowledge from disclosed or changed date",
+        "the Base cutoff is not substituted"
+      ],
+      "remediation_note": "Retain timing and rebuild identity/disclosure relationships under the successor Base."
+    },
+    {
+      "table": "dwd_shareholding_observation",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_not_historical",
+      "reference_field": "observation_start",
+      "ods_sufficiency": "forward_only_not_historical",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/ownership_capital.py",
+      "knowledge_rule": "parsed F10 shareholder tables use the actual source acquired_at",
+      "evidence": [
+        "materialize_f10_rows sets common knowledge from acquired_at",
+        "reported observation dates do not establish historical source availability"
+      ],
+      "remediation_note": "Retain as forward evidence; do not backfill holdings to reported dates without archived publications."
+    },
+    {
+      "table": "dwd_quality_exception",
+      "disposition": "forward_operational",
+      "historical_pit_authority": "forward_only_not_historical",
+      "reference_field": "detected_at",
+      "ods_sufficiency": "forward_only_not_historical",
+      "builder_path": "src/quanthus/pipelines/securities_warehouse/quality_governance.py",
+      "knowledge_rule": "quality exception knowledge equals its actual detection timestamp",
+      "evidence": [
+        "quality rows set knowledge_from=detected_at",
+        "the table records a governance finding rather than a historical business fact"
+      ],
+      "remediation_note": "Retain as point-of-detection governance evidence and do not project it backward."
+    }
+  ]
+}

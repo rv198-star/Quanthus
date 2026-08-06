@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Evidence status | blocked finding; CN01/OCI DWD V2 bytes and 33-table scans complete; audit timezone rerun, Hermes DWD/ODS mirrors, remaining audit dimensions, and V2.1 acceptance incomplete |
+| Evidence status | blocked finding; CN01/OCI DWD V2 bytes and deterministic 33-table scans complete; Hermes DWD/ODS mirrors, OCI descriptor contract, remaining audit dimensions, and V2.1 acceptance incomplete |
 | Evidence date | 2026-08-06 |
 | Governing work | `META-DATA-PIT-001` / GitHub Issue #78 |
 | Investigated package | `dwd-base-202607-v2` |
@@ -35,10 +35,11 @@ audits; every finding must have a measured impact and approved disposition, and 
 remediation, builder-contract, and semantic digests must be approved.
 
 CN01 and OCI package bytes have now been fully read and independently verified. Hermes remains
-unread, and the first cross-node table-profile comparison exposed an audit-tool timezone dependency
-that requires reviewed-code reruns. The sealed V2 package therefore remains blocked for historical
-PIT consumers. No V2.1 builder, candidate assembly, timestamp override, legacy fallback, Base
-mutation, package republish, or pointer movement is authorized.
+unread. The first cross-node table-profile comparison exposed an audit-tool timezone dependency;
+the reviewed UTC fix and independent full reruns then produced exactly equal raw profiles for all
+33 tables. The sealed V2 package remains blocked for historical PIT consumers. No V2.1 builder,
+candidate assembly, timestamp override, legacy fallback, Base mutation, package republish, or
+pointer movement is authorized.
 
 ## 2. Mirror Inventory And Physical Access
 
@@ -88,18 +89,26 @@ audit used node-local `CAST(TIMESTAMPTZ AS DATE)` and `year()` semantics:
 `dwd_disclosure`, `dwd_disclosure_subject`, `dwd_share_capital_observation`,
 `dwd_shareholding_change`, and `dwd_trading_calendar`. This is finding
 `DWDV2-PREAUDIT-A-001` (high). The audit connection is now pinned to UTC with an
-`Asia/Shanghai` boundary regression test, but CN01/OCI full scans must be rerun from the reviewed
-GitHub revision before their semantic profiles are accepted. The absent OCI descriptor is finding
-`DWDV2-PREAUDIT-A-002` (medium); successor mirror publication must freeze and satisfy its exact
-descriptor contract before cutover.
+`Asia/Shanghai` boundary regression test. Commit
+`3bb776105b843cbb5691bda58515d38975697892` was distributed through GitHub, and independent CN01
+and OCI full reruns produced exactly equal, unnormalized table-profile objects for all 33 tables.
+Their report digests are respectively
+`sha256:f3f7fb510d71edf98fb1da4be9c75712fffdfee3db8d992bcae8db447bf8c884` and
+`sha256:d7a5879f1dfe766d56d0bdf19bf5d534e8c26870aa143a0eb42d42d61900da95`.
+`DWDV2-PREAUDIT-A-001` is therefore resolved for Phase A audit evidence. The absent OCI descriptor
+is finding `DWDV2-PREAUDIT-A-002` (medium); successor mirror publication must freeze and satisfy its
+exact descriptor contract before cutover.
 
-The seven Phase A evidence files are retained outside every sealed package under
+The Phase A evidence files are retained outside every sealed package under
 `/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-a-20260806`.
 The canonical content digests for `mirror-inventory.json`, `mirror-comparison.json`, and
 `phase-a-findings.json` are respectively
 `sha256:5e7f000478dd01c56acfc98b11faebcebb8db418459dde6aed26771b17e97149`,
 `sha256:acb07176d0fe6e4bddd3f7ea307e757aaf30ba40d49358eb1cb8dca462bd8aa3`, and
 `sha256:25918b7f123c9800c923b0e86fb7b07aa0d2c9fc307cfe4f58e88bc399fac147`.
+The UTC rerun closure is bound separately by
+`phase-a-utc-rerun-closure.json` / canonical digest
+`sha256:d69db74fdd14ff0ce071735b4e3b4f449099f6400610e4354d8410769bfd67e4`.
 
 CN01 was then audited through temporary, explicitly authorized root access. The exact
 `/srv/quanthus/ods/base/ods-base-202607-v2` package passed deep verification with exit status `0`:
@@ -129,7 +138,6 @@ The missing pre-rebuild evidence is explicit:
 
 - READY/manifest binding and every declared file SHA-256 on the Hermes installed copy;
 - Hermes equality with the now byte-equal CN01/OCI copies;
-- UTC-pinned CN01/OCI full-scan reruns and deterministic table-profile equality;
 - partition-level schemas, nullability, types, timezone/decimal/enum domains, and path values;
 - row- and field-level PIT availability, identity graph, time-aware foreign keys, keys/versions,
   temporal intervals, and authorized lineage for all 33 tables;
@@ -311,9 +319,9 @@ manifest-declared Parquet paths accessed. Output paths inside a supplied mirror 
 - CN01 storage preflight proved local reconstruction capacity insufficient and `/personal` NFS
   mandatory; NFS write, atomic rename, same-mount hard link, and CN01-local lock probes passed and
   left no persistent probe artifact.
-- Phase A CN01/OCI physical inventory is executed, with byte equality proven. Phase A remains
-  blocked on Hermes and UTC-pinned reruns; no structural, replay, or full semantic conformance is
-  claimed by this evidence.
+- Phase A CN01/OCI physical inventory and UTC-pinned table profiles are executed, with byte and
+  profile equality proven. Phase A remains blocked on Hermes and the OCI descriptor contract; no
+  structural, replay, or full semantic conformance is claimed by this evidence.
 - Repository `make check` passed environment doctor, compilation, 903 tests, and GitHub planning
   synchronization after the full pre-rebuild audit scope was frozen.
 
@@ -324,8 +332,8 @@ The Phase A result and exact evidence digests were published to Issue #78 as
 
 Issue #78 remains open until:
 
-1. approved read-only access permits the remaining Hermes physical DWD audit, and the reviewed UTC
-   audit fix is distributed through GitHub for deterministic CN01/OCI reruns;
+1. approved read-only access permits the remaining Hermes physical DWD audit and its comparison
+   with the deterministic CN01/OCI results;
 2. the complete policy in `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` executes across all
    33 tables and all required audit dimensions;
 3. all three mirrors have matching package identity and every manifest part has physical/schema

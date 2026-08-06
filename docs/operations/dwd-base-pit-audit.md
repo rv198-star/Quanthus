@@ -157,7 +157,8 @@ remains pending.
 The first reports inherited UTC on OCI and `Asia/Shanghai` on CN01. Package and manifest row counts
 matched, but all table profiles rendered timestamp offsets differently and five tables returned
 different date-window/year metrics. Those reports remain retained finding evidence and are not
-accepted as deterministic semantic profiles. Use the UTC-pinned audit revision and rerun both nodes
-before Phase B accepts the distributions. OCI's package is complete, but its
+accepted as deterministic semantic profiles. The UTC-pinned revision was then distributed through
+GitHub and rerun independently on both nodes; all 33 raw table profiles matched exactly without
+normalization, closing the audit-tool finding for Phase A. OCI's package is complete, but its
 `/srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json` descriptor is absent; resolve that publication
 contract before V2.1 cutover.

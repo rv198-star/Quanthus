@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Audit explicit cross-field domain invariants in DWD Base V2."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.dwd_domain_invariant_audit import (  # noqa: E402
+    DwdDomainInvariantAuditError,
+    audit_dwd_domain_invariants,
+    write_domain_invariant_report,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        report = audit_dwd_domain_invariants(root=args.root)
+        write_domain_invariant_report(args.output, report, sealed_roots=(args.root,))
+    except (DwdDomainInvariantAuditError, OSError) as exc:
+        print(f"DWD domain invariant audit failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "status": report["summary"]["status"],
+                "canonical_digest": report["canonical_digest"],
+                "output": str(args.output.resolve()),
+            },
+            sort_keys=True,
+        )
+    )
+    return 0 if report["summary"]["status"] == "verified" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

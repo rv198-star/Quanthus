@@ -273,7 +273,7 @@ finding may remain only with an approved explicit disposition. No critical findi
 The canonical audit package contains:
 
 - `audit-plan.json`;
-- `mirror-and-package-inventory.json`;
+- `canonical-package-inventory.json`;
 - `table-and-partition-profile.json`;
 - `field-availability-matrix.json`;
 - `identity-graph-audit.json`;
@@ -313,7 +313,7 @@ Issue #78 does not close when the audit plan or remediation proposal is written.
 1. the full pre-rebuild audit is accepted;
 2. the complete 33-table V2.1 package is built and accepted;
 3. the CN01 local package is installed and deeply verified;
-4. Hermes and OCI successor mirrors are checksum-identical;
+4. any successor replicas actually deployed from CN01 are checksum-identical;
 5. consumer cutover and rollback are accepted; and
 6. V2 remains retained as immutable rollback evidence.
 

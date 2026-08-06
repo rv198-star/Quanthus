@@ -14,7 +14,7 @@ class DwdBasePreRebuildAuditPolicyTests(unittest.TestCase):
         expected_tables = [item["name"] for item in model["tables"]]
 
         self.assertEqual(policy["kind"], "dwd_base_pre_rebuild_audit_policy")
-        self.assertEqual(policy["policy_version"], "1.1.0")
+        self.assertEqual(policy["policy_version"], "1.2.0")
         self.assertEqual(policy["governing_issue"], 78)
         self.assertEqual(policy["base_release"]["expected_table_count"], 33)
         self.assertEqual(policy["table_scope"], expected_tables)
@@ -45,7 +45,7 @@ class DwdBasePreRebuildAuditPolicyTests(unittest.TestCase):
             item["dimension_id"] for item in policy["audit_dimensions"]
         }
         required_dimensions = {
-            "package_integrity_and_mirror_equality",
+            "canonical_package_integrity",
             "schema_and_partition_contract",
             "pit_and_field_availability",
             "identity_and_entity_graph",
@@ -68,6 +68,8 @@ class DwdBasePreRebuildAuditPolicyTests(unittest.TestCase):
             "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit",
         )
         self.assertIn("findings-ledger.json", artifacts)
+        self.assertIn("canonical-package-inventory.json", artifacts)
+        self.assertNotIn("mirror-and-package-inventory.json", artifacts)
         self.assertIn("v2.1-remediation-scope.json", artifacts)
         self.assertIn("v2.1-build-contract.json", artifacts)
         self.assertTrue(
@@ -97,7 +99,7 @@ class DwdBasePreRebuildAuditPolicyTests(unittest.TestCase):
         self.assertTrue(issue_gate["pre_rebuild_audit_accepted"])
         self.assertTrue(issue_gate["v2_1_complete_33_table_package_accepted"])
         self.assertTrue(issue_gate["cn01_local_package_installed_and_verified"])
-        self.assertTrue(issue_gate["hermes_and_oci_successor_mirrors_checksum_identical"])
+        self.assertTrue(issue_gate["deployed_successor_replicas_checksum_identical"])
         self.assertTrue(issue_gate["consumer_cutover_and_rollback_accepted"])
         self.assertIn(
             "close_issue_78_after_scope_freeze_but_before_v2_1_acceptance",

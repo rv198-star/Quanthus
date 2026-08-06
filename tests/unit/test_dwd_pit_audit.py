@@ -4,6 +4,7 @@ import unittest
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 from quanthus.pipelines.dwd_pit_audit import (
     DwdPitAuditError,
@@ -145,13 +146,14 @@ class DwdPitAuditTests(unittest.TestCase):
             path = Path(temporary) / "part-00000.parquet"
             table = pa.table(
                 {
-                    "record_source": ["fixture", "fixture", "fixture"],
-                    "source_record_id": ["late", "historical", "current"],
+                    "record_source": ["fixture", "fixture", "fixture", "fixture"],
+                    "source_record_id": ["late", "historical", "current", "utc-boundary"],
                     "knowledge_from": pa.array(
                         [
                             datetime(2026, 8, 1, tzinfo=timezone.utc),
                             datetime(2013, 1, 2, tzinfo=timezone.utc),
                             datetime(2026, 7, 31, tzinfo=timezone.utc),
+                            datetime(2026, 8, 1, tzinfo=timezone.utc),
                         ],
                         type=pa.timestamp("us", tz="UTC"),
                     ),
@@ -160,6 +162,7 @@ class DwdPitAuditTests(unittest.TestCase):
                             datetime(2012, 1, 3, tzinfo=timezone.utc),
                             datetime(2013, 1, 2, tzinfo=timezone.utc),
                             datetime(2026, 7, 31, tzinfo=timezone.utc),
+                            datetime(2011, 12, 31, 16, 30, tzinfo=timezone.utc),
                         ],
                         type=pa.timestamp("us", tz="UTC"),
                     ),
@@ -178,16 +181,26 @@ class DwdPitAuditTests(unittest.TestCase):
                 remediation_note="fixture",
             )
 
-            summary = _scan_table(
-                [path],
-                policy=policy,
-                expected_rows=3,
-                development_start=datetime(2012, 1, 1).date(),
-                development_end=datetime(2021, 12, 31).date(),
-                through_date=datetime(2026, 7, 31).date(),
-            )
+            import duckdb
 
-        self.assertEqual(summary["total_rows"], 3)
+            connect = duckdb.connect
+
+            def connect_in_shanghai(*args: object, **kwargs: object) -> object:
+                connection = connect(*args, **kwargs)
+                connection.execute("SET TimeZone='Asia/Shanghai'")
+                return connection
+
+            with mock.patch("duckdb.connect", side_effect=connect_in_shanghai):
+                summary = _scan_table(
+                    [path],
+                    policy=policy,
+                    expected_rows=4,
+                    development_start=datetime(2012, 1, 1).date(),
+                    development_end=datetime(2021, 12, 31).date(),
+                    through_date=datetime(2026, 7, 31).date(),
+                )
+
+        self.assertEqual(summary["total_rows"], 4)
         self.assertEqual(summary["development_rows"], 2)
         self.assertEqual(summary["development_future_knowledge_rows"], 1)
         self.assertEqual(summary["build_year_reference_rows"], 1)

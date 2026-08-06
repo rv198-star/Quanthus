@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Evidence status | blocked finding; code, CN01 ODS, and CN01+NFS topology audits complete; full DWD pre-rebuild audit, Hermes ODS mirror, and V2.1 acceptance incomplete |
+| Evidence status | blocked finding; CN01/OCI DWD V2 bytes and 33-table scans complete; audit timezone rerun, Hermes DWD/ODS mirrors, remaining audit dimensions, and V2.1 acceptance incomplete |
 | Evidence date | 2026-08-06 |
 | Governing work | `META-DATA-PIT-001` / GitHub Issue #78 |
 | Investigated package | `dwd-base-202607-v2` |
@@ -34,9 +34,10 @@ coverage, numeric, lineage, deterministic replay, downstream compatibility, and 
 audits; every finding must have a measured impact and approved disposition, and the exact findings,
 remediation, builder-contract, and semantic digests must be approved.
 
-The physical package bytes and installed Hermes, CN01, and OCI mirrors have not all been read by the
-current principal. The sealed V2 package therefore remains blocked for historical PIT consumers.
-No V2.1 builder, candidate assembly, historical scan, timestamp override, legacy fallback, Base
+CN01 and OCI package bytes have now been fully read and independently verified. Hermes remains
+unread, and the first cross-node table-profile comparison exposed an audit-tool timezone dependency
+that requires reviewed-code reruns. The sealed V2 package therefore remains blocked for historical
+PIT consumers. No V2.1 builder, candidate assembly, timestamp override, legacy fallback, Base
 mutation, package republish, or pointer movement is authorized.
 
 ## 2. Mirror Inventory And Physical Access
@@ -46,9 +47,9 @@ The final audit therefore requires the three labels `hermes`, `cn01`, and `oci`.
 
 | Mirror | Expected role | Current evidence | Physical result |
 | --- | --- | --- | --- |
-| Hermes | Node-local immutable Base used by the Hermes DWD builder | Deployment configuration names `dwd-base-202607-v2` | Not accessed from the OCI DevSpace boundary |
-| CN01 | Node-local immutable Base and source of OCI's current DWD mirror | Deployment configuration names `dwd-base-202607-v2` | Not accessed from the OCI DevSpace boundary |
-| OCI | Read-only verified DWD mirror | Protected root identified as `/srv/quanthus/dwd` | Root metadata was visible; `manifest.json` and child contents were unreadable to DevSpace |
+| Hermes | Node-local immutable Base used by the Hermes DWD builder | Deployment configuration names `dwd-base-202607-v2` | Pending; no DWD physical-audit authority was supplied to this run |
+| CN01 | Node-local immutable Base and source of OCI's current DWD mirror | Exact installed root and matching `BASE_CURRENT.json` read as root | Deep verify passed; all 33 tables scanned; 468,268,180 rows match the manifest |
+| OCI | Read-only verified DWD mirror | Exact installed root is `/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2` | Deep verify passed; all 33 tables scanned; package matches CN01; `BASE_CURRENT.json` is absent |
 
 A real node-local manifest-only probe used the new audit command against the OCI root. It returned
 exit code `2`, report digest
@@ -62,6 +63,43 @@ the command exited `2`, report digest was
 `sha256:fb803e6320b46d27bbb53b1293a0e05e5cd82a94451af08aac439ba00059e853`, and
 `mutation_performed=false`. This confirms that `/home/ubuntu/data/astock` is not an ODS Base
 substitute.
+
+The Phase A full scans then used revision
+`551de1031a02bc9a6d9fdbce2b135c1b03b71793` from independent OCI and CN01 worktrees. Both exact
+package roots passed READY/manifest binding, physical inventory, declared member size/SHA-256,
+package identity, and payload verification: 76,722 manifest members, 76,671 Parquet payload files,
+33 tables, 468,268,180 rows, and 14,842,590,066 payload bytes. Both scans opened all 76,671 declared
+Parquet files, reported no manifest row-count mismatch, and recorded `mutation_performed=false`.
+The node-local report digests are:
+
+- CN01: `sha256:09c44aad118858fc4148aa2b5ad9330466ac0b6f5496188c4d9c568e7bbbd4b3`;
+- OCI: `sha256:084e091906fef9eddfbf17056fb1a6bc48b7ee22ed9568f2539221201772fa4d`.
+
+The matching manifest plus two independent full member-SHA verifications prove CN01/OCI declared
+package-byte equality. The 16,384-byte difference in `du -sb` is directory metadata and is not a
+payload difference. CN01's local `/dev/vda3` package root is `root:root` and its descriptor matches
+V2. OCI's `/dev/sda1` mirror is `ubuntu:ubuntu`; the package is complete, but
+`/srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json` is absent.
+
+The first table-profile comparison is not acceptable as deterministic semantic evidence. DuckDB
+inherited `Asia/Shanghai` on CN01 and UTC on OCI. All 33 profiles rendered identical instants with
+different offsets, and five tables also returned different date-window/year counts because the
+audit used node-local `CAST(TIMESTAMPTZ AS DATE)` and `year()` semantics:
+`dwd_disclosure`, `dwd_disclosure_subject`, `dwd_share_capital_observation`,
+`dwd_shareholding_change`, and `dwd_trading_calendar`. This is finding
+`DWDV2-PREAUDIT-A-001` (high). The audit connection is now pinned to UTC with an
+`Asia/Shanghai` boundary regression test, but CN01/OCI full scans must be rerun from the reviewed
+GitHub revision before their semantic profiles are accepted. The absent OCI descriptor is finding
+`DWDV2-PREAUDIT-A-002` (medium); successor mirror publication must freeze and satisfy its exact
+descriptor contract before cutover.
+
+The seven Phase A evidence files are retained outside every sealed package under
+`/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-a-20260806`.
+The canonical content digests for `mirror-inventory.json`, `mirror-comparison.json`, and
+`phase-a-findings.json` are respectively
+`sha256:5e7f000478dd01c56acfc98b11faebcebb8db418459dde6aed26771b17e97149`,
+`sha256:acb07176d0fe6e4bddd3f7ea307e757aaf30ba40d49358eb1cb8dca462bd8aa3`, and
+`sha256:25918b7f123c9800c923b0e86fb7b07aa0d2c9fc307cfe4f58e88bc399fac147`.
 
 CN01 was then audited through temporary, explicitly authorized root access. The exact
 `/srv/quanthus/ods/base/ods-base-202607-v2` package passed deep verification with exit status `0`:
@@ -89,8 +127,9 @@ atomic installation. No pointer changes during build or installation.
 
 The missing pre-rebuild evidence is explicit:
 
-- READY/manifest binding and every declared file SHA-256 on all three installed copies;
-- cross-mirror manifest/content equality;
+- READY/manifest binding and every declared file SHA-256 on the Hermes installed copy;
+- Hermes equality with the now byte-equal CN01/OCI copies;
+- UTC-pinned CN01/OCI full-scan reruns and deterministic table-profile equality;
 - partition-level schemas, nullability, types, timezone/decimal/enum domains, and path values;
 - row- and field-level PIT availability, identity graph, time-aware foreign keys, keys/versions,
   temporal intervals, and authorized lineage for all 33 tables;
@@ -103,8 +142,9 @@ The missing pre-rebuild evidence is explicit:
 
 ## 3. Complete 33-Table Code And Source Matrix
 
-`Physical evidence` is `pending` for every row until the read-only three-mirror scan completes.
-The exact evidence statements and remediation notes are machine-readable in the audit policy.
+CN01/OCI package bytes and manifest row counts are verified for every row below. Detailed profile
+evidence remains pending until UTC-pinned reruns and the Hermes read-only scan complete. The exact
+evidence statements and remediation notes are machine-readable in the audit policy.
 
 | Table | Code disposition | Historical PIT authority | ODS sufficiency | Physical evidence |
 | --- | --- | --- | --- | --- |
@@ -252,13 +292,14 @@ manifest-declared Parquet paths accessed. Output paths inside a supplied mirror 
 
 ## 7. Verification
 
-- Focused DWD/ODS audit tests: 12 passed.
+- Focused DWD audit and pre-rebuild policy tests after the UTC fix: 11 passed.
 - Focused Ruff checks: passed.
 - Strict mypy for the audit implementation: passed.
 - Real OCI manifest-only permission probe: failed closed with exit code 2 as expected.
 - No sealed Base, READY marker, manifest, DWD increment, ODS package, DWS/ADS package, or consumer
   pointer was modified.
-- No DWD Parquet file was read during the current investigation.
+- CN01 and OCI each read and scanned all 76,671 manifest-declared DWD Parquet files; the reports
+  recorded no mutation and no manifest row-count mismatch.
 - CN01 ODS V2 deep verification passed all 21,396 declared package files and 13,643,600,642 bytes
   with exit status 0. Focused exact-source scans covered the listed Parquet/SQLite families.
 - Full financial decoding reconciled all 14,976 envelopes to 852,497 report versions. Publication
@@ -270,18 +311,21 @@ manifest-declared Parquet paths accessed. Output paths inside a supplied mirror 
 - CN01 storage preflight proved local reconstruction capacity insufficient and `/personal` NFS
   mandatory; NFS write, atomic rename, same-mount hard link, and CN01-local lock probes passed and
   left no persistent probe artifact.
-- The full pre-rebuild audit scope is frozen but not yet executed; no claim of DWD physical,
-  structural, replay, or full semantic conformance is made by this evidence.
+- Phase A CN01/OCI physical inventory is executed, with byte equality proven. Phase A remains
+  blocked on Hermes and UTC-pinned reruns; no structural, replay, or full semantic conformance is
+  claimed by this evidence.
 - Repository `make check` passed environment doctor, compilation, 903 tests, and GitHub planning
   synchronization after the full pre-rebuild audit scope was frozen.
 
-GitHub publication is recorded in the Issue #78 implementation change after branch review.
+The Phase A result and exact evidence digests were published to Issue #78 as
+`issuecomment-5202648389`. Publication does not accept the findings or open any gate.
 
 ## 8. Remaining Closure Gates
 
 Issue #78 remains open until:
 
-1. approved read-only access permits the Hermes/CN01/OCI physical DWD audit;
+1. approved read-only access permits the remaining Hermes physical DWD audit, and the reviewed UTC
+   audit fix is distributed through GitHub for deterministic CN01/OCI reruns;
 2. the complete policy in `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` executes across all
    33 tables and all required audit dimensions;
 3. all three mirrors have matching package identity and every manifest part has physical/schema

@@ -91,7 +91,9 @@ For each table and mirror, the command records:
 - up to ten representative historical rows with future knowledge.
 
 The selected reference field is table-specific and versioned in the audit policy. It is an audit
-coordinate, not an authorized replacement for `knowledge_from`.
+coordinate, not an authorized replacement for `knowledge_from`. The audit connection pins DuckDB
+to UTC before any `TIMESTAMPTZ` cast, year extraction, or rendering. Do not accept cross-node table
+profiles from an older revision that inherited the node timezone.
 
 ## Report Interpretation
 
@@ -143,10 +145,19 @@ Do not attach raw market rows beyond the bounded samples already emitted by the 
 - **DuckDB/PyArrow unavailable:** install the repository's declared `p1` dependency set in the audit
   environment; do not substitute a partial CSV or sampled-file audit.
 
-## Current OCI Probe
+## Current Phase A Evidence
 
-On 2026-08-06 the DevSpace principal identified `/srv/quanthus/dwd` but could not read its
-`manifest.json` because the protected directory is owned by the deployment account and is not
-traversable/readable by DevSpace. A node-local manifest-only probe returned exit code `2` with
-`required_mirror_not_supplied` and `mirror_verification_failed`; it recorded
-`mutation_performed=false`. No DWD Parquet file or market-data partition was read.
+On 2026-08-06 the authorized principal resolved the exact OCI mirror to
+`/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2`, not the older `/srv/quanthus/dwd` tree. OCI and
+CN01 independently passed full package verification and all 33 table scans: 76,722 manifest
+members verified, 76,671 Parquet files scanned, and 468,268,180 rows reconciled on each node. Their
+matching manifest and independent member-SHA checks prove declared package-byte equality. Hermes
+remains pending.
+
+The first reports inherited UTC on OCI and `Asia/Shanghai` on CN01. Package and manifest row counts
+matched, but all table profiles rendered timestamp offsets differently and five tables returned
+different date-window/year metrics. Those reports remain retained finding evidence and are not
+accepted as deterministic semantic profiles. Use the UTC-pinned audit revision and rerun both nodes
+before Phase B accepts the distributions. OCI's package is complete, but its
+`/srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json` descriptor is absent; resolve that publication
+contract before V2.1 cutover.

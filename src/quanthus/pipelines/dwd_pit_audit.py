@@ -341,6 +341,7 @@ def _scan_table(
     through_date_sql = _sql_text(through_date.isoformat())
     connection = duckdb.connect(":memory:")
     try:
+        connection.execute("SET TimeZone='UTC'")
         schema_rows = connection.execute(f"DESCRIBE SELECT * FROM {source}").fetchall()
         columns = {str(row[0]) for row in schema_rows}
         required = {"knowledge_from", "record_source", "source_record_id", policy.reference_field}

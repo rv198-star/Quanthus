@@ -71,6 +71,11 @@ failure stops the current stage; there is no local-scratch fallback.
 The output root contains immutable-identity run directories. A later run never overwrites an earlier
 report. Canonical summaries are created only after all referenced run reports are checksum-bound.
 
+Every DuckDB audit run must set an explicit memory limit that fits the measured CN01 RAM without
+depending on swap. The limit is part of the checkpoint identity and final report. A run performed
+with a different limit uses a new immutable run directory; checkpoints are never transplanted
+between auditor revisions or resource configurations.
+
 ## Audit Dimensions
 
 ### 1. Canonical package integrity

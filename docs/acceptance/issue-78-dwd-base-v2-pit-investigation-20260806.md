@@ -49,6 +49,14 @@ has a field-order mismatch; and `dwd_tradability_state` plus `dwd_observation_ga
 derived partition columns absent from the table-column contract. The canonical Phase B semantic
 digest is `sha256:ae3513f43d7eff991e5294e9e867243bb484823bdbb9397e2b8f4a246d32651d`.
 
+The first Phase C execution exposed a resource-control defect in the auditor: DuckDB was hard-coded
+to a `12GB` memory limit on a CN01 host with approximately 3.6 GiB RAM and 4 GiB swap. The run was
+stopped after seven atomically checkpointed tables when swap use reached approximately 3.8 GiB; its
+checkpoint remains retained as failed-method evidence. Revision `a9ee58e773ed4e437d01852eecfb828bf1ef3e06`
+adds a validated explicit memory limit, binds it into checkpoint identity and the final report, and
+defaults to `2GB`. The canonical Phase C rerun uses a new evidence directory and does not transplant
+the earlier checkpoint.
+
 CN01 package bytes have now been fully read and independently verified. An earlier supplementary
 OCI copy comparison exposed an audit-tool timezone dependency; the reviewed UTC fix and reruns
 closed that tool defect. No Hermes or OCI scan is required for the pre-rebuild audit. The sealed V2

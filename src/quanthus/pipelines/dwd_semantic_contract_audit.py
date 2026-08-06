@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -56,6 +57,7 @@ _EFFECTIVE_COORDINATES = (
     "period_end",
     "affected_effective_at",
 )
+_MEMORY_LIMIT_PATTERN = re.compile(r"[1-9][0-9]*(?:MB|GB)")
 
 
 def _object(path: Path, label: str) -> dict[str, Any]:
@@ -534,6 +536,15 @@ def _prepare_scratch(root: Path, scratch: Path) -> Path:
     return requested
 
 
+def _validated_memory_limit(value: str) -> str:
+    normalized = value.strip().upper()
+    if _MEMORY_LIMIT_PATTERN.fullmatch(normalized) is None:
+        raise DwdSemanticContractAuditError(
+            "memory limit must be a positive whole number followed by MB or GB"
+        )
+    return normalized
+
+
 def _outside_sealed(root: Path, path: Path, label: str) -> Path:
     sealed = root.resolve()
     resolved = path.resolve()
@@ -597,7 +608,12 @@ def _load_checkpoint(
 
 
 def audit_dwd_semantic_contracts(
-    *, root: Path, model_path: Path, scratch: Path, checkpoint_path: Path
+    *,
+    root: Path,
+    model_path: Path,
+    scratch: Path,
+    checkpoint_path: Path,
+    memory_limit: str = "2GB",
 ) -> dict[str, Any]:
     """Execute keys, intervals, lineage, FK, and explicit invariant checks for all tables."""
 
@@ -608,6 +624,7 @@ def audit_dwd_semantic_contracts(
 
     root = root.resolve()
     scratch = _prepare_scratch(root, scratch)
+    memory_limit = _validated_memory_limit(memory_limit)
     checkpoint_path = _outside_sealed(root, checkpoint_path, "checkpoint")
     try:
         verified = verify_domain_base(root)
@@ -628,6 +645,7 @@ def audit_dwd_semantic_contracts(
         "content_digest": verified.content_digest,
         "model_sha256": model_sha256,
         "auditor_sha256": "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "memory_limit": memory_limit,
     }
     table_reports = _load_checkpoint(
         checkpoint_path,
@@ -639,7 +657,7 @@ def audit_dwd_semantic_contracts(
     connection.execute("SET TimeZone='UTC'")
     escaped_scratch = str(scratch).replace("'", "''")
     connection.execute(f"SET temp_directory='{escaped_scratch}'")
-    connection.execute("SET memory_limit='12GB'")
+    connection.execute(f"SET memory_limit='{memory_limit}'")
     connection.execute("SET preserve_insertion_order=false")
     try:
         for table, contract in sorted(contracts.items()):
@@ -727,6 +745,10 @@ def audit_dwd_semantic_contracts(
             "sha256": model_sha256,
         },
         "auditor_sha256": audit_identity["auditor_sha256"],
+        "execution": {
+            "memory_limit": memory_limit,
+            "scratch": str(scratch),
+        },
         "checkpoint_path": str(checkpoint_path),
         "summary": {
             "status": "verified" if not finding_tables else "finding",

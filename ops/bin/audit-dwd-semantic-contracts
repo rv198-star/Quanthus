@@ -28,6 +28,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--scratch", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument(
+        "--memory-limit",
+        default="2GB",
+        help="DuckDB memory limit (positive whole MB or GB; default: 2GB)",
+    )
     args = parser.parse_args()
     try:
         report = audit_dwd_semantic_contracts(
@@ -35,6 +40,7 @@ def main() -> int:
             model_path=args.model,
             scratch=args.scratch,
             checkpoint_path=args.checkpoint,
+            memory_limit=args.memory_limit,
         )
         write_semantic_contract_report(args.output, report, sealed_roots=(args.root,))
     except (DwdSemanticContractAuditError, OSError) as exc:

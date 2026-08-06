@@ -10,6 +10,7 @@ from quanthus.pipelines.dwd_semantic_contract_audit import (
     _numeric_predicates,
     _partition_confines_business_key,
     _prepare_scratch,
+    _validated_memory_limit,
     load_semantic_contracts,
     write_semantic_contract_report,
 )
@@ -18,6 +19,16 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class DwdSemanticContractAuditTests(unittest.TestCase):
+    def test_memory_limit_is_explicit_and_injection_safe(self) -> None:
+        self.assertEqual(_validated_memory_limit("2048mb"), "2048MB")
+        self.assertEqual(_validated_memory_limit("2GB"), "2GB")
+        for invalid in ("0GB", "2.5GB", "2GiB", "2GB; DROP TABLE x"):
+            with (
+                self.subTest(invalid=invalid),
+                self.assertRaisesRegex(RuntimeError, "memory limit"),
+            ):
+                _validated_memory_limit(invalid)
+
     def test_report_cannot_be_written_inside_sealed_package(self) -> None:
         import tempfile
 

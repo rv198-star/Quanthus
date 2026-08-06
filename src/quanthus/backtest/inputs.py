@@ -23,6 +23,18 @@ class CoverageStatus(str, Enum):
     DELISTED = "delisted"
 
 
+def buy_open_rejection_reason(state: OpenExecutionState) -> str | None:
+    """Return the accepted P2 no-fill reason for one buy-side open state."""
+
+    if not isinstance(state, OpenExecutionState):
+        raise ValueError("state must be an OpenExecutionState")
+    return {
+        OpenExecutionState.SUSPENDED: "security_suspended",
+        OpenExecutionState.BUY_BLOCKED_LIMIT_UP: "buy_blocked_limit_up",
+        OpenExecutionState.MISSING_EVIDENCE: "missing_execution_evidence",
+    }.get(state)
+
+
 def _require_aware(value: datetime, field_name: str) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware")

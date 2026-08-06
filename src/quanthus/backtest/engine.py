@@ -35,6 +35,7 @@ from quanthus.backtest.contracts import (
     UnitState,
     decimal_text,
 )
+from quanthus.backtest.inputs import buy_open_rejection_reason
 from quanthus.backtest.policy import ExecutionPolicy, ExecutionProfile, ProfileKind
 
 
@@ -219,12 +220,7 @@ class BacktestEngine:
                 reason_code="entry_quantity_not_whole_lot",
                 append_event=append_event,
             )
-        buy_cancellation_reasons = {
-            OpenExecutionState.SUSPENDED: "security_suspended",
-            OpenExecutionState.BUY_BLOCKED_LIMIT_UP: "buy_blocked_limit_up",
-            OpenExecutionState.MISSING_EVIDENCE: "missing_execution_evidence",
-        }
-        cancellation_reason = buy_cancellation_reasons.get(session.open_execution_state)
+        cancellation_reason = buy_open_rejection_reason(session.open_execution_state)
         if cancellation_reason is not None:
             return self._no_fill_result(
                 run=run,

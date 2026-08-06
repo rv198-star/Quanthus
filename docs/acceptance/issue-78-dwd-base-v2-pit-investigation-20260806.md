@@ -2,14 +2,14 @@
 
 | Field | Value |
 | --- | --- |
-| Evidence status | blocked finding; CN01/OCI DWD V2 bytes and deterministic 33-table scans complete; Hermes DWD/ODS mirrors, OCI descriptor contract, remaining audit dimensions, and V2.1 acceptance incomplete |
+| Evidence status | blocked finding; CN01 is the sole canonical audit source; Phase B complete with seven affected tables; Phase C-D and V2.1 acceptance incomplete |
 | Evidence date | 2026-08-06 |
 | Governing work | `META-DATA-PIT-001` / GitHub Issue #78 |
 | Investigated package | `dwd-base-202607-v2` |
 | Manifest SHA-256 | `sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f` |
 | Content digest | `sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9` |
-| DWD PIT audit policy | `config/audits/dwd-pit-semantics.v1.json` / `sha256:9023edddad38b8a933dfc9c6150a71a285d7fa8fd441a1074f5ab4c4382cd1b0` |
-| Full pre-rebuild audit policy | `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` / `sha256:cd9b9e49f2c2fee76d4e13f5206c5bdb3a7e2dc82ac14f66fe97c2c55e74fc84` |
+| DWD PIT audit policy | `config/audits/dwd-pit-semantics.v1.json` / `sha256:b312afa9b8f6125581235c28ec82d192a38b9ce242472aa6b04dd8c25ad04ccd` |
+| Full pre-rebuild audit policy | `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` / `sha256:422d22867f8c05ebb419c0f2426bff615a50e567041aa8830045881d763a3319` |
 | ODS sufficiency policy | `config/audits/ods-pit-sufficiency.v1.json` / `sha256:170f4557c43202e82c6951f6a1516b2fee228b38b4b94766495ac1a232fafa4d` |
 | Successor boundary | new `dwd-base-202607-v2.1`, through 2026-07-31; CN01-only NFS build; later Daily excluded and cleaned separately |
 | Proposed remediation | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` |
@@ -34,6 +34,21 @@ coverage, numeric, lineage, deterministic replay, downstream compatibility, and 
 audits; every finding must have a measured impact and approved disposition, and the exact findings,
 remediation, builder-contract, and semantic digests must be approved.
 
+### 1.1 Canonical-Node Correction
+
+The pre-rebuild method now treats CN01 as the only authoritative DWD data node. All 13 quality
+dimensions execute once against the installed CN01 package. Hermes and OCI are byte-copy targets;
+they do not contribute independent semantics, findings, or remediation scope. Their only required
+role is checksum verification after the accepted CN01 successor is copied. Earlier OCI/Hermes
+reads remain supplementary copy-equality evidence and are not pre-rebuild closure gates.
+
+Phase B revision `5a14e30b046ae38487053995310d9b53363a1f83` audited all 76,671 CN01
+Parquet parts. Seven tables have physical-contract findings: four ownership tables use generic
+`year=` paths instead of their model coordinates; `dwd_quality_exception` uses `detected_year=` and
+has a field-order mismatch; and `dwd_tradability_state` plus `dwd_observation_gap` physically store
+derived partition columns absent from the table-column contract. The canonical Phase B semantic
+digest is `sha256:ae3513f43d7eff991e5294e9e867243bb484823bdbb9397e2b8f4a246d32651d`.
+
 CN01 and OCI package bytes have now been fully read and independently verified. Hermes remains
 unread. The first cross-node table-profile comparison exposed an audit-tool timezone dependency;
 the reviewed UTC fix and independent full reruns then produced exactly equal raw profiles for all
@@ -41,10 +56,10 @@ the reviewed UTC fix and independent full reruns then produced exactly equal raw
 candidate assembly, timestamp override, legacy fallback, Base mutation, package republish, or
 pointer movement is authorized.
 
-## 2. Mirror Inventory And Physical Access
+## 2. Canonical Inventory And Supplementary Copy Evidence
 
-ADR 0007 assigns node-local DWD Base use to Hermes and CN01 and a verified CN01 DWD mirror to OCI.
-The final audit therefore requires the three labels `hermes`, `cn01`, and `oci`.
+ADR 0007 assigns node-local copies to Hermes and OCI, but CN01 is the authority for this audit.
+The table below records earlier copy evidence for history; only the CN01 row governs findings.
 
 | Mirror | Expected role | Current evidence | Physical result |
 | --- | --- | --- | --- |
@@ -319,9 +334,9 @@ manifest-declared Parquet paths accessed. Output paths inside a supplied mirror 
 - CN01 storage preflight proved local reconstruction capacity insufficient and `/personal` NFS
   mandatory; NFS write, atomic rename, same-mount hard link, and CN01-local lock probes passed and
   left no persistent probe artifact.
-- Phase A CN01/OCI physical inventory and UTC-pinned table profiles are executed, with byte and
-  profile equality proven. Phase A remains blocked on Hermes and the OCI descriptor contract; no
-  structural, replay, or full semantic conformance is claimed by this evidence.
+- Phase A CN01/OCI physical inventory and UTC-pinned table profiles were executed and proved copy
+  equality. Under the corrected canonical-node method, this is supplementary evidence; only CN01
+  governs the pre-rebuild audit and no replica descriptor blocks Phase C-D.
 - Repository `make check` passed environment doctor, compilation, 903 tests, and GitHub planning
   synchronization after the full pre-rebuild audit scope was frozen.
 
@@ -332,24 +347,20 @@ The Phase A result and exact evidence digests were published to Issue #78 as
 
 Issue #78 remains open until:
 
-1. approved read-only access permits the remaining Hermes physical DWD audit and its comparison
-   with the deterministic CN01/OCI results;
-2. the complete policy in `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` executes across all
+1. the complete policy in `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` executes on CN01 across all
    33 tables and all required audit dimensions;
-3. all three mirrors have matching package identity and every manifest part has physical/schema
-   disposition;
-4. every PIT/field, identity, relationship, key/version, temporal, coverage, numeric, lineage,
+2. every CN01 manifest part has a physical/schema disposition;
+3. every PIT/field, identity, relationship, key/version, temporal, coverage, numeric, lineage,
    deterministic replay, downstream, and rebuild-readiness finding is measured and classified;
-5. no critical finding or unknown disposition remains, and every fail-closed exclusion and repair
+4. no critical finding or unknown disposition remains, and every fail-closed exclusion and repair
    has a reason, count, regression test, and V2.1 acceptance check;
-6. the exact findings ledger, one-time remediation scope, builder contracts, and semantic digests
+5. the exact findings ledger, one-time remediation scope, builder contracts, and semantic digests
    receive human approval before the V2.1 builder gate opens;
-7. the Hermes ODS V2 mirror is confirmed checksum-identical to the deep-verified CN01 package;
-8. the proposed ADR and table/source availability contracts are explicitly approved;
-9. the CN01 partition pilots freeze builder memory/spill bounds and the full NFS build completes;
-10. the complete 33-table NFS candidate and copied local ingress both pass deep and finding-closure
+6. the proposed ADR and table/source availability contracts are explicitly approved;
+7. the CN01 partition pilots freeze builder memory/spill bounds and the full NFS build completes;
+8. the complete 33-table NFS candidate and copied local ingress both pass deep and finding-closure
     verification;
-11. CN01 installs V2.1, Hermes/OCI successor mirrors are checksum-identical, and consumer cutover/
+9. CN01 installs V2.1, optional Hermes/OCI copies are checksum-identical, and consumer cutover/
     rollback are accepted; and
-12. the post-2026-07-31 Daily migration may remain separately executed, but its compatibility and
+10. the post-2026-07-31 Daily migration may remain separately executed, but its compatibility and
     migration disposition are frozen under Issue #78.

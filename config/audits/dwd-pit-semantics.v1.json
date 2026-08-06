@@ -2,8 +2,8 @@
   "schema_version": 1,
   "kind": "dwd_pit_semantics_audit_policy",
   "policy_id": "meta-data-pit-001.dwd-base-v2",
-  "policy_version": "1.1.0",
-  "status": "cn01_ods_semantics_frozen_dwd_physical_audit_pending",
+  "policy_version": "1.2.0",
+  "status": "cn01_canonical_dwd_full_audit_in_progress",
   "governing_issue": 78,
   "base_release": {
     "package_id": "dwd-base-202607-v2",
@@ -12,10 +12,15 @@
     "through_date": "2026-07-31"
   },
   "required_mirror_labels": [
-    "hermes",
-    "cn01",
-    "oci"
+    "cn01"
   ],
+  "replica_policy": {
+    "canonical_audit_source": "cn01",
+    "hermes_and_oci_pre_rebuild_semantic_audit_required": false,
+    "hermes_and_oci_role": "post-publication byte replicas only",
+    "replica_acceptance": "checksum identity after copying the accepted CN01 successor",
+    "replica_results_do_not_change_findings_or_remediation_scope": true
+  },
   "development_window": {
     "start": "2012-01-01",
     "end": "2021-12-31"

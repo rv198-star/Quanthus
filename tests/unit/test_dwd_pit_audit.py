@@ -49,7 +49,7 @@ class DwdPitAuditTests(unittest.TestCase):
                 "forward_only_not_historical": 11,
             },
         )
-        self.assertEqual(policy.required_mirror_labels, ("hermes", "cn01", "oci"))
+        self.assertEqual(policy.required_mirror_labels, ("cn01",))
         by_table = {item.table: item for item in policy.tables}
         self.assertEqual(
             by_table["dwd_financial_fact"].disposition, "forward_operational"

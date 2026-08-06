@@ -51,9 +51,10 @@ ODS V2 evidence:
   content  sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01
 ```
 
-The DWD mirror labels are `hermes`, `cn01`, and `oci`. Every physical result records hostname,
+CN01 is the sole canonical audit source. Every physical and semantic result records its hostname,
 resolved path, device/mount identity, principal, code revision, command, start/end time, and every
-package-relative artifact accessed.
+package-relative artifact accessed. Hermes and OCI are copy targets and are excluded from repeated
+pre-rebuild semantic execution; only successor-copy checksums are required after publication.
 
 ## Workspace
 
@@ -72,18 +73,18 @@ report. Canonical summaries are created only after all referenced run reports ar
 
 ## Audit Dimensions
 
-### 1. Package integrity and mirror equality
+### 1. Canonical package integrity
 
-For all three DWD mirrors:
+For the canonical CN01 DWD package:
 
 - verify READY/manifest binding;
 - verify package id, manifest SHA, content digest, and through-date;
 - verify size and SHA-256 of every manifest-declared member;
 - compare physical inventory with the manifest; and
-- prove byte equality or record every divergent file and package identity.
+- freeze the exact CN01 package identity used by every later dimension.
 
-Semantic analysis may proceed on a verified copy, but Issue #78 cannot close while a required mirror
-is missing, unreadable, or divergent.
+Do not repeat semantic analysis on Hermes or OCI copies. Their accepted role is post-publication
+checksum verification against the accepted CN01 successor.
 
 ### 2. Schema and partition contract
 
@@ -296,8 +297,8 @@ or redefining their content.
 
 | Phase | Exit gate |
 | --- | --- |
-| A — scope and inventory | Package identities, mirrors, 33 tables, dimensions, commands, code revision, and output paths frozen |
-| B — physical/schema | Every mirror and manifest part has integrity and schema disposition |
+| A — scope and inventory | Canonical CN01 package identity, 33 tables, dimensions, commands, code revision, and output paths frozen |
+| B — physical/schema | Every CN01 manifest part has integrity and schema disposition |
 | C — semantic/identity/temporal | Every table and field family has PIT, identity, relationship, key, interval, and lineage evidence |
 | D — coverage/numeric/replay/consumer | Coverage, invariants, real-partition replay, and downstream impact measured and reason-coded |
 | E — remediation freeze | No unknown finding; complete one-time findings and remediation digests produced |

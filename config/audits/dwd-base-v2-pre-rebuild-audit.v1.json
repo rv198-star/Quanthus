@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "dwd_base_pre_rebuild_audit_policy",
   "policy_id": "meta-data-pit-001.dwd-base-v2-pre-rebuild",
-  "policy_version": "1.0.0",
+  "policy_version": "1.1.0",
   "status": "scope_frozen_execution_pending",
   "governing_issue": 78,
   "objective": "Complete one evidence-backed physical, semantic, structural, temporal, lineage, coverage, reproducibility, and consumer-impact audit of DWD Base V2 before authorizing the expensive V2.1 reconstruction, then freeze one complete remediation scope so known and discoverable Base defects are corrected in a single successor build window.",
@@ -47,10 +47,15 @@
     }
   },
   "required_mirror_labels": [
-    "hermes",
-    "cn01",
-    "oci"
+    "cn01"
   ],
+  "audit_authority": {
+    "canonical_data_node": "cn01",
+    "all_13_dimensions_execute_on": "cn01",
+    "replica_nodes": ["hermes", "oci"],
+    "replica_pre_rebuild_semantic_audit_required": false,
+    "replica_post_publication_check": "checksum identity only"
+  },
   "table_scope": [
     "dwd_listed_company",
     "dwd_company_identifier",
@@ -89,13 +94,13 @@
   "audit_dimensions": [
     {
       "dimension_id": "package_integrity_and_mirror_equality",
-      "purpose": "Prove the exact installed bytes and enumerate every divergence before semantic conclusions are drawn.",
+      "purpose": "Prove the exact canonical CN01 installed bytes before semantic conclusions are drawn; replica equality is a later publication check, not a repeated quality audit.",
       "required_checks": [
         "READY and manifest binding",
         "package id, manifest SHA-256, content digest, and through-date",
         "manifest-declared file size and SHA-256 for every member",
-        "physical file inventory equality",
-        "cross-mirror byte identity for Hermes, CN01, and OCI"
+        "physical file inventory equality on CN01",
+        "record that Hermes and OCI are excluded from pre-rebuild semantic execution and receive only post-publication checksum verification"
       ]
     },
     {
@@ -269,12 +274,12 @@
     {
       "phase_id": "A",
       "name": "scope_and_inventory_freeze",
-      "exit": "Exact package identities, mirrors, 33-table scope, dimensions, commands, code revision, and output paths are frozen."
+      "exit": "The exact canonical CN01 package identity, 33-table scope, dimensions, commands, code revision, and output paths are frozen."
     },
     {
       "phase_id": "B",
       "name": "physical_schema_and_partition_audit",
-      "exit": "All mirrors and every manifest-declared part have integrity and schema dispositions."
+      "exit": "The canonical CN01 package and every manifest-declared part have integrity and schema dispositions."
     },
     {
       "phase_id": "C",
@@ -324,7 +329,7 @@
   "audit_closure_gate": {
     "all_33_tables_profiled": true,
     "all_dimensions_complete": true,
-    "all_required_mirrors_verified": true,
+    "canonical_cn01_package_verified": true,
     "all_findings_classified": true,
     "unresolved_critical_findings_allowed": 0,
     "high_findings_require_approved_disposition": true,

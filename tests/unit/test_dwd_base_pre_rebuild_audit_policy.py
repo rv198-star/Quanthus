@@ -14,11 +14,16 @@ class DwdBasePreRebuildAuditPolicyTests(unittest.TestCase):
         expected_tables = [item["name"] for item in model["tables"]]
 
         self.assertEqual(policy["kind"], "dwd_base_pre_rebuild_audit_policy")
-        self.assertEqual(policy["policy_version"], "1.0.0")
+        self.assertEqual(policy["policy_version"], "1.1.0")
         self.assertEqual(policy["governing_issue"], 78)
         self.assertEqual(policy["base_release"]["expected_table_count"], 33)
         self.assertEqual(policy["table_scope"], expected_tables)
         self.assertEqual(len(set(policy["table_scope"])), 33)
+        self.assertEqual(policy["required_mirror_labels"], ["cn01"])
+        self.assertEqual(policy["audit_authority"]["all_13_dimensions_execute_on"], "cn01")
+        self.assertFalse(
+            policy["audit_authority"]["replica_pre_rebuild_semantic_audit_required"]
+        )
 
     def test_v2_1_build_is_hard_blocked_until_full_audit_closure(self) -> None:
         policy = json.loads(POLICY.read_text(encoding="utf-8"))

@@ -3,9 +3,10 @@
 ## Purpose
 
 This runbook produces the read-only evidence required by `META-DATA-PIT-001` / Issue #78. It
-verifies installed DWD Base packages, compares Hermes/CN01/OCI identities, and scans all 33 tables
-for historical `knowledge_from` distributions. It does not repair, copy, promote, republish, or
-modify a Base.
+verifies the canonical CN01 DWD Base package and scans all 33 tables for historical
+`knowledge_from` distributions. Hermes and OCI are downstream byte replicas: they are not repeated
+semantic-audit inputs and receive checksum verification only after successor publication. It does
+not repair, copy, promote, republish, or modify a Base.
 
 The governing machine policy is `config/audits/dwd-pit-semantics.v1.json`. The target package is:
 
@@ -23,8 +24,8 @@ The governing machine policy is `config/audits/dwd-pit-semantics.v1.json`. The t
   or credentials for legacy ADS/research bundles.
 - Do not copy or normalize Parquet rows before the audit. A read-only bind mount is acceptable when
   it exposes the original installed files and preserves their exact bytes.
-- A missing mirror, unreadable manifest, checksum mismatch, absent table, row-count mismatch, or
-  incomplete scan blocks the execution gate.
+- An unreadable CN01 manifest, checksum mismatch, absent table, row-count mismatch, or incomplete
+  CN01 scan blocks the execution gate.
 
 ## Prerequisites
 
@@ -37,14 +38,9 @@ test -r /path/to/dwd-base-202607-v2/manifest.json
 test -r /path/to/dwd-base-202607-v2/READY
 ```
 
-The deployed CN01 and Hermes examples use
-`/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2`. OCI may expose the verified mirror under a
-different protected root. Resolve the installed physical package path from node configuration;
-do not guess it from a directory name.
-
-The final audit environment must expose all three physical package roots at once, normally through
-read-only mounts on a designated audit host. Node-local single-mirror runs are useful permission
-and identity probes, but remain incomplete by policy.
+The canonical CN01 installed root is
+`/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2`. Execute the full audit on CN01 against this
+physical path. Do not substitute a copied Hermes/OCI directory or a mutable descriptor.
 
 ## Permission Probe
 
@@ -52,9 +48,7 @@ Run a manifest-only probe before the full scan:
 
 ```bash
 PYTHONPATH=src .venv/bin/python ops/bin/audit-dwd-pit-semantics \
-  --mirror hermes=/audit/hermes/dwd-base-202607-v2 \
-  --mirror cn01=/audit/cn01/dwd-base-202607-v2 \
-  --mirror oci=/audit/oci/dwd-base-202607-v2 \
+  --mirror cn01=/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2 \
   --mode manifest-only \
   --output /var/lib/quanthus/audits/issue-78/manifest-audit.json \
   --markdown-output /var/lib/quanthus/audits/issue-78/manifest-audit.md
@@ -62,8 +56,8 @@ PYTHONPATH=src .venv/bin/python ops/bin/audit-dwd-pit-semantics \
 
 This mode still performs deep package verification: READY binding, manifest identity, exact file
 inventory, file sizes, every declared SHA-256, exactly 33 row-count entries, and payload totals. It
-does not issue Parquet aggregate queries. Exit code `0` means all three mirrors were verified and
-matched the policy identity; the historical PIT gate in the report remains blocked.
+does not issue Parquet aggregate queries. Exit code `0` means the canonical CN01 package was
+verified and matched the policy identity; the historical PIT gate in the report remains blocked.
 
 ## Full 33-Table Scan
 
@@ -71,15 +65,13 @@ After the manifest probe succeeds, run:
 
 ```bash
 PYTHONPATH=src .venv/bin/python ops/bin/audit-dwd-pit-semantics \
-  --mirror hermes=/audit/hermes/dwd-base-202607-v2 \
-  --mirror cn01=/audit/cn01/dwd-base-202607-v2 \
-  --mirror oci=/audit/oci/dwd-base-202607-v2 \
+  --mirror cn01=/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2 \
   --mode full \
   --output /var/lib/quanthus/audits/issue-78/full-audit.json \
   --markdown-output /var/lib/quanthus/audits/issue-78/full-audit.md
 ```
 
-For each table and mirror, the command records:
+For each CN01 table, the command records:
 
 - manifest and actual row counts;
 - Parquet file count and representative physical schema;
@@ -97,8 +89,8 @@ profiles from an older revision that inherited the node timezone.
 
 ## Report Interpretation
 
-`execution_gate.status=complete` proves that the requested verification and scans completed for all
-required mirrors. It does not approve historical use. `historical_pit_gate.status` remains
+`execution_gate.status=complete` proves that the requested verification and scans completed on the
+canonical CN01 package. It does not approve historical use. `historical_pit_gate.status` remains
 `blocked` because the code matrix contains confirmed defects and unresolved source families.
 
 Review these sections:
@@ -109,8 +101,8 @@ Review these sections:
 | `mirror_inventory.failed_labels` | empty |
 | `mirror_inventory.identity_mismatches` | empty |
 | `execution_gate.row_count_mismatches` | empty |
-| every mirror `verification_status` | `verified` |
-| every mirror `scan_status` | `full` for final evidence |
+| CN01 `verification_status` | `verified` |
+| CN01 `scan_status` | `full` for final evidence |
 | `accessed_artifacts.mutation_performed` | `false` |
 
 Any future-knowledge sample must be traced to its ODS source and builder rule. Do not bulk-rewrite
@@ -122,7 +114,7 @@ Attach both JSON and Markdown reports to Issue #78 with:
 
 - audit host and principal role, excluding credentials;
 - exact repository commit used to run the command;
-- exact read-only mount/source path mapping for Hermes, CN01, and OCI;
+- exact canonical CN01 physical source path;
 - command exit code;
 - report digest;
 - start/end time; and
@@ -139,8 +131,8 @@ Do not attach raw market rows beyond the bounded samples already emitted by the 
   with the authoritative release identity before any resynchronization.
 - **File checksum mismatch:** retain the bytes and incident evidence; do not overwrite the mirror in
   place.
-- **Cross-mirror mismatch:** treat the mirrors as different artifacts even when directory names
-  match.
+- **Replica checksum mismatch after publication:** reject that copy and repeat the copy operation
+  from the accepted CN01 successor; do not rerun the semantic audit on the replica.
 - **Missing table or row-count mismatch:** block the package and inspect publication evidence.
 - **DuckDB/PyArrow unavailable:** install the repository's declared `p1` dependency set in the audit
   environment; do not substitute a partial CSV or sampled-file audit.

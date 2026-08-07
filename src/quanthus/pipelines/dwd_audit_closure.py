@@ -741,11 +741,11 @@ def build_audit_closure(
     ]
     if coverage is not None:
         open_scope.remove("coverage_and_exclusion_matrix_coordinate_scan")
-    if replay["status"] == "verified":
+    if replay_value is not None:
         open_scope.remove("representative_replay_determinism_for_base_derivations")
-    if compatibility["status"] == "verified":
+    if compatibility["checked_package_count"] > 0:
         open_scope.remove("downstream_increment_compatibility_review")
-    if readiness["status"] == "verified":
+    if readiness_value is not None:
         open_scope.remove("rebuild_publication_and_rollback_readiness_acceptance")
 
     severity_counts = Counter(str(item.get("severity")) for item in findings)

@@ -179,7 +179,10 @@ class DwdAuditClosureTests(unittest.TestCase):
             ledger = json.loads((root / "out-replay" / "findings-ledger.json").read_text(encoding="ascii"))
             ids = {item["finding_id"] for item in ledger["findings"]}
             self.assertIn("DWDV2-REPLAY-DETERMINISM", ids)
-            self.assertIn("representative_replay_determinism_for_base_derivations", result["open_audit_scope"])
+            self.assertNotIn(
+                "representative_replay_determinism_for_base_derivations",
+                result["open_audit_scope"],
+            )
 
     def test_missing_readiness_report_is_classified(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

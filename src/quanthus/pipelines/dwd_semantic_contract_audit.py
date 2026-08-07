@@ -660,6 +660,14 @@ def audit_dwd_semantic_contracts(
     contracts = load_semantic_contracts(model_path)
     table_paths = _manifest_payload_files(root, manifest, table_names=sorted(contracts))
     sources = {table: _parquet_source(paths) for table, paths in table_paths.items()}
+    table_compressed_bytes = {
+        table: sum(path.stat().st_size for path in paths)
+        for table, paths in table_paths.items()
+    }
+    table_order = sorted(
+        contracts,
+        key=lambda table: (-table_compressed_bytes[table], table),
+    )
     raw_counts = manifest.get("row_counts")
     if not isinstance(raw_counts, Mapping):
         raise DwdSemanticContractAuditError("DWD Base manifest row_counts are invalid")
@@ -673,6 +681,7 @@ def audit_dwd_semantic_contracts(
         "auditor_sha256": "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "memory_limit": memory_limit,
         "threads": 1,
+        "table_order": "descending_compressed_bytes",
     }
     table_reports = _load_checkpoint(
         checkpoint_path,
@@ -688,7 +697,8 @@ def audit_dwd_semantic_contracts(
     connection.execute(f"SET memory_limit='{memory_limit}'")
     connection.execute("SET preserve_insertion_order=false")
     try:
-        for table, contract in sorted(contracts.items()):
+        for table in table_order:
+            contract = contracts[table]
             if table in table_reports:
                 continue
             source = sources[table]
@@ -763,9 +773,9 @@ def audit_dwd_semantic_contracts(
     finally:
         connection.close()
 
-    finding_tables = [
+    finding_tables = sorted(
         table for table, report in table_reports.items() if report["status"] == "finding"
-    ]
+    )
     report = {
         "schema_version": 1,
         "kind": "dwd_base_v2_semantic_contract_audit",
@@ -786,6 +796,7 @@ def audit_dwd_semantic_contracts(
             "memory_limit": memory_limit,
             "scratch": str(scratch),
             "threads": 1,
+            "table_order": "descending_compressed_bytes",
         },
         "checkpoint_path": str(checkpoint_path),
         "summary": {

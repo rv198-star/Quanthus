@@ -463,7 +463,7 @@ def build_audit_closure(
         for name in ("input-plan.json", "coverage-matrix.json", "source-disposition-ledger.json", "capacity-estimate.json", "run-receipt.json")
     }
     plan = _object(plan_files["input-plan.json"], "input plan")
-    coverage = _object(plan_files["coverage-matrix.json"], "coverage matrix")
+    plan_coverage = _object(plan_files["coverage-matrix.json"], "coverage matrix")
     ledger = _object(plan_files["source-disposition-ledger.json"], "source disposition ledger")
     capacity = _object(plan_files["capacity-estimate.json"], "capacity estimate")
     receipt = _object(plan_files["run-receipt.json"], "input plan receipt")

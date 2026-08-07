@@ -283,6 +283,38 @@ def _invariant_findings(report: Mapping[str, Any], source: str) -> list[dict[str
     return findings
 
 
+def _coverage_findings(report: Mapping[str, Any], source: str) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    tables = report.get("tables")
+    if not isinstance(tables, Mapping):
+        raise DwdAuditClosureError("coverage report has no table map")
+    for table, raw in sorted(tables.items()):
+        if not isinstance(raw, Mapping) or raw.get("status") == "verified":
+            continue
+        findings.append(
+            _finding(
+                finding_id=f"DWDV2-COVERAGE-{table}",
+                dimension_id="completeness_and_coverage",
+                scope=str(table),
+                severity="high",
+                evidence={
+                    "reason_codes": raw.get("reason_codes", []),
+                    "coordinates": raw.get("coordinates", {}),
+                    "row_count": raw.get("row_count", 0),
+                    "expected_rows": raw.get("expected_rows", 0),
+                },
+                root_cause="A business coordinate is outside the frozen Base through-date or its coverage proof is incomplete.",
+                affected={"rows_or_parts": raw.get("row_count", 0), "reason_codes": raw.get("reason_codes", [])},
+                disposition="fix_in_v2_1",
+                change="Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+                tests=["test_dwd_coverage_rejects_business_coordinates_after_through_date"],
+                acceptance="The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables.",
+                source_report=source,
+            )
+        )
+    return findings
+
+
 def _phase_a_findings(report: Mapping[str, Any], source: str) -> list[dict[str, Any]]:
     if report.get("kind") == "issue_78_dwd_v2_phase_a_utc_rerun_closure":
         closure = report.get("finding_closure")
@@ -375,6 +407,7 @@ def build_audit_closure(
     daily_root: Path,
     output_root: Path,
     code_revision: str,
+    coverage_report: Path | None = None,
     replay_evidence: Sequence[Path] = (),
 ) -> dict[str, Any]:
     """Build a provisional, digest-bound closure packet without touching sealed data."""
@@ -416,6 +449,12 @@ def build_audit_closure(
     lineage, lineage_digest, lineage_path = reports[2]
     invariant, invariant_digest, invariant_path = reports[3]
     phase_a, phase_a_digest, phase_a_path = reports[4]
+    coverage: dict[str, Any] | None = None
+    coverage_digest: str | None = None
+    coverage_path: Path | None = None
+    if coverage_report is not None:
+        coverage, coverage_digest = _sealed_report(coverage_report.resolve(), label="coverage report")
+        coverage_path = coverage_report.resolve()
     if lineage.get("dwd", {}).get("package_id") != base_release["package_id"]:
         raise DwdAuditClosureError("lineage report package differs from DWD Base")
 
@@ -435,6 +474,8 @@ def build_audit_closure(
     findings.extend(_schema_findings(schema, str(schema_path)))
     findings.extend(_semantic_findings(semantic, str(semantic_path)))
     findings.extend(_invariant_findings(invariant, str(invariant_path)))
+    if coverage is not None and coverage_path is not None:
+        findings.extend(_coverage_findings(coverage, str(coverage_path)))
 
     deferred = [
         item
@@ -515,6 +556,8 @@ def build_audit_closure(
         "rebuild_publication_and_rollback_readiness_acceptance",
         "human_approval_of_findings_and_remediation_scope",
     ]
+    if coverage is not None:
+        open_scope.remove("coverage_and_exclusion_matrix_coordinate_scan")
     if replay["status"] == "verified":
         open_scope.remove("representative_replay_determinism_for_base_derivations")
     if compatibility["status"] == "verified":
@@ -530,6 +573,7 @@ def build_audit_closure(
         "lineage": lineage_digest,
         "invariant": invariant_digest,
         "phase_a": phase_a_digest,
+        "coverage": coverage_digest,
         "input_plan": plan.get("plan_digest"),
         "input_plan_files": plan_digests,
     }

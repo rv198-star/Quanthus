@@ -22,6 +22,13 @@ _PROFILE_COORDINATES = {
     "reporting_period": ("period_end",),
     "governance_event": ("affected_effective_at", "detected_at"),
 }
+_THROUGH_DATE_COORDINATES = {
+    "effective_from",
+    "effective_at",
+    "observation_start",
+    "period_end",
+    "affected_effective_at",
+}
 
 
 def _canonical_digest(value: object) -> str:
@@ -128,7 +135,12 @@ def _coordinate_profile(
             "null_count_from_statistics": null_count,
             "statistics_complete": complete,
             "missing_part_count": missing_parts,
-            "after_through_date": bool(rendered_max and rendered_max[:10] > through_date),
+            "after_through_date": bool(
+                field in _THROUGH_DATE_COORDINATES
+                and rendered_max
+                and rendered_max[:10] > through_date
+            ),
+            "through_date_checked": field in _THROUGH_DATE_COORDINATES,
         }
     return {
         "time_profile": profile,

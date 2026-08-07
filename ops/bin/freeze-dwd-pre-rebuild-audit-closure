@@ -42,6 +42,7 @@ def main() -> int:
     parser.add_argument("--phase-a-findings", type=Path, required=True)
     parser.add_argument("--daily-root", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--coverage-report", type=Path)
     parser.add_argument("--code-revision")
     parser.add_argument("--replay-evidence", type=Path, action="append", default=[])
     args = parser.parse_args()
@@ -58,6 +59,7 @@ def main() -> int:
             daily_root=args.daily_root,
             output_root=args.output_root,
             code_revision=args.code_revision or _revision(repository),
+            coverage_report=args.coverage_report,
             replay_evidence=args.replay_evidence,
         )
     except (DwdAuditClosureError, OSError) as exc:

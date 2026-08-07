@@ -291,6 +291,9 @@ def _phase_a_findings(report: Mapping[str, Any], source: str) -> list[dict[str, 
             raise DwdAuditClosureError("Phase A finding is invalid")
         item = dict(raw)
         item["evidence_report"] = source
+        if "tests" not in item:
+            regression = item.get("regression_test")
+            item["tests"] = [regression] if isinstance(regression, str) and regression else []
         if item.get("disposition") not in _DISPOSITIONS:
             raise DwdAuditClosureError(f"Phase A finding has invalid disposition: {item.get('finding_id')}")
         result.append(item)

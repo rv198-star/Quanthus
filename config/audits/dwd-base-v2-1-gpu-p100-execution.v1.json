@@ -1,0 +1,63 @@
+{
+  "approval": {
+    "exact_digest_approval": "pending",
+    "execution_node_approval": "approved_by_project_owner_2026-08-07",
+    "pointer_cutover_approval": "separate_and_required"
+  },
+  "audit_baseline": {
+    "audit_closure_revision": "897b829876c387d7ca37090ef8bf8698594b4124",
+    "base_manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+    "findings_ledger_digest": "sha256:9a30644f64aacecaab2f9c20797d98d09aa968e1679121e16271ca2063ce9708",
+    "original_build_contract_digest": "sha256:045100edb5baa3cdeec32167c33dd8466d129b6897513876104b168ac70f860c",
+    "remediation_scope_digest": "sha256:e0c4e984e3508a77ac9e7b0546e6361e8be43bcbdaf3af76813aa40e4b8251db"
+  },
+  "authorized_execution": {
+    "build_node": "GPU-P100",
+    "build_workspace": "/srv/quanthus/gpu-p100-dwd-workspace",
+    "execution_backend": "cpu",
+    "install_node": "cn01",
+    "pointer_authority_node": "cn01",
+    "transfer_direction": "cn01_pull_from_gpu_p100_read_only_export"
+  },
+  "builder_gate": {
+    "authorized_before_pilot_acceptance": [
+      "implementation",
+      "preflight",
+      "planning",
+      "replay_pilot",
+      "partition_pilot"
+    ],
+    "full_build": "blocked_until_exact_digest_and_pilot_receipts_approved",
+    "install": "blocked_until_sealed_candidate_and_cn01_capacity_gate",
+    "pointer_cutover": "blocked_until_separate_exact_candidate_approval"
+  },
+  "canonical_digest": "sha256:bab98bb0a11dbd2c8395881931cdaed50f915ce2ce39065c25ac103e5ea84d8a",
+  "failure_policy": {
+    "automatic_failover": false,
+    "automatic_resume_after_node_return": false,
+    "checkpoint_resume_required": true,
+    "drvfs_or_ntfs_workspace_allowed": false,
+    "mutate_v2": false,
+    "partial_candidate_install_allowed": false
+  },
+  "generated_at": "2026-08-07T20:59:40+00:00",
+  "kind": "dwd_base_v2_1_gpu_p100_replacement_build_contract",
+  "locks": {
+    "cn01_import_install": "/srv/quanthus/dwd-dws-v2/v2.1-rebuild/locks/import-install.lock",
+    "cross_host_lock": null,
+    "gpu_build": "/srv/quanthus/gpu-p100-dwd-workspace/control/locks/dwd-base-v2-1-rebuild.lock"
+  },
+  "monitoring": {
+    "authority": "observe_diagnose_and_bounded_recovery_only",
+    "cadence": "PT1H",
+    "control_source": "approved_contract_and_phase_receipts",
+    "platform": "Codex App"
+  },
+  "schema_version": 2,
+  "status": "pending_exact_digest_approval",
+  "transfer_security": {
+    "cn01_write_credential_on_gpu_p100": false,
+    "export_account": "restricted_read_only_account_pending_provisioning",
+    "ready_marker_last": true
+  }
+}

@@ -87,6 +87,9 @@ nodes.
   `acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807/`. The builder remains blocked
   until those exact digests receive human approval and the recorded execution-readiness findings
   are closed; no V2.1 package or pointer has been created or changed.
+- A proposed Issue #78 topology amendment authorizes GPU-P100 in principle as the CPU build node
+  while CN01 retains import, installation, and cutover authority. Its exact machine-contract digest
+  remains a separate approval gate, so only implementation and bounded pilots are currently open.
 - Generic DWS is deferred until a concrete cross-domain consumer needs the retained ten-dimension,
   thirteen-fact constellation. P4 is not blocked by DWS: it consumes an exact DWD snapshot and
   produces a purpose-specific, manifest-bound `event_library` projection.

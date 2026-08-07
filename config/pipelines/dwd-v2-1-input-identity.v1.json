@@ -1,0 +1,12 @@
+{
+  "base_model_sha256": "sha256:7ccfbebbe8f06622363228cfa85abca23adb1b4ff8f5fff8c6c07cbc8d633dd7",
+  "build_input_contract": {
+    "bundle_id": "ods-base-202607-v2",
+    "content_digest": "sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01",
+    "manifest_sha256": "sha256:7f74a7655f3f86982b4e662f55b12aff4fa2f28ee23cf9b5db530f9f2aa0955b",
+    "through_date": "2026-07-31"
+  },
+  "kind": "dwd_dws_input_identity_override",
+  "override_id": "dwd-base-v2-1-ods-v2-input",
+  "schema_version": 1
+}

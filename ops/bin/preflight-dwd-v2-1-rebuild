@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""Run the governed GPU-P100 DWD Base V2.1 preflight."""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.dwd_v21_rebuild_preflight import main  # noqa: E402
+
+if __name__ == "__main__":
+    raise SystemExit(main())

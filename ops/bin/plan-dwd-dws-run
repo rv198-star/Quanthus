@@ -33,6 +33,11 @@ def main() -> int:
     parser.add_argument("--market-date")
     parser.add_argument("--through-date")
     parser.add_argument(
+        "--input-identity-override",
+        type=Path,
+        help="versioned exact ODS Base identity override bound to the base model SHA",
+    )
+    parser.add_argument(
         "--capacity-root",
         type=Path,
         help="existing filesystem root reserved for DWD/DWS candidate and spill capacity",
@@ -51,6 +56,7 @@ def main() -> int:
             market_date=args.market_date,
             through_date=args.through_date,
             capacity_root=args.capacity_root,
+            input_identity_override=args.input_identity_override,
         )
     except (WarehousePlanningError, FileExistsError, OSError) as exc:
         print(f"DWD/DWS input planning failed: {exc}", file=sys.stderr)

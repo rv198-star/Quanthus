@@ -10,6 +10,7 @@ from quanthus.pipelines.securities_warehouse.planner import (
     WarehousePlanningError,
     _base_records,
     _capacity,
+    _input_identity_override,
     _model_contract,
     _validate_base_coverage,
     build_input_plan,
@@ -198,6 +199,33 @@ class SecuritiesWarehousePlannerTests(unittest.TestCase):
 
         with self.assertRaisesRegex(WarehousePlanningError, "14 core objects"):
             _model_contract(invalid_model)
+
+    def test_input_identity_override_binds_exact_base_model(self) -> None:
+        model_sha = _sha256(MODEL)
+        override = self.root / "override.json"
+        self._write_json(
+            override,
+            {
+                "schema_version": 1,
+                "kind": "dwd_dws_input_identity_override",
+                "override_id": "fixture-v2",
+                "base_model_sha256": model_sha,
+                "build_input_contract": {
+                    "bundle_id": "ods-v2",
+                    "content_digest": "sha256:" + "1" * 64,
+                    "manifest_sha256": "sha256:" + "2" * 64,
+                    "through_date": "2026-07-31",
+                },
+            },
+        )
+        contract, override_sha, override_id = _input_identity_override(
+            override, model_sha256=model_sha
+        )
+        self.assertEqual(contract["bundle_id"], "ods-v2")
+        self.assertEqual(override_sha, _sha256(override))
+        self.assertEqual(override_id, "fixture-v2")
+        with self.assertRaisesRegex(WarehousePlanningError, "exact base model"):
+            _input_identity_override(override, model_sha256="sha256:" + "0" * 64)
 
     def test_model_contract_rejects_missing_cross_owner_foreign_key_edge(self) -> None:
         model = json.loads(MODEL.read_text(encoding="utf-8"))

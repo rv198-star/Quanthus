@@ -416,6 +416,33 @@ def _model_contract(path: Path) -> tuple[dict[str, Any], str]:
     return model, _sha256(path)
 
 
+def _input_identity_override(
+    path: Path,
+    *,
+    model_sha256: str,
+) -> tuple[Mapping[str, Any], str, str]:
+    value = _object(path)
+    if (
+        value.get("schema_version") != 1
+        or value.get("kind") != "dwd_dws_input_identity_override"
+        or value.get("base_model_sha256") != model_sha256
+    ):
+        raise WarehousePlanningError(
+            "input identity override does not bind the exact base model"
+        )
+    override_id = _text(value, "override_id")
+    contract = _mapping(value.get("build_input_contract"), "build_input_contract")
+    required = {"bundle_id", "content_digest", "manifest_sha256", "through_date"}
+    if set(contract) != required or any(
+        not isinstance(contract.get(field), str) or not contract.get(field)
+        for field in required
+    ):
+        raise WarehousePlanningError(
+            "input identity override must contain only the exact ODS Base identity"
+        )
+    return contract, _sha256(path), override_id
+
+
 def _lookups(model: Mapping[str, Any]) -> dict[str, Any]:
     contract = _mapping(model.get("ods_source_contract"), "model.ods_source_contract")
 
@@ -968,6 +995,7 @@ def build_input_plan(
     market_date: str | None = None,
     through_date: str | None = None,
     capacity_root: Path | None = None,
+    input_identity_override: Path | None = None,
 ) -> InputPlanResult:
     """Verify one immutable ODS package and publish its deterministic build plan."""
 
@@ -983,6 +1011,14 @@ def build_input_plan(
     selected_market_date = _date(market_date, "market_date") if market_date else None
     selected_through_date = _date(through_date, "through_date") if through_date else None
     model, model_sha = _model_contract(model_path.resolve())
+    expected_input = _mapping(model.get("build_input_contract"), "build_input_contract")
+    override_identity: dict[str, str] | None = None
+    if input_identity_override is not None:
+        expected_input, override_sha, override_id = _input_identity_override(
+            input_identity_override.resolve(),
+            model_sha256=model_sha,
+        )
+        override_identity = {"override_id": override_id, "sha256": override_sha}
     package_root = ods_package.resolve()
     base_manifest_path = package_root / "manifest.json"
     release_manifest_path = package_root / "release.json"
@@ -993,7 +1029,6 @@ def build_input_plan(
                 raise WarehousePlanningError(f"{mode} mode requires an ODS release, not a Base")
             verified = verify_ods_base_rollup(package_root, deep=True)
             manifest = _object(base_manifest_path)
-            expected = _mapping(model.get("build_input_contract"), "build_input_contract")
             actual_identity = {
                 "bundle_id": verified.bundle_id,
                 "content_digest": verified.content_digest,
@@ -1001,7 +1036,7 @@ def build_input_plan(
                 "through_date": verified.through_date.isoformat(),
             }
             for field, actual in actual_identity.items():
-                if expected.get(field) != actual:
+                if expected_input.get(field) != actual:
                     raise WarehousePlanningError(
                         f"ODS Base {field} differs from the model contract"
                     )
@@ -1096,6 +1131,8 @@ def build_input_plan(
         "coverage_matrix_digest": _canonical_digest(coverage),
         "capacity_requirement_digest": capacity["requirement_digest"],
     }
+    if override_identity is not None:
+        semantic_plan["input_identity_override"] = override_identity
     plan_digest = _canonical_digest(semantic_plan)
     input_plan = {
         "schema_version": 1,

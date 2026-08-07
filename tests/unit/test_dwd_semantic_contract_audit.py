@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from quanthus.pipelines.dwd_semantic_contract_audit import (
     _checkpoint_value,
@@ -9,6 +10,7 @@ from quanthus.pipelines.dwd_semantic_contract_audit import (
     _load_checkpoint,
     _numeric_predicates,
     _partition_confines_business_key,
+    _partitioned_key_version_metrics,
     _prepare_scratch,
     _validated_memory_limit,
     load_semantic_contracts,
@@ -145,6 +147,57 @@ class DwdSemanticContractAuditTests(unittest.TestCase):
             self.assertEqual(metrics["invalid_effective_from_effective_to_rows"], 1)
             self.assertEqual(metrics["knowledge_interval_overlap_rows"], 1)
             self.assertEqual(metrics["effective_interval_overlap_rows"], 1)
+        finally:
+            connection.close()
+
+    def test_partitioned_key_metrics_shard_without_splitting_business_keys(self) -> None:
+        import tempfile
+
+        import duckdb
+
+        contracts = load_semantic_contracts(ROOT / "config/pipelines/dwd-domain-model.v1.json")
+        contract = contracts["dwd_security_bar"]
+        connection = duckdb.connect(":memory:")
+        try:
+            connection.execute(
+                """
+                CREATE TABLE bars (
+                  listing_id VARCHAR,
+                  observation_start TIMESTAMPTZ,
+                  interval_size VARCHAR,
+                  price_basis VARCHAR,
+                  knowledge_from TIMESTAMPTZ,
+                  knowledge_to TIMESTAMPTZ
+                );
+                INSERT INTO bars VALUES
+                  ('a', '2026-01-01', '1d', 'UNADJUSTED', '2026-01-02', '2026-01-03'),
+                  ('a', '2026-01-01', '1d', 'UNADJUSTED', '2026-01-02', '2026-01-03'),
+                  ('a', '2026-01-01', '1d', 'UNADJUSTED', '2026-01-03', NULL),
+                  ('b', '2026-01-02', '1d', 'UNADJUSTED', '2026-01-03', NULL);
+                """
+            )
+            expected = _key_version_metrics(connection, "bars", contract)
+            with tempfile.TemporaryDirectory() as temporary:
+                path = (
+                    Path(temporary)
+                    / "interval_size=1d"
+                    / "observation_start_year=2026"
+                    / "observation_start_month=01"
+                    / "part.parquet"
+                )
+                path.parent.mkdir(parents=True)
+                connection.execute(f"COPY bars TO '{path}' (FORMAT PARQUET)")
+                with patch(
+                    "quanthus.pipelines.dwd_semantic_contract_audit."
+                    "_KEY_VERSION_TARGET_COMPRESSED_BYTES",
+                    max(1, path.stat().st_size // 2),
+                ):
+                    actual = _partitioned_key_version_metrics(
+                        connection,
+                        [path],
+                        contract,
+                    )
+            self.assertEqual(actual, expected)
         finally:
             connection.close()
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -58,6 +59,7 @@ _EFFECTIVE_COORDINATES = (
     "affected_effective_at",
 )
 _MEMORY_LIMIT_PATTERN = re.compile(r"[1-9][0-9]*(?:MB|GB)")
+_KEY_VERSION_TARGET_COMPRESSED_BYTES = 32 * 1024 * 1024
 
 
 def _object(path: Path, label: str) -> dict[str, Any]:
@@ -278,24 +280,48 @@ def _partitioned_key_version_metrics(
     groups: dict[Path, list[Path]] = {}
     for path in paths:
         groups.setdefault(path.parent, []).append(path)
-    if len(groups) <= 1 or not _partition_confines_business_key(contract):
+    if not _partition_confines_business_key(contract):
         return _key_version_metrics(connection, _parquet_source(paths), contract)
     result: dict[str, dict[str, int] | int] = {
         "duplicate_row_keys": {"group_count": 0, "row_count": 0},
         "business_key_version_groups": {"group_count": 0, "row_count": 0},
         "knowledge_interval_overlap_rows": 0,
     }
+    business = ", ".join(_identifier(field) for field in contract.business_key)
     for group_paths in groups.values():
-        group = _key_version_metrics(connection, _parquet_source(group_paths), contract)
-        for metric in ("duplicate_row_keys", "business_key_version_groups"):
-            target = cast(dict[str, int], result[metric])
-            source = cast(dict[str, int], group[metric])
-            target["group_count"] += source["group_count"]
-            target["row_count"] += source["row_count"]
-        result["knowledge_interval_overlap_rows"] = cast(
-            int, result["knowledge_interval_overlap_rows"]
-        ) + cast(int, group["knowledge_interval_overlap_rows"])
+        compressed_bytes = sum(path.stat().st_size for path in group_paths)
+        shard_count = max(
+            1,
+            math.ceil(compressed_bytes / _KEY_VERSION_TARGET_COMPRESSED_BYTES),
+        )
+        group_source = _parquet_source(group_paths)
+        for shard in range(shard_count):
+            source = group_source
+            if shard_count > 1:
+                source = (
+                    f"(SELECT * FROM {group_source} "
+                    f"WHERE hash({business}) % {shard_count} = {shard})"
+                )
+            group = _key_version_metrics(connection, source, contract)
+            for metric in ("duplicate_row_keys", "business_key_version_groups"):
+                target = cast(dict[str, int], result[metric])
+                source_metric = cast(dict[str, int], group[metric])
+                target["group_count"] += source_metric["group_count"]
+                target["row_count"] += source_metric["row_count"]
+            result["knowledge_interval_overlap_rows"] = cast(
+                int, result["knowledge_interval_overlap_rows"]
+            ) + cast(int, group["knowledge_interval_overlap_rows"])
     return result
+
+
+def _progress(table: str, stage: str) -> None:
+    print(
+        json.dumps(
+            {"audit": "semantic_contracts", "table": table, "stage": stage},
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
 
 def _time_coordinate(contract: SemanticTableContract) -> str | None:
@@ -666,21 +692,35 @@ def audit_dwd_semantic_contracts(
             if table in table_reports:
                 continue
             source = sources[table]
+            _progress(table, "row_count_and_null_keys")
             aggregate = connection.execute(
                 f"SELECT count(*), count(*) FILTER (WHERE "
                 f"{_null_predicate(contract.row_key)}) FROM {source}"
             ).fetchone()
             if aggregate is None:
                 raise DwdSemanticContractAuditError(f"aggregate returned no row: {table}")
+            _progress(table, "numeric_invariants")
             numeric = _numeric_metrics(connection, source, contract)
+            _progress(table, "key_versions")
             key_versions = _partitioned_key_version_metrics(
                 connection, table_paths[table], contract
             )
+            _progress(table, "intervals")
             intervals = _interval_metrics(
                 connection, source, contract, include_knowledge_overlap=False
             )
             intervals["knowledge_interval_overlap_rows"] = int(
                 cast(int, key_versions["knowledge_interval_overlap_rows"])
+            )
+            _progress(table, "lineage")
+            lineage = _lineage_metrics(connection, source)
+            _progress(table, "foreign_keys")
+            foreign_keys = _foreign_key_metrics(
+                connection,
+                child_source=source,
+                child_contract=contract,
+                parent_sources=sources,
+                parent_contracts=contracts,
             )
             report: dict[str, Any] = {
                 "row_count": int(aggregate[0]),
@@ -691,15 +731,9 @@ def audit_dwd_semantic_contracts(
                 "duplicate_row_keys": key_versions["duplicate_row_keys"],
                 "business_key_version_groups": key_versions["business_key_version_groups"],
                 "intervals": intervals,
-                "lineage": _lineage_metrics(connection, source),
+                "lineage": lineage,
                 "numeric_invariants": numeric,
-                "foreign_keys": _foreign_key_metrics(
-                    connection,
-                    child_source=source,
-                    child_contract=contract,
-                    parent_sources=sources,
-                    parent_contracts=contracts,
-                ),
+                "foreign_keys": foreign_keys,
             }
             violation_count = (
                 int(report["null_row_key_rows"])
@@ -717,6 +751,7 @@ def audit_dwd_semantic_contracts(
             report["violation_count"] = violation_count
             report["status"] = "verified" if violation_count == 0 else "finding"
             table_reports[table] = report
+            _progress(table, "checkpoint")
             _write_json_atomic(
                 checkpoint_path,
                 _checkpoint_value(audit_identity, table_reports),

@@ -60,6 +60,7 @@ _EFFECTIVE_COORDINATES = (
 )
 _MEMORY_LIMIT_PATTERN = re.compile(r"[1-9][0-9]*(?:MB|GB)")
 _KEY_VERSION_TARGET_COMPRESSED_BYTES = 32 * 1024 * 1024
+_FOREIGN_KEY_TARGET_COMPRESSED_BYTES = 32 * 1024 * 1024
 
 
 def _object(path: Path, label: str) -> dict[str, Any]:
@@ -542,6 +543,80 @@ def _foreign_key_metrics(
     return reports
 
 
+def _path_batches(paths: Sequence[Path], target_bytes: int) -> list[list[Path]]:
+    batches: list[list[Path]] = []
+    current: list[Path] = []
+    current_bytes = 0
+    for path in paths:
+        size = path.stat().st_size
+        if current and current_bytes + size > target_bytes:
+            batches.append(current)
+            current = []
+            current_bytes = 0
+        current.append(path)
+        current_bytes += size
+    if current:
+        batches.append(current)
+    return batches
+
+
+def _partitioned_foreign_key_metrics(
+    connection: Any,
+    *,
+    child_paths: Sequence[Path],
+    child_contract: SemanticTableContract,
+    parent_sources: Mapping[str, str],
+    parent_contracts: Mapping[str, SemanticTableContract],
+) -> list[dict[str, Any]]:
+    """Count child foreign-key violations in bounded physical batches."""
+
+    if not child_contract.foreign_keys:
+        return []
+    batches = _path_batches(child_paths, _FOREIGN_KEY_TARGET_COMPRESSED_BYTES)
+    if len(batches) <= 1:
+        return _foreign_key_metrics(
+            connection,
+            child_source=_parquet_source(child_paths),
+            child_contract=child_contract,
+            parent_sources=parent_sources,
+            parent_contracts=parent_contracts,
+        )
+    totals: list[dict[str, Any]] | None = None
+    hash_fields = ", ".join(
+        _identifier(foreign_key.column) for foreign_key in child_contract.foreign_keys
+    )
+    for batch in batches:
+        batch_bytes = sum(path.stat().st_size for path in batch)
+        shard_count = max(
+            1,
+            math.ceil(batch_bytes / _FOREIGN_KEY_TARGET_COMPRESSED_BYTES),
+        )
+        batch_source = _parquet_source(batch)
+        for shard in range(shard_count):
+            child_source = batch_source
+            if shard_count > 1:
+                child_source = (
+                    f"(SELECT * FROM {batch_source} "
+                    f"WHERE hash({hash_fields}) % {shard_count} = {shard})"
+                )
+            reports = _foreign_key_metrics(
+                connection,
+                child_source=child_source,
+                child_contract=child_contract,
+                parent_sources=parent_sources,
+                parent_contracts=parent_contracts,
+            )
+            if totals is None:
+                totals = reports
+                continue
+            if len(totals) != len(reports):
+                raise DwdSemanticContractAuditError("foreign-key batch report shape differs")
+            for total, report in zip(totals, reports, strict=True):
+                for metric in ("orphan_rows", "temporal_or_future_parent_rows"):
+                    total[metric] = int(total[metric]) + int(report[metric])
+    return totals or []
+
+
 def _canonical_digest(value: object) -> str:
     payload = json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode(
         "ascii"
@@ -725,9 +800,9 @@ def audit_dwd_semantic_contracts(
             _progress(table, "lineage")
             lineage = _lineage_metrics(connection, source)
             _progress(table, "foreign_keys")
-            foreign_keys = _foreign_key_metrics(
+            foreign_keys = _partitioned_foreign_key_metrics(
                 connection,
-                child_source=source,
+                child_paths=table_paths[table],
                 child_contract=contract,
                 parent_sources=sources,
                 parent_contracts=contracts,

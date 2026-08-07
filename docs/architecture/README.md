@@ -27,7 +27,7 @@ a parallel current-state architecture.
 | Node | Scope | Load when |
 | --- | --- | --- |
 | `adr-0008-dwd-historical-knowledge-remediation.md` | Proposed immutable successor-Base response to Issue #78; CN01 machine audit complete, exact closure/remediation digests awaiting approval | Auditing Base V2 historical PIT semantics, planning additive ODS evidence, successor rebuild, increment replay, or P4 source reapproval |
-| `adr-0009-gpu-p100-dwd-v2-1-execution.md` | Proposed GPU-P100 build and CN01 import/install authority split; exact replacement contract digest pending | Changing the V2.1 execution node, checkpoint topology, transfer boundary, or hourly inspection authority |
+| `adr-0009-gpu-p100-dwd-v2-1-execution.md` | Approved GPU-P100 build and CN01 import/install authority split; full build remains pilot-gated | Changing the V2.1 execution node, checkpoint topology, transfer boundary, or hourly inspection authority |
 
 ## Topic contracts
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Hourly Quanthus DWD Base V2.1 rebuild inspection on GPU-P100
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=1min
+Persistent=false
+Unit=quanthus-dwd-v2-1-monitor.service
+
+[Install]
+WantedBy=timers.target

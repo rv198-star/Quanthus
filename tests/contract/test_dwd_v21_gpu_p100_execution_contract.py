@@ -4,8 +4,12 @@ from pathlib import Path
 from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACT_PATH = (
-    ROOT / "config" / "audits" / "dwd-base-v2-1-gpu-p100-execution.v1.json"
+CONTRACT_PATH = ROOT / "config" / "audits" / "dwd-base-v2-1-gpu-p100-execution.v1.json"
+APPROVAL_PATH = (
+    ROOT
+    / "docs"
+    / "acceptance"
+    / "issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json"
 )
 
 
@@ -54,3 +58,12 @@ def test_monitor_is_not_an_authority_source() -> None:
     assert monitor["cadence"] == "PT1H"
     assert monitor["authority"] == "observe_diagnose_and_bounded_recovery_only"
     assert monitor["control_source"] == "approved_contract_and_phase_receipts"
+
+
+def test_exact_contract_has_a_separate_approval_receipt() -> None:
+    contract = _load_contract()
+    approval = json.loads(APPROVAL_PATH.read_text(encoding="ascii"))
+    supplied = approval.pop("canonical_digest")
+    assert supplied == _canonical_digest(approval)
+    assert approval["approved_contract_digest"] == contract["canonical_digest"]
+    assert approval["approval_statement"].endswith(contract["canonical_digest"])

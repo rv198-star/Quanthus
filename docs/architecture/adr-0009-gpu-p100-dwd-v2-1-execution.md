@@ -1,11 +1,11 @@
 # ADR 0009: GPU-P100 DWD Base V2.1 Execution Topology
 
-- Status: Proposed; execution node approved in principle, exact contract digest pending
+- Status: Accepted for implementation and bounded pilots; full build remains pilot-gated
 - Date: 2026-08-07
 - Decision id: `META-DATA-PIT-001`
-- Design status: draft
-- Delivery gate: implementation and bounded pilots only
-- Affects: ADR 0008 section 5 and the V2.1 rebuild runbook after exact digest approval
+- Design status: approved
+- Delivery gate: implementation and bounded pilots open; full build blocked on pilot acceptance
+- Affects: ADR 0008 section 5, the HLD data-platform topology, and the V2.1 rebuild runbook
 
 ## Context
 
@@ -15,11 +15,12 @@ GPU-P100 is an intermittently available WSL2 node with 12 vCPUs, 31 GiB usable R
 180 GiB ext4 workspace on host drive D. The current builders are CPU DuckDB, Polars, and PyArrow;
 the absent Tesla P100 device is not part of the execution path.
 
-The project owner authorized GPU-P100 as the V2.1 execution node on 2026-08-07. Because the exact
-replacement contract did not exist at that moment, its canonical digest remains a separate approval
-gate. The frozen audit packet remains immutable historical evidence.
+The project owner authorized GPU-P100 as the V2.1 execution node on 2026-08-07 and subsequently
+approved the exact replacement contract digest. The approval receipt is
+`docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json`. The frozen audit
+packet remains immutable historical evidence.
 
-## Proposed Decision
+## Decision
 
 - GPU-P100 owns preflight, planning, pilots, domain builds, assembly, verification, and sealing.
 - CN01 pulls the sealed candidate through a restricted read-only GPU-P100 export account.
@@ -33,16 +34,16 @@ gate. The frozen audit packet remains immutable historical evidence.
 - A Codex App task may inspect receipts hourly and perform only recovery already authorized by the
   active phase. It is not the scheduler and cannot open gates, create a run, install, or cut over.
 
-The proposed machine contract is
+The approved machine contract is
 `config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json`, canonical digest
 `sha256:bab98bb0a11dbd2c8395881931cdaed50f915ce2ce39065c25ac103e5ea84d8a`.
 
 ## Phase Authority
 
-Before exact digest and pilot acceptance, authority is limited to implementation, preflight,
-planning, deterministic replay pilots, and representative partition pilots. Full build remains
-blocked until those receipts are accepted. Candidate installation additionally requires CN01 local
-capacity; pointer movement always requires separate approval of the exact installed candidate.
+Until pilot acceptance, authority is limited to implementation, preflight, planning, deterministic
+replay pilots, and representative partition pilots. Full build remains blocked until those
+receipts are accepted. Candidate installation additionally requires CN01 local capacity; pointer
+movement always requires separate approval of the exact installed candidate.
 
 ## Consequences
 
@@ -51,4 +52,5 @@ Transfers cross a manifest boundary instead of a shared mutable workspace. The a
 boundary requires a restricted export account, two deep verifications, immutable receipts, and
 separate capacity and cutover gates.
 
-This proposal does not update the HLD current state until its exact contract digest is approved.
+The HLD current state is updated by the approval commit. Full build, installation, and cutover
+remain controlled by their later gates.

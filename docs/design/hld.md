@@ -80,12 +80,15 @@ governed by ADR 0007:
   DuckDB, Polars, and PyArrow provide local query, typed transformation, and validation.
 - PostgreSQL remains an optional rebuildable serving projection. It is not canonical storage and
   is not a prerequisite for P4 research.
-- The V2.1 audit and remediation build have one execution authority: CN01. The full audit outputs,
-  findings/remediation ledger, plans, candidates, spill, checkpoints, July-tail cleaning, assembled
-  package, and evidence use mandatory `/personal` NFS; CN01 local storage retains the single-writer
-  lock, hidden final ingress, installed Base packages, and `BASE_CURRENT.json`. NFS is never a
-  production pointer/catalog, and NFS loss fails closed without local-scratch fallback. This
-  topology and the pre-rebuild hard gate are frozen by ADR 0008 but do not activate V2.1.
+- The completed V2.1 audit retains CN01 as its evidence authority. Under ADR 0009, GPU-P100 is the
+  CPU remediation-build authority while CN01 retains import, deep verification, installation,
+  pointer compare-and-swap, and rollback authority. GPU-P100 keeps plans, candidates, spill,
+  checkpoints, July-tail cleaning, assembly, and build evidence on its dedicated ext4 workspace.
+  CN01 `/personal` NFS is the manifest-bound transfer and deep-verification landing area only;
+  CN01 local storage retains its import/install lock, hidden final ingress, installed Base
+  packages, and `BASE_CURRENT.json`. Neither NFS nor the GPU node owns a production pointer, and
+  loss of either workspace fails closed without fallback. This topology and its pilot gate are
+  frozen by ADR 0009 but do not activate V2.1.
 
 ADR 0006 owns the seven-domain, 33-object DWD semantic boundary. The accepted
 `dwd-base-202607-v2` contains all 14 core objects, 18 internal support objects, and one quality

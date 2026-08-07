@@ -1,0 +1,23 @@
+{
+  "approval_statement": "APPROVE DWD V2.1 GPU-P100 EXECUTION CONTRACT sha256:bab98bb0a11dbd2c8395881931cdaed50f915ce2ce39065c25ac103e5ea84d8a",
+  "approved_at": "2026-08-07T21:14:37+00:00",
+  "approved_contract_digest": "sha256:bab98bb0a11dbd2c8395881931cdaed50f915ce2ce39065c25ac103e5ea84d8a",
+  "approver": "project_owner",
+  "canonical_digest": "sha256:e238d7d96ab2158d6fca8aa7d2f6217841cb69c14aa221c529132b78c302fc38",
+  "kind": "dwd_base_v2_1_gpu_p100_execution_contract_approval",
+  "phase_authority": {
+    "full_build": "blocked_until_pilot_receipts_approved",
+    "install": "blocked_until_sealed_candidate_and_cn01_capacity_gate",
+    "open": [
+      "implementation",
+      "preflight",
+      "planning",
+      "replay_pilot",
+      "partition_pilot"
+    ],
+    "pointer_cutover": "separate_exact_candidate_approval_required"
+  },
+  "recorded_at": "2026-08-07T21:14:37+00:00",
+  "schema_version": 1,
+  "source": "Codex project task"
+}

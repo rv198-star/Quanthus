@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quanthus.pipelines.dwd_pit_audit import _manifest_payload_files, _parquet_source
@@ -215,7 +215,21 @@ def audit_dwd_domain_invariants(
         raise DwdDomainInvariantAuditError(f"DWD Base verification failed: {exc}") from exc
     manifest = _object(root / "manifest.json", "DWD manifest")
     predicates = invariant_predicates()
-    paths = _manifest_payload_files(root, manifest, table_names=sorted(predicates))
+    raw_files = manifest.get("files")
+    if not isinstance(raw_files, list):
+        raise DwdDomainInvariantAuditError("DWD Base manifest files are invalid")
+    manifest_tables = sorted(
+        {
+            part
+            for raw_file in raw_files
+            if isinstance(raw_file, Mapping)
+            and isinstance(raw_file.get("path"), str)
+            for part in PurePosixPath(raw_file["path"]).parts
+            if part.startswith("dwd_")
+        }
+    )
+    all_paths = _manifest_payload_files(root, manifest, table_names=manifest_tables)
+    paths = {table: all_paths[table] for table in predicates}
     audit_identity = {
         "package_id": verified.package_id,
         "manifest_sha256": verified.manifest_sha256,

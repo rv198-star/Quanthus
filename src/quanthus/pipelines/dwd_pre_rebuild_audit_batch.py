@@ -48,6 +48,11 @@ AUDIT_STEPS = (
         kind="dwd_base_v2_domain_invariant_audit",
         report_name="numeric-domain-invariant-audit.json",
     ),
+    AuditStep(
+        name="downstream_impact",
+        kind="dwd_base_v2_downstream_increment_impact_audit",
+        report_name="downstream-and-increment-impact.json",
+    ),
 )
 
 _STEP_BY_NAME = {step.name: step for step in AUDIT_STEPS}
@@ -196,6 +201,22 @@ def _command(
             str(checkpoint),
             "--memory-limit",
             memory_limit,
+            "--output",
+            str(report),
+        ]
+    if step.name == "downstream_impact":
+        dwd_tree = dwd_root.parent.parent
+        return [
+            sys.executable,
+            str(executable / "audit-dwd-downstream-impact"),
+            "--base-root",
+            str(dwd_root),
+            "--daily-root",
+            str(dwd_tree / "daily"),
+            "--dwd-tree",
+            str(dwd_tree),
+            "--current-pointer",
+            str(dwd_root.parent / "BASE_CURRENT.json"),
             "--output",
             str(report),
         ]
@@ -372,6 +393,23 @@ def run_audit_batch(
         statuses = [state["steps"][name]["status"] for name in selected_steps]
         if not all(status in _TERMINAL_STEP_STATUSES for status in statuses):
             raise DwdPreRebuildAuditBatchError("audit batch ended without terminal step evidence")
+        completed_scopes = {
+            "schema_partitions": None,
+            "semantic_contracts": None,
+            "lineage_authority": None,
+            "domain_invariants": None,
+            "downstream_impact": "downstream_and_increment_compatibility",
+        }
+        selected_scopes = {
+            completed_scopes[name]
+            for name in selected_steps
+            if completed_scopes.get(name) is not None
+        }
+        state["remaining_audit_scope"] = [
+            item
+            for item in state["remaining_audit_scope"]
+            if item not in selected_scopes
+        ]
         state["status"] = (
             "completed_with_findings"
             if "completed_with_findings" in statuses

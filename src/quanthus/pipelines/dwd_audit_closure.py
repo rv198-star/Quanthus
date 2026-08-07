@@ -201,6 +201,66 @@ def _missing_readiness_finding() -> dict[str, Any]:
     )
 
 
+def _downstream_audit_status(
+    report: Mapping[str, Any], *, source: str, base_release: Mapping[str, Any]
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Validate the aggregate downstream/increment compatibility report."""
+
+    if report.get("kind") != "dwd_base_v2_downstream_increment_impact_audit":
+        raise DwdAuditClosureError("downstream report has an unexpected kind")
+    observed = report.get("base_release")
+    if not isinstance(observed, Mapping):
+        raise DwdAuditClosureError("downstream report has no Base identity")
+    identity_keys = ("package_id", "manifest_sha256", "content_digest", "through_date")
+    if any(observed.get(key) != base_release.get(key) for key in identity_keys):
+        raise DwdAuditClosureError("downstream report Base identity differs from the sealed package")
+    summary = report.get("summary")
+    if not isinstance(summary, Mapping) or summary.get("status") not in {"verified", "finding"}:
+        raise DwdAuditClosureError("downstream report has an invalid summary")
+    if summary.get("mutation_performed") is not False:
+        raise DwdAuditClosureError("downstream report does not prove read-only execution")
+    raw_findings = report.get("findings")
+    if not isinstance(raw_findings, list):
+        raise DwdAuditClosureError("downstream report has no findings list")
+    findings: list[dict[str, Any]] = []
+    for raw in raw_findings:
+        if not isinstance(raw, Mapping):
+            raise DwdAuditClosureError("downstream finding is invalid")
+        item = dict(raw)
+        if item.get("disposition") not in _DISPOSITIONS:
+            raise DwdAuditClosureError(
+                f"downstream finding has invalid disposition: {item.get('finding_id')}"
+            )
+        item["evidence_report"] = source
+        findings.append(item)
+    details = {
+        "status": summary["status"],
+        "report": source,
+        "report_digest": report.get("canonical_digest"),
+        "finding_count": summary.get("finding_count", len(findings)),
+        "reason_codes": summary.get("reason_codes", []),
+        "checks": report.get("checks", {}),
+    }
+    return details, findings
+
+
+def _missing_downstream_finding() -> dict[str, Any]:
+    return _finding(
+        finding_id="DWDV2-DOWNSTREAM-REPORT",
+        dimension_id="downstream_and_increment_compatibility",
+        scope="CN01 downstream and increment inventory",
+        severity="high",
+        evidence={"reason_codes": ["downstream_report_missing"]},
+        root_cause="No immutable CN01 report proves Daily, weekly, historical PIT, pointer, mirror, and retained-artifact compatibility.",
+        affected={"reports": 0},
+        disposition="add_immutable_evidence_then_fix_in_v2_1",
+        change="Run the read-only downstream/increment auditor and bind its canonical report before human approval.",
+        tests=["test_downstream_impact_report_is_required_for_closure"],
+        acceptance="A sealed CN01 downstream report classifies every required consumer and increment with an explicit disposition.",
+        source_report="not_run_fallback",
+    )
+
+
 def _count_nonzero(value: object) -> dict[str, int]:
     if not isinstance(value, Mapping):
         return {}
@@ -526,6 +586,7 @@ def build_audit_closure(
     coverage_report: Path | None = None,
     replay_report: Path | None = None,
     readiness_report: Path | None = None,
+    downstream_report: Path | None = None,
     replay_evidence: Sequence[Path] = (),
 ) -> dict[str, Any]:
     """Build a provisional, digest-bound closure packet without touching sealed data."""
@@ -601,6 +662,18 @@ def build_audit_closure(
         readiness_value, readiness_digest = _sealed_report(
             readiness_path, label="readiness report"
         )
+    downstream_value: dict[str, Any] | None = None
+    downstream_digest: str | None = None
+    downstream_path: Path | None = None
+    if downstream_report is not None:
+        downstream_path = downstream_report.resolve()
+        if downstream_path == base_root or downstream_path.is_relative_to(base_root):
+            raise DwdAuditClosureError("downstream report must remain outside sealed DWD Base")
+        if downstream_path == plan_root or downstream_path.is_relative_to(plan_root):
+            raise DwdAuditClosureError("downstream report must remain outside sealed input plan")
+        downstream_value, downstream_digest = _sealed_report(
+            downstream_path, label="downstream report"
+        )
     if lineage.get("dwd", {}).get("package_id") != base_release["package_id"]:
         raise DwdAuditClosureError("lineage report package differs from DWD Base")
 
@@ -668,6 +741,22 @@ def build_audit_closure(
         )
     findings.extend(readiness_findings)
 
+    if downstream_value is None:
+        downstream: dict[str, Any] = {
+            "status": "missing",
+            "report": "not_run_fallback",
+            "report_digest": None,
+            "finding_count": 1,
+            "reason_codes": ["downstream_report_missing"],
+            "checks": {},
+        }
+        downstream_findings = [_missing_downstream_finding()]
+    else:
+        downstream, downstream_findings = _downstream_audit_status(
+            downstream_value, source=str(downstream_path), base_release=base_release
+        )
+    findings.extend(downstream_findings)
+
     deferred = [
         item
         for item in ledger.get("records", [])
@@ -714,7 +803,7 @@ def build_audit_closure(
         )
 
     compatibility = _daily_compatibility(daily_root=daily_root.resolve(), base_release=base_release)
-    if compatibility["status"] != "verified":
+    if downstream_value is None and compatibility["status"] != "verified":
         findings.append(
             _finding(
                 finding_id="DWDV2-COMPAT-DAILY-BASE",
@@ -743,7 +832,7 @@ def build_audit_closure(
         open_scope.remove("coverage_and_exclusion_matrix_coordinate_scan")
     if replay_value is not None:
         open_scope.remove("representative_replay_determinism_for_base_derivations")
-    if compatibility["checked_package_count"] > 0:
+    if downstream_value is not None:
         open_scope.remove("downstream_increment_compatibility_review")
     if readiness_value is not None:
         open_scope.remove("rebuild_publication_and_rollback_readiness_acceptance")
@@ -761,6 +850,7 @@ def build_audit_closure(
         "coverage": coverage_digest,
         "replay": replay_digest,
         "readiness": readiness_digest,
+        "downstream": downstream_digest,
         "input_plan": plan.get("plan_digest"),
         "input_plan_files": plan_digests,
     }
@@ -780,6 +870,7 @@ def build_audit_closure(
         "findings": findings,
         "replay_determinism": replay,
         "rebuild_readiness": readiness,
+        "downstream_compatibility_audit": downstream,
         "downstream_compatibility": compatibility,
         "open_audit_scope": open_scope,
         "summary": {
@@ -842,6 +933,7 @@ def build_audit_closure(
         f"- Daily compatibility: `{compatibility['status']}` over `{compatibility['checked_package_count']}` packages",
         f"- Replay determinism evidence: `{replay['status']}`",
         f"- Rebuild/publication/rollback readiness: `{readiness['status']}`",
+        f"- Downstream/increment compatibility: `{downstream['status']}`",
         "",
         "## Immediate blockers",
         "",

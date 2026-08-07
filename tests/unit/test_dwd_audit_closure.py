@@ -213,6 +213,35 @@ class DwdAuditClosureTests(unittest.TestCase):
                 result["open_audit_scope"],
             )
 
+    def test_missing_downstream_report_is_classified(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base, plan, daily, schema, semantic, lineage, invariant, phase_a = self._fixture(
+                Path(temporary)
+            )
+            result = build_audit_closure(
+                base_root=base,
+                plan_root=plan,
+                schema_report=schema,
+                semantic_report=semantic,
+                lineage_report=lineage,
+                invariant_report=invariant,
+                phase_a_findings=phase_a,
+                daily_root=daily,
+                output_root=Path(temporary) / "out-downstream",
+                code_revision="a" * 40,
+            )
+            ledger = json.loads(
+                (Path(temporary) / "out-downstream" / "findings-ledger.json").read_text(
+                    encoding="ascii"
+                )
+            )
+            ids = {item["finding_id"] for item in ledger["findings"]}
+            self.assertIn("DWDV2-DOWNSTREAM-REPORT", ids)
+            self.assertIn(
+                "downstream_increment_compatibility_review",
+                result["open_audit_scope"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

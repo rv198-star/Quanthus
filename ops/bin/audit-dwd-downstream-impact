@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Audit CN01 DWD downstream and increment compatibility without mutation."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.dwd_downstream_impact_audit import (  # noqa: E402
+    DwdDownstreamImpactAuditError,
+    audit_dwd_downstream_impact,
+    write_downstream_impact_report,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-root", type=Path, required=True)
+    parser.add_argument("--daily-root", type=Path, required=True)
+    parser.add_argument("--dwd-tree", type=Path, required=True)
+    parser.add_argument("--current-pointer", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        report = audit_dwd_downstream_impact(
+            base_root=args.base_root,
+            daily_root=args.daily_root,
+            dwd_tree=args.dwd_tree,
+            current_pointer=args.current_pointer,
+        )
+        write_downstream_impact_report(
+            args.output,
+            report,
+            sealed_roots=(args.base_root, args.daily_root),
+        )
+    except (DwdDownstreamImpactAuditError, OSError) as exc:
+        print(f"DWD downstream impact audit failed: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(report["summary"], ensure_ascii=True, sort_keys=True))
+    return 0 if report["summary"]["status"] == "verified" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

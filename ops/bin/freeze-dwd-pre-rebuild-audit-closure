@@ -45,6 +45,7 @@ def main() -> int:
     parser.add_argument("--coverage-report", type=Path)
     parser.add_argument("--replay-report", type=Path)
     parser.add_argument("--readiness-report", type=Path)
+    parser.add_argument("--downstream-report", type=Path)
     parser.add_argument("--code-revision")
     parser.add_argument("--replay-evidence", type=Path, action="append", default=[])
     args = parser.parse_args()
@@ -64,6 +65,7 @@ def main() -> int:
             coverage_report=args.coverage_report,
             replay_report=args.replay_report,
             readiness_report=args.readiness_report,
+            downstream_report=args.downstream_report,
             replay_evidence=args.replay_evidence,
         )
     except (DwdAuditClosureError, OSError) as exc:

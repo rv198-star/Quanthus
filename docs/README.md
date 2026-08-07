@@ -81,6 +81,12 @@ nodes.
   `ods-base-202607-v2` and `dwd-base-202607-v2` through 2026-07-31. The DWD package contains all 33
   ADR 0006 objects, 468,268,180 rows, and 14,842,590,066 payload bytes. Daily and weekly processing
   writes immutable increments or corrections and never mutates either Base.
+- Issue #78's CN01-only pre-rebuild machine audit is complete with 31 classified findings and no
+  critical finding. The exact findings ledger, V2.1 remediation scope, build contract, raw hashes,
+  and dedicated-agent handoff are frozen under
+  `acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807/`. The builder remains blocked
+  until those exact digests receive human approval and the recorded execution-readiness findings
+  are closed; no V2.1 package or pointer has been created or changed.
 - Generic DWS is deferred until a concrete cross-domain consumer needs the retained ten-dimension,
   thirteen-fact constellation. P4 is not blocked by DWS: it consumes an exact DWD snapshot and
   produces a purpose-specific, manifest-bound `event_library` projection.

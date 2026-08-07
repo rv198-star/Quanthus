@@ -1,0 +1,323 @@
+{
+  "base_release": {
+    "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+    "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+    "package_id": "dwd-base-202607-v2",
+    "row_count": 468268180,
+    "table_count": 33,
+    "through_date": "2026-07-31"
+  },
+  "builder_gate": "blocked",
+  "canonical_digest": "sha256:e0c4e984e3508a77ac9e7b0546e6361e8be43bcbdaf3af76813aa40e4b8251db",
+  "code_revision": "15bcdb6fccdd7f25caea37c6f509798ecd64991b",
+  "generated_at": "2026-08-07T14:12:48.388916+00:00",
+  "items": [
+    {
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SCHEMA-dwd_observation_gap",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SCHEMA-dwd_quality_exception",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SCHEMA-dwd_share_capital_observation",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SCHEMA-dwd_shareholder_count_observation",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SCHEMA-dwd_shareholding_change",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SCHEMA-dwd_shareholding_observation",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SCHEMA-dwd_tradability_state",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_adjustment_factor",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_corporate_action",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_disclosure",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_disclosure_subject",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_financial_fact",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_financial_report",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_security_bar",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_share_capital_observation",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_shareholder_count_observation",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_shareholding_change",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-SEMANTIC-dwd_shareholding_observation",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "builder_or_contract_change": "Make financial value representation mutually exclusive and fail the builder on conflicting value columns.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-INVARIANT-dwd_financial_fact",
+      "tests": [
+        "test_financial_fact_requires_one_value_representation"
+      ],
+      "v2_1_acceptance_check": "The invariant audit reports zero nonzero rules for every governed table, including zero multiple-value rows."
+    },
+    {
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-COVERAGE-dwd_corporate_action",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-COVERAGE-dwd_corporate_action_term",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-COVERAGE-dwd_disclosure",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-COVERAGE-dwd_disclosure_subject",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-COVERAGE-dwd_financial_concept",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "disposition": "fix_in_v2_1",
+      "finding_id": "DWDV2-COVERAGE-dwd_share_capital_observation",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "builder_or_contract_change": "Capture two read-only CN01 replay receipts over representative real partitions, bind both to the frozen Base and input plan, and reject mutable or network-dependent derivation inputs.",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "finding_id": "DWDV2-REPLAY-DETERMINISM",
+      "tests": [
+        "test_dwd_replay_determinism_requires_two_bound_executions"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 replay report verifies two independently named executions with equal bytes or an approved semantic digest and zero replay reason codes."
+    },
+    {
+      "builder_or_contract_change": "Reserve local installation capacity using the sealed successor manifest size plus the policy margin; do not use local storage for NFS candidates or spill.",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "finding_id": "DWDV2-READINESS-LOCAL-CAPACITY",
+      "tests": [
+        "test_rebuild_readiness_rejects_insufficient_local_install_capacity"
+      ],
+      "v2_1_acceptance_check": "A fresh readiness receipt proves local free bytes are at least the sealed V2.1 candidate size plus the required margin."
+    },
+    {
+      "builder_or_contract_change": "Create and preflight the CN01-local coordination root and lock under the frozen path; never move lock authority to NFS.",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "finding_id": "DWDV2-READINESS-SINGLE-WRITER",
+      "tests": [
+        "test_rebuild_readiness_requires_local_single_writer_lock"
+      ],
+      "v2_1_acceptance_check": "A fresh readiness report proves the local lock parent exists, is not NFS, and the lock can be acquired without a second writer."
+    },
+    {
+      "builder_or_contract_change": "Run one bounded, read-only representative partition pilot per heavy builder on NFS and freeze memory/spill limits before full execution.",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "finding_id": "DWDV2-READINESS-PARTITION-PILOT",
+      "tests": [
+        "test_rebuild_readiness_requires_partition_pilot_evidence"
+      ],
+      "v2_1_acceptance_check": "A sealed pilot report verifies sequential execution, explicit memory limit, NFS spill path, and no local-scratch fallback."
+    },
+    {
+      "builder_or_contract_change": "Keep the exclusion explicit in the V2.1 source ledger and reject consumers that require the excluded auxiliary grain.",
+      "disposition": "retain_with_approved_contract",
+      "finding_id": "DWDV2-COVERAGE-DEFERRED-SOURCE",
+      "tests": [
+        "test_source_disposition_ledger_requires_explicit_exclusion_reason"
+      ],
+      "v2_1_acceptance_check": "The V2.1 input-plan and coverage report contain the same explicit exclusion, reason, and zero DWD target tables."
+    },
+    {
+      "builder_or_contract_change": "Provision or reserve the required NFS capacity and rerun the partition pilot before opening the builder gate.",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "finding_id": "DWDV2-READINESS-CAPACITY",
+      "tests": [
+        "test_rebuild_readiness_rejects_insufficient_nfs_capacity"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 capacity receipt proves the required free bytes plus margin, with a successful pilot and no local-scratch fallback."
+    }
+  ],
+  "kind": "dwd_base_v2_v2_1_remediation_scope",
+  "mutation_performed": false,
+  "open_audit_scope": [
+    "human_approval_of_findings_and_remediation_scope"
+  ],
+  "schema_version": 1,
+  "source_digests": {
+    "coverage": "sha256:95fbb30f047c3e4dcf06e8bd01d82d2503b5719666d5ca6335a58e1e99d2581f",
+    "downstream": "sha256:14da0d698397939cc19023d01660d10485d6ea01758d86136c50aa80cbaf0810",
+    "input_plan": "sha256:0a79ef0a495f07bab39b1b40931581babbcb03ff63a506618b247373a070bba4",
+    "input_plan_files": {
+      "capacity-estimate.json": "sha256:443f799de899d1767bce7d341dcb89642a2c75e20a9b0c15dfaf351f8b758a9c",
+      "coverage-matrix.json": "sha256:26575ecbfa9ee773843251c571e1d345674446f31e6a39453d84ccbd0f13ded2",
+      "input-plan.json": "sha256:d0231a422385a4ff277d797d003ad939a4415f25f38fca25f7b9a169f05e42c2",
+      "run-receipt.json": "sha256:cc5f1b0844362f6198f837ab75ce472fd13f9252fdcef6cbb07fe6cc5a416010",
+      "source-disposition-ledger.json": "sha256:b18e71c961e668c68056241ffb1eede5b92203fcfd502729e7c1f97cb5716ed2"
+    },
+    "invariant": "sha256:b47334629ba780d57ec345bc54506e39d9f7035bc3d5160903a68bd63c845cd9",
+    "lineage": "sha256:7e5f8f8c90cde41313aea5e52845ffff0aa79e43c15ef321f8965b469a09c4c9",
+    "phase_a": "sha256:d69db74fdd14ff0ce071735b4e3b4f449099f6400610e4354d8410769bfd67e4",
+    "readiness": "sha256:443ae7a11e7e952e1cefdc8d57a693b9fdbf6d52199669dc4be9cc7a863b7116",
+    "replay": "sha256:0432654e1c0af18f1b3d1d8e57248697a004a98c0f52c9497e850acba6a47a3c",
+    "schema": "sha256:3a2f50c6637973df3f327cb0e7d950a2519235aef4ac6590fc4015a5a0ba42b7",
+    "semantic": "sha256:8c90497ffe0623465873f938ab3c417d604693b7ac3d8d9345a6f312542d7e68",
+    "semantic_dimensions": "sha256:64bb0baa700dc955783ea664b6e99e90bcb8f18be93b504545d80ab2bb9c117b"
+  },
+  "source_ledger_digest": "sha256:9a30644f64aacecaab2f9c20797d98d09aa968e1679121e16271ca2063ce9708",
+  "status": "pending_audit_closure"
+}

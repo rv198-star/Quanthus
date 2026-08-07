@@ -26,7 +26,7 @@ a parallel current-state architecture.
 
 | Node | Scope | Load when |
 | --- | --- | --- |
-| `adr-0008-dwd-historical-knowledge-remediation.md` | Proposed immutable successor-Base response to Issue #78; not approved while physical mirror evidence is incomplete | Auditing Base V2 historical PIT semantics, planning additive ODS evidence, successor rebuild, increment replay, or P4 source reapproval |
+| `adr-0008-dwd-historical-knowledge-remediation.md` | Proposed immutable successor-Base response to Issue #78; CN01 machine audit complete, exact closure/remediation digests awaiting approval | Auditing Base V2 historical PIT semantics, planning additive ODS evidence, successor rebuild, increment replay, or P4 source reapproval |
 
 ## Topic contracts
 

@@ -1,10 +1,10 @@
 # ADR 0008: DWD Historical Knowledge Remediation
 
-- Status: Proposed; full pre-rebuild audit scope, successor identity/range, and CN01+NFS execution topology accepted; audit execution and source semantics pending
+- Status: Proposed; CN01 machine audit complete with 31 classified findings; exact remediation and builder authorization pending
 - Date: 2026-08-06
 - Decision id: `META-DATA-PIT-001`
 - Design status: partial decision recorded; final remediation not approved
-- Delivery gate: blocked pending the complete DWD Base V2 pre-rebuild audit, frozen one-time remediation scope, Hermes ODS mirror confirmation, builder implementation, and availability-contract approval
+- Delivery gate: blocked pending exact ledger/remediation approval, execution-readiness closure, builder implementation, package acceptance, and cutover approval
 - Affects: ADR 0006/0007 DWD Base V2 historical PIT authority; does not supersede their current operational topology
 
 ## Context
@@ -24,9 +24,12 @@ substitution. The code audit classifies the 33 tables as follows:
 | `source_derived_historical` | 3 | Adjustment factors/inputs and shareholder counts already use defensible source knowledge timestamps |
 | `forward_operational` | 10 | Seven original operational/governance objects plus all three financial tables are knowable only from immutable acquisition/detection without a revision archive |
 
-The machine matrix is `config/audits/dwd-pit-semantics.v1.json`. CN01's exact ODS V2 package has now
-passed deep verification and source-family scans. The physical DWD bytes on Hermes, CN01, and OCI,
-and checksum equality of the Hermes ODS mirror, still require completion.
+The machine matrix is `config/audits/dwd-pit-semantics.v1.json`. CN01's exact ODS V2 package passed
+deep verification and source-family scans. CN01 then completed the 33-table, 13-dimension DWD
+machine audit with 31 classified findings and no critical finding. Hermes and OCI are replica
+targets rather than semantic-audit authorities; successor replicas require checksum verification
+only if they are deployed after publication. The exact closure packet is retained at
+`docs/acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807/`.
 
 ## Recorded Decisions And Remaining Proposal
 
@@ -44,9 +47,10 @@ The following boundaries are accepted for the remediation design:
   pre-rebuild audit closes and its complete findings/remediation digests are approved.
 
 The audit expansion is machine-readable in
-`config/audits/dwd-base-v2-pre-rebuild-audit.v1.json`. Table/source availability rules, additive ODS
-evidence package identities, builder implementation, and the final V2.1 semantic digest remain
-pending approval.
+`config/audits/dwd-base-v2-pre-rebuild-audit.v1.json`. The exact findings ledger and one-time
+remediation scope are frozen in the closure packet but remain pending explicit digest approval.
+Required additive evidence, builder implementation, the final V2.1 semantic digest, package
+acceptance, and cutover remain subsequent gates.
 
 ### 1. Keep V2 immutable and historically blocked
 

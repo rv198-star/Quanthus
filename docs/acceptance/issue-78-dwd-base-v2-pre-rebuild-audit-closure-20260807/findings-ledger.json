@@ -1,0 +1,1803 @@
+{
+  "base_release": {
+    "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+    "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+    "package_id": "dwd-base-202607-v2",
+    "row_count": 468268180,
+    "table_count": 33,
+    "through_date": "2026-07-31"
+  },
+  "builder_gate": "blocked",
+  "canonical_digest": "sha256:9a30644f64aacecaab2f9c20797d98d09aa968e1679121e16271ca2063ce9708",
+  "code_revision": "15bcdb6fccdd7f25caea37c6f509798ecd64991b",
+  "downstream_compatibility": {
+    "checked_package_count": 7,
+    "expected_base": {
+      "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+      "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+      "package_id": "dwd-base-202607-v2"
+    },
+    "mismatch_count": 0,
+    "mismatches": [],
+    "packages": [
+      {
+        "base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "manifest_digest": "sha256:9d37ca6dc6505db5fecf0ed387fc411cf7865a827346ed15364de374ff63e376",
+        "market_date": "2026-08-03",
+        "package_id": "dwd-daily-20260803-d4f6c9fff51c-e262609",
+        "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/repro-a-e262609/manifest.json",
+        "status": "compatible"
+      },
+      {
+        "base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "manifest_digest": "sha256:9d37ca6dc6505db5fecf0ed387fc411cf7865a827346ed15364de374ff63e376",
+        "market_date": "2026-08-03",
+        "package_id": "dwd-daily-20260803-d4f6c9fff51c-e262609",
+        "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/repro-b-e262609/manifest.json",
+        "status": "compatible"
+      },
+      {
+        "base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "manifest_digest": "sha256:a481ff532e16af7f13bfa7c5671cae4bc9a1c96cebda8ebcf2ee9681f5e189f6",
+        "market_date": "2026-08-03",
+        "package_id": "dwd-daily-20260803-d4f6c9fff51c",
+        "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/shadow-3a6720e/manifest.json",
+        "status": "compatible"
+      },
+      {
+        "base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "manifest_digest": "sha256:3669e4a2af7ae343489c6210403ab81c27dfdcfc437dd5e28a270a66fcc0b753",
+        "market_date": "2026-08-03",
+        "package_id": "dwd-daily-20260803-d4f6c9fff51c",
+        "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/validation-1084788/manifest.json",
+        "status": "compatible"
+      },
+      {
+        "base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "manifest_digest": "sha256:96759d4010b4f35967f1f599947008799b0bc4fa0c9c1fc7ee40b53c29fc82ca",
+        "market_date": "2026-08-04",
+        "package_id": "dwd-daily-20260804-6c5bbc770dba-f2d2764",
+        "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-04/6c5bbc770dba-f2d2764/manifest.json",
+        "status": "compatible"
+      },
+      {
+        "base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "manifest_digest": "sha256:4fb1883a4c0df3489c92cb4af00d86a972cb48e9dc000e9508883397c2b227e8",
+        "market_date": "2026-08-05",
+        "package_id": "dwd-daily-20260805-1e451e441164-1cf95a1",
+        "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-05/1e451e441164-1cf95a1/manifest.json",
+        "status": "compatible"
+      },
+      {
+        "base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "manifest_digest": "sha256:2de514b8ace52ef122b86e9137b02cef686941b9edc6a9971bf5581524d81e2b",
+        "market_date": "2026-08-06",
+        "package_id": "dwd-daily-20260806-827113f5d692-494404a",
+        "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-06/827113f5d692-494404a/manifest.json",
+        "status": "compatible"
+      }
+    ],
+    "status": "verified"
+  },
+  "downstream_compatibility_audit": {
+    "checks": {
+      "current_pointer_and_successor_retention": {
+        "candidate": {
+          "disposition": "retain_v2_and_ignore_unrelated_candidates",
+          "ingress_path": "/srv/quanthus/dwd-dws-v2/base/.incoming-dwd-base-202607-v2.1",
+          "ingress_present": false,
+          "status": "verified",
+          "successor_path": "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1",
+          "successor_present": false,
+          "unrelated_candidate_count": 68,
+          "unrelated_candidate_names": [
+            ".dwd2-base-202607-33b3b92-issue57-clean.lock",
+            ".dwd2-base-202607-33b3b92-issue57.lock",
+            ".dwd2-base-202607-33b3b92-issue72-clean.lock",
+            ".dwd2-base-202607-33b3b92-issue72.lock",
+            ".dwd2-base-202607-450b445-issue57.lock",
+            ".dwd2-base-202607-450b445-issue58.699102ff5ff1419a67c7ae3e59381efd5b9fd2da649027be8a0a3481a54c011d.work",
+            ".dwd2-base-202607-450b445-issue58.lock",
+            ".dwd2-base-202607-450b445-issue72.lock",
+            ".dwd2-base-202607-a7964fc-issue57-rebuilt.lock",
+            ".dwd2-base-202607-a7964fc-issue57.lock",
+            ".dwd2-base-202607-a7964fc-issue72.lock",
+            ".dwd2-base-202607-d1fd10d-issue57.lock",
+            ".dwd2-base-202607-d1fd10d-issue58.lock",
+            ".dwd2-base-202607-d1fd10d-issue72.lock",
+            ".dwd2-base-202607-d66ce55-issue57.lock",
+            ".dwd2-base-202607-d66ce55-issue58.lock",
+            ".dwd2-base-202607-d66ce55-issue59.0f8969d38ea86ec2539be2cc0c13d3e1f7b619a602aabca473e85821e154aac5.work",
+            ".dwd2-base-202607-d66ce55-issue59.lock",
+            ".dwd2-base-202607-d66ce55-issue60-v2.lock",
+            ".dwd2-base-202607-d66ce55-issue60.lock",
+            ".dwd2-base-202607-d66ce55-issue61.lock",
+            ".dwd2-base-202607-d66ce55-issue62.lock",
+            ".dwd2-base-202607-d66ce55-issue63-v2.lock",
+            ".dwd2-base-202607-d66ce55-issue63.lock",
+            ".dwd2-base-202607-d66ce55-issue64.lock",
+            ".dwd2-base-202607-d66ce55-issue72.lock",
+            ".dwd2-base-202607-dfcb873-issue57.lock",
+            ".dwd2-base-202607-dfcb873-issue58.lock",
+            ".dwd2-base-202607-dfcb873-issue72.lock",
+            ".dwd2-base-202607-f0e4dfc-issue57.lock",
+            ".dwd2-base-202607-f0e4dfc-issue58.lock",
+            ".dwd2-base-202607-f0e4dfc-issue72.lock",
+            ".dwd2-base-202607-f92ae36-issue57.lock",
+            ".dwd2-base-202607-f92ae36-issue72-clean.lock",
+            ".dwd2-base-202607-f92ae36-issue72.lock",
+            ".issue57-base-de26fed-clean.lock",
+            ".issue57-base-de26fed.lock",
+            "dwd2-base-202607-33b3b92-issue57",
+            "dwd2-base-202607-33b3b92-issue57-clean",
+            "dwd2-base-202607-33b3b92-issue72",
+            "dwd2-base-202607-33b3b92-issue72-clean",
+            "dwd2-base-202607-450b445-issue57",
+            "dwd2-base-202607-450b445-issue72",
+            "dwd2-base-202607-a7964fc-issue57",
+            "dwd2-base-202607-a7964fc-issue57-rebuilt",
+            "dwd2-base-202607-a7964fc-issue72",
+            "dwd2-base-202607-d1fd10d-issue57",
+            "dwd2-base-202607-d1fd10d-issue72",
+            "dwd2-base-202607-d66ce55-issue57",
+            "dwd2-base-202607-d66ce55-issue58",
+            "dwd2-base-202607-d66ce55-issue59",
+            "dwd2-base-202607-d66ce55-issue60",
+            "dwd2-base-202607-d66ce55-issue60-v2",
+            "dwd2-base-202607-d66ce55-issue61",
+            "dwd2-base-202607-d66ce55-issue62",
+            "dwd2-base-202607-d66ce55-issue63",
+            "dwd2-base-202607-d66ce55-issue63-v2",
+            "dwd2-base-202607-d66ce55-issue64",
+            "dwd2-base-202607-d66ce55-issue72",
+            "dwd2-base-202607-dfcb873-issue57",
+            "dwd2-base-202607-dfcb873-issue72",
+            "dwd2-base-202607-f0e4dfc-issue57",
+            "dwd2-base-202607-f0e4dfc-issue72",
+            "dwd2-base-202607-f92ae36-issue57",
+            "dwd2-base-202607-f92ae36-issue72",
+            "dwd2-base-202607-f92ae36-issue72-clean",
+            "issue57-base-de26fed",
+            "issue57-base-de26fed-clean"
+          ]
+        },
+        "disposition": "retain_v2_pointer_until_successor_acceptance",
+        "expected_base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "path": "/srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json",
+        "pointer": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "kind": "dwd_domain_base_current",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2",
+          "package_path": "dwd-base-202607-v2",
+          "run_id": "dwd2-base-202607-d66ce55",
+          "schema_version": 1,
+          "through_date": "2026-07-31"
+        },
+        "status": "verified"
+      },
+      "daily_increment_compatibility": {
+        "checked_package_count": 7,
+        "disposition": "retain_until_successor_rebase",
+        "expected_base": {
+          "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+          "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "package_id": "dwd-base-202607-v2"
+        },
+        "mismatch_count": 0,
+        "mismatches": [],
+        "packages": [
+          {
+            "base": {
+              "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+              "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+              "package_id": "dwd-base-202607-v2"
+            },
+            "manifest_sha256": "sha256:9d37ca6dc6505db5fecf0ed387fc411cf7865a827346ed15364de374ff63e376",
+            "market_date": "2026-08-03",
+            "package_id": "dwd-daily-20260803-d4f6c9fff51c-e262609",
+            "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/repro-a-e262609/manifest.json",
+            "status": "compatible"
+          },
+          {
+            "base": {
+              "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+              "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+              "package_id": "dwd-base-202607-v2"
+            },
+            "manifest_sha256": "sha256:9d37ca6dc6505db5fecf0ed387fc411cf7865a827346ed15364de374ff63e376",
+            "market_date": "2026-08-03",
+            "package_id": "dwd-daily-20260803-d4f6c9fff51c-e262609",
+            "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/repro-b-e262609/manifest.json",
+            "status": "compatible"
+          },
+          {
+            "base": {
+              "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+              "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+              "package_id": "dwd-base-202607-v2"
+            },
+            "manifest_sha256": "sha256:a481ff532e16af7f13bfa7c5671cae4bc9a1c96cebda8ebcf2ee9681f5e189f6",
+            "market_date": "2026-08-03",
+            "package_id": "dwd-daily-20260803-d4f6c9fff51c",
+            "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/shadow-3a6720e/manifest.json",
+            "status": "compatible"
+          },
+          {
+            "base": {
+              "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+              "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+              "package_id": "dwd-base-202607-v2"
+            },
+            "manifest_sha256": "sha256:3669e4a2af7ae343489c6210403ab81c27dfdcfc437dd5e28a270a66fcc0b753",
+            "market_date": "2026-08-03",
+            "package_id": "dwd-daily-20260803-d4f6c9fff51c",
+            "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/validation-1084788/manifest.json",
+            "status": "compatible"
+          },
+          {
+            "base": {
+              "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+              "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+              "package_id": "dwd-base-202607-v2"
+            },
+            "manifest_sha256": "sha256:96759d4010b4f35967f1f599947008799b0bc4fa0c9c1fc7ee40b53c29fc82ca",
+            "market_date": "2026-08-04",
+            "package_id": "dwd-daily-20260804-6c5bbc770dba-f2d2764",
+            "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-04/6c5bbc770dba-f2d2764/manifest.json",
+            "status": "compatible"
+          },
+          {
+            "base": {
+              "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+              "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+              "package_id": "dwd-base-202607-v2"
+            },
+            "manifest_sha256": "sha256:4fb1883a4c0df3489c92cb4af00d86a972cb48e9dc000e9508883397c2b227e8",
+            "market_date": "2026-08-05",
+            "package_id": "dwd-daily-20260805-1e451e441164-1cf95a1",
+            "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-05/1e451e441164-1cf95a1/manifest.json",
+            "status": "compatible"
+          },
+          {
+            "base": {
+              "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+              "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+              "package_id": "dwd-base-202607-v2"
+            },
+            "manifest_sha256": "sha256:2de514b8ace52ef122b86e9137b02cef686941b9edc6a9971bf5581524d81e2b",
+            "market_date": "2026-08-06",
+            "package_id": "dwd-daily-20260806-827113f5d692-494404a",
+            "path": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-06/827113f5d692-494404a/manifest.json",
+            "status": "compatible"
+          }
+        ],
+        "status": "verified"
+      },
+      "historical_pit_consumers": {
+        "active_historical_pit_units": [],
+        "disposition": "blocked_until_successor_pit_contract",
+        "historical_pit_units": [],
+        "inventory_error": null,
+        "status": "verified"
+      },
+      "mirror_restore_deployment": {
+        "disposition": "copy_and_checksum_after_cn01_successor_acceptance",
+        "hermes_dwd_unit": {
+          "active": "inactive",
+          "active_exit_code": 3,
+          "enabled": "Failed to get unit file state for hermes-dwd.service: No such file or directory",
+          "enabled_exit_code": 1,
+          "unit": "hermes-dwd.service"
+        },
+        "oci_and_hermes_pre_rebuild_semantics": "excluded_by_cn01_authority_contract",
+        "oci_sync_unit": {
+          "active": "inactive",
+          "active_exit_code": 3,
+          "enabled": "Failed to get unit file state for oci-dwd-sync.service: No such file or directory",
+          "enabled_exit_code": 1,
+          "unit": "oci-dwd-sync.service"
+        },
+        "status": "verified"
+      },
+      "retained_operational_artifacts": {
+        "disposition": "retain_without_using_as_successor_input",
+        "legacy_artifacts_are_authority": false,
+        "legacy_candidates_retained": 68,
+        "legacy_dwd_tree": "/srv/quanthus/dwd-dws-v2",
+        "status": "verified"
+      },
+      "weekly_correction_compatibility": {
+        "disposition": "disabled_until_successor_contract",
+        "dwd_weekly_input_unit": {
+          "active": "inactive",
+          "active_exit_code": 3,
+          "enabled": "disabled",
+          "enabled_exit_code": 1,
+          "unit": "cn01-dwd-weekly-input.timer"
+        },
+        "dwd_weekly_manifest_count": 0,
+        "paths": [],
+        "status": "verified",
+        "upstream_ods_weekly_unit": {
+          "active": "active",
+          "active_exit_code": 0,
+          "enabled": "enabled",
+          "enabled_exit_code": 0,
+          "unit": "cn01-ods-weekly-corrections.timer"
+        }
+      }
+    },
+    "finding_count": 0,
+    "reason_codes": [],
+    "report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-d-downstream-impact-20260807-rerun7/downstream_impact/downstream-and-increment-impact.json",
+    "report_digest": "sha256:14da0d698397939cc19023d01660d10485d6ea01758d86136c50aa80cbaf0810",
+    "status": "verified"
+  },
+  "findings": [
+    {
+      "affected_rows_or_partitions": {
+        "parts": 330,
+        "rows": 3799794
+      },
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "dimension_id": "schema_and_partition_contract",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "finding_part_count": 330,
+        "part_count": 330,
+        "reason_counts": {
+          "extra_fields:affected_effective_at_month,affected_effective_at_year": 330
+        },
+        "schema_variant_count": 1
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-b-20260806/cn01-dwd-v2-schema-partitions.json",
+      "finding_id": "DWDV2-SCHEMA-dwd_observation_gap",
+      "root_cause": "Physical partitions do not match the frozen DWD model or partition contract.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_observation_gap",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "parts": 1,
+        "rows": 1607
+      },
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "dimension_id": "schema_and_partition_contract",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "finding_part_count": 1,
+        "part_count": 1,
+        "reason_counts": {
+          "field_order_mismatch": 1,
+          "partition_keys_mismatch:detected_year:detected_at_year": 1
+        },
+        "schema_variant_count": 1
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-b-20260806/cn01-dwd-v2-schema-partitions.json",
+      "finding_id": "DWDV2-SCHEMA-dwd_quality_exception",
+      "root_cause": "Physical partitions do not match the frozen DWD model or partition contract.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_quality_exception",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "parts": 2293,
+        "rows": 207064
+      },
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "dimension_id": "schema_and_partition_contract",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "finding_part_count": 2293,
+        "part_count": 2293,
+        "reason_counts": {
+          "partition_keys_mismatch:year:observation_start_year": 2293
+        },
+        "schema_variant_count": 1
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-b-20260806/cn01-dwd-v2-schema-partitions.json",
+      "finding_id": "DWDV2-SCHEMA-dwd_share_capital_observation",
+      "root_cause": "Physical partitions do not match the frozen DWD model or partition contract.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_share_capital_observation",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "parts": 706,
+        "rows": 411318
+      },
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "dimension_id": "schema_and_partition_contract",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "finding_part_count": 706,
+        "part_count": 706,
+        "reason_counts": {
+          "partition_keys_mismatch:year:period_end_year": 706
+        },
+        "schema_variant_count": 1
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-b-20260806/cn01-dwd-v2-schema-partitions.json",
+      "finding_id": "DWDV2-SCHEMA-dwd_shareholder_count_observation",
+      "root_cause": "Physical partitions do not match the frozen DWD model or partition contract.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_shareholder_count_observation",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "parts": 110,
+        "rows": 192773
+      },
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "dimension_id": "schema_and_partition_contract",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "finding_part_count": 110,
+        "part_count": 110,
+        "reason_counts": {
+          "partition_keys_mismatch:year:effective_at_year,effective_at_month": 110
+        },
+        "schema_variant_count": 1
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-b-20260806/cn01-dwd-v2-schema-partitions.json",
+      "finding_id": "DWDV2-SCHEMA-dwd_shareholding_change",
+      "root_cause": "Physical partitions do not match the frozen DWD model or partition contract.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_shareholding_change",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "parts": 656,
+        "rows": 390627
+      },
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "dimension_id": "schema_and_partition_contract",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "finding_part_count": 656,
+        "part_count": 656,
+        "reason_counts": {
+          "partition_keys_mismatch:year:observation_start_year": 656
+        },
+        "schema_variant_count": 1
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-b-20260806/cn01-dwd-v2-schema-partitions.json",
+      "finding_id": "DWDV2-SCHEMA-dwd_shareholding_observation",
+      "root_cause": "Physical partitions do not match the frozen DWD model or partition contract.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_shareholding_observation",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "parts": 428,
+        "rows": 18557414
+      },
+      "builder_or_contract_change": "Make the V2.1 writer emit the model field set and canonical partition keys, with a partition-level contract test.",
+      "dimension_id": "schema_and_partition_contract",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "finding_part_count": 428,
+        "part_count": 428,
+        "reason_counts": {
+          "extra_fields:observation_start_month,observation_start_year": 428
+        },
+        "schema_variant_count": 1
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-b-20260806/cn01-dwd-v2-schema-partitions.json",
+      "finding_id": "DWDV2-SCHEMA-dwd_tradability_state",
+      "root_cause": "Physical partitions do not match the frozen DWD model or partition contract.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_tradability_state",
+      "tests": [
+        "test_dwd_schema_partition_contract_rejects_model_drift"
+      ],
+      "v2_1_acceptance_check": "The CN01 V2.1 schema audit reports zero finding parts and zero partition-contract reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_security:security_id": 139947
+          }
+        },
+        "rows": 139947
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "adjustment_factor_id",
+          "effective_from"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_security:security_id": 139947
+          }
+        },
+        "row_count": 139947,
+        "row_key": [
+          "adjustment_factor_id",
+          "effective_from",
+          "knowledge_from"
+        ],
+        "violation_count": 139947
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_adjustment_factor",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_adjustment_factor",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 94797,
+            "dwd_security:security_id": 94797
+          }
+        },
+        "rows": 189594
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "corporate_action_id",
+          "effective_at"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 94797,
+            "dwd_security:security_id": 94797
+          }
+        },
+        "row_count": 94797,
+        "row_key": [
+          "corporate_action_id",
+          "effective_at",
+          "knowledge_from"
+        ],
+        "violation_count": 189594
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_corporate_action",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_corporate_action",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 6489940
+          }
+        },
+        "rows": 6489940
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "disclosure_id",
+          "effective_at"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 6489940
+          }
+        },
+        "row_count": 6489940,
+        "row_key": [
+          "disclosure_id",
+          "effective_at",
+          "knowledge_from"
+        ],
+        "violation_count": 6489940
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_disclosure",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_disclosure",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_financial_report:financial_report_id": 2430409,
+            "dwd_security:security_id": 6395143
+          }
+        },
+        "rows": 8825552
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "disclosure_id",
+          "disclosure_subject_id",
+          "effective_at"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_financial_report:financial_report_id": 2430409,
+            "dwd_security:security_id": 6395143
+          }
+        },
+        "row_count": 8920349,
+        "row_key": [
+          "disclosure_id",
+          "disclosure_subject_id",
+          "effective_at",
+          "knowledge_from"
+        ],
+        "violation_count": 8825552
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_disclosure_subject",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_disclosure_subject",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_financial_concept:financial_concept_id": 89622402
+          }
+        },
+        "rows": 89622402
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "financial_report_id",
+          "financial_concept_id",
+          "unit_code",
+          "context_hash",
+          "period_end"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_financial_concept:financial_concept_id": 89622402
+          }
+        },
+        "row_count": 89622402,
+        "row_key": [
+          "financial_report_id",
+          "financial_concept_id",
+          "unit_code",
+          "context_hash",
+          "period_end",
+          "knowledge_from"
+        ],
+        "violation_count": 89622402
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_financial_fact",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_financial_fact",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 1288266
+          }
+        },
+        "rows": 1288266
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "financial_report_id",
+          "period_end"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 1288266
+          }
+        },
+        "row_count": 1749480,
+        "row_key": [
+          "financial_report_id",
+          "period_end",
+          "knowledge_from"
+        ],
+        "violation_count": 1288266
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_financial_report",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_financial_report",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "numeric_invariants": {
+            "ohlc_envelope_rows": 1
+          }
+        },
+        "rows": 1
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "numeric_and_domain_invariants",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "listing_id",
+          "observation_start",
+          "interval_size",
+          "price_basis"
+        ],
+        "components": {
+          "numeric_invariants": {
+            "ohlc_envelope_rows": 1
+          }
+        },
+        "row_count": 264385668,
+        "row_key": [
+          "listing_id",
+          "observation_start",
+          "interval_size",
+          "price_basis",
+          "knowledge_from"
+        ],
+        "violation_count": 1
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_security_bar",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_security_bar",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_security:security_id": 207064
+          }
+        },
+        "rows": 207064
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "security_id",
+          "capital_type",
+          "observation_start"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_security:security_id": 207064
+          }
+        },
+        "row_count": 207064,
+        "row_key": [
+          "security_id",
+          "capital_type",
+          "observation_start",
+          "knowledge_from"
+        ],
+        "violation_count": 207064
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_share_capital_observation",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_share_capital_observation",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 411318,
+            "dwd_security:security_id": 411318
+          }
+        },
+        "rows": 822636
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "shareholder_count_observation_id",
+          "period_end"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 411318,
+            "dwd_security:security_id": 411318
+          }
+        },
+        "row_count": 411318,
+        "row_key": [
+          "shareholder_count_observation_id",
+          "period_end",
+          "knowledge_from"
+        ],
+        "violation_count": 822636
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_shareholder_count_observation",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_shareholder_count_observation",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 192773,
+            "dwd_security:security_id": 192773
+          }
+        },
+        "rows": 385546
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "referential_integrity",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "shareholding_change_id",
+          "effective_at"
+        ],
+        "components": {
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 192773,
+            "dwd_security:security_id": 192773
+          }
+        },
+        "row_count": 192773,
+        "row_key": [
+          "shareholding_change_id",
+          "effective_at",
+          "knowledge_from"
+        ],
+        "violation_count": 385546
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_shareholding_change",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_shareholding_change",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "components": {
+          "business_key_version_groups": {
+            "group_count": 7,
+            "row_count": 14
+          },
+          "duplicate_row_keys": {
+            "group_count": 7,
+            "row_count": 14
+          },
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 390627,
+            "dwd_security:security_id": 390627
+          },
+          "numeric_invariants": {
+            "out_of_range_holding_percentage_rows": 1
+          }
+        },
+        "rows": 781269
+      },
+      "builder_or_contract_change": "Rebuild dependent rows against parent intervals at the effective coordinate and enforce immutable row/version and domain contracts.",
+      "dimension_id": "numeric_and_domain_invariants",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "business_key": [
+          "company_id",
+          "security_id",
+          "shareholder_source_name",
+          "holding_type",
+          "observation_start"
+        ],
+        "components": {
+          "business_key_version_groups": {
+            "group_count": 7,
+            "row_count": 14
+          },
+          "duplicate_row_keys": {
+            "group_count": 7,
+            "row_count": 14
+          },
+          "foreign_keys": {
+            "dwd_listed_company:company_id": 390627,
+            "dwd_security:security_id": 390627
+          },
+          "numeric_invariants": {
+            "out_of_range_holding_percentage_rows": 1
+          }
+        },
+        "row_count": 390627,
+        "row_key": [
+          "company_id",
+          "security_id",
+          "shareholder_source_name",
+          "holding_type",
+          "observation_start",
+          "knowledge_from"
+        ],
+        "violation_count": 781269
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c7-20260807/semantic-contract-audit.json",
+      "finding_id": "DWDV2-SEMANTIC-dwd_shareholding_observation",
+      "root_cause": "The V2 package joins historical rows to current or future parent identity, or contains a semantic row/key violation.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_shareholding_observation",
+      "tests": [
+        "test_dwd_semantic_contract_rejects_future_parent_and_key_violations"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 semantic audit has zero orphan, future-parent, interval, duplicate-key, and domain violation counts."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "rows": 39892294,
+        "rules": {
+          "multiple_value_representations_rows": 39892294
+        }
+      },
+      "builder_or_contract_change": "Make financial value representation mutually exclusive and fail the builder on conflicting value columns.",
+      "dimension_id": "numeric_and_domain_invariants",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "row_count": 89622402,
+        "rules": {
+          "multiple_value_representations_rows": 39892294
+        }
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-d-invariants-c7-rerun2-20260807/domain_invariants/numeric-domain-invariant-audit.json",
+      "finding_id": "DWDV2-INVARIANT-dwd_financial_fact",
+      "root_cause": "The encoded value contract permits semantically incompatible representations.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_financial_fact",
+      "tests": [
+        "test_financial_fact_requires_one_value_representation"
+      ],
+      "v2_1_acceptance_check": "The invariant audit reports zero nonzero rules for every governed table, including zero multiple-value rows."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "reason_codes": [
+          "coordinate_after_through_date:effective_at"
+        ],
+        "rows_or_parts": 94797
+      },
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "dimension_id": "completeness_and_coverage",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "coordinates": {
+          "coordinate_fields": [
+            "effective_at"
+          ],
+          "fields": {
+            "effective_at": {
+              "after_through_date": true,
+              "maximum": "2026-08-03T15:59:59.999999+00:00",
+              "minimum": "2011-04-01T15:59:59.999999+00:00",
+              "missing_part_count": 0,
+              "null_count_from_statistics": 0,
+              "statistics_complete": true,
+              "through_date_checked": true
+            }
+          },
+          "time_profile": "effective_event"
+        },
+        "expected_rows": 94797,
+        "reason_codes": [
+          "coordinate_after_through_date:effective_at"
+        ],
+        "row_count": 94797
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-d-coverage-20260807-rerun1/coverage-and-exclusion-matrix.json",
+      "finding_id": "DWDV2-COVERAGE-dwd_corporate_action",
+      "root_cause": "A business coordinate is outside the frozen Base through-date or its coverage proof is incomplete.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_corporate_action",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "reason_codes": [
+          "coordinate_after_through_date:effective_at"
+        ],
+        "rows_or_parts": 209493
+      },
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "dimension_id": "completeness_and_coverage",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "coordinates": {
+          "coordinate_fields": [
+            "effective_at"
+          ],
+          "fields": {
+            "effective_at": {
+              "after_through_date": true,
+              "maximum": "2026-08-03T15:59:59.999999+00:00",
+              "minimum": "2011-04-01T15:59:59.999999+00:00",
+              "missing_part_count": 0,
+              "null_count_from_statistics": 0,
+              "statistics_complete": true,
+              "through_date_checked": true
+            }
+          },
+          "time_profile": "effective_event"
+        },
+        "expected_rows": 209493,
+        "reason_codes": [
+          "coordinate_after_through_date:effective_at"
+        ],
+        "row_count": 209493
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-d-coverage-20260807-rerun1/coverage-and-exclusion-matrix.json",
+      "finding_id": "DWDV2-COVERAGE-dwd_corporate_action_term",
+      "root_cause": "A business coordinate is outside the frozen Base through-date or its coverage proof is incomplete.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_corporate_action_term",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "reason_codes": [
+          "coordinate_after_through_date:effective_at"
+        ],
+        "rows_or_parts": 6489940
+      },
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "dimension_id": "completeness_and_coverage",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "coordinates": {
+          "coordinate_fields": [
+            "effective_at"
+          ],
+          "fields": {
+            "effective_at": {
+              "after_through_date": true,
+              "maximum": "2026-08-03T15:59:59.999999+00:00",
+              "minimum": "2010-12-31T22:30:00+00:00",
+              "missing_part_count": 0,
+              "null_count_from_statistics": 0,
+              "statistics_complete": true,
+              "through_date_checked": true
+            }
+          },
+          "time_profile": "effective_event"
+        },
+        "expected_rows": 6489940,
+        "reason_codes": [
+          "coordinate_after_through_date:effective_at"
+        ],
+        "row_count": 6489940
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-d-coverage-20260807-rerun1/coverage-and-exclusion-matrix.json",
+      "finding_id": "DWDV2-COVERAGE-dwd_disclosure",
+      "root_cause": "A business coordinate is outside the frozen Base through-date or its coverage proof is incomplete.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_disclosure",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "reason_codes": [
+          "coordinate_after_through_date:effective_at"
+        ],
+        "rows_or_parts": 8920349
+      },
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "dimension_id": "completeness_and_coverage",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "coordinates": {
+          "coordinate_fields": [
+            "effective_at"
+          ],
+          "fields": {
+            "effective_at": {
+              "after_through_date": true,
+              "maximum": "2026-08-03T15:59:59.999999+00:00",
+              "minimum": "2010-12-31T22:30:00+00:00",
+              "missing_part_count": 0,
+              "null_count_from_statistics": 0,
+              "statistics_complete": true,
+              "through_date_checked": true
+            }
+          },
+          "time_profile": "effective_event"
+        },
+        "expected_rows": 8920349,
+        "reason_codes": [
+          "coordinate_after_through_date:effective_at"
+        ],
+        "row_count": 8920349
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-d-coverage-20260807-rerun1/coverage-and-exclusion-matrix.json",
+      "finding_id": "DWDV2-COVERAGE-dwd_disclosure_subject",
+      "root_cause": "A business coordinate is outside the frozen Base through-date or its coverage proof is incomplete.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_disclosure_subject",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "reason_codes": [
+          "coordinate_after_through_date:effective_from"
+        ],
+        "rows_or_parts": 765
+      },
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "dimension_id": "completeness_and_coverage",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "coordinates": {
+          "coordinate_fields": [
+            "effective_from"
+          ],
+          "fields": {
+            "effective_from": {
+              "after_through_date": true,
+              "maximum": "2026-08-02T05:16:00+00:00",
+              "minimum": "2026-07-31T15:12:41+00:00",
+              "missing_part_count": 0,
+              "null_count_from_statistics": 0,
+              "statistics_complete": true,
+              "through_date_checked": true
+            }
+          },
+          "time_profile": "effective_interval"
+        },
+        "expected_rows": 765,
+        "reason_codes": [
+          "coordinate_after_through_date:effective_from"
+        ],
+        "row_count": 765
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-d-coverage-20260807-rerun1/coverage-and-exclusion-matrix.json",
+      "finding_id": "DWDV2-COVERAGE-dwd_financial_concept",
+      "root_cause": "A business coordinate is outside the frozen Base through-date or its coverage proof is incomplete.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_financial_concept",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "reason_codes": [
+          "coordinate_after_through_date:observation_start"
+        ],
+        "rows_or_parts": 207064
+      },
+      "builder_or_contract_change": "Bound V2.1 business coordinates to the through-date and preserve any post-cutoff records only as explicitly excluded evidence.",
+      "dimension_id": "completeness_and_coverage",
+      "disposition": "fix_in_v2_1",
+      "evidence": {
+        "coordinates": {
+          "coordinate_fields": [
+            "observation_start"
+          ],
+          "fields": {
+            "observation_start": {
+              "after_through_date": true,
+              "maximum": "2026-08-10T16:00:00+00:00",
+              "minimum": "2015-12-30T16:00:00+00:00",
+              "missing_part_count": 0,
+              "null_count_from_statistics": 0,
+              "statistics_complete": true,
+              "through_date_checked": true
+            }
+          },
+          "time_profile": "market_observation"
+        },
+        "expected_rows": 207064,
+        "reason_codes": [
+          "coordinate_after_through_date:observation_start"
+        ],
+        "row_count": 207064
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-d-coverage-20260807-rerun1/coverage-and-exclusion-matrix.json",
+      "finding_id": "DWDV2-COVERAGE-dwd_share_capital_observation",
+      "root_cause": "A business coordinate is outside the frozen Base through-date or its coverage proof is incomplete.",
+      "severity": "high",
+      "table_or_cross_table_scope": "dwd_share_capital_observation",
+      "tests": [
+        "test_dwd_coverage_rejects_business_coordinates_after_through_date"
+      ],
+      "v2_1_acceptance_check": "The CN01 coverage/exclusion report has zero business-coordinate-after-through-date and zero incomplete-statistics reason codes across all 33 tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "independent_executions": 0
+      },
+      "builder_or_contract_change": "Capture two read-only CN01 replay receipts over representative real partitions, bind both to the frozen Base and input plan, and reject mutable or network-dependent derivation inputs.",
+      "dimension_id": "representative_replay_determinism",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "evidence": {
+        "evidence": [],
+        "independent_execution_count": 0,
+        "reason_codes": [
+          "base_replay_evidence_missing"
+        ]
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-replay-20260807-rerun1/replay-determinism-audit.json",
+      "finding_id": "DWDV2-REPLAY-DETERMINISM",
+      "root_cause": "The frozen Base has no two digest-bound, independently named representative derivation executions that prove deterministic replay.",
+      "severity": "high",
+      "table_or_cross_table_scope": "CN01 DWD Base derived builders",
+      "tests": [
+        "test_dwd_replay_determinism_requires_two_bound_executions"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 replay report verifies two independently named executions with equal bytes or an approved semantic digest and zero replay reason codes."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "free_bytes": 37268185088,
+        "required_free_bytes": 48408052245
+      },
+      "builder_or_contract_change": "Reserve local installation capacity using the sealed successor manifest size plus the policy margin; do not use local storage for NFS candidates or spill.",
+      "dimension_id": "rebuild_publication_and_rollback_readiness",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "evidence": {
+        "evidence": {
+          "base_root": "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2",
+          "estimated_final_dwd_bytes": 31228183061,
+          "filesystem": {
+            "filesystem_type": "ext4",
+            "mount_point": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "source": "/dev/vda3"
+          },
+          "free_bytes": 37268185088,
+          "required_free_bytes": 48408052245,
+          "safety_margin_bytes": 17179869184
+        },
+        "reason_codes": [
+          "local_install_capacity_below_candidate_plus_margin"
+        ],
+        "status": "finding"
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-f-readiness-20260807-rerun2/rebuild-readiness-audit.json",
+      "finding_id": "DWDV2-READINESS-LOCAL-CAPACITY",
+      "root_cause": "CN01 local storage cannot satisfy the manifest-sized successor installation gate plus its safety margin.",
+      "severity": "high",
+      "table_or_cross_table_scope": "/srv/quanthus/dwd-dws-v2/base",
+      "tests": [
+        "test_rebuild_readiness_rejects_insufficient_local_install_capacity"
+      ],
+      "v2_1_acceptance_check": "A fresh readiness receipt proves local free bytes are at least the sealed V2.1 candidate size plus the required margin."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "paths": 2
+      },
+      "builder_or_contract_change": "Create and preflight the CN01-local coordination root and lock under the frozen path; never move lock authority to NFS.",
+      "dimension_id": "rebuild_publication_and_rollback_readiness",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "evidence": {
+        "evidence": {
+          "coordination_root": "/srv/quanthus/dwd-dws-v2/v2.1-rebuild",
+          "coordination_root_exists": false,
+          "filesystem": {
+            "filesystem_type": "ext4",
+            "mount_point": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "source": "/dev/vda3"
+          },
+          "lock_file_present": false,
+          "lock_parent_exists": false,
+          "lock_path": "/srv/quanthus/dwd-dws-v2/v2.1-rebuild/locks/rebuild.lock",
+          "single_writer_policy": true
+        },
+        "reason_codes": [
+          "coordination_root_missing",
+          "lock_parent_missing"
+        ],
+        "status": "finding"
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-f-readiness-20260807-rerun2/rebuild-readiness-audit.json",
+      "finding_id": "DWDV2-READINESS-SINGLE-WRITER",
+      "root_cause": "The CN01-local coordination root or authoritative single-writer lock is not ready, or is placed on the wrong filesystem.",
+      "severity": "high",
+      "table_or_cross_table_scope": "/srv/quanthus/dwd-dws-v2/v2.1-rebuild",
+      "tests": [
+        "test_rebuild_readiness_requires_local_single_writer_lock"
+      ],
+      "v2_1_acceptance_check": "A fresh readiness report proves the local lock parent exists, is not NFS, and the lock can be acquired without a second writer."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "pilot_reports": 0
+      },
+      "builder_or_contract_change": "Run one bounded, read-only representative partition pilot per heavy builder on NFS and freeze memory/spill limits before full execution.",
+      "dimension_id": "rebuild_publication_and_rollback_readiness",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "evidence": {
+        "evidence": {
+          "path": null
+        },
+        "reason_codes": [
+          "partition_pilot_evidence_missing"
+        ],
+        "status": "finding"
+      },
+      "evidence_report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-f-readiness-20260807-rerun2/rebuild-readiness-audit.json",
+      "finding_id": "DWDV2-READINESS-PARTITION-PILOT",
+      "root_cause": "No verified partition pilot establishes the per-builder memory limit and NFS spill bound before a full rebuild.",
+      "severity": "high",
+      "table_or_cross_table_scope": "CN01 sequential domain builder limits",
+      "tests": [
+        "test_rebuild_readiness_requires_partition_pilot_evidence"
+      ],
+      "v2_1_acceptance_check": "A sealed pilot report verifies sequential execution, explicit memory limit, NFS spill path, and no local-scratch fallback."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "rows": 47301,
+        "source_records": 1
+      },
+      "builder_or_contract_change": "Keep the exclusion explicit in the V2.1 source ledger and reject consumers that require the excluded auxiliary grain.",
+      "dimension_id": "completeness_and_coverage",
+      "disposition": "retain_with_approved_contract",
+      "evidence": {
+        "records": [
+          {
+            "dataset_id": "daily_intraday_1m_after_hours_fixed_price_trades",
+            "disposition": "deferred",
+            "format": "parquet",
+            "mapping_group": "release_auxiliary_artifacts",
+            "mapping_identity": "after_hours_fixed_price_trades",
+            "path": "payload/daily/2026-07-31/intraday_1m/artifacts/after_hours_fixed_price_trades.parquet",
+            "reason": "trade-by-trade observations are outside the approved warehouse scope",
+            "record_type": "file",
+            "role": "increment",
+            "rollup_source": "ods-base-202607-v1.1",
+            "row_count": 47301,
+            "schema_sha256": "sha256:13093b0d9d70b4ab2832203bf5e253da424dd227fc044f5db559e22a11c181f8",
+            "sha256": "sha256:56415f61bd459e82e2a71a5005e7827becf2d4226a734679aa7e5de2fab2b2ed",
+            "size_bytes": 1972915,
+            "target_tables": []
+          }
+        ]
+      },
+      "evidence_report": "/srv/quanthus/dwd-dws-v2/plans/dwd2-base-202607-d66ce55/source-disposition-ledger.json",
+      "finding_id": "DWDV2-COVERAGE-DEFERRED-SOURCE",
+      "root_cause": "The source plan intentionally excludes trade-by-trade auxiliary artifacts from the approved DWD scope.",
+      "severity": "medium",
+      "table_or_cross_table_scope": "input-plan source disposition",
+      "tests": [
+        "test_source_disposition_ledger_requires_explicit_exclusion_reason"
+      ],
+      "v2_1_acceptance_check": "The V2.1 input-plan and coverage report contain the same explicit exclusion, reason, and zero DWD target tables."
+    },
+    {
+      "affected_rows_or_partitions": {
+        "free_bytes": 56861351936,
+        "required_free_bytes": 100290327430
+      },
+      "builder_or_contract_change": "Provision or reserve the required NFS capacity and rerun the partition pilot before opening the builder gate.",
+      "dimension_id": "rebuild_publication_and_rollback_readiness",
+      "disposition": "add_immutable_evidence_then_fix_in_v2_1",
+      "evidence": {
+        "capacity_estimate": {
+          "available_free_bytes": 56861351936,
+          "capacity_root": "/srv/quanthus",
+          "capacity_sufficient": false
+        },
+        "receipt_resource_use": {
+          "available_free_bytes": 56861351936,
+          "process_peak_rss_bytes": 471031808,
+          "required_free_bytes": 100290327430
+        },
+        "requirement": {
+          "dws_to_dwd_ratio_ppm": 1000000,
+          "estimate_class": "uncalibrated_baseline_requires_partition_pilot",
+          "estimated_final_dwd_bytes": 31228183061,
+          "estimated_final_dws_bytes": 31228183061,
+          "financial_compressed_input_bytes": 1730874579,
+          "financial_uncompressed_payload_bytes": 21118906736,
+          "largest_modeled_dataset_bytes": 2978215759,
+          "largest_stage_or_spill_bytes": 21118906736,
+          "modeled_input_bytes": 11840150904,
+          "required_free_bytes": 100290327430,
+          "safety_margin_bytes": 16715054572,
+          "safety_margin_ppm": 200000
+        }
+      },
+      "evidence_report": "/srv/quanthus/dwd-dws-v2/plans/dwd2-base-202607-d66ce55/capacity-estimate.json",
+      "finding_id": "DWDV2-READINESS-CAPACITY",
+      "root_cause": "The sealed build plan requires more free storage than the measured CN01 workspace provides.",
+      "severity": "high",
+      "table_or_cross_table_scope": "CN01 /personal NFS build workspace",
+      "tests": [
+        "test_rebuild_readiness_rejects_insufficient_nfs_capacity"
+      ],
+      "v2_1_acceptance_check": "A fresh CN01 capacity receipt proves the required free bytes plus margin, with a successful pilot and no local-scratch fallback."
+    }
+  ],
+  "generated_at": "2026-08-07T14:12:48.388916+00:00",
+  "kind": "dwd_base_v2_findings_ledger",
+  "mutation_performed": false,
+  "open_audit_scope": [
+    "human_approval_of_findings_and_remediation_scope"
+  ],
+  "rebuild_readiness": {
+    "checks": {
+      "audit_closure_binding": {
+        "evidence": {
+          "builder_gate": "blocked",
+          "contract_digest": "sha256:04654d5b79b3a540d287b3bda6ff2f46fd2b1d510bc0bf874cd43f58db670793",
+          "contract_finding_ledger_digest": "sha256:232ab94e942e3e801b6a2d741b380db885362eb2564f27d5a0023ad32c607d68",
+          "contract_remediation_scope_digest": "sha256:aeb2fdbac51cdf4a61d02f6d27bfb7575912f417166171138d81f27c31f1cb49",
+          "finding_count": 31,
+          "invalid_disposition_count": 0,
+          "ledger_digest": "sha256:232ab94e942e3e801b6a2d741b380db885362eb2564f27d5a0023ad32c607d68",
+          "root": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-e-closure-working-20260807-rerun5",
+          "scope_digest": "sha256:aeb2fdbac51cdf4a61d02f6d27bfb7575912f417166171138d81f27c31f1cb49",
+          "scope_source_ledger_digest": "sha256:232ab94e942e3e801b6a2d741b380db885362eb2564f27d5a0023ad32c607d68"
+        },
+        "reason_codes": [],
+        "status": "verified"
+      },
+      "candidate_and_rollback_retention": {
+        "evidence": {
+          "ingress_path": "/srv/quanthus/dwd-dws-v2/base/.incoming-dwd-base-202607-v2.1",
+          "ingress_present": false,
+          "installed_successor": "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1",
+          "installed_successor_present": false,
+          "rollback_contract": "restore_v2_pointer_without_mutating_or_deleting_either_package",
+          "v2_manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "v2_ready_present": true,
+          "v2_root": "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2"
+        },
+        "reason_codes": [],
+        "status": "verified"
+      },
+      "cas_pointer_and_v2_identity": {
+        "evidence": {
+          "expected_manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+          "pointer": {
+            "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
+            "kind": "dwd_domain_base_current",
+            "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
+            "package_id": "dwd-base-202607-v2",
+            "package_path": "dwd-base-202607-v2",
+            "run_id": "dwd2-base-202607-d66ce55",
+            "schema_version": 1,
+            "through_date": "2026-07-31"
+          },
+          "pointer_path": "/srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json",
+          "pointer_update": "compare_and_swap",
+          "sealed_v2_manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f"
+        },
+        "reason_codes": [],
+        "status": "verified"
+      },
+      "local_install_capacity": {
+        "evidence": {
+          "base_root": "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2",
+          "estimated_final_dwd_bytes": 31228183061,
+          "filesystem": {
+            "filesystem_type": "ext4",
+            "mount_point": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "source": "/dev/vda3"
+          },
+          "free_bytes": 37268185088,
+          "required_free_bytes": 48408052245,
+          "safety_margin_bytes": 17179869184
+        },
+        "reason_codes": [
+          "local_install_capacity_below_candidate_plus_margin"
+        ],
+        "status": "finding"
+      },
+      "nfs_mount_and_capacity": {
+        "evidence": {
+          "free_bytes": 11258742947446784,
+          "minimum_free_bytes": 128849018880,
+          "mount": {
+            "filesystem_type": "nfs",
+            "mount_point": "/personal",
+            "options": [
+              "rw",
+              "relatime",
+              "vers=3",
+              "rsize=1048576",
+              "wsize=1048576",
+              "namlen=255",
+              "hard",
+              "nolock",
+              "noresvport",
+              "proto=tcp",
+              "timeo=600",
+              "retrans=2",
+              "sec=sys",
+              "mountaddr=10.5.32.116",
+              "mountvers=3",
+              "mountport=2049",
+              "mountproto=tcp",
+              "local_lock=all",
+              "addr=10.5.32.116"
+            ],
+            "source": "9b7fc480d7-tqn18.cn-zhangjiakou.nas.aliyuncs.com:/4467464/3IJ8Z5uBnQ/personal"
+          },
+          "policy_probe_evidence": {
+            "atomic_rename_probe": "passed",
+            "cn01_local_flock_probe": "passed",
+            "same_mount_hardlink_probe": "passed",
+            "write_probe": "passed"
+          },
+          "workspace_root": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1"
+        },
+        "reason_codes": [],
+        "status": "verified"
+      },
+      "partition_pilot_and_spill": {
+        "evidence": {
+          "path": null
+        },
+        "reason_codes": [
+          "partition_pilot_evidence_missing"
+        ],
+        "status": "finding"
+      },
+      "single_writer_lock": {
+        "evidence": {
+          "coordination_root": "/srv/quanthus/dwd-dws-v2/v2.1-rebuild",
+          "coordination_root_exists": false,
+          "filesystem": {
+            "filesystem_type": "ext4",
+            "mount_point": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "source": "/dev/vda3"
+          },
+          "lock_file_present": false,
+          "lock_parent_exists": false,
+          "lock_path": "/srv/quanthus/dwd-dws-v2/v2.1-rebuild/locks/rebuild.lock",
+          "single_writer_policy": true
+        },
+        "reason_codes": [
+          "coordination_root_missing",
+          "lock_parent_missing"
+        ],
+        "status": "finding"
+      }
+    },
+    "finding_count": 3,
+    "reason_codes": [
+      "coordination_root_missing",
+      "local_install_capacity_below_candidate_plus_margin",
+      "lock_parent_missing",
+      "partition_pilot_evidence_missing"
+    ],
+    "report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-f-readiness-20260807-rerun2/rebuild-readiness-audit.json",
+    "report_digest": "sha256:443ae7a11e7e952e1cefdc8d57a693b9fdbf6d52199669dc4be9cc7a863b7116",
+    "status": "finding"
+  },
+  "replay_determinism": {
+    "evidence": [],
+    "independent_execution_count": 0,
+    "reason_codes": [
+      "base_replay_evidence_missing"
+    ],
+    "report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-replay-20260807-rerun1/replay-determinism-audit.json",
+    "report_digest": "sha256:0432654e1c0af18f1b3d1d8e57248697a004a98c0f52c9497e850acba6a47a3c",
+    "required": "two independently named representative Base derivation executions",
+    "status": "finding"
+  },
+  "schema_version": 1,
+  "semantic_dimension_audit": {
+    "dimension_count": 5,
+    "output_reports": {
+      "field_availability": {
+        "digest": "sha256:ca65f7f7048b1e7892d2eb88242956d0c39673f8969ff5683e62b954eb3783ec",
+        "kind": "dwd_base_v2_field_availability_matrix",
+        "path": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c8-semantic-dimensions-20260807/semantic_dimensions/field-availability-matrix.json"
+      },
+      "identity_graph": {
+        "digest": "sha256:9a7b94b17be69bc2178b2910cbb44e13a9e67f732c4bea52044069b4a9388497",
+        "kind": "dwd_base_v2_identity_graph_audit",
+        "path": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c8-semantic-dimensions-20260807/semantic_dimensions/identity-graph-audit.json"
+      },
+      "key_version_duplicates": {
+        "digest": "sha256:88c130dbf8aa0243e3db6def05b53a83f5b8c91fbabf735f0139838b3e6e505b",
+        "kind": "dwd_base_v2_key_version_duplicate_audit",
+        "path": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c8-semantic-dimensions-20260807/semantic_dimensions/key-version-and-duplicate-ledger.json"
+      },
+      "referential_integrity": {
+        "digest": "sha256:4983a43ee1c79c4f98c7e4d2ae3caf318c4fae5c997dbce8e2453f9f9c8a1b37",
+        "kind": "dwd_base_v2_referential_integrity_audit",
+        "path": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c8-semantic-dimensions-20260807/semantic_dimensions/referential-integrity-audit.json"
+      },
+      "temporal_intervals": {
+        "digest": "sha256:185d1a21f2e7f8e4fda1b3a0a9e866eeb1e285cef0c1e6919f9adb085ee421e7",
+        "kind": "dwd_base_v2_temporal_interval_audit",
+        "path": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c8-semantic-dimensions-20260807/semantic_dimensions/temporal-interval-audit.json"
+      }
+    },
+    "projection_only": true,
+    "reason_codes": [
+      "ambiguous_tables_require_source_evidence_or_fail_closed_rules",
+      "pit_source_execution_incomplete",
+      "semantic_contract_source_has_findings",
+      "successor_projection_or_base_requires_separate_approval",
+      "v2_contains_code_confirmed_historical_knowledge_defects"
+    ],
+    "report": "/personal/quanthus-cn01-build-scratch/dwd-base-202607-v2.1/pre-rebuild-audit/phase-c8-semantic-dimensions-20260807/semantic_dimensions/semantic-dimension-audit.json",
+    "report_digest": "sha256:64bb0baa700dc955783ea664b6e99e90bcb8f18be93b504545d80ab2bb9c117b",
+    "rescan_performed": false,
+    "source_findings_remain_authoritative": true,
+    "status": "finding",
+    "table_count": 33
+  },
+  "source_digests": {
+    "coverage": "sha256:95fbb30f047c3e4dcf06e8bd01d82d2503b5719666d5ca6335a58e1e99d2581f",
+    "downstream": "sha256:14da0d698397939cc19023d01660d10485d6ea01758d86136c50aa80cbaf0810",
+    "input_plan": "sha256:0a79ef0a495f07bab39b1b40931581babbcb03ff63a506618b247373a070bba4",
+    "input_plan_files": {
+      "capacity-estimate.json": "sha256:443f799de899d1767bce7d341dcb89642a2c75e20a9b0c15dfaf351f8b758a9c",
+      "coverage-matrix.json": "sha256:26575ecbfa9ee773843251c571e1d345674446f31e6a39453d84ccbd0f13ded2",
+      "input-plan.json": "sha256:d0231a422385a4ff277d797d003ad939a4415f25f38fca25f7b9a169f05e42c2",
+      "run-receipt.json": "sha256:cc5f1b0844362f6198f837ab75ce472fd13f9252fdcef6cbb07fe6cc5a416010",
+      "source-disposition-ledger.json": "sha256:b18e71c961e668c68056241ffb1eede5b92203fcfd502729e7c1f97cb5716ed2"
+    },
+    "invariant": "sha256:b47334629ba780d57ec345bc54506e39d9f7035bc3d5160903a68bd63c845cd9",
+    "lineage": "sha256:7e5f8f8c90cde41313aea5e52845ffff0aa79e43c15ef321f8965b469a09c4c9",
+    "phase_a": "sha256:d69db74fdd14ff0ce071735b4e3b4f449099f6400610e4354d8410769bfd67e4",
+    "readiness": "sha256:443ae7a11e7e952e1cefdc8d57a693b9fdbf6d52199669dc4be9cc7a863b7116",
+    "replay": "sha256:0432654e1c0af18f1b3d1d8e57248697a004a98c0f52c9497e850acba6a47a3c",
+    "schema": "sha256:3a2f50c6637973df3f327cb0e7d950a2519235aef4ac6590fc4015a5a0ba42b7",
+    "semantic": "sha256:8c90497ffe0623465873f938ab3c417d604693b7ac3d8d9345a6f312542d7e68",
+    "semantic_dimensions": "sha256:64bb0baa700dc955783ea664b6e99e90bcb8f18be93b504545d80ab2bb9c117b"
+  },
+  "status": "working_ledger",
+  "summary": {
+    "critical_findings": 0,
+    "finding_count": 31,
+    "invalid_disposition_count": 0,
+    "open_audit_scope_count": 1,
+    "severity_counts": {
+      "high": 30,
+      "medium": 1
+    }
+  }
+}

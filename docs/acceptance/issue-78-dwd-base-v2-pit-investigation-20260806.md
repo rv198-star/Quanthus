@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Evidence status | blocked finding; CN01 is the sole canonical audit source; Phase B complete with seven affected tables; Phase C-D and V2.1 acceptance incomplete |
-| Evidence date | 2026-08-06 |
+| Evidence status | investigation retained; superseded for machine-audit closure by the 2026-08-07 handoff packet |
+| Evidence date | 2026-08-06 investigation; closure packet generated 2026-08-07 |
 | Governing work | `META-DATA-PIT-001` / GitHub Issue #78 |
 | Investigated package | `dwd-base-202607-v2` |
 | Manifest SHA-256 | `sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f` |
@@ -12,8 +12,17 @@
 | Full pre-rebuild audit policy | `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` / `sha256:c2394fae5f8e46021865874aa1a309c5669e31cf851b14d292a8e56d57de9e56` |
 | ODS sufficiency policy | `config/audits/ods-pit-sufficiency.v1.json` / `sha256:170f4557c43202e82c6951f6a1516b2fee228b38b4b94766495ac1a232fafa4d` |
 | Successor boundary | new `dwd-base-202607-v2.1`, through 2026-07-31; CN01-only NFS build; later Daily excluded and cleaned separately |
-| Proposed remediation | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` |
+| Proposed remediation | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md`; exact scope in `docs/acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807/` |
 | Consequence | V2 historical PIT use remains blocked; no Base or consumer pointer changed |
+
+> Closure notice: this document preserves the investigation chronology and therefore contains
+> phase-local `pending` statements that were true when recorded. The repository authority for the
+> completed machine audit is now
+> `docs/acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807/`: 31 findings (30 high,
+> one medium, no critical), findings ledger
+> `sha256:9a30644f64aacecaab2f9c20797d98d09aa968e1679121e16271ca2063ce9708`, and remediation scope
+> `sha256:e0c4e984e3508a77ac9e7b0546e6361e8be43bcbdaf3af76813aa40e4b8251db`.
+> The remaining audit-scope item is exact human approval; the V2.1 builder is still blocked.
 
 ## 1. Investigation Decision
 

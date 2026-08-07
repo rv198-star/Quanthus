@@ -5,16 +5,18 @@
 | Governing work | `META-DATA-PIT-001` / Issue #78 |
 | Governing decision | `docs/architecture/adr-0008-dwd-historical-knowledge-remediation.md` |
 | Pre-rebuild audit gate | `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` |
+| Audit closure packet | `docs/acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807/` |
 | Machine topology | `config/audits/ods-pit-sufficiency.v1.json` → `cn01_rebuild_execution_topology` |
 | Execution node | CN01 only |
 | Build storage | mandatory `/personal` NFS |
 | Successor | `dwd-base-202607-v2.1` through 2026-07-31 |
-| Delivery gate | blocked until the full pre-rebuild audit, findings/remediation digests, builders, full build, and acceptance complete |
+| Delivery gate | machine audit complete; blocked on exact scope approval, readiness closure, builders, full build, and acceptance |
 
 This runbook freezes the storage, execution, installation, and rollback topology for the V2.1
-reconstruction. It does not approve table availability semantics or authorize a full build before
-the exact pre-rebuild audit, findings ledger, remediation scope, builder contracts, and semantic
-digests are accepted.
+reconstruction. The CN01 machine audit is complete and its exact ledger, remediation scope, build
+contract, and raw hashes are retained in the closure packet above. The packet still reports
+`builder_gate=blocked` because exact human scope approval is outstanding. This runbook does not
+authorize a full build, candidate assembly, installation, or pointer change by itself.
 
 ## Mandatory Pre-Rebuild Audit Gate
 
@@ -29,6 +31,11 @@ these artifacts are approved:
 - `v2.1-build-contract.json`;
 - table/source availability contracts; and
 - the audit summary that binds every supporting report.
+
+The machine-complete artifact values awaiting approval are findings ledger
+`sha256:9a30644f64aacecaab2f9c20797d98d09aa968e1679121e16271ca2063ce9708`, remediation scope
+`sha256:e0c4e984e3508a77ac9e7b0546e6361e8be43bcbdaf3af76813aa40e4b8251db`, and build contract
+`sha256:045100edb5baa3cdeec32167c33dd8466d129b6897513876104b168ac70f860c`.
 
 The accepted remediation scope is an immutable input to planning. A domain builder must reject a
 plan that omits an approved finding assigned to its table/domain or uses a different audit/remediation

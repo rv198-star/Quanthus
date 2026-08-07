@@ -4,18 +4,24 @@
 | --- | --- |
 | Governing work | `META-DATA-PIT-001` / Issue #78 |
 | Machine policy | `config/audits/dwd-base-v2-pre-rebuild-audit.v1.json` |
+| Machine closure packet | `docs/acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807/` |
 | Audited Base | `dwd-base-202607-v2` through 2026-07-31 |
 | Intended successor | new immutable `dwd-base-202607-v2.1` through 2026-07-31 |
 | Audit execution node | CN01 |
 | Audit/build workspace | mandatory `/personal` NFS |
-| Audit delivery gate | open for read-only evidence collection |
-| V2.1 build gate | blocked until the full audit and one-time remediation scope are accepted |
+| Audit delivery gate | machine execution complete; exact findings/remediation approval pending |
+| V2.1 build gate | blocked until the closure packet is approved and readiness findings close |
 
 This audit exists because a DWD Base reconstruction is expensive and disruptive. It expands Issue
 #78 from a timestamp-focused investigation into a complete Base-quality gate. The objective is to
 find physical, semantic, identity, relationship, key, interval, coverage, numeric, lineage,
 reproducibility, and consumer-compatibility defects before the V2.1 builders start, then freeze one
 complete remediation ledger for a single successor build window.
+
+The machine execution completed on 2026-08-07 with 31 classified findings, no critical finding,
+and only `human_approval_of_findings_and_remediation_scope` left in `open_audit_scope`. The exact
+ledger, remediation scope, build contract, report summary, and raw hashes are retained in the
+closure packet above. That state is reviewable evidence, not builder authorization.
 
 The audit does not mutate ODS V2, DWD V2, Daily packages, mirrors, or pointers. A successful audit
 is permission to review a proposed remediation scope, not automatic permission to build or cut over.

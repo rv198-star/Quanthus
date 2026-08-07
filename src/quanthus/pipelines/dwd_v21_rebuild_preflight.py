@@ -18,7 +18,8 @@ from pathlib import Path
 from typing import Any, cast
 
 from quanthus.pipelines.dwd_v21_rebuild_monitor import parse_mountinfo, verify_authority
-from quanthus.pipelines.ods_base_rollup import OdsBaseRollupError, verify_ods_base_rollup
+from quanthus.pipelines.ods_base import OdsBaseError
+from quanthus.pipelines.ods_base_rollup import verify_ods_base_rollup
 from quanthus.pipelines.securities_warehouse.domain_base import (
     DomainBaseError,
     verify_domain_base,
@@ -211,7 +212,7 @@ def run_preflight(
         git = _git_state(repository, expected_revision)
         ods = verify_ods_base_rollup(ods_base, deep=True)
         dwd = verify_domain_base(dwd_base)
-    except (OdsBaseRollupError, DomainBaseError, OSError) as error:
+    except (OdsBaseError, DomainBaseError, OSError) as error:
         raise DwdV21PreflightError(str(error)) from error
     finally:
         os.close(lock_fd)

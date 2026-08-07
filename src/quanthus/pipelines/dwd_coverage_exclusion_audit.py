@@ -39,7 +39,7 @@ def _sha256(path: Path) -> str:
 
 def _object(path: Path, label: str) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="ascii"))
+        value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise DwdCoverageExclusionAuditError(f"cannot read {label}: {path}") from exc
     if not isinstance(value, dict):

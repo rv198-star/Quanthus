@@ -141,6 +141,66 @@ def _replay_audit_status(
     ]
 
 
+def _readiness_audit_status(
+    report: Mapping[str, Any], *, source: str, base_release: Mapping[str, Any]
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Validate the readiness report and import its deterministic findings."""
+
+    if report.get("kind") != "dwd_base_v2_rebuild_publication_rollback_readiness_audit":
+        raise DwdAuditClosureError("readiness report has an unexpected kind")
+    observed = report.get("base_release")
+    if not isinstance(observed, Mapping):
+        raise DwdAuditClosureError("readiness report has no Base identity")
+    identity_keys = ("package_id", "manifest_sha256", "content_digest", "through_date")
+    if any(observed.get(key) != base_release.get(key) for key in identity_keys):
+        raise DwdAuditClosureError("readiness report Base identity differs from the sealed package")
+    summary = report.get("summary")
+    if not isinstance(summary, Mapping) or summary.get("status") not in {"verified", "finding"}:
+        raise DwdAuditClosureError("readiness report has an invalid summary")
+    if summary.get("mutation_performed") is not False:
+        raise DwdAuditClosureError("readiness report does not prove read-only execution")
+    raw_findings = report.get("findings")
+    if not isinstance(raw_findings, list):
+        raise DwdAuditClosureError("readiness report has no findings list")
+    findings: list[dict[str, Any]] = []
+    for raw in raw_findings:
+        if not isinstance(raw, Mapping):
+            raise DwdAuditClosureError("readiness finding is invalid")
+        item = dict(raw)
+        if item.get("disposition") not in _DISPOSITIONS:
+            raise DwdAuditClosureError(
+                f"readiness finding has invalid disposition: {item.get('finding_id')}"
+            )
+        item["evidence_report"] = source
+        findings.append(item)
+    details = {
+        "status": summary["status"],
+        "report": source,
+        "report_digest": report.get("canonical_digest"),
+        "finding_count": summary.get("finding_count", len(findings)),
+        "reason_codes": summary.get("reason_codes", []),
+        "checks": report.get("checks", {}),
+    }
+    return details, findings
+
+
+def _missing_readiness_finding() -> dict[str, Any]:
+    return _finding(
+        finding_id="DWDV2-READINESS-REPORT",
+        dimension_id="rebuild_publication_and_rollback_readiness",
+        scope="CN01 rebuild/publication/rollback topology",
+        severity="high",
+        evidence={"reason_codes": ["readiness_report_missing"]},
+        root_cause="No immutable CN01 readiness report proves the NFS, capacity, single-writer, pilot, pointer, and rollback contracts.",
+        affected={"reports": 0},
+        disposition="add_immutable_evidence_then_fix_in_v2_1",
+        change="Run the read-only CN01 readiness auditor and bind its canonical report into the closure ledger before any builder approval.",
+        tests=["test_rebuild_readiness_report_is_required_for_closure"],
+        acceptance="A sealed CN01 readiness report verifies every topology check and carries zero unclassified readiness findings.",
+        source_report="not_run_fallback",
+    )
+
+
 def _count_nonzero(value: object) -> dict[str, int]:
     if not isinstance(value, Mapping):
         return {}
@@ -465,6 +525,7 @@ def build_audit_closure(
     code_revision: str,
     coverage_report: Path | None = None,
     replay_report: Path | None = None,
+    readiness_report: Path | None = None,
     replay_evidence: Sequence[Path] = (),
 ) -> dict[str, Any]:
     """Build a provisional, digest-bound closure packet without touching sealed data."""
@@ -528,6 +589,18 @@ def build_audit_closure(
         if replay_path == plan_root or replay_path.is_relative_to(plan_root):
             raise DwdAuditClosureError("replay report must remain outside sealed input plan")
         replay_value, replay_digest = _sealed_report(replay_path, label="replay report")
+    readiness_value: dict[str, Any] | None = None
+    readiness_digest: str | None = None
+    readiness_path: Path | None = None
+    if readiness_report is not None:
+        readiness_path = readiness_report.resolve()
+        if readiness_path == base_root or readiness_path.is_relative_to(base_root):
+            raise DwdAuditClosureError("readiness report must remain outside sealed DWD Base")
+        if readiness_path == plan_root or readiness_path.is_relative_to(plan_root):
+            raise DwdAuditClosureError("readiness report must remain outside sealed input plan")
+        readiness_value, readiness_digest = _sealed_report(
+            readiness_path, label="readiness report"
+        )
     if lineage.get("dwd", {}).get("package_id") != base_release["package_id"]:
         raise DwdAuditClosureError("lineage report package differs from DWD Base")
 
@@ -579,6 +652,21 @@ def build_audit_closure(
         )
         replay["required"] = "two independently named representative Base derivation executions"
     findings.extend(replay_findings)
+
+    readiness = {
+        "status": "missing",
+        "report": "not_run_fallback",
+        "report_digest": None,
+        "finding_count": 1,
+        "reason_codes": ["readiness_report_missing"],
+    }
+    if readiness_value is None:
+        readiness_findings = [_missing_readiness_finding()]
+    else:
+        readiness, readiness_findings = _readiness_audit_status(
+            readiness_value, source=str(readiness_path), base_release=base_release
+        )
+    findings.extend(readiness_findings)
 
     deferred = [
         item
@@ -657,6 +745,8 @@ def build_audit_closure(
         open_scope.remove("representative_replay_determinism_for_base_derivations")
     if compatibility["status"] == "verified":
         open_scope.remove("downstream_increment_compatibility_review")
+    if readiness["status"] == "verified":
+        open_scope.remove("rebuild_publication_and_rollback_readiness_acceptance")
 
     severity_counts = Counter(str(item.get("severity")) for item in findings)
     invalid = [item.get("finding_id") for item in findings if item.get("disposition") not in _DISPOSITIONS]
@@ -670,6 +760,7 @@ def build_audit_closure(
         "phase_a": phase_a_digest,
         "coverage": coverage_digest,
         "replay": replay_digest,
+        "readiness": readiness_digest,
         "input_plan": plan.get("plan_digest"),
         "input_plan_files": plan_digests,
     }
@@ -688,6 +779,7 @@ def build_audit_closure(
         "status": "working_ledger",
         "findings": findings,
         "replay_determinism": replay,
+        "rebuild_readiness": readiness,
         "downstream_compatibility": compatibility,
         "open_audit_scope": open_scope,
         "summary": {
@@ -749,6 +841,7 @@ def build_audit_closure(
         f"- Phase A findings: `{phase_a_path}` ({phase_a_digest})",
         f"- Daily compatibility: `{compatibility['status']}` over `{compatibility['checked_package_count']}` packages",
         f"- Replay determinism evidence: `{replay['status']}`",
+        f"- Rebuild/publication/rollback readiness: `{readiness['status']}`",
         "",
         "## Immediate blockers",
         "",

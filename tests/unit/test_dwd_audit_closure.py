@@ -181,6 +181,35 @@ class DwdAuditClosureTests(unittest.TestCase):
             self.assertIn("DWDV2-REPLAY-DETERMINISM", ids)
             self.assertIn("representative_replay_determinism_for_base_derivations", result["open_audit_scope"])
 
+    def test_missing_readiness_report_is_classified(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base, plan, daily, schema, semantic, lineage, invariant, phase_a = self._fixture(
+                Path(temporary)
+            )
+            result = build_audit_closure(
+                base_root=base,
+                plan_root=plan,
+                schema_report=schema,
+                semantic_report=semantic,
+                lineage_report=lineage,
+                invariant_report=invariant,
+                phase_a_findings=phase_a,
+                daily_root=daily,
+                output_root=Path(temporary) / "out-readiness",
+                code_revision="a" * 40,
+            )
+            ledger = json.loads(
+                (Path(temporary) / "out-readiness" / "findings-ledger.json").read_text(
+                    encoding="ascii"
+                )
+            )
+            ids = {item["finding_id"] for item in ledger["findings"]}
+            self.assertIn("DWDV2-READINESS-REPORT", ids)
+            self.assertIn(
+                "rebuild_publication_and_rollback_readiness_acceptance",
+                result["open_audit_scope"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

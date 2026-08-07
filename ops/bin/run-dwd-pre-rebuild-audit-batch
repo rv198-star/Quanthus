@@ -49,6 +49,7 @@ def main() -> int:
     parser.add_argument("--dwd-root", type=Path, required=True)
     parser.add_argument("--ods-root", type=Path)
     parser.add_argument("--plan-root", type=Path)
+    parser.add_argument("--pit-report", type=Path)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--batch-id", required=True)
     parser.add_argument("--package-id", default="dwd-base-202607-v2")
@@ -74,6 +75,7 @@ def main() -> int:
             code_revision=_code_revision(repository),
             selected_steps=args.steps or names,
             evidence=evidence,
+            pit_report=args.pit_report,
             memory_limit=args.memory_limit,
             required_output_ancestor=Path(
                 "/personal/quanthus-cn01-build-scratch/"

@@ -39,6 +39,11 @@ AUDIT_STEPS = (
         report_name="semantic-contract-audit.json",
     ),
     AuditStep(
+        name="semantic_dimensions",
+        kind="dwd_base_v2_semantic_dimension_audit",
+        report_name="semantic-dimension-audit.json",
+    ),
+    AuditStep(
         name="lineage_authority",
         kind="dwd_base_v2_lineage_authority_audit",
         report_name="lineage-authority-audit.json",
@@ -144,6 +149,8 @@ def _command(
     scratch: Path,
     checkpoint: Path,
     memory_limit: str,
+    semantic_report: Path | None = None,
+    pit_report: Path | None = None,
 ) -> list[str]:
     executable = repository / "ops" / "bin"
     if step.name == "schema_partitions":
@@ -169,6 +176,21 @@ def _command(
             memory_limit,
             "--output",
             str(report),
+        ]
+    if step.name == "semantic_dimensions":
+        if semantic_report is None or pit_report is None:
+            raise DwdPreRebuildAuditBatchError(
+                "semantic dimension audit requires semantic and PIT reports"
+            )
+        return [
+            sys.executable,
+            str(executable / "audit-dwd-semantic-dimensions"),
+            "--semantic-report",
+            str(semantic_report),
+            "--pit-report",
+            str(pit_report),
+            "--output-root",
+            str(report.parent),
         ]
     if step.name == "lineage_authority":
         if ods_root is None or plan_root is None:
@@ -244,6 +266,7 @@ def _initial_state(
         "remaining_audit_scope": [
             "coverage_and_exclusion_matrix",
             "representative_replay_determinism",
+            "semantic_dimension_split_reports",
             "downstream_and_increment_compatibility",
             "rebuild_publication_and_rollback_readiness",
             "findings_and_remediation_freeze",
@@ -263,6 +286,7 @@ def run_audit_batch(
     code_revision: str,
     selected_steps: Sequence[str],
     evidence: Mapping[str, Path],
+    pit_report: Path | None = None,
     memory_limit: str = "2GB",
     required_output_ancestor: Path | None = None,
 ) -> dict[str, Any]:
@@ -358,6 +382,11 @@ def run_audit_batch(
                         scratch=step_root / "duckdb-scratch",
                         checkpoint=step_root / "checkpoint.json",
                         memory_limit=memory_limit,
+                        semantic_report=(
+                            evidence.get("semantic_contracts")
+                            or batch_root / "semantic_contracts" / "semantic-contract-audit.json"
+                        ),
+                        pit_report=pit_report,
                     )
                     log_path = step_root / "audit.log"
                     with log_path.open("a", encoding="utf-8") as log:
@@ -396,6 +425,7 @@ def run_audit_batch(
         completed_scopes = {
             "schema_partitions": None,
             "semantic_contracts": None,
+            "semantic_dimensions": "semantic_dimension_split_reports",
             "lineage_authority": None,
             "domain_invariants": None,
             "downstream_impact": "downstream_and_increment_compatibility",

@@ -33,6 +33,29 @@ _DISPOSITIONS = {
     "no_change_proven",
 }
 
+_SEMANTIC_DIMENSION_REPORTS = {
+    "field_availability": (
+        "field-availability-matrix.json",
+        "dwd_base_v2_field_availability_matrix",
+    ),
+    "identity_graph": (
+        "identity-graph-audit.json",
+        "dwd_base_v2_identity_graph_audit",
+    ),
+    "referential_integrity": (
+        "referential-integrity-audit.json",
+        "dwd_base_v2_referential_integrity_audit",
+    ),
+    "key_version_duplicates": (
+        "key-version-and-duplicate-ledger.json",
+        "dwd_base_v2_key_version_duplicate_audit",
+    ),
+    "temporal_intervals": (
+        "temporal-interval-audit.json",
+        "dwd_base_v2_temporal_interval_audit",
+    ),
+}
+
 
 def _canonical_digest(value: object) -> str:
     payload = json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
@@ -242,6 +265,177 @@ def _downstream_audit_status(
         "checks": report.get("checks", {}),
     }
     return details, findings
+
+
+def _semantic_dimension_audit_status(
+    report: Mapping[str, Any],
+    *,
+    source: str,
+    base_release: Mapping[str, Any],
+    sealed_roots: Sequence[Path],
+) -> dict[str, Any]:
+    """Validate the five named semantic-dimension projections as one packet."""
+
+    if report.get("kind") != "dwd_base_v2_semantic_dimension_audit":
+        raise DwdAuditClosureError("semantic dimension report has an unexpected kind")
+    observed = report.get("base_release")
+    if not isinstance(observed, Mapping):
+        raise DwdAuditClosureError("semantic dimension report has no Base identity")
+    identity_keys = ("package_id", "manifest_sha256", "content_digest", "through_date")
+    if any(observed.get(key) != base_release.get(key) for key in identity_keys):
+        raise DwdAuditClosureError(
+            "semantic dimension report Base identity differs from the sealed package"
+        )
+
+    summary = report.get("summary")
+    if not isinstance(summary, Mapping) or summary.get("status") not in {
+        "verified",
+        "finding",
+    }:
+        raise DwdAuditClosureError("semantic dimension report has an invalid summary")
+    if summary.get("mutation_performed") is not False:
+        raise DwdAuditClosureError(
+            "semantic dimension report does not prove read-only execution"
+        )
+    projection = report.get("projection_contract")
+    if not isinstance(projection, Mapping):
+        raise DwdAuditClosureError("semantic dimension report has no projection contract")
+    if (
+        projection.get("rescan_performed") is not False
+        or projection.get("findings_reclassified") is not False
+        or projection.get("source_findings_remain_authoritative") is not True
+    ):
+        raise DwdAuditClosureError(
+            "semantic dimension report violates the projection-only contract"
+        )
+    required_outputs = projection.get("required_outputs")
+    expected_outputs = [filename for filename, _ in _SEMANTIC_DIMENSION_REPORTS.values()]
+    if required_outputs != expected_outputs:
+        raise DwdAuditClosureError(
+            "semantic dimension report required outputs differ from policy"
+        )
+    dimensions = report.get("dimensions")
+    if not isinstance(dimensions, Mapping) or set(dimensions) != set(_SEMANTIC_DIMENSION_REPORTS):
+        raise DwdAuditClosureError("semantic dimension report does not cover all five dimensions")
+    if summary.get("dimension_count") != len(_SEMANTIC_DIMENSION_REPORTS):
+        raise DwdAuditClosureError("semantic dimension report dimension count differs")
+    if summary.get("table_count") != 33:
+        raise DwdAuditClosureError("semantic dimension report table count differs")
+
+    source_reports = report.get("source_reports")
+    if not isinstance(source_reports, Mapping):
+        raise DwdAuditClosureError("semantic dimension report has no source reports")
+    for label in ("semantic_contract", "pit_semantics"):
+        raw_source = source_reports.get(label)
+        if not isinstance(raw_source, Mapping) or not isinstance(
+            raw_source.get("path"), str
+        ) or not isinstance(raw_source.get("digest"), str) or not _SHA256.fullmatch(
+            raw_source["digest"]
+        ):
+            raise DwdAuditClosureError(
+                f"semantic dimension report has invalid {label} source binding"
+            )
+
+    output_reports = report.get("output_reports")
+    if not isinstance(output_reports, Mapping) or set(output_reports) != set(
+        _SEMANTIC_DIMENSION_REPORTS
+    ):
+        raise DwdAuditClosureError(
+            "semantic dimension report does not list all five output reports"
+        )
+    checked_outputs: dict[str, Any] = {}
+    resolved_roots = tuple(root.resolve() for root in sealed_roots)
+    for dimension, (filename, expected_kind) in _SEMANTIC_DIMENSION_REPORTS.items():
+        binding = output_reports.get(dimension)
+        if not isinstance(binding, Mapping):
+            raise DwdAuditClosureError(
+                f"semantic dimension output binding is invalid: {dimension}"
+            )
+        raw_path = binding.get("path")
+        supplied_digest = binding.get("digest")
+        if not isinstance(raw_path, str) or not isinstance(supplied_digest, str) or not _SHA256.fullmatch(
+            supplied_digest
+        ):
+            raise DwdAuditClosureError(
+                f"semantic dimension output binding is incomplete: {dimension}"
+            )
+        output_path = Path(raw_path)
+        if not output_path.is_absolute() or output_path.name != filename:
+            raise DwdAuditClosureError(
+                f"semantic dimension output path is invalid: {dimension}"
+            )
+        output_path = output_path.resolve()
+        if any(output_path == root or output_path.is_relative_to(root) for root in resolved_roots):
+            raise DwdAuditClosureError(
+                f"semantic dimension output is inside sealed input: {output_path}"
+            )
+        output, output_digest = _sealed_report(
+            output_path, label=f"semantic dimension output {dimension}"
+        )
+        if output_digest != supplied_digest:
+            raise DwdAuditClosureError(
+                f"semantic dimension output digest differs: {dimension}"
+            )
+        if output.get("kind") != expected_kind or output.get("dimension_id") != dimension:
+            raise DwdAuditClosureError(
+                f"semantic dimension output kind differs: {dimension}"
+            )
+        output_base = output.get("base_release")
+        if not isinstance(output_base, Mapping) or any(
+            output_base.get(key) != base_release.get(key) for key in identity_keys
+        ):
+            raise DwdAuditClosureError(
+                f"semantic dimension output Base identity differs: {dimension}"
+            )
+        output_summary = output.get("summary")
+        if not isinstance(output_summary, Mapping) or output_summary.get("table_count") != 33:
+            raise DwdAuditClosureError(
+                f"semantic dimension output table count differs: {dimension}"
+            )
+        checked_outputs[dimension] = {
+            "path": str(output_path),
+            "kind": expected_kind,
+            "digest": output_digest,
+        }
+    return {
+        "status": summary["status"],
+        "report": source,
+        "report_digest": report.get("canonical_digest"),
+        "output_reports": checked_outputs,
+        "dimension_count": len(checked_outputs),
+        "table_count": summary["table_count"],
+        "projection_only": True,
+        "rescan_performed": False,
+        "source_findings_remain_authoritative": True,
+        "reason_codes": list(summary.get("reason_codes", [])),
+    }
+
+
+def _missing_semantic_dimension_finding() -> dict[str, Any]:
+    return _finding(
+        finding_id="DWDV2-SEMANTIC-DIMENSION-REPORT",
+        dimension_id="semantic_dimension_split_reports",
+        scope="CN01 DWD semantic dimension evidence",
+        severity="high",
+        evidence={"reason_codes": ["semantic_dimension_report_missing"]},
+        root_cause=(
+            "No immutable packet proves that field availability, identity graph, "
+            "referential integrity, key/version duplicates, and temporal intervals "
+            "were each emitted as named audit evidence."
+        ),
+        affected={"reports": 0, "required_dimensions": len(_SEMANTIC_DIMENSION_REPORTS)},
+        disposition="add_immutable_evidence_then_fix_in_v2_1",
+        change=(
+            "Run the read-only semantic dimension projection against the sealed CN01 "
+            "semantic and PIT reports, then bind its index and five child digests into closure."
+        ),
+        tests=["test_semantic_dimension_report_is_required_for_closure"],
+        acceptance=(
+            "The CN01 closure verifies the index plus all five named dimension files, "
+            "with matching Base identity, canonical digests, and projection-only flags."
+        ),
+        source_report="not_run_fallback",
+    )
 
 
 def _missing_downstream_finding() -> dict[str, Any]:
@@ -587,6 +781,7 @@ def build_audit_closure(
     replay_report: Path | None = None,
     readiness_report: Path | None = None,
     downstream_report: Path | None = None,
+    semantic_dimension_report: Path | None = None,
     replay_evidence: Sequence[Path] = (),
 ) -> dict[str, Any]:
     """Build a provisional, digest-bound closure packet without touching sealed data."""
@@ -674,6 +869,22 @@ def build_audit_closure(
         downstream_value, downstream_digest = _sealed_report(
             downstream_path, label="downstream report"
         )
+    semantic_dimension_value: dict[str, Any] | None = None
+    semantic_dimension_digest: str | None = None
+    semantic_dimension_path: Path | None = None
+    if semantic_dimension_report is not None:
+        semantic_dimension_path = semantic_dimension_report.resolve()
+        if semantic_dimension_path == base_root or semantic_dimension_path.is_relative_to(base_root):
+            raise DwdAuditClosureError(
+                "semantic dimension report must remain outside sealed DWD Base"
+            )
+        if semantic_dimension_path == plan_root or semantic_dimension_path.is_relative_to(plan_root):
+            raise DwdAuditClosureError(
+                "semantic dimension report must remain outside sealed input plan"
+            )
+        semantic_dimension_value, semantic_dimension_digest = _sealed_report(
+            semantic_dimension_path, label="semantic dimension report"
+        )
     if lineage.get("dwd", {}).get("package_id") != base_release["package_id"]:
         raise DwdAuditClosureError("lineage report package differs from DWD Base")
 
@@ -682,7 +893,6 @@ def build_audit_closure(
         for name in ("input-plan.json", "coverage-matrix.json", "source-disposition-ledger.json", "capacity-estimate.json", "run-receipt.json")
     }
     plan = _object(plan_files["input-plan.json"], "input plan")
-    plan_coverage = _object(plan_files["coverage-matrix.json"], "coverage matrix")
     ledger = _object(plan_files["source-disposition-ledger.json"], "source disposition ledger")
     capacity = _object(plan_files["capacity-estimate.json"], "capacity estimate")
     receipt = _object(plan_files["run-receipt.json"], "input plan receipt")
@@ -757,6 +967,30 @@ def build_audit_closure(
         )
     findings.extend(downstream_findings)
 
+    semantic_dimensions: dict[str, Any]
+    if semantic_dimension_value is None:
+        semantic_dimensions = {
+            "status": "missing",
+            "report": "not_run_fallback",
+            "report_digest": None,
+            "dimension_count": 0,
+            "table_count": 0,
+            "projection_only": None,
+            "rescan_performed": None,
+            "source_findings_remain_authoritative": None,
+            "reason_codes": ["semantic_dimension_report_missing"],
+            "output_reports": {},
+        }
+        findings.append(_missing_semantic_dimension_finding())
+    else:
+        assert semantic_dimension_path is not None
+        semantic_dimensions = _semantic_dimension_audit_status(
+            semantic_dimension_value,
+            source=str(semantic_dimension_path),
+            base_release=base_release,
+            sealed_roots=(base_root, plan_root),
+        )
+
     deferred = [
         item
         for item in ledger.get("records", [])
@@ -824,6 +1058,7 @@ def build_audit_closure(
     open_scope = [
         "coverage_and_exclusion_matrix_coordinate_scan",
         "representative_replay_determinism_for_base_derivations",
+        "semantic_dimension_split_reports",
         "downstream_increment_compatibility_review",
         "rebuild_publication_and_rollback_readiness_acceptance",
         "human_approval_of_findings_and_remediation_scope",
@@ -834,6 +1069,8 @@ def build_audit_closure(
         open_scope.remove("representative_replay_determinism_for_base_derivations")
     if downstream_value is not None:
         open_scope.remove("downstream_increment_compatibility_review")
+    if semantic_dimension_value is not None:
+        open_scope.remove("semantic_dimension_split_reports")
     if readiness_value is not None:
         open_scope.remove("rebuild_publication_and_rollback_readiness_acceptance")
 
@@ -851,6 +1088,7 @@ def build_audit_closure(
         "replay": replay_digest,
         "readiness": readiness_digest,
         "downstream": downstream_digest,
+        "semantic_dimensions": semantic_dimension_digest,
         "input_plan": plan.get("plan_digest"),
         "input_plan_files": plan_digests,
     }
@@ -872,6 +1110,7 @@ def build_audit_closure(
         "rebuild_readiness": readiness,
         "downstream_compatibility_audit": downstream,
         "downstream_compatibility": compatibility,
+        "semantic_dimension_audit": semantic_dimensions,
         "open_audit_scope": open_scope,
         "summary": {
             "finding_count": len(findings),
@@ -934,6 +1173,8 @@ def build_audit_closure(
         f"- Replay determinism evidence: `{replay['status']}`",
         f"- Rebuild/publication/rollback readiness: `{readiness['status']}`",
         f"- Downstream/increment compatibility: `{downstream['status']}`",
+        f"- Semantic dimension projections: `{semantic_dimensions['status']}`",
+        f"- Semantic dimension index: `{semantic_dimension_path or 'not_run_fallback'}` ({semantic_dimension_digest})",
         "",
         "## Immediate blockers",
         "",

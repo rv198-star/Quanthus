@@ -99,11 +99,21 @@ Previously completed immutable reports can be adopted without repeating their sc
 --evidence lineage_authority=/absolute/lineage-authority-audit.json
 ```
 
-The current registry covers schema/partition, semantic contract, lineage authority, and domain
-invariant auditors. Its `remaining_audit_scope` state remains nonempty until the coverage/exclusion,
-representative replay, downstream compatibility, rebuild-readiness, and remediation-freeze tools
-are implemented and executed. Therefore a `verified` batch is not the Phase F human approval and
-never opens the V2.1 builder gate.
+The semantic-dimension step is a projection-only step over the sealed semantic-contract and PIT
+reports. It requires the PIT report explicitly and writes the five named dimension files plus an
+aggregate `semantic-dimension-audit.json` index. A complete invocation may adopt the semantic
+contract report while executing the projection once:
+
+```text
+--pit-report /absolute/pit-semantics-audit.json
+--evidence semantic_contracts=/absolute/semantic-contract-audit.json
+```
+
+The current registry covers schema/partition, semantic contract, named semantic dimensions,
+lineage authority, domain invariants, and downstream impact auditors. Its
+`remaining_audit_scope` state remains nonempty until the coverage/exclusion, representative
+replay, rebuild-readiness, and remediation-freeze tools are implemented and executed. Therefore a
+`verified` batch is not the Phase F human approval and never opens the V2.1 builder gate.
 
 ## Audit Dimensions
 

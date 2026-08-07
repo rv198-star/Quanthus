@@ -106,6 +106,25 @@ def _load_checkpoint(
     return tables
 
 
+def _manifest_table_names(manifest: Mapping[str, Any]) -> list[str]:
+    raw_files = manifest.get("files")
+    if not isinstance(raw_files, list):
+        raise DwdDomainInvariantAuditError("DWD Base manifest files are invalid")
+    names: set[str] = set()
+    for raw_file in raw_files:
+        if not isinstance(raw_file, Mapping) or not isinstance(raw_file.get("path"), str):
+            continue
+        relative = PurePosixPath(raw_file["path"])
+        names.update(
+            part
+            for part in relative.parts
+            if part.startswith("dwd_") and "." not in part
+        )
+        if relative.stem.startswith("dwd_"):
+            names.add(relative.stem)
+    return sorted(names)
+
+
 def invariant_predicates() -> dict[str, dict[str, str]]:
     """Return unambiguous cross-field rules not covered by generic numeric checks."""
 
@@ -215,19 +234,7 @@ def audit_dwd_domain_invariants(
         raise DwdDomainInvariantAuditError(f"DWD Base verification failed: {exc}") from exc
     manifest = _object(root / "manifest.json", "DWD manifest")
     predicates = invariant_predicates()
-    raw_files = manifest.get("files")
-    if not isinstance(raw_files, list):
-        raise DwdDomainInvariantAuditError("DWD Base manifest files are invalid")
-    manifest_tables = sorted(
-        {
-            part
-            for raw_file in raw_files
-            if isinstance(raw_file, Mapping)
-            and isinstance(raw_file.get("path"), str)
-            for part in PurePosixPath(raw_file["path"]).parts
-            if part.startswith("dwd_")
-        }
-    )
+    manifest_tables = _manifest_table_names(manifest)
     all_paths = _manifest_payload_files(root, manifest, table_names=manifest_tables)
     paths = {table: all_paths[table] for table in predicates}
     audit_identity = {

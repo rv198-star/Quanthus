@@ -6,6 +6,7 @@ from pathlib import Path
 from quanthus.pipelines.dwd_domain_invariant_audit import (
     _checkpoint_value,
     _load_checkpoint,
+    _manifest_table_names,
     _validated_memory_limit,
     invariant_predicates,
     write_domain_invariant_report,
@@ -13,6 +14,25 @@ from quanthus.pipelines.dwd_domain_invariant_audit import (
 
 
 class DwdDomainInvariantAuditTests(unittest.TestCase):
+    def test_manifest_table_names_normalize_flat_payload_stems(self) -> None:
+        self.assertEqual(
+            _manifest_table_names(
+                {
+                    "files": [
+                        {
+                            "path": "payload/tradability_state/"
+                            "dwd_price_limit_regime.parquet"
+                        },
+                        {
+                            "path": "payload/security_market_observation/"
+                            "dwd_security_bar/interval_size=1d/part.parquet"
+                        },
+                    ]
+                }
+            ),
+            ["dwd_price_limit_regime", "dwd_security_bar"],
+        )
+
     def test_resource_contract_and_checkpoint_identity(self) -> None:
         self.assertEqual(_validated_memory_limit("2gb"), "2GB")
         with self.assertRaisesRegex(RuntimeError, "memory limit"):

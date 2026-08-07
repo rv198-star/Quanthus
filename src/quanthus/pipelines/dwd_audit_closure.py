@@ -85,6 +85,62 @@ def _report_digest(path: Path) -> str:
     return _sha256(path)
 
 
+def _replay_audit_status(
+    report: Mapping[str, Any], *, source: str, base_release: Mapping[str, Any]
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Validate the aggregate replay report and classify an evidence gap."""
+
+    if report.get("kind") != "dwd_base_v2_replay_determinism_audit":
+        raise DwdAuditClosureError("replay report has an unexpected kind")
+    observed = report.get("base_release")
+    if not isinstance(observed, Mapping):
+        raise DwdAuditClosureError("replay report has no Base identity")
+    identity_keys = ("package_id", "manifest_sha256", "content_digest", "through_date")
+    if any(observed.get(key) != base_release.get(key) for key in identity_keys):
+        raise DwdAuditClosureError("replay report Base identity differs from the sealed package")
+    summary = report.get("summary")
+    if not isinstance(summary, Mapping):
+        raise DwdAuditClosureError("replay report has no summary")
+    status = summary.get("status")
+    if status not in {"verified", "finding"}:
+        raise DwdAuditClosureError(f"replay report has invalid status: {status}")
+    if summary.get("mutation_performed") is not False:
+        raise DwdAuditClosureError("replay report does not prove read-only execution")
+    reason_codes = summary.get("reason_codes", [])
+    if not isinstance(reason_codes, list) or any(not isinstance(item, str) for item in reason_codes):
+        raise DwdAuditClosureError("replay report reason codes are invalid")
+    details = {
+        "status": status,
+        "report": source,
+        "report_digest": report.get("canonical_digest"),
+        "reason_codes": sorted(set(reason_codes)),
+        "independent_execution_count": summary.get("independent_execution_count", 0),
+        "evidence": report.get("evidence", []),
+    }
+    if status == "verified":
+        return details, []
+    return details, [
+        _finding(
+            finding_id="DWDV2-REPLAY-DETERMINISM",
+            dimension_id="representative_replay_determinism",
+            scope="CN01 DWD Base derived builders",
+            severity="high",
+            evidence={
+                "reason_codes": details["reason_codes"],
+                "independent_execution_count": details["independent_execution_count"],
+                "evidence": details["evidence"],
+            },
+            root_cause="The frozen Base has no two digest-bound, independently named representative derivation executions that prove deterministic replay.",
+            affected={"independent_executions": details["independent_execution_count"]},
+            disposition="add_immutable_evidence_then_fix_in_v2_1",
+            change="Capture two read-only CN01 replay receipts over representative real partitions, bind both to the frozen Base and input plan, and reject mutable or network-dependent derivation inputs.",
+            tests=["test_dwd_replay_determinism_requires_two_bound_executions"],
+            acceptance="A fresh CN01 replay report verifies two independently named executions with equal bytes or an approved semantic digest and zero replay reason codes.",
+            source_report=source,
+        )
+    ]
+
+
 def _count_nonzero(value: object) -> dict[str, int]:
     if not isinstance(value, Mapping):
         return {}
@@ -408,6 +464,7 @@ def build_audit_closure(
     output_root: Path,
     code_revision: str,
     coverage_report: Path | None = None,
+    replay_report: Path | None = None,
     replay_evidence: Sequence[Path] = (),
 ) -> dict[str, Any]:
     """Build a provisional, digest-bound closure packet without touching sealed data."""
@@ -421,6 +478,12 @@ def build_audit_closure(
         raise DwdAuditClosureError("closure output must remain outside sealed DWD Base")
     if output_root == plan_root or output_root.is_relative_to(plan_root):
         raise DwdAuditClosureError("closure output must remain outside sealed input plan")
+    if replay_report is not None and replay_evidence:
+        raise DwdAuditClosureError("replay-report and replay-evidence cannot both be supplied")
+    if replay_report is None and replay_evidence:
+        if len(replay_evidence) != 1:
+            raise DwdAuditClosureError("replay-evidence must contain one aggregate replay report")
+        replay_report = replay_evidence[0]
 
     manifest = _object(base_root / "manifest.json", "DWD manifest")
     base_release = {
@@ -455,6 +518,16 @@ def build_audit_closure(
     if coverage_report is not None:
         coverage, coverage_digest = _sealed_report(coverage_report.resolve(), label="coverage report")
         coverage_path = coverage_report.resolve()
+    replay_value: dict[str, Any] | None = None
+    replay_digest: str | None = None
+    replay_path: Path | None = None
+    if replay_report is not None:
+        replay_path = replay_report.resolve()
+        if replay_path == base_root or replay_path.is_relative_to(base_root):
+            raise DwdAuditClosureError("replay report must remain outside sealed DWD Base")
+        if replay_path == plan_root or replay_path.is_relative_to(plan_root):
+            raise DwdAuditClosureError("replay report must remain outside sealed input plan")
+        replay_value, replay_digest = _sealed_report(replay_path, label="replay report")
     if lineage.get("dwd", {}).get("package_id") != base_release["package_id"]:
         raise DwdAuditClosureError("lineage report package differs from DWD Base")
 
@@ -476,6 +549,36 @@ def build_audit_closure(
     findings.extend(_invariant_findings(invariant, str(invariant_path)))
     if coverage is not None and coverage_path is not None:
         findings.extend(_coverage_findings(coverage, str(coverage_path)))
+
+    replay = {
+        "status": "missing",
+        "required": "two independently named representative Base derivation executions",
+        "evidence": [],
+        "reason_codes": ["base_replay_evidence_missing"],
+    }
+    replay_findings: list[dict[str, Any]]
+    if replay_value is None:
+        _, replay_findings = _replay_audit_status(
+            {
+                "kind": "dwd_base_v2_replay_determinism_audit",
+                "base_release": base_release,
+                "summary": {
+                    "status": "finding",
+                    "mutation_performed": False,
+                    "reason_codes": ["base_replay_evidence_missing"],
+                    "independent_execution_count": 0,
+                },
+                "evidence": [],
+            },
+            source="not_run_fallback",
+            base_release=base_release,
+        )
+    else:
+        replay, replay_findings = _replay_audit_status(
+            replay_value, source=str(replay_path), base_release=base_release
+        )
+        replay["required"] = "two independently named representative Base derivation executions"
+    findings.extend(replay_findings)
 
     deferred = [
         item
@@ -541,14 +644,6 @@ def build_audit_closure(
             )
         )
 
-    replay = {
-        "status": "missing",
-        "required": "two independently named representative Base derivation executions",
-        "evidence": [],
-    }
-    if replay_evidence:
-        replay["evidence"] = [{"path": str(path.resolve()), "digest": _report_digest(path.resolve())} for path in replay_evidence]
-        replay["status"] = "verified" if len(replay_evidence) >= 2 and len({_report_digest(path.resolve()) for path in replay_evidence}) == 1 else "finding"
     open_scope = [
         "coverage_and_exclusion_matrix_coordinate_scan",
         "representative_replay_determinism_for_base_derivations",
@@ -574,6 +669,7 @@ def build_audit_closure(
         "invariant": invariant_digest,
         "phase_a": phase_a_digest,
         "coverage": coverage_digest,
+        "replay": replay_digest,
         "input_plan": plan.get("plan_digest"),
         "input_plan_files": plan_digests,
     }

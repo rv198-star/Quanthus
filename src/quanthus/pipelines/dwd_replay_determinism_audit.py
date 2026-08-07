@@ -37,7 +37,15 @@ def _object(path: Path, label: str) -> dict[str, Any]:
 
 
 def _normalized_replay(value: dict[str, Any]) -> dict[str, Any]:
-    ignored = {"generated_at", "started_at", "completed_at", "output_root", "report_path"}
+    ignored = {
+        "canonical_digest",
+        "completed_at",
+        "generated_at",
+        "output_root",
+        "report_path",
+        "semantic_digest",
+        "started_at",
+    }
     return {key: item for key, item in value.items() if key not in ignored}
 
 
@@ -64,7 +72,10 @@ def audit_dwd_replay_determinism(
         reasons.append("base_replay_evidence_missing")
     else:
         values: list[dict[str, Any]] = []
-        for path in (replay_a.resolve(), replay_b.resolve()):
+        resolved_paths = (replay_a.resolve(), replay_b.resolve())
+        if resolved_paths[0] == resolved_paths[1]:
+            reasons.append("replay_evidence_paths_not_independent")
+        for path in resolved_paths:
             value = _object(path, "replay evidence")
             if value.get("kind") != "dwd_base_v2_replay_execution":
                 reasons.append("replay_evidence_kind_invalid")

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import tempfile
 import unittest
@@ -136,6 +137,49 @@ class DwdAuditClosureTests(unittest.TestCase):
                     output_root=Path(temporary) / "out",
                     code_revision="a" * 40,
                 )
+
+    def test_replay_finding_is_added_when_report_has_no_executions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            base, plan, daily, schema, semantic, lineage, invariant, phase_a = self._fixture(root)
+            replay = root / "replay.json"
+            manifest = json.loads((base / "manifest.json").read_text(encoding="ascii"))
+            replay_value = {
+                "kind": "dwd_base_v2_replay_determinism_audit",
+                "base_release": {
+                    "package_id": manifest["package_id"],
+                    "manifest_sha256": "sha256:" + hashlib.sha256(
+                        (base / "manifest.json").read_bytes()
+                    ).hexdigest(),
+                    "content_digest": manifest["content_digest"],
+                    "through_date": manifest["through_date"],
+                },
+                "summary": {
+                    "status": "finding",
+                    "mutation_performed": False,
+                    "reason_codes": ["base_replay_evidence_missing"],
+                    "independent_execution_count": 0,
+                },
+                "evidence": [],
+            }
+            _sealed(replay, replay_value)
+            result = build_audit_closure(
+                base_root=base,
+                plan_root=plan,
+                schema_report=schema,
+                semantic_report=semantic,
+                lineage_report=lineage,
+                invariant_report=invariant,
+                phase_a_findings=phase_a,
+                daily_root=daily,
+                output_root=root / "out-replay",
+                code_revision="a" * 40,
+                replay_report=replay,
+            )
+            ledger = json.loads((root / "out-replay" / "findings-ledger.json").read_text(encoding="ascii"))
+            ids = {item["finding_id"] for item in ledger["findings"]}
+            self.assertIn("DWDV2-REPLAY-DETERMINISM", ids)
+            self.assertIn("representative_replay_determinism_for_base_derivations", result["open_audit_scope"])
 
 
 if __name__ == "__main__":

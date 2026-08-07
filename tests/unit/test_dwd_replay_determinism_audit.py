@@ -30,6 +30,55 @@ class DwdReplayDeterminismAuditTests(unittest.TestCase):
             self.assertEqual(report["summary"]["reason_codes"], ["base_replay_evidence_missing"])
             self.assertFalse(report["summary"]["mutation_performed"])
 
+    def test_same_execution_path_is_not_independent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            base = root / "base"
+            plan = root / "plan"
+            base.mkdir()
+            plan.mkdir()
+            (base / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "package_id": "dwd-base-202607-v2",
+                        "content_digest": "sha256:" + "1" * 64,
+                        "through_date": "2026-07-31",
+                    }
+                ),
+                encoding="ascii",
+            )
+            (plan / "input-plan.json").write_text(
+                json.dumps({"run_id": "run", "plan_digest": "sha256:" + "2" * 64}),
+                encoding="ascii",
+            )
+            replay = root / "replay.json"
+            replay.write_text(
+                json.dumps(
+                    {
+                        "kind": "dwd_base_v2_replay_execution",
+                        "base_release": {
+                            "package_id": "dwd-base-202607-v2",
+                            "manifest_sha256": "sha256:" + "0" * 64,
+                            "content_digest": "sha256:" + "1" * 64,
+                            "through_date": "2026-07-31",
+                        },
+                        "mutation_performed": False,
+                        "result": "same",
+                    }
+                ),
+                encoding="ascii",
+            )
+            report = audit_dwd_replay_determinism(
+                base_root=base,
+                plan_root=plan,
+                replay_a=replay,
+                replay_b=replay,
+            )
+            self.assertEqual(report["summary"]["status"], "finding")
+            self.assertIn(
+                "replay_evidence_paths_not_independent", report["summary"]["reason_codes"]
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

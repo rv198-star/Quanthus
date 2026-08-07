@@ -227,7 +227,9 @@ def _semantic_findings(report: Mapping[str, Any], source: str) -> list[dict[str,
         findings.append(
             _finding(
                 finding_id=f"DWDV2-SEMANTIC-{table}",
-                dimension_id="referential_integrity"
+                dimension_id="numeric_and_domain_invariants"
+                if "numeric_invariants" in components
+                else "referential_integrity"
                 if "foreign_keys" in components
                 else "business_keys_row_keys_and_versions"
                 if "business_key_version_groups" in components or "duplicate_row_keys" in components
@@ -282,6 +284,11 @@ def _invariant_findings(report: Mapping[str, Any], source: str) -> list[dict[str
 
 
 def _phase_a_findings(report: Mapping[str, Any], source: str) -> list[dict[str, Any]]:
+    if report.get("kind") == "issue_78_dwd_v2_phase_a_utc_rerun_closure":
+        closure = report.get("finding_closure")
+        if isinstance(closure, Mapping) and closure.get("status") == "resolved_for_phase_a_audit_evidence":
+            return []
+        raise DwdAuditClosureError("Phase A UTC rerun closure does not resolve its finding")
     raw_findings = report.get("findings")
     if not isinstance(raw_findings, list):
         raise DwdAuditClosureError("Phase A findings report has no findings list")

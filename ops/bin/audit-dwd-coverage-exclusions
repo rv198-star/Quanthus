@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Audit CN01 DWD coverage coordinates and explicit source exclusions."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.dwd_coverage_exclusion_audit import (  # noqa: E402
+    DwdCoverageExclusionAuditError,
+    audit_dwd_coverage_exclusions,
+    write_coverage_exclusion_report,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--plan-root", type=Path, required=True)
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--schema-report", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        report = audit_dwd_coverage_exclusions(
+            root=args.root,
+            plan_root=args.plan_root,
+            model_path=args.model,
+            schema_report=args.schema_report,
+        )
+        write_coverage_exclusion_report(args.output, report, sealed_roots=(args.root, args.plan_root))
+    except (DwdCoverageExclusionAuditError, OSError) as exc:
+        print(f"DWD coverage/exclusion audit failed: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(report["summary"], ensure_ascii=True, sort_keys=True))
+    return 0 if report["summary"]["status"] == "verified" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

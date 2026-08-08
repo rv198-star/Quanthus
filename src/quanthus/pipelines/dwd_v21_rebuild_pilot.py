@@ -174,7 +174,7 @@ def _scan_parquet(path: Path, *, expected_sha256: str, batch_size_rows: int) -> 
     try:
         import pyarrow.parquet as pq
     except ImportError as error:
-        raise DwdV21PilotError("PyArrow is required for DWD V2.1 pilots") from error
+        raise DwdV21PilotError(f"PyArrow is required for DWD V2.1 pilots: {error}") from error
 
     actual_sha = _sha256(path)
     if actual_sha != expected_sha256:
@@ -245,6 +245,15 @@ def run_worker(spec: Mapping[str, Any]) -> dict[str, Any]:
 
 def _directory_bytes(root: Path) -> int:
     return sum(path.stat().st_size for path in root.rglob("*") if path.is_file())
+
+
+def _execution_python(path: Path) -> Path:
+    """Keep a virtualenv entry-point symlink intact so Python discovers pyvenv.cfg."""
+
+    selected = path.expanduser()
+    if not selected.is_absolute():
+        selected = (Path.cwd() / selected).absolute()
+    return selected
 
 
 def _run_isolated_worker(
@@ -380,7 +389,7 @@ def run_pilots(
     ods_base = ods_base.resolve()
     dwd_base = dwd_base.resolve()
     environment_path = environment_path.resolve()
-    python = python.resolve()
+    python = _execution_python(python)
     run_root = workspace / "runs" / run_id
     plan_root = run_root / "plan"
     evidence_root = run_root / "evidence" / "pilot"

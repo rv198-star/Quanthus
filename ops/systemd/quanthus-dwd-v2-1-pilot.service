@@ -10,6 +10,9 @@ Group=root
 WorkingDirectory=/home/rv192/work/Quanthus-issue78-audit-closure
 EnvironmentFile=/etc/quanthus/gpu-p100-dwd-rebuild.env
 Environment=PYTHONPATH=/home/rv192/work/Quanthus-issue78-audit-closure/src
+Environment=GIT_CONFIG_COUNT=1
+Environment=GIT_CONFIG_KEY_0=safe.directory
+Environment=GIT_CONFIG_VALUE_0=/home/rv192/work/Quanthus-issue78-audit-closure
 ExecStart=/home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python /home/rv192/work/Quanthus-issue78-audit-closure/ops/bin/pilot-dwd-v2-1-rebuild --repository /home/rv192/work/Quanthus-issue78-audit-closure --workspace /srv/quanthus/gpu-p100-dwd-workspace --ods-base /srv/quanthus/ods/base/ods-base-202607-v2 --dwd-base /srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2 --environment /etc/quanthus/gpu-p100-dwd-rebuild.env --run-id ${QUANTHUS_DWD_RUN_ID} --expected-revision ${QUANTHUS_DWD_CODE_REVISION} --expected-contract-digest ${QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST} --python /home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python --memory-limit-bytes 12884901888 --spill-limit-bytes 8589934592 --thread-limit 4 --batch-size-rows 256
 NoNewPrivileges=true
 PrivateNetwork=true

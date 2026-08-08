@@ -7,6 +7,7 @@ import pytest
 from quanthus.pipelines.dwd_replay_determinism_audit import audit_dwd_replay_determinism
 from quanthus.pipelines.dwd_v21_rebuild_pilot import (
     DwdV21PilotError,
+    _execution_python,
     _replay_receipt,
     _run_isolated_worker,
     _scan_parquet,
@@ -115,6 +116,19 @@ def test_isolated_worker_applies_bounded_read_only_scan(tmp_path: Path) -> None:
     assert result["spill_bytes"] == 0
 
 
+def test_execution_python_preserves_virtualenv_symlink(tmp_path: Path) -> None:
+    system_python = tmp_path / "system-python"
+    system_python.write_bytes(b"binary")
+    venv_python = tmp_path / "venv/bin/python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.symlink_to(system_python)
+
+    selected = _execution_python(venv_python)
+
+    assert selected == venv_python.absolute()
+    assert selected != venv_python.resolve()
+
+
 def test_replay_receipts_bind_plan_and_verify_determinism(tmp_path: Path) -> None:
     base = tmp_path / "base"
     plan = tmp_path / "plan"
@@ -213,6 +227,7 @@ def test_systemd_pilot_is_persistent_and_resource_bounded() -> None:
     assert "ConditionPathIsMountPoint=/srv/quanthus/gpu-p100-dwd-workspace" in service
     assert "pilot-dwd-v2-1-rebuild" in service
     assert "PrivateNetwork=true" in service
+    assert "Environment=GIT_CONFIG_KEY_0=safe.directory" in service
     assert "ReadWritePaths=/srv/quanthus/gpu-p100-dwd-workspace" in service
     assert "MemoryMax=14G" in service
     assert "CPUQuota=400%" in service

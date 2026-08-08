@@ -60,6 +60,28 @@ def test_phase_receipt_rejects_cross_run_reuse(tmp_path: Path) -> None:
         )
 
 
+def test_phase_receipt_rejects_evidence_drift(tmp_path: Path) -> None:
+    _phase_receipt(
+        tmp_path,
+        phase="candidate-passed",
+        run_id="run-1",
+        contract_digest=CONTRACT,
+        code_revision=REVISION,
+        status="passed",
+        evidence={"sha256": "sha256:first"},
+    )
+    with pytest.raises(DwdV21RuntimeError, match="evidence differs"):
+        _phase_receipt(
+            tmp_path,
+            phase="candidate-passed",
+            run_id="run-1",
+            contract_digest=CONTRACT,
+            code_revision=REVISION,
+            status="passed",
+            evidence={"sha256": "sha256:changed"},
+        )
+
+
 def test_active_pointer_matches_monitor_contract(tmp_path: Path) -> None:
     _active_pointer(
         tmp_path,

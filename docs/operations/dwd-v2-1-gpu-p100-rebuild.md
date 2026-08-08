@@ -7,36 +7,40 @@
 | Machine contract | `config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json` |
 | Build node | GPU-P100, CPU execution |
 | Install and cutover node | CN01 |
-| Delivery gate | exact contract approved; implementation and pilots open; full build pilot-gated |
+| Delivery gate | contract and pilot receipts approved; full build exact-revision-gated |
 
-This runbook does not authorize a full builder, installation, or pointer movement. The exact
-execution contract is approved, but full build remains blocked until the replay and partition-pilot
-receipts are accepted.
+The exact execution contract and pilot receipts are approved. This runbook does not itself
+authorize a full builder revision, installation, or pointer movement. Full build opens only when
+the project owner approves the exact implementation revision and that same revision is placed in
+the fail-closed node environment.
 
 ## Script Workflow
 
 Repository wrappers call production Python modules and emit structured receipts:
 
-1. `preflight-dwd-v2-1-rebuild` verifies node identity, exact contract and inputs, ext4 mount,
-   capacity, filesystem semantics, environment, and the GPU-local lock.
-2. `plan-dwd-v2-1-rebuild` freezes one run id, source dispositions, finding coverage, domain order,
-   package identity, tool versions, and capacity receipt.
-3. `pilot-dwd-v2-1-rebuild` runs bound deterministic replays and representative heavy partitions,
+1. `run-dwd-v2-1-rebuild` verifies node identity, exact contract and inputs, ext4 mount, capacity,
+   filesystem semantics, environment, and the GPU-local lock; it then freezes one pilot run id,
+   source dispositions, domain order, package identity, tool versions, and capacity receipt.
+2. `pilot-dwd-v2-1-rebuild` runs bound deterministic replays and representative heavy partitions,
    producing measured memory, thread, and spill limits. It executes two isolated, sequential,
    read-only PyArrow decodes against the sealed financial-reporting and market-observation inputs,
    then pauses at `awaiting-pilot-acceptance`.
-4. `run-dwd-v2-1-rebuild` currently executes the authorized preflight and exact-input planning
-   phases, publishes durable phase receipts, and pauses at `awaiting-pilot-receipts`. `--resume`
-   revalidates immutable inputs before continuing. Nine-domain execution remains unavailable until
-   the sealed replay and partition-pilot receipts are explicitly approved.
-5. `assemble-dwd-v2-1-candidate` requires nine verified domain receipts and assembles all 33 tables
-   on the same ext4 filesystem.
-6. `verify-dwd-v2-1-candidate` checks physical integrity, PIT semantics, identities, invariants,
-   finding closure, replay, and V2 business-row differences.
-7. `seal-dwd-v2-1-export` writes the immutable manifest and publishes `READY` last.
-8. `import-dwd-v2-1-candidate` runs on CN01, pulls only manifest-declared bytes into `/personal`,
+3. The exact pilot receipt approval is frozen in
+   `docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-pilot-approval-20260808.json`.
+4. `build-dwd-v2-1-rebuild` creates a distinct revision-bound full-build run. It verifies the
+   accepted pilot approval and source receipts, repeats the deep preflight under `full_build`
+   authority, freezes a new plan, executes the nine-domain DAG sequentially, and deeply verifies
+   every immutable checkpoint before continuing.
+5. The same full-build runtime hard-links the nine verified domain candidates into a 33-table
+   export, writes its manifest and `READY`, and deeply verifies it. It then runs five checkpointed
+   successor-candidate audits: physical schema and partitions, semantic contracts, domain
+   invariants, coverage and exclusions, and lineage authority. Only five sealed `verified` reports
+   advance the run to `awaiting-candidate-approval`; a finding or report drift fails closed. The
+   runtime calls the pointerless seal API and cannot create or change a `CURRENT` descriptor.
+6. `import-dwd-v2-1-candidate` runs on CN01 after separate implementation and authorization. It
+   pulls only manifest-declared bytes into `/personal`,
    deep-verifies them, rechecks local capacity, and prepares hidden local ingress.
-9. Existing install and pointer compare-and-swap tools remain separate; cutover is never part of
+7. Existing install and pointer compare-and-swap tools remain separate; cutover is never part of
    the rebuild phase chain.
 
 Each phase writes temporary output, fsyncs files and parent directories, verifies the result, then
@@ -78,8 +82,36 @@ sudo systemctl daemon-reload
 sudo systemctl start quanthus-dwd-v2-1-pilot.service
 ```
 
-The unit has no restart policy. A node outage or failed pilot requires evidence inspection and an
-explicit checkpoint decision; it never resumes itself or opens full-builder authority.
+The pilot unit has no restart policy. A node outage or failed pilot requires evidence inspection
+and an explicit checkpoint decision; it never resumes itself or opens full-builder authority.
+
+## Full Build Service
+
+After the exact full-build revision is approved, install
+`ops/systemd/gpu-p100-dwd-full-build.env.example` as the node environment and replace its revision
+and run placeholders. The new run id must contain the first eight characters of the approved
+revision. Keep `QUANTHUS_DWD_RESUME_AUTHORIZED=0` for the first start.
+
+Install and start the bounded service:
+
+```bash
+sudo install -m 0644 ops/systemd/quanthus-dwd-v2-1-full-build.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start quanthus-dwd-v2-1-full-build.service
+```
+
+The service is sequential, network-isolated, limited to four CPUs and 14 GiB, and has
+`Restart=no`. All temporary directories are pinned below `runs/<run-id>/scratch/full-build` on the
+ext4 workspace. Build and audit checkpoints allow an explicitly authorized later invocation to
+continue without repeating verified domains or completed audit tables. Normal success is the
+paused `awaiting-candidate-approval` phase with five candidate-audit digests in its receipt, not
+installation.
+
+After an interruption, inspect the immutable failure and last-passed receipts. Resume only after
+an explicit checkpoint decision by setting `QUANTHUS_DWD_RESUME_AUTHORIZED=1` and starting the
+service again. The runtime re-runs deep preflight, rejects drift in any completed checkpoint, and
+continues at the first unfinished source audit, domain, or candidate audit. Set the flag back to
+`0` after the recovery invocation.
 
 ## Fixed Control Paths
 

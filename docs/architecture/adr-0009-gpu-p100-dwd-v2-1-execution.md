@@ -1,10 +1,10 @@
 # ADR 0009: GPU-P100 DWD Base V2.1 Execution Topology
 
-- Status: Accepted for implementation and bounded pilots; full build remains pilot-gated
+- Status: Accepted; pilot receipts approved, full build remains exact-revision-gated
 - Date: 2026-08-07
 - Decision id: `META-DATA-PIT-001`
 - Design status: approved
-- Delivery gate: implementation and bounded pilots open; full build blocked on pilot acceptance
+- Delivery gate: pilot accepted; full build blocked on exact builder revision approval
 - Affects: ADR 0008 section 5, the HLD data-platform topology, and the V2.1 rebuild runbook
 
 ## Context
@@ -40,10 +40,15 @@ The approved machine contract is
 
 ## Phase Authority
 
-Until pilot acceptance, authority is limited to implementation, preflight, planning, deterministic
-replay pilots, and representative partition pilots. Full build remains blocked until those
-receipts are accepted. Candidate installation additionally requires CN01 local capacity; pointer
-movement always requires separate approval of the exact installed candidate.
+The exact replay and partition receipts from run
+`dwd-v2-1-gpu-p100-20260808T162708Z-r6feca07-r3` were accepted on 2026-08-08. Their canonical
+approval receipt is
+`docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-pilot-approval-20260808.json`.
+Full-build execution remains blocked until the project owner approves the exact revision that
+implements the builder. That revision must create a new revision-bound run and verify the accepted
+pilot receipts before decoding business rows. Candidate installation additionally requires CN01
+local capacity; pointer movement always requires separate approval of the exact installed
+candidate.
 
 ## Consequences
 

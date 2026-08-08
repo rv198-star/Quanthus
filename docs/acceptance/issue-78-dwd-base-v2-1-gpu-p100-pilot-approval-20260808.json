@@ -1,0 +1,12 @@
+{
+  "approval_statement": "APPROVE DWD V2.1 GPU-P100 PILOT RECEIPTS replay=sha256:d1f25e8410c8e26ce44bcc70c3dc57dd65c177016a95b2ae17eae5cf2f9a49cf partition=sha256:c577984ed394288ef2d3f8eae41afa598a90f52caaeb7c9402bdd6b914c46a34 RUN=dwd-v2-1-gpu-p100-20260808T162708Z-r6feca07-r3",
+  "approved_at": "2026-08-08T16:40:04Z",
+  "approved_contract_digest": "sha256:bab98bb0a11dbd2c8395881931cdaed50f915ce2ce39065c25ac103e5ea84d8a",
+  "approved_pilot_revision": "6feca07c78522571096c0910abef9507d93cdebd",
+  "canonical_digest": "sha256:2a4b2fd9a007d82e94b583bdef7f16bb7ccffca2dccca77efe733e645a357443",
+  "kind": "dwd_base_v2_1_gpu_p100_pilot_receipt_approval",
+  "partition_receipt_digest": "sha256:c577984ed394288ef2d3f8eae41afa598a90f52caaeb7c9402bdd6b914c46a34",
+  "pilot_run_id": "dwd-v2-1-gpu-p100-20260808T162708Z-r6feca07-r3",
+  "replay_receipt_digest": "sha256:d1f25e8410c8e26ce44bcc70c3dc57dd65c177016a95b2ae17eae5cf2f9a49cf",
+  "schema_version": 1
+}

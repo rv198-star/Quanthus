@@ -31,6 +31,17 @@ class DomainBaseResult:
     payload_file_count: int
 
 
+@dataclass(frozen=True)
+class DomainCandidateVerification:
+    """Deep verification result for one same-run domain candidate."""
+
+    root: Path
+    manifest_sha256: str
+    semantic_digest: str
+    row_counts: dict[str, int]
+    payload_file_count: int
+
+
 _EXPECTED_KINDS = {
     "listed_company": "dwd_listed_company_candidate",
     "trading_calendar": "dwd_trading_calendar_candidate",
@@ -92,9 +103,18 @@ def _write_json(path: Path, value: Mapping[str, Any]) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary_path, path)
+        _fsync_directory(path.parent)
     except BaseException:
         temporary_path.unlink(missing_ok=True)
         raise
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _candidate(
@@ -146,6 +166,35 @@ def _candidate(
     if physical != seen | {"manifest.json", "READY"}:
         raise DomainBaseError(f"candidate physical inventory differs: {domain}")
     return manifest, manifest_sha, files
+
+
+def verify_domain_candidate(
+    root: Path,
+    *,
+    domain: str,
+    run_id: str,
+    input_plan_digest: str,
+) -> DomainCandidateVerification:
+    """Deeply verify one immutable domain candidate and its run binding."""
+
+    if domain not in _EXPECTED_KINDS:
+        raise DomainBaseError(f"unknown DWD candidate domain: {domain}")
+    manifest, manifest_sha, files = _candidate(
+        domain,
+        root.resolve(),
+        run_id=run_id,
+        input_plan_digest=input_plan_digest,
+    )
+    raw_counts = manifest.get("row_counts")
+    if not isinstance(raw_counts, Mapping):
+        raise DomainBaseError(f"candidate row counts are invalid: {domain}")
+    return DomainCandidateVerification(
+        root.resolve(),
+        manifest_sha,
+        str(manifest["semantic_digest"]),
+        {str(key): int(value) for key, value in raw_counts.items()},
+        sum(str(raw["path"]).startswith("payload/") for raw in files),
+    )
 
 
 def _link(source: Path, destination: Path) -> None:
@@ -229,11 +278,9 @@ def _current_descriptor(result: DomainBaseResult, *, run_id: str) -> dict[str, A
     }
 
 
-def publish_domain_base(
+def _verify_package_binding(
+    root: Path,
     *,
-    candidates: Mapping[str, Path],
-    output: Path,
-    current: Path,
     package_id: str,
     run_id: str,
     input_plan_digest: str,
@@ -242,20 +289,50 @@ def publish_domain_base(
     model_extension_sha256: str,
     code_revision: str,
 ) -> DomainBaseResult:
-    """Hard-link nine immutable candidates, seal a Base, and publish CURRENT."""
+    result = verify_domain_base(root)
+    manifest = _object(root / "manifest.json")
+    expected = {
+        "package_id": package_id,
+        "run_id": run_id,
+        "input_plan_digest": input_plan_digest,
+        "ods_base": dict(ods_base),
+        "model_sha256": model_sha256,
+        "model_extension_sha256": model_extension_sha256,
+        "code_revision": code_revision,
+    }
+    if any(manifest.get(key) != value for key, value in expected.items()):
+        raise DomainBaseError("existing DWD Base candidate has a different identity")
+    return result
+
+
+def seal_domain_base_candidate(
+    *,
+    candidates: Mapping[str, Path],
+    output: Path,
+    package_id: str,
+    run_id: str,
+    input_plan_digest: str,
+    ods_base: Mapping[str, str],
+    model_sha256: str,
+    model_extension_sha256: str,
+    code_revision: str,
+) -> DomainBaseResult:
+    """Hard-link nine immutable candidates and seal a Base without publishing a pointer."""
 
     if set(candidates) != set(_EXPECTED_KINDS) or output.name != package_id:
         raise DomainBaseError("DWD Base publication arguments differ")
     output.parent.mkdir(parents=True, exist_ok=True)
-    current.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
-        result = verify_domain_base(output)
-        descriptor = _current_descriptor(result, run_id=run_id)
-        if current.exists() and _object(current) != descriptor:
-            raise DomainBaseError("DWD Base CURRENT already points elsewhere")
-        if not current.exists():
-            _write_json(current, descriptor)
-        return result
+        return _verify_package_binding(
+            output,
+            package_id=package_id,
+            run_id=run_id,
+            input_plan_digest=input_plan_digest,
+            ods_base=ods_base,
+            model_sha256=model_sha256,
+            model_extension_sha256=model_extension_sha256,
+            code_revision=code_revision,
+        )
     staging = output.with_name(f".{package_id}.staging")
     if staging.exists():
         shutil.rmtree(staging)
@@ -335,21 +412,67 @@ def publish_domain_base(
         }
         _write_json(staging / "manifest.json", manifest)
         ready = staging / "READY"
-        ready.write_text(_sha256(staging / "manifest.json") + "\n", encoding="ascii")
-        ready.chmod(0o640)
+        with ready.open("x", encoding="ascii") as stream:
+            os.fchmod(stream.fileno(), 0o640)
+            stream.write(_sha256(staging / "manifest.json") + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
         for directory in sorted(
             (item for item in staging.rglob("*") if item.is_dir()), reverse=True
         ):
             directory.chmod(0o750)
+            _fsync_directory(directory)
         staging.chmod(0o750)
+        _fsync_directory(staging)
         os.replace(staging, output)
-        result = verify_domain_base(output)
-        descriptor = _current_descriptor(result, run_id=run_id)
-        if current.exists():
-            raise DomainBaseError("DWD Base CURRENT appeared during publication")
-        _write_json(current, descriptor)
-        return result
+        _fsync_directory(output.parent)
+        return _verify_package_binding(
+            output,
+            package_id=package_id,
+            run_id=run_id,
+            input_plan_digest=input_plan_digest,
+            ods_base=ods_base,
+            model_sha256=model_sha256,
+            model_extension_sha256=model_extension_sha256,
+            code_revision=code_revision,
+        )
     except BaseException:
         if staging.exists():
             shutil.rmtree(staging)
         raise
+
+
+def publish_domain_base(
+    *,
+    candidates: Mapping[str, Path],
+    output: Path,
+    current: Path,
+    package_id: str,
+    run_id: str,
+    input_plan_digest: str,
+    ods_base: Mapping[str, str],
+    model_sha256: str,
+    model_extension_sha256: str,
+    code_revision: str,
+) -> DomainBaseResult:
+    """Seal one immutable Base candidate and publish its CURRENT descriptor."""
+
+    result = seal_domain_base_candidate(
+        candidates=candidates,
+        output=output,
+        package_id=package_id,
+        run_id=run_id,
+        input_plan_digest=input_plan_digest,
+        ods_base=ods_base,
+        model_sha256=model_sha256,
+        model_extension_sha256=model_extension_sha256,
+        code_revision=code_revision,
+    )
+    current.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = _current_descriptor(result, run_id=run_id)
+    if current.exists():
+        if _object(current) != descriptor:
+            raise DomainBaseError("DWD Base CURRENT already points elsewhere")
+        return result
+    _write_json(current, descriptor)
+    return result

@@ -11,6 +11,10 @@ APPROVAL_PATH = (
     / "acceptance"
     / "issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json"
 )
+PILOT_APPROVAL_PATH = (
+    ROOT / "docs" / "acceptance" / "issue-78-dwd-base-v2-1-gpu-p100-pilot-approval-20260808.json"
+)
+FULL_BUILD_SERVICE = ROOT / "ops/systemd/quanthus-dwd-v2-1-full-build.service"
 
 
 def _load_contract() -> dict[str, Any]:
@@ -67,3 +71,23 @@ def test_exact_contract_has_a_separate_approval_receipt() -> None:
     assert supplied == _canonical_digest(approval)
     assert approval["approved_contract_digest"] == contract["canonical_digest"]
     assert approval["approval_statement"].endswith(contract["canonical_digest"])
+
+
+def test_accepted_pilot_receipts_have_a_canonical_approval() -> None:
+    approval = json.loads(PILOT_APPROVAL_PATH.read_text(encoding="ascii"))
+    supplied = approval.pop("canonical_digest")
+    assert supplied == _canonical_digest(approval)
+    assert approval["approved_contract_digest"] == _load_contract()["canonical_digest"]
+    assert approval["approval_statement"].endswith(f"RUN={approval['pilot_run_id']}")
+
+
+def test_full_build_service_is_bounded_and_never_auto_resumes() -> None:
+    service = FULL_BUILD_SERVICE.read_text(encoding="ascii")
+    assert "PrivateNetwork=true" in service
+    assert "MemoryMax=14G" in service
+    assert "LimitAS=12G" in service
+    assert "CPUQuota=400%" in service
+    assert "Restart=no" in service
+    assert "RuntimeMaxSec=72h" in service
+    assert "TMPDIR=/srv/quanthus/gpu-p100-dwd-workspace/control/tmp" in service
+    assert "publish-dwd-domain-base" not in service

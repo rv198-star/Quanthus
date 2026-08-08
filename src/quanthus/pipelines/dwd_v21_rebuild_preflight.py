@@ -71,9 +71,7 @@ def load_environment(path: Path) -> dict[str, str]:
             continue
         key, separator, value = line.partition("=")
         if not separator or not key.replace("_", "").isalnum() or not key[0].isalpha():
-            raise DwdV21PreflightError(
-                f"invalid environment assignment at {path}:{line_number}"
-            )
+            raise DwdV21PreflightError(f"invalid environment assignment at {path}:{line_number}")
         result[key] = value
     return result
 
@@ -168,27 +166,39 @@ def run_preflight(
     expected_findings_digest: str,
     expected_remediation_digest: str,
     minimum_free_bytes: int,
+    expected_execution_mode: str = "pilot_only",
     mountinfo_path: Path = Path("/proc/self/mountinfo"),
 ) -> dict[str, Any]:
     started_at = datetime.now(timezone.utc)
     observed_host = socket.gethostname()
     if observed_host.casefold() != "gpu-p100":
         raise DwdV21PreflightError(f"preflight must run on GPU-P100, not {observed_host}")
-    contract, approval = verify_authority(
-        contract_path, approval_path, expected_contract_digest
-    )
+    contract, approval = verify_authority(contract_path, approval_path, expected_contract_digest)
     _verify_canonical(findings_path, "findings ledger", expected_findings_digest)
     _verify_canonical(remediation_path, "remediation scope", expected_remediation_digest)
     environment = load_environment(environment_path)
+    authority_profiles = {
+        "pilot_only": {
+            "QUANTHUS_DWD_BUILDER_AUTHORIZED": "0",
+            "QUANTHUS_DWD_PILOT_AUTHORIZED": "1",
+        },
+        "full_build": {
+            "QUANTHUS_DWD_BUILDER_AUTHORIZED": "1",
+            "QUANTHUS_DWD_PILOT_AUTHORIZED": "0",
+        },
+    }
+    if expected_execution_mode not in authority_profiles:
+        raise DwdV21PreflightError(f"unsupported execution authority: {expected_execution_mode}")
     expected_environment = {
-        "QUANTHUS_DWD_BUILDER_AUTHORIZED": "0",
+        **authority_profiles[expected_execution_mode],
         "QUANTHUS_DWD_CODE_REVISION": expected_revision,
         "QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST": expected_contract_digest,
-        "QUANTHUS_DWD_EXECUTION_MODE": "pilot_only",
-        "QUANTHUS_DWD_PILOT_AUTHORIZED": "1",
+        "QUANTHUS_DWD_EXECUTION_MODE": expected_execution_mode,
     }
     if any(environment.get(key) != value for key, value in expected_environment.items()):
-        raise DwdV21PreflightError("deployment environment differs from pilot-only authority")
+        raise DwdV21PreflightError(
+            f"deployment environment differs from {expected_execution_mode} authority"
+        )
     expected_workspace = contract.get("authorized_execution", {}).get("build_workspace")
     if expected_workspace != str(workspace.resolve()):
         raise DwdV21PreflightError("workspace differs from the approved contract")
@@ -248,7 +258,7 @@ def run_preflight(
         raise DwdV21PreflightError("deep-verified input identity differs from the contract")
     return {
         "approval_receipt_digest": approval["canonical_digest"],
-        "authority": "pilot_only",
+        "authority": expected_execution_mode,
         "code": git,
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "contract_digest": expected_contract_digest,
@@ -286,6 +296,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--expected-findings-digest", required=True)
     parser.add_argument("--expected-remediation-digest", required=True)
     parser.add_argument("--minimum-free-bytes", type=int, required=True)
+    parser.add_argument(
+        "--expected-execution-mode",
+        choices=("pilot_only", "full_build"),
+        default="pilot_only",
+    )
     parser.add_argument("--output-root", type=Path, required=True)
     return parser
 
@@ -308,6 +323,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             expected_findings_digest=args.expected_findings_digest,
             expected_remediation_digest=args.expected_remediation_digest,
             minimum_free_bytes=args.minimum_free_bytes,
+            expected_execution_mode=args.expected_execution_mode,
         )
         path = write_receipt(args.output_root.resolve(), receipt)
     except (DwdV21PreflightError, OSError) as error:

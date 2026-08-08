@@ -107,9 +107,12 @@ def _phase_receipt(
             "contract_digest": contract_digest,
             "code_revision": code_revision,
             "phase": phase,
+            "status": status,
         }
         if any(current.get(key) != value for key, value in expected.items()):
             raise DwdV21RuntimeError(f"existing phase receipt belongs to another run: {path}")
+        if evidence is not None and current.get("evidence") != dict(evidence):
+            raise DwdV21RuntimeError(f"existing phase receipt evidence differs: {path}")
         return path
     receipt = _sealed(
         {

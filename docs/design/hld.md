@@ -87,8 +87,9 @@ governed by ADR 0007:
   CN01 `/personal` NFS is the manifest-bound transfer and deep-verification landing area only;
   CN01 local storage retains its import/install lock, hidden final ingress, installed Base
   packages, and `BASE_CURRENT.json`. Neither NFS nor the GPU node owns a production pointer, and
-  loss of either workspace fails closed without fallback. This topology and its pilot gate are
-  frozen by ADR 0009 but do not activate V2.1.
+  loss of either workspace fails closed without fallback. This topology is frozen by ADR 0009;
+  its pilot gate has passed, but exact full-builder revision approval, candidate acceptance, CN01
+  installation, and pointer cutover remain separate gates and V2.1 is not active.
 
 ADR 0006 owns the seven-domain, 33-object DWD semantic boundary. The accepted
 `dwd-base-202607-v2` contains all 14 core objects, 18 internal support objects, and one quality

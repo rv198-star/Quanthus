@@ -88,8 +88,9 @@ nodes.
   until those exact digests receive human approval and the recorded execution-readiness findings
   are closed; no V2.1 package or pointer has been created or changed.
 - The approved Issue #78 topology amendment makes GPU-P100 the CPU build node while CN01 retains
-  import, installation, and cutover authority. The exact machine-contract digest is approved, but
-  only implementation and bounded pilots are open until their receipts pass acceptance.
+  import, installation, and cutover authority. The exact machine-contract digest and the bounded
+  replay/partition pilot receipts are approved. Full build remains blocked until its exact code
+  revision is approved; candidate acceptance, CN01 installation, and cutover remain later gates.
 - Generic DWS is deferred until a concrete cross-domain consumer needs the retained ten-dimension,
   thirteen-fact constellation. P4 is not blocked by DWS: it consumes an exact DWD snapshot and
   produces a purpose-specific, manifest-bound `event_library` projection.

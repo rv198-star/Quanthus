@@ -1,0 +1,27 @@
+[Unit]
+Description=Quanthus bounded DWD Base V2.1 pilots on GPU-P100
+ConditionPathIsMountPoint=/srv/quanthus/gpu-p100-dwd-workspace
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/home/rv192/work/Quanthus-issue78-audit-closure
+EnvironmentFile=/etc/quanthus/gpu-p100-dwd-rebuild.env
+Environment=PYTHONPATH=/home/rv192/work/Quanthus-issue78-audit-closure/src
+ExecStart=/home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python /home/rv192/work/Quanthus-issue78-audit-closure/ops/bin/pilot-dwd-v2-1-rebuild --repository /home/rv192/work/Quanthus-issue78-audit-closure --workspace /srv/quanthus/gpu-p100-dwd-workspace --ods-base /srv/quanthus/ods/base/ods-base-202607-v2 --dwd-base /srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2 --environment /etc/quanthus/gpu-p100-dwd-rebuild.env --run-id ${QUANTHUS_DWD_RUN_ID} --expected-revision ${QUANTHUS_DWD_CODE_REVISION} --expected-contract-digest ${QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST} --python /home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python --memory-limit-bytes 12884901888 --spill-limit-bytes 8589934592 --thread-limit 4 --batch-size-rows 256
+NoNewPrivileges=true
+PrivateNetwork=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/srv/quanthus/gpu-p100-dwd-workspace
+MemoryMax=14G
+CPUQuota=400%
+TasksMax=64
+UMask=0027
+TimeoutStartSec=12h
+
+[Install]
+WantedBy=multi-user.target

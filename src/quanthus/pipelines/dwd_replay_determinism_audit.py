@@ -64,6 +64,7 @@ def audit_dwd_replay_determinism(
         "content_digest": manifest.get("content_digest"),
         "through_date": manifest.get("through_date"),
     }
+    input_plan = {"run_id": plan.get("run_id"), "plan_digest": plan.get("plan_digest")}
     evidence: list[dict[str, Any]] = []
     reasons: list[str] = []
     if (replay_a is None) != (replay_b is None):
@@ -71,6 +72,7 @@ def audit_dwd_replay_determinism(
     if replay_a is None:
         reasons.append("base_replay_evidence_missing")
     else:
+        assert replay_b is not None
         values: list[dict[str, Any]] = []
         resolved_paths = (replay_a.resolve(), replay_b.resolve())
         if resolved_paths[0] == resolved_paths[1]:
@@ -81,10 +83,22 @@ def audit_dwd_replay_determinism(
                 reasons.append("replay_evidence_kind_invalid")
             if value.get("base_release") != base_release:
                 reasons.append("replay_evidence_base_identity_mismatch")
+            if value.get("input_plan") != input_plan:
+                reasons.append("replay_evidence_input_plan_mismatch")
             if value.get("mutation_performed") is not False:
                 reasons.append("replay_evidence_not_read_only")
+            unsigned = dict(value)
+            supplied_digest = unsigned.pop("canonical_digest", None)
+            if supplied_digest != _canonical_digest(unsigned):
+                reasons.append("replay_evidence_canonical_digest_invalid")
             values.append(value)
-            evidence.append({"path": str(path), "sha256": _sha256(path), "canonical_digest": value.get("canonical_digest")})
+            evidence.append(
+                {
+                    "path": str(path),
+                    "sha256": _sha256(path),
+                    "canonical_digest": value.get("canonical_digest"),
+                }
+            )
         if not reasons and _normalized_replay(values[0]) != _normalized_replay(values[1]):
             reasons.append("replay_semantic_digest_mismatch")
     status = "verified" if not reasons else "finding"
@@ -93,7 +107,7 @@ def audit_dwd_replay_determinism(
         "kind": "dwd_base_v2_replay_determinism_audit",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "base_release": base_release,
-        "input_plan": {"run_id": plan.get("run_id"), "plan_digest": plan.get("plan_digest")},
+        "input_plan": input_plan,
         "summary": {
             "status": status,
             "mutation_performed": False,
@@ -109,22 +123,36 @@ def audit_dwd_replay_determinism(
         },
     }
     report["semantic_digest"] = _canonical_digest(
-        {"kind": report["kind"], "base_release": report["base_release"], "input_plan": report["input_plan"], "summary": report["summary"], "evidence": report["evidence"], "contract": report["contract"]}
+        {
+            "kind": report["kind"],
+            "base_release": report["base_release"],
+            "input_plan": report["input_plan"],
+            "summary": report["summary"],
+            "evidence": report["evidence"],
+            "contract": report["contract"],
+        }
     )
     report["canonical_digest"] = _canonical_digest(report)
     return report
 
 
-def write_replay_determinism_report(path: Path, report: dict[str, Any], *, sealed_roots: tuple[Path, ...] = ()) -> None:
+def write_replay_determinism_report(
+    path: Path, report: dict[str, Any], *, sealed_roots: tuple[Path, ...] = ()
+) -> None:
     resolved = path.resolve()
     for root in sealed_roots:
         sealed = root.resolve()
         if resolved == sealed or resolved.is_relative_to(sealed):
-            raise DwdReplayDeterminismAuditError(f"replay report must remain outside sealed package: {resolved}")
+            raise DwdReplayDeterminismAuditError(
+                f"replay report must remain outside sealed package: {resolved}"
+            )
     if resolved.exists():
         raise DwdReplayDeterminismAuditError(f"refusing to overwrite replay report: {resolved}")
     resolved.parent.mkdir(parents=True, exist_ok=True)
     temporary = resolved.with_name(f".{resolved.name}.partial")
-    temporary.write_text(json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    temporary.write_text(
+        json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+        encoding="ascii",
+    )
     temporary.chmod(0o640)
     temporary.replace(resolved)

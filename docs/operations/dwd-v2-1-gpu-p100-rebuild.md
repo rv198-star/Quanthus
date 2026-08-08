@@ -22,11 +22,13 @@ Repository wrappers call production Python modules and emit structured receipts:
 2. `plan-dwd-v2-1-rebuild` freezes one run id, source dispositions, finding coverage, domain order,
    package identity, tool versions, and capacity receipt.
 3. `pilot-dwd-v2-1-rebuild` runs bound deterministic replays and representative heavy partitions,
-   producing measured memory, thread, and spill limits.
+   producing measured memory, thread, and spill limits. It executes two isolated, sequential,
+   read-only PyArrow decodes against the sealed financial-reporting and market-observation inputs,
+   then pauses at `awaiting-pilot-acceptance`.
 4. `run-dwd-v2-1-rebuild` currently executes the authorized preflight and exact-input planning
    phases, publishes durable phase receipts, and pauses at `awaiting-pilot-receipts`. `--resume`
    revalidates immutable inputs before continuing. Nine-domain execution remains unavailable until
-   replay and partition-pilot receipts are implemented, reviewed, and approved.
+   the sealed replay and partition-pilot receipts are explicitly approved.
 5. `assemble-dwd-v2-1-candidate` requires nine verified domain receipts and assembles all 33 tables
    on the same ext4 filesystem.
 6. `verify-dwd-v2-1-candidate` checks physical integrity, PIT semantics, identities, invariants,
@@ -40,6 +42,44 @@ Repository wrappers call production Python modules and emit structured receipts:
 Each phase writes temporary output, fsyncs files and parent directories, verifies the result, then
 atomically publishes a receipt. Resume revalidates the run id, code revision, input manifests,
 audit/remediation/contract digests, phase cursor, and output hashes. Any mismatch fails closed.
+
+## Pilot Limits And Invocation
+
+The GPU-P100 pilot defaults are frozen at one worker, 12 GiB address-space limit, four threads,
+256 decoded rows per batch, and 8 GiB maximum spill per execution. `TMPDIR` and all supported engine
+temporary-directory variables are pinned below the run's ext4 `scratch/pilot` directory. No local
+scratch fallback, Base mutation, builder output, network input, or concurrent worker is allowed.
+
+Run the pilot only after `run-dwd-v2-1-rebuild` has produced a sealed
+`awaiting-pilot-receipts` phase for the same revision and run id:
+
+```bash
+ops/bin/pilot-dwd-v2-1-rebuild \
+  --repository /home/rv192/work/Quanthus-issue78-audit-closure \
+  --workspace /srv/quanthus/gpu-p100-dwd-workspace \
+  --ods-base /srv/quanthus/ods/base/ods-base-202607-v2 \
+  --dwd-base /srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2 \
+  --environment /etc/quanthus/gpu-p100-dwd-rebuild.env \
+  --run-id "$RUN_ID" \
+  --expected-revision "$REVISION" \
+  --expected-contract-digest "$CONTRACT_DIGEST" \
+  --python /home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python
+```
+
+Success is a pause, not builder authorization. The two approval inputs are the canonical digests in
+`evidence/pilot/replay-determinism.json` and `evidence/pilot/partition-pilot.json`.
+
+Install and start the persistent one-shot unit after placing the approved revision and run id in
+`/etc/quanthus/gpu-p100-dwd-rebuild.env`:
+
+```bash
+sudo install -m 0644 ops/systemd/quanthus-dwd-v2-1-pilot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start quanthus-dwd-v2-1-pilot.service
+```
+
+The unit has no restart policy. A node outage or failed pilot requires evidence inspection and an
+explicit checkpoint decision; it never resumes itself or opens full-builder authority.
 
 ## Fixed Control Paths
 

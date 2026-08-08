@@ -23,8 +23,10 @@ Repository wrappers call production Python modules and emit structured receipts:
    package identity, tool versions, and capacity receipt.
 3. `pilot-dwd-v2-1-rebuild` runs bound deterministic replays and representative heavy partitions,
    producing measured memory, thread, and spill limits.
-4. `run-dwd-v2-1-rebuild --run-id ID --resume` executes nine domain builders sequentially and
-   skips work only after complete receipt and byte verification.
+4. `run-dwd-v2-1-rebuild` currently executes the authorized preflight and exact-input planning
+   phases, publishes durable phase receipts, and pauses at `awaiting-pilot-receipts`. `--resume`
+   revalidates immutable inputs before continuing. Nine-domain execution remains unavailable until
+   replay and partition-pilot receipts are implemented, reviewed, and approved.
 5. `assemble-dwd-v2-1-candidate` requires nine verified domain receipts and assembles all 33 tables
    on the same ext4 filesystem.
 6. `verify-dwd-v2-1-candidate` checks physical integrity, PIT semantics, identities, invariants,

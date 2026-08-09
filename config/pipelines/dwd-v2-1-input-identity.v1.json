@@ -7,6 +7,7 @@
     "through_date": "2026-07-31"
   },
   "kind": "dwd_dws_input_identity_override",
+  "minimum_knowledge_cutoff": "2026-08-03T23:59:00+00:00",
   "override_id": "dwd-base-v2-1-ods-v2-input",
   "schema_version": 1
 }

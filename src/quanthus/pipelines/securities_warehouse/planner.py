@@ -431,6 +431,10 @@ def _input_identity_override(
             "input identity override does not bind the exact base model"
         )
     override_id = _text(value, "override_id")
+    minimum_knowledge_cutoff = _utc_datetime(
+        _text(value, "minimum_knowledge_cutoff"),
+        "minimum_knowledge_cutoff",
+    )
     contract = _mapping(value.get("build_input_contract"), "build_input_contract")
     required = {"bundle_id", "content_digest", "manifest_sha256", "through_date"}
     if set(contract) != required or any(
@@ -445,6 +449,7 @@ def _input_identity_override(
         "kind": "dwd_dws_input_identity_override",
         "override_id": override_id,
         "base_model_sha256": model_sha256,
+        "minimum_knowledge_cutoff": minimum_knowledge_cutoff,
         "build_input_contract": dict(contract),
     }
     return contract, {
@@ -1029,6 +1034,10 @@ def build_input_plan(
             input_identity_override.resolve(),
             model_sha256=model_sha,
         )
+        if cutoff < override_identity["minimum_knowledge_cutoff"]:
+            raise WarehousePlanningError(
+                "knowledge_cutoff precedes the frozen input identity authority"
+            )
     package_root = ods_package.resolve()
     base_manifest_path = package_root / "manifest.json"
     release_manifest_path = package_root / "release.json"

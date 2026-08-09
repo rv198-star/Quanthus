@@ -384,6 +384,7 @@ def _verify_ods_binding(
             "kind",
             "override_id",
             "base_model_sha256",
+            "minimum_knowledge_cutoff",
             "build_input_contract",
         }
         if set(override) != authority_keys | {"canonical_digest", "sha256"}:
@@ -395,6 +396,11 @@ def _verify_ods_binding(
             authority.get("schema_version") != 1
             or authority.get("kind") != "dwd_dws_input_identity_override"
             or authority.get("base_model_sha256") != plan_model.get("sha256")
+            or _timestamp(
+                authority.get("minimum_knowledge_cutoff"),
+                "input identity override minimum knowledge cutoff",
+            )
+            > _timestamp(semantic_plan.get("knowledge_cutoff"), "knowledge cutoff")
             or override.get("canonical_digest") != _canonical_digest(authority)
             or not isinstance(override_sha, str)
             or not override_sha.startswith("sha256:")

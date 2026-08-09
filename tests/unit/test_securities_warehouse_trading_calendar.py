@@ -324,6 +324,7 @@ class TradingCalendarBuildTests(unittest.TestCase):
             "kind": "dwd_dws_input_identity_override",
             "override_id": "fixture-v2",
             "base_model_sha256": model_sha,
+            "minimum_knowledge_cutoff": self.cutoff,
             "build_input_contract": {
                 key: self.ods_identity[key]
                 for key in ("bundle_id", "content_digest", "manifest_sha256", "through_date")
@@ -331,6 +332,7 @@ class TradingCalendarBuildTests(unittest.TestCase):
         }
         semantic_plan = {
             "input": self.ods_identity,
+            "knowledge_cutoff": self.cutoff,
             "model": {"sha256": model_sha},
             "input_identity_override": {
                 **authority,

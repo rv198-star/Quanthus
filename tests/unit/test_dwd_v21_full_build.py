@@ -31,7 +31,7 @@ PILOT_RUN = "pilot-run-r33333333"
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_gpu_full_build_cutoff_covers_the_frozen_reference_seed() -> None:
+def test_gpu_full_build_cutoff_covers_all_frozen_input_authority() -> None:
     environment = {
         key: value
         for line in (
@@ -45,10 +45,15 @@ def test_gpu_full_build_cutoff_covers_the_frozen_reference_seed() -> None:
             ROOT / "config/pipelines/securities-warehouse-reference-seeds.v1.json"
         ).read_text(encoding="ascii")
     )
+    input_identity = json.loads(
+        (ROOT / "config/pipelines/dwd-v2-1-input-identity.v1.json").read_text(
+            encoding="ascii"
+        )
+    )
+    cutoff = datetime.fromisoformat(environment["QUANTHUS_DWD_KNOWLEDGE_CUTOFF"])
 
-    assert datetime.fromisoformat(
-        environment["QUANTHUS_DWD_KNOWLEDGE_CUTOFF"]
-    ) >= datetime.fromisoformat(seed["source_snapshot"]["retrieved_at"])
+    assert cutoff >= datetime.fromisoformat(seed["source_snapshot"]["retrieved_at"])
+    assert cutoff >= datetime.fromisoformat(input_identity["minimum_knowledge_cutoff"])
 
 
 def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Path) -> None:

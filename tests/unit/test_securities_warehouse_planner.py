@@ -218,12 +218,14 @@ class SecuritiesWarehousePlannerTests(unittest.TestCase):
                 },
             },
         )
-        contract, override_sha, override_id = _input_identity_override(
+        contract, authority = _input_identity_override(
             override, model_sha256=model_sha
         )
         self.assertEqual(contract["bundle_id"], "ods-v2")
-        self.assertEqual(override_sha, _sha256(override))
-        self.assertEqual(override_id, "fixture-v2")
+        self.assertEqual(authority["sha256"], _sha256(override))
+        self.assertEqual(authority["override_id"], "fixture-v2")
+        self.assertEqual(authority["base_model_sha256"], model_sha)
+        self.assertEqual(authority["build_input_contract"], contract)
         with self.assertRaisesRegex(WarehousePlanningError, "exact base model"):
             _input_identity_override(override, model_sha256="sha256:" + "0" * 64)
 

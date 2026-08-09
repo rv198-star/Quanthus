@@ -420,7 +420,7 @@ def _input_identity_override(
     path: Path,
     *,
     model_sha256: str,
-) -> tuple[Mapping[str, Any], str, str]:
+) -> tuple[Mapping[str, Any], dict[str, Any]]:
     value = _object(path)
     if (
         value.get("schema_version") != 1
@@ -440,7 +440,18 @@ def _input_identity_override(
         raise WarehousePlanningError(
             "input identity override must contain only the exact ODS Base identity"
         )
-    return contract, _sha256(path), override_id
+    authority = {
+        "schema_version": 1,
+        "kind": "dwd_dws_input_identity_override",
+        "override_id": override_id,
+        "base_model_sha256": model_sha256,
+        "build_input_contract": dict(contract),
+    }
+    return contract, {
+        **authority,
+        "canonical_digest": _canonical_digest(authority),
+        "sha256": _sha256(path),
+    }
 
 
 def _lookups(model: Mapping[str, Any]) -> dict[str, Any]:
@@ -1012,13 +1023,12 @@ def build_input_plan(
     selected_through_date = _date(through_date, "through_date") if through_date else None
     model, model_sha = _model_contract(model_path.resolve())
     expected_input = _mapping(model.get("build_input_contract"), "build_input_contract")
-    override_identity: dict[str, str] | None = None
+    override_identity: dict[str, Any] | None = None
     if input_identity_override is not None:
-        expected_input, override_sha, override_id = _input_identity_override(
+        expected_input, override_identity = _input_identity_override(
             input_identity_override.resolve(),
             model_sha256=model_sha,
         )
-        override_identity = {"override_id": override_id, "sha256": override_sha}
     package_root = ods_package.resolve()
     base_manifest_path = package_root / "manifest.json"
     release_manifest_path = package_root / "release.json"

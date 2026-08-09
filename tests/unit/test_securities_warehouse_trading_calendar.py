@@ -14,6 +14,7 @@ import pyarrow.parquet as pq
 from quanthus.pipelines.securities_warehouse import listed_company as listed_company_module
 from quanthus.pipelines.securities_warehouse.trading_calendar import (
     TradingCalendarBuildError,
+    _verify_ods_binding,
     build_trading_calendar,
     verify_trading_calendar_candidate,
 )
@@ -313,6 +314,41 @@ class TradingCalendarBuildTests(unittest.TestCase):
             files=files,
             extra_manifest={"plan_digest": plan_digest},
         )
+
+    def test_ods_binding_accepts_a_digest_bound_input_identity_override(self) -> None:
+        model = json.loads(self.model.read_text(encoding="utf-8"))
+        model["build_input_contract"]["bundle_id"] = "ods-base-previous-v1"
+        model_sha = _digest(model)
+        authority = {
+            "schema_version": 1,
+            "kind": "dwd_dws_input_identity_override",
+            "override_id": "fixture-v2",
+            "base_model_sha256": model_sha,
+            "build_input_contract": {
+                key: self.ods_identity[key]
+                for key in ("bundle_id", "content_digest", "manifest_sha256", "through_date")
+            },
+        }
+        semantic_plan = {
+            "input": self.ods_identity,
+            "model": {"sha256": model_sha},
+            "input_identity_override": {
+                **authority,
+                "canonical_digest": _digest(authority),
+                "sha256": f"sha256:{'a' * 64}",
+            },
+        }
+
+        self.assertEqual(
+            _verify_ods_binding(self.ods, semantic_plan, model),
+            date.fromisoformat(self.through_date),
+        )
+
+        semantic_plan["input_identity_override"]["build_input_contract"][
+            "bundle_id"
+        ] = "tampered"
+        with self.assertRaisesRegex(TradingCalendarBuildError, "exact model"):
+            _verify_ods_binding(self.ods, semantic_plan, model)
 
     def _write_upstream(self) -> None:
         payload = self.upstream / "payload/listed_company"

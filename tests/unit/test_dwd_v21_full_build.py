@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -27,6 +28,27 @@ CONTRACT = "sha256:" + "1" * 64
 REVISION = "2" * 40
 PILOT_REVISION = "3" * 40
 PILOT_RUN = "pilot-run-r33333333"
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_gpu_full_build_cutoff_covers_the_frozen_reference_seed() -> None:
+    environment = {
+        key: value
+        for line in (
+            ROOT / "ops/systemd/gpu-p100-dwd-full-build.env.example"
+        ).read_text(encoding="ascii").splitlines()
+        if line and not line.startswith("#")
+        for key, value in [line.split("=", 1)]
+    }
+    seed = json.loads(
+        (
+            ROOT / "config/pipelines/securities-warehouse-reference-seeds.v1.json"
+        ).read_text(encoding="ascii")
+    )
+
+    assert datetime.fromisoformat(
+        environment["QUANTHUS_DWD_KNOWLEDGE_CUTOFF"]
+    ) >= datetime.fromisoformat(seed["source_snapshot"]["retrieved_at"])
 
 
 def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Path) -> None:

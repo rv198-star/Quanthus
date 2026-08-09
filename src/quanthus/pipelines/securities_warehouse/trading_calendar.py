@@ -375,8 +375,50 @@ def _verify_ods_binding(
         raise TradingCalendarBuildError("ODS package must be a physical directory")
     plan_input = _mapping(semantic_plan.get("input"), "input plan ODS identity")
     model_input = _mapping(model.get("build_input_contract"), "model build input")
+    authorized_input = model_input
+    raw_override = semantic_plan.get("input_identity_override")
+    if raw_override is not None:
+        override = _mapping(raw_override, "input identity override")
+        authority_keys = {
+            "schema_version",
+            "kind",
+            "override_id",
+            "base_model_sha256",
+            "build_input_contract",
+        }
+        if set(override) != authority_keys | {"canonical_digest", "sha256"}:
+            raise TradingCalendarBuildError("input identity override contract is incomplete")
+        authority = {key: override.get(key) for key in authority_keys}
+        plan_model = _mapping(semantic_plan.get("model"), "input plan model")
+        override_sha = override.get("sha256")
+        if (
+            authority.get("schema_version") != 1
+            or authority.get("kind") != "dwd_dws_input_identity_override"
+            or authority.get("base_model_sha256") != plan_model.get("sha256")
+            or override.get("canonical_digest") != _canonical_digest(authority)
+            or not isinstance(override_sha, str)
+            or not override_sha.startswith("sha256:")
+            or len(override_sha) != 71
+            or any(character not in "0123456789abcdef" for character in override_sha[7:])
+        ):
+            raise TradingCalendarBuildError(
+                "input identity override does not bind the exact model"
+            )
+        authorized_input = _mapping(
+            authority.get("build_input_contract"),
+            "input identity override build input",
+        )
+        if set(authorized_input) != {
+            "bundle_id",
+            "manifest_sha256",
+            "content_digest",
+            "through_date",
+        }:
+            raise TradingCalendarBuildError(
+                "input identity override does not contain an exact ODS Base identity"
+            )
     for key in ("bundle_id", "manifest_sha256", "content_digest", "through_date"):
-        if plan_input.get(key) != model_input.get(key):
+        if plan_input.get(key) != authorized_input.get(key):
             raise TradingCalendarBuildError(
                 "input plan does not bind the model-authorized ODS Base"
             )

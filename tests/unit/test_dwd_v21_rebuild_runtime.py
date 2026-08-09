@@ -89,12 +89,14 @@ def test_active_pointer_matches_monitor_contract(tmp_path: Path) -> None:
         phase="bootstrap",
         contract_digest=CONTRACT,
         executor_pid=123,
+        status="running",
     )
     value = json.loads((tmp_path / "control/active-run.json").read_text(encoding="ascii"))
     assert value["run_id"] == "run-1"
     assert value["phase"] == "bootstrap"
     assert value["contract_digest"] == CONTRACT
     assert value["executor_pid"] == 123
+    assert value["status"] == "running"
 
 
 def test_runtime_requires_pilot_only_environment(tmp_path: Path) -> None:

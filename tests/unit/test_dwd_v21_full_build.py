@@ -11,6 +11,8 @@ import pytest
 
 from quanthus.pipelines.dwd_v21_full_build import (
     DwdV21FullBuildError,
+    DwdV21FullBuildInterrupted,
+    _audit_full_build_contract,
     _pilot_approval,
     _require_full_build_environment,
     _run_file_step,
@@ -34,26 +36,46 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_gpu_full_build_cutoff_covers_all_frozen_input_authority() -> None:
     environment = {
         key: value
-        for line in (
-            ROOT / "ops/systemd/gpu-p100-dwd-full-build.env.example"
-        ).read_text(encoding="ascii").splitlines()
+        for line in (ROOT / "ops/systemd/gpu-p100-dwd-full-build.env.example")
+        .read_text(encoding="ascii")
+        .splitlines()
         if line and not line.startswith("#")
         for key, value in [line.split("=", 1)]
     }
     seed = json.loads(
-        (
-            ROOT / "config/pipelines/securities-warehouse-reference-seeds.v1.json"
-        ).read_text(encoding="ascii")
-    )
-    input_identity = json.loads(
-        (ROOT / "config/pipelines/dwd-v2-1-input-identity.v1.json").read_text(
+        (ROOT / "config/pipelines/securities-warehouse-reference-seeds.v1.json").read_text(
             encoding="ascii"
         )
+    )
+    input_identity = json.loads(
+        (ROOT / "config/pipelines/dwd-v2-1-input-identity.v1.json").read_text(encoding="ascii")
     )
     cutoff = datetime.fromisoformat(environment["QUANTHUS_DWD_KNOWLEDGE_CUTOFF"])
 
     assert cutoff >= datetime.fromisoformat(seed["source_snapshot"]["retrieved_at"])
     assert cutoff >= datetime.fromisoformat(input_identity["minimum_knowledge_cutoff"])
+
+
+def test_static_full_build_contract_is_audited_before_domains() -> None:
+    input_identity = json.loads(
+        (ROOT / "config/pipelines/dwd-v2-1-input-identity.v1.json").read_text(encoding="ascii")
+    )["build_input_contract"]
+    evidence = _audit_full_build_contract(
+        repository=ROOT,
+        preflight={"ods_base": input_identity},
+        knowledge_cutoff="2026-08-03T23:59:00+00:00",
+        through_date="2026-07-31",
+    )
+    assert evidence["status"] == "passed"
+    assert len(evidence["static_inputs"]) == 7
+
+    with pytest.raises(DwdV21FullBuildError, match="frozen ODS identity authority"):
+        _audit_full_build_contract(
+            repository=ROOT,
+            preflight={"ods_base": input_identity},
+            knowledge_cutoff="2026-08-03T23:58:59+00:00",
+            through_date="2026-07-31",
+        )
 
 
 def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Path) -> None:
@@ -69,6 +91,10 @@ def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Pa
                 "QUANTHUS_DWD_PILOT_AUTHORIZED=0",
                 "QUANTHUS_DWD_RUN_ID=build-r22222222",
                 "QUANTHUS_DWD_RESUME_AUTHORIZED=0",
+                "QUANTHUS_DWD_KNOWLEDGE_CUTOFF=2026-08-03T23:59:00+00:00",
+                "QUANTHUS_DWD_THROUGH_DATE=2026-07-31",
+                "QUANTHUS_DWD_RUNTIME_ID=runtime-1",
+                "QUANTHUS_DWD_MINIMUM_FREE_BYTES=1",
             ]
         )
         + "\n",
@@ -79,6 +105,10 @@ def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Pa
         expected_revision=REVISION,
         expected_contract_digest=CONTRACT,
         run_id="build-r22222222",
+        knowledge_cutoff="2026-08-03T23:59:00+00:00",
+        through_date="2026-07-31",
+        runtime_id="runtime-1",
+        minimum_free_bytes=1,
     )
     assert parsed["QUANTHUS_DWD_BUILDER_AUTHORIZED"] == "1"
 
@@ -95,6 +125,10 @@ def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Pa
             expected_revision=REVISION,
             expected_contract_digest=CONTRACT,
             run_id="build-r22222222",
+            knowledge_cutoff="2026-08-03T23:59:00+00:00",
+            through_date="2026-07-31",
+            runtime_id="runtime-1",
+            minimum_free_bytes=1,
         )
 
 
@@ -285,6 +319,81 @@ def _sha(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def test_full_build_records_controlled_interruption(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import quanthus.pipelines.dwd_v21_full_build as subject
+
+    repository = tmp_path / "repository"
+    workspace = tmp_path / "workspace"
+    ods = tmp_path / "ods"
+    dwd = tmp_path / "dwd"
+    environment = tmp_path / "full.env"
+    for path in (repository, workspace, ods, dwd):
+        path.mkdir(parents=True)
+    revision = "a" * 40
+    run_id = "dwd-v2-1-full-aaaaaaaa-interrupted"
+    environment.write_text(
+        "\n".join(
+            [
+                "QUANTHUS_DWD_BUILDER_AUTHORIZED=1",
+                f"QUANTHUS_DWD_CODE_REVISION={revision}",
+                f"QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST={CONTRACT}",
+                "QUANTHUS_DWD_EXECUTION_MODE=full_build",
+                f"QUANTHUS_DWD_FULL_BUILD_APPROVED_REVISION={revision}",
+                "QUANTHUS_DWD_PILOT_AUTHORIZED=0",
+                f"QUANTHUS_DWD_RUN_ID={run_id}",
+                "QUANTHUS_DWD_RESUME_AUTHORIZED=0",
+                "QUANTHUS_DWD_KNOWLEDGE_CUTOFF=2026-08-03T23:59:00+00:00",
+                "QUANTHUS_DWD_THROUGH_DATE=2026-07-31",
+                "QUANTHUS_DWD_RUNTIME_ID=runtime-1",
+                "QUANTHUS_DWD_MINIMUM_FREE_BYTES=1",
+            ]
+        )
+        + "\n",
+        encoding="ascii",
+    )
+    monkeypatch.setattr(subject, "_require_clean_revision", lambda *_args: None)
+    monkeypatch.setattr(subject, "verify_authority", lambda *_args: ({}, {}))
+    monkeypatch.setattr(
+        subject,
+        "_pilot_approval",
+        lambda **_kwargs: {"pilot_run_id": "distinct-pilot"},
+    )
+    monkeypatch.setattr(
+        subject,
+        "run_preflight",
+        lambda **_kwargs: (_ for _ in ()).throw(DwdV21FullBuildInterrupted(15)),
+    )
+
+    with pytest.raises(DwdV21FullBuildInterrupted):
+        run_full_build(
+            repository=repository,
+            workspace=workspace,
+            ods_base=ods,
+            dwd_base=dwd,
+            environment_path=environment,
+            run_id=run_id,
+            expected_revision=revision,
+            expected_contract_digest=CONTRACT,
+            expected_findings_digest="sha256:findings",
+            expected_remediation_digest="sha256:remediation",
+            minimum_free_bytes=1,
+            knowledge_cutoff="2026-08-03T23:59:00+00:00",
+            through_date="2026-07-31",
+            runtime_id="runtime-1",
+            resume=False,
+        )
+
+    interrupted = list((workspace / "runs" / run_id / "state").glob("*interrupted*.json"))
+    assert len(interrupted) == 1
+    receipt = json.loads(interrupted[0].read_text(encoding="ascii"))
+    pointer = json.loads((workspace / "control/active-run.json").read_text(encoding="ascii"))
+    assert receipt["status"] == "interrupted"
+    assert receipt["evidence"]["signal"] == 15
+    assert pointer["status"] == "interrupted"
+
+
 def test_full_build_runs_sequentially_and_resumes_from_verified_checkpoints(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -310,6 +419,10 @@ def test_full_build_runs_sequentially_and_resumes_from_verified_checkpoints(
                 "QUANTHUS_DWD_PILOT_AUTHORIZED=0",
                 f"QUANTHUS_DWD_RUN_ID={run_id}",
                 "QUANTHUS_DWD_RESUME_AUTHORIZED=0",
+                "QUANTHUS_DWD_KNOWLEDGE_CUTOFF=2026-08-01T00:00:00+00:00",
+                "QUANTHUS_DWD_THROUGH_DATE=2026-07-31",
+                "QUANTHUS_DWD_RUNTIME_ID=runtime-1",
+                "QUANTHUS_DWD_MINIMUM_FREE_BYTES=1",
             ]
         )
         + "\n",
@@ -364,6 +477,11 @@ def test_full_build_runs_sequentially_and_resumes_from_verified_checkpoints(
         }
 
     monkeypatch.setattr(subject, "run_preflight", fake_preflight)
+    monkeypatch.setattr(
+        subject,
+        "_audit_full_build_contract",
+        lambda **_kwargs: {"status": "passed"},
+    )
 
     def fake_plan(**kwargs: Any) -> SimpleNamespace:
         output = Path(kwargs["output"])

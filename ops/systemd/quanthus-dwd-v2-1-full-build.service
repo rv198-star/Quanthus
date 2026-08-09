@@ -25,13 +25,13 @@ PrivateTmp=true
 ProtectHome=read-only
 ProtectSystem=strict
 ReadWritePaths=/srv/quanthus/gpu-p100-dwd-workspace
-MemoryHigh=12G
-MemoryMax=14G
-LimitAS=12G
+MemoryHigh=10G
+MemoryMax=12G
 CPUQuota=400%
 TasksMax=64
 UMask=0027
 Restart=no
+SuccessExitStatus=143
 RuntimeMaxSec=72h
 TimeoutStopSec=5m
 

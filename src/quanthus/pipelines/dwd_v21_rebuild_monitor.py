@@ -128,6 +128,9 @@ def _active_run_snapshot(workspace: Path, contract_digest: str) -> dict[str, Any
         raise DwdV21MonitorError("active run pointer has an invalid phase")
     if value.get("contract_digest") != contract_digest:
         raise DwdV21MonitorError("active run pointer has contract digest drift")
+    pointer_status = value.get("status")
+    if pointer_status not in {"running", "passed", "paused", "failed", "interrupted"}:
+        raise DwdV21MonitorError("active run pointer has an invalid status")
     run_root = workspace / "runs" / run_id
     phase_receipt = run_root / "state" / f"{phase}.json"
     if not run_root.is_dir() or not phase_receipt.is_file():
@@ -135,6 +138,8 @@ def _active_run_snapshot(workspace: Path, contract_digest: str) -> dict[str, Any
     receipt = _verify_canonical_object(phase_receipt, "phase receipt")
     if receipt.get("run_id") != run_id or receipt.get("contract_digest") != contract_digest:
         raise DwdV21MonitorError("phase receipt does not bind the active run and contract")
+    if receipt.get("status") != pointer_status:
+        raise DwdV21MonitorError("active run pointer status differs from its phase receipt")
     executor_pid = value.get("executor_pid")
     process_status = "not_declared"
     if isinstance(executor_pid, int) and executor_pid > 0:
@@ -146,13 +151,19 @@ def _active_run_snapshot(workspace: Path, contract_digest: str) -> dict[str, Any
             process_status = "present_uninspectable"
         else:
             process_status = "present"
+    if pointer_status == "running":
+        snapshot_status = (
+            "active" if process_status in {"present", "present_uninspectable"} else "stale"
+        )
+    else:
+        snapshot_status = str(pointer_status)
     return {
         "executor_pid": executor_pid,
         "phase": phase,
         "phase_receipt": str(phase_receipt),
         "process_status": process_status,
         "run_id": run_id,
-        "status": "active",
+        "status": snapshot_status,
     }
 
 
@@ -200,7 +211,13 @@ def inspect_rebuild(
         "mount": mount,
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "schema_version": 1,
-        "status": "healthy" if active_run["status"] == "active" else "idle",
+        "status": (
+            "healthy"
+            if active_run["status"] == "active"
+            else "failed"
+            if active_run["status"] in {"failed", "stale"}
+            else "idle"
+        ),
         "workspace": str(workspace),
     }
 
@@ -272,7 +289,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
     print(json.dumps(snapshot, ensure_ascii=True, sort_keys=True))
-    return 0
+    return 2 if snapshot["status"] == "failed" else 0
 
 
 if __name__ == "__main__":

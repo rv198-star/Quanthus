@@ -138,6 +138,7 @@ def _active_pointer(
     phase: str,
     contract_digest: str,
     executor_pid: int,
+    status: str,
 ) -> None:
     _atomic_json(
         workspace / "control" / "active-run.json",
@@ -148,6 +149,7 @@ def _active_pointer(
             "phase": phase,
             "contract_digest": contract_digest,
             "executor_pid": executor_pid,
+            "status": status,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         },
     )
@@ -179,6 +181,7 @@ def _advance(
         phase=phase,
         contract_digest=contract_digest,
         executor_pid=os.getpid(),
+        status=status,
     )
     return receipt
 

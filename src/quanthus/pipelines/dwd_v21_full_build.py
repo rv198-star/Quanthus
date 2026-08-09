@@ -8,6 +8,7 @@ import fcntl
 import hashlib
 import json
 import os
+import signal
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
@@ -99,6 +100,14 @@ class DwdV21FullBuildError(RuntimeError):
     """Raised when the full builder cannot advance without violating its authority."""
 
 
+class DwdV21FullBuildInterrupted(DwdV21FullBuildError):
+    """Raised by a controlled termination request so durable state can be recorded."""
+
+    def __init__(self, signum: int) -> None:
+        super().__init__(f"received signal {signum}")
+        self.signum = signum
+
+
 _PILOT_APPROVAL = "docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-pilot-approval-20260808.json"
 _CONTRACT = "config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json"
 _CONTRACT_APPROVAL = (
@@ -157,6 +166,10 @@ def _require_full_build_environment(
     expected_revision: str,
     expected_contract_digest: str,
     run_id: str,
+    knowledge_cutoff: str,
+    through_date: str,
+    runtime_id: str,
+    minimum_free_bytes: int,
 ) -> dict[str, str]:
     environment = load_environment(environment_path)
     expected = {
@@ -167,12 +180,139 @@ def _require_full_build_environment(
         "QUANTHUS_DWD_FULL_BUILD_APPROVED_REVISION": expected_revision,
         "QUANTHUS_DWD_PILOT_AUTHORIZED": "0",
         "QUANTHUS_DWD_RUN_ID": run_id,
+        "QUANTHUS_DWD_KNOWLEDGE_CUTOFF": knowledge_cutoff,
+        "QUANTHUS_DWD_THROUGH_DATE": through_date,
+        "QUANTHUS_DWD_RUNTIME_ID": runtime_id,
+        "QUANTHUS_DWD_MINIMUM_FREE_BYTES": str(minimum_free_bytes),
     }
     if any(environment.get(key) != value for key, value in expected.items()):
         raise DwdV21FullBuildError("deployment environment differs from full-build authority")
     if environment.get("QUANTHUS_DWD_RESUME_AUTHORIZED", "0") not in {"0", "1"}:
         raise DwdV21FullBuildError("resume authority must be exactly 0 or 1")
     return environment
+
+
+def _utc_datetime(value: object, label: str) -> datetime:
+    if not isinstance(value, str) or not value:
+        raise DwdV21FullBuildError(f"{label} must be a timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise DwdV21FullBuildError(f"{label} must be an ISO timestamp") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise DwdV21FullBuildError(f"{label} must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def _json_mapping(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise DwdV21FullBuildError(f"{label} must be a physical file: {path}")
+    try:
+        value: Any = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise DwdV21FullBuildError(f"cannot read {label}: {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise DwdV21FullBuildError(f"{label} must be a JSON object")
+    return cast(dict[str, Any], value)
+
+
+def _audit_full_build_contract(
+    *, repository: Path, preflight: Mapping[str, Any], knowledge_cutoff: str, through_date: str
+) -> dict[str, Any]:
+    """Fail before domain work when frozen build inputs are internally inconsistent."""
+
+    cutoff = _utc_datetime(knowledge_cutoff, "full-build knowledge cutoff")
+    identity_path = repository / "config/pipelines/dwd-v2-1-input-identity.v1.json"
+    seed_path = repository / "config/pipelines/securities-warehouse-reference-seeds.v1.json"
+    validity_path = repository / "config/security-code-validity.v1.json"
+    vocabulary_path = repository / "config/pipelines/disclosure-event-vocabulary.v1.json"
+    hierarchy_path = repository / "config/pipelines/csrc-industry-hierarchy.v1.json"
+    accounting_path = repository / "config/pipelines/dwd-domain-accounting-receipt.v1.json"
+    model_path = repository / "config/pipelines/dwd-domain-model.v1.json"
+
+    identity = _json_mapping(identity_path, "ODS V2 input identity")
+    build_input = identity.get("build_input_contract")
+    if not isinstance(build_input, Mapping):
+        raise DwdV21FullBuildError("ODS V2 input identity lacks its build input contract")
+    observed_ods = preflight.get("ods_base")
+    expected_ods = {
+        key: build_input.get(key) for key in ("bundle_id", "manifest_sha256", "content_digest")
+    }
+    if not isinstance(observed_ods, Mapping) or any(
+        observed_ods.get(key) != value for key, value in expected_ods.items()
+    ):
+        raise DwdV21FullBuildError("preflight ODS identity differs from frozen build authority")
+    if build_input.get("through_date") != through_date:
+        raise DwdV21FullBuildError("full-build through date differs from frozen build authority")
+    if cutoff < _utc_datetime(
+        identity.get("minimum_knowledge_cutoff"), "minimum ODS identity cutoff"
+    ):
+        raise DwdV21FullBuildError("full-build cutoff precedes frozen ODS identity authority")
+    if identity.get("base_model_sha256") != _sha256(model_path):
+        raise DwdV21FullBuildError("base model differs from frozen ODS identity authority")
+
+    seed = _json_mapping(seed_path, "securities reference seed")
+    source_snapshot = seed.get("source_snapshot")
+    if not isinstance(source_snapshot, Mapping) or cutoff < _utc_datetime(
+        source_snapshot.get("retrieved_at"), "reference seed retrieval time"
+    ):
+        raise DwdV21FullBuildError("full-build cutoff precedes securities reference seed")
+    if not isinstance(seed.get("venues"), list) or not seed["venues"]:
+        raise DwdV21FullBuildError("securities reference seed has no venues")
+
+    validity = _json_mapping(validity_path, "security code validity map")
+    intervals = validity.get("intervals")
+    if not isinstance(intervals, list) or not intervals:
+        raise DwdV21FullBuildError("security code validity map has no intervals")
+    for index, raw in enumerate(intervals):
+        if not isinstance(raw, Mapping) or cutoff < _utc_datetime(
+            raw.get("knowledge_cutoff"), f"security code interval {index} cutoff"
+        ):
+            raise DwdV21FullBuildError("full-build cutoff precedes security code validity evidence")
+
+    vocabulary = _json_mapping(vocabulary_path, "disclosure vocabulary")
+    if (
+        vocabulary.get("kind") != "quanthus_disclosure_event_vocabulary"
+        or not isinstance(vocabulary.get("action_types"), Mapping)
+        or not vocabulary["action_types"]
+    ):
+        raise DwdV21FullBuildError("disclosure vocabulary contract is incomplete")
+    hierarchy = _json_mapping(hierarchy_path, "CSRC industry hierarchy")
+    parents = hierarchy.get("parent_nodes")
+    leaves = hierarchy.get("leaf_nodes")
+    if (
+        hierarchy.get("kind") != "csrc_industry_hierarchy_reference"
+        or not isinstance(parents, Mapping)
+        or not isinstance(leaves, Mapping)
+        or not leaves
+        or any(not isinstance(code, str) or code[:1] not in parents for code in leaves)
+    ):
+        raise DwdV21FullBuildError("CSRC industry hierarchy contract is incomplete")
+    accounting = _json_mapping(accounting_path, "domain accounting contract")
+    if (
+        accounting.get("contract_id") != "quanthus-dwd-domain-source-accounting-receipt-v1"
+        or accounting.get("blocking_dispositions") != ["FAILED"]
+        or not isinstance(accounting.get("terminal_dispositions"), list)
+    ):
+        raise DwdV21FullBuildError("domain accounting contract is incomplete")
+
+    return {
+        "status": "passed",
+        "knowledge_cutoff": cutoff.isoformat(),
+        "through_date": through_date,
+        "static_inputs": {
+            path.relative_to(repository).as_posix(): _sha256(path)
+            for path in (
+                identity_path,
+                seed_path,
+                validity_path,
+                vocabulary_path,
+                hierarchy_path,
+                accounting_path,
+                model_path,
+            )
+        },
+    }
 
 
 def _pilot_approval(
@@ -732,6 +872,7 @@ def run_full_build(
         raise DwdV21FullBuildError("full-build run path escapes the approved workspace")
     if (
         thread_limit < 1
+        or thread_limit > 4
         or min(
             statement_audit_batch_size,
             financial_source_batch_size,
@@ -740,6 +881,11 @@ def run_full_build(
             ownership_batch_size,
         )
         < 1
+        or statement_audit_batch_size > 4
+        or financial_source_batch_size > 32
+        or financial_native_batch_size > 4096
+        or disclosure_batch_size > 50000
+        or ownership_batch_size > 8192
     ):
         raise DwdV21FullBuildError("full-build resource or batch limits are invalid")
     if expected_revision[:8] not in run_id:
@@ -750,6 +896,10 @@ def run_full_build(
         expected_revision=expected_revision,
         expected_contract_digest=expected_contract_digest,
         run_id=run_id,
+        knowledge_cutoff=knowledge_cutoff,
+        through_date=through_date,
+        runtime_id=runtime_id,
+        minimum_free_bytes=minimum_free_bytes,
     )
     existed = run_root.exists()
     if existed and (not resume or environment.get("QUANTHUS_DWD_RESUME_AUTHORIZED", "0") != "1"):
@@ -795,6 +945,12 @@ def run_full_build(
             expected_remediation_digest=expected_remediation_digest,
             minimum_free_bytes=minimum_free_bytes,
             expected_execution_mode="full_build",
+        )
+        preflight["build_contract"] = _audit_full_build_contract(
+            repository=repository,
+            preflight=preflight,
+            knowledge_cutoff=knowledge_cutoff,
+            through_date=through_date,
         )
         preflight_path = write_preflight_receipt(
             run_root / "evidence/preflight-full-build", preflight
@@ -1333,6 +1489,24 @@ def run_full_build(
             }
         finally:
             os.close(lock_fd)
+    except DwdV21FullBuildInterrupted as error:
+        stamp = datetime.now(timezone.utc).strftime("full-build-interrupted-%Y%m%dT%H%M%SZ")
+        with contextlib.suppress(DwdV21RuntimeError, OSError):
+            _advance(
+                workspace,
+                run_root,
+                phase=stamp,
+                run_id=run_id,
+                contract_digest=expected_contract_digest,
+                code_revision=expected_revision,
+                status="interrupted",
+                evidence={
+                    "signal": error.signum,
+                    "install_started": False,
+                    "pointer_cutover_started": False,
+                },
+            )
+        raise
     except (OSError, RuntimeError) as error:
         stamp = datetime.now(timezone.utc).strftime("full-build-failed-%Y%m%dT%H%M%SZ")
         with contextlib.suppress(DwdV21RuntimeError, OSError):
@@ -1382,6 +1556,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if run_root.exists() and not args.resume:
         print(f"DWD V2.1 full build failed: run already exists: {run_root}", file=sys.stderr)
         return 2
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+
+    def terminate(signum: int, _frame: object) -> None:
+        raise DwdV21FullBuildInterrupted(signum)
+
+    signal.signal(signal.SIGTERM, terminate)
     try:
         result = run_full_build(
             repository=args.repository,
@@ -1401,9 +1581,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             resume=args.resume,
             thread_limit=args.thread_limit,
         )
+    except DwdV21FullBuildInterrupted as error:
+        print(f"DWD V2.1 full build interrupted: {error}", file=sys.stderr)
+        return 128 + error.signum
     except (DwdV21FullBuildError, KeyError, TypeError, ValueError) as error:
         print(f"DWD V2.1 full build failed: {error}", file=sys.stderr)
         return 2
+    finally:
+        signal.signal(signal.SIGTERM, previous_sigterm)
     print(json.dumps(result, ensure_ascii=True, sort_keys=True))
     return 0
 

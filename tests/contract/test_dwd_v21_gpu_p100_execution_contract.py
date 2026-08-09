@@ -84,10 +84,12 @@ def test_accepted_pilot_receipts_have_a_canonical_approval() -> None:
 def test_full_build_service_is_bounded_and_never_auto_resumes() -> None:
     service = FULL_BUILD_SERVICE.read_text(encoding="ascii")
     assert "PrivateNetwork=true" in service
-    assert "MemoryMax=14G" in service
-    assert "LimitAS=12G" in service
+    assert "MemoryHigh=10G" in service
+    assert "MemoryMax=12G" in service
+    assert "LimitAS=" not in service
     assert "CPUQuota=400%" in service
     assert "Restart=no" in service
+    assert "SuccessExitStatus=143" in service
     assert "RuntimeMaxSec=72h" in service
     assert "TMPDIR=/srv/quanthus/gpu-p100-dwd-workspace/control/tmp" in service
     assert "publish-dwd-domain-base" not in service

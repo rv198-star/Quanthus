@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,10 +10,12 @@ from typing import Any
 
 import pytest
 
+from quanthus.pipelines.dwd_execution_resources import DWD_THREAD_LIMIT_ENV
 from quanthus.pipelines.dwd_v21_full_build import (
     DwdV21FullBuildError,
     DwdV21FullBuildInterrupted,
     _audit_full_build_contract,
+    _configure_scratch,
     _pilot_approval,
     _require_full_build_environment,
     _run_file_step,
@@ -31,6 +34,18 @@ REVISION = "2" * 40
 PILOT_REVISION = "3" * 40
 PILOT_RUN = "pilot-run-r33333333"
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_full_builder_exports_the_governed_thread_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(DWD_THREAD_LIMIT_ENV, raising=False)
+
+    scratch = _configure_scratch(tmp_path, 4)
+
+    assert scratch == tmp_path / "scratch/full-build"
+    assert scratch.is_dir()
+    assert os.environ[DWD_THREAD_LIMIT_ENV] == "4"
 
 
 def test_gpu_full_build_cutoff_covers_all_frozen_input_authority() -> None:

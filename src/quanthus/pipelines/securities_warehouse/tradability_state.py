@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from quanthus.pipelines.dwd_execution_resources import configure_duckdb_threads
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
     verify_listed_company_candidate,
@@ -1284,7 +1285,7 @@ def _create_scratch_directory(output: Path, build_identity: str, scratch_root: P
 
 
 def _configure_connection(connection: Any, scratch: Path) -> None:
-    connection.execute("SET threads=1")
+    configure_duckdb_threads(connection)
     connection.execute("SET preserve_insertion_order=false")
     connection.execute("SET enable_progress_bar=false")
     connection.execute("SET memory_limit='1600MB'")

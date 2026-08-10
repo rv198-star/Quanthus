@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
+from quanthus.pipelines.dwd_execution_resources import DWD_THREAD_LIMIT_ENV
 from quanthus.pipelines.dwd_replay_determinism_audit import (
     DwdReplayDeterminismAuditError,
     audit_dwd_replay_determinism,
@@ -294,6 +295,7 @@ def _run_isolated_worker(
         "ARROW_NUM_THREADS",
     ):
         environment[key] = str(thread_limit)
+    environment[DWD_THREAD_LIMIT_ENV] = str(thread_limit)
     completed = subprocess.run(
         [
             str(python),
@@ -396,7 +398,7 @@ def run_pilots(
     spill_root = run_root / "scratch" / "pilot"
     if memory_limit_bytes < 2 * 1024**3 or spill_limit_bytes < 0:
         raise DwdV21PilotError("pilot resource limits are invalid")
-    if thread_limit < 1 or batch_size_rows < 1:
+    if thread_limit < 1 or thread_limit > 4 or batch_size_rows < 1:
         raise DwdV21PilotError("pilot thread or batch limit is invalid")
     if not python.is_file():
         raise DwdV21PilotError(f"pilot Python does not exist: {python}")

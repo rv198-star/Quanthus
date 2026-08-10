@@ -24,6 +24,7 @@ from quanthus.pipelines.dwd_domain_invariant_audit import (
     audit_dwd_domain_invariants,
     write_domain_invariant_report,
 )
+from quanthus.pipelines.dwd_execution_resources import DWD_THREAD_LIMIT_ENV
 from quanthus.pipelines.dwd_lineage_authority_audit import (
     audit_dwd_lineage_authority,
     write_lineage_authority_report,
@@ -652,6 +653,7 @@ def _configure_scratch(run_root: Path, thread_limit: int) -> Path:
         "ARROW_NUM_THREADS",
     ):
         os.environ[key] = str(thread_limit)
+    os.environ[DWD_THREAD_LIMIT_ENV] = str(thread_limit)
     return scratch
 
 

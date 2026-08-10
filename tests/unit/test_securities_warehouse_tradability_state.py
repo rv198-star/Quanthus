@@ -5,11 +5,13 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from quanthus.pipelines.dwd_execution_resources import DWD_THREAD_LIMIT_ENV
 from quanthus.pipelines.securities_warehouse.tradability_state import (
     _audit_outputs,
     _configure_connection,
@@ -37,7 +39,8 @@ class TradabilityStateQueryTests(unittest.TestCase):
 
     def test_connection_uses_bounded_spill_friendly_settings(self) -> None:
         scratch = Path("/tmp/tradability-state-test-scratch")
-        _configure_connection(self.connection, scratch)
+        with patch.dict("os.environ", {DWD_THREAD_LIMIT_ENV: "4"}):
+            _configure_connection(self.connection, scratch)
         settings = self.connection.execute(
             """
             SELECT current_setting('threads'),
@@ -46,7 +49,7 @@ class TradabilityStateQueryTests(unittest.TestCase):
                    current_setting('temp_directory')
             """
         ).fetchone()
-        self.assertEqual(settings, (1, False, "1.4 GiB", str(scratch)))
+        self.assertEqual(settings, (4, False, "1.4 GiB", str(scratch)))
 
     def test_expected_rows_uses_only_listing_calendar_cardinality(self) -> None:
         self.connection.execute(

@@ -10,6 +10,10 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from quanthus.pipelines.dwd_execution_resources import (
+    configure_duckdb_threads,
+    dwd_thread_limit,
+)
 from quanthus.pipelines.dwd_pit_audit import _manifest_payload_files, _parquet_source
 from quanthus.pipelines.securities_warehouse.domain_base import DomainBaseError, verify_domain_base
 
@@ -237,13 +241,14 @@ def audit_dwd_domain_invariants(
     manifest_tables = _manifest_table_names(manifest)
     all_paths = _manifest_payload_files(root, manifest, table_names=manifest_tables)
     paths = {table: all_paths[table] for table in predicates}
+    thread_limit = dwd_thread_limit()
     audit_identity = {
         "package_id": verified.package_id,
         "manifest_sha256": verified.manifest_sha256,
         "content_digest": verified.content_digest,
         "auditor_sha256": "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "memory_limit": memory_limit,
-        "threads": 1,
+        "threads": thread_limit,
     }
     tables = _load_checkpoint(
         checkpoint_path,
@@ -252,7 +257,7 @@ def audit_dwd_domain_invariants(
     )
     connection = duckdb.connect(":memory:")
     connection.execute("SET TimeZone='UTC'")
-    connection.execute("SET threads=1")
+    configure_duckdb_threads(connection)
     escaped_scratch = str(scratch).replace("'", "''")
     connection.execute(f"SET temp_directory='{escaped_scratch}'")
     connection.execute(f"SET memory_limit='{memory_limit}'")

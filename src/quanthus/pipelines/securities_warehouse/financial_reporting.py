@@ -22,7 +22,10 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
-from quanthus.pipelines.dwd_execution_resources import configure_duckdb_threads
+from quanthus.pipelines.dwd_execution_resources import (
+    configure_duckdb_threads,
+    dwd_duckdb_memory_limit_mb,
+)
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
     verify_listed_company_candidate,
@@ -2493,7 +2496,7 @@ def _audit_financial_candidate(
     scratch.mkdir(exist_ok=True)
     connection = duckdb.connect(database=":memory:")
     try:
-        connection.execute("SET memory_limit='1536MB'")
+        connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1536)}MB'")
         configure_duckdb_threads(connection)
         connection.execute("SET preserve_insertion_order=false")
         escaped_scratch = str(scratch).replace("'", "''")

@@ -35,3 +35,14 @@ def configure_duckdb_threads(
     thread_limit = dwd_thread_limit(environment)
     connection.execute(f"SET threads={thread_limit}")
     return thread_limit
+
+
+def dwd_duckdb_memory_limit_mb(
+    per_thread_mb: int,
+    environment: Mapping[str, str] | None = None,
+) -> int:
+    """Scale a bounded DuckDB memory allowance with the governed worker count."""
+
+    if isinstance(per_thread_mb, bool) or per_thread_mb < 1 or per_thread_mb > 2048:
+        raise DwdExecutionResourceError("DuckDB per-thread memory must be between 1 and 2048 MB")
+    return per_thread_mb * dwd_thread_limit(environment)

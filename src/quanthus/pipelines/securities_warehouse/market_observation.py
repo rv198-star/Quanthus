@@ -14,7 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quanthus.pipelines.dwd_execution_resources import configure_duckdb_threads
+from quanthus.pipelines.dwd_execution_resources import (
+    configure_duckdb_threads,
+    dwd_duckdb_memory_limit_mb,
+)
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
     verify_listed_company_candidate,
@@ -1926,7 +1929,7 @@ def _build_locked(
     configure_duckdb_threads(connection)
     connection.execute("SET preserve_insertion_order=true")
     connection.execute("SET enable_progress_bar=false")
-    connection.execute("SET memory_limit='1400MB'")
+    connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1400)}MB'")
     connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
     _register_sources(connection, registry)
     listing_path = listed.root / "payload/listed_company/dwd_listing.parquet"

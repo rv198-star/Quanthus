@@ -49,7 +49,7 @@ class TradabilityStateQueryTests(unittest.TestCase):
                    current_setting('temp_directory')
             """
         ).fetchone()
-        self.assertEqual(settings, (4, False, "1.4 GiB", str(scratch)))
+        self.assertEqual(settings, (4, False, "5.9 GiB", str(scratch)))
 
     def test_expected_rows_uses_only_listing_calendar_cardinality(self) -> None:
         self.connection.execute(

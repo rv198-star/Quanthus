@@ -24,7 +24,10 @@ from quanthus.pipelines.dwd_domain_invariant_audit import (
     audit_dwd_domain_invariants,
     write_domain_invariant_report,
 )
-from quanthus.pipelines.dwd_execution_resources import DWD_THREAD_LIMIT_ENV
+from quanthus.pipelines.dwd_execution_resources import (
+    DWD_THREAD_LIMIT_ENV,
+    dwd_duckdb_memory_limit_mb,
+)
 from quanthus.pipelines.dwd_lineage_authority_audit import (
     audit_dwd_lineage_authority,
     write_lineage_authority_report,
@@ -692,6 +695,7 @@ def _run_candidate_audits(
     audit_root.mkdir(parents=True, exist_ok=True)
     checkpoint_root.mkdir(parents=True, exist_ok=True)
     audit_scratch.mkdir(parents=True, exist_ok=True)
+    audit_memory_limit = f"{dwd_duckdb_memory_limit_mb(1536)}MB"
 
     schema_path = audit_root / "schema-partitions.json"
 
@@ -724,7 +728,7 @@ def _run_candidate_audits(
             model_path=model_path,
             scratch=audit_scratch / "semantic-contracts",
             checkpoint_path=checkpoint_root / "semantic-contracts.json",
-            memory_limit="2GB",
+            memory_limit=audit_memory_limit,
         )
         write_semantic_contract_report(
             semantic_path,
@@ -752,7 +756,7 @@ def _run_candidate_audits(
             root=sealed_root,
             scratch=audit_scratch / "domain-invariants",
             checkpoint_path=checkpoint_root / "domain-invariants.json",
-            memory_limit="2GB",
+            memory_limit=audit_memory_limit,
         )
         write_domain_invariant_report(
             invariant_path,
@@ -1509,7 +1513,7 @@ def run_full_build(
                 },
             )
         raise
-    except (OSError, RuntimeError) as error:
+    except Exception as error:
         stamp = datetime.now(timezone.utc).strftime("full-build-failed-%Y%m%dT%H%M%SZ")
         with contextlib.suppress(DwdV21RuntimeError, OSError):
             _advance(

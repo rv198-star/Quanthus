@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import itertools
 import json
 import sqlite3
 import unittest
@@ -13,6 +14,10 @@ from tempfile import TemporaryDirectory
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from quanthus.pipelines.dwd_semantic_contract_audit import (
+    _foreign_key_metrics,
+    load_semantic_contracts,
+)
 from quanthus.pipelines.securities_warehouse.financial_reporting import (
     FinancialCompanyIdentity,
     FinancialCompanyResolver,
@@ -23,6 +28,7 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (
     _audit_financial_candidate,
     _batch_rows,
     _finalize_concepts,
+    _merge_concept_row,
     _plan_date,
     _reporting_batch_rows,
     _write_batch,
@@ -42,6 +48,8 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (
     write_financial_reporting_source_audit,
 )
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 def _envelope(payload: dict[str, object]) -> dict[str, object]:
     raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -54,6 +62,44 @@ def _envelope(payload: dict[str, object]) -> dict[str, object]:
 
 
 class FinancialEnvelopeTests(unittest.TestCase):
+    def test_concept_merge_is_input_order_independent(self) -> None:
+        rows = [
+            {
+                "financial_concept_id": "concept-1",
+                "effective_from": datetime(1998, 12, 30, 16, tzinfo=timezone.utc),
+                "knowledge_from": datetime(2026, 8, 1, tzinfo=timezone.utc),
+                "source_record_id": "record-b",
+                "source_artifact_sha256": "sha256:" + "b" * 64,
+            },
+            {
+                "financial_concept_id": "concept-1",
+                "effective_from": datetime(1990, 12, 30, 16, tzinfo=timezone.utc),
+                "knowledge_from": datetime(2026, 8, 2, tzinfo=timezone.utc),
+                "source_record_id": "record-c",
+                "source_artifact_sha256": "sha256:" + "c" * 64,
+            },
+            {
+                "financial_concept_id": "concept-1",
+                "effective_from": datetime(2000, 12, 30, 16, tzinfo=timezone.utc),
+                "knowledge_from": datetime(2026, 8, 1, tzinfo=timezone.utc),
+                "source_record_id": "record-a",
+                "source_artifact_sha256": "sha256:" + "a" * 64,
+            },
+        ]
+
+        results = []
+        for order in itertools.permutations(rows):
+            merged: dict[str, dict[str, object]] = {}
+            for row in order:
+                _merge_concept_row(merged, row)
+            results.append(merged["concept-1"])
+
+        self.assertTrue(all(result == results[0] for result in results))
+        self.assertEqual(
+            results[0]["effective_from"], datetime(1990, 12, 30, 16, tzinfo=timezone.utc)
+        )
+        self.assertEqual(results[0]["source_record_id"], "record-a")
+
     def test_plan_date_accepts_the_sealed_plan_format(self) -> None:
         self.assertEqual(_plan_date("2026-07-31", "through_date").isoformat(), "2026-07-31")
         with self.assertRaisesRegex(FinancialReportingBuildError, "YYYY-MM-DD"):
@@ -1105,6 +1151,187 @@ class FinancialEnvelopeTests(unittest.TestCase):
         self.assertEqual(len(concepts), 0)
         self.assertTrue(all(not partitions for partitions in rows_by_year.values()))
         self.assertEqual(exceptions, {"BEFORE_FIRST_LISTED_COMPANY_IDENTITY": 1})
+
+    def test_reporting_batch_retains_earliest_concept_coordinates(self) -> None:
+        source = FinancialReportingSource(
+            source_id="canonical_financial_quarterly",
+            source_kind="quarterly_projection",
+            ledger_identity="financial_quarterly",
+            path=Path("/fixture/canonical.parquet"),
+            relative_path="payload/canonical/financial_quarterly.parquet",
+            source_sha256="sha256:" + "a" * 64,
+            source_revision="ods-base-v1.2",
+            precedence="independent",
+        )
+        resolver = FinancialCompanyResolver(
+            [
+                FinancialCompanyIdentity(
+                    stock_code="000001",
+                    security_id="security-1",
+                    company_id="company-1",
+                    effective_from=datetime(1980, 1, 1, tzinfo=timezone.utc),
+                    effective_to=None,
+                )
+            ]
+        )
+
+        rows_by_year, concepts, _counts, exceptions = _reporting_batch_rows(
+            [
+                {
+                    "stock_code": "000001",
+                    "report_date": datetime(1998, 12, 31),
+                    "acquired_at": "2026-08-01T00:00:00+00:00",
+                    "revenue": 2.0,
+                },
+                {
+                    "stock_code": "000001",
+                    "report_date": datetime(1990, 12, 31),
+                    "acquired_at": "2026-08-02T00:00:00+00:00",
+                    "revenue": 1.0,
+                },
+            ],
+            source=source,
+            resolver=resolver,
+            knowledge_cutoff=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(exceptions, {})
+        self.assertEqual(len(concepts), 5)
+        self.assertTrue(
+            all(
+                concept["effective_from"] == datetime(1990, 12, 30, 16, 0, tzinfo=timezone.utc)
+                for concept in concepts
+            )
+        )
+        self.assertTrue(
+            all(
+                concept["knowledge_from"] == datetime(2026, 8, 1, tzinfo=timezone.utc)
+                for concept in concepts
+            )
+        )
+        concepts_by_id = {concept["financial_concept_id"]: concept for concept in concepts}
+        facts = [
+            fact
+            for partitions in rows_by_year["dwd_financial_fact"].values()
+            for fact in partitions
+        ]
+        self.assertTrue(
+            all(
+                concepts_by_id[fact["financial_concept_id"]]["effective_from"].date()
+                <= fact["period_end"]
+                for fact in facts
+            )
+        )
+        self.assertTrue(
+            all(
+                concepts_by_id[fact["financial_concept_id"]]["knowledge_from"]
+                <= fact["knowledge_from"]
+                for fact in facts
+            )
+        )
+        reports = [
+            report
+            for partitions in rows_by_year["dwd_financial_report"].values()
+            for report in partitions
+        ]
+        schemas = financial_reporting_schemas()
+        second_rows_by_year, second_concepts, _second_counts, second_exceptions = (
+            _reporting_batch_rows(
+                [
+                    {
+                        "stock_code": "000001",
+                        "report_date": datetime(2005, 12, 31),
+                        "acquired_at": "2026-07-31T00:00:00+00:00",
+                        "revenue": 3.0,
+                    }
+                ],
+                source=source,
+                resolver=resolver,
+                knowledge_cutoff=datetime(2026, 8, 3, tzinfo=timezone.utc),
+            )
+        )
+        self.assertEqual(second_exceptions, {})
+        second_facts = [
+            fact
+            for partitions in second_rows_by_year["dwd_financial_fact"].values()
+            for fact in partitions
+        ]
+        second_reports = [
+            report
+            for partitions in second_rows_by_year["dwd_financial_report"].values()
+            for report in partitions
+        ]
+        with TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            _write_batch(
+                work=work,
+                batch_id="00-000000",
+                rows_by_year=rows_by_year,
+                concepts=concepts,
+                schemas=schemas,
+            )
+            _write_batch(
+                work=work,
+                batch_id="00-000001",
+                rows_by_year=second_rows_by_year,
+                concepts=second_concepts,
+                schemas=schemas,
+            )
+            self.assertEqual(_finalize_concepts(work, {"concept_finalized": False}, schemas), 5)
+            finalized_concepts = pq.read_table(
+                work / "payload/financial_reporting/dwd_financial_concept/part-00000.parquet"
+            ).to_pylist()
+
+        self.assertTrue(
+            all(
+                concept["effective_from"] == datetime(1990, 12, 30, 16, 0, tzinfo=timezone.utc)
+                for concept in finalized_concepts
+            )
+        )
+        self.assertTrue(
+            all(
+                concept["knowledge_from"] == datetime(2026, 7, 31, tzinfo=timezone.utc)
+                for concept in finalized_concepts
+            )
+        )
+        facts.extend(second_facts)
+        reports.extend(second_reports)
+        import duckdb
+
+        connection = duckdb.connect(":memory:")
+        try:
+            connection.register(
+                "financial_facts",
+                pa.Table.from_pylist(facts, schema=schemas["dwd_financial_fact"]),
+            )
+            connection.register(
+                "financial_reports",
+                pa.Table.from_pylist(reports, schema=schemas["dwd_financial_report"]),
+            )
+            connection.register(
+                "financial_concepts",
+                pa.Table.from_pylist(finalized_concepts, schema=schemas["dwd_financial_concept"]),
+            )
+            contracts = load_semantic_contracts(ROOT / "config/pipelines/dwd-domain-model.v1.json")
+            foreign_keys = _foreign_key_metrics(
+                connection,
+                child_source="financial_facts",
+                child_contract=contracts["dwd_financial_fact"],
+                parent_sources={
+                    "dwd_financial_report": "financial_reports",
+                    "dwd_financial_concept": "financial_concepts",
+                },
+                parent_contracts=contracts,
+            )
+        finally:
+            connection.close()
+        self.assertEqual(
+            [
+                (item["parent_table"], item["temporal_or_future_parent_rows"])
+                for item in foreign_keys
+            ],
+            [("dwd_financial_report", 0), ("dwd_financial_concept", 0)],
+        )
 
     def test_writes_partitioned_rows_and_runs_external_key_audit(self) -> None:
         row = {

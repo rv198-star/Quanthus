@@ -2339,6 +2339,32 @@ def _load_or_initialize_checkpoint(work: Path, identity: Mapping[str, Any]) -> d
     return checkpoint
 
 
+def _merge_concept_row(
+    concepts_by_id: dict[str, dict[str, Any]], concept: Mapping[str, Any]
+) -> None:
+    concept_id = str(concept["financial_concept_id"])
+    incoming = dict(concept)
+    previous = concepts_by_id.get(concept_id)
+    if previous is None:
+        concepts_by_id[concept_id] = incoming
+        return
+
+    earliest_effective_from = min(previous["effective_from"], incoming["effective_from"])
+    previous_order = (
+        previous["knowledge_from"],
+        str(previous["source_record_id"]),
+        str(previous["source_artifact_sha256"]),
+    )
+    incoming_order = (
+        incoming["knowledge_from"],
+        str(incoming["source_record_id"]),
+        str(incoming["source_artifact_sha256"]),
+    )
+    retained = incoming if incoming_order < previous_order else previous
+    retained["effective_from"] = earliest_effective_from
+    concepts_by_id[concept_id] = retained
+
+
 def _batch_rows(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -2357,7 +2383,7 @@ def _batch_rows(
         for fact in expanded.facts:
             rows_by_year["dwd_financial_fact"][fact["period_end"].year].append(fact)
         for concept in expanded.concepts:
-            concepts_by_id.setdefault(str(concept["financial_concept_id"]), concept)
+            _merge_concept_row(concepts_by_id, concept)
         row_counts["dwd_financial_report"] += len(expanded.reports)
         row_counts["dwd_financial_fact"] += len(expanded.facts)
     concepts = [concepts_by_id[key] for key in sorted(concepts_by_id)]
@@ -2419,7 +2445,7 @@ def _reporting_batch_rows(
         for fact in expanded.facts:
             rows_by_year["dwd_financial_fact"][fact["period_end"].year].append(fact)
         for concept in expanded.concepts:
-            concepts_by_id.setdefault(str(concept["financial_concept_id"]), concept)
+            _merge_concept_row(concepts_by_id, concept)
         row_counts["dwd_financial_report"] += len(expanded.reports)
         row_counts["dwd_financial_fact"] += len(expanded.facts)
         exception_counts.update(str(exception["code"]) for exception in expanded.quality_exceptions)

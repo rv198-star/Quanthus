@@ -10,7 +10,7 @@ import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 
 class DomainBaseError(RuntimeError):
@@ -40,6 +40,22 @@ class DomainCandidateVerification:
     semantic_digest: str
     row_counts: dict[str, int]
     payload_file_count: int
+
+
+@dataclass(frozen=True)
+class ImportedDomainCandidateVerification:
+    """Verified run-bound wrapper around one immutable prior-run candidate."""
+
+    root: Path
+    manifest_sha256: str
+    semantic_digest: str
+    row_counts: dict[str, int]
+    payload_file_count: int
+    source_root: Path
+    source_run_id: str
+    source_plan_digest: str
+    source_manifest_sha256: str
+    target_bindings: dict[str, Any]
 
 
 _EXPECTED_KINDS = {
@@ -185,6 +201,15 @@ def verify_domain_candidate(
         run_id=run_id,
         input_plan_digest=input_plan_digest,
     )
+    if manifest.get("candidate_import") is not None:
+        _verify_import_receipt(
+            root.resolve(),
+            domain=domain,
+            run_id=run_id,
+            input_plan_digest=input_plan_digest,
+            manifest=manifest,
+            manifest_sha256=manifest_sha,
+        )
     raw_counts = manifest.get("row_counts")
     if not isinstance(raw_counts, Mapping):
         raise DomainBaseError(f"candidate row counts are invalid: {domain}")
@@ -195,6 +220,255 @@ def verify_domain_candidate(
         {str(key): int(value) for key, value in raw_counts.items()},
         sum(str(raw["path"]).startswith("payload/") for raw in files),
     )
+
+
+def _verify_import_receipt(
+    root: Path,
+    *,
+    domain: str,
+    run_id: str,
+    input_plan_digest: str,
+    manifest: Mapping[str, Any],
+    manifest_sha256: str,
+) -> ImportedDomainCandidateVerification:
+    raw_import = manifest.get("candidate_import")
+    if not isinstance(raw_import, Mapping):
+        raise DomainBaseError(f"candidate import metadata is invalid: {domain}")
+    receipt_relative = _relative(
+        raw_import.get("receipt_path"), "candidate_import.receipt_path"
+    ).as_posix()
+    receipt_path = root.joinpath(*PurePosixPath(receipt_relative).parts)
+    receipt = _object(receipt_path)
+    canonical_digest = receipt.get("canonical_digest")
+    unsigned_receipt = {key: value for key, value in receipt.items() if key != "canonical_digest"}
+    source = receipt.get("source_candidate")
+    target = receipt.get("target_candidate")
+    bindings = receipt.get("target_bindings")
+    if (
+        receipt.get("schema_version") != 1
+        or receipt.get("kind") != "dwd_domain_candidate_import_receipt"
+        or receipt.get("status") != "imported"
+        or receipt.get("domain") != domain
+        or canonical_digest != _digest(unsigned_receipt)
+        or raw_import.get("receipt_sha256") != _sha256(receipt_path)
+        or raw_import.get("canonical_digest") != canonical_digest
+        or not isinstance(source, Mapping)
+        or not isinstance(target, Mapping)
+        or not isinstance(bindings, Mapping)
+        or target.get("root") != str(root)
+        or target.get("run_id") != run_id
+        or target.get("input_plan_digest") != input_plan_digest
+        or target.get("manifest_sha256") not in (None, manifest_sha256)
+    ):
+        raise DomainBaseError(f"candidate import receipt binding differs: {domain}")
+    source_root_raw = source.get("root")
+    source_run_id = source.get("run_id")
+    source_plan_digest = source.get("input_plan_digest")
+    if not all(
+        isinstance(value, str) and value
+        for value in (source_root_raw, source_run_id, source_plan_digest)
+    ):
+        raise DomainBaseError(f"candidate import source identity is incomplete: {domain}")
+    source_root = Path(str(source_root_raw)).resolve()
+    if source_root == root:
+        raise DomainBaseError(f"candidate import source cannot reference itself: {domain}")
+    verified_source = verify_domain_candidate(
+        source_root,
+        domain=domain,
+        run_id=str(source_run_id),
+        input_plan_digest=str(source_plan_digest),
+    )
+    raw_counts = manifest.get("row_counts")
+    if (
+        source.get("manifest_sha256") != verified_source.manifest_sha256
+        or source.get("semantic_digest") != verified_source.semantic_digest
+        or source.get("row_counts") != dict(sorted(verified_source.row_counts.items()))
+        or manifest.get("semantic_digest") != verified_source.semantic_digest
+        or not isinstance(raw_counts, Mapping)
+        or dict(sorted((str(key), int(value)) for key, value in raw_counts.items()))
+        != dict(sorted(verified_source.row_counts.items()))
+    ):
+        raise DomainBaseError(f"candidate import source content differs: {domain}")
+    return ImportedDomainCandidateVerification(
+        root=root,
+        manifest_sha256=manifest_sha256,
+        semantic_digest=verified_source.semantic_digest,
+        row_counts=dict(verified_source.row_counts),
+        payload_file_count=sum(
+            str(raw.get("path", "")).startswith("payload/")
+            for raw in cast(list[Mapping[str, Any]], manifest.get("files", []))
+        ),
+        source_root=source_root,
+        source_run_id=str(source_run_id),
+        source_plan_digest=str(source_plan_digest),
+        source_manifest_sha256=verified_source.manifest_sha256,
+        target_bindings={str(key): value for key, value in bindings.items()},
+    )
+
+
+def verify_imported_domain_candidate(
+    root: Path,
+    *,
+    domain: str,
+    run_id: str,
+    input_plan_digest: str,
+    expected_bindings: Mapping[str, Any] | None = None,
+) -> ImportedDomainCandidateVerification | None:
+    """Verify an imported candidate, returning ``None`` for a native candidate."""
+
+    root = root.resolve()
+    manifest = _object(root / "manifest.json")
+    if manifest.get("candidate_import") is None:
+        return None
+    _manifest, manifest_sha, _files = _candidate(
+        domain, root, run_id=run_id, input_plan_digest=input_plan_digest
+    )
+    result = _verify_import_receipt(
+        root,
+        domain=domain,
+        run_id=run_id,
+        input_plan_digest=input_plan_digest,
+        manifest=manifest,
+        manifest_sha256=manifest_sha,
+    )
+    if expected_bindings is not None and any(
+        result.target_bindings.get(key) != value for key, value in expected_bindings.items()
+    ):
+        raise DomainBaseError(f"candidate import target bindings differ: {domain}")
+    return result
+
+
+def import_domain_candidate(
+    *,
+    source: Path,
+    output: Path,
+    domain: str,
+    source_run_id: str,
+    source_plan_digest: str,
+    target_run_id: str,
+    target_plan_digest: str,
+    target_bindings: Mapping[str, Any],
+    source_authority: Mapping[str, Any],
+) -> ImportedDomainCandidateVerification:
+    """Hard-link one native prior-run candidate into a new immutable run wrapper."""
+
+    if domain not in _EXPECTED_KINDS:
+        raise DomainBaseError(f"unknown DWD candidate domain: {domain}")
+    source = source.resolve()
+    output = output.resolve()
+    if source == output or output.is_symlink():
+        raise DomainBaseError("candidate import paths are invalid")
+    source_manifest = _object(source / "manifest.json")
+    if source_manifest.get("candidate_import") is not None:
+        raise DomainBaseError("candidate import source must be a native candidate")
+    source_verified = verify_domain_candidate(
+        source,
+        domain=domain,
+        run_id=source_run_id,
+        input_plan_digest=source_plan_digest,
+    )
+    if output.exists():
+        existing = verify_imported_domain_candidate(
+            output,
+            domain=domain,
+            run_id=target_run_id,
+            input_plan_digest=target_plan_digest,
+            expected_bindings=target_bindings,
+        )
+        if existing is None or existing.source_root != source:
+            raise DomainBaseError("existing candidate import has a different source")
+        return existing
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging = output.with_name(f".{output.name}.importing")
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(mode=0o750)
+    try:
+        raw_files = source_manifest.get("files")
+        if not isinstance(raw_files, list):
+            raise DomainBaseError(f"candidate files are invalid: {domain}")
+        for raw in raw_files:
+            if not isinstance(raw, Mapping):
+                raise DomainBaseError(f"candidate file row is invalid: {domain}")
+            relative = _relative(raw.get("path"), "candidate.files.path")
+            if relative.as_posix() == "receipts/candidate-import.json":
+                raise DomainBaseError("native candidate collides with import receipt path")
+            _link(source.joinpath(*relative.parts), staging.joinpath(*relative.parts))
+        receipt_path = staging / "receipts/candidate-import.json"
+        receipt = {
+            "schema_version": 1,
+            "kind": "dwd_domain_candidate_import_receipt",
+            "status": "imported",
+            "domain": domain,
+            "source_candidate": {
+                "root": str(source),
+                "run_id": source_run_id,
+                "input_plan_digest": source_plan_digest,
+                "manifest_sha256": source_verified.manifest_sha256,
+                "semantic_digest": source_verified.semantic_digest,
+                "row_counts": dict(sorted(source_verified.row_counts.items())),
+            },
+            "target_candidate": {
+                "root": str(output),
+                "run_id": target_run_id,
+                "input_plan_digest": target_plan_digest,
+                "manifest_sha256": None,
+            },
+            "target_bindings": dict(target_bindings),
+            "source_authority": dict(source_authority),
+            "mutation_performed_on_source": False,
+            "payload_transport": "hardlink",
+        }
+        receipt["canonical_digest"] = _digest(receipt)
+        _write_json(receipt_path, receipt)
+        files = [
+            {
+                "path": path.relative_to(staging).as_posix(),
+                "sha256": _sha256(path),
+                "size_bytes": path.stat().st_size,
+            }
+            for path in sorted(staging.rglob("*"))
+            if path.is_file() and not path.is_symlink()
+        ]
+        manifest = {
+            "schema_version": 1,
+            "kind": _EXPECTED_KINDS[domain],
+            "run_id": target_run_id,
+            "input_plan_digest": target_plan_digest,
+            "semantic_digest": source_verified.semantic_digest,
+            "owned_tables": source_manifest.get("owned_tables"),
+            "row_counts": dict(sorted(source_verified.row_counts.items())),
+            **dict(target_bindings),
+            "candidate_import": {
+                "receipt_path": "receipts/candidate-import.json",
+                "receipt_sha256": _sha256(receipt_path),
+                "canonical_digest": receipt["canonical_digest"],
+                "source_manifest_sha256": source_verified.manifest_sha256,
+            },
+            "files": files,
+        }
+        _write_json(staging / "manifest.json", manifest)
+        ready = staging / "READY"
+        with ready.open("x", encoding="ascii") as stream:
+            os.fchmod(stream.fileno(), 0o640)
+            stream.write(_sha256(staging / "manifest.json") + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(staging, output)
+        _fsync_directory(output.parent)
+        result = verify_imported_domain_candidate(
+            output,
+            domain=domain,
+            run_id=target_run_id,
+            input_plan_digest=target_plan_digest,
+            expected_bindings=target_bindings,
+        )
+        if result is None:
+            raise DomainBaseError("candidate import did not produce an import wrapper")
+        return result
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
 
 
 def _link(source: Path, destination: Path) -> None:

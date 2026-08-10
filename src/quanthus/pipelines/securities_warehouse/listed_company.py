@@ -22,6 +22,9 @@ from quanthus.code_validity import (
     CodeValidityInterval,
     load_code_validity_mapping,
 )
+from quanthus.pipelines.securities_warehouse.domain_base import (
+    verify_imported_domain_candidate,
+)
 
 
 class ListedCompanyBuildError(RuntimeError):
@@ -778,6 +781,27 @@ def verify_listed_company_candidate(
 ) -> ListedCompanyCandidateVerification:
     """Deep-verify a sealed #57 candidate and expose only its venue rows."""
 
+    imported = verify_imported_domain_candidate(
+        root,
+        domain="listed_company",
+        run_id=run_id,
+        input_plan_digest=input_plan_digest,
+        expected_bindings={"model_sha256": model_sha256},
+    )
+    if imported is not None:
+        source_receipt = _object(imported.source_root / "receipts/listed-company-build.json")
+        native = verify_listed_company_candidate(
+            imported.source_root,
+            run_id=imported.source_run_id,
+            input_plan_digest=imported.source_plan_digest,
+            model_sha256=_text(source_receipt, "model_sha256"),
+        )
+        return ListedCompanyCandidateVerification(
+            root=imported.root,
+            manifest_sha256=imported.manifest_sha256,
+            semantic_digest=native.semantic_digest,
+            venue_rows=native.venue_rows,
+        )
     if root.is_symlink() or not root.is_dir():
         raise ListedCompanyBuildError("listed-company candidate must be a physical directory")
     manifest_path = root / "manifest.json"

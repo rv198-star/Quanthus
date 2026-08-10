@@ -88,6 +88,7 @@ def test_full_build_service_is_bounded_and_never_auto_resumes() -> None:
     assert "MemoryMax=12G" in service
     assert "LimitAS=" not in service
     assert "--thread-limit 2" in service
+    assert "--reuse-run-id ${QUANTHUS_DWD_REUSE_RUN_ID}" in service
     assert "CPUQuota=200%" in service
     assert "Restart=no" in service
     assert "SuccessExitStatus=143" in service

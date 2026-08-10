@@ -363,7 +363,7 @@ def _load_company_resolver(listed_company_candidate: Path):
     )
 
 
-def _audit_announcements(source: _Source, resolver) -> dict[str, Any]:
+def _audit_announcements(source: _Source, resolver, *, through_date: date) -> dict[str, Any]:
     uri = f"file:{source.path}?mode=ro"
     try:
         connection = sqlite3.connect(uri, uri=True)
@@ -401,8 +401,14 @@ def _audit_announcements(source: _Source, resolver) -> dict[str, Any]:
                 _text(title, "announcement title")
                 _text(ann_id, "announcement id")
                 published_at = _provider_timestamp(publish_time, "announcement publish_time")
+                publication_date = published_at.astimezone(_SHANGHAI).date()
+                if publication_date > through_date:
+                    quality["AFTER_THROUGH_DATE"] += 1
+                    categories[str(category or "UNCLASSIFIED")] += 1
+                    impacts[str(impact or "UNCLASSIFIED")] += 1
+                    continue
                 identity, reason = resolver.resolve_for_report(
-                    stock_code, period_end=published_at.date()
+                    stock_code, period_end=publication_date
                 )
                 if identity is None or reason is not None:
                     quality[str(reason)] += 1
@@ -424,7 +430,11 @@ def _audit_announcements(source: _Source, resolver) -> dict[str, Any]:
 
 
 def _audit_parquet_sources(
-    sources: Mapping[str, _Source], vocabulary: Mapping[str, Any], resolver
+    sources: Mapping[str, _Source],
+    vocabulary: Mapping[str, Any],
+    resolver,
+    *,
+    through_date: date,
 ) -> dict[str, Any]:
     try:
         import pyarrow.parquet as pq
@@ -500,6 +510,9 @@ def _audit_parquet_sources(
                 if key in unique_keys:
                     raise DisclosureEventBuildError(f"{source_id} has a duplicate business key")
                 unique_keys.add(key)
+                if coordinate > through_date:
+                    quality["AFTER_THROUGH_DATE"] += 1
+                    continue
                 identity, reason = resolver.resolve_for_report(stock_code, period_end=coordinate)
                 if identity is None or reason is not None:
                     quality[str(reason)] += 1
@@ -527,18 +540,23 @@ def materialize_announcement_rows(
     source_sha256: str,
     source_revision: str,
     financial_report_ids: Sequence[str] = (),
+    parent_knowledge_from: datetime | None = None,
+    financial_report_knowledge: Mapping[str, datetime] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Materialize one governed announcement and its typed subjects."""
 
     ann_id = _text(row.get("ann_id"), "announcement ann_id")
     published_at = _provider_timestamp(row.get("publish_time"), "announcement publish_time")
+    knowledge_from = max(
+        value for value in (published_at, parent_knowledge_from) if value is not None
+    )
     disclosure_id = _stable_id("disclosure", "announcement_archive", ann_id)
     common = {
         "record_source": "announcement_archive",
         "source_record_id": ann_id,
         "source_revision": source_revision,
         "source_artifact_sha256": source_sha256,
-        "knowledge_from": published_at,
+        "knowledge_from": knowledge_from,
         "knowledge_to": None,
         "effective_at": published_at,
         "announced_at": published_at,
@@ -567,9 +585,17 @@ def materialize_announcement_rows(
         }
     ]
     for report_id in sorted(set(financial_report_ids)):
+        report_knowledge = (
+            financial_report_knowledge.get(report_id)
+            if financial_report_knowledge is not None
+            else None
+        )
         subjects.append(
             {
                 **common,
+                "knowledge_from": max(
+                    value for value in (knowledge_from, report_knowledge) if value is not None
+                ),
                 "disclosure_subject_id": _stable_id(
                     "disclosure_subject", disclosure_id, "FINANCIAL_REPORT", report_id
                 ),
@@ -608,6 +634,7 @@ def materialize_corporate_action_rows(
     company_id: str,
     security_id: str,
     vocabulary: Mapping[str, Any],
+    parent_knowledge_from: datetime | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Materialize one provider action or dividend row without losing term roles."""
 
@@ -638,10 +665,13 @@ def materialize_corporate_action_rows(
         )
     )
     action_id = _stable_id("corporate_action", source_id, source_key)
-    knowledge_from = (
+    source_knowledge_from = (
         _provider_timestamp(row["built_at"], "action built_at")
         if row.get("built_at") not in (None, "")
         else _provider_timestamp(announced_date or effective_date, "action knowledge date")
+    )
+    knowledge_from = max(
+        value for value in (source_knowledge_from, parent_knowledge_from) if value is not None
     )
     common = {
         "record_source": source_id,
@@ -707,6 +737,7 @@ def materialize_adjustment_factor_rows(
     source_sha256: str,
     company_security_id: str,
     vocabulary: Mapping[str, Any],
+    parent_knowledge_from: datetime | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Materialize every provider factor method and its raw evidence input."""
 
@@ -715,7 +746,12 @@ def materialize_adjustment_factor_rows(
     effective_from = _effective_start(effective_date)
     revision = _text(row.get("adj_version"), "factor adj_version")
     source_revision = str(row.get("source_revision") or revision)
-    knowledge_from = _provider_timestamp(row.get("knowledge_cutoff"), "factor knowledge_cutoff")
+    source_knowledge_from = _provider_timestamp(
+        row.get("knowledge_cutoff"), "factor knowledge_cutoff"
+    )
+    knowledge_from = max(
+        value for value in (source_knowledge_from, parent_knowledge_from) if value is not None
+    )
     factors: list[dict[str, Any]] = []
     inputs: list[dict[str, Any]] = []
     for field, raw_mapping in vocabulary["factor_methods"].items():
@@ -878,9 +914,12 @@ def audit_disclosure_event_source_package(
     sources = _select_sources(records, ods_package)
     vocabulary, vocabulary_sha = _load_vocabulary(vocabulary_path)
     resolver = _load_company_resolver(listed_company_candidate)
+    through_date = _report_date(semantic_plan.get("through_date"), "disclosure through_date")
     source_rows = {
-        "announcements": _audit_announcements(sources["announcements"], resolver),
-        **_audit_parquet_sources(sources, vocabulary, resolver),
+        "announcements": _audit_announcements(
+            sources["announcements"], resolver, through_date=through_date
+        ),
+        **_audit_parquet_sources(sources, vocabulary, resolver, through_date=through_date),
     }
     report = {
         "schema_version": 1,
@@ -928,23 +967,31 @@ def _read_audit(path: Path) -> tuple[dict[str, Any], str]:
     return audit, _sha256(path)
 
 
-def _financial_report_index(candidate: Path) -> dict[tuple[str, date], tuple[str, ...]]:
+def _financial_report_index(
+    candidate: Path,
+) -> dict[tuple[str, date], tuple[tuple[str, datetime], ...]]:
     try:
         import pyarrow.dataset as ds
     except ModuleNotFoundError as exc:
         raise DisclosureEventBuildError("pyarrow is required for report subjects") from exc
     root = candidate / "payload/financial_reporting/dwd_financial_report"
-    index: dict[tuple[str, date], set[str]] = {}
+    index: dict[tuple[str, date], dict[str, datetime]] = {}
     scanner = ds.dataset(root, format="parquet", partitioning="hive").scanner(
-        columns=["company_id", "period_end", "financial_report_id"],
+        columns=["company_id", "period_end", "financial_report_id", "knowledge_from"],
         batch_size=32768,
     )
     for batch in scanner.to_batches():
         for row in batch.to_pylist():
-            index.setdefault((str(row["company_id"]), row["period_end"]), set()).add(
-                str(row["financial_report_id"])
-            )
-    return {key: tuple(sorted(values)) for key, values in index.items()}
+            key = (str(row["company_id"]), row["period_end"])
+            report_id = str(row["financial_report_id"])
+            knowledge_from = row["knowledge_from"]
+            if not isinstance(knowledge_from, datetime):
+                raise DisclosureEventBuildError("financial report index lacks knowledge_from")
+            prior = index.setdefault(key, {}).get(report_id)
+            if prior is not None and prior != knowledge_from:
+                raise DisclosureEventBuildError("financial report index has conflicting knowledge")
+            index[key][report_id] = knowledge_from
+    return {key: tuple(sorted(values.items())) for key, values in index.items()}
 
 
 def _title_period(title: str) -> date | None:
@@ -1129,6 +1176,7 @@ def _build_disclosure_event_locked(
     model_sha = _sha256(model_path)
     if plan.get("run_id") != run_id or semantic_plan.get("mode") != "base":
         raise DisclosureEventBuildError("disclosure build must match one Base plan")
+    through_date = _report_date(semantic_plan.get("through_date"), "disclosure through_date")
     if _mapping(semantic_plan.get("model"), "input plan model").get("sha256") != model_sha:
         raise DisclosureEventBuildError("disclosure build model differs from plan")
     listed = verify_listed_company_candidate(
@@ -1213,14 +1261,19 @@ def _build_disclosure_event_locked(
             for code, title, publish_time, ann_id, url, category, impact in raw_batch:
                 del impact
                 published = _provider_timestamp(publish_time, "announcement publish_time")
+                publication_date = published.astimezone(_SHANGHAI).date()
+                if publication_date > through_date:
+                    batch_quality["AFTER_THROUGH_DATE"] += 1
+                    continue
                 company, reason = resolver.resolve_for_report(
-                    str(code), period_end=published.date()
+                    str(code), period_end=publication_date
                 )
                 if company is None:
                     batch_quality[str(reason)] += 1
                     continue
                 period = _title_period(str(title))
-                report_ids = report_index.get((company.company_id, period), ()) if period else ()
+                report_refs = report_index.get((company.company_id, period), ()) if period else ()
+                report_ids = tuple(report_id for report_id, _knowledge in report_refs)
                 expanded = materialize_announcement_rows(
                     {
                         "ann_id": ann_id,
@@ -1234,6 +1287,8 @@ def _build_disclosure_event_locked(
                     source_sha256=sources["announcements"].sha256,
                     source_revision=run_id,
                     financial_report_ids=report_ids,
+                    parent_knowledge_from=company.knowledge_from,
+                    financial_report_knowledge=dict(report_refs),
                 )
                 for table in rows:
                     rows[table].extend(expanded[table])
@@ -1271,6 +1326,9 @@ def _build_disclosure_event_locked(
                     if source_id == "dividend_history":
                         raw["ex_date"] = raw.get("ex_dividend_date")
                     coordinate, announced = _action_coordinate(raw)
+                    if coordinate > through_date:
+                        event_quality["AFTER_THROUGH_DATE"] += 1
+                        continue
                     key = (
                         str(raw.get("stock_code")),
                         coordinate,
@@ -1296,6 +1354,7 @@ def _build_disclosure_event_locked(
                         company_id=company.company_id,
                         security_id=company.security_id,
                         vocabulary=vocabulary,
+                        parent_knowledge_from=company.knowledge_from,
                     )
                     for table, values in expanded.items():
                         rows[table].extend(values)
@@ -1308,6 +1367,9 @@ def _build_disclosure_event_locked(
         for batch in pq.ParquetFile(factor_source.path).iter_batches(batch_size=8192):
             for raw in batch.to_pylist():
                 coordinate = _report_date(raw.get("effective_date"), "factor date")
+                if coordinate > through_date:
+                    event_quality["AFTER_THROUGH_DATE"] += 1
+                    continue
                 company, reason = resolver.resolve_for_report(
                     str(raw.get("stock_code")), period_end=coordinate
                 )
@@ -1319,6 +1381,7 @@ def _build_disclosure_event_locked(
                     source_sha256=factor_source.sha256,
                     company_security_id=company.security_id,
                     vocabulary=vocabulary,
+                    parent_knowledge_from=company.knowledge_from,
                 )
                 for table, values in expanded.items():
                     rows[table].extend(values)

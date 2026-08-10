@@ -11,6 +11,7 @@ import pyarrow.parquet as pq
 
 from quanthus.pipelines.securities_warehouse.ownership_capital import (
     OwnershipCapitalBuildError,
+    _exclude_out_of_range_holdings,
     _file_source,
     _partition_for_row,
     _single_record,
@@ -42,6 +43,35 @@ class OwnershipCapitalTests(unittest.TestCase):
         self.assertEqual(row["holder_count"], 457610)
         self.assertEqual(row["raw_holder_count"], "457610")
         self.assertEqual(row["raw_unit"], "HOLDER_ACCOUNT;SHARE_PER_HOLDER")
+
+    def test_parent_knowledge_controls_shareholder_count_visibility(self) -> None:
+        parent_knowledge = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        row = materialize_shareholder_count_row(
+            {
+                "code": "000001",
+                "end_date": "2026-03-31",
+                "shareholder_count": 10,
+                "knowledge_cutoff": "2026-04-24",
+            },
+            company_id="company-1",
+            security_id="security-1",
+            source_sha256="sha256:holder-count",
+            parent_knowledge_from=parent_knowledge,
+        )
+
+        self.assertEqual(row["knowledge_from"], parent_knowledge)
+
+    def test_out_of_range_holding_percentage_is_excluded_exactly(self) -> None:
+        accepted, excluded = _exclude_out_of_range_holdings(
+            [
+                {"holder_rank": 1, "holding_percentage": 2.94},
+                {"holder_rank": 2, "holding_percentage": 168.87},
+                {"holder_rank": 3, "holding_percentage": None},
+            ]
+        )
+
+        self.assertEqual([row["holder_rank"] for row in accepted], [1, 3])
+        self.assertEqual(excluded, 1)
 
     def test_v11_schemas_cover_four_owned_objects(self) -> None:
         schemas = ownership_capital_schemas()
@@ -113,9 +143,7 @@ class OwnershipCapitalTests(unittest.TestCase):
             root = Path(temporary)
             for table, row, schema, partition in cases:
                 relative = _write_ownership_rows(root, table, [row], schema, "audit")
-                expected = (
-                    f"payload/ownership_capital/{table}/{partition}/part-audit.parquet"
-                )
+                expected = f"payload/ownership_capital/{table}/{partition}/part-audit.parquet"
                 self.assertEqual(relative, [expected])
                 self.assertTrue(pq.ParquetFile(root / expected).schema_arrow.equals(schema))
 

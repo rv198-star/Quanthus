@@ -12,9 +12,10 @@ import stat
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from quanthus.pipelines.securities_warehouse.model_extension import (
     verify_additive_model_extension,
@@ -56,11 +57,7 @@ def _timestamp(value: object, field: str) -> datetime:
     if not isinstance(value, str) or not value:
         raise QualityGovernanceBuildError(f"{field} must be an ISO-8601 timestamp")
     normalized = value.replace("Z", "+00:00")
-    if (
-        len(normalized) >= 3
-        and normalized[-3] in {"+", "-"}
-        and normalized[-2:].isdigit()
-    ):
+    if len(normalized) >= 3 and normalized[-3] in {"+", "-"} and normalized[-2:].isdigit():
         normalized += ":00"
     try:
         parsed = datetime.fromisoformat(normalized)
@@ -596,8 +593,15 @@ def _financial_receipt(
     native = audit["component_audits"]["native"]["audit"]["source_rows"]
     for identity, raw in sorted(native.items()):
         rows = int(raw["selected_rows"])
+        deferred = sum(int(value) for value in raw.get("quality_exceptions", {}).values())
         sources.append(
-            _source(identity, rows, modeled=rows, source_artifact_sha256=raw["source_sha256"])
+            _source(
+                identity,
+                rows,
+                modeled=rows - deferred,
+                deferred=deferred,
+                source_artifact_sha256=raw["source_sha256"],
+            )
         )
     statement = audit["component_audits"]["statement"]["audit"]["source_rows"]
     for identity, raw in sorted(statement.items()):
@@ -676,6 +680,7 @@ def _extract_terminal_exceptions(
     listed_company_candidate: Path,
     run_id: str,
     detected_at: str,
+    through_date: date,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], Mapping[str, Any], Mapping[str, Any]]:
     from quanthus.pipelines.securities_warehouse import disclosure_event as disclosure
     from quanthus.pipelines.securities_warehouse import ownership_capital as ownership
@@ -692,7 +697,10 @@ def _extract_terminal_exceptions(
         )
         for code, publish_time, ann_id in cursor:
             published = disclosure._provider_timestamp(publish_time, "announcement publish_time")
-            company, reason = resolver.resolve_for_report(str(code), period_end=published.date())
+            publication_date = published.astimezone(ZoneInfo("Asia/Shanghai")).date()
+            if publication_date > through_date:
+                continue
+            company, reason = resolver.resolve_for_report(str(code), period_end=publication_date)
             if company is None and str(reason) == "NO_LISTED_COMPANY_IDENTITY":
                 disclosure_exceptions.append(
                     _accepted_exception(
@@ -723,6 +731,8 @@ def _extract_terminal_exceptions(
         )
         for code, changed, disclosed, row_key in cursor:
             coordinate = ownership._report_date(changed or disclosed, "holder change date")
+            if coordinate > through_date:
+                continue
             company, reason = resolver.resolve_for_report(str(code), period_end=coordinate)
             if company is None and str(reason) == "NO_LISTED_COMPANY_IDENTITY":
                 ownership_exceptions.append(
@@ -810,11 +820,16 @@ def _disclosure_receipt(
     for identity, raw in sorted(audit["source_rows"].items()):
         rows = int(raw["input_rows"])
         terminal = expected if identity == "announcements" else 0
+        all_exclusions = sum(
+            int(value) for value in raw.get("identity_quality_exceptions", {}).values()
+        )
+        deferred = all_exclusions - terminal
         sources.append(
             _source(
                 identity,
                 rows,
-                modeled=rows - terminal,
+                modeled=rows - terminal - deferred,
+                deferred=deferred,
                 quality_exception=terminal,
                 source_artifact_sha256=audit["source_sha256"][identity],
             )
@@ -842,21 +857,34 @@ def _ownership_receipt(
         raise QualityGovernanceBuildError("ownership terminal exception extraction differs")
     sources = []
     holder_rows = int(audit["source_rows"]["holder_changes"]["input_rows"])
+    holder_exclusions = sum(
+        int(value)
+        for value in audit["source_rows"]["holder_changes"]["identity_quality_exceptions"].values()
+    )
+    holder_deferred = holder_exclusions - counts["holder_changes"]
     sources.append(
         _source(
             "holder_changes",
             holder_rows,
-            modeled=holder_rows - counts["holder_changes"],
+            modeled=holder_rows - counts["holder_changes"] - holder_deferred,
+            deferred=holder_deferred,
             quality_exception=counts["holder_changes"],
             source_artifact_sha256=audit["source_sha256"]["holder_changes"],
         )
     )
     shareholder_rows = int(audit["source_rows"]["shareholder_count"]["input_rows"])
+    shareholder_deferred = sum(
+        int(value)
+        for value in audit["source_rows"]["shareholder_count"][
+            "identity_quality_exceptions"
+        ].values()
+    )
     sources.append(
         _source(
             "shareholder_count",
             shareholder_rows,
-            modeled=shareholder_rows,
+            modeled=shareholder_rows - shareholder_deferred,
+            deferred=shareholder_deferred,
             source_artifact_sha256=audit["source_sha256"]["shareholder_count"],
         )
     )
@@ -928,6 +956,7 @@ def build_quality_governance(
         raise QualityGovernanceBuildError("quality run differs from input plan")
     plan_digest = str(plan["plan_digest"])
     detected_at = str(plan["plan"]["knowledge_cutoff"])
+    through_date = date.fromisoformat(str(plan["plan"]["through_date"]))
     contract, contract_sha = load_quality_contract(accounting_contract_path)
     extension_sha = verify_quality_models(model_path, model_extension_path)
     manifests: dict[str, tuple[dict[str, Any], str]] = {}
@@ -947,6 +976,7 @@ def build_quality_governance(
             listed_company_candidate=candidates["listed_company"],
             run_id=run_id,
             detected_at=detected_at,
+            through_date=through_date,
         )
     )
     receipts = [

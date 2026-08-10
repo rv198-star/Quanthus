@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 class DwdCoverageExclusionAuditError(RuntimeError):
@@ -29,6 +30,7 @@ _THROUGH_DATE_COORDINATES = {
     "period_end",
     "affected_effective_at",
 }
+_BUSINESS_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 def _canonical_digest(value: object) -> str:
@@ -74,6 +76,27 @@ def _iso(value: object) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _business_date(value: object) -> date | None:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(_BUSINESS_TIMEZONE).date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            try:
+                return date.fromisoformat(value[:10])
+            except ValueError:
+                return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(_BUSINESS_TIMEZONE).date()
+    return None
 
 
 def _stats_for_column(parquet: Any, field: str) -> tuple[list[object], list[object], int, bool]:
@@ -127,8 +150,16 @@ def _coordinate_profile(
             maxima.extend(maximum)
             null_count += nulls
             complete = complete and stats_complete
-        rendered_min = min((_iso(value) for value in minima if _iso(value) is not None), default=None)
-        rendered_max = max((_iso(value) for value in maxima if _iso(value) is not None), default=None)
+        rendered_min = min(
+            (_iso(value) for value in minima if _iso(value) is not None), default=None
+        )
+        rendered_max = max(
+            (_iso(value) for value in maxima if _iso(value) is not None), default=None
+        )
+        maximum_business_date = max(
+            (_business_date(value) for value in maxima if _business_date(value) is not None),
+            default=None,
+        )
         field_reports[field] = {
             "minimum": rendered_min,
             "maximum": rendered_max,
@@ -137,8 +168,8 @@ def _coordinate_profile(
             "missing_part_count": missing_parts,
             "after_through_date": bool(
                 field in _THROUGH_DATE_COORDINATES
-                and rendered_max
-                and rendered_max[:10] > through_date
+                and maximum_business_date is not None
+                and maximum_business_date > date.fromisoformat(through_date)
             ),
             "through_date_checked": field in _THROUGH_DATE_COORDINATES,
         }
@@ -184,7 +215,10 @@ def audit_dwd_coverage_exclusions(
         raw_profile = schema_tables.get(table)
         if not isinstance(raw_profile, Mapping):
             reasons["table_missing_from_schema_inventory"] += 1
-            table_reports[table] = {"status": "finding", "reason_codes": ["table_missing_from_schema_inventory"]}
+            table_reports[table] = {
+                "status": "finding",
+                "reason_codes": ["table_missing_from_schema_inventory"],
+            }
             continue
         parts = raw_profile.get("parts")
         if not isinstance(parts, list):
@@ -250,7 +284,9 @@ def audit_dwd_coverage_exclusions(
                 }
             )
 
-    finding_tables = [table for table, value in table_reports.items() if value.get("status") == "finding"]
+    finding_tables = [
+        table for table, value in table_reports.items() if value.get("status") == "finding"
+    ]
     reasons.update({"finding_table": len(finding_tables)} if finding_tables else {})
     status = "verified" if not reasons else "finding"
     report: dict[str, Any] = {
@@ -306,16 +342,22 @@ def audit_dwd_coverage_exclusions(
     return report
 
 
-def write_coverage_exclusion_report(path: Path, report: Mapping[str, Any], *, sealed_roots: Sequence[Path] = ()) -> None:
+def write_coverage_exclusion_report(
+    path: Path, report: Mapping[str, Any], *, sealed_roots: Sequence[Path] = ()
+) -> None:
     resolved = path.resolve()
     for root in sealed_roots:
         sealed = root.resolve()
         if resolved == sealed or resolved.is_relative_to(sealed):
-            raise DwdCoverageExclusionAuditError(f"audit output must remain outside sealed package: {resolved}")
+            raise DwdCoverageExclusionAuditError(
+                f"audit output must remain outside sealed package: {resolved}"
+            )
     if resolved.exists():
         raise DwdCoverageExclusionAuditError(f"refusing to overwrite coverage report: {resolved}")
     resolved.parent.mkdir(parents=True, exist_ok=True)
     temporary = resolved.with_name(f".{resolved.name}.partial")
-    temporary.write_text(json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    temporary.write_text(
+        json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="ascii"
+    )
     temporary.chmod(0o640)
     temporary.replace(resolved)

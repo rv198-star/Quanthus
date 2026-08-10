@@ -48,6 +48,23 @@ def test_full_builder_exports_the_governed_thread_limit(
     assert os.environ[DWD_THREAD_LIMIT_ENV] == "2"
 
 
+def test_full_build_service_binds_the_r11_reuse_source() -> None:
+    service = (ROOT / "ops/systemd/quanthus-dwd-v2-1-full-build.service").read_text(
+        encoding="ascii"
+    )
+    environment = {
+        key: value
+        for line in (ROOT / "ops/systemd/gpu-p100-dwd-full-build.env.example")
+        .read_text(encoding="ascii")
+        .splitlines()
+        if line and not line.startswith("#")
+        for key, value in [line.split("=", 1)]
+    }
+
+    assert "--reuse-run-id ${QUANTHUS_DWD_REUSE_RUN_ID}" in service
+    assert environment["QUANTHUS_DWD_REUSE_RUN_ID"].endswith("-c010c277-r11")
+
+
 def test_gpu_full_build_cutoff_covers_all_frozen_input_authority() -> None:
     environment = {
         key: value
@@ -268,7 +285,7 @@ def test_file_checkpoint_detects_artifact_drift(tmp_path: Path) -> None:
         )
 
 
-def test_report_step_blocks_findings_and_verified_report_drift(tmp_path: Path) -> None:
+def test_report_step_records_findings_and_blocks_verified_report_drift(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     run_root = workspace / "runs/build-r22222222"
     finding_output = run_root / "evidence/finding.json"
@@ -276,19 +293,20 @@ def test_report_step_blocks_findings_and_verified_report_drift(tmp_path: Path) -
     def write_finding() -> None:
         _atomic_json(finding_output, _sealed({"summary": {"status": "finding"}}))
 
-    with pytest.raises(DwdV21FullBuildError, match="did not verify"):
-        _run_report_step(
-            workspace=workspace,
-            run_root=run_root,
-            phase="candidate-finding-audit",
-            output=finding_output,
-            action=write_finding,
-            label="candidate finding audit",
-            status_path=("summary", "status"),
-            run_id="build-r22222222",
-            contract_digest=CONTRACT,
-            code_revision=REVISION,
-        )
+    finding = _run_report_step(
+        workspace=workspace,
+        run_root=run_root,
+        phase="candidate-finding-audit",
+        output=finding_output,
+        action=write_finding,
+        label="candidate finding audit",
+        status_path=("summary", "status"),
+        run_id="build-r22222222",
+        contract_digest=CONTRACT,
+        code_revision=REVISION,
+    )
+    assert finding["status"] == "finding"
+    assert (run_root / "state/candidate-finding-audit-finding.json").is_file()
 
     verified_output = run_root / "evidence/verified.json"
 
@@ -328,6 +346,59 @@ def test_report_step_blocks_findings_and_verified_report_drift(tmp_path: Path) -
             contract_digest=CONTRACT,
             code_revision=REVISION,
         )
+
+
+def test_candidate_audits_collect_all_reports_before_failing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import quanthus.pipelines.dwd_v21_full_build as subject
+
+    phases: list[str] = []
+
+    def fake_report_step(**kwargs: Any) -> dict[str, Any]:
+        phase = str(kwargs["phase"])
+        phases.append(phase)
+        status = "finding" if phase == "11b-semantic-contract-audit" else "verified"
+        return {
+            "path": str(kwargs["output"]),
+            "sha256": f"sha256:{phase}",
+            "size_bytes": 1,
+            "canonical_digest": f"sha256:canonical-{phase}",
+            "status": status,
+        }
+
+    monkeypatch.setattr(subject, "_run_report_step", fake_report_step)
+    workspace = tmp_path / "workspace"
+    run_root = workspace / "runs/build-r22222222"
+
+    with pytest.raises(DwdV21FullBuildError, match="all reports were collected"):
+        subject._run_candidate_audits(
+            repository=tmp_path,
+            workspace=workspace,
+            run_root=run_root,
+            sealed_root=tmp_path / "sealed",
+            ods_base=tmp_path / "ods",
+            plan_root=tmp_path / "plan",
+            model_path=tmp_path / "model.json",
+            model_extension_path=tmp_path / "extension.json",
+            scratch=tmp_path / "scratch",
+            run_id="build-r22222222",
+            contract_digest=CONTRACT,
+            code_revision=REVISION,
+        )
+
+    assert phases == [
+        "11a-schema-partition-audit",
+        "11b-semantic-contract-audit",
+        "11c-domain-invariant-audit",
+        "11d-coverage-exclusion-audit",
+        "11e-lineage-authority-audit",
+    ]
+    state = json.loads(
+        (run_root / "state/11-candidate-audits-finding.json").read_text(encoding="utf-8")
+    )
+    assert state["evidence"]["all_reports_collected"] is True
+    assert state["evidence"]["finding_reports"] == ["semantic_contracts"]
 
 
 def _sha(path: Path) -> str:

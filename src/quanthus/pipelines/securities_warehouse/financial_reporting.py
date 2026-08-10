@@ -128,6 +128,7 @@ class FinancialCompanyIdentity:
     company_id: str
     effective_from: datetime
     effective_to: datetime | None
+    knowledge_from: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
 
 @dataclass(frozen=True)
@@ -563,14 +564,28 @@ def _row_identity(row: Mapping[str, Any]) -> tuple[str, str]:
 
 def _analyze_envelope(
     row: Mapping[str, Any],
-) -> tuple[str, Counter[str], set[tuple[str, str]]]:
+    *,
+    company_resolver: FinancialCompanyResolver | None = None,
+    through_date: date | None = None,
+) -> tuple[
+    str,
+    Counter[str],
+    Counter[str],
+    set[tuple[str, str]],
+    set[tuple[str, str]],
+    Counter[str],
+]:
     statement_type = _row_identity(row)[1]
+    stock_code = _row_identity(row)[0]
     envelope = decode_financial_envelope(row)
     accounting = _empty_accounting()
+    candidate_accounting = _empty_accounting()
     concept_coordinates: set[tuple[str, str]] = set()
+    candidate_concepts: set[tuple[str, str]] = set()
+    exceptions: Counter[str] = Counter()
     accounting["envelope_rows"] += 1
     accounting["uncompressed_bytes"] += len(envelope.raw_payload)
-    for _period, report, report_accounting in iter_statement_reports(envelope):
+    for period, report, report_accounting in iter_statement_reports(envelope):
         accounting["report_periods"] += 1
         accounting["heading_rows"] += report_accounting.heading_rows
         accounting["null_placeholders"] += report_accounting.null_placeholders
@@ -579,6 +594,27 @@ def _analyze_envelope(
         accounting["materializable_fact_rows"] += (
             report_accounting.null_placeholders + report_accounting.valid_facts
         )
+        period_end = _report_date(period, "financial report period")
+        eligible = True
+        if through_date is not None and period_end > through_date:
+            exceptions["AFTER_THROUGH_DATE"] += 1
+            eligible = False
+        if eligible and company_resolver is not None:
+            identity, reason = company_resolver.resolve_for_report(
+                stock_code, period_end=period_end
+            )
+            if identity is None:
+                exceptions[str(reason)] += 1
+                eligible = False
+        if eligible:
+            candidate_accounting["report_periods"] += 1
+            candidate_accounting["heading_rows"] += report_accounting.heading_rows
+            candidate_accounting["null_placeholders"] += report_accounting.null_placeholders
+            candidate_accounting["valid_facts"] += report_accounting.valid_facts
+            candidate_accounting["invalid_rows"] += report_accounting.invalid_rows
+            candidate_accounting["materializable_fact_rows"] += (
+                report_accounting.null_placeholders + report_accounting.valid_facts
+            )
         items = report.get("data")
         if not isinstance(items, list):
             raise FinancialReportingBuildError("provider report data must be an array")
@@ -593,10 +629,22 @@ def _analyze_envelope(
             ):
                 continue
             concept_coordinates.add((statement_type, field.strip()))
+            if eligible:
+                candidate_concepts.add((statement_type, field.strip()))
+    if candidate_accounting["report_periods"]:
+        candidate_accounting["envelope_rows"] = 1
+        candidate_accounting["uncompressed_bytes"] = len(envelope.raw_payload)
     digest = row.get("raw_payload_sha256")
     if not isinstance(digest, str) or not digest:
         raise FinancialReportingBuildError("financial source row has no raw_payload_sha256")
-    return digest, accounting, concept_coordinates
+    return (
+        digest,
+        accounting,
+        candidate_accounting,
+        concept_coordinates,
+        candidate_concepts,
+        exceptions,
+    )
 
 
 def _accounting_dict(value: Counter[str]) -> dict[str, int]:
@@ -604,7 +652,11 @@ def _accounting_dict(value: Counter[str]) -> dict[str, int]:
 
 
 def audit_financial_statement_sources(
-    sources: Sequence[FinancialStatementSource], *, batch_size: int = 32
+    sources: Sequence[FinancialStatementSource],
+    *,
+    batch_size: int = 32,
+    company_resolver: FinancialCompanyResolver | None = None,
+    through_date: date | None = None,
 ) -> FinancialReportingSourceAudit:
     """Stream the full statement corpus and prove its overlay disposition.
 
@@ -637,6 +689,7 @@ def audit_financial_statement_sources(
     hotfix_keys: set[tuple[str, str]] = set()
     source_concepts: dict[str, set[tuple[str, str]]] = {source.label: set() for source in sources}
     selected_concepts: set[tuple[str, str]] = set()
+    quality_exceptions: Counter[str] = Counter()
     overlap_rows = 0
     hotfix_fill_rows = 0
 
@@ -667,7 +720,18 @@ def audit_financial_statement_sources(
                 for raw_row in batch.to_pylist():
                     row = dict(raw_row)
                     key = _row_identity(row)
-                    digest, row_accounting, row_concepts = _analyze_envelope(row)
+                    (
+                        digest,
+                        row_accounting,
+                        candidate_accounting,
+                        row_concepts,
+                        candidate_concepts,
+                        row_exceptions,
+                    ) = _analyze_envelope(
+                        row,
+                        company_resolver=company_resolver,
+                        through_date=through_date,
+                    )
                     source_accounting[source.label].update(row_accounting)
                     source_concepts[source.label].update(row_concepts)
                     source_key_counts[source.label] += 1
@@ -677,8 +741,9 @@ def audit_financial_statement_sources(
                                 f"duplicate parent financial statement key: {key}"
                             )
                         parent_payloads[key] = digest
-                        selected_accounting[source.label].update(row_accounting)
-                        selected_concepts.update(row_concepts)
+                        selected_accounting[source.label].update(candidate_accounting)
+                        selected_concepts.update(candidate_concepts)
+                        quality_exceptions.update(row_exceptions)
                         selected_key_counts[source.label] += 1
                         continue
                     if key in hotfix_keys:
@@ -697,8 +762,9 @@ def audit_financial_statement_sources(
                             )
                         continue
                     hotfix_fill_rows += 1
-                    selected_accounting[source.label].update(row_accounting)
-                    selected_concepts.update(row_concepts)
+                    selected_accounting[source.label].update(candidate_accounting)
+                    selected_concepts.update(candidate_concepts)
+                    quality_exceptions.update(row_exceptions)
                     selected_key_counts[source.label] += 1
         except FinancialReportingBuildError:
             raise
@@ -748,6 +814,7 @@ def audit_financial_statement_sources(
             "provider_native_concept_coordinate_count": len(selected_concepts),
             "selected_uncompressed_bytes": int(selected["uncompressed_bytes"]),
         },
+        "quality_exceptions": dict(sorted(quality_exceptions.items())),
     }
     return FinancialReportingSourceAudit(report=report)
 
@@ -862,7 +929,30 @@ def combine_financial_reporting_source_audits(
             "native_report_rows": native_reports,
             "native_fact_rows": native_facts,
         },
-        "quality_exceptions": native.get("quality_exceptions", {}),
+        "quality_exceptions": dict(
+            sorted(
+                (
+                    Counter(
+                        {
+                            str(key): int(value)
+                            for key, value in _plan_mapping(
+                                statement.get("quality_exceptions", {}),
+                                "statement quality exceptions",
+                            ).items()
+                        }
+                    )
+                    + Counter(
+                        {
+                            str(key): int(value)
+                            for key, value in _plan_mapping(
+                                native.get("quality_exceptions", {}),
+                                "native quality exceptions",
+                            ).items()
+                        }
+                    )
+                ).items()
+            )
+        ),
     }
     audit = FinancialReportingSourceAudit(report=report)
     write_financial_reporting_source_audit(output, audit)
@@ -1033,7 +1123,7 @@ class FinancialCompanyResolver:
     def resolve_for_report(
         self, stock_code: str, *, period_end: date
     ) -> tuple[FinancialCompanyIdentity | None, str | None]:
-        """Resolve at report period, bridging later code changes within one company."""
+        """Resolve at report period without bridging uncovered identity intervals."""
 
         coordinate = _period_coordinate(period_end)
         code_identities = self._by_code.get(stock_code, ())
@@ -1051,49 +1141,17 @@ class FinancialCompanyResolver:
                 "financial report resolves to multiple companies at period end: "
                 f"stock_code={stock_code} period_end={period_end.isoformat()}"
             )
-        candidate_companies = {identity.company_id for identity in code_identities}
-        if not candidate_companies:
+        if not code_identities:
             return None, "NO_LISTED_COMPANY_IDENTITY"
-        if len(candidate_companies) != 1:
-            raise FinancialReportingBuildError(
-                "financial report has no unambiguous company bridge: "
-                f"stock_code={stock_code} candidate_companies={len(candidate_companies)}"
-            )
-        company_id = next(iter(candidate_companies))
-        company_identities = self._by_company[company_id]
-        active_company = [
-            identity
-            for identity in company_identities
-            if identity.effective_from <= coordinate
-            and (identity.effective_to is None or coordinate < identity.effective_to)
-        ]
-        if active_company:
-            return sorted(active_company, key=lambda item: item.security_id)[0], None
-        if coordinate < min(identity.effective_from for identity in company_identities):
-            resolved = sorted(
-                company_identities,
-                key=lambda item: (item.effective_from, item.security_id),
-            )[0]
-            return resolved, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY"
-        prior = [
-            identity for identity in company_identities if identity.effective_from <= coordinate
-        ]
-        if not prior:
-            raise FinancialReportingBuildError(
-                "financial company identity interval classification is inconsistent"
-            )
-        resolved = sorted(
-            prior, key=lambda item: (item.effective_from, item.security_id)
-        )[-1]
-        later = [
-            identity for identity in company_identities if identity.effective_from > coordinate
-        ]
+        if coordinate < min(identity.effective_from for identity in code_identities):
+            return None, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY"
+        later = [identity for identity in code_identities if identity.effective_from > coordinate]
         reason = (
             "BETWEEN_LISTED_COMPANY_IDENTITY_INTERVALS"
             if later
             else "AFTER_LAST_LISTED_COMPANY_IDENTITY"
         )
-        return resolved, reason
+        return None, reason
 
     def resolve(
         self, stock_code: str, *, period_end: date, published_at: datetime | None
@@ -1113,7 +1171,7 @@ def financial_company_resolver_from_listed_company_rows(
 ) -> FinancialCompanyResolver:
     """Build the #61 resolver from a deeply verified same-run #57 candidate."""
 
-    securities: dict[str, Mapping[str, Any]] = {}
+    securities: dict[str, list[Mapping[str, Any]]] = {}
     for row in security_rows:
         security_id = row.get("security_id")
         company_id = row.get("company_id")
@@ -1121,12 +1179,12 @@ def financial_company_resolver_from_listed_company_rows(
             raise FinancialReportingBuildError("#57 security row has no security_id")
         if not isinstance(company_id, str) or not company_id:
             raise FinancialReportingBuildError("#57 security row has no company_id")
-        prior = securities.get(security_id)
-        if prior is not None and prior.get("company_id") != company_id:
+        prior = securities.get(security_id, [])
+        if any(candidate.get("company_id") != company_id for candidate in prior):
             raise FinancialReportingBuildError(
                 f"#57 security_id resolves to more than one company: {security_id}"
             )
-        securities[security_id] = row
+        securities.setdefault(security_id, []).append(row)
     identities: list[FinancialCompanyIdentity] = []
     for row in identifier_rows:
         namespace = row.get("identifier_namespace")
@@ -1138,25 +1196,50 @@ def financial_company_resolver_from_listed_company_rows(
             raise FinancialReportingBuildError("#57 stock-code identifier is empty")
         if not isinstance(security_id, str) or security_id not in securities:
             raise FinancialReportingBuildError("#57 stock-code identifier has no security")
-        effective_from = row.get("effective_from")
-        effective_to = row.get("effective_to")
-        if not isinstance(effective_from, datetime):
+        identifier_from = row.get("effective_from")
+        identifier_to = row.get("effective_to")
+        identifier_knowledge = row.get("knowledge_from")
+        if not isinstance(identifier_from, datetime):
             raise FinancialReportingBuildError("#57 stock-code identifier lacks effective_from")
-        if effective_to is not None and not isinstance(effective_to, datetime):
+        if identifier_to is not None and not isinstance(identifier_to, datetime):
             raise FinancialReportingBuildError("#57 stock-code identifier has invalid effective_to")
-        identities.append(
-            FinancialCompanyIdentity(
-                stock_code=stock_code,
-                security_id=security_id,
-                company_id=str(securities[security_id]["company_id"]),
-                effective_from=effective_from.astimezone(timezone.utc),
-                effective_to=(
-                    effective_to.astimezone(timezone.utc)
-                    if isinstance(effective_to, datetime)
-                    else None
-                ),
+        if not isinstance(identifier_knowledge, datetime):
+            raise FinancialReportingBuildError("#57 identifier row lacks knowledge_from")
+        for security in securities[security_id]:
+            security_from = security.get("effective_from")
+            security_to = security.get("effective_to")
+            security_knowledge = security.get("knowledge_from")
+            if not isinstance(security_from, datetime):
+                raise FinancialReportingBuildError("#57 security row lacks effective_from")
+            if security_to is not None and not isinstance(security_to, datetime):
+                raise FinancialReportingBuildError("#57 security row has invalid effective_to")
+            if not isinstance(security_knowledge, datetime):
+                raise FinancialReportingBuildError("#57 security row lacks knowledge_from")
+            effective_from = max(
+                identifier_from.astimezone(timezone.utc),
+                security_from.astimezone(timezone.utc),
             )
-        )
+            ends = [
+                value.astimezone(timezone.utc)
+                for value in (identifier_to, security_to)
+                if isinstance(value, datetime)
+            ]
+            effective_to = min(ends) if ends else None
+            if effective_to is not None and effective_to <= effective_from:
+                continue
+            identities.append(
+                FinancialCompanyIdentity(
+                    stock_code=stock_code,
+                    security_id=security_id,
+                    company_id=str(security["company_id"]),
+                    effective_from=effective_from,
+                    effective_to=effective_to,
+                    knowledge_from=max(
+                        identifier_knowledge.astimezone(timezone.utc),
+                        security_knowledge.astimezone(timezone.utc),
+                    ),
+                )
+            )
     if not identities:
         raise FinancialReportingBuildError("#57 candidate has no CN stock-code identities")
     return FinancialCompanyResolver(identities)
@@ -1167,6 +1250,7 @@ def expand_financial_envelope(
     *,
     source: FinancialStatementSource,
     company_resolver: FinancialCompanyResolver,
+    through_date: date | None = None,
 ) -> FinancialEnvelopeRows:
     """Expand one losslessly decoded provider envelope into atomic #61 DWD rows."""
 
@@ -1184,6 +1268,20 @@ def expand_financial_envelope(
 
     for period, report, _accounting in iter_statement_reports(envelope):
         period_end = _report_date(period, "financial report period")
+        if through_date is not None and period_end > through_date:
+            quality_exceptions.append(
+                {
+                    "code": "AFTER_THROUGH_DATE",
+                    "stock_code": stock_code,
+                    "period_end": period_end.isoformat(),
+                    "source_record_id": (
+                        f"{source.relative_path}#stock_code={stock_code}"
+                        f"&statement_type={statement_type}&period_end={period}"
+                    ),
+                    "source_artifact_sha256": source.source_sha256,
+                }
+            )
+            continue
         published_at = conservative_provider_timestamp(report.get("publish_date"))
         company, resolution_reason = company_resolver.resolve_for_report(
             stock_code, period_end=period_end
@@ -1231,13 +1329,14 @@ def expand_financial_envelope(
             f"{source.relative_path}#stock_code={stock_code}&statement_type={statement_type}"
             f"&period_end={period}"
         )
+        row_knowledge_from = max(knowledge_from, company.knowledge_from)
         reports.append(
             {
                 "record_source": source_name,
                 "source_record_id": report_record_id,
                 "source_revision": source_revision,
                 "source_artifact_sha256": source.source_sha256,
-                "knowledge_from": knowledge_from,
+                "knowledge_from": row_knowledge_from,
                 "knowledge_to": None,
                 "period_start": None,
                 "period_end": period_end,
@@ -1284,9 +1383,9 @@ def expand_financial_envelope(
                 ),
                 "source_revision": source_revision,
                 "source_artifact_sha256": source.source_sha256,
-                "knowledge_from": knowledge_from,
+                "knowledge_from": row_knowledge_from,
                 "knowledge_to": None,
-                "effective_from": knowledge_from,
+                "effective_from": _period_coordinate(period_end),
                 "effective_to": None,
                 "financial_concept_id": concept_id,
                 "taxonomy_namespace": _TAXONOMY_NAMESPACE,
@@ -1330,13 +1429,14 @@ def expand_financial_envelope(
                     f"report={report_id} concept={concept_id} context={context_hash}"
                 )
             seen_fact_keys.add(fact_key)
+            numeric_value = _numeric_value(raw_text) if raw_text is not None else None
             facts.append(
                 {
                     "record_source": source_name,
                     "source_record_id": f"{report_record_id}&item_index={item_index}",
                     "source_revision": source_revision,
                     "source_artifact_sha256": source.source_sha256,
-                    "knowledge_from": knowledge_from,
+                    "knowledge_from": row_knowledge_from,
                     "knowledge_to": None,
                     "period_start": None,
                     "period_end": period_end,
@@ -1347,8 +1447,8 @@ def expand_financial_envelope(
                     "financial_report_id": report_id,
                     "financial_concept_id": concept_id,
                     "unit_code": unit_code,
-                    "value_decimal": _numeric_value(raw_text) if raw_text is not None else None,
-                    "value_text": raw_text,
+                    "value_decimal": numeric_value,
+                    "value_text": raw_text if numeric_value is None else None,
                     "dimensions_json": dimensions_json,
                     "context_hash": context_hash,
                     "decimals": _item_decimals(item.get("item_precision")),
@@ -1502,6 +1602,7 @@ def expand_financial_native_row(
     source: FinancialReportingSource,
     company_resolver: FinancialCompanyResolver,
     knowledge_cutoff: datetime,
+    through_date: date | None = None,
 ) -> FinancialEnvelopeRows:
     """Expand one quarterly projection or abstract row without cross-source coalescing."""
 
@@ -1509,21 +1610,34 @@ def expand_financial_native_row(
         raise FinancialReportingBuildError("native-row adapter received a statement envelope")
     if knowledge_cutoff.tzinfo is None or knowledge_cutoff.utcoffset() is None:
         raise FinancialReportingBuildError("financial knowledge cutoff must include a timezone")
-    namespace, report_type, fields, statement_scope, period_type = _native_source_contract(
-        source
-    )
+    namespace, report_type, fields, statement_scope, period_type = _native_source_contract(source)
     stock_value = row.get("stock_code", row.get("code"))
     stock_code = _provider_text(stock_value, "")
     if not re.fullmatch(r"\d{6}", stock_code):
         raise FinancialReportingBuildError("native financial row has an invalid stock code")
     period_end = _native_report_date(row.get("report_date"))
-    company, resolution_reason = company_resolver.resolve_for_report(
-        stock_code, period_end=period_end
-    )
     source_record_id = (
         f"{source.relative_path}"
         + (f"#table={source.member}" if source.member is not None else "")
         + f"#stock_code={stock_code}&period_end={period_end.isoformat()}"
+    )
+    if through_date is not None and period_end > through_date:
+        return FinancialEnvelopeRows(
+            (),
+            (),
+            (),
+            (
+                {
+                    "code": "AFTER_THROUGH_DATE",
+                    "stock_code": stock_code,
+                    "period_end": period_end.isoformat(),
+                    "source_record_id": source_record_id,
+                    "source_artifact_sha256": source.source_sha256,
+                },
+            ),
+        )
+    company, resolution_reason = company_resolver.resolve_for_report(
+        stock_code, period_end=period_end
     )
     if company is None:
         return FinancialEnvelopeRows(
@@ -1552,15 +1666,14 @@ def expand_financial_native_row(
             },
         )
     acquired_at = row.get("acquired_at")
-    knowledge_from = (
+    source_knowledge_from = (
         _utc_timestamp(acquired_at, "native financial acquired_at")
         if acquired_at not in {None, ""}
         else knowledge_cutoff.astimezone(timezone.utc)
     )
+    knowledge_from = max(source_knowledge_from, company.knowledge_from)
     published_at = (
-        conservative_provider_timestamp(row.get("publish_date"))
-        if "publish_date" in row
-        else None
+        conservative_provider_timestamp(row.get("publish_date")) if "publish_date" in row else None
     )
     source_name = _provider_text(row.get("source"), namespace)
     source_revision = _provider_text(row.get("source_revision"), source.source_revision)
@@ -1588,18 +1701,13 @@ def expand_financial_native_row(
         "report_type": report_type,
         "statement_scope": statement_scope,
         "accounting_standard": "PROVIDER_NATIVE_UNSPECIFIED",
-        "audit_status": _provider_text(
-            row.get("audit_opinion", row.get("is_audit")), ""
-        )
-        or None,
+        "audit_status": _provider_text(row.get("audit_opinion", row.get("is_audit")), "") or None,
         "restatement_flag": False,
     }
     concepts: list[dict[str, Any]] = []
     facts: list[dict[str, Any]] = []
     for field in fields:
-        concept_id = _stable_id(
-            "financial_concept", namespace, source_revision, report_type, field
-        )
+        concept_id = _stable_id("financial_concept", namespace, source_revision, report_type, field)
         unit_code = _native_unit(field, currency)
         dimensions_json = _canonical_json(
             {
@@ -1616,9 +1724,7 @@ def expand_financial_native_row(
         )
         context_hash = _context_hash(dimensions_json)
         raw_value = row.get(field)
-        is_nil = raw_value is None or (
-            isinstance(raw_value, str) and not raw_value.strip()
-        )
+        is_nil = raw_value is None or (isinstance(raw_value, str) and not raw_value.strip())
         raw_text = None if is_nil else str(raw_value)
         concepts.append(
             {
@@ -1628,7 +1734,7 @@ def expand_financial_native_row(
                 "source_artifact_sha256": source.source_sha256,
                 "knowledge_from": knowledge_from,
                 "knowledge_to": None,
-                "effective_from": knowledge_from,
+                "effective_from": _period_coordinate(period_end),
                 "effective_to": None,
                 "financial_concept_id": concept_id,
                 "taxonomy_namespace": namespace,
@@ -1641,6 +1747,7 @@ def expand_financial_native_row(
                 "balance_type": None,
             }
         )
+        numeric_value = _numeric_value(raw_text) if raw_text is not None else None
         facts.append(
             {
                 "record_source": source_name,
@@ -1658,17 +1765,15 @@ def expand_financial_native_row(
                 "financial_report_id": report_id,
                 "financial_concept_id": concept_id,
                 "unit_code": unit_code,
-                "value_decimal": _numeric_value(raw_text) if raw_text is not None else None,
-                "value_text": raw_text,
+                "value_decimal": numeric_value,
+                "value_text": raw_text if numeric_value is None else None,
                 "dimensions_json": dimensions_json,
                 "context_hash": context_hash,
                 "decimals": None,
                 "is_nil": is_nil,
             }
         )
-    return FinancialEnvelopeRows(
-        (report,), tuple(concepts), tuple(facts), quality_exceptions
-    )
+    return FinancialEnvelopeRows((report,), tuple(concepts), tuple(facts), quality_exceptions)
 
 
 def _iter_financial_native_rows(
@@ -1683,9 +1788,7 @@ def _iter_financial_native_rows(
             ) from exc
         parquet = pq.ParquetFile(source.path)
         required = {"stock_code", "report_date"}
-        _namespace, _report_type, fields, _scope, _period_type = _native_source_contract(
-            source
-        )
+        _namespace, _report_type, fields, _scope, _period_type = _native_source_contract(source)
         required.update(fields)
         if source.source_id != "canonical_financial_quarterly":
             required.update(
@@ -1718,9 +1821,7 @@ def _iter_financial_native_rows(
         raise FinancialReportingBuildError("cannot open financial abstract archive") from exc
     try:
         columns = ["code", "report_date", *_FINANCIAL_ABSTRACT_FIELDS]
-        present = {
-            str(row[1]) for row in connection.execute("PRAGMA table_info(fin_abstract)")
-        }
+        present = {str(row[1]) for row in connection.execute("PRAGMA table_info(fin_abstract)")}
         missing = sorted(set(columns).difference(present))
         if missing:
             raise FinancialReportingBuildError(
@@ -1744,6 +1845,7 @@ def audit_financial_native_sources(
     *,
     company_resolver: FinancialCompanyResolver,
     knowledge_cutoff: datetime,
+    through_date: date | None = None,
     batch_size: int = 4096,
 ) -> FinancialReportingSourceAudit:
     """Validate all lightweight financial sources and calibrate their DWD output."""
@@ -1813,9 +1915,7 @@ def audit_financial_native_sources(
                 parent_digests[key] = quarterly_digest(row)
             elif source.source_id == "hotfix_financial_quarterly":
                 if key in hotfix_keys:
-                    raise FinancialReportingBuildError(
-                        f"duplicate quarterly Hotfix key: {key}"
-                    )
+                    raise FinancialReportingBuildError(f"duplicate quarterly Hotfix key: {key}")
                 hotfix_keys.add(key)
                 if key in parent_digests:
                     overlap_rows += 1
@@ -1834,6 +1934,7 @@ def audit_financial_native_sources(
                 source=source,
                 company_resolver=company_resolver,
                 knowledge_cutoff=knowledge_cutoff,
+                through_date=through_date,
             )
             output_reports += len(expanded.reports)
             output_facts += len(expanded.facts)
@@ -1890,6 +1991,8 @@ _OWNED_TABLES = (
 )
 _PARTITIONED_TABLES = ("dwd_financial_report", "dwd_financial_fact")
 _FINANCIAL_BUILDER_CONTRACT = "financial-reporting-six-source-v2"
+
+
 @dataclass(frozen=True)
 class FinancialReportingBuildResult:
     """A sealed, non-published financial-reporting candidate."""
@@ -2054,6 +2157,7 @@ def _candidate_identity(
     FinancialCompanyResolver,
     dict[str, Any],
     datetime,
+    date,
 ]:
     """Verify all governed inputs before any financial candidate write."""
 
@@ -2110,9 +2214,7 @@ def _candidate_identity(
         "model_sha256": model_sha,
         "listed_company_manifest_sha256": upstream.manifest_sha256,
         "listed_company_semantic_digest": upstream.semantic_digest,
-        "source_sha256": {
-            source.source_id: source.source_sha256 for source in inventory.sources
-        },
+        "source_sha256": {source.source_id: source.source_sha256 for source in inventory.sources},
     }
     if any(audit.get(field) != value for field, value in expected_bindings.items()):
         raise FinancialReportingBuildError("financial combined audit binding differs")
@@ -2122,10 +2224,9 @@ def _candidate_identity(
         "source_audit_sha256": audit_sha,
         "builder_contract": _FINANCIAL_BUILDER_CONTRACT,
     }
-    cutoff = _utc_timestamp(
-        semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff"
-    )
-    return identity, inventory, resolver, audit, cutoff
+    cutoff = _utc_timestamp(semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff")
+    through_date = _report_date(semantic_plan.get("through_date"), "financial through_date")
+    return identity, inventory, resolver, audit, cutoff, through_date
 
 
 def audit_financial_native_source_package(
@@ -2152,9 +2253,7 @@ def audit_financial_native_source_package(
     if plan.get("run_id") != run_id or semantic_plan.get("mode") != "base":
         raise FinancialReportingBuildError("financial native audit must match one Base run")
     model_sha = _sha256(model_path)
-    if _plan_mapping(semantic_plan.get("model"), "input plan model").get(
-        "sha256"
-    ) != model_sha:
+    if _plan_mapping(semantic_plan.get("model"), "input plan model").get("sha256") != model_sha:
         raise FinancialReportingBuildError("financial model differs from sealed input plan")
     _verify_financial_model(model)
     input_plan_digest = _text(plan.get("plan_digest"), "input plan digest")
@@ -2179,21 +2278,19 @@ def audit_financial_native_source_package(
     identifier_rows = pq.read_table(
         listed_company_candidate / "payload/listed_company/dwd_security_identifier.parquet"
     ).to_pylist()
-    resolver = financial_company_resolver_from_listed_company_rows(
-        security_rows, identifier_rows
-    )
+    resolver = financial_company_resolver_from_listed_company_rows(security_rows, identifier_rows)
     records = [
         _plan_mapping(value, "source ledger record")
         for value in _plan_sequence(ledger.get("records"), "source ledger records")
     ]
     inventory = select_financial_reporting_sources(records, ods_package)
-    cutoff = _utc_timestamp(
-        semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff"
-    )
+    cutoff = _utc_timestamp(semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff")
+    through_date = _report_date(semantic_plan.get("through_date"), "financial through_date")
     audit = audit_financial_native_sources(
         inventory,
         company_resolver=resolver,
         knowledge_cutoff=cutoff,
+        through_date=through_date,
         batch_size=batch_size,
     )
     audit.report.update(
@@ -2265,6 +2362,7 @@ def _reporting_batch_rows(
     source: FinancialReportingSource,
     resolver: FinancialCompanyResolver,
     knowledge_cutoff: datetime,
+    through_date: date | None = None,
 ) -> tuple[
     dict[str, dict[int, list[dict[str, Any]]]],
     list[dict[str, Any]],
@@ -2294,7 +2392,10 @@ def _reporting_batch_rows(
     for row in rows:
         if statement_source is not None:
             expanded = expand_financial_envelope(
-                row, source=statement_source, company_resolver=resolver
+                row,
+                source=statement_source,
+                company_resolver=resolver,
+                through_date=through_date,
             )
         else:
             expanded = expand_financial_native_row(
@@ -2302,20 +2403,17 @@ def _reporting_batch_rows(
                 source=source,
                 company_resolver=resolver,
                 knowledge_cutoff=knowledge_cutoff,
+                through_date=through_date,
             )
         for report in expanded.reports:
-            rows_by_year["dwd_financial_report"][report["period_end"].year].append(
-                report
-            )
+            rows_by_year["dwd_financial_report"][report["period_end"].year].append(report)
         for fact in expanded.facts:
             rows_by_year["dwd_financial_fact"][fact["period_end"].year].append(fact)
         for concept in expanded.concepts:
             concepts_by_id.setdefault(str(concept["financial_concept_id"]), concept)
         row_counts["dwd_financial_report"] += len(expanded.reports)
         row_counts["dwd_financial_fact"] += len(expanded.facts)
-        exception_counts.update(
-            str(exception["code"]) for exception in expanded.quality_exceptions
-        )
+        exception_counts.update(str(exception["code"]) for exception in expanded.quality_exceptions)
     concepts = [concepts_by_id[key] for key in sorted(concepts_by_id)]
     row_counts["dwd_financial_concept"] = len(concepts)
     return rows_by_year, concepts, row_counts, dict(sorted(exception_counts.items()))
@@ -2331,9 +2429,7 @@ def _iter_reporting_source_batches(
             raise FinancialReportingBuildError(
                 "pyarrow is required for financial DWD rows"
             ) from exc
-        for batch in pq.ParquetFile(source.path).iter_batches(
-            batch_size=statement_batch_size
-        ):
+        for batch in pq.ParquetFile(source.path).iter_batches(batch_size=statement_batch_size):
             yield [dict(row) for row in batch.to_pylist()]
         return
     batch: list[dict[str, Any]] = []
@@ -2429,12 +2525,17 @@ def _finalize_concepts(work: Path, checkpoint: dict[str, Any], schemas: Mapping[
             raise FinancialReportingBuildError("financial concept has conflicting source semantics")
         concept_table = connection.execute(
             """
-            SELECT * EXCLUDE (ordinality)
+            SELECT * EXCLUDE (ordinality, earliest_effective_from)
+              REPLACE (earliest_effective_from AS effective_from)
             FROM (
-              SELECT *, ROW_NUMBER() OVER (
-                PARTITION BY financial_concept_id
-                ORDER BY knowledge_from, source_record_id, source_artifact_sha256
-              ) AS ordinality
+              SELECT *,
+                MIN(effective_from) OVER (
+                  PARTITION BY financial_concept_id
+                ) AS earliest_effective_from,
+                ROW_NUMBER() OVER (
+                  PARTITION BY financial_concept_id
+                  ORDER BY knowledge_from, source_record_id, source_artifact_sha256
+                ) AS ordinality
               FROM concept_stage
             )
             WHERE ordinality = 1
@@ -2513,21 +2614,17 @@ def _audit_financial_candidate(
                 partitions[int(matched.group(1))].append(path)
             return dict(sorted(partitions.items()))
 
-        report_partitions = year_partitions(
-            paths["dwd_financial_report"], "dwd_financial_report"
-        )
-        fact_partitions = year_partitions(
-            paths["dwd_financial_fact"], "dwd_financial_fact"
-        )
+        report_partitions = year_partitions(paths["dwd_financial_report"], "dwd_financial_report")
+        fact_partitions = year_partitions(paths["dwd_financial_fact"], "dwd_financial_fact")
         missing_report_years = sorted(set(fact_partitions).difference(report_partitions))
         if missing_report_years:
             raise FinancialReportingBuildError(
                 "financial fact partitions have no report partition: "
                 + ",".join(str(year) for year in missing_report_years)
             )
-        connection.from_parquet(
-            [str(path) for path in paths["dwd_financial_concept"]]
-        ).create_view("dwd_financial_concept")
+        connection.from_parquet([str(path) for path in paths["dwd_financial_concept"]]).create_view(
+            "dwd_financial_concept"
+        )
         null_counts = {
             "dwd_financial_report": 0,
             "dwd_financial_concept": int(
@@ -2582,9 +2679,7 @@ def _audit_financial_candidate(
             null_counts["dwd_financial_report"] += report_nulls
             duplicate_reports += report_duplicates
             partition_audit[str(year)] = {
-                "report_rows": sum(
-                    pq.ParquetFile(path).metadata.num_rows for path in report_paths
-                ),
+                "report_rows": sum(pq.ParquetFile(path).metadata.num_rows for path in report_paths),
                 "fact_rows": 0,
                 "null_report_keys": report_nulls,
                 "null_fact_keys": 0,
@@ -2597,9 +2692,9 @@ def _audit_financial_candidate(
             connection.from_parquet([str(path) for path in fact_paths]).create_view(
                 "financial_fact_partition", replace=True
             )
-            connection.from_parquet(
-                [str(path) for path in report_partitions[year]]
-            ).create_view("financial_report_partition", replace=True)
+            connection.from_parquet([str(path) for path in report_partitions[year]]).create_view(
+                "financial_report_partition", replace=True
+            )
             fact_nulls = int(
                 connection.execute(
                     """
@@ -2648,9 +2743,7 @@ def _audit_financial_candidate(
             year_audit = partition_audit[str(year)]
             year_audit.update(
                 {
-                    "fact_rows": sum(
-                        pq.ParquetFile(path).metadata.num_rows for path in fact_paths
-                    ),
+                    "fact_rows": sum(pq.ParquetFile(path).metadata.num_rows for path in fact_paths),
                     "null_fact_keys": fact_nulls,
                     "duplicate_fact_keys": fact_duplicates,
                     "orphan_report_ids": report_orphans,
@@ -2795,7 +2888,14 @@ def _build_financial_reporting_locked(
 ) -> FinancialReportingBuildResult:
     if source_batch_size < 1 or native_batch_size < 1:
         raise FinancialReportingBuildError("financial source batch sizes must be positive")
-    identity, inventory, resolver, source_audit, knowledge_cutoff = _candidate_identity(
+    (
+        identity,
+        inventory,
+        resolver,
+        source_audit,
+        knowledge_cutoff,
+        through_date,
+    ) = _candidate_identity(
         ods_package=ods_package,
         input_plan=input_plan,
         model_path=model_path,
@@ -2841,9 +2941,7 @@ def _build_financial_reporting_locked(
             )
         }
         return hashlib.sha256(
-            json.dumps(payload, ensure_ascii=True, sort_keys=True, default=str).encode(
-                "utf-8"
-            )
+            json.dumps(payload, ensure_ascii=True, sort_keys=True, default=str).encode("utf-8")
         ).hexdigest()
 
     for source_index, source in enumerate(inventory.sources):
@@ -2857,9 +2955,7 @@ def _build_financial_reporting_locked(
             for row in raw_rows:
                 if source.source_kind == "statement_envelope":
                     key = _row_identity(row)
-                    payload_digest = _text(
-                        row.get("raw_payload_sha256"), "raw_payload_sha256"
-                    )
+                    payload_digest = _text(row.get("raw_payload_sha256"), "raw_payload_sha256")
                     if source.precedence == "parent":
                         if key in parent_payloads:
                             raise FinancialReportingBuildError(
@@ -2933,6 +3029,7 @@ def _build_financial_reporting_locked(
                 source=source,
                 resolver=resolver,
                 knowledge_cutoff=knowledge_cutoff,
+                through_date=through_date,
             )
             files = _write_batch(
                 work=work,
@@ -2956,10 +3053,9 @@ def _build_financial_reporting_locked(
     calibration = _plan_mapping(
         source_audit.get("candidate_size_calibration"), "financial source audit calibration"
     )
-    if (
-        totals["dwd_financial_report"] != calibration.get("dwd_financial_report_rows")
-        or totals["dwd_financial_fact"] != calibration.get("dwd_financial_fact_rows")
-    ):
+    if totals["dwd_financial_report"] != calibration.get("dwd_financial_report_rows") or totals[
+        "dwd_financial_fact"
+    ] != calibration.get("dwd_financial_fact_rows"):
         raise FinancialReportingBuildError("financial build does not reconcile to source audit")
     concept_count = _finalize_concepts(work, checkpoint, schemas)
     row_counts, reconciliation = _audit_financial_candidate(

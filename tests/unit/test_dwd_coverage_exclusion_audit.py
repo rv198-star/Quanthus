@@ -1,17 +1,31 @@
-import json
 import importlib.util
+import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from quanthus.pipelines.dwd_coverage_exclusion_audit import (
+    _business_date,
     _canonical_digest,
     audit_dwd_coverage_exclusions,
 )
 
 
 class DwdCoverageExclusionAuditTests(unittest.TestCase):
-    @unittest.skipUnless(importlib.util.find_spec("pyarrow"), "pyarrow is required for coverage scan")
+    def test_through_date_coordinates_use_shanghai_business_date(self) -> None:
+        self.assertEqual(
+            _business_date(datetime(2026, 7, 31, 16, 0, tzinfo=timezone.utc)).isoformat(),
+            "2026-08-01",
+        )
+        self.assertEqual(
+            _business_date(datetime(2026, 7, 31, 15, 59, tzinfo=timezone.utc)).isoformat(),
+            "2026-07-31",
+        )
+
+    @unittest.skipUnless(
+        importlib.util.find_spec("pyarrow"), "pyarrow is required for coverage scan"
+    )
     def test_plan_and_inventory_are_reported_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -33,8 +47,27 @@ class DwdCoverageExclusionAuditTests(unittest.TestCase):
             )
             for name, value in {
                 "input-plan.json": {"run_id": "run", "plan_digest": "sha256:" + "2" * 64},
-                "coverage-matrix.json": {"domains": [{"domain": "listed_company", "status": "complete", "missing_source_tables": [], "source_gaps": []}]},
-                "source-disposition-ledger.json": {"records": [{"dataset_id": "excluded", "disposition": "deferred", "reason": "outside scope", "target_tables": [], "row_count": 1}]},
+                "coverage-matrix.json": {
+                    "domains": [
+                        {
+                            "domain": "listed_company",
+                            "status": "complete",
+                            "missing_source_tables": [],
+                            "source_gaps": [],
+                        }
+                    ]
+                },
+                "source-disposition-ledger.json": {
+                    "records": [
+                        {
+                            "dataset_id": "excluded",
+                            "disposition": "deferred",
+                            "reason": "outside scope",
+                            "target_tables": [],
+                            "row_count": 1,
+                        }
+                    ]
+                },
                 "capacity-estimate.json": {"environment": {"capacity_sufficient": True}},
             }.items():
                 (plan / name).write_text(json.dumps(value), encoding="ascii")
@@ -43,7 +76,10 @@ class DwdCoverageExclusionAuditTests(unittest.TestCase):
             model.write_text(
                 json.dumps(
                     {
-                        "tables": [{"name": name, "time_profile": "effective_interval"} for name in table_names],
+                        "tables": [
+                            {"name": name, "time_profile": "effective_interval"}
+                            for name in table_names
+                        ],
                         "time_profiles": {"effective_interval": {"effective_from": "timestamp"}},
                     }
                 ),

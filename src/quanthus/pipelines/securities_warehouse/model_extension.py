@@ -32,8 +32,9 @@ def verify_additive_model_extension(
 ) -> tuple[dict[str, Any], str]:
     """Return a verified extension and its digest.
 
-    The extension may add columns only to tables owned by its declared unbuilt
-    issue owners. It cannot replace an existing column or introduce a new table.
+    The extension may add columns and append those new columns to business keys
+    only on tables owned by its declared unbuilt issue owners. It cannot replace
+    an existing column or introduce a new table.
     """
 
     base = _object(base_path)
@@ -43,16 +44,14 @@ def verify_additive_model_extension(
         or extension.get("base_contract_id") != base.get("contract_id")
         or extension.get("base_model_sha256") != _sha256(base_path)
         or extension.get("compatibility")
-        != "additive_columns_on_unbuilt_issue_63_and_64_objects_only"
+        != "additive_columns_and_bounded_business_keys_on_unbuilt_issue_63_and_64_objects_only"
     ):
         raise ModelExtensionError("model extension is not bound to the exact base model")
     owners = extension.get("allowed_issue_owners")
     if owners != [63, 64]:
         raise ModelExtensionError("model extension owner scope differs")
     ownership = base.get("build_execution_contract", {}).get("dwd_script_ownership", {})
-    allowed_tables = {
-        table for issue in owners for table in ownership.get(str(issue), [])
-    }
+    allowed_tables = {table for issue in owners for table in ownership.get(str(issue), [])}
     base_tables = {
         table.get("name"): table
         for table in base.get("tables", [])
@@ -77,4 +76,13 @@ def verify_additive_model_extension(
             for column, kind in additions.items()
         ):
             raise ModelExtensionError(f"model extension has invalid columns: {name}")
+        key_append = raw.get("business_key_append", [])
+        if (
+            not isinstance(key_append, list)
+            or any(not isinstance(column, str) or not column for column in key_append)
+            or len(key_append) != len(set(key_append))
+            or not set(key_append).issubset(additions)
+            or set(key_append).intersection(base_tables[name].get("business_key", []))
+        ):
+            raise ModelExtensionError(f"model extension has invalid business key append: {name}")
     return extension, _sha256(extension_path)

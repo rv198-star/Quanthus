@@ -551,12 +551,10 @@ class FinancialEnvelopeTests(unittest.TestCase):
         self.assertEqual(len(expanded.facts), 5)
         self.assertEqual(expanded.reports[0]["company_id"], "company-1")
         self.assertEqual(expanded.facts[0]["value_decimal"], Decimal("12.500000"))
-        self.assertEqual(expanded.facts[0]["value_text"], "12.500000")
+        self.assertIsNone(expanded.facts[0]["value_text"])
         self.assertIsNone(expanded.facts[2]["value_decimal"])
         self.assertTrue(expanded.facts[3]["is_nil"])
-        self.assertNotEqual(
-            expanded.facts[0]["context_hash"], expanded.facts[4]["context_hash"]
-        )
+        self.assertNotEqual(expanded.facts[0]["context_hash"], expanded.facts[4]["context_hash"])
         cash_concepts = {
             concept["financial_concept_id"]
             for concept in expanded.concepts
@@ -760,7 +758,7 @@ class FinancialEnvelopeTests(unittest.TestCase):
             company_resolver=resolver,
             knowledge_cutoff=cutoff,
         )
-        self.assertEqual(len(before_listing.reports), 1)
+        self.assertEqual(len(before_listing.reports), 0)
         self.assertEqual(
             before_listing.quality_exceptions[0]["code"],
             "BEFORE_FIRST_LISTED_COMPANY_IDENTITY",
@@ -855,9 +853,7 @@ class FinancialEnvelopeTests(unittest.TestCase):
                 )
             ]
             with sqlite3.connect(archive_path) as connection:
-                connection.execute(
-                    f"CREATE TABLE fin_abstract ({', '.join(abstract_columns)})"
-                )
+                connection.execute(f"CREATE TABLE fin_abstract ({', '.join(abstract_columns)})")
                 connection.execute(
                     "INSERT INTO fin_abstract (code, report_date, revenue) VALUES (?, ?, ?)",
                     ("000001", "2025-12-31", 100.0),
@@ -910,9 +906,7 @@ class FinancialEnvelopeTests(unittest.TestCase):
                     "fin_abstract",
                 ),
             )
-            inventory = FinancialReportingSourceInventory(
-                sources=sources, empty_modeled_sources=()
-            )
+            inventory = FinancialReportingSourceInventory(sources=sources, empty_modeled_sources=())
             resolver = FinancialCompanyResolver(
                 [
                     FinancialCompanyIdentity(
@@ -942,8 +936,8 @@ class FinancialEnvelopeTests(unittest.TestCase):
             self.assertEqual(
                 audit.report["candidate_size_calibration"],
                 {
-                    "dwd_financial_report_rows": 5,
-                    "dwd_financial_fact_rows": 44,
+                    "dwd_financial_report_rows": 4,
+                    "dwd_financial_fact_rows": 39,
                     "dwd_financial_concept_count": 36,
                     "quality_exception_rows": 1,
                 },
@@ -952,15 +946,25 @@ class FinancialEnvelopeTests(unittest.TestCase):
                 audit.report["quality_exceptions"],
                 {"BEFORE_FIRST_LISTED_COMPANY_IDENTITY": 1},
             )
-            self.assertEqual(
-                audit.report["quarterly_overlay"]["hotfix_fill_rows"], 1
-            )
+            self.assertEqual(audit.report["quarterly_overlay"]["hotfix_fill_rows"], 1)
 
     def test_company_resolver_accepts_multiple_same_company_security_versions(self) -> None:
         resolver = financial_company_resolver_from_listed_company_rows(
             [
-                {"security_id": "security-1", "company_id": "company-1"},
-                {"security_id": "security-1", "company_id": "company-1"},
+                {
+                    "security_id": "security-1",
+                    "company_id": "company-1",
+                    "effective_from": datetime(1999, 1, 1, tzinfo=timezone.utc),
+                    "effective_to": datetime(2010, 1, 1, tzinfo=timezone.utc),
+                    "knowledge_from": datetime(2026, 7, 31, tzinfo=timezone.utc),
+                },
+                {
+                    "security_id": "security-1",
+                    "company_id": "company-1",
+                    "effective_from": datetime(2010, 1, 1, tzinfo=timezone.utc),
+                    "effective_to": None,
+                    "knowledge_from": datetime(2026, 8, 1, tzinfo=timezone.utc),
+                },
             ],
             [
                 {
@@ -969,6 +973,7 @@ class FinancialEnvelopeTests(unittest.TestCase):
                     "identifier_value": "600000",
                     "effective_from": datetime(1999, 1, 1, tzinfo=timezone.utc),
                     "effective_to": None,
+                    "knowledge_from": datetime(2026, 7, 30, tzinfo=timezone.utc),
                 }
             ],
         )
@@ -979,7 +984,7 @@ class FinancialEnvelopeTests(unittest.TestCase):
         )
         self.assertEqual(resolved.company_id, "company-1")
 
-    def test_company_resolver_bridges_a_later_code_to_the_same_historical_company(self) -> None:
+    def test_company_resolver_does_not_bridge_a_later_code_backward(self) -> None:
         resolver = FinancialCompanyResolver(
             [
                 FinancialCompanyIdentity(
@@ -1003,14 +1008,12 @@ class FinancialEnvelopeTests(unittest.TestCase):
             "001872", period_end=datetime(2010, 12, 31, tzinfo=timezone.utc).date()
         )
 
-        self.assertIsNone(reason)
-        self.assertIsNotNone(resolved)
-        self.assertEqual(resolved.security_id, "security-old")
+        self.assertIsNone(resolved)
+        self.assertEqual(reason, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY")
         outside, reason = resolver.resolve_for_report(
             "001872", period_end=datetime(1990, 12, 31, tzinfo=timezone.utc).date()
         )
-        self.assertIsNotNone(outside)
-        self.assertEqual(outside.company_id, "company-1")
+        self.assertIsNone(outside)
         self.assertEqual(reason, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY")
 
     def test_company_resolver_classifies_report_between_listing_intervals(self) -> None:
@@ -1037,9 +1040,8 @@ class FinancialEnvelopeTests(unittest.TestCase):
             "001267", period_end=datetime(2011, 3, 31, tzinfo=timezone.utc).date()
         )
 
-        self.assertIsNotNone(resolved)
-        self.assertEqual(resolved.company_id, "company-1")
-        self.assertEqual(reason, "BETWEEN_LISTED_COMPANY_IDENTITY_INTERVALS")
+        self.assertIsNone(resolved)
+        self.assertEqual(reason, "BEFORE_FIRST_LISTED_COMPANY_IDENTITY")
 
     def test_company_resolver_classifies_an_uncovered_code(self) -> None:
         resolver = FinancialCompanyResolver([])
@@ -1091,11 +1093,11 @@ class FinancialEnvelopeTests(unittest.TestCase):
             knowledge_cutoff=datetime(2026, 8, 1, tzinfo=timezone.utc),
         )
 
-        self.assertEqual(counts["dwd_financial_report"], 1)
-        self.assertEqual(counts["dwd_financial_fact"], 5)
-        self.assertEqual(counts["dwd_financial_concept"], 5)
-        self.assertEqual(len(concepts), 5)
-        self.assertEqual(len(rows_by_year["dwd_financial_fact"][1990]), 5)
+        self.assertEqual(counts["dwd_financial_report"], 0)
+        self.assertEqual(counts["dwd_financial_fact"], 0)
+        self.assertEqual(counts["dwd_financial_concept"], 0)
+        self.assertEqual(len(concepts), 0)
+        self.assertTrue(all(not partitions for partitions in rows_by_year.values()))
         self.assertEqual(exceptions, {"BEFORE_FIRST_LISTED_COMPANY_IDENTITY": 1})
 
     def test_writes_partitioned_rows_and_runs_external_key_audit(self) -> None:
@@ -1179,9 +1181,7 @@ class FinancialEnvelopeTests(unittest.TestCase):
                 "dwd_financial_fact": 0,
             },
         )
-        self.assertEqual(
-            audit["audit_policy"], "duckdb_year_partitioned_external_audit_v2"
-        )
+        self.assertEqual(audit["audit_policy"], "duckdb_year_partitioned_external_audit_v2")
         self.assertEqual(audit["year_partitions"]["2025"]["report_rows"], 1)
         self.assertEqual(audit["year_partitions"]["2025"]["fact_rows"], 2)
 

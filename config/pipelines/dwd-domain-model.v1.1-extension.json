@@ -3,7 +3,7 @@
   "contract_id": "quanthus-product-bounded-a-share-dwd-dws-model-v1.1-extension",
   "base_contract_id": "quanthus-product-bounded-a-share-dwd-dws-model-v1",
   "base_model_sha256": "sha256:7ccfbebbe8f06622363228cfa85abca23adb1b4ff8f5fff8c6c07cbc8d633dd7",
-  "compatibility": "additive_columns_on_unbuilt_issue_63_and_64_objects_only",
+  "compatibility": "additive_columns_and_bounded_business_keys_on_unbuilt_issue_63_and_64_objects_only",
   "allowed_issue_owners": [63, 64],
   "table_extensions": {
     "dwd_share_capital_observation": {
@@ -36,6 +36,7 @@
       }
     },
     "dwd_shareholding_observation": {
+      "business_key_append": ["holder_rank"],
       "columns": {
         "holder_match_key": "string",
         "table_kind": "string",

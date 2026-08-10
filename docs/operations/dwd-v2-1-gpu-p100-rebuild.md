@@ -27,16 +27,21 @@ Repository wrappers call production Python modules and emit structured receipts:
    then pauses at `awaiting-pilot-acceptance`.
 3. The exact pilot receipt approval is frozen in
    `docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-pilot-approval-20260808.json`.
-4. `build-dwd-v2-1-rebuild` creates a distinct revision-bound full-build run. It verifies the
-   accepted pilot approval and source receipts, repeats the deep preflight under `full_build`
-   authority, freezes a new plan, executes the nine-domain DAG sequentially, and deeply verifies
-   every immutable checkpoint before continuing.
+4. `build-dwd-v2-1-rebuild` creates a distinct revision-bound repair run. It verifies the accepted
+   pilot receipts and the r11 post-build audit authority, repeats the deep preflight under
+   `full_build` authority, and freezes a data-compatible new plan. It then deep-verifies and
+   hard-links the five reusable r11 domain candidates into current-run import wrappers, rebuilds
+   only financial reporting, disclosure/company event, ownership/capital, and quality governance,
+   and verifies every immutable checkpoint before continuing. The r11 candidates and manifests
+   remain unchanged.
 5. The same full-build runtime hard-links the nine verified domain candidates into a 33-table
    export, writes its manifest and `READY`, and deeply verifies it. It then runs five checkpointed
    successor-candidate audits: physical schema and partitions, semantic contracts, domain
-   invariants, coverage and exclusions, and lineage authority. Only five sealed `verified` reports
-   advance the run to `awaiting-candidate-approval`; a finding or report drift fails closed. The
-   runtime calls the pointerless seal API and cannot create or change a `CURRENT` descriptor.
+   invariants, coverage and exclusions, and lineage authority. All five reports are collected even
+   when an earlier report has findings; only five sealed `verified` reports advance the run to
+   `awaiting-candidate-approval`. The aggregate fails closed after evidence collection when any
+   report has a finding or drift. The runtime calls the pointerless seal API and cannot create or
+   change a `CURRENT` descriptor.
 6. `import-dwd-v2-1-candidate` runs on CN01 after separate implementation and authorization. It
    pulls only manifest-declared bytes into `/personal`,
    deep-verifies them, rechecks local capacity, and prepares hidden local ingress.
@@ -91,6 +96,9 @@ After the exact full-build revision is approved, install
 `ops/systemd/gpu-p100-dwd-full-build.env.example` as the node environment and replace its revision
 and run placeholders. The new run id must contain the first eight characters of the approved
 revision. Keep `QUANTHUS_DWD_RESUME_AUTHORIZED=0` for the first start.
+Set `QUANTHUS_DWD_REUSE_RUN_ID` to the exact r11 run named in the checked-in environment example.
+The runtime rejects a different reuse source, a changed audit summary, or an r11 plan whose ODS,
+model, cutoff, source ledger, coverage matrix, or domain plan differs from the new plan.
 
 Install and start the bounded service:
 
@@ -103,7 +111,8 @@ sudo systemctl start quanthus-dwd-v2-1-full-build.service
 The service is sequential, network-isolated, limited to two CPUs and 12 GiB, and has
 `Restart=no`. All temporary directories are pinned below `runs/<run-id>/scratch/full-build` on the
 ext4 workspace. Build and audit checkpoints allow an explicitly authorized later invocation to
-continue without repeating verified domains or completed audit tables. Normal success is the
+continue without reimporting verified domains, rebuilding completed repair domains, or repeating
+completed audit tables. Normal success is the
 paused `awaiting-candidate-approval` phase with five candidate-audit digests in its receipt, not
 installation.
 

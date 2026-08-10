@@ -19,6 +19,9 @@ from quanthus.pipelines.dwd_execution_resources import (
     configure_duckdb_threads,
     dwd_duckdb_memory_limit_mb,
 )
+from quanthus.pipelines.securities_warehouse.domain_base import (
+    verify_imported_domain_candidate,
+)
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
     verify_listed_company_candidate,
@@ -1246,9 +1249,7 @@ def _audit_outputs(
         raise TradabilityStateBuildError(
             f"output key audit failed: duplicates={duplicates}, nulls={null_keys}"
         )
-    state_rows = sum(
-        int(partition["row_count"]) for partition in states["dwd_tradability_state"]
-    )
+    state_rows = sum(int(partition["row_count"]) for partition in states["dwd_tradability_state"])
     if state_rows != expected_state_rows:
         raise TradabilityStateBuildError("tradability state did not cover every listing session")
     gap_reason_counts: dict[str, int] = {}
@@ -1390,6 +1391,50 @@ def verify_tradability_state_candidate(
 ) -> TradabilityStateCandidateVerification:
     """Deep-verify a sealed #59 candidate for downstream same-run builders."""
 
+    imported = verify_imported_domain_candidate(
+        root,
+        domain="tradability_state",
+        run_id=run_id,
+        input_plan_digest=input_plan_digest,
+        expected_bindings={
+            "model_sha256": model_sha256,
+            "listed_company_semantic_digest": listed_company_semantic_digest,
+            "listed_company_manifest_sha256": listed_company_manifest_sha256,
+            "trading_calendar_semantic_digest": trading_calendar_semantic_digest,
+            "trading_calendar_manifest_sha256": trading_calendar_manifest_sha256,
+            "market_observation_semantic_digest": market_observation_semantic_digest,
+            "market_observation_manifest_sha256": market_observation_manifest_sha256,
+        },
+    )
+    if imported is not None:
+        source_manifest = _object(imported.source_root / "manifest.json")
+        native = verify_tradability_state_candidate(
+            imported.source_root,
+            run_id=imported.source_run_id,
+            input_plan_digest=imported.source_plan_digest,
+            model_sha256=_text(source_manifest, "model_sha256"),
+            listed_company_semantic_digest=_text(source_manifest, "listed_company_semantic_digest"),
+            listed_company_manifest_sha256=_text(source_manifest, "listed_company_manifest_sha256"),
+            trading_calendar_semantic_digest=_text(
+                source_manifest, "trading_calendar_semantic_digest"
+            ),
+            trading_calendar_manifest_sha256=_text(
+                source_manifest, "trading_calendar_manifest_sha256"
+            ),
+            market_observation_semantic_digest=_text(
+                source_manifest, "market_observation_semantic_digest"
+            ),
+            market_observation_manifest_sha256=_text(
+                source_manifest, "market_observation_manifest_sha256"
+            ),
+        )
+        return TradabilityStateCandidateVerification(
+            root=imported.root,
+            manifest_sha256=imported.manifest_sha256,
+            semantic_digest=native.semantic_digest,
+            row_counts=native.row_counts,
+            partition_counts=native.partition_counts,
+        )
     receipt = _object(root / "receipts/tradability-state-build.json")
     result = _verify_existing_output(
         root,

@@ -426,6 +426,7 @@ def materialize_shareholder_count_row(
     company_id: str,
     security_id: str,
     source_sha256: str,
+    parent_knowledge_from: datetime | None = None,
 ) -> dict[str, Any]:
     """Convert one canonical holder-count row with raw numeric evidence."""
 
@@ -442,13 +443,16 @@ def materialize_shareholder_count_row(
         row.get("knowledge_cutoff") or row.get("hold_notice_date"),
         "shareholder_count knowledge_cutoff",
     )
+    knowledge_from = max(
+        value for value in (published_at, parent_knowledge_from) if value is not None
+    )
     source_record_id = f"stock_code={stock_code}&period_end={period_end.isoformat()}"
     return {
         "record_source": str(row.get("source") or "shareholder_count"),
         "source_record_id": source_record_id,
         "source_revision": str(row.get("fetched_at") or "ods-base-v1.2"),
         "source_artifact_sha256": source_sha256,
-        "knowledge_from": published_at,
+        "knowledge_from": knowledge_from,
         "knowledge_to": None,
         "period_start": None,
         "period_end": period_end,
@@ -475,6 +479,7 @@ def materialize_holder_change_row(
     security_id: str,
     source_sha256: str,
     source_revision: str,
+    parent_knowledge_from: datetime | None = None,
 ) -> dict[str, Any]:
     """Convert one SQLite holder-change event with explicit unit semantics."""
 
@@ -491,7 +496,10 @@ def materialize_holder_change_row(
     raw_change = _raw_number(row.get("change_shares"))
     raw_ratio = _raw_number(row.get("change_ratio"))
     raw_after = _raw_number(row.get("shares_after"))
-    knowledge = _effective_start(disclosed or changed)
+    source_knowledge = _effective_start(disclosed or changed)
+    knowledge = max(
+        value for value in (source_knowledge, parent_knowledge_from) if value is not None
+    )
     return {
         "record_source": "announcement_archive.holder_changes",
         "source_record_id": row_key,
@@ -531,6 +539,8 @@ def materialize_f10_rows(
     company_id: str,
     security_id: str,
     source_sha256: str,
+    parent_knowledge_from: datetime | None = None,
+    identity_by_date: Mapping[date, Any] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Attach governed lineage and identities to parsed F10 ownership rows."""
 
@@ -541,13 +551,21 @@ def materialize_f10_rows(
         f"stock_code={stock_code}&category={category}&content_sha256="
         f"{_text(row.get('content_sha256'), 'F10 content_sha256')}"
     )
-    knowledge = _utc_timestamp(row.get("acquired_at"), "F10 acquired_at")
+    source_knowledge = _utc_timestamp(row.get("acquired_at"), "F10 acquired_at")
+    common_knowledge_from = max(
+        value
+        for value in (
+            source_knowledge,
+            None if identity_by_date is not None else parent_knowledge_from,
+        )
+        if value is not None
+    )
     common = {
         "record_source": str(row.get("source") or "tdx_f10"),
         "source_record_id": source_record_id,
         "source_revision": str(row.get("source_revision") or "provider-native"),
         "source_artifact_sha256": source_sha256,
-        "knowledge_from": knowledge,
+        "knowledge_from": common_knowledge_from,
         "knowledge_to": None,
     }
     result = {
@@ -556,24 +574,50 @@ def materialize_f10_rows(
     }
     if category == "股本结构":
         for parsed in parse_f10_capital_structure(content):
+            identity = (
+                identity_by_date.get(parsed["observation_date"])
+                if identity_by_date is not None
+                else None
+            )
+            if identity_by_date is not None and identity is None:
+                continue
             result["dwd_share_capital_observation"].append(
                 {
                     **common,
+                    "knowledge_from": max(
+                        common["knowledge_from"],
+                        identity.knowledge_from
+                        if identity is not None
+                        else common["knowledge_from"],
+                    ),
                     "observation_start": _effective_start(parsed["observation_date"]),
                     "observation_end": None,
-                    "security_id": security_id,
+                    "security_id": identity.security_id if identity is not None else security_id,
                     **{key: value for key, value in parsed.items() if key != "observation_date"},
                 }
             )
     elif category == "股东研究":
         for parsed in parse_f10_shareholding_tables(content):
+            identity = (
+                identity_by_date.get(parsed["observation_date"])
+                if identity_by_date is not None
+                else None
+            )
+            if identity_by_date is not None and identity is None:
+                continue
             result["dwd_shareholding_observation"].append(
                 {
                     **common,
+                    "knowledge_from": max(
+                        common["knowledge_from"],
+                        identity.knowledge_from
+                        if identity is not None
+                        else common["knowledge_from"],
+                    ),
                     "observation_start": _effective_start(parsed["observation_date"]),
                     "observation_end": None,
-                    "company_id": company_id,
-                    "security_id": security_id,
+                    "company_id": identity.company_id if identity is not None else company_id,
+                    "security_id": identity.security_id if identity is not None else security_id,
                     "shareholder_id": None,
                     **{key: value for key, value in parsed.items() if key != "observation_date"},
                 }
@@ -581,6 +625,20 @@ def materialize_f10_rows(
     else:
         raise OwnershipCapitalBuildError(f"unsupported ownership F10 category: {category}")
     return result
+
+
+def _exclude_out_of_range_holdings(
+    rows: Sequence[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], int]:
+    accepted: list[dict[str, Any]] = []
+    excluded = 0
+    for row in rows:
+        percentage = row.get("holding_percentage")
+        if percentage is not None and percentage > 100:
+            excluded += 1
+        else:
+            accepted.append(row)
+    return accepted, excluded
 
 
 def _single_record(
@@ -690,7 +748,9 @@ def _identity_quality(resolver: Any, code: object, coordinate: object) -> str | 
     return str(reason) if identity is None or reason is not None else None
 
 
-def _audit_shareholder_count(source: _Source, resolver: Any) -> dict[str, Any]:
+def _audit_shareholder_count(
+    source: _Source, resolver: Any, *, through_date: date
+) -> dict[str, Any]:
     try:
         import pyarrow.parquet as pq
     except ModuleNotFoundError as exc:
@@ -722,6 +782,9 @@ def _audit_shareholder_count(source: _Source, resolver: Any) -> dict[str, Any]:
             if key in keys:
                 raise OwnershipCapitalBuildError("shareholder_count has duplicate keys")
             keys.add(key)
+            if end_date > through_date:
+                quality["AFTER_THROUGH_DATE"] += 1
+                continue
             if row.get("shareholder_count") is None:
                 null_counts["shareholder_count"] += 1
             reason = _identity_quality(resolver, code, end_date)
@@ -735,7 +798,7 @@ def _audit_shareholder_count(source: _Source, resolver: Any) -> dict[str, Any]:
     }
 
 
-def _audit_holder_changes(source: _Source, resolver: Any) -> dict[str, Any]:
+def _audit_holder_changes(source: _Source, resolver: Any, *, through_date: date) -> dict[str, Any]:
     connection = sqlite3.connect(f"file:{source.path}?mode=ro", uri=True)
     required = {
         "exchange",
@@ -772,7 +835,11 @@ def _audit_holder_changes(source: _Source, resolver: Any) -> dict[str, Any]:
             for code, changed, disclosed, row_key in batch:
                 rows += 1
                 _text(row_key, "holder_changes row_key")
-                reason = _identity_quality(resolver, code, changed or disclosed)
+                coordinate = _report_date(changed or disclosed, "holder change date")
+                if coordinate > through_date:
+                    quality["AFTER_THROUGH_DATE"] += 1
+                    continue
+                reason = _identity_quality(resolver, code, coordinate)
                 if reason is not None:
                     quality[reason] += 1
     except sqlite3.Error as exc:
@@ -898,6 +965,7 @@ def audit_ownership_capital_source_package(
     ]
     sources = _select_sources(records, ods_package)
     resolver = _load_company_resolver(listed_company_candidate)
+    through_date = _report_date(semantic_plan.get("through_date"), "ownership through_date")
     report = {
         "schema_version": 1,
         "kind": "dwd_ownership_capital_source_audit",
@@ -909,8 +977,12 @@ def audit_ownership_capital_source_package(
         "listed_company_semantic_digest": listed.semantic_digest,
         "source_sha256": {key: value.sha256 for key, value in sorted(sources.items())},
         "source_rows": {
-            "shareholder_count": _audit_shareholder_count(sources["shareholder_count"], resolver),
-            "holder_changes": _audit_holder_changes(sources["holder_changes"], resolver),
+            "shareholder_count": _audit_shareholder_count(
+                sources["shareholder_count"], resolver, through_date=through_date
+            ),
+            "holder_changes": _audit_holder_changes(
+                sources["holder_changes"], resolver, through_date=through_date
+            ),
             "f10": _audit_f10_sources(sources["parent_f10"], sources["hotfix_f10"], resolver),
         },
         "build_gate": {
@@ -1028,6 +1100,7 @@ def _build_ownership_capital_locked(
     model_sha = _sha256(model_path)
     if plan.get("run_id") != run_id:
         raise OwnershipCapitalBuildError("ownership run differs from plan")
+    through_date = _report_date(semantic_plan.get("through_date"), "ownership through_date")
     listed = verify_listed_company_candidate(
         listed_company_candidate,
         run_id=run_id,
@@ -1117,6 +1190,9 @@ def _build_ownership_capital_locked(
         notes: Counter[str] = Counter()
         for raw in batch.to_pylist():
             coordinate = _report_date(raw.get("end_date"), "holder count date")
+            if coordinate > through_date:
+                notes["AFTER_THROUGH_DATE"] += 1
+                continue
             company, reason = resolver.resolve_for_report(
                 str(raw.get("code")), period_end=coordinate
             )
@@ -1129,6 +1205,7 @@ def _build_ownership_capital_locked(
                     company_id=company.company_id,
                     security_id=company.security_id,
                     source_sha256=sources["shareholder_count"].sha256,
+                    parent_knowledge_from=company.knowledge_from,
                 )
             )
             if reason is not None:
@@ -1153,6 +1230,9 @@ def _build_ownership_capital_locked(
                         raw.get("change_date") or raw.get("disclosure_date"),
                         "holder change date",
                     )
+                    if coordinate > through_date:
+                        notes["AFTER_THROUGH_DATE"] += 1
+                        continue
                     company, reason = resolver.resolve_for_report(
                         str(raw.get("code")), period_end=coordinate
                     )
@@ -1166,6 +1246,7 @@ def _build_ownership_capital_locked(
                             security_id=company.security_id,
                             source_sha256=sources["holder_changes"].sha256,
                             source_revision=run_id,
+                            parent_knowledge_from=company.knowledge_from,
                         )
                     )
                     if reason is not None:
@@ -1194,20 +1275,38 @@ def _build_ownership_capital_locked(
                 selected.add(key)
                 if batch_id in checkpoint["batches"]:
                     continue
-                coordinate = _report_date(
-                    raw.get("market_date") or raw.get("provider_updated_date"),
-                    "F10 date",
+                content = _text(raw.get("content"), "F10 content")
+                parsed_rows = (
+                    parse_f10_capital_structure(content)
+                    if category == "股本结构"
+                    else parse_f10_shareholding_tables(content)
                 )
-                company, reason = resolver.resolve_for_report(key[0], period_end=coordinate)
-                if company is None:
-                    notes[str(reason)] += 1
-                    continue
+                identity_by_date: dict[date, Any] = {}
+                for coordinate in sorted({parsed["observation_date"] for parsed in parsed_rows}):
+                    if coordinate > through_date:
+                        notes["AFTER_THROUGH_DATE"] += 1
+                        continue
+                    company, reason = resolver.resolve_for_report(key[0], period_end=coordinate)
+                    if company is None:
+                        notes[str(reason)] += 1
+                        continue
+                    identity_by_date[coordinate] = company
+                fallback = next(iter(identity_by_date.values()), None)
                 expanded = materialize_f10_rows(
                     raw,
-                    company_id=company.company_id,
-                    security_id=company.security_id,
+                    company_id=fallback.company_id if fallback is not None else "UNRESOLVED",
+                    security_id=fallback.security_id if fallback is not None else "UNRESOLVED",
                     source_sha256=source.sha256,
+                    parent_knowledge_from=(
+                        fallback.knowledge_from if fallback is not None else None
+                    ),
+                    identity_by_date=identity_by_date,
                 )
+                accepted_holdings, excluded_holdings = _exclude_out_of_range_holdings(
+                    expanded["dwd_shareholding_observation"]
+                )
+                notes["OUT_OF_RANGE_HOLDING_PERCENTAGE"] += excluded_holdings
+                expanded["dwd_shareholding_observation"] = accepted_holdings
                 for table, values in expanded.items():
                     rows[table].extend(values)
                 if not any(expanded.values()):

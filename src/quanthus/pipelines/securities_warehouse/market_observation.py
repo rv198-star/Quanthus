@@ -18,6 +18,9 @@ from quanthus.pipelines.dwd_execution_resources import (
     configure_duckdb_threads,
     dwd_duckdb_memory_limit_mb,
 )
+from quanthus.pipelines.securities_warehouse.domain_base import (
+    verify_imported_domain_candidate,
+)
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
     verify_listed_company_candidate,
@@ -841,9 +844,7 @@ def _configure_connection(connection: Any, scratch: Path) -> None:
     configure_duckdb_threads(connection, maximum=2)
     connection.execute("SET preserve_insertion_order=true")
     connection.execute("SET enable_progress_bar=false")
-    connection.execute(
-        f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1792, minimum_mb=7168)}MB'"
-    )
+    connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1792, minimum_mb=7168)}MB'")
     connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
 
 
@@ -1758,6 +1759,42 @@ def verify_market_observation_candidate(
 ) -> MarketObservationCandidateVerification:
     """Deep-verify a sealed #58 candidate for a same-run downstream builder."""
 
+    imported = verify_imported_domain_candidate(
+        root,
+        domain="security_market_observation",
+        run_id=run_id,
+        input_plan_digest=input_plan_digest,
+        expected_bindings={
+            "model_sha256": model_sha256,
+            "listed_company_semantic_digest": listed_company_semantic_digest,
+            "listed_company_manifest_sha256": listed_company_manifest_sha256,
+            "trading_calendar_semantic_digest": trading_calendar_semantic_digest,
+            "trading_calendar_manifest_sha256": trading_calendar_manifest_sha256,
+        },
+    )
+    if imported is not None:
+        source_manifest = _object(imported.source_root / "manifest.json")
+        native = verify_market_observation_candidate(
+            imported.source_root,
+            run_id=imported.source_run_id,
+            input_plan_digest=imported.source_plan_digest,
+            model_sha256=_text(source_manifest, "model_sha256"),
+            listed_company_semantic_digest=_text(source_manifest, "listed_company_semantic_digest"),
+            listed_company_manifest_sha256=_text(source_manifest, "listed_company_manifest_sha256"),
+            trading_calendar_semantic_digest=_text(
+                source_manifest, "trading_calendar_semantic_digest"
+            ),
+            trading_calendar_manifest_sha256=_text(
+                source_manifest, "trading_calendar_manifest_sha256"
+            ),
+        )
+        return MarketObservationCandidateVerification(
+            root=imported.root,
+            manifest_sha256=imported.manifest_sha256,
+            semantic_digest=native.semantic_digest,
+            row_counts=native.row_counts,
+            partition_counts=native.partition_counts,
+        )
     receipt = _object(root / "receipts/market-observation-build.json")
     source_set_digest = _text(receipt, "source_set_digest")
     result = _verify_existing_output(

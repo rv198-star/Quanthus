@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import unittest
-from datetime import date, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -132,6 +132,8 @@ class DisclosureEventTests(unittest.TestCase):
             )
 
     def test_announcement_has_security_and_report_subjects(self) -> None:
+        parent_knowledge = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        report_knowledge = datetime(2026, 8, 2, tzinfo=timezone.utc)
         rows = materialize_announcement_rows(
             {
                 "ann_id": "ann-1",
@@ -145,6 +147,8 @@ class DisclosureEventTests(unittest.TestCase):
             source_sha256="sha256:archive",
             source_revision="ods-base-v1.2",
             financial_report_ids=["report-1"],
+            parent_knowledge_from=parent_knowledge,
+            financial_report_knowledge={"report-1": report_knowledge},
         )
 
         self.assertEqual(len(rows["dwd_disclosure"]), 1)
@@ -167,6 +171,9 @@ class DisclosureEventTests(unittest.TestCase):
                 for row in subjects
             )
         )
+        self.assertEqual(rows["dwd_disclosure"][0]["knowledge_from"], parent_knowledge)
+        report_subject = next(row for row in subjects if row["subject_type"] == "FINANCIAL_REPORT")
+        self.assertEqual(report_subject["knowledge_from"], report_knowledge)
 
     def test_action_terms_preserve_cash_and_share_roles(self) -> None:
         vocabulary = {

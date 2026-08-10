@@ -1,0 +1,33 @@
+{
+  "candidate": {
+    "package_id": "dwd-base-202607-v2.1",
+    "row_count": 468268180,
+    "table_count": 33
+  },
+  "code_revision": "c010c2772ac54938042507f7f1d0296fcd4dadba",
+  "gates": {
+    "coverage_exclusions": "finding",
+    "domain_invariants": "finding",
+    "lineage_authority": "verified",
+    "schema_partitions": "verified",
+    "semantic_contracts": "finding"
+  },
+  "kind": "dwd_base_v2_1_r11_post_build_audit_summary",
+  "mutation_performed": false,
+  "rebuild_domains": [
+    "financial_reporting",
+    "disclosure_company_event",
+    "ownership_capital",
+    "governance_sidecar"
+  ],
+  "reuse_domains": [
+    "listed_company",
+    "trading_calendar",
+    "security_market_observation",
+    "tradability_state",
+    "industry_classification"
+  ],
+  "run_id": "dwd-v2-1-gpu-p100-20260810T063544Z-c010c277-r11",
+  "schema_version": 1,
+  "status": "repair_required"
+}

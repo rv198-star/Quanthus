@@ -12,7 +12,7 @@ import signal
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
@@ -60,6 +60,7 @@ from quanthus.pipelines.securities_warehouse.disclosure_event import (
 )
 from quanthus.pipelines.securities_warehouse.domain_base import (
     DomainBaseResult,
+    import_domain_candidate,
     seal_domain_base_candidate,
     verify_domain_base,
     verify_domain_candidate,
@@ -69,6 +70,7 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (
     audit_financial_statement_sources,
     build_financial_reporting,
     combine_financial_reporting_source_audits,
+    financial_company_resolver_from_listed_company_rows,
     select_financial_statement_sources,
     write_financial_reporting_source_audit,
 )
@@ -119,6 +121,16 @@ _CONTRACT_APPROVAL = (
 )
 _CLOSURE = "docs/acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807"
 _PACKAGE_ID = "dwd-base-202607-v2.1"
+_R11_REUSE_AUDIT = (
+    "docs/acceptance/issue-78-dwd-base-v2-1-r11-post-build-audit-20260810/audit-summary.json"
+)
+_REUSABLE_DOMAINS = (
+    "listed_company",
+    "trading_calendar",
+    "security_market_observation",
+    "tradability_state",
+    "industry_classification",
+)
 _CANDIDATE_NAMES = {
     "listed_company": "issue57",
     "trading_calendar": "issue72",
@@ -174,6 +186,7 @@ def _require_full_build_environment(
     through_date: str,
     runtime_id: str,
     minimum_free_bytes: int,
+    reuse_run_id: str | None = None,
 ) -> dict[str, str]:
     environment = load_environment(environment_path)
     expected = {
@@ -189,6 +202,8 @@ def _require_full_build_environment(
         "QUANTHUS_DWD_RUNTIME_ID": runtime_id,
         "QUANTHUS_DWD_MINIMUM_FREE_BYTES": str(minimum_free_bytes),
     }
+    if reuse_run_id is not None:
+        expected["QUANTHUS_DWD_REUSE_RUN_ID"] = reuse_run_id
     if any(environment.get(key) != value for key, value in expected.items()):
         raise DwdV21FullBuildError("deployment environment differs from full-build authority")
     if environment.get("QUANTHUS_DWD_RESUME_AUTHORIZED", "0") not in {"0", "1"}:
@@ -557,8 +572,8 @@ def _report_evidence(
         if not isinstance(status, Mapping):
             raise DwdV21FullBuildError(f"{label} has no status path: {status_path}")
         status = status.get(key)
-    if status != "verified":
-        raise DwdV21FullBuildError(f"{label} did not verify: status={status!r}")
+    if status not in {"verified", "finding"}:
+        raise DwdV21FullBuildError(f"{label} has unsupported status: {status!r}")
     return {
         **_file_evidence(path),
         "canonical_digest": report["canonical_digest"],
@@ -579,17 +594,17 @@ def _run_report_step(
     contract_digest: str,
     code_revision: str,
 ) -> dict[str, Any]:
-    passed_phase = f"{phase}-passed"
-    if (run_root / "state" / f"{passed_phase}.json").exists() or output.exists():
+    if output.exists():
         evidence = _report_evidence(output, label=label, status_path=status_path)
+        terminal_phase = f"{phase}-{'passed' if evidence['status'] == 'verified' else 'finding'}"
         _advance(
             workspace,
             run_root,
-            phase=passed_phase,
+            phase=terminal_phase,
             run_id=run_id,
             contract_digest=contract_digest,
             code_revision=code_revision,
-            status="passed",
+            status="passed" if evidence["status"] == "verified" else "finding",
             evidence=evidence,
         )
         return evidence
@@ -605,14 +620,15 @@ def _run_report_step(
     )
     action()
     evidence = _report_evidence(output, label=label, status_path=status_path)
+    terminal_phase = f"{phase}-{'passed' if evidence['status'] == 'verified' else 'finding'}"
     _advance(
         workspace,
         run_root,
-        phase=passed_phase,
+        phase=terminal_phase,
         run_id=run_id,
         contract_digest=contract_digest,
         code_revision=code_revision,
-        status="passed",
+        status="passed" if evidence["status"] == "verified" else "finding",
         evidence=evidence,
     )
     return evidence
@@ -623,6 +639,7 @@ def _statement_audit(
     ods_base: Path,
     plan_root: Path,
     model_path: Path,
+    listed_company_candidate: Path,
     output: Path,
     run_id: str,
     batch_size: int,
@@ -638,7 +655,21 @@ def _statement_audit(
         for raw in plan_sequence(ledger.get("records"), "source ledger records")
     ]
     sources = select_financial_statement_sources(records, ods_base)
-    audit = audit_financial_statement_sources(sources, batch_size=batch_size)
+    try:
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise DwdV21FullBuildError("pyarrow is required for financial statement audit") from exc
+    listed_root = listed_company_candidate / "payload/listed_company"
+    resolver = financial_company_resolver_from_listed_company_rows(
+        pq.read_table(listed_root / "dwd_security.parquet").to_pylist(),
+        pq.read_table(listed_root / "dwd_security_identifier.parquet").to_pylist(),
+    )
+    audit = audit_financial_statement_sources(
+        sources,
+        batch_size=batch_size,
+        company_resolver=resolver,
+        through_date=date.fromisoformat(str(semantic_plan.get("through_date"))),
+    )
     write_financial_reporting_source_audit(output, audit)
 
 
@@ -658,6 +689,67 @@ def _configure_scratch(run_root: Path, thread_limit: int) -> Path:
         os.environ[key] = str(thread_limit)
     os.environ[DWD_THREAD_LIMIT_ENV] = str(thread_limit)
     return scratch
+
+
+def _reuse_context(
+    *,
+    repository: Path,
+    workspace: Path,
+    current_plan_root: Path,
+    current_run_id: str,
+    reuse_run_id: str,
+) -> dict[str, Any]:
+    if reuse_run_id == current_run_id:
+        raise DwdV21FullBuildError("reuse source run must differ from the current run")
+    summary_path = repository / _R11_REUSE_AUDIT
+    summary = _json_mapping(summary_path, "r11 domain reuse authority")
+    if (
+        summary.get("schema_version") != 1
+        or summary.get("kind") != "dwd_base_v2_1_r11_post_build_audit_summary"
+        or summary.get("status") != "repair_required"
+        or summary.get("mutation_performed") is not False
+        or summary.get("run_id") != reuse_run_id
+        or summary.get("reuse_domains") != list(_REUSABLE_DOMAINS)
+    ):
+        raise DwdV21FullBuildError("r11 domain reuse authority differs from the requested run")
+    source_root = (workspace / "runs" / reuse_run_id).resolve()
+    if not source_root.is_relative_to(workspace) or not source_root.is_dir():
+        raise DwdV21FullBuildError("reuse source run is outside the approved workspace")
+    source_plan, _source_ledger = _verify_plan_package(source_root / "plan")
+    current_plan, _current_ledger = _verify_plan_package(current_plan_root)
+    source_semantic = plan_mapping(source_plan.get("plan"), "reuse source semantic plan")
+    current_semantic = plan_mapping(current_plan.get("plan"), "current semantic plan")
+    compatibility_fields = (
+        "mode",
+        "knowledge_cutoff",
+        "market_date",
+        "through_date",
+        "model",
+        "input",
+        "domain_plan",
+        "source_precedence",
+        "source_ledger_digest",
+        "coverage_matrix_digest",
+        "input_identity_override",
+    )
+    if any(source_semantic.get(key) != current_semantic.get(key) for key in compatibility_fields):
+        raise DwdV21FullBuildError("reuse source plan is not data-compatible with current plan")
+    source_revision = summary.get("code_revision")
+    source_plan_digest = source_plan.get("plan_digest")
+    if not all(isinstance(value, str) and value for value in (source_revision, source_plan_digest)):
+        raise DwdV21FullBuildError("reuse source authority lacks revision or plan digest")
+    return {
+        "run_root": source_root,
+        "run_id": reuse_run_id,
+        "plan_digest": str(source_plan_digest),
+        "authority": {
+            "path": str(summary_path.resolve()),
+            "sha256": _sha256(summary_path),
+            "kind": summary["kind"],
+            "status": summary["status"],
+            "source_code_revision": str(source_revision),
+        },
+    }
 
 
 def _seal_evidence(result: DomainBaseResult) -> dict[str, Any]:
@@ -726,6 +818,7 @@ def _run_candidate_audits(
         report = audit_dwd_semantic_contracts(
             root=sealed_root,
             model_path=model_path,
+            extension_path=model_extension_path,
             scratch=audit_scratch / "semantic-contracts",
             checkpoint_path=checkpoint_root / "semantic-contracts.json",
             memory_limit=audit_memory_limit,
@@ -833,13 +926,34 @@ def _run_candidate_audits(
         contract_digest=contract_digest,
         code_revision=code_revision,
     )
-    return {
+    evidence = {
         "schema_partitions": schema,
         "semantic_contracts": semantic,
         "domain_invariants": invariant,
         "coverage_exclusions": coverage,
         "lineage_authority": lineage,
     }
+    findings = sorted(name for name, item in evidence.items() if item["status"] != "verified")
+    _advance(
+        workspace,
+        run_root,
+        phase="11-candidate-audits-verified" if not findings else "11-candidate-audits-finding",
+        run_id=run_id,
+        contract_digest=contract_digest,
+        code_revision=code_revision,
+        status="passed" if not findings else "finding",
+        evidence={
+            "reports": evidence,
+            "finding_reports": findings,
+            "all_reports_collected": True,
+        },
+    )
+    if findings:
+        raise DwdV21FullBuildError(
+            "candidate audits reported findings after all reports were collected: "
+            + ", ".join(findings)
+        )
+    return evidence
 
 
 def run_full_build(
@@ -859,6 +973,7 @@ def run_full_build(
     through_date: str,
     runtime_id: str,
     resume: bool,
+    reuse_run_id: str | None = None,
     thread_limit: int = 4,
     statement_audit_batch_size: int = 4,
     financial_source_batch_size: int = 32,
@@ -906,6 +1021,7 @@ def run_full_build(
         through_date=through_date,
         runtime_id=runtime_id,
         minimum_free_bytes=minimum_free_bytes,
+        reuse_run_id=reuse_run_id,
     )
     existed = run_root.exists()
     if existed and (not resume or environment.get("QUANTHUS_DWD_RESUME_AUTHORIZED", "0") != "1"):
@@ -1068,72 +1184,148 @@ def run_full_build(
             ownership = candidates["ownership_capital"]
             quality = candidates["governance_sidecar"]
 
-            _run_domain_step(
+            reuse = (
+                _reuse_context(
+                    repository=repository,
+                    workspace=workspace,
+                    current_plan_root=plan_root,
+                    current_run_id=run_id,
+                    reuse_run_id=reuse_run_id,
+                )
+                if reuse_run_id is not None
+                else None
+            )
+
+            def reused_action(
+                domain: str, output: Path, target_bindings: Mapping[str, Any]
+            ) -> Callable[[], None]:
+                if reuse is None:
+                    raise DwdV21FullBuildError("candidate reuse was not configured")
+                source = (
+                    cast(Path, reuse["run_root"])
+                    / "candidates"
+                    / f"{reuse['run_id']}-{_CANDIDATE_NAMES[domain]}"
+                )
+
+                def execute() -> None:
+                    import_domain_candidate(
+                        source=source,
+                        output=output,
+                        domain=domain,
+                        source_run_id=str(reuse["run_id"]),
+                        source_plan_digest=str(reuse["plan_digest"]),
+                        target_run_id=run_id,
+                        target_plan_digest=plan.plan_digest,
+                        target_bindings=target_bindings,
+                        source_authority=cast(Mapping[str, Any], reuse["authority"]),
+                    )
+
+                return execute
+
+            listed_evidence = _run_domain_step(
                 workspace=workspace,
                 run_root=run_root,
                 phase="01-listed-company",
                 domain="listed_company",
                 output=listed,
-                action=lambda: cast(
-                    None,
-                    build_listed_company(
-                        ods_package=ods_base,
-                        input_plan=plan_root,
-                        model_path=model_path,
-                        reference_seed_path=(
-                            repository
-                            / "config/pipelines/securities-warehouse-reference-seeds.v1.json"
+                action=(
+                    reused_action(
+                        "listed_company",
+                        listed,
+                        {"model_sha256": _sha256(model_path)},
+                    )
+                    if reuse is not None
+                    else lambda: cast(
+                        None,
+                        build_listed_company(
+                            ods_package=ods_base,
+                            input_plan=plan_root,
+                            model_path=model_path,
+                            reference_seed_path=(
+                                repository
+                                / "config/pipelines/securities-warehouse-reference-seeds.v1.json"
+                            ),
+                            code_validity_path=repository / "config/security-code-validity.v1.json",
+                            output=listed,
+                            run_id=run_id,
                         ),
-                        code_validity_path=repository / "config/security-code-validity.v1.json",
-                        output=listed,
-                        run_id=run_id,
-                    ),
+                    )
                 ),
                 run_id=run_id,
                 plan_digest=plan.plan_digest,
                 contract_digest=expected_contract_digest,
                 code_revision=expected_revision,
             )
-            _run_domain_step(
+            calendar_evidence = _run_domain_step(
                 workspace=workspace,
                 run_root=run_root,
                 phase="02-trading-calendar",
                 domain="trading_calendar",
                 output=calendar,
-                action=lambda: cast(
-                    None,
-                    build_trading_calendar(
-                        ods_package=ods_base,
-                        input_plan=plan_root,
-                        model_path=model_path,
-                        upstream_candidate=listed,
-                        output=calendar,
-                        run_id=run_id,
-                    ),
+                action=(
+                    reused_action(
+                        "trading_calendar",
+                        calendar,
+                        {
+                            "model_sha256": _sha256(model_path),
+                            "upstream_semantic_digest": listed_evidence["semantic_digest"],
+                            "upstream_manifest_sha256": listed_evidence["manifest_sha256"],
+                        },
+                    )
+                    if reuse is not None
+                    else lambda: cast(
+                        None,
+                        build_trading_calendar(
+                            ods_package=ods_base,
+                            input_plan=plan_root,
+                            model_path=model_path,
+                            upstream_candidate=listed,
+                            output=calendar,
+                            run_id=run_id,
+                        ),
+                    )
                 ),
                 run_id=run_id,
                 plan_digest=plan.plan_digest,
                 contract_digest=expected_contract_digest,
                 code_revision=expected_revision,
             )
-            _run_domain_step(
+            market_evidence = _run_domain_step(
                 workspace=workspace,
                 run_root=run_root,
                 phase="03-market-observation",
                 domain="security_market_observation",
                 output=market,
-                action=lambda: cast(
-                    None,
-                    build_market_observation(
-                        ods_package=ods_base,
-                        input_plan=plan_root,
-                        model_path=model_path,
-                        listed_company_candidate=listed,
-                        trading_calendar_candidate=calendar,
-                        output=market,
-                        run_id=run_id,
-                        scratch_root=market_scratch,
-                    ),
+                action=(
+                    reused_action(
+                        "security_market_observation",
+                        market,
+                        {
+                            "model_sha256": _sha256(model_path),
+                            "listed_company_semantic_digest": listed_evidence["semantic_digest"],
+                            "listed_company_manifest_sha256": listed_evidence["manifest_sha256"],
+                            "trading_calendar_semantic_digest": calendar_evidence[
+                                "semantic_digest"
+                            ],
+                            "trading_calendar_manifest_sha256": calendar_evidence[
+                                "manifest_sha256"
+                            ],
+                        },
+                    )
+                    if reuse is not None
+                    else lambda: cast(
+                        None,
+                        build_market_observation(
+                            ods_package=ods_base,
+                            input_plan=plan_root,
+                            model_path=model_path,
+                            listed_company_candidate=listed,
+                            trading_calendar_candidate=calendar,
+                            output=market,
+                            run_id=run_id,
+                            scratch_root=market_scratch,
+                        ),
+                    )
                 ),
                 run_id=run_id,
                 plan_digest=plan.plan_digest,
@@ -1146,19 +1338,43 @@ def run_full_build(
                 phase="04-tradability-state",
                 domain="tradability_state",
                 output=tradability,
-                action=lambda: cast(
-                    None,
-                    build_tradability_state(
-                        ods_package=ods_base,
-                        input_plan=plan_root,
-                        model_path=model_path,
-                        listed_company_candidate=listed,
-                        trading_calendar_candidate=calendar,
-                        market_observation_candidate=market,
-                        output=tradability,
-                        run_id=run_id,
-                        scratch_root=tradability_scratch,
-                    ),
+                action=(
+                    reused_action(
+                        "tradability_state",
+                        tradability,
+                        {
+                            "model_sha256": _sha256(model_path),
+                            "listed_company_semantic_digest": listed_evidence["semantic_digest"],
+                            "listed_company_manifest_sha256": listed_evidence["manifest_sha256"],
+                            "trading_calendar_semantic_digest": calendar_evidence[
+                                "semantic_digest"
+                            ],
+                            "trading_calendar_manifest_sha256": calendar_evidence[
+                                "manifest_sha256"
+                            ],
+                            "market_observation_semantic_digest": market_evidence[
+                                "semantic_digest"
+                            ],
+                            "market_observation_manifest_sha256": market_evidence[
+                                "manifest_sha256"
+                            ],
+                        },
+                    )
+                    if reuse is not None
+                    else lambda: cast(
+                        None,
+                        build_tradability_state(
+                            ods_package=ods_base,
+                            input_plan=plan_root,
+                            model_path=model_path,
+                            listed_company_candidate=listed,
+                            trading_calendar_candidate=calendar,
+                            market_observation_candidate=market,
+                            output=tradability,
+                            run_id=run_id,
+                            scratch_root=tradability_scratch,
+                        ),
+                    )
                 ),
                 run_id=run_id,
                 plan_digest=plan.plan_digest,
@@ -1178,6 +1394,7 @@ def run_full_build(
                     ods_base=ods_base,
                     plan_root=plan_root,
                     model_path=model_path,
+                    listed_company_candidate=listed,
                     output=statement_audit,
                     run_id=run_id,
                     batch_size=statement_audit_batch_size,
@@ -1309,19 +1526,34 @@ def run_full_build(
                 phase="07-industry-classification",
                 domain="industry_classification",
                 output=industry,
-                action=lambda: cast(
-                    None,
-                    build_industry_classification(
-                        ods_package=ods_base,
-                        input_plan=plan_root,
-                        model_path=model_path,
-                        listed_company_candidate=listed,
-                        hierarchy_reference=(
-                            repository / "config/pipelines/csrc-industry-hierarchy.v1.json"
+                action=(
+                    reused_action(
+                        "industry_classification",
+                        industry,
+                        {
+                            "model_sha256": _sha256(model_path),
+                            "hierarchy_reference_sha256": _sha256(
+                                repository / "config/pipelines/csrc-industry-hierarchy.v1.json"
+                            ),
+                            "listed_company_semantic_digest": listed_evidence["semantic_digest"],
+                            "listed_company_manifest_sha256": listed_evidence["manifest_sha256"],
+                        },
+                    )
+                    if reuse is not None
+                    else lambda: cast(
+                        None,
+                        build_industry_classification(
+                            ods_package=ods_base,
+                            input_plan=plan_root,
+                            model_path=model_path,
+                            listed_company_candidate=listed,
+                            hierarchy_reference=(
+                                repository / "config/pipelines/csrc-industry-hierarchy.v1.json"
+                            ),
+                            output=industry,
+                            run_id=run_id,
                         ),
-                        output=industry,
-                        run_id=run_id,
-                    ),
+                    )
                 ),
                 run_id=run_id,
                 plan_digest=plan.plan_digest,
@@ -1551,6 +1783,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--knowledge-cutoff", required=True)
     parser.add_argument("--through-date", required=True)
     parser.add_argument("--runtime-id", required=True)
+    parser.add_argument("--reuse-run-id")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--thread-limit", type=int, default=4)
     return parser
@@ -1585,6 +1818,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             through_date=args.through_date,
             runtime_id=args.runtime_id,
             resume=args.resume,
+            reuse_run_id=args.reuse_run_id,
             thread_limit=args.thread_limit,
         )
     except DwdV21FullBuildInterrupted as error:

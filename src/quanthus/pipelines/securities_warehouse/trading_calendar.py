@@ -15,6 +15,9 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from quanthus.pipelines.securities_warehouse.domain_base import (
+    verify_imported_domain_candidate,
+)
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
     verify_listed_company_candidate,
@@ -132,9 +135,7 @@ def _timestamp(value: object, field: str) -> datetime:
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError as exc:
-            raise TradingCalendarBuildError(
-                f"{field} must be an ISO-8601 timestamp"
-            ) from exc
+            raise TradingCalendarBuildError(f"{field} must be an ISO-8601 timestamp") from exc
     else:
         raise TradingCalendarBuildError(f"{field} must be an ISO-8601 timestamp")
     if parsed.tzinfo is None or parsed.utcoffset() is None:
@@ -204,9 +205,7 @@ def _verify_manifest_package(
             or path.stat().st_size != item.get("size_bytes")
             or _sha256(path) != item.get("sha256")
         ):
-            raise TradingCalendarBuildError(
-                f"package file failed verification: {relative}"
-            )
+            raise TradingCalendarBuildError(f"package file failed verification: {relative}")
     if declared != expected_files:
         raise TradingCalendarBuildError("package manifest file inventory is not exact")
     physical = {
@@ -262,8 +261,7 @@ def _verify_plan_package(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         or receipt.get("run_id") != plan.get("run_id")
         or receipt.get("semantic_digest") != plan.get("plan_digest")
         or receipt.get("schema_digest") != model_identity.get("sha256")
-        or receipt.get("input_manifest_sha256")
-        != input_identity.get("manifest_sha256")
+        or receipt.get("input_manifest_sha256") != input_identity.get("manifest_sha256")
     ):
         raise TradingCalendarBuildError("input plan package identity is inconsistent")
     return plan, ledger
@@ -278,9 +276,7 @@ def _verify_source(record: Mapping[str, Any], ods_root: Path) -> Path:
         or path.stat().st_size != record.get("size_bytes")
         or _sha256(path) != record.get("sha256")
     ):
-        raise TradingCalendarBuildError(
-            f"ODS source failed verification: {record.get('path')}"
-        )
+        raise TradingCalendarBuildError(f"ODS source failed verification: {record.get('path')}")
     return path
 
 
@@ -332,9 +328,7 @@ def _verify_model_calendar_contract(model: Mapping[str, Any]) -> None:
         "lineage columns",
     )
     market_time = _mapping(
-        _mapping(model.get("time_profiles"), "model time profiles").get(
-            "market_observation"
-        ),
+        _mapping(model.get("time_profiles"), "model time profiles").get("market_observation"),
         "market-observation columns",
     )
     if (
@@ -342,8 +336,7 @@ def _verify_model_calendar_contract(model: Mapping[str, Any]) -> None:
         or table.get("inherits") != ["lineage"]
         or table.get("columns") != _CALENDAR_COLUMNS
         or table.get("business_key") != ["venue_id", "trade_date", "session_type"]
-        or table.get("row_key")
-        != ["venue_id", "trade_date", "session_type", "knowledge_from"]
+        or table.get("row_key") != ["venue_id", "trade_date", "session_type", "knowledge_from"]
         or foreign_keys != [expected_foreign_key]
         or table.get("partition_by") != ["trade_date_year"]
         or dict(lineage)
@@ -407,9 +400,7 @@ def _verify_ods_binding(
             or len(override_sha) != 71
             or any(character not in "0123456789abcdef" for character in override_sha[7:])
         ):
-            raise TradingCalendarBuildError(
-                "input identity override does not bind the exact model"
-            )
+            raise TradingCalendarBuildError("input identity override does not bind the exact model")
         authorized_input = _mapping(
             authority.get("build_input_contract"),
             "input identity override build input",
@@ -428,9 +419,7 @@ def _verify_ods_binding(
             raise TradingCalendarBuildError(
                 "input plan does not bind the model-authorized ODS Base"
             )
-    if plan_input.get("kind") != "ods_base_rollup" or plan_input.get(
-        "verification_mode"
-    ) != "deep":
+    if plan_input.get("kind") != "ods_base_rollup" or plan_input.get("verification_mode") != "deep":
         raise TradingCalendarBuildError("ODS Base must have deep rollup verification")
     manifest_path = ods_package / "manifest.json"
     if (
@@ -518,8 +507,7 @@ def _load_calendar_snapshots(
         if isinstance(raw, Mapping)
         and raw.get("record_type") == "file"
         and raw.get("disposition") == "modeled"
-        and raw.get("mapping_identity")
-        in {"trading_calendar", "trading_calendar_history_hotfix"}
+        and raw.get("mapping_identity") in {"trading_calendar", "trading_calendar_history_hotfix"}
         and _OWNED_TABLE in raw.get("target_tables", [])
     ]
     if not records:
@@ -649,14 +637,11 @@ def _session_rows(
         key=lambda item: (item[0][1], item[0][0], item[0][2]),
     )
     for (exchange, trade_date, _session), source_row in ordered_source_rows:
-        source_record = _mapping(
-            source_row.get("_source_record"), "calendar row source record"
-        )
+        source_record = _mapping(source_row.get("_source_record"), "calendar row source record")
         source_path = _text(source_record, "path")
         source_sha = _text(source_record, "sha256")
         source_revision = (
-            f"{_text(source_record, 'dataset_id')}@"
-            f"{source_sha.removeprefix(_SHA256)[:16]}"
+            f"{_text(source_record, 'dataset_id')}@{source_sha.removeprefix(_SHA256)[:16]}"
         )
         venue = venues[exchange]
         venue_id = _text(venue, "venue_id")
@@ -665,8 +650,7 @@ def _session_rows(
         venue_start = _timestamp(venue.get("effective_from"), "venue effective_from")
         venue_end_raw = venue.get("effective_to")
         outside_venue_interval = venue_start > start or (
-            venue_end_raw is not None
-            and _timestamp(venue_end_raw, "venue effective_to") < end
+            venue_end_raw is not None and _timestamp(venue_end_raw, "venue effective_to") < end
         )
         if outside_venue_interval and exchange == "BSE" and end <= venue_start:
             excluded_bse_dates.append(trade_date)
@@ -701,16 +685,12 @@ def _session_rows(
                 "session_type": _SESSION_TYPE,
                 "is_open": is_open,
                 "open_at": (
-                    datetime.combine(trade_date, time(9, 30), _SHANGHAI).astimezone(
-                        timezone.utc
-                    )
+                    datetime.combine(trade_date, time(9, 30), _SHANGHAI).astimezone(timezone.utc)
                     if is_open
                     else None
                 ),
                 "close_at": (
-                    datetime.combine(trade_date, time(15), _SHANGHAI).astimezone(
-                        timezone.utc
-                    )
+                    datetime.combine(trade_date, time(15), _SHANGHAI).astimezone(timezone.utc)
                     if is_open
                     else None
                 ),
@@ -792,9 +772,7 @@ def _fsync_file(path: Path) -> None:
 
 
 def _remove_orphaned_temporaries(work: Path, output_files: set[str]) -> None:
-    final_paths = {
-        work / relative for relative in output_files | {"manifest.json", "READY"}
-    }
+    final_paths = {work / relative for relative in output_files | {"manifest.json", "READY"}}
     for final_path in sorted(final_paths):
         if final_path.parent.is_dir():
             for candidate in final_path.parent.glob(f".{final_path.name}.*"):
@@ -804,8 +782,7 @@ def _remove_orphaned_temporaries(work: Path, output_files: set[str]) -> None:
                     )
                 candidate.unlink(missing_ok=True)
     for partial in work.glob(
-        f"payload/tradability_state/{_OWNED_TABLE}/trade_date_year=*/"
-        "part-00000.parquet.partial"
+        f"payload/tradability_state/{_OWNED_TABLE}/trade_date_year=*/part-00000.parquet.partial"
     ):
         if partial.is_dir() and not partial.is_symlink():
             raise TradingCalendarBuildError(
@@ -851,9 +828,7 @@ def _prepare_work(
                 continue
             if path.is_file() and relative in expected_files:
                 continue
-            raise TradingCalendarBuildError(
-                f"build work contains an unexpected path: {relative}"
-            )
+            raise TradingCalendarBuildError(f"build work contains an unexpected path: {relative}")
     else:
         work.mkdir(mode=0o750)
         _fsync_directory(work)
@@ -921,23 +896,17 @@ def _verify_existing_output(
         raise TradingCalendarBuildError("existing output has another build identity")
     if _object(output / "receipts/trading-calendar-build.json") != expected_receipt:
         raise TradingCalendarBuildError("existing output receipt differs")
-    if (
-        _object(output / "reconciliation/source-row-reconciliation.json")
-        != expected_reconciliation
-    ):
+    if _object(output / "reconciliation/source-row-reconciliation.json") != expected_reconciliation:
         raise TradingCalendarBuildError("existing output reconciliation differs")
     checkpoint = _object(output / "checkpoint.json")
     completed = _mapping(checkpoint.get("completed_years"), "completed years")
-    partition_digests = _mapping(
-        expected_receipt.get("partition_digests"), "partition digests"
-    )
+    partition_digests = _mapping(expected_receipt.get("partition_digests"), "partition digests")
     if (
         checkpoint.get("schema_version") != 1
         or checkpoint.get("kind") != "dwd_trading_calendar_checkpoint"
         or checkpoint.get("run_id") != run_id
         or checkpoint.get("semantic_digest") != semantic_digest
-        or checkpoint.get("input_plan_digest")
-        != expected_receipt.get("input_plan_digest")
+        or checkpoint.get("input_plan_digest") != expected_receipt.get("input_plan_digest")
         or set(completed) != set(partition_digests)
     ):
         raise TradingCalendarBuildError("existing output checkpoint is inconsistent")
@@ -962,9 +931,7 @@ def _verify_existing_output(
             or state.get("semantic_digest") != partition_digests[year_key]
             or state.get("sha256") != _sha256(path)
         ):
-            raise TradingCalendarBuildError(
-                f"existing output partition is invalid: {year_key}"
-            )
+            raise TradingCalendarBuildError(f"existing output partition is invalid: {year_key}")
         tables.append(table)
     combined = pa.concat_tables(tables).to_pylist()
     if len(combined) != row_count or _canonical_digest(combined) != expected_receipt.get(
@@ -984,19 +951,41 @@ def verify_trading_calendar_candidate(
 ) -> TradingCalendarCandidateVerification:
     """Deep-verify a sealed #72 candidate for same-run downstream use."""
 
-    receipt = _object(root / "receipts/trading-calendar-build.json")
-    partition_digests = _mapping(
-        receipt.get("partition_digests"), "calendar partition digests"
+    imported = verify_imported_domain_candidate(
+        root,
+        domain="trading_calendar",
+        run_id=run_id,
+        input_plan_digest=input_plan_digest,
+        expected_bindings={
+            "model_sha256": model_sha256,
+            "upstream_semantic_digest": upstream_semantic_digest,
+            "upstream_manifest_sha256": upstream_manifest_sha256,
+        },
     )
+    if imported is not None:
+        source_manifest = _object(imported.source_root / "manifest.json")
+        native = verify_trading_calendar_candidate(
+            imported.source_root,
+            run_id=imported.source_run_id,
+            input_plan_digest=imported.source_plan_digest,
+            model_sha256=_text(source_manifest, "model_sha256"),
+            upstream_semantic_digest=_text(source_manifest, "upstream_semantic_digest"),
+            upstream_manifest_sha256=_text(source_manifest, "upstream_manifest_sha256"),
+        )
+        return TradingCalendarCandidateVerification(
+            root=imported.root,
+            manifest_sha256=imported.manifest_sha256,
+            semantic_digest=native.semantic_digest,
+            calendar_rows=native.calendar_rows,
+        )
+    receipt = _object(root / "receipts/trading-calendar-build.json")
+    partition_digests = _mapping(receipt.get("partition_digests"), "calendar partition digests")
     years = sorted(partition_digests)
     expected_files = {
         "checkpoint.json",
         "receipts/trading-calendar-build.json",
         "reconciliation/source-row-reconciliation.json",
-        *{
-            _partition_path(Path("."), int(year)).as_posix().removeprefix("./")
-            for year in years
-        },
+        *{_partition_path(Path("."), int(year)).as_posix().removeprefix("./") for year in years},
     }
     manifest = _verify_manifest_package(
         root,
@@ -1062,10 +1051,9 @@ def verify_trading_calendar_candidate(
         tables.append(table)
     combined = pa.concat_tables(tables)
     combined_rows = combined.to_pylist()
-    if (
-        combined.num_rows != row_counts.get(_OWNED_TABLE)
-        or _canonical_digest(combined_rows) != receipt.get("table_digest")
-    ):
+    if combined.num_rows != row_counts.get(_OWNED_TABLE) or _canonical_digest(
+        combined_rows
+    ) != receipt.get("table_digest"):
         raise TradingCalendarBuildError("calendar candidate table digest differs")
     return TradingCalendarCandidateVerification(
         root=root.resolve(),
@@ -1134,9 +1122,7 @@ def _build_locked(
     )
     years = sorted({row["trade_date"].year for row in rows})
     by_year = {year: [row for row in rows if row["trade_date"].year == year] for year in years}
-    partition_digests = {
-        str(year): _canonical_digest(by_year[year]) for year in years
-    }
+    partition_digests = {str(year): _canonical_digest(by_year[year]) for year in years}
     receipt = {
         "schema_version": 1,
         "kind": "dwd_trading_calendar_build_receipt",
@@ -1171,9 +1157,7 @@ def _build_locked(
         "sources": source_reconciliation,
         "source_rows_selected": len(selected.rows),
         "output_rows": len(rows),
-        "excluded_noneligible_rows": sum(
-            item["affected_rows"] for item in coverage_exceptions
-        ),
+        "excluded_noneligible_rows": sum(item["affected_rows"] for item in coverage_exceptions),
         "unaccounted_selected_rows": 0,
         "conflicting_rows": 0,
     }
@@ -1213,9 +1197,7 @@ def _build_locked(
         "input_plan_digest": plan["plan_digest"],
         "completed_years": {},
     }
-    checkpoint = _prepare_work(
-        work, checkpoint_path, checkpoint_identity, output_files
-    )
+    checkpoint = _prepare_work(work, checkpoint_path, checkpoint_identity, output_files)
     completed = dict(_mapping(checkpoint.get("completed_years"), "completed years"))
 
     try:
@@ -1273,12 +1255,8 @@ def _build_locked(
     checkpoint = {**checkpoint_identity, "completed_years": completed}
     _write_json_atomic(checkpoint_path, checkpoint)
     _write_json_atomic(work / "receipts/trading-calendar-build.json", receipt)
-    _write_json_atomic(
-        work / "reconciliation/source-row-reconciliation.json", reconciliation
-    )
-    manifest_files = [
-        _file_record(work, work / relative) for relative in sorted(output_files)
-    ]
+    _write_json_atomic(work / "reconciliation/source-row-reconciliation.json", reconciliation)
+    manifest_files = [_file_record(work, work / relative) for relative in sorted(output_files)]
     manifest = {
         "schema_version": 1,
         "kind": "dwd_trading_calendar_candidate",

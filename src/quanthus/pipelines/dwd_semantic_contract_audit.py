@@ -21,6 +21,10 @@ from quanthus.pipelines.securities_warehouse.domain_base import (
     DomainBaseError,
     verify_domain_base,
 )
+from quanthus.pipelines.securities_warehouse.model_extension import (
+    ModelExtensionError,
+    verify_additive_model_extension,
+)
 
 
 class DwdSemanticContractAuditError(RuntimeError):
@@ -90,10 +94,22 @@ def _names(value: object, label: str) -> tuple[str, ...]:
     return result
 
 
-def load_semantic_contracts(model_path: Path) -> dict[str, SemanticTableContract]:
+def load_semantic_contracts(
+    model_path: Path, extension_path: Path | None = None
+) -> dict[str, SemanticTableContract]:
     """Load keys, relationships, intervals, and constraints for exactly 33 tables."""
 
     model = _object(model_path, "DWD model")
+    table_extensions: Mapping[str, Any] = {}
+    if extension_path is not None:
+        try:
+            extension, _extension_sha = verify_additive_model_extension(model_path, extension_path)
+        except ModelExtensionError as exc:
+            raise DwdSemanticContractAuditError("DWD model extension failed verification") from exc
+        raw_extensions = extension.get("table_extensions")
+        if not isinstance(raw_extensions, Mapping):
+            raise DwdSemanticContractAuditError("DWD model extension tables are invalid")
+        table_extensions = raw_extensions
     profiles = model.get("time_profiles")
     raw_tables = model.get("tables")
     lineage = model.get("column_sets", {}).get("lineage")
@@ -125,9 +141,26 @@ def load_semantic_contracts(model_path: Path) -> dict[str, SemanticTableContract
         profile = profiles.get(profile_name)
         if not isinstance(profile, Mapping):
             raise DwdSemanticContractAuditError(f"unknown time profile: {name}.{profile_name}")
-        fields = frozenset(lineage) | frozenset(profile) | frozenset(columns)
-        business_key = _names(raw.get("business_key"), f"{name}.business_key")
+        raw_extension = table_extensions.get(name, {})
+        if not isinstance(raw_extension, Mapping):
+            raise DwdSemanticContractAuditError(f"invalid semantic extension: {name}")
+        extension_columns = raw_extension.get("columns", {})
+        if not isinstance(extension_columns, Mapping):
+            raise DwdSemanticContractAuditError(f"invalid extension columns: {name}")
+        fields = (
+            frozenset(lineage)
+            | frozenset(profile)
+            | frozenset(columns)
+            | frozenset(extension_columns)
+        )
+        base_business_key = _names(raw.get("business_key"), f"{name}.business_key")
+        raw_key_append = raw_extension.get("business_key_append", [])
+        if not isinstance(raw_key_append, list):
+            raise DwdSemanticContractAuditError(f"invalid key append: {name}")
+        business_key = (*base_business_key, *(str(value) for value in raw_key_append))
         row_key = _names(raw.get("row_key"), f"{name}.row_key")
+        if raw_key_append:
+            row_key = (*row_key[:-1], *(str(value) for value in raw_key_append), row_key[-1])
         if not set(business_key).issubset(fields) or not set(row_key).issubset(fields):
             raise DwdSemanticContractAuditError(f"key fields are absent for {name}")
         if row_key != (*business_key, "knowledge_from"):
@@ -435,19 +468,48 @@ def _lineage_metrics(connection: Any, source: str) -> dict[str, int]:
 
 
 def _numeric_metrics(
-    connection: Any, source: str, contract: SemanticTableContract
+    connection: Any,
+    source: str,
+    contract: SemanticTableContract,
+    *,
+    quality_source: str | None = None,
 ) -> dict[str, int]:
     predicates = _numeric_predicates(contract)
     if not predicates:
         return {}
-    row = connection.execute(
-        "SELECT "
-        + ", ".join(f"count(*) FILTER (WHERE {predicate})" for predicate in predicates.values())
-        + f" FROM {source}"
-    ).fetchone()
-    if row is None:
-        raise DwdSemanticContractAuditError("numeric aggregate returned no row")
-    return {name: int(value) for name, value in zip(predicates, row, strict=True)}
+    result: dict[str, int] = {}
+    for name, predicate in predicates.items():
+        accepted_filter = ""
+        alias = ""
+        if name == "ohlc_envelope_rows" and quality_source is not None:
+            alias = " AS audited"
+            accepted_filter = f"""
+              AND NOT EXISTS (
+                SELECT 1 FROM {quality_source} AS quality
+                WHERE quality.affected_table = 'dwd_security_bar'
+                  AND quality.rule_id = 'DWD_SECURITY_BAR_OHLC_ENVELOPE_V1'
+                  AND quality.resolution_state = 'OPEN_ACCEPTED'
+                  AND quality.disposition = 'ACCEPTED_LIMITATION'
+                  AND quality.affected_effective_at = audited.observation_start
+                  AND json_extract_string(
+                        quality.affected_business_key_json, '$.listing_id'
+                      ) = audited.listing_id
+                  AND CAST(json_extract_string(
+                        quality.affected_business_key_json, '$.observation_start'
+                      ) AS TIMESTAMPTZ) = audited.observation_start
+                  AND json_extract_string(
+                        quality.affected_business_key_json, '$.interval_size'
+                      ) = audited.interval_size
+                  AND json_extract_string(
+                        quality.affected_business_key_json, '$.price_basis'
+                      ) = audited.price_basis
+              )
+            """
+        result[name] = _count(
+            connection,
+            f"SELECT count(*) FROM {source}{alias} WHERE ({predicate}){accepted_filter}",
+        )
+    return result
 
 
 def _numeric_predicates(contract: SemanticTableContract) -> dict[str, str]:
@@ -716,6 +778,7 @@ def audit_dwd_semantic_contracts(
     *,
     root: Path,
     model_path: Path,
+    extension_path: Path | None = None,
     scratch: Path,
     checkpoint_path: Path,
     memory_limit: str = "2GB",
@@ -736,12 +799,11 @@ def audit_dwd_semantic_contracts(
     except DomainBaseError as exc:
         raise DwdSemanticContractAuditError(f"DWD Base verification failed: {exc}") from exc
     manifest = _object(root / "manifest.json", "DWD Base manifest")
-    contracts = load_semantic_contracts(model_path)
+    contracts = load_semantic_contracts(model_path, extension_path)
     table_paths = _manifest_payload_files(root, manifest, table_names=sorted(contracts))
     sources = {table: _parquet_source(paths) for table, paths in table_paths.items()}
     table_compressed_bytes = {
-        table: sum(path.stat().st_size for path in paths)
-        for table, paths in table_paths.items()
+        table: sum(path.stat().st_size for path in paths) for table, paths in table_paths.items()
     }
     table_order = sorted(
         contracts,
@@ -752,12 +814,18 @@ def audit_dwd_semantic_contracts(
         raise DwdSemanticContractAuditError("DWD Base manifest row_counts are invalid")
 
     model_sha256 = "sha256:" + hashlib.sha256(model_path.read_bytes()).hexdigest()
+    extension_sha256 = (
+        "sha256:" + hashlib.sha256(extension_path.read_bytes()).hexdigest()
+        if extension_path is not None
+        else None
+    )
     thread_limit = dwd_thread_limit()
     audit_identity = {
         "package_id": verified.package_id,
         "manifest_sha256": verified.manifest_sha256,
         "content_digest": verified.content_digest,
         "model_sha256": model_sha256,
+        "model_extension_sha256": extension_sha256,
         "auditor_sha256": "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "memory_limit": memory_limit,
         "threads": thread_limit,
@@ -790,7 +858,14 @@ def audit_dwd_semantic_contracts(
             if aggregate is None:
                 raise DwdSemanticContractAuditError(f"aggregate returned no row: {table}")
             _progress(table, "numeric_invariants")
-            numeric = _numeric_metrics(connection, source, contract)
+            numeric = _numeric_metrics(
+                connection,
+                source,
+                contract,
+                quality_source=(
+                    sources["dwd_quality_exception"] if table == "dwd_security_bar" else None
+                ),
+            )
             _progress(table, "key_versions")
             key_versions = _partitioned_key_version_metrics(
                 connection, table_paths[table], contract
@@ -870,6 +945,8 @@ def audit_dwd_semantic_contracts(
         "model": {
             "path": str(model_path.resolve()),
             "sha256": model_sha256,
+            "extension_path": str(extension_path.resolve()) if extension_path else None,
+            "extension_sha256": extension_sha256,
         },
         "auditor_sha256": audit_identity["auditor_sha256"],
         "execution": {
@@ -893,6 +970,7 @@ def audit_dwd_semantic_contracts(
             "kind": report["kind"],
             "base_release": report["base_release"],
             "model_sha256": report["model"]["sha256"],
+            "model_extension_sha256": report["model"]["extension_sha256"],
             "summary": report["summary"],
             "tables": report["tables"],
         }

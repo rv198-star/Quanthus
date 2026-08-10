@@ -8,6 +8,7 @@ from quanthus.pipelines.dwd_semantic_contract_audit import (
     _interval_metrics,
     _key_version_metrics,
     _load_checkpoint,
+    _numeric_metrics,
     _numeric_predicates,
     _partition_confines_business_key,
     _partitioned_key_version_metrics,
@@ -212,6 +213,73 @@ class DwdSemanticContractAuditTests(unittest.TestCase):
             _numeric_predicates(contracts["dwd_adjustment_factor"])["nonpositive_factor_rows"],
             "factor_value <= 0",
         )
+
+    def test_ohlc_finding_requires_an_exact_governed_exception_match(self) -> None:
+        import duckdb
+
+        connection = duckdb.connect(":memory:")
+        try:
+            connection.execute(
+                """
+                CREATE TABLE bars AS SELECT
+                  'listing-1'::VARCHAR AS listing_id,
+                  TIMESTAMPTZ '2026-07-31 07:00:00+00:00' AS observation_start,
+                  '1d'::VARCHAR AS interval_size,
+                  'UNADJUSTED'::VARCHAR AS price_basis,
+                  10.0::DOUBLE AS open,
+                  9.0::DOUBLE AS high,
+                  8.0::DOUBLE AS low,
+                  8.5::DOUBLE AS close,
+                  1.0::DOUBLE AS volume,
+                  1.0::DOUBLE AS turnover,
+                  1::BIGINT AS trade_count
+                """
+            )
+            key = (
+                '{"interval_size":"1d","listing_id":"listing-1",'
+                '"observation_start":"2026-07-31T07:00:00+00:00",'
+                '"price_basis":"UNADJUSTED"}'
+            )
+            connection.execute(
+                """
+                CREATE TABLE quality (
+                  affected_table VARCHAR,
+                  rule_id VARCHAR,
+                  resolution_state VARCHAR,
+                  disposition VARCHAR,
+                  affected_effective_at TIMESTAMPTZ,
+                  affected_business_key_json VARCHAR
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO quality VALUES (
+                  'dwd_security_bar',
+                  'DWD_SECURITY_BAR_OHLC_ENVELOPE_V1',
+                  'OPEN_ACCEPTED',
+                  'ACCEPTED_LIMITATION',
+                  TIMESTAMPTZ '2026-07-31 07:00:00+00:00',
+                  ?
+                )
+                """,
+                [key],
+            )
+            contract = load_semantic_contracts(ROOT / "config/pipelines/dwd-domain-model.v1.json")[
+                "dwd_security_bar"
+            ]
+
+            accepted = _numeric_metrics(connection, "bars", contract, quality_source="quality")
+            self.assertEqual(accepted["ohlc_envelope_rows"], 0)
+
+            connection.execute(
+                "UPDATE quality SET affected_business_key_json = "
+                "replace(affected_business_key_json, 'listing-1', 'listing-2')"
+            )
+            mismatched = _numeric_metrics(connection, "bars", contract, quality_source="quality")
+            self.assertEqual(mismatched["ohlc_envelope_rows"], 1)
+        finally:
+            connection.close()
 
 
 if __name__ == "__main__":

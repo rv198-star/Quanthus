@@ -8,9 +8,13 @@ from pathlib import Path
 
 from quanthus.pipelines.securities_warehouse.domain_base import (
     _EXPECTED_KINDS,
+    DomainBaseError,
+    import_domain_candidate,
     publish_domain_base,
     seal_domain_base_candidate,
     verify_domain_base,
+    verify_domain_candidate,
+    verify_imported_domain_candidate,
 )
 
 
@@ -98,6 +102,56 @@ class DomainBaseTests(unittest.TestCase):
 
             self.assertEqual(result.table_count, 33)
             self.assertFalse((output.parent / "BASE_CURRENT.json").exists())
+
+    def test_import_hardlinks_native_candidate_and_revalidates_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidates, source_payloads = self._candidates(root)
+            source = candidates["listed_company"]
+            output = root / "target" / "listed-company"
+
+            imported = import_domain_candidate(
+                source=source,
+                output=output,
+                domain="listed_company",
+                source_run_id="run-1",
+                source_plan_digest="sha256:plan",
+                target_run_id="run-2",
+                target_plan_digest="sha256:plan-2",
+                target_bindings={"model_sha256": "sha256:model"},
+                source_authority={"sha256": "sha256:audit"},
+            )
+
+            verified = verify_domain_candidate(
+                output,
+                domain="listed_company",
+                run_id="run-2",
+                input_plan_digest="sha256:plan-2",
+            )
+            self.assertEqual(verified.semantic_digest, imported.semantic_digest)
+            self.assertEqual(
+                (output / "payload/listed_company/part-4.parquet").stat().st_ino,
+                source_payloads["listed_company"].stat().st_ino,
+            )
+            self.assertEqual(
+                verify_imported_domain_candidate(
+                    output,
+                    domain="listed_company",
+                    run_id="run-2",
+                    input_plan_digest="sha256:plan-2",
+                    expected_bindings={"model_sha256": "sha256:model"},
+                ),
+                imported,
+            )
+
+            source_payloads["listed_company"].write_bytes(b"mutated")
+            with self.assertRaisesRegex(DomainBaseError, "checksum differs"):
+                verify_domain_candidate(
+                    output,
+                    domain="listed_company",
+                    run_id="run-2",
+                    input_plan_digest="sha256:plan-2",
+                )
 
 
 if __name__ == "__main__":

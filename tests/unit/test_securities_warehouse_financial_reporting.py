@@ -23,6 +23,7 @@ from quanthus.pipelines.securities_warehouse.financial_reporting import (
     _audit_financial_candidate,
     _batch_rows,
     _finalize_concepts,
+    _plan_date,
     _reporting_batch_rows,
     _write_batch,
     audit_financial_native_sources,
@@ -53,6 +54,11 @@ def _envelope(payload: dict[str, object]) -> dict[str, object]:
 
 
 class FinancialEnvelopeTests(unittest.TestCase):
+    def test_plan_date_accepts_the_sealed_plan_format(self) -> None:
+        self.assertEqual(_plan_date("2026-07-31", "through_date").isoformat(), "2026-07-31")
+        with self.assertRaisesRegex(FinancialReportingBuildError, "YYYY-MM-DD"):
+            _plan_date("20260731", "through_date")
+
     def test_decodes_byte_literal_gzip_and_hash_checks_payload(self) -> None:
         row = _envelope(
             {

@@ -1057,6 +1057,15 @@ def _report_date(value: object, field: str) -> date:
         raise FinancialReportingBuildError(f"{field} must use a valid YYYYMMDD date") from exc
 
 
+def _plan_date(value: object, field: str) -> date:
+    if not isinstance(value, str) or not value:
+        raise FinancialReportingBuildError(f"{field} must use YYYY-MM-DD")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise FinancialReportingBuildError(f"{field} must use a valid YYYY-MM-DD date") from exc
+
+
 def _period_coordinate(period_end: date) -> datetime:
     return datetime.combine(period_end, time.min, tzinfo=_SHANGHAI).astimezone(timezone.utc)
 
@@ -2225,7 +2234,7 @@ def _candidate_identity(
         "builder_contract": _FINANCIAL_BUILDER_CONTRACT,
     }
     cutoff = _utc_timestamp(semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff")
-    through_date = _report_date(semantic_plan.get("through_date"), "financial through_date")
+    through_date = _plan_date(semantic_plan.get("through_date"), "financial through_date")
     return identity, inventory, resolver, audit, cutoff, through_date
 
 
@@ -2285,7 +2294,7 @@ def audit_financial_native_source_package(
     ]
     inventory = select_financial_reporting_sources(records, ods_package)
     cutoff = _utc_timestamp(semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff")
-    through_date = _report_date(semantic_plan.get("through_date"), "financial through_date")
+    through_date = _plan_date(semantic_plan.get("through_date"), "financial through_date")
     audit = audit_financial_native_sources(
         inventory,
         company_resolver=resolver,

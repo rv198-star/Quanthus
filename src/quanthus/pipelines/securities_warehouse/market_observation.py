@@ -841,7 +841,9 @@ def _configure_connection(connection: Any, scratch: Path) -> None:
     configure_duckdb_threads(connection, maximum=2)
     connection.execute("SET preserve_insertion_order=true")
     connection.execute("SET enable_progress_bar=false")
-    connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1792)}MB'")
+    connection.execute(
+        f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1792, minimum_mb=7168)}MB'"
+    )
     connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
 
 

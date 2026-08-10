@@ -41,11 +41,11 @@ def test_full_builder_exports_the_governed_thread_limit(
 ) -> None:
     monkeypatch.delenv(DWD_THREAD_LIMIT_ENV, raising=False)
 
-    scratch = _configure_scratch(tmp_path, 4)
+    scratch = _configure_scratch(tmp_path, 2)
 
     assert scratch == tmp_path / "scratch/full-build"
     assert scratch.is_dir()
-    assert os.environ[DWD_THREAD_LIMIT_ENV] == "4"
+    assert os.environ[DWD_THREAD_LIMIT_ENV] == "2"
 
 
 def test_gpu_full_build_cutoff_covers_all_frozen_input_authority() -> None:

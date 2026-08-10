@@ -87,7 +87,8 @@ def test_full_build_service_is_bounded_and_never_auto_resumes() -> None:
     assert "MemoryHigh=10G" in service
     assert "MemoryMax=12G" in service
     assert "LimitAS=" not in service
-    assert "CPUQuota=400%" in service
+    assert "--thread-limit 2" in service
+    assert "CPUQuota=200%" in service
     assert "Restart=no" in service
     assert "SuccessExitStatus=143" in service
     assert "RuntimeMaxSec=72h" in service

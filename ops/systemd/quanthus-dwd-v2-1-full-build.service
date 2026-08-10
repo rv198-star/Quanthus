@@ -18,7 +18,7 @@ Environment=TMPDIR=/srv/quanthus/gpu-p100-dwd-workspace/control/tmp
 Environment=TMP=/srv/quanthus/gpu-p100-dwd-workspace/control/tmp
 Environment=TEMP=/srv/quanthus/gpu-p100-dwd-workspace/control/tmp
 ExecStartPre=/usr/bin/install -d -m 0750 /srv/quanthus/gpu-p100-dwd-workspace/control/tmp
-ExecStart=/home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python /home/rv192/work/Quanthus-issue78-audit-closure/ops/bin/build-dwd-v2-1-rebuild --repository /home/rv192/work/Quanthus-issue78-audit-closure --workspace /srv/quanthus/gpu-p100-dwd-workspace --ods-base /srv/quanthus/ods/base/ods-base-202607-v2 --dwd-base /srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2 --environment /etc/quanthus/gpu-p100-dwd-rebuild.env --run-id ${QUANTHUS_DWD_RUN_ID} --expected-revision ${QUANTHUS_DWD_CODE_REVISION} --expected-contract-digest ${QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST} --expected-findings-digest ${QUANTHUS_DWD_FINDINGS_DIGEST} --expected-remediation-digest ${QUANTHUS_DWD_REMEDIATION_DIGEST} --minimum-free-bytes ${QUANTHUS_DWD_MINIMUM_FREE_BYTES} --knowledge-cutoff ${QUANTHUS_DWD_KNOWLEDGE_CUTOFF} --through-date ${QUANTHUS_DWD_THROUGH_DATE} --runtime-id ${QUANTHUS_DWD_RUNTIME_ID} --thread-limit 4 --resume
+ExecStart=/home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python /home/rv192/work/Quanthus-issue78-audit-closure/ops/bin/build-dwd-v2-1-rebuild --repository /home/rv192/work/Quanthus-issue78-audit-closure --workspace /srv/quanthus/gpu-p100-dwd-workspace --ods-base /srv/quanthus/ods/base/ods-base-202607-v2 --dwd-base /srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2 --environment /etc/quanthus/gpu-p100-dwd-rebuild.env --run-id ${QUANTHUS_DWD_RUN_ID} --expected-revision ${QUANTHUS_DWD_CODE_REVISION} --expected-contract-digest ${QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST} --expected-findings-digest ${QUANTHUS_DWD_FINDINGS_DIGEST} --expected-remediation-digest ${QUANTHUS_DWD_REMEDIATION_DIGEST} --minimum-free-bytes ${QUANTHUS_DWD_MINIMUM_FREE_BYTES} --knowledge-cutoff ${QUANTHUS_DWD_KNOWLEDGE_CUTOFF} --through-date ${QUANTHUS_DWD_THROUGH_DATE} --runtime-id ${QUANTHUS_DWD_RUNTIME_ID} --thread-limit 2 --resume
 NoNewPrivileges=true
 PrivateNetwork=true
 PrivateTmp=true
@@ -27,7 +27,7 @@ ProtectSystem=strict
 ReadWritePaths=/srv/quanthus/gpu-p100-dwd-workspace
 MemoryHigh=10G
 MemoryMax=12G
-CPUQuota=400%
+CPUQuota=200%
 TasksMax=64
 UMask=0027
 Restart=no

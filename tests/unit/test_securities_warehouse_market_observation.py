@@ -183,7 +183,7 @@ class MarketObservationQueryTests(unittest.TestCase):
     def test_connection_caps_market_workers_without_reducing_spill_memory(self) -> None:
         connection = duckdb.connect()
         scratch = self.root / "market-scratch"
-        with patch.dict("os.environ", {DWD_THREAD_LIMIT_ENV: "4"}):
+        with patch.dict("os.environ", {DWD_THREAD_LIMIT_ENV: "2"}):
             _configure_connection(connection, scratch)
         settings = connection.execute(
             """

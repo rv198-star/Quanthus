@@ -63,7 +63,19 @@ def test_duckdb_memory_scales_with_the_governed_worker_count() -> None:
     assert dwd_duckdb_memory_limit_mb(1536, {}) == 1536
     assert dwd_duckdb_memory_limit_mb(1536, {DWD_THREAD_LIMIT_ENV: "4"}) == 6144
     assert dwd_duckdb_memory_limit_mb(1792, {DWD_THREAD_LIMIT_ENV: "4"}) == 7168
+    assert (
+        dwd_duckdb_memory_limit_mb(
+            1792,
+            {DWD_THREAD_LIMIT_ENV: "2"},
+            minimum_mb=7168,
+        )
+        == 7168
+    )
 
     for invalid in (0, 2049, True):
         with pytest.raises(DwdExecutionResourceError, match="per-thread memory"):
             dwd_duckdb_memory_limit_mb(invalid, {DWD_THREAD_LIMIT_ENV: "4"})
+
+    for invalid in (0, 8193, True):
+        with pytest.raises(DwdExecutionResourceError, match="minimum memory"):
+            dwd_duckdb_memory_limit_mb(1792, minimum_mb=invalid)

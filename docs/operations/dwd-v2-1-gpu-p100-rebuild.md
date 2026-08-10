@@ -100,7 +100,7 @@ sudo systemctl daemon-reload
 sudo systemctl start quanthus-dwd-v2-1-full-build.service
 ```
 
-The service is sequential, network-isolated, limited to four CPUs and 14 GiB, and has
+The service is sequential, network-isolated, limited to two CPUs and 12 GiB, and has
 `Restart=no`. All temporary directories are pinned below `runs/<run-id>/scratch/full-build` on the
 ext4 workspace. Build and audit checkpoints allow an explicitly authorized later invocation to
 continue without repeating verified domains or completed audit tables. Normal success is the

@@ -65,7 +65,7 @@ class TradabilityStateCandidateVerification:
     partition_counts: dict[str, int]
 
 
-_BUILDER_REVISION = "tradability-state-v3"
+_BUILDER_REVISION = "tradability-state-v4"
 _OWNED_TABLES = (
     "dwd_security_status_interval",
     "dwd_listing_status_interval",
@@ -193,8 +193,6 @@ def _schemas() -> dict[str, Any]:
                 pa.field("upper_price", pa.decimal128(38, 10), optional),
                 pa.field("lower_price", pa.decimal128(38, 10), optional),
                 pa.field("input_revision_digest", pa.string(), required),
-                pa.field("observation_start_year", pa.string(), required),
-                pa.field("observation_start_month", pa.string(), required),
             ]
         ),
         "dwd_observation_gap": pa.schema(
@@ -208,8 +206,6 @@ def _schemas() -> dict[str, Any]:
                 pa.field("gap_reason", pa.string(), required),
                 pa.field("is_expected", pa.bool_(), required),
                 pa.field("evidence_digest", pa.string(), required),
-                pa.field("affected_effective_at_year", pa.string(), required),
-                pa.field("affected_effective_at_month", pa.string(), required),
             ]
         ),
     }
@@ -251,7 +247,6 @@ def _verify_model_contract(model: Mapping[str, Any]) -> None:
             names |= {"observation_start", "observation_end"}
         elif profile == "governance_event":
             names |= {"affected_effective_at", "detected_at"}
-        names |= set(contract.get("partition_by", []))
         if names != set(schemas[table].names):
             raise TradabilityStateBuildError(f"physical schema differs from model: {table}")
 
@@ -975,18 +970,11 @@ def _normalize_output(
         )
         row_count = 0
         try:
-            partition_values = (
-                _partition_values(relative_parent, partition_columns) if partition_columns else {}
-            )
+            if partition_columns:
+                _partition_values(relative_parent, partition_columns)
             for raw in sorted(groups[relative_parent]):
                 for batch in pq.ParquetFile(raw).iter_batches(batch_size=122_880):
                     value = pa.Table.from_batches([batch])
-                    for column in partition_columns:
-                        if column not in value.column_names:
-                            value = value.append_column(
-                                column,
-                                pa.array([partition_values[column]] * value.num_rows),
-                            )
                     value = value.select(schema.names).cast(schema)
                     writer.write_table(value, row_group_size=122_880)
                     row_count += value.num_rows

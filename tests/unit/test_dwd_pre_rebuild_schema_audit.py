@@ -13,6 +13,19 @@ from quanthus.pipelines.dwd_pre_rebuild_audit import (
     load_table_contracts,
     write_phase_b_report,
 )
+from quanthus.pipelines.securities_warehouse.ownership_capital import (
+    ownership_capital_schemas,
+)
+from quanthus.pipelines.securities_warehouse.quality_governance import (
+    _QUALITY_PARTITION_COLUMN,
+    quality_governance_schema,
+)
+from quanthus.pipelines.securities_warehouse.tradability_state import (
+    _PARTITIONED_TABLES,
+)
+from quanthus.pipelines.securities_warehouse.tradability_state import (
+    _schemas as tradability_schemas,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -56,6 +69,45 @@ class DwdPreRebuildSchemaAuditTests(unittest.TestCase):
         self.assertEqual(
             contracts["dwd_security_bar"].partition_by,
             ("interval_size", "observation_start_year", "observation_start_month"),
+        )
+
+    def test_failed_candidate_writers_match_frozen_schema_and_partition_contracts(self) -> None:
+        contracts = load_table_contracts(
+            ROOT / "config/pipelines/dwd-domain-model.v1.json",
+            ROOT / "config/pipelines/dwd-domain-model.v1.1-extension.json",
+        )
+        schemas = {
+            **tradability_schemas(),
+            **ownership_capital_schemas(),
+            "dwd_quality_exception": quality_governance_schema(),
+        }
+        failed_tables = {
+            "dwd_observation_gap",
+            "dwd_quality_exception",
+            "dwd_share_capital_observation",
+            "dwd_shareholder_count_observation",
+            "dwd_shareholding_change",
+            "dwd_shareholding_observation",
+            "dwd_tradability_state",
+        }
+
+        for table in failed_tables:
+            self.assertEqual(
+                schemas[table].names,
+                [field.name for field in contracts[table].fields],
+                table,
+            )
+        self.assertEqual(
+            _PARTITIONED_TABLES["dwd_tradability_state"],
+            contracts["dwd_tradability_state"].partition_by,
+        )
+        self.assertEqual(
+            _PARTITIONED_TABLES["dwd_observation_gap"],
+            contracts["dwd_observation_gap"].partition_by,
+        )
+        self.assertEqual(
+            (_QUALITY_PARTITION_COLUMN,),
+            contracts["dwd_quality_exception"].partition_by,
         )
 
     def test_schema_drift_reports_type_nullable_and_order(self) -> None:

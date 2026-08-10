@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+import pyarrow.parquet as pq
+
+from quanthus.pipelines.dwd_pre_rebuild_audit import load_table_contracts
 from quanthus.pipelines.securities_warehouse.quality_governance import (
     QualityGovernanceBuildError,
+    _write_quality_rows,
     quality_exception_rows,
+    quality_governance_schema,
     validate_domain_accounting_receipt,
 )
+
+_ROOT = Path(__file__).resolve().parents[2]
 
 _CONTRACT = {
     "contract_id": "quanthus-dwd-domain-source-accounting-receipt-v1",
@@ -79,6 +89,41 @@ def _receipt() -> dict[str, object]:
 
 
 class QualityGovernanceTests(unittest.TestCase):
+    def test_physical_schema_order_matches_the_frozen_extended_model(self) -> None:
+        contract = load_table_contracts(
+            _ROOT / "config/pipelines/dwd-domain-model.v1.json",
+            _ROOT / "config/pipelines/dwd-domain-model.v1.1-extension.json",
+        )["dwd_quality_exception"]
+
+        self.assertEqual(
+            quality_governance_schema().names,
+            [field.name for field in contract.fields],
+        )
+
+    def test_writer_derives_partition_year_and_keeps_it_out_of_physical_schema(self) -> None:
+        rows = quality_exception_rows(
+            [_receipt()],
+            contract=_CONTRACT,
+            run_id="run-1",
+            input_plan_digest="sha256:plan",
+        )
+        rows[0]["detected_at"] = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            relative = _write_quality_rows(
+                root,
+                rows,
+                default_detected_at="2026-07-31T15:59:59Z",
+            )
+            expected = (
+                "payload/governance/dwd_quality_exception/"
+                "detected_at_year=2025/part-00000.parquet"
+            )
+            self.assertEqual(relative, [expected])
+            schema = pq.ParquetFile(root / expected).schema_arrow
+            self.assertTrue(schema.equals(quality_governance_schema()))
+            self.assertNotIn("detected_at_year", schema.names)
+
     def test_quality_rows_normalize_iso_hour_timezone_offset(self) -> None:
         receipt = _receipt()
         receipt["exceptions"][0]["affected_effective_at"] = (  # type: ignore[index]

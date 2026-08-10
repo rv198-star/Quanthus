@@ -930,12 +930,16 @@ _OWNED_TABLES = (
 )
 
 
-def _year_for_row(table: str, row: Mapping[str, Any]) -> int:
+def _partition_for_row(table: str, row: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
     if table == "dwd_shareholder_count_observation":
-        return row["period_end"].year
+        return (("period_end_year", f"{row['period_end'].year:04d}"),)
     if table == "dwd_shareholding_change":
-        return row["effective_at"].year
-    return row["observation_start"].year
+        effective_at = row["effective_at"]
+        return (
+            ("effective_at_year", f"{effective_at.year:04d}"),
+            ("effective_at_month", f"{effective_at.month:02d}"),
+        )
+    return (("observation_start_year", f"{row['observation_start'].year:04d}"),)
 
 
 def _write_ownership_rows(
@@ -949,18 +953,15 @@ def _write_ownership_rows(
         import pyarrow as pa
     except ModuleNotFoundError as exc:
         raise OwnershipCapitalBuildError("pyarrow is required for ownership writes") from exc
-    grouped: dict[int, list[Mapping[str, Any]]] = {}
+    grouped: dict[tuple[tuple[str, str], ...], list[Mapping[str, Any]]] = {}
     for row in rows:
-        grouped.setdefault(_year_for_row(table, row), []).append(row)
+        grouped.setdefault(_partition_for_row(table, row), []).append(row)
     files: list[str] = []
-    for year, values in sorted(grouped.items()):
-        path = (
-            work
-            / "payload/ownership_capital"
-            / table
-            / f"year={year:04d}"
-            / f"part-{batch_id}.parquet"
-        )
+    for partition, values in sorted(grouped.items()):
+        directory = work / "payload/ownership_capital" / table
+        for key, value in partition:
+            directory /= f"{key}={value}"
+        path = directory / f"part-{batch_id}.parquet"
         _write_parquet_atomic(path, pa.Table.from_pylist(values, schema=schema))
         files.append(path.relative_to(work).as_posix())
     return files

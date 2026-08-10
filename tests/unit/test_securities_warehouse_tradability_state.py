@@ -8,12 +8,14 @@ from pathlib import Path
 
 import duckdb
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 from quanthus.pipelines.securities_warehouse.tradability_state import (
     _audit_outputs,
     _configure_connection,
     _daily_status_relation_query,
     _expected_tradability_rows,
+    _normalize_output,
     _price_regime_internal_query,
     _schemas,
     _security_status_query,
@@ -119,6 +121,53 @@ class TradabilityStateQueryTests(unittest.TestCase):
         self.assertEqual(audit["actual_tradability_rows"], 7)
         self.assertEqual(audit["gap_reason_counts"], {"NO_SOURCE_OBSERVATION": 2})
         self.assertEqual(len(connection.queries), 11)
+
+    def test_normalizer_keeps_partition_values_in_path_only(self) -> None:
+        schema = _schemas()["dwd_tradability_state"]
+        raw_schema = pa.schema(
+            [*schema, pa.field("observation_start_year", pa.string())]
+        )
+        timestamp = datetime(2026, 7, 31, tzinfo=timezone.utc)
+        raw_table = pa.Table.from_pylist(
+            [
+                {
+                    "record_source": "audit",
+                    "source_record_id": "audit-1",
+                    "source_revision": "v1",
+                    "source_artifact_sha256": "sha256:source",
+                    "knowledge_from": timestamp,
+                    "observation_start": timestamp,
+                    "listing_id": "listing-1",
+                    "calendar_session_id": "session-1",
+                    "is_tradable": True,
+                    "can_buy": True,
+                    "can_sell": True,
+                    "reason_code": "REGULAR_TRADING",
+                    "input_revision_digest": "sha256:input",
+                    "observation_start_year": "2026",
+                }
+            ],
+            schema=raw_schema,
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            raw = root / "raw/observation_start_year=2026/observation_start_month=07"
+            raw.mkdir(parents=True)
+            pq.write_table(raw_table, raw / "part-0.parquet")
+            final = root / "final"
+            states = _normalize_output("dwd_tradability_state", root / "raw", final)
+            output = (
+                final
+                / "observation_start_year=2026/observation_start_month=07/part-00000.parquet"
+            )
+
+            self.assertEqual(len(states), 1)
+            self.assertTrue(output.is_file())
+            self.assertTrue(pq.ParquetFile(output).schema_arrow.equals(schema))
+            self.assertNotIn(
+                "observation_start_year", pq.ParquetFile(output).schema_arrow.names
+            )
 
     def _register(self, name: str, rows: list[dict[str, object]]) -> None:
         self.connection.register(name, pa.Table.from_pylist(rows))
@@ -421,8 +470,19 @@ class TradabilityStateQueryTests(unittest.TestCase):
                 "dwd_observation_gap",
             },
         )
+        self.assertNotIn(
+            "observation_start_year", _schemas()["dwd_tradability_state"].names
+        )
+        self.assertNotIn(
+            "observation_start_month", _schemas()["dwd_tradability_state"].names
+        )
+        self.assertNotIn(
+            "affected_effective_at_year", _schemas()["dwd_observation_gap"].names
+        )
+        self.assertNotIn(
+            "affected_effective_at_month", _schemas()["dwd_observation_gap"].names
+        )
 
 
 if __name__ == "__main__":
     unittest.main()
-    _expected_tradability_rows,

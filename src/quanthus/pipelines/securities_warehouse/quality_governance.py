@@ -264,17 +264,17 @@ def quality_governance_schema() -> Any:
             pa.field("affected_effective_at", pa.timestamp("us", tz="UTC"), nullable=False),
             pa.field("detected_at", pa.timestamp("us", tz="UTC"), nullable=False),
             pa.field("quality_exception_id", pa.string(), nullable=False),
-            pa.field("affected_domain", pa.string(), nullable=False),
             pa.field("affected_table", pa.string(), nullable=False),
             pa.field("affected_business_key_json", pa.string(), nullable=False),
             pa.field("rule_id", pa.string(), nullable=False),
-            pa.field("rule_version", pa.string(), nullable=False),
             pa.field("classification", pa.string(), nullable=False),
             pa.field("severity", pa.string(), nullable=False),
             pa.field("authority", pa.string(), nullable=False),
             pa.field("evidence_digest", pa.string(), nullable=False),
-            pa.field("disposition", pa.string(), nullable=False),
             pa.field("resolution_state", pa.string(), nullable=False),
+            pa.field("rule_version", pa.string(), nullable=False),
+            pa.field("affected_domain", pa.string(), nullable=False),
+            pa.field("disposition", pa.string(), nullable=False),
         ]
     )
 
@@ -289,6 +289,48 @@ _CANDIDATES = (
     ("industry_classification", "dwd_industry_classification_candidate"),
     ("ownership_capital", "dwd_ownership_capital_candidate"),
 )
+_QUALITY_PARTITION_COLUMN = "detected_at_year"
+
+
+def _write_quality_rows(
+    work: Path,
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    default_detected_at: str,
+) -> list[str]:
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise QualityGovernanceBuildError("pyarrow is required for quality build") from exc
+
+    grouped: dict[int, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        detected = row.get("detected_at")
+        if not isinstance(detected, datetime) or detected.utcoffset() is None:
+            raise QualityGovernanceBuildError("quality detected_at must be timezone-aware")
+        grouped.setdefault(detected.year, []).append(row)
+    if not grouped:
+        grouped[_timestamp(default_detected_at, "quality default detected_at").year] = []
+
+    files: list[str] = []
+    schema = quality_governance_schema()
+    for year, values in sorted(grouped.items()):
+        payload = (
+            work
+            / "payload/governance/dwd_quality_exception"
+            / f"{_QUALITY_PARTITION_COLUMN}={year:04d}"
+            / "part-00000.parquet"
+        )
+        payload.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(
+            pa.Table.from_pylist(values, schema=schema),
+            payload,
+            compression="zstd",
+            version="2.6",
+        )
+        files.append(payload.relative_to(work).as_posix())
+    return files
 
 
 def _object(path: Path) -> dict[str, Any]:
@@ -978,21 +1020,7 @@ def build_quality_governance(
             shutil.rmtree(work)
         for receipt in receipts:
             _write_json(work / "receipts/domain-accounting" / f"{receipt['domain']}.json", receipt)
-        try:
-            import pyarrow as pa
-            import pyarrow.parquet as pq
-        except ModuleNotFoundError as exc:
-            raise QualityGovernanceBuildError("pyarrow is required for quality build") from exc
-        payload = (
-            work / "payload/governance/dwd_quality_exception/detected_year=2026/part-00000.parquet"
-        )
-        payload.parent.mkdir(parents=True, exist_ok=True)
-        pq.write_table(
-            pa.Table.from_pylist(rows, schema=quality_governance_schema()),
-            payload,
-            compression="zstd",
-            version="2.6",
-        )
+        _write_quality_rows(work, rows, default_detected_at=detected_at)
         files = sorted(item for item in work.rglob("*") if item.is_file())
         identity = {
             "run_id": run_id,

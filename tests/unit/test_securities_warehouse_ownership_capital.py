@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import hashlib
 import unittest
+from datetime import date, datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from quanthus.pipelines.securities_warehouse.ownership_capital import (
     OwnershipCapitalBuildError,
     _file_source,
+    _partition_for_row,
     _single_record,
+    _write_ownership_rows,
     materialize_shareholder_count_row,
     ownership_capital_schemas,
     parse_f10_capital_structure,
@@ -51,6 +57,67 @@ class OwnershipCapitalTests(unittest.TestCase):
         )
         self.assertIn("holder_match_key", schemas["dwd_shareholding_observation"].names)
         self.assertIn("parser_version", schemas["dwd_shareholding_change"].names)
+
+    def test_partition_paths_match_the_frozen_model(self) -> None:
+        self.assertEqual(
+            _partition_for_row(
+                "dwd_share_capital_observation",
+                {"observation_start": datetime(2021, 7, 9, tzinfo=timezone.utc)},
+            ),
+            (("observation_start_year", "2021"),),
+        )
+        self.assertEqual(
+            _partition_for_row(
+                "dwd_shareholder_count_observation",
+                {"period_end": date(2022, 3, 31)},
+            ),
+            (("period_end_year", "2022"),),
+        )
+        self.assertEqual(
+            _partition_for_row(
+                "dwd_shareholding_change",
+                {"effective_at": datetime(2023, 4, 5, tzinfo=timezone.utc)},
+            ),
+            (("effective_at_year", "2023"), ("effective_at_month", "04")),
+        )
+        self.assertEqual(
+            _partition_for_row(
+                "dwd_shareholding_observation",
+                {"observation_start": datetime(2024, 5, 6, tzinfo=timezone.utc)},
+            ),
+            (("observation_start_year", "2024"),),
+        )
+
+    def test_writer_materializes_model_partition_names_without_schema_columns(self) -> None:
+        cases = (
+            (
+                "dwd_share_capital_observation",
+                {"observation_start": datetime(2021, 7, 9, tzinfo=timezone.utc)},
+                pa.schema([pa.field("observation_start", pa.timestamp("us", tz="UTC"))]),
+                "observation_start_year=2021",
+            ),
+            (
+                "dwd_shareholder_count_observation",
+                {"period_end": date(2022, 3, 31)},
+                pa.schema([pa.field("period_end", pa.date32())]),
+                "period_end_year=2022",
+            ),
+            (
+                "dwd_shareholding_change",
+                {"effective_at": datetime(2023, 4, 5, tzinfo=timezone.utc)},
+                pa.schema([pa.field("effective_at", pa.timestamp("us", tz="UTC"))]),
+                "effective_at_year=2023/effective_at_month=04",
+            ),
+        )
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for table, row, schema, partition in cases:
+                relative = _write_ownership_rows(root, table, [row], schema, "audit")
+                expected = (
+                    f"payload/ownership_capital/{table}/{partition}/part-audit.parquet"
+                )
+                self.assertEqual(relative, [expected])
+                self.assertTrue(pq.ParquetFile(root / expected).schema_arrow.equals(schema))
 
     def test_capital_matrix_expands_dates_and_units(self) -> None:
         rows = parse_f10_capital_structure(

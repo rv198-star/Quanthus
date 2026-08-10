@@ -1929,7 +1929,7 @@ def _build_locked(
     configure_duckdb_threads(connection)
     connection.execute("SET preserve_insertion_order=true")
     connection.execute("SET enable_progress_bar=false")
-    connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1400)}MB'")
+    connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1792)}MB'")
     connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
     _register_sources(connection, registry)
     listing_path = listed.root / "payload/listed_company/dwd_listing.parquet"

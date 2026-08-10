@@ -8,16 +8,19 @@ import unittest
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import patch
 
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from quanthus.pipelines.dwd_execution_resources import DWD_THREAD_LIMIT_ENV
 from quanthus.pipelines.securities_warehouse.market_observation import (
     MarketObservationBuildError,
     _audit_outputs,
     _bar_query,
     _canonical_digest,
+    _configure_connection,
     _copy_query,
     _create_scratch_directory,
     _expected_row_counts,
@@ -176,6 +179,23 @@ class MarketObservationQueryTests(unittest.TestCase):
             self.assertTrue(scratch.name.endswith(".duckdb-tmp"))
         finally:
             shutil.rmtree(scratch)
+
+    def test_connection_caps_market_workers_without_reducing_spill_memory(self) -> None:
+        connection = duckdb.connect()
+        scratch = self.root / "market-scratch"
+        with patch.dict("os.environ", {DWD_THREAD_LIMIT_ENV: "4"}):
+            _configure_connection(connection, scratch)
+        settings = connection.execute(
+            """
+            SELECT current_setting('threads'),
+                   current_setting('preserve_insertion_order'),
+                   current_setting('memory_limit'),
+                   current_setting('temp_directory')
+            """
+        ).fetchone()
+        connection.close()
+
+        self.assertEqual(settings, (2, True, "6.6 GiB", str(scratch)))
 
     def test_bar_query_normalizes_daily_and_minute_intervals(self) -> None:
         self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])

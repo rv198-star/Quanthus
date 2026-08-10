@@ -29,10 +29,16 @@ def dwd_thread_limit(environment: Mapping[str, str] | None = None) -> int:
 def configure_duckdb_threads(
     connection: Any,
     environment: Mapping[str, str] | None = None,
+    *,
+    maximum: int | None = None,
 ) -> int:
     """Apply and return the governed thread limit on one DuckDB connection."""
 
     thread_limit = dwd_thread_limit(environment)
+    if maximum is not None:
+        if isinstance(maximum, bool) or maximum < 1 or maximum > 4:
+            raise DwdExecutionResourceError("DuckDB thread maximum must be between 1 and 4")
+        thread_limit = min(thread_limit, maximum)
     connection.execute(f"SET threads={thread_limit}")
     return thread_limit
 

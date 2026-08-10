@@ -835,6 +835,16 @@ def _copy_query(
     connection.execute(sql)
 
 
+def _configure_connection(connection: Any, scratch: Path) -> None:
+    """Apply the spill-friendly market profile for the memory-constrained build node."""
+
+    configure_duckdb_threads(connection, maximum=2)
+    connection.execute("SET preserve_insertion_order=true")
+    connection.execute("SET enable_progress_bar=false")
+    connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1792)}MB'")
+    connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
+
+
 def _partition_digest(path: Path, schema: Any) -> tuple[str, int]:
     _, pa, pq = _dependencies()
     if not pq.ParquetFile(path).schema_arrow.equals(schema, check_metadata=True):
@@ -1926,11 +1936,7 @@ def _build_locked(
     duckdb, _, _ = _dependencies()
     scratch = _create_scratch_directory(output, build_identity, scratch_root)
     connection = duckdb.connect()
-    configure_duckdb_threads(connection)
-    connection.execute("SET preserve_insertion_order=true")
-    connection.execute("SET enable_progress_bar=false")
-    connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1792)}MB'")
-    connection.execute(f"SET temp_directory={_sql_literal(str(scratch))}")
+    _configure_connection(connection, scratch)
     _register_sources(connection, registry)
     listing_path = listed.root / "payload/listed_company/dwd_listing.parquet"
     venue_path = listed.root / "payload/listed_company/dwd_trading_venue.parquet"

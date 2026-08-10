@@ -42,6 +42,23 @@ def test_duckdb_connection_receives_the_exact_governed_limit() -> None:
     assert connection.queries == ["SET threads=4"]
 
 
+def test_duckdb_connection_honors_a_stage_specific_maximum() -> None:
+    connection = _Connection()
+
+    result = configure_duckdb_threads(
+        connection,
+        {DWD_THREAD_LIMIT_ENV: "4"},
+        maximum=2,
+    )
+
+    assert result == 2
+    assert connection.queries == ["SET threads=2"]
+
+    for invalid in (0, 5, True):
+        with pytest.raises(DwdExecutionResourceError, match="thread maximum"):
+            configure_duckdb_threads(connection, maximum=invalid)
+
+
 def test_duckdb_memory_scales_with_the_governed_worker_count() -> None:
     assert dwd_duckdb_memory_limit_mb(1536, {}) == 1536
     assert dwd_duckdb_memory_limit_mb(1536, {DWD_THREAD_LIMIT_ENV: "4"}) == 6144

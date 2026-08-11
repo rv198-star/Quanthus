@@ -277,6 +277,11 @@ def main() -> int:
     parser.add_argument("--sla-seconds", type=int)
     parser.add_argument("--dwd-sla-seconds", type=int)
     parser.add_argument("--poll-seconds", type=float)
+    parser.add_argument(
+        "--ods-only",
+        action="store_true",
+        help="seal the ODS lanes and catalog without starting the daily DWD build",
+    )
     args = parser.parse_args()
 
     node_id = os.environ.get("HERMES_ODS_NODE_ID", "cn01").strip().lower()
@@ -373,6 +378,7 @@ def main() -> int:
         "schema_version": 1,
         "kind": "ods_daily_orchestration",
         "node": node_id,
+        "mode": "ods_only" if args.ods_only else "ods_to_dwd",
         **common,
         "status": "acquiring",
         "lanes": {},
@@ -511,6 +517,8 @@ def main() -> int:
             "log": catalog_log,
         }
         if catalog_rc == 0:
+            if args.ods_only:
+                state["dwd"] = {"status": "not_requested"}
             dwd_base = Path(
                 os.environ.get(
                     "QUANTHUS_DWD_BASE",
@@ -529,31 +537,32 @@ def main() -> int:
                     "/srv/quanthus/dwd-dws-v2/daily",
                 )
             )
-            dwd_command = [
-                str(dwd_python),
-                str(dwd_runner),
-                "--market-date",
-                market_date.isoformat(),
-                "--release-root",
-                str(release_root),
-                "--base",
-                str(dwd_base),
-                "--release-config",
-                str(release_config),
-                "--daily-root",
-                str(dwd_daily_root),
-            ]
-            dwd_rc, dwd_log = _run_command(
-                dwd_command,
-                log_path=log_root / "dwd-daily-build.log",
-                timeout=_duration(dwd_deadline),
-            )
-            state["dwd"] = {
-                "status": "ready" if dwd_rc == 0 else "failed",
-                "returncode": dwd_rc,
-                "log": dwd_log,
-                "daily_root": str(dwd_daily_root),
-            }
+            if not args.ods_only:
+                dwd_command = [
+                    str(dwd_python),
+                    str(dwd_runner),
+                    "--market-date",
+                    market_date.isoformat(),
+                    "--release-root",
+                    str(release_root),
+                    "--base",
+                    str(dwd_base),
+                    "--release-config",
+                    str(release_config),
+                    "--daily-root",
+                    str(dwd_daily_root),
+                ]
+                dwd_rc, dwd_log = _run_command(
+                    dwd_command,
+                    log_path=log_root / "dwd-daily-build.log",
+                    timeout=_duration(dwd_deadline),
+                )
+                state["dwd"] = {
+                    "status": "ready" if dwd_rc == 0 else "failed",
+                    "returncode": dwd_rc,
+                    "log": dwd_log,
+                    "daily_root": str(dwd_daily_root),
+                }
     elif not lane_success:
         state["catalog"] = {"status": "blocked_by_lane_failure"}
         state["dwd"] = {"status": "blocked_by_lane_failure"}
@@ -561,26 +570,26 @@ def main() -> int:
     state["finished_at"] = _iso(_now())
     catalog_state = state.get("catalog") or {}
     dwd_state = state.get("dwd") or {}
-    state["status"] = (
-        "ready"
-        if lane_success
-        and catalog_state.get("status") == "ready"
-        and dwd_state.get("status") == "ready"
-        else "failed"
-    )
-    _write_run_state(run_root, state, ready=state["status"] == "ready")
+    ods_ready = lane_success and catalog_state.get("status") == "ready"
+    fully_ready = ods_ready and dwd_state.get("status") == "ready"
+    if args.ods_only and ods_ready:
+        state["status"] = "ods_ready"
+    else:
+        state["status"] = "ready" if fully_ready else "failed"
+    successful = state["status"] in {"ready", "ods_ready"}
+    _write_run_state(run_root, state, ready=successful)
     notification_context.update(
         {
             "status": state["status"],
             "finished_at": state["finished_at"],
         }
     )
-    if state["status"] == "ready":
+    if successful:
         notification_context["error_code"] = None
         notification_context["error"] = None
     _atomic_json(notification_context_path, notification_context)
     print(json.dumps(state, ensure_ascii=True, sort_keys=True))
-    return 0 if state["status"] == "ready" else 2
+    return 0 if successful else 2
 
 
 if __name__ == "__main__":

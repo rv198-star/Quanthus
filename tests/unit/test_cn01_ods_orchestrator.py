@@ -6,6 +6,7 @@ import os
 import stat
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -166,8 +167,18 @@ raise SystemExit(0)
 def test_cn01_orchestrator_ods_only_seals_catalog_without_starting_dwd(
     tmp_path: Path,
 ) -> None:
+    calls = tmp_path / "calls.log"
     runner = tmp_path / "runner.py"
-    _write_executable(runner, "#!/usr/bin/env python3\nraise SystemExit(0)\n")
+    _write_executable(
+        runner,
+        """#!/usr/bin/env python3
+from pathlib import Path
+import sys
+with Path(__CALLS__).open('a', encoding='utf-8') as stream:
+    stream.write(' '.join(sys.argv[1:]) + '\\n')
+raise SystemExit(0)
+""".replace("__CALLS__", repr(str(calls))),
+    )
     catalog_builder = tmp_path / "catalog.py"
     _write_executable(
         catalog_builder,
@@ -228,6 +239,17 @@ catalog.write_text('{"kind":"daily_ods_input_catalog"}\\n', encoding='ascii')
     assert state["catalog"]["status"] == "ready"
     assert state["dwd"] == {"status": "not_requested"}
     assert not dwd_marker.exists()
+    lane_calls = calls.read_text(encoding="utf-8").splitlines()
+    market_call = next(call for call in lane_calls if "--lane market-daily-core" in call)
+    deadline_text = market_call.split("--recovery-deadline-at ", 1)[1].split()[0]
+    recovery_deadline = datetime.fromisoformat(deadline_text)
+    assert recovery_deadline.tzinfo is not None
+    assert recovery_deadline > datetime.fromisoformat(state["started_at"].replace("Z", "+00:00"))
+    assert all(
+        "--recovery-deadline-at" not in call
+        for call in lane_calls
+        if "--lane market-daily-core" not in call
+    )
 
 
 def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:

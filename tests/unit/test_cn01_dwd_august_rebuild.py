@@ -12,6 +12,24 @@ REBUILD = ROOT / "ops/bin/rebuild-cn01-dwd-august-202608"
 
 def test_august_rebuild_uses_staging_root_in_market_date_order(tmp_path: Path) -> None:
     calls = tmp_path / "calls.log"
+    catalog_calls = tmp_path / "catalog-calls.log"
+    catalog_builder = tmp_path / "catalog-builder"
+    catalog_builder.write_text(
+        """#!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+market_date = args[args.index('--market-date') + 1]
+output = Path(args[args.index('--output') + 1])
+output.mkdir(parents=True, exist_ok=True)
+with Path(os.environ['CATALOG_CALLS']).open('a', encoding='ascii') as stream:
+    stream.write(market_date + '\\n')
+""",
+        encoding="ascii",
+    )
+    catalog_builder.chmod(catalog_builder.stat().st_mode | stat.S_IXUSR)
     fake_python = tmp_path / "python"
     fake_python.write_text(
         """#!/usr/bin/env python3
@@ -43,7 +61,9 @@ with Path(os.environ['REBUILD_CALLS']).open('a', encoding='ascii') as stream:
             "QUANTHUS_DWD_PYTHON": str(fake_python),
             "QUANTHUS_DWD_DAILY_ROOT": str(canonical),
             "QUANTHUS_DWD_DAILY_REBUILD_ROOT": str(rebuild),
+            "HERMES_ODS_CATALOG_BUILDER": str(catalog_builder),
             "REBUILD_CALLS": str(calls),
+            "CATALOG_CALLS": str(catalog_calls),
         }
     )
 
@@ -57,7 +77,7 @@ with Path(os.environ['REBUILD_CALLS']).open('a', encoding='ascii') as stream:
     )
 
     assert completed.returncode == 0, completed.stderr + completed.stdout
-    assert calls.read_text(encoding="ascii").splitlines() == [
+    expected_dates = [
         "2026-08-03",
         "2026-08-04",
         "2026-08-05",
@@ -66,5 +86,7 @@ with Path(os.environ['REBUILD_CALLS']).open('a', encoding='ascii') as stream:
         "2026-08-10",
         "2026-08-11",
     ]
+    assert catalog_calls.read_text(encoding="ascii").splitlines() == expected_dates
+    assert calls.read_text(encoding="ascii").splitlines() == expected_dates
     assert json.loads((rebuild / "CURRENT.json").read_text())["market_date"] == "2026-08-11"
     assert not canonical.exists()

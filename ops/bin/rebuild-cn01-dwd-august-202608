@@ -17,6 +17,7 @@ release_config="${QUANTHUS_V2_RELEASE_CONFIG:-$ROOT/config/releases/v2-build2026
 canonical_root="${QUANTHUS_DWD_DAILY_ROOT:-/srv/quanthus/dwd-dws-v2/daily}"
 rebuild_root="${QUANTHUS_DWD_DAILY_REBUILD_ROOT:-/srv/quanthus/dwd-dws-v2/daily-rebuild-20260812}"
 python="${QUANTHUS_DWD_PYTHON:-$ROOT/.venv-p1/bin/python}"
+catalog_builder="${HERMES_ODS_CATALOG_BUILDER:-$ROOT/ops/bin/build-cn01-daily-ods-catalog}"
 
 if [[ "$rebuild_root" == "$canonical_root" ]]; then
   echo "rebuild root must not be the canonical daily root" >&2
@@ -24,6 +25,10 @@ if [[ "$rebuild_root" == "$canonical_root" ]]; then
 fi
 if [[ ! -x "$python" ]]; then
   echo "DWD Python is not executable: $python" >&2
+  exit 2
+fi
+if [[ ! -x "$catalog_builder" ]]; then
+  echo "ODS catalog builder is not executable: $catalog_builder" >&2
   exit 2
 fi
 
@@ -38,6 +43,14 @@ market_dates=(
 )
 
 mkdir -p "$rebuild_root"
+for market_date in "${market_dates[@]}"; do
+  echo "[$(date -u +%FT%TZ)] verifying ODS daily $market_date"
+  "$catalog_builder" \
+    --release-root "$release_root" \
+    --market-date "$market_date" \
+    --output "$rebuild_root/catalogs/$market_date"
+done
+
 for market_date in "${market_dates[@]}"; do
   echo "[$(date -u +%FT%TZ)] rebuilding DWD daily $market_date"
   "$python" "$ROOT/ops/bin/run-cn01-daily-dwd" \

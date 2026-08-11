@@ -31,3 +31,25 @@ are production repository code. Their reliability is defined by deterministic in
 hashes, filesystem semantics, resource bounds, and tests rather than by a node name.
 
 The predecessor `dwd-base-202607-v2` remains immutable and is the immediate rollback package.
+
+## Runtime Promotion
+
+GPU-P100 installed and activated the release in place on 2026-08-11 with the node-independent
+promotion code at revision `eef63d1c7252ab3ed8456818f8ec5d77ba0db05e`.
+
+| Evidence | Value |
+| --- | --- |
+| Previous package | `dwd-base-202607-v2` |
+| Previous manifest | `sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f` |
+| Previous `BASE_CURRENT.json` SHA-256 | `sha256:229d38776f4ccb7a6dfe0aead5b5c80efe201abb4fd0d0db1228c62bf2f9973a` |
+| Current package | `dwd-base-202607-v2.1` |
+| Current `BASE_CURRENT.json` SHA-256 | `sha256:95ac52cff022848db2cf34a75e831910c396a956d59631ff9f77852a3a7eddf3` |
+| Installed | `true` |
+| Retained rollback | `dwd-base-202607-v2` |
+
+The first installation attempt exposed WSL's `EXDEV` behavior across two mount views of the same
+ext4 device. It failed before staging publication or pointer movement and cleaned its hidden
+incoming directory. Revision `eef63d1` makes promotion prefer hardlinks but fall back to verified
+`copy2` only for `EXDEV`; permission and other filesystem errors still fail closed. The successful
+run deeply verified source, predecessor, staging, and installed package before the pointer
+compare-and-swap. No `.incoming-*` directory remained after completion.

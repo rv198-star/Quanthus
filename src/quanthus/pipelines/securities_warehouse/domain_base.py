@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import fcntl
 import hashlib
 import json
@@ -603,6 +604,18 @@ def _same_package(left: DomainBaseResult, right: DomainBaseResult) -> bool:
     )
 
 
+def _link_or_copy(source: str, destination: str) -> str:
+    """Prefer a hardlink, falling back only when the filesystem reports EXDEV."""
+
+    try:
+        os.link(source, destination)
+    except OSError as error:
+        if error.errno != errno.EXDEV:
+            raise
+        shutil.copy2(source, destination)
+    return destination
+
+
 def promote_domain_base_candidate(
     *,
     source: Path,
@@ -670,7 +683,7 @@ def promote_domain_base_candidate(
             if staging.exists() or staging.is_symlink():
                 raise DomainBaseError("DWD Base incoming path already exists")
             try:
-                shutil.copytree(source, staging, copy_function=os.link)
+                shutil.copytree(source, staging, copy_function=_link_or_copy)
                 installed_result = verify_domain_base(staging)
                 if not _same_package(source_result, installed_result):
                     raise DomainBaseError("installed DWD Base differs from the release source")

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from quanthus.pipelines.securities_warehouse.domain_base import (
     _EXPECTED_KINDS,
     DomainBaseError,
+    _link_or_copy,
     import_domain_candidate,
     promote_domain_base_candidate,
     publish_domain_base,
@@ -191,6 +194,25 @@ class DomainBaseTests(unittest.TestCase):
                     expected_current_sha256="sha256:" + "0" * 64,
                 )
             self.assertFalse((base_root / source.name).exists())
+
+    def test_promotion_copy_function_falls_back_only_for_cross_device_links(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            destination = root / "destination"
+            source.write_bytes(b"verified payload")
+            with mock.patch(
+                "quanthus.pipelines.securities_warehouse.domain_base.os.link",
+                side_effect=OSError(errno.EXDEV, "cross-device link"),
+            ):
+                self.assertEqual(_link_or_copy(str(source), str(destination)), str(destination))
+            self.assertEqual(destination.read_bytes(), source.read_bytes())
+
+            with mock.patch(
+                "quanthus.pipelines.securities_warehouse.domain_base.os.link",
+                side_effect=PermissionError(errno.EACCES, "permission denied"),
+            ), self.assertRaises(PermissionError):
+                _link_or_copy(str(source), str(root / "forbidden"))
 
     def test_import_hardlinks_native_candidate_and_revalidates_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

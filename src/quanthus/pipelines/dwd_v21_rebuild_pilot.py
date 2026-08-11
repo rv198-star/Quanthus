@@ -25,8 +25,7 @@ from quanthus.pipelines.dwd_replay_determinism_audit import (
     audit_dwd_replay_determinism,
     write_replay_determinism_report,
 )
-from quanthus.pipelines.dwd_v21_rebuild_monitor import verify_authority
-from quanthus.pipelines.dwd_v21_rebuild_preflight import load_environment
+from quanthus.pipelines.dwd_v21_rebuild_monitor import verify_execution_contract
 from quanthus.pipelines.dwd_v21_rebuild_runtime import (
     DwdV21RuntimeError,
     _advance,
@@ -409,15 +408,8 @@ def run_pilots(
             raise DwdV21PilotError(f"pilot output is outside workspace: {selected}")
 
     contract_path = repository / "config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json"
-    approval_path = (
-        repository
-        / "docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json"
-    )
-    verify_authority(contract_path, approval_path, expected_contract_digest)
+    verify_execution_contract(contract_path, expected_contract_digest)
     _require_pilot_only(environment_path, expected_revision)
-    environment = load_environment(environment_path)
-    if environment.get("QUANTHUS_DWD_BUILDER_AUTHORIZED") != "0":
-        raise DwdV21PilotError("full builder authority must remain disabled")
     _require_clean_revision(repository, expected_revision)
     awaiting = _verify_sealed(
         run_root / "state/awaiting-pilot-receipts.json", "awaiting-pilot-receipts phase"
@@ -428,7 +420,7 @@ def run_pilots(
         or awaiting.get("code_revision") != expected_revision
         or awaiting.get("status") != "paused"
     ):
-        raise DwdV21PilotError("run is not at the approved pilot gate")
+        raise DwdV21PilotError("run is not at the pilot gate")
     planning = _verify_sealed(run_root / "state/planning-passed.json", "planning phase")
     planning_evidence = planning.get("evidence")
     if not isinstance(planning_evidence, Mapping):
@@ -457,7 +449,7 @@ def run_pilots(
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
-            raise DwdV21PilotError("GPU rebuild lock is already held") from error
+            raise DwdV21PilotError("DWD rebuild lock is already held") from error
         _advance(
             workspace,
             run_root,

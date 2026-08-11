@@ -60,13 +60,11 @@ outside automated execution; no broker adapter exists in the near-term profile.
 The current file-first analytical architecture is distributed across CN01, Hermes, and OCI and is
 governed by ADR 0007:
 
-- `V2 Build202607` binds immutable, read-only `ods-base-202607-v2` and
-  `dwd-base-202607-v2` packages through 2026-07-31. Daily and weekly work creates immutable
-  increments or corrections and never rewrites either Base. Issue #78 keeps V2 historically
-  blocked and requires a complete 33-table pre-rebuild audit—physical, schema, field-level PIT,
-  identity, referential, key/version, temporal, coverage, numeric, lineage, deterministic replay,
-  downstream compatibility, and publication readiness—before any `dwd-base-202607-v2.1` builder
-  starts. The successor retains the same cutoff and never mutates either V2 input.
+- `V2.1 Build202607` binds immutable, read-only `ods-base-202607-v2` and
+  `dwd-base-202607-v2.1` packages through 2026-07-31. Daily and weekly work creates immutable
+  increments or corrections and never rewrites either Base. Issue #78's R18 build completed the
+  33-table successor and five independent post-build audits. The previous
+  `dwd-base-202607-v2` remains immutable as the immediate rollback package.
 - CN01 and Hermes run the same four-lane ODS controller. A DWD daily build starts only after all
   four target-date ODS releases pass manifest, content, and READY verification; a fixed wall-clock
   time alone is not the data gate.
@@ -80,20 +78,15 @@ governed by ADR 0007:
   DuckDB, Polars, and PyArrow provide local query, typed transformation, and validation.
 - PostgreSQL remains an optional rebuildable serving projection. It is not canonical storage and
   is not a prerequisite for P4 research.
-- The completed V2.1 audit retains CN01 as its evidence authority. Under ADR 0009, GPU-P100 is the
-  CPU remediation-build authority while CN01 retains import, deep verification, installation,
-  pointer compare-and-swap, and rollback authority. GPU-P100 keeps plans, candidates, spill,
-  checkpoints, July-tail cleaning, assembly, and build evidence on its dedicated ext4 workspace.
-  CN01 `/personal` NFS is the manifest-bound transfer and deep-verification landing area only;
-  CN01 local storage retains its import/install lock, hidden final ingress, installed Base
-  packages, and `BASE_CURRENT.json`. Neither NFS nor the GPU node owns a production pointer, and
-  loss of either workspace fails closed without fallback. This topology is frozen by ADR 0009;
-  its pilot gate has passed, but exact full-builder revision approval, candidate acceptance, CN01
-  installation, and pointer cutover remain separate gates and V2.1 is not active.
+- Rebuild, audit, and promotion are node-independent repository capabilities. A compatible host
+  must prove immutable input identities, a clean code revision, ext4 semantics, capacity, and
+  bounded resources. GPU-P100 is recorded as R18 provenance, not as an authority source. Promotion
+  deeply verifies source, staging, installed package, and retained predecessor before an atomic
+  SHA-preconditioned `BASE_CURRENT.json` compare-and-swap.
 
 ADR 0006 owns the seven-domain, 33-object DWD semantic boundary. The accepted
-`dwd-base-202607-v2` contains all 14 core objects, 18 internal support objects, and one quality
-governance sidecar. Its manifest records 468,268,180 rows and 14,842,590,066 payload bytes. The
+`dwd-base-202607-v2.1` contains all 14 core objects, 18 internal support objects, and one quality
+governance sidecar. Its manifest records 455,817,962 rows and 14,447,400,032 payload bytes. The
 retained ten-dimension, thirteen-fact DWS constellation is demand-gated: it will be implemented
 only when a concrete cross-domain consumer requires it.
 

@@ -9,10 +9,10 @@
 
 ## Context
 
-The July rebuild has produced the first product-bounded warehouse baseline rather than the earlier
+The July V2.1 rebuild has produced the current product-bounded warehouse baseline rather than the earlier
 strategy-shaped trial slice. `V2 Build202607` contains an immutable ODS Base through 2026-07-31 and
-an immutable DWD Base with all 33 approved objects. The DWD manifest records 468,268,180 rows and
-14,842,590,066 payload bytes. It is the seed for later immutable daily and weekly increments; the
+an immutable DWD Base with all 33 approved objects. The DWD manifest records 455,817,962 rows and
+14,447,400,032 payload bytes. It is the seed for later immutable daily and weekly increments; the
 Base itself is never mutated.
 
 The earlier dual-lane design required CN01 and Hermes to produce paired DWD/DWS candidates for OCI
@@ -32,7 +32,7 @@ candidate events. That question belongs to P4 and can consume exact DWD snapshot
 The two authoritative Base identities are declared by `config/releases/v2-build202607.json`:
 
 - `ods-base-202607-v2`, logical role `ODS Base V2 Build202607`;
-- `dwd-base-202607-v2`, logical role `DWD Base V2 Build202607`.
+- `dwd-base-202607-v2.1`, logical role `DWD Base V2.1 Build202607 Release`.
 
 Both are read-only inputs. Daily processing writes immutable target-date ODS releases and DWD
 increments. Weekly processing writes immutable correction releases and corresponding DWD

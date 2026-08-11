@@ -11,7 +11,7 @@
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
 | Dual-lane delivery | three-node shadow deployment, role-scoped historical ADS bootstrap, and final OCI operational ADS Base accepted; catalog-native consumer publication and cutover remain blocked pending their own evidence and `GO_FOR_CUTOVER` |
-| Product-bounded DWD model | ADR 0006/0007/0008, `META-DATA-DWD-002`, `META-DATA-PIT-001`, `01-data-foundation/dwd-domain-model.md`; all 33 objects exist in `dwd-base-202607-v2`, but Issue #78 blocks historical PIT authority and requires a full 33-table pre-rebuild audit before the CN01-only NFS-built V2.1; daily maintenance evidence remains immutable and generic DWS deferred |
+| Product-bounded DWD model | ADR 0006/0007/0008/0009, `META-DATA-DWD-002`, `META-DATA-PIT-001`, `01-data-foundation/dwd-domain-model.md`; all 33 objects are released in independently audited `dwd-base-202607-v2.1`; rebuild/audit/promotion are node-independent, daily maintenance remains immutable, and generic DWS is deferred |
 | ODS/DWD reference | `01-data-foundation/ods-dwd-data-dictionary.md` and `01-data-foundation/ods-to-dwd-lineage.md` |
 
 ## 1. Goal
@@ -46,25 +46,14 @@ declared referential identities after full package verification. Historical DWD/
 mutable pointers remain retained but cannot be read as sources, migration targets, reconciliation
 baselines, or acceptance evidence for the new Base.
 
-Issue #78 defines the bounded successor `dwd-base-202607-v2.1`, but the successor build is not the
-next executable step. First, CN01 must complete the machine-governed full pre-rebuild audit in
-`config/audits/dwd-base-v2-pre-rebuild-audit.v1.json`: every one of the 33 tables and physical
-partitions is checked for package/schema integrity, field-level PIT, identity, time-aware
-relationships, keys/versions, temporal intervals, coverage, numeric invariants, immutable lineage,
-deterministic replay, downstream compatibility, and rebuild readiness. Every finding must have a
-stable id, measured impact, approved disposition, regression test, and V2.1 acceptance check. No
-critical finding or unknown disposition may remain when the one-time remediation scope is frozen.
-
-After those exact audit/findings/remediation digests are approved, V2.1 is reconstructed only on
-CN01 from immutable ODS V2 and retained evidence. CN01 local storage owns the single-writer lock,
-final hidden ingress, installed Base directory, and `BASE_CURRENT.json`; mandatory `/personal` NFS
-owns the audit package, plans, candidates, spill, checkpoints, July-tail cleaning,
-complete-package assembly, and build evidence. NFS is root-squashed and mounted without distributed
-locking, so no cross-host lock or production pointer may live there. NFS loss or capacity failure
-blocks audit/build work rather than falling back to local scratch. The NFS candidate is deeply
-verified, copied manifest-by-manifest to a local hidden ingress, deeply verified again, and
-installed without changing the pointer. Pointer cutover and rollback remain separately approved
-compare-and-swap actions.
+Issue #78 is closed by `dwd-base-202607-v2.1` from R18. The 33 tables and physical partitions pass
+package/schema, semantic contract, domain invariant, coverage/exclusion, and lineage-authority
+audits; exact digests are recorded in the release acceptance packet. The rebuild workflow is
+checkpointed and pointerless. Its execution host is not part of the data contract: a host is
+eligible when immutable inputs, clean revision, ext4 filesystem semantics, capacity, and resource
+bounds pass preflight. Promotion deeply verifies the candidate and retained predecessor, installs
+under a local single-writer lock, and compare-and-swaps `BASE_CURRENT.json`; the old V2 package is
+retained for rollback.
 
 P1 acceptance establishes deterministic replay and fail-closed behavior. The initial S3 full build
 exposed 276 securities with incomplete normalized unadjusted-price history and 639,009 affected

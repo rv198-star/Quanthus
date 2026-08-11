@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the checkpointed GPU-P100 DWD Base V2.1 preparation phases."""
+"""Run the checkpointed DWD Base V2.1 preparation phases."""
 
 import sys
 from pathlib import Path

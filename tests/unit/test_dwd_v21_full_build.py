@@ -16,7 +16,7 @@ from quanthus.pipelines.dwd_v21_full_build import (
     DwdV21FullBuildInterrupted,
     _audit_full_build_contract,
     _configure_scratch,
-    _pilot_approval,
+    _pilot_evidence,
     _require_full_build_environment,
     _run_file_step,
     _run_report_step,
@@ -110,7 +110,7 @@ def test_static_full_build_contract_is_audited_before_domains() -> None:
         )
 
 
-def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Path) -> None:
+def test_full_build_environment_binds_reproducible_run_configuration(tmp_path: Path) -> None:
     environment = tmp_path / "full.env"
     environment.write_text(
         "\n".join(
@@ -121,6 +121,7 @@ def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Pa
                 "QUANTHUS_DWD_EXECUTION_MODE=full_build",
                 f"QUANTHUS_DWD_FULL_BUILD_APPROVED_REVISION={REVISION}",
                 "QUANTHUS_DWD_PILOT_AUTHORIZED=0",
+                f"QUANTHUS_DWD_PILOT_RUN_ID={PILOT_RUN}",
                 "QUANTHUS_DWD_RUN_ID=build-r22222222",
                 "QUANTHUS_DWD_RESUME_AUTHORIZED=0",
                 "QUANTHUS_DWD_KNOWLEDGE_CUTOFF=2026-08-03T23:59:00+00:00",
@@ -136,26 +137,28 @@ def test_full_build_environment_requires_distinct_revision_approval(tmp_path: Pa
         environment,
         expected_revision=REVISION,
         expected_contract_digest=CONTRACT,
+        pilot_run_id=PILOT_RUN,
         run_id="build-r22222222",
         knowledge_cutoff="2026-08-03T23:59:00+00:00",
         through_date="2026-07-31",
         runtime_id="runtime-1",
         minimum_free_bytes=1,
     )
-    assert parsed["QUANTHUS_DWD_BUILDER_AUTHORIZED"] == "1"
+    assert parsed["QUANTHUS_DWD_CODE_REVISION"] == REVISION
 
     environment.write_text(
         environment.read_text(encoding="ascii").replace(
-            f"QUANTHUS_DWD_FULL_BUILD_APPROVED_REVISION={REVISION}",
-            f"QUANTHUS_DWD_FULL_BUILD_APPROVED_REVISION={PILOT_REVISION}",
+            "QUANTHUS_DWD_EXECUTION_MODE=full_build",
+            "QUANTHUS_DWD_EXECUTION_MODE=pilot_only",
         ),
         encoding="ascii",
     )
-    with pytest.raises(DwdV21FullBuildError, match="full-build authority"):
+    with pytest.raises(DwdV21FullBuildError, match="full-build configuration"):
         _require_full_build_environment(
             environment,
             expected_revision=REVISION,
             expected_contract_digest=CONTRACT,
+            pilot_run_id=PILOT_RUN,
             run_id="build-r22222222",
             knowledge_cutoff="2026-08-03T23:59:00+00:00",
             through_date="2026-07-31",
@@ -235,15 +238,15 @@ def _pilot_fixture(repository: Path, workspace: Path) -> tuple[str, str]:
     return replay_digest, partition_digest
 
 
-def test_pilot_approval_verifies_exact_run_and_receipts(tmp_path: Path) -> None:
+def test_pilot_evidence_verifies_exact_run_and_receipts(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     workspace = tmp_path / "workspace"
     replay_digest, partition_digest = _pilot_fixture(repository, workspace)
 
-    evidence = _pilot_approval(
-        repository=repository,
+    evidence = _pilot_evidence(
         workspace=workspace,
         expected_contract_digest=CONTRACT,
+        pilot_run_id=PILOT_RUN,
     )
 
     assert evidence["pilot_run_id"] == PILOT_RUN
@@ -459,6 +462,7 @@ def test_full_build_records_controlled_interruption(
                 "QUANTHUS_DWD_EXECUTION_MODE=full_build",
                 f"QUANTHUS_DWD_FULL_BUILD_APPROVED_REVISION={revision}",
                 "QUANTHUS_DWD_PILOT_AUTHORIZED=0",
+                "QUANTHUS_DWD_PILOT_RUN_ID=distinct-pilot",
                 f"QUANTHUS_DWD_RUN_ID={run_id}",
                 "QUANTHUS_DWD_RESUME_AUTHORIZED=0",
                 "QUANTHUS_DWD_KNOWLEDGE_CUTOFF=2026-08-03T23:59:00+00:00",
@@ -471,10 +475,10 @@ def test_full_build_records_controlled_interruption(
         encoding="ascii",
     )
     monkeypatch.setattr(subject, "_require_clean_revision", lambda *_args: None)
-    monkeypatch.setattr(subject, "verify_authority", lambda *_args: ({}, {}))
+    monkeypatch.setattr(subject, "verify_execution_contract", lambda *_args: {})
     monkeypatch.setattr(
         subject,
-        "_pilot_approval",
+        "_pilot_evidence",
         lambda **_kwargs: {"pilot_run_id": "distinct-pilot"},
     )
     monkeypatch.setattr(
@@ -496,6 +500,7 @@ def test_full_build_records_controlled_interruption(
             expected_findings_digest="sha256:findings",
             expected_remediation_digest="sha256:remediation",
             minimum_free_bytes=1,
+            pilot_run_id="distinct-pilot",
             knowledge_cutoff="2026-08-03T23:59:00+00:00",
             through_date="2026-07-31",
             runtime_id="runtime-1",
@@ -534,6 +539,7 @@ def test_full_build_runs_sequentially_and_resumes_from_verified_checkpoints(
                 "QUANTHUS_DWD_EXECUTION_MODE=full_build",
                 f"QUANTHUS_DWD_FULL_BUILD_APPROVED_REVISION={revision}",
                 "QUANTHUS_DWD_PILOT_AUTHORIZED=0",
+                "QUANTHUS_DWD_PILOT_RUN_ID=pilot-run",
                 f"QUANTHUS_DWD_RUN_ID={run_id}",
                 "QUANTHUS_DWD_RESUME_AUTHORIZED=0",
                 "QUANTHUS_DWD_KNOWLEDGE_CUTOFF=2026-08-01T00:00:00+00:00",
@@ -547,7 +553,6 @@ def test_full_build_runs_sequentially_and_resumes_from_verified_checkpoints(
     )
     for relative in (
         subject._CONTRACT,
-        subject._CONTRACT_APPROVAL,
         f"{subject._CLOSURE}/findings-ledger.json",
         f"{subject._CLOSURE}/v2.1-remediation-scope.json",
         "config/pipelines/dwd-domain-model.v1.json",
@@ -564,7 +569,7 @@ def test_full_build_runs_sequentially_and_resumes_from_verified_checkpoints(
         path.write_text("{}\n", encoding="ascii")
 
     monkeypatch.setattr(subject, "_require_clean_revision", lambda *_args: None)
-    monkeypatch.setattr(subject, "verify_authority", lambda *_args: ({}, {}))
+    monkeypatch.setattr(subject, "verify_execution_contract", lambda *_args: {})
     accepted_pilot = {
         "approval_receipt": "/approval.json",
         "approval_receipt_digest": "sha256:approval",
@@ -575,7 +580,7 @@ def test_full_build_runs_sequentially_and_resumes_from_verified_checkpoints(
         "partition_receipt": "/partition.json",
         "partition_receipt_digest": "sha256:partition",
     }
-    monkeypatch.setattr(subject, "_pilot_approval", lambda **_kwargs: accepted_pilot)
+    monkeypatch.setattr(subject, "_pilot_evidence", lambda **_kwargs: accepted_pilot)
     preflight_count = 0
 
     def fake_preflight(**_kwargs: Any) -> dict[str, Any]:
@@ -716,13 +721,14 @@ def test_full_build_runs_sequentially_and_resumes_from_verified_checkpoints(
         "expected_findings_digest": "sha256:findings",
         "expected_remediation_digest": "sha256:remediation",
         "minimum_free_bytes": 1,
+        "pilot_run_id": "pilot-run",
         "knowledge_cutoff": "2026-08-01T00:00:00+00:00",
         "through_date": "2026-07-31",
         "runtime_id": "runtime-1",
         "resume": True,
     }
     first = run_full_build(**arguments)
-    assert first["phase"] == "awaiting-candidate-approval"
+    assert first["phase"] == "candidate-verified"
     assert first["table_count"] == 33
     assert first["candidate_audit_digests"] == {
         name: evidence["canonical_digest"] for name, evidence in candidate_audits.items()

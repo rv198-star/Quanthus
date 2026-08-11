@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Install a sealed DWD Base and atomically advance BASE_CURRENT."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.securities_warehouse.domain_base import (  # noqa: E402
+    DomainBaseError,
+    promote_domain_base_candidate,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--base-root", type=Path, required=True)
+    parser.add_argument("--current", type=Path, required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument(
+        "--expected-current-sha256",
+        required=True,
+        help="Expected BASE_CURRENT file SHA-256 with sha256: prefix, or absent",
+    )
+    args = parser.parse_args()
+    expected = None if args.expected_current_sha256 == "absent" else args.expected_current_sha256
+    try:
+        result = promote_domain_base_candidate(
+            source=args.source,
+            base_root=args.base_root,
+            current=args.current,
+            run_id=args.run_id,
+            expected_current_sha256=expected,
+        )
+    except (DomainBaseError, OSError) as exc:
+        print(f"DWD domain Base promotion failed: {exc}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "content_digest": result.package.content_digest,
+                "current_sha256": result.current_sha256,
+                "installed": result.installed,
+                "manifest_sha256": result.package.manifest_sha256,
+                "package_id": result.package.package_id,
+                "previous_current_sha256": result.previous_current_sha256,
+                "previous_manifest_sha256": result.previous_manifest_sha256,
+                "previous_package_id": result.previous_package_id,
+                "row_count": result.package.row_count,
+                "table_count": result.package.table_count,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

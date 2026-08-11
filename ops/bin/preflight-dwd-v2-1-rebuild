@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the governed GPU-P100 DWD Base V2.1 preflight."""
+"""Run the DWD Base V2.1 rebuild preflight."""
 
 import sys
 from pathlib import Path

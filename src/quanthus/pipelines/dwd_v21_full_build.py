@@ -1,4 +1,4 @@
-"""Checkpointed full DWD Base V2.1 build for the approved GPU-P100 execution node."""
+"""Checkpointed full DWD Base V2.1 build on any compatible execution node."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ from quanthus.pipelines.dwd_semantic_contract_audit import (
     audit_dwd_semantic_contracts,
     write_semantic_contract_report,
 )
-from quanthus.pipelines.dwd_v21_rebuild_monitor import verify_authority
+from quanthus.pipelines.dwd_v21_rebuild_monitor import verify_execution_contract
 from quanthus.pipelines.dwd_v21_rebuild_preflight import (
     load_environment,
     run_preflight,
@@ -103,7 +103,7 @@ from quanthus.pipelines.securities_warehouse.trading_calendar import (
 
 
 class DwdV21FullBuildError(RuntimeError):
-    """Raised when the full builder cannot advance without violating its authority."""
+    """Raised when the full builder cannot advance safely."""
 
 
 class DwdV21FullBuildInterrupted(DwdV21FullBuildError):
@@ -114,11 +114,7 @@ class DwdV21FullBuildInterrupted(DwdV21FullBuildError):
         self.signum = signum
 
 
-_PILOT_APPROVAL = "docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-pilot-approval-20260808.json"
 _CONTRACT = "config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json"
-_CONTRACT_APPROVAL = (
-    "docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json"
-)
 _CLOSURE = "docs/acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807"
 _PACKAGE_ID = "dwd-base-202607-v2.1"
 _R11_REUSE_AUDIT = (
@@ -171,7 +167,7 @@ def _require_clean_revision(repository: Path, expected_revision: str) -> None:
     if revision.returncode != 0 or status.returncode != 0:
         raise DwdV21FullBuildError("cannot inspect full-builder repository state")
     if revision.stdout.strip() != expected_revision:
-        raise DwdV21FullBuildError("full-builder code revision differs from approval")
+        raise DwdV21FullBuildError("full-builder code revision differs from the requested revision")
     if status.stdout.strip():
         raise DwdV21FullBuildError("full-builder repository checkout is not clean")
 
@@ -181,6 +177,7 @@ def _require_full_build_environment(
     *,
     expected_revision: str,
     expected_contract_digest: str,
+    pilot_run_id: str,
     run_id: str,
     knowledge_cutoff: str,
     through_date: str,
@@ -190,12 +187,10 @@ def _require_full_build_environment(
 ) -> dict[str, str]:
     environment = load_environment(environment_path)
     expected = {
-        "QUANTHUS_DWD_BUILDER_AUTHORIZED": "1",
         "QUANTHUS_DWD_CODE_REVISION": expected_revision,
         "QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST": expected_contract_digest,
         "QUANTHUS_DWD_EXECUTION_MODE": "full_build",
-        "QUANTHUS_DWD_FULL_BUILD_APPROVED_REVISION": expected_revision,
-        "QUANTHUS_DWD_PILOT_AUTHORIZED": "0",
+        "QUANTHUS_DWD_PILOT_RUN_ID": pilot_run_id,
         "QUANTHUS_DWD_RUN_ID": run_id,
         "QUANTHUS_DWD_KNOWLEDGE_CUTOFF": knowledge_cutoff,
         "QUANTHUS_DWD_THROUGH_DATE": through_date,
@@ -205,9 +200,7 @@ def _require_full_build_environment(
     if reuse_run_id is not None:
         expected["QUANTHUS_DWD_REUSE_RUN_ID"] = reuse_run_id
     if any(environment.get(key) != value for key, value in expected.items()):
-        raise DwdV21FullBuildError("deployment environment differs from full-build authority")
-    if environment.get("QUANTHUS_DWD_RESUME_AUTHORIZED", "0") not in {"0", "1"}:
-        raise DwdV21FullBuildError("resume authority must be exactly 0 or 1")
+        raise DwdV21FullBuildError("deployment environment differs from full-build configuration")
     return environment
 
 
@@ -334,37 +327,25 @@ def _audit_full_build_contract(
     }
 
 
-def _pilot_approval(
+def _pilot_evidence(
     *,
-    repository: Path,
     workspace: Path,
     expected_contract_digest: str,
+    pilot_run_id: str,
 ) -> dict[str, Any]:
-    approval = _verify_sealed(repository / _PILOT_APPROVAL, "pilot acceptance receipt")
-    expected = {
-        "schema_version": 1,
-        "kind": "dwd_base_v2_1_gpu_p100_pilot_receipt_approval",
-        "approved_contract_digest": expected_contract_digest,
-    }
-    if any(approval.get(key) != value for key, value in expected.items()):
-        raise DwdV21FullBuildError("pilot acceptance receipt differs from the execution contract")
-    pilot_run_id = approval.get("pilot_run_id")
-    pilot_revision = approval.get("approved_pilot_revision")
-    replay_digest = approval.get("replay_receipt_digest")
-    partition_digest = approval.get("partition_receipt_digest")
-    if not all(
-        isinstance(value, str) and value
-        for value in (pilot_run_id, pilot_revision, replay_digest, partition_digest)
-    ):
-        raise DwdV21FullBuildError("pilot acceptance receipt lacks exact evidence bindings")
-    pilot_root = (workspace / "runs" / str(pilot_run_id)).resolve()
+    if not pilot_run_id or "/" in pilot_run_id:
+        raise DwdV21FullBuildError("pilot run id is invalid")
+    pilot_root = (workspace / "runs" / pilot_run_id).resolve()
     if not pilot_root.is_relative_to(workspace) or not pilot_root.is_dir():
-        raise DwdV21FullBuildError("approved pilot run is outside the build workspace")
+        raise DwdV21FullBuildError("pilot evidence run is outside the build workspace")
 
     replay_path = pilot_root / "evidence/pilot/replay-determinism.json"
     partition_path = pilot_root / "evidence/pilot/partition-pilot.json"
     replay = _verify_sealed(replay_path, "accepted replay receipt")
     partition = _verify_sealed(partition_path, "accepted partition receipt")
+    replay_digest = replay.get("canonical_digest")
+    partition_digest = partition.get("canonical_digest")
+    pilot_revision = partition.get("code_revision")
     awaiting = _verify_sealed(
         pilot_root / "state/awaiting-pilot-acceptance.json",
         "accepted pilot phase",
@@ -376,6 +357,9 @@ def _pilot_approval(
     if not all(
         isinstance(value, Mapping)
         for value in (replay_summary, replay_input, partition_summary, awaiting_evidence)
+    ) or not all(
+        isinstance(value, str) and value
+        for value in (replay_digest, partition_digest, pilot_revision)
     ):
         raise DwdV21FullBuildError("accepted pilot evidence is malformed")
     replay_summary = cast(Mapping[str, Any], replay_summary)
@@ -403,10 +387,8 @@ def _pilot_approval(
         or awaiting_evidence.get("replay_report_digest") != replay_digest
         or awaiting_evidence.get("partition_report_digest") != partition_digest
     ):
-        raise DwdV21FullBuildError("approved pilot evidence failed exact receipt verification")
+        raise DwdV21FullBuildError("pilot evidence failed exact receipt verification")
     return {
-        "approval_receipt": str((repository / _PILOT_APPROVAL).resolve()),
-        "approval_receipt_digest": approval["canonical_digest"],
         "pilot_run_id": pilot_run_id,
         "pilot_revision": pilot_revision,
         "replay_receipt": str(replay_path),
@@ -735,7 +717,7 @@ def _reuse_context(
         raise DwdV21FullBuildError("r11 domain reuse authority differs from the requested run")
     source_root = (workspace / "runs" / reuse_run_id).resolve()
     if not source_root.is_relative_to(workspace) or not source_root.is_dir():
-        raise DwdV21FullBuildError("reuse source run is outside the approved workspace")
+        raise DwdV21FullBuildError("reuse source run is outside the workspace")
     source_plan, _source_ledger = _verify_plan_package(source_root / "plan")
     current_plan, _current_ledger = _verify_plan_package(current_plan_root)
     source_semantic = plan_mapping(source_plan.get("plan"), "reuse source semantic plan")
@@ -1019,6 +1001,7 @@ def run_full_build(
     expected_findings_digest: str,
     expected_remediation_digest: str,
     minimum_free_bytes: int,
+    pilot_run_id: str,
     knowledge_cutoff: str,
     through_date: str,
     runtime_id: str,
@@ -1040,7 +1023,7 @@ def run_full_build(
     environment_path = environment_path.resolve()
     run_root = workspace / "runs" / run_id
     if not run_root.resolve().is_relative_to(workspace):
-        raise DwdV21FullBuildError("full-build run path escapes the approved workspace")
+        raise DwdV21FullBuildError("full-build run path escapes the workspace")
     if (
         thread_limit < 1
         or thread_limit > 4
@@ -1060,12 +1043,13 @@ def run_full_build(
     ):
         raise DwdV21FullBuildError("full-build resource or batch limits are invalid")
     if expected_revision[:8] not in run_id:
-        raise DwdV21FullBuildError("full-build run id is not bound to the approved revision")
+        raise DwdV21FullBuildError("full-build run id is not bound to the requested revision")
 
-    environment = _require_full_build_environment(
+    _require_full_build_environment(
         environment_path,
         expected_revision=expected_revision,
         expected_contract_digest=expected_contract_digest,
+        pilot_run_id=pilot_run_id,
         run_id=run_id,
         knowledge_cutoff=knowledge_cutoff,
         through_date=through_date,
@@ -1074,19 +1058,18 @@ def run_full_build(
         reuse_run_id=reuse_run_id,
     )
     existed = run_root.exists()
-    if existed and (not resume or environment.get("QUANTHUS_DWD_RESUME_AUTHORIZED", "0") != "1"):
-        raise DwdV21FullBuildError("existing full-build run requires explicit resume authority")
+    if existed and not resume:
+        raise DwdV21FullBuildError("existing full-build run requires --resume")
     _require_clean_revision(repository, expected_revision)
     contract_path = repository / _CONTRACT
-    contract_approval_path = repository / _CONTRACT_APPROVAL
-    verify_authority(contract_path, contract_approval_path, expected_contract_digest)
-    accepted_pilot = _pilot_approval(
-        repository=repository,
+    verify_execution_contract(contract_path, expected_contract_digest)
+    pilot_evidence = _pilot_evidence(
         workspace=workspace,
         expected_contract_digest=expected_contract_digest,
+        pilot_run_id=pilot_run_id,
     )
-    if accepted_pilot["pilot_run_id"] == run_id:
-        raise DwdV21FullBuildError("full-build run must be distinct from the accepted pilot run")
+    if pilot_evidence["pilot_run_id"] == run_id:
+        raise DwdV21FullBuildError("full-build run must be distinct from the pilot run")
 
     run_root.mkdir(parents=True, exist_ok=True)
     _advance(
@@ -1107,7 +1090,6 @@ def run_full_build(
             ods_base=ods_base,
             dwd_base=dwd_base,
             contract_path=contract_path,
-            approval_path=contract_approval_path,
             findings_path=closure / "findings-ledger.json",
             remediation_path=closure / "v2.1-remediation-scope.json",
             environment_path=environment_path,
@@ -1151,7 +1133,7 @@ def run_full_build(
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:
-                raise DwdV21FullBuildError("GPU rebuild lock is already held") from error
+                raise DwdV21FullBuildError("DWD rebuild lock is already held") from error
 
             _advance(
                 workspace,
@@ -1161,7 +1143,7 @@ def run_full_build(
                 contract_digest=expected_contract_digest,
                 code_revision=expected_revision,
                 status="passed",
-                evidence=accepted_pilot,
+                evidence=pilot_evidence,
             )
             scratch = _configure_scratch(run_root, thread_limit)
             market_scratch = scratch / "market-observation"
@@ -1756,23 +1738,22 @@ def run_full_build(
             _advance(
                 workspace,
                 run_root,
-                phase="awaiting-candidate-approval",
+                phase="candidate-verified",
                 run_id=run_id,
                 contract_digest=expected_contract_digest,
                 code_revision=expected_revision,
-                status="paused",
+                status="passed",
                 evidence={
                     **seal_evidence,
                     "candidate_audit_digests": candidate_audit_digests,
                     "install_started": False,
                     "pointer_cutover_started": False,
-                    "required_next_authority": "exact_sealed_candidate_approval",
                 },
             )
             return {
                 "run_id": run_id,
-                "phase": "awaiting-candidate-approval",
-                "status": "paused",
+                "phase": "candidate-verified",
+                "status": "passed",
                 **seal_evidence,
                 "candidate_audit_digests": candidate_audit_digests,
             }
@@ -1831,6 +1812,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--expected-findings-digest", required=True)
     parser.add_argument("--expected-remediation-digest", required=True)
     parser.add_argument("--minimum-free-bytes", type=int, required=True)
+    parser.add_argument("--pilot-run-id", required=True)
     parser.add_argument("--knowledge-cutoff", required=True)
     parser.add_argument("--through-date", required=True)
     parser.add_argument("--runtime-id", required=True)
@@ -1865,6 +1847,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             expected_findings_digest=args.expected_findings_digest,
             expected_remediation_digest=args.expected_remediation_digest,
             minimum_free_bytes=args.minimum_free_bytes,
+            pilot_run_id=args.pilot_run_id,
             knowledge_cutoff=args.knowledge_cutoff,
             through_date=args.through_date,
             runtime_id=args.runtime_id,

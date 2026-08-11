@@ -1,8 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "kind": "quanthus_base_build_release",
   "build_id": "V2-Build202607",
-  "display_name": "V2 Build202607",
+  "display_name": "V2.1 Build202607",
+  "release_id": "DWD-Base-V2.1-Build202607",
+  "release_status": "released",
+  "released_at": "2026-08-11T07:44:39Z",
   "through_date": "2026-07-31",
   "layers": {
     "ods": {
@@ -12,10 +15,23 @@
       "logical_role": "ODS Base V2 Build202607"
     },
     "dwd": {
-      "package_id": "dwd-base-202607-v2",
-      "manifest_sha256": "sha256:82dfe29400a6b4dbc901e5d2d999ebcbb6887dc4af46a082f87e7acc74a4ee9f",
-      "content_digest": "sha256:5a183ca5790d9384ec0256137186a7d74fd1df52f2b5e15dbe1f6c998d106fc9",
-      "logical_role": "DWD Base V2 Build202607"
+      "package_id": "dwd-base-202607-v2.1",
+      "manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b",
+      "content_digest": "sha256:b689a21b2052ca722af35faeb72cb68850b54d00ddb062b3694e443ba29c32b9",
+      "logical_role": "DWD Base V2.1 Build202607 Release",
+      "release_run_id": "dwd-v2-1-gpu-p100-20260811T063015Z-5b90cc47-r18",
+      "manifest_run_id": "dwd-v2-1-gpu-p100-20260810T132353Z-3156b74e-r13",
+      "code_revision": "5b90cc47414a3542ab65e04e703554d487cd448d",
+      "table_count": 33,
+      "total_rows": 455817962,
+      "payload_bytes": 14447400032,
+      "candidate_audits": {
+        "schema_partitions": "sha256:0f56725669865fa8a89ec0040b471938f5fa30f8379a321cf9d31deb1f7cbbc2",
+        "semantic_contracts": "sha256:4cc59ac2bb84e0715c239bb5ed700c91001d62e7bb1ebffbe99d6b60ddf0bdd9",
+        "domain_invariants": "sha256:0040cc36dad224ed3bc155c85dfceb4a493126d060872ac8ffbe99b5aee875ce",
+        "coverage_exclusions": "sha256:5bfb22c9be7193f2cff334c576d73d61bb6248ad7c9156714da09c637f5935b8",
+        "lineage_authority": "sha256:d7ccdcce48110234ae0ceaaab65098ef0733ccad55fb12cbb137a1b8bf13bd61"
+      }
     }
   },
   "storage_policy": {

@@ -45,21 +45,16 @@ def _verify_canonical_object(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def verify_authority(
+def verify_execution_contract(
     contract_path: Path,
-    approval_path: Path,
     expected_contract_digest: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> dict[str, Any]:
+    """Verify the immutable build configuration without assigning authority to a host."""
+
     contract = _verify_canonical_object(contract_path, "execution contract")
-    approval = _verify_canonical_object(approval_path, "approval receipt")
     if contract.get("canonical_digest") != expected_contract_digest:
         raise DwdV21MonitorError("execution contract does not match the deployed digest")
-    if approval.get("approved_contract_digest") != expected_contract_digest:
-        raise DwdV21MonitorError("approval receipt does not bind the deployed contract")
-    expected_statement = "APPROVE DWD V2.1 GPU-P100 EXECUTION CONTRACT " + expected_contract_digest
-    if approval.get("approval_statement") != expected_statement:
-        raise DwdV21MonitorError("approval receipt does not contain the exact approval statement")
-    return contract, approval
+    return contract
 
 
 def _decode_mount_path(value: str) -> str:
@@ -170,27 +165,17 @@ def _active_run_snapshot(workspace: Path, contract_digest: str) -> dict[str, Any
 def inspect_rebuild(
     *,
     contract_path: Path,
-    approval_path: Path,
     expected_contract_digest: str,
     workspace: Path,
     minimum_free_bytes: int,
     mountinfo_path: Path = Path("/proc/self/mountinfo"),
 ) -> dict[str, Any]:
-    contract, approval = verify_authority(
-        contract_path,
-        approval_path,
-        expected_contract_digest,
-    )
-    if contract.get("authorized_execution", {}).get("build_node") != "GPU-P100":
-        raise DwdV21MonitorError("contract does not authorize GPU-P100")
-    expected_workspace = contract.get("authorized_execution", {}).get("build_workspace")
-    if expected_workspace != str(workspace):
-        raise DwdV21MonitorError("workspace differs from the approved contract")
+    verify_execution_contract(contract_path, expected_contract_digest)
     if not workspace.is_dir() or workspace.is_symlink():
-        raise DwdV21MonitorError("approved workspace is missing or symlinked")
+        raise DwdV21MonitorError("workspace is missing or symlinked")
     mount = parse_mountinfo(mountinfo_path.read_text(encoding="ascii"), workspace)
-    if mount is None or mount["mount_point"] != str(workspace) or mount["filesystem"] != "ext4":
-        raise DwdV21MonitorError("approved workspace is not the exact ext4 mount point")
+    if mount is None or mount["filesystem"] != "ext4":
+        raise DwdV21MonitorError("workspace is not on ext4")
     filesystem = os.statvfs(workspace)
     free_bytes = filesystem.f_bavail * filesystem.f_frsize
     if free_bytes < minimum_free_bytes:
@@ -201,7 +186,6 @@ def inspect_rebuild(
     active_run = _active_run_snapshot(workspace, expected_contract_digest)
     return {
         "active_run": active_run,
-        "approval_receipt_digest": approval["canonical_digest"],
         "contract_digest": expected_contract_digest,
         "free_bytes": free_bytes,
         "host": socket.gethostname(),
@@ -253,7 +237,6 @@ def write_snapshot(output_root: Path, snapshot: Mapping[str, Any]) -> tuple[Path
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--contract", type=Path, required=True)
-    parser.add_argument("--approval", type=Path, required=True)
     parser.add_argument("--expected-contract-digest", required=True)
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--minimum-free-bytes", type=int, default=10 * 1024**3)
@@ -269,7 +252,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         snapshot = inspect_rebuild(
             contract_path=args.contract.resolve(),
-            approval_path=args.approval.resolve(),
             expected_contract_digest=args.expected_contract_digest,
             workspace=args.workspace.resolve(),
             minimum_free_bytes=args.minimum_free_bytes,

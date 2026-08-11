@@ -21,13 +21,13 @@ a parallel current-state architecture.
 | `adr-0005-dual-lane-canonical-and-ads-publication.md` | Dual-lane candidates, OCI canonical authority, atomic release sets, and offline research bundles | Changing daily candidate ownership, arbitration, canonical catalogs, research-bundle portability, or target cutover |
 | `adr-0006-industry-aligned-dwd-domain-model.md` | Product-bounded seven-domain DWD model and retained demand-gated DWS constellation | Changing DWD domains, supporting structures, grains, dimensions/facts, identities, or source disposition |
 | `adr-0007-dwd-maintenance-and-p4-handoff.md` | Current Base V2 maintenance topology, generic-DWS deferral, and P4 handoff | Changing current node responsibilities, Base/increment policy, DWS activation, or the P4 data boundary |
+| `adr-0008-dwd-historical-knowledge-remediation.md` | Completed immutable successor-Base response to Issue #78 | Auditing historical PIT semantics or changing the V2.1 remediation scope |
+| `adr-0009-gpu-p100-dwd-v2-1-execution.md` | Completed node-independent V2.1 rebuild, audit, and promotion workflow; GPU-P100 retained as R18 provenance | Changing rebuild checkpoints, resource bounds, audit closure, or atomic promotion |
 
 ## Proposals under investigation
 
 | Node | Scope | Load when |
 | --- | --- | --- |
-| `adr-0008-dwd-historical-knowledge-remediation.md` | Proposed immutable successor-Base response to Issue #78; CN01 machine audit complete, exact closure/remediation digests awaiting approval | Auditing Base V2 historical PIT semantics, planning additive ODS evidence, successor rebuild, increment replay, or P4 source reapproval |
-| `adr-0009-gpu-p100-dwd-v2-1-execution.md` | Approved GPU-P100 build and CN01 import/install authority split; pilots accepted, full build exact-revision-gated | Changing the V2.1 execution node, checkpoint topology, transfer boundary, or hourly inspection authority |
 
 ## Topic contracts
 

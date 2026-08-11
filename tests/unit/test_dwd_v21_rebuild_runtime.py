@@ -104,20 +104,18 @@ def test_runtime_requires_pilot_only_environment(tmp_path: Path) -> None:
     environment.write_text(
         "\n".join(
             [
-                "QUANTHUS_DWD_BUILDER_AUTHORIZED=0",
                 f"QUANTHUS_DWD_CODE_REVISION={REVISION}",
                 "QUANTHUS_DWD_EXECUTION_MODE=pilot_only",
-                "QUANTHUS_DWD_PILOT_AUTHORIZED=1",
             ]
         )
         + "\n",
         encoding="ascii",
     )
-    assert _require_pilot_only(environment, REVISION)["QUANTHUS_DWD_BUILDER_AUTHORIZED"] == "0"
+    assert _require_pilot_only(environment, REVISION)["QUANTHUS_DWD_CODE_REVISION"] == REVISION
     environment.write_text(
         environment.read_text(encoding="ascii").replace(
-            "QUANTHUS_DWD_BUILDER_AUTHORIZED=0",
-            "QUANTHUS_DWD_BUILDER_AUTHORIZED=1",
+            "QUANTHUS_DWD_EXECUTION_MODE=pilot_only",
+            "QUANTHUS_DWD_EXECUTION_MODE=full_build",
         ),
         encoding="ascii",
     )

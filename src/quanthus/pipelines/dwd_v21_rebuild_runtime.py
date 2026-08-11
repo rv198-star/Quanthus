@@ -1,4 +1,4 @@
-"""Checkpointed preparation runtime for the governed DWD Base V2.1 rebuild."""
+"""Checkpointed preparation runtime for the DWD Base V2.1 rebuild."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
-from quanthus.pipelines.dwd_v21_rebuild_monitor import verify_authority
+from quanthus.pipelines.dwd_v21_rebuild_monitor import verify_execution_contract
 from quanthus.pipelines.dwd_v21_rebuild_preflight import (
     DwdV21PreflightError,
     load_environment,
@@ -189,13 +189,11 @@ def _advance(
 def _require_pilot_only(environment_path: Path, expected_revision: str) -> dict[str, str]:
     environment: dict[str, str] = load_environment(environment_path)
     expected = {
-        "QUANTHUS_DWD_BUILDER_AUTHORIZED": "0",
         "QUANTHUS_DWD_CODE_REVISION": expected_revision,
         "QUANTHUS_DWD_EXECUTION_MODE": "pilot_only",
-        "QUANTHUS_DWD_PILOT_AUTHORIZED": "1",
     }
     if any(environment.get(key) != value for key, value in expected.items()):
-        raise DwdV21RuntimeError("deployment environment is not the approved pilot-only state")
+        raise DwdV21RuntimeError("deployment environment is not configured for pilot-only mode")
     return environment
 
 
@@ -216,7 +214,7 @@ def run_prepare(
     through_date: str,
     runtime_id: str,
 ) -> dict[str, Any]:
-    """Run the authorized preflight and planning phases, then pause at the pilot gate."""
+    """Run the preflight and planning phases, then pause for explicit pilot execution."""
 
     repository = repository.resolve()
     workspace = workspace.resolve()
@@ -225,10 +223,6 @@ def run_prepare(
     environment_path = environment_path.resolve()
     run_root = workspace / "runs" / run_id
     contract_path = repository / "config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json"
-    approval_path = (
-        repository
-        / "docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json"
-    )
     closure_root = (
         repository / "docs/acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807"
     )
@@ -237,7 +231,7 @@ def run_prepare(
     model_path = repository / "config/pipelines/dwd-domain-model.v1.json"
     input_override = repository / "config/pipelines/dwd-v2-1-input-identity.v1.json"
 
-    verify_authority(contract_path, approval_path, expected_contract_digest)
+    verify_execution_contract(contract_path, expected_contract_digest)
     _require_pilot_only(environment_path, expected_revision)
     run_root.mkdir(parents=True, exist_ok=True)
     _advance(
@@ -266,7 +260,6 @@ def run_prepare(
             ods_base=ods_base,
             dwd_base=dwd_base,
             contract_path=contract_path,
-            approval_path=approval_path,
             findings_path=findings_path,
             remediation_path=remediation_path,
             environment_path=environment_path,
@@ -299,7 +292,7 @@ def run_prepare(
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:
-                raise DwdV21RuntimeError("GPU rebuild lock is already held") from error
+                raise DwdV21RuntimeError("DWD rebuild lock is already held") from error
             _advance(
                 workspace,
                 run_root,

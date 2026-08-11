@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run bounded read-only GPU-P100 DWD Base V2.1 pilots."""
+"""Run bounded read-only DWD Base V2.1 pilots."""
 
 import sys
 from pathlib import Path

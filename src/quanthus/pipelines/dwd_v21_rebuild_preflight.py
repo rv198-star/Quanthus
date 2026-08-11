@@ -1,4 +1,4 @@
-"""Fail-closed GPU-P100 preflight for the governed DWD Base V2.1 rebuild."""
+"""Fail-closed preflight for a checkpointed DWD Base V2.1 rebuild."""
 
 from __future__ import annotations
 
@@ -17,7 +17,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
-from quanthus.pipelines.dwd_v21_rebuild_monitor import parse_mountinfo, verify_authority
+from quanthus.pipelines.dwd_v21_rebuild_monitor import (
+    parse_mountinfo,
+    verify_execution_contract,
+)
 from quanthus.pipelines.ods_base import OdsBaseError
 from quanthus.pipelines.ods_base_rollup import verify_ods_base_rollup
 from quanthus.pipelines.securities_warehouse.domain_base import (
@@ -157,7 +160,6 @@ def run_preflight(
     ods_base: Path,
     dwd_base: Path,
     contract_path: Path,
-    approval_path: Path,
     findings_path: Path,
     remediation_path: Path,
     environment_path: Path,
@@ -171,40 +173,22 @@ def run_preflight(
 ) -> dict[str, Any]:
     started_at = datetime.now(timezone.utc)
     observed_host = socket.gethostname()
-    if observed_host.casefold() != "gpu-p100":
-        raise DwdV21PreflightError(f"preflight must run on GPU-P100, not {observed_host}")
-    contract, approval = verify_authority(contract_path, approval_path, expected_contract_digest)
+    verify_execution_contract(contract_path, expected_contract_digest)
     _verify_canonical(findings_path, "findings ledger", expected_findings_digest)
     _verify_canonical(remediation_path, "remediation scope", expected_remediation_digest)
     environment = load_environment(environment_path)
-    authority_profiles = {
-        "pilot_only": {
-            "QUANTHUS_DWD_BUILDER_AUTHORIZED": "0",
-            "QUANTHUS_DWD_PILOT_AUTHORIZED": "1",
-        },
-        "full_build": {
-            "QUANTHUS_DWD_BUILDER_AUTHORIZED": "1",
-            "QUANTHUS_DWD_PILOT_AUTHORIZED": "0",
-        },
-    }
-    if expected_execution_mode not in authority_profiles:
-        raise DwdV21PreflightError(f"unsupported execution authority: {expected_execution_mode}")
+    if expected_execution_mode not in {"pilot_only", "full_build"}:
+        raise DwdV21PreflightError(f"unsupported execution mode: {expected_execution_mode}")
     expected_environment = {
-        **authority_profiles[expected_execution_mode],
         "QUANTHUS_DWD_CODE_REVISION": expected_revision,
         "QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST": expected_contract_digest,
         "QUANTHUS_DWD_EXECUTION_MODE": expected_execution_mode,
     }
     if any(environment.get(key) != value for key, value in expected_environment.items()):
-        raise DwdV21PreflightError(
-            f"deployment environment differs from {expected_execution_mode} authority"
-        )
-    expected_workspace = contract.get("authorized_execution", {}).get("build_workspace")
-    if expected_workspace != str(workspace.resolve()):
-        raise DwdV21PreflightError("workspace differs from the approved contract")
+        raise DwdV21PreflightError(f"deployment environment differs from {expected_execution_mode}")
     mount = parse_mountinfo(mountinfo_path.read_text(encoding="ascii"), workspace)
-    if mount is None or mount["mount_point"] != str(workspace) or mount["filesystem"] != "ext4":
-        raise DwdV21PreflightError("workspace is not the exact approved ext4 mount")
+    if mount is None or mount["filesystem"] != "ext4":
+        raise DwdV21PreflightError("workspace is not on ext4")
     free_bytes = shutil.disk_usage(workspace).free
     if free_bytes < minimum_free_bytes:
         raise DwdV21PreflightError(
@@ -217,7 +201,7 @@ def run_preflight(
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
-            raise DwdV21PreflightError("GPU rebuild lock is already held") from error
+            raise DwdV21PreflightError("DWD rebuild lock is already held") from error
         filesystem_semantics = _filesystem_probe(workspace)
         git = _git_state(repository, expected_revision)
         ods = verify_ods_base_rollup(ods_base, deep=True)
@@ -257,8 +241,7 @@ def run_preflight(
     if observed_ods != expected_ods or observed_dwd != expected_dwd:
         raise DwdV21PreflightError("deep-verified input identity differs from the contract")
     return {
-        "approval_receipt_digest": approval["canonical_digest"],
-        "authority": expected_execution_mode,
+        "execution_mode": expected_execution_mode,
         "code": git,
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "contract_digest": expected_contract_digest,
@@ -267,7 +250,7 @@ def run_preflight(
         "findings_digest": expected_findings_digest,
         "free_bytes": free_bytes,
         "host": observed_host,
-        "kind": "dwd_base_v2_1_gpu_p100_preflight_receipt",
+        "kind": "dwd_base_v2_1_preflight_receipt",
         "lock": {"path": str(lock_path), "status": "acquired_and_released"},
         "minimum_free_bytes": minimum_free_bytes,
         "mount": mount,
@@ -287,7 +270,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--ods-base", type=Path, required=True)
     parser.add_argument("--dwd-base", type=Path, required=True)
     parser.add_argument("--contract", type=Path, required=True)
-    parser.add_argument("--approval", type=Path, required=True)
     parser.add_argument("--findings", type=Path, required=True)
     parser.add_argument("--remediation", type=Path, required=True)
     parser.add_argument("--environment", type=Path, required=True)
@@ -314,7 +296,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             ods_base=args.ods_base.resolve(),
             dwd_base=args.dwd_base.resolve(),
             contract_path=args.contract.resolve(),
-            approval_path=args.approval.resolve(),
             findings_path=args.findings.resolve(),
             remediation_path=args.remediation.resolve(),
             environment_path=args.environment.resolve(),

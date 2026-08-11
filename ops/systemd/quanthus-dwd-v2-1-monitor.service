@@ -1,5 +1,5 @@
 [Unit]
-Description=Quanthus DWD Base V2.1 rebuild health snapshot on GPU-P100
+Description=Quanthus DWD Base V2.1 rebuild health snapshot
 ConditionPathIsMountPoint=/srv/quanthus/gpu-p100-dwd-workspace
 After=local-fs.target
 
@@ -10,7 +10,7 @@ Group=rv192
 WorkingDirectory=/home/rv192/work/Quanthus-issue78-audit-closure
 EnvironmentFile=/etc/quanthus/gpu-p100-dwd-rebuild.env
 Environment=PYTHONPATH=/home/rv192/work/Quanthus-issue78-audit-closure/src
-ExecStart=/home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python /home/rv192/work/Quanthus-issue78-audit-closure/ops/bin/inspect-dwd-v2-1-rebuild --contract /home/rv192/work/Quanthus-issue78-audit-closure/config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json --approval /home/rv192/work/Quanthus-issue78-audit-closure/docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json --expected-contract-digest ${QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST} --workspace /srv/quanthus/gpu-p100-dwd-workspace --minimum-free-bytes ${QUANTHUS_DWD_MONITOR_MINIMUM_FREE_BYTES} --output-root /srv/quanthus/gpu-p100-dwd-workspace/control/monitor
+ExecStart=/home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python /home/rv192/work/Quanthus-issue78-audit-closure/ops/bin/inspect-dwd-v2-1-rebuild --contract /home/rv192/work/Quanthus-issue78-audit-closure/config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json --expected-contract-digest ${QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST} --workspace /srv/quanthus/gpu-p100-dwd-workspace --minimum-free-bytes ${QUANTHUS_DWD_MONITOR_MINIMUM_FREE_BYTES} --output-root /srv/quanthus/gpu-p100-dwd-workspace/control/monitor
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=read-only

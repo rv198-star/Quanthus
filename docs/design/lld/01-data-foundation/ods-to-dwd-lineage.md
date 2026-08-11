@@ -5,7 +5,7 @@
 | 设计状态 | approved |
 | 交付状态 | Base accepted；日更部分覆盖；DWD 周更 open |
 | 上级设计 | [`../01-data-foundation.md`](../01-data-foundation.md) |
-| 当前 Base | ODS / DWD `V2 Build202607` |
+| 当前 Base | ODS V2 / DWD V2.1 `Build202607` |
 | 全量覆盖 | 7 个业务域，9 个物理 DWD builder，33 张 DWD 表 |
 | 当前日更覆盖 | 1 个聚合 builder，7 张当日增量表 |
 | 当前周更覆盖 | ODS corrections 已调度；DWD transform 未启用 |
@@ -28,7 +28,7 @@ DWD 行继续保留 `record_source`、`source_record_id`、`source_revision`、
 
 ### 1.1 Base 实例身份桥
 
-`dwd-base-202607-v2` 在构建时封存的直接上游仍是原包名 `ods-base-202607-v1.2`，其
+历史包 `dwd-base-202607-v2` 在构建时封存的直接上游仍是原包名 `ods-base-202607-v1.2`，其
 manifest SHA-256 为
 `sha256:090d6a50aac7007337229588e9cd1586a50f09811332e6024d08f28ddc4b6e05`。ODS 后续做了
 名称迁移，当前正式身份是 `ods-base-202607-v2`，manifest SHA-256 为
@@ -36,10 +36,10 @@ manifest SHA-256 为
 content digest 都是
 `sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01`。
 
-因此 `config/releases/v2-build202607.json` 是当前 ODS/DWD Base 组合身份的权威；DWD
-manifest 是原始构建血缘的权威。名称迁移没有重写 DWD manifest，也不能把两个不同的
-manifest SHA-256 当成相同 artifact。实例链应解释为“内容相同的正式重命名”，不是一次
-新的 ODS 到 DWD 重建。
+当前正式 DWD 是从该 ODS V2 身份重建并通过五项独立审计的
+`dwd-base-202607-v2.1`。因此 `config/releases/v2-build202607.json` 是当前 ODS/DWD Base
+组合身份的权威；各包 manifest 是其原始构建血缘的权威。名称迁移没有重写 DWD manifest；
+V2.1 则是新的正式重建 Release，二者都保持不可变。
 
 ## 2. 全局关系图
 
@@ -66,7 +66,7 @@ flowchart LR
     E --> Q
     D --> Q
     H --> Q
-    Q --> B[DWD Base V2<br/>33 tables]
+    Q --> B[DWD Base V2.1<br/>33 tables]
 ```
 
 身份桥是所有公司/证券事实的关联前提。财务先于披露事件，是因为

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -29,6 +30,18 @@ class DomainBaseResult:
     row_count: int
     payload_bytes: int
     payload_file_count: int
+
+
+@dataclass(frozen=True)
+class DomainBasePromotionResult:
+    """One verified installation and atomic Base pointer transition."""
+
+    package: DomainBaseResult
+    previous_package_id: str | None
+    previous_manifest_sha256: str | None
+    previous_current_sha256: str | None
+    current_sha256: str
+    installed: bool
 
 
 @dataclass(frozen=True)
@@ -550,6 +563,133 @@ def _current_descriptor(result: DomainBaseResult, *, run_id: str) -> dict[str, A
         "run_id": run_id,
         "through_date": "2026-07-31",
     }
+
+
+def _verified_current(current: Path) -> tuple[dict[str, Any], DomainBaseResult]:
+    value = _object(current)
+    if value.get("schema_version") != 1 or value.get("kind") != "dwd_domain_base_current":
+        raise DomainBaseError("DWD Base CURRENT descriptor is invalid")
+    package_path = _relative(value.get("package_path"), "CURRENT.package_path")
+    if len(package_path.parts) != 1:
+        raise DomainBaseError("DWD Base CURRENT package path must be one directory name")
+    package = verify_domain_base(current.parent / package_path.as_posix())
+    expected = {
+        "package_id": package.package_id,
+        "manifest_sha256": package.manifest_sha256,
+        "content_digest": package.content_digest,
+    }
+    if any(value.get(key) != item for key, item in expected.items()):
+        raise DomainBaseError("DWD Base CURRENT no longer binds its package")
+    return value, package
+
+
+def _same_package(left: DomainBaseResult, right: DomainBaseResult) -> bool:
+    return (
+        left.package_id,
+        left.manifest_sha256,
+        left.content_digest,
+        left.table_count,
+        left.row_count,
+        left.payload_bytes,
+        left.payload_file_count,
+    ) == (
+        right.package_id,
+        right.manifest_sha256,
+        right.content_digest,
+        right.table_count,
+        right.row_count,
+        right.payload_bytes,
+        right.payload_file_count,
+    )
+
+
+def promote_domain_base_candidate(
+    *,
+    source: Path,
+    base_root: Path,
+    current: Path,
+    run_id: str,
+    expected_current_sha256: str | None,
+) -> DomainBasePromotionResult:
+    """Install one sealed Base and compare-and-swap the active descriptor."""
+
+    source = source.resolve()
+    source_result = verify_domain_base(source)
+    if source.name != source_result.package_id:
+        raise DomainBaseError("DWD Base source directory must equal its package id")
+    base_root = base_root.resolve()
+    base_root.mkdir(parents=True, exist_ok=True)
+    if current.resolve().parent != base_root or current.name != "BASE_CURRENT.json":
+        raise DomainBaseError("DWD Base CURRENT must be BASE_CURRENT.json below the Base root")
+    lock_path = base_root / ".dwd-domain-base-promotion.lock"
+    with lock_path.open("a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        previous_value: dict[str, Any] | None = None
+        previous_package: DomainBaseResult | None = None
+        previous_sha = _sha256(current) if current.exists() else None
+        if current.exists():
+            previous_value, previous_package = _verified_current(current)
+        target = base_root / source_result.package_id
+        descriptor = _current_descriptor(
+            DomainBaseResult(
+                target,
+                source_result.package_id,
+                source_result.manifest_sha256,
+                source_result.content_digest,
+                source_result.table_count,
+                source_result.row_count,
+                source_result.payload_bytes,
+                source_result.payload_file_count,
+            ),
+            run_id=run_id,
+        )
+        if previous_value == descriptor:
+            installed_result = verify_domain_base(target)
+            if not _same_package(source_result, installed_result):
+                raise DomainBaseError("installed DWD Base differs from the release source")
+            return DomainBasePromotionResult(
+                installed_result,
+                previous_package.package_id if previous_package else None,
+                previous_package.manifest_sha256 if previous_package else None,
+                previous_sha,
+                _sha256(current),
+                False,
+            )
+        if previous_sha != expected_current_sha256:
+            raise DomainBaseError(
+                "DWD Base CURRENT SHA precondition failed: "
+                f"observed={previous_sha!r} expected={expected_current_sha256!r}"
+            )
+        installed = False
+        if target.exists():
+            installed_result = verify_domain_base(target)
+            if not _same_package(source_result, installed_result):
+                raise DomainBaseError("installed DWD Base path has a different identity")
+        else:
+            staging = base_root / f".incoming-{source_result.package_id}"
+            if staging.exists() or staging.is_symlink():
+                raise DomainBaseError("DWD Base incoming path already exists")
+            try:
+                shutil.copytree(source, staging, copy_function=os.link)
+                installed_result = verify_domain_base(staging)
+                if not _same_package(source_result, installed_result):
+                    raise DomainBaseError("installed DWD Base differs from the release source")
+                os.replace(staging, target)
+                _fsync_directory(base_root)
+                installed_result = verify_domain_base(target)
+                installed = True
+            except BaseException:
+                shutil.rmtree(staging, ignore_errors=True)
+                raise
+        _write_json(current, descriptor)
+        return DomainBasePromotionResult(
+            installed_result,
+            previous_package.package_id if previous_package else None,
+            previous_package.manifest_sha256 if previous_package else None,
+            previous_sha,
+            _sha256(current),
+            installed,
+        )
 
 
 def _verify_package_binding(

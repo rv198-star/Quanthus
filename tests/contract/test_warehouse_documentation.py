@@ -83,7 +83,7 @@ class WarehouseDocumentationContractTest(unittest.TestCase):
             table = columns[1].strip("`")
             documented_rows[table] = int(columns[6].replace(",", ""))
         self.assertEqual(set(documented_rows), model_tables)
-        self.assertEqual(sum(documented_rows.values()), 468_268_180)
+        self.assertEqual(sum(documented_rows.values()), 455_817_962)
 
         for table in model_tables:
             with self.subTest(table=table):

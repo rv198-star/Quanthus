@@ -10,6 +10,7 @@ from quanthus.pipelines.securities_warehouse.domain_base import (
     _EXPECTED_KINDS,
     DomainBaseError,
     import_domain_candidate,
+    promote_domain_base_candidate,
     publish_domain_base,
     seal_domain_base_candidate,
     verify_domain_base,
@@ -102,6 +103,94 @@ class DomainBaseTests(unittest.TestCase):
 
             self.assertEqual(result.table_count, 33)
             self.assertFalse((output.parent / "BASE_CURRENT.json").exists())
+
+    def test_promote_sealed_candidate_installs_and_compare_and_swaps_current(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidates, _ = self._candidates(root)
+            base_root = root / "base"
+            current = base_root / "BASE_CURRENT.json"
+            publish_domain_base(
+                candidates=candidates,
+                output=base_root / "dwd-base-202607-v2",
+                current=current,
+                package_id="dwd-base-202607-v2",
+                run_id="run-1",
+                input_plan_digest="sha256:plan",
+                ods_base={"package_id": "ods", "manifest_sha256": "sha256:ods"},
+                model_sha256="sha256:model",
+                model_extension_sha256="sha256:extension",
+                code_revision="a" * 40,
+            )
+            source = root / "release" / "dwd-base-202607-v2.1"
+            sealed = seal_domain_base_candidate(
+                candidates=candidates,
+                output=source,
+                package_id=source.name,
+                run_id="run-1",
+                input_plan_digest="sha256:plan",
+                ods_base={"package_id": "ods", "manifest_sha256": "sha256:ods"},
+                model_sha256="sha256:model",
+                model_extension_sha256="sha256:extension",
+                code_revision="a" * 40,
+            )
+            before = _sha(current)
+
+            result = promote_domain_base_candidate(
+                source=source,
+                base_root=base_root,
+                current=current,
+                run_id="release-r1",
+                expected_current_sha256=before,
+            )
+
+            self.assertTrue(result.installed)
+            self.assertEqual(result.previous_package_id, "dwd-base-202607-v2")
+            self.assertEqual(result.package.manifest_sha256, sealed.manifest_sha256)
+            self.assertEqual(json.loads(current.read_text())["run_id"], "release-r1")
+            installed = base_root / source.name
+            self.assertEqual(verify_domain_base(installed).content_digest, sealed.content_digest)
+            source_payload = next((source / "payload").rglob("*.parquet"))
+            installed_payload = installed / source_payload.relative_to(source)
+            self.assertEqual(source_payload.stat().st_ino, installed_payload.stat().st_ino)
+
+            repeated = promote_domain_base_candidate(
+                source=source,
+                base_root=base_root,
+                current=current,
+                run_id="release-r1",
+                expected_current_sha256=before,
+            )
+            self.assertFalse(repeated.installed)
+
+    def test_promote_sealed_candidate_rejects_current_sha_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidates, _ = self._candidates(root)
+            source = root / "release" / "dwd-base-202607-v2.1"
+            seal_domain_base_candidate(
+                candidates=candidates,
+                output=source,
+                package_id=source.name,
+                run_id="run-1",
+                input_plan_digest="sha256:plan",
+                ods_base={"package_id": "ods", "manifest_sha256": "sha256:ods"},
+                model_sha256="sha256:model",
+                model_extension_sha256="sha256:extension",
+                code_revision="a" * 40,
+            )
+            base_root = root / "base"
+            base_root.mkdir()
+
+            with self.assertRaisesRegex(DomainBaseError, "SHA precondition failed"):
+                promote_domain_base_candidate(
+                    source=source,
+                    base_root=base_root,
+                    current=base_root / "BASE_CURRENT.json",
+                    run_id="release-r1",
+                    expected_current_sha256="sha256:" + "0" * 64,
+                )
+            self.assertFalse((base_root / source.name).exists())
 
     def test_import_hardlinks_native_candidate_and_revalidates_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

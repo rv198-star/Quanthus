@@ -1,157 +1,58 @@
-# DWD Base V2.1 GPU-P100 Rebuild Runbook
+# DWD Base V2.1 Rebuild Runbook
+
+This runbook records the R18 GPU-P100 execution and the reusable production workflow. GPU-P100 is
+run provenance, not an execution requirement.
+
+## Released Build
 
 | Field | Value |
 | --- | --- |
-| Governing work | `META-DATA-PIT-001` / Issue #78 |
-| Governing decision | `docs/architecture/adr-0009-gpu-p100-dwd-v2-1-execution.md` |
-| Machine contract | `config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json` |
-| Build node | GPU-P100, CPU execution |
-| Install and cutover node | CN01 |
-| Delivery gate | contract and pilot receipts approved; full build exact-revision-gated |
+| Release | DWD Base V2.1 Build202607 Release |
+| Run | `dwd-v2-1-gpu-p100-20260811T063015Z-5b90cc47-r18` |
+| Package | `dwd-base-202607-v2.1` |
+| Manifest SHA-256 | `sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b` |
+| Content digest | `sha256:b689a21b2052ca722af35faeb72cb68850b54d00ddb062b3694e443ba29c32b9` |
+| Build revision | `5b90cc47414a3542ab65e04e703554d487cd448d` |
+| Scale | 33 tables; 455,817,962 rows; 14,447,400,032 payload bytes |
 
-The exact execution contract and pilot receipts are approved. This runbook does not itself
-authorize a full builder revision, installation, or pointer movement. Full build opens only when
-the project owner approves the exact implementation revision and that same revision is placed in
-the fail-closed node environment.
+## Workflow
 
-## Script Workflow
+1. `preflight-dwd-v2-1-rebuild` verifies the clean code revision, canonical build configuration,
+   immutable ODS/DWD inputs, ext4 filesystem semantics, capacity, and the local single-writer lock.
+2. `run-dwd-v2-1-rebuild` creates the input plan and durable phase receipts.
+3. `pilot-dwd-v2-1-rebuild` performs deterministic replay and bounded representative decoding.
+4. `build-dwd-v2-1-rebuild` resumes from verified checkpoints, builds nine domains, seals the
+   pointerless 33-table candidate, and runs the five independent candidate audits.
+5. Success is `candidate-verified` with all five audit digests. It does not modify a current pointer.
+6. `promote-dwd-domain-base` deeply verifies and atomically installs the candidate, retains the old
+   package, and compare-and-swaps `BASE_CURRENT.json`.
 
-Repository wrappers call production Python modules and emit structured receipts:
+No step checks for GPU-P100 or CN01. The historical contract digest is a reproducibility input for
+R18, not a human authorization token. Host-specific systemd files under `ops/systemd/` are deployment
+examples; the Python and `ops/bin/` entry points are portable.
 
-1. `run-dwd-v2-1-rebuild` verifies node identity, exact contract and inputs, ext4 mount, capacity,
-   filesystem semantics, environment, and the GPU-local lock; it then freezes one pilot run id,
-   source dispositions, domain order, package identity, tool versions, and capacity receipt.
-2. `pilot-dwd-v2-1-rebuild` runs bound deterministic replays and representative heavy partitions,
-   producing measured memory, thread, and spill limits. It executes two isolated, sequential,
-   read-only PyArrow decodes against the sealed financial-reporting and market-observation inputs,
-   then pauses at `awaiting-pilot-acceptance`.
-3. The exact pilot receipt approval is frozen in
-   `docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-pilot-approval-20260808.json`.
-4. `build-dwd-v2-1-rebuild` creates a distinct revision-bound repair run. It verifies the accepted
-   pilot receipts and the r11 post-build audit authority, repeats the deep preflight under
-   `full_build` authority, and freezes a data-compatible new plan. It then deep-verifies and
-   hard-links the five reusable r11 domain candidates into current-run import wrappers, rebuilds
-   only financial reporting, disclosure/company event, ownership/capital, and quality governance,
-   and verifies every immutable checkpoint before continuing. The r11 candidates and manifests
-   remain unchanged.
-5. The same full-build runtime hard-links the nine verified domain candidates into a 33-table
-   export, writes its manifest and `READY`, and deeply verifies it. It then runs five checkpointed
-   successor-candidate audits: physical schema and partitions, semantic contracts, domain
-   invariants, coverage and exclusions, and lineage authority. All five reports are collected even
-   when an earlier report has findings; only five sealed `verified` reports advance the run to
-   `awaiting-candidate-approval`. The aggregate fails closed after evidence collection when any
-   report has a finding or drift. The runtime calls the pointerless seal API and cannot create or
-   change a `CURRENT` descriptor.
-6. `import-dwd-v2-1-candidate` runs on CN01 after separate implementation and authorization. It
-   pulls only manifest-declared bytes into `/personal`,
-   deep-verifies them, rechecks local capacity, and prepares hidden local ingress.
-7. Existing install and pointer compare-and-swap tools remain separate; cutover is never part of
-   the rebuild phase chain.
+## Safety Properties
 
-Each phase writes temporary output, fsyncs files and parent directories, verifies the result, then
-atomically publishes a receipt. Resume revalidates the run id, code revision, input manifests,
-audit/remediation/contract digests, phase cursor, and output hashes. Any mismatch fails closed.
+- Base inputs and completed candidates are immutable and hash-bound.
+- A run id is bound to its code revision and input plan.
+- Every checkpoint is revalidated before reuse.
+- Thread, batch, memory, spill, and free-space bounds fail closed.
+- Temporary output is fsynced and atomically renamed.
+- Promotion uses a local lock and a SHA-preconditioned pointer compare-and-swap.
+- `dwd-base-202607-v2` remains intact as the immediate rollback package.
 
-## Pilot Limits And Invocation
+## R18 Promotion
 
-The GPU-P100 pilot defaults are frozen at one worker, 12 GiB address-space limit, four threads,
-256 decoded rows per batch, and 8 GiB maximum spill per execution. `TMPDIR` and all supported engine
-temporary-directory variables are pinned below the run's ext4 `scratch/pilot` directory. No local
-scratch fallback, Base mutation, builder output, network input, or concurrent worker is allowed.
-
-Run the pilot only after `run-dwd-v2-1-rebuild` has produced a sealed
-`awaiting-pilot-receipts` phase for the same revision and run id:
+On the host that contains both the candidate and Base root:
 
 ```bash
-ops/bin/pilot-dwd-v2-1-rebuild \
-  --repository /home/rv192/work/Quanthus-issue78-audit-closure \
-  --workspace /srv/quanthus/gpu-p100-dwd-workspace \
-  --ods-base /srv/quanthus/ods/base/ods-base-202607-v2 \
-  --dwd-base /srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2 \
-  --environment /etc/quanthus/gpu-p100-dwd-rebuild.env \
-  --run-id "$RUN_ID" \
-  --expected-revision "$REVISION" \
-  --expected-contract-digest "$CONTRACT_DIGEST" \
-  --python /home/rv192/work/Quanthus-issue78-audit-closure/.venv-dwd-rebuild/bin/python
+ops/bin/promote-dwd-domain-base \
+  --source /srv/quanthus/gpu-p100-dwd-workspace/runs/dwd-v2-1-gpu-p100-20260811T063015Z-5b90cc47-r18/export/dwd-base-202607-v2.1 \
+  --base-root /srv/quanthus/dwd-dws-v2/base \
+  --current /srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json \
+  --run-id dwd-v2-1-gpu-p100-20260811T063015Z-5b90cc47-r18 \
+  --expected-current-sha256 sha256:<observed-current-file-sha256>
 ```
 
-Success is a pause, not builder authorization. The two approval inputs are the canonical digests in
-`evidence/pilot/replay-determinism.json` and `evidence/pilot/partition-pilot.json`.
-
-Install and start the persistent one-shot unit after placing the approved revision and run id in
-`/etc/quanthus/gpu-p100-dwd-rebuild.env`:
-
-```bash
-sudo install -m 0644 ops/systemd/quanthus-dwd-v2-1-pilot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl start quanthus-dwd-v2-1-pilot.service
-```
-
-The pilot unit has no restart policy. A node outage or failed pilot requires evidence inspection
-and an explicit checkpoint decision; it never resumes itself or opens full-builder authority.
-
-## Full Build Service
-
-After the exact full-build revision is approved, install
-`ops/systemd/gpu-p100-dwd-full-build.env.example` as the node environment and replace its revision
-and run placeholders. The new run id must contain the first eight characters of the approved
-revision. Keep `QUANTHUS_DWD_RESUME_AUTHORIZED=0` for the first start.
-Set `QUANTHUS_DWD_REUSE_RUN_ID` to the exact r11 run named in the checked-in environment example.
-The runtime rejects a different reuse source, a changed audit summary, or an r11 plan whose ODS,
-model, cutoff, source ledger, coverage matrix, or domain plan differs from the new plan.
-
-Install and start the bounded service:
-
-```bash
-sudo install -m 0644 ops/systemd/quanthus-dwd-v2-1-full-build.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl start quanthus-dwd-v2-1-full-build.service
-```
-
-The service is sequential, network-isolated, limited to two CPUs and 12 GiB, and has
-`Restart=no`. All temporary directories are pinned below `runs/<run-id>/scratch/full-build` on the
-ext4 workspace. Build and audit checkpoints allow an explicitly authorized later invocation to
-continue without reimporting verified domains, rebuilding completed repair domains, or repeating
-completed audit tables. Normal success is the
-paused `awaiting-candidate-approval` phase with five candidate-audit digests in its receipt, not
-installation.
-
-After an interruption, inspect the immutable failure and last-passed receipts. Resume only after
-an explicit checkpoint decision by setting `QUANTHUS_DWD_RESUME_AUTHORIZED=1` and starting the
-service again. The runtime re-runs deep preflight, rejects drift in any completed checkpoint, and
-continues at the first unfinished source audit, domain, or candidate audit. Set the flag back to
-`0` after the recovery invocation.
-
-## Fixed Control Paths
-
-| Role | Path |
-| --- | --- |
-| GPU workspace | `/srv/quanthus/gpu-p100-dwd-workspace` |
-| GPU build lock | `/srv/quanthus/gpu-p100-dwd-workspace/control/locks/dwd-base-v2-1-rebuild.lock` |
-| CN01 import/install lock | `/srv/quanthus/dwd-dws-v2/v2.1-rebuild/locks/import-install.lock` |
-| CN01 transfer landing | `/personal` under a manifest-bound run directory |
-| CN01 hidden ingress | `/srv/quanthus/dwd-dws-v2/base/.incoming-dwd-base-202607-v2.1` |
-| CN01 installed package | `/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1` |
-| CN01 active pointer | `/srv/quanthus/dwd-dws-v2/base/BASE_CURRENT.json` |
-
-## Hourly Inspection Layers
-
-The GPU-P100 systemd timer performs one bounded local inspection pass and exits. It treats an
-offline GPU-P100 as expected availability, not data corruption; no timer runs while the node is
-offline.
-
-It checks reachability, approved contract digest, active run identity, phase receipts, process and
-lock owner, ext4 mount identity, free bytes, memory pressure, spill growth, and recent structured
-events. Healthy work is left untouched. On failure it preserves evidence and may apply only an
-idempotent recovery already authorized for the active phase. Digest drift, conflicting run ids,
-checkpoint corruption, repeated failure, capacity breach, and every import/install/cutover action
-require escalation.
-
-The monitor never starts a new run, opens a gate, infers success from free-form log text, resumes
-after a node outage, installs a partial candidate, or changes `BASE_CURRENT.json`.
-
-GPU-P100 runs `quanthus-dwd-v2-1-monitor.timer` once per hour and writes atomic snapshots below
-`control/monitor`. The timer is non-persistent: after an offline interval it performs one normal
-post-boot inspection instead of replaying missed checks. Codex App may later inspect the same
-snapshots by connecting directly from OCI to GPU-P100; that supervisory task does not replace or
-control the systemd timer.
+The command may be rerun idempotently after success. It rejects pointer drift, changed source
+bytes, a conflicting installed package, non-local package paths, and failed deep verification.

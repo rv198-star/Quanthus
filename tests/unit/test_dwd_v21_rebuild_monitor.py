@@ -7,26 +7,24 @@ from quanthus.pipelines.dwd_v21_rebuild_monitor import (
     DwdV21MonitorError,
     _active_run_snapshot,
     parse_mountinfo,
-    verify_authority,
+    verify_execution_contract,
     write_snapshot,
 )
 from quanthus.pipelines.dwd_v21_rebuild_runtime import _active_pointer, _phase_receipt
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / "config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json"
-APPROVAL = ROOT / "docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json"
 DIGEST = "sha256:bab98bb0a11dbd2c8395881931cdaed50f915ce2ce39065c25ac103e5ea84d8a"
 
 
-def test_authority_receipt_activates_exact_contract() -> None:
-    contract, approval = verify_authority(CONTRACT, APPROVAL, DIGEST)
+def test_exact_execution_contract_is_hash_bound_without_approval_input() -> None:
+    contract = verify_execution_contract(CONTRACT, DIGEST)
     assert contract["authorized_execution"]["build_node"] == "GPU-P100"
-    assert approval["phase_authority"]["full_build"] == ("blocked_until_pilot_receipts_approved")
 
 
-def test_authority_rejects_digest_drift() -> None:
+def test_execution_contract_rejects_digest_drift() -> None:
     with pytest.raises(DwdV21MonitorError, match="deployed digest"):
-        verify_authority(CONTRACT, APPROVAL, "sha256:" + "0" * 64)
+        verify_execution_contract(CONTRACT, "sha256:" + "0" * 64)
 
 
 def test_mountinfo_selects_exact_nested_mount() -> None:
@@ -120,5 +118,6 @@ def test_systemd_timer_is_observational_and_hourly() -> None:
     assert "inspect-dwd-v2-1-rebuild" in service
     assert "run-dwd-v2-1-rebuild" not in service
     assert "QUANTHUS_DWD_EXECUTION_MODE=pilot_only" in environment
-    assert "QUANTHUS_DWD_BUILDER_AUTHORIZED=0" in environment
+    assert "QUANTHUS_DWD_BUILDER_AUTHORIZED" not in environment
+    assert "--approval" not in service
     assert f"QUANTHUS_DWD_EXECUTION_CONTRACT_DIGEST={DIGEST}" in environment

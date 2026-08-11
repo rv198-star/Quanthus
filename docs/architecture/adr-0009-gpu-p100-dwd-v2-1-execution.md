@@ -1,61 +1,39 @@
-# ADR 0009: GPU-P100 DWD Base V2.1 Execution Topology
+# ADR 0009: DWD Base V2.1 Rebuild Execution
 
-- Status: Accepted; pilot receipts approved, full build remains exact-revision-gated
+- Status: Accepted and completed; R18 released
 - Date: 2026-08-07
+- Completion date: 2026-08-11
 - Decision id: `META-DATA-PIT-001`
-- Design status: approved
-- Delivery gate: pilot accepted; full build blocked on exact builder revision approval
-- Affects: ADR 0008 section 5, the HLD data-platform topology, and the V2.1 rebuild runbook
 
 ## Context
 
-ADR 0008 assumed that CN01 would both build and install DWD Base V2.1. The completed machine audit
-showed that CN01 has only two CPUs, about 3.9 GB RAM, and insufficient local installation capacity.
-GPU-P100 is an intermittently available WSL2 node with 12 vCPUs, 31 GiB usable RAM, and a dedicated
-180 GiB ext4 workspace on host drive D. The current builders are CPU DuckDB, Polars, and PyArrow;
-the absent Tesla P100 device is not part of the execution path.
+The July V2.1 rebuild needed more CPU, memory, and local ext4 capacity than CN01 could provide.
+GPU-P100 was available temporarily and therefore executed the completed R18 build. Its name remains
+in run ids and historical receipts as provenance.
 
-The project owner authorized GPU-P100 as the V2.1 execution node on 2026-08-07 and subsequently
-approved the exact replacement contract digest. The approval receipt is
-`docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-execution-approval-20260807.json`. The frozen audit
-packet remains immutable historical evidence.
+The original execution plan also assigned build, import, install, and pointer authority to named
+hosts and required separate approval statements between phases. That topology added coordination
+without improving the integrity of a personal warehouse whose immutable packages can be verified
+directly.
 
 ## Decision
 
-- GPU-P100 owns preflight, planning, pilots, domain builds, assembly, verification, and sealing.
-- CN01 pulls the sealed candidate through a restricted read-only GPU-P100 export account.
-- CN01 retains transfer acceptance, deep verification, local installation, pointer compare-and-swap,
-  and rollback authority.
-- GPU-P100 uses `/srv/quanthus/gpu-p100-dwd-workspace`; DrvFS/NTFS and the WSL root filesystem are
-  forbidden workspace fallbacks.
-- GPU-P100 and CN01 use independent local locks. No NFS or cross-host lock is authoritative.
-- The build is a versioned, checkpointed script workflow. A node outage never triggers automatic
-  failover or implicit resume.
-- A Codex App task may inspect receipts hourly and perform only recovery already authorized by the
-  active phase. It is not the scheduler and cannot open gates, create a run, install, or cut over.
+Rebuild, audit, and promotion code is node-independent production code:
 
-The approved machine contract is
-`config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json`, canonical digest
-`sha256:bab98bb0a11dbd2c8395881931cdaed50f915ce2ce39065c25ac103e5ea84d8a`.
+- any host may execute it when the exact inputs, code revision, ext4 semantics, capacity, and
+  bounded resource settings pass preflight;
+- checkpoint and audit receipts bind inputs and outputs by digest, not by hostname;
+- a successful full build ends at a deeply verified, pointerless candidate;
+- promotion deeply verifies source, staging, installed package, and the retained predecessor, then
+  compare-and-swaps `BASE_CURRENT.json` under a local lock;
+- no approval phrase, CN01 transfer, or named execution node is a software gate;
+- the previous immutable Base remains available for rollback.
 
-## Phase Authority
+The frozen GPU-P100 contract and approval receipts are retained only as R18 historical evidence.
+They are not current operating authority and are not required inputs to promotion.
 
-The exact replay and partition receipts from run
-`dwd-v2-1-gpu-p100-20260808T162708Z-r6feca07-r3` were accepted on 2026-08-08. Their canonical
-approval receipt is
-`docs/acceptance/issue-78-dwd-base-v2-1-gpu-p100-pilot-approval-20260808.json`.
-Full-build execution remains blocked until the project owner approves the exact revision that
-implements the builder. That revision must create a new revision-bound run and verify the accepted
-pilot receipts before decoding business rows. Candidate installation additionally requires CN01
-local capacity; pointer movement always requires separate approval of the exact installed
-candidate.
+## Result
 
-## Consequences
-
-The faster node can perform the expensive CPU work without becoming a production dependency.
-Transfers cross a manifest boundary instead of a shared mutable workspace. The additional host
-boundary requires a restricted export account, two deep verifications, immutable receipts, and
-separate capacity and cutover gates.
-
-The HLD current state is updated by the approval commit. Full build, installation, and cutover
-remain controlled by their later gates.
+Run `dwd-v2-1-gpu-p100-20260811T063015Z-5b90cc47-r18` produced the released
+`dwd-base-202607-v2.1`. GPU-P100 was the machine used for that run; it is not a production
+dependency. The release identity is governed by `config/releases/v2-build202607.json`.

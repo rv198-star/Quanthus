@@ -78,19 +78,15 @@ nodes.
   increment. The former epoch arbitration, paired DWD/DWS publication, old operational ADS, and
   release-set path are retained only as ADR 0005 migration evidence.
 - `config/releases/v2-build202607.json` is the Base identity authority. It binds read-only
-  `ods-base-202607-v2` and `dwd-base-202607-v2` through 2026-07-31. The DWD package contains all 33
-  ADR 0006 objects, 468,268,180 rows, and 14,842,590,066 payload bytes. Daily and weekly processing
+  `ods-base-202607-v2` and `dwd-base-202607-v2.1` through 2026-07-31. The DWD package contains all 33
+  ADR 0006 objects, 455,817,962 rows, and 14,447,400,032 payload bytes. Daily and weekly processing
   writes immutable increments or corrections and never mutates either Base.
-- Issue #78's CN01-only pre-rebuild machine audit is complete with 31 classified findings and no
-  critical finding. The exact findings ledger, V2.1 remediation scope, build contract, raw hashes,
-  and dedicated-agent handoff are frozen under
-  `acceptance/issue-78-dwd-base-v2-pre-rebuild-audit-closure-20260807/`. The builder remains blocked
-  until those exact digests receive human approval and the recorded execution-readiness findings
-  are closed; no V2.1 package or pointer has been created or changed.
-- The approved Issue #78 topology amendment makes GPU-P100 the CPU build node while CN01 retains
-  import, installation, and cutover authority. The exact machine-contract digest and the bounded
-  replay/partition pilot receipts are approved. Full build remains blocked until its exact code
-  revision is approved; candidate acceptance, CN01 installation, and cutover remain later gates.
+- Issue #78 is closed by the independently audited R18 successor. The pre-rebuild findings,
+  remediation scope, build checkpoints, five candidate audits, and final package identities remain
+  immutable evidence under `docs/acceptance/`; they are no longer open delivery gates.
+- Rebuild, audit, and atomic promotion are production repository capabilities. R18 happened to run
+  on GPU-P100, but script validity and package acceptance depend on exact inputs, hashes, tests,
+  filesystem semantics, and bounded resources rather than a named node or approval phrase.
 - Generic DWS is deferred until a concrete cross-domain consumer needs the retained ten-dimension,
   thirteen-fact constellation. P4 is not blocked by DWS: it consumes an exact DWD snapshot and
   produces a purpose-specific, manifest-bound `event_library` projection.

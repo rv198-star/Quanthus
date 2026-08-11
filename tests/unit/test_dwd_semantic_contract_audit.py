@@ -25,6 +25,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class DwdSemanticContractAuditTests(unittest.TestCase):
+    def test_cli_passes_the_model_extension_to_the_auditor(self) -> None:
+        executable = (ROOT / "ops/bin/audit-dwd-semantic-contracts").read_text(encoding="utf-8")
+
+        self.assertIn('parser.add_argument(\n        "--extension",', executable)
+        self.assertIn("extension_path=args.extension", executable)
+
     def test_memory_limit_is_explicit_and_injection_safe(self) -> None:
         self.assertEqual(_validated_memory_limit("2048mb"), "2048MB")
         self.assertEqual(_validated_memory_limit("2GB"), "2GB")

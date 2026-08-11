@@ -26,6 +26,11 @@ def main() -> int:
         default=Path("config/pipelines/dwd-domain-model.v1.json"),
     )
     parser.add_argument(
+        "--extension",
+        type=Path,
+        default=Path("config/pipelines/dwd-domain-model.v1.1-extension.json"),
+    )
+    parser.add_argument(
         "--semantics-policy",
         type=Path,
         default=Path("config/audits/dwd-financial-concept-semantics.v1.json"),
@@ -43,6 +48,7 @@ def main() -> int:
         report = audit_dwd_semantic_contracts(
             root=args.root,
             model_path=args.model,
+            extension_path=args.extension,
             semantics_policy_path=args.semantics_policy,
             scratch=args.scratch,
             checkpoint_path=args.checkpoint,

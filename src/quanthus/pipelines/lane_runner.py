@@ -2027,78 +2027,92 @@ def _cninfo_fetch_announcements(
             "seDate": se,
             "pageSize": 30,
         }
-        page = 1
         got_total = 0
         err = "0"
         msg = "ok"
-        try:
-            while page <= 40:
-                payload = {
-                    "pageNum": str(page),
-                    "pageSize": "30",
-                    "column": "szse",
-                    "tabName": "fulltext",
-                    "plate": "",
-                    "stock": stock,
-                    "searchkey": "",
-                    "secid": "",
-                    "category": "",
-                    "trade": "",
-                    "seDate": se,
-                    "sortName": "",
-                    "sortType": "",
-                    "isHLtitle": "false",
-                }
-                resp = session.post(url, data=payload, headers=headers, timeout=30)
-                if resp.status_code != 200:
-                    raise RuntimeError(f"HTTP {resp.status_code}")
-                body = resp.json()
-                batch = body.get("announcements") or []
-                for item in batch:
-                    ann_id = str(item.get("announcementId") or "")
-                    title = (item.get("announcementTitle") or "").strip()
-                    if not ann_id or not title:
-                        continue
-                    ts_ms = item.get("announcementTime")
-                    try:
-                        from datetime import datetime as _dt
+        attempt = 0
+        for attempt in range(1, 4):
+            page = 1
+            code_rows: list[dict[str, Any]] = []
+            try:
+                while page <= 40:
+                    payload = {
+                        "pageNum": str(page),
+                        "pageSize": "30",
+                        "column": "szse",
+                        "tabName": "fulltext",
+                        "plate": "",
+                        "stock": stock,
+                        "searchkey": "",
+                        "secid": "",
+                        "category": "",
+                        "trade": "",
+                        "seDate": se,
+                        "sortName": "",
+                        "sortType": "",
+                        "isHLtitle": "false",
+                    }
+                    resp = session.post(url, data=payload, headers=headers, timeout=30)
+                    if resp.status_code != 200:
+                        raise RuntimeError(f"HTTP {resp.status_code}")
+                    body = resp.json()
+                    batch = body.get("announcements") or []
+                    for item in batch:
+                        ann_id = str(item.get("announcementId") or "")
+                        title = (item.get("announcementTitle") or "").strip()
+                        if not ann_id or not title:
+                            continue
+                        ts_ms = item.get("announcementTime")
+                        try:
+                            from datetime import datetime as _dt
 
-                        pub = _dt.fromtimestamp(int(ts_ms) / 1000).strftime(
-                            "%Y-%m-%d %H:%M:%S"
+                            pub = _dt.fromtimestamp(int(ts_ms) / 1000).strftime(
+                                "%Y-%m-%d %H:%M:%S"
+                            )
+                        except Exception:
+                            continue
+                        code_rows.append(
+                            {
+                                "security_id": code,
+                                "stock_code": code,
+                                "ann_id": ann_id,
+                                "title": title,
+                                "publish_time": pub,
+                                "announce_date": pub[:10],
+                                "name": item.get("secName") or "",
+                                "url": (
+                                    f"http://www.cninfo.com.cn/new/disclosure/detail?"
+                                    f"stockCode={code}&announcementId={ann_id}"
+                                ),
+                                "source": "cninfo.hisAnnouncement",
+                                "acquired_at": acquired_at,
+                            }
                         )
-                    except Exception:
-                        continue
-                    rows.append(
-                        {
-                            "security_id": code,
-                            "stock_code": code,
-                            "ann_id": ann_id,
-                            "title": title,
-                            "publish_time": pub,
-                            "announce_date": pub[:10],
-                            "name": item.get("secName") or "",
-                            "url": (
-                                f"http://www.cninfo.com.cn/new/disclosure/detail?"
-                                f"stockCode={code}&announcementId={ann_id}"
-                            ),
-                            "source": "cninfo.hisAnnouncement",
-                            "acquired_at": acquired_at,
-                        }
-                    )
-                    got_total += 1
-                has_more = bool(body.get("hasMore"))
-                if has_more and page == 40:
-                    raise RuntimeError("pagination limit reached with hasMore=true")
-                if not has_more or not batch:
-                    break
-                page += 1
-        except Exception as exc:  # noqa: BLE001
-            err = "1"
-            msg = str(exc)
+                    has_more = bool(body.get("hasMore"))
+                    if has_more and page == 40:
+                        raise RuntimeError("pagination limit reached with hasMore=true")
+                    if not has_more or not batch:
+                        break
+                    page += 1
+            except Exception as exc:  # noqa: BLE001
+                err = "1"
+                msg = str(exc)
+                if attempt < 3:
+                    session.close()
+                    session = requests.Session()
+                    time.sleep(0.2 * attempt)
+                    continue
+            else:
+                rows.extend(code_rows)
+                got_total = len(code_rows)
+                err = "0"
+                msg = "ok"
+            break
         logs.append(
             {
                 "security_id": code,
                 "request": request,
+                "attempts": attempt,
                 "response_error_code": err,
                 "response_error_msg": msg,
                 "response_rows": got_total,

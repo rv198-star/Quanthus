@@ -6,8 +6,10 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -1791,6 +1793,56 @@ def test_provider_event_request_failure_never_ready_or_advances_watermark(
     assert result.release_dir is None
     assert not (shadow / "watermarks" / "calendar-daily-events.json").exists()
     assert not list(shadow.rglob("READY"))
+
+
+def test_cninfo_retries_one_security_without_duplicate_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = 0
+
+    class FakeResponse:
+        status_code = 200
+
+        @staticmethod
+        def json() -> dict[str, object]:
+            return {
+                "announcements": [
+                    {
+                        "announcementId": "notice-1",
+                        "announcementTitle": "Notice",
+                        "announcementTime": 1786406400000,
+                        "secName": "Example",
+                    }
+                ],
+                "hasMore": False,
+            }
+
+    class FakeSession:
+        def post(self, *_args: object, **_kwargs: object) -> FakeResponse:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise TimeoutError("injected timeout")
+            return FakeResponse()
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setenv("ASTOCK_HOME", str(tmp_path))
+    monkeypatch.setitem(sys.modules, "requests", SimpleNamespace(Session=FakeSession))
+
+    rows, logs = lane_runner._cninfo_fetch_announcements(
+        codes=["000001"],
+        start=date(2026, 8, 7),
+        end=date(2026, 8, 7),
+    )
+
+    assert calls == 2
+    assert len(rows) == 1
+    assert rows[0]["ann_id"] == "notice-1"
+    assert logs[0]["attempts"] == 2
+    assert logs[0]["response_error_code"] == "0"
+    assert logs[0]["response_rows"] == 1
 
 
 def test_weekly_provider_error_is_not_a_business_conflict(

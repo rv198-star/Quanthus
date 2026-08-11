@@ -514,7 +514,7 @@ def main() -> int:
             dwd_base = Path(
                 os.environ.get(
                     "QUANTHUS_DWD_BASE",
-                    "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2",
+                    "/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1",
                 )
             )
             release_config = Path(

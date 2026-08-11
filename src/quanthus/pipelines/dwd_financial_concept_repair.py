@@ -39,6 +39,8 @@ class DwdFinancialConceptRepairResult:
     manifest_sha256: str
     content_digest: str
     source_manifest_sha256: str
+    source_run_id: str
+    repair_id: str
     fact_rows: int
     concept_rows: int
     changed_rows: int
@@ -209,7 +211,7 @@ def repair_financial_concept_effective_from(
     *,
     source_root: Path,
     output: Path,
-    run_id: str,
+    repair_id: str,
     code_revision: str,
     expected_source_manifest_sha256: str,
     expected_fact_rows: int,
@@ -224,12 +226,15 @@ def repair_financial_concept_effective_from(
     output = output.resolve()
     if output == source_root or output.is_relative_to(source_root):
         raise DwdFinancialConceptRepairError("repair output must be outside the source package")
-    if not run_id or not code_revision or len(code_revision) != 40:
+    if not repair_id or not code_revision or len(code_revision) != 40:
         raise DwdFinancialConceptRepairError("repair identity is incomplete")
     manifest, source_manifest_sha256 = _verify_source_seal(
         source_root, expected_source_manifest_sha256
     )
-    if manifest.get("run_id") == run_id:
+    source_run_id = manifest.get("run_id")
+    if not isinstance(source_run_id, str) or not source_run_id:
+        raise DwdFinancialConceptRepairError("source package run identity is incomplete")
+    if source_run_id == repair_id:
         raise DwdFinancialConceptRepairError("repair run must differ from its source run")
     files, concept_path, fact_paths = _source_inventory(source_root, manifest)
     coordinates, fact_rows = _fact_coordinates(
@@ -284,7 +289,12 @@ def repair_financial_concept_effective_from(
                 "manifest_sha256": source_manifest_sha256,
                 "content_digest": manifest.get("content_digest"),
             },
-            "target": {"root": str(output), "run_id": run_id, "code_revision": code_revision},
+            "target": {
+                "root": str(output),
+                "repair_id": repair_id,
+                "source_run_id": source_run_id,
+                "code_revision": code_revision,
+            },
             "fact_rows": fact_rows,
             "referenced_concepts": len(coordinates),
             "concept_rows": repaired.num_rows,
@@ -307,7 +317,7 @@ def repair_financial_concept_effective_from(
             raise DwdFinancialConceptRepairError("source package identity is incomplete")
         identity = {
             "package_id": manifest.get("package_id"),
-            "run_id": run_id,
+            "run_id": source_run_id,
             "through_date": manifest.get("through_date"),
             "input_plan_digest": manifest.get("input_plan_digest"),
             "ods_base": manifest.get("ods_base"),
@@ -358,6 +368,8 @@ def repair_financial_concept_effective_from(
         manifest_sha256=verified.manifest_sha256,
         content_digest=verified.content_digest,
         source_manifest_sha256=source_manifest_sha256,
+        source_run_id=source_run_id,
+        repair_id=repair_id,
         fact_rows=fact_rows,
         concept_rows=repaired.num_rows,
         changed_rows=changed_rows,
@@ -368,7 +380,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--repair-id", required=True)
     parser.add_argument("--code-revision", required=True)
     parser.add_argument("--expected-source-manifest-sha256", required=True)
     parser.add_argument("--expected-fact-rows", type=int, required=True)
@@ -381,7 +393,7 @@ def main(argv: list[str] | None = None) -> int:
         result = repair_financial_concept_effective_from(
             source_root=args.source_root,
             output=args.output,
-            run_id=args.run_id,
+            repair_id=args.repair_id,
             code_revision=args.code_revision,
             expected_source_manifest_sha256=args.expected_source_manifest_sha256,
             expected_fact_rows=args.expected_fact_rows,
@@ -401,6 +413,8 @@ def main(argv: list[str] | None = None) -> int:
                 "manifest_sha256": result.manifest_sha256,
                 "content_digest": result.content_digest,
                 "source_manifest_sha256": result.source_manifest_sha256,
+                "source_run_id": result.source_run_id,
+                "repair_id": result.repair_id,
                 "fact_rows": result.fact_rows,
                 "concept_rows": result.concept_rows,
                 "changed_rows": result.changed_rows,

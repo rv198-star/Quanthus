@@ -118,7 +118,7 @@ def test_derives_package_and_only_rewrites_concept_payload(tmp_path: Path) -> No
     result = repair_financial_concept_effective_from(
         source_root=source,
         output=output,
-        run_id="repair-r16",
+        repair_id="repair-r16",
         code_revision="a" * 40,
         expected_source_manifest_sha256=source_manifest_sha,
         expected_fact_rows=3,
@@ -149,7 +149,7 @@ def test_derives_package_and_only_rewrites_concept_payload(tmp_path: Path) -> No
     )
     assert os.stat(source_fact).st_ino == os.stat(target_fact).st_ino
     manifest = json.loads((output / "manifest.json").read_text(encoding="ascii"))
-    assert manifest["run_id"] == "repair-r16"
+    assert manifest["run_id"] == "source-r13"
     assert manifest["repair_provenance"]["source_manifest_sha256"] == source_manifest_sha
     receipt = json.loads(
         (output / "evidence/repairs/financial-concept-effective-from.json").read_text(
@@ -158,6 +158,8 @@ def test_derives_package_and_only_rewrites_concept_payload(tmp_path: Path) -> No
     )
     assert receipt["fact_rows"] == 3
     assert receipt["changed_rows"] == 1
+    assert receipt["target"]["repair_id"] == "repair-r16"
+    assert receipt["target"]["source_run_id"] == "source-r13"
 
 
 def test_rejects_unexpected_change_count_without_output(tmp_path: Path) -> None:
@@ -170,7 +172,7 @@ def test_rejects_unexpected_change_count_without_output(tmp_path: Path) -> None:
         repair_financial_concept_effective_from(
             source_root=source,
             output=output,
-            run_id="repair-r16",
+            repair_id="repair-r16",
             code_revision="a" * 40,
             expected_source_manifest_sha256=source_manifest_sha,
             expected_fact_rows=3,

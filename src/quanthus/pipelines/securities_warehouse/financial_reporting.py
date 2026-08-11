@@ -26,6 +26,11 @@ from quanthus.pipelines.dwd_execution_resources import (
     configure_duckdb_threads,
     dwd_duckdb_memory_limit_mb,
 )
+from quanthus.pipelines.securities_warehouse.financial_concept_semantics import (
+    FinancialConceptSemanticsPolicy,
+    FinancialConceptSemanticsPolicyError,
+    load_financial_concept_semantics_policy,
+)
 from quanthus.pipelines.securities_warehouse.listed_company import (
     ListedCompanyBuildError,
     verify_listed_company_candidate,
@@ -56,6 +61,19 @@ _TAXONOMY_NAMESPACE = "sina.company_finance"
 _UNSPECIFIED_SCOPE = "SINA_PROVIDER_SCOPE_UNSPECIFIED"
 _UNSPECIFIED_STANDARD = "SINA_PROVIDER_STANDARD_UNSPECIFIED"
 _UNSPECIFIED_UNIT = "SINA_PROVIDER_UNIT_UNSPECIFIED"
+_FINANCIAL_SOURCE_ORDER = (
+    "weekly_full_financial_statements",
+    "hotfix_financial_statements",
+    "canonical_financial_quarterly",
+    "weekly_full_financial_quarterly",
+    "hotfix_financial_quarterly",
+    "announcement_archive_fin_abstract",
+)
+_FINANCIAL_STATEMENT_AUDIT_ORDER = (
+    "financial_statements",
+    "fundamentals_financial_statements_parquet",
+)
+_FINANCIAL_NATIVE_SOURCE_ORDER = _FINANCIAL_SOURCE_ORDER[2:]
 
 
 @dataclass(frozen=True)
@@ -689,6 +707,9 @@ def audit_financial_statement_sources(
     hotfix_keys: set[tuple[str, str]] = set()
     source_concepts: dict[str, set[tuple[str, str]]] = {source.label: set() for source in sources}
     selected_concepts: set[tuple[str, str]] = set()
+    source_quality_exceptions: dict[str, Counter[str]] = {
+        source.label: Counter() for source in sources
+    }
     quality_exceptions: Counter[str] = Counter()
     overlap_rows = 0
     hotfix_fill_rows = 0
@@ -743,6 +764,7 @@ def audit_financial_statement_sources(
                         parent_payloads[key] = digest
                         selected_accounting[source.label].update(candidate_accounting)
                         selected_concepts.update(candidate_concepts)
+                        source_quality_exceptions[source.label].update(row_exceptions)
                         quality_exceptions.update(row_exceptions)
                         selected_key_counts[source.label] += 1
                         continue
@@ -764,6 +786,7 @@ def audit_financial_statement_sources(
                     hotfix_fill_rows += 1
                     selected_accounting[source.label].update(candidate_accounting)
                     selected_concepts.update(candidate_concepts)
+                    source_quality_exceptions[source.label].update(row_exceptions)
                     quality_exceptions.update(row_exceptions)
                     selected_key_counts[source.label] += 1
         except FinancialReportingBuildError:
@@ -789,6 +812,7 @@ def audit_financial_statement_sources(
             "input_business_key_count": int(source_key_counts[source.label]),
             "selected_business_key_count": int(selected_key_counts[source.label]),
             "unique_provider_concept_count": len(source_concepts[source.label]),
+            "quality_exceptions": dict(sorted(source_quality_exceptions[source.label].items())),
         }
         for source in sources
     }
@@ -909,6 +933,7 @@ def combine_financial_reporting_source_audits(
         "schema_version": 1,
         "kind": "dwd_financial_reporting_combined_source_audit",
         **{field: native[field] for field in required_bindings},
+        "source_order": list(_FINANCIAL_SOURCE_ORDER),
         "component_audits": {
             "statement": {
                 "path": str(statement_audit_path.resolve()),
@@ -955,6 +980,7 @@ def combine_financial_reporting_source_audits(
         ),
     }
     audit = FinancialReportingSourceAudit(report=report)
+    _financial_source_audit_proof(audit.report)
     write_financial_reporting_source_audit(output, audit)
     return audit
 
@@ -1068,6 +1094,13 @@ def _plan_date(value: object, field: str) -> date:
 
 def _period_coordinate(period_end: date) -> datetime:
     return datetime.combine(period_end, time.min, tzinfo=_SHANGHAI).astimezone(timezone.utc)
+
+
+def _epoch_microseconds(value: datetime) -> int:
+    normalized = value.astimezone(timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    delta = normalized - epoch
+    return ((delta.days * 86_400) + delta.seconds) * 1_000_000 + delta.microseconds
 
 
 def _provider_text(value: object, fallback: str) -> str:
@@ -1269,7 +1302,7 @@ def expand_financial_envelope(
     knowledge_from = _utc_timestamp(row.get("acquired_at"), "acquired_at")
     envelope = decode_financial_envelope(row)
     reports: list[dict[str, Any]] = []
-    concepts: dict[str, dict[str, Any]] = {}
+    concepts: dict[tuple[str, datetime, str], dict[str, Any]] = {}
     facts: list[dict[str, Any]] = []
     quality_exceptions: list[dict[str, Any]] = []
     seen_fact_keys: set[tuple[str, str, str, str, date]] = set()
@@ -1382,17 +1415,18 @@ def expand_financial_envelope(
                 concept_code,
                 concept_name,
             )
-            prior_concept = concepts.get(concept_id)
             concept_row = {
                 "record_source": source_name,
                 "source_record_id": (
-                    f"{source.relative_path}#statement_type={statement_type}"
+                    f"{source.relative_path}#stock_code={stock_code}"
+                    f"&statement_type={statement_type}&period_end={period_end.isoformat()}"
+                    f"&source_acquired_at_us={_epoch_microseconds(knowledge_from)}"
                     f"&concept={concept_code}"
                     f"&concept_name_sha256={hashlib.sha256(concept_name.encode('utf-8')).hexdigest()}"
                 ),
                 "source_revision": source_revision,
                 "source_artifact_sha256": source.source_sha256,
-                "knowledge_from": row_knowledge_from,
+                "knowledge_from": knowledge_from,
                 "knowledge_to": None,
                 "effective_from": _period_coordinate(period_end),
                 "effective_to": None,
@@ -1406,12 +1440,13 @@ def expand_financial_envelope(
                 "period_type": period_type,
                 "balance_type": None,
             }
+            prior_concept = concepts.get(_concept_evidence_key(concept_row))
             if prior_concept is not None and prior_concept["concept_name"] != concept_name:
                 raise FinancialReportingBuildError(
                     "provider concept code has conflicting names within one envelope: "
                     f"statement_type={statement_type} concept={concept_code}"
                 )
-            concepts[concept_id] = concept_row
+            _merge_concept_row(concepts, concept_row)
             raw_value = item.get("item_value")
             is_nil = raw_value is None or (isinstance(raw_value, str) and not raw_value.strip())
             raw_text = None if is_nil else str(raw_value)
@@ -1738,10 +1773,13 @@ def expand_financial_native_row(
         concepts.append(
             {
                 "record_source": source_name,
-                "source_record_id": f"{source_record_id}&concept={field}",
+                "source_record_id": (
+                    f"{source_record_id}&source_acquired_at_us="
+                    f"{_epoch_microseconds(source_knowledge_from)}&concept={field}"
+                ),
                 "source_revision": source_revision,
                 "source_artifact_sha256": source.source_sha256,
-                "knowledge_from": knowledge_from,
+                "knowledge_from": source_knowledge_from,
                 "knowledge_to": None,
                 "effective_from": _period_coordinate(period_end),
                 "effective_to": None,
@@ -1999,7 +2037,62 @@ _OWNED_TABLES = (
     "dwd_financial_fact",
 )
 _PARTITIONED_TABLES = ("dwd_financial_report", "dwd_financial_fact")
-_FINANCIAL_BUILDER_CONTRACT = "financial-reporting-six-source-v2"
+_FINANCIAL_BUILDER_CONTRACT = "financial-reporting-six-source-v3"
+_FINANCIAL_CONCEPT_EVIDENCE = "audits/financial-concept-evidence"
+_FINANCIAL_CONCEPT_EVIDENCE_STORAGE = "checkpoint_parts_atomic_directory_rename_v1"
+_FINANCIAL_RESOURCE_POLICY = "checkpointed_partitioned_write_and_duckdb_external_audit_v2"
+_FINANCIAL_BATCH_ID_PATTERN = re.compile(r"[0-9]{2}-[0-9]{6}")
+_FINANCIAL_CONCEPT_PART_PATTERN = re.compile(r"part-[0-9]{2}-[0-9]{6}\.parquet")
+_FINANCIAL_CANDIDATE_CONTROL_FILES = frozenset(
+    {
+        "audits/financial-source-audit.json",
+        "checkpoint.json",
+        "receipts/financial-reporting-build.json",
+        "reconciliation/source-row-reconciliation.json",
+    }
+)
+_FINANCIAL_SEMANTIC_VERIFICATION_CACHE: set[tuple[str, str]] = set()
+_FINANCIAL_PARTITION_BY = {
+    "dwd_financial_report": ["period_end_year"],
+    "dwd_financial_concept": [],
+    "dwd_financial_fact": ["period_end_year"],
+}
+_FINANCIAL_RECONCILIATION_METRIC_KEYS = {
+    "null_row_keys": frozenset(_OWNED_TABLES),
+    "duplicate_business_keys": frozenset(_OWNED_TABLES),
+    "orphan_foreign_keys": frozenset({"financial_report_id", "financial_concept_id"}),
+    "temporal_or_future_foreign_keys": frozenset({"financial_report_id", "financial_concept_id"}),
+    "concept_revision_evidence": frozenset(
+        {
+            "unsupported_rows",
+            "missing_revision_rows",
+            "invalid_evidence_rows",
+            "source_coordinate_violations",
+            "semantic_conflict_rows",
+            "parallel_state_rows",
+            "boundary_violations",
+        }
+    ),
+}
+_FINANCIAL_YEAR_PARTITION_KEYS = frozenset(
+    {
+        "report_rows",
+        "fact_rows",
+        "null_report_keys",
+        "null_fact_keys",
+        "duplicate_report_keys",
+        "duplicate_fact_keys",
+        "orphan_report_ids",
+        "orphan_concept_ids",
+        "temporal_or_future_report_ids",
+        "temporal_or_future_concept_ids",
+    }
+)
+_FINANCIAL_REPOSITORY = Path(__file__).resolve().parents[4]
+_FINANCIAL_MODEL = _FINANCIAL_REPOSITORY / "config/pipelines/dwd-domain-model.v1.json"
+_FINANCIAL_CONCEPT_SEMANTICS_POLICY = (
+    _FINANCIAL_REPOSITORY / "config/audits/dwd-financial-concept-semantics.v1.json"
+)
 
 
 @dataclass(frozen=True)
@@ -2009,6 +2102,20 @@ class FinancialReportingBuildResult:
     root: Path
     semantic_digest: str
     row_counts: Mapping[str, int]
+
+
+def _financial_concept_semantics_policy(
+    model_path: Path = _FINANCIAL_MODEL,
+) -> FinancialConceptSemanticsPolicy:
+    try:
+        return load_financial_concept_semantics_policy(
+            _FINANCIAL_CONCEPT_SEMANTICS_POLICY,
+            model_path=model_path,
+        )
+    except FinancialConceptSemanticsPolicyError as exc:
+        raise FinancialReportingBuildError(
+            "financial concept semantics policy failed verification"
+        ) from exc
 
 
 def _digest_value(value: object) -> str:
@@ -2067,6 +2174,23 @@ def _write_text_atomic(path: Path, value: str) -> None:
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+            os.fchmod(stream.fileno(), 0o640)
+            stream.write(value)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        _fsync_directory(path.parent)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _write_bytes_atomic(path: Path, value: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
             os.fchmod(stream.fileno(), 0o640)
             stream.write(value)
             stream.flush()
@@ -2138,18 +2262,423 @@ def _verify_financial_model(model: Mapping[str, Any]) -> None:
             raise FinancialReportingBuildError("financial model partition contract differs")
 
 
-def _verify_financial_source_audit(path: Path) -> tuple[dict[str, Any], str]:
-    audit = _read_json_object(path, "financial source audit")
-    calibration = audit.get("candidate_size_calibration")
+def _nonnegative_integer(value: Any, label: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise FinancialReportingBuildError(f"{label} must be a non-negative integer")
+    return value
+
+
+def _exact_nonnegative_counts(
+    value: Any, expected_keys: Sequence[str] | frozenset[str], label: str
+) -> dict[str, int]:
+    if not isinstance(value, Mapping) or set(value) != set(expected_keys):
+        raise FinancialReportingBuildError(f"{label} keys differ")
+    return {key: _nonnegative_integer(value[key], f"{label}.{key}") for key in expected_keys}
+
+
+def _nonnegative_counter(value: Any, label: str) -> dict[str, int]:
+    if not isinstance(value, Mapping) or any(not isinstance(key, str) or not key for key in value):
+        raise FinancialReportingBuildError(f"{label} must be a string-keyed mapping")
+    return dict(
+        sorted((key, _nonnegative_integer(raw, f"{label}.{key}")) for key, raw in value.items())
+    )
+
+
+def _canonical_source_audit_sha256(audit: Mapping[str, Any]) -> str:
+    payload = (json.dumps(audit, ensure_ascii=True, indent=2, sort_keys=True) + "\n").encode(
+        "ascii"
+    )
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _financial_source_audit_proof(audit: Mapping[str, Any]) -> dict[str, Any]:
+    required_bindings = (
+        "run_id",
+        "input_plan_digest",
+        "model_sha256",
+        "listed_company_manifest_sha256",
+        "listed_company_semantic_digest",
+        "source_sha256",
+    )
+    expected_top_level = {
+        "schema_version",
+        "kind",
+        *required_bindings,
+        "source_order",
+        "component_audits",
+        "candidate_size_calibration",
+        "quality_exceptions",
+    }
     if (
-        audit.get("schema_version") != 1
+        set(audit) != expected_top_level
+        or audit.get("schema_version") != 1
         or audit.get("kind") != "dwd_financial_reporting_combined_source_audit"
-        or not isinstance(calibration, Mapping)
-        or not isinstance(calibration.get("dwd_financial_report_rows"), int)
-        or not isinstance(calibration.get("dwd_financial_fact_rows"), int)
+        or audit.get("source_order") != list(_FINANCIAL_SOURCE_ORDER)
+        or any(audit.get(field) in (None, "", {}) for field in required_bindings)
     ):
         raise FinancialReportingBuildError("financial source audit has an unsupported contract")
-    return audit, _sha256(path)
+
+    source_sha256 = audit.get("source_sha256")
+    if (
+        not isinstance(source_sha256, Mapping)
+        or set(source_sha256) != set(_FINANCIAL_SOURCE_ORDER)
+        or any(
+            not isinstance(source_sha256[source], str)
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", source_sha256[source]) is None
+            for source in source_sha256
+        )
+    ):
+        raise FinancialReportingBuildError("financial source audit source checksums differ")
+
+    raw_components = audit.get("component_audits")
+    if not isinstance(raw_components, Mapping) or set(raw_components) != {"statement", "native"}:
+        raise FinancialReportingBuildError("financial source audit components differ")
+    components: dict[str, Mapping[str, Any]] = {}
+    for component_name in ("statement", "native"):
+        raw_component = raw_components[component_name]
+        if (
+            not isinstance(raw_component, Mapping)
+            or set(raw_component) != {"path", "sha256", "audit"}
+            or not isinstance(raw_component.get("path"), str)
+            or not raw_component.get("path")
+            or not isinstance(raw_component.get("audit"), Mapping)
+            or raw_component.get("sha256") != _canonical_source_audit_sha256(raw_component["audit"])
+        ):
+            raise FinancialReportingBuildError(
+                f"financial {component_name} source audit component differs"
+            )
+        components[component_name] = raw_component["audit"]
+
+    statement = components["statement"]
+    statement_keys = {
+        "schema_version",
+        "kind",
+        "decoder_contract",
+        "source_order",
+        "business_key",
+        "source_rows",
+        "overlay",
+        "all_source_accounting",
+        "selected_source_accounting",
+        "candidate_size_calibration",
+        "quality_exceptions",
+    }
+    if (
+        set(statement) != statement_keys
+        or statement.get("schema_version") != 1
+        or statement.get("kind") != "dwd_financial_reporting_source_audit"
+        or statement.get("decoder_contract") != "byte_literal_gzip_sha256_json_v1"
+        or statement.get("source_order") != list(_FINANCIAL_STATEMENT_AUDIT_ORDER)
+        or statement.get("business_key") != ["stock_code", "statement_type"]
+    ):
+        raise FinancialReportingBuildError("financial statement source audit contract differs")
+    statement_rows = statement.get("source_rows")
+    if not isinstance(statement_rows, Mapping) or set(statement_rows) != set(
+        _FINANCIAL_STATEMENT_AUDIT_ORDER
+    ):
+        raise FinancialReportingBuildError("financial statement source rows differ")
+    statement_input_accounting = Counter({field: 0 for field in _ACCOUNTING_FIELDS})
+    statement_selected_accounting = Counter({field: 0 for field in _ACCOUNTING_FIELDS})
+    selected_rows_by_source: dict[str, int] = {}
+    input_rows_by_source: dict[str, int] = {}
+    output_rows_by_source: dict[str, dict[str, int]] = {}
+    quality_exceptions_by_source: dict[str, dict[str, int]] = {}
+    for index, audit_source in enumerate(_FINANCIAL_STATEMENT_AUDIT_ORDER):
+        source_id = _FINANCIAL_SOURCE_ORDER[index]
+        raw_row = statement_rows[audit_source]
+        expected_row_keys = {
+            "path",
+            "source_sha256",
+            "source_revision",
+            "precedence",
+            "input_accounting",
+            "selected_accounting",
+            "input_business_key_count",
+            "selected_business_key_count",
+            "unique_provider_concept_count",
+            "quality_exceptions",
+        }
+        if (
+            not isinstance(raw_row, Mapping)
+            or set(raw_row) != expected_row_keys
+            or not isinstance(raw_row.get("path"), str)
+            or not raw_row.get("path")
+            or raw_row.get("source_sha256") != source_sha256[source_id]
+            or not isinstance(raw_row.get("source_revision"), str)
+            or raw_row.get("precedence") != ("parent" if index == 0 else "hotfix")
+        ):
+            raise FinancialReportingBuildError("financial statement source row contract differs")
+        input_accounting = _exact_nonnegative_counts(
+            raw_row.get("input_accounting"), _ACCOUNTING_FIELDS, "statement input accounting"
+        )
+        selected_accounting = _exact_nonnegative_counts(
+            raw_row.get("selected_accounting"),
+            _ACCOUNTING_FIELDS,
+            "statement selected accounting",
+        )
+        input_business_keys = _nonnegative_integer(
+            raw_row.get("input_business_key_count"), "statement input business keys"
+        )
+        selected_business_keys = _nonnegative_integer(
+            raw_row.get("selected_business_key_count"), "statement selected business keys"
+        )
+        _nonnegative_integer(
+            raw_row.get("unique_provider_concept_count"), "statement provider concepts"
+        )
+        if (
+            input_business_keys != input_accounting["envelope_rows"]
+            or selected_business_keys > input_business_keys
+        ):
+            raise FinancialReportingBuildError("financial statement source accounting differs")
+        statement_input_accounting.update(input_accounting)
+        statement_selected_accounting.update(selected_accounting)
+        quality_exceptions_by_source[source_id] = _nonnegative_counter(
+            raw_row.get("quality_exceptions"), "statement source quality exceptions"
+        )
+        input_rows_by_source[source_id] = input_business_keys
+        selected_rows_by_source[source_id] = selected_business_keys
+        output_rows_by_source[source_id] = {
+            "dwd_financial_report": selected_accounting["report_periods"],
+            "dwd_financial_fact": selected_accounting["materializable_fact_rows"],
+        }
+    all_source_accounting = _exact_nonnegative_counts(
+        statement.get("all_source_accounting"),
+        _ACCOUNTING_FIELDS,
+        "statement all-source accounting",
+    )
+    selected_source_accounting = _exact_nonnegative_counts(
+        statement.get("selected_source_accounting"),
+        _ACCOUNTING_FIELDS,
+        "statement selected-source accounting",
+    )
+    if all_source_accounting != _accounting_dict(
+        statement_input_accounting
+    ) or selected_source_accounting != _accounting_dict(statement_selected_accounting):
+        raise FinancialReportingBuildError("financial statement aggregate accounting differs")
+    statement_overlay = statement.get("overlay")
+    if (
+        not isinstance(statement_overlay, Mapping)
+        or set(statement_overlay)
+        != {
+            "policy",
+            "overlap_mismatch_policy",
+            "parent_overlap_rows",
+            "hotfix_fill_rows",
+            "selected_envelope_rows",
+        }
+        or statement_overlay.get("policy")
+        != "parent_base_wins_on_overlapping_business_keys_hotfix_fills_absent_keys_only"
+        or statement_overlay.get("overlap_mismatch_policy") != "fail_build"
+        or _nonnegative_integer(
+            statement_overlay.get("selected_envelope_rows"), "statement selected envelope rows"
+        )
+        != sum(selected_rows_by_source.values())
+        or _nonnegative_integer(
+            statement_overlay.get("hotfix_fill_rows"), "statement Hotfix fill rows"
+        )
+        != selected_rows_by_source[_FINANCIAL_SOURCE_ORDER[1]]
+    ):
+        raise FinancialReportingBuildError("financial statement overlay differs")
+    _nonnegative_integer(
+        statement_overlay.get("parent_overlap_rows"), "statement parent overlap rows"
+    )
+    statement_calibration = _exact_nonnegative_counts(
+        statement.get("candidate_size_calibration"),
+        (
+            "dwd_financial_report_rows",
+            "dwd_financial_fact_upper_bound",
+            "provider_native_concept_coordinate_count",
+            "selected_uncompressed_bytes",
+        ),
+        "statement candidate calibration",
+    )
+    if (
+        statement_calibration["dwd_financial_report_rows"]
+        != selected_source_accounting["report_periods"]
+        or statement_calibration["dwd_financial_fact_upper_bound"]
+        != selected_source_accounting["materializable_fact_rows"]
+        or statement_calibration["selected_uncompressed_bytes"]
+        != selected_source_accounting["uncompressed_bytes"]
+    ):
+        raise FinancialReportingBuildError("financial statement calibration differs")
+    statement_exceptions = _nonnegative_counter(
+        statement.get("quality_exceptions"), "statement quality exceptions"
+    )
+    if statement_exceptions != dict(
+        sorted(
+            sum(
+                (
+                    Counter(quality_exceptions_by_source[source])
+                    for source in _FINANCIAL_SOURCE_ORDER[:2]
+                ),
+                Counter(),
+            ).items()
+        )
+    ):
+        raise FinancialReportingBuildError("financial statement quality exceptions differ")
+
+    native = components["native"]
+    native_keys = {
+        "schema_version",
+        "kind",
+        *required_bindings,
+        "source_order",
+        "source_rows",
+        "quarterly_overlay",
+        "empty_modeled_sources",
+        "candidate_size_calibration",
+        "quality_exceptions",
+    }
+    if (
+        set(native) != native_keys
+        or native.get("schema_version") != 1
+        or native.get("kind") != "dwd_financial_reporting_native_source_audit"
+        or native.get("source_order") != list(_FINANCIAL_NATIVE_SOURCE_ORDER)
+        or any(native.get(field) != audit.get(field) for field in required_bindings)
+        or not isinstance(native.get("empty_modeled_sources"), Sequence)
+        or isinstance(native.get("empty_modeled_sources"), str | bytes)
+        or any(not isinstance(value, str) or not value for value in native["empty_modeled_sources"])
+    ):
+        raise FinancialReportingBuildError("financial native source audit contract differs")
+    native_rows = native.get("source_rows")
+    if not isinstance(native_rows, Mapping) or set(native_rows) != set(
+        _FINANCIAL_NATIVE_SOURCE_ORDER
+    ):
+        raise FinancialReportingBuildError("financial native source rows differ")
+    native_reports = 0
+    native_facts = 0
+    native_exception_counts: Counter[str] = Counter()
+    native_kinds = {
+        "canonical_financial_quarterly": "quarterly_projection",
+        "weekly_full_financial_quarterly": "quarterly_projection",
+        "hotfix_financial_quarterly": "quarterly_projection",
+        "announcement_archive_fin_abstract": "financial_abstract",
+    }
+    for source_id in _FINANCIAL_NATIVE_SOURCE_ORDER:
+        raw_row = native_rows[source_id]
+        if (
+            not isinstance(raw_row, Mapping)
+            or set(raw_row)
+            != {
+                "source_kind",
+                "path",
+                "member",
+                "source_sha256",
+                "input_rows",
+                "selected_rows",
+                "output_reports",
+                "output_facts",
+                "quality_exceptions",
+            }
+            or raw_row.get("source_kind") != native_kinds[source_id]
+            or not isinstance(raw_row.get("path"), str)
+            or not raw_row.get("path")
+            or raw_row.get("member") is not None
+            and (not isinstance(raw_row.get("member"), str) or not raw_row.get("member"))
+            or raw_row.get("source_sha256") != source_sha256[source_id]
+        ):
+            raise FinancialReportingBuildError("financial native source row contract differs")
+        input_rows = _nonnegative_integer(raw_row.get("input_rows"), "native input rows")
+        selected_rows = _nonnegative_integer(raw_row.get("selected_rows"), "native selected rows")
+        output_reports = _nonnegative_integer(
+            raw_row.get("output_reports"), "native output reports"
+        )
+        output_facts = _nonnegative_integer(raw_row.get("output_facts"), "native output facts")
+        if selected_rows > input_rows:
+            raise FinancialReportingBuildError("financial native selected rows differ")
+        row_exceptions = _nonnegative_counter(
+            raw_row.get("quality_exceptions"), "native source quality exceptions"
+        )
+        quality_exceptions_by_source[source_id] = row_exceptions
+        native_exception_counts.update(row_exceptions)
+        native_reports += output_reports
+        native_facts += output_facts
+        input_rows_by_source[source_id] = input_rows
+        selected_rows_by_source[source_id] = selected_rows
+        output_rows_by_source[source_id] = {
+            "dwd_financial_report": output_reports,
+            "dwd_financial_fact": output_facts,
+        }
+    native_overlay = native.get("quarterly_overlay")
+    if (
+        not isinstance(native_overlay, Mapping)
+        or set(native_overlay) != {"policy", "parent_overlap_rows", "hotfix_fill_rows"}
+        or native_overlay.get("policy") != "weekly_parent_then_hotfix_fill_only"
+    ):
+        raise FinancialReportingBuildError("financial native source overlay differs")
+    _nonnegative_integer(native_overlay.get("parent_overlap_rows"), "native parent overlap rows")
+    _nonnegative_integer(native_overlay.get("hotfix_fill_rows"), "native Hotfix fill rows")
+    native_calibration = _exact_nonnegative_counts(
+        native.get("candidate_size_calibration"),
+        (
+            "dwd_financial_report_rows",
+            "dwd_financial_fact_rows",
+            "dwd_financial_concept_count",
+            "quality_exception_rows",
+        ),
+        "native candidate calibration",
+    )
+    native_exceptions = _nonnegative_counter(
+        native.get("quality_exceptions"), "native quality exceptions"
+    )
+    if (
+        native_calibration["dwd_financial_report_rows"] != native_reports
+        or native_calibration["dwd_financial_fact_rows"] != native_facts
+        or native_calibration["quality_exception_rows"] != sum(native_exception_counts.values())
+        or native_exceptions != dict(sorted(native_exception_counts.items()))
+    ):
+        raise FinancialReportingBuildError("financial native source calibration differs")
+
+    combined_calibration = _exact_nonnegative_counts(
+        audit.get("candidate_size_calibration"),
+        (
+            "dwd_financial_report_rows",
+            "dwd_financial_fact_rows",
+            "statement_report_rows",
+            "statement_fact_rows",
+            "native_report_rows",
+            "native_fact_rows",
+        ),
+        "combined candidate calibration",
+    )
+    expected_calibration = {
+        "dwd_financial_report_rows": statement_calibration["dwd_financial_report_rows"]
+        + native_reports,
+        "dwd_financial_fact_rows": statement_calibration["dwd_financial_fact_upper_bound"]
+        + native_facts,
+        "statement_report_rows": statement_calibration["dwd_financial_report_rows"],
+        "statement_fact_rows": statement_calibration["dwd_financial_fact_upper_bound"],
+        "native_report_rows": native_reports,
+        "native_fact_rows": native_facts,
+    }
+    combined_exceptions = dict(
+        sorted((Counter(statement_exceptions) + Counter(native_exceptions)).items())
+    )
+    if (
+        combined_calibration != expected_calibration
+        or _nonnegative_counter(audit.get("quality_exceptions"), "combined quality exceptions")
+        != combined_exceptions
+    ):
+        raise FinancialReportingBuildError("financial combined source audit differs")
+    return {
+        "input_rows_by_source": input_rows_by_source,
+        "selected_rows_by_source": selected_rows_by_source,
+        "output_rows_by_source": output_rows_by_source,
+        "quality_exceptions_by_source": quality_exceptions_by_source,
+        "quality_exceptions": combined_exceptions,
+    }
+
+
+def _verify_financial_source_audit(path: Path) -> tuple[dict[str, Any], str, bytes]:
+    try:
+        audit_bytes = path.read_bytes()
+        audit = json.loads(audit_bytes.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise FinancialReportingBuildError(f"cannot read financial source audit: {path}") from exc
+    if not isinstance(audit, dict):
+        raise FinancialReportingBuildError("financial source audit must be a JSON object")
+    _financial_source_audit_proof(audit)
+    return audit, "sha256:" + hashlib.sha256(audit_bytes).hexdigest(), audit_bytes
 
 
 def _candidate_identity(
@@ -2167,6 +2696,7 @@ def _candidate_identity(
     dict[str, Any],
     datetime,
     date,
+    bytes,
 ]:
     """Verify all governed inputs before any financial candidate write."""
 
@@ -2216,7 +2746,7 @@ def _candidate_identity(
         for value in _plan_sequence(ledger.get("records"), "source ledger records")
     ]
     inventory = select_financial_reporting_sources(records, ods_package)
-    audit, audit_sha = _verify_financial_source_audit(source_audit_path)
+    audit, audit_sha, audit_bytes = _verify_financial_source_audit(source_audit_path)
     expected_bindings = {
         "run_id": run_id,
         "input_plan_digest": input_plan_digest,
@@ -2232,10 +2762,41 @@ def _candidate_identity(
         **expected_bindings,
         "source_audit_sha256": audit_sha,
         "builder_contract": _FINANCIAL_BUILDER_CONTRACT,
+        "financial_concept_semantics_policy_sha256": _financial_concept_semantics_policy(
+            model_path
+        ).sha256,
     }
     cutoff = _utc_timestamp(semantic_plan.get("knowledge_cutoff"), "financial knowledge cutoff")
     through_date = _plan_date(semantic_plan.get("through_date"), "financial through_date")
-    return identity, inventory, resolver, audit, cutoff, through_date
+    return identity, inventory, resolver, audit, cutoff, through_date, audit_bytes
+
+
+def _reverify_financial_build_inputs(
+    *,
+    initial_identity: Mapping[str, Any],
+    ods_package: Path,
+    input_plan: Path,
+    model_path: Path,
+    listed_company_candidate: Path,
+    source_audit_path: Path,
+    run_id: str,
+    initial_source_audit_bytes: bytes,
+) -> bytes:
+    refreshed = _candidate_identity(
+        ods_package=ods_package,
+        input_plan=input_plan,
+        model_path=model_path,
+        listed_company_candidate=listed_company_candidate,
+        source_audit_path=source_audit_path,
+        run_id=run_id,
+    )
+    refreshed_identity = refreshed[0]
+    source_audit_bytes = refreshed[-1]
+    if refreshed_identity != dict(initial_identity):
+        raise FinancialReportingBuildError("financial frozen inputs changed during the build")
+    if source_audit_bytes != initial_source_audit_bytes:
+        raise FinancialReportingBuildError("financial source audit changed during the build")
+    return source_audit_bytes
 
 
 def audit_financial_native_source_package(
@@ -2326,43 +2887,63 @@ def _load_or_initialize_checkpoint(work: Path, identity: Mapping[str, Any]) -> d
             checkpoint.get("schema_version") != 1
             or checkpoint.get("identity") != dict(identity)
             or not isinstance(checkpoint.get("completed_batches"), Mapping)
+            or not isinstance(checkpoint.get("concept_finalized"), bool)
+            or not isinstance(checkpoint.get("concept_staging_retired", False), bool)
+            or (
+                checkpoint.get("concept_staging_retired", False)
+                and not checkpoint.get("concept_finalized")
+            )
         ):
             raise FinancialReportingBuildError("existing financial work has a different identity")
+        checkpoint.setdefault("concept_staging_retired", False)
         return checkpoint
     checkpoint = {
         "schema_version": 1,
         "identity": dict(identity),
         "completed_batches": {},
         "concept_finalized": False,
+        "concept_staging_retired": False,
     }
     _write_json_atomic(checkpoint_path, checkpoint)
     return checkpoint
 
 
 def _merge_concept_row(
-    concepts_by_id: dict[str, dict[str, Any]], concept: Mapping[str, Any]
+    concepts_by_evidence: dict[tuple[str, datetime, str], dict[str, Any]],
+    concept: Mapping[str, Any],
 ) -> None:
-    concept_id = str(concept["financial_concept_id"])
     incoming = dict(concept)
-    previous = concepts_by_id.get(concept_id)
+    evidence_key = _concept_evidence_key(incoming)
+    previous = concepts_by_evidence.get(evidence_key)
     if previous is None:
-        concepts_by_id[concept_id] = incoming
+        concepts_by_evidence[evidence_key] = incoming
         return
 
-    earliest_effective_from = min(previous["effective_from"], incoming["effective_from"])
     previous_order = (
-        previous["knowledge_from"],
+        previous["effective_from"],
         str(previous["source_record_id"]),
         str(previous["source_artifact_sha256"]),
+        str(previous["record_source"]),
+        str(previous["source_revision"]),
     )
     incoming_order = (
-        incoming["knowledge_from"],
+        incoming["effective_from"],
         str(incoming["source_record_id"]),
         str(incoming["source_artifact_sha256"]),
+        str(incoming["record_source"]),
+        str(incoming["source_revision"]),
     )
-    retained = incoming if incoming_order < previous_order else previous
-    retained["effective_from"] = earliest_effective_from
-    concepts_by_id[concept_id] = retained
+    concepts_by_evidence[evidence_key] = incoming if incoming_order < previous_order else previous
+
+
+def _concept_evidence_key(concept: Mapping[str, Any]) -> tuple[str, datetime, str]:
+    knowledge_from = concept.get("knowledge_from")
+    if not isinstance(knowledge_from, datetime):
+        raise FinancialReportingBuildError("financial concept knowledge_from is not a timestamp")
+    source_record_id = concept.get("source_record_id")
+    if not isinstance(source_record_id, str) or not source_record_id:
+        raise FinancialReportingBuildError("financial concept source_record_id is empty")
+    return str(concept["financial_concept_id"]), knowledge_from, source_record_id
 
 
 def _batch_rows(
@@ -2374,7 +2955,7 @@ def _batch_rows(
     rows_by_year: dict[str, dict[int, list[dict[str, Any]]]] = {
         table: defaultdict(list) for table in _PARTITIONED_TABLES
     }
-    concepts_by_id: dict[str, dict[str, Any]] = {}
+    concepts_by_evidence: dict[tuple[str, datetime, str], dict[str, Any]] = {}
     row_counts = {table: 0 for table in _OWNED_TABLES}
     for row in rows:
         expanded = expand_financial_envelope(row, source=source, company_resolver=resolver)
@@ -2383,10 +2964,10 @@ def _batch_rows(
         for fact in expanded.facts:
             rows_by_year["dwd_financial_fact"][fact["period_end"].year].append(fact)
         for concept in expanded.concepts:
-            _merge_concept_row(concepts_by_id, concept)
+            _merge_concept_row(concepts_by_evidence, concept)
         row_counts["dwd_financial_report"] += len(expanded.reports)
         row_counts["dwd_financial_fact"] += len(expanded.facts)
-    concepts = [concepts_by_id[key] for key in sorted(concepts_by_id)]
+    concepts = [concepts_by_evidence[key] for key in sorted(concepts_by_evidence)]
     row_counts["dwd_financial_concept"] = len(concepts)
     return rows_by_year, concepts, row_counts
 
@@ -2409,7 +2990,7 @@ def _reporting_batch_rows(
     rows_by_year: dict[str, dict[int, list[dict[str, Any]]]] = {
         table: defaultdict(list) for table in _PARTITIONED_TABLES
     }
-    concepts_by_id: dict[str, dict[str, Any]] = {}
+    concepts_by_evidence: dict[tuple[str, datetime, str], dict[str, Any]] = {}
     row_counts = {table: 0 for table in _OWNED_TABLES}
     exception_counts: Counter[str] = Counter()
     statement_source = (
@@ -2445,11 +3026,11 @@ def _reporting_batch_rows(
         for fact in expanded.facts:
             rows_by_year["dwd_financial_fact"][fact["period_end"].year].append(fact)
         for concept in expanded.concepts:
-            _merge_concept_row(concepts_by_id, concept)
+            _merge_concept_row(concepts_by_evidence, concept)
         row_counts["dwd_financial_report"] += len(expanded.reports)
         row_counts["dwd_financial_fact"] += len(expanded.facts)
         exception_counts.update(str(exception["code"]) for exception in expanded.quality_exceptions)
-    concepts = [concepts_by_id[key] for key in sorted(concepts_by_id)]
+    concepts = [concepts_by_evidence[key] for key in sorted(concepts_by_evidence)]
     row_counts["dwd_financial_concept"] = len(concepts)
     return rows_by_year, concepts, row_counts, dict(sorted(exception_counts.items()))
 
@@ -2501,23 +3082,225 @@ def _write_batch(
             path = work / relative
             if path.exists():
                 raise FinancialReportingBuildError("financial batch part already exists")
-            _write_parquet_atomic(path, pa.Table.from_pylist(list(rows), schema=schemas[table]))
-            files.append(_file_record(work, path))
+            table_value = pa.Table.from_pylist(list(rows), schema=schemas[table])
+            _write_parquet_atomic(path, table_value)
+            files.append({**_file_record(work, path), "row_count": table_value.num_rows})
     if concepts:
         relative = f"staging/concepts/part-{batch_id}.parquet"
         path = work / relative
         if path.exists():
             raise FinancialReportingBuildError("financial concept staging part already exists")
-        _write_parquet_atomic(
-            path,
-            pa.Table.from_pylist(list(concepts), schema=schemas["dwd_financial_concept"]),
-        )
-        files.append(_file_record(work, path))
+        table_value = pa.Table.from_pylist(list(concepts), schema=schemas["dwd_financial_concept"])
+        _write_parquet_atomic(path, table_value)
+        files.append({**_file_record(work, path), "row_count": table_value.num_rows})
     return files
+
+
+def _discard_uncheckpointed_batch_files(work: Path, batch_id: str) -> None:
+    work_root = work.resolve()
+    roots = (work / "payload/financial_reporting", work / "staging/concepts")
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in root.rglob(f"part-{batch_id}.parquet"):
+            if (
+                path.is_symlink()
+                or not path.is_file()
+                or not path.resolve().is_relative_to(work_root)
+            ):
+                raise FinancialReportingBuildError("financial orphan batch path is unsafe")
+            path.unlink()
+            _fsync_directory(path.parent)
+
+
+def _financial_concept_evidence_paths(root: Path) -> list[Path]:
+    evidence_root = root / _FINANCIAL_CONCEPT_EVIDENCE
+    if evidence_root.is_symlink():
+        raise FinancialReportingBuildError("financial concept evidence path is unsafe")
+    if not evidence_root.exists():
+        return []
+    if not evidence_root.is_dir():
+        raise FinancialReportingBuildError("financial concept evidence is not a directory")
+    paths = sorted(evidence_root.iterdir())
+    if not paths or any(
+        path.is_symlink()
+        or not path.is_file()
+        or _FINANCIAL_CONCEPT_PART_PATTERN.fullmatch(path.name) is None
+        for path in paths
+    ):
+        raise FinancialReportingBuildError("financial concept evidence inventory is invalid")
+    return paths
+
+
+def _retire_concept_staging(work: Path) -> list[Path]:
+    staging_root = work / "staging/concepts"
+    evidence_root = work / _FINANCIAL_CONCEPT_EVIDENCE
+    existing_evidence = _financial_concept_evidence_paths(work)
+    if existing_evidence:
+        if staging_root.exists():
+            raise FinancialReportingBuildError("financial concept staging and evidence both exist")
+        return existing_evidence
+    if staging_root.is_symlink() or not staging_root.is_dir():
+        raise FinancialReportingBuildError("financial concept staging is unavailable")
+    staging_paths = sorted(staging_root.iterdir())
+    if not staging_paths or any(
+        path.is_symlink()
+        or not path.is_file()
+        or _FINANCIAL_CONCEPT_PART_PATTERN.fullmatch(path.name) is None
+        for path in staging_paths
+    ):
+        raise FinancialReportingBuildError("financial concept staging inventory is invalid")
+    evidence_root.parent.mkdir(parents=True, exist_ok=True)
+    _fsync_directory(work)
+    try:
+        os.replace(staging_root, evidence_root)
+        _fsync_directory(evidence_root)
+        _fsync_directory(evidence_root.parent)
+        _fsync_directory(staging_root.parent)
+    except OSError as exc:
+        raise FinancialReportingBuildError(
+            "financial concept staging could not be atomically retired"
+        ) from exc
+    return _financial_concept_evidence_paths(work)
+
+
+def _checkpoint_batch_digest(completed: Mapping[str, Any]) -> str:
+    return _digest_value(
+        {
+            field: completed.get(field)
+            for field in (
+                "source",
+                "selected_source_rows",
+                "row_counts",
+                "quality_exceptions",
+                "files",
+            )
+        }
+    )
+
+
+def _checkpoint_batch_files_valid(
+    work: Path,
+    batch_id: str,
+    completed: Mapping[str, Any],
+    *,
+    source_id: str,
+    selected_source_rows: int,
+    concept_staging_retired: bool = False,
+) -> bool:
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise FinancialReportingBuildError("pyarrow is required for financial checkpoints") from exc
+    raw_files = completed.get("files")
+    raw_counts = completed.get("row_counts")
+    raw_exceptions = completed.get("quality_exceptions")
+    if (
+        not isinstance(raw_files, Sequence)
+        or isinstance(raw_files, str | bytes)
+        or not isinstance(raw_counts, Mapping)
+        or set(raw_counts) != set(_OWNED_TABLES)
+        or any(
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+            for value in raw_counts.values()
+        )
+        or not isinstance(raw_exceptions, Mapping)
+        or any(
+            not isinstance(key, str)
+            or not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 0
+            for key, value in raw_exceptions.items()
+        )
+        or completed.get("source") != source_id
+        or not isinstance(completed.get("selected_source_rows"), int)
+        or isinstance(completed.get("selected_source_rows"), bool)
+        or int(completed["selected_source_rows"]) < 0
+        or completed.get("selected_source_rows") != selected_source_rows
+        or completed.get("batch_digest") != _checkpoint_batch_digest(completed)
+    ):
+        return False
+    declared: set[str] = set()
+    retired_missing: set[str] = set()
+    work_root = work.resolve()
+    observed_counts = {table: 0 for table in _OWNED_TABLES}
+    for raw in raw_files:
+        if (
+            not isinstance(raw, Mapping)
+            or not isinstance(raw.get("path"), str)
+            or not isinstance(raw.get("row_count"), int)
+            or isinstance(raw.get("row_count"), bool)
+            or int(raw["row_count"]) < 0
+        ):
+            raise FinancialReportingBuildError("financial checkpoint file record is invalid")
+        relative = str(raw["path"])
+        relative_path = PurePosixPath(relative)
+        if (
+            relative in declared
+            or relative_path.is_absolute()
+            or ".." in relative_path.parts
+            or relative_path.name != f"part-{batch_id}.parquet"
+        ):
+            raise FinancialReportingBuildError("financial checkpoint file path is unsafe")
+        declared.add(relative)
+        table_name: str | None
+        if relative.startswith("staging/concepts/"):
+            table_name = "dwd_financial_concept"
+        else:
+            table_name = next(
+                (
+                    owned
+                    for owned in _PARTITIONED_TABLES
+                    if relative.startswith(f"payload/financial_reporting/{owned}/")
+                ),
+                None,
+            )
+        if table_name is None:
+            raise FinancialReportingBuildError("financial checkpoint owns an unexpected file")
+        path = work.joinpath(*relative_path.parts)
+        if not path.exists() and table_name == "dwd_financial_concept" and concept_staging_retired:
+            retired_missing.add(relative)
+            observed_counts[table_name] += int(raw["row_count"])
+            continue
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or not path.resolve().is_relative_to(work_root)
+            or path.stat().st_size != raw.get("size_bytes")
+            or _sha256(path) != raw.get("sha256")
+        ):
+            return False
+        try:
+            parquet_rows = pq.ParquetFile(path).metadata.num_rows
+        except (OSError, pa.ArrowException):
+            return False
+        if parquet_rows != raw["row_count"]:
+            return False
+        observed_counts[table_name] += parquet_rows
+    try:
+        expected_counts = {table: int(raw_counts.get(table, 0)) for table in _OWNED_TABLES}
+    except (TypeError, ValueError) as exc:
+        raise FinancialReportingBuildError("financial checkpoint row counts are invalid") from exc
+    actual_files: set[str] = set()
+    for root in (work / "payload/financial_reporting", work / "staging/concepts"):
+        if not root.is_dir():
+            continue
+        for path in root.rglob(f"part-{batch_id}.parquet"):
+            if (
+                path.is_symlink()
+                or not path.is_file()
+                or not path.resolve().is_relative_to(work_root)
+            ):
+                raise FinancialReportingBuildError("financial checkpoint batch path is unsafe")
+            actual_files.add(path.resolve().relative_to(work_root).as_posix())
+    return observed_counts == expected_counts and actual_files == declared - retired_missing
 
 
 def _finalize_concepts(work: Path, checkpoint: dict[str, Any], schemas: Mapping[str, Any]) -> int:
     final_path = work / "payload/financial_reporting/dwd_financial_concept/part-00000.parquet"
+    concept_paths = sorted((work / "staging/concepts").glob("*.parquet"))
+    evidence_paths = _financial_concept_evidence_paths(work)
     if checkpoint.get("concept_finalized"):
         try:
             import pyarrow.parquet as pq
@@ -2525,10 +3308,23 @@ def _finalize_concepts(work: Path, checkpoint: dict[str, Any], schemas: Mapping[
             raise FinancialReportingBuildError(
                 "pyarrow is required for financial DWD rows"
             ) from exc
-        if not final_path.is_file():
-            raise FinancialReportingBuildError("financial concept checkpoint has no output")
-        return pq.ParquetFile(final_path).metadata.num_rows
-    concept_paths = sorted((work / "staging/concepts").glob("*.parquet"))
+        if checkpoint.get("concept_staging_retired"):
+            if not evidence_paths:
+                evidence_paths = _retire_concept_staging(work)
+            _verify_financial_concept_evidence(work, verify_semantics=False)
+            return pq.ParquetFile(final_path).metadata.num_rows
+        if evidence_paths and not concept_paths:
+            checkpoint["concept_staging_retired"] = True
+            _write_json_atomic(work / "checkpoint.json", checkpoint)
+            _verify_financial_concept_evidence(work, verify_semantics=False)
+            return pq.ParquetFile(final_path).metadata.num_rows
+        if not concept_paths:
+            raise FinancialReportingBuildError("financial concept checkpoint has incomplete output")
+        checkpoint["concept_finalized"] = False
+        checkpoint["concept_staging_retired"] = False
+        _write_json_atomic(work / "checkpoint.json", checkpoint)
+    if evidence_paths:
+        raise FinancialReportingBuildError("financial concept evidence state is inconsistent")
     if not concept_paths:
         raise FinancialReportingBuildError("financial build has no concept staging rows")
     try:
@@ -2539,6 +3335,7 @@ def _finalize_concepts(work: Path, checkpoint: dict[str, Any], schemas: Mapping[
     scratch.mkdir(exist_ok=True)
     connection = duckdb.connect(database=":memory:")
     try:
+        connection.execute("SET TimeZone='UTC'")
         connection.execute("SET memory_limit='512MB'")
         escaped_scratch = str(scratch).replace("'", "''")
         connection.execute(f"SET temp_directory='{escaped_scratch}'")
@@ -2558,23 +3355,56 @@ def _finalize_concepts(work: Path, checkpoint: dict[str, Any], schemas: Mapping[
         ).fetchone()
         if conflict is not None:
             raise FinancialReportingBuildError("financial concept has conflicting source semantics")
+        connection.execute(
+            """
+            CREATE TEMP VIEW financial_concept_evidence AS
+            SELECT * FROM concept_stage
+            """
+        )
+        connection.execute(
+            """
+            CREATE TEMP VIEW concept_revision_evidence AS
+            WITH ranked_evidence AS (
+              SELECT *, ROW_NUMBER() OVER (
+                PARTITION BY financial_concept_id, knowledge_from
+                ORDER BY effective_from, source_record_id, source_artifact_sha256,
+                  record_source, source_revision
+              ) AS same_time_rank
+              FROM financial_concept_evidence
+            ), evidence AS (
+              SELECT * EXCLUDE (same_time_rank)
+              FROM ranked_evidence
+              WHERE same_time_rank = 1
+            ), cumulative AS (
+              SELECT *, MIN(effective_from) OVER (
+                PARTITION BY financial_concept_id
+                ORDER BY knowledge_from
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+              ) AS cumulative_effective_from
+              FROM evidence
+            ), compared AS (
+              SELECT *, LAG(cumulative_effective_from) OVER (
+                PARTITION BY financial_concept_id ORDER BY knowledge_from
+              ) AS previous_effective_from
+              FROM cumulative
+            ), changes AS (
+              SELECT * EXCLUDE (cumulative_effective_from, previous_effective_from)
+              FROM compared
+              WHERE previous_effective_from IS NULL
+                OR effective_from < previous_effective_from
+            )
+            SELECT * FROM changes
+            """
+        )
         concept_table = connection.execute(
             """
-            SELECT * EXCLUDE (ordinality, earliest_effective_from)
-              REPLACE (earliest_effective_from AS effective_from)
-            FROM (
-              SELECT *,
-                MIN(effective_from) OVER (
-                  PARTITION BY financial_concept_id
-                ) AS earliest_effective_from,
-                ROW_NUMBER() OVER (
-                  PARTITION BY financial_concept_id
-                  ORDER BY knowledge_from, source_record_id, source_artifact_sha256
-                ) AS ordinality
-              FROM concept_stage
+            SELECT * REPLACE (
+              LEAD(knowledge_from) OVER (
+                PARTITION BY financial_concept_id ORDER BY knowledge_from
+              ) AS knowledge_to
             )
-            WHERE ordinality = 1
-            ORDER BY financial_concept_id
+            FROM concept_revision_evidence
+            ORDER BY financial_concept_id, knowledge_from
             """
         ).to_arrow_table()
     finally:
@@ -2583,8 +3413,190 @@ def _finalize_concepts(work: Path, checkpoint: dict[str, Any], schemas: Mapping[
         concept_table = concept_table.cast(schemas["dwd_financial_concept"])
     _write_parquet_atomic(final_path, concept_table)
     checkpoint["concept_finalized"] = True
+    checkpoint["concept_staging_retired"] = True
     _write_json_atomic(work / "checkpoint.json", checkpoint)
+    _retire_concept_staging(work)
+    _verify_financial_concept_evidence(work, verify_semantics=False)
     return concept_table.num_rows
+
+
+def _concept_revision_evidence_metrics(connection: Any) -> dict[str, int]:
+    connection.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE expected_financial_concept_revisions AS
+        WITH ranked_evidence AS (
+          SELECT *, ROW_NUMBER() OVER (
+            PARTITION BY financial_concept_id, knowledge_from
+            ORDER BY effective_from, source_record_id, source_artifact_sha256,
+              record_source, source_revision
+          ) AS same_time_rank
+          FROM financial_concept_evidence
+        ), evidence AS (
+          SELECT * EXCLUDE (same_time_rank)
+          FROM ranked_evidence
+          WHERE same_time_rank = 1
+        ), cumulative AS (
+          SELECT *, MIN(effective_from) OVER (
+            PARTITION BY financial_concept_id
+            ORDER BY knowledge_from
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) AS cumulative_effective_from
+          FROM evidence
+        ), compared AS (
+          SELECT *, LAG(cumulative_effective_from) OVER (
+            PARTITION BY financial_concept_id ORDER BY knowledge_from
+          ) AS previous_effective_from
+          FROM cumulative
+        ), changes AS (
+          SELECT * EXCLUDE (cumulative_effective_from, previous_effective_from)
+          FROM compared
+          WHERE previous_effective_from IS NULL
+            OR effective_from < previous_effective_from
+        )
+        SELECT * REPLACE (
+          LEAD(knowledge_from) OVER (
+            PARTITION BY financial_concept_id ORDER BY knowledge_from
+          ) AS knowledge_to
+        )
+        FROM changes
+        """
+    )
+    output_matches_expected = """
+      concept.financial_concept_id = expected.financial_concept_id
+      AND concept.taxonomy_namespace = expected.taxonomy_namespace
+      AND concept.taxonomy_version = expected.taxonomy_version
+      AND concept.concept_code = expected.concept_code
+      AND concept.concept_name = expected.concept_name
+      AND concept.statement_type = expected.statement_type
+      AND concept.data_type = expected.data_type
+      AND concept.period_type = expected.period_type
+      AND concept.balance_type IS NOT DISTINCT FROM expected.balance_type
+      AND concept.effective_from = expected.effective_from
+      AND concept.effective_to IS NOT DISTINCT FROM expected.effective_to
+      AND concept.knowledge_from = expected.knowledge_from
+      AND concept.knowledge_to IS NOT DISTINCT FROM expected.knowledge_to
+      AND concept.record_source = expected.record_source
+      AND concept.source_record_id = expected.source_record_id
+      AND concept.source_revision = expected.source_revision
+      AND concept.source_artifact_sha256 = expected.source_artifact_sha256
+    """
+    unsupported_rows = int(
+        connection.execute(
+            f"""
+            SELECT COUNT(*) FROM dwd_financial_concept AS concept
+            WHERE NOT EXISTS (
+              SELECT 1 FROM expected_financial_concept_revisions AS expected
+              WHERE {output_matches_expected}
+            )
+            """
+        ).fetchone()[0]
+    )
+    missing_revision_rows = int(
+        connection.execute(
+            f"""
+            SELECT COUNT(*) FROM expected_financial_concept_revisions AS expected
+            WHERE NOT EXISTS (
+              SELECT 1 FROM dwd_financial_concept AS concept
+              WHERE {output_matches_expected}
+            )
+            """
+        ).fetchone()[0]
+    )
+    invalid_evidence_rows = int(
+        connection.execute(
+            """
+            SELECT COUNT(*) FROM financial_concept_evidence
+            WHERE record_source IS NULL OR source_record_id IS NULL
+              OR source_revision IS NULL OR source_artifact_sha256 IS NULL
+              OR financial_concept_id IS NULL OR taxonomy_namespace IS NULL
+              OR taxonomy_version IS NULL OR concept_code IS NULL OR concept_name IS NULL
+              OR statement_type IS NULL OR data_type IS NULL OR period_type IS NULL
+              OR effective_from IS NULL OR knowledge_from IS NULL
+              OR knowledge_to IS NOT NULL
+            """
+        ).fetchone()[0]
+    )
+    source_coordinate_violations = int(
+        connection.execute(
+            """
+            WITH parsed AS (
+              SELECT effective_from, knowledge_from,
+                regexp_extract(
+                  source_record_id,
+                  '(?:#|&)period_end=([0-9]{4}-[0-9]{2}-[0-9]{2})(?:&|$)',
+                  1
+                ) AS period_end_text,
+                regexp_extract(
+                  source_record_id,
+                  '(?:#|&)source_acquired_at_us=([0-9]+)(?:&|$)',
+                  1
+                ) AS acquired_at_us_text
+              FROM financial_concept_evidence
+            ), coordinates AS (
+              SELECT *, try_strptime(period_end_text, '%Y-%m-%d') AS period_end_value,
+                try_cast(acquired_at_us_text AS BIGINT) AS acquired_at_us
+              FROM parsed
+            )
+            SELECT COUNT(*) FROM coordinates
+            WHERE period_end_text = '' OR acquired_at_us_text = ''
+              OR period_end_value IS NULL OR acquired_at_us IS NULL
+              OR effective_from IS DISTINCT FROM timezone('Asia/Shanghai', period_end_value)
+              OR epoch_us(knowledge_from) IS DISTINCT FROM acquired_at_us
+            """
+        ).fetchone()[0]
+    )
+    semantic_conflict_rows = int(
+        connection.execute(
+            """
+            SELECT COUNT(*) FROM (
+              SELECT financial_concept_id
+              FROM (
+                SELECT DISTINCT financial_concept_id, taxonomy_namespace, taxonomy_version,
+                  concept_code, concept_name, statement_type, data_type, period_type,
+                  balance_type
+                FROM financial_concept_evidence
+              )
+              GROUP BY financial_concept_id
+              HAVING COUNT(*) <> 1
+            )
+            """
+        ).fetchone()[0]
+    )
+    parallel_state_rows = int(
+        connection.execute(
+            """
+            SELECT COALESCE(SUM(row_count), 0) FROM (
+              SELECT COUNT(*) AS row_count
+              FROM dwd_financial_concept
+              GROUP BY financial_concept_id, taxonomy_version, knowledge_from
+              HAVING COUNT(*) > 1
+            )
+            """
+        ).fetchone()[0]
+    )
+    boundary_violations = int(
+        connection.execute(
+            """
+            SELECT COUNT(*) FROM (
+              SELECT knowledge_to, LEAD(knowledge_from) OVER (
+                PARTITION BY financial_concept_id, taxonomy_version
+                ORDER BY knowledge_from
+              ) AS next_knowledge_from
+              FROM dwd_financial_concept
+            )
+            WHERE knowledge_to IS DISTINCT FROM next_knowledge_from
+            """
+        ).fetchone()[0]
+    )
+    return {
+        "unsupported_rows": unsupported_rows,
+        "missing_revision_rows": missing_revision_rows,
+        "invalid_evidence_rows": invalid_evidence_rows,
+        "source_coordinate_violations": source_coordinate_violations,
+        "semantic_conflict_rows": semantic_conflict_rows,
+        "parallel_state_rows": parallel_state_rows,
+        "boundary_violations": boundary_violations,
+    }
 
 
 def _audit_financial_candidate(
@@ -2632,6 +3644,7 @@ def _audit_financial_candidate(
     scratch.mkdir(exist_ok=True)
     connection = duckdb.connect(database=":memory:")
     try:
+        connection.execute("SET TimeZone='UTC'")
         connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1536)}MB'")
         configure_duckdb_threads(connection)
         connection.execute("SET preserve_insertion_order=false")
@@ -2660,6 +3673,16 @@ def _audit_financial_candidate(
         connection.from_parquet([str(path) for path in paths["dwd_financial_concept"]]).create_view(
             "dwd_financial_concept"
         )
+        concept_evidence_paths = _financial_concept_evidence_paths(work)
+        connection.from_parquet([str(path) for path in concept_evidence_paths]).create_view(
+            "financial_concept_evidence"
+        )
+        evidence_count_row = connection.execute(
+            "SELECT COUNT(*) FROM financial_concept_evidence"
+        ).fetchone()
+        if evidence_count_row is None:
+            raise FinancialReportingBuildError("financial concept evidence count is unavailable")
+        concept_evidence_rows = int(evidence_count_row[0])
         null_counts = {
             "dwd_financial_report": 0,
             "dwd_financial_concept": int(
@@ -2678,15 +3701,18 @@ def _audit_financial_candidate(
             connection.execute(
                 """
                 SELECT COUNT(*) FROM (
-                  SELECT financial_concept_id, taxonomy_version, effective_from, knowledge_from
+                  SELECT financial_concept_id, taxonomy_version, knowledge_from
                   FROM dwd_financial_concept GROUP BY ALL HAVING COUNT(*) > 1
                 )
                 """
             ).fetchone()[0]
         )
+        concept_revision_evidence = _concept_revision_evidence_metrics(connection)
         duplicate_facts = 0
         orphan_reports = 0
         orphan_concepts = 0
+        temporal_or_future_reports = 0
+        temporal_or_future_concepts = 0
         partition_audit: dict[str, dict[str, int]] = {}
         for year, report_paths in report_partitions.items():
             connection.from_parquet([str(path) for path in report_paths]).create_view(
@@ -2722,6 +3748,8 @@ def _audit_financial_candidate(
                 "duplicate_fact_keys": 0,
                 "orphan_report_ids": 0,
                 "orphan_concept_ids": 0,
+                "temporal_or_future_report_ids": 0,
+                "temporal_or_future_concept_ids": 0,
             }
         for year, fact_paths in fact_partitions.items():
             connection.from_parquet([str(path) for path in fact_paths]).create_view(
@@ -2771,10 +3799,43 @@ def _audit_financial_candidate(
                     """
                 ).fetchone()[0]
             )
+            report_temporal_or_future = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM financial_fact_partition AS fact
+                    WHERE NOT EXISTS (
+                      SELECT 1 FROM financial_report_partition AS report
+                      WHERE fact.financial_report_id = report.financial_report_id
+                        AND report.knowledge_from <= fact.knowledge_from
+                        AND (report.knowledge_to IS NULL
+                          OR report.knowledge_to > fact.knowledge_from)
+                    )
+                    """
+                ).fetchone()[0]
+            )
+            concept_temporal_or_future = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM financial_fact_partition AS fact
+                    WHERE NOT EXISTS (
+                      SELECT 1 FROM dwd_financial_concept AS concept
+                      WHERE fact.financial_concept_id = concept.financial_concept_id
+                        AND concept.knowledge_from <= fact.knowledge_from
+                        AND (concept.knowledge_to IS NULL
+                          OR concept.knowledge_to > fact.knowledge_from)
+                        AND concept.effective_from <= fact.period_end
+                        AND (concept.effective_to IS NULL
+                          OR concept.effective_to > fact.period_end)
+                    )
+                    """
+                ).fetchone()[0]
+            )
             null_counts["dwd_financial_fact"] += fact_nulls
             duplicate_facts += fact_duplicates
             orphan_reports += report_orphans
             orphan_concepts += concept_orphans
+            temporal_or_future_reports += report_temporal_or_future
+            temporal_or_future_concepts += concept_temporal_or_future
             year_audit = partition_audit[str(year)]
             year_audit.update(
                 {
@@ -2783,15 +3844,26 @@ def _audit_financial_candidate(
                     "duplicate_fact_keys": fact_duplicates,
                     "orphan_report_ids": report_orphans,
                     "orphan_concept_ids": concept_orphans,
+                    "temporal_or_future_report_ids": report_temporal_or_future,
+                    "temporal_or_future_concept_ids": concept_temporal_or_future,
                 }
             )
     finally:
         connection.close()
     if any(null_counts.values()) or any(
-        (duplicate_reports, duplicate_concepts, duplicate_facts, orphan_reports, orphan_concepts)
+        (
+            duplicate_reports,
+            duplicate_concepts,
+            *concept_revision_evidence.values(),
+            duplicate_facts,
+            orphan_reports,
+            orphan_concepts,
+            temporal_or_future_reports,
+            temporal_or_future_concepts,
+        )
     ):
         raise FinancialReportingBuildError(
-            "financial candidate has key, duplicate, or FK violations"
+            "financial candidate has evidence, interval, key, duplicate, or temporal FK violations"
         )
     audit = {
         "schema_version": 1,
@@ -2809,10 +3881,617 @@ def _audit_financial_candidate(
             "financial_report_id": orphan_reports,
             "financial_concept_id": orphan_concepts,
         },
+        "temporal_or_future_foreign_keys": {
+            "financial_report_id": temporal_or_future_reports,
+            "financial_concept_id": temporal_or_future_concepts,
+        },
+        "concept_revision_evidence": concept_revision_evidence,
+        "concept_evidence_rows": concept_evidence_rows,
         "year_partitions": partition_audit,
-        "audit_policy": "duckdb_year_partitioned_external_audit_v2",
+        "audit_policy": "duckdb_year_partitioned_external_audit_v4",
     }
     return metadata_counts, audit
+
+
+def _verify_financial_concept_evidence(
+    output: Path,
+    *,
+    expected_evidence_rows: int | None = None,
+    verify_semantics: bool = True,
+) -> dict[str, int]:
+    try:
+        import duckdb
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise FinancialReportingBuildError(
+            "duckdb and pyarrow are required for financial concept verification"
+        ) from exc
+    concept_path = output / "payload/financial_reporting/dwd_financial_concept/part-00000.parquet"
+    evidence_paths = _financial_concept_evidence_paths(output)
+    scratch: Path | None = None
+    try:
+        schema = financial_reporting_schemas()["dwd_financial_concept"]
+        evidence_rows = 0
+        for path in (concept_path, *evidence_paths):
+            if (
+                not path.is_file()
+                or path.is_symlink()
+                or not pq.ParquetFile(path).schema_arrow.equals(schema, check_metadata=True)
+            ):
+                raise FinancialReportingBuildError("financial concept evidence schema is invalid")
+            if path != concept_path:
+                evidence_rows += pq.ParquetFile(path).metadata.num_rows
+        if expected_evidence_rows is not None and evidence_rows != expected_evidence_rows:
+            raise FinancialReportingBuildError("financial concept evidence verification failed")
+        if not verify_semantics:
+            return {}
+        scratch = Path(
+            tempfile.mkdtemp(
+                prefix=f".{output.name}.concept-evidence-audit.",
+                dir=output.parent,
+            )
+        )
+        connection = duckdb.connect(database=":memory:")
+        try:
+            connection.execute("SET TimeZone='UTC'")
+            connection.execute(f"SET memory_limit='{dwd_duckdb_memory_limit_mb(1536)}MB'")
+            configure_duckdb_threads(connection)
+            connection.execute("SET preserve_insertion_order=false")
+            escaped_scratch = str(scratch).replace("'", "''")
+            connection.execute(f"SET temp_directory='{escaped_scratch}'")
+            connection.from_parquet(str(concept_path)).create_view("dwd_financial_concept")
+            connection.from_parquet([str(path) for path in evidence_paths]).create_view(
+                "financial_concept_evidence"
+            )
+            metrics = _concept_revision_evidence_metrics(connection)
+        finally:
+            connection.close()
+    except FinancialReportingBuildError:
+        raise
+    except (OSError, pa.ArrowException, duckdb.Error) as exc:
+        raise FinancialReportingBuildError("financial concept evidence is unreadable") from exc
+    finally:
+        if scratch is not None:
+            shutil.rmtree(scratch, ignore_errors=True)
+    if any(metrics.values()):
+        raise FinancialReportingBuildError("financial concept evidence verification failed")
+    return metrics
+
+
+def _verify_financial_candidate_semantics_once(
+    output: Path,
+    *,
+    manifest_sha256: str,
+    policy_sha256: str,
+    expected_evidence_rows: int,
+) -> None:
+    cache_key = (manifest_sha256, policy_sha256)
+    if cache_key in _FINANCIAL_SEMANTIC_VERIFICATION_CACHE:
+        return
+    _verify_financial_concept_evidence(
+        output,
+        expected_evidence_rows=expected_evidence_rows,
+        verify_semantics=True,
+    )
+    _FINANCIAL_SEMANTIC_VERIFICATION_CACHE.add(cache_key)
+
+
+def _verify_financial_partition_statistics(parquet: Any, expected_year: int) -> None:
+    if parquet.metadata.num_rows < 1:
+        raise FinancialReportingBuildError("financial partition payload is empty")
+    period_index = parquet.schema_arrow.get_field_index("period_end")
+    if period_index < 0:
+        raise FinancialReportingBuildError("financial partition coordinates are missing")
+    for row_group_index in range(parquet.metadata.num_row_groups):
+        row_group = parquet.metadata.row_group(row_group_index)
+        period_statistics = row_group.column(period_index).statistics
+        if (
+            period_statistics is None
+            or not period_statistics.has_min_max
+            or getattr(period_statistics.min, "year", None) != expected_year
+            or getattr(period_statistics.max, "year", None) != expected_year
+        ):
+            raise FinancialReportingBuildError(
+                "financial partition directory differs from Parquet coordinates"
+            )
+
+
+def _verify_financial_manifest_inventory(
+    output: Path, manifest: Mapping[str, Any]
+) -> tuple[
+    dict[str, Mapping[str, Any]],
+    dict[str, int],
+    dict[str, str],
+    dict[str, int],
+]:
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ModuleNotFoundError as exc:
+        raise FinancialReportingBuildError(
+            "pyarrow is required for financial manifest verification"
+        ) from exc
+    raw_files = manifest.get("files")
+    if (
+        manifest.get("partition_by") != _FINANCIAL_PARTITION_BY
+        or not isinstance(raw_files, Sequence)
+        or isinstance(raw_files, str | bytes)
+    ):
+        raise FinancialReportingBuildError("financial candidate manifest files are invalid")
+    schemas = financial_reporting_schemas()
+    manifest_files: dict[str, Mapping[str, Any]] = {}
+    parquet_rows: dict[str, int] = {}
+    table_files: dict[str, list[dict[str, object]]] = {table: [] for table in _OWNED_TABLES}
+    physical_row_counts = {table: 0 for table in _OWNED_TABLES}
+    output_root = output.resolve()
+    for raw in raw_files:
+        if (
+            not isinstance(raw, Mapping)
+            or set(raw) != {"path", "sha256", "size_bytes"}
+            or not isinstance(raw.get("path"), str)
+            or not isinstance(raw.get("sha256"), str)
+            or not isinstance(raw.get("size_bytes"), int)
+            or isinstance(raw.get("size_bytes"), bool)
+            or int(raw["size_bytes"]) < 0
+        ):
+            raise FinancialReportingBuildError("financial candidate manifest file is invalid")
+        relative = str(raw["path"])
+        relative_path = PurePosixPath(relative)
+        if relative in manifest_files or relative_path.is_absolute() or ".." in relative_path.parts:
+            raise FinancialReportingBuildError("financial candidate manifest has unsafe files")
+        path = output.joinpath(*relative_path.parts)
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or not path.resolve().is_relative_to(output_root)
+            or path.stat().st_size != raw["size_bytes"]
+            or _sha256(path) != raw["sha256"]
+        ):
+            raise FinancialReportingBuildError(
+                f"financial candidate file verification failed: {relative}"
+            )
+        manifest_files[relative] = raw
+
+        parts = relative_path.parts
+        table_name: str | None = None
+        partition_year: int | None = None
+        is_evidence = parts[:2] == ("audits", "financial-concept-evidence")
+        if parts[:2] == ("payload", "financial_reporting"):
+            if len(parts) < 3 or parts[2] not in _OWNED_TABLES:
+                raise FinancialReportingBuildError("financial payload inventory is invalid")
+            table_name = parts[2]
+            if table_name == "dwd_financial_concept":
+                expected = (
+                    "payload",
+                    "financial_reporting",
+                    table_name,
+                    "part-00000.parquet",
+                )
+                if parts != expected:
+                    raise FinancialReportingBuildError("financial concept payload path is invalid")
+            elif (
+                len(parts) != 5
+                or re.fullmatch(r"period_end_year=[0-9]{4}", parts[3]) is None
+                or _FINANCIAL_CONCEPT_PART_PATTERN.fullmatch(parts[4]) is None
+            ):
+                raise FinancialReportingBuildError("financial partition payload path is invalid")
+            else:
+                partition_year = int(parts[3].split("=", 1)[1])
+        elif is_evidence:
+            if len(parts) != 3 or _FINANCIAL_CONCEPT_PART_PATTERN.fullmatch(parts[2]) is None:
+                raise FinancialReportingBuildError("financial concept evidence path is invalid")
+            table_name = "dwd_financial_concept"
+        elif relative not in _FINANCIAL_CANDIDATE_CONTROL_FILES:
+            raise FinancialReportingBuildError("financial candidate control inventory is invalid")
+
+        if table_name is not None:
+            try:
+                parquet = pq.ParquetFile(path)
+                row_count = parquet.metadata.num_rows
+                schema = parquet.schema_arrow
+            except (OSError, pa.ArrowException) as exc:
+                raise FinancialReportingBuildError(
+                    "financial payload Parquet is unreadable"
+                ) from exc
+            if not schema.equals(schemas[table_name], check_metadata=True):
+                raise FinancialReportingBuildError("financial payload schema is invalid")
+            if partition_year is not None:
+                _verify_financial_partition_statistics(parquet, partition_year)
+            parquet_rows[relative] = row_count
+            if not is_evidence:
+                physical_row_counts[table_name] += row_count
+                table_files[table_name].append(
+                    {
+                        "path": relative,
+                        "sha256": str(raw["sha256"]),
+                        "size_bytes": int(raw["size_bytes"]),
+                    }
+                )
+
+    if {
+        relative for relative in manifest_files if relative in _FINANCIAL_CANDIDATE_CONTROL_FILES
+    } != _FINANCIAL_CANDIDATE_CONTROL_FILES:
+        raise FinancialReportingBuildError("financial candidate control inventory is incomplete")
+
+    physical: set[str] = set()
+    physical_directories: set[str] = set()
+    for path in output.rglob("*"):
+        if path.is_symlink() or (not path.is_dir() and not path.is_file()):
+            raise FinancialReportingBuildError("financial candidate contains unsafe file types")
+        if path.is_file():
+            physical.add(path.relative_to(output).as_posix())
+        else:
+            physical_directories.add(path.relative_to(output).as_posix())
+    if physical != set(manifest_files) | {"manifest.json", "READY"}:
+        raise FinancialReportingBuildError("financial candidate physical inventory is inconsistent")
+    expected_directories = {
+        parent.as_posix()
+        for relative in manifest_files
+        for parent in PurePosixPath(relative).parents
+        if parent.as_posix() != "."
+    }
+    if physical_directories != expected_directories:
+        raise FinancialReportingBuildError(
+            "financial candidate physical directory inventory is inconsistent"
+        )
+    evidence_inventory = {
+        path.relative_to(output).as_posix() for path in _financial_concept_evidence_paths(output)
+    }
+    manifest_evidence = {
+        relative
+        for relative in manifest_files
+        if PurePosixPath(relative).parts[:2] == ("audits", "financial-concept-evidence")
+    }
+    if evidence_inventory != manifest_evidence:
+        raise FinancialReportingBuildError("financial concept evidence manifest differs")
+
+    manifest_rows = manifest.get("row_counts")
+    if (
+        not isinstance(manifest_rows, Mapping)
+        or set(manifest_rows) != set(_OWNED_TABLES)
+        or any(
+            not isinstance(manifest_rows.get(table), int)
+            or isinstance(manifest_rows.get(table), bool)
+            or int(manifest_rows[table]) < 1
+            or manifest_rows[table] != physical_row_counts[table]
+            for table in _OWNED_TABLES
+        )
+    ):
+        raise FinancialReportingBuildError("financial candidate physical row counts differ")
+    table_digests = {
+        table: _digest_value(sorted(records, key=lambda record: str(record["path"])))
+        for table, records in table_files.items()
+    }
+    return manifest_files, parquet_rows, table_digests, physical_row_counts
+
+
+def _verify_financial_checkpoint_evidence_binding(
+    output: Path,
+    *,
+    checkpoint: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    manifest_files: Mapping[str, Mapping[str, Any]],
+    receipt: Mapping[str, Any],
+    reconciliation: Mapping[str, Any],
+    source_audit: Mapping[str, Any],
+    source_audit_sha256: str,
+    parquet_rows: Mapping[str, int],
+    table_digests: Mapping[str, str],
+    physical_row_counts: Mapping[str, int],
+    expected_evidence_rows: int,
+) -> None:
+    completed_batches = checkpoint.get("completed_batches")
+    checkpoint_identity = checkpoint.get("identity")
+    manifest_rows = manifest.get("row_counts")
+    identity_fields = (
+        "run_id",
+        "input_plan_digest",
+        "model_sha256",
+        "source_audit_sha256",
+        "builder_contract",
+        "financial_concept_semantics_policy_sha256",
+        "listed_company_manifest_sha256",
+        "listed_company_semantic_digest",
+        "source_sha256",
+    )
+    semantic_identity = {
+        "schema_version": 1,
+        **{field: manifest.get(field) for field in identity_fields},
+    }
+    expected_semantic_digest = _digest_value(
+        {**semantic_identity, "table_digests": dict(table_digests)}
+    )
+    if (
+        not isinstance(completed_batches, Mapping)
+        or not isinstance(checkpoint_identity, Mapping)
+        or not isinstance(manifest_rows, Mapping)
+        or checkpoint.get("concept_finalized") is not True
+        or checkpoint.get("concept_staging_retired") is not True
+        or checkpoint.get("completed") is not True
+        or checkpoint.get("semantic_digest") != expected_semantic_digest
+        or manifest.get("semantic_digest") != expected_semantic_digest
+        or receipt.get("schema_version") != 1
+        or receipt.get("kind") != "dwd_financial_reporting_build_receipt"
+        or receipt.get("status") != "built"
+        or receipt.get("semantic_digest") != expected_semantic_digest
+        or receipt.get("row_counts") != manifest_rows
+        or receipt.get("table_digests") != table_digests
+        or receipt.get("concept_evidence_storage") != _FINANCIAL_CONCEPT_EVIDENCE_STORAGE
+        or receipt.get("resource_policy") != _FINANCIAL_RESOURCE_POLICY
+    ):
+        raise FinancialReportingBuildError("financial checkpoint seal state is invalid")
+    checkpoint_identity_keys = {
+        "schema_version",
+        *identity_fields,
+        "source_batch_size",
+        "native_batch_size",
+    }
+    source_batch_size = checkpoint_identity.get("source_batch_size")
+    native_batch_size = checkpoint_identity.get("native_batch_size")
+    if (
+        set(checkpoint_identity) != checkpoint_identity_keys
+        or checkpoint_identity.get("schema_version") != 1
+        or not isinstance(source_batch_size, int)
+        or isinstance(source_batch_size, bool)
+        or source_batch_size < 1
+        or not isinstance(native_batch_size, int)
+        or isinstance(native_batch_size, bool)
+        or native_batch_size < 1
+    ):
+        raise FinancialReportingBuildError("financial checkpoint identity is inconsistent")
+    for field in identity_fields:
+        if checkpoint_identity.get(field) != manifest.get(field) or receipt.get(
+            field
+        ) != manifest.get(field):
+            raise FinancialReportingBuildError("financial checkpoint identity is inconsistent")
+    source_audit_fields = (
+        "run_id",
+        "input_plan_digest",
+        "model_sha256",
+        "listed_company_manifest_sha256",
+        "listed_company_semantic_digest",
+        "source_sha256",
+    )
+    calibration = source_audit.get("candidate_size_calibration")
+    source_audit_proof = _financial_source_audit_proof(source_audit)
+    if (
+        source_audit_sha256 != manifest.get("source_audit_sha256")
+        or any(source_audit.get(field) != manifest.get(field) for field in source_audit_fields)
+        or not isinstance(calibration, Mapping)
+        or calibration.get("dwd_financial_report_rows")
+        != physical_row_counts.get("dwd_financial_report")
+        or calibration.get("dwd_financial_fact_rows")
+        != physical_row_counts.get("dwd_financial_fact")
+    ):
+        raise FinancialReportingBuildError("financial source audit seal binding differs")
+
+    expected_batch_ids = {
+        f"{source_ordinal:02d}-{batch_index:06d}"
+        for source_ordinal, source in enumerate(_FINANCIAL_SOURCE_ORDER)
+        for batch_index in range(
+            (
+                source_audit_proof["input_rows_by_source"][source]
+                + (source_batch_size if source_ordinal < 2 else native_batch_size)
+                - 1
+            )
+            // (source_batch_size if source_ordinal < 2 else native_batch_size)
+        )
+    }
+    if set(completed_batches) != expected_batch_ids:
+        raise FinancialReportingBuildError("financial checkpoint batch inventory differs")
+
+    expected_parts: dict[str, Mapping[str, Any]] = {}
+    staged_rows = 0
+    selected_source_rows = 0
+    batch_rows = {table: 0 for table in _OWNED_TABLES}
+    quality_exceptions: Counter[str] = Counter()
+    quality_exceptions_by_source = {source: Counter() for source in _FINANCIAL_SOURCE_ORDER}
+    selected_rows_by_source: Counter[str] = Counter()
+    output_rows_by_source = {
+        source: {table: 0 for table in _PARTITIONED_TABLES} for source in _FINANCIAL_SOURCE_ORDER
+    }
+    for batch_id, raw_batch in completed_batches.items():
+        if (
+            not isinstance(batch_id, str)
+            or _FINANCIAL_BATCH_ID_PATTERN.fullmatch(batch_id) is None
+            or not isinstance(raw_batch, Mapping)
+            or raw_batch.get("batch_digest") != _checkpoint_batch_digest(raw_batch)
+        ):
+            raise FinancialReportingBuildError("financial checkpoint batch digest is invalid")
+        source_ordinal = int(batch_id[:2])
+        if source_ordinal >= len(_FINANCIAL_SOURCE_ORDER):
+            raise FinancialReportingBuildError("financial checkpoint batch source is invalid")
+        expected_source = _FINANCIAL_SOURCE_ORDER[source_ordinal]
+        raw_counts = raw_batch.get("row_counts")
+        raw_exceptions = raw_batch.get("quality_exceptions")
+        raw_files = raw_batch.get("files")
+        if (
+            not isinstance(raw_counts, Mapping)
+            or set(raw_counts) != set(_OWNED_TABLES)
+            or not isinstance(raw_exceptions, Mapping)
+            or not isinstance(raw_files, Sequence)
+            or isinstance(raw_files, str | bytes)
+            or raw_batch.get("source") != expected_source
+            or not isinstance(raw_batch.get("selected_source_rows"), int)
+            or isinstance(raw_batch.get("selected_source_rows"), bool)
+            or int(raw_batch["selected_source_rows"]) < 0
+        ):
+            raise FinancialReportingBuildError("financial checkpoint batch shape is invalid")
+        observed_batch_rows = {table: 0 for table in _OWNED_TABLES}
+        try:
+            for table in _OWNED_TABLES:
+                value = raw_counts[table]
+                if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                    raise ValueError
+                batch_rows[table] += value
+                if table in _PARTITIONED_TABLES:
+                    output_rows_by_source[expected_source][table] += value
+            for key, value in raw_exceptions.items():
+                if (
+                    not isinstance(key, str)
+                    or not isinstance(value, int)
+                    or isinstance(value, bool)
+                    or value < 0
+                ):
+                    raise ValueError
+                quality_exceptions[key] += value
+                quality_exceptions_by_source[expected_source][key] += value
+        except (KeyError, TypeError, ValueError) as exc:
+            raise FinancialReportingBuildError(
+                "financial checkpoint batch accounting is invalid"
+            ) from exc
+        selected_source_rows += int(raw_batch["selected_source_rows"])
+        selected_rows_by_source[expected_source] += int(raw_batch["selected_source_rows"])
+        for raw_file in raw_files:
+            if (
+                not isinstance(raw_file, Mapping)
+                or set(raw_file) != {"path", "sha256", "size_bytes", "row_count"}
+                or not isinstance(raw_file.get("path"), str)
+                or not isinstance(raw_file.get("sha256"), str)
+                or not isinstance(raw_file.get("size_bytes"), int)
+                or isinstance(raw_file.get("size_bytes"), bool)
+                or int(raw_file["size_bytes"]) < 0
+            ):
+                raise FinancialReportingBuildError("financial checkpoint file record is invalid")
+            source_relative = str(raw_file["path"])
+            source_path = PurePosixPath(source_relative)
+            if source_path.is_absolute() or ".." in source_path.parts:
+                raise FinancialReportingBuildError("financial checkpoint file path is unsafe")
+            expected_name = f"part-{batch_id}.parquet"
+            table_name: str
+            if source_path.parts[:2] == ("staging", "concepts"):
+                if source_path.parts != ("staging", "concepts", expected_name):
+                    raise FinancialReportingBuildError(
+                        "financial checkpoint concept path is not canonical"
+                    )
+                table_name = "dwd_financial_concept"
+                target_relative = f"{_FINANCIAL_CONCEPT_EVIDENCE}/{expected_name}"
+            elif source_path.parts[:2] == ("payload", "financial_reporting"):
+                if (
+                    len(source_path.parts) != 5
+                    or source_path.parts[2] not in _PARTITIONED_TABLES
+                    or re.fullmatch(r"period_end_year=[0-9]{4}", source_path.parts[3]) is None
+                    or source_path.parts[4] != expected_name
+                ):
+                    raise FinancialReportingBuildError(
+                        "financial checkpoint partition path is not canonical"
+                    )
+                table_name = source_path.parts[2]
+                target_relative = source_relative
+            else:
+                raise FinancialReportingBuildError("financial checkpoint owns an unexpected file")
+            if target_relative in expected_parts:
+                raise FinancialReportingBuildError("financial checkpoint output is duplicated")
+            row_count = raw_file.get("row_count")
+            if not isinstance(row_count, int) or isinstance(row_count, bool) or row_count < 0:
+                raise FinancialReportingBuildError("financial checkpoint file row count is invalid")
+            manifest_file = manifest_files.get(target_relative)
+            if manifest_file is None or any(
+                manifest_file.get(field) != raw_file.get(field)
+                for field in ("size_bytes", "sha256")
+            ):
+                raise FinancialReportingBuildError("financial checkpoint output digest differs")
+            if parquet_rows.get(target_relative) != row_count:
+                raise FinancialReportingBuildError("financial checkpoint output row count differs")
+            expected_parts[target_relative] = raw_file
+            observed_batch_rows[table_name] += row_count
+            if table_name == "dwd_financial_concept":
+                staged_rows += row_count
+        if observed_batch_rows != {table: int(raw_counts[table]) for table in _OWNED_TABLES}:
+            raise FinancialReportingBuildError("financial checkpoint batch file counts differ")
+
+    physical_checkpoint_parts = {
+        relative
+        for relative in parquet_rows
+        if relative != "payload/financial_reporting/dwd_financial_concept/part-00000.parquet"
+    }
+    if (
+        physical_checkpoint_parts != set(expected_parts)
+        or staged_rows != expected_evidence_rows
+        or any(batch_rows[table] != physical_row_counts.get(table) for table in _PARTITIONED_TABLES)
+        or batch_rows["dwd_financial_concept"] != expected_evidence_rows
+        or dict(sorted(quality_exceptions.items())) != receipt.get("quality_exceptions")
+        or dict(sorted(quality_exceptions.items())) != source_audit_proof["quality_exceptions"]
+        or {
+            source: dict(sorted(quality_exceptions_by_source[source].items()))
+            for source in _FINANCIAL_SOURCE_ORDER
+        }
+        != source_audit_proof["quality_exceptions_by_source"]
+        or {source: int(selected_rows_by_source[source]) for source in _FINANCIAL_SOURCE_ORDER}
+        != source_audit_proof["selected_rows_by_source"]
+        or output_rows_by_source != source_audit_proof["output_rows_by_source"]
+    ):
+        raise FinancialReportingBuildError("financial checkpoint reconciliation differs")
+
+    physical_year_rows: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"report_rows": 0, "fact_rows": 0}
+    )
+    for relative, row_count in parquet_rows.items():
+        parts = PurePosixPath(relative).parts
+        if parts[:3] == ("payload", "financial_reporting", "dwd_financial_report"):
+            physical_year_rows[parts[3].split("=", 1)[1]]["report_rows"] += row_count
+        elif parts[:3] == ("payload", "financial_reporting", "dwd_financial_fact"):
+            physical_year_rows[parts[3].split("=", 1)[1]]["fact_rows"] += row_count
+    if any(
+        counts["fact_rows"] and not counts["report_rows"] for counts in physical_year_rows.values()
+    ):
+        raise FinancialReportingBuildError("financial reconciliation year partitions differ")
+    expected_year_partitions = {
+        year: {
+            "report_rows": counts["report_rows"],
+            "fact_rows": counts["fact_rows"],
+            **{
+                key: 0
+                for key in _FINANCIAL_YEAR_PARTITION_KEYS
+                if key not in {"report_rows", "fact_rows"}
+            },
+        }
+        for year, counts in sorted(physical_year_rows.items())
+        if counts["report_rows"]
+    }
+    expected_reconciliation_keys = {
+        "schema_version",
+        "kind",
+        "row_counts",
+        "expected_reports",
+        "expected_facts",
+        "concept_evidence_rows",
+        "concept_staging_rows",
+        "selected_source_rows",
+        "source_audit_sha256",
+        "concept_evidence_storage",
+        "quality_exceptions",
+        "audit_policy",
+        "year_partitions",
+        *_FINANCIAL_RECONCILIATION_METRIC_KEYS,
+    }
+    if (
+        set(reconciliation) != expected_reconciliation_keys
+        or reconciliation.get("schema_version") != 1
+        or reconciliation.get("kind") != "dwd_financial_reporting_reconciliation"
+        or reconciliation.get("row_counts") != manifest_rows
+        or reconciliation.get("expected_reports") != physical_row_counts["dwd_financial_report"]
+        or reconciliation.get("expected_facts") != physical_row_counts["dwd_financial_fact"]
+        or reconciliation.get("concept_evidence_rows") != expected_evidence_rows
+        or reconciliation.get("concept_staging_rows") != expected_evidence_rows
+        or reconciliation.get("selected_source_rows") != selected_source_rows
+        or reconciliation.get("source_audit_sha256") != source_audit_sha256
+        or reconciliation.get("concept_evidence_storage") != _FINANCIAL_CONCEPT_EVIDENCE_STORAGE
+        or reconciliation.get("quality_exceptions") != receipt.get("quality_exceptions")
+        or reconciliation.get("audit_policy") != "duckdb_year_partitioned_external_audit_v4"
+        or reconciliation.get("year_partitions") != expected_year_partitions
+        or any(
+            not isinstance(reconciliation.get(section), Mapping)
+            or set(reconciliation[section]) != set(expected_keys)
+            or any(
+                not isinstance(value, int) or isinstance(value, bool) or value != 0
+                for value in reconciliation[section].values()
+            )
+            for section, expected_keys in _FINANCIAL_RECONCILIATION_METRIC_KEYS.items()
+        )
+    ):
+        raise FinancialReportingBuildError("financial reconciliation seal binding differs")
 
 
 def _verify_existing_financial_candidate(
@@ -2835,47 +4514,65 @@ def _verify_existing_financial_candidate(
         or manifest.get("input_plan_digest") != identity.get("input_plan_digest")
         or manifest.get("model_sha256") != identity.get("model_sha256")
         or manifest.get("source_audit_sha256") != identity.get("source_audit_sha256")
+        or manifest.get("builder_contract") != _FINANCIAL_BUILDER_CONTRACT
         or manifest.get("builder_contract") != identity.get("builder_contract")
+        or manifest.get("financial_concept_semantics_policy_sha256")
+        != _financial_concept_semantics_policy().sha256
+        or manifest.get("financial_concept_semantics_policy_sha256")
+        != identity.get("financial_concept_semantics_policy_sha256")
         or manifest.get("listed_company_manifest_sha256")
         != identity.get("listed_company_manifest_sha256")
         or manifest.get("listed_company_semantic_digest")
         != identity.get("listed_company_semantic_digest")
         or manifest.get("source_sha256") != identity.get("source_sha256")
         or manifest.get("owned_tables") != list(_OWNED_TABLES)
+        or manifest.get("partition_by") != _FINANCIAL_PARTITION_BY
         or not isinstance(manifest.get("row_counts"), Mapping)
     ):
         raise FinancialReportingBuildError("financial candidate manifest identity is inconsistent")
-    declared: set[str] = set()
-    for raw in manifest.get("files", []):
-        if not isinstance(raw, Mapping) or not isinstance(raw.get("path"), str):
-            raise FinancialReportingBuildError("financial candidate manifest file is invalid")
-        relative = str(raw["path"])
-        if (
-            relative in declared
-            or relative.startswith("/")
-            or ".." in PurePosixPath(relative).parts
-        ):
-            raise FinancialReportingBuildError("financial candidate manifest has unsafe files")
-        declared.add(relative)
-        path = output / relative
-        if (
-            path.is_symlink()
-            or not path.is_file()
-            or path.stat().st_size != raw.get("size_bytes")
-            or _sha256(path) != raw.get("sha256")
-        ):
-            raise FinancialReportingBuildError(
-                f"financial candidate file verification failed: {relative}"
-            )
-    physical = {
-        path.relative_to(output).as_posix()
-        for path in output.rglob("*")
-        if path.is_file() and not path.is_symlink()
-    }
-    if physical != declared | {"manifest.json", "READY"} or any(
-        path.is_symlink() for path in output.rglob("*")
+    manifest_files, parquet_rows, table_digests, physical_row_counts = (
+        _verify_financial_manifest_inventory(output, manifest)
+    )
+    reconciliation = _read_json_object(
+        output / "reconciliation/source-row-reconciliation.json",
+        "financial candidate reconciliation",
+    )
+    expected_evidence_rows = reconciliation.get("concept_staging_rows")
+    if (
+        not isinstance(expected_evidence_rows, int)
+        or isinstance(expected_evidence_rows, bool)
+        or expected_evidence_rows < 1
+        or reconciliation.get("concept_evidence_storage") != _FINANCIAL_CONCEPT_EVIDENCE_STORAGE
     ):
-        raise FinancialReportingBuildError("financial candidate physical inventory is inconsistent")
+        raise FinancialReportingBuildError("financial candidate concept evidence count is invalid")
+    checkpoint = _read_json_object(output / "checkpoint.json", "financial checkpoint")
+    receipt = _read_json_object(
+        output / "receipts/financial-reporting-build.json",
+        "financial build receipt",
+    )
+    source_audit, source_audit_sha256, _source_audit_bytes = _verify_financial_source_audit(
+        output / "audits/financial-source-audit.json"
+    )
+    _verify_financial_checkpoint_evidence_binding(
+        output,
+        checkpoint=checkpoint,
+        manifest=manifest,
+        manifest_files=manifest_files,
+        receipt=receipt,
+        reconciliation=reconciliation,
+        source_audit=source_audit,
+        source_audit_sha256=source_audit_sha256,
+        parquet_rows=parquet_rows,
+        table_digests=table_digests,
+        physical_row_counts=physical_row_counts,
+        expected_evidence_rows=expected_evidence_rows,
+    )
+    _verify_financial_candidate_semantics_once(
+        output,
+        manifest_sha256=_sha256(manifest_path),
+        policy_sha256=_financial_concept_semantics_policy().sha256,
+        expected_evidence_rows=expected_evidence_rows,
+    )
     return FinancialReportingBuildResult(
         root=output.resolve(),
         semantic_digest=str(manifest.get("semantic_digest")),
@@ -2893,6 +4590,9 @@ def verify_financial_reporting_candidate(
         manifest.get("run_id") != run_id
         or manifest.get("input_plan_digest") != input_plan_digest
         or manifest.get("model_sha256") != model_sha256
+        or manifest.get("builder_contract") != _FINANCIAL_BUILDER_CONTRACT
+        or manifest.get("financial_concept_semantics_policy_sha256")
+        != _financial_concept_semantics_policy().sha256
     ):
         raise FinancialReportingBuildError("financial predecessor binding differs")
     identity_fields = (
@@ -2901,6 +4601,7 @@ def verify_financial_reporting_candidate(
         "model_sha256",
         "source_audit_sha256",
         "builder_contract",
+        "financial_concept_semantics_policy_sha256",
         "listed_company_manifest_sha256",
         "listed_company_semantic_digest",
         "source_sha256",
@@ -2930,6 +4631,7 @@ def _build_financial_reporting_locked(
         source_audit,
         knowledge_cutoff,
         through_date,
+        initial_source_audit_bytes,
     ) = _candidate_identity(
         ods_package=ods_package,
         input_plan=input_plan,
@@ -3046,6 +4748,23 @@ def _build_financial_reporting_locked(
             if completed is not None:
                 if not isinstance(completed, Mapping):
                     raise FinancialReportingBuildError("financial checkpoint batch is invalid")
+                if not _checkpoint_batch_files_valid(
+                    work,
+                    batch_id,
+                    completed,
+                    source_id=source.source_id,
+                    selected_source_rows=len(selected_rows),
+                    concept_staging_retired=bool(checkpoint.get("concept_staging_retired", False)),
+                ):
+                    if checkpoint.get("concept_staging_retired"):
+                        raise FinancialReportingBuildError(
+                            "retired financial checkpoint has invalid durable batch files"
+                        )
+                    del checkpoint["completed_batches"][batch_id]
+                    _write_json_atomic(work / "checkpoint.json", checkpoint)
+                    _discard_uncheckpointed_batch_files(work, batch_id)
+                    completed = None
+            if completed is not None:
                 counts = completed.get("row_counts")
                 exceptions = completed.get("quality_exceptions", {})
                 if not isinstance(counts, Mapping) or not isinstance(exceptions, Mapping):
@@ -3059,6 +4778,7 @@ def _build_financial_reporting_locked(
                 )
                 selected_source_rows += int(completed.get("selected_source_rows", 0))
                 continue
+            _discard_uncheckpointed_batch_files(work, batch_id)
             rows_by_year, concepts, counts, exceptions = _reporting_batch_rows(
                 selected_rows,
                 source=source,
@@ -3073,18 +4793,30 @@ def _build_financial_reporting_locked(
                 concepts=concepts,
                 schemas=schemas,
             )
-            checkpoint["completed_batches"][batch_id] = {
+            completed_batch = {
                 "source": source.source_id,
                 "selected_source_rows": len(selected_rows),
                 "row_counts": counts,
                 "quality_exceptions": exceptions,
                 "files": files,
             }
+            completed_batch["batch_digest"] = _checkpoint_batch_digest(completed_batch)
+            checkpoint["completed_batches"][batch_id] = completed_batch
             _write_json_atomic(work / "checkpoint.json", checkpoint)
             for table in _OWNED_TABLES:
                 totals[table] += counts[table]
             quality_exceptions.update(exceptions)
             selected_source_rows += len(selected_rows)
+    source_audit_bytes = _reverify_financial_build_inputs(
+        initial_identity=identity,
+        ods_package=ods_package,
+        input_plan=input_plan,
+        model_path=model_path,
+        listed_company_candidate=listed_company_candidate,
+        source_audit_path=source_audit_path,
+        run_id=run_id,
+        initial_source_audit_bytes=initial_source_audit_bytes,
+    )
     calibration = _plan_mapping(
         source_audit.get("candidate_size_calibration"), "financial source audit calibration"
     )
@@ -3101,19 +4833,34 @@ def _build_financial_reporting_locked(
     )
     if row_counts["dwd_financial_concept"] != concept_count:
         raise FinancialReportingBuildError("financial concept audit count differs from output")
+    if reconciliation.get("concept_evidence_rows") != totals["dwd_financial_concept"]:
+        raise FinancialReportingBuildError(
+            "financial concept evidence count differs from staged source evidence"
+        )
     reconciliation["selected_source_rows"] = selected_source_rows
     reconciliation["source_audit_sha256"] = identity["source_audit_sha256"]
     reconciliation["concept_staging_rows"] = totals["dwd_financial_concept"]
+    reconciliation["concept_evidence_storage"] = _FINANCIAL_CONCEPT_EVIDENCE_STORAGE
     reconciliation["quality_exceptions"] = dict(sorted(quality_exceptions.items()))
     _write_json_atomic(work / "reconciliation/source-row-reconciliation.json", reconciliation)
     audit_copy = work / "audits/financial-source-audit.json"
     audit_copy.parent.mkdir(parents=True, exist_ok=True)
-    if audit_copy.exists() and audit_copy.read_bytes() != source_audit_path.read_bytes():
+    if audit_copy.exists() and audit_copy.read_bytes() != source_audit_bytes:
         raise FinancialReportingBuildError("candidate financial source audit differs")
     if not audit_copy.exists():
-        shutil.copyfile(source_audit_path, audit_copy)
-        _fsync_directory(audit_copy.parent)
-    shutil.rmtree(work / "staging", ignore_errors=True)
+        _write_bytes_atomic(audit_copy, source_audit_bytes)
+    checkpoint["concept_staging_retired"] = True
+    _write_json_atomic(work / "checkpoint.json", checkpoint)
+    staging = work / "staging"
+    try:
+        if staging.exists():
+            shutil.rmtree(staging)
+    except OSError as exc:
+        raise FinancialReportingBuildError(
+            "financial concept staging could not be retired"
+        ) from exc
+    if staging.exists():
+        raise FinancialReportingBuildError("financial concept staging retirement is incomplete")
     shutil.rmtree(work / ".audit", ignore_errors=True)
     table_files = {
         table: [
@@ -3133,13 +4880,26 @@ def _build_financial_reporting_locked(
         "row_counts": row_counts,
         "table_digests": table_digests,
         "quality_exceptions": dict(sorted(quality_exceptions.items())),
-        "resource_policy": "partitioned_write_and_duckdb_external_audit_v1",
+        "concept_evidence_storage": _FINANCIAL_CONCEPT_EVIDENCE_STORAGE,
+        "resource_policy": _FINANCIAL_RESOURCE_POLICY,
     }
     _write_json_atomic(work / "receipts/financial-reporting-build.json", receipt)
     checkpoint["completed"] = True
     checkpoint["semantic_digest"] = semantic_digest
     _write_json_atomic(work / "checkpoint.json", checkpoint)
-    files = sorted(
+    source_audit_bytes = _reverify_financial_build_inputs(
+        initial_identity=identity,
+        ods_package=ods_package,
+        input_plan=input_plan,
+        model_path=model_path,
+        listed_company_candidate=listed_company_candidate,
+        source_audit_path=source_audit_path,
+        run_id=run_id,
+        initial_source_audit_bytes=initial_source_audit_bytes,
+    )
+    if audit_copy.read_bytes() != source_audit_bytes:
+        raise FinancialReportingBuildError("candidate financial source audit differs before seal")
+    candidate_files = sorted(
         path
         for path in work.rglob("*")
         if path.is_file() and not path.is_symlink() and path.name not in {"manifest.json", "READY"}
@@ -3152,23 +4912,42 @@ def _build_financial_reporting_locked(
         "model_sha256": identity["model_sha256"],
         "source_audit_sha256": identity["source_audit_sha256"],
         "builder_contract": identity["builder_contract"],
+        "financial_concept_semantics_policy_sha256": identity[
+            "financial_concept_semantics_policy_sha256"
+        ],
         "listed_company_manifest_sha256": identity["listed_company_manifest_sha256"],
         "listed_company_semantic_digest": identity["listed_company_semantic_digest"],
         "source_sha256": identity["source_sha256"],
         "semantic_digest": semantic_digest,
         "owned_tables": list(_OWNED_TABLES),
-        "partition_by": {
-            "dwd_financial_report": ["period_end_year"],
-            "dwd_financial_concept": [],
-            "dwd_financial_fact": ["period_end_year"],
-        },
+        "partition_by": _FINANCIAL_PARTITION_BY,
         "row_counts": row_counts,
-        "files": [_file_record(work, path) for path in files],
+        "files": [_file_record(work, path) for path in candidate_files],
     }
     _write_json_atomic(work / "manifest.json", manifest)
     _write_text_atomic(work / "READY", _sha256(work / "manifest.json") + "\n")
+    _reverify_financial_build_inputs(
+        initial_identity=identity,
+        ods_package=ods_package,
+        input_plan=input_plan,
+        model_path=model_path,
+        listed_company_candidate=listed_company_candidate,
+        source_audit_path=source_audit_path,
+        run_id=run_id,
+        initial_source_audit_bytes=initial_source_audit_bytes,
+    )
     _fsync_directory(work)
     _verify_existing_financial_candidate(work, identity=identity)
+    _reverify_financial_build_inputs(
+        initial_identity=identity,
+        ods_package=ods_package,
+        input_plan=input_plan,
+        model_path=model_path,
+        listed_company_candidate=listed_company_candidate,
+        source_audit_path=source_audit_path,
+        run_id=run_id,
+        initial_source_audit_bytes=initial_source_audit_bytes,
+    )
     os.replace(work, output)
     _fsync_directory(output.parent)
     return _verify_existing_financial_candidate(output, identity=identity)

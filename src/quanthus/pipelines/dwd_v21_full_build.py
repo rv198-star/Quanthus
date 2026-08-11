@@ -565,8 +565,17 @@ def _report_evidence(
     *,
     label: str,
     status_path: tuple[str, ...],
+    expected_bindings: Mapping[tuple[str, ...], Any],
 ) -> dict[str, Any]:
     report = _verify_sealed(path, label)
+    for binding_path, expected in expected_bindings.items():
+        actual: object = report
+        for key in binding_path:
+            if not isinstance(actual, Mapping):
+                raise DwdV21FullBuildError(f"{label} has no identity path: {binding_path}")
+            actual = actual.get(key)
+        if actual != expected:
+            raise DwdV21FullBuildError(f"{label} identity differs at {'.'.join(binding_path)}")
     status: object = report
     for key in status_path:
         if not isinstance(status, Mapping):
@@ -593,9 +602,16 @@ def _run_report_step(
     run_id: str,
     contract_digest: str,
     code_revision: str,
+    expected_bindings: Mapping[tuple[str, ...], Any] | None = None,
 ) -> dict[str, Any]:
+    bindings = expected_bindings or {}
     if output.exists():
-        evidence = _report_evidence(output, label=label, status_path=status_path)
+        evidence = _report_evidence(
+            output,
+            label=label,
+            status_path=status_path,
+            expected_bindings=bindings,
+        )
         terminal_phase = f"{phase}-{'passed' if evidence['status'] == 'verified' else 'finding'}"
         _advance(
             workspace,
@@ -619,7 +635,12 @@ def _run_report_step(
         evidence={"output": str(output)},
     )
     action()
-    evidence = _report_evidence(output, label=label, status_path=status_path)
+    evidence = _report_evidence(
+        output,
+        label=label,
+        status_path=status_path,
+        expected_bindings=bindings,
+    )
     terminal_phase = f"{phase}-{'passed' if evidence['status'] == 'verified' else 'finding'}"
     _advance(
         workspace,
@@ -780,6 +801,7 @@ def _run_candidate_audits(
     run_id: str,
     contract_digest: str,
     code_revision: str,
+    sealed_identity: Mapping[str, Any],
 ) -> dict[str, dict[str, Any]]:
     audit_root = run_root / "evidence/candidate-audits"
     checkpoint_root = run_root / "checkpoints/candidate-audits"
@@ -788,6 +810,11 @@ def _run_candidate_audits(
     checkpoint_root.mkdir(parents=True, exist_ok=True)
     audit_scratch.mkdir(parents=True, exist_ok=True)
     audit_memory_limit = f"{dwd_duckdb_memory_limit_mb(1536)}MB"
+    base_bindings = {
+        ("base_release", "package_id"): sealed_identity.get("package_id"),
+        ("base_release", "manifest_sha256"): sealed_identity.get("manifest_sha256"),
+        ("base_release", "content_digest"): sealed_identity.get("content_digest"),
+    }
 
     schema_path = audit_root / "schema-partitions.json"
 
@@ -810,6 +837,10 @@ def _run_candidate_audits(
         run_id=run_id,
         contract_digest=contract_digest,
         code_revision=code_revision,
+        expected_bindings={
+            ("kind",): "dwd_base_v2_physical_schema_partition_audit",
+            **base_bindings,
+        },
     )
 
     semantic_path = audit_root / "semantic-contracts.json"
@@ -819,6 +850,9 @@ def _run_candidate_audits(
             root=sealed_root,
             model_path=model_path,
             extension_path=model_extension_path,
+            semantics_policy_path=(
+                repository / "config/audits/dwd-financial-concept-semantics.v1.json"
+            ),
             scratch=audit_scratch / "semantic-contracts",
             checkpoint_path=checkpoint_root / "semantic-contracts.json",
             memory_limit=audit_memory_limit,
@@ -840,6 +874,10 @@ def _run_candidate_audits(
         run_id=run_id,
         contract_digest=contract_digest,
         code_revision=code_revision,
+        expected_bindings={
+            ("kind",): "dwd_base_v2_semantic_contract_audit",
+            **base_bindings,
+        },
     )
 
     invariant_path = audit_root / "domain-invariants.json"
@@ -868,6 +906,10 @@ def _run_candidate_audits(
         run_id=run_id,
         contract_digest=contract_digest,
         code_revision=code_revision,
+        expected_bindings={
+            ("kind",): "dwd_base_v2_domain_invariant_audit",
+            **base_bindings,
+        },
     )
 
     coverage_path = audit_root / "coverage-exclusions.json"
@@ -896,6 +938,10 @@ def _run_candidate_audits(
         run_id=run_id,
         contract_digest=contract_digest,
         code_revision=code_revision,
+        expected_bindings={
+            ("kind",): "dwd_base_v2_coverage_exclusion_audit",
+            **base_bindings,
+        },
     )
 
     lineage_path = audit_root / "lineage-authority.json"
@@ -925,6 +971,10 @@ def _run_candidate_audits(
         run_id=run_id,
         contract_digest=contract_digest,
         code_revision=code_revision,
+        expected_bindings={
+            ("kind",): "dwd_base_v2_lineage_authority_audit",
+            ("dwd", "package_id"): sealed_identity.get("package_id"),
+        },
     )
     evidence = {
         "schema_partitions": schema,
@@ -1697,6 +1747,7 @@ def run_full_build(
                 run_id=run_id,
                 contract_digest=expected_contract_digest,
                 code_revision=expected_revision,
+                sealed_identity=seal_evidence,
             )
             candidate_audit_digests = {
                 name: evidence["canonical_digest"]

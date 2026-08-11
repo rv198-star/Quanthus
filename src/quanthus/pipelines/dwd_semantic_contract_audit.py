@@ -21,6 +21,11 @@ from quanthus.pipelines.securities_warehouse.domain_base import (
     DomainBaseError,
     verify_domain_base,
 )
+from quanthus.pipelines.securities_warehouse.financial_concept_semantics import (
+    FinancialConceptSemanticsPolicy,
+    FinancialConceptSemanticsPolicyError,
+    load_financial_concept_semantics_policy,
+)
 from quanthus.pipelines.securities_warehouse.model_extension import (
     ModelExtensionError,
     verify_additive_model_extension,
@@ -49,6 +54,8 @@ class SemanticTableContract:
     foreign_keys: tuple[ForeignKeyContract, ...]
     constraints: tuple[str, ...]
     partition_by: tuple[str, ...]
+    knowledge_interval_identity: tuple[str, ...]
+    require_closed_knowledge_intervals: bool
 
 
 _LINEAGE_FIELDS = (
@@ -95,11 +102,28 @@ def _names(value: object, label: str) -> tuple[str, ...]:
 
 
 def load_semantic_contracts(
-    model_path: Path, extension_path: Path | None = None
+    model_path: Path,
+    extension_path: Path | None = None,
+    semantics_policy_path: Path | None = None,
+    semantics_policy: FinancialConceptSemanticsPolicy | None = None,
 ) -> dict[str, SemanticTableContract]:
     """Load keys, relationships, intervals, and constraints for exactly 33 tables."""
 
     model = _object(model_path, "DWD model")
+    knowledge_identity_overrides: Mapping[str, Any] = {}
+    if semantics_policy_path is not None and semantics_policy is not None:
+        raise DwdSemanticContractAuditError("DWD semantics policy was supplied twice")
+    if semantics_policy_path is not None:
+        try:
+            semantics_policy = load_financial_concept_semantics_policy(
+                semantics_policy_path, model_path=model_path
+            )
+        except FinancialConceptSemanticsPolicyError as exc:
+            raise DwdSemanticContractAuditError("DWD semantics policy binding is invalid") from exc
+    if semantics_policy is not None:
+        knowledge_identity_overrides = {
+            "dwd_financial_concept": list(semantics_policy.knowledge_interval_identity)
+        }
     table_extensions: Mapping[str, Any] = {}
     if extension_path is not None:
         try:
@@ -167,6 +191,16 @@ def load_semantic_contracts(
             raise DwdSemanticContractAuditError(
                 f"row key must extend the business key with knowledge_from: {name}"
             )
+        raw_knowledge_identity = knowledge_identity_overrides.get(name)
+        knowledge_interval_identity = (
+            _names(raw_knowledge_identity, f"{name}.knowledge_interval_identity")
+            if raw_knowledge_identity is not None
+            else business_key
+        )
+        if not set(knowledge_interval_identity).issubset(business_key):
+            raise DwdSemanticContractAuditError(
+                f"knowledge identity must be a subset of the business key: {name}"
+            )
         foreign_keys: list[ForeignKeyContract] = []
         for raw_foreign_key in raw_foreign_keys:
             if not isinstance(raw_foreign_key, Mapping):
@@ -199,6 +233,10 @@ def load_semantic_contracts(
             foreign_keys=tuple(foreign_keys),
             constraints=tuple(raw_constraints),
             partition_by=tuple(raw_partition_by),
+            knowledge_interval_identity=knowledge_interval_identity,
+            require_closed_knowledge_intervals=(
+                name == "dwd_financial_concept" and semantics_policy is not None
+            ),
         )
     if len(result) != 33:
         raise DwdSemanticContractAuditError(
@@ -253,6 +291,9 @@ def _key_version_metrics(
     connection: Any, source: str, contract: SemanticTableContract
 ) -> dict[str, dict[str, int] | int]:
     business = ", ".join(_identifier(field) for field in contract.business_key)
+    knowledge_identity = ", ".join(
+        _identifier(field) for field in _knowledge_interval_identity(contract)
+    )
     row = connection.execute(
         f"""
         WITH row_versions AS (
@@ -273,20 +314,40 @@ def _key_version_metrics(
           SELECT {business}, sum(row_count) AS row_count, count(*) AS version_count
           FROM row_versions
           GROUP BY {business}
+        ), knowledge_versions AS (
+          SELECT {knowledge_identity}, knowledge_from,
+                 max(knowledge_to) AS knowledge_to, count(*) AS row_count
+          FROM {source}
+          GROUP BY {knowledge_identity}, knowledge_from
+        ), ordered_knowledge_versions AS (
+          SELECT *, lag(knowledge_to) OVER (
+            PARTITION BY {knowledge_identity} ORDER BY knowledge_from
+          ) AS previous_to,
+          lead(knowledge_from) OVER (
+            PARTITION BY {knowledge_identity} ORDER BY knowledge_from
+          ) AS next_from,
+          row_number() OVER (
+            PARTITION BY {knowledge_identity} ORDER BY knowledge_from
+          ) AS version_number
+          FROM knowledge_versions
         )
         SELECT
           (SELECT count(*) FROM row_versions WHERE row_count > 1),
           (SELECT coalesce(sum(row_count), 0) FROM row_versions WHERE row_count > 1),
           (SELECT count(*) FROM business_versions WHERE row_count > 1),
           (SELECT coalesce(sum(row_count), 0) FROM business_versions WHERE row_count > 1),
-          (SELECT count(*) FROM ordered_versions
-           WHERE version_number > 1
-             AND (previous_to IS NULL OR previous_to > knowledge_from))
+          (SELECT coalesce(sum(row_count), 0) FROM ordered_knowledge_versions
+           WHERE row_count > 1)
+          + (SELECT count(*) FROM ordered_knowledge_versions
+             WHERE version_number > 1
+               AND (previous_to IS NULL OR previous_to > knowledge_from)),
+          (SELECT count(*) FROM ordered_knowledge_versions
+           WHERE knowledge_to IS DISTINCT FROM next_from)
         """
     ).fetchone()
     if row is None:
         raise DwdSemanticContractAuditError("key-version query returned no row")
-    return {
+    result: dict[str, dict[str, int] | int] = {
         "duplicate_row_keys": {"group_count": int(row[0]), "row_count": int(row[1])},
         "business_key_version_groups": {
             "group_count": int(row[2]),
@@ -294,6 +355,9 @@ def _key_version_metrics(
         },
         "knowledge_interval_overlap_rows": int(row[4]),
     }
+    if contract.require_closed_knowledge_intervals:
+        result["knowledge_interval_boundary_violation_rows"] = int(row[5])
+    return result
 
 
 def _partition_confines_business_key(contract: SemanticTableContract) -> bool:
@@ -308,6 +372,10 @@ def _partition_confines_business_key(contract: SemanticTableContract) -> bool:
         if coordinate not in contract.business_key:
             return False
     return bool(contract.partition_by)
+
+
+def _knowledge_interval_identity(contract: SemanticTableContract) -> tuple[str, ...]:
+    return contract.knowledge_interval_identity
 
 
 def _partitioned_key_version_metrics(
@@ -325,6 +393,8 @@ def _partitioned_key_version_metrics(
         "business_key_version_groups": {"group_count": 0, "row_count": 0},
         "knowledge_interval_overlap_rows": 0,
     }
+    if contract.require_closed_knowledge_intervals:
+        result["knowledge_interval_boundary_violation_rows"] = 0
     business = ", ".join(_identifier(field) for field in contract.business_key)
     for group_paths in groups.values():
         compressed_bytes = sum(path.stat().st_size for path in group_paths)
@@ -349,6 +419,10 @@ def _partitioned_key_version_metrics(
             result["knowledge_interval_overlap_rows"] = cast(
                 int, result["knowledge_interval_overlap_rows"]
             ) + cast(int, group["knowledge_interval_overlap_rows"])
+            if contract.require_closed_knowledge_intervals:
+                result["knowledge_interval_boundary_violation_rows"] = cast(
+                    int, result["knowledge_interval_boundary_violation_rows"]
+                ) + cast(int, group["knowledge_interval_boundary_violation_rows"])
     return result
 
 
@@ -395,29 +469,47 @@ def _interval_metrics(
         raise DwdSemanticContractAuditError("interval aggregate returned no row")
     metrics = {name: int(value) for name, value in zip(names, aggregate, strict=True)}
     if include_knowledge_overlap:
-        knowledge_keys = ", ".join(_identifier(field) for field in contract.business_key)
-        metrics["knowledge_interval_overlap_rows"] = _count(
-            connection,
+        knowledge_identity = _knowledge_interval_identity(contract)
+        knowledge_keys = ", ".join(_identifier(field) for field in knowledge_identity)
+        knowledge_metrics = connection.execute(
             f"""
-            SELECT count(*) FROM (
-              SELECT knowledge_from, lag(knowledge_to) OVER (
+            WITH knowledge_versions AS (
+              SELECT {knowledge_keys}, knowledge_from,
+                     max(knowledge_to) AS knowledge_to, count(*) AS row_count
+              FROM {source}
+              GROUP BY {knowledge_keys}, knowledge_from
+            ), ordered AS (
+              SELECT *, lag(knowledge_to) OVER (
                 PARTITION BY {knowledge_keys} ORDER BY knowledge_from
               ) AS previous_to,
+              lead(knowledge_from) OVER (
+                PARTITION BY {knowledge_keys} ORDER BY knowledge_from
+              ) AS next_from,
               row_number() OVER (
                 PARTITION BY {knowledge_keys} ORDER BY knowledge_from
               ) AS version_number
-              FROM {source}
-            ) versions
-            WHERE version_number > 1 AND (previous_to IS NULL OR previous_to > knowledge_from)
+              FROM knowledge_versions
+            )
+            SELECT
+              (SELECT coalesce(sum(row_count), 0) FROM ordered WHERE row_count > 1)
+              + (SELECT count(*) FROM ordered
+                 WHERE version_number > 1
+                   AND (previous_to IS NULL OR previous_to > knowledge_from)),
+              (SELECT count(*) FROM ordered
+               WHERE knowledge_to IS DISTINCT FROM next_from)
             """,
-        )
+        ).fetchone()
+        if knowledge_metrics is None:
+            raise DwdSemanticContractAuditError("knowledge interval query returned no row")
+        metrics["knowledge_interval_overlap_rows"] = int(knowledge_metrics[0])
+        if contract.require_closed_knowledge_intervals:
+            metrics["knowledge_interval_boundary_violation_rows"] = int(knowledge_metrics[1])
     if "effective_from" in contract.fields and "effective_to" in contract.fields:
-        identity_fields = tuple(
-            field for field in contract.business_key if field != "effective_from"
-        )
+        knowledge_identity = _knowledge_interval_identity(contract)
+        identity_fields = tuple(field for field in knowledge_identity if field != "effective_from")
         if identity_fields:
             identity = ", ".join(_identifier(field) for field in identity_fields)
-            business = ", ".join(_identifier(field) for field in contract.business_key)
+            business = ", ".join(_identifier(field) for field in knowledge_identity)
             metrics["effective_interval_overlap_rows"] = _count(
                 connection,
                 f"""
@@ -748,11 +840,148 @@ def _checkpoint_value(
     return value
 
 
+def _checkpoint_metric(value: Any, label: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise DwdSemanticContractAuditError(f"Phase C checkpoint {label} is invalid")
+    return value
+
+
+def _checkpoint_metric_map(value: Any, expected_keys: set[str], label: str) -> dict[str, int]:
+    if not isinstance(value, Mapping) or set(value) != expected_keys:
+        raise DwdSemanticContractAuditError(f"Phase C checkpoint {label} shape differs")
+    return {key: _checkpoint_metric(value[key], f"{label}.{key}") for key in expected_keys}
+
+
+def _validate_checkpoint_table_report(
+    table: str,
+    report: Any,
+    *,
+    contract: SemanticTableContract,
+    expected_rows: int,
+) -> None:
+    expected_report_keys = {
+        "row_count",
+        "expected_rows",
+        "null_row_key_rows",
+        "row_key",
+        "business_key",
+        "duplicate_row_keys",
+        "business_key_version_groups",
+        "intervals",
+        "lineage",
+        "numeric_invariants",
+        "foreign_keys",
+        "violation_count",
+        "status",
+    }
+    if (
+        not isinstance(report, Mapping)
+        or set(report) != expected_report_keys
+        or report.get("row_key") != list(contract.row_key)
+        or report.get("business_key") != list(contract.business_key)
+        or report.get("expected_rows") != expected_rows
+    ):
+        raise DwdSemanticContractAuditError(
+            f"Phase C checkpoint table report shape differs: {table}"
+        )
+    row_count = _checkpoint_metric(report.get("row_count"), f"{table}.row_count")
+    null_rows = _checkpoint_metric(report.get("null_row_key_rows"), f"{table}.null_row_key_rows")
+    duplicate_rows = _checkpoint_metric_map(
+        report.get("duplicate_row_keys"),
+        {"group_count", "row_count"},
+        f"{table}.duplicate_row_keys",
+    )
+    _checkpoint_metric_map(
+        report.get("business_key_version_groups"),
+        {"group_count", "row_count"},
+        f"{table}.business_key_version_groups",
+    )
+    interval_keys = {"invalid_knowledge_interval_rows", "knowledge_interval_overlap_rows"}
+    for start, end in (
+        ("effective_from", "effective_to"),
+        ("observation_start", "observation_end"),
+        ("period_start", "period_end"),
+    ):
+        if start in contract.fields and end in contract.fields:
+            interval_keys.add(f"invalid_{start}_{end}_rows")
+    if contract.require_closed_knowledge_intervals:
+        interval_keys.add("knowledge_interval_boundary_violation_rows")
+    if (
+        "effective_from" in contract.fields
+        and "effective_to" in contract.fields
+        and any(field != "effective_from" for field in contract.knowledge_interval_identity)
+    ):
+        interval_keys.add("effective_interval_overlap_rows")
+    intervals = _checkpoint_metric_map(report.get("intervals"), interval_keys, f"{table}.intervals")
+    lineage = _checkpoint_metric_map(
+        report.get("lineage"),
+        {
+            "null_required_lineage_rows",
+            "invalid_source_artifact_sha256_rows",
+            "blank_lineage_rows",
+        },
+        f"{table}.lineage",
+    )
+    numeric = _checkpoint_metric_map(
+        report.get("numeric_invariants"),
+        set(_numeric_predicates(contract)),
+        f"{table}.numeric_invariants",
+    )
+    foreign_keys = report.get("foreign_keys")
+    if not isinstance(foreign_keys, list) or len(foreign_keys) != len(contract.foreign_keys):
+        raise DwdSemanticContractAuditError(
+            f"Phase C checkpoint foreign-key shape differs: {table}"
+        )
+    foreign_key_violations = 0
+    child_coordinate = _time_coordinate(contract)
+    for raw, foreign_key in zip(foreign_keys, contract.foreign_keys, strict=True):
+        if (
+            not isinstance(raw, Mapping)
+            or set(raw)
+            != {
+                "column",
+                "parent_table",
+                "parent_column",
+                "nullable",
+                "orphan_rows",
+                "temporal_or_future_parent_rows",
+                "effective_coordinate",
+            }
+            or raw.get("column") != foreign_key.column
+            or raw.get("parent_table") != foreign_key.table
+            or raw.get("parent_column") != foreign_key.reference_column
+            or raw.get("nullable") is not foreign_key.nullable
+            or raw.get("effective_coordinate") != child_coordinate
+        ):
+            raise DwdSemanticContractAuditError(
+                f"Phase C checkpoint foreign-key contract differs: {table}"
+            )
+        foreign_key_violations += _checkpoint_metric(
+            raw.get("orphan_rows"), f"{table}.foreign_keys.orphan_rows"
+        ) + _checkpoint_metric(
+            raw.get("temporal_or_future_parent_rows"),
+            f"{table}.foreign_keys.temporal_or_future_parent_rows",
+        )
+    violation_count = (
+        null_rows
+        + duplicate_rows["row_count"]
+        + sum(intervals.values())
+        + sum(lineage.values())
+        + sum(numeric.values())
+        + foreign_key_violations
+        + int(row_count != expected_rows)
+    )
+    expected_status = "verified" if violation_count == 0 else "finding"
+    if report.get("violation_count") != violation_count or report.get("status") != expected_status:
+        raise DwdSemanticContractAuditError(f"Phase C checkpoint table result differs: {table}")
+
+
 def _load_checkpoint(
     path: Path,
     *,
     identity: Mapping[str, Any],
-    allowed_tables: set[str],
+    contracts: Mapping[str, SemanticTableContract],
+    expected_rows: Mapping[str, Any],
 ) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -767,10 +996,18 @@ def _load_checkpoint(
     ):
         raise DwdSemanticContractAuditError("Phase C checkpoint identity or digest differs")
     tables = value.get("tables")
-    if not isinstance(tables, dict) or not set(tables).issubset(allowed_tables):
+    if not isinstance(tables, dict) or not set(tables).issubset(contracts):
         raise DwdSemanticContractAuditError("Phase C checkpoint table scope differs")
     if value.get("completed_table_count") != len(tables):
         raise DwdSemanticContractAuditError("Phase C checkpoint count differs")
+    for table, table_report in tables.items():
+        expected = _checkpoint_metric(expected_rows.get(table), f"{table}.expected_rows")
+        _validate_checkpoint_table_report(
+            table,
+            table_report,
+            contract=contracts[table],
+            expected_rows=expected,
+        )
     return tables
 
 
@@ -779,6 +1016,7 @@ def audit_dwd_semantic_contracts(
     root: Path,
     model_path: Path,
     extension_path: Path | None = None,
+    semantics_policy_path: Path | None = None,
     scratch: Path,
     checkpoint_path: Path,
     memory_limit: str = "2GB",
@@ -799,7 +1037,19 @@ def audit_dwd_semantic_contracts(
     except DomainBaseError as exc:
         raise DwdSemanticContractAuditError(f"DWD Base verification failed: {exc}") from exc
     manifest = _object(root / "manifest.json", "DWD Base manifest")
-    contracts = load_semantic_contracts(model_path, extension_path)
+    validated_semantics_policy = None
+    if semantics_policy_path is not None:
+        try:
+            validated_semantics_policy = load_financial_concept_semantics_policy(
+                semantics_policy_path, model_path=model_path
+            )
+        except FinancialConceptSemanticsPolicyError as exc:
+            raise DwdSemanticContractAuditError("DWD semantics policy binding is invalid") from exc
+    contracts = load_semantic_contracts(
+        model_path,
+        extension_path,
+        semantics_policy=validated_semantics_policy,
+    )
     table_paths = _manifest_payload_files(root, manifest, table_names=sorted(contracts))
     sources = {table: _parquet_source(paths) for table, paths in table_paths.items()}
     table_compressed_bytes = {
@@ -819,22 +1069,33 @@ def audit_dwd_semantic_contracts(
         if extension_path is not None
         else None
     )
+    semantics_policy_sha256 = (
+        validated_semantics_policy.sha256 if validated_semantics_policy is not None else None
+    )
     thread_limit = dwd_thread_limit()
+    execution = {
+        "memory_limit": memory_limit,
+        "scratch": str(scratch),
+        "threads": thread_limit,
+        "table_order": "descending_compressed_bytes",
+    }
     audit_identity = {
         "package_id": verified.package_id,
         "manifest_sha256": verified.manifest_sha256,
         "content_digest": verified.content_digest,
         "model_sha256": model_sha256,
         "model_extension_sha256": extension_sha256,
+        "semantics_policy_sha256": semantics_policy_sha256,
         "auditor_sha256": "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        "memory_limit": memory_limit,
-        "threads": thread_limit,
-        "table_order": "descending_compressed_bytes",
+        "memory_limit": execution["memory_limit"],
+        "threads": execution["threads"],
+        "table_order": execution["table_order"],
     }
     table_reports = _load_checkpoint(
         checkpoint_path,
         identity=audit_identity,
-        allowed_tables=set(contracts),
+        contracts=contracts,
+        expected_rows=raw_counts,
     )
 
     connection = duckdb.connect(":memory:")
@@ -877,6 +1138,10 @@ def audit_dwd_semantic_contracts(
             intervals["knowledge_interval_overlap_rows"] = int(
                 cast(int, key_versions["knowledge_interval_overlap_rows"])
             )
+            if contract.require_closed_knowledge_intervals:
+                intervals["knowledge_interval_boundary_violation_rows"] = int(
+                    cast(int, key_versions["knowledge_interval_boundary_violation_rows"])
+                )
             _progress(table, "lineage")
             lineage = _lineage_metrics(connection, source)
             _progress(table, "foreign_keys")
@@ -947,14 +1212,13 @@ def audit_dwd_semantic_contracts(
             "sha256": model_sha256,
             "extension_path": str(extension_path.resolve()) if extension_path else None,
             "extension_sha256": extension_sha256,
+            "semantics_policy_path": (
+                str(semantics_policy_path.resolve()) if semantics_policy_path else None
+            ),
+            "semantics_policy_sha256": semantics_policy_sha256,
         },
         "auditor_sha256": audit_identity["auditor_sha256"],
-        "execution": {
-            "memory_limit": memory_limit,
-            "scratch": str(scratch),
-            "threads": 1,
-            "table_order": "descending_compressed_bytes",
-        },
+        "execution": execution,
         "checkpoint_path": str(checkpoint_path),
         "summary": {
             "status": "verified" if not finding_tables else "finding",
@@ -971,6 +1235,7 @@ def audit_dwd_semantic_contracts(
             "base_release": report["base_release"],
             "model_sha256": report["model"]["sha256"],
             "model_extension_sha256": report["model"]["extension_sha256"],
+            "semantics_policy_sha256": report["model"]["semantics_policy_sha256"],
             "summary": report["summary"],
             "tables": report["tables"],
         }

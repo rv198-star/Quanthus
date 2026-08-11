@@ -284,6 +284,32 @@ def test_file_checkpoint_detects_artifact_drift(tmp_path: Path) -> None:
             code_revision=REVISION,
         )
 
+    stale_output = run_root / "evidence/stale.json"
+    _atomic_json(
+        stale_output,
+        _sealed(
+            {
+                "kind": "candidate-audit",
+                "base_release": {"manifest_sha256": "sha256:stale"},
+                "summary": {"status": "verified"},
+            }
+        ),
+    )
+    with pytest.raises(DwdV21FullBuildError, match="identity differs"):
+        _run_report_step(
+            workspace=workspace,
+            run_root=run_root,
+            phase="candidate-stale-audit",
+            output=stale_output,
+            action=lambda: None,
+            label="candidate stale audit",
+            status_path=("summary", "status"),
+            run_id="build-r22222222",
+            contract_digest=CONTRACT,
+            code_revision=REVISION,
+            expected_bindings={("base_release", "manifest_sha256"): "sha256:current"},
+        )
+
 
 def test_report_step_records_findings_and_blocks_verified_report_drift(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
@@ -385,6 +411,11 @@ def test_candidate_audits_collect_all_reports_before_failing(
             run_id="build-r22222222",
             contract_digest=CONTRACT,
             code_revision=REVISION,
+            sealed_identity={
+                "package_id": "dwd-base-202607-v2.1",
+                "manifest_sha256": "sha256:manifest",
+                "content_digest": "sha256:content",
+            },
         )
 
     assert phases == [

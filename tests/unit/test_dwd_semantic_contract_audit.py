@@ -17,6 +17,9 @@ from quanthus.pipelines.dwd_semantic_contract_audit import (
     load_semantic_contracts,
     write_semantic_contract_report,
 )
+from quanthus.pipelines.securities_warehouse.financial_concept_semantics import (
+    load_financial_concept_semantics_policy,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -57,28 +60,49 @@ class DwdSemanticContractAuditTests(unittest.TestCase):
         import tempfile
 
         identity = {"package_id": "fixture", "auditor_sha256": "sha256:fixture"}
-        tables = {"dwd_fixture": {"status": "verified"}}
+        contracts = load_semantic_contracts(ROOT / "config/pipelines/dwd-domain-model.v1.json")
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "checkpoint.json"
-            path.write_text(json.dumps(_checkpoint_value(identity, tables)))
+            path.write_text(json.dumps(_checkpoint_value(identity, {})))
 
             self.assertEqual(
                 _load_checkpoint(
                     path,
                     identity=identity,
-                    allowed_tables={"dwd_fixture"},
+                    contracts=contracts,
+                    expected_rows={table: 0 for table in contracts},
                 ),
-                tables,
+                {},
             )
             with self.assertRaisesRegex(RuntimeError, "identity or digest differs"):
                 _load_checkpoint(
                     path,
                     identity={"package_id": "other"},
-                    allowed_tables={"dwd_fixture"},
+                    contracts=contracts,
+                    expected_rows={table: 0 for table in contracts},
+                )
+            path.write_text(
+                json.dumps(
+                    _checkpoint_value(
+                        identity,
+                        {"dwd_listed_company": {"status": "verified"}},
+                    )
+                )
+            )
+            with self.assertRaisesRegex(RuntimeError, "table report shape differs"):
+                _load_checkpoint(
+                    path,
+                    identity=identity,
+                    contracts=contracts,
+                    expected_rows={table: 0 for table in contracts},
                 )
 
     def test_repository_model_resolves_all_keys_and_foreign_keys(self) -> None:
         contracts = load_semantic_contracts(ROOT / "config/pipelines/dwd-domain-model.v1.json")
+        governed_contracts = load_semantic_contracts(
+            ROOT / "config/pipelines/dwd-domain-model.v1.json",
+            semantics_policy_path=(ROOT / "config/audits/dwd-financial-concept-semantics.v1.json"),
+        )
 
         self.assertEqual(len(contracts), 33)
         self.assertEqual(
@@ -98,6 +122,62 @@ class DwdSemanticContractAuditTests(unittest.TestCase):
         self.assertTrue(_partition_confines_business_key(contracts["dwd_security_bar"]))
         self.assertTrue(_partition_confines_business_key(contracts["dwd_financial_fact"]))
         self.assertFalse(_partition_confines_business_key(contracts["dwd_quality_exception"]))
+        self.assertEqual(
+            contracts["dwd_financial_concept"].knowledge_interval_identity,
+            contracts["dwd_financial_concept"].business_key,
+        )
+        self.assertEqual(
+            governed_contracts["dwd_financial_concept"].knowledge_interval_identity,
+            ("financial_concept_id", "taxonomy_version"),
+        )
+        self.assertFalse(contracts["dwd_financial_concept"].require_closed_knowledge_intervals)
+        self.assertTrue(
+            governed_contracts["dwd_financial_concept"].require_closed_knowledge_intervals
+        )
+
+    def test_financial_concept_policy_is_validated_before_contract_loading(self) -> None:
+        import json
+        import tempfile
+
+        source = ROOT / "config/audits/dwd-financial-concept-semantics.v1.json"
+        policy = json.loads(source.read_text(encoding="utf-8"))
+        policy["base_model_sha256"] = "sha256:" + "0" * 64
+        with tempfile.TemporaryDirectory() as temporary:
+            invalid = Path(temporary) / "invalid-policy.json"
+            invalid.write_text(json.dumps(policy), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "policy binding is invalid"):
+                load_semantic_contracts(
+                    ROOT / "config/pipelines/dwd-domain-model.v1.json",
+                    semantics_policy_path=invalid,
+                )
+
+    def test_financial_concept_policy_parse_and_digest_share_one_byte_snapshot(self) -> None:
+        import hashlib
+
+        policy_path = ROOT / "config/audits/dwd-financial-concept-semantics.v1.json"
+        model_path = ROOT / "config/pipelines/dwd-domain-model.v1.json"
+        policy_bytes = policy_path.read_bytes()
+        original_read_bytes = Path.read_bytes
+        policy_reads = 0
+
+        def read_bytes_once(path: Path) -> bytes:
+            nonlocal policy_reads
+            if path == policy_path:
+                policy_reads += 1
+                return policy_bytes if policy_reads == 1 else b"{}"
+            return original_read_bytes(path)
+
+        with patch.object(Path, "read_bytes", read_bytes_once):
+            policy = load_financial_concept_semantics_policy(
+                policy_path,
+                model_path=model_path,
+            )
+
+        self.assertEqual(policy_reads, 1)
+        self.assertEqual(
+            policy.sha256,
+            "sha256:" + hashlib.sha256(policy_bytes).hexdigest(),
+        )
 
     def test_duplicate_and_interval_metrics_detect_violations(self) -> None:
         import duckdb
@@ -148,6 +228,127 @@ class DwdSemanticContractAuditTests(unittest.TestCase):
             self.assertEqual(metrics["invalid_effective_from_effective_to_rows"], 1)
             self.assertEqual(metrics["knowledge_interval_overlap_rows"], 1)
             self.assertEqual(metrics["effective_interval_overlap_rows"], 1)
+        finally:
+            connection.close()
+
+    def test_financial_concept_audit_treats_effective_start_as_revised_state(self) -> None:
+        import duckdb
+
+        connection = duckdb.connect(":memory:")
+        try:
+            connection.execute(
+                """
+                CREATE TABLE concepts (
+                  financial_concept_id VARCHAR,
+                  taxonomy_version VARCHAR,
+                  effective_from TIMESTAMPTZ,
+                  effective_to TIMESTAMPTZ,
+                  knowledge_from TIMESTAMPTZ,
+                  knowledge_to TIMESTAMPTZ
+                );
+                INSERT INTO concepts VALUES
+                  ('concept-1', 'v1', '2005-12-30 16:00:00+00', NULL,
+                    '2026-07-31 00:00:00+00', '2026-08-01 00:00:00+00'),
+                  ('concept-1', 'v1', '1998-12-30 16:00:00+00', NULL,
+                    '2026-08-01 00:00:00+00', '2026-08-02 00:00:00+00'),
+                  ('concept-1', 'v1', '1990-12-30 16:00:00+00', NULL,
+                    '2026-08-02 00:00:00+00', NULL)
+                """
+            )
+            contract = load_semantic_contracts(
+                ROOT / "config/pipelines/dwd-domain-model.v1.json",
+                semantics_policy_path=(
+                    ROOT / "config/audits/dwd-financial-concept-semantics.v1.json"
+                ),
+            )["dwd_financial_concept"]
+
+            self.assertEqual(
+                _key_version_metrics(connection, "concepts", contract),
+                {
+                    "duplicate_row_keys": {"group_count": 0, "row_count": 0},
+                    "business_key_version_groups": {
+                        "group_count": 0,
+                        "row_count": 0,
+                    },
+                    "knowledge_interval_overlap_rows": 0,
+                    "knowledge_interval_boundary_violation_rows": 0,
+                },
+            )
+            self.assertEqual(
+                _interval_metrics(connection, "concepts", contract),
+                {
+                    "invalid_knowledge_interval_rows": 0,
+                    "invalid_effective_from_effective_to_rows": 0,
+                    "knowledge_interval_overlap_rows": 0,
+                    "knowledge_interval_boundary_violation_rows": 0,
+                    "effective_interval_overlap_rows": 0,
+                },
+            )
+            connection.execute(
+                """
+                INSERT INTO concepts VALUES
+                  ('concept-1', 'v1', '1980-12-30 16:00:00+00', NULL,
+                    '2026-08-02 00:00:00+00', '2026-08-03 00:00:00+00')
+                """
+            )
+            self.assertGreater(
+                int(
+                    _key_version_metrics(connection, "concepts", contract)[
+                        "knowledge_interval_overlap_rows"
+                    ]
+                ),
+                0,
+            )
+            self.assertGreater(
+                _interval_metrics(connection, "concepts", contract)[
+                    "knowledge_interval_overlap_rows"
+                ],
+                0,
+            )
+        finally:
+            connection.close()
+
+    def test_financial_concept_audit_rejects_knowledge_interval_gaps(self) -> None:
+        import duckdb
+
+        connection = duckdb.connect(":memory:")
+        try:
+            connection.execute(
+                """
+                CREATE TABLE concepts (
+                  financial_concept_id VARCHAR,
+                  taxonomy_version VARCHAR,
+                  effective_from TIMESTAMPTZ,
+                  effective_to TIMESTAMPTZ,
+                  knowledge_from TIMESTAMPTZ,
+                  knowledge_to TIMESTAMPTZ
+                );
+                INSERT INTO concepts VALUES
+                  ('concept-1', 'v1', '2005-12-30 16:00:00+00', NULL,
+                    '2026-07-31 00:00:00+00', '2026-07-31 12:00:00+00'),
+                  ('concept-1', 'v1', '1998-12-30 16:00:00+00', NULL,
+                    '2026-08-01 00:00:00+00', NULL)
+                """
+            )
+            contract = load_semantic_contracts(
+                ROOT / "config/pipelines/dwd-domain-model.v1.json",
+                semantics_policy_path=(
+                    ROOT / "config/audits/dwd-financial-concept-semantics.v1.json"
+                ),
+            )["dwd_financial_concept"]
+
+            key_metrics = _key_version_metrics(connection, "concepts", contract)
+            interval_metrics = _interval_metrics(connection, "concepts", contract)
+            self.assertEqual(key_metrics["knowledge_interval_overlap_rows"], 0)
+            self.assertEqual(
+                key_metrics["knowledge_interval_boundary_violation_rows"],
+                1,
+            )
+            self.assertEqual(interval_metrics["knowledge_interval_overlap_rows"], 0)
+            self.assertEqual(
+                interval_metrics["knowledge_interval_boundary_violation_rows"],
+                1,
+            )
         finally:
             connection.close()
 

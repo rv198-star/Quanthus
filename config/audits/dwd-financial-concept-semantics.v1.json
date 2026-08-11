@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "dwd_financial_concept_semantics_policy",
+  "policy_id": "issue-78.dwd-financial-concept-v2-1",
+  "policy_version": "1.0.0",
+  "status": "approved_remediation_contract",
+  "governing_issue": 78,
+  "builder_contract": "financial-reporting-six-source-v3",
+  "base_model_sha256": "sha256:7ccfbebbe8f06622363228cfa85abca23adb1b4ff8f5fff8c6c07cbc8d633dd7",
+  "supersedes": {
+    "policy": "config/audits/dwd-pit-semantics.v1.json",
+    "policy_sha256": "sha256:b312afa9b8f6125581235c28ec82d192a38b9ce242472aa6b04dd8c25ad04ccd",
+    "table": "dwd_financial_concept",
+    "reason": "The R11 post-build audit proved that acquisition time is a knowledge coordinate, not the concept business-validity lower bound."
+  },
+  "decision_evidence": {
+    "path": "docs/acceptance/issue-78-dwd-base-v2-1-r11-post-build-audit-20260810/README.md",
+    "sha256": "sha256:74ceb7b4a43074e7ecf4d6fa9b65ea38e37efa76efedfb0f8121e2f08aa38caa",
+    "section": "B. Financial concept effective interval"
+  },
+  "table": "dwd_financial_concept",
+  "knowledge_rule": "knowledge_from is immutable source acquisition time; current evidence grants no visibility before acquisition",
+  "effective_rule": "effective_from is the earliest report period that references the provider concept among evidence available at knowledge_from",
+  "revision_rule": "emit a new knowledge revision only when newly acquired evidence moves the cumulative earliest referenced period backward",
+  "knowledge_interval_identity": [
+    "financial_concept_id",
+    "taxonomy_version"
+  ],
+  "authority_boundary": "The referenced-period lower bound supports fact-to-concept business-time validity only. It does not claim that the concept or current fact value was knowable before knowledge_from.",
+  "required_evidence": [
+    "persist every staged source concept row in the sealed candidate",
+    "independently recompute deterministic same-knowledge selection and cumulative earliest-period revisions",
+    "bind each evidence row to parseable report-period and source-acquisition coordinates",
+    "close each knowledge interval at the next emitted revision",
+    "reject parallel concept states at one knowledge coordinate",
+    "retain acquisition time as knowledge_from"
+  ]
+}

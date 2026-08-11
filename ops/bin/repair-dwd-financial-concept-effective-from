@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+"""Derive a DWD Base by correcting financial concept effective dates."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from quanthus.pipelines.dwd_financial_concept_repair import main  # noqa: E402
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ENV_FILE="${QUANTHUS_DWD_ENV_FILE:-/etc/quanthus/cn01-dwd.env}"
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+release_root="${QUANTHUS_CN01_ODS_RELEASE_ROOT:-/root/work/astock/data/shadow/cn01-ods-v1/releases}"
+base="${QUANTHUS_DWD_BASE:-/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1}"
+release_config="${QUANTHUS_V2_RELEASE_CONFIG:-$ROOT/config/releases/v2-build202607.json}"
+canonical_root="${QUANTHUS_DWD_DAILY_ROOT:-/srv/quanthus/dwd-dws-v2/daily}"
+rebuild_root="${QUANTHUS_DWD_DAILY_REBUILD_ROOT:-/srv/quanthus/dwd-dws-v2/daily-rebuild-20260812}"
+python="${QUANTHUS_DWD_PYTHON:-$ROOT/.venv-p1/bin/python}"
+
+if [[ "$rebuild_root" == "$canonical_root" ]]; then
+  echo "rebuild root must not be the canonical daily root" >&2
+  exit 2
+fi
+if [[ ! -x "$python" ]]; then
+  echo "DWD Python is not executable: $python" >&2
+  exit 2
+fi
+
+market_dates=(
+  2026-08-03
+  2026-08-04
+  2026-08-05
+  2026-08-06
+  2026-08-07
+  2026-08-10
+  2026-08-11
+)
+
+mkdir -p "$rebuild_root"
+for market_date in "${market_dates[@]}"; do
+  echo "[$(date -u +%FT%TZ)] rebuilding DWD daily $market_date"
+  "$python" "$ROOT/ops/bin/run-cn01-daily-dwd" \
+    --market-date "$market_date" \
+    --release-root "$release_root" \
+    --base "$base" \
+    --release-config "$release_config" \
+    --daily-root "$rebuild_root"
+done
+
+if ! grep -q '"market_date":"2026-08-11"' "$rebuild_root/CURRENT.json"; then
+  echo "rebuilt CURRENT did not reach 2026-08-11" >&2
+  exit 2
+fi
+
+echo "[$(date -u +%FT%TZ)] August DWD daily staging rebuild complete: $rebuild_root"

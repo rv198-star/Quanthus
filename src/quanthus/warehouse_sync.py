@@ -419,6 +419,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     if result is None:
         raise AssertionError("sync loop reached no terminal result")
+    # A successful sync supersedes the mutable latest-failure marker. Keep the
+    # date-scoped receipt as audit history, but do not let OnFailure reuse stale state.
+    (local_root / "failures" / "LATEST.json").unlink(missing_ok=True)
     print(json.dumps(result.__dict__, default=str, ensure_ascii=False, sort_keys=True))
     return 0
 

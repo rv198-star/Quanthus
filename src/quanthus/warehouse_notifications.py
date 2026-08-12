@@ -476,7 +476,7 @@ def send_failure_events(
     """Send the OCI synchronization failure alert."""
 
     try:
-        _object(failure_receipt)
+        receipt = _object(failure_receipt)
     except WarehouseNotificationError as exc:
         # A full sync failure can include a disk error before its receipt is written.  Keep a
         # generic OCI alert possible in that case; the journal still contains the detailed cause.
@@ -493,6 +493,18 @@ def send_failure_events(
             },
         )
         return {"status": "sent", "events": [record]}
+    failed_at = receipt.get("failed_at")
+    if isinstance(failed_at, str):
+        try:
+            failure_time = datetime.fromisoformat(failed_at)
+            if failure_time.tzinfo is None:
+                raise ValueError("missing timezone")
+        except ValueError as exc:
+            raise WarehouseNotificationError("failure receipt failed_at is invalid") from exc
+        max_age = int(os.environ.get("QUANTHUS_FAILURE_RECEIPT_MAX_AGE_SECONDS", "600"))
+        age = (datetime.now(timezone.utc) - failure_time.astimezone(timezone.utc)).total_seconds()
+        if age > max_age:
+            return {"status": "skipped_stale", "events": [], "receipt_age_seconds": int(age)}
     record = send_daily_event(
         event="oci_dwd_sync_failed",
         daily_root=daily_root,

@@ -415,6 +415,64 @@ def test_sync_main_waits_for_the_ready_gated_cn01_pointer(
     assert "dwd-daily-20260804-test" in capsys.readouterr().out
 
 
+def test_sync_success_clears_mutable_latest_failure_receipt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    local = tmp_path / "local"
+    latest = local / "failures" / "LATEST.json"
+    latest.parent.mkdir(parents=True)
+    latest.write_text("stale", encoding="ascii")
+    monkeypatch.setattr(
+        warehouse_sync,
+        "sync_latest",
+        lambda *, local_root, market_date: warehouse_sync.WarehouseSyncResult(
+            market_date=market_date,
+            package_id="dwd-daily-20260804-test",
+            manifest_sha256="sha256:" + "1" * 64,
+            content_digest="sha256:" + "2" * 64,
+            payload_bytes=10,
+            changed=True,
+            local_package=local_root / "package",
+        ),
+    )
+
+    assert warehouse_sync.main(
+        ["--local-root", str(local), "--market-date", "2026-08-04"]
+    ) == 0
+    assert not latest.exists()
+
+
+def test_failure_notification_skips_stale_timed_receipt(tmp_path: Path, monkeypatch) -> None:
+    receipt = tmp_path / "failure.json"
+    receipt.write_bytes(
+        _canonical(
+            {
+                "kind": "oci_cn01_dwd_daily_sync_failure",
+                "market_date": "2026-08-04",
+                "error_code": "transfer_failed",
+                "error": "old failure",
+                "failed_at": "2026-08-04T00:00:00+00:00",
+            }
+        )
+        + b"\n"
+    )
+    monkeypatch.setenv("QUANTHUS_FAILURE_RECEIPT_MAX_AGE_SECONDS", "600")
+    monkeypatch.setattr(
+        warehouse_notifications,
+        "_send_resend",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError(kwargs)),
+    )
+
+    result = warehouse_notifications.send_failure_events(
+        failure_receipt=receipt,
+        daily_root=tmp_path / "daily",
+        state_root=tmp_path / "notifications",
+    )
+
+    assert result["status"] == "skipped_stale"
+    assert result["events"] == []
+
+
 def test_oci_sync_units_define_2030_pull_and_success_and_failure_notifications() -> None:
     root = Path(__file__).resolve().parents[2]
     service = (root / "ops/systemd/oci-dwd-daily-sync.service").read_text(encoding="ascii")

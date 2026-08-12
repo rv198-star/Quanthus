@@ -382,9 +382,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--market-date")
     parser.add_argument("--wait-seconds", type=int, default=0)
     parser.add_argument("--poll-seconds", type=int, default=60)
+    parser.add_argument("--max-attempts", type=int, default=1)
     args = parser.parse_args(argv)
-    if args.wait_seconds < 0 or args.poll_seconds < 1:
-        parser.error("wait seconds must be nonnegative and poll seconds must be positive")
+    if args.wait_seconds < 0 or args.poll_seconds < 1 or args.max_attempts < 1:
+        parser.error(
+            "wait seconds must be nonnegative; poll seconds and max attempts must be positive"
+        )
     local_root = args.local_root.resolve()
     try:
         requested_date = _parse_market_date(args.market_date)
@@ -395,14 +398,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     deadline = time.monotonic() + args.wait_seconds
     failure: WarehouseSyncError | None = None
     result: WarehouseSyncResult | None = None
+    attempts = 0
     while True:
+        attempts += 1
         try:
             result = sync_latest(local_root=local_root, market_date=expected_date)
             break
         except WarehouseSyncError as exc:
             # The OCI wall clock is only a start time. A stale prior-day pointer is an
             # expected wait condition until CN01 publishes today's READY-gated DWD package.
-            if exc.code != "source_market_date_stale" or time.monotonic() >= deadline:
+            stale_can_wait = (
+                exc.code == "source_market_date_stale" and time.monotonic() < deadline
+            )
+            transient_can_retry = attempts < args.max_attempts
+            if not stale_can_wait and not transient_can_retry:
                 failure = exc
                 break
             time.sleep(min(args.poll_seconds, max(1, int(deadline - time.monotonic()))))

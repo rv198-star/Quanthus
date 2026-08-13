@@ -192,7 +192,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         gate_ids = [item["id"] for item in gate["gates"]]
 
         self.assertEqual(fields["Design status"], "approved")
-        self.assertEqual(fields["Delivery gate"], "open")
+        self.assertEqual(fields["Delivery gate"], "accepted")
         self.assertEqual(fields["Gate source"], "`config/platform-kernel-gates.v1.json`")
         self.assertEqual(gate["relationship_to_delivery_phases"], "orthogonal-to-P1-P7")
         self.assertEqual(gate["current_gate"], "PK6")
@@ -201,7 +201,12 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(all(item["status"] == "accepted" for item in gate["gates"][1:4]))
         self.assertEqual(gate["gates"][4]["status"], "accepted")
         self.assertEqual(gate["gates"][5]["status"], "not-applicable")
-        self.assertEqual(gate["gates"][6]["status"], "open")
+        self.assertEqual(gate["gates"][6]["status"], "accepted")
+        self.assertEqual(
+            gate["gates"][6]["evidence"],
+            "docs/acceptance/platform-kernel-pk6-cutover-recovery-20260813.md",
+        )
+        self.assertTrue((root / gate["gates"][6]["evidence"]).is_file())
         self.assertEqual(dispositions, {"keep", "replace", "defer", "remove"})
         self.assertEqual(len(capability_ids), len(set(capability_ids)))
         self.assertTrue(
@@ -255,11 +260,14 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "PK-WORKER-006",
             "PK-WORKER-007",
             "PK-WORKER-008",
+            "PK-RECOVERY-001",
+            "PK-CUTOVER-001",
         }
         self.assertTrue(all(gate["work_items"][item_id] == "accepted" for item_id in accepted))
         self.assertEqual(gate["work_items"]["PK-WEB-001"], "accepted")
         self.assertEqual(gate["work_items"]["PK-AUTHORING-001"], "not-applicable")
-        self.assertEqual(gate["work_items"]["PK-RECOVERY-001"], "open")
+        self.assertEqual(gate["work_items"]["PK-RECOVERY-001"], "accepted")
+        self.assertEqual(gate["work_items"]["PK-CUTOVER-001"], "accepted")
         self.assertTrue(
             all(
                 state in {"blocked", "deferred"}
@@ -267,7 +275,6 @@ class DocumentTraceabilityTests(unittest.TestCase):
                 if item_id not in accepted
                 | {
                     "PK-AUTHORING-001",
-                    "PK-RECOVERY-001",
                 }
             )
         )
@@ -1013,10 +1020,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             all(item.status == "blocked" for item in items if item.phase in {"P5", "P6", "P7"})
         )
         self.assertTrue(pk_items)
-        self.assertEqual(
-            {item.stable_id for item in pk_items if item.status == "ready"},
-            {"PK-RECOVERY-001"},
-        )
+        self.assertEqual({item.stable_id for item in pk_items if item.status == "ready"}, set())
         self.assertEqual(
             {item.stable_id for item in pk_items if item.status == "closed"},
             {
@@ -1044,6 +1048,8 @@ class DocumentTraceabilityTests(unittest.TestCase):
                 "PK-WORKER-006",
                 "PK-WORKER-007",
                 "PK-WORKER-008",
+                "PK-RECOVERY-001",
+                "PK-CUTOVER-001",
             },
         )
         self.assertTrue(

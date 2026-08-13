@@ -236,8 +236,9 @@ panel, result, and scoreboard byte-identically. The bounded conformance review t
 Platform Kernel is orthogonal to P1-P7 and is governed by ADR 0010, ADR 0012, LLD 11, and
 `config/platform-kernel-gates.v1.json`. PK1 Minimal Boot through PK4 Operator Web are accepted.
 PK5 Optional Authoring is explicitly not applicable to the first cutover and remains recoverable
-behind a later activation decision. PK6 is open with `PK-RECOVERY-001` actionable; final cutover
-stays blocked until the recovery package is complete. `PK-WORKER-000` is accepted: production
+behind a later activation decision. PK6, `PK-RECOVERY-001`, and `PK-CUTOVER-001` are accepted with
+the self-verifying recovery package, isolated restore, rollback/forward cycle, public acceptance,
+and old-path shutdown evidence. `PK-WORKER-000` is accepted: production
 replay runs in one PostgreSQL-backed Replay Worker and the five-candidate producer loop is closed.
 Existing node-local warehouse schedules remain explicitly outside this milestone.
 
@@ -268,8 +269,8 @@ Existing node-local warehouse schedules remain explicitly outside this milestone
 | PK-WORKER-007 | Inventory warehouse execution boundaries and retain node-local schedules | PK-WORKER-003 | accepted |
 | PK-WORKER-008 | Deploy and accept one PostgreSQL Replay Worker on OCI | PK-WORKER-005, PK-WORKER-006 | accepted |
 | PK-AUTHORING-001 | Optionally implement isolated strategy/indicator draft authoring | PK-WEB-001 | not-applicable |
-| PK-RECOVERY-001 | Build provenance, contract, schema, dependency, and restoration packages | PK-BOUNDARY-001 | open |
-| PK-CUTOVER-001 | Execute deployment, rollback, restoration drill, and old-path shutdown | PK-WEB-001, PK-AUTHORING-001, PK-RECOVERY-001 | blocked |
+| PK-RECOVERY-001 | Build provenance, contract, schema, dependency, and restoration packages | PK-BOUNDARY-001 | accepted |
+| PK-CUTOVER-001 | Execute deployment, rollback, restoration drill, and old-path shutdown | PK-WEB-001, PK-AUTHORING-001, PK-RECOVERY-001 | accepted |
 
 ## Issue creation policy
 

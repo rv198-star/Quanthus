@@ -4,7 +4,7 @@
 - Date: 2026-08-12
 - Decision id: `PK-BOUNDARY-001`
 - Design status: approved
-- Delivery gate: PK1-PK4 accepted; first-cutover PK5 not applicable; PK6 open
+- Delivery gate: PK1-PK4 and PK6 accepted; first-cutover PK5 not applicable
 - Gate source: `config/platform-kernel-gates.v1.json`
 - Source baseline: QuantDinger `v5.0.15` / `e64e1c227bf3174e441a42143620179b286387e1`
 

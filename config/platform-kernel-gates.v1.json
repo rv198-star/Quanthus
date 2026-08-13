@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0.0",
-  "gate_version": "platform-kernel-2026-08-13.11",
+  "gate_version": "platform-kernel-2026-08-13.12",
   "milestone": "Platform Kernel Extraction",
   "relationship_to_delivery_phases": "orthogonal-to-P1-P7",
   "current_gate": "PK6",
-  "current_status": "cutover-and-recovery-open",
+  "current_status": "cutover-and-recovery-accepted",
   "worker_runtime_decision": {
     "status": "accepted-production",
     "accepted_at": "2026-08-13",
@@ -637,8 +637,10 @@
     {
       "id": "PK6",
       "name": "Cutover and Recovery",
-      "status": "open",
+      "status": "accepted",
       "opened_at": "2026-08-12",
+      "accepted_at": "2026-08-13",
+      "evidence": "docs/acceptance/platform-kernel-pk6-cutover-recovery-20260813.md",
       "entry_conditions": [
         "PK4-accepted",
         "PK5-accepted-or-not-applicable"
@@ -686,8 +688,8 @@
     "PK-WORKER-007": "accepted",
     "PK-WORKER-008": "accepted",
     "PK-AUTHORING-001": "not-applicable",
-    "PK-RECOVERY-001": "open",
-    "PK-CUTOVER-001": "blocked"
+    "PK-RECOVERY-001": "accepted",
+    "PK-CUTOVER-001": "accepted"
   },
   "acceptance_results": {
     "capability_boundary_complete": "passed",
@@ -696,6 +698,6 @@
     "operator_web_workflows_complete": "passed",
     "replay_worker_producer_loop_complete": "passed",
     "authoring_isolated_or_not_applicable": "passed",
-    "cutover_rollback_and_restoration_rehearsed": "pending"
+    "cutover_rollback_and_restoration_rehearsed": "passed"
   }
 }

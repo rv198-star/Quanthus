@@ -53,7 +53,7 @@ module internals unless a named application port crosses that boundary.
 | `08-validation-governance.md` | P6 policy | Approved future governance | Arbitration, blind data, change budgets, or model promotion |
 | `09-roadmap.md` | All | Delivery sequence | Phase gates, milestones, or stop rules |
 | `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts and bounded synthetic attribution closure; formal attribution and recurring reports remain proposal-triggered | Decision or notification logs, hypothetical paths, funnels, or attribution |
-| `11-platform-kernel.md` | PK, orthogonal | PK1-PK4 accepted; first-cutover Authoring not applicable; PK6 recovery open | Authentication, API composition, jobs, platform persistence, Web shell, QuantDinger extraction, or module recovery |
+| `11-platform-kernel.md` | PK, orthogonal | PK1-PK4, Worker, and PK6 accepted; first-cutover Authoring not applicable | Authentication, API composition, jobs, platform persistence, Web shell, QuantDinger extraction, or module recovery |
 
 Detailed child files are added beneath a same-named module directory only after one module becomes
 too large to load usefully as a single node. The parent LLD remains the stable entry point and owns

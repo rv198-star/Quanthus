@@ -146,7 +146,7 @@ CHAPTERS = (
         "PK",
         "platform",
         PLATFORM_KERNEL_MILESTONE,
-        "ready",
+        "closed",
     ),
 )
 
@@ -169,9 +169,9 @@ PHASE_GATES = {
     "P6": "Simulation governance starts after the P3 baseline is frozen.",
     "P7": "Blocked until frozen simulation supports an explicit live/no-live decision.",
     "PK": (
-        "Platform Kernel is orthogonal to P1-P7. PK1-PK4 are accepted, first-cutover PK5 is "
-        "not applicable, PK6 recovery is open, and the ADR 0010 PostgreSQL Worker Runtime is "
-        "the active post-PK4 milestone under config/platform-kernel-gates.v1.json."
+        "Platform Kernel is orthogonal to P1-P7. PK1-PK4, the ADR 0010 PostgreSQL Worker "
+        "Runtime, and PK6 cutover/recovery are accepted; first-cutover PK5 is not applicable "
+        "under config/platform-kernel-gates.v1.json."
     ),
 }
 

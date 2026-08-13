@@ -95,8 +95,10 @@ nodes.
 - Platform Kernel is an orthogonal engineering milestone under
   `config/platform-kernel-gates.v1.json`. PK1 Minimal Boot through PK4 Operator Web are accepted
   after real PostgreSQL/Gunicorn, production-image, desktop/mobile browser, tailnet HTTPS, and
-  public Traefik-edge acceptance. Optional Authoring is explicitly not applicable to the first cutover, leaving PK6
-  Cutover and Recovery open. This does not change the P4 domain gate. Quanthus retains
+  public Traefik-edge acceptance. Optional Authoring is explicitly not applicable to the first
+  cutover. PK6 Cutover and Recovery is accepted after a self-verifying recovery package, isolated
+  restore, deferred-cache restoration drill, production rollback/forward cycle, public verification,
+  and old-path shutdown. This does not change the P4 domain gate. Quanthus retains
   sole authority for data, PIT, replay, strategy governance, decisions, and execution, and the
   first Web path remains a Quanthus-owned shell. The boundary freeze and PK1-PK3 acceptance are
   recorded in `acceptance/platform-kernel-pk0-boundary-freeze-20260812.md`,
@@ -123,6 +125,10 @@ nodes.
   registry, or warehouse schedule migration was added. Evidence is recorded in
   `acceptance/platform-worker-production-loop-20260813.md`; the earlier infrastructure-only state
   remains recorded in `acceptance/platform-worker-lean-v1-infrastructure-checkpoint-20260813.md`.
+- PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
+  Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,
+  retained PostgreSQL and candidate-Run volumes, and Traefik as the only product edge. The former
+  Tailscale `:8443` Serve route and damaged repository deployment path are no longer required.
 - The old Base, DWS, ADS, dual-lane, and portable research packages remain immutable historical
   evidence under their acceptance records. They are not current transformation inputs or current
   operating authority and are not deleted by this stage transition.

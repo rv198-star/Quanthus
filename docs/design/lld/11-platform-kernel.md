@@ -4,8 +4,8 @@
 | --- | --- |
 | Phase | Platform Kernel, orthogonal to P1-P7 |
 | Design status | approved |
-| Delivery gate | open |
-| Implementation status | PK1-PK4, candidate workbench/approval, and `PK-WORKER-000` Lean V1 producer loop accepted; first-cutover PK5 not applicable; PK6 open |
+| Delivery gate | accepted |
+| Implementation status | PK1-PK4, candidate workbench/approval, `PK-WORKER-000`, and PK6 cutover/recovery accepted; first-cutover PK5 not applicable |
 | Gate source | `config/platform-kernel-gates.v1.json` |
 | PK0 acceptance | `docs/acceptance/platform-kernel-pk0-boundary-freeze-20260812.md` |
 | PK1-PK3 acceptance | `docs/acceptance/platform-kernel-pk1-pk3-acceptance-20260812.md` |
@@ -14,6 +14,7 @@
 | Candidate approval acceptance | `docs/acceptance/platform-candidate-approval-workflow-20260813.md` |
 | Replay Worker acceptance | `docs/acceptance/platform-worker-production-loop-20260813.md` |
 | Public edge acceptance | `docs/acceptance/platform-kernel-public-edge-acceptance-20260812.md` |
+| PK6 acceptance | `docs/acceptance/platform-kernel-pk6-cutover-recovery-20260813.md` |
 | Operations | `docs/operations/platform-kernel-runbook.md` |
 | Governing decisions | `docs/architecture/adr-0010-platform-kernel-integration.md`, `docs/architecture/adr-0012-postgresql-worker-runtime.md` |
 | Source baseline | QuantDinger `v5.0.15` / `e64e1c227bf3174e441a42143620179b286387e1` |

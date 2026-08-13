@@ -24,14 +24,14 @@ def _table_ids(path: Path) -> set[str]:
     return ids
 
 
-def test_platform_kernel_gate_opens_pk6_after_pk4_acceptance() -> None:
+def test_platform_kernel_gate_accepts_pk6_after_cutover_and_recovery() -> None:
     gate = json.loads(
         (ROOT / "config" / "platform-kernel-gates.v1.json").read_text(encoding="utf-8")
     )
 
     assert gate["relationship_to_delivery_phases"] == "orthogonal-to-P1-P7"
     assert gate["current_gate"] == "PK6"
-    assert gate["current_status"] == "cutover-and-recovery-open"
+    assert gate["current_status"] == "cutover-and-recovery-accepted"
     assert [item["id"] for item in gate["gates"]] == [
         "PK0",
         "PK1",
@@ -56,7 +56,11 @@ def test_platform_kernel_gate_opens_pk6_after_pk4_acceptance() -> None:
     assert (ROOT / web_acceptance).is_file()
     assert gate["gates"][5]["status"] == "not-applicable"
     assert gate["gates"][5]["decision_scope"] == "first-cutover-only"
-    assert gate["gates"][6]["status"] == "open"
+    assert gate["gates"][6]["status"] == "accepted"
+    assert gate["gates"][6]["accepted_at"] == "2026-08-13"
+    assert gate["gates"][6]["evidence"] == (
+        "docs/acceptance/platform-kernel-pk6-cutover-recovery-20260813.md"
+    )
     assert len(gate["pending_decisions"]) == 6
     assert all(item["status"] == "accepted" for item in gate["pending_decisions"])
     assert all(item["accepted_at"] == "2026-08-12" for item in gate["pending_decisions"])
@@ -70,6 +74,10 @@ def test_platform_kernel_gate_opens_pk6_after_pk4_acceptance() -> None:
     assert gate["acceptance_results"]["operator_web_workflows_complete"] == "passed"
     assert gate["acceptance_results"]["authoring_isolated_or_not_applicable"] == "passed"
     assert gate["acceptance_results"]["replay_worker_producer_loop_complete"] == "passed"
+    assert gate["acceptance_results"]["cutover_rollback_and_restoration_rehearsed"] == "passed"
+    assert gate["work_items"]["PK-RECOVERY-001"] == "accepted"
+    assert gate["work_items"]["PK-CUTOVER-001"] == "accepted"
+    assert (ROOT / gate["gates"][6]["evidence"]).is_file()
 
 
 def test_platform_kernel_capabilities_and_work_items_are_complete_and_unique() -> None:
@@ -108,15 +116,13 @@ def test_platform_kernel_capabilities_and_work_items_are_complete_and_unique() -
     assert configured_work.issubset(_table_ids(ROOT / "docs" / "work-items" / "index.md"))
 
 
-def test_platform_kernel_planning_exposes_worker_contract_and_recovery_as_ready() -> None:
+def test_platform_kernel_planning_closes_accepted_cutover_and_recovery() -> None:
     pk_chapters = [chapter for chapter in CHAPTERS if chapter.phase == "PK"]
     pk_items = [item for item in work_items(ROOT) if item.phase == "PK"]
 
     assert len(pk_chapters) == 1
     assert pk_chapters[0].milestone == PLATFORM_KERNEL_MILESTONE
-    assert {item.stable_id for item in pk_items if item.status == "ready"} == {
-        "PK-RECOVERY-001"
-    }
+    assert {item.stable_id for item in pk_items if item.status == "ready"} == set()
     assert {item.stable_id for item in pk_items if item.status == "closed"} == {
         "PK-BOUNDARY-001",
         "PK-COMPOSE-001",
@@ -142,6 +148,8 @@ def test_platform_kernel_planning_exposes_worker_contract_and_recovery_as_ready(
         "PK-WORKER-006",
         "PK-WORKER-007",
         "PK-WORKER-008",
+        "PK-RECOVERY-001",
+        "PK-CUTOVER-001",
     }
     assert all(
         item.status == "blocked" for item in pk_items if item.status not in {"ready", "closed"}

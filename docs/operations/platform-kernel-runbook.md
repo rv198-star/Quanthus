@@ -1,8 +1,8 @@
 # Platform Kernel Runbook
 
-This runbook operates the accepted PK1-PK4 Platform Kernel governed by ADR 0010, LLD 11, and
+This runbook operates the accepted Platform Kernel governed by ADR 0010, LLD 11, and
 `config/platform-kernel-gates.v1.json`. Optional Authoring is not applicable to the first cutover;
-PK6 recovery and cutover work remains open.
+PK6 recovery, rollback, cutover, and old-path shutdown are accepted.
 
 ## Runtime Boundary
 
@@ -177,8 +177,10 @@ Never point the restore script at the `quanthus-platform` production project or 
 - Job cancel: cancellation is cooperative. The Supervisor terminates and then kills the child by
   the configured deadline. Poll until `canceled`; do not treat
   `cancel_requested=true` as terminal.
-- Rollback before PK6 acceptance: stop the new Web and API services and retain the database volume and immutable artifacts for
-  diagnosis. No old product path is shut down by this checkpoint.
+- Rollback after PK6 acceptance: restore the retained pre-PK6 image digests through the clean
+  deployment Compose, retain the database and candidate-Run volumes, and verify health, public
+  access, row counts, active pointers, and immutable Run hashes before deciding whether to move
+  forward again. Do not reactivate the former repository deployment or Tailscale Serve path.
 
 Do not add a second always-running Replay Worker, a new queue transport, or another deferred
 capability without its measured ADR 0012 activation trigger and matching contracts, permissions,

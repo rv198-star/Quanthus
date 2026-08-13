@@ -68,6 +68,8 @@ tar -C "$ATTRIBUTION_ROOT" -czf "$STAGING/attribution-releases.tar.gz" .
 cp "$REPOSITORY_ROOT/ops/platform/compose.yaml" "$STAGING/production.compose.yaml"
 cp "$REPOSITORY_ROOT/ops/platform/recovery.compose.yaml" "$STAGING/recovery.compose.yaml"
 cp "$REPOSITORY_ROOT/ops/platform/platform.env.example" "$STAGING/platform.env.example"
+cp "$REPOSITORY_ROOT/ops/bin/backup-platform-recovery" "$STAGING/"
+cp "$REPOSITORY_ROOT/ops/bin/restore-platform-recovery" "$STAGING/"
 cp "$REPOSITORY_ROOT/config/platform-features.v1.json" "$STAGING/"
 cp "$REPOSITORY_ROOT/config/platform-kernel-gates.v1.json" "$STAGING/"
 cp "$REPOSITORY_ROOT/product-web/LICENSE.quantdinger-frontend" "$STAGING/"
@@ -123,6 +125,7 @@ manifest = {
         "attribution_releases": "attribution-releases.tar.gz",
     },
     "secret_policy": "secrets-excluded; supply a mode-0600 platform env file at restore time",
+    "restore_command": "./restore-platform-recovery PACKAGE PROJECT /absolute/platform.env RECEIPT",
     "warehouse_policy": "DWD and corrections are external read-only authorities and are not copied",
     "excluded_runtime_state": ["candidate-runs/.staging", "sessions outside PostgreSQL"],
 }

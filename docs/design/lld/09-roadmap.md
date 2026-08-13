@@ -22,6 +22,10 @@ and live operation. A later phase cannot compensate for an untrusted earlier pha
 P5 research may run beside P6 frozen simulation, but a development build cannot alter the
 simulation policy.
 
+Platform Kernel is a separate engineering track rather than P8. It may proceed beside P4 when its
+own predecessor gate passes, but it cannot weaken a P1-P7 domain gate or redefine Quanthus data,
+replay, strategy, decision, or execution authority.
+
 Current state: P2 remains conditionally accepted for the active daily research profile by
 `config/p2-gates.v1.json`, and P3 is accepted by `config/p3-gates.v1.json`. Its strategy-neutral
 replay, rule contracts, position/risk path, audit funnel, and one frozen capability fixture prove
@@ -38,6 +42,24 @@ notification retain their separate blockers.
 - **M4**: frozen paper operation and idempotent signal notification begin and continuously record
   arbitration evidence without live-fill claims.
 - **M5**: first operator-assisted live review and explicit continue/stop decision.
+- **Platform Kernel**: selectively extract the operator platform from QuantDinger through PK0-PK6
+  while retaining Quanthus domain authority.
+
+### Platform Kernel stage gates
+
+| Gate | Outcome | Opens when | Blocks expansion when |
+| --- | --- | --- | --- |
+| PK0 Boundary Freeze | Complete keep/replace/defer/remove and recovery inventory | Fixed upstream backend revision is audited | Web source/license, capability owner, or disposition is unresolved |
+| PK1 Minimal Boot | Explicitly composed auth/API/observability kernel | PK0 accepted | A removed route, hook, process, schema, or dependency remains reachable |
+| PK2 Structural Slimming | Modular schema/dependencies and billing-free identity | PK1 accepted | Core boot or auth still needs a removed domain |
+| PK3 Quanthus Integration | Platform workflows use versioned Quanthus ports | PK2 accepted | Platform bypasses or manufactures domain truth |
+| PK4 Operator Web | Source-built retained desktop workflows | PK3 accepted and the Quanthus-owned Web baseline is declared | Navigation or workflows still depend on removed APIs or prebuilt-only assets |
+| PK5 Optional Authoring | Draft-only strategy/indicator generation, or not applicable | PK4 accepted plus a separate activation decision | Output can publish, decide, notify, or execute directly |
+| PK6 Cutover and Recovery | Deploy, rollback, restoration drill, and old-path closure | PK4 accepted and PK5 accepted/not-applicable | Rollback/restoration fails or an old service remains required |
+
+`config/platform-kernel-gates.v1.json` is the stage authority. LLD 11 owns the detailed module
+matrix, entry evidence, stop conditions, and work items. PK0 was accepted on 2026-08-12 with the
+six default boundary decisions; PK1 is now open and begins with `PK-COMPOSE-001` only.
 
 ## 4. Release mechanics
 

@@ -23,6 +23,7 @@ from quanthus.pipelines.securities_warehouse.tradability_state import (
     _security_status_query,
     _state_resolved_query,
     _state_rule_candidates_query,
+    _tradability_state_query,
     _verify_model_contract,
 )
 
@@ -457,6 +458,73 @@ class TradabilityStateQueryTests(unittest.TestCase):
         resolved = self.connection.execute(_state_resolved_query()).fetchone()
         columns = [item[0] for item in self.connection.description]
         self.assertEqual(dict(zip(columns, resolved, strict=True))["price_limit_regime_id"], "st-a")
+
+    def test_zero_activity_observation_is_not_executable(self) -> None:
+        self.connection.execute(
+            """
+            CREATE TABLE state_resolved AS SELECT
+              'listing-1' listing_id,'session-1' calendar_session_id,
+              TIMESTAMPTZ '2012-05-29T01:30:00Z' open_at,
+              TIMESTAMPTZ '2012-05-29T07:00:00Z' close_at,
+              NULL::VARCHAR canonical_status_id,
+              NULL::VARCHAR provider_status_sha256,
+              NULL::VARCHAR provider_trade_status,
+              NULL::VARCHAR suspension_status_id,
+              'regime-1' price_limit_regime_id,
+              'sha256:bar' bar_sha256,
+              225.49::DECIMAL(38,10) observed_close,
+              0::DECIMAL(38,10) observed_volume,
+              0::DECIMAL(38,10) observed_turnover,
+              220::DECIMAL(38,10) previous_close,
+              0.1::DECIMAL(18,12) upper_limit_ratio,
+              0.1::DECIMAL(18,12) lower_limit_ratio
+            """
+        )
+        row = self.connection.execute(
+            _tradability_state_query(
+                predecessor_digest="sha256:parent",
+                market_manifest_sha256="sha256:market",
+            )
+        ).fetchone()
+        columns = [item[0] for item in self.connection.description]
+        value = dict(zip(columns, row, strict=True))
+
+        self.assertFalse(value["is_tradable"])
+        self.assertFalse(value["can_buy"])
+        self.assertFalse(value["can_sell"])
+        self.assertEqual(value["reason_code"], "ZERO_ACTIVITY_OBSERVATION")
+        self.assertIsNone(value["upper_price"])
+        self.assertIsNone(value["lower_price"])
+
+    def test_suspension_precedes_zero_activity_reason(self) -> None:
+        self.connection.execute(
+            """
+            CREATE TABLE state_resolved AS SELECT
+              'listing-1' listing_id,'session-1' calendar_session_id,
+              TIMESTAMPTZ '2012-05-29T01:30:00Z' open_at,
+              TIMESTAMPTZ '2012-05-29T07:00:00Z' close_at,
+              NULL::VARCHAR canonical_status_id,
+              NULL::VARCHAR provider_status_sha256,
+              NULL::VARCHAR provider_trade_status,
+              'suspension-1' suspension_status_id,
+              'regime-1' price_limit_regime_id,
+              'sha256:bar' bar_sha256,
+              225.49::DECIMAL(38,10) observed_close,
+              0::DECIMAL(38,10) observed_volume,
+              0::DECIMAL(38,10) observed_turnover,
+              220::DECIMAL(38,10) previous_close,
+              0.1::DECIMAL(18,12) upper_limit_ratio,
+              0.1::DECIMAL(18,12) lower_limit_ratio
+            """
+        )
+        row = self.connection.execute(
+            _tradability_state_query(
+                predecessor_digest="sha256:parent",
+                market_manifest_sha256="sha256:market",
+            )
+        ).fetchone()
+        columns = [item[0] for item in self.connection.description]
+        self.assertEqual(dict(zip(columns, row, strict=True))["reason_code"], "SUSPENDED")
 
     def test_physical_schemas_match_approved_model(self) -> None:
         model = json.loads(

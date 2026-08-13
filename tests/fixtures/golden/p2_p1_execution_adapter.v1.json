@@ -79,8 +79,8 @@
       "is_executable": false,
       "entry_policy_allows": true,
       "reason_code": "zero_liquidity",
-      "expected_state": "missing_evidence",
-      "keeps_prices": false
+      "expected_state": "non_trading_observed",
+      "keeps_prices": true
     }
   ]
 }

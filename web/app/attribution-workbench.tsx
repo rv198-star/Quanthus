@@ -16,6 +16,7 @@ import {
   GitCompareArrows,
   Layers3,
   Route,
+  Settings,
   ShieldCheck,
   Upload,
   X,
@@ -1305,6 +1306,9 @@ export function AttributionWorkbench() {
             : "尚未接入正式归因数据"}
         </span>
         <div className="topbar-actions">
+          <a className="icon-button" href="/operator" title="打开平台控制台" aria-label="打开平台控制台">
+            <Settings aria-hidden="true" />
+          </a>
           <input
             ref={fileInput}
             type="file"

@@ -3,6 +3,7 @@
   "kind": "quanthus_disclosure_event_vocabulary",
   "mapping_version": "quanthus-cn-disclosure-event-v1",
   "date_only_availability": "asia_shanghai_end_of_day_then_utc",
+  "share_quantity_unit": "per_ten_shares",
   "corporate_action_reference": {
     "authority": "ISO 20022 seev bounded semantic reference",
     "version": "2025 bounded mapping reviewed 2026-08-03"

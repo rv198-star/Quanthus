@@ -23,11 +23,9 @@ a parallel current-state architecture.
 | `adr-0007-dwd-maintenance-and-p4-handoff.md` | Current Base V2 maintenance topology, generic-DWS deferral, and P4 handoff | Changing current node responsibilities, Base/increment policy, DWS activation, or the P4 data boundary |
 | `adr-0008-dwd-historical-knowledge-remediation.md` | Completed immutable successor-Base response to Issue #78 | Auditing historical PIT semantics or changing the V2.1 remediation scope |
 | `adr-0009-gpu-p100-dwd-v2-1-execution.md` | Completed node-independent V2.1 rebuild, audit, and promotion workflow; GPU-P100 retained as R18 provenance | Changing rebuild checkpoints, resource bounds, audit closure, or atomic promotion |
-
-## Proposals under investigation
-
-| Node | Scope | Load when |
-| --- | --- | --- |
+| `adr-0010-platform-kernel-integration.md` | Extract-and-recompose decision, Quanthus authority boundary, staged slimming, and recovery policy | Admitting QuantDinger-derived platform code, changing platform/domain ownership, or restoring a deferred module |
+| `adr-0011-quantdinger-vue-product-web.md` | Pinned QuantDinger-Vue selective derivative and candidate-only product semantics | Changing the primary product Web, candidate status model, or frontend provenance |
+| `adr-0012-postgresql-worker-runtime.md` | PostgreSQL-backed, capability-routed Worker Runtime for replay and warehouse jobs | Changing Job transport, Worker topology, batch execution, warehouse-operation routing, or Run publication |
 
 ## Topic contracts
 

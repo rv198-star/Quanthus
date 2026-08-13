@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DWD_ROOT=${QUANTHUS_DWD_BASE:-/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1}
+CORRECTION_ROOT=${QUANTHUS_DWD_CORRECTION:-/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001}
+OUTPUT_ROOT=${QUANTHUS_CONFORMANCE_OUTPUT:-/home/ubuntu/data/quanthus/research/dwd-v2.1-quantdinger-conformance-20260813}
+IMAGE=${QUANTHUS_REPLAY_IMAGE:-quanthus-replay:local}
+
+mkdir -p "$OUTPUT_ROOT"
+
+docker run --rm -i --entrypoint python \
+  -v "$DWD_ROOT:/dwd:ro" \
+  -v "$CORRECTION_ROOT:/correction:ro" \
+  -v "$OUTPUT_ROOT:/out" \
+  "$IMAGE" - <<'PY'
+import duckdb
+import hashlib
+import json
+from pathlib import Path
+
+EXPECTED_PACKAGE = "dwd-base-202607-v2.1"
+EXPECTED_CONTENT = "sha256:b689a21b2052ca722af35faeb72cb68850b54d00ddb062b3694e443ba29c32b9"
+EXPECTED_CORRECTION = "dwd-base-202607-v2.1-correction-20260813-001"
+
+dwd = Path("/dwd")
+output = Path("/out")
+if not (dwd / "READY").is_file():
+    raise SystemExit("DWD package is not READY")
+manifest_bytes = (dwd / "manifest.json").read_bytes()
+manifest = json.loads(manifest_bytes)
+if manifest.get("package_id") != EXPECTED_PACKAGE:
+    raise SystemExit("unexpected DWD package id")
+if manifest.get("content_digest") != EXPECTED_CONTENT:
+    raise SystemExit("unexpected DWD content digest")
+correction_manifest_bytes = (Path("/correction") / "manifest.json").read_bytes()
+correction_manifest = json.loads(correction_manifest_bytes)
+if correction_manifest.get("correction_id") != EXPECTED_CORRECTION:
+    raise SystemExit("unexpected DWD correction id")
+if correction_manifest.get("parent", {}).get("content_digest") != EXPECTED_CONTENT:
+    raise SystemExit("DWD correction parent binding failed")
+if (Path("/correction") / "READY").read_text().strip() != (
+    "sha256:" + hashlib.sha256(correction_manifest_bytes).hexdigest()
+):
+    raise SystemExit("DWD correction is not READY")
+
+connection = duckdb.connect()
+projection = output / "dwd-600519-development.parquet"
+connection.execute(
+    f"""
+    COPY (
+      WITH listing AS (
+        SELECT listing_id, security_id, venue_id, listing_code, lot_size
+        FROM read_parquet('/dwd/payload/listed_company/dwd_listing.parquet')
+        WHERE listing_code = '600519' AND knowledge_to IS NULL
+      ), bars AS (
+        SELECT *
+        FROM read_parquet(
+          '/dwd/payload/security_market_observation/dwd_security_bar/**/*.parquet',
+          hive_partitioning=true
+        )
+        WHERE interval_size = '1d'
+          AND observation_start_year BETWEEN 2012 AND 2021
+          AND price_basis = 'UNADJUSTED'
+          AND knowledge_to IS NULL
+      ), state AS (
+        WITH replacement AS (
+          SELECT * FROM read_parquet(
+            '/correction/payload/tradability_state/dwd_tradability_state_replacement.parquet'
+          )
+          WHERE observation_start_year BETWEEN 2012 AND 2021 AND knowledge_to IS NULL
+        )
+        SELECT * FROM read_parquet(
+          '/dwd/payload/tradability_state/dwd_tradability_state/**/*.parquet',
+          hive_partitioning=true
+        ) base
+        WHERE observation_start_year BETWEEN 2012 AND 2021 AND knowledge_to IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM replacement r
+            WHERE r.listing_id=base.listing_id
+              AND r.calendar_session_id=base.calendar_session_id
+          )
+        UNION ALL BY NAME SELECT * FROM replacement
+      ), calendar AS (
+        SELECT *
+        FROM read_parquet(
+          '/dwd/payload/tradability_state/dwd_trading_calendar/**/*.parquet',
+          hive_partitioning=true
+        )
+        WHERE trade_date_year BETWEEN 2012 AND 2021 AND knowledge_to IS NULL
+      )
+      SELECT CAST(calendar.trade_date AS DATE) AS "date",
+             CAST(bars.open AS DOUBLE) AS "open",
+             CAST(bars.high AS DOUBLE) AS "high",
+             CAST(bars.low AS DOUBLE) AS "low",
+             CAST(bars.close AS DOUBLE) AS "close",
+             CAST(bars.volume AS DOUBLE) AS volume,
+             CAST(bars.turnover AS DOUBLE) AS turnover,
+             listing.lot_size,
+             state.is_tradable,
+             state.can_buy,
+             state.can_sell,
+             state.reason_code,
+             CAST(state.upper_price AS DOUBLE) AS upper_price,
+             CAST(state.lower_price AS DOUBLE) AS lower_price,
+             bars.listing_id,
+             listing.security_id,
+             listing.venue_id,
+             bars.calendar_session_id,
+             CAST(bars.knowledge_from AS VARCHAR) AS bar_knowledge_from,
+             bars.source_revision AS bar_source_revision,
+             bars.source_artifact_sha256 AS bar_source_artifact_sha256
+      FROM listing
+      JOIN bars USING (listing_id)
+      JOIN calendar USING (calendar_session_id, venue_id)
+      LEFT JOIN state USING (listing_id, calendar_session_id)
+      WHERE calendar.trade_date BETWEEN DATE '2012-01-04' AND DATE '2021-12-31'
+      ORDER BY calendar.trade_date
+    ) TO '{projection}' (FORMAT PARQUET, COMPRESSION ZSTD)
+    """
+)
+
+summary = connection.execute(
+    """
+    SELECT count(*), min(date), max(date), count(DISTINCT date),
+           count(DISTINCT listing_id), count(DISTINCT security_id),
+           count(DISTINCT venue_id), min(lot_size), max(lot_size),
+           count(*) FILTER (
+             WHERE is_tradable IS NULL OR can_buy IS NULL OR can_sell IS NULL
+           ), min(bar_knowledge_from), max(bar_knowledge_from),
+           min(listing_id), min(security_id), min(venue_id)
+    FROM read_parquet(?)
+    """,
+    [str(projection)],
+).fetchone()
+(
+    row_count,
+    scope_start,
+    scope_end,
+    unique_dates,
+    listing_count,
+    security_count,
+    venue_count,
+    min_lot,
+    max_lot,
+    missing_state,
+    min_knowledge,
+    max_knowledge,
+    listing_id,
+    security_id,
+    venue_id,
+) = summary
+if row_count != unique_dates or (listing_count, security_count, venue_count) != (1, 1, 1):
+    raise SystemExit("projection identity or date uniqueness failed")
+if row_count != 2431 or str(scope_start) != "2012-01-04" or str(scope_end) != "2021-12-31":
+    raise SystemExit("projection development scope failed")
+if min_lot != 100 or max_lot != 100 or missing_state:
+    raise SystemExit("projection lot size or tradability evidence failed")
+
+duplicate_groups = connection.execute(
+    """
+    WITH deleted_term AS (
+      SELECT record_id FROM read_parquet(
+        '/correction/payload/disclosure_company_event/dwd_corporate_action_term_delete.parquet'
+      )
+    ), deleted_action AS (
+      SELECT record_id FROM read_parquet(
+        '/correction/payload/disclosure_company_event/dwd_corporate_action_delete.parquet'
+      )
+    ), replacement AS (
+      SELECT * FROM read_parquet(
+        '/correction/payload/disclosure_company_event/dwd_corporate_action_term_replacement.parquet'
+      )
+    ), effective_term AS (
+      SELECT * FROM read_parquet(
+        '/dwd/payload/disclosure_company_event/dwd_corporate_action_term/**/*.parquet',
+        hive_partitioning=true
+      ) base
+      WHERE corporate_action_term_id NOT IN (SELECT record_id FROM deleted_term)
+        AND corporate_action_term_id NOT IN (
+          SELECT corporate_action_term_id FROM replacement
+        )
+      UNION ALL BY NAME SELECT * FROM replacement
+    ), terms AS (
+      SELECT action.security_id,
+             CAST(action.effective_at AS DATE) AS effective_date,
+             term.term_type,
+             term.amount_per_share,
+             term.ratio_numerator,
+             term.ratio_denominator,
+             count(DISTINCT action.corporate_action_id) AS action_count
+      FROM read_parquet(
+        '/dwd/payload/disclosure_company_event/dwd_corporate_action/**/*.parquet',
+        hive_partitioning=true
+      ) action
+      JOIN effective_term term USING (corporate_action_id)
+      WHERE action.security_id = ?
+        AND action.corporate_action_id NOT IN (SELECT record_id FROM deleted_action)
+        AND action.knowledge_to IS NULL
+        AND term.knowledge_to IS NULL
+        AND action.effective_at_year BETWEEN 2012 AND 2021
+      GROUP BY ALL
+    )
+    SELECT count(*) FROM terms WHERE action_count > 1
+    """,
+    [security_id],
+).fetchone()[0]
+
+def sha256(path):
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+identity = {
+    "schema_version": "quanthus.dwd-strategy-projection.v1",
+    "dwd": {
+        "package_id": manifest["package_id"],
+        "content_digest": manifest["content_digest"],
+        "manifest_sha256": "sha256:" + hashlib.sha256(manifest_bytes).hexdigest(),
+        "through_date": manifest["through_date"],
+        "correction_id": correction_manifest["correction_id"],
+        "correction_content_digest": correction_manifest["content_digest"],
+        "correction_manifest_sha256": (
+            "sha256:" + hashlib.sha256(correction_manifest_bytes).hexdigest()
+        ),
+    },
+    "security": {
+        "listing_id": listing_id,
+        "security_id": security_id,
+        "venue_id": venue_id,
+        "listing_code": "600519",
+        "source_symbol": "CNStock:600519.SH",
+        "lot_size": 100,
+    },
+    "projection": {
+        "path": projection.name,
+        "sha256": sha256(projection),
+        "price_basis": "UNADJUSTED",
+        "scope_start": str(scope_start),
+        "scope_end": str(scope_end),
+        "row_count": row_count,
+        "historical_knowledge_from": str(min_knowledge),
+        "historical_knowledge_through": str(max_knowledge),
+        "point_in_time_publication_proven": False,
+        "replay_availability_assumption": "market bar available at its session close",
+    },
+    "corporate_actions": {
+        "status": "corrected-normalized-authority",
+        "duplicate_semantic_groups": duplicate_groups,
+    },
+}
+(output / "projection-identity.json").write_text(
+    json.dumps(identity, ensure_ascii=True, indent=2, sort_keys=True) + "\n"
+)
+print(json.dumps(identity, ensure_ascii=True, sort_keys=True))
+PY

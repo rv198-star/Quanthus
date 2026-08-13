@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+IMAGE_TAG=${1:-quanthus-platform-kernel:local}
+BUILD_CONTEXT=$(mktemp -d /tmp/quanthus-platform-image.XXXXXX)
+
+cleanup() {
+    rm -rf -- "$BUILD_CONTEXT"
+}
+trap cleanup EXIT INT TERM
+
+install -d "$BUILD_CONTEXT/config" "$BUILD_CONTEXT/src/quanthus"
+cp "$REPOSITORY_ROOT/.dockerignore" \
+    "$REPOSITORY_ROOT/pyproject.toml" \
+    "$REPOSITORY_ROOT/README.md" \
+    "$BUILD_CONTEXT/"
+cp "$REPOSITORY_ROOT/config/platform-features.v1.json" \
+    "$REPOSITORY_ROOT/config/platform-kernel-gates.v1.json" \
+    "$REPOSITORY_ROOT/config/product-research-catalog.v1.json" \
+    "$REPOSITORY_ROOT/config/product-candidate-evidence.v1.json" \
+    "$BUILD_CONTEXT/config/"
+cp "$REPOSITORY_ROOT/src/quanthus/__init__.py" \
+    "$REPOSITORY_ROOT/src/quanthus/policy.py" \
+    "$REPOSITORY_ROOT/src/quanthus/strategy_attribution.py" \
+    "$REPOSITORY_ROOT/src/quanthus/strategy_attribution_pipeline.py" \
+    "$REPOSITORY_ROOT/src/quanthus/strategy_attribution_planning.py" \
+    "$REPOSITORY_ROOT/src/quanthus/strategy_attribution_publication.py" \
+    "$BUILD_CONTEXT/src/quanthus/"
+cp -a "$REPOSITORY_ROOT/src/quanthus/platform" "$BUILD_CONTEXT/src/quanthus/"
+
+docker build \
+    --file "$REPOSITORY_ROOT/ops/platform/Dockerfile" \
+    --tag "$IMAGE_TAG" \
+    "$BUILD_CONTEXT"
+
+printf 'Platform Kernel image built: %s\n' "$IMAGE_TAG"

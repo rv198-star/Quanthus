@@ -1,0 +1,45 @@
+{
+  "schema_version": "quanthus.candidate-strategy.v1",
+  "candidate_id": "quantdinger.strategy-v2-bullish-three-lines",
+  "candidate_version": "11.0.0-quanthus.1",
+  "display_name": "QuantDinger 三均线阳线突破",
+  "source": {
+    "system": "QuantDinger",
+    "repository": "https://github.com/OpenByteInc/QuantDinger",
+    "commit": "e64e1c227bf3174e441a42143620179b286387e1",
+    "license": "Apache-2.0",
+    "template_key": "strategy_v2_bullish_three_lines",
+    "template_catalog_version": 11,
+    "template_source_sha256": "sha256:c6e57e40ee3b9ccd0dbf59c6395febb9f829ec8c08cd64dfa9ee0efe672b3122"
+  },
+  "adapter": {
+    "contract": "quanthus.quantdinger-signal-adapter.v1",
+    "template": "bullish-three-lines",
+    "frequency": "1d",
+    "direction": "long-only",
+    "execution_profile": "close-to-next-open-v1"
+  },
+  "universe": {
+    "kind": "static",
+    "source_symbols": [
+      "CNStock:600519.SH"
+    ],
+    "symbols": [
+      "600519"
+    ]
+  },
+  "parameters": {
+    "short_period": 5,
+    "mid_period": 10,
+    "long_period": 20,
+    "min_body_pct": "0.02",
+    "target_pct": "0.95",
+    "lot_size": 100
+  },
+  "governance": {
+    "pipeline_state": "packaged",
+    "research_only": true,
+    "execution_authorized": false,
+    "admission_decision": "pending-validation"
+  }
+}

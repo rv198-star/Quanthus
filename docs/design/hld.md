@@ -5,10 +5,11 @@
 | Design status | approved |
 | Delivery gate | not-applicable |
 | Current phase | P4 implementation open |
-| Version | 0.10 |
-| Effective date | 2026-07-31 |
+| Version | 0.11 |
+| Effective date | 2026-08-12 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
+| Platform gate | `config/platform-kernel-gates.v1.json` |
 
 ## 1. System context
 
@@ -54,6 +55,28 @@ outside automated execution; no broker adapter exists in the near-term profile.
 | Notification delivery | Idempotent delivery of persisted signal or intent | Notification events; never fills |
 | Audit/attribution | Provenance, immutable planning, verified reruns, claim construction, and atomic publication | Run manifests, receipts, claims, and workspace releases |
 | Report viewing | Checksum-gated read-only consumption of published attribution workspaces | Three-layer explanation views; never new analysis facts |
+| Platform Kernel | Identity, access, HTTP/OpenAPI transport, generic jobs, observability, and operator presentation | Authenticated requests and operational state; never financial truth |
+| Application ports | Translate platform requests into Quanthus-owned commands and queries | Typed results bound to authoritative Quanthus artifacts |
+
+### Platform and domain authority
+
+The Platform Kernel is an orthogonal engineering track governed by ADR 0010 and LLD 11. It may
+reuse selected QuantDinger platform mechanics only through an explicit Feature Manifest. Quanthus
+remains the sole owner of market data, point-in-time visibility, snapshots, replay/accounting,
+strategy and feature governance, decisions, execution authorization, and fill truth.
+
+Platform routes and jobs call versioned Quanthus application ports. They cannot import upstream
+market providers, backtests, strategy runtimes, brokers, or trading workers. Under ADR 0012, Web
+and API are control-plane processes: product-initiated replay, backtest, and other heavy analysis
+execute in independently deployed Workers. Existing accepted CN01/Hermes/OCI node-local data
+schedules retain `systemd`/CLI ownership. Lightweight reads of published metadata and serving
+projections remain synchronous.
+
+PostgreSQL stores identity, access, the durable Worker queue, leases, operational Job/Run state,
+and rebuildable serving projections. Workers poll and claim transactionally for the current
+workload, without Redis, Celery, RabbitMQ, or an initial registry/event stream. It does not replace immutable
+analytical artifacts. Optional AI authoring may create an untrusted draft only and has no direct
+edge to strategy publication, decisions, notifications, orders, or fills.
 
 ## 3. Data platform and storage design
 
@@ -285,6 +308,11 @@ hypotheses remain separately governed and the later validation partitions remain
 - Runtime roles separate CN01/Hermes ODS and candidate production, OCI canonical/ADS/serving
   publication, migrations, and read-only consumption. Lane nodes possess no OCI publication
   credential or path authority.
+- Platform runtime roles are separately composed. The first Worker expansion contains API,
+  PostgreSQL, Web, and one independently deployed Replay Worker with concurrency one. API never
+  executes batch handlers; the Replay Worker is read-only to authoritative DWD and may publish only
+  immutable candidate Runs plus their active-evidence database pointer. MCP,
+  mobile, payment, AI-maintenance, trading, and broker roles remain absent.
 - The private GitHub repository stores code, configuration, tests, and approved documentation.
 - CI validates policy, gates, imports, and deterministic bootstrap tests.
 
@@ -298,7 +326,7 @@ failed proposal. Repository docs and configuration are updated in the same pull 
 
 The operating profiles are defined in `docs/design/execution-notification-profiles.md`. Module
 contracts are indexed by `docs/design/lld/README.md` and defined under
-`docs/design/lld/01-data-foundation.md` through `docs/design/lld/10-monitoring-attribution.md`.
+`docs/design/lld/01-data-foundation.md` through `docs/design/lld/11-platform-kernel.md`.
 Stable work-item ids connect each design section to code, tests, acceptance evidence, and GitHub
 issues.
 
@@ -310,3 +338,8 @@ module acceptance.
 The attribution publication and read-only report boundary is refined by
 `docs/architecture/strategy-attribution-publication.md`; LLD 10 owns its adapter, planning,
 Pipeline, kernel, publication, report-view, failure, and acceptance contracts.
+
+The platform extraction decision is `docs/architecture/adr-0010-platform-kernel-integration.md`.
+LLD 11 owns feature disposition, composition, schema/dependency slimming, Quanthus adapters, Web
+admission, optional authoring, stage gates, and recovery contracts. Its gate is orthogonal to the
+current P4 domain gate.

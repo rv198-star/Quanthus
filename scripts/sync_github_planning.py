@@ -51,6 +51,7 @@ class WorkItem:
     priority: str
     milestone: str | None
     design_path: str
+    issue_type: str
 
 
 LABELS = (
@@ -64,6 +65,7 @@ LABELS = (
     LabelSpec("priority:high", "E99695", "High-priority work in the released phase"),
     LabelSpec("priority:normal", "C5DEF5", "Normal planned work"),
     *(LabelSpec(f"phase:P{phase}", "0052CC", f"Delivery phase P{phase}") for phase in range(1, 8)),
+    LabelSpec("phase:PK", "0B7285", "Orthogonal Platform Kernel engineering milestone"),
     LabelSpec("phase:meta", "6F42C1", "Cross-phase project governance"),
     LabelSpec("area:data", "BFDADC", "Point-in-time data foundation"),
     LabelSpec("area:backtest", "D4C5F9", "Backtest engine and accounting"),
@@ -75,8 +77,12 @@ LABELS = (
     LabelSpec("area:governance", "E4E669", "Validation and change governance"),
     LabelSpec("area:roadmap", "D4C5F9", "Delivery roadmap and gates"),
     LabelSpec("area:observability", "BFD4F2", "Monitoring and attribution"),
+    LabelSpec("area:platform", "9ED9CC", "Platform identity, API, jobs, Web, and operations"),
     LabelSpec("area:docs", "0075CA", "Product and design documentation"),
 )
+
+PLATFORM_KERNEL_MILESTONE = "Platform Kernel Extraction"
+WORKER_RUNTIME_MILESTONE = "PostgreSQL Worker Runtime"
 
 MILESTONES = (
     "P1 Data Foundation",
@@ -86,6 +92,8 @@ MILESTONES = (
     "P5 Research Scoring",
     "P6 Simulation Governance",
     "P7 Live Validation",
+    PLATFORM_KERNEL_MILESTONE,
+    WORKER_RUNTIME_MILESTONE,
 )
 
 CHAPTERS = (
@@ -132,6 +140,14 @@ CHAPTERS = (
         MILESTONES[1],
         "ready",
     ),
+    ChapterSpec(
+        "11",
+        "docs/design/lld/11-platform-kernel.md",
+        "PK",
+        "platform",
+        PLATFORM_KERNEL_MILESTONE,
+        "ready",
+    ),
 )
 
 PHASE_GATES = {
@@ -152,6 +168,11 @@ PHASE_GATES = {
     "P5": "Blocked until the P4 event library and frozen rule baselines are accepted.",
     "P6": "Simulation governance starts after the P3 baseline is frozen.",
     "P7": "Blocked until frozen simulation supports an explicit live/no-live decision.",
+    "PK": (
+        "Platform Kernel is orthogonal to P1-P7. PK1-PK4 are accepted, first-cutover PK5 is "
+        "not applicable, PK6 recovery is open, and the ADR 0010 PostgreSQL Worker Runtime is "
+        "the active post-PK4 milestone under config/platform-kernel-gates.v1.json."
+    ),
 }
 
 CRITICAL_IDS = {"C1", "C2", "S1"}
@@ -246,6 +267,7 @@ def index_rows(root: Path) -> list[dict[str, str]]:
         "P2 backtest and observability": "P2",
         "P3 rule-only vertical slice": "P3",
         "P4-P7": "explicit",
+        "Platform Kernel": "PK",
     }
     phase: str | None = None
     rows: list[dict[str, str]] = []
@@ -279,6 +301,14 @@ def work_items(root: Path) -> list[WorkItem]:
             status = "closed"
         elif phase == "P3" and row.get("Disposition", "").startswith("deferred"):
             status = "blocked"
+        elif phase == "PK":
+            disposition = row.get("Disposition", "")
+            if disposition in {"open", "ready", "open epic"}:
+                status = "ready"
+            elif disposition.startswith("accepted"):
+                status = "closed"
+            else:
+                status = "blocked"
         else:
             status = "ready" if phase in {"P1", "P2", "P3", "P4"} else "blocked"
         if stable_id in CRITICAL_IDS:
@@ -287,7 +317,16 @@ def work_items(root: Path) -> list[WorkItem]:
             priority = "high"
         else:
             priority = "normal"
-        milestone = None if phase == "meta" else MILESTONES[int(phase[1:]) - 1]
+        if phase == "meta":
+            milestone = None
+        elif phase == "PK":
+            milestone = (
+                WORKER_RUNTIME_MILESTONE
+                if stable_id.startswith("PK-WORKER-")
+                else PLATFORM_KERNEL_MILESTONE
+            )
+        else:
+            milestone = MILESTONES[int(phase[1:]) - 1]
         items.append(
             WorkItem(
                 stable_id=stable_id,
@@ -300,6 +339,7 @@ def work_items(root: Path) -> list[WorkItem]:
                 priority=priority,
                 milestone=milestone,
                 design_path=chapter.path,
+                issue_type="epic" if stable_id == "PK-WORKER-000" else "task",
             )
         )
     return items
@@ -311,6 +351,13 @@ def repo_url(repository: str, path: str) -> str:
 
 def task_body(item: WorkItem, repository: str) -> str:
     blocked_note = ""
+    worker_decision = ""
+    if item.stable_id.startswith("PK-WORKER-"):
+        worker_decision = (
+            "- [Worker Runtime decision]("
+            f"{repo_url(repository, 'docs/architecture/adr-0010-postgresql-worker-runtime.md')}"
+            ")\n"
+        )
     return f"""<!-- quanthus-planning:v1 id={item.stable_id} kind=task -->
 ## Objective
 
@@ -319,7 +366,7 @@ def task_body(item: WorkItem, repository: str) -> str:
 ## Governing design
 
 - [Detailed design]({repo_url(repository, item.design_path)})
-- [Product requirements]({repo_url(repository, "docs/product/prd.md")})
+{worker_decision}- [Product requirements]({repo_url(repository, "docs/product/prd.md")})
 - [High-level design]({repo_url(repository, "docs/design/hld.md")})
 
 ## Phase and gate
@@ -504,9 +551,17 @@ class GitHub:
             name for name in existing_labels if not name.startswith(MANAGED_LABEL_PREFIXES)
         ]
         desired_labels = sorted(set(labels + unmanaged))
+        existing_body = None if existing is None else existing.get("body")
+        desired_body = body
+        if (
+            isinstance(existing_body, str)
+            and "<!-- quanthus-planning:v2 " in existing_body
+            and "<!-- quanthus-planning:v1 " in body
+        ):
+            desired_body = existing_body
         payload: dict[str, Any] = {
             "title": title,
-            "body": body,
+            "body": desired_body,
             "labels": desired_labels,
             "milestone": milestone,
         }
@@ -518,7 +573,7 @@ class GitHub:
         )
         unchanged = (
             existing["title"] == title
-            and existing.get("body") == body
+            and existing_body == desired_body
             and sorted(existing_labels) == desired_labels
             and current_milestone_number == milestone
         )
@@ -571,7 +626,7 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
     task_urls: dict[str, str] = {}
     for item in items:
         labels = [
-            "type:task",
+            f"type:{item.issue_type}",
             f"status:{item.status}",
             f"priority:{item.priority}",
             f"phase:{item.phase}",

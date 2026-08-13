@@ -69,6 +69,7 @@ class DecisionDisposition(str, Enum):
 class OpenExecutionState(str, Enum):
     EXECUTABLE = "executable"
     SUSPENDED = "suspended"
+    NON_TRADING_OBSERVED = "non_trading_observed"
     BUY_BLOCKED_LIMIT_UP = "buy_blocked_limit_up"
     SELL_BLOCKED_LIMIT_DOWN = "sell_blocked_limit_down"
     MISSING_EVIDENCE = "missing_evidence"
@@ -188,6 +189,7 @@ class MarketSession:
             raise ValueError("open_execution_state must be an OpenExecutionState")
         price_bearing_states = {
             OpenExecutionState.EXECUTABLE,
+            OpenExecutionState.NON_TRADING_OBSERVED,
             OpenExecutionState.BUY_BLOCKED_LIMIT_UP,
             OpenExecutionState.SELL_BLOCKED_LIMIT_DOWN,
         }

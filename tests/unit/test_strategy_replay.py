@@ -300,6 +300,84 @@ class StrategyReplayTests(unittest.TestCase):
             with self.assertRaisesRegex(AuditIntegrityError, "payload checksum mismatch"):
                 store.load_strategy_replay(replay.backtest.run.run_id)
 
+    def test_target_percent_is_resolved_at_next_open(self) -> None:
+        strategy = ScriptedStrategy(
+            {
+                date(2026, 1, 5): ReplayDecision(
+                    ReplayAction.ENTER,
+                    "target_entry",
+                    Decimal("1"),
+                    "000001.SZ",
+                    target_percent=Decimal("0.95"),
+                )
+            }
+        )
+        frames = (
+            frame(
+                date(2026, 1, 5),
+                date(2026, 1, 6),
+                session(date(2026, 1, 6), "000001.SZ", "10.00", "10.10"),
+            ),
+        )
+        replay = run_strategy_replay(
+            self.engine,
+            strategy,
+            self.run_spec(frames, run_id="target-percent-next-open"),
+        )
+        self.assertEqual(replay.decisions[0].quantity, 900)
+        fill = next(
+            event.payload
+            for event in replay.backtest.events
+            if event.event_type.value == "fill"
+        )
+        self.assertEqual(fill["price"], "10.01")
+        self.assertEqual(fill["quantity"], 900)
+
+    def test_target_percent_non_trading_observation_sizes_then_cancels(self) -> None:
+        strategy = ScriptedStrategy(
+            {
+                date(2026, 1, 5): ReplayDecision(
+                    ReplayAction.ENTER,
+                    "target_entry",
+                    Decimal("1"),
+                    "000001.SZ",
+                    target_percent=Decimal("0.95"),
+                )
+            }
+        )
+        observed = session(date(2026, 1, 6), "000001.SZ", "10.00", "10.10")
+        frames = (
+            frame(
+                date(2026, 1, 5),
+                date(2026, 1, 6),
+                replace(
+                    observed,
+                    open_execution_state=OpenExecutionState.NON_TRADING_OBSERVED,
+                ),
+            ),
+        )
+
+        replay = run_strategy_replay(
+            self.engine,
+            strategy,
+            self.run_spec(frames, run_id="target-percent-non-trading"),
+        )
+
+        self.assertEqual(replay.decisions[0].quantity, 900)
+        self.assertEqual(
+            replay.decisions[0].execution_status,
+            "completed_with_cancellation",
+        )
+        self.assertFalse(
+            any(event.event_type.value == "fill" for event in replay.backtest.events)
+        )
+        cancellation = next(
+            event
+            for event in replay.backtest.events
+            if event.event_type.value == "order_status"
+        )
+        self.assertEqual(cancellation.reason_code, "security_not_trading_observed")
+
     def test_carried_exit_skips_new_strategy_decisions_and_keeps_one_order(self) -> None:
         frames = (
             frame(

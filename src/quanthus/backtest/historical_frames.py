@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from quanthus.backtest.contracts import (
     MARKET_TIMEZONE,
@@ -34,6 +34,10 @@ from quanthus.backtest.strategy_replay import (
 )
 from quanthus.contracts import SnapshotRef
 from quanthus.corporate_action_normalization import CorporateActionNormalizationPolicy
+
+if TYPE_CHECKING:
+    from quanthus.backtest.benchmark import BenchmarkCurve
+    from quanthus.industry_mapping import StaticIndustryMapping
 
 FRAME_READER_VERSION = "1.1.0"
 PRICE_TICK = Decimal("0.01")
@@ -168,6 +172,11 @@ def _data_valid(row: dict[str, Any]) -> bool:
 
 
 def _coverage(row: dict[str, Any]) -> CoverageStatus:
+    if (
+        str(row.get("source_reason_code") or "") == "ZERO_ACTIVITY_OBSERVATION"
+        and row.get("bar_security_id") is not None
+    ):
+        return CoverageStatus.TRADING
     if str(row.get("observed_tradestatus") or "") == "0":
         return CoverageStatus.SUSPENDED
     if row.get("bar_security_id") is None:
@@ -469,6 +478,19 @@ class HistoricalReplayFrameReader:
     @property
     def runner_only_access_count(self) -> int:
         return 0
+
+    def load_benchmark(self) -> BenchmarkCurve:
+        """Load the benchmark reference bound to this replay source."""
+
+        raise HistoricalFrameReaderError("replay source does not provide a benchmark")
+
+    def load_industry_mapping(
+        self, *, expected_version: str
+    ) -> StaticIndustryMapping:
+        """Load the versioned industry reference bound to this replay source."""
+
+        del expected_version
+        raise HistoricalFrameReaderError("replay source does not provide industry mapping")
 
     def __enter__(self) -> HistoricalReplayFrameReader:
         self._ensure_open()

@@ -262,6 +262,29 @@ class BaselineResearchTests(unittest.TestCase):
         with self.assertRaisesRegex(BaselineResearchError, "position_fraction"):
             load_baseline_strategy_catalogue(invalid_path)
 
+    def test_governed_scan_respects_the_frozen_mapping_universe(self) -> None:
+        market_date = self.dates[-2]
+        with self._panel() as panel:
+            unrestricted = panel.governed_candidate_scan(
+                market_date,
+                minimum_listing_sessions=20,
+                minimum_average_amount20=Decimal("0"),
+                limit=20,
+            )
+            restricted = panel.governed_candidate_scan(
+                market_date,
+                minimum_listing_sessions=20,
+                minimum_average_amount20=Decimal("0"),
+                limit=20,
+                allowed_security_ids=("SZSE-000002",),
+            )
+
+        self.assertEqual(
+            tuple(item.security_id for item in unrestricted),
+            ("SSE-600001",),
+        )
+        self.assertEqual(restricted, ())
+
     def test_suite_runs_all_baselines_and_rejects_non_development_scope(self) -> None:
         execution_policy = load_execution_policy(
             ROOT / "config" / "p2-execution-policy.research.v1.json"

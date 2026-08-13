@@ -105,12 +105,13 @@ test("server-renders an honest empty state before formal attribution data exists
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Quanthus 策略归因工作台<\/title>/i);
+  assert.match(html, /<title>策略归因工作台 · Quanthus<\/title>/i);
   assert.match(html, /策略归因分析/);
   assert.match(html, /尚未接入真实归因结果/);
   assert.match(html, /正式策略适配器/);
   assert.match(html, /已发布归因产物/);
   assert.match(html, /查看虚构样例/);
+  assert.match(html, /href="\/operator"/);
   assert.match(html, /人为编造的合同样例/);
   assert.doesNotMatch(html, /Strategy Attribution/);
   assert.doesNotMatch(html, /class="baseline-metric/);

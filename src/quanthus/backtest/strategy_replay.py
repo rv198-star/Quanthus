@@ -85,6 +85,7 @@ class ReplayDecision:
     aggregate_score: Decimal = Decimal("0")
     security_code: str | None = None
     quantity: int | None = None
+    target_percent: Decimal | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.action, ReplayAction):
@@ -94,14 +95,27 @@ class ReplayDecision:
             raise ValueError("aggregate_score must be finite")
         if self.action is ReplayAction.ENTER:
             _require_text(self.security_code, "security_code")
-            if (
+            has_quantity = self.quantity is not None
+            has_target = self.target_percent is not None
+            if has_quantity == has_target:
+                raise ValueError("enter must declare exactly one of quantity or target_percent")
+            if has_quantity and (
                 not isinstance(self.quantity, int)
                 or isinstance(self.quantity, bool)
                 or self.quantity <= 0
             ):
                 raise ValueError("enter quantity must be a positive integer")
-        elif self.security_code is not None or self.quantity is not None:
-            raise ValueError("only an enter decision may declare security_code and quantity")
+            if has_target and (
+                not self.target_percent.is_finite()
+                or not Decimal("0") < self.target_percent <= Decimal("1")
+            ):
+                raise ValueError("enter target_percent must be in (0, 1]")
+        elif (
+            self.security_code is not None
+            or self.quantity is not None
+            or self.target_percent is not None
+        ):
+            raise ValueError("only an enter decision may declare sizing")
 
 
 @dataclass(frozen=True)
@@ -856,6 +870,41 @@ def _build_signal(
     )
 
 
+def _resolve_entry_quantity(
+    *,
+    engine: BacktestEngine,
+    decision: ReplayDecision,
+    session: MarketSession,
+    cash: Decimal,
+) -> int:
+    if decision.quantity is not None:
+        return decision.quantity
+    if decision.target_percent is None:
+        raise BacktestInputError("entry decision has no sizing instruction")
+    if session.open_price is None:
+        raise BacktestInputError("target-percent entry requires an observed next open")
+    policy = engine.policy
+    fill_price = (session.open_price * (
+        Decimal("1") + policy.buy_cost.slippage_bps / Decimal("10000")
+    )).quantize(policy.money.price_tick, rounding=ROUND_HALF_UP)
+    target_cash = cash * decision.target_percent
+    lot = policy.entry_lot_size
+    lots = int(target_cash / fill_price / lot)
+    while lots > 0:
+        quantity = lots * lot
+        gross = (fill_price * quantity).quantize(
+            policy.money.cash_quantum, rounding=ROUND_HALF_UP
+        )
+        commission = max(
+            gross * policy.buy_cost.commission_rate,
+            policy.buy_cost.minimum_commission,
+        ).quantize(policy.money.cash_quantum, rounding=ROUND_HALF_UP)
+        if gross + commission <= target_cash:
+            return quantity
+        lots -= 1
+    raise BacktestInputError("target-percent entry is below one executable lot")
+
+
 def _child_run(spec: StrategyReplaySpec, *, suffix: str, data_snapshot_id: str) -> BacktestRunSpec:
     return replace(
         spec.run,
@@ -1012,8 +1061,13 @@ def run_strategy_replay(
             if frame.corporate_actions:
                 raise BacktestInputError("entry frame cannot carry portfolio corporate actions")
             assert decision.security_code is not None
-            assert decision.quantity is not None
             session = frame.session(decision.security_code)
+            entry_quantity = _resolve_entry_quantity(
+                engine=engine,
+                decision=decision,
+                session=session,
+                cash=state.cash,
+            )
             signal = _build_signal(
                 spec=spec,
                 strategy_version=strategy.strategy_version,
@@ -1021,7 +1075,7 @@ def run_strategy_replay(
                 decision=decision,
                 side=OrderSide.BUY,
                 security_code=decision.security_code,
-                quantity=decision.quantity,
+                quantity=entry_quantity,
             )
             result = engine.run_buy_session(
                 run=_child_run(
@@ -1037,7 +1091,7 @@ def run_strategy_replay(
             state = _state_from_events(result.events, target_notional=spec.initial_cash)
             execution_status = str(result.result_summary["status"])
             trace_security = decision.security_code
-            trace_quantity = decision.quantity
+            trace_quantity = entry_quantity
             fills = [event.payload for event in result.events if event.event_type is EventType.FILL]
             if fills:
                 fill = fills[0]

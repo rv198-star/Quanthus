@@ -221,6 +221,7 @@ class BacktestEngine:
             )
         buy_cancellation_reasons = {
             OpenExecutionState.SUSPENDED: "security_suspended",
+            OpenExecutionState.NON_TRADING_OBSERVED: "security_not_trading_observed",
             OpenExecutionState.BUY_BLOCKED_LIMIT_UP: "buy_blocked_limit_up",
             OpenExecutionState.MISSING_EVIDENCE: "missing_execution_evidence",
         }
@@ -710,6 +711,7 @@ class BacktestEngine:
         current_mark_snapshot_id = opening_state.last_mark_snapshot_id
         sell_carry_reasons = {
             OpenExecutionState.SUSPENDED: "security_suspended",
+            OpenExecutionState.NON_TRADING_OBSERVED: "security_not_trading_observed",
             OpenExecutionState.SELL_BLOCKED_LIMIT_DOWN: "sell_blocked_limit_down",
             OpenExecutionState.MISSING_EVIDENCE: "missing_execution_evidence",
         }

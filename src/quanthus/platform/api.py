@@ -1,0 +1,767 @@
+"""Manifest-driven, dependency-free WSGI transport for the Platform Kernel."""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+import time
+import urllib.parse
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
+from http import HTTPStatus
+from typing import Any
+
+from quanthus.platform.candidate_approval import (
+    CandidateApprovalService,
+    public_candidate_approval_event,
+)
+from quanthus.platform.identity import (
+    AuthenticatedPrincipal,
+    AuthenticationError,
+    AuthorizationError,
+    IdentityService,
+    MfaRequiredError,
+    public_user,
+)
+from quanthus.platform.jobs import (
+    ATTRIBUTION_VERIFICATION_JOB,
+    CANDIDATE_REPLAY_JOB,
+    DurableJobQueue,
+    JobNotCancelableError,
+    LocalJobRunner,
+    public_job,
+)
+from quanthus.platform.manifest import FeatureManifest
+from quanthus.platform.observability import JsonFormatter, Metrics, request_id, request_id_context
+from quanthus.platform.persistence import (
+    DuplicateRecordError,
+    IdempotencyConflictError,
+    PlatformStore,
+)
+from quanthus.platform.ports import GateQueryPort
+from quanthus.platform.product_query import ProductCandidateEvidence, ProductResearchCatalog
+
+OPENAPI_VERSION = "3.1.0"
+MAX_BODY_BYTES = 64 * 1024
+StartResponse = Callable[[str, list[tuple[str, str]]], object]
+Handler = Callable[["HttpRequest", Mapping[str, str]], "HttpResponse"]
+
+
+@dataclass(frozen=True)
+class HttpRequest:
+    method: str
+    path: str
+    headers: Mapping[str, str]
+    body: bytes
+    request_id: str
+
+    def json_object(self) -> dict[str, Any]:
+        try:
+            value: Any = json.loads(self.body) if self.body else None
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("request body must be valid JSON") from exc
+        if not isinstance(value, dict):
+            raise ValueError("request body must be a JSON object")
+        return value
+
+
+@dataclass(frozen=True)
+class HttpResponse:
+    status: int
+    body: bytes
+    headers: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class Route:
+    operation_id: str
+    method: str
+    path: str
+    pattern: re.Pattern[str]
+    handler: Handler
+    public: bool
+
+
+def _json_response(payload: Mapping[str, Any], status: int = 200) -> HttpResponse:
+    body = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return HttpResponse(
+        status=status,
+        body=body,
+        headers=(("Content-Type", "application/json"),),
+    )
+
+
+def _text_response(body: str, content_type: str = "text/plain") -> HttpResponse:
+    return HttpResponse(
+        status=200,
+        body=body.encode("utf-8"),
+        headers=(("Content-Type", f"{content_type}; charset=utf-8"),),
+    )
+
+
+def _error(reason: str, status: int, observed_request_id: str) -> HttpResponse:
+    return _json_response(
+        {"error": {"reason": reason, "request_id": observed_request_id}},
+        status,
+    )
+
+
+def _bearer_token(observed_request: HttpRequest) -> str:
+    value = observed_request.headers.get("authorization", "")
+    scheme, _, token = value.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise AuthenticationError("authentication_required")
+    return token
+
+
+def _principal(
+    identity: IdentityService,
+    observed_request: HttpRequest,
+    permission: str,
+) -> AuthenticatedPrincipal:
+    principal = identity.authenticate(_bearer_token(observed_request))
+    identity.require(principal, permission)
+    return principal
+
+
+def _compile_path(path: str) -> re.Pattern[str]:
+    parts: list[str] = []
+    cursor = 0
+    for match in re.finditer(r"<([a-z][a-z0-9_]*)>", path):
+        parts.append(re.escape(path[cursor : match.start()]))
+        parts.append(f"(?P<{match.group(1)}>[^/]+)")
+        cursor = match.end()
+    parts.append(re.escape(path[cursor:]))
+    return re.compile("^" + "".join(parts) + "$")
+
+
+class PlatformHttpApp:
+    """Eager WSGI application whose complete route set comes from one manifest."""
+
+    def __init__(
+        self,
+        *,
+        manifest: FeatureManifest,
+        store: PlatformStore,
+        identity: IdentityService,
+        jobs: LocalJobRunner,
+        replay_jobs: DurableJobQueue,
+        gate_query: GateQueryPort,
+        product_catalog: ProductResearchCatalog,
+        candidate_evidence: ProductCandidateEvidence,
+        candidate_approvals: CandidateApprovalService,
+        metrics: Metrics,
+    ) -> None:
+        self.manifest = manifest
+        self._store = store
+        self._identity = identity
+        self._jobs = jobs
+        self._replay_jobs = replay_jobs
+        self._gate_query = gate_query
+        self._product_catalog = product_catalog
+        self._candidate_evidence = candidate_evidence
+        self._candidate_approvals = candidate_approvals
+        self._metrics = metrics
+        self._routes: list[Route] = []
+        self._logger = logging.getLogger("quanthus.platform.http")
+        if not self._logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(JsonFormatter())
+            self._logger.addHandler(handler)
+            self._logger.setLevel(logging.INFO)
+            self._logger.propagate = False
+        self._register_routes()
+        registered = {route.operation_id for route in self._routes}
+        if registered != set(self.manifest.routes):
+            missing = sorted(set(self.manifest.routes).difference(registered))
+            unexpected = sorted(registered.difference(self.manifest.routes))
+            raise RuntimeError(
+                f"manifest and HTTP composition differ: missing={missing}, unexpected={unexpected}"
+            )
+
+    @property
+    def routes(self) -> tuple[Route, ...]:
+        return tuple(self._routes)
+
+    def __call__(
+        self,
+        environ: Mapping[str, Any],
+        start_response: StartResponse,
+    ) -> Iterable[bytes]:
+        method = str(environ.get("REQUEST_METHOD", "GET")).upper()
+        path = str(environ.get("PATH_INFO", "/"))
+        headers = self._headers(environ)
+        observed_request_id = request_id(headers.get("x-request-id"))
+        token = request_id_context.set(observed_request_id)
+        started = time.perf_counter()
+        route: Route | None = None
+        response: HttpResponse
+        try:
+            body = self._body(environ)
+            observed_request = HttpRequest(
+                method=method,
+                path=path,
+                headers=headers,
+                body=body,
+                request_id=observed_request_id,
+            )
+            route, params = self._match(method, path)
+            if route is None:
+                response = _error("route_not_found", 404, observed_request_id)
+            else:
+                response = route.handler(observed_request, params)
+        except MfaRequiredError as exc:
+            response = _error(str(exc), 428, observed_request_id)
+        except AuthenticationError as exc:
+            response = _error(str(exc), 401, observed_request_id)
+        except AuthorizationError as exc:
+            response = _error(str(exc), 403, observed_request_id)
+        except DuplicateRecordError as exc:
+            response = _error(str(exc), 409, observed_request_id)
+        except ValueError as exc:
+            response = _error(str(exc), 400, observed_request_id)
+        except Exception:
+            self._logger.exception("platform_request_failed")
+            response = _error("internal_error", 500, observed_request_id)
+        route_label = route.path if route else "unmatched"
+        duration_ms = round((time.perf_counter() - started) * 1000)
+        self._metrics.observe(
+            method=method,
+            route=route_label,
+            status=response.status,
+            duration_ms=duration_ms,
+        )
+        self._logger.info(
+            "platform_request method=%s route=%s status=%s duration_ms=%s",
+            method,
+            route_label,
+            response.status,
+            duration_ms,
+            extra={"request_id": observed_request_id},
+        )
+        request_id_context.reset(token)
+        status_line = f"{response.status} {HTTPStatus(response.status).phrase}"
+        response_headers = [
+            *response.headers,
+            ("Content-Length", str(len(response.body))),
+            ("X-Request-ID", observed_request_id),
+        ]
+        start_response(status_line, response_headers)
+        return [response.body]
+
+    @staticmethod
+    def _headers(environ: Mapping[str, Any]) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        for key, value in environ.items():
+            if key.startswith("HTTP_"):
+                headers[key[5:].replace("_", "-").lower()] = str(value)
+        if environ.get("CONTENT_TYPE"):
+            headers["content-type"] = str(environ["CONTENT_TYPE"])
+        return headers
+
+    @staticmethod
+    def _body(environ: Mapping[str, Any]) -> bytes:
+        try:
+            length = int(environ.get("CONTENT_LENGTH") or 0)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("invalid content length") from exc
+        if length < 0 or length > MAX_BODY_BYTES:
+            raise ValueError("request body is too large")
+        stream = environ.get("wsgi.input")
+        body = stream.read(length) if stream is not None and length else b""
+        if not isinstance(body, bytes) or len(body) != length:
+            raise ValueError("incomplete request body")
+        return body
+
+    def _match(self, method: str, path: str) -> tuple[Route | None, Mapping[str, str]]:
+        for route in self._routes:
+            if route.method != method:
+                continue
+            match = route.pattern.fullmatch(path)
+            if match is not None:
+                return route, match.groupdict()
+        return None, {}
+
+    def _add(
+        self,
+        operation_id: str,
+        path: str,
+        method: str,
+        handler: Handler,
+        *,
+        public: bool = False,
+    ) -> None:
+        if operation_id not in self.manifest.routes:
+            return
+        self._routes.append(
+            Route(
+                operation_id=operation_id,
+                method=method,
+                path=path,
+                pattern=_compile_path(path),
+                handler=handler,
+                public=public,
+            )
+        )
+
+    def openapi_document(self) -> dict[str, Any]:
+        paths: dict[str, dict[str, Any]] = {}
+        for route in self._routes:
+            openapi_path = re.sub(r"<([a-z][a-z0-9_]*)>", r"{\1}", route.path)
+            paths.setdefault(openapi_path, {})[route.method.lower()] = {
+                "operationId": route.operation_id,
+                "responses": {"200": {"description": "Success"}},
+                "security": [] if route.public else [{"bearerAuth": []}],
+            }
+        return {
+            "openapi": OPENAPI_VERSION,
+            "info": {"title": "Quanthus Platform API", "version": "1.0.0"},
+            "components": {
+                "securitySchemes": {
+                    "bearerAuth": {"type": "http", "scheme": "bearer"},
+                }
+            },
+            "paths": dict(sorted(paths.items())),
+        }
+
+    def _register_routes(self) -> None:
+        self._add("system.health", "/health", "GET", self._health, public=True)
+        self._add("system.ready", "/ready", "GET", self._ready, public=True)
+        self._add("system.metrics", "/metrics", "GET", self._platform_metrics, public=True)
+        self._add("system.openapi", "/openapi.json", "GET", self._openapi, public=True)
+        self._add("auth.login", "/api/platform/v1/auth/login", "POST", self._login, public=True)
+        self._add("auth.logout", "/api/platform/v1/auth/logout", "POST", self._logout)
+        self._add("auth.me", "/api/platform/v1/auth/me", "GET", self._me)
+        self._add("auth.mfa.enroll", "/api/platform/v1/auth/mfa/enroll", "POST", self._enroll_mfa)
+        self._add(
+            "jobs.submit-candidate-replay",
+            "/api/platform/v1/product/candidate-replays",
+            "POST",
+            self._submit_candidate_replay,
+        )
+        self._add(
+            "jobs.list-candidate-replays",
+            "/api/platform/v1/product/candidate-replays",
+            "GET",
+            self._list_candidate_replays,
+        )
+        self._add(
+            "auth.mfa.confirm", "/api/platform/v1/auth/mfa/confirm", "POST", self._confirm_mfa
+        )
+        self._add("auth.mfa.disable", "/api/platform/v1/auth/mfa", "DELETE", self._disable_mfa)
+        self._add("admin.users.list", "/api/platform/v1/admin/users", "GET", self._list_users)
+        self._add("admin.users.create", "/api/platform/v1/admin/users", "POST", self._create_user)
+        self._add("quanthus.gates.read", "/api/platform/v1/quanthus/gates", "GET", self._read_gates)
+        self._add(
+            "quanthus.product.catalog.read",
+            "/api/platform/v1/product/catalog",
+            "GET",
+            self._read_product_catalog,
+        )
+        self._add(
+            "quanthus.product.candidate.read",
+            "/api/platform/v1/product/candidates/<strategy_id>",
+            "GET",
+            self._read_product_candidate,
+        )
+        self._add(
+            "quanthus.product.candidate-review.write",
+            "/api/platform/v1/product/candidates/<strategy_id>/reviews",
+            "POST",
+            self._record_product_candidate_review,
+        )
+        self._add(
+            "quanthus.product.candidate-governance.write",
+            "/api/platform/v1/product/candidates/<strategy_id>/governance",
+            "POST",
+            self._record_product_candidate_governance,
+        )
+        self._add(
+            "jobs.submit-attribution-verification",
+            "/api/platform/v1/jobs/attribution-verifications",
+            "POST",
+            self._submit_attribution_verification,
+        )
+        self._add("jobs.read", "/api/platform/v1/jobs/<job_id>", "GET", self._read_job)
+        self._add("jobs.cancel", "/api/platform/v1/jobs/<job_id>/cancel", "POST", self._cancel_job)
+
+    def _health(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
+        return _json_response(
+            {"status": "healthy", "role": "api", "manifest": self.manifest.version}
+        )
+
+    def _ready(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
+        available = self._store.ready()
+        return _json_response(
+            {
+                "status": "ready" if available else "unavailable",
+                "checks": {"postgres": available},
+            },
+            200 if available else 503,
+        )
+
+    def _platform_metrics(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
+        return _text_response(self._metrics.render())
+
+    def _openapi(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
+        return _json_response(self.openapi_document())
+
+    def _login(self, observed_request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
+        payload = observed_request.json_object()
+        result = self._identity.login(
+            username=str(payload.get("username", "")),
+            password=str(payload.get("password", "")),
+            mfa_code=str(payload["mfa_code"]) if payload.get("mfa_code") is not None else None,
+            request_id=observed_request.request_id,
+        )
+        return _json_response(
+            {
+                "token": result.token,
+                "expires_at": result.expires_at.isoformat(),
+                "user": {
+                    "user_id": result.principal.user_id,
+                    "username": result.principal.username,
+                    "role": result.principal.role,
+                },
+            }
+        )
+
+    def _logout(self, observed_request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
+        token = _bearer_token(observed_request)
+        self._identity.authenticate(token)
+        self._identity.logout(token, request_id=observed_request.request_id)
+        return _json_response({"revoked": True})
+
+    def _me(self, observed_request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
+        principal = self._identity.authenticate(_bearer_token(observed_request))
+        user = self._store.get_user(principal.user_id)
+        if user is None:
+            raise AuthenticationError("invalid_or_expired_session")
+        return _json_response(
+            {
+                "user_id": principal.user_id,
+                "username": principal.username,
+                "role": principal.role,
+                "mfa_enabled": user.mfa_enabled,
+            }
+        )
+
+    def _enroll_mfa(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = self._identity.authenticate(_bearer_token(observed_request))
+        enrollment = self._identity.begin_mfa(principal)
+        return _json_response(
+            {"secret": enrollment.secret, "provisioning_uri": enrollment.provisioning_uri}
+        )
+
+    def _confirm_mfa(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = self._identity.authenticate(_bearer_token(observed_request))
+        payload = observed_request.json_object()
+        self._identity.confirm_mfa(
+            principal,
+            str(payload.get("code", "")),
+            request_id=observed_request.request_id,
+        )
+        return _json_response({"mfa_enabled": True})
+
+    def _disable_mfa(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = self._identity.authenticate(_bearer_token(observed_request))
+        payload = observed_request.json_object()
+        self._identity.disable_mfa(
+            principal,
+            str(payload.get("code", "")),
+            request_id=observed_request.request_id,
+        )
+        return _json_response({"mfa_enabled": False})
+
+    def _list_users(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        _principal(self._identity, observed_request, "users:read")
+        return _json_response({"users": [public_user(user) for user in self._store.list_users()]})
+
+    def _create_user(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "users:write")
+        payload = observed_request.json_object()
+        user = self._identity.create_user(
+            username=str(payload.get("username", "")),
+            password=str(payload.get("password", "")),
+            role=str(payload.get("role", "")),
+            actor_user_id=principal.user_id,
+            request_id=observed_request.request_id,
+        )
+        return _json_response(public_user(user), 201)
+
+    def _read_gates(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        _principal(self._identity, observed_request, "gates:read")
+        return _json_response(self._gate_query.read().to_dict())
+
+    def _read_product_catalog(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        _principal(self._identity, observed_request, "product:read")
+        catalog = self._product_catalog.read()
+        for candidate in catalog["strategies"]:
+            evidence = self._candidate_evidence.candidate_summary(candidate["strategy_id"])
+            if evidence is None:
+                raise ValueError("candidate evidence does not exist")
+            self._apply_evidence_summary(candidate, evidence)
+            candidate["approval"] = self._candidate_approval(candidate, evidence)
+        return _json_response(catalog)
+
+    def _candidate_approval(
+        self, candidate: Mapping[str, Any], evidence: Mapping[str, Any]
+    ) -> dict[str, object]:
+        return self._candidate_approvals.state(
+            str(candidate["strategy_id"]),
+            str(candidate["version"]),
+            str(evidence["source_artifact_sha256"]),
+        )
+
+    @staticmethod
+    def _apply_evidence_summary(
+        candidate: dict[str, Any], evidence: Mapping[str, Any]
+    ) -> None:
+        summary = evidence.get("summary")
+        if not isinstance(summary, Mapping):
+            return
+        candidate.update(
+            {
+                "operations": summary["operations"],
+                "closed_trades": summary["closed_trades"],
+                "total_return": summary["total_return"],
+                "max_drawdown": summary["max_drawdown"],
+            }
+        )
+
+    def _candidate_identity(self, raw_strategy_id: str) -> tuple[str, dict[str, Any]]:
+        strategy_id = urllib.parse.unquote(raw_strategy_id)
+        candidate = self._product_catalog.candidate(strategy_id)
+        if candidate is None:
+            raise ValueError("candidate does not exist")
+        return strategy_id, candidate
+
+    def _read_product_candidate(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        _principal(self._identity, observed_request, "product:read")
+        strategy_id, candidate = self._candidate_identity(params["strategy_id"])
+        evidence = self._candidate_evidence.candidate(strategy_id)
+        if evidence is None:
+            raise ValueError("candidate evidence does not exist")
+        self._apply_evidence_summary(candidate, evidence)
+        approval = self._candidate_approval(candidate, evidence)
+        active_run_id = next(
+            (
+                item.run_id
+                for item in self._store.candidate_active_runs()
+                if item.strategy_id == strategy_id
+                and item.strategy_version == candidate["version"]
+            ),
+            None,
+        )
+        run_history = []
+        for run in self._store.candidate_runs(strategy_id, candidate["version"]):
+            item = next(
+                value
+                for value in run.candidates
+                if value.get("candidate_id") == strategy_id
+                and value.get("candidate_version") == candidate["version"]
+            )
+            run_history.append(
+                {
+                    "run_id": run.run_id,
+                    "job_id": run.job_id,
+                    "created_at": run.created_at.isoformat(),
+                    "result_sha256": run.result_sha256,
+                    "evidence_digest": item.get("artifact_sha256"),
+                    "result_digest": item.get("result_digest"),
+                    "active": run.run_id == active_run_id,
+                    "active_switch_applied": run.active_switch_applied,
+                    "summary": item.get("summary", {}),
+                }
+            )
+        return _json_response(
+            {
+                "candidate": candidate,
+                "evidence": evidence,
+                "approval": approval,
+                "run_history": run_history,
+            }
+        )
+
+    def _record_product_candidate_review(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "product:review")
+        strategy_id, candidate = self._candidate_identity(params["strategy_id"])
+        evidence = self._candidate_evidence.candidate(strategy_id)
+        if evidence is None:
+            raise ValueError("candidate evidence does not exist")
+        payload = observed_request.json_object()
+        event = self._candidate_approvals.record_review(
+            strategy_id=strategy_id,
+            strategy_version=candidate["version"],
+            evidence_digest=str(evidence["source_artifact_sha256"]),
+            action=str(payload.get("action", "")),
+            note=str(payload.get("note", "")),
+            principal=principal,
+            request_id=observed_request.request_id,
+        )
+        return _json_response(
+            {
+                "event": public_candidate_approval_event(event),
+                "approval": self._candidate_approval(candidate, evidence),
+            },
+            201,
+        )
+
+    def _record_product_candidate_governance(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "product:govern")
+        strategy_id, candidate = self._candidate_identity(params["strategy_id"])
+        evidence = self._candidate_evidence.candidate(strategy_id)
+        if evidence is None:
+            raise ValueError("candidate evidence does not exist")
+        payload = observed_request.json_object()
+        event = self._candidate_approvals.record_governance(
+            strategy_id=strategy_id,
+            strategy_version=candidate["version"],
+            evidence_digest=str(evidence["source_artifact_sha256"]),
+            action=str(payload.get("action", "")),
+            note=str(payload.get("note", "")),
+            principal=principal,
+            request_id=observed_request.request_id,
+        )
+        return _json_response(
+            {
+                "event": public_candidate_approval_event(event),
+                "approval": self._candidate_approval(candidate, evidence),
+            },
+            201,
+        )
+
+    def _submit_attribution_verification(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "jobs:run")
+        payload = observed_request.json_object()
+        job, created = self._jobs.submit(
+            kind=ATTRIBUTION_VERIFICATION_JOB,
+            actor_user_id=principal.user_id,
+            idempotency_key=observed_request.headers.get("idempotency-key", ""),
+            input_ref={"release_id": str(payload.get("release_id", ""))},
+            execute=False,
+        )
+        job = self._jobs.dispatch(job.job_id)
+        return _json_response(public_job(job), 201 if created else 200)
+
+    def _submit_candidate_replay(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "jobs:run")
+        payload = observed_request.json_object()
+        reason = str(payload.get("reason", "")).strip()
+        if not 1 <= len(reason) <= 500:
+            return _error("replay_reason_required", 400, observed_request.request_id)
+        active_runs = {
+            f"{item.strategy_id}@{item.strategy_version}": item.run_id
+            for item in self._store.candidate_active_runs()
+        }
+        candidate_identities = (
+            f"{item['strategy_id']}@{item['version']}"
+            for item in self._product_catalog.read()["strategies"]
+        )
+        input_ref = {
+            "scope_start": "2012-01-04",
+            "scope_end": "2021-12-30",
+            "provider_config": "config/replay-data-provider.development.v2.json",
+            "candidate_set": "current-five",
+            "reason": reason,
+            "expected_active_runs": {
+                identity: active_runs.get(identity) for identity in candidate_identities
+            },
+        }
+        try:
+            job, created = self._replay_jobs.submit(
+                kind=CANDIDATE_REPLAY_JOB,
+                actor_user_id=principal.user_id,
+                idempotency_key=observed_request.headers.get("idempotency-key", ""),
+                input_ref=input_ref,
+                concurrency_key="candidate-set:current-five:development",
+            )
+        except IdempotencyConflictError as exc:
+            return _error(str(exc), 409, observed_request.request_id)
+        except DuplicateRecordError:
+            return _error("candidate_replay_already_active", 409, observed_request.request_id)
+        return _json_response(public_job(job), 201 if created else 200)
+
+    def _list_candidate_replays(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "jobs:read")
+        jobs = self._replay_jobs.list(CANDIDATE_REPLAY_JOB)
+        if principal.role != "admin":
+            jobs = tuple(job for job in jobs if job.actor_user_id == principal.user_id)
+        return _json_response({"jobs": [public_job(job) for job in jobs]})
+
+    def _read_job(self, observed_request: HttpRequest, params: Mapping[str, str]) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "jobs:read")
+        job = self._replay_jobs.get(params["job_id"])
+        if job is None:
+            return _error("job_not_found", 404, observed_request.request_id)
+        if principal.role != "admin" and job.actor_user_id != principal.user_id:
+            raise AuthorizationError("permission_denied")
+        return _json_response(public_job(job))
+
+    def _cancel_job(self, observed_request: HttpRequest, params: Mapping[str, str]) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "jobs:run")
+        job = self._replay_jobs.get(params["job_id"])
+        if job is None:
+            return _error("job_not_found", 404, observed_request.request_id)
+        if principal.role != "admin" and job.actor_user_id != principal.user_id:
+            raise AuthorizationError("permission_denied")
+        try:
+            return _json_response(public_job(self._replay_jobs.cancel(job.job_id)))
+        except JobNotCancelableError as exc:
+            return _error(str(exc), 409, observed_request.request_id)
+
+
+def create_http_app(
+    *,
+    manifest: FeatureManifest,
+    store: PlatformStore,
+    identity: IdentityService,
+    jobs: LocalJobRunner,
+    replay_jobs: DurableJobQueue,
+    gate_query: GateQueryPort,
+    product_catalog: ProductResearchCatalog,
+    candidate_evidence: ProductCandidateEvidence,
+    candidate_approvals: CandidateApprovalService,
+    metrics: Metrics,
+) -> PlatformHttpApp:
+    return PlatformHttpApp(
+        manifest=manifest,
+        store=store,
+        identity=identity,
+        jobs=jobs,
+        replay_jobs=replay_jobs,
+        gate_query=gate_query,
+        product_catalog=product_catalog,
+        candidate_evidence=candidate_evidence,
+        candidate_approvals=candidate_approvals,
+        metrics=metrics,
+    )

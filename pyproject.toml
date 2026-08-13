@@ -13,6 +13,11 @@ authors = [{ name = "Quanthus maintainers" }]
 dependencies = []
 
 [project.optional-dependencies]
+platform = [
+  "cryptography>=45,<46",
+  "gunicorn>=26,<27",
+  "psycopg[binary]>=3.2,<4",
+]
 p1 = [
   "duckdb>=1.1,<2",
   "polars>=1.17,<2",
@@ -35,6 +40,8 @@ dev = [
 
 [project.scripts]
 quanthus = "quanthus.cli:main"
+quanthus-platform = "quanthus.platform.server:main"
+quanthus-replay-worker = "quanthus.platform.worker:main"
 quanthus-minute-tdx = "quanthus.providers.minute_tdx:main"
 quanthus-ods-snapshot = "quanthus.providers.ods_snapshot:main"
 quanthus-calendar-refresh = "quanthus.providers.trading_calendar:main"

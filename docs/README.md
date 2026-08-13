@@ -77,8 +77,10 @@ nodes.
   node-specific success or failure notifications. OCI mirrors CN01's verified immutable DWD
   increment. The former epoch arbitration, paired DWD/DWS publication, old operational ADS, and
   release-set path are retained only as ADR 0005 migration evidence.
-- `config/releases/v2-build202607.json` is the Base identity authority. It binds read-only
-  `ods-base-202607-v2` and `dwd-base-202607-v2.1` through 2026-07-31. The DWD package contains all 33
+- `config/releases/v2-build202607.json` remains the build identity authority. The installed
+  read-only authority is `ods-base-202607-v2` and immutable `dwd-base-202607-v2.1` through
+  2026-07-31; the effective DWD view also applies the Base-bound
+  `dwd-base-202607-v2.1-correction-20260813-001`. The DWD Base contains all 33
   ADR 0006 objects, 455,817,962 rows, and 14,447,400,032 payload bytes. Daily and weekly processing
   writes immutable increments or corrections and never mutates either Base.
 - Issue #78 is closed by the independently audited R18 successor. The pre-rebuild findings,
@@ -90,6 +92,37 @@ nodes.
 - Generic DWS is deferred until a concrete cross-domain consumer needs the retained ten-dimension,
   thirteen-fact constellation. P4 is not blocked by DWS: it consumes an exact DWD snapshot and
   produces a purpose-specific, manifest-bound `event_library` projection.
+- Platform Kernel is an orthogonal engineering milestone under
+  `config/platform-kernel-gates.v1.json`. PK1 Minimal Boot through PK4 Operator Web are accepted
+  after real PostgreSQL/Gunicorn, production-image, desktop/mobile browser, tailnet HTTPS, and
+  public Traefik-edge acceptance. Optional Authoring is explicitly not applicable to the first cutover, leaving PK6
+  Cutover and Recovery open. This does not change the P4 domain gate. Quanthus retains
+  sole authority for data, PIT, replay, strategy governance, decisions, and execution, and the
+  first Web path remains a Quanthus-owned shell. The boundary freeze and PK1-PK3 acceptance are
+  recorded in `acceptance/platform-kernel-pk0-boundary-freeze-20260812.md`,
+  `acceptance/platform-kernel-pk1-pk3-acceptance-20260812.md`, and
+  `acceptance/platform-kernel-pk4-operator-web-acceptance-20260812.md`; the later public edge is
+  recorded separately in `acceptance/platform-kernel-public-edge-acceptance-20260812.md`.
+- The candidate workbench now projects replay, evidence review, governance, and execution as four
+  independent axes. All five current versions start replay-succeeded, pending review, governance
+  not submitted, and execution not authorized. Review and governance events are digest-bound and
+  append-only; governance admission cannot authorize execution. Acceptance is recorded in
+  `acceptance/platform-candidate-approval-workflow-20260813.md`.
+- ADR 0012 opens the post-PK4 lean Worker milestone for a personal strategy experiment platform.
+  Web/API remain the control plane and candidate replay is the first independently executed
+  PostgreSQL-queued Job. Production starts with one Replay Worker at concurrency one; registry,
+  event stream, notification wakeups, and speculative Worker families remain deferred. Existing
+  CN01/Hermes/OCI data schedules retain node-local `systemd`/CLI ownership. Redis, Celery, and
+  RabbitMQ remain absent.
+- The Lean V1 Replay Worker producer loop is accepted. Production runs one independently deployed
+  PostgreSQL Worker at concurrency one; the successful five-candidate Job reads authoritative
+  DWD/PIT directly, executes through P2, seals one immutable Run, atomically switches five active
+  evidence digests, and resets each digest to pending review. Generation-fenced recovery and
+  temporary two-Worker competition passed without double publication, and public desktop/mobile
+  Run-history acceptance passed. No Redis, Celery, RabbitMQ, maintained per-strategy ADS, Worker
+  registry, or warehouse schedule migration was added. Evidence is recorded in
+  `acceptance/platform-worker-production-loop-20260813.md`; the earlier infrastructure-only state
+  remains recorded in `acceptance/platform-worker-lean-v1-infrastructure-checkpoint-20260813.md`.
 - The old Base, DWS, ADS, dual-lane, and portable research packages remain immutable historical
   evidence under their acceptance records. They are not current transformation inputs or current
   operating authority and are not deleted by this stage transition.
@@ -108,6 +141,7 @@ gate is a conformance defect rather than an alternate project state.
 | `design/` | Approved current-state HLD, execution profiles, and module LLDs | `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md` |
 | `design/strategies/` | Formal strategy proposals and frozen capability fixtures | `design/strategies/README.md` |
 | `architecture/` | Accepted decisions and stable topic contracts | `architecture/README.md` |
+| `references/` | Non-governing external research references and Quanthus applicability notes | `references/README.md` |
 | `work-items/` | Stable ids joining design, code, tests, issues, and evidence | `work-items/index.md` |
 | `operations/` | Deployment, recurring operation, incident, migration, and rollback | Runbook selected by the active component |
 | `acceptance/` | Point-in-time acceptance and conformance evidence | Load only for the claim being audited |
@@ -123,6 +157,7 @@ gate is a conformance defect rather than an alternate project state.
 | ODS or daily operations | this map, architecture index, ADR 0003/0004/0007, selected runbook | Exact config, service, and contract tests |
 | Historical dual-lane or ADS evidence | root `AGENTS.md`, this map, ADR 0005 and the exact acceptance record | Treat packages as retained historical evidence, not current operating authority |
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
+| Platform Kernel extraction or restoration | root `AGENTS.md`, this map, HLD, ADR 0010, LLD 11, `config/platform-kernel-gates.v1.json` | QuantDinger audit record, exact upstream source path, selected Web ownership/source evidence, and adapter contract |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |

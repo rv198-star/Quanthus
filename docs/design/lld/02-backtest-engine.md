@@ -207,6 +207,11 @@ Suspension discards placeholder prices; invalid, missing, non-executable, or pol
 fail closed; an open at the upper/lower limit becomes a directional buy/sell block. The adapter
 does not query vendors or infer state inside strategy code.
 
+A `ZERO_ACTIVITY_OBSERVATION` may retain a static close for valuation while remaining
+non-executable. P2 represents it as price-bearing `NON_TRADING_OBSERVED`: a new buy is cancelled
+with `security_not_trading_observed`, while a held sell is carried and may mark the position from
+the observed close. This does not convert the static observation into a fill price.
+
 ## 5. Capital units
 
 P2 records accounting facts for each unit: available and reserved cash, settled and pending

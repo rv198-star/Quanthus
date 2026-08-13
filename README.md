@@ -39,6 +39,24 @@ Install the optional P1 data stack with:
 make bootstrap-p1
 ```
 
+Install and validate the separately composed operator Platform Kernel with:
+
+```bash
+make bootstrap-platform
+make platform-check
+make platform-web-check
+```
+
+Its runtime surface is controlled by `config/platform-features.v1.json`. PostgreSQL clean-
+migration acceptance additionally requires a disposable database named by
+`QUANTHUS_TEST_POSTGRES_DSN` and runs through `make platform-postgres-check`. The default Quanthus
+installation remains free of HTTP, database, AI, broker, market-provider, Redis, and Celery
+dependencies.
+
+The accepted operator deployment adds source-built API and Web images through
+`make platform-image` and `make platform-web-image`; its PostgreSQL, API, and Web services remain a
+separately composed optional runtime.
+
 ## Repository layout
 
 ```text

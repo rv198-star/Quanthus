@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+COMPOSE_FILE="$REPOSITORY_ROOT/ops/platform/acceptance.compose.yaml"
+EVIDENCE_DIR="$REPOSITORY_ROOT/artifacts/platform-kernel"
+PROJECT_NAME="quanthus-pk-acceptance-20260812"
+
+export QUANTHUS_ACCEPTANCE_UID
+export QUANTHUS_ACCEPTANCE_GID
+QUANTHUS_ACCEPTANCE_UID=$(id -u)
+QUANTHUS_ACCEPTANCE_GID=$(id -g)
+
+mkdir -p "$EVIDENCE_DIR"
+rm -f \
+    "$EVIDENCE_DIR/platform-kernel-postgres-runtime.json" \
+    "$EVIDENCE_DIR/platform-kernel-postgres-junit.xml"
+
+cleanup() {
+    docker compose --project-name "$PROJECT_NAME" --file "$COMPOSE_FILE" \
+        down --volumes --remove-orphans >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+cleanup
+docker compose --project-name "$PROJECT_NAME" --file "$COMPOSE_FILE" \
+    up --build --abort-on-container-exit --exit-code-from acceptance
+
+test -s "$EVIDENCE_DIR/platform-kernel-postgres-runtime.json"
+test -s "$EVIDENCE_DIR/platform-kernel-postgres-junit.xml"
+printf '%s\n' "Platform Kernel Docker acceptance passed."
+printf 'Evidence: %s\n' "$EVIDENCE_DIR/platform-kernel-postgres-runtime.json"
+printf 'JUnit: %s\n' "$EVIDENCE_DIR/platform-kernel-postgres-junit.xml"

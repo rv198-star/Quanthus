@@ -1,0 +1,167 @@
+{
+  "schema_version": "quanthus.platform.features.v1",
+  "manifest_version": "1.0.0",
+  "process_roles": [
+    "api",
+    "migration",
+    "web",
+    "replay-worker"
+  ],
+  "dependency_groups": [
+    "platform"
+  ],
+  "features": [
+    {
+      "id": "platform-core",
+      "enabled": true,
+      "source_capabilities": [
+        "app-factory",
+        "postgresql-platform-store",
+        "production-deployment-skeleton"
+      ],
+      "routes": [],
+      "startup_hooks": [],
+      "migrations": [],
+      "web_routes": []
+    },
+    {
+      "id": "identity",
+      "enabled": true,
+      "source_capabilities": [
+        "local-auth-password-session",
+        "user-admin-rbac",
+        "mfa-login-controls-security-audit"
+      ],
+      "routes": [
+        "auth.login",
+        "auth.logout",
+        "auth.me",
+        "auth.mfa.enroll",
+        "auth.mfa.confirm",
+        "auth.mfa.disable",
+        "admin.users.list",
+        "admin.users.create"
+      ],
+      "startup_hooks": [],
+      "migrations": [
+        "identity"
+      ],
+      "web_routes": []
+    },
+    {
+      "id": "observability",
+      "enabled": true,
+      "source_capabilities": [
+        "health-request-id-logging-metrics",
+        "openapi-and-api-errors"
+      ],
+      "routes": [
+        "system.health",
+        "system.ready",
+        "system.metrics",
+        "system.openapi"
+      ],
+      "startup_hooks": [],
+      "migrations": [],
+      "web_routes": []
+    },
+    {
+      "id": "quanthus-gate-query-v1",
+      "enabled": true,
+      "source_capabilities": [],
+      "routes": [
+        "quanthus.gates.read"
+      ],
+      "startup_hooks": [],
+      "migrations": [],
+      "web_routes": []
+    },
+    {
+      "id": "quanthus-product-research-query-v1",
+      "enabled": true,
+      "source_capabilities": [
+        "dashboard-portfolio-report-views"
+      ],
+      "routes": [
+        "quanthus.product.catalog.read",
+        "quanthus.product.candidate.read",
+        "quanthus.product.candidate-review.write",
+        "quanthus.product.candidate-governance.write"
+      ],
+      "startup_hooks": [],
+      "migrations": [
+        "candidate-review",
+        "candidate-approval"
+      ],
+      "web_routes": []
+    },
+    {
+      "id": "finite-jobs",
+      "enabled": true,
+      "source_capabilities": [
+        "generic-finite-jobs"
+      ],
+      "routes": [
+        "jobs.submit-attribution-verification",
+        "jobs.submit-candidate-replay",
+        "jobs.list-candidate-replays",
+        "jobs.read",
+        "jobs.cancel"
+      ],
+      "startup_hooks": [
+        "jobs.resume-pending"
+      ],
+      "migrations": [
+        "jobs"
+      ],
+      "web_routes": []
+    },
+    {
+      "id": "quanthus-attribution-verification-v1",
+      "enabled": true,
+      "source_capabilities": [],
+      "routes": [],
+      "startup_hooks": [],
+      "migrations": [],
+      "web_routes": []
+    },
+    {
+      "id": "desktop-operator-web",
+      "enabled": true,
+      "source_capabilities": [
+        "desktop-operator-web"
+      ],
+      "routes": [],
+      "startup_hooks": [],
+      "migrations": [],
+      "web_routes": [
+        "/",
+        "/research",
+        "/candidates",
+        "/candidates/:strategy_id",
+        "/attribution",
+        "/operator"
+      ]
+    }
+  ],
+  "excluded_capabilities": [
+    "oauth-providers",
+    "redis-response-cache",
+    "celery-redis-job-transport",
+    "agent-token-audit-idempotency",
+    "email-webhook-transport",
+    "mobile-clients",
+    "market-universe-factor-fundamental-apis",
+    "quantdinger-data-providers-and-market-sync",
+    "strategy-v2-bots-runtime-workers",
+    "quantdinger-backtest-factor-analysis",
+    "broker-live-grid-pending-orders",
+    "billing-membership-credits-referral-usdt",
+    "community-marketplace-comments-purchases",
+    "mcp-and-legacy-agent-tools",
+    "fast-analysis",
+    "ai-copilot-chat-tools",
+    "ai-review-reflection-calibration-decision",
+    "strategy-indicator-authoring"
+  ]
+}

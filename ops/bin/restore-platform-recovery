@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -ne 4 ]; then
+    echo "usage: $0 PACKAGE_DIR PROJECT_NAME /absolute/path/platform.env RECEIPT_PATH" >&2
+    exit 2
+fi
+
+PACKAGE=$1
+PROJECT=$2
+SECRET_ENV=$3
+RECEIPT=$4
+
+if [[ ! "$PROJECT" =~ ^quanthus-pk6-restore-[a-z0-9-]+$ ]]; then
+    echo "project name must match quanthus-pk6-restore-[a-z0-9-]+" >&2
+    exit 2
+fi
+case "$SECRET_ENV" in
+    /*) ;;
+    *) echo "secret env path must be absolute" >&2; exit 2 ;;
+esac
+test -f "$SECRET_ENV"
+test "$(stat -c '%a' "$SECRET_ENV")" = "600"
+PACKAGE=$(CDPATH= cd -- "$PACKAGE" && pwd)
+
+(
+    cd "$PACKAGE"
+    sha256sum -c SHA256SUMS
+)
+docker load < <(gzip -dc "$PACKAGE/images.tar.gz") >/dev/null
+
+set -a
+# shellcheck disable=SC1090
+. "$PACKAGE/expected-state.env"
+set +a
+test "$(docker image inspect "$QUANTHUS_PLATFORM_IMAGE" --format '{{.Id}}')" = \
+    "$QUANTHUS_RECOVERY_API_IMAGE_ID"
+test "$(docker image inspect "$QUANTHUS_PLATFORM_WEB_IMAGE" --format '{{.Id}}')" = \
+    "$QUANTHUS_RECOVERY_WEB_IMAGE_ID"
+test "$(docker image inspect "$QUANTHUS_REPLAY_IMAGE" --format '{{.Id}}')" = \
+    "$QUANTHUS_RECOVERY_REPLAY_IMAGE_ID"
+test "$(docker image inspect postgres:16-alpine --format '{{.Id}}')" = \
+    "$QUANTHUS_RECOVERY_POSTGRES_IMAGE_ID"
+
+compose() {
+    docker compose --project-name "$PROJECT" \
+        --env-file "$SECRET_ENV" \
+        --env-file "$PACKAGE/recovery-images.env" \
+        --file "$PACKAGE/recovery.compose.yaml" "$@"
+}
+
+if docker volume inspect "${PROJECT}_postgres-data" >/dev/null 2>&1; then
+    echo "restore project already has state: $PROJECT" >&2
+    exit 2
+fi
+
+compose up -d postgres
+POSTGRES_CONTAINER="${PROJECT}-postgres-1"
+for _ in $(seq 1 60); do
+    if [ "$(docker inspect "$POSTGRES_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || true)" = healthy ]; then
+        break
+    fi
+    sleep 1
+done
+test "$(docker inspect "$POSTGRES_CONTAINER" --format '{{.State.Health.Status}}')" = healthy
+docker exec -i "$POSTGRES_CONTAINER" sh -lc \
+    'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --exit-on-error' \
+    <"$PACKAGE/postgres.dump"
+
+compose create api web >/dev/null
+docker run --rm \
+    --volume "${PROJECT}_candidate-runs:/target" \
+    --volume "$PACKAGE:/backup:ro" \
+    postgres:16-alpine sh -ec 'tar -C /target -xzf /backup/candidate-runs.tar.gz'
+docker run --rm \
+    --volume "${PROJECT}_attribution-releases:/target" \
+    --volume "$PACKAGE:/backup:ro" \
+    postgres:16-alpine sh -ec 'tar -C /target -xzf /backup/attribution-releases.tar.gz'
+
+compose up -d api web
+API_CONTAINER="${PROJECT}-api-1"
+WEB_CONTAINER="${PROJECT}-web-1"
+for container in "$API_CONTAINER" "$WEB_CONTAINER"; do
+    for _ in $(seq 1 60); do
+        if [ "$(docker inspect "$container" --format '{{.State.Health.Status}}' 2>/dev/null || true)" = healthy ]; then
+            break
+        fi
+        sleep 1
+    done
+    test "$(docker inspect "$container" --format '{{.State.Health.Status}}')" = healthy
+done
+
+RUN_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_runs"')
+ACTIVE_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_active_runs"')
+USER_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_users"')
+test "$RUN_COUNT" = "$QUANTHUS_RECOVERY_RUN_COUNT"
+test "$ACTIVE_COUNT" = "$QUANTHUS_RECOVERY_ACTIVE_POINTER_COUNT"
+test "$USER_COUNT" = "$QUANTHUS_RECOVERY_USER_COUNT"
+
+docker exec -i "$API_CONTAINER" python - <<'PY'
+import json
+import urllib.request
+for path in ("/health", "/ready", "/openapi.json"):
+    with urllib.request.urlopen("http://127.0.0.1:8080" + path, timeout=3) as response:
+        assert response.status == 200
+        json.load(response)
+PY
+docker exec -i "$API_CONTAINER" python - <<'PY'
+import hashlib
+import os
+from pathlib import Path
+
+import psycopg
+
+with psycopg.connect(os.environ["QUANTHUS_PLATFORM_DATABASE_URL"]) as connection:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT run_id, artifact_ref, result_sha256 FROM platform_candidate_runs ORDER BY run_id"
+        )
+        rows = cursor.fetchall()
+assert rows, "restored database has no candidate Runs"
+for run_id, artifact_ref, expected in rows:
+    relative = Path(artifact_ref).relative_to("/data/candidate-runs")
+    result = Path("/data/candidate-runs") / relative / "result.json"
+    observed = "sha256:" + hashlib.sha256(result.read_bytes()).hexdigest()
+    assert observed == expected, f"Run digest mismatch: {run_id}"
+PY
+docker exec "$WEB_CONTAINER" node -e \
+    "Promise.all(['/ready','/operator'].map(p=>fetch('http://127.0.0.1:3100'+p).then(r=>{if(!r.ok)throw Error(p+':'+r.status)}))).catch(()=>process.exit(1))"
+
+install -d -m 0700 "$(dirname -- "$RECEIPT")"
+cat >"$RECEIPT" <<EOF
+status=passed
+project=$PROJECT
+git_commit=$QUANTHUS_RECOVERY_GIT_COMMIT
+run_count=$RUN_COUNT
+active_pointer_count=$ACTIVE_COUNT
+user_count=$USER_COUNT
+api_image_id=$(docker inspect "$API_CONTAINER" --format '{{.Image}}')
+web_image_id=$(docker inspect "$WEB_CONTAINER" --format '{{.Image}}')
+postgres_image_id=$(docker inspect "$POSTGRES_CONTAINER" --format '{{.Image}}')
+EOF
+chmod 0600 "$RECEIPT"
+printf 'Isolated recovery passed: %s\n' "$PROJECT"
+printf 'Receipt: %s\n' "$RECEIPT"

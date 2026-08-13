@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-platform bootstrap-p1 bootstrap-ods doctor test platform-check platform-postgres-check platform-docker-acceptance platform-image platform-web-image platform-web-check replay-image candidate-batch compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
+.PHONY: bootstrap bootstrap-platform bootstrap-p1 bootstrap-ods doctor test platform-check platform-postgres-check platform-docker-acceptance platform-image platform-web-image platform-web-check platform-recovery-backup platform-recovery-restore replay-image candidate-batch compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -51,6 +51,24 @@ platform-web-image:
 
 platform-web-check:
 	cd web && npm test
+
+platform-recovery-backup:
+	@test -n "$${QUANTHUS_RECOVERY_PACKAGE:-}" || \
+		(echo "set QUANTHUS_RECOVERY_PACKAGE to a new absolute package path"; exit 2)
+	./ops/bin/backup-platform-recovery "$${QUANTHUS_RECOVERY_PACKAGE}"
+
+platform-recovery-restore:
+	@test -n "$${QUANTHUS_RECOVERY_PACKAGE:-}" || \
+		(echo "set QUANTHUS_RECOVERY_PACKAGE to an existing package path"; exit 2)
+	@test -n "$${QUANTHUS_RESTORE_PROJECT:-}" || \
+		(echo "set QUANTHUS_RESTORE_PROJECT to quanthus-pk6-restore-NAME"; exit 2)
+	@test -n "$${QUANTHUS_PLATFORM_ENV:-}" || \
+		(echo "set QUANTHUS_PLATFORM_ENV to the absolute mode-0600 secret env path"; exit 2)
+	./ops/bin/restore-platform-recovery \
+		"$${QUANTHUS_RECOVERY_PACKAGE}" \
+		"$${QUANTHUS_RESTORE_PROJECT}" \
+		"$${QUANTHUS_PLATFORM_ENV}" \
+		"$${QUANTHUS_RECOVERY_RECEIPT:-artifacts/platform-kernel/recovery-receipt.txt}"
 
 replay-image:
 	./ops/bin/build-replay-image

@@ -135,6 +135,35 @@ or an API/database container on `traefik-net` as a failed deployment.
 
 ## Failure And Recovery
 
+Create a self-verifying recovery package only from a clean revision equal to `origin/main`:
+
+```bash
+QUANTHUS_RECOVERY_PACKAGE=/srv/quanthus/recovery/pk6-YYYYMMDD-HHMMSS \
+  make platform-recovery-backup
+```
+
+The mode-0700 package contains a Git bundle, exact API/Web/Replay/PostgreSQL images, a consistent
+PostgreSQL custom dump, sealed candidate Runs, attribution releases, Compose/config/license
+inventory, expected state, and SHA-256 manifest. It excludes node-local passwords and MFA keys,
+failed `.staging` attempts, and the external 14 GB DWD authority. Keep the node-local mode-0600
+environment through a separate secret-backup mechanism.
+
+Prove restoration in an isolated project whose name starts with `quanthus-pk6-restore-`. The
+restore topology has separate volumes, loopback-only ports 18080/13100, no Replay Worker, and no
+Traefik network, so it cannot consume work or receive public traffic:
+
+```bash
+QUANTHUS_RECOVERY_PACKAGE=/srv/quanthus/recovery/pk6-YYYYMMDD-HHMMSS \
+QUANTHUS_RESTORE_PROJECT=quanthus-pk6-restore-drill \
+QUANTHUS_PLATFORM_ENV=/home/ubuntu/.config/quanthus/platform.env \
+QUANTHUS_RECOVERY_RECEIPT=artifacts/platform-kernel/recovery-receipt.txt \
+  make platform-recovery-restore
+```
+
+After inspecting the receipt and restored UI, remove only that explicit drill project with
+`docker compose --project-name quanthus-pk6-restore-drill --env-file ... --env-file ... -f ... down -v`.
+Never point the restore script at the `quanthus-platform` production project or production volumes.
+
 - Migration failure: the transaction rolls back and no ledger row is authoritative; diagnose and
   rerun the same migration. Never hand-edit the ledger.
 - Readiness failure: keep the API out of service and inspect PostgreSQL connectivity; liveness does

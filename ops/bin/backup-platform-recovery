@@ -60,9 +60,9 @@ docker exec "$POSTGRES_CONTAINER" sh -lc \
 
 docker run --rm \
     --volume "$RUN_VOLUME:/source:ro" \
-    --volume "$STAGING:/backup" \
     postgres:16-alpine \
-    sh -ec 'test -d /source/runs; tar -C /source -czf /backup/candidate-runs.tar.gz runs'
+    sh -ec 'test -d /source/runs; tar -C /source -czf - runs' \
+    >"$STAGING/candidate-runs.tar.gz"
 tar -C "$ATTRIBUTION_ROOT" -czf "$STAGING/attribution-releases.tar.gz" .
 
 cp "$REPOSITORY_ROOT/ops/platform/compose.yaml" "$STAGING/production.compose.yaml"

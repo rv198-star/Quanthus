@@ -551,6 +551,7 @@ class GitHub:
             name for name in existing_labels if not name.startswith(MANAGED_LABEL_PREFIXES)
         ]
         desired_labels = sorted(set(labels + unmanaged))
+        should_close = "status:closed" in desired_labels
         existing_body = None if existing is None else existing.get("body")
         desired_body = body
         if (
@@ -566,7 +567,14 @@ class GitHub:
             "milestone": milestone,
         }
         if existing is None:
-            return self.api("POST", f"/repos/{self.repository}/issues", payload), "created"
+            created = self.api("POST", f"/repos/{self.repository}/issues", payload)
+            if should_close:
+                created = self.api(
+                    "PATCH",
+                    f"/repos/{self.repository}/issues/{created['number']}",
+                    {"state": "closed"},
+                )
+            return created, "created"
         current_milestone = existing.get("milestone")
         current_milestone_number = (
             None if current_milestone is None else current_milestone["number"]
@@ -576,9 +584,12 @@ class GitHub:
             and existing_body == desired_body
             and sorted(existing_labels) == desired_labels
             and current_milestone_number == milestone
+            and (not should_close or existing.get("state", "").casefold() == "closed")
         )
         if unchanged:
             return existing, "reused"
+        if should_close:
+            payload["state"] = "closed"
         endpoint = f"/repos/{self.repository}/issues/{existing['number']}"
         return self.api("PATCH", endpoint, payload), "updated"
 
@@ -604,6 +615,9 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
     items = work_items(root)
     _, rows_by_chapter = chapter_rows(root)
     target_ids = {item.stable_id for item in items} | {f"LLD-{item.number}" for item in CHAPTERS}
+    closed_ids = {item.stable_id for item in items if item.status == "closed"} | {
+        f"LLD-{chapter.number}" for chapter in CHAPTERS if chapter.status == "closed"
+    }
     github = GitHub(repository)
 
     existing_issues = github.issues()
@@ -675,6 +689,11 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
         if not remote_issue["title"].startswith(f"[{stable_id}]"):
             raise RuntimeError(
                 f"GitHub verification failed for {stable_id}: issue #{verification_issue['number']}"
+            )
+        if stable_id in closed_ids and remote_issue.get("state", "").casefold() != "closed":
+            raise RuntimeError(
+                f"GitHub verification failed for {stable_id}: expected closed issue "
+                f"#{verification_issue['number']}"
             )
 
     issue_by_stable_id(github.issues(), target_ids)

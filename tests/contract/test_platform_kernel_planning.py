@@ -188,6 +188,58 @@ def test_planning_sync_preserves_newer_managed_issue_body() -> None:
     assert captured["body"] == existing["body"]
 
 
+def test_planning_sync_closes_issue_when_document_status_is_closed() -> None:
+    existing = {
+        "title": "[PK-RECOVERY-001] Recovery",
+        "body": "Managed body",
+        "labels": [{"name": "status:closed"}],
+        "milestone": {"number": 9},
+        "number": 140,
+        "state": "open",
+    }
+    captured: dict[str, object] = {}
+    github = GitHub("rv198-star/Quanthus")
+
+    def fake_api(method: str, endpoint: str, payload: dict[str, object]) -> dict[str, object]:
+        captured.update(payload)
+        return {**existing, **payload}
+
+    github.api = fake_api  # type: ignore[method-assign]
+    _, result = github.upsert_issue(
+        existing,
+        existing["title"],
+        existing["body"],
+        ["status:closed"],
+        9,
+    )
+
+    assert result == "updated"
+    assert captured["state"] == "closed"
+
+
+def test_planning_sync_does_not_reopen_manually_closed_nonclosed_issue() -> None:
+    existing = {
+        "title": "[P4-EVENT-001] Event contract",
+        "body": "Managed body",
+        "labels": [{"name": "status:ready"}],
+        "milestone": {"number": 4},
+        "number": 73,
+        "state": "closed",
+    }
+    github = GitHub("rv198-star/Quanthus")
+
+    issue, result = github.upsert_issue(
+        existing,
+        existing["title"],
+        existing["body"],
+        ["status:ready"],
+        4,
+    )
+
+    assert result == "reused"
+    assert issue["state"] == "closed"
+
+
 def test_platform_kernel_authority_and_authoring_boundaries_are_explicit() -> None:
     hld = (ROOT / "docs" / "design" / "hld.md").read_text(encoding="utf-8")
     lld = (ROOT / "docs" / "design" / "lld" / "11-platform-kernel.md").read_text(encoding="utf-8")

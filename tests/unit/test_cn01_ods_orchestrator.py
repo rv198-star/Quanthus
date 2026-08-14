@@ -261,7 +261,7 @@ def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     assert "TimeoutStartSec=160min" in service
     assert "SuccessExitStatus=0" in service
     assert "OnSuccess=hermes-dwd-success-notification.service" in service
-    assert "OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai" in timer
+    assert "OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai" in timer
     assert "Persistent=false" in timer
 
 

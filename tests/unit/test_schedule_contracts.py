@@ -9,6 +9,7 @@ from quanthus.pipelines.schedule_contracts import ScheduleContractError, load_sc
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "config" / "schedules" / "hermes-ods-schedule.v1.json"
+LATE_CONFIG = ROOT / "config" / "schedules" / "hermes-ods-schedule.late.v1.json"
 TRADING_SESSION = ROOT / "config" / "trading-session.v1.json"
 
 
@@ -32,6 +33,30 @@ class ScheduleContractTests(unittest.TestCase):
             "hermes-full-ods-scope-cn01-throughput-20260731",
         )
         self.assertEqual(len(contract.lanes), 5)
+
+    def test_repository_late_hermes_schedule_is_valid(self) -> None:
+        contract = load_schedule_contract(LATE_CONFIG)
+
+        self.assertEqual(contract.schedule_id, "hermes-ods-schedule-late-v1")
+        self.assertEqual(
+            contract.contract_revision,
+            "hermes-late-window-cn01-throughput-20260814",
+        )
+        self.assertEqual(len(contract.lanes), 5)
+
+    def test_late_schedule_rejects_unversioned_deadline_change(self) -> None:
+        payload = json.loads(LATE_CONFIG.read_text(encoding="utf-8"))
+        lane = next(
+            lane for lane in payload["lanes"] if lane["id"] == "market-daily-core"
+        )
+        lane["completion_deadline"] = "21:00:00"
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        path = Path(directory.name) / "schedule.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        with self.assertRaisesRegex(ScheduleContractError, "20:46"):
+            load_schedule_contract(path)
 
     def test_2026_trading_session_contract_is_explicit_and_sparse(self) -> None:
         payload = json.loads(TRADING_SESSION.read_text(encoding="utf-8"))

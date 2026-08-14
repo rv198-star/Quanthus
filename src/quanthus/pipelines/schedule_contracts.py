@@ -23,6 +23,24 @@ _LANE_IDS = {
     "weekly-corrections",
 }
 _CORRECTION_CLASSES = {"same", "missing_in_daily", "changed_upstream", "conflict"}
+_MARKET_PROFILES: dict[str, dict[str, str]] = {
+    "hermes-ods-schedule-v1": {
+        "contract_revision": "hermes-full-ods-scope-cn01-throughput-20260731",
+        "trigger_time": "17:30:00",
+        "experiment_id": "baostock-load-window-20260731-v3",
+        "hermes_timer_start": "17:30:00",
+        "readiness_deadline": "19:00:00",
+        "completion_deadline": "19:46:00",
+    },
+    "hermes-ods-schedule-late-v1": {
+        "contract_revision": "hermes-late-window-cn01-throughput-20260814",
+        "trigger_time": "19:30:00",
+        "experiment_id": "baostock-load-window-20260814-v4",
+        "hermes_timer_start": "19:30:00",
+        "readiness_deadline": "20:00:00",
+        "completion_deadline": "20:46:00",
+    },
+}
 
 
 def _mapping(value: Any, *, field: str) -> Mapping[str, Any]:
@@ -76,6 +94,18 @@ def load_schedule_contract(path: Path) -> ScheduleContract:
     if root.get("schema_version") != 1:
         raise ScheduleContractError("unsupported schedule contract schema_version")
 
+    schedule_id = _string(root.get("schedule_id"), field="schedule_id")
+    contract_revision = _string(
+        root.get("contract_revision"), field="contract_revision"
+    )
+    market_profile = _MARKET_PROFILES.get(schedule_id)
+    if market_profile is None:
+        raise ScheduleContractError(f"unsupported schedule_id: {schedule_id}")
+    if contract_revision != market_profile["contract_revision"]:
+        raise ScheduleContractError(
+            "schedule contract_revision does not match its versioned market profile"
+        )
+
     timezone = _string(root.get("timezone"), field="timezone")
     try:
         ZoneInfo(timezone)
@@ -126,16 +156,14 @@ def load_schedule_contract(path: Path) -> ScheduleContract:
         raise ScheduleContractError(f"lane set mismatch: missing={missing}, extra={extra}")
 
     _validate_bootstrap(lanes["bootstrap"])
-    _validate_market_daily(lanes["market-daily-core"])
+    _validate_market_daily(lanes["market-daily-core"], profile=market_profile)
     _validate_calendar_events(lanes["calendar-daily-events"])
     _validate_intraday(lanes["intraday-archive"])
     _validate_weekly(lanes["weekly-corrections"])
 
     return ScheduleContract(
-        schedule_id=_string(root.get("schedule_id"), field="schedule_id"),
-        contract_revision=_string(
-            root.get("contract_revision"), field="contract_revision"
-        ),
+        schedule_id=schedule_id,
+        contract_revision=contract_revision,
         timezone=timezone,
         lanes=tuple(lanes),
         config_path=path.resolve(),
@@ -150,13 +178,16 @@ def _validate_bootstrap(lane: Mapping[str, Any]) -> None:
         raise ScheduleContractError("bootstrap must not be enabled by the scheduler")
 
 
-def _validate_market_daily(lane: Mapping[str, Any]) -> None:
+def _validate_market_daily(
+    lane: Mapping[str, Any], *, profile: Mapping[str, str]
+) -> None:
     trigger = _mapping(lane.get("trigger"), field="market-daily-core.trigger")
     if trigger.get("weekdays") != [1, 2, 3, 4, 5]:
         raise ScheduleContractError("market-daily-core must run Monday through Friday")
-    if trigger.get("kind") != "timer" or trigger.get("time") != "17:30:00":
+    trigger_time = profile["trigger_time"]
+    if trigger.get("kind") != "timer" or trigger.get("time") != trigger_time:
         raise ScheduleContractError(
-            "market-daily-core must start at the versioned 17:30 collection window"
+            f"market-daily-core must start at the versioned {trigger_time[:5]} collection window"
         )
     expected_finality = {
         "auction_close_time": "15:00:00",
@@ -181,12 +212,12 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
         field="market-daily-core.collection_window_experiment",
     )
     expected_experiment = {
-        "experiment_id": "baostock-load-window-20260731-v3",
+        "experiment_id": profile["experiment_id"],
         "minimum_open_sessions": 5,
         "nodes": [
             {
                 "node_id": "hermes",
-                "timer_start": "17:30:00",
+                "timer_start": profile["hermes_timer_start"],
                 "activation_grace_seconds": 300,
                 "start_policy": "first_provider_ready_after_timer",
                 "service_timeout_seconds": 15000,
@@ -218,7 +249,7 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
     expected_readiness = {
         "sentinel_indices": ["sh.000001", "sh.000300", "sz.399001"],
         "target_row_policy": "all_sentinels_return_target_market_date",
-        "deadline": "19:00:00",
+        "deadline": profile["readiness_deadline"],
         "empty_response_policy": "poll_or_missing_set_retry_without_reconnect",
         "provider_error_policy": "bounded_reconnect",
         "missing_set_retry_rounds": 1,
@@ -233,8 +264,12 @@ def _validate_market_daily(lane: Mapping[str, Any]) -> None:
         _positive_number(
             readiness.get(field), field=f"market-daily-core.provider_readiness.{field}"
         )
-    if lane.get("completion_deadline") != "19:46:00":
-        raise ScheduleContractError("market-daily-core must use the provisional 19:46 deadline")
+    completion_deadline = profile["completion_deadline"]
+    if lane.get("completion_deadline") != completion_deadline:
+        raise ScheduleContractError(
+            "market-daily-core must use the versioned "
+            f"{completion_deadline[:5]} completion deadline"
+        )
     datasets = _string_set(lane.get("datasets"), field="market-daily-core.datasets")
     if "valuation_daily_delta" not in datasets:
         raise ScheduleContractError("market-daily-core must acquire daily valuation")

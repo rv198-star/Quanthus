@@ -1,8 +1,8 @@
 # Hermes ODS Scheduler V1 Runbook
 
-This runbook deploys the schedule in
-`config/schedules/hermes-ods-schedule.v1.json`. Times are Asia/Shanghai. Issue #41 is the change
-record; Hermes must not alter live cron until OCI posts `GO_FOR_CUTOVER`.
+This runbook deploys `config/schedules/hermes-ods-schedule.late.v1.json` on Hermes and
+`config/schedules/hermes-ods-schedule.v1.json` on CN01. Times are Asia/Shanghai. Issue #41 is the
+change record; Hermes must not alter live cron until OCI posts `GO_FOR_CUTOVER`.
 
 ## Validate the contract
 
@@ -14,8 +14,8 @@ make bootstrap-ods
 make schedule-check
 ```
 
-The result must name `hermes-ods-schedule-v1`, five lanes, and `Asia/Shanghai`. This validates
-platform invariants, not the live Hermes scheduler.
+The result must name the selected versioned schedule, five lanes, and `Asia/Shanghai`. This
+validates platform invariants, not the live node scheduler.
 
 ## Node-local Git deployment
 
@@ -44,8 +44,8 @@ sudo systemctl daemon-reload
 The rendered directory includes the generic `quanthus-pipeline-failure@.service` handler. Node
 renaming changes unit names, the protected environment-file path, and the market-window metadata,
 but the repository-owned launcher remains `ops/bin/run-hermes-ods-lane` for each individual lane.
-CN01 and Hermes both render one `<node>-ods-daily-orchestrator.{service,timer}` at 18:30 with a
-130-minute systemd bound. The controller reuses verified same-date READY releases, starts only
+CN01 renders its daily orchestrator at 18:30; Hermes renders it at 19:30. Both use a 160-minute
+systemd bound. The controller reuses verified same-date READY releases, starts only
 missing lanes, seals the daily catalog, and builds the node-local DWD increment after all four
 lanes pass. The former four daily lane timers are rendered with
 `ConditionPathExists=/etc/quanthus/<node>-ods-legacy-timers-enabled` as rollback units and must not
@@ -97,12 +97,13 @@ attempt's `landing/preflight/`. It does not overwrite the Base calendar. Market 
 collectors must not run if this refresh fails.
 
 For an open session, inspect `landing/provider_readiness.json`. The market collector polls
-`sh.000001`, `sh.000300`, and `sz.399001` until all three return the target date or the 19:00
+`sh.000001`, `sh.000300`, and `sz.399001` until all three return the target date or the configured
 readiness deadline expires. An empty successful response is not a connection error and must not
 cause an immediate logout/login cycle. Provider/network errors have bounded reconnects; each
 successful login applies a 30-second socket timeout. After readiness, the first stock pass is
-followed by one retry of only the missing set. A residual gap or the 19:46 completion deadline
-produces no READY.
+followed by one retry of only the missing set. A residual gap or the configured completion
+deadline produces no READY. The CN01 profile uses 19:00/19:46; the Hermes late profile uses
+20:00/20:46.
 
 Minute provider collection is always written under the current attempt. Shared legacy minute
 partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must

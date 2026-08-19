@@ -83,6 +83,20 @@ LABELS = (
 
 PLATFORM_KERNEL_MILESTONE = "Platform Kernel Extraction"
 WORKER_RUNTIME_MILESTONE = "PostgreSQL Worker Runtime"
+EXPERT_STRATEGY_MILESTONE = "Expert Strategy Layer MVP"
+EXPERT_STRATEGY_DESIGN_PATH = "docs/design/lld/04-experts-aggregator/expert-strategy-layer.md"
+EXPERT_STRATEGY_CHILD_IDS = (
+    "P3-EXPERT-001",
+    "P3-EXPERT-002",
+    "P3-EXPERT-003",
+    "P3-STRAT-002",
+    "P3-ATTR-001",
+    "P3-EXPERT-004",
+    "P3-EXPERT-005",
+)
+EXPERT_STRATEGY_IDS = frozenset({"P3-EXPERT-000", *EXPERT_STRATEGY_CHILD_IDS})
+EXPERT_STRATEGY_DESIGN_IDS = EXPERT_STRATEGY_IDS - {"P3-ATTR-001"}
+PROGRAM_EPIC_IDS = frozenset({"PK-WORKER-000", "P3-EXPERT-000"})
 
 MILESTONES = (
     "P1 Data Foundation",
@@ -94,6 +108,7 @@ MILESTONES = (
     "P7 Live Validation",
     PLATFORM_KERNEL_MILESTONE,
     WORKER_RUNTIME_MILESTONE,
+    EXPERT_STRATEGY_MILESTONE,
 )
 
 CHAPTERS = (
@@ -184,6 +199,9 @@ HIGH_IDS = {
     "P2-MATCH-001",
     "P2-LEDGER-001",
     "P2-ACCEPT-001",
+    "P3-EXPERT-000",
+    "P3-EXPERT-001",
+    "P3-STRAT-002",
 }
 
 
@@ -299,7 +317,7 @@ def work_items(root: Path) -> list[WorkItem]:
             status = "ready" if state == "active" else "triage"
         elif phase == "P3" and row.get("Disposition", "").startswith("closed"):
             status = "closed"
-        elif phase == "P3" and row.get("Disposition", "").startswith("deferred"):
+        elif phase == "P3" and row.get("Disposition", "").startswith(("blocked", "deferred")):
             status = "blocked"
         elif phase == "PK":
             disposition = row.get("Disposition", "")
@@ -319,6 +337,8 @@ def work_items(root: Path) -> list[WorkItem]:
             priority = "normal"
         if phase == "meta":
             milestone = None
+        elif stable_id in EXPERT_STRATEGY_IDS:
+            milestone = EXPERT_STRATEGY_MILESTONE
         elif phase == "PK":
             milestone = (
                 WORKER_RUNTIME_MILESTONE
@@ -338,8 +358,12 @@ def work_items(root: Path) -> list[WorkItem]:
                 status=status,
                 priority=priority,
                 milestone=milestone,
-                design_path=chapter.path,
-                issue_type="epic" if stable_id == "PK-WORKER-000" else "task",
+                design_path=(
+                    EXPERT_STRATEGY_DESIGN_PATH
+                    if stable_id in EXPERT_STRATEGY_DESIGN_IDS
+                    else chapter.path
+                ),
+                issue_type="epic" if stable_id in PROGRAM_EPIC_IDS else "task",
             )
         )
     return items
@@ -352,26 +376,45 @@ def repo_url(repository: str, path: str) -> str:
 def task_body(item: WorkItem, repository: str) -> str:
     blocked_note = ""
     worker_decision = ""
+    expert_design = ""
+    expert_gate_note = ""
+    product_requirements = (
+        f"- [Product requirements]({repo_url(repository, 'docs/product/prd.md')})\n"
+    )
     if item.stable_id.startswith("PK-WORKER-"):
         worker_decision = (
             "- [Worker Runtime decision]("
             f"{repo_url(repository, 'docs/architecture/adr-0010-postgresql-worker-runtime.md')}"
             ")\n"
         )
-    return f"""<!-- quanthus-planning:v1 id={item.stable_id} kind=task -->
+    if item.stable_id in EXPERT_STRATEGY_IDS:
+        if item.design_path != EXPERT_STRATEGY_DESIGN_PATH:
+            expert_design = (
+                "- [Expert Strategy Layer MVP]("
+                f"{repo_url(repository, EXPERT_STRATEGY_DESIGN_PATH)})\n"
+            )
+        expert_gate_note = (
+            "\n\nThis is a bounded post-P3 development increment. It does not reopen P3 "
+            "acceptance or authorize arbitration, permanent-blind, P6 promotion, notification, "
+            "or execution access."
+        )
+    governing_links = (
+        f"- [Detailed design]({repo_url(repository, item.design_path)})\n"
+        f"{expert_design}{worker_decision}{product_requirements}"
+        f"- [High-level design]({repo_url(repository, 'docs/design/hld.md')})\n"
+    )
+    return f"""<!-- quanthus-planning:v1 id={item.stable_id} kind={item.issue_type} -->
 ## Objective
 
 {item.title}.
 
 ## Governing design
 
-- [Detailed design]({repo_url(repository, item.design_path)})
-{worker_decision}- [Product requirements]({repo_url(repository, "docs/product/prd.md")})
-- [High-level design]({repo_url(repository, "docs/design/hld.md")})
+{governing_links}
 
 ## Phase and gate
 
-{PHASE_GATES[item.phase]}{blocked_note}
+{PHASE_GATES[item.phase]}{blocked_note}{expert_gate_note}
 
 ## Dependencies
 
@@ -395,6 +438,17 @@ def task_body(item: WorkItem, repository: str) -> str:
 - [ ] Documentation and traceability are updated.
 - [ ] `make check` passes.
 """
+
+
+def expert_strategy_epic_body(item: WorkItem, repository: str, task_urls: dict[str, str]) -> str:
+    checklist = "\n".join(
+        f"- [ ] [{stable_id}]({task_urls[stable_id]})" for stable_id in EXPERT_STRATEGY_CHILD_IDS
+    )
+    return task_body(item, repository).replace(
+        "## Acceptance evidence\n",
+        f"## Blocking work items\n\n{checklist}\n\n## Acceptance evidence\n",
+        1,
+    )
 
 
 def epic_body(
@@ -638,7 +692,9 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
 
     task_results = {"created": 0, "updated": 0, "reused": 0}
     task_urls: dict[str, str] = {}
-    for item in items:
+    ordered_items = [item for item in items if item.stable_id != "P3-EXPERT-000"]
+    ordered_items.extend(item for item in items if item.stable_id == "P3-EXPERT-000")
+    for item in ordered_items:
         labels = [
             f"type:{item.issue_type}",
             f"status:{item.status}",
@@ -647,10 +703,15 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
             f"area:{item.area}",
         ]
         milestone = None if item.milestone is None else milestone_numbers[item.milestone]
+        body = (
+            expert_strategy_epic_body(item, repository, task_urls)
+            if item.stable_id == "P3-EXPERT-000"
+            else task_body(item, repository)
+        )
         issue, result = github.upsert_issue(
             issues_by_id.get(item.stable_id),
             f"[{item.stable_id}] {item.title}",
-            task_body(item, repository),
+            body,
             labels,
             milestone,
         )

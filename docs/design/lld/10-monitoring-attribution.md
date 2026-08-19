@@ -168,7 +168,7 @@ never a formal strategy report and cannot satisfy `P3-DASH-001`.
 | P2-OBS-001 | Define decision/shadow/notification log schema | P2 events | Accepted, rejected, delivered, and no-implied-fill fixture |
 | P2-HYP-001 | Implement diagnostic hypothetical ledger | Matcher/exit policy | 20-session path fixture |
 | P3-FUNNEL-001 | Implement reconciled opportunity funnel | P3 vertical slice | Count reconciliation |
-| P3-ATTR-001 | Implement constrained remove/neutralize reruns when a formal strategy requires them | Trusted engine and predeclared attribution questions | Reproducible contribution matrix |
+| P3-ATTR-001 | Implement bounded remove/neutralize reruns for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002, trusted engine, and predeclared questions | Baseline reproduction plus at most two single-expert effects and one required pair through complete capital-constrained replay |
 | P3-DASH-001 | Produce three-layer monitoring report for a recurring formal strategy | Funnel/attribution and reporting cadence | Monthly report fixture |
 
 ## 8. Acceptance

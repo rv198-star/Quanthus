@@ -5,7 +5,7 @@ import json
 import tempfile
 import unittest
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from quanthus.event_library.contracts import sha256_digest
@@ -19,6 +19,7 @@ from quanthus.policy import find_project_root
 ROOT = find_project_root()
 POLICY_PATH = ROOT / "config" / "p4-event-scan-source.research.v1.json"
 RELEASE_PATH = ROOT / "config" / "releases" / "v2-build202607.json"
+PROVIDER_PATH = ROOT / "config" / "replay-data-provider.development.v2.json"
 
 
 def _file_sha(path: Path) -> str:
@@ -35,10 +36,10 @@ def _semantic_digest(raw: dict[str, object]) -> str:
 
 
 def _build_base(root: Path) -> tuple[Path, str, str]:
-    package = root / "dwd-base-202607-v2"
+    package = root / "dwd-base-202607-v2.1"
     payload = package / "payload" / "security_market_observation" / "part-00000.parquet"
     payload.parent.mkdir(parents=True)
-    payload.write_bytes(b"synthetic-dwd-base")
+    payload.write_bytes(b"synthetic-dwd-base-v2.1")
     required = [
         "dwd_security",
         "dwd_listing",
@@ -93,23 +94,90 @@ def _write_policy(
 
 
 class EventScanSourceTests(unittest.TestCase):
-    def test_repository_policy_matches_new_chain_release_and_requires_explicit_root(self) -> None:
-        policy = load_event_scan_source_policy(POLICY_PATH, release_path=RELEASE_PATH)
+    def test_repository_policy_matches_v21_correction_and_direct_provider(self) -> None:
+        policy = load_event_scan_source_policy(
+            POLICY_PATH,
+            release_path=RELEASE_PATH,
+            provider_path=PROVIDER_PATH,
+        )
 
-        self.assertEqual(policy.authority, "new_chain_cn01_dwd_mirror")
-        self.assertEqual(policy.base_release.package_id, "dwd-base-202607-v2")
+        self.assertEqual(policy.authority, "direct_dwd_v2_1_plus_correction")
+        self.assertEqual(policy.status, "approved_development_only")
+        self.assertEqual(policy.base_release.package_id, "dwd-base-202607-v2.1")
+        self.assertEqual(
+            policy.correction_release.correction_id,
+            "dwd-base-202607-v2.1-correction-20260813-001",
+        )
         self.assertEqual(policy.daily_increment_mode, "disabled_for_initial_development_scan")
-        self.assertEqual(policy.historical_visibility.status, "blocked")
+        self.assertEqual(
+            policy.historical_visibility.status,
+            "approved_development_retrospective",
+        )
+        self.assertFalse(policy.historical_visibility.per_decision_publication_proven)
+        policy.historical_visibility.require_full_scan_authority()
         self.assertEqual(policy.semantic_digest, policy.computed_semantic_digest)
         self.assertIn("legacy_operational_ads", policy.forbidden_sources)
-        with self.assertRaisesRegex(EventScanSourceError, "set QUANTHUS_P4_DWD_BASE"):
+        self.assertIn("permanent_blind", policy.historical_visibility.forbidden_uses)
+        with self.assertRaisesRegex(EventScanSourceError, "set QUANTHUS_REPLAY_PROVIDER_DWD_ROOT"):
             policy.resolve_runtime_root({})
+        with self.assertRaisesRegex(
+            EventScanSourceError,
+            "set QUANTHUS_REPLAY_PROVIDER_DWD_CORRECTION_ROOT",
+        ):
+            policy.resolve_correction_root({})
         with self.assertRaisesRegex(EventScanSourceError, "outside the authorized"):
             policy.require_development_date(date(2022, 1, 1))
-        with self.assertRaisesRegex(EventScanSourceError, "historical PIT projection"):
-            policy.historical_visibility.require_full_scan_authority()
 
-    def test_exact_physical_new_chain_base_passes_deep_verification(self) -> None:
+    def test_development_projection_is_table_specific_and_retains_pit_limit(self) -> None:
+        policy = load_event_scan_source_policy(POLICY_PATH)
+        visibility = policy.historical_visibility
+        close = datetime(2018, 5, 8, 7, 0, tzinfo=timezone.utc)
+        effective = datetime(2010, 1, 4, 0, 0, tzinfo=timezone.utc)
+
+        self.assertEqual(
+            visibility.project_candidate_knowledge(
+                table="dwd_security_bar",
+                session_close=close,
+            ),
+            close,
+        )
+        self.assertEqual(
+            visibility.project_candidate_knowledge(
+                table="dwd_tradability_state",
+                session_close=close,
+            ),
+            close,
+        )
+        self.assertEqual(
+            visibility.project_candidate_knowledge(
+                table="dwd_listing",
+                session_close=close,
+                effective_from=effective,
+            ),
+            effective,
+        )
+        self.assertEqual(
+            visibility.project_candidate_knowledge(
+                table="dwd_adjustment_factor",
+                session_close=close,
+                effective_from=close,
+            ),
+            close,
+        )
+        with self.assertRaisesRegex(EventScanSourceError, "after the candidate session close"):
+            visibility.project_candidate_knowledge(
+                table="dwd_security",
+                session_close=close,
+                effective_from=datetime(2018, 5, 9, 0, 0, tzinfo=timezone.utc),
+            )
+        with self.assertRaisesRegex(EventScanSourceError, "not a candidate T-close"):
+            visibility.project_candidate_knowledge(
+                table="dwd_price_limit_regime",
+                session_close=close,
+                effective_from=effective,
+            )
+
+    def test_exact_physical_v21_base_passes_deep_verification(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             package, manifest_sha, content_digest = _build_base(root)
@@ -123,10 +191,10 @@ class EventScanSourceTests(unittest.TestCase):
 
             result = verify_event_scan_base(
                 policy,
-                environment={"QUANTHUS_P4_DWD_BASE": str(package)},
+                environment={"QUANTHUS_REPLAY_PROVIDER_DWD_ROOT": str(package)},
             )
 
-            self.assertEqual(result.package_id, "dwd-base-202607-v2")
+            self.assertEqual(result.package_id, "dwd-base-202607-v2.1")
             self.assertEqual(result.table_count, 33)
             self.assertEqual(result.manifest_sha256, manifest_sha)
 
@@ -143,11 +211,15 @@ class EventScanSourceTests(unittest.TestCase):
             pointer = root / "CURRENT.json"
             pointer.write_text("{}", encoding="utf-8")
             with self.assertRaisesRegex(EventScanSourceError, "package id differs"):
-                policy.resolve_runtime_root({"QUANTHUS_P4_DWD_BASE": str(pointer)})
+                policy.resolve_runtime_root(
+                    {"QUANTHUS_REPLAY_PROVIDER_DWD_ROOT": str(pointer)}
+                )
             legacy = root / "legacy-operational-ads"
             legacy.mkdir()
             with self.assertRaisesRegex(EventScanSourceError, "package id differs"):
-                policy.resolve_runtime_root({"QUANTHUS_P4_DWD_BASE": str(legacy)})
+                policy.resolve_runtime_root(
+                    {"QUANTHUS_REPLAY_PROVIDER_DWD_ROOT": str(legacy)}
+                )
 
             raw = json.loads(policy_path.read_text(encoding="utf-8"))
             raw["legacy_fallback"] = str(package)
@@ -155,6 +227,17 @@ class EventScanSourceTests(unittest.TestCase):
             invalid.write_text(json.dumps(raw), encoding="utf-8")
             with self.assertRaisesRegex(EventScanSourceError, "unexpected"):
                 load_event_scan_source_policy(invalid)
+
+    def test_provider_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            provider = json.loads(PROVIDER_PATH.read_text(encoding="utf-8"))
+            provider["execution_authorized"] = True
+            provider_path = root / "provider.json"
+            provider_path.write_text(json.dumps(provider), encoding="utf-8")
+
+            with self.assertRaisesRegex(EventScanSourceError, "research-only direct DWD provider"):
+                load_event_scan_source_policy(POLICY_PATH, provider_path=provider_path)
 
 
 if __name__ == "__main__":

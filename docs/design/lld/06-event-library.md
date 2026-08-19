@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` source-authority, pure forward-trigger, reconciliation, and T+1 entry-partition slice implemented; historical PIT projection, physical DWD reader, and full development scan pending |
+| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, development-only economic-availability projection, pure forward-trigger, reconciliation, and T+1 entry-partition slice implemented; physical event projection and full development scan pending |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -78,21 +78,31 @@ validation rejects duplicate identities or one event assigned to multiple splits
 
 ### 3.2 Forward-scan source and first implementation slice
 
-`config/p4-event-scan-source.research.v1.json` makes the new-chain CN01 DWD mirror the only P4 scan
-authority. The initial development scan binds `dwd-base-202607-v2` by package id, manifest SHA-256,
-and content digest, requires a physical package path through `QUANTHUS_P4_DWD_BASE`, and deeply
-verifies the 33-table Base before use. It explicitly forbids old dual-lane DWD/DWS, operational or
-portable ADS, release sets, and mutable `CURRENT` pointers. Daily increments are disabled for the
-first 2012-2021 scan because the accepted Base already contains the complete development history.
+`config/p4-event-scan-source.research.v1.json` now binds the accepted
+`dwd-base-202607-v2.1` plus `dwd-base-202607-v2.1-correction-20260813-001` and reuses the exact
+research-only direct-DWD contract in `config/replay-data-provider.development.v2.json`. The source
+contract is development-only, requires the immutable Base/correction identities and static-industry
+reference digest, and explicitly forbids the old dual-lane DWD/DWS, operational or portable ADS,
+release sets, and mutable `CURRENT` pointers. Post-2021 Daily increments are not inputs to the
+initial 2012-2021 event scan.
 
-The new Base cannot yet be read directly under the approved #73 visibility rule. Historical market
-bars and the aggregated tradability state currently carry the Base build cutoff as
-`knowledge_from`, and listed-company identities similarly retain later construction knowledge.
-Those values are later than historical T close even when the underlying economic observation was
-available at T. The source policy therefore blocks the full corpus scan until a versioned
-`economic_availability` PIT projection declares, table by table, which source timestamp proves
-historical visibility. It explicitly forbids treating the build cutoff as historical knowledge,
-substituting observation time without approval, or falling back to a legacy ADS/bundle.
+V2.1 closes the Base-remediation work but intentionally does not claim that its reconstructed
+historical `knowledge_from` values were published with the same content on the original dates. P4
+therefore keeps raw DWD `knowledge_from` as immutable lineage and adds the separately versioned
+`p4-economic-availability-development-v1` projection for the authorized development partition.
+The mapping is table-specific: daily bars and calendars become knowable at session close; listing
+and security identity must already be effective at that close; corrected tradability becomes
+knowable at session close; adjustment factors are used only as a conservative effective-date
+candidate exclusion; and T+1 price-limit evidence remains an execution-open input. The projection
+must never rewrite the Base or discard raw knowledge lineage.
+
+This is a retrospective development-research authority, not historical publication proof. Its
+machine contract keeps `per_decision_publication_proven=false` and explicitly forbids arbitration,
+permanent-blind, simulation, governance admission, and execution authorization. The frozen
+`p4-event.price-volume-state-transition@1.0.0` rule card and its approved digest are unchanged: no
+threshold, feature, split, isolation, or concentration semantic is modified by the source recovery.
+Any future projection that changes that exact logical candidate-input contract requires a new rule
+version and renewed approval.
 
 `src/quanthus/event_library/scan.py` implements the outcome-blind chronological transform over
 strict typed daily inputs. Activity ratios use exact rational arithmetic, so candidate membership
@@ -102,10 +112,11 @@ retained candidate events with zero unexplained loss. It does not accept returns
 post-T features.
 
 The T+1 partition reuses the public P1-to-P2 daily execution adapter and the same buy-open rejection
-mapping used by `BacktestEngine`. It classifies executable versus `not_executable` without creating
-an order or fill and without changing the candidate event id. The physical DWD-to-typed-input reader
-and full 2012-2021 corpus run remain blocked until the historical PIT projection is approved; the
-physical DWD reader follows that projection rather than inventing visibility during ingestion.
+mapping used by `BacktestEngine`, including the accepted `NON_TRADING_OBSERVED` cancellation state.
+It classifies executable versus `not_executable` without creating an order or fill and without
+changing the candidate event id. The remaining #74 implementation is the bounded physical
+DWD-to-event projection and the full 2012-2021 development corpus run; neither is permission to
+open a stronger PIT partition.
 
 ## 4. Timing and feature window
 
@@ -176,7 +187,7 @@ unexecutable group.
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
 | P4-EVENT-001 | Freeze candidate-source hypothesis; define event, isolation, and split schemas | Accepted P3 replay and audit contracts | Exact rule-card and split-policy digests approved; deterministic contract tests and acceptance record pass |
-| P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Source/pure-scan/entry slice implemented with synthetic contract evidence; historical PIT projection, physical DWD reader, and full development corpus pending |
+| P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | V2.1/correction source and development availability projection accepted as implementation authority; pure scan and entry partition implemented; physical event projection and full development corpus pending |
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Reproducible label corpus |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Three leading features |
 

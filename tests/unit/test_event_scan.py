@@ -30,9 +30,10 @@ SPLIT = load_split_policy(ROOT / "config" / "p4-event-split-policy.research.v1.j
 SOURCE = load_event_scan_source_policy(
     ROOT / "config" / "p4-event-scan-source.research.v1.json",
     release_path=ROOT / "config" / "releases" / "v2-build202607.json",
+    provider_path=ROOT / "config" / "replay-data-provider.development.v2.json",
 )
 SHANGHAI = ZoneInfo("Asia/Shanghai")
-SNAPSHOT_ID = "dwd-base-202607-v2"
+SNAPSHOT_ID = "dwd-base-202607-v2.1+correction-20260813-001"
 SNAPSHOT_MANIFEST = SOURCE.base_release.manifest_sha256
 
 

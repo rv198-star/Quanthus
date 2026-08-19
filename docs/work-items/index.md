@@ -18,11 +18,14 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-BASE-002 | Build authoritative DWD/DWS July trial Base (Issue #48) | accepted historical trial slice |
 | META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | accepted historical trial slice |
 | META-DATA-DWD-002 | Build the product-bounded seven-domain DWD Base V2.1 | accepted Release; 33 DWD objects; daily maintenance active; correction-001 accepted; recurring weekly corrections open; generic DWS deferred |
+| META-DATA-MAINT-001 | Reconcile post-V2.1 daily ODS/DWD operational hardening | active under Issue #143; post-2026-07-31 maintenance only; does not reopen Issue #78 or P4 gates |
 
 ADR 0007 is the current topology authority. `config/releases/v2-build202607.json` binds immutable
 `ods-base-202607-v2` and `dwd-base-202607-v2.1`. CN01 and Hermes run the same READY-gated ODS-to-DWD
 daily path; OCI mirrors CN01's verified DWD increments. The Base packages are read-only. Weekly
-DWD corrections remain maintenance work until separately accepted.
+DWD corrections remain maintenance work until separately accepted. `META-DATA-MAINT-001` owns the
+post-V2.1 Daily recovery, synchronization, August promotion, provider-retry, and schedule-hardening
+changes that accumulated after Issue #78's Base remediation scope was complete.
 
 ADR 0005 and Issues #39, #45-#48 retain the old pull, arbitration, paired DWD/DWS, ADS, and
 research-bundle acceptance history. Their artifacts are not deleted, but their incomplete future

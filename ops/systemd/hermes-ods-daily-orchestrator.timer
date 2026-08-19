@@ -1,8 +1,8 @@
 [Unit]
-Description=Quanthus ODS-to-DWD daily orchestrator (18:30, READY-gated)
+Description=Quanthus ODS-to-DWD daily orchestrator (19:30, READY-gated)
 
 [Timer]
-OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai
+OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai
 AccuracySec=1min
 Persistent=false
 Unit=hermes-ods-daily-orchestrator.service

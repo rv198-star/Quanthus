@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export HERMES_ODS_NODE_ID=cn01
+export HERMES_ODS_ENV_FILE=/etc/quanthus/cn01-ods-lane.env
+
+daily_dates=(2026-08-07 2026-08-10 2026-08-11)
+weekly_date=2026-08-08
+
+for market_date in "${daily_dates[@]}"; do
+  echo "[$(date -u +%FT%TZ)] recovering ODS daily ${market_date}"
+  "$ROOT/ops/bin/run-cn01-ods-daily" \
+    --market-date "$market_date" \
+    --ods-only \
+    --sla-seconds 5400
+done
+
+echo "[$(date -u +%FT%TZ)] recovering ODS weekly ${weekly_date}"
+"$ROOT/ops/bin/run-hermes-ods-lane" \
+  --lane weekly-corrections \
+  --market-date "$weekly_date"
+
+echo "[$(date -u +%FT%TZ)] August ODS recovery complete"

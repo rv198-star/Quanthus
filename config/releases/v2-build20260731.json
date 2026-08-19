@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "kind": "quanthus_base_build_release",
+  "build_id": "V2-Build20260731",
+  "display_name": "ODS V2 + DWD V2.1 Build20260731",
+  "release_id": "Quanthus-Base-Build20260731",
+  "release_status": "released",
+  "released_at": "2026-08-11T18:30:00Z",
+  "through_date": "2026-07-31",
+  "layers": {
+    "ods": {
+      "package_id": "ods-base-202607-v2",
+      "manifest_sha256": "sha256:7f74a7655f3f86982b4e662f55b12aff4fa2f28ee23cf9b5db530f9f2aa0955b",
+      "content_digest": "sha256:c95adef6624d5d904a53fc93b27d1e2d78ed4a908a653661d89c47147380ac01",
+      "logical_role": "ODS V2 Build20260731"
+    },
+    "dwd": {
+      "package_id": "dwd-base-202607-v2.1",
+      "manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b",
+      "content_digest": "sha256:b689a21b2052ca722af35faeb72cb68850b54d00ddb062b3694e443ba29c32b9",
+      "logical_role": "DWD V2.1 Build20260731",
+      "release_run_id": "dwd-v2-1-gpu-p100-20260811T063015Z-5b90cc47-r18",
+      "code_revision": "5b90cc47414a3542ab65e04e703554d487cd448d",
+      "table_count": 33,
+      "total_rows": 455817962,
+      "payload_bytes": 14447400032
+    }
+  },
+  "archives": {
+    "root": "/personal/quanthus-cold-backup/V2-Build202607",
+    "ods": {
+      "file": "ods-base-202607-v2.7z",
+      "sha256": "sha256:0480b85c51f9845e3775f10f5a1b7351832d61378256556cc4eebd1f16289ee9"
+    },
+    "dwd": {
+      "file": "dwd-base-202607-v2.1.7z",
+      "sha256": "sha256:75416980b8d8705c29bda4abb09d7accec57c439bbfa7e3417938caa518f6ff9"
+    }
+  },
+  "storage_policy": {
+    "online_base_format": "independent_unpacked_checksum_bound_package",
+    "shared_directory_links": false,
+    "hardlink_sharing": false,
+    "cold_archive_format": "7z",
+    "cold_archive_local_retention": "retain_on_nfs"
+  },
+  "etl_policy": {
+    "seed_build_id": "V2-Build20260731",
+    "daily_output_mode": "immutable_incremental_partition",
+    "weekly_output_mode": "immutable_correction_partition",
+    "base_mutation": "forbidden"
+  }
+}

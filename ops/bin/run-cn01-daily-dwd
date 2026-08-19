@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -22,6 +23,15 @@ from quanthus.pipelines.securities_warehouse import (  # noqa: E402
     build_daily_ods_catalog,
     verify_daily_domain_increment,
 )
+
+
+def _seal_for_read_only_sync(root: Path) -> None:
+    """Make an immutable daily package traversable by the read-only sync group."""
+
+    for path in [root, *root.rglob("*")]:
+        if path.is_symlink():
+            raise DailyDomainBuildError(f"daily DWD package contains a symlink: {path}")
+        os.chmod(path, 0o2750 if path.is_dir() else 0o640)
 
 
 def main() -> int:
@@ -73,6 +83,7 @@ def main() -> int:
             code_revision=revision,
             prior_pointer=current,
         )
+        _seal_for_read_only_sync(result.root)
         advance_daily_current(package=result.root, pointer=current)
     except (
         DailyDomainBuildError,

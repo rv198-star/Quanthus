@@ -133,8 +133,10 @@ pipeline-check:
 		--config config/pipelines/t-close-plus-5h.v1.json
 
 schedule-check:
-	$(VENV)/bin/python -m quanthus schedule-check \
+	PYTHONPATH=src $(VENV)/bin/python -m quanthus schedule-check \
 		--config config/schedules/hermes-ods-schedule.v1.json
+	PYTHONPATH=src $(VENV)/bin/python -m quanthus schedule-check \
+		--config config/schedules/hermes-ods-schedule.late.v1.json
 
 lane-shadow-matrix:
 	PYTHONPATH=src $(PYTHON) -m quanthus.cli lane-shadow-matrix \

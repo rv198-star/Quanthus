@@ -6,6 +6,7 @@ import os
 import stat
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -163,6 +164,94 @@ raise SystemExit(0)
     assert context["run_path"] == str(run_roots[0])
 
 
+def test_cn01_orchestrator_ods_only_seals_catalog_without_starting_dwd(
+    tmp_path: Path,
+) -> None:
+    calls = tmp_path / "calls.log"
+    runner = tmp_path / "runner.py"
+    _write_executable(
+        runner,
+        """#!/usr/bin/env python3
+from pathlib import Path
+import sys
+with Path(__CALLS__).open('a', encoding='utf-8') as stream:
+    stream.write(' '.join(sys.argv[1:]) + '\\n')
+raise SystemExit(0)
+""".replace("__CALLS__", repr(str(calls))),
+    )
+    catalog_builder = tmp_path / "catalog.py"
+    _write_executable(
+        catalog_builder,
+        """#!/usr/bin/env python3
+import argparse
+import hashlib
+from pathlib import Path
+parser = argparse.ArgumentParser()
+parser.add_argument('--release-root')
+parser.add_argument('--market-date')
+parser.add_argument('--output', type=Path)
+args = parser.parse_args()
+args.output.mkdir(parents=True)
+catalog = args.output / 'catalog.json'
+catalog.write_text('{"kind":"daily_ods_input_catalog"}\\n', encoding='ascii')
+(args.output / 'READY').write_text(
+    'sha256:' + hashlib.sha256(catalog.read_bytes()).hexdigest() + '\\n',
+    encoding='ascii',
+)
+""",
+    )
+    dwd_marker = tmp_path / "dwd-started"
+    dwd_runner = tmp_path / "dwd.py"
+    _write_executable(
+        dwd_runner,
+        "#!/usr/bin/env python3\nfrom pathlib import Path\n"
+        f"Path({str(dwd_marker)!r}).touch()\n",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "HERMES_ODS_NODE_ID": "cn01",
+            "HERMES_ODS_ENV_FILE": str(tmp_path / "missing.env"),
+            "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+            "ASTOCK_HOME": str(tmp_path / "home"),
+            "HERMES_ODS_RUNNER": str(runner),
+            "HERMES_ODS_CATALOG_BUILDER": str(catalog_builder),
+            "QUANTHUS_DWD_RUNNER": str(dwd_runner),
+            "QUANTHUS_DWD_PYTHON": sys.executable,
+            "HERMES_ODS_DAILY_SLA_SECONDS": "20",
+            "HERMES_ODS_ORCHESTRATOR_POLL_SECONDS": "0.1",
+        }
+    )
+
+    completed = subprocess.run(
+        [str(ORCHESTRATOR), "--market-date", "2026-08-04", "--ods-only"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr + completed.stdout
+    state = json.loads(completed.stdout)
+    assert state["mode"] == "ods_only"
+    assert state["status"] == "ods_ready"
+    assert state["catalog"]["status"] == "ready"
+    assert state["dwd"] == {"status": "not_requested"}
+    assert not dwd_marker.exists()
+    lane_calls = calls.read_text(encoding="utf-8").splitlines()
+    market_call = next(call for call in lane_calls if "--lane market-daily-core" in call)
+    deadline_text = market_call.split("--recovery-deadline-at ", 1)[1].split()[0]
+    recovery_deadline = datetime.fromisoformat(deadline_text)
+    assert recovery_deadline.tzinfo is not None
+    assert recovery_deadline > datetime.fromisoformat(state["started_at"].replace("Z", "+00:00"))
+    assert all(
+        "--recovery-deadline-at" not in call
+        for call in lane_calls
+        if "--lane market-daily-core" not in call
+    )
+
+
 def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     service = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.service").read_text(
         encoding="ascii"
@@ -172,7 +261,7 @@ def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     assert "TimeoutStartSec=160min" in service
     assert "SuccessExitStatus=0" in service
     assert "OnSuccess=hermes-dwd-success-notification.service" in service
-    assert "OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai" in timer
+    assert "OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai" in timer
     assert "Persistent=false" in timer
 
 

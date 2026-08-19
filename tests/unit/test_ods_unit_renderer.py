@@ -47,7 +47,14 @@ class OdsUnitRendererTests(unittest.TestCase):
             orchestrator_service,
         )
         self.assertIn("TimeoutStartSec=160min", orchestrator_service)
+        self.assertIn("StartLimitBurst=3", orchestrator_service)
+        self.assertIn("Restart=on-failure", orchestrator_service)
+        self.assertIn("RestartSec=10min", orchestrator_service)
         self.assertIn("OnSuccess=cn01-dwd-success-notification.service", orchestrator_service)
+
+        weekly_service = (output / "cn01-ods-weekly-corrections.service").read_text()
+        self.assertIn("TimeoutStartSec=8h", weekly_service)
+        self.assertIn("Restart=on-failure", weekly_service)
 
         success_notification = (output / "cn01-dwd-success-notification.service").read_text()
         failure_notification = (output / "cn01-dwd-failure-notification.service").read_text()
@@ -98,7 +105,9 @@ class OdsUnitRendererTests(unittest.TestCase):
             "ConditionPathExists=/etc/quanthus/hermes-ods-legacy-timers-enabled",
             rendered,
         )
-        self.assertIn("OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai", orchestrator)
+        self.assertIn("OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai", orchestrator)
+        orchestrator_service = (output / "hermes-ods-daily-orchestrator.service").read_text()
+        self.assertIn("Restart=on-failure", orchestrator_service)
         self.assertIn("--event hermes_dwd_completed", success_notification)
         self.assertIn("--node Hermes", success_notification)
 
@@ -111,6 +120,33 @@ class OdsUnitRendererTests(unittest.TestCase):
             ("cn01", "2026-07-29T15:40:00+08:00", 1),
             ("cn01", "2026-07-29T18:34:59+08:00", 0),
             ("cn01", "2026-07-29T18:35:00+08:00", 1),
+        ]
+        for node_id, observed_at, expected in cases:
+            with self.subTest(node_id=node_id, observed_at=observed_at):
+                result = subprocess.run(
+                    [
+                        str(WINDOW_CHECKER),
+                        "--node-id",
+                        node_id,
+                        "--config",
+                        str(config),
+                        "--at",
+                        observed_at,
+                    ],
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                self.assertEqual(result.returncode, expected, result.stderr)
+
+    def test_late_schedule_moves_only_the_hermes_collection_window(self) -> None:
+        config = ROOT / "config/schedules/hermes-ods-schedule.late.v1.json"
+
+        cases = [
+            ("hermes", "2026-08-17T19:30:00+08:00", 0),
+            ("hermes", "2026-08-17T19:35:00+08:00", 1),
+            ("cn01", "2026-08-17T18:30:00+08:00", 0),
+            ("cn01", "2026-08-17T18:35:00+08:00", 1),
         ]
         for node_id, observed_at, expected in cases:
             with self.subTest(node_id=node_id, observed_at=observed_at):

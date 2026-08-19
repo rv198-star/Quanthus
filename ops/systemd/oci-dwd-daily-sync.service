@@ -4,6 +4,8 @@ After=network-online.target
 Wants=network-online.target
 OnFailure=oci-dwd-sync-failure-notification.service quanthus-pipeline-failure@%n.service
 OnSuccess=oci-dwd-sync-notification.service
+StartLimitIntervalSec=6h
+StartLimitBurst=2
 
 [Service]
 Type=oneshot
@@ -23,7 +25,7 @@ Environment=QUANTHUS_DWD_FAILURE_RECEIPT=/home/ubuntu/data/quanthus/dwd-daily/fa
 Environment=QUANTHUS_NODE=OCI
 Environment=QUANTHUS_SYSTEMD_UNIT=oci-dwd-daily-sync.service
 WorkingDirectory=/opt/quanthus/current
-ExecStart=/opt/quanthus/current/.venv/bin/python /opt/quanthus/current/ops/bin/sync-cn01-dwd-daily --wait-seconds 5400 --poll-seconds 60
+ExecStart=/opt/quanthus/current/.venv/bin/python /opt/quanthus/current/ops/bin/sync-cn01-dwd-daily --wait-seconds 5400 --poll-seconds 60 --max-attempts 3
 TimeoutStartSec=100min
 Nice=5
 IOSchedulingClass=best-effort

@@ -1,0 +1,13 @@
+{
+  "automated_lifecycle_actor": "A lifecycle decision with actor_type=automated is rejected before construction.",
+  "digest_mismatch": "A canonical artifact whose declared digest differs from semantic content is rejected.",
+  "field_mismatch": "Missing, unknown, or duplicate fields are rejected by exact decoders.",
+  "future_evidence_at_observation": "Evidence visible after knowledge_cutoff cannot enter an observation or policy effect.",
+  "ledger_not_closed": "Eligible and terminal sample counts must close against the complete observation graph.",
+  "lifecycle_disposition_conflict": "Lifecycle decision and Shadow status or budget must be compatible.",
+  "metric_not_registered": "Scorecard metrics, uncertainty, stability, and baselines must be declared by the evaluation spec.",
+  "settlement_state_conflict": "Pending, censored, and unavailable states cannot carry realized values or target scores.",
+  "unsupported_schema": "An unknown or mixed artifact schema version is rejected before domain construction.",
+  "v1_compatibility_drift": "Any changed v1 protocol, aggregator, DecisionEvent, governed-strategy, or replay digest blocks acceptance.",
+  "value_type_mismatch": "Probability, continuous, ordinal, and policy-only values retain distinct admitted shapes."
+}

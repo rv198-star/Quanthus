@@ -139,9 +139,11 @@ EXPERT_STRATEGY_IMPLEMENTATION_SPECS = {
             "boundary around accepted v1 Runs."
         ),
         owned_paths=(
-            "src/quanthus/expert_evaluation/{contracts,serialization,validation}.py",
+            "src/quanthus/expert_evaluation/{__init__,contracts,serialization,validation}.py",
+            "tests/expert_evaluation_fixtures.py",
             "tests/unit/test_expert_evaluation_contracts.py",
             "tests/contract/test_expert_evaluation_compatibility.py",
+            "tests/fixtures/golden/expert_evaluation_v2/",
         ),
         decision_gates=(
             "No new semantic human decision; target, expert, Worker, and UI choices remain out "

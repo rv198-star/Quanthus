@@ -5,7 +5,7 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-003` |
 | Design status | approved |
-| Delivery gate | blocked by `P3-EXPERT-001`, `P3-EXPERT-002`, and `P4-LABEL-001` |
+| Delivery gate | blocked by `P3-EXPERT-002` and `P4-LABEL-001`; `P3-EXPERT-001` accepted |
 | Implementation readiness | ready after dependencies and target decision |
 | Result access | forbidden until the target decision record is sealed |
 

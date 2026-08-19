@@ -5,8 +5,8 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-001` |
 | Design status | approved |
-| Delivery gate | open |
-| Implementation readiness | ready |
+| Delivery gate | accepted |
+| Implementation status | accepted by `docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md` |
 | Compatibility boundary | additive sidecars only; accepted v1 objects and bytes remain frozen |
 
 ## 1. Outcome and boundary
@@ -32,6 +32,7 @@ The issue owns:
 - `src/quanthus/expert_evaluation/contracts.py`
 - `src/quanthus/expert_evaluation/serialization.py`
 - `src/quanthus/expert_evaluation/validation.py`
+- `tests/expert_evaluation_fixtures.py`
 - `tests/unit/test_expert_evaluation_contracts.py`
 - `tests/contract/test_expert_evaluation_compatibility.py`
 - `tests/fixtures/golden/expert_evaluation_v2/`
@@ -153,7 +154,8 @@ The focused suite must prove:
   validation before a decision object is constructed.
 
 Acceptance evidence consists of the golden fixture manifest, focused test output, a v1 before/after
-digest inventory, and one compatibility note linked from the Issue. No human semantic decision is
+digest inventory, and the compatibility record in
+`docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md`. No human semantic decision was
 required for this protocol-only issue.
 
 ## 9. Rollback

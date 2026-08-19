@@ -40,6 +40,11 @@ planning synchronization checks, and 1,190 tests. Three PostgreSQL acceptance te
 because `QUANTHUS_TEST_POSTGRES_DSN` was not configured; this protocol-only issue neither changes
 nor claims those external-runtime paths.
 
+GitHub Actions run `32296951379` did not start any test step: GitHub rejected its jobs because of
+an account payment or spending-limit condition. This is recorded as unavailable external CI, not
+as passing or failing implementation evidence. The focused Ruff and repository checks above ran in
+the project workspace before publication.
+
 ## Boundary and next gate
 
 This acceptance proves protocol identity, serialization, validation, and v1 byte compatibility.

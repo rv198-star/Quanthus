@@ -63,9 +63,13 @@ nodes.
 - The Expert Strategy Layer design is approved as a bounded post-P3 product increment. Trusted
   DWD/P2 remains the factual referee; expert assessments and policy mappings are independently
   versioned and pass separate assessment-quality and complete-strategy economic-value gates. The
-  additive v2 protocol must preserve every accepted v1 Run. `P3-EXPERT-001` is the only initially
-  ready implementation item; later Worker, formal-strategy, attribution, workbench, and forward-
-  Shadow work remains dependency-gated, development-only, and unable to open P5/P6 or sealed data.
+  additive v2 protocol must preserve every accepted v1 Run. The implementation-readiness review
+  freezes the first formal topology at exactly two active strategy experts, assigns the second
+  expert and executable topology to `P3-STRAT-002`, and makes `P4-LABEL-001` target-card reuse a
+  predecessor of the first target/resolver. Its result-bearing DWD evaluation also waits for
+  `P3-EXPERT-002`. `P3-EXPERT-001` is the only initially ready implementation item; later Worker,
+  formal-strategy, attribution, workbench, and forward-Shadow-disposition work remains
+  dependency-gated, development-only, and unable to open P5/P6 or sealed data.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.
@@ -175,7 +179,7 @@ gate is a conformance defect rather than an alternate project state.
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child, LLD 01 `strategy-replay-ads.md` | Exact strategy, authorized ADS bundle, and P2 execution evidence; load the legacy P1 snapshot only for frozen P3 reproduction |
 | P3 governed strategy implementation | root `AGENTS.md`, this map, selected `design/strategies/` card, LLD 03/04/05, accepted P2 interfaces | LLD 10 for decision/funnel evidence; exact feature, label, policy, and industry-map inputs |
-| Expert Strategy Layer design or MVP implementation | root `AGENTS.md`, this map, HLD, LLD 04 and its `04-experts-aggregator/expert-strategy-layer.md` child, work-item index | LLD 02/05 for exact replay/position interfaces, LLD 10 strategy-attribution child for `P3-ATTR-001`, LLD 11 only for the admitted Worker/platform port |
+| Expert Strategy Layer design or MVP implementation | root `AGENTS.md`, this map, HLD, LLD 04, its `04-experts-aggregator/expert-strategy-layer.md` child, that child's implementation `README.md`, and the work-item index | Select only the active work-item child; add LLD 02/05 for exact replay/position interfaces, LLD 10's formal-strategy-attribution child for `P3-ATTR-001`, and LLD 11 only for the admitted Worker/platform port |
 | Strategy attribution or report viewing | root `AGENTS.md`, this map, HLD, `architecture/strategy-attribution-publication.md`, LLD 10 and its `strategy-attribution.md` child | Exact adapter, method registry, Pipeline/publication code, Web contract tests, gate, and acceptance evidence for the claim under review |
 | P4 event-library implementation | root `AGENTS.md`, this map, HLD, LLD 06, `config/p3-gates.v1.json` | ADR 0005 and LLD 01 only when producing/consuming offline research bundles; exact frozen candidate source, label cards, split policy, and P3 replay evidence |
 

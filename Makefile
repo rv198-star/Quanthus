@@ -1,12 +1,17 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-p1 bootstrap-ods doctor test compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
+.PHONY: bootstrap bootstrap-platform bootstrap-p1 bootstrap-ods doctor test platform-check platform-postgres-check platform-docker-acceptance platform-image platform-web-image platform-web-check platform-recovery-backup platform-recovery-restore replay-image candidate-batch compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
 	$(VENV)/bin/python -m pip install --upgrade pip
 	$(VENV)/bin/python -m pip install -e ".[dev]"
+
+bootstrap-platform:
+	$(PYTHON) -m venv $(VENV)
+	$(VENV)/bin/python -m pip install --upgrade pip
+	$(VENV)/bin/python -m pip install -e ".[dev,platform]"
 
 bootstrap-p1:
 	$(PYTHON) -m venv $(VENV)
@@ -23,6 +28,53 @@ doctor:
 
 test:
 	PYTHONPATH=src $(PYTHON) -m pytest -q
+
+platform-check:
+	PYTHONPATH=src $(VENV)/bin/python -m pytest -q \
+		tests/platform \
+		tests/contract/test_platform_kernel_planning.py
+
+platform-postgres-check:
+	@test -n "$${QUANTHUS_TEST_POSTGRES_DSN:-}" || \
+		(echo "set QUANTHUS_TEST_POSTGRES_DSN to a disposable PostgreSQL database"; exit 2)
+	PYTHONPATH=src $(VENV)/bin/python -m pytest -q \
+		tests/platform/test_postgres_acceptance.py
+
+platform-docker-acceptance:
+	./ops/bin/run-platform-docker-acceptance
+
+platform-image:
+	./ops/bin/build-platform-image
+
+platform-web-image:
+	./ops/bin/build-platform-web-image
+
+platform-web-check:
+	cd web && npm test
+
+platform-recovery-backup:
+	@test -n "$${QUANTHUS_RECOVERY_PACKAGE:-}" || \
+		(echo "set QUANTHUS_RECOVERY_PACKAGE to a new absolute package path"; exit 2)
+	./ops/bin/backup-platform-recovery "$${QUANTHUS_RECOVERY_PACKAGE}"
+
+platform-recovery-restore:
+	@test -n "$${QUANTHUS_RECOVERY_PACKAGE:-}" || \
+		(echo "set QUANTHUS_RECOVERY_PACKAGE to an existing package path"; exit 2)
+	@test -n "$${QUANTHUS_RESTORE_PROJECT:-}" || \
+		(echo "set QUANTHUS_RESTORE_PROJECT to quanthus-pk6-restore-NAME"; exit 2)
+	@test -n "$${QUANTHUS_PLATFORM_ENV:-}" || \
+		(echo "set QUANTHUS_PLATFORM_ENV to the absolute mode-0600 secret env path"; exit 2)
+	./ops/bin/restore-platform-recovery \
+		"$${QUANTHUS_RECOVERY_PACKAGE}" \
+		"$${QUANTHUS_RESTORE_PROJECT}" \
+		"$${QUANTHUS_PLATFORM_ENV}" \
+		"$${QUANTHUS_RECOVERY_RECEIPT:-artifacts/platform-kernel/recovery-receipt.txt}"
+
+replay-image:
+	./ops/bin/build-replay-image
+
+candidate-batch:
+	./ops/bin/run-candidate-batch
 
 compile:
 	PYTHONPATH=src $(PYTHON) -m compileall -q src tests

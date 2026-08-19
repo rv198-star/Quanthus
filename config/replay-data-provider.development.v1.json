@@ -1,0 +1,43 @@
+{
+  "schema_version": "quanthus.replay-data-provider.v1",
+  "provider_id": "development-shared-replay-v1",
+  "provider_version": "1.0.0",
+  "mode": "shared-replay-projection",
+  "research_only": true,
+  "execution_authorized": false,
+  "scope": {
+    "partition": "development",
+    "decision_start": "2012-01-04",
+    "decision_end": "2021-12-30",
+    "execution_end": "2021-12-31",
+    "reader_role": "development_research"
+  },
+  "replay_source": {
+    "root": "/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1",
+    "root_env": "QUANTHUS_REPLAY_PROVIDER_BUNDLE_ROOT",
+    "policy": "config/strategy-replay-ads.v1.json",
+    "bundle_id": "strategy-replay-development-1f1ea4d-v1",
+    "bundle_content_digest": "sha256:ed799c7825c10ae1a1e6b7a722c0df82e35703a77d822a77b3d1cc2a5970c284",
+    "manifest_sha256": "sha256:9d6af65970d496658946e8d5739a31c403c12cf70845cd7e16863e44293cd628",
+    "source_snapshot_id": "p1-historical-replay-20260729-v1",
+    "source_manifest_sha256": "sha256:f33050ea493e9fbbd5a93967a76986817443a8725bed673a118cf70a4df677a1"
+  },
+  "dwd_authority": {
+    "root": "/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1",
+    "root_env": "QUANTHUS_REPLAY_PROVIDER_DWD_ROOT",
+    "package_id": "dwd-base-202607-v2.1",
+    "through_date": "2026-07-31",
+    "content_digest": "sha256:b689a21b2052ca722af35faeb72cb68850b54d00ddb062b3694e443ba29c32b9",
+    "manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b",
+    "relationship_to_replay_source": "authority-baseline-not-direct-replay-parent"
+  },
+  "materialization": {
+    "ordinary_replay_requires_dedicated_ads": false,
+    "shared_projection_reused": true,
+    "frozen_ads_required_for": [
+      "governance-admission",
+      "cross-node-transfer",
+      "long-term-archive"
+    ]
+  }
+}

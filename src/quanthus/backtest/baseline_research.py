@@ -813,13 +813,27 @@ class BaselineFeaturePanel:
         minimum_listing_sessions: int,
         minimum_average_amount20: Decimal,
         limit: int,
+        allowed_security_ids: Sequence[str] | None = None,
     ) -> tuple[BaselineFeatureRow, ...]:
         """Return a bounded broad scan; labels and experts own final entry eligibility."""
 
         if minimum_listing_sessions <= 0 or minimum_average_amount20 < 0 or limit <= 0:
             raise BaselineResearchError("governed candidate scan bounds are invalid")
+        if allowed_security_ids is not None and not allowed_security_ids:
+            raise BaselineResearchError("governed candidate scan universe must not be empty")
+        universe_predicate = (
+            "AND security_id = ANY(?)" if allowed_security_ids is not None else ""
+        )
+        parameters: list[object] = [
+            market_date,
+            minimum_listing_sessions,
+            minimum_average_amount20,
+        ]
+        if allowed_security_ids is not None:
+            parameters.append(list(allowed_security_ids))
+        parameters.append(limit)
         rows = self._rows(
-            """
+            f"""
             SELECT * EXCLUDE (
                 exception_active,
                 unexplained_price_transition,
@@ -832,15 +846,11 @@ class BaselineFeaturePanel:
               AND average_amount20 >= ?
               AND total_return_index > sma60
               AND momentum20 > 0
+              {universe_predicate}
             ORDER BY realized_volatility20 ASC, momentum20 DESC, security_id ASC
             LIMIT ?
             """,
-            (
-                market_date,
-                minimum_listing_sessions,
-                minimum_average_amount20,
-                limit,
-            ),
+            parameters,
         )
         return tuple(BaselineFeatureRow.from_mapping(row) for row in rows)
 

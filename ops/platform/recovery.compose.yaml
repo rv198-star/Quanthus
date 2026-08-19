@@ -1,0 +1,78 @@
+name: quanthus-pk6-restore
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      POSTGRES_DB: quanthus_platform
+      POSTGRES_USER: quanthus_platform
+      POSTGRES_PASSWORD: ${QUANTHUS_PLATFORM_POSTGRES_PASSWORD:?required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quanthus_platform -d quanthus_platform"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  api:
+    image: ${QUANTHUS_PLATFORM_IMAGE:?required}
+    restart: "no"
+    environment:
+      PGPASSWORD: ${QUANTHUS_PLATFORM_POSTGRES_PASSWORD:?required}
+      QUANTHUS_PLATFORM_DATABASE_URL: postgresql://quanthus_platform@postgres:5432/quanthus_platform
+      QUANTHUS_PLATFORM_MFA_KEY: ${QUANTHUS_PLATFORM_MFA_KEY:?required}
+      QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT: /data/attribution-releases
+      QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${QUANTHUS_RESTORE_API_PORT:-18080}:8080"
+    read_only: true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=2))['status'] == 'ready'"
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    tmpfs:
+      - /tmp
+    volumes:
+      - attribution-releases:/data/attribution-releases:ro
+      - candidate-runs:/data/candidate-runs:ro
+
+  web:
+    image: ${QUANTHUS_PLATFORM_WEB_IMAGE:?required}
+    restart: "no"
+    environment:
+      QUANTHUS_PLATFORM_API_ORIGIN: http://api:8080
+      QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT: /data/attribution-releases
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${QUANTHUS_RESTORE_WEB_PORT:-13100}:3100"
+    read_only: true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3100/ready').then(r=>{if(!r.ok)throw Error(r.status)}).catch(()=>process.exit(1))"
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    tmpfs:
+      - /tmp
+    volumes:
+      - attribution-releases:/data/attribution-releases:ro
+
+volumes:
+  postgres-data:
+  candidate-runs:
+  attribution-releases:

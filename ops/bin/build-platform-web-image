@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+IMAGE_TAG=${1:-quanthus-platform-web:local}
+BUILD_CONTEXT=$(mktemp -d /tmp/quanthus-platform-web-image.XXXXXX)
+
+cleanup() {
+    rm -rf -- "$BUILD_CONTEXT"
+}
+trap cleanup EXIT INT TERM
+
+cp "$REPOSITORY_ROOT/web/package.json" \
+    "$REPOSITORY_ROOT/web/package-lock.json" \
+    "$REPOSITORY_ROOT/web/eslint.config.mjs" \
+    "$REPOSITORY_ROOT/web/next.config.ts" \
+    "$REPOSITORY_ROOT/web/postcss.config.mjs" \
+    "$REPOSITORY_ROOT/web/tsconfig.json" \
+    "$REPOSITORY_ROOT/web/vite.config.ts" \
+    "$REPOSITORY_ROOT/ops/platform/web-server.mjs" \
+    "$BUILD_CONTEXT/"
+cp -a "$REPOSITORY_ROOT/web/.openai" \
+    "$REPOSITORY_ROOT/web/app" \
+    "$REPOSITORY_ROOT/web/build" \
+    "$REPOSITORY_ROOT/web/public" \
+    "$REPOSITORY_ROOT/web/worker" \
+    "$BUILD_CONTEXT/"
+mkdir -p "$BUILD_CONTEXT/product-web"
+cp "$REPOSITORY_ROOT/product-web/package.json" \
+    "$REPOSITORY_ROOT/product-web/package-lock.json" \
+    "$REPOSITORY_ROOT/product-web/vite.config.js" \
+    "$REPOSITORY_ROOT/product-web/index.html" \
+    "$REPOSITORY_ROOT/product-web/LICENSE.quantdinger-frontend" \
+    "$REPOSITORY_ROOT/product-web/UPSTREAM.md" \
+    "$BUILD_CONTEXT/product-web/"
+cp -a "$REPOSITORY_ROOT/product-web/src" "$REPOSITORY_ROOT/product-web/public" "$BUILD_CONTEXT/product-web/"
+
+docker build \
+    --file "$REPOSITORY_ROOT/ops/platform/Web.Dockerfile" \
+    --tag "$IMAGE_TAG" \
+    "$BUILD_CONTEXT"
+
+printf 'Platform Web image built: %s\n' "$IMAGE_TAG"

@@ -5,6 +5,7 @@ import json
 import sys
 from collections.abc import Sequence
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 
 from quanthus import __version__
@@ -16,6 +17,11 @@ from quanthus.backtest.baseline_research import (
     run_baseline_strategy_suite,
 )
 from quanthus.backtest.benchmark import BenchmarkCurveError, load_benchmark_curve
+from quanthus.backtest.candidate_batch import run_candidate_batch
+from quanthus.backtest.data_provider import (
+    ReplayDataProvider,
+    load_replay_data_provider_config,
+)
 from quanthus.backtest.engine import BacktestEngine, BacktestInputError
 from quanthus.backtest.historical_bundle import HistoricalReplayBundleError
 from quanthus.backtest.historical_frames import (
@@ -27,6 +33,12 @@ from quanthus.backtest.portfolio_replay import (
     PortfolioReplayError,
     render_governed_portfolio_scoreboard,
     run_governed_portfolio_replay,
+)
+from quanthus.candidate_strategy import (
+    CandidateContractError,
+    QuantDingerCandidateAdapterError,
+    load_candidate_manifest,
+    run_candidate_replay,
 )
 from quanthus.code_validity import (
     CodeValidityError,
@@ -544,6 +556,45 @@ def _parser() -> argparse.ArgumentParser:
     governed_portfolio.add_argument("--p0-policy", type=Path)
     governed_portfolio.add_argument("--execution-policy", type=Path)
     governed_portfolio.add_argument("--corporate-action-policy", type=Path)
+
+    candidate_replay = subparsers.add_parser(
+        "run-candidate-strategy-replay",
+        help="run one packaged external candidate through Quanthus DWD/PIT and P2",
+    )
+    candidate_source = candidate_replay.add_mutually_exclusive_group(required=True)
+    candidate_source.add_argument("--operational-ads-base", type=Path)
+    candidate_source.add_argument("--ads-bundle", type=Path)
+    candidate_source.add_argument(
+        "--snapshot-dir",
+        dest="candidate_snapshot_dir",
+        type=Path,
+        help=argparse.SUPPRESS,
+    )
+    candidate_replay.add_argument("--candidate", type=Path, required=True)
+    candidate_replay.add_argument("--scope-start", type=date.fromisoformat, required=True)
+    candidate_replay.add_argument("--scope-end", type=date.fromisoformat, required=True)
+    candidate_replay.add_argument("--initial-cash", type=Decimal, default=Decimal("1000000.00"))
+    candidate_replay.add_argument("--output", type=Path, required=True)
+    candidate_replay.add_argument("--operational-ads-policy", type=Path)
+    candidate_replay.add_argument("--ads-role")
+    candidate_replay.add_argument("--ads-policy", type=Path)
+    candidate_replay.add_argument("--execution-policy", type=Path)
+    candidate_replay.add_argument("--corporate-action-policy", type=Path)
+
+    candidate_batch = subparsers.add_parser(
+        "run-candidate-batch",
+        help="replay all five candidate versions through one configured shared data provider",
+    )
+    candidate_batch.add_argument("--provider-config", type=Path)
+    candidate_batch.add_argument(
+        "--scope-start", type=date.fromisoformat, default=date(2012, 1, 4)
+    )
+    candidate_batch.add_argument(
+        "--scope-end", type=date.fromisoformat, default=date(2021, 12, 30)
+    )
+    candidate_batch.add_argument("--feature-panel", type=Path)
+    candidate_batch.add_argument("--evidence-dir", type=Path)
+    candidate_batch.add_argument("--output", type=Path, required=True)
 
     st_status = subparsers.add_parser(
         "build-st-status",
@@ -1342,6 +1393,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     args.scope_end,
                     args.scope_end,
                 )[0].execution_date
+
                 with BaselineFeaturePanel.build(
                     baseline_reader.bundle,
                     baseline_registry,
@@ -1393,6 +1445,90 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             print(baseline_scoreboard, file=sys.stderr)
             print(json.dumps(baseline_payload, ensure_ascii=True, sort_keys=True))
+        elif args.command == "run-candidate-batch":
+            project_root = find_project_root()
+            provider_config = load_replay_data_provider_config(
+                args.provider_config
+                or project_root / "config" / "replay-data-provider.development.v1.json"
+            )
+            batch_result = run_candidate_batch(
+                ReplayDataProvider(provider_config),
+                scope_start=args.scope_start,
+                scope_end=args.scope_end,
+                feature_panel=args.feature_panel,
+                evidence_dir=args.evidence_dir,
+                project_root=project_root,
+                progress=lambda stage, details: print(
+                    json.dumps(
+                        {"event": "candidate-batch-progress", "stage": stage, **details},
+                        ensure_ascii=True,
+                        sort_keys=True,
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                ),
+            )
+            batch_payload = batch_result.to_dict()
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(
+                json.dumps(batch_payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            print(json.dumps(batch_payload, ensure_ascii=True, sort_keys=True))
+            return 0 if batch_result.succeeded else 1
+        elif args.command == "run-candidate-strategy-replay":
+            project_root = find_project_root()
+            candidate_manifest = load_candidate_manifest(args.candidate)
+            candidate_engine = BacktestEngine(
+                load_execution_policy(
+                    args.execution_policy
+                    or project_root / "config" / "p2-execution-policy.research.v1.json"
+                )
+            )
+            corporate_action_policy = load_corporate_action_normalization_policy(
+                args.corporate_action_policy
+            )
+            if args.operational_ads_base is not None:
+                opened_reader = load_operational_ads_replay_reader(
+                    args.operational_ads_base,
+                    policy=load_operational_ads_base_policy(args.operational_ads_policy),
+                    corporate_action_policy=corporate_action_policy,
+                )
+            elif args.ads_bundle is not None:
+                if args.ads_role is None:
+                    raise StrategyReplayADSError("--ads-role is required with --ads-bundle")
+                opened_reader = load_strategy_replay_ads_reader(
+                    args.ads_bundle,
+                    ads_policy=load_strategy_replay_ads_policy(args.ads_policy),
+                    reader_role=args.ads_role,
+                    corporate_action_policy=corporate_action_policy,
+                )
+            else:
+                print(
+                    "warning: --snapshot-dir is a frozen acceptance-only compatibility path",
+                    file=sys.stderr,
+                )
+                opened_reader = load_historical_frame_reader(
+                    args.candidate_snapshot_dir,
+                    corporate_action_policy,
+                )
+            with opened_reader as candidate_reader:
+                evidence = run_candidate_replay(
+                    reader=candidate_reader,
+                    engine=candidate_engine,
+                    manifest=candidate_manifest,
+                    scope_start=args.scope_start,
+                    scope_end=args.scope_end,
+                    initial_cash=args.initial_cash,
+                    code_version=__version__,
+                )
+            payload = evidence.to_dict()
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(
+                json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            print(json.dumps(payload, ensure_ascii=True, sort_keys=True))
         elif args.command == "run-governed-portfolio-replay":
             project_root = find_project_root()
             strategy_policy = load_governed_strategy_policy(
@@ -1983,6 +2119,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         StrategyReplayADSError,
         OperationalADSBaseError,
         AttributionError,
+        CandidateContractError,
+        QuantDingerCandidateAdapterError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

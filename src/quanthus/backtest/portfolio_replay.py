@@ -887,6 +887,7 @@ def _build_exit_schedule(
             mark_cursor = session.close_price
         if session.open_execution_state not in {
             OpenExecutionState.SUSPENDED,
+            OpenExecutionState.NON_TRADING_OBSERVED,
             OpenExecutionState.SELL_BLOCKED_LIMIT_DOWN,
             OpenExecutionState.MISSING_EVIDENCE,
         }:
@@ -1294,6 +1295,7 @@ def run_governed_portfolio_replay(
             minimum_listing_sessions=policy.entry.minimum_listing_sessions,
             minimum_average_amount20=policy.entry.minimum_average_amount20,
             limit=policy.entry.candidate_scan_limit,
+            allowed_security_ids=tuple(sorted(industry_mapping.by_security_id)),
         )
         industry_mapping.require_coverage(tuple(row.security_id for row in scanned_rows))
         daily_records: list[_CandidateRecord] = []

@@ -35,6 +35,10 @@ publisher-to-browser trust boundary. Strategy topology remains native and may be
 current candidate/expert path. Its bounded synthetic implementation does not reopen the deferred
 formal P3 attribution or dashboard work items.
 
+For Platform Kernel extraction, load `11-platform-kernel.md`, ADR 0010, and its machine-readable
+gate. Load the non-governing QuantDinger audit only to verify upstream facts. Do not load P1-P7
+module internals unless a named application port crosses that boundary.
+
 ## Module tree
 
 | Node | Phase | Current role | Load when |
@@ -49,6 +53,7 @@ formal P3 attribution or dashboard work items.
 | `08-validation-governance.md` | P6 policy | Approved future governance | Arbitration, blind data, change budgets, or model promotion |
 | `09-roadmap.md` | All | Delivery sequence | Phase gates, milestones, or stop rules |
 | `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts and bounded synthetic attribution closure; formal attribution and recurring reports remain proposal-triggered | Decision or notification logs, hypothetical paths, funnels, or attribution |
+| `11-platform-kernel.md` | PK, orthogonal | PK1-PK4, Worker, and PK6 accepted; first-cutover Authoring not applicable | Authentication, API composition, jobs, platform persistence, Web shell, QuantDinger extraction, or module recovery |
 
 Detailed child files are added beneath a same-named module directory only after one module becomes
 too large to load usefully as a single node. The parent LLD remains the stable entry point and owns

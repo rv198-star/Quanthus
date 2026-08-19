@@ -39,6 +39,11 @@ increments. Weekly processing writes immutable correction releases and correspon
 correction increments after its separate implementation and acceptance gate. No recurring job may
 rewrite either Base.
 
+The bounded `dwd-base-202607-v2.1-correction-20260813-001` package establishes the first manual,
+Base-bound DWD correction contract for external findings. It uses business-key replacements and
+record tombstones, binds the exact v2.1 manifest/content digests, and leaves the Base unchanged.
+This accepted Hotfix does not activate or accept the recurring weekly correction pipeline.
+
 ### 2. Node responsibilities
 
 - CN01 and Hermes run the same four-lane ODS controller and build their own READY-gated DWD daily

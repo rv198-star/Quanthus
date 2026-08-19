@@ -117,6 +117,12 @@ def market_session_from_p1(evidence: P1DailyExecutionEvidence) -> MarketSession:
     if evidence.coverage_status is CoverageStatus.SUSPENDED:
         state = OpenExecutionState.SUSPENDED
     elif (
+        evidence.coverage_status is CoverageStatus.TRADING
+        and evidence.data_valid
+        and evidence.reason_code in {"zero_liquidity", "ZERO_ACTIVITY_OBSERVATION"}
+    ):
+        state = OpenExecutionState.NON_TRADING_OBSERVED
+    elif (
         no_observation
         or not evidence.data_valid
         or not evidence.is_executable
@@ -145,6 +151,7 @@ def market_session_from_p1(evidence: P1DailyExecutionEvidence) -> MarketSession:
 
     price_bearing = state in {
         OpenExecutionState.EXECUTABLE,
+        OpenExecutionState.NON_TRADING_OBSERVED,
         OpenExecutionState.BUY_BLOCKED_LIMIT_UP,
         OpenExecutionState.SELL_BLOCKED_LIMIT_DOWN,
     }

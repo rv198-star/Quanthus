@@ -1,0 +1,279 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+OUTPUT_ROOT=${QUANTHUS_CONFORMANCE_OUTPUT:-/home/ubuntu/data/quanthus/research/dwd-v2.1-quantdinger-conformance-20260813}
+QUANTDINGER_ROOT=${QUANTDINGER_ROOT:-/tmp/QuantDinger-research-20260812/backend_api_python}
+
+"$ROOT/ops/bin/build-dwd-strategy-projection"
+
+ROOT="$ROOT" OUTPUT_ROOT="$OUTPUT_ROOT" QUANTDINGER_ROOT="$QUANTDINGER_ROOT" \
+  "$ROOT/.venv/bin/python" - <<'PY'
+import json
+import os
+import re
+import sys
+import types
+from datetime import date
+from decimal import Decimal
+from pathlib import Path
+
+import pandas as pd
+
+root = Path(os.environ["ROOT"])
+output = Path(os.environ["OUTPUT_ROOT"])
+quantdinger = Path(os.environ["QUANTDINGER_ROOT"])
+sys.path.append("/usr/lib/python3/dist-packages")
+
+from quanthus.backtest.policy import load_execution_policy
+from quanthus.candidate_strategy import load_candidate_manifest
+from quanthus.candidate_strategy.dwd_conformance import run_direct_dwd_candidate
+
+app = types.ModuleType("app")
+app.__path__ = [str(quantdinger / "app")]
+sys.modules["app"] = app
+from app.services.strategy_v2.runtime import StrategyV2BacktestRunner
+
+template_sql = (quantdinger / "migrations/strategy_v2_templates.sql").read_text()
+start = template_sql.index("('strategy_v2_bullish_three_lines'")
+end = template_sql.index("('strategy_v2_bullish_three_lines_trend'", start)
+native_code = re.search(r"\$three\$(.*?)\$three\$", template_sql[start:end], re.S).group(1)
+
+projection_path = output / "dwd-600519-development.parquet"
+frame = pd.read_parquet(projection_path)
+frame["date"] = pd.to_datetime(frame["date"])
+frame = frame.set_index("date")
+frame["suspended"] = ~frame["is_tradable"].fillna(False)
+native = StrategyV2BacktestRunner(
+    code=native_code,
+    frames={"CNStock:600519.SH": frame},
+    initial_capital=1_000_000,
+    params={
+        "short_period": 5,
+        "mid_period": 10,
+        "long_period": 20,
+        "min_body_pct": 0.02,
+        "target_pct": 0.95,
+    },
+    commission=0.0003,
+    slippage=0.0005,
+).run(start_date="2012-01-04", end_date="2021-12-31")
+(output / "quantdinger-native-common-cost.json").write_text(
+    json.dumps(native, ensure_ascii=True, indent=2, sort_keys=True, default=str) + "\n"
+)
+
+quanthus, lineage = run_direct_dwd_candidate(
+    projection_path=projection_path,
+    identity_path=output / "projection-identity.json",
+    manifest=load_candidate_manifest(
+        root / "config/quantdinger-candidates/bullish-three-lines.v1.json"
+    ),
+    policy=load_execution_policy(root / "config/p2-execution-policy.research.v1.json"),
+    initial_cash=Decimal("1000000.00"),
+    scope_start=date(2012, 1, 4),
+    scope_end=date(2021, 12, 30),
+)
+quanthus_payload = quanthus.to_dict()
+(output / "quanthus-common-cost.json").write_text(
+    json.dumps(quanthus_payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n"
+)
+
+full_p2, full_p2_lineage = run_direct_dwd_candidate(
+    projection_path=projection_path,
+    identity_path=output / "projection-identity.json",
+    manifest=load_candidate_manifest(
+        root / "config/quantdinger-candidates/bullish-three-lines.v1.json"
+    ),
+    policy=load_execution_policy(root / "config/p2-execution-policy.research.v1.json"),
+    initial_cash=Decimal("1000000.00"),
+    scope_start=date(2012, 1, 4),
+    scope_end=date(2021, 12, 30),
+    corporate_action_root=Path(
+        "/srv/quanthus/dwd-dws-v2.1/corrections/"
+        "dwd-base-202607-v2.1-correction-20260813-001"
+    ),
+    common_costs=False,
+)
+full_p2_payload = full_p2.to_dict()
+(output / "quanthus-full-p2.json").write_text(
+    json.dumps(full_p2_payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n"
+)
+
+native_signals = [
+    {
+        "signal_date": item["signal_time"][:10],
+        "fill_date": item["time"][:10],
+        "side": item["side"],
+        "reason": item["reason"],
+        "quantity": int(item["quantity"]),
+        "price": float(item["price"]),
+    }
+    for item in native["executions"]
+]
+quanthus_fill_events = [
+    event
+    for event in quanthus_payload["backtest"]["events"]
+    if event["event_type"] == "fill"
+]
+quanthus_decisions = [
+    decision
+    for decision in quanthus_payload["decisions"]
+    if decision["action"] in {"enter", "exit"}
+]
+quanthus_filled_decisions = [
+    decision
+    for decision in quanthus_decisions
+    if decision["execution_status"] == "completed"
+]
+blocked_decisions = [
+    decision
+    for decision in quanthus_decisions
+    if decision["execution_status"] != "completed"
+]
+if len(quanthus_filled_decisions) != len(quanthus_fill_events):
+    raise SystemExit("cannot reconcile completed Quanthus decisions and fills")
+quanthus_fills = [
+    {
+        "signal_date": decision["market_date"],
+        "fill_date": event["payload"]["filled_at"][:10],
+        "side": event["payload"]["side"],
+        "reason": decision["reason_code"].removeprefix("quantdinger_"),
+        "quantity": int(event["payload"]["quantity"]),
+        "price": float(event["payload"]["price"]),
+    }
+    for decision, event in zip(quanthus_filled_decisions, quanthus_fill_events, strict=True)
+]
+side_map = {"enter": "buy", "exit": "sell"}
+native_signal_keys = [(x["signal_date"], x["side"], x["reason"]) for x in native_signals]
+quanthus_signal_keys = [
+    (
+        decision["market_date"],
+        side_map[decision["action"]],
+        decision["reason_code"].removeprefix("quantdinger_"),
+    )
+    for decision in quanthus_decisions
+]
+signal_divergence = sorted(set(native_signal_keys) ^ set(quanthus_signal_keys))
+expected_downstream_exit = ("2012-06-28", "sell", "bullish_three_lines_exit")
+signal_match = signal_divergence == [expected_downstream_exit]
+native_execution_keys = [(x["fill_date"], x["side"]) for x in native_signals]
+quanthus_execution_keys = [(x["fill_date"], x["side"]) for x in quanthus_fills]
+execution_match = native_execution_keys == quanthus_execution_keys
+native_fill_by_key = {
+    (item["fill_date"], item["side"]): item for item in native_signals
+}
+maximum_fill_price_difference = max(
+    abs(native_fill_by_key[(item["fill_date"], item["side"])]["price"] - item["price"])
+    for item in quanthus_fills
+)
+blocked_reasons = [
+    event
+    for event in quanthus_payload["backtest"]["events"]
+    if event["event_type"] == "order_status"
+    and event["reason_code"] == "security_not_trading_observed"
+]
+accepted = (
+    signal_match
+    and not execution_match
+    and len(blocked_decisions) == 1
+    and blocked_decisions[0]["market_date"] == "2012-05-28"
+    and len(blocked_reasons) == 1
+    and blocked_reasons[0]["event_time"][:10] == "2012-05-29"
+)
+
+comparison = {
+    "schema_version": "quanthus.external-strategy-conformance.v1",
+    "status": (
+        "accepted-corrected-data-policy-divergence"
+        if accepted else "rejected-unexplained-divergence"
+    ),
+    "lineage": lineage,
+    "scope": {
+        "decision_start": "2012-01-04",
+        "decision_end": "2021-12-30",
+        "execution_end": "2021-12-31",
+        "initial_capital": 1_000_000,
+    },
+    "signal_comparison": {
+        "match": signal_match,
+        "quantdinger_signal_count": len(native_signal_keys),
+        "quanthus_signal_count": len(quanthus_signal_keys),
+        "quantdinger_only": sorted(set(native_signal_keys) - set(quanthus_signal_keys)),
+        "quanthus_only": sorted(set(quanthus_signal_keys) - set(native_signal_keys)),
+        "interpretation": (
+            "37 shared intents; the missing QuantDinger exit follows its carried May entry"
+        ),
+    },
+    "execution_comparison": {
+        "match": execution_match,
+        "matched_date_side_count": (
+            len(set(native_execution_keys) & set(quanthus_execution_keys))
+        ),
+        "quantdinger_execution_count": len(native_execution_keys),
+        "quanthus_execution_count": len(quanthus_execution_keys),
+        "quantdinger_only": sorted(
+            set(native_execution_keys) - set(quanthus_execution_keys)
+        ),
+        "quanthus_only": sorted(
+            set(quanthus_execution_keys) - set(native_execution_keys)
+        ),
+        "maximum_fill_price_difference": maximum_fill_price_difference,
+        "price_difference_reason": "Quanthus rounds fill prices to CNY cents",
+        "governed_divergence": {
+            "signal_date": "2012-05-28",
+            "blocked_execution_date": "2012-05-29",
+            "quantdinger_carried_fill_date": "2012-05-30",
+            "quanthus_reason_code": "security_not_trading_observed",
+            "quanthus_policy": "cancel-buy-requires-new-close-decision",
+        },
+    },
+    "common_cost_results": {
+        "quantdinger": {
+            "executions": native["totalExecutions"],
+            "closed_trades": native["totalTrades"],
+            "total_return_percent": native["totalReturn"],
+            "maximum_drawdown_percent": abs(native["maxDrawdown"]),
+            "ending_equity": native["finalEquity"],
+        },
+        "quanthus": {
+            "executions": quanthus_payload["backtest"]["manifest"]["result_summary"]["fills"],
+            "closed_trades": quanthus_payload["performance"]["closed_trades"],
+            "total_return_percent": float(quanthus_payload["performance"]["total_return"]) * 100,
+            "maximum_drawdown_percent": (
+                float(quanthus_payload["performance"]["maximum_drawdown"]) * 100
+            ),
+            "ending_equity": float(quanthus_payload["performance"]["ending_equity"]),
+        },
+    },
+    "full_p2": {
+        "status": "completed",
+        "capital_policy": "fixed-research-unit-non-compounding",
+        "execution_policy": "p2-daily-research-v1",
+        "normalized_corporate_action_revision": full_p2_lineage[
+            "normalized_corporate_action_revision"
+        ],
+        "dwd_domain_action_duplicate_groups_not_consumed": lineage[
+            "corporate_action_duplicate_groups"
+        ],
+        "executions": full_p2_payload["backtest"]["manifest"]["result_summary"]["fills"],
+        "closed_trades": full_p2_payload["performance"]["closed_trades"],
+        "total_return_percent": float(full_p2_payload["performance"]["total_return"]) * 100,
+        "maximum_drawdown_percent": (
+            float(full_p2_payload["performance"]["maximum_drawdown"]) * 100
+        ),
+        "ending_equity": float(full_p2_payload["performance"]["ending_equity"]),
+    },
+    "legacy_result": {
+        "direct_dwd_v2_1": False,
+        "executions": 30,
+        "closed_trades": 15,
+        "total_return_percent": 69.630054,
+    },
+}
+(output / "comparison.json").write_text(
+    json.dumps(comparison, ensure_ascii=True, indent=2, sort_keys=True) + "\n"
+)
+print(json.dumps(comparison, ensure_ascii=True, sort_keys=True))
+if not accepted:
+    raise SystemExit("corrected-data comparison has an unexplained divergence")
+PY

@@ -321,6 +321,25 @@ class BacktestEngineTests(unittest.TestCase):
                     )
                 )
 
+    def test_observed_non_trading_buy_cancels_without_discarding_prices(self) -> None:
+        session = replace(
+            self.session(),
+            open_execution_state=OpenExecutionState.NON_TRADING_OBSERVED,
+        )
+
+        result = self.engine.run_session(
+            run=self.run_spec(),
+            signal=self.signal(),
+            session=session,
+            initial_cash=Decimal(self.inputs["initial_cash"]),
+        )
+
+        status = next(
+            event for event in result.events if event.event_type is EventType.ORDER_STATUS
+        )
+        self.assertEqual(status.reason_code, "security_not_trading_observed")
+        self.assertEqual(result.result_summary["fills"], 0)
+
     def test_suspended_session_cannot_carry_invented_prices(self) -> None:
         with self.assertRaisesRegex(ValueError, "must not invent"):
             replace(

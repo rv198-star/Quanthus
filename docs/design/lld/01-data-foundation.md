@@ -11,7 +11,7 @@
 | Coverage follow-up | Issues #38/#40 resolved through OCI DWD revision `daily_ohlcv_none_dwd_v2_oci_20260725` |
 | Dual-lane design | ADR 0005, `META-DATA-PIPE-003` |
 | Dual-lane delivery | three-node shadow deployment, role-scoped historical ADS bootstrap, and final OCI operational ADS Base accepted; catalog-native consumer publication and cutover remain blocked pending their own evidence and `GO_FOR_CUTOVER` |
-| Product-bounded DWD model | ADR 0006/0007/0008/0009, `META-DATA-DWD-002`, `META-DATA-PIT-001`, `01-data-foundation/dwd-domain-model.md`; all 33 objects are released in independently audited `dwd-base-202607-v2.1`; rebuild/audit/promotion are node-independent, daily maintenance remains immutable, and generic DWS is deferred |
+| Product-bounded DWD model | ADR 0006/0007/0008/0009, `META-DATA-DWD-002`, `META-DATA-PIT-001`, `01-data-foundation/dwd-domain-model.md`; all 33 objects are released in independently audited `dwd-base-202607-v2.1`; one Base-bound correction is accepted, recurring weekly corrections remain open, rebuild/audit/promotion are node-independent, and generic DWS is deferred |
 | ODS/DWD reference | `01-data-foundation/ods-dwd-data-dictionary.md` and `01-data-foundation/ods-to-dwd-lineage.md` |
 
 ## 1. Goal

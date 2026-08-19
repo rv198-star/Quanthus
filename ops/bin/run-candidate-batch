@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+OUTPUT=${1:-"$REPOSITORY_ROOT/artifacts/candidate-replay/five-candidate-development.json"}
+IMAGE_TAG=${QUANTHUS_REPLAY_IMAGE:-quanthus-replay:local}
+
+case "$OUTPUT" in
+    /*) ;;
+    *) OUTPUT="$REPOSITORY_ROOT/$OUTPUT" ;;
+esac
+
+OUTPUT_DIR=$(dirname -- "$OUTPUT")
+OUTPUT_NAME=$(basename -- "$OUTPUT")
+mkdir -p "$OUTPUT_DIR"
+
+docker run --rm \
+    --read-only \
+    --tmpfs /tmp:rw,size=12g \
+    --volume /srv/quanthus:/srv/quanthus:ro \
+    --volume "$OUTPUT_DIR:/output" \
+    "$IMAGE_TAG" \
+    run-candidate-batch \
+    --output "/output/$OUTPUT_NAME"
+
+test -s "$OUTPUT"
+printf 'Candidate batch manifest: %s\n' "$OUTPUT"

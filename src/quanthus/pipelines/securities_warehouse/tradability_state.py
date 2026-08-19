@@ -641,10 +641,13 @@ WITH listing_sessions AS (
    AND c.open_at >= l.effective_from
    AND (l.effective_to IS NULL OR c.open_at < l.effective_to)
 ), daily_observed AS (
-  SELECT listing_id,calendar_session_id,close,source_revision,source_artifact_sha256
+  SELECT listing_id,calendar_session_id,close,volume,turnover,
+         source_revision,source_artifact_sha256
   FROM ref_bar WHERE interval_size='1d'
 ), enriched AS (
   SELECT s.*, b.close AS observed_close,
+         b.volume AS observed_volume,
+         b.turnover AS observed_turnover,
          b.source_revision AS bar_revision,
          b.source_artifact_sha256 AS bar_sha256,
          cs.security_status_id AS canonical_status_id,
@@ -740,24 +743,42 @@ SELECT 'governed_tradability_state_v1' AS record_source,
        open_at AS observation_start, close_at AS observation_end,
        listing_id,calendar_session_id,
        CASE WHEN suspension_status_id IS NOT NULL OR provider_trade_status='0'
+                  OR observed_close IS NULL
+                  OR observed_volume IS NULL OR observed_volume <= 0
+                  OR observed_turnover IS NULL OR observed_turnover <= 0
             THEN false ELSE true END AS is_tradable,
        CASE WHEN suspension_status_id IS NOT NULL OR provider_trade_status='0'
+                  OR observed_close IS NULL
+                  OR observed_volume IS NULL OR observed_volume <= 0
+                  OR observed_turnover IS NULL OR observed_turnover <= 0
             THEN false ELSE true END AS can_buy,
        CASE WHEN suspension_status_id IS NOT NULL OR provider_trade_status='0'
+                  OR observed_close IS NULL
+                  OR observed_volume IS NULL OR observed_volume <= 0
+                  OR observed_turnover IS NULL OR observed_turnover <= 0
             THEN false ELSE true END AS can_sell,
        CASE
          WHEN suspension_status_id IS NOT NULL THEN 'SUSPENDED'
          WHEN provider_trade_status='0' THEN 'PROVIDER_NOT_TRADING'
          WHEN observed_close IS NULL THEN 'TRADABLE_OBSERVATION_MISSING'
+         WHEN observed_volume IS NULL OR observed_volume <= 0
+           OR observed_turnover IS NULL OR observed_turnover <= 0
+           THEN 'ZERO_ACTIVITY_OBSERVATION'
          ELSE 'TRADABLE_OBSERVED'
        END AS reason_code,
        CASE WHEN previous_close IS NULL OR upper_limit_ratio IS NULL
                  OR suspension_status_id IS NOT NULL OR provider_trade_status='0'
+                 OR observed_close IS NULL
+                 OR observed_volume IS NULL OR observed_volume <= 0
+                 OR observed_turnover IS NULL OR observed_turnover <= 0
             THEN NULL
             ELSE CAST(round(previous_close * (1 + upper_limit_ratio),2) AS DECIMAL(38,10))
        END AS upper_price,
        CASE WHEN previous_close IS NULL OR lower_limit_ratio IS NULL
                  OR suspension_status_id IS NOT NULL OR provider_trade_status='0'
+                 OR observed_close IS NULL
+                 OR observed_volume IS NULL OR observed_volume <= 0
+                 OR observed_turnover IS NULL OR observed_turnover <= 0
             THEN NULL
             ELSE CAST(round(previous_close * (1 - lower_limit_ratio),2) AS DECIMAL(38,10))
        END AS lower_price,
@@ -765,7 +786,8 @@ SELECT 'governed_tradability_state_v1' AS record_source,
           {predecessor},listing_id,calendar_session_id,
           coalesce(canonical_status_id,''),coalesce(provider_status_sha256,''),
           coalesce(suspension_status_id,''),coalesce(price_limit_regime_id,''),
-          coalesce(bar_sha256,''))) AS input_revision_digest,
+          coalesce(bar_sha256,''),coalesce(CAST(observed_volume AS VARCHAR),''),
+          coalesce(CAST(observed_turnover AS VARCHAR),''))) AS input_revision_digest,
        strftime(open_at,'%Y') AS observation_start_year,
        strftime(open_at,'%m') AS observation_start_month
 FROM state_resolved

@@ -4,6 +4,7 @@ import hashlib
 import json
 import unittest
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -17,6 +18,7 @@ from quanthus.pipelines.securities_warehouse.disclosure_event import (
     materialize_adjustment_factor_rows,
     materialize_announcement_rows,
     materialize_corporate_action_rows,
+    reconcile_supplemental_corporate_action,
 )
 
 
@@ -211,6 +213,160 @@ class DisclosureEventTests(unittest.TestCase):
             {row["term_type"] for row in terms},
             {"CASH_AMOUNT_PER_SHARE", "BONUS_SHARES_PER_SHARE"},
         )
+
+    def test_action_share_terms_normalize_per_ten_to_per_share(self) -> None:
+        rows = materialize_corporate_action_rows(
+            {
+                "action_id": "action-per-ten",
+                "stock_code": "600519",
+                "announce_date": "2014-06-18",
+                "ex_date": "2014-06-25",
+                "action_type": "mixed",
+                "progress": "实施",
+                "cash_per_share": 4.374,
+                "bonus_shares": 1,
+            },
+            source_id="corporate_actions",
+            source_sha256="sha256:actions",
+            source_revision="v1",
+            company_id="company-1",
+            security_id="security-1",
+            vocabulary={
+                "share_quantity_unit": "per_ten_shares",
+                "action_types": {"mixed": "MIXED_DISTRIBUTION"},
+                "action_statuses": {"实施": "IMPLEMENTED"},
+                "term_types": {
+                    "cash_per_share": "CASH_AMOUNT_PER_SHARE",
+                    "bonus_shares": "BONUS_SHARES_PER_SHARE",
+                    "transfer_shares": "TRANSFER_SHARES_PER_SHARE",
+                },
+            },
+        )
+        bonus = next(
+            term
+            for term in rows["dwd_corporate_action_term"]
+            if term["term_type"] == "BONUS_SHARES_PER_SHARE"
+        )
+
+        self.assertEqual(bonus["ratio_numerator"], Decimal("0.1"))
+
+    def test_action_terms_drop_zero_value_placeholders(self) -> None:
+        rows = materialize_corporate_action_rows(
+            {
+                "action_id": "action-zero",
+                "stock_code": "000001",
+                "announce_date": "2026-06-01",
+                "ex_date": "2026-06-12",
+                "action_type": "cash_div",
+                "progress": "实施",
+                "cash_per_share": 0.36,
+                "bonus_shares": 0,
+                "transfer_shares": 0,
+            },
+            source_id="dividend_history",
+            source_sha256="sha256:dividend",
+            source_revision="v1",
+            company_id="company-1",
+            security_id="security-1",
+            vocabulary={
+                "action_types": {"cash_div": "CASH_DIVIDEND"},
+                "action_statuses": {"实施": "IMPLEMENTED"},
+                "term_types": {
+                    "cash_per_share": "CASH_AMOUNT_PER_SHARE",
+                    "bonus_shares": "BONUS_SHARES_PER_SHARE",
+                    "transfer_shares": "TRANSFER_SHARES_PER_SHARE",
+                },
+            },
+        )
+
+        self.assertEqual(len(rows["dwd_corporate_action_term"]), 1)
+        self.assertEqual(
+            rows["dwd_corporate_action_term"][0]["term_type"],
+            "CASH_AMOUNT_PER_SHARE",
+        )
+
+    def test_supplemental_action_keeps_only_terms_missing_from_authority(self) -> None:
+        vocabulary = {
+            "action_types": {"mixed": "MIXED_DISTRIBUTION"},
+            "action_statuses": {"实施": "IMPLEMENTED"},
+            "term_types": {
+                "cash_per_share": "CASH_AMOUNT_PER_SHARE",
+                "bonus_shares": "BONUS_SHARES_PER_SHARE",
+                "transfer_shares": "TRANSFER_SHARES_PER_SHARE",
+            },
+        }
+        rows = materialize_corporate_action_rows(
+            {
+                "action_id": "supplemental",
+                "stock_code": "000001",
+                "announce_date": "2026-06-01",
+                "ex_date": "2026-06-12",
+                "action_type": "mixed",
+                "progress": "实施",
+                "cash_per_share": 0.36,
+                "bonus_shares": 0.1,
+            },
+            source_id="dividend_history",
+            source_sha256="sha256:dividend",
+            source_revision="v1",
+            company_id="company-1",
+            security_id="security-1",
+            vocabulary=vocabulary,
+        )
+        authority = {
+            (
+                "security-1",
+                date(2026, 6, 12),
+                date(2026, 6, 1),
+                "CASH_AMOUNT_PER_SHARE",
+            ): rows["dwd_corporate_action_term"][0]["amount_per_share"]
+        }
+
+        reconciled = reconcile_supplemental_corporate_action(rows, authority_terms=authority)
+
+        self.assertEqual(len(reconciled["dwd_corporate_action"]), 1)
+        self.assertEqual(
+            [term["term_type"] for term in reconciled["dwd_corporate_action_term"]],
+            ["BONUS_SHARES_PER_SHARE"],
+        )
+
+    def test_supplemental_action_conflict_fails_closed(self) -> None:
+        rows = materialize_corporate_action_rows(
+            {
+                "action_id": "conflict",
+                "stock_code": "000001",
+                "announce_date": "2026-06-01",
+                "ex_date": "2026-06-12",
+                "action_type": "cash_div",
+                "progress": "实施",
+                "cash_per_share": 0.36,
+            },
+            source_id="dividend_history",
+            source_sha256="sha256:dividend",
+            source_revision="v1",
+            company_id="company-1",
+            security_id="security-1",
+            vocabulary={
+                "action_types": {"cash_div": "CASH_DIVIDEND"},
+                "action_statuses": {"实施": "IMPLEMENTED"},
+                "term_types": {
+                    "cash_per_share": "CASH_AMOUNT_PER_SHARE",
+                    "bonus_shares": "BONUS_SHARES_PER_SHARE",
+                    "transfer_shares": "TRANSFER_SHARES_PER_SHARE",
+                },
+            },
+        )
+        authority = {
+            (
+                "security-1",
+                date(2026, 6, 12),
+                date(2026, 6, 1),
+                "CASH_AMOUNT_PER_SHARE",
+            ): rows["dwd_corporate_action_term"][0]["amount_per_share"] + 1
+        }
+
+        with self.assertRaisesRegex(DisclosureEventBuildError, "conflicts"):
+            reconcile_supplemental_corporate_action(rows, authority_terms=authority)
 
     def test_factor_has_one_explicit_evidence_input_per_method(self) -> None:
         rows = materialize_adjustment_factor_rows(

@@ -17,7 +17,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-BASE-001 | Build the Hermes-authoritative ODS July Base and checksum-identical CN01 mirror | accepted; renamed `ods-base-202607-v2` |
 | META-DATA-BASE-002 | Build authoritative DWD/DWS July trial Base (Issue #48) | accepted historical trial slice |
 | META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | accepted historical trial slice |
-| META-DATA-DWD-002 | Build the product-bounded seven-domain DWD Base V2.1 | accepted Release; 33 DWD objects; daily maintenance active; generic DWS deferred |
+| META-DATA-DWD-002 | Build the product-bounded seven-domain DWD Base V2.1 | accepted Release; 33 DWD objects; daily maintenance active; correction-001 accepted; recurring weekly corrections open; generic DWS deferred |
 
 ADR 0007 is the current topology authority. `config/releases/v2-build202607.json` binds immutable
 `ods-base-202607-v2` and `dwd-base-202607-v2.1`. CN01 and Hermes run the same READY-gated ODS-to-DWD
@@ -230,6 +230,47 @@ panel, result, and scoreboard byte-identically. The bounded conformance review t
 | P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | P7 |
 | P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | P7 |
 | P7-SCALE-001 | Implement explicit unit expansion decision | P7 |
+
+## Platform Kernel
+
+Platform Kernel is orthogonal to P1-P7 and is governed by ADR 0010, ADR 0012, LLD 11, and
+`config/platform-kernel-gates.v1.json`. PK1 Minimal Boot through PK4 Operator Web are accepted.
+PK5 Optional Authoring is explicitly not applicable to the first cutover and remains recoverable
+behind a later activation decision. PK6, `PK-RECOVERY-001`, and `PK-CUTOVER-001` are accepted with
+the self-verifying recovery package, isolated restore, rollback/forward cycle, public acceptance,
+and old-path shutdown evidence. `PK-WORKER-000` is accepted: production
+replay runs in one PostgreSQL-backed Replay Worker and the five-candidate producer loop is closed.
+Existing node-local warehouse schedules remain explicitly outside this milestone.
+
+| ID | Title | Depends on | Disposition |
+| --- | --- | --- | --- |
+| PK-BOUNDARY-001 | Freeze capability dispositions, ownership, source baseline, and activation conditions | META-DOC-001 | accepted |
+| PK-COMPOSE-001 | Implement the Feature Manifest and explicit composition root | PK-BOUNDARY-001 | accepted |
+| PK-BOOT-001 | Boot the minimal approved API kernel | PK-COMPOSE-001 | accepted |
+| PK-SCHEMA-001 | Split platform migrations and remove shared bootstrap ownership | PK-BOOT-001 | accepted |
+| PK-DEPS-001 | Split core and optional dependency groups | PK-BOOT-001 | accepted |
+| PK-AUTH-001 | Detach identity and administration from monetization domains | PK-SCHEMA-001, PK-DEPS-001 | accepted |
+| PK-OBS-001 | Extract health, request id, metrics, and structured logging | PK-COMPOSE-001 | accepted |
+| PK-JOBS-001 | Define JobRunner and decide the local versus Celery adapter | PK-DEPS-001 | accepted |
+| PK-ADAPTER-001 | Connect selected workflows to Quanthus application ports | PK-AUTH-001, PK-JOBS-001 | accepted |
+| PK-AUTHORITY-001 | Enforce the platform/domain authority boundary | PK-ADAPTER-001 | accepted |
+| PK-WEB-001 | Admit, trim, and connect the desktop operator Web | PK-AUTHORITY-001 | accepted |
+| PK-WEB-002 | Correct the primary product Web to candidate-only workflows | PK-WEB-001 | accepted; superseded in product depth by PK-WEB-003 |
+| PK-WEB-003 | Turn the candidate catalogue into a validation workbench with real detail evidence and bounded review actions | PK-WEB-002 | accepted |
+| PK-WEB-004 | Migrate candidate approval to independent evidence-review, governance, and execution projections | PK-WEB-003 | accepted |
+| PK-CANDIDATE-001 | Prove one QuantDinger signal through Quanthus replay without governance promotion | PK-AUTHORITY-001 | accepted |
+| PK-WORKER-000 | Deliver lean PostgreSQL Replay Worker and candidate replay production loop | PK-JOBS-001, PK-CANDIDATE-001, PK-WEB-004 | accepted |
+| PK-WORKER-001 | Freeze Job/Worker/Run contracts and state machines | PK-WORKER-000 | accepted |
+| PK-WORKER-002 | Implement PostgreSQL queue, leases, cancellation, and bounded progress | PK-WORKER-001 | accepted |
+| PK-WORKER-003 | Implement independent Worker Supervisor and isolated attempt process | PK-WORKER-002 | accepted |
+| PK-WORKER-004 | Connect candidate replay to authoritative DWD/PIT and P2 | PK-WORKER-003 | accepted |
+| PK-WORKER-005 | Publish immutable Run/evidence and switch active digest atomically | PK-WORKER-004 | accepted |
+| PK-WORKER-006 | Add replay operations and Run history to the candidate workbench | PK-WORKER-005 | accepted |
+| PK-WORKER-007 | Inventory warehouse execution boundaries and retain node-local schedules | PK-WORKER-003 | accepted |
+| PK-WORKER-008 | Deploy and accept one PostgreSQL Replay Worker on OCI | PK-WORKER-005, PK-WORKER-006 | accepted |
+| PK-AUTHORING-001 | Optionally implement isolated strategy/indicator draft authoring | PK-WEB-001 | not-applicable |
+| PK-RECOVERY-001 | Build provenance, contract, schema, dependency, and restoration packages | PK-BOUNDARY-001 | accepted |
+| PK-CUTOVER-001 | Execute deployment, rollback, restoration drill, and old-path shutdown | PK-WEB-001, PK-AUTHORING-001, PK-RECOVERY-001 | accepted |
 
 ## Issue creation policy
 

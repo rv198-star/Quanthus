@@ -3,7 +3,7 @@
 | 字段 | 值 |
 | --- | --- |
 | 设计状态 | approved |
-| 交付状态 | Base accepted；日更部分覆盖；DWD 周更 open |
+| 交付状态 | Base accepted；手工 correction-001 accepted；日更部分覆盖；自动 DWD 周更 open |
 | 上级设计 | [`../01-data-foundation.md`](../01-data-foundation.md) |
 | 当前 Base | ODS V2 / DWD V2.1 `Build202607` |
 | 全量覆盖 | 7 个业务域，9 个物理 DWD builder，33 张 DWD 表 |
@@ -186,6 +186,10 @@ listing + calendar session
 `dwd_tradability_state` 是可重放的治理状态，不是策略标签。缺行情、停牌、一字板或异常
 转移必须保留不同 reason；缺失数据不能被解释为结构破坏。
 
+日行情存在 OHLC 静态占位但 `volume<=0` 或 `turnover<=0` 时，状态必须为
+`ZERO_ACTIVITY_OBSERVATION`，且 `is_tradable/can_buy/can_sell=false`、上下限为空。它与
+`SUSPENDED` 和 `PROVIDER_NOT_TRADING` 分开保留；后两者的明确证据优先于零活动分类。
+
 ### 5.4 所有权和股本
 
 ```text
@@ -235,6 +239,11 @@ ODS `weekly-corrections` 在周六 08:00 运行。`cn01-dwd-weekly-input` 仅能
 
 周更实现必须复用第 3 节领域 builder 的 schema 和 transform，不允许另写一套业务清洗
 逻辑，也不能修改 Base。
+
+`dwd-base-202607-v2.1-correction-20260813-001` 是一次手工 Hotfix：状态按
+`listing_id+calendar_session_id` replacement，公司行动按稳定记录 id tombstone/replacement，
+并把规范化 v3 公司行动封装到 correction 的 replay 面。它验证了不可变 correction 的最小
+合同，但不代表上述自动周更 transform、调度和发布已启用。
 
 ## 8. 外键和回放主链
 

@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Build the bounded Product Web projection from accepted replay artifacts."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from collections import OrderedDict
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_RESEARCH_ROOT = Path("/home/ubuntu/data/quanthus/research")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
+
+
+def _read(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError(f"expected JSON object: {path}")
+    return value
+
+
+def _monthly_curve(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    observed: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    for row in rows:
+        observed[str(row["market_date"])[:7]] = {
+            "market_date": str(row["market_date"]),
+            "system_equity": float(row["system_equity"]),
+        }
+    first = {
+        "market_date": str(rows[0]["market_date"]),
+        "system_equity": float(rows[0]["system_equity"]),
+    }
+    values = list(observed.values())
+    return [first, *values] if values[0]["market_date"] != first["market_date"] else values
+
+
+def _trade(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "security_code": str(row.get("security_code") or row.get("security_id")),
+        "entry_date": str(row["entry_date"]),
+        "exit_date": str(row["exit_date"]),
+        "holding_sessions": int(row["holding_sessions"]),
+        "entry_quantity": int(row["entry_quantity"]),
+        "pnl": float(row["pnl"]),
+        "return_rate": float(row["return_rate"]) * 100,
+        "dividends": float(row["dividends"]),
+        "fees": float(row["entry_fees"]) + float(row["exit_fees"]),
+        **({"exit_sources": row["exit_sources"]} if row.get("exit_sources") else {}),
+    }
+
+
+def _detail(
+    candidate: dict[str, Any],
+    source: Path,
+    artifact: dict[str, Any],
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
+    performance = artifact["performance"]
+    manifest = artifact.get("run_manifest") or artifact["backtest"]["manifest"]
+    result_summary = manifest.get("result_summary", {})
+    expected = {
+        "operations": int(
+            result_summary.get("fills")
+            or performance.get("operation_count")
+            or (performance["closed_trades"] * 2 + (1 if artifact.get("pending_exit") else 0))
+        ),
+        "closed_trades": int(performance["closed_trades"]),
+        "total_return": round(float(performance["total_return"]) * 100, 6),
+        "max_drawdown": round(float(performance["maximum_drawdown"]) * 100, 6),
+    }
+    for field, value in expected.items():
+        if abs(float(candidate[field]) - float(value)) > 0.005:
+            raise ValueError(
+                f"catalog and replay disagree for {candidate['strategy_id']} {field}: "
+                f"{candidate[field]} != {value}"
+            )
+    return {
+        "strategy_id": candidate["strategy_id"],
+        "strategy_version": candidate["version"],
+        "source_artifact_sha256": _sha256(source),
+        "run_manifest": {
+            key: manifest.get(key)
+            for key in (
+                "run_id",
+                "data_snapshot_id",
+                "execution_policy_version",
+                "execution_profile_id",
+                "schedule_version",
+                "rule_version",
+                "feature_version",
+                "parameter_hash",
+                "official",
+            )
+        },
+        "parameters": parameters,
+        "performance": {
+            "initial_equity": float(performance["initial_equity"]),
+            "ending_equity": float(performance["ending_equity"]),
+            "total_pnl": float(performance["total_pnl"]),
+            "total_fees": float(performance["total_fees"]),
+            "win_rate": float(performance["win_rate"]) * 100,
+            "sharpe_ratio": float(performance["sharpe_ratio"]),
+            "exposure_rate": float(performance["exposure_rate"]) * 100,
+            "profit_factor": float(performance["profit_factor"]),
+            "average_holding_sessions": float(performance["average_holding_sessions"]),
+            "turnover": float(performance["turnover"]),
+            "return_excluding_top_3_closed_trades": float(
+                performance["return_excluding_top_3_closed_trades"]
+            )
+            * 100,
+            "capital_matched_benchmark_total_return": (
+                float(performance["capital_matched_benchmark_total_return"]) * 100
+                if performance.get("capital_matched_benchmark_total_return") is not None
+                else None
+            ),
+        },
+        "equity_curve": _monthly_curve(artifact["equity_curve"]),
+        "trades": [_trade(row) for row in artifact["trades"]],
+        "validation": artifact.get("validation", []),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--research-root", type=Path, default=DEFAULT_RESEARCH_ROOT)
+    parser.add_argument(
+        "--output", type=Path, default=ROOT / "config/product-candidate-evidence.v1.json"
+    )
+    args = parser.parse_args()
+    root = args.research_root
+    catalog = _read(ROOT / "config/product-research-catalog.v1.json")
+    candidates = {item["strategy_id"]: item for item in catalog["strategies"]}
+    baseline_config = _read(ROOT / "config/p3-baseline-strategies.research.v2.json")
+    baseline_parameters = {
+        item["strategy_id"]: {**baseline_config["shared"], **item["parameters"]}
+        for item in baseline_config["strategies"]
+    }
+    quantdinger = _read(
+        ROOT / "config/quantdinger-candidates/bullish-three-lines.v1.json"
+    )
+    sources = {
+        "candidate.market-breadth-trend-breakout": root
+        / "p3-governed-development-20260729-v1/result.json",
+        "baseline.ma-trend": root
+        / "p3-baseline-v2-capital-matched-20260729/strategy-audits/baseline.ma-trend-2.0.0.json",
+        "baseline.breakout20": root
+        / "p3-baseline-v2-capital-matched-20260729/strategy-audits/baseline.breakout20-2.0.0.json",
+        "baseline.oversold-rebound": root
+        / (
+            "p3-baseline-v2-capital-matched-20260729/strategy-audits/"
+            "baseline.oversold-rebound-2.0.0.json"
+        ),
+        "quantdinger.strategy-v2-bullish-three-lines": root
+        / "dwd-v2.1-quantdinger-conformance-20260813/quanthus-full-p2.json",
+    }
+    parameters = {
+        **baseline_parameters,
+        "candidate.market-breadth-trend-breakout": {
+            "portfolio_units": 5,
+            "capital_per_unit": 100000,
+            "execution_profile": "close-to-next-open-v1",
+            "selection": "market-breadth-trend-breakout",
+        },
+        quantdinger["candidate_id"]: quantdinger["parameters"],
+    }
+    strategies = [
+        _detail(candidates[strategy_id], source, _read(source), parameters[strategy_id])
+        for strategy_id, source in sources.items()
+    ]
+    payload: dict[str, Any] = {
+        "schema_version": "quanthus.product-candidate-evidence.v1",
+        "catalog_version": catalog["catalog_version"],
+        "generated_from": "accepted-replay-artifacts",
+        "strategies": strategies,
+    }
+    canonical = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    payload["content_digest"] = "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
+    args.output.write_text(
+        json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps({"output": str(args.output), "content_digest": payload["content_digest"]}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

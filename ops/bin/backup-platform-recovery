@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: $0 /absolute/path/to/new-recovery-package" >&2
+    exit 2
+fi
+
+OUTPUT=$1
+case "$OUTPUT" in
+    /*) ;;
+    *) echo "recovery package path must be absolute" >&2; exit 2 ;;
+esac
+if [ -e "$OUTPUT" ]; then
+    echo "recovery package target already exists: $OUTPUT" >&2
+    exit 2
+fi
+
+PARENT=$(dirname -- "$OUTPUT")
+install -d -m 0700 "$PARENT"
+STAGING=$(mktemp -d "$PARENT/.quanthus-recovery.XXXXXX")
+cleanup() {
+    if [ -d "$STAGING" ]; then
+        rm -rf -- "$STAGING"
+    fi
+}
+trap cleanup EXIT INT TERM
+chmod 0700 "$STAGING"
+
+POSTGRES_CONTAINER=${QUANTHUS_POSTGRES_CONTAINER:-quanthus-platform-postgres-1}
+POSTGRES_VOLUME=${QUANTHUS_POSTGRES_VOLUME:-quanthus-platform_quanthus-platform-postgres}
+RUN_VOLUME=${QUANTHUS_CANDIDATE_RUN_VOLUME:-quanthus-platform_quanthus-candidate-runs}
+ATTRIBUTION_ROOT=${QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT:-/home/ubuntu/data/quanthus/attribution-releases}
+git -C "$REPOSITORY_ROOT" diff --quiet
+git -C "$REPOSITORY_ROOT" diff --cached --quiet
+GIT_COMMIT=$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)
+test "$GIT_COMMIT" = "$(git -C "$REPOSITORY_ROOT" rev-parse origin/main)"
+GIT_SHORT=$(git -C "$REPOSITORY_ROOT" rev-parse --short=7 HEAD)
+API_IMAGE=${QUANTHUS_PLATFORM_IMAGE:-quanthus-platform-kernel:git-$GIT_SHORT}
+WEB_IMAGE=${QUANTHUS_PLATFORM_WEB_IMAGE:-quanthus-platform-web:git-$GIT_SHORT}
+REPLAY_IMAGE=${QUANTHUS_REPLAY_IMAGE:-quanthus-replay:git-$GIT_SHORT}
+
+docker inspect "$POSTGRES_CONTAINER" >/dev/null
+docker volume inspect "$POSTGRES_VOLUME" "$RUN_VOLUME" >/dev/null
+docker image inspect "$API_IMAGE" "$WEB_IMAGE" "$REPLAY_IMAGE" postgres:16-alpine >/dev/null
+test -d "$ATTRIBUTION_ROOT"
+
+docker exec "$POSTGRES_CONTAINER" sh -lc \
+    'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-acl' \
+    >"$STAGING/postgres.dump"
+docker exec "$POSTGRES_CONTAINER" sh -lc \
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -AtF "|" -c "
+      select state, count(*) from platform_jobs group by state order by state;
+      select run_id, job_id, result_sha256, artifact_ref from platform_candidate_runs order by created_at;
+      select strategy_id, strategy_version, run_id, evidence_digest from platform_candidate_active_runs order by 1,2;
+    "' >"$STAGING/database-state.txt"
+
+docker run --rm \
+    --volume "$RUN_VOLUME:/source:ro" \
+    postgres:16-alpine \
+    sh -ec 'test -d /source/runs; tar -C /source -czf - runs' \
+    >"$STAGING/candidate-runs.tar.gz"
+tar -C "$ATTRIBUTION_ROOT" -czf "$STAGING/attribution-releases.tar.gz" .
+
+cp "$REPOSITORY_ROOT/ops/platform/compose.yaml" "$STAGING/production.compose.yaml"
+cp "$REPOSITORY_ROOT/ops/platform/recovery.compose.yaml" "$STAGING/recovery.compose.yaml"
+cp "$REPOSITORY_ROOT/ops/platform/platform.env.example" "$STAGING/platform.env.example"
+cp "$REPOSITORY_ROOT/ops/bin/backup-platform-recovery" "$STAGING/"
+cp "$REPOSITORY_ROOT/ops/bin/restore-platform-recovery" "$STAGING/"
+cp "$REPOSITORY_ROOT/config/platform-features.v1.json" "$STAGING/"
+cp "$REPOSITORY_ROOT/config/platform-kernel-gates.v1.json" "$STAGING/"
+cp "$REPOSITORY_ROOT/product-web/LICENSE.quantdinger-frontend" "$STAGING/"
+cp "$REPOSITORY_ROOT/product-web/UPSTREAM.md" "$STAGING/"
+git -C "$REPOSITORY_ROOT" bundle create "$STAGING/source.bundle" HEAD
+
+docker save "$API_IMAGE" "$WEB_IMAGE" "$REPLAY_IMAGE" postgres:16-alpine | gzip -1 \
+    >"$STAGING/images.tar.gz"
+
+API_ID=$(docker image inspect "$API_IMAGE" --format '{{.Id}}')
+WEB_ID=$(docker image inspect "$WEB_IMAGE" --format '{{.Id}}')
+REPLAY_ID=$(docker image inspect "$REPLAY_IMAGE" --format '{{.Id}}')
+POSTGRES_ID=$(docker image inspect postgres:16-alpine --format '{{.Id}}')
+cat >"$STAGING/recovery-images.env" <<EOF
+QUANTHUS_PLATFORM_IMAGE=$API_IMAGE
+QUANTHUS_PLATFORM_WEB_IMAGE=$WEB_IMAGE
+QUANTHUS_REPLAY_IMAGE=$REPLAY_IMAGE
+EOF
+cat >"$STAGING/expected-state.env" <<EOF
+QUANTHUS_RECOVERY_GIT_COMMIT=$GIT_COMMIT
+QUANTHUS_RECOVERY_API_IMAGE_ID=$API_ID
+QUANTHUS_RECOVERY_WEB_IMAGE_ID=$WEB_ID
+QUANTHUS_RECOVERY_REPLAY_IMAGE_ID=$REPLAY_ID
+QUANTHUS_RECOVERY_POSTGRES_IMAGE_ID=$POSTGRES_ID
+QUANTHUS_RECOVERY_POSTGRES_VOLUME=$POSTGRES_VOLUME
+QUANTHUS_RECOVERY_RUN_VOLUME=$RUN_VOLUME
+QUANTHUS_RECOVERY_RUN_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_runs"')
+QUANTHUS_RECOVERY_ACTIVE_POINTER_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_active_runs"')
+QUANTHUS_RECOVERY_USER_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_users"')
+EOF
+
+python3 - "$STAGING" "$GIT_COMMIT" "$API_IMAGE" "$API_ID" "$WEB_IMAGE" "$WEB_ID" \
+    "$REPLAY_IMAGE" "$REPLAY_ID" "$POSTGRES_ID" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+root = Path(sys.argv[1])
+manifest = {
+    "schema_version": "quanthus.platform.recovery.v1",
+    "created_at": datetime.now(timezone.utc).isoformat(),
+    "git_commit": sys.argv[2],
+    "images": {
+        "api": {"reference": sys.argv[3], "image_id": sys.argv[4]},
+        "web": {"reference": sys.argv[5], "image_id": sys.argv[6]},
+        "replay": {"reference": sys.argv[7], "image_id": sys.argv[8]},
+        "postgres": {"reference": "postgres:16-alpine", "image_id": sys.argv[9]},
+    },
+    "state": {
+        "postgres": "postgres.dump",
+        "candidate_runs": "candidate-runs.tar.gz",
+        "attribution_releases": "attribution-releases.tar.gz",
+    },
+    "secret_policy": "secrets-excluded; supply a mode-0600 platform env file at restore time",
+    "restore_command": "./restore-platform-recovery PACKAGE PROJECT /absolute/platform.env RECEIPT",
+    "warehouse_policy": "DWD and corrections are external read-only authorities and are not copied",
+    "excluded_runtime_state": ["candidate-runs/.staging", "sessions outside PostgreSQL"],
+}
+(root / "manifest.json").write_text(
+    json.dumps(manifest, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+    encoding="ascii",
+)
+PY
+
+(
+    cd "$STAGING"
+    find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum >SHA256SUMS
+    sha256sum -c SHA256SUMS >/dev/null
+)
+mv -- "$STAGING" "$OUTPUT"
+trap - EXIT INT TERM
+chmod -R go-rwx "$OUTPUT"
+printf 'Recovery package created: %s\n' "$OUTPUT"
+printf 'Git commit: %s\n' "$GIT_COMMIT"

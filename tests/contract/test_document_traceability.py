@@ -9,7 +9,7 @@ from quanthus.gates import load_gate_report, load_p2_gate_report, load_p3_gate_r
 from quanthus.policy import find_project_root
 from scripts.sync_github_planning import CHAPTERS, work_items
 
-WORK_ITEM_ID_PATTERN = r"(?:META|P[1-7])-[A-Z0-9-]+-[0-9]{3}|[CS][0-9]+"
+WORK_ITEM_ID_PATTERN = r"(?:META|P[1-7]|PK)-[A-Z0-9-]+-[0-9]{3}|[CS][0-9]+"
 WORK_ITEM_ROW = re.compile(rf"^\|\s*({WORK_ITEM_ID_PATTERN})\s*\|")
 WORK_ITEM_TOKEN = re.compile(rf"(?<![A-Z0-9-])({WORK_ITEM_ID_PATTERN})(?![A-Z0-9-])")
 
@@ -91,6 +91,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "docs/AGENTS.md",
             "docs/README.md",
             "docs/architecture/README.md",
+            "docs/architecture/adr-0010-platform-kernel-integration.md",
             "docs/architecture/strategy-attribution-publication.md",
             "docs/design/execution-notification-profiles.md",
             "docs/design/hld.md",
@@ -98,10 +99,12 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "docs/design/lld/01-data-foundation.md",
             "docs/design/lld/02-backtest-engine.md",
             "docs/design/lld/10-monitoring-attribution.md",
+            "docs/design/lld/11-platform-kernel.md",
             "docs/design/source-precedence.md",
             "docs/work-items/index.md",
             "config/p2-gates.v1.json",
             "config/p3-gates.v1.json",
+            "config/platform-kernel-gates.v1.json",
         )
 
         missing = [path for path in required if not (root / path).is_file()]
@@ -176,6 +179,105 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertEqual(fields["Design status"], "draft")
         self.assertEqual(fields["Delivery gate"], "blocked")
         self.assertIn("Non-governing", fields["Authority"])
+
+    def test_platform_kernel_boundary_is_machine_readable_and_bounded(self) -> None:
+        root = find_project_root()
+        gate_path = root / "config" / "platform-kernel-gates.v1.json"
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        lld_path = root / "docs" / "design" / "lld" / "11-platform-kernel.md"
+        fields = _header_fields(lld_path)
+        lld = lld_path.read_text(encoding="utf-8")
+        capability_ids = [item["id"] for item in gate["capabilities"]]
+        dispositions = {item["disposition"] for item in gate["capabilities"]}
+        gate_ids = [item["id"] for item in gate["gates"]]
+
+        self.assertEqual(fields["Design status"], "approved")
+        self.assertEqual(fields["Delivery gate"], "accepted")
+        self.assertEqual(fields["Gate source"], "`config/platform-kernel-gates.v1.json`")
+        self.assertEqual(gate["relationship_to_delivery_phases"], "orthogonal-to-P1-P7")
+        self.assertEqual(gate["current_gate"], "PK6")
+        self.assertEqual(gate_ids, ["PK0", "PK1", "PK2", "PK3", "PK4", "PK5", "PK6"])
+        self.assertEqual(gate["gates"][0]["status"], "accepted")
+        self.assertTrue(all(item["status"] == "accepted" for item in gate["gates"][1:4]))
+        self.assertEqual(gate["gates"][4]["status"], "accepted")
+        self.assertEqual(gate["gates"][5]["status"], "not-applicable")
+        self.assertEqual(gate["gates"][6]["status"], "accepted")
+        self.assertEqual(
+            gate["gates"][6]["evidence"],
+            "docs/acceptance/platform-kernel-pk6-cutover-recovery-20260813.md",
+        )
+        self.assertTrue((root / gate["gates"][6]["evidence"]).is_file())
+        self.assertEqual(dispositions, {"keep", "replace", "defer", "remove"})
+        self.assertEqual(len(capability_ids), len(set(capability_ids)))
+        self.assertTrue(
+            all(
+                item["target_owner"] and item["source_scope"] and item["restore_condition"]
+                for item in gate["capabilities"]
+            )
+        )
+        self.assertEqual(
+            gate["source_baseline"]["commit"],
+            "e64e1c227bf3174e441a42143620179b286387e1",
+        )
+        self.assertIn("Platform endpoints call versioned Quanthus application ports", lld)
+        self.assertIn("no direct edge to strategy registration", lld)
+
+    def test_platform_kernel_gate_and_work_item_index_agree(self) -> None:
+        root = find_project_root()
+        gate = json.loads(
+            (root / "config" / "platform-kernel-gates.v1.json").read_text(encoding="utf-8")
+        )
+        lld_ids = set(_table_ids(root / "docs" / "design" / "lld" / "11-platform-kernel.md"))
+        index_ids = set(_table_ids(root / "docs" / "work-items" / "index.md"))
+        configured_ids = set(gate["work_items"])
+
+        self.assertEqual(configured_ids, lld_ids)
+        self.assertTrue(configured_ids.issubset(index_ids))
+        self.assertEqual(gate["work_items"]["PK-BOUNDARY-001"], "accepted")
+        self.assertEqual(gate["work_items"]["PK-COMPOSE-001"], "accepted")
+        accepted = {
+            "PK-BOUNDARY-001",
+            "PK-COMPOSE-001",
+            "PK-BOOT-001",
+            "PK-SCHEMA-001",
+            "PK-DEPS-001",
+            "PK-AUTH-001",
+            "PK-OBS-001",
+            "PK-JOBS-001",
+            "PK-ADAPTER-001",
+            "PK-AUTHORITY-001",
+            "PK-WEB-001",
+            "PK-WEB-002",
+            "PK-WEB-003",
+            "PK-WEB-004",
+            "PK-CANDIDATE-001",
+            "PK-WORKER-000",
+            "PK-WORKER-001",
+            "PK-WORKER-002",
+            "PK-WORKER-003",
+            "PK-WORKER-004",
+            "PK-WORKER-005",
+            "PK-WORKER-006",
+            "PK-WORKER-007",
+            "PK-WORKER-008",
+            "PK-RECOVERY-001",
+            "PK-CUTOVER-001",
+        }
+        self.assertTrue(all(gate["work_items"][item_id] == "accepted" for item_id in accepted))
+        self.assertEqual(gate["work_items"]["PK-WEB-001"], "accepted")
+        self.assertEqual(gate["work_items"]["PK-AUTHORING-001"], "not-applicable")
+        self.assertEqual(gate["work_items"]["PK-RECOVERY-001"], "accepted")
+        self.assertEqual(gate["work_items"]["PK-CUTOVER-001"], "accepted")
+        self.assertTrue(
+            all(
+                state in {"blocked", "deferred"}
+                for item_id, state in gate["work_items"].items()
+                if item_id not in accepted
+                | {
+                    "PK-AUTHORING-001",
+                }
+            )
+        )
 
     def test_p3_feature_registry_slice_is_bounded_and_traceable(self) -> None:
         root = find_project_root()
@@ -902,6 +1004,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         items = work_items(find_project_root())
         p3_items = [item for item in items if item.phase == "P3"]
         p4_items = [item for item in items if item.phase == "P4"]
+        pk_items = [item for item in items if item.phase == "PK"]
 
         self.assertTrue(p3_items)
         self.assertEqual(
@@ -916,6 +1019,46 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(
             all(item.status == "blocked" for item in items if item.phase in {"P5", "P6", "P7"})
         )
+        self.assertTrue(pk_items)
+        self.assertEqual({item.stable_id for item in pk_items if item.status == "ready"}, set())
+        self.assertEqual(
+            {item.stable_id for item in pk_items if item.status == "closed"},
+            {
+                "PK-BOUNDARY-001",
+                "PK-COMPOSE-001",
+                "PK-BOOT-001",
+                "PK-SCHEMA-001",
+                "PK-DEPS-001",
+                "PK-AUTH-001",
+                "PK-OBS-001",
+                "PK-JOBS-001",
+                "PK-ADAPTER-001",
+                "PK-AUTHORITY-001",
+                "PK-WEB-001",
+                "PK-WEB-002",
+                "PK-WEB-003",
+                "PK-WEB-004",
+                "PK-CANDIDATE-001",
+                "PK-WORKER-000",
+                "PK-WORKER-001",
+                "PK-WORKER-002",
+                "PK-WORKER-003",
+                "PK-WORKER-004",
+                "PK-WORKER-005",
+                "PK-WORKER-006",
+                "PK-WORKER-007",
+                "PK-WORKER-008",
+                "PK-RECOVERY-001",
+                "PK-CUTOVER-001",
+            },
+        )
+        self.assertTrue(
+            all(
+                item.status == "blocked"
+                for item in pk_items
+                if item.status not in {"ready", "closed"}
+            )
+        )
 
     def test_planning_epic_status_matches_document_delivery_gate(self) -> None:
         root = find_project_root()
@@ -927,7 +1070,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         }
 
         for chapter in CHAPTERS:
-            if chapter.phase not in {"P1", "P2", "P3", "P4"}:
+            if chapter.phase not in {"P1", "P2", "P3", "P4", "PK"}:
                 continue
             fields = _header_fields(root / chapter.path)
             delivery_gate = fields.get("Delivery gate")

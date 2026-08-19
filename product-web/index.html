@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1728" />
+    <link rel="icon" href="/product-assets/slogo.png" />
+    <title>Quanthus Research</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      window.require = function (name) {
+        if (name === 'enquire.js') return { register: function () {}, unregister: function () {} }
+        if (name === 'mutationobserver-shim') return window.MutationObserver
+        return {}
+      }
+    </script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

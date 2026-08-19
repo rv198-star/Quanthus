@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: quanthus_platform_acceptance
+      POSTGRES_USER: quanthus_platform_acceptance
+      POSTGRES_PASSWORD: local-disposable-acceptance-only
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U quanthus_platform_acceptance -d quanthus_platform_acceptance
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  acceptance:
+    build:
+      context: .
+      dockerfile: acceptance.Dockerfile
+    user: "${QUANTHUS_ACCEPTANCE_UID:-1000}:${QUANTHUS_ACCEPTANCE_GID:-1000}"
+    environment:
+      QUANTHUS_TEST_POSTGRES_DSN: postgresql://quanthus_platform_acceptance:local-disposable-acceptance-only@postgres:5432/quanthus_platform_acceptance
+      QUANTHUS_PLATFORM_ACCEPTANCE_EVIDENCE: /evidence/platform-kernel-postgres-runtime.json
+      PYTHONPATH: /workspace/src
+      PYTHONDONTWRITEBYTECODE: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - python
+      - -m
+      - pytest
+      - -q
+      - -p
+      - no:cacheprovider
+      - tests/platform/test_postgres_acceptance.py
+      - --junitxml=/evidence/platform-kernel-postgres-junit.xml
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ../..:/workspace:ro
+      - ../../artifacts/platform-kernel:/evidence
+
+networks:
+  default:
+    internal: true

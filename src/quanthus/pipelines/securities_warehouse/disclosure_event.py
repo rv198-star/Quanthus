@@ -316,6 +316,8 @@ def _load_vocabulary(path: Path) -> tuple[dict[str, Any], str]:
     for field in ("action_types", "action_statuses", "term_types", "factor_methods"):
         if not isinstance(vocabulary.get(field), Mapping) or not vocabulary[field]:
             raise DisclosureEventBuildError(f"event vocabulary has no {field}")
+    if vocabulary.get("share_quantity_unit") not in (None, "per_ten_shares"):
+        raise DisclosureEventBuildError("event vocabulary has unsupported share quantity unit")
     return vocabulary, _sha256(path)
 
 
@@ -710,8 +712,12 @@ def materialize_corporate_action_rows(
     )
     for raw_term, raw_value in term_fields:
         value = _decimal(raw_value, f"action {raw_term}")
-        if value is None:
+        if value is None or value == 0:
             continue
+        if raw_term != "cash_per_share" and vocabulary.get("share_quantity_unit") == (
+            "per_ten_shares"
+        ):
+            value /= Decimal("10")
         term_type = str(vocabulary["term_types"][raw_term])
         term_id = _stable_id("corporate_action_term", action_id, term_type)
         terms.append(
@@ -729,6 +735,54 @@ def materialize_corporate_action_rows(
             }
         )
     return {"dwd_corporate_action": [action], "dwd_corporate_action_term": terms}
+
+
+def _term_semantic_values(
+    rows: Mapping[str, Sequence[Mapping[str, Any]]],
+) -> dict[str, Decimal]:
+    values: dict[str, Decimal] = {}
+    for term in rows["dwd_corporate_action_term"]:
+        term_type = str(term["term_type"])
+        value = term.get("amount_per_share")
+        if value is None:
+            numerator = term.get("ratio_numerator")
+            denominator = term.get("ratio_denominator")
+            if numerator is None or denominator in (None, Decimal("0")):
+                raise DisclosureEventBuildError("corporate action term has no semantic value")
+            value = Decimal(numerator) / Decimal(denominator)
+        values[term_type] = Decimal(value)
+    return values
+
+
+def reconcile_supplemental_corporate_action(
+    rows: dict[str, list[dict[str, Any]]],
+    *,
+    authority_terms: Mapping[tuple[str, date, date | None, str], Decimal],
+) -> dict[str, list[dict[str, Any]]]:
+    """Retain only non-zero supplemental terms absent from canonical authority."""
+
+    action = rows["dwd_corporate_action"][0]
+    effective_date = action["effective_at"].date()
+    announced = action.get("announced_at")
+    announced_date = announced.date() if announced is not None else None
+    retained: list[dict[str, Any]] = []
+    for term_type, value in _term_semantic_values(rows).items():
+        key = (str(action["security_id"]), effective_date, announced_date, term_type)
+        authority = authority_terms.get(key)
+        if authority is None:
+            retained.extend(
+                term for term in rows["dwd_corporate_action_term"] if term["term_type"] == term_type
+            )
+            continue
+        if authority != value:
+            raise DisclosureEventBuildError(
+                "supplemental corporate action conflicts with canonical authority: "
+                f"{key} supplemental={value} authority={authority}"
+            )
+    rows["dwd_corporate_action_term"] = retained
+    if not retained:
+        rows["dwd_corporate_action"] = []
+    return rows
 
 
 def materialize_adjustment_factor_rows(
@@ -1319,6 +1373,7 @@ def _build_disclosure_event_locked(
         rows = {table: [] for table in _OWNED_TABLES}
         event_quality: Counter[str] = Counter()
         natural_keys: set[tuple[object, ...]] = set()
+        authority_terms: dict[tuple[str, date, date | None, str], Decimal] = {}
         for source_id in ("corporate_actions", "dividend_history"):
             source = sources[source_id]
             for batch in pq.ParquetFile(source.path).iter_batches(batch_size=8192):
@@ -1356,6 +1411,29 @@ def _build_disclosure_event_locked(
                         vocabulary=vocabulary,
                         parent_knowledge_from=company.knowledge_from,
                     )
+                    if source_id == "corporate_actions":
+                        action = expanded["dwd_corporate_action"][0]
+                        for term_type, value in _term_semantic_values(expanded).items():
+                            term_key = (
+                                str(action["security_id"]),
+                                coordinate,
+                                announced,
+                                term_type,
+                            )
+                            previous = authority_terms.get(term_key)
+                            if previous is not None and previous != value:
+                                raise DisclosureEventBuildError(
+                                    "canonical corporate action terms conflict: "
+                                    f"{term_key} values={previous},{value}"
+                                )
+                            authority_terms[term_key] = value
+                    else:
+                        expanded = reconcile_supplemental_corporate_action(
+                            expanded,
+                            authority_terms=authority_terms,
+                        )
+                    if not expanded["dwd_corporate_action"]:
+                        continue
                     for table, values in expanded.items():
                         rows[table].extend(values)
                     synthetic = _synthetic_action_disclosure(

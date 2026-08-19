@@ -1,0 +1,703 @@
+{
+  "schema_version": "1.0.0",
+  "gate_version": "platform-kernel-2026-08-13.12",
+  "milestone": "Platform Kernel Extraction",
+  "relationship_to_delivery_phases": "orthogonal-to-P1-P7",
+  "current_gate": "PK6",
+  "current_status": "cutover-and-recovery-accepted",
+  "worker_runtime_decision": {
+    "status": "accepted-production",
+    "accepted_at": "2026-08-13",
+    "decision": "lean-postgresql-replay-worker-for-personal-strategy-experiments",
+    "governing_adr": "docs/architecture/adr-0012-postgresql-worker-runtime.md",
+    "milestone": "PostgreSQL Worker Runtime",
+    "first_consumer": "quanthus.candidate-replay.v1",
+    "queue_authority": "postgresql",
+    "wakeup_optimization": "polling-only-until-measured-need",
+    "excluded_transports": [
+      "redis",
+      "celery",
+      "rabbitmq"
+    ],
+    "invariants": [
+      "web-and-api-never-execute-product-batch-handlers",
+      "product-initiated-replay-and-heavy-analysis-use-workers",
+      "accepted-node-local-warehouse-schedules-retain-systemd-cli-ownership",
+      "lightweight-published-metadata-reads-remain-synchronous",
+      "initial-production-has-one-static-replay-worker-at-concurrency-one",
+      "large-domain-results-remain-immutable-artifacts",
+      "stale-claim-generation-cannot-update-or-publish"
+    ]
+  },
+  "source_baseline": {
+    "repository": "https://github.com/OpenByteInc/QuantDinger.git",
+    "tag": "v5.0.15",
+    "commit": "e64e1c227bf3174e441a42143620179b286387e1",
+    "backend_license": "Apache-2.0",
+    "frontend_repository": "https://github.com/OpenByteInc/QuantDinger-Vue.git",
+    "frontend_commit": "f2b5968bb815ed7c0c2301d61523dca98dcdddde",
+    "frontend_license": "QuantDinger Frontend Source-Available License v1.0",
+    "audit": "docs/references/quantdinger-platform-kernel-audit-20260812.md"
+  },
+  "implementation_checkpoint": {
+    "status": "accepted-candidate-only-product-web",
+    "recorded_at": "2026-08-12",
+    "feature_manifest": "config/platform-features.v1.json",
+    "evidence": "docs/acceptance/quantdinger-candidate-pilot-20260812.md",
+    "public_edge_evidence": "docs/acceptance/platform-kernel-public-edge-acceptance-20260812.md",
+    "implemented_scope": [
+      "manifest-and-composition-root",
+      "minimal-wsgi-api",
+      "local-password-session-mfa-rbac-security-audit",
+      "module-migration-registry-and-postgresql-adapter",
+      "health-readiness-request-id-json-logs-metrics-openapi",
+      "finite-local-jobrunner",
+      "versioned-gate-query-and-attribution-verification-ports",
+      "single-worker-container-compose-skeleton",
+      "source-built-desktop-operator-web",
+      "same-origin-platform-api-and-attribution-publication-proxy",
+      "public-traefik-https-carrier",
+      "tailnet-only-fallback-carrier",
+      "candidate-only-product-catalog",
+      "quantdinger-signal-only-candidate-replay"
+    ],
+    "open_blockers": []
+  },
+  "authority": {
+    "platform_owns": [
+      "identity-and-access",
+      "http-and-openapi-transport",
+      "generic-operational-jobs",
+      "platform-state",
+      "observability",
+      "operator-presentation"
+    ],
+    "quanthus_owns": [
+      "market-data-authority",
+      "point-in-time-visibility",
+      "snapshots",
+      "replay-and-accounting",
+      "strategy-and-feature-governance",
+      "decisions",
+      "execution-and-fill-truth"
+    ],
+    "forbidden_platform_import_families": [
+      "quantdinger-data-providers",
+      "quantdinger-backtest",
+      "quantdinger-strategy-runtime",
+      "broker-and-exchange-adapters"
+    ]
+  },
+  "pending_decisions": [
+    {
+      "id": "PK0-WEB-SOURCE",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "accepted_value": "pinned-quantdinger-vue-selective-derivative",
+      "proposed_default": "admit-exact-licensed-quantdinger-vue-revision-otherwise-build-quanthus-web",
+      "blocks": []
+    },
+    {
+      "id": "PK0-OAUTH",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "accepted_value": "defer-local-password-plus-mfa-first",
+      "proposed_default": "defer-local-password-plus-mfa-first",
+      "blocks": []
+    },
+    {
+      "id": "PK0-JOB-TRANSPORT",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "accepted_value": "keep-jobrunner-port-defer-redis-and-celery-until-consumer-evidence",
+      "proposed_default": "keep-jobrunner-port-defer-redis-and-celery-until-consumer-evidence",
+      "blocks": []
+    },
+    {
+      "id": "PK0-AGENT-AUTH",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "accepted_value": "defer-until-approved-non-human-consumer",
+      "proposed_default": "defer-until-approved-non-human-consumer",
+      "blocks": []
+    },
+    {
+      "id": "PK0-NOTIFICATION",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "accepted_value": "defer-behind-p6-notification-transport-gate",
+      "proposed_default": "defer-behind-p6-notification-transport-gate",
+      "blocks": []
+    },
+    {
+      "id": "PK0-AUTHORING",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "accepted_value": "defer-to-optional-pk5-and-allow-not-applicable-for-first-cutover",
+      "proposed_default": "defer-to-optional-pk5-and-allow-not-applicable-for-first-cutover",
+      "blocks": []
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "app-factory",
+      "disposition": "keep",
+      "target_owner": "platform.composition",
+      "source_scope": [
+        "backend_api_python/app/__init__.py",
+        "backend_api_python/app/startup.py"
+      ],
+      "first_kernel": true,
+      "restore_condition": "always-enabled"
+    },
+    {
+      "id": "local-auth-password-session",
+      "disposition": "keep",
+      "target_owner": "platform.identity",
+      "source_scope": [
+        "backend_api_python/app/routes/auth.py",
+        "backend_api_python/app/utils/auth.py",
+        "backend_api_python/app/services/user_service.py"
+      ],
+      "first_kernel": true,
+      "restore_condition": "always-enabled"
+    },
+    {
+      "id": "user-admin-rbac",
+      "disposition": "keep",
+      "target_owner": "platform.identity",
+      "source_scope": [
+        "backend_api_python/app/routes/user.py",
+        "backend_api_python/app/services/user_service.py"
+      ],
+      "first_kernel": true,
+      "restore_condition": "always-enabled"
+    },
+    {
+      "id": "mfa-login-controls-security-audit",
+      "disposition": "keep",
+      "target_owner": "platform.identity",
+      "source_scope": [
+        "backend_api_python/app/routes/auth.py",
+        "backend_api_python/app/utils/auth.py",
+        "backend_api_python/migrations/init.sql"
+      ],
+      "first_kernel": true,
+      "restore_condition": "always-enabled"
+    },
+    {
+      "id": "oauth-providers",
+      "disposition": "defer",
+      "target_owner": "platform.identity",
+      "source_scope": [
+        "backend_api_python/app/routes/auth.py",
+        "backend_api_python/migrations/init.sql"
+      ],
+      "first_kernel": false,
+      "restore_condition": "named-provider-requirement-and-threat-review"
+    },
+    {
+      "id": "health-request-id-logging-metrics",
+      "disposition": "keep",
+      "target_owner": "platform.observability",
+      "source_scope": [
+        "backend_api_python/app/observability/",
+        "backend_api_python/app/openapi/routes/health.py",
+        "backend_api_python/app/utils/logger.py"
+      ],
+      "first_kernel": true,
+      "restore_condition": "always-enabled"
+    },
+    {
+      "id": "openapi-and-api-errors",
+      "disposition": "keep",
+      "target_owner": "platform.api",
+      "source_scope": [
+        "backend_api_python/app/openapi/"
+      ],
+      "first_kernel": true,
+      "restore_condition": "always-enabled"
+    },
+    {
+      "id": "postgresql-platform-store",
+      "disposition": "keep",
+      "target_owner": "platform.persistence",
+      "source_scope": [
+        "backend_api_python/app/utils/db.py",
+        "backend_api_python/migrations/init.sql"
+      ],
+      "first_kernel": true,
+      "restore_condition": "always-enabled"
+    },
+    {
+      "id": "redis-response-cache",
+      "disposition": "defer",
+      "target_owner": "platform.cache",
+      "source_scope": [
+        "backend_api_python/app/config/redis_urls.py",
+        "backend_api_python/app/utils/cache.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "measured-latency-or-concurrency-need"
+    },
+    {
+      "id": "generic-finite-jobs",
+      "disposition": "replace",
+      "target_owner": "platform.jobs.JobRunner",
+      "source_scope": [
+        "backend_api_python/app/routes/agent_v1/jobs.py",
+        "backend_api_python/app/tasks/agent_jobs.py",
+        "backend_api_python/migrations/init.sql"
+      ],
+      "first_kernel": false,
+      "restore_condition": "named-quanthus-long-running-workflow"
+    },
+    {
+      "id": "celery-redis-job-transport",
+      "disposition": "defer",
+      "target_owner": "platform.jobs.adapters",
+      "source_scope": [
+        "backend_api_python/app/celery_app.py",
+        "backend_api_python/app/tasks/",
+        "docker-compose.yml"
+      ],
+      "first_kernel": false,
+      "restore_condition": "jobrunner-load-or-ha-evidence"
+    },
+    {
+      "id": "agent-token-audit-idempotency",
+      "disposition": "defer",
+      "target_owner": "platform.automation",
+      "source_scope": [
+        "backend_api_python/app/utils/agent_auth.py",
+        "backend_api_python/app/routes/agent_v1/",
+        "backend_api_python/migrations/init.sql"
+      ],
+      "first_kernel": false,
+      "restore_condition": "approved-non-human-consumer"
+    },
+    {
+      "id": "email-webhook-transport",
+      "disposition": "defer",
+      "target_owner": "quanthus.notification-port",
+      "source_scope": [
+        "backend_api_python/app/services/notifications/",
+        "backend_api_python/app/routes/agent_v1/notifications.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "p6-transport-gate-and-named-consumer"
+    },
+    {
+      "id": "production-deployment-skeleton",
+      "disposition": "keep",
+      "target_owner": "platform.operations",
+      "source_scope": [
+        "docker-compose.yml",
+        "docker-compose.production.yml",
+        "docker-compose.observability.yml",
+        "ops/"
+      ],
+      "first_kernel": true,
+      "restore_condition": "always-enabled"
+    },
+    {
+      "id": "desktop-operator-web",
+      "disposition": "replace",
+      "target_owner": "platform.web",
+      "source_scope": [
+        "https://github.com/OpenByteInc/QuantDinger-Vue"
+      ],
+      "first_kernel": true,
+      "selected_implementation": "pinned-quantdinger-vue-selective-derivative",
+      "upstream_source_admitted": true,
+      "upstream_commit": "f2b5968bb815ed7c0c2301d61523dca98dcdddde",
+      "restore_condition": "always-enabled-with-license-and-provenance-retained"
+    },
+    {
+      "id": "mobile-clients",
+      "disposition": "remove",
+      "target_owner": "platform.product-governance",
+      "source_scope": [
+        "https://github.com/OpenByteInc/QuantDinger-Mobile"
+      ],
+      "first_kernel": false,
+      "restore_condition": "new-product-security-and-ux-decision"
+    },
+    {
+      "id": "market-universe-factor-fundamental-apis",
+      "disposition": "replace",
+      "target_owner": "quanthus.query-ports",
+      "source_scope": [
+        "backend_api_python/app/routes/market.py",
+        "backend_api_python/app/routes/universe.py",
+        "backend_api_python/app/routes/factors.py",
+        "backend_api_python/app/routes/kline.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "accepted-quanthus-query-port"
+    },
+    {
+      "id": "dashboard-portfolio-report-views",
+      "disposition": "replace",
+      "target_owner": "platform.web-over-quanthus-artifacts",
+      "source_scope": [
+        "backend_api_python/app/routes/dashboard.py",
+        "backend_api_python/app/routes/portfolio.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "named-authoritative-view-contract"
+    },
+    {
+      "id": "quantdinger-data-providers-and-market-sync",
+      "disposition": "remove",
+      "target_owner": "quanthus.data-foundation",
+      "source_scope": [
+        "backend_api_python/app/data_sources/",
+        "backend_api_python/app/data_providers/",
+        "backend_api_python/app/services/market_catalog_sync.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "separate-adapter-adr-never-domain-authority"
+    },
+    {
+      "id": "strategy-v2-bots-runtime-workers",
+      "disposition": "remove",
+      "target_owner": "quanthus.strategy-governance",
+      "source_scope": [
+        "backend_api_python/app/services/strategy_v2/",
+        "backend_api_python/app/services/strategy_runtime/",
+        "backend_api_python/app/workers/trading.py",
+        "backend_api_python/app/routes/strategy.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "independent-quanthus-strategy-proposal"
+    },
+    {
+      "id": "quantdinger-backtest-factor-analysis",
+      "disposition": "remove",
+      "target_owner": "quanthus.replay-and-research",
+      "source_scope": [
+        "backend_api_python/app/services/backtest_execution.py",
+        "backend_api_python/app/services/backtest_cache.py",
+        "backend_api_python/app/services/strategy_v2/",
+        "backend_api_python/app/routes/backtest_center.py",
+        "backend_api_python/app/services/factors/",
+        "backend_api_python/app/routes/factors.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "independent-conformance-review"
+    },
+    {
+      "id": "broker-live-grid-pending-orders",
+      "disposition": "remove",
+      "target_owner": "quanthus.execution-governance",
+      "source_scope": [
+        "backend_api_python/app/services/live_trading/",
+        "backend_api_python/app/services/alpaca_trading/",
+        "backend_api_python/app/services/ibkr_trading/",
+        "backend_api_python/app/services/pending_orders/",
+        "backend_api_python/app/services/grid/"
+      ],
+      "first_kernel": false,
+      "restore_condition": "separate-execution-milestone-and-capital-authority"
+    },
+    {
+      "id": "billing-membership-credits-referral-usdt",
+      "disposition": "remove",
+      "target_owner": "platform.product-governance",
+      "source_scope": [
+        "backend_api_python/app/routes/billing.py",
+        "backend_api_python/app/services/billing_service.py",
+        "backend_api_python/app/services/usdt_payment/",
+        "backend_api_python/migrations/init.sql"
+      ],
+      "first_kernel": false,
+      "restore_condition": "new-product-and-compliance-decision"
+    },
+    {
+      "id": "community-marketplace-comments-purchases",
+      "disposition": "remove",
+      "target_owner": "platform.product-governance",
+      "source_scope": [
+        "backend_api_python/app/routes/community.py",
+        "backend_api_python/migrations/init.sql"
+      ],
+      "first_kernel": false,
+      "restore_condition": "new-product-and-moderation-decision"
+    },
+    {
+      "id": "mcp-and-legacy-agent-tools",
+      "disposition": "remove",
+      "target_owner": "future-quanthus-api-adapter",
+      "source_scope": [
+        "mcp_server/",
+        "backend_api_python/app/routes/agent_v1/"
+      ],
+      "first_kernel": false,
+      "restore_condition": "real-mcp-consumer-on-current-quanthus-api"
+    },
+    {
+      "id": "fast-analysis",
+      "disposition": "remove",
+      "target_owner": "platform.product-governance",
+      "source_scope": [
+        "backend_api_python/app/routes/fast_analysis.py",
+        "backend_api_python/app/services/fast_analysis.py",
+        "backend_api_python/app/services/fast_analysis_tasks.py",
+        "backend_api_python/app/tasks/fast_analysis.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "no-planned-restoration"
+    },
+    {
+      "id": "ai-copilot-chat-tools",
+      "disposition": "remove",
+      "target_owner": "platform.product-governance",
+      "source_scope": [
+        "backend_api_python/app/routes/ai_chat.py",
+        "backend_api_python/app/services/ai_copilot_store.py",
+        "backend_api_python/app/services/ai_tool_registry.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "new-operator-problem-and-value-evidence"
+    },
+    {
+      "id": "ai-review-reflection-calibration-decision",
+      "disposition": "remove",
+      "target_owner": "platform.product-governance",
+      "source_scope": [
+        "backend_api_python/app/services/reflection.py",
+        "backend_api_python/app/services/ai_calibration.py",
+        "backend_api_python/app/services/ai_decision.py",
+        "backend_api_python/app/celery_app.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "no-planned-restoration"
+    },
+    {
+      "id": "strategy-indicator-authoring",
+      "disposition": "defer",
+      "target_owner": "quanthus.authoring-drafts",
+      "source_scope": [
+        "backend_api_python/app/routes/strategy.py",
+        "backend_api_python/app/routes/indicator.py",
+        "backend_api_python/app/services/ai_generation_contracts.py"
+      ],
+      "first_kernel": false,
+      "restore_condition": "pk4-accepted-and-separate-draft-only-activation"
+    }
+  ],
+  "gates": [
+    {
+      "id": "PK0",
+      "name": "Boundary Freeze",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "acceptance_evidence": "docs/acceptance/platform-kernel-pk0-boundary-freeze-20260812.md",
+      "entry_conditions": [
+        "fixed-upstream-backend-source"
+      ],
+      "required_evidence": [
+        "complete-capability-owner-source-and-recovery-inventory",
+        "license-and-provenance-record",
+        "exact-desktop-web-source-and-license-verdict",
+        "human-boundary-approval"
+      ],
+      "stop_conditions": [
+        "unclassified-capability",
+        "unknown-web-source-or-license-terms",
+        "unresolved-domain-owner"
+      ],
+      "work_items": [
+        "PK-BOUNDARY-001"
+      ]
+    },
+    {
+      "id": "PK1",
+      "name": "Minimal Boot",
+      "status": "accepted",
+      "opened_at": "2026-08-12",
+      "accepted_at": "2026-08-12",
+      "acceptance_evidence": "docs/acceptance/platform-kernel-pk1-pk3-acceptance-20260812.md",
+      "entry_conditions": [
+        "PK0-accepted"
+      ],
+      "required_evidence": [
+        "feature-manifest",
+        "api-postgresql-clean-boot",
+        "auth-admin-mfa-health-openapi-observability-tests",
+        "negative-route-startup-process-schema-dependency-tests"
+      ],
+      "stop_conditions": [
+        "removed-route-hook-process-schema-or-dependency-reachable"
+      ],
+      "work_items": [
+        "PK-COMPOSE-001",
+        "PK-BOOT-001",
+        "PK-OBS-001"
+      ]
+    },
+    {
+      "id": "PK2",
+      "name": "Structural Slimming",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "acceptance_evidence": "docs/acceptance/platform-kernel-pk1-pk3-acceptance-20260812.md",
+      "entry_conditions": [
+        "PK1-accepted"
+      ],
+      "required_evidence": [
+        "module-migration-registry",
+        "minimal-dependency-groups",
+        "billing-free-identity",
+        "clean-install-and-upgrade-tests"
+      ],
+      "stop_conditions": [
+        "shared-bootstrap-or-auth-requires-removed-domain"
+      ],
+      "work_items": [
+        "PK-SCHEMA-001",
+        "PK-DEPS-001",
+        "PK-AUTH-001"
+      ]
+    },
+    {
+      "id": "PK3",
+      "name": "Quanthus Integration",
+      "status": "accepted",
+      "accepted_at": "2026-08-12",
+      "acceptance_evidence": "docs/acceptance/platform-kernel-pk1-pk3-acceptance-20260812.md",
+      "entry_conditions": [
+        "PK2-accepted"
+      ],
+      "required_evidence": [
+        "versioned-application-ports-and-adapters",
+        "selected-query-and-job-vertical-slice",
+        "authority-import-and-idempotency-tests"
+      ],
+      "stop_conditions": [
+        "platform-manufactures-domain-truth",
+        "platform-bypasses-quanthus-service"
+      ],
+      "work_items": [
+        "PK-JOBS-001",
+        "PK-ADAPTER-001",
+        "PK-AUTHORITY-001"
+      ]
+    },
+    {
+      "id": "PK4",
+      "name": "Product and Operator Web",
+      "status": "accepted",
+      "opened_at": "2026-08-12",
+      "accepted_at": "2026-08-12",
+      "acceptance_evidence": "docs/acceptance/quantdinger-candidate-pilot-20260812.md",
+      "entry_conditions": [
+        "PK3-accepted",
+        "pinned-quantdinger-vue-selective-derivative"
+      ],
+      "required_evidence": [
+        "source-built-retained-workflows",
+        "no-dead-navigation-or-deleted-api-calls",
+        "desktop-accessibility-and-end-to-end-tests"
+      ],
+      "stop_conditions": [
+        "retained-workflow-needs-removed-upstream-api",
+        "prebuilt-only-frontend-dependency"
+      ],
+      "work_items": [
+        "PK-WEB-001",
+        "PK-WEB-002",
+        "PK-CANDIDATE-001"
+      ]
+    },
+    {
+      "id": "PK5",
+      "name": "Optional Authoring",
+      "status": "not-applicable",
+      "decided_at": "2026-08-12",
+      "decision_evidence": "docs/acceptance/platform-kernel-pk4-operator-web-acceptance-20260812.md",
+      "decision_scope": "first-cutover-only",
+      "entry_conditions": [
+        "PK4-accepted",
+        "separate-authoring-activation-approved"
+      ],
+      "required_evidence": [
+        "draft-only-schema-and-provenance",
+        "sandbox-and-static-restrictions",
+        "quanthus-replay-and-human-governance-handoff"
+      ],
+      "stop_conditions": [
+        "generated-output-can-publish-decide-notify-or-execute-directly"
+      ],
+      "work_items": [
+        "PK-AUTHORING-001"
+      ]
+    },
+    {
+      "id": "PK6",
+      "name": "Cutover and Recovery",
+      "status": "accepted",
+      "opened_at": "2026-08-12",
+      "accepted_at": "2026-08-13",
+      "evidence": "docs/acceptance/platform-kernel-pk6-cutover-recovery-20260813.md",
+      "entry_conditions": [
+        "PK4-accepted",
+        "PK5-accepted-or-not-applicable"
+      ],
+      "required_evidence": [
+        "clean-deploy-and-observability",
+        "rollback-rehearsal",
+        "license-and-recovery-inventory",
+        "one-deferred-module-restoration-drill",
+        "old-path-shutdown"
+      ],
+      "stop_conditions": [
+        "rollback-or-restoration-fails",
+        "old-service-remains-required"
+      ],
+      "work_items": [
+        "PK-RECOVERY-001",
+        "PK-CUTOVER-001"
+      ]
+    }
+  ],
+  "work_items": {
+    "PK-BOUNDARY-001": "accepted",
+    "PK-COMPOSE-001": "accepted",
+    "PK-BOOT-001": "accepted",
+    "PK-SCHEMA-001": "accepted",
+    "PK-DEPS-001": "accepted",
+    "PK-AUTH-001": "accepted",
+    "PK-OBS-001": "accepted",
+    "PK-JOBS-001": "accepted",
+    "PK-ADAPTER-001": "accepted",
+    "PK-AUTHORITY-001": "accepted",
+    "PK-WEB-001": "accepted",
+    "PK-WEB-002": "accepted",
+    "PK-WEB-003": "accepted",
+    "PK-WEB-004": "accepted",
+    "PK-CANDIDATE-001": "accepted",
+    "PK-WORKER-000": "accepted",
+    "PK-WORKER-001": "accepted",
+    "PK-WORKER-002": "accepted",
+    "PK-WORKER-003": "accepted",
+    "PK-WORKER-004": "accepted",
+    "PK-WORKER-005": "accepted",
+    "PK-WORKER-006": "accepted",
+    "PK-WORKER-007": "accepted",
+    "PK-WORKER-008": "accepted",
+    "PK-AUTHORING-001": "not-applicable",
+    "PK-RECOVERY-001": "accepted",
+    "PK-CUTOVER-001": "accepted"
+  },
+  "acceptance_results": {
+    "capability_boundary_complete": "passed",
+    "minimal_kernel_only_admits_approved_surfaces": "passed",
+    "quanthus_authority_contracts_pass": "passed",
+    "operator_web_workflows_complete": "passed",
+    "replay_worker_producer_loop_complete": "passed",
+    "authoring_isolated_or_not_applicable": "passed",
+    "cutover_rollback_and_restoration_rehearsed": "passed"
+  }
+}

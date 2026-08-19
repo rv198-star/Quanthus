@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from quanthus.event_library.rule_card import load_candidate_rule_card
+from quanthus.event_library.source import load_event_scan_source_policy
 from quanthus.event_library.splits import load_split_policy
 from quanthus.gates import load_gate_report, load_p2_gate_report, load_p3_gate_report
 from quanthus.policy import find_project_root
@@ -977,7 +978,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             root / "config" / "p4-event-split-policy.research.v1.json"
         )
 
-        self.assertIn("`P4-EVENT-001` Stage A contracts implemented and human-approved", lld)
+        self.assertIn("`P4-EVENT-001` accepted", lld)
         self.assertIn("`CandidateRuleCard.require_stage_b_authority()`", lld)
         self.assertEqual(card.lifecycle, "approved")
         self.assertEqual(card.governance.approval_state, "approved")
@@ -999,6 +1000,67 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(card.semantic_digest, acceptance)
         self.assertIn(split.semantic_digest, acceptance)
         self.assertIn("no market-data partition was read", acceptance)
+
+    def test_p4_forward_scan_first_slice_is_new_chain_only_and_traceable(self) -> None:
+        root = find_project_root()
+        lld = (root / "docs" / "design" / "lld" / "06-event-library.md").read_text(
+            encoding="utf-8"
+        )
+        source = load_event_scan_source_policy(
+            root / "config" / "p4-event-scan-source.research.v1.json",
+            release_path=root / "config" / "releases" / "v2-build202607.json",
+            provider_path=root / "config" / "replay-data-provider.development.v2.json",
+        )
+
+        self.assertIn("`dwd-base-202607-v2.1`", lld)
+        self.assertIn("`p4-economic-availability-development-v1`", lld)
+        self.assertIn("`src/quanthus/event_library/scan.py`", lld)
+        self.assertEqual(source.authority, "direct_dwd_v2_1_plus_correction")
+        self.assertEqual(source.base_release.package_id, "dwd-base-202607-v2.1")
+        self.assertEqual(
+            source.correction_release.correction_id,
+            "dwd-base-202607-v2.1-correction-20260813-001",
+        )
+        self.assertEqual(
+            source.daily_increment_mode,
+            "disabled_for_initial_development_scan",
+        )
+        self.assertEqual(
+            source.historical_visibility.status,
+            "approved_development_retrospective",
+        )
+        self.assertFalse(source.historical_visibility.per_decision_publication_proven)
+        self.assertIn("per_decision_publication_proven=false", lld)
+        self.assertIn("legacy_operational_ads", source.forbidden_sources)
+        self.assertIn("permanent_blind", source.historical_visibility.forbidden_uses)
+        self.assertTrue((root / "src" / "quanthus" / "event_library" / "source.py").is_file())
+        self.assertTrue((root / "src" / "quanthus" / "event_library" / "scan.py").is_file())
+        self.assertTrue(
+            (root / "src" / "quanthus" / "event_library" / "physical_scan.py").is_file()
+        )
+        self.assertTrue((root / "tests" / "unit" / "test_event_scan_source.py").is_file())
+        self.assertTrue((root / "tests" / "unit" / "test_event_scan.py").is_file())
+        self.assertTrue((root / "tests" / "unit" / "test_event_physical_scan.py").is_file())
+        self.assertTrue((root / "ops" / "bin" / "run-p4-event-scan").is_file())
+        audit_path = root / "docs" / "acceptance" / "p4-event-dwd-pit-source-audit-20260806.md"
+        self.assertTrue(audit_path.is_file())
+        audit = audit_path.read_text(encoding="utf-8")
+        self.assertIn("knowledge_after_t_close", audit)
+        self.assertIn("No market-data file", audit)
+        recovery_path = root / "docs" / "acceptance" / "p4-event-v21-source-recovery-20260819.md"
+        self.assertTrue(recovery_path.is_file())
+        recovery = recovery_path.read_text(encoding="utf-8")
+        self.assertIn(source.semantic_digest, recovery)
+        self.assertIn("74 passed", recovery)
+        self.assertIn("1,158 passed and 3 skipped", recovery)
+        physical_path = (
+            root / "docs" / "acceptance" / "p4-event-physical-scan-implementation-20260819.md"
+        )
+        self.assertTrue(physical_path.is_file())
+        physical = physical_path.read_text(encoding="utf-8")
+        self.assertIn(source.semantic_digest, physical)
+        self.assertIn("run-p4-event-scan", physical)
+        self.assertIn("two independently", physical)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

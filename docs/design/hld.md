@@ -330,11 +330,15 @@ hypotheses remain separately governed and the later validation partitions remain
 - Runtime roles separate CN01/Hermes ODS and candidate production, OCI canonical/ADS/serving
   publication, migrations, and read-only consumption. Lane nodes possess no OCI publication
   credential or path authority.
-- Platform runtime roles are separately composed. The first Worker expansion contains API,
+- Platform runtime roles are separately composed. The accepted first Worker expansion contains API,
   PostgreSQL, Web, and one independently deployed Replay Worker with concurrency one. API never
   executes batch handlers; the Replay Worker is read-only to authoritative DWD and may publish only
-  immutable candidate Runs plus their active-evidence database pointer. MCP,
-  mobile, payment, AI-maintenance, trading, and broker roles remain absent.
+  immutable candidate Runs plus their active-evidence database pointer. P4 Issue #74 is the first
+  named follow-on that adds a second static Event Worker: `queue=event`, concurrency one,
+  `quanthus.p4-event-scan.v1` only, exact read-only DWD/reference mounts, and an independent
+  immutable Event-Run root. It reuses PostgreSQL Job/lease/cancel fences without introducing a
+  Worker registry or new queue transport. MCP, mobile, payment, AI-maintenance, trading, and broker
+  roles remain absent from the product runtime.
 - The private GitHub repository stores code, configuration, tests, and approved documentation.
 - CI validates policy, gates, imports, and deterministic bootstrap tests.
 

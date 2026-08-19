@@ -1,7 +1,7 @@
 PYTHON ?= python3
 VENV ?= .venv
 
-.PHONY: bootstrap bootstrap-platform bootstrap-p1 bootstrap-ods doctor test platform-check platform-postgres-check platform-docker-acceptance platform-image platform-web-image platform-web-check platform-recovery-backup platform-recovery-restore replay-image candidate-batch compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
+.PHONY: bootstrap bootstrap-platform bootstrap-p1 bootstrap-ods doctor test platform-check platform-postgres-check platform-docker-acceptance platform-image platform-web-image platform-web-check platform-recovery-backup platform-recovery-restore replay-image event-image candidate-batch compile planning-check check lint format data-audit curate-none coverage-none s1-coverage p1-evidence-check publish-snapshot pipeline-check schedule-check lane-shadow-matrix
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
@@ -72,6 +72,9 @@ platform-recovery-restore:
 
 replay-image:
 	./ops/bin/build-replay-image
+
+event-image:
+	./ops/bin/build-event-image
 
 candidate-batch:
 	./ops/bin/run-candidate-batch

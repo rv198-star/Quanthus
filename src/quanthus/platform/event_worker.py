@@ -1,0 +1,445 @@
+"""Lean PostgreSQL Event Worker for governed P4 event scans."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import time
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from quanthus.platform.jobs import P4_EVENT_SCAN_JOB
+from quanthus.platform.persistence import PostgresPlatformStore
+
+EVENT_QUEUE = "event"
+RUN_SCHEMA = "quanthus.p4-event-run.v1"
+_CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
+_EXPECTED_INPUT = {
+    "source_policy": "config/p4-event-scan-source.research.v1.json",
+    "provider_config": "config/replay-data-provider.development.v2.json",
+    "rule_card": "config/p4-candidate-price-volume-transition.research.v1.json",
+    "split_policy": "config/p4-event-split-policy.research.v1.json",
+}
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the lean Quanthus P4 Event Worker")
+    parser.add_argument("--once", action="store_true")
+    parser.add_argument("--poll-seconds", type=float, default=3.0)
+    parser.add_argument("--lease-seconds", type=int, default=300)
+    parser.add_argument("--renew-seconds", type=float, default=30.0)
+    parser.add_argument("--terminate-seconds", type=float, default=20.0)
+    return parser
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return f"sha256:{digest.hexdigest()}"
+
+
+def _terminate(process: subprocess.Popen[bytes], deadline_seconds: float) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=deadline_seconds)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=deadline_seconds)
+
+
+def _event_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
+    expected_keys = {"code_revision", *_EXPECTED_INPUT}
+    if set(input_ref) != expected_keys:
+        raise RuntimeError("event_scan_input_contract_mismatch")
+    code_revision = str(input_ref.get("code_revision") or "")
+    if _CODE_REVISION_RE.fullmatch(code_revision) is None:
+        raise RuntimeError("event_scan_code_revision_invalid")
+    normalized = {"code_revision": code_revision}
+    for field, expected in _EXPECTED_INPUT.items():
+        observed = input_ref.get(field)
+        if observed != expected:
+            raise RuntimeError(f"event_scan_{field}_not_governed")
+        normalized[field] = expected
+    return normalized
+
+
+@dataclass(frozen=True)
+class EventLibraryEnvelope:
+    root: Path
+    manifest_sha256: str
+    content_digest: str
+    candidate_events: int
+    executable_events: int
+    not_executable_events: int
+
+
+def _verify_event_library(root: Path) -> EventLibraryEnvelope:
+    completed = subprocess.run(
+        (
+            sys.executable,
+            "-m",
+            "quanthus",
+            "verify-p4-event-scan",
+            "--root",
+            str(root),
+        ),
+        check=False,
+        capture_output=True,
+        timeout=300,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("event_library_verifier_failed")
+    try:
+        payload = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
+    except (UnicodeDecodeError, json.JSONDecodeError, IndexError) as exc:
+        raise RuntimeError("event_library_verifier_response_invalid") from exc
+    required = {
+        "root",
+        "manifest_sha256",
+        "content_digest",
+        "candidate_events",
+        "executable_events",
+        "not_executable_events",
+    }
+    if not isinstance(payload, dict) or set(payload) != required:
+        raise RuntimeError("event_library_verifier_response_invalid")
+    return EventLibraryEnvelope(
+        root=Path(str(payload["root"])).resolve(),
+        manifest_sha256=str(payload["manifest_sha256"]),
+        content_digest=str(payload["content_digest"]),
+        candidate_events=int(payload["candidate_events"]),
+        executable_events=int(payload["executable_events"]),
+        not_executable_events=int(payload["not_executable_events"]),
+    )
+
+
+def _result_ref(
+    *,
+    run_id: str,
+    artifact_ref: Path,
+    result: EventLibraryEnvelope,
+) -> dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "artifact_ref": str(artifact_ref),
+        "result_sha256": result.manifest_sha256,
+        "content_digest": result.content_digest,
+        "candidate_events": result.candidate_events,
+        "executable_events": result.executable_events,
+        "not_executable_events": result.not_executable_events,
+    }
+
+
+def _validate_run_directory(
+    path: Path,
+    *,
+    run_id: str,
+    job_id: str,
+    input_digest: str,
+    code_revision: str,
+) -> tuple[EventLibraryEnvelope, dict[str, Any]]:
+    try:
+        manifest = json.loads((path / "run-manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("event_run_manifest_unreadable") from exc
+    if not isinstance(manifest, dict):
+        raise RuntimeError("event_run_manifest_invalid")
+    result = _verify_event_library(path / "event-library")
+    try:
+        event_manifest = json.loads(
+            (path / "event-library" / "manifest.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("event_library_manifest_unreadable") from exc
+    expected = {
+        "schema_version": RUN_SCHEMA,
+        "run_id": run_id,
+        "job_id": job_id,
+        "input_digest": input_digest,
+        "code_revision": code_revision,
+        "event_manifest_sha256": result.manifest_sha256,
+        "event_content_digest": result.content_digest,
+        "candidate_events": result.candidate_events,
+        "executable_events": result.executable_events,
+        "not_executable_events": result.not_executable_events,
+    }
+    if manifest != expected:
+        raise RuntimeError("event_run_manifest_mismatch")
+    if not isinstance(event_manifest, dict) or event_manifest.get("code_revision") != code_revision:
+        raise RuntimeError("event_library_code_revision_mismatch")
+    return result, _result_ref(run_id=run_id, artifact_ref=path, result=result)
+
+
+class EventWorker:
+    """One static worker that executes only governed P4 development event scans."""
+
+    def __init__(
+        self,
+        store: PostgresPlatformStore,
+        *,
+        worker_id: str,
+        run_root: Path,
+        lease_seconds: int,
+        renew_seconds: float,
+        terminate_seconds: float,
+    ) -> None:
+        self.store = store
+        self.worker_id = worker_id
+        self.run_root = run_root.resolve()
+        self.lease_seconds = lease_seconds
+        self.renew_seconds = renew_seconds
+        self.terminate_seconds = terminate_seconds
+        self.stopping = False
+
+    def run_once(self) -> bool:
+        job = self.store.claim_job(EVENT_QUEUE, self.worker_id, self.lease_seconds)
+        if job is None:
+            return False
+        if job.kind != P4_EVENT_SCAN_JOB:
+            self.store.finish_claimed_job(
+                job.job_id,
+                job.claim_generation,
+                state="failed",
+                result_ref=None,
+                error_reason="job_kind_not_admitted",
+            )
+            return True
+        try:
+            self._execute(
+                job.job_id,
+                job.claim_generation,
+                job.input_ref,
+                job.input_digest,
+            )
+        except Exception as exc:
+            reason = f"event_worker_error:{type(exc).__name__}:{exc}"[:500]
+            try:
+                self.store.finish_claimed_job(
+                    job.job_id,
+                    job.claim_generation,
+                    state="failed",
+                    result_ref=None,
+                    error_reason=reason,
+                )
+            except RuntimeError as stale:
+                if str(stale) != "stale_claim_generation":
+                    raise
+        return True
+
+    def _execute(
+        self,
+        job_id: str,
+        generation: int,
+        input_ref: Mapping[str, Any],
+        input_digest: str,
+    ) -> None:
+        governed = _event_input(input_ref)
+        observed = self.store.get_job(job_id)
+        if observed is None or observed.claim_generation != generation:
+            return
+        run_id = f"run_{job_id.removeprefix('job_')}"
+        final = self.run_root / "runs" / run_id
+        if final.exists():
+            result, result_ref = _validate_run_directory(
+                final,
+                run_id=run_id,
+                job_id=job_id,
+                input_digest=input_digest,
+                code_revision=governed["code_revision"],
+            )
+            self.store.update_claimed_job(
+                job_id,
+                generation,
+                stage="recovering-sealed-event-run",
+                progress=98,
+                progress_detail={
+                    "run_id": run_id,
+                    "candidate_events": result.candidate_events,
+                },
+            )
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="succeeded",
+                result_ref=result_ref,
+                error_reason=None,
+            )
+            return
+
+        staging = self.run_root / ".staging" / job_id / str(generation)
+        if staging.exists():
+            shutil.rmtree(staging)
+        staging.mkdir(parents=True)
+        stdout_path = staging / "stdout.log"
+        stderr_path = staging / "stderr.log"
+        event_root = staging / "event-library"
+        command = (
+            sys.executable,
+            "-m",
+            "quanthus",
+            "run-p4-event-scan",
+            "--source-policy",
+            governed["source_policy"],
+            "--provider-config",
+            governed["provider_config"],
+            "--rule-card",
+            governed["rule_card"],
+            "--split-policy",
+            governed["split_policy"],
+            "--output",
+            str(event_root),
+            "--code-revision",
+            governed["code_revision"],
+        )
+        self.store.update_claimed_job(
+            job_id,
+            generation,
+            stage="running-event-scan",
+            progress=5,
+            progress_detail={"run_id": run_id},
+        )
+        with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+            process = subprocess.Popen(command, stdout=stdout, stderr=stderr)  # noqa: S603
+        last_renewal = time.monotonic()
+        canceled = False
+        lost_lease = False
+        while process.poll() is None:
+            time.sleep(1)
+            observed = self.store.get_job(job_id)
+            if observed is None or observed.claim_generation != generation:
+                lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
+            if observed.cancel_requested or self.stopping:
+                canceled = observed.cancel_requested
+                _terminate(process, self.terminate_seconds)
+                break
+            if time.monotonic() - last_renewal >= self.renew_seconds:
+                if not self.store.renew_job_lease(
+                    job_id, generation, self.worker_id, self.lease_seconds
+                ):
+                    lost_lease = True
+                    _terminate(process, self.terminate_seconds)
+                    break
+                last_renewal = time.monotonic()
+        if lost_lease:
+            return
+        if canceled:
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="canceled",
+                result_ref=None,
+                error_reason=None,
+            )
+            return
+        if process.returncode != 0 or not event_root.is_dir():
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="failed",
+                result_ref=None,
+                error_reason=f"event_scan_child_exit_{process.returncode}",
+            )
+            return
+
+        self.store.update_claimed_job(
+            job_id,
+            generation,
+            stage="validating-event-run",
+            progress=90,
+            progress_detail={"run_id": run_id},
+        )
+        result = _verify_event_library(event_root)
+        run_manifest = {
+            "schema_version": RUN_SCHEMA,
+            "run_id": run_id,
+            "job_id": job_id,
+            "input_digest": input_digest,
+            "code_revision": governed["code_revision"],
+            "event_manifest_sha256": result.manifest_sha256,
+            "event_content_digest": result.content_digest,
+            "candidate_events": result.candidate_events,
+            "executable_events": result.executable_events,
+            "not_executable_events": result.not_executable_events,
+        }
+        (staging / "run-manifest.json").write_text(
+            json.dumps(run_manifest, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        self.store.update_claimed_job(
+            job_id,
+            generation,
+            stage="sealing-event-run",
+            progress=97,
+            progress_detail={
+                "run_id": run_id,
+                "candidate_events": result.candidate_events,
+            },
+        )
+        final.parent.mkdir(parents=True, exist_ok=True)
+        if final.exists():
+            raise RuntimeError("immutable_event_run_already_exists")
+        os.replace(staging, final)
+        result, result_ref = _validate_run_directory(
+            final,
+            run_id=run_id,
+            job_id=job_id,
+            input_digest=input_digest,
+            code_revision=governed["code_revision"],
+        )
+        self.store.finish_claimed_job(
+            job_id,
+            generation,
+            state="succeeded",
+            result_ref=result_ref,
+            error_reason=None,
+        )
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    dsn = os.environ.get("QUANTHUS_PLATFORM_DATABASE_URL", "").strip()
+    if not dsn:
+        raise RuntimeError("QUANTHUS_PLATFORM_DATABASE_URL is required")
+    worker_id = os.environ.get("QUANTHUS_WORKER_ID", "").strip() or socket.gethostname()
+    run_root = Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs"))
+    worker = EventWorker(
+        PostgresPlatformStore(dsn),
+        worker_id=worker_id,
+        run_root=run_root,
+        lease_seconds=args.lease_seconds,
+        renew_seconds=args.renew_seconds,
+        terminate_seconds=args.terminate_seconds,
+    )
+
+    def stop(_signum: int, _frame: object) -> None:
+        worker.stopping = True
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    while not worker.stopping:
+        worked = worker.run_once()
+        if args.once:
+            return 0
+        if not worked:
+            time.sleep(args.poll_seconds)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

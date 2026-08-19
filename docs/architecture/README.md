@@ -25,7 +25,7 @@ a parallel current-state architecture.
 | `adr-0009-gpu-p100-dwd-v2-1-execution.md` | Completed node-independent V2.1 rebuild, audit, and promotion workflow; GPU-P100 retained as R18 provenance | Changing rebuild checkpoints, resource bounds, audit closure, or atomic promotion |
 | `adr-0010-platform-kernel-integration.md` | Extract-and-recompose decision, Quanthus authority boundary, staged slimming, and recovery policy | Admitting QuantDinger-derived platform code, changing platform/domain ownership, or restoring a deferred module |
 | `adr-0011-quantdinger-vue-product-web.md` | Pinned QuantDinger-Vue selective derivative and candidate-only product semantics | Changing the primary product Web, candidate status model, or frontend provenance |
-| `adr-0012-postgresql-worker-runtime.md` | PostgreSQL-backed, capability-routed Worker Runtime for replay and warehouse jobs | Changing Job transport, Worker topology, batch execution, warehouse-operation routing, or Run publication |
+| `adr-0012-postgresql-worker-runtime.md` | PostgreSQL-backed static Worker Runtime for candidate replay and named heavy-analysis Jobs, including the P4 Event Worker extension | Changing Job transport, Worker topology, batch execution, warehouse-operation routing, or Run publication |
 
 ## Topic contracts
 

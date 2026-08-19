@@ -23,7 +23,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 def test_manifest_admits_only_minimal_runtime_and_operator_web_surfaces() -> None:
     manifest = load_feature_manifest()
 
-    assert manifest.process_roles == ("api", "migration", "web", "replay-worker")
+    assert manifest.process_roles == (
+        "api",
+        "migration",
+        "web",
+        "replay-worker",
+        "event-worker",
+    )
     assert manifest.dependency_groups == ("platform",)
     assert manifest.migrations == (
         "identity",
@@ -164,6 +170,29 @@ def test_production_docker_context_excludes_unneeded_or_restricted_surfaces() ->
     assert "condition: service_healthy" in compose
     assert compose.count("healthcheck:") == 3
     assert "build:" not in compose
+
+
+def test_event_worker_stays_a_control_plane_supervisor() -> None:
+    worker = PROJECT_ROOT.joinpath("src/quanthus/platform/event_worker.py").read_text(
+        encoding="utf-8"
+    )
+    builder = PROJECT_ROOT.joinpath("ops/bin/build-event-image").read_text(encoding="utf-8")
+    dockerfile = PROJECT_ROOT.joinpath("ops/event/Dockerfile").read_text(encoding="utf-8")
+
+    assert "quanthus.p4-event-scan.v1" not in worker
+    assert "run-p4-event-scan" in worker
+    assert "verify-p4-event-scan" in worker
+    assert all(
+        forbidden not in worker
+        for forbidden in (
+            "from quanthus.event_library",
+            "from quanthus.backtest",
+            "from quanthus.pipelines",
+        )
+    )
+    assert 'find "$REPOSITORY_ROOT/src/quanthus" -type f' in builder
+    assert "event_library" not in builder.split("find", 1)[1].split("cp", 1)[0]
+    assert 'RUN python -m pip install --no-cache-dir ".[p1,platform]"' in dockerfile
 
 
 def test_operator_web_is_source_built_and_independently_removable() -> None:

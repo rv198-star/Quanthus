@@ -143,6 +143,9 @@ def _materialize(
     try:
         connection.execute(
             f"""
+            CREATE VIEW dwd_security AS
+            SELECT * FROM read_parquet({_sql_path(payload / 'listed_company/dwd_security.parquet')})
+            WHERE knowledge_to IS NULL;
             CREATE VIEW dwd_listing AS
             SELECT * FROM read_parquet({_sql_path(payload / 'listed_company/dwd_listing.parquet')})
             WHERE knowledge_to IS NULL;
@@ -205,6 +208,16 @@ def _materialize(
             """
             SELECT listing.listing_code AS security_id,
                    listing.listing_code AS stock_code,
+                   security.security_id AS dwd_security_id,
+                   security.company_id AS dwd_company_id,
+                   listing.listing_id AS dwd_listing_id,
+                   listing.venue_id AS dwd_venue_id,
+                   security.instrument_type AS dwd_instrument_type,
+                   security.effective_from AS dwd_security_effective_from,
+                   listing.effective_from AS dwd_listing_effective_from,
+                   security.knowledge_from AS dwd_security_knowledge_from,
+                   listing.knowledge_from AS dwd_listing_knowledge_from,
+                   state.knowledge_from AS dwd_state_knowledge_from,
                    CASE listing.venue_id
                      WHEN 'venue_bec59e31eb6bb28111a10d7e6d2c689f' THEN 'SSE'
                      WHEN 'venue_8c0bd9088a0dc88f28e5e7fa8efdce87' THEN 'SZSE'
@@ -216,6 +229,15 @@ def _materialize(
                    CAST(bar.close AS DOUBLE) AS close,
                    CAST(bar.volume AS DOUBLE) AS volume,
                    CAST(bar.turnover AS DOUBLE) AS amount,
+                   bar.open AS dwd_open_decimal,
+                   bar.high AS dwd_high_decimal,
+                   bar.low AS dwd_low_decimal,
+                   bar.close AS dwd_close_decimal,
+                   bar.turnover AS dwd_turnover_decimal,
+                   bar.knowledge_from AS dwd_bar_knowledge_from,
+                   bar.source_record_id AS dwd_bar_source_record_id,
+                   bar.source_revision AS dwd_bar_source_revision,
+                   bar.source_artifact_sha256 AS dwd_bar_source_artifact_sha256,
                    NULL::DOUBLE AS turnover_rate,
                    NULL::DOUBLE AS pct_change,
                    'none' AS adj_mode,
@@ -224,6 +246,7 @@ def _materialize(
                    bar.knowledge_from AS built_at
             FROM dwd_state state
             JOIN dwd_listing listing USING (listing_id)
+            JOIN dwd_security security ON security.security_id=listing.security_id
             JOIN dwd_calendar calendar
               ON calendar.calendar_session_id=state.calendar_session_id
              AND calendar.venue_id=listing.venue_id
@@ -243,6 +266,16 @@ def _materialize(
             """
             SELECT listing.listing_code AS security_id,
                    listing.listing_code AS stock_code,
+                   security.security_id AS dwd_security_id,
+                   security.company_id AS dwd_company_id,
+                   listing.listing_id AS dwd_listing_id,
+                   listing.venue_id AS dwd_venue_id,
+                   security.instrument_type AS dwd_instrument_type,
+                   security.effective_from AS dwd_security_effective_from,
+                   listing.effective_from AS dwd_listing_effective_from,
+                   security.knowledge_from AS dwd_security_knowledge_from,
+                   listing.knowledge_from AS dwd_listing_knowledge_from,
+                   state.knowledge_from AS dwd_state_knowledge_from,
                    CASE listing.venue_id
                      WHEN 'venue_bec59e31eb6bb28111a10d7e6d2c689f' THEN 'SSE'
                      WHEN 'venue_8c0bd9088a0dc88f28e5e7fa8efdce87' THEN 'SZSE'
@@ -254,6 +287,7 @@ def _materialize(
                    listing.source_artifact_sha256 AS mapping_digest
             FROM dwd_state state
             JOIN dwd_listing listing USING (listing_id)
+            JOIN dwd_security security ON security.security_id=listing.security_id
             JOIN dwd_calendar calendar
               ON calendar.calendar_session_id=state.calendar_session_id
              AND calendar.venue_id=listing.venue_id
@@ -271,6 +305,16 @@ def _materialize(
             WITH joined AS (
               SELECT listing.listing_code AS security_id,
                      listing.listing_code AS stock_code,
+                     security.security_id AS dwd_security_id,
+                     security.company_id AS dwd_company_id,
+                     listing.listing_id AS dwd_listing_id,
+                     listing.venue_id AS dwd_venue_id,
+                     security.instrument_type AS dwd_instrument_type,
+                     security.effective_from AS dwd_security_effective_from,
+                     listing.effective_from AS dwd_listing_effective_from,
+                     security.knowledge_from AS dwd_security_knowledge_from,
+                     listing.knowledge_from AS dwd_listing_knowledge_from,
+                     state.knowledge_from AS dwd_state_knowledge_from,
                      listing.board_code AS board,
                      CASE listing.venue_id
                        WHEN 'venue_bec59e31eb6bb28111a10d7e6d2c689f' THEN 'SSE'
@@ -283,6 +327,7 @@ def _materialize(
                      ) AS prior_close
               FROM dwd_state state
               JOIN dwd_listing listing USING (listing_id)
+              JOIN dwd_security security ON security.security_id=listing.security_id
               JOIN dwd_calendar calendar
                 ON calendar.calendar_session_id=state.calendar_session_id
                AND calendar.venue_id=listing.venue_id
@@ -294,7 +339,11 @@ def _materialize(
                 'venue_8c0bd9088a0dc88f28e5e7fa8efdce87'
               )
             )
-            SELECT security_id, stock_code, exchange, board, execution_date,
+            SELECT security_id, stock_code, dwd_security_id, dwd_company_id,
+                   dwd_listing_id, dwd_venue_id, dwd_instrument_type,
+                   dwd_security_effective_from, dwd_listing_effective_from,
+                   dwd_security_knowledge_from, dwd_listing_knowledge_from,
+                   dwd_state_knowledge_from, exchange, board, execution_date,
                    'unknown' AS st_status_label, NULL::BOOLEAN AS is_st_class,
                    true AS status_known, execution_date AS st_source_market_date,
                    source_revision AS st_revision,

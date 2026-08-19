@@ -68,6 +68,11 @@ from quanthus.delisted_coverage import (
     DelistedCoverageReport,
     run_delisted_coverage,
 )
+from quanthus.event_library.physical_scan import (
+    PhysicalEventScanError,
+    build_physical_event_scan,
+    verify_physical_event_scan,
+)
 from quanthus.feature_registry import FeatureRegistryError, load_feature_registry
 from quanthus.gates import (
     GateReport,
@@ -595,6 +600,39 @@ def _parser() -> argparse.ArgumentParser:
     candidate_batch.add_argument("--feature-panel", type=Path)
     candidate_batch.add_argument("--evidence-dir", type=Path)
     candidate_batch.add_argument("--output", type=Path, required=True)
+
+    p4_event_scan = subparsers.add_parser(
+        "run-p4-event-scan",
+        help="build the development-only P4 event library from DWD V2.1 plus correction-001",
+    )
+    p4_event_scan.add_argument(
+        "--source-policy",
+        type=Path,
+        default=Path("config/p4-event-scan-source.research.v1.json"),
+    )
+    p4_event_scan.add_argument(
+        "--provider-config",
+        type=Path,
+        default=Path("config/replay-data-provider.development.v2.json"),
+    )
+    p4_event_scan.add_argument(
+        "--rule-card",
+        type=Path,
+        default=Path("config/p4-candidate-price-volume-transition.research.v1.json"),
+    )
+    p4_event_scan.add_argument(
+        "--split-policy",
+        type=Path,
+        default=Path("config/p4-event-split-policy.research.v1.json"),
+    )
+    p4_event_scan.add_argument("--output", type=Path, required=True)
+    p4_event_scan.add_argument("--code-revision", required=True)
+
+    p4_event_verify = subparsers.add_parser(
+        "verify-p4-event-scan",
+        help="deeply verify one immutable P4 event-library package",
+    )
+    p4_event_verify.add_argument("--root", type=Path, required=True)
 
     st_status = subparsers.add_parser(
         "build-st-status",
@@ -1476,6 +1514,43 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             print(json.dumps(batch_payload, ensure_ascii=True, sort_keys=True))
             return 0 if batch_result.succeeded else 1
+        elif args.command == "run-p4-event-scan":
+            event_scan_result = build_physical_event_scan(
+                source_policy_path=args.source_policy,
+                provider_config_path=args.provider_config,
+                rule_card_path=args.rule_card,
+                split_policy_path=args.split_policy,
+                output=args.output,
+                code_revision=args.code_revision,
+            )
+            print(
+                json.dumps(
+                    {
+                        "root": str(event_scan_result.root),
+                        "manifest_sha256": event_scan_result.manifest_sha256,
+                        "content_digest": event_scan_result.content_digest,
+                        "candidate_events": event_scan_result.candidate_events,
+                        "executable_events": event_scan_result.executable_events,
+                        "not_executable_events": event_scan_result.not_executable_events,
+                    },
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "verify-p4-event-scan":
+            event_verify_result = verify_physical_event_scan(args.root)
+            print(
+                json.dumps(
+                    {
+                        "root": str(event_verify_result.root),
+                        "manifest_sha256": event_verify_result.manifest_sha256,
+                        "content_digest": event_verify_result.content_digest,
+                        "candidate_events": event_verify_result.candidate_events,
+                        "executable_events": event_verify_result.executable_events,
+                        "not_executable_events": event_verify_result.not_executable_events,
+                    },
+                    sort_keys=True,
+                )
+            )
         elif args.command == "run-candidate-strategy-replay":
             project_root = find_project_root()
             candidate_manifest = load_candidate_manifest(args.candidate)
@@ -2121,6 +2196,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AttributionError,
         CandidateContractError,
         QuantDingerCandidateAdapterError,
+        PhysicalEventScanError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

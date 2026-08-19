@@ -253,6 +253,30 @@ def test_platform_kernel_authority_and_authoring_boundaries_are_explicit() -> No
     assert "QuantDinger-Vue@f2b5968bb815ed7c0c2301d61523dca98dcdddde" in lld
 
 
+def test_platform_kernel_event_worker_recovery_assets_remain_self_contained() -> None:
+    compose = (ROOT / "ops" / "platform" / "compose.yaml").read_text(encoding="utf-8")
+    recovery = (ROOT / "ops" / "platform" / "recovery.compose.yaml").read_text(
+        encoding="utf-8"
+    )
+    backup = (ROOT / "ops" / "bin" / "backup-platform-recovery").read_text(
+        encoding="utf-8"
+    )
+    restore = (ROOT / "ops" / "bin" / "restore-platform-recovery").read_text(
+        encoding="utf-8"
+    )
+
+    assert "quanthus-event-runs:/data/event-runs" in compose
+    assert "event-runs:/data/event-runs:ro" in recovery
+    assert "QUANTHUS_EVENT_IMAGE" in backup
+    assert "event-runs.tar.gz" in backup
+    assert "QUANTHUS_RECOVERY_EVENT_IMAGE_ID" in backup
+    assert "QUANTHUS_RECOVERY_EVENT_JOB_COUNT" in backup
+    assert "QUANTHUS_EVENT_IMAGE" in restore
+    assert "event-runs.tar.gz" in restore
+    assert "QUANTHUS_RECOVERY_EVENT_JOB_COUNT" in restore
+    assert "quanthus.p4-event-scan.v1" in restore
+
+
 def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:
     compose = (ROOT / "ops" / "platform" / "compose.yaml").read_text(encoding="utf-8")
 
@@ -267,13 +291,21 @@ def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:
     assert "traefik.http.routers.quanthus.tls.certresolver=letsencrypt" in compose
     assert "traefik.http.services.quanthus-web.loadbalancer.server.port=3100" in compose
     assert compose.count("traefik.enable=true") == 1
-    assert compose.count("restart: unless-stopped") == 4
+    assert compose.count("restart: unless-stopped") == 5
 
     postgres = compose.split("  postgres:", 1)[1].split("\n  api:", 1)[0]
     api = compose.split("  api:", 1)[1].split("\n  replay-worker:", 1)[0]
-    replay_worker = compose.split("  replay-worker:", 1)[1].split("\n  web:", 1)[0]
+    replay_worker = compose.split("  replay-worker:", 1)[1].split("\n  event-worker:", 1)[0]
+    event_worker = compose.split("  event-worker:", 1)[1].split("\n  web:", 1)[0]
     assert "ports:" not in postgres
     assert "ports:" not in replay_worker
+    assert "ports:" not in event_worker
     assert "traefik-net" not in postgres
     assert "traefik-net" not in api
     assert "traefik-net" not in replay_worker
+    assert "traefik-net" not in event_worker
+    assert "QUANTHUS_EVENT_RUN_ROOT: /data/event-runs" in event_worker
+    assert "quanthus-event-runs:/data/event-runs" in event_worker
+    assert event_worker.count(":ro") == 3
+    assert "/dwd-base-202607-v2.1:ro" in event_worker
+    assert "correction-20260813-001:ro" in event_worker

@@ -17,6 +17,7 @@ from quanthus.platform.ports import AttributionVerificationPort
 
 ATTRIBUTION_VERIFICATION_JOB = "quanthus.attribution.verify.v1"
 CANDIDATE_REPLAY_JOB = "quanthus.candidate-replay.v1"
+P4_EVENT_SCAN_JOB = "quanthus.p4-event-scan.v1"
 
 
 class JobNotCancelableError(RuntimeError):

@@ -8,7 +8,9 @@ index, and one active branch; expand to linked siblings only for a concrete inte
 1. `../hld.md`: global invariants and active daily sequence.
 2. `06-event-library.md`: current P4 event, outcome, isolation, and split design.
 3. `03-label-feature-system.md`: accepted P3 vocabulary and feature-lineage substrate.
-4. `04-experts-aggregator.md`: accepted typed opinions, vetoes, constraints, and decisions.
+4. `04-experts-aggregator.md`: accepted typed opinions, vetoes, constraints, and decisions; load
+   `04-experts-aggregator/expert-strategy-layer.md` for the approved additive v2 evaluation,
+   lifecycle, formal-strategy MVP, and stop-condition design.
 5. `05-position-execution.md`: accepted fixed-unit strategy lifecycle and exits.
 6. `02-backtest-engine.md`: accepted daily execution/accounting interface and the
    `02-backtest-engine/strategy-replay.md` P3 orchestration child; load exact evidence only when
@@ -46,7 +48,7 @@ module internals unless a named application port crosses that boundary.
 | `01-data-foundation.md` | P1 | Accepted-conditional input foundation | Data, snapshots, tradability, ODS/DWD/DWS, or PIT behavior changes |
 | `02-backtest-engine.md` | P2/P3 | Accepted-conditional daily referee plus integrated bounded strategy replay; target intraday activation blocked | Events, orders, fills, matching, ledgers, costs, or deterministic replay |
 | `03-label-feature-system.md` | P3 | Accepted capability substrate; formal vocabularies are proposal-driven | Labels, features, state vocabularies, or feature lineage |
-| `04-experts-aggregator.md` | P3 | Accepted capability substrate; concrete shadow production is proposal-driven | Expert contracts, vetoes, constraints, scores, or aggregation |
+| `04-experts-aggregator.md` | P3 | Accepted v1 capability substrate; Expert Strategy Layer MVP v2 evaluation design approved and implementation open | Expert contracts, vetoes, constraints, scores, aggregation, evaluation, scorecards, or expert lifecycle |
 | `05-position-execution.md` | P3 | Accepted capability substrate | Strategy position lifecycle, sizing, exits, or cooldown |
 | `06-event-library.md` | P4 | Implementation open | Event cohorts, outcomes, or event-window definitions |
 | `07-research-scoring.md` | P5 | Deferred | Statistical/ML research and promotion |

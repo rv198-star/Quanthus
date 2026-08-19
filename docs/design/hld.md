@@ -5,8 +5,8 @@
 | Design status | approved |
 | Delivery gate | not-applicable |
 | Current phase | P4 implementation open |
-| Version | 0.11 |
-| Effective date | 2026-08-12 |
+| Version | 0.12 |
+| Effective date | 2026-08-19 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
 | Platform gate | `config/platform-kernel-gates.v1.json` |
@@ -48,7 +48,7 @@ outside automated execution; no broker adapter exists in the near-term profile.
 | Normalized data | Canonical security, calendar, prices, actions, and status | Versioned Parquet datasets |
 | Snapshot service | Enforce market-date and knowledge-cutoff visibility | `SnapshotRef` plus data views |
 | Labels/features | Replayable state descriptions | Versioned evidence-bearing values |
-| Experts | Scoring, position constraints, and veto decisions | Typed expert outputs |
+| Experts | Versioned market assessments plus independently versioned score, constraint, veto, or abstention policy effects | Typed expert outputs and evaluation artifacts |
 | Aggregator | Fixed-priority governance and action mapping | Proposed position action |
 | Position engine | Capital-unit lifecycle and concentration rules | Desired orders |
 | Matching/ledger | Conservative fills, rejects, costs, and accounting | Immutable order/fill/ledger events |
@@ -77,6 +77,22 @@ and rebuildable serving projections. Workers poll and claim transactionally for 
 workload, without Redis, Celery, RabbitMQ, or an initial registry/event stream. It does not replace immutable
 analytical artifacts. Optional AI authoring may create an untrusted draft only and has no direct
 edge to strategy publication, decisions, notifications, orders, or fills.
+
+### Expert strategy research authority
+
+Trusted DWD/P2 evidence is the factual referee. A versioned, composable expert-decision topology is
+the primary strategy research and decision-expression unit, but candidate generation, aggregation,
+positions, exits, funding, matching, and costs remain part of the complete strategy topology that
+owns final economic acceptance. Experts are not a voting body.
+
+Every expert version has a quantitative, falsifiable evaluation contract. Assessment semantics and
+the policy mapping that affects an action are independently versioned: future outcomes may settle a
+declared assessment, while complete capital-constrained replay evaluates an action-changing policy.
+Forward Shadow may add prospective evidence to either route. Common contracts normalize audit and
+composition, not unlike target values or a universal accuracy score. PIT, tradability, accounting,
+funding, and data-quality guardians remain non-optimizable system invariants. Detailed contracts,
+MVP boundaries, lifecycle decisions, and stop conditions are owned by
+`docs/design/lld/04-experts-aggregator/expert-strategy-layer.md`.
 
 ## 3. Data platform and storage design
 

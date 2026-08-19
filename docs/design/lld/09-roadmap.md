@@ -44,6 +44,9 @@ notification retain their separate blockers.
 - **M5**: first operator-assisted live review and explicit continue/stop decision.
 - **Platform Kernel**: selectively extract the operator platform from QuantDinger through PK0-PK6
   while retaining Quanthus domain authority.
+- **Expert Strategy Layer MVP**: a bounded post-P3 product increment that adds falsifiable expert
+  evaluation, one formal two-to-four-expert topology, constrained attribution, candidate-detail
+  evidence, and a forward-Shadow handoff. It does not reopen P3 acceptance or advance P4-P6 gates.
 
 ### Platform Kernel stage gates
 
@@ -66,6 +69,12 @@ six default boundary decisions; PK1 is now open and begins with `PK-COMPOSE-001`
 Each phase has a GitHub milestone and an epic issue. Child issues carry stable ids from
 `docs/work-items/index.md`, list dependency ids, and link the governing LLD section. A gate
 changes only through configuration, tests, and evidence in one pull request.
+
+The cross-phase Expert Strategy Layer MVP has its own GitHub milestone and `P3-EXPERT-000` epic.
+Only `P3-EXPERT-001` is an initially actionable child. Its later children remain blocked by explicit
+predecessors, and the existing `P3-ATTR-001` gate remains deferred until the formal strategy and
+predeclared questions exist. This product increment may use development data but cannot open
+arbitration, permanent-blind, P6 promotion, notification, or execution authority.
 
 ## 5. Stop rules
 

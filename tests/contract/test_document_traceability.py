@@ -1058,10 +1058,27 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(p3_items)
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "blocked"},
-            {"P3-LABEL-004", "P3-ATTR-001", "P3-DASH-001"},
+            {
+                "P3-LABEL-004",
+                "P3-ATTR-001",
+                "P3-DASH-001",
+                "P3-EXPERT-002",
+                "P3-EXPERT-003",
+                "P3-STRAT-002",
+                "P3-EXPERT-004",
+                "P3-EXPERT-005",
+            },
+        )
+        self.assertEqual(
+            {item.stable_id for item in p3_items if item.status == "ready"},
+            {"P3-EXPERT-000", "P3-EXPERT-001"},
         )
         self.assertTrue(
-            all(item.status == "closed" for item in p3_items if item.status != "blocked")
+            all(
+                item.status == "closed"
+                for item in p3_items
+                if item.status not in {"blocked", "ready"}
+            )
         )
         self.assertTrue(p4_items)
         self.assertTrue(all(item.status == "ready" for item in p4_items))

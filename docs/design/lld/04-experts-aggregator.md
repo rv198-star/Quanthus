@@ -5,14 +5,22 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-EXP-001` accepted; `P3-AGG-001` accepted; `P3-SHADOW-001` comparison contract accepted; fixture scoring/action and experts accepted; concrete shadow production is proposal-triggered |
+| Implementation status | `P3-EXP-001` accepted; `P3-AGG-001` accepted; `P3-SHADOW-001` comparison contract accepted; fixture scoring/action and experts accepted; accepted v1 remains frozen; the Expert Strategy Layer MVP child opens additive v2 evaluation work under `P3-EXPERT-000` without reopening P3 acceptance |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-002/003/006, FR-AUDIT-001 |
 
 ## 1. Goal
 
-Keep all action authority in typed expert and governance contracts. Experts produce opinions
-or boundaries; the aggregator applies fixed precedence and records why an action exists.
+Keep all action authority in typed expert and governance contracts. Experts produce assessments or
+boundaries; the aggregator applies fixed precedence and records why an action exists. A versioned,
+composable expert topology is the primary strategy research and decision-expression unit, while the
+complete strategy topology remains the final unit of economic acceptance.
+
+### Detailed design
+
+| Child | Ownership | Delivery state |
+| --- | --- | --- |
+| `04-experts-aggregator/expert-strategy-layer.md` | Additive v2 evaluation artifacts, assessment/policy separation, scorecards, lifecycle, Worker boundary, formal-strategy MVP, and stop conditions | Design approved; `P3-EXPERT-001` ready; later work dependency-gated |
 
 ## 2. Interfaces
 
@@ -20,6 +28,11 @@ or boundaries; the aggregator applies fixed precedence and records why an action
 
 Signal in [-1, 1], confidence in [0, 1], evidence references, expert/rule version, and an
 applicability reason. A non-applicable expert returns an explicit abstention.
+
+These are accepted v1 action-policy semantics. `confidence` is not a calibrated forecast
+probability. New forecast, settlement, scorecard, and policy-mapping identities are additive v2
+sidecar artifacts owned by `04-experts-aggregator/expert-strategy-layer.md`; accepted v1 fields and
+Run digests are never reinterpreted or rewritten.
 
 ### Constraint output
 
@@ -89,8 +102,9 @@ remaining 51,962 are non-ordering rejections or holds. Evidence:
 
 The vertical slice enables tradability/funding vetoes, a basic candidate rule, extension-risk
 and market constraints, structural exit, concentration, and audit logging. Later price/volume,
-trend, leadership, and context proposals must begin in shadow-only mode. Sector, news, and
-company-quality experts are disabled until their point-in-time inputs are approved.
+trend, leadership, and context proposals must begin in shadow-only mode and carry the evaluation
+contract required by the Expert Strategy Layer child. Sector, news, and company-quality experts
+are disabled until their point-in-time inputs are approved.
 
 `src/quanthus/shadow_divergence.py` now validates that an active/rejected decision and each shadow
 decision belong to the same review, then emits a canonical comparison of actions, scores, expert
@@ -119,9 +133,21 @@ score, proposed/final action, rejected action when applicable, and reason codes.
 | P3-AGG-002 | Implement score and action mapping with versioning | P3-AGG-001 | Boundary fixtures |
 | P3-SHADOW-001 | Implement shadow execution and divergence log | Audit schema | No action-path side effects |
 | P3-EXP-002 | Add vertical-slice rule experts | Aggregator | End-to-end replay |
+| P3-EXPERT-000 | Deliver the bounded Expert Strategy Layer MVP | META-DOC-001 | All seven blocking children close, one lifecycle decision is recorded, and sealed partitions remain unopened |
+| P3-EXPERT-001 | Implement additive expert evaluation protocol v2 | P3-EXP-001, P3-AGG-001 | Schema/contract tests and byte-stable v1 compatibility evidence |
+| P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | Idempotency, recovery, cancellation, fencing, and deterministic publication evidence |
+| P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-FEAT-001, P3-REPLAY-001 | Human-approved target card, leakage tests, sample ledger, and development scorecard |
+| P3-STRAT-002 | Freeze the first formal two-to-four-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | Approved strategy card, version bindings, expected changes, controls, and legal interventions |
+| P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | Digest-resolved API/Web contracts with no calculation, approval, or execution authority |
+| P3-EXPERT-005 | Accept the development MVP and hand the frozen version to forward Shadow | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | Deterministic acceptance packet, lifecycle decision, cost report, rollback, and zero sealed-partition access |
 
 ## 7. Acceptance
 
 A perfect score cannot bypass a veto. Disabling any non-system expert degrades explicitly and
 does not crash. Any decision can answer which experts agreed, which veto or constraint applied,
 which evidence was used, and which versions produced the result.
+
+The Expert Strategy Layer MVP additionally requires every declared assessment to resolve to a
+falsifiable evaluation contract, every action-changing policy to disclose its complete-strategy
+economic effect, and at least one evidence-backed lifecycle decision. It does not authorize a
+cross-target ranking or automated expert evolution.

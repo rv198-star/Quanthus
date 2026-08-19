@@ -187,6 +187,12 @@ panel, result, and scoreboard byte-identically. The bounded conformance review t
 `docs/acceptance/p3-governed-strategy-development-20260729.md` and
 `docs/acceptance/p3-conformance-acceptance-20260729.md`.
 
+The approved Expert Strategy Layer MVP is a separate post-P3 product increment governed by
+`docs/design/lld/04-experts-aggregator/expert-strategy-layer.md`. It does not reopen the accepted P3
+fixture or alter the current P4 gate. `P3-EXPERT-000` tracks seven blocking children; only the
+additive v2 contract is initially ready. The formal attribution item retains its machine-readable
+`deferred` state until `P3-STRAT-002` supplies the strategy adapter and predeclared questions.
+
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P3-REPLAY-001 | Implement strategy-neutral daily historical replay | P2-ACCEPT-001 | closed |
@@ -202,6 +208,11 @@ panel, result, and scoreboard byte-identically. The bounded conformance review t
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |
 | P3-SHADOW-001 | Implement shadow execution and divergence log | P3-AGG-001 | closed for comparison-contract scope |
 | P3-EXP-002 | Add vertical-slice rule experts | P3 aggregator | closed for fixture scope |
+| P3-EXPERT-000 | Deliver the bounded Expert Strategy Layer MVP | META-DOC-001 | open epic |
+| P3-EXPERT-001 | Implement additive expert evaluation protocol v2 | P3-EXP-001, P3-AGG-001 | ready |
+| P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | blocked by P3-EXPERT-001 |
+| P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-FEAT-001, P3-REPLAY-001 | blocked by P3-EXPERT-001 |
+| P3-STRAT-002 | Freeze the first formal two-to-four-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | blocked by P3-EXPERT-002 and P3-EXPERT-003 |
 | P3-POS-001 | Implement unit/position state machine | P2 ledger | closed |
 | P3-POLICY-001 | Freeze trial/add/hold/cooldown parameters | P2 acceptance | closed for fixture scope |
 | P3-RISK-001 | Implement concentration caps | P3-POS-001 | closed |
@@ -209,8 +220,10 @@ panel, result, and scoreboard byte-identically. The bounded conformance review t
 | P3-EXIT-001 | Implement four-source exit arbitration | P3 aggregator | closed |
 | P3-POS-003 | Implement cooldown and carried exit | P2 matcher | closed |
 | P3-FUNNEL-001 | Implement opportunity funnel | P3 vertical slice | closed |
-| P3-ATTR-001 | Implement constrained contribution reruns | P3 vertical slice | deferred pending formal strategy questions |
+| P3-ATTR-001 | Run bounded attribution for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002 | deferred pending P3-STRAT-002 and an explicit gate change |
 | P3-DASH-001 | Produce monitoring report | Funnel and attribution | deferred pending recurring formal strategy |
+| P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | blocked by P3-ATTR-001 |
+| P3-EXPERT-005 | Accept the development MVP and hand the frozen version to forward Shadow | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | blocked by P3-EXPERT-004 and P3-ATTR-001 |
 | P3-ACCEPT-001 | Execute multi-year vertical-slice acceptance | All P3 release blockers | closed |
 
 ## P4-P7

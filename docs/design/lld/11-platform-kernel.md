@@ -5,7 +5,7 @@
 | Phase | Platform Kernel, orthogonal to P1-P7 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | PK1-PK4, candidate workbench/approval, `PK-WORKER-000`, and PK6 cutover/recovery accepted; first-cutover PK5 not applicable |
+| Implementation status | PK1-PK4, candidate workbench/approval, Replay Worker, and PK6 cutover/recovery accepted; P4 Event Worker is an additive named-workflow extension under Issue #74 and remains unaccepted until the real-corpus double-run gate closes |
 | Gate source | `config/platform-kernel-gates.v1.json` |
 | PK0 acceptance | `docs/acceptance/platform-kernel-pk0-boundary-freeze-20260812.md` |
 | PK1-PK3 acceptance | `docs/acceptance/platform-kernel-pk1-pk3-acceptance-20260812.md` |
@@ -13,6 +13,7 @@
 | Candidate workbench acceptance | `docs/acceptance/platform-candidate-validation-workbench-20260813.md` |
 | Candidate approval acceptance | `docs/acceptance/platform-candidate-approval-workflow-20260813.md` |
 | Replay Worker acceptance | `docs/acceptance/platform-worker-production-loop-20260813.md` |
+| P4 Event Worker checkpoint | `docs/acceptance/p4-event-worker-implementation-20260820.md` |
 | Public edge acceptance | `docs/acceptance/platform-kernel-public-edge-acceptance-20260812.md` |
 | PK6 acceptance | `docs/acceptance/platform-kernel-pk6-cutover-recovery-20260813.md` |
 | Operations | `docs/operations/platform-kernel-runbook.md` |
@@ -234,8 +235,19 @@ and artifact references. Large results remain immutable Quanthus artifacts.
 The initial deployment is one statically configured Replay Worker with `queue=replay`, concurrency
 one, a read-only exact DWD view, and a writable Run root. It performs replay, metrics, evidence,
 sealing, and candidate-active-evidence CAS as stages of one Job. It has no DWD mutation authority.
-Worker registry, dynamic capability documents, resource classes, and separate QA/build/artifact/
-publication services are deferred until named workflows require different dependencies or permissions.
+
+Issue #74 is the first named workflow that justifies a second static Worker kind. The P4 Event
+Worker uses `queue=event`, concurrency one, and admits only `quanthus.p4-event-scan.v1`. It receives
+read-only mounts for the exact DWD Base V2.1, correction-001, and the frozen development research
+references, plus a separate writable `/data/event-runs` volume. The request is exact-path and
+exact-code-revision bound; the Worker executes the existing `run-p4-event-scan` child process,
+validates the immutable Event Library package, writes one generation-bound `run-manifest.json`, and
+only then marks the PostgreSQL Job succeeded. A reclaimed sealed Run is deep-verified before reuse.
+The API may read `/data/event-runs` read-only for bounded Run metadata; it never executes the scan.
+
+This activation does not admit a Worker registry, dynamic capability documents, resource classes,
+or separate QA/build/artifact/publication services. Those remain deferred until additional named
+workflows demonstrate a routing or permission need.
 
 Existing CN01/Hermes ODS and DWD schedules, OCI DWD synchronization, notifications, recovery, and
 operator hotfix commands retain their accepted node-local `systemd`/CLI ownership. They are outside
@@ -251,6 +263,13 @@ parameter versions, authoritative DWD package plus correction identities and dig
 window, P2 execution policy/profile, code version, and request reason. Ordinary replay consumes
 the DWD/PIT provider directly and may build disposable Job-local frames; it does not require one
 maintained ADS per candidate.
+
+P4 full-market event scanning uses `quanthus.p4-event-scan.v1`. Its input contains only the exact
+code revision and the four frozen repository contracts for source authority, direct-DWD provider,
+candidate rule, and split policy. The first two acceptance Jobs intentionally use identical
+`input_ref` with different idempotency keys so deterministic equivalence is measured rather than
+created by changing a run label. Their Event Library candidate count, event identities, manifest
+SHA-256, and content digest must match before Issue #74 may close.
 
 Direct DWD availability does not redefine a versioned strategy's research universe. A candidate
 whose policy binds a frozen static mapping or universe must apply that identity set before ranking

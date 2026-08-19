@@ -41,6 +41,8 @@ test "$(docker image inspect "$QUANTHUS_PLATFORM_WEB_IMAGE" --format '{{.Id}}')"
     "$QUANTHUS_RECOVERY_WEB_IMAGE_ID"
 test "$(docker image inspect "$QUANTHUS_REPLAY_IMAGE" --format '{{.Id}}')" = \
     "$QUANTHUS_RECOVERY_REPLAY_IMAGE_ID"
+test "$(docker image inspect "$QUANTHUS_EVENT_IMAGE" --format '{{.Id}}')" = \
+    "$QUANTHUS_RECOVERY_EVENT_IMAGE_ID"
 test "$(docker image inspect postgres:16-alpine --format '{{.Id}}')" = \
     "$QUANTHUS_RECOVERY_POSTGRES_IMAGE_ID"
 
@@ -75,6 +77,10 @@ docker run --rm \
     --volume "$PACKAGE:/backup:ro" \
     postgres:16-alpine sh -ec 'tar -C /target -xzf /backup/candidate-runs.tar.gz'
 docker run --rm \
+    --volume "${PROJECT}_event-runs:/target" \
+    --volume "$PACKAGE:/backup:ro" \
+    postgres:16-alpine sh -ec 'tar -C /target -xzf /backup/event-runs.tar.gz'
+docker run --rm \
     --volume "${PROJECT}_attribution-releases:/target" \
     --volume "$PACKAGE:/backup:ro" \
     postgres:16-alpine sh -ec 'tar -C /target -xzf /backup/attribution-releases.tar.gz'
@@ -96,10 +102,13 @@ RUN_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_runs"')
 ACTIVE_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_active_runs"')
+EVENT_JOB_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_jobs where kind='"'"'quanthus.p4-event-scan.v1'"'"' and state='"'"'succeeded'"'"'"')
 USER_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_users"')
 test "$RUN_COUNT" = "$QUANTHUS_RECOVERY_RUN_COUNT"
 test "$ACTIVE_COUNT" = "$QUANTHUS_RECOVERY_ACTIVE_POINTER_COUNT"
+test "$EVENT_JOB_COUNT" = "$QUANTHUS_RECOVERY_EVENT_JOB_COUNT"
 test "$USER_COUNT" = "$QUANTHUS_RECOVERY_USER_COUNT"
 
 docker exec -i "$API_CONTAINER" python - <<'PY'
@@ -130,6 +139,37 @@ for run_id, artifact_ref, expected in rows:
     observed = "sha256:" + hashlib.sha256(result.read_bytes()).hexdigest()
     assert observed == expected, f"Run digest mismatch: {run_id}"
 PY
+docker exec -i "$API_CONTAINER" python - <<'PY'
+import hashlib
+import json
+import os
+from pathlib import Path
+
+import psycopg
+
+with psycopg.connect(os.environ["QUANTHUS_PLATFORM_DATABASE_URL"]) as connection:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT job_id, result_ref
+            FROM platform_jobs
+            WHERE kind = 'quanthus.p4-event-scan.v1' AND state = 'succeeded'
+            ORDER BY job_id
+            """
+        )
+        rows = cursor.fetchall()
+for job_id, result_ref in rows:
+    artifact_ref = result_ref.get("artifact_ref")
+    expected = result_ref.get("result_sha256")
+    assert isinstance(artifact_ref, str) and isinstance(expected, str)
+    relative = Path(artifact_ref).relative_to("/data/event-runs")
+    run = Path("/data/event-runs") / relative
+    run_manifest = json.loads((run / "run-manifest.json").read_text(encoding="utf-8"))
+    event_manifest = run / "event-library" / "manifest.json"
+    observed = "sha256:" + hashlib.sha256(event_manifest.read_bytes()).hexdigest()
+    assert run_manifest["job_id"] == job_id
+    assert observed == expected, f"Event Run digest mismatch: {job_id}"
+PY
 docker exec "$WEB_CONTAINER" node -e \
     "Promise.all(['/ready','/operator'].map(p=>fetch('http://127.0.0.1:3100'+p).then(r=>{if(!r.ok)throw Error(p+':'+r.status)}))).catch(()=>process.exit(1))"
 
@@ -140,6 +180,7 @@ project=$PROJECT
 git_commit=$QUANTHUS_RECOVERY_GIT_COMMIT
 run_count=$RUN_COUNT
 active_pointer_count=$ACTIVE_COUNT
+event_job_count=$EVENT_JOB_COUNT
 user_count=$USER_COUNT
 api_image_id=$(docker inspect "$API_CONTAINER" --format '{{.Image}}')
 web_image_id=$(docker inspect "$WEB_CONTAINER" --format '{{.Image}}')

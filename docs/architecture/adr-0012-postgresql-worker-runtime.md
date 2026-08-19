@@ -55,6 +55,25 @@ candidate-active-evidence database compare-and-swap as stages of one logical Job
 authoritative DWD. Future Worker kinds receive separate queues and credentials only when a named
 product workflow needs them.
 
+#### P4 named extension: one static Event Worker
+
+`P4-EVENT-002` / Issue #74 is the first named workflow that exercises that extension rule. Its
+2012-2021 full-market forward scan is a long-running, product-initiated analytical task with a
+separate immutable result family, so it receives one statically admitted `event-worker` with
+`queue=event` and concurrency one rather than expanding Replay Worker permissions.
+
+The Event Worker admits only `quanthus.p4-event-scan.v1`. Its immutable input binds the exact code
+revision and the frozen P4 source-policy, direct-DWD provider, candidate-rule, and split-policy
+paths. It receives read-only mounts for DWD Base V2.1, correction-001, and the frozen development
+research references, plus one writable `/data/event-runs` root. It cannot modify DWD, submit
+arbitrary commands, run replay Jobs, or open arbitration/blind partitions. A sealed Event Run keeps
+the event-library package, its manifest/content digests, and the generation-fenced Job identity;
+a reclaim validates the package before terminal publication.
+
+This second Worker kind does not introduce a registry, resource classes, dynamic routing,
+Redis/Celery/RabbitMQ, or another scheduler. PostgreSQL remains the queue authority and the same
+lease, cancellation, stale-generation, immutable-Run, and recovery contracts apply.
+
 ### 4. Lease at least once; publish exactly one accepted result
 
 Queue execution is at least once. A claim records `claimed_by`, a monotonically increasing

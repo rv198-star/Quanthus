@@ -25,6 +25,7 @@ services:
       QUANTHUS_PLATFORM_MFA_KEY: ${QUANTHUS_PLATFORM_MFA_KEY:?required}
       QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT: /data/attribution-releases
       QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
+      QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,6 +46,7 @@ services:
     volumes:
       - ${QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT:?required}:/data/attribution-releases:ro
       - quanthus-candidate-runs:/data/candidate-runs:ro
+      - quanthus-event-runs:/data/event-runs:ro
 
   replay-worker:
     image: ${QUANTHUS_REPLAY_IMAGE:-quanthus-replay:local}
@@ -62,6 +64,25 @@ services:
     volumes:
       - /srv/quanthus:/srv/quanthus:ro
       - quanthus-candidate-runs:/data/candidate-runs
+
+  event-worker:
+    image: ${QUANTHUS_EVENT_IMAGE:-quanthus-event:local}
+    restart: unless-stopped
+    entrypoint: ["python", "-m", "quanthus.platform.event_worker"]
+    environment:
+      PGPASSWORD: ${QUANTHUS_PLATFORM_POSTGRES_PASSWORD:?required}
+      QUANTHUS_PLATFORM_DATABASE_URL: postgresql://quanthus_platform@postgres:5432/quanthus_platform
+      QUANTHUS_WORKER_ID: oci-event-1
+      QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 45s
+    volumes:
+      - /srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:ro
+      - /srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:ro
+      - /srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:ro
+      - quanthus-event-runs:/data/event-runs
 
   web:
     image: ${QUANTHUS_PLATFORM_WEB_IMAGE:-quanthus-platform-web:local}
@@ -110,6 +131,7 @@ services:
 volumes:
   quanthus-platform-postgres:
   quanthus-candidate-runs:
+  quanthus-event-runs:
 
 networks:
   traefik-net:

@@ -76,9 +76,15 @@ def create_platform_kernel(
     root = find_project_root()
     manifest = load_feature_manifest(manifest_path)
     validate_manifest_against_capability_gate(manifest, gate_path)
-    if set(manifest.process_roles) != {"api", "migration", "web", "replay-worker"}:
+    if set(manifest.process_roles) != {
+        "api",
+        "migration",
+        "web",
+        "replay-worker",
+        "event-worker",
+    }:
         raise RuntimeError(
-            "the Platform Kernel admits api, migration, web, and replay-worker roles"
+            "the Platform Kernel admits api, migration, web, replay-worker, and event-worker roles"
         )
     if manifest.dependency_groups != ("platform",):
         raise RuntimeError("the first Platform Kernel must use only the platform dependency group")

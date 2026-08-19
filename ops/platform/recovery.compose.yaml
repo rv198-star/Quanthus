@@ -25,6 +25,7 @@ services:
       QUANTHUS_PLATFORM_MFA_KEY: ${QUANTHUS_PLATFORM_MFA_KEY:?required}
       QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT: /data/attribution-releases
       QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
+      QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,6 +46,7 @@ services:
     volumes:
       - attribution-releases:/data/attribution-releases:ro
       - candidate-runs:/data/candidate-runs:ro
+      - event-runs:/data/event-runs:ro
 
   web:
     image: ${QUANTHUS_PLATFORM_WEB_IMAGE:?required}
@@ -75,4 +77,5 @@ services:
 volumes:
   postgres-data:
   candidate-runs:
+  event-runs:
   attribution-releases:

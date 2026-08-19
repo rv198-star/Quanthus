@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+IMAGE_TAG=${1:-quanthus-event:local}
+BUILD_CONTEXT=$(mktemp -d /tmp/quanthus-event-image.XXXXXX)
+
+cleanup() {
+    rm -rf -- "$BUILD_CONTEXT"
+}
+trap cleanup EXIT INT TERM
+
+install -d "$BUILD_CONTEXT/config" "$BUILD_CONTEXT/src/quanthus"
+cp "$REPOSITORY_ROOT/pyproject.toml" "$REPOSITORY_ROOT/README.md" "$BUILD_CONTEXT/"
+
+while IFS= read -r source; do
+    relative=${source#"$REPOSITORY_ROOT/"}
+    install -D -m 0644 "$source" "$BUILD_CONTEXT/$relative"
+done < <(
+    find "$REPOSITORY_ROOT/config" -type f -readable -print
+    find "$REPOSITORY_ROOT/src/quanthus" -type f -readable -name '*.py' -print
+)
+
+cp "$REPOSITORY_ROOT/ops/event/Dockerfile" "$BUILD_CONTEXT/Dockerfile"
+docker build --tag "$IMAGE_TAG" "$BUILD_CONTEXT"
+
+printf 'Event image built: %s\n' "$IMAGE_TAG"

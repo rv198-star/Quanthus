@@ -16,6 +16,7 @@ from quanthus.event_library.scan import (
     CandidateReason,
     EntryStatus,
     partition_executable_entries,
+    scan_forward_candidate_series,
     scan_forward_candidates,
 )
 from quanthus.event_library.source import load_event_scan_source_policy
@@ -181,6 +182,72 @@ def _entry_evidence(candidate, *, state: str) -> CandidateEntryEvidence:
 
 
 class EventForwardScanTests(unittest.TestCase):
+    def test_streaming_series_matches_in_memory_scan_exactly(self) -> None:
+        first = _series("600001", signal_indices=(43, 80), industry="industry-01")
+        second = _series("000001", signal_indices=(50,), industry="industry-02")
+        in_memory = _scan(first + second)
+        streamed = scan_forward_candidate_series(
+            (tuple(first), tuple(second)),
+            trading_dates=TRADING_DATES,
+            snapshot_id=SNAPSHOT_ID,
+            snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+            card=CARD,
+            split_policy=SPLIT,
+            source_policy=SOURCE,
+        )
+
+        self.assertEqual(streamed, in_memory)
+
+    def test_static_industry_is_applied_only_after_raw_trigger(self) -> None:
+        rows = [
+            replace(row, static_level1_industry_id=None)
+            for row in _series("600001", signal_indices=(43,))
+        ]
+
+        result = _scan(rows)
+
+        self.assertEqual(result.counters.raw_triggers, 1)
+        self.assertEqual(result.counters.isolated_candidates, 1)
+        self.assertEqual(result.counters.concentration_retained, 0)
+        self.assertEqual(result.counters.candidate_events, 0)
+        self.assertEqual(
+            result.counters.reason_counts[CandidateReason.STATIC_INDUSTRY_MISSING.value],
+            1,
+        )
+
+    def test_streaming_series_allows_non_overlapping_relisting_intervals(self) -> None:
+        first = tuple(_series("600001", signal_indices=(43,)))
+        second = tuple(
+            replace(row, listing_id="listing-600001-r2")
+            for row in _series("600001", signal_indices=(80,))
+        )
+
+        result = scan_forward_candidate_series(
+            (first, second),
+            trading_dates=TRADING_DATES,
+            snapshot_id=SNAPSHOT_ID,
+            snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+            card=CARD,
+            split_policy=SPLIT,
+            source_policy=SOURCE,
+        )
+
+        self.assertEqual(result.counters.raw_triggers, 2)
+        self.assertEqual(result.counters.candidate_events, 2)
+
+    def test_streaming_series_rejects_duplicate_security_chunks(self) -> None:
+        series = tuple(_series("600001", signal_indices=(43,)))
+        with self.assertRaisesRegex(ValueError, "multiple scan series"):
+            scan_forward_candidate_series(
+                (series, series),
+                trading_dates=TRADING_DATES,
+                snapshot_id=SNAPSHOT_ID,
+                snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+                card=CARD,
+                split_policy=SPLIT,
+                source_policy=SOURCE,
+            )
+
     def test_quiet_to_active_edge_materializes_one_deterministic_event(self) -> None:
         result = _scan(_series("600001", signal_indices=(43,)))
 

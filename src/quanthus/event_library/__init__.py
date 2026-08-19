@@ -8,6 +8,13 @@ from quanthus.event_library.contracts import (
     event_record_from_dict,
     validate_event_record_set,
 )
+from quanthus.event_library.physical_scan import (
+    EventCandidateProjection,
+    PhysicalEventScanError,
+    PhysicalEventScanResult,
+    build_physical_event_scan,
+    verify_physical_event_scan,
+)
 from quanthus.event_library.rule_card import (
     CandidateRuleCard,
     CandidateRuleCardError,
@@ -25,6 +32,7 @@ from quanthus.event_library.scan import (
     ExecutableCandidate,
     ScannedCandidate,
     partition_executable_entries,
+    scan_forward_candidate_series,
     scan_forward_candidates,
 )
 from quanthus.event_library.source import (
@@ -51,6 +59,7 @@ __all__ = [
     "CandidateRuleCardError",
     "CandidateScanError",
     "CandidateScanResult",
+    "EventCandidateProjection",
     "EventContractError",
     "EventIdentity",
     "EntryPartitionResult",
@@ -60,12 +69,15 @@ __all__ = [
     "EventScanSourcePolicy",
     "HistoricalVisibilityPolicy",
     "ExecutableCandidate",
+    "PhysicalEventScanError",
+    "PhysicalEventScanResult",
     "PartitionAccessError",
     "SplitAssignment",
     "SplitPolicy",
     "ScannedCandidate",
     "SplitPolicyError",
     "assign_event_split",
+    "build_physical_event_scan",
     "calculate_candidate_rule_card_digest",
     "calculate_split_policy_digest",
     "event_record_from_dict",
@@ -73,7 +85,9 @@ __all__ = [
     "load_event_scan_source_policy",
     "load_split_policy",
     "partition_executable_entries",
+    "scan_forward_candidate_series",
     "scan_forward_candidates",
     "validate_event_record_set",
     "verify_event_scan_base",
+    "verify_physical_event_scan",
 ]

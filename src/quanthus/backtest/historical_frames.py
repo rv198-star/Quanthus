@@ -1075,12 +1075,16 @@ class HistoricalReplayFrameReader:
             return CoverageStatus.DELISTED
         return CoverageStatus.MISSING
 
-    def _session(self, security_code: str, execution_date: date) -> MarketSession:
-        bars = self._bars_for_date(execution_date, security_code)
+    def _execution_evidence_from_bar(
+        self,
+        security_code: str,
+        execution_date: date,
+        bar: PITDailyBar | None,
+    ) -> P1DailyExecutionEvidence:
         snapshot = self._snapshot(execution_date, role="execution")
-        if not bars:
+        if bar is None:
             coverage = self._missing_coverage(security_code, execution_date)
-            evidence = P1DailyExecutionEvidence(
+            return P1DailyExecutionEvidence(
                 snapshot=snapshot,
                 security_code=security_code,
                 open_at=_market_time(execution_date, time(9, 30)),
@@ -1097,10 +1101,8 @@ class HistoricalReplayFrameReader:
                 upper_limit_price=None,
                 lower_limit_price=None,
             )
-            return market_session_from_p1(evidence)
-        bar = bars[0]
         keep_prices = bar.coverage_status is CoverageStatus.TRADING and bar.data_valid
-        evidence = P1DailyExecutionEvidence(
+        return P1DailyExecutionEvidence(
             snapshot=snapshot,
             security_code=security_code,
             open_at=_market_time(execution_date, time(9, 30)),
@@ -1117,7 +1119,49 @@ class HistoricalReplayFrameReader:
             upper_limit_price=bar.upper_limit_price,
             lower_limit_price=bar.lower_limit_price,
         )
-        return market_session_from_p1(evidence)
+
+    def execution_evidence(
+        self, security_code: str, execution_date: date
+    ) -> P1DailyExecutionEvidence:
+        """Return the accepted P1 evidence used to construct one P2 execution session."""
+
+        bars = self._bars_for_date(execution_date, security_code)
+        return self._execution_evidence_from_bar(
+            security_code,
+            execution_date,
+            bars[0] if bars else None,
+        )
+
+    def execution_evidence_batch(
+        self,
+        requests: Sequence[tuple[str, date]],
+    ) -> dict[tuple[str, date], P1DailyExecutionEvidence]:
+        """Resolve many T+1 requests with one full-market evidence read per execution date."""
+
+        ordered = tuple(requests)
+        if len(ordered) != len(set(ordered)):
+            raise HistoricalFrameReaderError("execution evidence requests must be unique")
+        by_date: dict[date, set[str]] = {}
+        for security_code, execution_date in ordered:
+            by_date.setdefault(execution_date, set()).add(security_code)
+        result: dict[tuple[str, date], P1DailyExecutionEvidence] = {}
+        for execution_date in sorted(by_date):
+            requested = by_date[execution_date]
+            bars = {
+                bar.security_code: bar
+                for bar in self._bars_for_date(execution_date)
+                if bar.security_code in requested
+            }
+            for security_code in sorted(requested):
+                result[(security_code, execution_date)] = self._execution_evidence_from_bar(
+                    security_code,
+                    execution_date,
+                    bars.get(security_code),
+                )
+        return result
+
+    def _session(self, security_code: str, execution_date: date) -> MarketSession:
+        return market_session_from_p1(self.execution_evidence(security_code, execution_date))
 
     def _corporate_actions(
         self,

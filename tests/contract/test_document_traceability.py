@@ -1035,8 +1035,13 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("permanent_blind", source.historical_visibility.forbidden_uses)
         self.assertTrue((root / "src" / "quanthus" / "event_library" / "source.py").is_file())
         self.assertTrue((root / "src" / "quanthus" / "event_library" / "scan.py").is_file())
+        self.assertTrue(
+            (root / "src" / "quanthus" / "event_library" / "physical_scan.py").is_file()
+        )
         self.assertTrue((root / "tests" / "unit" / "test_event_scan_source.py").is_file())
         self.assertTrue((root / "tests" / "unit" / "test_event_scan.py").is_file())
+        self.assertTrue((root / "tests" / "unit" / "test_event_physical_scan.py").is_file())
+        self.assertTrue((root / "ops" / "bin" / "run-p4-event-scan").is_file())
         audit_path = root / "docs" / "acceptance" / "p4-event-dwd-pit-source-audit-20260806.md"
         self.assertTrue(audit_path.is_file())
         audit = audit_path.read_text(encoding="utf-8")
@@ -1048,6 +1053,14 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(source.semantic_digest, recovery)
         self.assertIn("74 passed", recovery)
         self.assertIn("1,158 passed and 3 skipped", recovery)
+        physical_path = (
+            root / "docs" / "acceptance" / "p4-event-physical-scan-implementation-20260819.md"
+        )
+        self.assertTrue(physical_path.is_file())
+        physical = physical_path.read_text(encoding="utf-8")
+        self.assertIn(source.semantic_digest, physical)
+        self.assertIn("run-p4-event-scan", physical)
+        self.assertIn("two independently", physical)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

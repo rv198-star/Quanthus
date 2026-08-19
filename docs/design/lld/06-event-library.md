@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, development-only economic-availability projection, pure forward-trigger, reconciliation, and T+1 entry-partition slice implemented; physical event projection and full development scan pending |
+| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, development-only economic-availability projection, streaming physical event projection, pure forward-trigger, reconciliation, and P1/P2-backed T+1 entry partition implemented; full 2012-2021 runtime scan and independent digest replay pending |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -106,16 +106,30 @@ version and renewed approval.
 
 `src/quanthus/event_library/scan.py` implements the outcome-blind chronological transform over
 strict typed daily inputs. Activity ratios use exact rational arithmetic, so candidate membership
-has no hidden floating-point or rounding policy. The implementation reconciles evaluated rows,
-raw triggers, same-security isolation, deterministic concentration sampling, split rejection, and
-retained candidate events with zero unexplained loss. It does not accept returns, labels, fills, or
-post-T features.
+has no hidden floating-point or rounding policy. The production API streams one stable listing
+series at a time and retains only raw triggers globally, avoiding a full-market Python row materialization.
+It permits non-overlapping relisting intervals for one security while keeping cooldown/isolation at
+the security level. Static industry membership is intentionally applied only after raw-trigger
+formation for concentration control; missing industry mapping can reject a triggered event but
+cannot manufacture or suppress the underlying trigger. The implementation reconciles evaluated
+rows, raw triggers, same-security isolation, deterministic concentration sampling, split rejection,
+and retained candidate events with zero unexplained loss. It does not accept returns, labels, fills,
+or post-T features.
 
-The T+1 partition reuses the public P1-to-P2 daily execution adapter and the same buy-open rejection
-mapping used by `BacktestEngine`, including the accepted `NON_TRADING_OBSERVED` cancellation state.
-It classifies executable versus `not_executable` without creating an order or fill and without
-changing the candidate event id. The remaining #74 implementation is the bounded physical
-DWD-to-event projection and the full 2012-2021 development corpus run; neither is permission to
+`src/quanthus/event_library/physical_scan.py` now implements the bounded physical path. It reuses
+the accepted Direct-DWD job-local provider, carries DWD internal security/listing/company identity,
+retains exact Decimal OHLC/turnover alongside the legacy replay columns, preserves raw DWD
+knowledge/source lineage, applies correction-001 tradability, and emits a checksum-bound candidate
+projection before scanning. The projection, events, entry partition, summary, manifest, and READY
+marker are published as one immutable research-only package. `run-p4-event-scan` builds that package
+and `verify-p4-event-scan` independently verifies its physical inventory and digests.
+
+The T+1 partition reuses the exact `P1DailyExecutionEvidence` constructed by the historical reader
+and the same P1-to-P2 buy-open adapter and rejection mapping used by `BacktestEngine`, including the
+accepted `NON_TRADING_OBSERVED` cancellation state. It classifies executable versus
+`not_executable` without creating an order or fill and without changing the candidate event id.
+The remaining #74 acceptance work is the full 2012-2021 runtime scan from the protected DWD mount and
+an independently named rerun with identical manifest/content identities; neither is permission to
 open a stronger PIT partition.
 
 ## 4. Timing and feature window

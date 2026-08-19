@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter, defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -224,14 +224,17 @@ class CandidateScanCounters:
             raise CandidateScanError("scan counters must be non-negative integers")
         cooldown = self.reason_counts.get(CandidateReason.SAME_SECURITY_ISOLATION.value, 0)
         concentration = self.reason_counts.get(CandidateReason.CONCENTRATION_REJECTED.value, 0)
+        missing_industry = self.reason_counts.get(CandidateReason.STATIC_INDUSTRY_MISSING.value, 0)
         split = self.reason_counts.get(CandidateReason.SPLIT_POLICY_REJECTED.value, 0)
-        post_trigger = cooldown + concentration + split
+        post_trigger = cooldown + concentration + missing_industry + split
         pre_trigger = sum(self.reason_counts.values()) - post_trigger
         if self.evaluated_rows != self.raw_triggers + pre_trigger:
             raise CandidateScanError("evaluated-row reconciliation differs")
         if self.raw_triggers != self.isolated_candidates + cooldown:
             raise CandidateScanError("raw-trigger reconciliation differs")
-        if self.isolated_candidates != self.concentration_retained + concentration:
+        if self.isolated_candidates != (
+            self.concentration_retained + concentration + missing_industry
+        ):
             raise CandidateScanError("isolation reconciliation differs")
         if self.concentration_retained != self.candidate_events + split:
             raise CandidateScanError("split reconciliation differs")
@@ -318,7 +321,7 @@ class _RawCandidate:
     listing_id: str
     listing_code: str
     company_id: str
-    industry_id: str
+    industry_id: str | None
     signal_date: date
     signal_close: datetime
     knowledge_cutoff: datetime
@@ -345,8 +348,6 @@ def _window_reason(
         return CandidateReason.INSTRUMENT_NOT_ALLOWED
     if current.listing_sessions < card.eligibility.minimum_listing_sessions:
         return CandidateReason.INSUFFICIENT_LISTING_HISTORY
-    if current.static_level1_industry_id is None or not current.static_level1_industry_id.strip():
-        return CandidateReason.STATIC_INDUSTRY_MISSING
     if prior.is_tradable is not True:
         return CandidateReason.T_MINUS_1_NOT_TRADABLE
     if current.is_tradable is not True:
@@ -425,8 +426,7 @@ def _triggered(features: CandidateFeatureEvidence, card: CandidateRuleCard) -> b
     )
 
 
-def scan_forward_candidates(
-    rows: Sequence[CandidateDailyInput],
+def _scan_context(
     *,
     trading_dates: Sequence[date],
     snapshot_id: str,
@@ -434,9 +434,7 @@ def scan_forward_candidates(
     card: CandidateRuleCard,
     split_policy: SplitPolicy,
     source_policy: EventScanSourcePolicy,
-) -> CandidateScanResult:
-    """Scan chronologically without accepting outcomes, future returns, or mutable sources."""
-
+) -> tuple[tuple[date, ...], dict[date, int], int]:
     card.require_stage_b_authority()
     split_policy.require_stage_b_authority()
     _require_text(snapshot_id, "snapshot_id")
@@ -446,98 +444,124 @@ def scan_forward_candidates(
         raise CandidateScanError("trading_dates must be sorted and unique")
     for value in ordered_dates:
         source_policy.require_development_date(value)
-    date_index = {value: index for index, value in enumerate(ordered_dates)}
-
-    grouped: dict[str, list[CandidateDailyInput]] = defaultdict(list)
-    seen_rows: set[tuple[str, date]] = set()
-    for row in rows:
-        source_policy.require_development_date(row.session_date)
-        key = (row.security_id, row.session_date)
-        if key in seen_rows:
-            raise CandidateScanError("candidate input contains duplicate security-date rows")
-        seen_rows.add(key)
-        grouped[row.security_id].append(row)
-
-    reasons: Counter[str] = Counter()
-    raw: list[_RawCandidate] = []
-    evaluated = 0
     history_sessions = card.eligibility.minimum_history_sessions
     if history_sessions != 22:
         raise CandidateScanError("approved candidate implementation requires 22-session history")
+    return (
+        ordered_dates,
+        {value: index for index, value in enumerate(ordered_dates)},
+        history_sessions,
+    )
 
-    for security_id in sorted(grouped):
-        security_rows = sorted(grouped[security_id], key=lambda item: item.session_date)
-        series_identities = {
-            (item.listing_id, item.listing_code, item.company_id)
-            for item in security_rows
+
+def _scan_security_series(
+    security_rows: Sequence[CandidateDailyInput],
+    *,
+    ordered_dates: Sequence[date],
+    date_index: Mapping[date, int],
+    history_sessions: int,
+    snapshot_id: str,
+    snapshot_manifest_digest: str,
+    card: CandidateRuleCard,
+    source_policy: EventScanSourcePolicy,
+) -> tuple[list[_RawCandidate], Counter[str], int]:
+    if not security_rows:
+        return [], Counter(), 0
+    rows = tuple(security_rows)
+    if tuple(sorted(rows, key=lambda item: item.session_date)) != rows:
+        raise CandidateScanError("one security scan series must be sorted by session_date")
+    security_ids = {item.security_id for item in rows}
+    if len(security_ids) != 1:
+        raise CandidateScanError("one scan series must contain exactly one security_id")
+    session_dates = [item.session_date for item in rows]
+    if len(session_dates) != len(set(session_dates)):
+        raise CandidateScanError("candidate input contains duplicate security-date rows")
+    for row in rows:
+        source_policy.require_development_date(row.session_date)
+    series_identities = {(item.listing_id, item.listing_code, item.company_id) for item in rows}
+    if len(series_identities) != 1:
+        raise CandidateScanError("one scan series must retain one listing/company identity")
+
+    security_id = rows[0].security_id
+    reasons: Counter[str] = Counter()
+    raw: list[_RawCandidate] = []
+    evaluated = 0
+    for local_index in range(history_sessions - 1, len(rows)):
+        current = rows[local_index]
+        evaluated += 1
+        trading_index = date_index.get(current.session_date)
+        if trading_index is None or trading_index < history_sessions - 1:
+            reasons[CandidateReason.OBSERVATION_GAP.value] += 1
+            continue
+        if trading_index + 1 >= len(ordered_dates):
+            reasons[CandidateReason.MISSING_T_PLUS_1_SESSION.value] += 1
+            continue
+        window = rows[local_index - history_sessions + 1 : local_index + 1]
+        expected_dates = ordered_dates[trading_index - history_sessions + 1 : trading_index + 1]
+        reason = _window_reason(window, expected_dates=expected_dates, card=card)
+        if reason is not None:
+            reasons[reason.value] += 1
+            continue
+        features = _feature_evidence(window)
+        if features is None:
+            reasons[CandidateReason.ZERO_ACTIVITY_BASELINE.value] += 1
+            continue
+        if not _triggered(features, card):
+            reasons[CandidateReason.NOT_TRIGGERED.value] += 1
+            continue
+        eligibility_payload: dict[str, Any] = {
+            "security_id": security_id,
+            "listing_id": current.listing_id,
+            "signal_date": current.session_date.isoformat(),
+            "source_evidence_digests": list(features.source_evidence_digests),
+            "candidate_rule_digest": card.semantic_digest,
+            "snapshot_manifest_digest": snapshot_manifest_digest,
         }
-        if len(series_identities) != 1:
-            raise CandidateScanError("one scan series must retain one listing/company identity")
-        for local_index in range(history_sessions - 1, len(security_rows)):
-            current = security_rows[local_index]
-            evaluated += 1
-            trading_index = date_index.get(current.session_date)
-            if trading_index is None or trading_index < history_sessions - 1:
-                reasons[CandidateReason.OBSERVATION_GAP.value] += 1
-                continue
-            if trading_index + 1 >= len(ordered_dates):
-                reasons[CandidateReason.MISSING_T_PLUS_1_SESSION.value] += 1
-                continue
-            window = security_rows[local_index - history_sessions + 1 : local_index + 1]
-            expected_dates = ordered_dates[
-                trading_index - history_sessions + 1 : trading_index + 1
-            ]
-            reason = _window_reason(window, expected_dates=expected_dates, card=card)
-            if reason is not None:
-                reasons[reason.value] += 1
-                continue
-            features = _feature_evidence(window)
-            if features is None:
-                reasons[CandidateReason.ZERO_ACTIVITY_BASELINE.value] += 1
-                continue
-            if not _triggered(features, card):
-                reasons[CandidateReason.NOT_TRIGGERED.value] += 1
-                continue
-            assert current.static_level1_industry_id is not None
-            eligibility_payload: dict[str, Any] = {
-                "security_id": security_id,
-                "listing_id": current.listing_id,
-                "signal_date": current.session_date.isoformat(),
-                "source_evidence_digests": list(features.source_evidence_digests),
-                "candidate_rule_digest": card.semantic_digest,
-                "snapshot_manifest_digest": snapshot_manifest_digest,
-            }
-            raw.append(
-                _RawCandidate(
-                    security_id=security_id,
-                    listing_id=current.listing_id,
-                    listing_code=current.listing_code,
-                    company_id=current.company_id,
-                    industry_id=current.static_level1_industry_id,
+        raw.append(
+            _RawCandidate(
+                security_id=security_id,
+                listing_id=current.listing_id,
+                listing_code=current.listing_code,
+                company_id=current.company_id,
+                industry_id=current.static_level1_industry_id,
+                signal_date=current.session_date,
+                signal_close=current.close_at,
+                knowledge_cutoff=max(item.knowledge_cutoff for item in window),
+                feature_start=features.feature_start,
+                entry_date=ordered_dates[trading_index + 1],
+                feature_evidence=features,
+                eligibility_evidence_digest=sha256_digest(eligibility_payload),
+                rank_digest=_rank_digest(
+                    rule_digest=card.semantic_digest,
+                    snapshot_id=snapshot_id,
                     signal_date=current.session_date,
-                    signal_close=current.close_at,
-                    knowledge_cutoff=max(item.knowledge_cutoff for item in window),
-                    feature_start=features.feature_start,
-                    entry_date=ordered_dates[trading_index + 1],
-                    feature_evidence=features,
-                    eligibility_evidence_digest=sha256_digest(eligibility_payload),
-                    rank_digest=_rank_digest(
-                        rule_digest=card.semantic_digest,
-                        snapshot_id=snapshot_id,
-                        signal_date=current.session_date,
-                        security_id=security_id,
-                    ),
-                )
+                    security_id=security_id,
+                ),
             )
+        )
+    return raw, reasons, evaluated
 
-    raw.sort(key=lambda item: (item.signal_date, item.security_id))
+
+def _finalize_raw_candidates(
+    raw: Sequence[_RawCandidate],
+    *,
+    reasons: Counter[str],
+    evaluated: int,
+    ordered_dates: Sequence[date],
+    date_index: Mapping[date, int],
+    snapshot_id: str,
+    snapshot_manifest_digest: str,
+    card: CandidateRuleCard,
+    split_policy: SplitPolicy,
+) -> CandidateScanResult:
+    ordered_raw = sorted(raw, key=lambda item: (item.signal_date, item.security_id))
     isolated: list[_RawCandidate] = []
     last_accepted_index: dict[str, int] = {}
     separation = max(
         card.isolation.cooldown_sessions,
         card.isolation.same_security_minimum_separation_sessions,
     )
-    for candidate in raw:
+    for candidate in ordered_raw:
         index = date_index[candidate.signal_date]
         previous = last_accepted_index.get(candidate.security_id)
         if previous is not None and index - previous < separation:
@@ -546,9 +570,17 @@ def scan_forward_candidates(
         last_accepted_index[candidate.security_id] = index
         isolated.append(candidate)
 
+    concentration_pool: list[_RawCandidate] = []
+    for candidate in isolated:
+        if candidate.industry_id is None or not candidate.industry_id.strip():
+            reasons[CandidateReason.STATIC_INDUSTRY_MISSING.value] += 1
+            continue
+        concentration_pool.append(candidate)
+
     daily_groups: dict[date, list[_RawCandidate]] = defaultdict(list)
     wave_groups: dict[tuple[int, str], list[_RawCandidate]] = defaultdict(list)
-    for candidate in isolated:
+    for candidate in concentration_pool:
+        assert candidate.industry_id is not None
         daily_groups[candidate.signal_date].append(candidate)
         wave = date_index[candidate.signal_date] // card.concentration.wave_sessions
         wave_groups[(wave, candidate.industry_id)].append(candidate)
@@ -563,7 +595,7 @@ def scan_forward_candidates(
         for candidate in ranked[: card.concentration.maximum_events_per_group_per_wave]:
             wave_allowed.add((candidate.security_id, candidate.signal_date))
     retained: list[_RawCandidate] = []
-    for candidate in isolated:
+    for candidate in concentration_pool:
         key = (candidate.security_id, candidate.signal_date)
         if key not in daily_allowed or key not in wave_allowed:
             reasons[CandidateReason.CONCENTRATION_REJECTED.value] += 1
@@ -613,6 +645,7 @@ def scan_forward_candidates(
             split_policy_digest=split_policy.semantic_digest,
             split_assignment=assignment,
         )
+        assert candidate.industry_id is not None
         events.append(
             ScannedCandidate(
                 record=record,
@@ -628,7 +661,7 @@ def scan_forward_candidates(
 
     counters = CandidateScanCounters(
         evaluated_rows=evaluated,
-        raw_triggers=len(raw),
+        raw_triggers=len(ordered_raw),
         isolated_candidates=len(isolated),
         concentration_retained=len(retained),
         candidate_events=len(events),
@@ -645,6 +678,97 @@ def scan_forward_candidates(
             )
         ),
         counters=counters,
+    )
+
+
+def scan_forward_candidate_series(
+    series: Iterable[Sequence[CandidateDailyInput]],
+    *,
+    trading_dates: Sequence[date],
+    snapshot_id: str,
+    snapshot_manifest_digest: str,
+    card: CandidateRuleCard,
+    split_policy: SplitPolicy,
+    source_policy: EventScanSourcePolicy,
+) -> CandidateScanResult:
+    """Scan sorted one-security series while keeping only triggers globally in memory."""
+
+    ordered_dates, date_index, history_sessions = _scan_context(
+        trading_dates=trading_dates,
+        snapshot_id=snapshot_id,
+        snapshot_manifest_digest=snapshot_manifest_digest,
+        card=card,
+        split_policy=split_policy,
+        source_policy=source_policy,
+    )
+    reasons: Counter[str] = Counter()
+    raw: list[_RawCandidate] = []
+    evaluated = 0
+    last_series_end: dict[str, date] = {}
+    for security_rows in series:
+        rows = tuple(security_rows)
+        if not rows:
+            continue
+        security_id = rows[0].security_id
+        previous_end = last_series_end.get(security_id)
+        if previous_end is not None and rows[0].session_date <= previous_end:
+            raise CandidateScanError(
+                "multiple scan series for one security_id must be ordered and non-overlapping"
+            )
+        last_series_end[security_id] = rows[-1].session_date
+        child_raw, child_reasons, child_evaluated = _scan_security_series(
+            rows,
+            ordered_dates=ordered_dates,
+            date_index=date_index,
+            history_sessions=history_sessions,
+            snapshot_id=snapshot_id,
+            snapshot_manifest_digest=snapshot_manifest_digest,
+            card=card,
+            source_policy=source_policy,
+        )
+        raw.extend(child_raw)
+        reasons.update(child_reasons)
+        evaluated += child_evaluated
+    return _finalize_raw_candidates(
+        raw,
+        reasons=reasons,
+        evaluated=evaluated,
+        ordered_dates=ordered_dates,
+        date_index=date_index,
+        snapshot_id=snapshot_id,
+        snapshot_manifest_digest=snapshot_manifest_digest,
+        card=card,
+        split_policy=split_policy,
+    )
+
+
+def scan_forward_candidates(
+    rows: Sequence[CandidateDailyInput],
+    *,
+    trading_dates: Sequence[date],
+    snapshot_id: str,
+    snapshot_manifest_digest: str,
+    card: CandidateRuleCard,
+    split_policy: SplitPolicy,
+    source_policy: EventScanSourcePolicy,
+) -> CandidateScanResult:
+    """Scan an in-memory corpus; production callers should prefer the series-streaming API."""
+
+    grouped: dict[tuple[str, str, str, str], list[CandidateDailyInput]] = defaultdict(list)
+    for row in rows:
+        key = (row.security_id, row.listing_id, row.listing_code, row.company_id)
+        grouped[key].append(row)
+    return scan_forward_candidate_series(
+        (
+            tuple(sorted(grouped[key], key=lambda item: item.session_date))
+            for key in sorted(grouped)
+        ),
+        trading_dates=trading_dates,
+        snapshot_id=snapshot_id,
+        snapshot_manifest_digest=snapshot_manifest_digest,
+        card=card,
+        split_policy=split_policy,
+        source_policy=source_policy,
     )
 
 

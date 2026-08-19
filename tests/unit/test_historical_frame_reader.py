@@ -473,6 +473,11 @@ class HistoricalReplayFrameReaderTests(unittest.TestCase):
 
         with HistoricalReplayFrameReader(self.bundle) as reader:
             frame = reader.frames(d1, d1)[0]
+            evidence = reader.execution_evidence(ECONOMIC, d2)
+            batched = reader.execution_evidence_batch(((ECONOMIC, d2),))
+            self.assertEqual(batched[(ECONOMIC, d2)], evidence)
+            self.assertEqual(evidence.security_code, ECONOMIC)
+            self.assertFalse(evidence.is_executable)
             self.assertEqual(
                 frame.session(ECONOMIC).open_execution_state,
                 OpenExecutionState.MISSING_EVIDENCE,

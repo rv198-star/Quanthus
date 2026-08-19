@@ -4,7 +4,7 @@
 | --- | --- |
 | Parent | `../04-experts-aggregator.md` |
 | Design status | approved |
-| Delivery gate | open for `P3-EXPERT-001`; all later work remains dependency-gated |
+| Delivery gate | `P3-EXPERT-001` accepted; `P3-EXPERT-002` ready; all later work remains dependency-gated |
 | Milestone | Expert Strategy Layer MVP |
 | Governing work | `P3-EXPERT-000` |
 | Effective date | 2026-08-19 |
@@ -344,8 +344,9 @@ P3-EXPERT-001 --> P3-EXPERT-002 --> P3-EXPERT-003 --> P3-STRAT-002 --> P3-ATTR-0
                                                               P3-EXPERT-005
 ```
 
-`P3-EXPERT-000` is the tracking epic for every node above. Only `P3-EXPERT-001` is an initially
-actionable implementation child. Creating the issues does not satisfy any delivery gate.
+`P3-EXPERT-000` is the tracking epic for every node above. `P3-EXPERT-001` is accepted by its
+linked protocol evidence, making `P3-EXPERT-002` the active implementation gate. Creating the
+issues does not satisfy any delivery gate.
 
 ### `P3-EXPERT-000` - Expert Strategy Layer MVP epic
 
@@ -362,6 +363,8 @@ actionable implementation child. Creating the issues does not satisfy any delive
   v1 compatibility boundary from Sections 4 and 11.
 - Acceptance: schema/unit/contract tests cover every artifact and typed failure; accepted v1 golden
   bytes remain unchanged; future settlement cannot affect observation identity.
+- Delivery: accepted by
+  `docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md`.
 - Non-goals: concrete target, expert, Worker handler, score calculation, or UI.
 
 ### `P3-EXPERT-002` - Worker evaluation pipeline

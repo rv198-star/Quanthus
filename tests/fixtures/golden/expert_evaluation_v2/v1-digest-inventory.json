@@ -1,0 +1,18 @@
+{
+  "files": {
+    "config/p3-governed-strategy.research.v1.json": "73000797dabf394ff745547684d90bcdfb10cffda74c36cf288ea043e74ebb54",
+    "src/quanthus/aggregator.py": "2b650ae51851239bfda8d068c07b77f0637c5af59e0326656782aef4f5eefdea",
+    "src/quanthus/expert_protocols.py": "41e8d2e812c5616fd99e8b1d268633a79278bc6c538e5fcb0ac288422f3a2e22",
+    "tests/fixtures/golden/p2_decision_log.v1.json": "9d732a1c256c94de6d6632955d9046f114358aa8cd289aac4c590ac3d55a099b",
+    "tests/fixtures/golden/p3_strategy_replay.v1.json": "b8647222344171d79c2fb0106930aad6ab71a194ecf674f91417d5f1c11c471c"
+  },
+  "semantic": {
+    "constraint_output": "sha256:ac7bdffbbeb7e95c3cfc9ecc69715ea0a3d0a76ca2b7ade6b92097aa1952a2f4",
+    "decision_event": "sha256:c3d145396792f989be54f271808fbbbcf18595f0ae6b747f16eb7a932310fc69",
+    "governance_result": "sha256:5dfea5deafd37644fbc8ae7f5396bf2dc2420a75aa8e7f3b1118e041bfa8e236",
+    "governed_decision_event": "sha256:18ba2b3939505325991c0c63a9d079f76a3ab524e5d813ef782a98a7d9a2cfa5",
+    "score_action_result": "sha256:4f129040507df10063611cf8cd068ed69025120c8e85cab5385444ab92b36bcc",
+    "scoring_output": "sha256:c023f5ae5ecb394186edcf317422f0ea7bf9c4809e5d0e56691a547bb5a22e73",
+    "veto_output": "sha256:279c432e294bde562c9417aea2454ae09a5b7cdcc393d02ac33ff6ac01ec0744"
+  }
+}

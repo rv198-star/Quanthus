@@ -189,9 +189,10 @@ panel, result, and scoreboard byte-identically. The bounded conformance review t
 
 The approved Expert Strategy Layer MVP is a separate post-P3 product increment governed by
 `docs/design/lld/04-experts-aggregator/expert-strategy-layer.md`. It does not reopen the accepted P3
-fixture or alter the current P4 gate. `P3-EXPERT-000` tracks seven blocking children; only the
-additive v2 contract is initially ready. The formal attribution item retains its machine-readable
-`deferred` state until `P3-STRAT-002` supplies the strategy adapter and predeclared questions.
+fixture or alter the current P4 gate. `P3-EXPERT-000` tracks seven blocking children; the additive
+v2 contract is accepted and the Worker evaluation pipeline is ready. The formal attribution item
+retains its machine-readable `deferred` state until `P3-STRAT-002` supplies the strategy adapter and
+predeclared questions.
 
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
@@ -209,9 +210,9 @@ additive v2 contract is initially ready. The formal attribution item retains its
 | P3-SHADOW-001 | Implement shadow execution and divergence log | P3-AGG-001 | closed for comparison-contract scope |
 | P3-EXP-002 | Add vertical-slice rule experts | P3 aggregator | closed for fixture scope |
 | P3-EXPERT-000 | Deliver the bounded Expert Strategy Layer MVP | META-DOC-001 | open epic |
-| P3-EXPERT-001 | Implement additive expert evaluation protocol v2 | P3-EXP-001, P3-AGG-001 | ready |
-| P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | blocked by P3-EXPERT-001 |
-| P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-EXPERT-002, P3-FEAT-001, P3-REPLAY-001, P4-LABEL-001 | blocked by P3-EXPERT-001, P3-EXPERT-002, and P4-LABEL-001 |
+| P3-EXPERT-001 | Implement additive expert evaluation protocol v2 | P3-EXP-001, P3-AGG-001 | closed by `docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md` |
+| P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | ready |
+| P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-EXPERT-002, P3-FEAT-001, P3-REPLAY-001, P4-LABEL-001 | blocked by P3-EXPERT-002 and P4-LABEL-001 |
 | P3-STRAT-002 | Freeze and implement the first formal two-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | blocked by P3-EXPERT-002 and P3-EXPERT-003 |
 | P3-POS-001 | Implement unit/position state machine | P2 ledger | closed |
 | P3-POLICY-001 | Freeze trial/add/hold/cooldown parameters | P2 acceptance | closed for fixture scope |

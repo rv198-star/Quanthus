@@ -1,0 +1,37 @@
+{
+  "evaluation-spec.json": {
+    "artifact_digest": "sha256:f1370c005ed7212497cbe46de8ec7d709c095b98e4ec81c01734569bd3b4513b",
+    "canonical_sha256": "2291916aa512143214e5531cd8fc18447de6dd21d72b69aac8602212aaccaaf8",
+    "schema_version": "quanthus.expert-evaluation-spec.v2"
+  },
+  "forecast-spec.json": {
+    "artifact_digest": "sha256:b7ee8ec9c84eef786e63ec6ceb2c088977ec2e11c49a547189fc6160d51f63cf",
+    "canonical_sha256": "14831468a93468c1aed895b0eebec7d66809b9b75e6c60024c8e00b826619797",
+    "schema_version": "quanthus.forecast-spec.v2"
+  },
+  "lifecycle-decision.json": {
+    "artifact_digest": "sha256:5f217aa188b96b479d343dc0522891715a4f1c4fb0d90bc2700c85f35cc91994",
+    "canonical_sha256": "21772bf915fc217d9ff57e33faece6daaa5928a31bfcacc211b0498824e8bb53",
+    "schema_version": "quanthus.expert-lifecycle-decision.v2"
+  },
+  "observation.json": {
+    "artifact_digest": "sha256:2120d36c6e05af5fc7484b12815b007d25c3dea8e094661b24aea0b348135215",
+    "canonical_sha256": "c13b320b6b128c2426ac9de1a59b1488afeb696142374d782758c8ec7f9cd1c9",
+    "schema_version": "quanthus.expert-observation.v2"
+  },
+  "policy-effect.json": {
+    "artifact_digest": "sha256:0ba7be73e04d9e0736350dd0d6b2d4430c2f33298959eeb00777ff5b6c341239",
+    "canonical_sha256": "4f9aa6217cc69f7112e74500d21aefd800e30a8298faa89f31acfcb300206f69",
+    "schema_version": "quanthus.policy-effect.v2"
+  },
+  "scorecard.json": {
+    "artifact_digest": "sha256:8e1a9e6c1755d4fdf7658fadd666e0c9fc6b15fc023af9b3b079d3f579d4173f",
+    "canonical_sha256": "5669ac43ffdc1570835e0311d444b31de2d81a77984620f9c509fe991d8a6de8",
+    "schema_version": "quanthus.expert-scorecard.v2"
+  },
+  "settlement.json": {
+    "artifact_digest": "sha256:8dd654571f3a781ed8850727b3ab3e9cc084a77eb982f8863380c3c43c0818ed",
+    "canonical_sha256": "b648cee7bebd89353f00ed3e3006532b0d5a06dd4ea29cb172f7c70964798ac7",
+    "schema_version": "quanthus.outcome-settlement.v2"
+  }
+}

@@ -401,7 +401,7 @@ def task_body(item: WorkItem, repository: str) -> str:
     governing_links = (
         f"- [Detailed design]({repo_url(repository, item.design_path)})\n"
         f"{expert_design}{worker_decision}{product_requirements}"
-        f"- [High-level design]({repo_url(repository, 'docs/design/hld.md')})\n"
+        f"- [High-level design]({repo_url(repository, 'docs/design/hld.md')})"
     )
     return f"""<!-- quanthus-planning:v1 id={item.stable_id} kind={item.issue_type} -->
 ## Objective

@@ -8,6 +8,7 @@ from scripts.sync_github_planning import (
     EXPERT_STRATEGY_MILESTONE,
     MILESTONES,
     expert_strategy_epic_body,
+    task_body,
     work_items,
 )
 
@@ -75,3 +76,12 @@ def test_expert_strategy_epic_body_links_every_blocking_child() -> None:
     assert "kind=epic" in body
     assert "## Blocking work items" in body
     assert all(f"[{item_id}]({urls[item_id]})" in body for item_id in EXPERT_STRATEGY_CHILD_IDS)
+
+
+def test_planning_body_keeps_existing_section_spacing() -> None:
+    item = next(item for item in work_items(ROOT) if item.stable_id == "P3-EXP-001")
+
+    body = task_body(item, "rv198-star/Quanthus")
+
+    assert "docs/design/hld.md)\n\n## Phase and gate" in body
+    assert "docs/design/hld.md)\n\n\n## Phase and gate" not in body

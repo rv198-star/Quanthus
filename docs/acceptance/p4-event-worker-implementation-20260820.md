@@ -71,7 +71,8 @@ copied into the recovery package.
 Repository verification at this checkpoint:
 
 - Event Worker / Platform / P4 boundary regression: 138 passed and 3 PostgreSQL-DSN tests skipped;
-- full repository `make check` equivalent: 1,174 passed and the same 3 optional PostgreSQL-DSN
+- full repository `make check` equivalent after merging current `origin/main`: 1,177 passed and the
+  same 3 optional PostgreSQL-DSN
   tests skipped;
 - doctor, compileall, planning preview, and `git diff --check`: passed;
 - Ruff on Platform, Event Library, Direct-DWD, and affected tests: passed;

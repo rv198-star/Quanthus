@@ -94,6 +94,12 @@ funding, and data-quality guardians remain non-optimizable system invariants. De
 MVP boundaries, lifecycle decisions, and stop conditions are owned by
 `docs/design/lld/04-experts-aggregator/expert-strategy-layer.md`.
 
+The bounded MVP starts with exactly two active strategy experts so both action-changing mappings
+receive an isolated complete-strategy replay plus one predeclared joint replay. This is a delivery
+budget, not a permanent architectural maximum; adding experts requires a later versioned proposal.
+Its terminal lifecycle decision also owns the forward-Shadow disposition: negative or replacement
+decisions close with the current version disabled instead of forcing it into prospective operation.
+
 ## 3. Data platform and storage design
 
 The current file-first analytical architecture is distributed across CN01, Hermes, and OCI and is

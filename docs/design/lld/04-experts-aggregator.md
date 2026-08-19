@@ -20,7 +20,7 @@ complete strategy topology remains the final unit of economic acceptance.
 
 | Child | Ownership | Delivery state |
 | --- | --- | --- |
-| `04-experts-aggregator/expert-strategy-layer.md` | Additive v2 evaluation artifacts, assessment/policy separation, scorecards, lifecycle, Worker boundary, formal-strategy MVP, and stop conditions | Design approved; `P3-EXPERT-001` ready; later work dependency-gated |
+| `04-experts-aggregator/expert-strategy-layer.md` | Additive v2 evaluation artifacts, assessment/policy separation, scorecards, lifecycle, Worker boundary, formal-strategy MVP, stop conditions, and routing to work-item child designs | Design approved and implementation-readiness reviewed; `P3-EXPERT-001` ready; later work dependency-gated |
 
 ## 2. Interfaces
 
@@ -133,13 +133,13 @@ score, proposed/final action, rejected action when applicable, and reason codes.
 | P3-AGG-002 | Implement score and action mapping with versioning | P3-AGG-001 | Boundary fixtures |
 | P3-SHADOW-001 | Implement shadow execution and divergence log | Audit schema | No action-path side effects |
 | P3-EXP-002 | Add vertical-slice rule experts | Aggregator | End-to-end replay |
-| P3-EXPERT-000 | Deliver the bounded Expert Strategy Layer MVP | META-DOC-001 | All seven blocking children close, one lifecycle decision is recorded, and sealed partitions remain unopened |
+| P3-EXPERT-000 | Deliver the bounded Expert Strategy Layer MVP | META-DOC-001 | All seven blocking children close, one lifecycle decision and Shadow disposition are recorded, and sealed partitions remain unopened |
 | P3-EXPERT-001 | Implement additive expert evaluation protocol v2 | P3-EXP-001, P3-AGG-001 | Schema/contract tests and byte-stable v1 compatibility evidence |
 | P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | Idempotency, recovery, cancellation, fencing, and deterministic publication evidence |
-| P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-FEAT-001, P3-REPLAY-001 | Human-approved target card, leakage tests, sample ledger, and development scorecard |
-| P3-STRAT-002 | Freeze the first formal two-to-four-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | Approved strategy card, version bindings, expected changes, controls, and legal interventions |
+| P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-EXPERT-002, P3-FEAT-001, P3-REPLAY-001, P4-LABEL-001 | Human-approved target-card reuse/non-reuse decision, Worker-run leakage tests, sample ledger, and development scorecard |
+| P3-STRAT-002 | Freeze and implement the first formal two-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | Approved strategy card, executable two-expert binding, expected changes, controls, and legal interventions |
 | P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | Digest-resolved API/Web contracts with no calculation, approval, or execution authority |
-| P3-EXPERT-005 | Accept the development MVP and hand the frozen version to forward Shadow | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | Deterministic acceptance packet, lifecycle decision, cost report, rollback, and zero sealed-partition access |
+| P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | Deterministic acceptance packet, lifecycle decision, enabled/disabled Shadow proof, cost report, rollback, and zero sealed-partition access |
 
 ## 7. Acceptance
 

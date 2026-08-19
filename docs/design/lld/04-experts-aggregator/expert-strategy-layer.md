@@ -53,6 +53,14 @@ This child does not:
 - create per-expert ADS datasets, a second pricing engine, Redis, Celery, RabbitMQ, or another
   approval state machine.
 
+### 2.1 Implementation designs
+
+`04-experts-aggregator/expert-strategy-layer/README.md` routes the seven blocking work items to
+their independently owned implementation designs. Those children define package paths, exact
+contracts, failure behavior, verification, human decisions, and rollback. The readiness review in
+that directory narrows the first formal topology to exactly two active strategy experts so every
+action-changing expert is covered by the bounded attribution budget.
+
 ## 3. Authority and expert classes
 
 ### 3.1 Strategy experts
@@ -90,15 +98,18 @@ dataclasses or rewrite an accepted `DecisionEvent`.
 
 | Artifact | Required responsibility |
 | --- | --- |
-| `ExpertEvaluationSpec` | Bind expert assessment and policy versions, evaluation route, population, partition, primary metric, baselines, slices, and stop conditions |
+| `ExpertEvaluationSpec` | Bind one expert assessment version, its ordered policy-mapping set, evaluation route, population, partition, primary metric, baselines, slices, and stop conditions |
 | `ForecastSpec` | When a future target is claimed, bind target/version/digest, subject, eligibility population, observation anchor, trading-session horizon, outcome type, resolver/scorer versions, exclusions, missing rules, and censoring rules |
-| `ExpertObservation` | Bind deterministic prediction id, expert/target versions, PIT context and evidence digests, applicability or abstention, typed raw value, evidence quality, and policy-effect digest |
-| `PolicyEffect` | Carry the accepted score, constraint, veto, or abstention semantics plus its own mapping identity; it is not a forecast |
+| `ExpertObservation` | Bind deterministic prediction id, expert/target versions, PIT context and evidence digests, applicability or abstention, typed raw value, and evidence quality; it contains no policy mapping |
+| `PolicyEffect` | Reference one observation and carry the accepted score, constraint, veto, or abstention semantics plus its own mapping identity; a policy-only observation is not a forecast |
 | `OutcomeSettlement` | Record `pending`, `settled`, `censored`, or `unavailable`, the realized result, observation window, future DWD identity, resolver version, and target-specific score |
-| `ExpertScorecard` | Aggregate one exact expert/target/population/partition binding and reference, rather than recompute, independently published economic effects |
+| `ExpertScorecard` | Aggregate one exact expert/target/population/partition binding, sample ledger, assessment metrics, uncertainty, stability, and decision-change counts; economic effects remain separate attribution artifacts |
+| `ExpertLifecycleDecision` | Bind one human decision, compatible enabled/disabled Shadow disposition, rationale, limitations, actor/time, and the complete accepted evidence chain without mutating any parent artifact |
 
 Every artifact has a schema version, deterministic content identity, producer version, parent
-digests, and canonical serialization. Transport timestamps live outside canonical content.
+digests, and canonical serialization. Transport timestamps, Job ids, claim generations, Worker ids,
+and filesystem paths live outside canonical content. Reproducibility means byte-identical semantic
+artifacts; operational envelopes may differ between attempts.
 
 ### 4.1 Typed values
 
@@ -167,9 +178,10 @@ independent rows. Exploration cannot be relabeled as confirmation.
 Every action-changing expert or mapping records how often and how it changed a decision. A bounded,
 complete P2 replay compares the frozen baseline with one legal intervention and reports return,
 drawdown, tail loss, exposure/capital use, turnover, costs, missed opportunity, and relevant risk
-metrics. One proposal may initially request at most two single-expert interventions and one
-necessary predeclared pair. Single-intervention effects are not additive; unchecked interactions
-remain visible.
+metrics. The two-expert MVP requires both single-expert interventions and their one predeclared
+joint intervention. A later proposal may still request at most two singles and one necessary pair
+until a separate resource and multiple-comparison budget is approved. Single-intervention effects
+are not additive; unchecked interactions remain visible.
 
 ### 7.4 Product-value gate
 
@@ -197,7 +209,9 @@ scorecard digests.
 Development evidence may create a new version. A revealed arbitration or permanent-blind failure
 permits rollback or retirement but never retuning against that period. Narrowing applicability,
 changing abstention, changing a target, or merging experts is a new hypothesis and version, not an
-in-place repair. Insufficient rare-event evidence remains `inconclusive` and in Shadow.
+in-place repair. Insufficient rare-event evidence remains `inconclusive` and may continue in
+bounded Shadow only when the lifecycle decision records an observation budget and no stop condition
+has fired.
 
 ## 9. Worker and artifact boundary
 
@@ -216,6 +230,10 @@ One baseline run records all active and Shadow observations from one shared prov
 feature panel. Future-target settlement is a result join and does not rerun the strategy. Full
 capital-constrained replay runs only for predeclared interventions after sample and decision-change
 conditions pass.
+
+The Job input carries a canonical non-empty evaluation-spec set. The technical proof binds one
+spec; the formal topology binds its complete two-expert set and rejects missing, extra, or duplicate
+members before opening DWD.
 
 Immutable compact columnar artifacts own observation and settlement rows. PostgreSQL owns Job/Run
 state, versions, summaries, and artifact references; it does not store one row per daily expert
@@ -269,20 +287,29 @@ baseline-versus-abstain replay waits for the formal topology and `P3-ATTR-001`.
 
 ### 12.2 Product proof
 
-After the technical proof, one formal strategy card binds two to four complementary experts plus
-candidate, aggregation, position, exit, funding, and execution versions. The first topology must
-cover at least entry assessment, risk boundary, and hold/exit review; the original nine experts are
-a candidate catalogue rather than a mandatory set. One baseline run records active and Shadow
-opinions, and only one or two predeclared expert interventions are replayed.
+After the technical proof, one formal strategy card binds exactly two active complementary strategy
+experts plus candidate, aggregation, position, exit, funding, and execution versions. The first is
+the market assessment expert from `P3-EXPERT-003`; `P3-STRAT-002` implements the second,
+policy-only position-risk expert. Together they cover entry assessment, strategy risk boundary, and
+hold/exit review. System guardians remain outside the count. The original nine experts are a
+candidate catalogue rather than a mandatory set.
+
+Both action-changing expert mappings receive a mandatory single-expert fallback replay, and their
+one joint fallback is predeclared to expose interaction. This exhausts the MVP intervention budget
+without leaving an active expert economically unevaluated. One baseline Run records all active and
+Shadow opinions; expanding beyond two active experts requires a later proposal and budget.
 
 The existing candidate detail page gains an unframed, read-only expert evidence section showing the
 bound topology, assessment scorecards, decision-change counts, economic effects, disagreement
 cases, limitations, and append-only research decision. It does not calculate results, create a new
 approval state, or authorize execution.
 
-MVP closure requires a development-only lifecycle decision and an operational handoff of the
-frozen version to daily forward Shadow. Forward evidence accrues after MVP closure and remains a P6
-input rather than retroactive proof of the development result.
+MVP closure requires a development-only lifecycle decision and an explicit forward-Shadow
+disposition for the frozen version. `keep` enters daily forward Shadow; `inconclusive` may enter it
+only under a bounded observation budget; `narrow_with_new_version`, `remap_policy`, `merge`, and
+`retire` keep the current version unscheduled. An enabled handoff must pass one operational drill;
+a disabled disposition must prove that no Job can be submitted. Forward evidence accrues after MVP
+closure and remains a P6 input rather than retroactive proof of the development result.
 
 ## 13. Falsification and stop conditions
 
@@ -308,15 +335,13 @@ result. Return to the formal strategy question, simplify the topology, or pause 
 ## 14. Work-item sequence
 
 ```text
-P3-EXPERT-001
-    +--> P3-EXPERT-002 --+
-    +--> P3-EXPERT-003 --+--> P3-STRAT-002 --> P3-ATTR-001
-                                                   |
-                                                   v
-                                           P3-EXPERT-004
-                                                   |
-                                                   v
-                                           P3-EXPERT-005
+P3-EXPERT-001 --> P3-EXPERT-002 --> P3-EXPERT-003 --> P3-STRAT-002 --> P3-ATTR-001
+                                      ^                              |
+                                      |                              v
+                                P4-LABEL-001                 P3-EXPERT-004
+                                                                      |
+                                                                      v
+                                                              P3-EXPERT-005
 ```
 
 `P3-EXPERT-000` is the tracking epic for every node above. Only `P3-EXPERT-001` is an initially
@@ -326,8 +351,9 @@ actionable implementation child. Creating the issues does not satisfy any delive
 
 - Objective: deliver one formal, evidence-backed expert lifecycle loop without opening later data
   or capital gates.
-- Acceptance: every blocking child closes; one development lifecycle decision and forward-Shadow
-  handoff are recorded; v1 evidence remains reproducible; arbitration/blind access remains zero.
+- Acceptance: every blocking child closes; one development lifecycle decision and its
+  forward-Shadow disposition are recorded; an enabled or disabled disposition is operationally
+  proved; v1 evidence remains reproducible; arbitration/blind access remains zero.
 - Non-goals: all nine experts, production promotion, live notification, or automated evolution.
 
 ### `P3-EXPERT-001` - evaluation protocol v2
@@ -348,20 +374,24 @@ actionable implementation child. Creating the issues does not satisfy any delive
 
 ### `P3-EXPERT-003` - first target, resolver, and technical expert
 
-- Objective: freeze one human-approved market-data target card and implement the first assessment
-  expert, resolver, sample ledger, and development scorecard.
+- Objective: reference an accepted `P4-LABEL-001` target card when semantics match, or record a
+  human-approved non-reuse decision, then implement the first assessment expert, resolver, sample
+  ledger, and development scorecard.
 - Acceptance: eligibility, horizon, outcome, exclusions, censoring, primary metric, naive baseline,
-  and stop conditions are frozen before results; PIT leakage and boundary tests pass; coverage,
-  abstention, base rate, quality, stability, and uncertainty are reported.
+  and stop conditions are frozen before results; the accepted Worker is used for every DWD read;
+  PIT leakage and boundary tests pass; coverage, abstention, base rate, quality, stability, and
+  uncertainty are reported.
 - Non-goals: treating the result as a formal strategy, universal ranking, or target optimization on
   arbitration/blind data.
 
-### `P3-STRAT-002` - first formal expert topology
+### `P3-STRAT-002` - first formal two-expert topology
 
-- Objective: approve one formal strategy card with two to four experts and every candidate,
-  aggregation, position, exit, funding, execution, assessment, target, and policy-mapping version.
-- Acceptance: active/Shadow roles, expected decision changes, controls, legal abstain interventions,
-  resource budget, and rollback criteria are predeclared; only development data is authorized.
+- Objective: approve and implement one formal strategy card with the assessment expert plus one
+  position-risk expert, and bind the exact product candidate, candidate generator, aggregation,
+  position, exit, funding, execution, assessment, target, and policy-mapping versions.
+- Acceptance: the second expert, active/Shadow roles, expected decision changes, controls, two
+  single fallbacks, one joint fallback, resource budget, and rollback criteria are versioned; only
+  development data is authorized.
 - Non-goals: copying the frozen capability fixture into a promotable lineage or implementing all
   original expert candidates.
 
@@ -369,9 +399,9 @@ actionable implementation child. Creating the issues does not satisfy any delive
 
 - Objective: resume the existing deferred attribution work only after `P3-STRAT-002` supplies a
   formal adapter and predeclared questions.
-- Acceptance: baseline reproduction and at most two single-expert abstain interventions use the
-  complete P2 capital path; one pair is added only when predeclared; effects retain interaction and
-  frozen-simulator limitations.
+- Acceptance: baseline reproduction, both predeclared single-expert fallbacks, and their required
+  joint fallback use the complete P2 capital path; effects retain interaction and frozen-simulator
+  limitations.
 - Non-goals: exhaustive combination search, Shapley allocation, additive profit ownership, or
   real-world causal claims.
 
@@ -384,13 +414,14 @@ actionable implementation child. Creating the issues does not satisfy any delive
   to a trusted artifact digest.
 - Non-goals: a new dashboard product, role system, expert leaderboard, or second approval flow.
 
-### `P3-EXPERT-005` - end-to-end MVP acceptance and Shadow handoff
+### `P3-EXPERT-005` - end-to-end MVP acceptance and Shadow disposition
 
-- Objective: run the complete development loop, record a human lifecycle decision, and hand the
-  frozen version to daily forward Shadow without granting promotion or notification authority.
+- Objective: run the complete development loop, record a human lifecycle decision, and either hand
+  the frozen version to bounded daily forward Shadow or prove it remains disabled, without granting
+  promotion or notification authority.
 - Acceptance: deterministic rerun, scorecard, bounded attribution, workbench trace, lifecycle
-  decision, resource-cost report, rollback package, and zero sealed-partition access are preserved
-  in one acceptance record.
+  decision, Shadow disposition proof, resource-cost report, rollback package, and zero
+  sealed-partition access are preserved in one acceptance record.
 - Non-goals: P6 quarterly acceptance, blind reveal, execution authorization, or live capital.
 
 ## 15. Follow-on boundary

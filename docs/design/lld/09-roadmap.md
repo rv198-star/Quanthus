@@ -45,8 +45,9 @@ notification retain their separate blockers.
 - **Platform Kernel**: selectively extract the operator platform from QuantDinger through PK0-PK6
   while retaining Quanthus domain authority.
 - **Expert Strategy Layer MVP**: a bounded post-P3 product increment that adds falsifiable expert
-  evaluation, one formal two-to-four-expert topology, constrained attribution, candidate-detail
-  evidence, and a forward-Shadow handoff. It does not reopen P3 acceptance or advance P4-P6 gates.
+  evaluation, one formal two-expert topology, constrained attribution, candidate-detail
+  evidence, and an explicit forward-Shadow disposition. It does not reopen P3 acceptance or advance
+  P4-P6 gates.
 
 ### Platform Kernel stage gates
 

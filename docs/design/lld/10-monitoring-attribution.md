@@ -19,6 +19,7 @@ quality changed. Monitoring is an event contract, not a dashboard added after th
 | Child | Ownership | Delivery state |
 | --- | --- | --- |
 | `10-monitoring-attribution/strategy-attribution.md` | Strategy-owned topology adapter, predeclared questions, legal interventions, evidence validation, paired replay effects, interactions, and three-layer explanations | Bounded synthetic Pipeline/publication/viewer closure accepted; `P3-ATTR-001` and `P3-DASH-001` remain deferred by the P3 gate |
+| `10-monitoring-attribution/formal-strategy-attribution.md` | First formal two-expert adapter, outcome-blind questions, two single fallbacks, required joint fallback, complete P2 reruns, and publication acceptance | Design approved; implementation remains deferred until `P3-STRAT-002` is accepted and the gate is explicitly resumed |
 
 ## 2. North-star metrics
 
@@ -168,7 +169,7 @@ never a formal strategy report and cannot satisfy `P3-DASH-001`.
 | P2-OBS-001 | Define decision/shadow/notification log schema | P2 events | Accepted, rejected, delivered, and no-implied-fill fixture |
 | P2-HYP-001 | Implement diagnostic hypothetical ledger | Matcher/exit policy | 20-session path fixture |
 | P3-FUNNEL-001 | Implement reconciled opportunity funnel | P3 vertical slice | Count reconciliation |
-| P3-ATTR-001 | Implement bounded remove/neutralize reruns for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002, trusted engine, and predeclared questions | Baseline reproduction plus at most two single-expert effects and one required pair through complete capital-constrained replay |
+| P3-ATTR-001 | Implement bounded remove/neutralize reruns for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002, trusted engine, and predeclared questions | Baseline reproduction plus two mandatory single-expert effects and one required joint effect through complete capital-constrained replay |
 | P3-DASH-001 | Produce three-layer monitoring report for a recurring formal strategy | Funnel/attribution and reporting cadence | Monthly report fixture |
 
 ## 8. Acceptance

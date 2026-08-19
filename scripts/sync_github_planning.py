@@ -54,6 +54,15 @@ class WorkItem:
     issue_type: str
 
 
+@dataclass(frozen=True)
+class IssueImplementationSpec:
+    design_path: str
+    approach: str
+    owned_paths: tuple[str, ...]
+    decision_gates: tuple[str, ...]
+    verification: tuple[str, ...]
+
+
 LABELS = (
     LabelSpec("type:epic", "5319E7", "Design chapter or delivery epic"),
     LabelSpec("type:task", "1D76DB", "Executable work item"),
@@ -85,6 +94,10 @@ PLATFORM_KERNEL_MILESTONE = "Platform Kernel Extraction"
 WORKER_RUNTIME_MILESTONE = "PostgreSQL Worker Runtime"
 EXPERT_STRATEGY_MILESTONE = "Expert Strategy Layer MVP"
 EXPERT_STRATEGY_DESIGN_PATH = "docs/design/lld/04-experts-aggregator/expert-strategy-layer.md"
+EXPERT_STRATEGY_IMPLEMENTATION_ROOT = "docs/design/lld/04-experts-aggregator/expert-strategy-layer"
+EXPERT_STRATEGY_REVIEW_PATH = (
+    f"{EXPERT_STRATEGY_IMPLEMENTATION_ROOT}/implementation-readiness-review.md"
+)
 EXPERT_STRATEGY_CHILD_IDS = (
     "P3-EXPERT-001",
     "P3-EXPERT-002",
@@ -95,7 +108,204 @@ EXPERT_STRATEGY_CHILD_IDS = (
     "P3-EXPERT-005",
 )
 EXPERT_STRATEGY_IDS = frozenset({"P3-EXPERT-000", *EXPERT_STRATEGY_CHILD_IDS})
-EXPERT_STRATEGY_DESIGN_IDS = EXPERT_STRATEGY_IDS - {"P3-ATTR-001"}
+EXPERT_STRATEGY_IMPLEMENTATION_SPECS = {
+    "P3-EXPERT-000": IssueImplementationSpec(
+        design_path=EXPERT_STRATEGY_DESIGN_PATH,
+        approach=(
+            "Coordinate the seven dependency-gated children as one bounded lifecycle loop; the "
+            "Epic closes only from child acceptance evidence, not from issue or document creation."
+        ),
+        owned_paths=(
+            EXPERT_STRATEGY_DESIGN_PATH,
+            f"{EXPERT_STRATEGY_IMPLEMENTATION_ROOT}/README.md",
+            EXPERT_STRATEGY_REVIEW_PATH,
+        ),
+        decision_gates=(
+            "Preserve the target, strategy-card, and lifecycle decisions as explicit human gates.",
+            "Keep arbitration, permanent-blind, P6, notification, and execution authority closed.",
+        ),
+        verification=(
+            "All seven blocking children are accepted with linked immutable evidence.",
+            "One lifecycle decision and compatible enabled/disabled Shadow disposition are "
+            "recorded with zero sealed access.",
+        ),
+    ),
+    "P3-EXPERT-001": IssueImplementationSpec(
+        design_path=f"{EXPERT_STRATEGY_IMPLEMENTATION_ROOT}/evaluation-protocol-v2.md",
+        approach=(
+            "Add a domain-only v2 sidecar package with seven exact artifacts, canonical "
+            "identities, "
+            "graph validation, lifecycle/Shadow compatibility, and a hard byte-compatibility "
+            "boundary around accepted v1 Runs."
+        ),
+        owned_paths=(
+            "src/quanthus/expert_evaluation/{contracts,serialization,validation}.py",
+            "tests/unit/test_expert_evaluation_contracts.py",
+            "tests/contract/test_expert_evaluation_compatibility.py",
+        ),
+        decision_gates=(
+            "No new semantic human decision; target, expert, Worker, and UI choices remain out "
+            "of scope.",
+        ),
+        verification=(
+            "Golden round trips and typed negative cases cover every v2 artifact, including "
+            "lifecycle/Shadow compatibility.",
+            "Future settlement and policy remapping cannot affect observation identity; accepted "
+            "v1 bytes remain unchanged.",
+        ),
+    ),
+    "P3-EXPERT-002": IssueImplementationSpec(
+        design_path=f"{EXPERT_STRATEGY_IMPLEMENTATION_ROOT}/worker-evaluation-pipeline.md",
+        approach=(
+            "Admit `quanthus.expert-evaluation.v1` through the existing PostgreSQL Worker, reuse "
+            "static concurrency-one dispatch, accept a canonical non-empty evaluation-spec set, "
+            "and publish immutable semantic Run artifacts plus one summary row."
+        ),
+        owned_paths=(
+            "src/quanthus/platform/{jobs,worker,worker_handlers,models,persistence,migrations}.py",
+            "src/quanthus/expert_evaluation/{runner,cli}.py",
+            "tests/platform/test_expert_evaluation_worker.py",
+        ),
+        decision_gates=(
+            "Do not add a queue, daemon, registry, cache, or opinion-row table without a measured "
+            "trigger.",
+        ),
+        verification=(
+            "Lease loss, cancellation, retry, stale fencing, partial publication, and two-Worker "
+            "competition pass.",
+            "Identical semantic inputs publish the same content Run and byte-identical canonical "
+            "artifacts while operational attempt fields may differ; candidate replay remains "
+            "compatible.",
+        ),
+    ),
+    "P3-EXPERT-003": IssueImplementationSpec(
+        design_path=f"{EXPERT_STRATEGY_IMPLEMENTATION_ROOT}/first-target-resolver-expert.md",
+        approach=(
+            "Reference the accepted P4 outcome card when semantics match, then implement one "
+            "outcome-blind technical assessment expert, independent resolver, closed sample "
+            "ledger, and development scorecard through the accepted Worker."
+        ),
+        owned_paths=(
+            "config/expert-evaluations/{targets,experts,specs}/",
+            "src/quanthus/expert_evaluation/{target_cards,resolver,scoring}.py",
+            "src/quanthus/expert_evaluation/experts/trend_stability.py",
+        ),
+        decision_gates=(
+            "A human freezes target, population, horizon, metric, baseline, slices, and stop "
+            "conditions before result access.",
+            "If P4-LABEL-001 cannot be reused, record an outcome-blind non-reuse decision before "
+            "creating a card.",
+        ),
+        verification=(
+            "PIT leakage, resolver independence, horizon edges, suspension/delisting, censoring, "
+            "and ledger closure pass.",
+            "The accepted Worker produces the development scorecard with coverage, abstention, "
+            "dependence-aware uncertainty, and limitations.",
+        ),
+    ),
+    "P3-STRAT-002": IssueImplementationSpec(
+        design_path=f"{EXPERT_STRATEGY_IMPLEMENTATION_ROOT}/first-formal-topology.md",
+        approach=(
+            "Freeze and implement exactly two active strategy experts: the accepted assessment "
+            "expert and one policy-only position-risk expert, composed through existing "
+            "P2/aggregator ports and bound to one exact product candidate version."
+        ),
+        owned_paths=(
+            "config/expert-strategies/",
+            "src/quanthus/expert_strategy/{contracts,registry,position_risk,runner}.py",
+            "src/quanthus/expert_strategy/attribution_adapter.py",
+        ),
+        decision_gates=(
+            "A human freezes the complete strategy card, expected changes, resource budget, and "
+            "rollback before results.",
+            "The assessment evidence population must match the strategy applicability population.",
+            "The card admits exactly two single fallbacks and their required joint fallback; no "
+            "search is allowed.",
+        ),
+        verification=(
+            "Two-expert topology closure, guardian separation, legal fallbacks, audit "
+            "completeness, and deterministic sentinel replay pass.",
+            "The frozen P3 fixture and all v1 Run digests remain unchanged.",
+        ),
+    ),
+    "P3-ATTR-001": IssueImplementationSpec(
+        design_path="docs/design/lld/10-monitoring-attribution/formal-strategy-attribution.md",
+        approach=(
+            "Bind the formal strategy to the accepted attribution planner/Pipeline, reproduce its "
+            "baseline, and run both single fallbacks plus their required joint fallback through "
+            "full P2 replay."
+        ),
+        owned_paths=(
+            "sealed src/quanthus/expert_strategy/attribution_adapter.py (read-only input)",
+            "src/quanthus/strategy_attribution_{planning,pipeline}.py only for a proven "
+            "generic gap",
+            "tests/unit/test_formal_expert_attribution_adapter.py",
+            "tests/acceptance/test_formal_expert_attribution_pipeline.py",
+        ),
+        decision_gates=(
+            "Persist the three outcome-blind questions and metric/materiality rules before result "
+            "access.",
+            "Explicitly resume the deferred gate after P3-STRAT-002 acceptance.",
+        ),
+        verification=(
+            "Baseline reproduction and four complete P2 Runs pass deep evidence verification.",
+            "Effects remain non-additive and the published release exposes interaction and "
+            "simulator limitations.",
+        ),
+    ),
+    "P3-EXPERT-004": IssueImplementationSpec(
+        design_path=f"{EXPERT_STRATEGY_IMPLEMENTATION_ROOT}/candidate-detail-evidence.md",
+        approach=(
+            "Project trusted topology, scorecard, attribution, disagreement, limitation, and "
+            "optional lifecycle artifacts through an exact product-candidate evidence package "
+            "into the existing candidate detail response and page without adding mutations."
+        ),
+        owned_paths=(
+            "src/quanthus/expert_evaluation/product_view.py",
+            "config/product-expert-evidence.v1.json",
+            "src/quanthus/platform/{product_query,api}.py",
+            "product-web/src/views/CandidateDetail.vue",
+        ),
+        decision_gates=(
+            "No UI decision gate: lifecycle decisions are immutable domain artifacts and existing "
+            "approval axes stay unchanged.",
+        ),
+        verification=(
+            "API digest resolution and invalid/partial/stale artifact paths fail closed without "
+            "fallback mixing.",
+            "Desktop/mobile E2E proves the section is read-only and cannot change governance or "
+            "execution authority.",
+        ),
+    ),
+    "P3-EXPERT-005": IssueImplementationSpec(
+        design_path=f"{EXPERT_STRATEGY_IMPLEMENTATION_ROOT}/mvp-shadow-handoff.md",
+        approach=(
+            "Bind and independently reproduce the full development package, record one append-only "
+            "human lifecycle decision, then either enable bounded background forward Shadow or "
+            "prove the current version remains disabled."
+        ),
+        owned_paths=(
+            "src/quanthus/expert_evaluation/{lifecycle,cli}.py",
+            "config/product-expert-evidence.v1.json (decision-bound serving advance)",
+            "config/expert-evaluations/shadow/",
+            "tests/acceptance/test_expert_mvp_acceptance.py",
+        ),
+        decision_gates=(
+            "A human selects keep, narrow, remap, merge, retire, or inconclusive from the complete "
+            "evidence package.",
+            "The decision records a compatible enabled/disabled Shadow disposition; replacement "
+            "and retire decisions disable the current version.",
+            "Forward Shadow has no notification, promotion, Order, Fill, or execution edge.",
+        ),
+        verification=(
+            "Independent semantic rerun, lifecycle append, decided-page binding, enabled Shadow "
+            "idempotency/recovery or disabled submission rejection, schedule rollback, cost, and "
+            "zero sealed access pass.",
+            "One acceptance record binds every artifact, limitation, decision, and runtime "
+            "revision.",
+        ),
+    ),
+}
 PROGRAM_EPIC_IDS = frozenset({"PK-WORKER-000", "P3-EXPERT-000"})
 
 MILESTONES = (
@@ -359,8 +569,8 @@ def work_items(root: Path) -> list[WorkItem]:
                 priority=priority,
                 milestone=milestone,
                 design_path=(
-                    EXPERT_STRATEGY_DESIGN_PATH
-                    if stable_id in EXPERT_STRATEGY_DESIGN_IDS
+                    EXPERT_STRATEGY_IMPLEMENTATION_SPECS[stable_id].design_path
+                    if stable_id in EXPERT_STRATEGY_IMPLEMENTATION_SPECS
                     else chapter.path
                 ),
                 issue_type="epic" if stable_id in PROGRAM_EPIC_IDS else "task",
@@ -378,6 +588,7 @@ def task_body(item: WorkItem, repository: str) -> str:
     worker_decision = ""
     expert_design = ""
     expert_gate_note = ""
+    implementation_contract = ""
     product_requirements = (
         f"- [Product requirements]({repo_url(repository, 'docs/product/prd.md')})\n"
     )
@@ -398,6 +609,28 @@ def task_body(item: WorkItem, repository: str) -> str:
             "acceptance or authorize arbitration, permanent-blind, P6 promotion, notification, "
             "or execution access."
         )
+        implementation = EXPERT_STRATEGY_IMPLEMENTATION_SPECS[item.stable_id]
+        owned_paths = "\n".join(f"- `{path}`" for path in implementation.owned_paths)
+        decision_gates = "\n".join(f"- {gate}" for gate in implementation.decision_gates)
+        verification = "\n".join(f"- {check}" for check in implementation.verification)
+        implementation_contract = f"""
+
+## Implementation contract
+
+{implementation.approach}
+
+### Owned paths
+
+{owned_paths}
+
+## Decision gates
+
+{decision_gates}
+
+## Verification
+
+{verification}
+""".rstrip()
     governing_links = (
         f"- [Detailed design]({repo_url(repository, item.design_path)})\n"
         f"{expert_design}{worker_decision}{product_requirements}"
@@ -418,7 +651,7 @@ def task_body(item: WorkItem, repository: str) -> str:
 
 ## Dependencies
 
-{item.dependencies}
+{item.dependencies}{implementation_contract}
 
 ## Acceptance evidence
 

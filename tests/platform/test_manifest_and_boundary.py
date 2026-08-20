@@ -74,6 +74,7 @@ def test_platform_schema_contains_only_approved_control_state() -> None:
         "platform_jobs",
         "platform_candidate_runs",
         "platform_candidate_active_runs",
+        "platform_expert_evaluation_runs",
         "platform_candidate_reviews",
         "platform_candidate_approval_events",
     )

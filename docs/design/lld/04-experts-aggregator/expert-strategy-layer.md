@@ -4,7 +4,7 @@
 | --- | --- |
 | Parent | `../04-experts-aggregator.md` |
 | Design status | approved |
-| Delivery gate | `P3-EXPERT-001` accepted; `P3-EXPERT-002` ready; all later work remains dependency-gated |
+| Delivery gate | `P3-EXPERT-001` and `P3-EXPERT-002` accepted; later work remains dependency-gated |
 | Milestone | Expert Strategy Layer MVP |
 | Governing work | `P3-EXPERT-000` |
 | Effective date | 2026-08-19 |

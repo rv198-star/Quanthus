@@ -151,6 +151,7 @@ def test_postgres_clean_upgrade_and_real_http_workflow(tmp_path: Path) -> None:
             "jobs-0001",
             "jobs-0002-lean-worker",
             "jobs-0003-candidate-runs",
+            "jobs-0004-expert-evaluation-runs",
             "candidate-review-0001",
             "candidate-approval-0001",
         )
@@ -181,7 +182,8 @@ def test_postgres_clean_upgrade_and_real_http_workflow(tmp_path: Path) -> None:
             ("identity", "identity-0001"),
             ("jobs", "jobs-0001"),
             ("jobs", "jobs-0002-lean-worker"),
-            ("jobs", "jobs-0003-candidate-runs"),
+                ("jobs", "jobs-0003-candidate-runs"),
+                ("jobs", "jobs-0004-expert-evaluation-runs"),
         )
 
         request = synthetic_run_request()

@@ -17,6 +17,7 @@ from quanthus.platform.ports import AttributionVerificationPort
 
 ATTRIBUTION_VERIFICATION_JOB = "quanthus.attribution.verify.v1"
 CANDIDATE_REPLAY_JOB = "quanthus.candidate-replay.v1"
+EXPERT_EVALUATION_JOB = "quanthus.expert-evaluation.v1"
 P4_EVENT_SCAN_JOB = "quanthus.p4-event-scan.v1"
 
 
@@ -42,6 +43,20 @@ def input_digest(input_ref: Mapping[str, Any]) -> str:
         input_ref, ensure_ascii=True, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def expert_evaluation_submission(
+    input_ref: Mapping[str, Any],
+) -> tuple[dict[str, Any], str, str]:
+    """Validate the exact domain input and derive both queue keys from its content."""
+    from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput
+
+    parsed = ExpertEvaluationJobInput.from_dict(input_ref)
+    canonical = parsed.to_dict()
+    if input_digest(canonical) != parsed.input_digest:
+        raise RuntimeError("expert evaluation digest implementations differ")
+    concurrency_key = f"expert-evaluation:{parsed.input_digest[7:]}"
+    return canonical, parsed.idempotency_key, concurrency_key
 
 
 def public_job(job: JobRecord) -> dict[str, Any]:

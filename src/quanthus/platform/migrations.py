@@ -180,6 +180,26 @@ MIGRATIONS = (
         ),
     ),
     Migration(
+        module_id="jobs",
+        migration_id="jobs-0004-expert-evaluation-runs",
+        statements=(
+            """
+            CREATE TABLE platform_expert_evaluation_runs (
+                run_id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL UNIQUE REFERENCES platform_jobs(job_id),
+                claim_generation BIGINT NOT NULL,
+                input_digest TEXT NOT NULL UNIQUE,
+                artifact_ref TEXT NOT NULL,
+                manifest_digest TEXT NOT NULL,
+                evaluation_identities JSONB NOT NULL,
+                strategy_identity JSONB,
+                summary JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """.strip(),
+        ),
+    ),
+    Migration(
         module_id="candidate-review",
         migration_id="candidate-review-0001",
         statements=(
@@ -266,6 +286,7 @@ def expected_tables(modules: tuple[str, ...]) -> tuple[str, ...]:
                 "platform_jobs",
                 "platform_candidate_runs",
                 "platform_candidate_active_runs",
+                "platform_expert_evaluation_runs",
             )
         )
     if "candidate-review" in modules:

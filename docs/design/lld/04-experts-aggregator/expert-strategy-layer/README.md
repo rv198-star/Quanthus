@@ -4,7 +4,7 @@
 | --- | --- |
 | Parent | `../expert-strategy-layer.md` |
 | Design status | approved |
-| Delivery gate | `P3-EXPERT-001` accepted; `P3-EXPERT-002` ready; every later child dependency-gated |
+| Delivery gate | `P3-EXPERT-001` and `P3-EXPERT-002` accepted; later children dependency-gated |
 | Governing work | `P3-EXPERT-000` |
 | Review | `implementation-readiness-review.md` |
 
@@ -64,8 +64,8 @@ predecessors are accepted and its own human decision gate has a recorded, digest
 | Work item | Owned result | Detailed design | Current gate |
 | --- | --- | --- | --- |
 | `P3-EXPERT-001` | Additive v2 contracts and canonical identities | `evaluation-protocol-v2.md` | accepted; evidence: `docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md` |
-| `P3-EXPERT-002` | PostgreSQL Worker evaluation and immutable publication | `worker-evaluation-pipeline.md` | ready |
-| `P3-EXPERT-003` | First target, resolver, assessment expert, and scorecard | `first-target-resolver-expert.md` | blocked by `P3-EXPERT-002` and `P4-LABEL-001` |
+| `P3-EXPERT-002` | PostgreSQL Worker evaluation and immutable publication | `worker-evaluation-pipeline.md` | accepted; evidence: `docs/acceptance/p3-expert-evaluation-worker-20260820.md` |
+| `P3-EXPERT-003` | First target, resolver, assessment expert, and scorecard | `first-target-resolver-expert.md` | blocked by `P4-LABEL-001` |
 | `P3-STRAT-002` | Executable two-expert strategy topology | `first-formal-topology.md` | blocked by `P3-EXPERT-002` and `P3-EXPERT-003` |
 | `P3-ATTR-001` | Bounded formal-strategy counterfactual evidence | `../../10-monitoring-attribution/formal-strategy-attribution.md` | blocked by `P3-STRAT-002` |
 | `P3-EXPERT-004` | Read-only candidate-detail evidence projection | `candidate-detail-evidence.md` | blocked by `P3-ATTR-001` |

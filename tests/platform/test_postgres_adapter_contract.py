@@ -68,6 +68,7 @@ def test_postgres_adapter_migration_contract_is_ordered_locked_and_idempotent() 
         "jobs-0001",
         "jobs-0002-lean-worker",
         "jobs-0003-candidate-runs",
+        "jobs-0004-expert-evaluation-runs",
     )
     assert store.migrate(("identity", "jobs")) == ()
     assert store.ready() is True
@@ -79,10 +80,15 @@ def test_postgres_adapter_migration_contract_is_ordered_locked_and_idempotent() 
     )
     assert any(statement.startswith("CREATE TABLE platform_users") for statement in statements)
     assert any(statement.startswith("CREATE TABLE platform_jobs") for statement in statements)
+    assert any(
+        statement.startswith("CREATE TABLE platform_expert_evaluation_runs")
+        for statement in statements
+    )
     assert cursor.ledger == {
-            ("identity", "identity-0001"),
-            ("jobs", "jobs-0001"),
-            ("jobs", "jobs-0002-lean-worker"),
-            ("jobs", "jobs-0003-candidate-runs"),
-        }
+        ("identity", "identity-0001"),
+        ("jobs", "jobs-0001"),
+        ("jobs", "jobs-0002-lean-worker"),
+        ("jobs", "jobs-0003-candidate-runs"),
+        ("jobs", "jobs-0004-expert-evaluation-runs"),
+    }
     assert all(connection.committed for connection in connections)

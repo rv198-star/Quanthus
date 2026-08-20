@@ -5,8 +5,8 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-002` |
 | Design status | approved |
-| Delivery gate | open |
-| Implementation readiness | ready; `P3-EXPERT-001` and `PK-WORKER-000` are accepted |
+| Delivery gate | accepted; evidence: `docs/acceptance/p3-expert-evaluation-worker-20260820.md` |
+| Implementation readiness | implemented and accepted |
 | Runtime budget | existing PostgreSQL Worker deployment, concurrency one |
 
 ## 1. Outcome and boundary

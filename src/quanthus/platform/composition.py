@@ -16,6 +16,7 @@ from quanthus.platform.identity import FernetSecretCipher, IdentityService, Secr
 from quanthus.platform.jobs import (
     ATTRIBUTION_VERIFICATION_JOB,
     CANDIDATE_REPLAY_JOB,
+    EXPERT_EVALUATION_JOB,
     DurableJobQueue,
     LocalJobRunner,
     attribution_verification_handler,
@@ -117,7 +118,13 @@ def create_platform_kernel(
             attribution_verification
         )
     jobs = LocalJobRunner(store, handlers)
-    replay_jobs = DurableJobQueue(store, {CANDIDATE_REPLAY_JOB: "replay"})
+    replay_jobs = DurableJobQueue(
+        store,
+        {
+            CANDIDATE_REPLAY_JOB: "replay",
+            EXPERT_EVALUATION_JOB: "replay",
+        },
+    )
     metrics = Metrics()
     app = create_http_app(
         manifest=manifest,

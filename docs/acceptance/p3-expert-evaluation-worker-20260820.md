@@ -58,6 +58,12 @@ publication paths.
   byte-identical Run inventory;
 - `git diff --check`, environment doctor, compileall, and planning synchronization: passed.
 
+GitHub Actions run `32336758653` did not execute a test step. Its check annotations state that the
+jobs were not started because recent account payments failed or the spending limit must be
+increased; the Python 3.12 matrix leg was then canceled because Python 3.10 had not started. This
+is external CI unavailable evidence, not a passing or failing code result. The complete local and
+disposable-PostgreSQL evidence above is the acceptance basis.
+
 ## Boundary and next gate
 
 This acceptance proves infrastructure behavior, not that any expert predicts correctly or improves

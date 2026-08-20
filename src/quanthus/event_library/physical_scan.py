@@ -697,12 +697,16 @@ def materialize_p4_research_adm(
             f"{reason}:{count}"
             for reason, count in sorted(coverage_audit["missing_reason_counts"].items())
         )
+        missing_codes = ",".join(
+            str(item["listing_code"])
+            for item in coverage_audit["missing_securities"]
+        )
         raise PhysicalEventScanError(
             "P4 static industry projection does not cover full candidate-security universe: "
             f"missing_securities={missing_security_count} "
             f"current_listed={coverage_audit['missing_current_listed']} "
             f"historical_only={coverage_audit['missing_historical_only']} "
-            f"reasons={reason_text}"
+            f"reasons={reason_text} codes={missing_codes}"
         )
     identity = _adm_identity(
         adm_policy=adm_policy,

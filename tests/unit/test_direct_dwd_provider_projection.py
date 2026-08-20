@@ -24,19 +24,31 @@ class DirectDwdProjectionTests(unittest.TestCase):
             output.mkdir()
             day = date(2012, 1, 4)
             known = datetime(2026, 8, 3, 23, 59, tzinfo=timezone.utc)
-            effective = datetime(2010, 1, 1, tzinfo=timezone.utc)
+            listing_effective = datetime(2010, 1, 1, tzinfo=timezone.utc)
+            security_effective = datetime(2009, 1, 1, tzinfo=timezone.utc)
+            superseded_security_effective = datetime(2000, 1, 1, tzinfo=timezone.utc)
 
             self._write(
                 dwd / "payload/listed_company/dwd_security.parquet",
                 [
                     {
                         "security_id": "security-001",
-                        "company_id": "company-001",
+                        "company_id": "company-old",
                         "instrument_type": "common_equity",
-                        "effective_from": effective,
+                        "effective_from": superseded_security_effective,
+                        "effective_to": security_effective,
                         "knowledge_from": known,
                         "knowledge_to": None,
-                    }
+                    },
+                    {
+                        "security_id": "security-001",
+                        "company_id": "company-001",
+                        "instrument_type": "common_equity",
+                        "effective_from": security_effective,
+                        "effective_to": None,
+                        "knowledge_from": known,
+                        "knowledge_to": None,
+                    },
                 ],
             )
             self._write(
@@ -48,7 +60,7 @@ class DirectDwdProjectionTests(unittest.TestCase):
                         "venue_id": SSE,
                         "listing_code": "600001",
                         "board_code": "MAIN",
-                        "effective_from": effective,
+                        "effective_from": listing_effective,
                         "effective_to": None,
                         "knowledge_from": known,
                         "knowledge_to": None,
@@ -159,8 +171,8 @@ class DirectDwdProjectionTests(unittest.TestCase):
 
             universe = pq.read_table(output / "tables/daily_universe.parquet").to_pylist()[0]
             self.assertEqual(universe["dwd_security_id"], "security-001")
-            self.assertEqual(universe["dwd_security_effective_from"], effective)
-            self.assertEqual(universe["dwd_listing_effective_from"], effective)
+            self.assertEqual(universe["dwd_security_effective_from"], security_effective)
+            self.assertEqual(universe["dwd_listing_effective_from"], listing_effective)
 
             limits = pq.read_table(
                 output / "tables/price_limit_execution_daily.parquet"

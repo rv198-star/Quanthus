@@ -246,7 +246,17 @@ def _materialize(
                    bar.knowledge_from AS built_at
             FROM dwd_state state
             JOIN dwd_listing listing USING (listing_id)
-            JOIN dwd_security security ON security.security_id=listing.security_id
+            JOIN dwd_security security
+              ON security.security_id=listing.security_id
+             AND security.effective_from <= listing.effective_from
+             AND (
+               security.effective_to IS NULL
+               OR (
+                 listing.effective_to IS NOT NULL
+                 AND listing.effective_to <= security.effective_to
+               )
+             )
+             AND security.knowledge_from <= listing.knowledge_from
             JOIN dwd_calendar calendar
               ON calendar.calendar_session_id=state.calendar_session_id
              AND calendar.venue_id=listing.venue_id
@@ -287,7 +297,17 @@ def _materialize(
                    listing.source_artifact_sha256 AS mapping_digest
             FROM dwd_state state
             JOIN dwd_listing listing USING (listing_id)
-            JOIN dwd_security security ON security.security_id=listing.security_id
+            JOIN dwd_security security
+              ON security.security_id=listing.security_id
+             AND security.effective_from <= listing.effective_from
+             AND (
+               security.effective_to IS NULL
+               OR (
+                 listing.effective_to IS NOT NULL
+                 AND listing.effective_to <= security.effective_to
+               )
+             )
+             AND security.knowledge_from <= listing.knowledge_from
             JOIN dwd_calendar calendar
               ON calendar.calendar_session_id=state.calendar_session_id
              AND calendar.venue_id=listing.venue_id
@@ -327,7 +347,17 @@ def _materialize(
                      ) AS prior_close
               FROM dwd_state state
               JOIN dwd_listing listing USING (listing_id)
-              JOIN dwd_security security ON security.security_id=listing.security_id
+              JOIN dwd_security security
+                ON security.security_id=listing.security_id
+               AND security.effective_from <= listing.effective_from
+               AND (
+                 security.effective_to IS NULL
+                 OR (
+                   listing.effective_to IS NOT NULL
+                   AND listing.effective_to <= security.effective_to
+                 )
+               )
+               AND security.knowledge_from <= listing.knowledge_from
               JOIN dwd_calendar calendar
                 ON calendar.calendar_session_id=state.calendar_session_id
                AND calendar.venue_id=listing.venue_id

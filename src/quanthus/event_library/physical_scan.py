@@ -448,13 +448,13 @@ def _audit_projection_static_industry_coverage(
             ORDER BY coverage_reason
             """
         ).fetchall()
-        samples = connection.execute(
+        missing_rows = connection.execute(
             """
             SELECT security_id, company_id, listing_code, current_listing, coverage_reason
             FROM audit_classified
             WHERE coverage_reason<>'covered'
             ORDER BY current_listing DESC, listing_code, security_id
-            LIMIT 20
+            LIMIT 1000
             """
         ).fetchall()
     finally:
@@ -468,7 +468,7 @@ def _audit_projection_static_industry_coverage(
         "missing_current_listed": int(counts[3]),
         "missing_historical_only": int(counts[4]),
         "missing_reason_counts": {str(reason): int(count) for reason, count in reason_rows},
-        "samples": [
+        "missing_securities": [
             {
                 "security_id": str(security_id),
                 "company_id": str(company_id),
@@ -476,7 +476,7 @@ def _audit_projection_static_industry_coverage(
                 "current_listing": bool(current_listing),
                 "coverage_reason": str(reason),
             }
-            for security_id, company_id, listing_code, current_listing, reason in samples
+            for security_id, company_id, listing_code, current_listing, reason in missing_rows
         ],
     }
     _write_json(output_path, payload)

@@ -519,6 +519,7 @@ class EventPhysicalScanTests(unittest.TestCase):
         self.assertEqual(
             audit["missing_reason_counts"], {"no_company_industry_membership": 2}
         )
+        self.assertEqual(len(audit["missing_securities"]), 2)
 
     def test_physical_scan_fails_when_static_industry_does_not_cover_trigger(self) -> None:
         reader, dwd_root = self._write_inputs()

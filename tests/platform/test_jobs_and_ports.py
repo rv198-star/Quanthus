@@ -131,7 +131,7 @@ def test_public_failed_event_job_exposes_bounded_stderr(tmp_path, monkeypatch) -
         "missing_current_listed": 2,
         "missing_historical_only": 15,
         "missing_reason_counts": {"no_company_industry_membership": 17},
-        "samples": [],
+        "missing_securities": [],
     }
     audit_path.write_text(json.dumps(audit), encoding="utf-8")
     monkeypatch.setattr("quanthus.platform.jobs.EVENT_RUN_ROOT", tmp_path)

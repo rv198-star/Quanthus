@@ -15,6 +15,7 @@ import pyarrow.parquet as pq
 from quanthus.backtest.inputs import CoverageStatus, P1DailyExecutionEvidence
 from quanthus.contracts import SnapshotRef
 from quanthus.event_library.physical_scan import (
+    PhysicalEventScanError,
     iter_projected_candidate_series,
     materialize_event_candidate_projection,
     scan_event_candidate_projection,
@@ -205,51 +206,58 @@ class EventPhysicalScanTests(unittest.TestCase):
             ),
             factor_path,
         )
-        (dwd_root / "manifest.json").write_text(
-            json.dumps(
-                {
-                    "files": [
-                        {
-                            "path": factor_path.relative_to(dwd_root).as_posix(),
-                            "sha256": "sha256:" + "b" * 64,
-                            "size_bytes": factor_path.stat().st_size,
-                        }
-                    ]
-                }
+        node_path = dwd_root / "payload/industry_classification/dwd_industry_node.parquet"
+        node_path.parent.mkdir(parents=True)
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "industry_node_id": "industry-level1",
+                        "parent_node_id": None,
+                        "node_level": 1,
+                        "knowledge_to": None,
+                    },
+                    {
+                        "industry_node_id": "industry-leaf",
+                        "parent_node_id": "industry-level1",
+                        "node_level": 2,
+                        "knowledge_to": None,
+                    },
+                ]
             ),
+            node_path,
+        )
+        membership_path = (
+            dwd_root
+            / "payload/industry_classification/dwd_company_industry_membership.parquet"
+        )
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "company_id": "company-001",
+                        "industry_node_id": "industry-leaf",
+                        "membership_type": "PRIMARY_CLASSIFICATION",
+                        "knowledge_to": None,
+                    }
+                ]
+            ),
+            membership_path,
+        )
+        manifest_files = []
+        for path in (factor_path, node_path, membership_path):
+            manifest_files.append(
+                {
+                    "path": path.relative_to(dwd_root).as_posix(),
+                    "sha256": "sha256:" + "b" * 64,
+                    "size_bytes": path.stat().st_size,
+                }
+            )
+        (dwd_root / "manifest.json").write_text(
+            json.dumps({"files": manifest_files}),
             encoding="utf-8",
         )
         return _Reader(paths), dwd_root
-
-    def _industry(self):
-        unsigned = {
-            "schema_version": "1.0.0",
-            "mapping_version": "static-level1-concentration-research-v1",
-            "usage": "static_non_pit_concentration_only",
-            "source": {
-                "provider": "synthetic",
-                "endpoint": "fixture://p4",
-                "retrieved_at": "2026-08-19T00:00:00+00:00",
-                "source_revision": "synthetic-v1",
-            },
-            "memberships": [
-                {
-                    "security_id": "opaque-security-001",
-                    "stock_code": "600001",
-                    "exchange": "SSE",
-                    "level1_industry_id": "industry-01",
-                }
-            ],
-        }
-        path = self.root / "industry.json"
-        path.write_text(
-            json.dumps({**unsigned, "artifact_digest": _digest(unsigned)}),
-            encoding="utf-8",
-        )
-        return load_static_industry_mapping(
-            path,
-            expected_version="static-level1-concentration-research-v1",
-        )
 
     def test_materialized_projection_streams_into_real_scan_contract(self) -> None:
         reader, dwd_root = self._write_inputs()
@@ -266,7 +274,15 @@ class EventPhysicalScanTests(unittest.TestCase):
             output_root=self.root / "projection",
         )
         reader.snapshot_id = projection.snapshot_id
-        industry = self._industry()
+        industry = projection.industry_mapping
+        self.assertEqual(
+            set(industry.by_security_id),
+            {"opaque-security-001"},
+        )
+        self.assertEqual(
+            industry.by_security_id["opaque-security-001"].level1_industry_id,
+            "industry-level1",
+        )
 
         series = tuple(
             iter_projected_candidate_series(
@@ -294,6 +310,63 @@ class EventPhysicalScanTests(unittest.TestCase):
         self.assertEqual(entries.executable_events, 1)
         self.assertEqual(entries.not_executable_events, 0)
         self.assertEqual(scan.candidates[0].record.identity.security_id, "opaque-security-001")
+
+    def test_physical_scan_fails_when_static_industry_does_not_cover_trigger(self) -> None:
+        reader, dwd_root = self._write_inputs()
+        projection = materialize_event_candidate_projection(
+            reader=reader,  # type: ignore[arg-type]
+            dwd_root=dwd_root,
+            source_policy=self.source,
+            provider_identity={
+                "provider_id": "synthetic-direct-dwd",
+                "provider_version": "1.0.0",
+                "provider_config_digest": "sha256:" + "c" * 64,
+                "provider_lineage_digest": "sha256:" + "d" * 64,
+            },
+            output_root=self.root / "projection-missing-industry",
+        )
+        reader.snapshot_id = projection.snapshot_id
+        unsigned = {
+            "schema_version": "1.0.0",
+            "mapping_version": "static-level1-concentration-research-v1",
+            "usage": "static_non_pit_concentration_only",
+            "source": {
+                "provider": "synthetic",
+                "endpoint": "fixture://missing-industry",
+                "retrieved_at": "2026-08-19T00:00:00+00:00",
+                "source_revision": "synthetic-v1",
+            },
+            "memberships": [
+                {
+                    "security_id": "unrelated-security",
+                    "stock_code": "000001",
+                    "exchange": "SZSE",
+                    "level1_industry_id": "industry-other",
+                }
+            ],
+        }
+        path = self.root / "missing-industry.json"
+        path.write_text(
+            json.dumps({**unsigned, "artifact_digest": _digest(unsigned)}),
+            encoding="utf-8",
+        )
+        missing = load_static_industry_mapping(
+            path,
+            expected_version="static-level1-concentration-research-v1",
+        )
+
+        with self.assertRaisesRegex(
+            PhysicalEventScanError,
+            "does not cover all isolated candidates: missing=1",
+        ):
+            scan_event_candidate_projection(
+                projection,
+                reader=reader,  # type: ignore[arg-type]
+                industry_mapping=missing,
+                source_policy=self.source,
+                card=self.card,
+                split_policy=self.split,
+            )
 
 
 if __name__ == "__main__":

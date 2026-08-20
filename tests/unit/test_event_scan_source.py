@@ -48,6 +48,8 @@ def _build_base(root: Path) -> tuple[Path, str, str]:
         "dwd_tradability_state",
         "dwd_price_limit_regime",
         "dwd_adjustment_factor",
+        "dwd_company_industry_membership",
+        "dwd_industry_node",
     ]
     rows = {name: 1 for name in required}
     for index in range(33 - len(rows)):
@@ -109,6 +111,14 @@ class EventScanSourceTests(unittest.TestCase):
             "dwd-base-202607-v2.1-correction-20260813-001",
         )
         self.assertEqual(policy.daily_increment_mode, "disabled_for_initial_development_scan")
+        self.assertEqual(
+            policy.static_industry_reference.authority,
+            "dwd_v2_1_static_company_industry_projection",
+        )
+        self.assertEqual(
+            policy.static_industry_reference.source_tables,
+            ("dwd_company_industry_membership", "dwd_industry_node"),
+        )
         self.assertEqual(
             policy.historical_visibility.status,
             "approved_development_retrospective",

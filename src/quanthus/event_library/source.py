@@ -319,17 +319,40 @@ class HistoricalVisibilityPolicy:
 class StaticIndustryReference:
     version: str
     usage: str
-    sha256: str
+    authority: str
+    source_tables: tuple[str, ...]
+    sha256: str | None = None
 
     def __post_init__(self) -> None:
         if self.version != "static-level1-concentration-research-v1":
             raise EventScanSourceError("unexpected static industry mapping version")
         if self.usage != "static_non_pit_concentration_only":
             raise EventScanSourceError("industry mapping may only be used for concentration")
-        require_sha256_digest(self.sha256, "static_industry_reference.sha256")
+        if self.authority == "legacy_checksum_bound_reference":
+            if self.source_tables:
+                raise EventScanSourceError("legacy industry reference must not declare DWD tables")
+            if self.sha256 is None:
+                raise EventScanSourceError("legacy industry reference requires sha256")
+            require_sha256_digest(self.sha256, "static_industry_reference.sha256")
+            return
+        if self.authority != "dwd_v2_1_static_company_industry_projection":
+            raise EventScanSourceError("unexpected static industry authority")
+        expected = ("dwd_company_industry_membership", "dwd_industry_node")
+        if self.source_tables != expected:
+            raise EventScanSourceError("DWD static industry source tables differ")
+        if self.sha256 is not None:
+            raise EventScanSourceError("DWD static industry projection must not bind legacy sha256")
 
-    def to_dict(self) -> dict[str, str]:
-        return {"version": self.version, "usage": self.usage, "sha256": self.sha256}
+    def to_dict(self) -> dict[str, object]:
+        if self.authority == "legacy_checksum_bound_reference":
+            assert self.sha256 is not None
+            return {"version": self.version, "usage": self.usage, "sha256": self.sha256}
+        return {
+            "version": self.version,
+            "usage": self.usage,
+            "authority": self.authority,
+            "source_tables": list(self.source_tables),
+        }
 
 
 @dataclass(frozen=True)
@@ -393,6 +416,7 @@ class EventScanSourcePolicy:
             "dwd_tradability_state",
             "dwd_price_limit_regime",
             "dwd_adjustment_factor",
+            *self.static_industry_reference.source_tables,
         }
         if not required.issubset(self.required_tables):
             missing = sorted(required.difference(self.required_tables))
@@ -539,9 +563,11 @@ def _validate_provider_config(policy: EventScanSourcePolicy, provider_path: Path
         provider.get("research_references"), "replay_provider.research_references"
     )
     industry = _mapping(references.get("industry_mapping"), "research_references.industry_mapping")
-    if industry.get("sha256") != policy.static_industry_reference.sha256:
+    if policy.static_industry_reference.sha256 is not None and (
+        industry.get("sha256") != policy.static_industry_reference.sha256
+    ):
         raise EventScanSourceError(
-            "P4 industry mapping digest differs from the direct DWD provider"
+            "P4 legacy industry mapping digest differs from the direct DWD provider"
         )
     materialization = _mapping(provider.get("materialization"), "replay_provider.materialization")
     if (
@@ -638,11 +664,25 @@ def load_event_scan_source_policy(
             )
         )
     static_industry = _mapping(raw["static_industry_reference"], "static_industry_reference")
-    _exact_keys(
-        static_industry,
-        {"version", "usage", "sha256"},
-        "static_industry_reference",
-    )
+    if set(static_industry) == {"version", "usage", "sha256"}:
+        static_industry_authority = "legacy_checksum_bound_reference"
+        static_industry_tables: tuple[str, ...] = ()
+        static_industry_sha256: str | None = _text(
+            static_industry["sha256"], "static_industry_reference.sha256"
+        )
+    else:
+        _exact_keys(
+            static_industry,
+            {"version", "usage", "authority", "source_tables"},
+            "static_industry_reference",
+        )
+        static_industry_authority = _text(
+            static_industry["authority"], "static_industry_reference.authority"
+        )
+        static_industry_tables = _unique_text_tuple(
+            static_industry["source_tables"], "static_industry_reference.source_tables"
+        )
+        static_industry_sha256 = None
     result = EventScanSourcePolicy(
         path=path.resolve(),
         schema_version=_text(raw["schema_version"], "schema_version"),
@@ -691,7 +731,9 @@ def load_event_scan_source_policy(
         static_industry_reference=StaticIndustryReference(
             version=_text(static_industry["version"], "static_industry_reference.version"),
             usage=_text(static_industry["usage"], "static_industry_reference.usage"),
-            sha256=_text(static_industry["sha256"], "static_industry_reference.sha256"),
+            authority=static_industry_authority,
+            source_tables=static_industry_tables,
+            sha256=static_industry_sha256,
         ),
         daily_increment_mode=_text(raw["daily_increment_mode"], "daily_increment_mode"),
         forbidden_sources=_unique_text_tuple(raw["forbidden_sources"], "forbidden_sources"),

@@ -1,7 +1,7 @@
 {
   "schema_version": "2.0.0",
   "policy_id": "p4-event-source.direct-dwd-v2.1-retrospective",
-  "policy_version": "2.0.0",
+  "policy_version": "2.1.0",
   "status": "approved_development_only",
   "authority": "direct_dwd_v2_1_plus_correction",
   "provider_config": "config/replay-data-provider.development.v2.json",
@@ -88,7 +88,11 @@
   "static_industry_reference": {
     "version": "static-level1-concentration-research-v1",
     "usage": "static_non_pit_concentration_only",
-    "sha256": "sha256:4ee486decef111c854576b74217a228015eb463b82efe87505c9715d4e70ca31"
+    "authority": "dwd_v2_1_static_company_industry_projection",
+    "source_tables": [
+      "dwd_company_industry_membership",
+      "dwd_industry_node"
+    ]
   },
   "daily_increment_mode": "disabled_for_initial_development_scan",
   "forbidden_sources": [
@@ -106,8 +110,10 @@
     "dwd_security_bar",
     "dwd_tradability_state",
     "dwd_price_limit_regime",
-    "dwd_adjustment_factor"
+    "dwd_adjustment_factor",
+    "dwd_company_industry_membership",
+    "dwd_industry_node"
   ],
   "decision_reference": "https://github.com/rv198-star/Quanthus/issues/74",
-  "semantic_digest": "sha256:3b4992128ee40f8896e8b703806ea19b67da71e2ce60567a5f95021ee9a64489"
+  "semantic_digest": "sha256:000bd6898903e87f55f3c5ca70f37afaa060029b464e379eead0884ca52a2d53"
 }

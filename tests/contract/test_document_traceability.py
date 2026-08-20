@@ -8,6 +8,7 @@ from quanthus.event_library.source import load_event_scan_source_policy
 from quanthus.event_library.splits import load_split_policy
 from quanthus.gates import load_gate_report, load_p2_gate_report, load_p3_gate_report
 from quanthus.policy import find_project_root
+from quanthus.research_adm import load_p4_research_adm_policy
 from scripts.sync_github_planning import CHAPTERS, work_items
 
 WORK_ITEM_ID_PATTERN = r"(?:META|P[1-7]|PK)-[A-Z0-9-]+-[0-9]{3}|[CS][0-9]+"
@@ -1011,10 +1012,14 @@ class DocumentTraceabilityTests(unittest.TestCase):
             release_path=root / "config" / "releases" / "v2-build202607.json",
             provider_path=root / "config" / "replay-data-provider.development.v2.json",
         )
+        adm = load_p4_research_adm_policy(root / "config" / "p4-research-adm.v1.json")
 
         self.assertIn("`dwd-base-202607-v2.1`", lld)
         self.assertIn("`p4-economic-availability-development-v1`", lld)
         self.assertIn("`src/quanthus/event_library/scan.py`", lld)
+        self.assertIn("P4 Research ADM", lld)
+        self.assertEqual(adm.adm_id, "p4-event-research-adm")
+        self.assertFalse(adm.execution_authorized)
         self.assertEqual(source.authority, "direct_dwd_v2_1_plus_correction")
         self.assertEqual(source.base_release.package_id, "dwd-base-202607-v2.1")
         self.assertEqual(
@@ -1078,6 +1083,20 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(source.semantic_digest, remediation)
         self.assertIn("53,527", remediation)
         self.assertIn("46,522", remediation)
+        adm_checkpoint_path = (
+            root / "docs" / "acceptance" / "p4-research-adm-consolidation-20260820.md"
+        )
+        self.assertTrue(adm_checkpoint_path.is_file())
+        adm_checkpoint = adm_checkpoint_path.read_text(encoding="utf-8")
+        self.assertIn(adm.semantic_digest, adm_checkpoint)
+        self.assertIn("historical_only=259", adm_checkpoint)
+        adm_adr = (
+            root
+            / "docs"
+            / "architecture"
+            / "adr-0013-p4-research-adm-and-legacy-ads-retirement.md"
+        )
+        self.assertTrue(adm_adr.is_file())
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

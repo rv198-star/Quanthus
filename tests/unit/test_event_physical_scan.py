@@ -17,9 +17,11 @@ from quanthus.contracts import SnapshotRef
 from quanthus.event_library.physical_scan import (
     PhysicalEventScanError,
     _audit_projection_static_industry_coverage,
+    _publish_package,
     iter_projected_candidate_series,
-    materialize_event_candidate_projection,
+    materialize_p4_research_adm,
     scan_event_candidate_projection,
+    verify_physical_event_scan,
 )
 from quanthus.event_library.rule_card import load_candidate_rule_card
 from quanthus.event_library.source import load_event_scan_source_policy
@@ -274,9 +276,9 @@ class EventPhysicalScanTests(unittest.TestCase):
         )
         return _Reader(paths), dwd_root
 
-    def test_materialized_projection_streams_into_real_scan_contract(self) -> None:
+    def test_materialized_adm_streams_into_real_scan_contract(self) -> None:
         reader, dwd_root = self._write_inputs()
-        projection = materialize_event_candidate_projection(
+        projection = materialize_p4_research_adm(
             reader=reader,  # type: ignore[arg-type]
             dwd_root=dwd_root,
             source_policy=self.source,
@@ -286,9 +288,13 @@ class EventPhysicalScanTests(unittest.TestCase):
                 "provider_config_digest": "sha256:" + "c" * 64,
                 "provider_lineage_digest": "sha256:" + "d" * 64,
             },
-            output_root=self.root / "projection",
+            output_root=self.root / "adm",
         )
         reader.snapshot_id = projection.snapshot_id
+        adm_manifest = json.loads(projection.manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(adm_manifest["schema_version"], "quanthus.p4-research-adm.v1")
+        self.assertEqual(adm_manifest["logical_layer"], "research_adm")
+        self.assertEqual(adm_manifest["adm_policy"]["adm_id"], "p4-event-research-adm")
         industry = projection.industry_mapping
         self.assertEqual(
             set(industry.by_security_id),
@@ -325,6 +331,50 @@ class EventPhysicalScanTests(unittest.TestCase):
         self.assertEqual(entries.executable_events, 1)
         self.assertEqual(entries.not_executable_events, 0)
         self.assertEqual(scan.candidates[0].record.identity.security_id, "opaque-security-001")
+
+    def test_event_package_binds_research_adm(self) -> None:
+        reader, dwd_root = self._write_inputs()
+        staging = self.root / "event-staging"
+        staging.mkdir()
+        adm = materialize_p4_research_adm(
+            reader=reader,  # type: ignore[arg-type]
+            dwd_root=dwd_root,
+            source_policy=self.source,
+            provider_identity={
+                "provider_id": "synthetic-direct-dwd",
+                "provider_version": "1.0.0",
+                "provider_config_digest": "sha256:" + "c" * 64,
+                "provider_lineage_digest": "sha256:" + "d" * 64,
+            },
+            output_root=staging / "adm",
+        )
+        reader.snapshot_id = adm.snapshot_id
+        scan, entries = scan_event_candidate_projection(
+            adm,
+            reader=reader,  # type: ignore[arg-type]
+            industry_mapping=adm.industry_mapping,
+            source_policy=self.source,
+            card=self.card,
+            split_policy=self.split,
+        )
+        result = _publish_package(
+            staging,
+            output=self.root / "event-library",
+            source_policy=self.source,
+            card=self.card,
+            split_policy=self.split,
+            projection=adm,
+            scan=scan,
+            entries=entries,
+            code_revision="synthetic-adm-test",
+        )
+
+        verified = verify_physical_event_scan(result.root)
+        manifest = json.loads((result.root / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["schema_version"], "quanthus.p4-event-library.v2")
+        self.assertEqual(manifest["adm"]["id"], "p4-event-research-adm")
+        self.assertTrue((result.root / "adm" / "adm.json").is_file())
+        self.assertEqual(verified.content_digest, result.content_digest)
 
     def test_static_industry_coverage_audit_classifies_current_and_historical_gaps(self) -> None:
         candidate_path = self.root / "candidate-audit.parquet"
@@ -472,7 +522,7 @@ class EventPhysicalScanTests(unittest.TestCase):
 
     def test_physical_scan_fails_when_static_industry_does_not_cover_trigger(self) -> None:
         reader, dwd_root = self._write_inputs()
-        projection = materialize_event_candidate_projection(
+        projection = materialize_p4_research_adm(
             reader=reader,  # type: ignore[arg-type]
             dwd_root=dwd_root,
             source_policy=self.source,
@@ -482,7 +532,7 @@ class EventPhysicalScanTests(unittest.TestCase):
                 "provider_config_digest": "sha256:" + "c" * 64,
                 "provider_lineage_digest": "sha256:" + "d" * 64,
             },
-            output_root=self.root / "projection-missing-industry",
+            output_root=self.root / "adm-missing-industry",
         )
         reader.snapshot_id = projection.snapshot_id
         unsigned = {

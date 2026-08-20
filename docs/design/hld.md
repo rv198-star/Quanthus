@@ -116,9 +116,11 @@ governed by ADR 0007:
 - Each acquisition node builds and notifies its own Base-seeded DWD increment. CN01 is the source
   for OCI's current DWD mirror; OCI pulls, deeply verifies, and atomically installs only that
   immutable DWD increment.
-- OCI does not currently acquire ODS or build generic DWS or ADS. The earlier epoch arbitration,
-  paired DWD/DWS publication, operational ADS, and release-set path are retained as historical
-  migration evidence under ADR 0005, not current operating authority.
+- OCI does not currently acquire ODS or build generic DWS or operational ADS. The earlier epoch
+  arbitration, paired DWD/DWS publication, operational ADS, and release-set path are retained as
+  historical migration evidence under ADR 0005, not current operating authority. New
+  application-specific research preparation uses the thin Research ADM boundary from ADR 0013;
+  no new current dataset is named ADS.
 - Canonical and derived artifacts are versioned Parquet with portable relative-path manifests.
   DuckDB, Polars, and PyArrow provide local query, typed transformation, and validation.
 - PostgreSQL remains an optional rebuildable serving projection. It is not canonical storage and
@@ -135,11 +137,13 @@ governance sidecar. Its manifest records 455,817,962 rows and 14,447,400,032 pay
 retained ten-dimension, thirteen-fact DWS constellation is demand-gated: it will be implemented
 only when a concrete cross-domain consumer requires it.
 
-P4 consumes an exact manifest-bound DWD snapshot directly and builds its own purpose-specific
-`event_library` projection. The event library is not generic DWS and does not reuse the retained
-strategy-specific ADS as its authority. P1/P2 replay likewise does not depend on PostgreSQL once
-bound to an accepted snapshot or self-contained research bundle. Notebooks never own canonical
-transformation or event-label logic.
+P4 consumes an exact manifest-bound DWD snapshot through one purpose-specific Research ADM. The
+ADM materializes candidate/eligibility rows, static non-PIT concentration membership, and coverage
+evidence; the Event Library then consumes that immutable ADM plus P1/P2 T+1 execution evidence.
+Neither layer is generic DWS, and neither reuses retained strategy-specific ADS as current
+authority. P1/P2 replay likewise does not depend on PostgreSQL once bound to an accepted snapshot
+or explicit historical reproduction bundle. Notebooks never own canonical transformation or
+event-label logic.
 
 ## 4. Canonical daily sequence
 

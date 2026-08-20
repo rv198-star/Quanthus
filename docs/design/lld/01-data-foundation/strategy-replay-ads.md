@@ -4,15 +4,17 @@
 | --- | --- |
 | Parent | `../01-data-foundation.md` |
 | Work item | `META-DATA-PIPE-003` |
-| Design status | approved |
-| Delivery gate | accepted-conditional for retained historical research exports; operational Base publication and sealed evaluation remain open |
+| Design status | superseded for current operation; retained reproduction contract |
+| Delivery gate | not-applicable to current P4; exact historical reproduction only |
 | Profile | `strategy_replay` |
 
 ## 1. Purpose and boundary
 
-This profile is the normal immutable input boundary for historical strategy replay. A research
-node receives one explicit bundle and needs no ODS, DWD/DWS, PostgreSQL, mutable `CURRENT`, or
-producer path. The bundle is research-only and cannot authorize an order, notification, or fill.
+This profile was the immutable input boundary for the retained P3/legacy historical strategy
+replays. It is no longer a current application-data boundary under ADR 0013. Use it only when an
+explicit exact historical reproduction requires one of the retained bundles. Current P4 research
+preparation uses the P4 Research ADM and must not fall back to these bundles. A retained bundle is
+research-only and cannot authorize an order, notification, or fill.
 
 The 2012-2025 bootstrap is assembled from accepted snapshot
 `p1-historical-replay-20260729-v1`. The additive 2026 research backfill is assembled from

@@ -10,9 +10,11 @@ from quanthus.event_library.contracts import (
 )
 from quanthus.event_library.physical_scan import (
     EventCandidateProjection,
+    P4ResearchADM,
     PhysicalEventScanError,
     PhysicalEventScanResult,
     build_physical_event_scan,
+    materialize_p4_research_adm,
     verify_physical_event_scan,
 )
 from quanthus.event_library.rule_card import (
@@ -69,6 +71,7 @@ __all__ = [
     "EventScanSourcePolicy",
     "HistoricalVisibilityPolicy",
     "ExecutableCandidate",
+    "P4ResearchADM",
     "PhysicalEventScanError",
     "PhysicalEventScanResult",
     "PartitionAccessError",
@@ -84,6 +87,7 @@ __all__ = [
     "load_candidate_rule_card",
     "load_event_scan_source_policy",
     "load_split_policy",
+    "materialize_p4_research_adm",
     "partition_executable_entries",
     "scan_forward_candidate_series",
     "scan_forward_candidates",

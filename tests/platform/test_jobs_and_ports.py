@@ -121,6 +121,19 @@ def test_public_failed_event_job_exposes_bounded_stderr(tmp_path, monkeypatch) -
         "P4 static industry coverage missing 17 isolated trigger securities\n",
         encoding="utf-8",
     )
+    audit_path = staging / "event-library" / "projection" / "static_industry_coverage_audit.json"
+    audit_path.parent.mkdir(parents=True)
+    audit = {
+        "schema_version": "quanthus.p4-static-industry-coverage-audit.v1",
+        "candidate_security_count": 100,
+        "mapped_security_count": 83,
+        "missing_security_count": 17,
+        "missing_current_listed": 2,
+        "missing_historical_only": 15,
+        "missing_reason_counts": {"no_company_industry_membership": 17},
+        "samples": [],
+    }
+    audit_path.write_text(json.dumps(audit), encoding="utf-8")
     monkeypatch.setattr("quanthus.platform.jobs.EVENT_RUN_ROOT", tmp_path)
     now = datetime.now(timezone.utc)
     job = JobRecord(
@@ -151,6 +164,7 @@ def test_public_failed_event_job_exposes_bounded_stderr(tmp_path, monkeypatch) -
         "status": "available",
         "stderr": "P4 static industry coverage missing 17 isolated trigger securities",
         "size_bytes": 67,
+        "static_industry_coverage_audit": audit,
     }
 
 

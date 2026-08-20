@@ -117,9 +117,13 @@ the security level. Static industry membership is intentionally applied only aft
 formation for concentration control and is keyed by the same governed DWD `security_id` used by
 event identity. A physical scan now fails closed if any isolated raw trigger lacks static-industry
 coverage; missing membership cannot silently turn a valid full-market trigger set into an empty or
-partial event library. The implementation reconciles evaluated rows, raw triggers, same-security
-isolation, deterministic concentration sampling, split rejection, and retained candidate events
-with zero unexplained loss. It does not accept returns, labels, fills, or post-T features.
+partial event library. Before the expensive forward scan, the physical path also audits industry
+coverage over the complete projected candidate-security universe and records a bounded
+`static_industry_coverage_audit.json`. Missing securities are classified by DWD source failure and
+by whether they still have a current listing; any full-universe gap fails closed before trigger
+scanning. The implementation reconciles evaluated rows, raw triggers, same-security isolation,
+deterministic concentration sampling, split rejection, and retained candidate events with zero
+unexplained loss. It does not accept returns, labels, fills, or post-T features.
 
 `src/quanthus/event_library/physical_scan.py` now implements the bounded physical path. It reuses
 the accepted Direct-DWD job-local provider, carries DWD internal security/listing/company identity,

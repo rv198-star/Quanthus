@@ -2,11 +2,13 @@
 
 | Field | Value |
 | --- | --- |
-| Evidence status | production defect confirmed; remediation implemented; rerun pending |
+| Evidence status | first identity defect remediated; replacement Run exposed second DWD industry-coverage gap; classified preflight pending production |
 | Evidence date | 2026-08-20 |
 | Work item | `P4-EVENT-002` / GitHub Issue #74 |
 | Negative production Run | `run_4609925c665c44ddaba56538565f7e08` |
 | Negative Run code revision | `2484766a12ff07ae4d8fed6d70ed427b2dfd2ca9` |
+| Coverage-gated replacement Run | `run_efa71da07add4c1d8ac9d95fc792aed6`; failed closed with 3,287 isolated events lacking industry coverage |
+| Replacement Run code revision | `61810840d34ded94973dfb1ee0efbb23f60a82d8` |
 | Candidate rule | `p4-event.price-volume-state-transition@1.0.0` |
 | Candidate digest | `sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50` |
 | Source policy after remediation | `p4-event-source.direct-dwd-v2.1-retrospective@2.1.0` |
@@ -81,3 +83,33 @@ Focused verification after the remediation:
 
 Repository-wide `make check`, merge, exact production Event Worker deployment, and replacement
 production A/B runs remain required before #74 can close.
+
+## 5. Second production finding and audit direction
+
+The first replacement production Run at source policy 2.1 did not reproduce the namespace defect.
+Instead, after 1 hour 41 minutes it failed at the new coverage gate with:
+
+```text
+P4 static industry projection does not cover all isolated candidates: missing=3287
+```
+
+This proves the DWD-native identity bridge is operating but the DWD static industry source does not
+cover the full historical candidate set. Repository data contracts independently explain why this
+is plausible: `dwd_company_industry_membership` contains 5,201 rows, exactly the audited count of
+**currently listed** SSE/SZSE securities, and its builder explicitly records
+`historical_backfill=false` / `first_defensible_industry_snapshot_only`. P4, by contrast, scans the
+2012-2021 historical market and therefore includes historical-only listing identities.
+
+A bounded preflight now runs immediately after candidate projection and before the expensive trigger
+scan. It records:
+
+- distinct projected security count and mapped count;
+- distinct missing security count;
+- missing current-listed versus historical-only listing counts;
+- source classification (`no_company_industry_membership`, missing node, unresolved level-one
+  parent, or unexpected mapping gap); and
+- at most 20 identity samples.
+
+The preflight is fail-closed and writes `projection/static_industry_coverage_audit.json` so a
+production failure can be diagnosed without another full 1.5-hour trigger scan. The next bounded
+production run is diagnostic evidence only; it cannot open Run B or close #74.

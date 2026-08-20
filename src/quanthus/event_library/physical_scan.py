@@ -305,6 +305,162 @@ def _materialize_dwd_static_industry_mapping(
     )
 
 
+def _audit_projection_static_industry_coverage(
+    *,
+    dwd_root: Path,
+    candidate_path: Path,
+    industry_mapping: StaticIndustryMapping,
+    output_path: Path,
+) -> dict[str, Any]:
+    """Classify DWD-static industry coverage over the full P4 candidate-security universe."""
+
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise PhysicalEventScanError("P4 static industry coverage audit requires duckdb") from exc
+
+    listing_expression = _read_parquet_expression(_table_paths(dwd_root, "dwd_listing"))
+    membership_expression = _read_parquet_expression(
+        _table_paths(dwd_root, "dwd_company_industry_membership")
+    )
+    node_expression = _read_parquet_expression(_table_paths(dwd_root, "dwd_industry_node"))
+    connection = duckdb.connect(":memory:")
+    try:
+        connection.execute("CREATE TABLE mapped_security(security_id VARCHAR PRIMARY KEY)")
+        connection.executemany(
+            "INSERT INTO mapped_security VALUES (?)",
+            [(security_id,) for security_id in sorted(industry_mapping.by_security_id)],
+        )
+        connection.execute(
+            f"""
+            CREATE VIEW audit_candidates AS
+            SELECT dwd_security_id,
+                   dwd_company_id,
+                   min(listing_code) AS listing_code
+            FROM read_parquet({_sql_path(candidate_path)})
+            GROUP BY dwd_security_id, dwd_company_id;
+
+            CREATE VIEW audit_membership AS
+            SELECT company_id, industry_node_id
+            FROM {membership_expression}
+            WHERE knowledge_to IS NULL
+              AND membership_type='PRIMARY_CLASSIFICATION';
+
+            CREATE VIEW audit_nodes AS
+            SELECT industry_node_id, parent_node_id, node_level
+            FROM {node_expression}
+            WHERE knowledge_to IS NULL;
+
+            CREATE VIEW audit_current_listing AS
+            SELECT DISTINCT security_id
+            FROM {listing_expression}
+            WHERE knowledge_to IS NULL
+              AND effective_to IS NULL;
+
+            CREATE VIEW audit_classified AS
+            SELECT candidate.dwd_security_id AS security_id,
+                   candidate.dwd_company_id AS company_id,
+                   candidate.listing_code,
+                   current_listing.security_id IS NOT NULL AS current_listing,
+                   CASE
+                     WHEN mapped.security_id IS NOT NULL THEN 'covered'
+                     WHEN membership.company_id IS NULL
+                       THEN 'no_company_industry_membership'
+                     WHEN node.industry_node_id IS NULL
+                       THEN 'industry_node_missing'
+                     WHEN node.node_level=1 THEN 'unexpected_mapping_gap'
+                     WHEN node.node_level=2
+                          AND (parent.industry_node_id IS NULL OR parent.node_level<>1)
+                       THEN 'level1_parent_unresolved'
+                     ELSE 'unexpected_mapping_gap'
+                   END AS coverage_reason
+            FROM audit_candidates candidate
+            LEFT JOIN mapped_security mapped
+              ON mapped.security_id=candidate.dwd_security_id
+            LEFT JOIN audit_membership membership
+              ON membership.company_id=candidate.dwd_company_id
+            LEFT JOIN audit_nodes node
+              ON node.industry_node_id=membership.industry_node_id
+            LEFT JOIN audit_nodes parent
+              ON parent.industry_node_id=node.parent_node_id
+            LEFT JOIN audit_current_listing current_listing
+              ON current_listing.security_id=candidate.dwd_security_id;
+            """
+        )
+        duplicate = connection.execute(
+            """
+            SELECT count(*) FROM (
+              SELECT security_id
+              FROM audit_classified
+              GROUP BY security_id
+              HAVING count(*) <> 1
+            )
+            """
+        ).fetchone()
+        if duplicate is None or int(duplicate[0]):
+            raise PhysicalEventScanError(
+                "P4 static industry coverage audit produced ambiguous security rows"
+            )
+        counts = connection.execute(
+            """
+            SELECT count(*) AS candidate_security_count,
+                   count(*) FILTER (WHERE coverage_reason='covered') AS mapped_security_count,
+                   count(*) FILTER (WHERE coverage_reason<>'covered') AS missing_security_count,
+                   count(*) FILTER (
+                     WHERE coverage_reason<>'covered' AND current_listing
+                   ) AS missing_current_listed,
+                   count(*) FILTER (
+                     WHERE coverage_reason<>'covered' AND NOT current_listing
+                   ) AS missing_historical_only
+            FROM audit_classified
+            """
+        ).fetchone()
+        if counts is None:
+            raise PhysicalEventScanError("P4 static industry coverage audit returned no counts")
+        reason_rows = connection.execute(
+            """
+            SELECT coverage_reason, count(*)
+            FROM audit_classified
+            WHERE coverage_reason<>'covered'
+            GROUP BY coverage_reason
+            ORDER BY coverage_reason
+            """
+        ).fetchall()
+        samples = connection.execute(
+            """
+            SELECT security_id, company_id, listing_code, current_listing, coverage_reason
+            FROM audit_classified
+            WHERE coverage_reason<>'covered'
+            ORDER BY current_listing DESC, listing_code, security_id
+            LIMIT 20
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    payload: dict[str, Any] = {
+        "schema_version": "quanthus.p4-static-industry-coverage-audit.v1",
+        "candidate_security_count": int(counts[0]),
+        "mapped_security_count": int(counts[1]),
+        "missing_security_count": int(counts[2]),
+        "missing_current_listed": int(counts[3]),
+        "missing_historical_only": int(counts[4]),
+        "missing_reason_counts": {str(reason): int(count) for reason, count in reason_rows},
+        "samples": [
+            {
+                "security_id": str(security_id),
+                "company_id": str(company_id),
+                "listing_code": str(listing_code),
+                "current_listing": bool(current_listing),
+                "coverage_reason": str(reason),
+            }
+            for security_id, company_id, listing_code, current_listing, reason in samples
+        ],
+    }
+    _write_json(output_path, payload)
+    return payload
+
+
 def _projection_identity(
     *,
     source_policy: EventScanSourcePolicy,
@@ -493,6 +649,25 @@ def materialize_event_candidate_projection(
         source_policy=source_policy,
         output_path=output_root / "static_industry_mapping.json",
     )
+    coverage_audit = _audit_projection_static_industry_coverage(
+        dwd_root=dwd_root,
+        candidate_path=candidate_path,
+        industry_mapping=industry_mapping,
+        output_path=output_root / "static_industry_coverage_audit.json",
+    )
+    missing_security_count = int(coverage_audit["missing_security_count"])
+    if missing_security_count:
+        reason_text = ",".join(
+            f"{reason}:{count}"
+            for reason, count in sorted(coverage_audit["missing_reason_counts"].items())
+        )
+        raise PhysicalEventScanError(
+            "P4 static industry projection does not cover full candidate-security universe: "
+            f"missing_securities={missing_security_count} "
+            f"current_listed={coverage_audit['missing_current_listed']} "
+            f"historical_only={coverage_audit['missing_historical_only']} "
+            f"reasons={reason_text}"
+        )
     identity = _projection_identity(
         source_policy=source_policy,
         provider_identity=provider_identity,

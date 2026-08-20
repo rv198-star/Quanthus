@@ -9,6 +9,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Protocol
 
 from quanthus.platform.models import JobRecord
@@ -19,6 +20,8 @@ ATTRIBUTION_VERIFICATION_JOB = "quanthus.attribution.verify.v1"
 CANDIDATE_REPLAY_JOB = "quanthus.candidate-replay.v1"
 EXPERT_EVALUATION_JOB = "quanthus.expert-evaluation.v1"
 P4_EVENT_SCAN_JOB = "quanthus.p4-event-scan.v1"
+EVENT_RUN_ROOT = Path("/data/event-runs")
+EVENT_SUMMARY_MAX_BYTES = 1024 * 1024
 
 
 class JobNotCancelableError(RuntimeError):
@@ -59,8 +62,68 @@ def expert_evaluation_submission(
     return canonical, parsed.idempotency_key, concurrency_key
 
 
-def public_job(job: JobRecord) -> dict[str, Any]:
+def _event_scan_summary(job: JobRecord) -> dict[str, Any] | None:
+    if job.kind != P4_EVENT_SCAN_JOB or job.state != "succeeded" or not job.result_ref:
+        return None
+    artifact = job.result_ref.get("artifact_ref")
+    if not isinstance(artifact, str):
+        return None
+    try:
+        root = EVENT_RUN_ROOT.resolve()
+        run = Path(artifact).resolve()
+    except OSError:
+        return None
+    if run == root or root not in run.parents:
+        return None
+    summary_path = run / "event-library" / "summary.json"
+    try:
+        if not summary_path.is_file() or summary_path.stat().st_size > EVENT_SUMMARY_MAX_BYTES:
+            return None
+        raw = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    counters = raw.get("scan_counters")
+    if not isinstance(counters, dict):
+        return None
+    expected = {
+        "evaluated_rows",
+        "raw_triggers",
+        "isolated_candidates",
+        "concentration_retained",
+        "candidate_events",
+        "reason_counts",
+    }
+    if set(counters) != expected:
+        return None
+    reason_counts = counters.get("reason_counts")
+    if not isinstance(reason_counts, dict) or any(
+        not isinstance(key, str)
+        or not isinstance(value, int)
+        or isinstance(value, bool)
+        or value < 0
+        for key, value in reason_counts.items()
+    ):
+        return None
+    for field in expected - {"reason_counts"}:
+        value = counters.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            return None
     return {
+        "scan_counters": {
+            "evaluated_rows": counters["evaluated_rows"],
+            "raw_triggers": counters["raw_triggers"],
+            "isolated_candidates": counters["isolated_candidates"],
+            "concentration_retained": counters["concentration_retained"],
+            "candidate_events": counters["candidate_events"],
+            "reason_counts": dict(sorted(reason_counts.items())),
+        }
+    }
+
+
+def public_job(job: JobRecord) -> dict[str, Any]:
+    value = {
         "job_id": job.job_id,
         "kind": job.kind,
         "actor_user_id": job.actor_user_id,
@@ -88,6 +151,10 @@ def public_job(job: JobRecord) -> dict[str, Any]:
             job.cancel_requested_at.isoformat() if job.cancel_requested_at else None
         ),
     }
+    event_summary = _event_scan_summary(job)
+    if event_summary is not None:
+        value["event_scan_summary"] = event_summary
+    return value
 
 
 class LocalJobRunner:

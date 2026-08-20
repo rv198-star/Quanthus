@@ -1,15 +1,132 @@
 from __future__ import annotations
 
+import json
 import threading
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 from quanthus.platform.jobs import (
     ATTRIBUTION_VERIFICATION_JOB,
+    P4_EVENT_SCAN_JOB,
     JobNotCancelableError,
     LocalJobRunner,
+    public_job,
 )
+from quanthus.platform.models import JobRecord
 from quanthus.platform.persistence import InMemoryPlatformStore
+
+
+def test_public_event_job_exposes_bounded_scan_counters(tmp_path, monkeypatch) -> None:
+    run = tmp_path / "runs" / "run_test"
+    event_library = run / "event-library"
+    event_library.mkdir(parents=True)
+    (event_library / "summary.json").write_text(
+        json.dumps(
+            {
+                "scan_counters": {
+                    "evaluated_rows": 100,
+                    "raw_triggers": 7,
+                    "isolated_candidates": 6,
+                    "concentration_retained": 4,
+                    "candidate_events": 3,
+                    "reason_counts": {
+                        "not_triggered": 93,
+                        "same_security_isolation": 1,
+                        "static_industry_missing": 2,
+                        "split_policy_rejected": 1,
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("quanthus.platform.jobs.EVENT_RUN_ROOT", tmp_path)
+    now = datetime.now(timezone.utc)
+    job = JobRecord(
+        job_id="job_0123456789abcdef0123456789abcdef",
+        kind=P4_EVENT_SCAN_JOB,
+        actor_user_id="usr_test",
+        idempotency_key="event-summary-test",
+        input_ref={},
+        input_digest="sha256:test",
+        queue="event",
+        concurrency_key="p4-event-scan:test",
+        state="succeeded",
+        stage="succeeded",
+        progress=100,
+        progress_detail={"candidate_events": 3},
+        cancel_requested=False,
+        attempt=1,
+        result_ref={"artifact_ref": str(run), "run_id": "run_test"},
+        error_reason=None,
+        created_at=now,
+        updated_at=now,
+        started_at=now,
+        completed_at=now,
+    )
+
+    public = public_job(job)
+
+    assert public["event_scan_summary"] == {
+        "scan_counters": {
+            "evaluated_rows": 100,
+            "raw_triggers": 7,
+            "isolated_candidates": 6,
+            "concentration_retained": 4,
+            "candidate_events": 3,
+            "reason_counts": {
+                "not_triggered": 93,
+                "same_security_isolation": 1,
+                "split_policy_rejected": 1,
+                "static_industry_missing": 2,
+            },
+        }
+    }
+
+
+def test_public_event_job_does_not_read_summary_outside_event_root(tmp_path, monkeypatch) -> None:
+    outside = tmp_path.parent / "outside-event-run-test"
+    event_library = outside / "event-library"
+    event_library.mkdir(parents=True, exist_ok=True)
+    (event_library / "summary.json").write_text(
+        json.dumps(
+            {
+                "scan_counters": {
+                    "evaluated_rows": 1,
+                    "raw_triggers": 1,
+                    "isolated_candidates": 1,
+                    "concentration_retained": 1,
+                    "candidate_events": 1,
+                    "reason_counts": {},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("quanthus.platform.jobs.EVENT_RUN_ROOT", tmp_path)
+    now = datetime.now(timezone.utc)
+    job = JobRecord(
+        job_id="job_fedcba9876543210fedcba9876543210",
+        kind=P4_EVENT_SCAN_JOB,
+        actor_user_id="usr_test",
+        idempotency_key="event-summary-path-test",
+        input_ref={},
+        input_digest="sha256:test",
+        queue="event",
+        concurrency_key="p4-event-scan:test",
+        state="succeeded",
+        stage="succeeded",
+        progress=100,
+        cancel_requested=False,
+        attempt=1,
+        result_ref={"artifact_ref": str(outside), "run_id": "run_test"},
+        error_reason=None,
+        created_at=now,
+        updated_at=now,
+    )
+
+    assert "event_scan_summary" not in public_job(job)
 
 
 def test_gate_query_returns_versioned_repository_facts(kernel) -> None:

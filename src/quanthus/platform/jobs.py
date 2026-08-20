@@ -22,6 +22,11 @@ EXPERT_EVALUATION_JOB = "quanthus.expert-evaluation.v1"
 P4_EVENT_SCAN_JOB = "quanthus.p4-event-scan.v1"
 EVENT_RUN_ROOT = Path("/data/event-runs")
 EVENT_SUMMARY_MAX_BYTES = 1024 * 1024
+P4_INDUSTRY_MAPPING_PATH = Path(
+    "/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1/"
+    "tables/static_industry_mapping.json"
+)
+P4_INDUSTRY_MAPPING_MAX_BYTES = 8 * 1024 * 1024
 
 
 class JobNotCancelableError(RuntimeError):
@@ -60,6 +65,49 @@ def expert_evaluation_submission(
         raise RuntimeError("expert evaluation digest implementations differ")
     concurrency_key = f"expert-evaluation:{parsed.input_digest[7:]}"
     return canonical, parsed.idempotency_key, concurrency_key
+
+
+def _industry_mapping_identity_summary() -> dict[str, Any]:
+    path = P4_INDUSTRY_MAPPING_PATH
+    try:
+        if not path.is_file():
+            return {"status": "mapping_missing"}
+        if path.stat().st_size > P4_INDUSTRY_MAPPING_MAX_BYTES:
+            return {"status": "mapping_too_large"}
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except OSError:
+        return {"status": "mapping_unreadable"}
+    except json.JSONDecodeError:
+        return {"status": "mapping_invalid_json"}
+    if not isinstance(raw, dict) or not isinstance(raw.get("memberships"), list):
+        return {"status": "mapping_schema_invalid"}
+    memberships = raw["memberships"]
+    if len(memberships) > 10000:
+        return {"status": "mapping_membership_limit_exceeded"}
+    counts = {
+        "dwd_governed_security_id": 0,
+        "exchange_prefixed_security_id": 0,
+        "plain_six_digit_security_id": 0,
+        "other_security_id": 0,
+    }
+    for item in memberships:
+        if not isinstance(item, dict) or not isinstance(item.get("security_id"), str):
+            return {"status": "mapping_membership_invalid"}
+        security_id = item["security_id"]
+        if security_id.startswith("security_"):
+            counts["dwd_governed_security_id"] += 1
+        elif security_id.startswith(("SSE-", "SZSE-", "BSE-")):
+            counts["exchange_prefixed_security_id"] += 1
+        elif len(security_id) == 6 and security_id.isdigit():
+            counts["plain_six_digit_security_id"] += 1
+        else:
+            counts["other_security_id"] += 1
+    return {
+        "status": "available",
+        "mapping_version": raw.get("mapping_version"),
+        "membership_count": len(memberships),
+        "security_id_namespace_counts": counts,
+    }
 
 
 def _event_scan_summary(job: JobRecord) -> dict[str, Any] | None:
@@ -118,6 +166,7 @@ def _event_scan_summary(job: JobRecord) -> dict[str, Any] | None:
             return {"status": "scan_counter_value_invalid"}
     return {
         "status": "available",
+        "industry_mapping_identity": _industry_mapping_identity_summary(),
         "scan_counters": {
             "evaluated_rows": counters["evaluated_rows"],
             "raw_triggers": counters["raw_triggers"],

@@ -47,6 +47,7 @@ services:
       - ${QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT:?required}:/data/attribution-releases:ro
       - quanthus-candidate-runs:/data/candidate-runs:ro
       - quanthus-event-runs:/data/event-runs:ro
+      - /srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:ro
 
   replay-worker:
     image: ${QUANTHUS_REPLAY_IMAGE:-quanthus-replay:local}

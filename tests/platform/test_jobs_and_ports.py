@@ -41,7 +41,23 @@ def test_public_event_job_exposes_bounded_scan_counters(tmp_path, monkeypatch) -
         ),
         encoding="utf-8",
     )
+    mapping_path = tmp_path / "static_industry_mapping.json"
+    mapping_path.write_text(
+        json.dumps(
+            {
+                "mapping_version": "static-level1-concentration-research-v1",
+                "memberships": [
+                    {"security_id": "SZSE-000001"},
+                    {"security_id": "600001"},
+                    {"security_id": "security_abc123"},
+                    {"security_id": "legacy-other"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr("quanthus.platform.jobs.EVENT_RUN_ROOT", tmp_path)
+    monkeypatch.setattr("quanthus.platform.jobs.P4_INDUSTRY_MAPPING_PATH", mapping_path)
     now = datetime.now(timezone.utc)
     job = JobRecord(
         job_id="job_0123456789abcdef0123456789abcdef",
@@ -70,6 +86,17 @@ def test_public_event_job_exposes_bounded_scan_counters(tmp_path, monkeypatch) -
 
     assert public["event_scan_summary"] == {
         "status": "available",
+        "industry_mapping_identity": {
+            "status": "available",
+            "mapping_version": "static-level1-concentration-research-v1",
+            "membership_count": 4,
+            "security_id_namespace_counts": {
+                "dwd_governed_security_id": 1,
+                "exchange_prefixed_security_id": 1,
+                "plain_six_digit_security_id": 1,
+                "other_security_id": 1,
+            },
+        },
         "scan_counters": {
             "evaluated_rows": 100,
             "raw_triggers": 7,

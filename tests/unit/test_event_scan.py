@@ -14,6 +14,7 @@ from quanthus.event_library.scan import (
     CandidateDailyInput,
     CandidateEntryEvidence,
     CandidateReason,
+    CandidateScanError,
     EntryStatus,
     partition_executable_entries,
     scan_forward_candidate_series,
@@ -124,7 +125,13 @@ def _scan(rows: list[CandidateDailyInput]):
     )
 
 
-def _entry_evidence(candidate, *, state: str) -> CandidateEntryEvidence:
+def _entry_evidence(
+    candidate,
+    *,
+    state: str,
+    source_snapshot_id: str | None = None,
+    candidate_snapshot_id: str | None = None,
+) -> CandidateEntryEvidence:
     entry_date = candidate.entry_date
     open_at = datetime.combine(entry_date, time(9, 30), SHANGHAI)
     close_at = datetime.combine(entry_date, time(15, 0), SHANGHAI)
@@ -132,7 +139,10 @@ def _entry_evidence(candidate, *, state: str) -> CandidateEntryEvidence:
         market_date=entry_date,
         knowledge_cutoff=close_at,
         source_revision="synthetic-entry-v1",
-        snapshot_id=SNAPSHOT_ID,
+        snapshot_id=(
+            source_snapshot_id
+            or f"synthetic-source.execution.{entry_date.strftime('%Y%m%d')}"
+        ),
     )
     if state == "suspended":
         evidence = P1DailyExecutionEvidence(
@@ -173,6 +183,7 @@ def _entry_evidence(candidate, *, state: str) -> CandidateEntryEvidence:
         )
     return CandidateEntryEvidence(
         event_id=candidate.event_id,
+        candidate_snapshot_id=(candidate_snapshot_id or candidate.record.identity.snapshot_id),
         evidence=evidence,
         evidence_digest=sha256_digest(
             {"event_id": candidate.event_id, "state": state}
@@ -340,6 +351,24 @@ class EventForwardScanTests(unittest.TestCase):
         self.assertEqual(executable.executable_events, 1)
         self.assertEqual(executable.records[0].status, EntryStatus.EXECUTABLE)
         self.assertEqual(executable.records[0].reason_code, "executable_at_t_plus_1_open")
+        self.assertNotEqual(
+            executable.records[0].entry_source_snapshot_id,
+            candidate.record.identity.snapshot_id,
+        )
+
+        mismatched_binding = _entry_evidence(
+            candidate,
+            state="normal",
+            candidate_snapshot_id="different-adm-snapshot",
+        )
+        with self.assertRaisesRegex(
+            CandidateScanError,
+            "entry evidence candidate snapshot binding differs",
+        ):
+            partition_executable_entries(
+                (candidate,),
+                evidence_by_event_id={candidate.event_id: mismatched_binding},
+            )
 
         limit_up = _entry_evidence(candidate, state="limit_up")
         blocked = partition_executable_entries(

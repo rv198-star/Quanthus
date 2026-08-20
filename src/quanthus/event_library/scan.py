@@ -298,12 +298,14 @@ class CandidateScanResult:
 @dataclass(frozen=True)
 class CandidateEntryEvidence:
     event_id: str
+    candidate_snapshot_id: str
     evidence: P1DailyExecutionEvidence
     evidence_digest: str
     matcher_policy_version: str
 
     def __post_init__(self) -> None:
         _require_text(self.event_id, "event_id")
+        _require_text(self.candidate_snapshot_id, "candidate_snapshot_id")
         require_sha256_digest(self.evidence_digest, "entry evidence digest")
         _require_text(self.matcher_policy_version, "matcher_policy_version")
 
@@ -316,11 +318,14 @@ class ExecutableCandidate:
     open_execution_state: OpenExecutionState
     entry_open_price: Decimal | None
     entry_evidence_digest: str
+    entry_source_snapshot_id: str | None
     matcher_policy_version: str
 
     def __post_init__(self) -> None:
         _require_text(self.reason_code, "reason_code")
         require_sha256_digest(self.entry_evidence_digest, "entry_evidence_digest")
+        if self.entry_source_snapshot_id is not None:
+            _require_text(self.entry_source_snapshot_id, "entry_source_snapshot_id")
         _require_text(self.matcher_policy_version, "matcher_policy_version")
         if self.status is EntryStatus.EXECUTABLE:
             if self.entry_open_price is None:
@@ -856,6 +861,7 @@ def partition_executable_entries(
                             "reason_code": "missing_execution_evidence",
                         }
                     ),
+                    entry_source_snapshot_id=None,
                     matcher_policy_version="p2-daily-research-v1",
                 )
             )
@@ -866,8 +872,8 @@ def partition_executable_entries(
         evidence = binding.evidence
         if evidence.snapshot.market_date != candidate.entry_date:
             raise CandidateScanError("entry evidence does not belong to the candidate T+1 date")
-        if evidence.snapshot.snapshot_id != candidate.record.identity.snapshot_id:
-            raise CandidateScanError("entry evidence snapshot differs from candidate snapshot")
+        if binding.candidate_snapshot_id != candidate.record.identity.snapshot_id:
+            raise CandidateScanError("entry evidence candidate snapshot binding differs")
         if evidence.security_code != candidate.listing_code:
             raise CandidateScanError("entry evidence security code differs from candidate listing")
         session = market_session_from_p1(evidence)
@@ -892,6 +898,7 @@ def partition_executable_entries(
                 open_execution_state=session.open_execution_state,
                 entry_open_price=entry_price,
                 entry_evidence_digest=binding.evidence_digest,
+                entry_source_snapshot_id=evidence.snapshot.snapshot_id,
                 matcher_policy_version=binding.matcher_policy_version,
             )
         )

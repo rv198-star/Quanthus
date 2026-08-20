@@ -217,12 +217,14 @@ class EventPhysicalScanTests(unittest.TestCase):
                     {
                         "industry_node_id": "industry-level1",
                         "parent_node_id": None,
+                        "node_code": "A",
                         "node_level": 1,
                         "knowledge_to": None,
                     },
                     {
                         "industry_node_id": "industry-leaf",
                         "parent_node_id": "industry-level1",
+                        "node_code": "A01",
                         "node_level": 2,
                         "knowledge_to": None,
                     },
@@ -426,12 +428,14 @@ class EventPhysicalScanTests(unittest.TestCase):
                     {
                         "industry_node_id": "industry-level1",
                         "parent_node_id": None,
+                        "node_code": "A",
                         "node_level": 1,
                         "knowledge_to": None,
                     },
                     {
                         "industry_node_id": "industry-leaf",
                         "parent_node_id": "industry-level1",
+                        "node_code": "A01",
                         "node_level": 2,
                         "knowledge_to": None,
                     },

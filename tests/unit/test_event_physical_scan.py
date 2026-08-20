@@ -16,6 +16,7 @@ from quanthus.backtest.inputs import CoverageStatus, P1DailyExecutionEvidence
 from quanthus.contracts import SnapshotRef
 from quanthus.event_library.physical_scan import (
     PhysicalEventScanError,
+    _audit_projection_static_industry_coverage,
     iter_projected_candidate_series,
     materialize_event_candidate_projection,
     scan_event_candidate_projection,
@@ -244,8 +245,22 @@ class EventPhysicalScanTests(unittest.TestCase):
             ),
             membership_path,
         )
+        listing_path = dwd_root / "payload/listed_company/dwd_listing.parquet"
+        listing_path.parent.mkdir(parents=True)
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "security_id": "opaque-security-001",
+                        "knowledge_to": None,
+                        "effective_to": None,
+                    }
+                ]
+            ),
+            listing_path,
+        )
         manifest_files = []
-        for path in (factor_path, node_path, membership_path):
+        for path in (factor_path, node_path, membership_path, listing_path):
             manifest_files.append(
                 {
                     "path": path.relative_to(dwd_root).as_posix(),
@@ -310,6 +325,150 @@ class EventPhysicalScanTests(unittest.TestCase):
         self.assertEqual(entries.executable_events, 1)
         self.assertEqual(entries.not_executable_events, 0)
         self.assertEqual(scan.candidates[0].record.identity.security_id, "opaque-security-001")
+
+    def test_static_industry_coverage_audit_classifies_current_and_historical_gaps(self) -> None:
+        candidate_path = self.root / "candidate-audit.parquet"
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "dwd_security_id": "security-covered",
+                        "dwd_company_id": "company-covered",
+                        "listing_code": "600001",
+                    },
+                    {
+                        "dwd_security_id": "security-current-gap",
+                        "dwd_company_id": "company-current-gap",
+                        "listing_code": "600002",
+                    },
+                    {
+                        "dwd_security_id": "security-historical-gap",
+                        "dwd_company_id": "company-historical-gap",
+                        "listing_code": "600003",
+                    },
+                ]
+            ),
+            candidate_path,
+        )
+        dwd_root = self.root / "dwd-audit"
+        membership_path = (
+            dwd_root
+            / "payload/industry_classification/dwd_company_industry_membership.parquet"
+        )
+        membership_path.parent.mkdir(parents=True)
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "company_id": "company-covered",
+                        "industry_node_id": "industry-leaf",
+                        "membership_type": "PRIMARY_CLASSIFICATION",
+                        "knowledge_to": None,
+                    }
+                ]
+            ),
+            membership_path,
+        )
+        node_path = dwd_root / "payload/industry_classification/dwd_industry_node.parquet"
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "industry_node_id": "industry-level1",
+                        "parent_node_id": None,
+                        "node_level": 1,
+                        "knowledge_to": None,
+                    },
+                    {
+                        "industry_node_id": "industry-leaf",
+                        "parent_node_id": "industry-level1",
+                        "node_level": 2,
+                        "knowledge_to": None,
+                    },
+                ]
+            ),
+            node_path,
+        )
+        listing_path = dwd_root / "payload/listed_company/dwd_listing.parquet"
+        listing_path.parent.mkdir(parents=True)
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "security_id": "security-covered",
+                        "knowledge_to": None,
+                        "effective_to": None,
+                    },
+                    {
+                        "security_id": "security-current-gap",
+                        "knowledge_to": None,
+                        "effective_to": None,
+                    },
+                    {
+                        "security_id": "security-historical-gap",
+                        "knowledge_to": None,
+                        "effective_to": datetime(2020, 1, 1, tzinfo=UTC),
+                    },
+                ]
+            ),
+            listing_path,
+        )
+        files = []
+        for path in (membership_path, node_path, listing_path):
+            files.append(
+                {
+                    "path": path.relative_to(dwd_root).as_posix(),
+                    "sha256": "sha256:" + "f" * 64,
+                    "size_bytes": path.stat().st_size,
+                }
+            )
+        (dwd_root / "manifest.json").write_text(
+            json.dumps({"files": files}), encoding="utf-8"
+        )
+        unsigned = {
+            "schema_version": "1.0.0",
+            "mapping_version": "static-level1-concentration-research-v1",
+            "usage": "static_non_pit_concentration_only",
+            "source": {
+                "provider": "synthetic",
+                "endpoint": "fixture://coverage-audit",
+                "retrieved_at": "2026-08-20T00:00:00+00:00",
+                "source_revision": "synthetic-v1",
+            },
+            "memberships": [
+                {
+                    "security_id": "security-covered",
+                    "stock_code": "600001",
+                    "exchange": "SSE",
+                    "level1_industry_id": "industry-level1",
+                }
+            ],
+        }
+        mapping_path = self.root / "audit-industry.json"
+        mapping_path.write_text(
+            json.dumps({**unsigned, "artifact_digest": _digest(unsigned)}),
+            encoding="utf-8",
+        )
+        mapping = load_static_industry_mapping(
+            mapping_path,
+            expected_version="static-level1-concentration-research-v1",
+        )
+
+        audit = _audit_projection_static_industry_coverage(
+            dwd_root=dwd_root,
+            candidate_path=candidate_path,
+            industry_mapping=mapping,
+            output_path=self.root / "coverage-audit.json",
+        )
+
+        self.assertEqual(audit["candidate_security_count"], 3)
+        self.assertEqual(audit["mapped_security_count"], 1)
+        self.assertEqual(audit["missing_security_count"], 2)
+        self.assertEqual(audit["missing_current_listed"], 1)
+        self.assertEqual(audit["missing_historical_only"], 1)
+        self.assertEqual(
+            audit["missing_reason_counts"], {"no_company_industry_membership": 2}
+        )
 
     def test_physical_scan_fails_when_static_industry_does_not_cover_trigger(self) -> None:
         reader, dwd_root = self._write_inputs()

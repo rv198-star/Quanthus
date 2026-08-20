@@ -23,6 +23,7 @@ P4_EVENT_SCAN_JOB = "quanthus.p4-event-scan.v1"
 EVENT_RUN_ROOT = Path("/data/event-runs")
 EVENT_SUMMARY_MAX_BYTES = 1024 * 1024
 EVENT_FAILURE_LOG_MAX_BYTES = 64 * 1024
+EVENT_FAILURE_AUDIT_MAX_BYTES = 256 * 1024
 P4_INDUSTRY_MAPPING_PATH = Path(
     "/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1/"
     "tables/static_industry_mapping.json"
@@ -134,11 +135,22 @@ def _event_scan_failure(job: JobRecord) -> dict[str, Any] | None:
         stderr = stderr_path.read_text(encoding="utf-8", errors="replace").strip()
     except OSError:
         return {"status": "stderr_unreadable"}
-    return {
+    response: dict[str, Any] = {
         "status": "available",
         "stderr": stderr,
         "size_bytes": size,
     }
+    audit_path = staging / "event-library" / "projection" / "static_industry_coverage_audit.json"
+    try:
+        if audit_path.is_file() and audit_path.stat().st_size <= EVENT_FAILURE_AUDIT_MAX_BYTES:
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            if isinstance(audit, dict) and audit.get("schema_version") == (
+                "quanthus.p4-static-industry-coverage-audit.v1"
+            ):
+                response["static_industry_coverage_audit"] = audit
+    except (OSError, json.JSONDecodeError):
+        pass
+    return response
 
 
 def _event_scan_summary(job: JobRecord) -> dict[str, Any] | None:

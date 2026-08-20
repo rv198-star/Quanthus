@@ -251,9 +251,29 @@ class CandidateScanCounters:
 
 
 @dataclass(frozen=True)
+class CandidateIndustryGap:
+    security_id: str
+    listing_id: str
+    listing_code: str
+    company_id: str
+    isolated_event_count: int
+
+    def __post_init__(self) -> None:
+        for field_name in ("security_id", "listing_id", "listing_code", "company_id"):
+            _require_text(getattr(self, field_name), field_name)
+        if (
+            not isinstance(self.isolated_event_count, int)
+            or isinstance(self.isolated_event_count, bool)
+            or self.isolated_event_count <= 0
+        ):
+            raise CandidateScanError("industry-gap event count must be a positive integer")
+
+
+@dataclass(frozen=True)
 class CandidateScanResult:
     candidates: tuple[ScannedCandidate, ...]
     counters: CandidateScanCounters
+    industry_gaps: tuple[CandidateIndustryGap, ...] = ()
 
     def __post_init__(self) -> None:
         event_ids = [candidate.event_id for candidate in self.candidates]
@@ -261,6 +281,18 @@ class CandidateScanResult:
             raise CandidateScanError("candidate scan contains duplicate event ids")
         if len(self.candidates) != self.counters.candidate_events:
             raise CandidateScanError("candidate count differs from reconciliation counters")
+        gap_keys = [
+            (item.security_id, item.listing_id, item.listing_code, item.company_id)
+            for item in self.industry_gaps
+        ]
+        if len(gap_keys) != len(set(gap_keys)):
+            raise CandidateScanError("industry-gap identities must be unique")
+        gap_event_count = sum(item.isolated_event_count for item in self.industry_gaps)
+        expected_gap_events = self.counters.reason_counts.get(
+            CandidateReason.STATIC_INDUSTRY_MISSING.value, 0
+        )
+        if gap_event_count != expected_gap_events:
+            raise CandidateScanError("industry-gap diagnostics do not reconcile")
 
 
 @dataclass(frozen=True)
@@ -571,9 +603,18 @@ def _finalize_raw_candidates(
         isolated.append(candidate)
 
     concentration_pool: list[_RawCandidate] = []
+    industry_gap_counts: Counter[tuple[str, str, str, str]] = Counter()
     for candidate in isolated:
         if candidate.industry_id is None or not candidate.industry_id.strip():
             reasons[CandidateReason.STATIC_INDUSTRY_MISSING.value] += 1
+            industry_gap_counts[
+                (
+                    candidate.security_id,
+                    candidate.listing_id,
+                    candidate.listing_code,
+                    candidate.company_id,
+                )
+            ] += 1
             continue
         concentration_pool.append(candidate)
 
@@ -678,6 +719,18 @@ def _finalize_raw_candidates(
             )
         ),
         counters=counters,
+        industry_gaps=tuple(
+            CandidateIndustryGap(
+                security_id=security_id,
+                listing_id=listing_id,
+                listing_code=listing_code,
+                company_id=company_id,
+                isolated_event_count=count,
+            )
+            for (security_id, listing_id, listing_code, company_id), count in sorted(
+                industry_gap_counts.items()
+            )
+        ),
     )
 
 

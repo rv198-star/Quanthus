@@ -73,7 +73,7 @@ already-admitted `baostock.query_stock_industry` provider at fixed dates `2021-0
 three empty legacy rows, `2012-12-31`. All selected rows must report `证监会行业分类`; legacy names
 map deterministically and uniquely into the checksum-bound CSRC-2012 hierarchy. The complete 259-row
 selection is frozen at source-content digest
-`sha256:609fe99ea5eb2d29237a5c0112779ae58491270a80f390f099fb798de07382c9`.
+`sha256:20b51d52070b8976f9f8989ff0f54124aea098ca749167bedbddbed947c3196b`.
 
 The supplement:
 

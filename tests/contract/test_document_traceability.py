@@ -1095,9 +1095,25 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(supplement_path.is_file())
         supplement = supplement_path.read_text(encoding="utf-8")
         self.assertIn(source.semantic_digest, supplement)
-        self.assertIn(adm.semantic_digest, supplement)
-        self.assertIn(adm.historical_industry_reference.source_content_digest, supplement)
+        self.assertIn(
+            "sha256:ace9e9a864e143f6b37bdea7539d83114d2d0102e6acd4def4865441f316213c",
+            supplement,
+        )
+        self.assertIn(
+            "sha256:609fe99ea5eb2d29237a5c0112779ae58491270a80f390f099fb798de07382c9",
+            supplement,
+        )
         self.assertIn("259 / 259", supplement.replace("259/259", "259 / 259"))
+        correction_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-research-adm-industry-source-digest-correction-20260820.md"
+        )
+        self.assertTrue(correction_path.is_file())
+        correction = correction_path.read_text(encoding="utf-8")
+        self.assertIn(adm.semantic_digest, correction)
+        self.assertIn(adm.historical_industry_reference.source_content_digest, correction)
         adm_checkpoint_path = (
             root / "docs" / "acceptance" / "p4-research-adm-consolidation-20260820.md"
         )

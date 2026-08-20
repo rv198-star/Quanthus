@@ -152,12 +152,12 @@ def collect_p4_historical_industry_supplement(
             ) from exc
         bs_module = loaded_bs
 
-    provider_version = getattr(bs_module, "__version__", None)
-    if not isinstance(provider_version, str) or not provider_version.strip():
-        try:
-            provider_version = importlib.metadata.version("baostock")
-        except importlib.metadata.PackageNotFoundError as exc:
-            raise ResearchADMError("cannot resolve BaoStock provider version") from exc
+    try:
+        provider_version = importlib.metadata.version("baostock")
+    except importlib.metadata.PackageNotFoundError:
+        provider_version = getattr(bs_module, "__version__", None)
+        if not isinstance(provider_version, str) or not provider_version.strip():
+            raise ResearchADMError("cannot resolve BaoStock provider version") from None
     if binding is not None and provider_version != binding.provider_version:
         raise ResearchADMError("BaoStock provider version differs from ADM policy")
 

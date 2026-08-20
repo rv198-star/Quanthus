@@ -21,7 +21,6 @@ COPY src/quanthus/__init__.py \
 COPY src/quanthus/platform ./src/quanthus/platform
 RUN python -m pip install --no-cache-dir ".[platform]"
 
-USER quanthus
 EXPOSE 8080
 
-CMD ["gunicorn", "--bind=0.0.0.0:8080", "--workers=1", "quanthus.platform.server:create_app()"]
+CMD ["python", "-m", "quanthus.platform.launcher"]

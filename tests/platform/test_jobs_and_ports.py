@@ -69,6 +69,7 @@ def test_public_event_job_exposes_bounded_scan_counters(tmp_path, monkeypatch) -
     public = public_job(job)
 
     assert public["event_scan_summary"] == {
+        "status": "available",
         "scan_counters": {
             "evaluated_rows": 100,
             "raw_triggers": 7,
@@ -126,7 +127,9 @@ def test_public_event_job_does_not_read_summary_outside_event_root(tmp_path, mon
         updated_at=now,
     )
 
-    assert "event_scan_summary" not in public_job(job)
+    assert public_job(job)["event_scan_summary"] == {
+        "status": "artifact_outside_event_root"
+    }
 
 
 def test_gate_query_returns_versioned_repository_facts(kernel) -> None:

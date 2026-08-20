@@ -63,30 +63,36 @@ def expert_evaluation_submission(
 
 
 def _event_scan_summary(job: JobRecord) -> dict[str, Any] | None:
-    if job.kind != P4_EVENT_SCAN_JOB or job.state != "succeeded" or not job.result_ref:
+    if job.kind != P4_EVENT_SCAN_JOB or job.state != "succeeded":
         return None
+    if not job.result_ref:
+        return {"status": "result_ref_missing"}
     artifact = job.result_ref.get("artifact_ref")
     if not isinstance(artifact, str):
-        return None
+        return {"status": "artifact_ref_invalid"}
     try:
         root = EVENT_RUN_ROOT.resolve()
         run = Path(artifact).resolve()
     except OSError:
-        return None
+        return {"status": "artifact_path_unresolvable"}
     if run == root or root not in run.parents:
-        return None
+        return {"status": "artifact_outside_event_root"}
     summary_path = run / "event-library" / "summary.json"
     try:
-        if not summary_path.is_file() or summary_path.stat().st_size > EVENT_SUMMARY_MAX_BYTES:
-            return None
+        if not summary_path.is_file():
+            return {"status": "summary_missing"}
+        if summary_path.stat().st_size > EVENT_SUMMARY_MAX_BYTES:
+            return {"status": "summary_too_large"}
         raw = json.loads(summary_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
+    except OSError:
+        return {"status": "summary_unreadable"}
+    except json.JSONDecodeError:
+        return {"status": "summary_invalid_json"}
     if not isinstance(raw, dict):
-        return None
+        return {"status": "summary_not_object"}
     counters = raw.get("scan_counters")
     if not isinstance(counters, dict):
-        return None
+        return {"status": "scan_counters_missing"}
     expected = {
         "evaluated_rows",
         "raw_triggers",
@@ -96,7 +102,7 @@ def _event_scan_summary(job: JobRecord) -> dict[str, Any] | None:
         "reason_counts",
     }
     if set(counters) != expected:
-        return None
+        return {"status": "scan_counter_keys_invalid"}
     reason_counts = counters.get("reason_counts")
     if not isinstance(reason_counts, dict) or any(
         not isinstance(key, str)
@@ -105,12 +111,13 @@ def _event_scan_summary(job: JobRecord) -> dict[str, Any] | None:
         or value < 0
         for key, value in reason_counts.items()
     ):
-        return None
+        return {"status": "reason_counts_invalid"}
     for field in expected - {"reason_counts"}:
         value = counters.get(field)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-            return None
+            return {"status": "scan_counter_value_invalid"}
     return {
+        "status": "available",
         "scan_counters": {
             "evaluated_rows": counters["evaluated_rows"],
             "raw_triggers": counters["raw_triggers"],

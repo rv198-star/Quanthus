@@ -1080,15 +1080,33 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertTrue(remediation_path.is_file())
         remediation = remediation_path.read_text(encoding="utf-8")
-        self.assertIn(source.semantic_digest, remediation)
+        self.assertIn(
+            "sha256:000bd6898903e87f55f3c5ca70f37afaa060029b464e379eead0884ca52a2d53",
+            remediation,
+        )
         self.assertIn("53,527", remediation)
         self.assertIn("46,522", remediation)
+        supplement_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-research-adm-industry-supplement-20260820.md"
+        )
+        self.assertTrue(supplement_path.is_file())
+        supplement = supplement_path.read_text(encoding="utf-8")
+        self.assertIn(source.semantic_digest, supplement)
+        self.assertIn(adm.semantic_digest, supplement)
+        self.assertIn(adm.historical_industry_reference.source_content_digest, supplement)
+        self.assertIn("259 / 259", supplement.replace("259/259", "259 / 259"))
         adm_checkpoint_path = (
             root / "docs" / "acceptance" / "p4-research-adm-consolidation-20260820.md"
         )
         self.assertTrue(adm_checkpoint_path.is_file())
         adm_checkpoint = adm_checkpoint_path.read_text(encoding="utf-8")
-        self.assertIn(adm.semantic_digest, adm_checkpoint)
+        self.assertIn(
+            "sha256:31020e184836e1981559aebd7d1c7620e29065d1038df696f932ec3f1d3555e3",
+            adm_checkpoint,
+        )
         self.assertIn("historical_only=259", adm_checkpoint)
         adm_adr = (
             root

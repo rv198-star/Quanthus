@@ -113,7 +113,7 @@ class EventScanSourceTests(unittest.TestCase):
         self.assertEqual(policy.daily_increment_mode, "disabled_for_initial_development_scan")
         self.assertEqual(
             policy.static_industry_reference.authority,
-            "dwd_v2_1_static_company_industry_projection",
+            "p4_adm_dwd_plus_checksum_bound_historical_industry",
         )
         self.assertEqual(
             policy.static_industry_reference.source_tables,

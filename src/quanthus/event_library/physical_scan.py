@@ -34,7 +34,13 @@ from quanthus.event_library.source import EventScanSourcePolicy, load_event_scan
 from quanthus.event_library.splits import SplitPolicy, load_split_policy
 from quanthus.industry_mapping import StaticIndustryMapping, load_static_industry_mapping
 from quanthus.policy import find_project_root
-from quanthus.research_adm import P4ResearchADMPolicy, load_p4_research_adm_policy
+from quanthus.research_adm import (
+    HistoricalIndustryReference,
+    P4ResearchADMPolicy,
+    ResearchADMError,
+    collect_p4_historical_industry_supplement,
+    load_p4_research_adm_policy,
+)
 
 MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 ADM_SCHEMA = "quanthus.p4-research-adm.v1"
@@ -208,11 +214,16 @@ def _materialize_dwd_static_industry_mapping(
     candidate_path: Path,
     source_policy: EventScanSourcePolicy,
     output_path: Path,
+    source_receipt_path: Path,
+    hierarchy_path: Path,
+    historical_reference: HistoricalIndustryReference,
+    bs_module: Any | None = None,
 ) -> StaticIndustryMapping:
-    """Project current DWD company industry membership onto governed P4 security ids.
+    """Build the P4 static industry map from DWD plus historical-only ADM supplementation.
 
-    The mapping is deliberately static and non-PIT. It is used only after a raw event trigger
-    exists, for concentration control, and never as candidate signal input.
+    Current DWD company-industry membership remains the first authority. Securities outside that
+    current snapshot are supplemented from fixed BaoStock CSRC snapshots and mapped onto the same
+    governed DWD security identity. The result is static, non-PIT and concentration-only.
     """
 
     try:
@@ -275,40 +286,118 @@ def _materialize_dwd_static_industry_mapping(
             raise PhysicalEventScanError(
                 "P4 DWD static industry projection contains ambiguous security membership"
             )
-        rows = connection.execute(
+        rows = list(
+            connection.execute(
+                """
+                WITH ranked AS (
+                  SELECT dwd_security_id, listing_code, venue_id, level1_industry_id,
+                         row_number() OVER (
+                           PARTITION BY dwd_security_id
+                           ORDER BY listing_code, venue_id
+                         ) AS identity_rank
+                  FROM p4_static_industry_resolved
+                  WHERE level1_industry_id IS NOT NULL
+                )
+                SELECT dwd_security_id, listing_code, venue_id, level1_industry_id
+                FROM ranked
+                WHERE identity_rank=1
+                ORDER BY dwd_security_id
+                """
+            ).fetchall()
+        )
+        candidate_identities = connection.execute(
             """
-            WITH ranked AS (
-              SELECT dwd_security_id, listing_code, venue_id, level1_industry_id,
-                     row_number() OVER (
-                       PARTITION BY dwd_security_id
-                       ORDER BY listing_code, venue_id
-                     ) AS identity_rank
-              FROM p4_static_industry_resolved
-              WHERE level1_industry_id IS NOT NULL
-            )
-            SELECT dwd_security_id, listing_code, venue_id, level1_industry_id
-            FROM ranked
-            WHERE identity_rank=1
+            SELECT DISTINCT dwd_security_id, listing_code, venue_id
+            FROM p4_candidate_identities
             ORDER BY dwd_security_id
             """
         ).fetchall()
+        level1_by_code = {
+            str(node_code): str(industry_node_id)
+            for node_code, industry_node_id in connection.execute(
+                f"""
+                SELECT node_code, industry_node_id
+                FROM {node_expression}
+                WHERE knowledge_to IS NULL
+                  AND node_level=1
+                ORDER BY node_code
+                """
+            ).fetchall()
+        }
     finally:
         connection.close()
 
-    retrieved_at = datetime.combine(
-        source_policy.base_release.through_date,
-        time(23, 59, 59),
-        tzinfo=timezone.utc,
-    ).isoformat()
+    covered = {str(row[0]) for row in rows}
+    missing_identities = [row for row in candidate_identities if str(row[0]) not in covered]
+    supplement_receipt: Mapping[str, Any]
+    if missing_identities:
+        missing_codes = tuple(sorted({str(row[1]) for row in missing_identities}))
+        try:
+            supplement, supplement_receipt = collect_p4_historical_industry_supplement(
+                missing_codes,
+                hierarchy_path=hierarchy_path,
+                binding=historical_reference,
+                bs_module=bs_module,
+            )
+        except ResearchADMError as exc:
+            raise PhysicalEventScanError(
+                f"P4 historical industry supplement failed: {exc}"
+            ) from exc
+        for security_id, stock_code, venue_id in missing_identities:
+            membership = supplement.get(str(stock_code))
+            if membership is None:
+                raise PhysicalEventScanError(
+                    f"P4 historical industry supplement lacks {stock_code}"
+                )
+            leaf_code = str(membership["industry_code"])
+            level1_id = level1_by_code.get(leaf_code[0])
+            if level1_id is None:
+                raise PhysicalEventScanError(
+                    f"P4 historical industry code has no DWD level-one node: {leaf_code}"
+                )
+            rows.append((security_id, stock_code, venue_id, level1_id))
+    else:
+        supplement_receipt = {
+            "schema_version": "quanthus.p4-adm-industry-source-receipt.v1",
+            "provider": "not_required",
+            "selected_security_count": 0,
+            "source_rows": [],
+        }
+        supplement_receipt = {
+            **supplement_receipt,
+            "content_digest": _digest(supplement_receipt),
+        }
+
+    combined_receipt_payload = {
+        "schema_version": "quanthus.p4-adm-static-industry-receipt.v1",
+        "dwd_base_package_id": source_policy.base_release.package_id,
+        "dwd_membership_count": len(covered),
+        "historical_supplement": dict(supplement_receipt),
+    }
+    combined_receipt = {
+        **combined_receipt_payload,
+        "content_digest": _digest(combined_receipt_payload),
+    }
+    _write_json(source_receipt_path, combined_receipt)
+
+    retrieved_at = (
+        "2021-09-30T15:00:00+08:00"
+        if missing_identities
+        else datetime.combine(
+            source_policy.base_release.through_date,
+            time(23, 59, 59),
+            tzinfo=timezone.utc,
+        ).isoformat()
+    )
     unsigned = {
         "schema_version": "1.0.0",
         "mapping_version": source_policy.static_industry_reference.version,
         "usage": source_policy.static_industry_reference.usage,
         "source": {
-            "provider": "quanthus-dwd-v2.1",
-            "endpoint": "dwd://industry_classification/static-level1-company-membership",
+            "provider": "quanthus-p4-research-adm",
+            "endpoint": "dwd-v2.1+baostock-csrc-static-industry",
             "retrieved_at": retrieved_at,
-            "source_revision": source_policy.base_release.package_id,
+            "source_revision": str(combined_receipt["content_digest"]),
         },
         "memberships": [
             {
@@ -317,7 +406,9 @@ def _materialize_dwd_static_industry_mapping(
                 "exchange": str(exchange),
                 "level1_industry_id": str(level1_industry_id),
             }
-            for security_id, stock_code, exchange, level1_industry_id in rows
+            for security_id, stock_code, exchange, level1_industry_id in sorted(
+                rows, key=lambda item: (str(item[0]), str(item[1]), str(item[2]))
+            )
         ],
     }
     _write_json(output_path, {**unsigned, "artifact_digest": _digest(unsigned)})
@@ -490,6 +581,7 @@ def _adm_identity(
     provider_identity: Mapping[str, Any],
     candidate_path: Path,
     industry_mapping: StaticIndustryMapping,
+    source_receipt_path: Path,
     coverage_audit_path: Path,
     row_count: int,
     trading_dates: Sequence[date],
@@ -514,6 +606,10 @@ def _adm_identity(
             "artifact_digest": industry_mapping.artifact_digest,
             "sha256": _sha256(industry_mapping.path),
             "membership_count": len(industry_mapping.memberships),
+        },
+        "static_industry_source_receipt": {
+            "path": adm_policy.assets["static_industry_source_receipt"],
+            "sha256": _sha256(source_receipt_path),
         },
         "static_industry_coverage_audit": {
             "path": adm_policy.assets["static_industry_coverage_audit"],
@@ -678,11 +774,19 @@ def materialize_p4_research_adm(
             raise PhysicalEventScanError("P4 trading calendar returned a non-date value")
         source_policy.require_development_date(value)
 
+    project_root = find_project_root(source_policy.path)
+    source_receipt_path = output_root / adm_policy.assets["static_industry_source_receipt"]
     industry_mapping = _materialize_dwd_static_industry_mapping(
         dwd_root=dwd_root,
         candidate_path=candidate_path,
         source_policy=source_policy,
         output_path=output_root / adm_policy.assets["static_industry_mapping"],
+        source_receipt_path=source_receipt_path,
+        hierarchy_path=(
+            project_root / adm_policy.historical_industry_reference.hierarchy_path
+        ),
+        historical_reference=adm_policy.historical_industry_reference,
+        bs_module=None,
     )
     coverage_audit_path = output_root / adm_policy.assets["static_industry_coverage_audit"]
     coverage_audit = _audit_projection_static_industry_coverage(
@@ -714,6 +818,7 @@ def materialize_p4_research_adm(
         provider_identity=provider_identity,
         candidate_path=candidate_path,
         industry_mapping=industry_mapping,
+        source_receipt_path=source_receipt_path,
         coverage_audit_path=coverage_audit_path,
         row_count=row_count,
         trading_dates=trading_dates,

@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, thin P4 Research ADM, development-only economic-availability projection, DWD-native static-industry identity projection, streaming forward scan, reconciliation, and P1/P2-backed T+1 entry partition implemented; 259 historical-only industry memberships and production A/B acceptance remain open |
+| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, thin P4 Research ADM, checksum-bound 259-security historical industry supplement, development-only economic-availability projection, streaming forward scan, reconciliation, and P1/P2-backed T+1 entry partition implemented; production A/B acceptance remains open |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -131,7 +131,12 @@ the accepted Direct-DWD job-local provider, carries DWD internal security/listin
 retains exact Decimal OHLC/turnover alongside the legacy replay columns, preserves raw DWD
 knowledge/source lineage, and applies correction-001 tradability. Before event scanning it seals a
 thin `P4 Research ADM` under `adm/`: `candidate_daily.parquet`, `static_industry_mapping.json`,
-`static_industry_coverage_audit.json`, and `adm.json`. The ADM is application data only: it is not
+`static_industry_source_receipt.json`, `static_industry_coverage_audit.json`, and `adm.json`.
+Current DWD industry membership remains the first mapping authority; the 259 historical-only
+securities are filled only by ADM 1.1's checksum-bound fixed-date BaoStock `证监会行业分类`
+supplement. Its complete selected source content must reproduce
+`sha256:609fe99ea5eb2d29237a5c0112779ae58491270a80f390f099fb798de07382c9`
+before scanning continues. The ADM is application data only: it is not
 DWD, generic DWS, operational ADS, or an execution authority. Event identity binds the exact ADM
 snapshot manifest. The Event Library then adds events, entry partition, summary, manifest, and READY
 around that ADM. `run-p4-event-scan` builds the combined immutable Run package and

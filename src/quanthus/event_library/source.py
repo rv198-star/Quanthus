@@ -335,7 +335,10 @@ class StaticIndustryReference:
                 raise EventScanSourceError("legacy industry reference requires sha256")
             require_sha256_digest(self.sha256, "static_industry_reference.sha256")
             return
-        if self.authority != "dwd_v2_1_static_company_industry_projection":
+        if self.authority not in {
+            "dwd_v2_1_static_company_industry_projection",
+            "p4_adm_dwd_plus_checksum_bound_historical_industry",
+        }:
             raise EventScanSourceError("unexpected static industry authority")
         expected = ("dwd_company_industry_membership", "dwd_industry_node")
         if self.source_tables != expected:

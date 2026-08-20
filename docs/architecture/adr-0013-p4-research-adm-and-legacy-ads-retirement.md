@@ -4,7 +4,7 @@
 - Date: 2026-08-20
 - Decision id: `P4-EVENT-002`
 - Design status: approved
-- Delivery gate: P4 Research ADM active; historical-industry supplement and #74 A/B acceptance open
+- Delivery gate: P4 Research ADM active; checksum-bound historical-industry supplement implemented; #74 production A/B acceptance open
 - Extends: ADR 0007 P4 handoff boundary
 
 ## Context
@@ -40,6 +40,7 @@ DWD V2.1 + correction
 P4 Research ADM
   - candidate_daily.parquet
   - static_industry_mapping.json
+  - static_industry_source_receipt.json
   - static_industry_coverage_audit.json
   - adm.json
         |
@@ -66,13 +67,22 @@ DWD V2.1 remains unchanged. Current DWD industry membership may populate the ADM
 exists, but the ADM must not rewrite DWD or describe a static application grouping as historical
 PIT truth.
 
-The 259 historical-only securities are therefore an ADM coverage problem. A future checksum-bound
-historical static-industry supplement may complete the ADM, provided that it:
+The 259 historical-only securities are therefore an ADM coverage problem. ADM 1.1 resolves that
+application-only gap with a checksum-bound BaoStock/CSRC supplement. It queries the repository's
+already-admitted `baostock.query_stock_industry` provider at fixed dates `2021-09-30` and, only for
+three empty legacy rows, `2012-12-31`. All selected rows must report `证监会行业分类`; legacy names
+map deterministically and uniquely into the checksum-bound CSRC-2012 hierarchy. The complete 259-row
+selection is frozen at source-content digest
+`sha256:609fe99ea5eb2d29237a5c0112779ae58491270a80f390f099fb798de07382c9`.
+
+The supplement:
 
 - maps to governed DWD `security_id` values;
 - is explicitly static and non-PIT;
 - is used only for concentration control;
-- records source lineage and deterministic mapping rules; and
+- records provider version, fixed source dates, hierarchy SHA, source rows, resolution mode, and
+  deterministic mapping rules in `static_industry_source_receipt.json`;
+- fails closed if the provider response no longer reproduces the frozen source digest; and
 - makes no claim that the assigned industry was the security's industry at each historical event
   date.
 
@@ -121,14 +131,14 @@ Positive consequences:
 
 - DWD remains a strict reusable fact layer instead of absorbing P4-only static semantics;
 - P4 application inputs have one explicit manifest-bound home;
-- the historical-industry supplement can be solved locally without a DWD 2.2 rebuild;
+- the historical-industry supplement is solved locally without a DWD 2.2 rebuild;
 - Event Library lineage becomes easier to audit; and
 - the old ADS name stops competing with the current application-data boundary.
 
 Costs and constraints:
 
 - P4 now has one additional small governed contract and manifest;
-- the 259 historical-only securities still require a static ADM supplement before #74 can pass;
+- the 259 historical-only securities are resolved in ADM, but production A/B must still prove the integrated full-corpus path;
 - historical ADS code and packages cannot be deleted in one unreviewed bulk operation; and
 - exact P3/legacy reproduction may continue to retain selected old ADS artifacts until explicitly
   retired.

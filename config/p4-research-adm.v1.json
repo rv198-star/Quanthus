@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "adm_id": "p4-event-research-adm",
+  "adm_version": "1.0.0",
+  "status": "approved_development_only",
+  "research_only": true,
+  "execution_authorized": false,
+  "upstream_authority": "dwd_v2_1_plus_correction",
+  "purpose": "prepare_p4_event_library_inputs",
+  "assets": {
+    "candidate_daily": "candidate_daily.parquet",
+    "static_industry_mapping": "static_industry_mapping.json",
+    "static_industry_coverage_audit": "static_industry_coverage_audit.json"
+  },
+  "allowed_uses": [
+    "candidate_signal_input",
+    "eligibility_input",
+    "static_non_pit_concentration_only",
+    "coverage_gate_evidence"
+  ],
+  "forbidden_claims": [
+    "canonical_dwd_fact",
+    "historical_industry_pit",
+    "generic_dws",
+    "operational_ads",
+    "execution_authority"
+  ],
+  "semantic_digest": "sha256:31020e184836e1981559aebd7d1c7620e29065d1038df696f932ec3f1d3555e3"
+}

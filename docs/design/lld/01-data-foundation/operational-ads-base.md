@@ -5,17 +5,18 @@
 | Parent | `../01-data-foundation.md` |
 | Work item | `META-DATA-BASE-003` |
 | Tracking issue | GitHub issue #46 |
-| Design status | approved under ADR 0005 |
-| Delivery gate | provisional and final July Bases accepted; consumer publication remains separate |
+| Design status | superseded for current operation under ADR 0013 |
+| Delivery gate | historical evidence and cleanup candidate; no current consumer authority |
 | Profile | `strategy_replay_operational_v1` |
 
 ## 1. Purpose and authority
 
-OCI owns the one authoritative operational ADS historical Base. It lives below
-`/srv/quanthus/ads/operational/base/`; immutable daily operational ADS revisions remain below the
-daily publication tree. Existing development, arbitration, permanent-blind, recent-research, and
-other offline research bundles are derived snapshots. Copying or comparing one does not promote it
-to operational authority.
+This document records the former OCI operational ADS historical Base. Under ADR 0013 it is retained
+only for historical evidence or exact reproduction and is not a current application authority. Its
+physical roots below `/srv/quanthus/ads/operational/` are cleanup candidates after the separate
+retirement audit proves no runtime, rollback, or reproduction dependency remains. Existing
+development, arbitration, permanent-blind, recent-research, and other offline research bundles are
+likewise historical artifacts rather than current ADM inputs.
 
 The provisional package is `ads-base-through-20260730-v1`. After the July 31 close and exact final
 upstream acceptance, a separate `ads-base-202607-v1` is created. Neither package may be appended,

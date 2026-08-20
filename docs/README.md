@@ -138,19 +138,20 @@ nodes.
   `acceptance/platform-worker-production-loop-20260813.md`; the earlier infrastructure-only state
   remains recorded in `acceptance/platform-worker-lean-v1-infrastructure-checkpoint-20260813.md`.
 - `P4-EVENT-002` now supplies the first named second Worker kind allowed by ADR 0012: one static
-  `event-worker`, `queue=event`, concurrency one, and `quanthus.p4-event-scan.v1` only. Repository
-  implementation, image, read-only DWD/reference mount contract, immutable `/data/event-runs`, and
-  PK6 recovery extension are recorded in
-  `acceptance/p4-event-worker-implementation-20260820.md`. This is an implementation checkpoint,
-  not acceptance: the Event Worker remains unaccepted until two real 2012-2021 Jobs with identical
-  governed input reproduce identical Event Library identities and digests under Issue #74.
+  `event-worker`, `queue=event`, concurrency one, and `quanthus.p4-event-scan.v1` only. ADR 0013
+  inserts a thin `P4 Research ADM` between DWD and Event Library so candidate projection, static
+  concentration membership, and coverage evidence have one application-data boundary without
+  expanding DWD or reviving ADS. The Event Worker remains unaccepted until the 259 historical-only
+  industry memberships are resolved in ADM and two real 2012-2021 Jobs with identical governed
+  input reproduce identical Event Library identities and digests under Issue #74.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,
   retained PostgreSQL and candidate-Run volumes, and Traefik as the only product edge. The former
   Tailscale `:8443` Serve route and damaged repository deployment path are no longer required.
-- The old Base, DWS, ADS, dual-lane, and portable research packages remain immutable historical
-  evidence under their acceptance records. They are not current transformation inputs or current
-  operating authority and are not deleted by this stage transition.
+- The old Base, DWS, ADS, dual-lane, and portable research packages are historical evidence, not
+  current transformation inputs or operating authority. ADR 0013 retires ADS as a current naming
+  and application-data concept. Physical ADS packages are cleanup candidates once a separate audit
+  proves no runtime, rollback, or exact-reproduction dependency remains.
 - `design/stock-stage-state-machine.md` is a non-governing P3 draft and is not P2 context.
 
 The current machine-readable release state is `config/p3-gates.v1.json`; P2's retained conditional

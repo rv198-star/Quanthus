@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, development-only economic-availability projection, DWD-native static-industry identity projection, streaming physical event projection, pure forward-trigger, reconciliation, and P1/P2-backed T+1 entry partition implemented; production rerun and independent digest replay pending |
+| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, thin P4 Research ADM, development-only economic-availability projection, DWD-native static-industry identity projection, streaming forward scan, reconciliation, and P1/P2-backed T+1 entry partition implemented; 259 historical-only industry memberships and production A/B acceptance remain open |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -73,10 +73,11 @@ The exact card digest is human-approved and bound to the approval record in GitH
 payload. A semantic or threshold edit changes the digest and requires a new rule version,
 experiment identity, and renewed human approval rather than in-place tuning.
 
-The contract implementation is under `src/quanthus/event_library/`. Exact-key parsing rejects
-unknown or outcome-bearing candidate inputs and record extensions; canonical serialization verifies
-the semantic digest; the event record enforces `knowledge_cutoff <= T close`; and record-set
-validation rejects duplicate identities or one event assigned to multiple splits.
+The event contract implementation is under `src/quanthus/event_library/`. The small upstream ADM
+contract is under `src/quanthus/research_adm.py` and `config/p4-research-adm.v1.json`. Exact-key
+parsing rejects unknown or outcome-bearing candidate inputs and record extensions; canonical
+serialization verifies semantic digests; the event record enforces `knowledge_cutoff <= T close`;
+and record-set validation rejects duplicate identities or one event assigned to multiple splits.
 
 ### 3.2 Forward-scan source and first implementation slice
 
@@ -128,12 +129,12 @@ unexplained loss. It does not accept returns, labels, fills, or post-T features.
 `src/quanthus/event_library/physical_scan.py` now implements the bounded physical path. It reuses
 the accepted Direct-DWD job-local provider, carries DWD internal security/listing/company identity,
 retains exact Decimal OHLC/turnover alongside the legacy replay columns, preserves raw DWD
-knowledge/source lineage, applies correction-001 tradability, and emits a checksum-bound candidate
-projection before scanning. The same projection materializes a deterministic static level-one
-industry artifact by joining candidate `dwd_company_id` to current DWD company-industry membership
-and resolving its level-one parent, then keys the result by candidate `dwd_security_id`. The
-projection, static-industry artifact, events, entry partition, summary, manifest, and READY marker
-are published as one immutable research-only package. `run-p4-event-scan` builds that package and
+knowledge/source lineage, and applies correction-001 tradability. Before event scanning it seals a
+thin `P4 Research ADM` under `adm/`: `candidate_daily.parquet`, `static_industry_mapping.json`,
+`static_industry_coverage_audit.json`, and `adm.json`. The ADM is application data only: it is not
+DWD, generic DWS, operational ADS, or an execution authority. Event identity binds the exact ADM
+snapshot manifest. The Event Library then adds events, entry partition, summary, manifest, and READY
+around that ADM. `run-p4-event-scan` builds the combined immutable Run package and
 `verify-p4-event-scan` independently verifies its physical inventory and digests.
 
 The T+1 partition reuses the exact `P1DailyExecutionEvidence` constructed by the historical reader

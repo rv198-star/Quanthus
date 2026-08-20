@@ -140,16 +140,22 @@ def _event_scan_failure(job: JobRecord) -> dict[str, Any] | None:
         "stderr": stderr,
         "size_bytes": size,
     }
-    audit_path = staging / "event-library" / "projection" / "static_industry_coverage_audit.json"
-    try:
-        if audit_path.is_file() and audit_path.stat().st_size <= EVENT_FAILURE_AUDIT_MAX_BYTES:
-            audit = json.loads(audit_path.read_text(encoding="utf-8"))
-            if isinstance(audit, dict) and audit.get("schema_version") == (
-                "quanthus.p4-static-industry-coverage-audit.v1"
-            ):
-                response["static_industry_coverage_audit"] = audit
-    except (OSError, json.JSONDecodeError):
-        pass
+    audit_paths = (
+        staging / "event-library" / "adm" / "static_industry_coverage_audit.json",
+        staging / "event-library" / "projection" / "static_industry_coverage_audit.json",
+    )
+    for audit_path in audit_paths:
+        try:
+            if audit_path.is_file() and audit_path.stat().st_size <= EVENT_FAILURE_AUDIT_MAX_BYTES:
+                audit = json.loads(audit_path.read_text(encoding="utf-8"))
+                if isinstance(audit, dict) and audit.get("schema_version") == (
+                    "quanthus.p4-static-industry-coverage-audit.v1"
+                ):
+                    response["static_industry_coverage_audit"] = audit
+                    response["static_industry_coverage_layer"] = audit_path.parent.name
+                    break
+        except (OSError, json.JSONDecodeError):
+            continue
     return response
 
 

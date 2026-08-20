@@ -347,12 +347,12 @@ If ADS build or validation fails, the acceptance record remains internal evidenc
 ADS, or DWD/DWS-only state becomes consumer-visible. The legacy and target publishers share one
 fenced single-writer lease; target cutover first quiesces and fences the legacy writer.
 
-### 5.4 ADS lifecycle and layout
+### 5.4 Historical ADS lifecycle and layout
 
-Operational ADS participates in one atomic OCI release profile. A portable research bundle is a
-separate frozen revision assembled from an exact catalog snapshot for `strategy_replay`,
-`event_library`, or `ml_training`; it has no `CURRENT` and resolves no mutable pointer after
-construction.
+ADR 0013 supersedes ADS as a current application-data concept. This section records the retained
+historical publication/reproduction contracts only; current P4 application preparation uses the
+thin Research ADM. The former operational ADS participated in one atomic OCI release profile, and
+portable research bundles were separate frozen revisions assembled from exact catalog snapshots.
 
 The delivered `operational_daily_v1` ADS is only a bounded migration projection. It contains the
 three decision-visible tables `market_daily`, `market_status`, and `market_summary`, and its
@@ -373,8 +373,8 @@ The delivered portable `strategy_replay` profile is specified by
 checksum-bound CSI 300 curve and static concentration-only industry mapping required by the active
 P3 runners. It binds exact content and manifest identities into the feature panel and run manifest,
 authorizes one configured reader role, and never resolves ODS, DWD/DWS, PostgreSQL, a legacy
-snapshot path, or any mutable `CURRENT` while running. Normal replay commands use this profile;
-the hidden snapshot path is retained only to reproduce frozen P3 evidence.
+snapshot path, or any mutable `CURRENT` while running. Exact historical reproduction commands may still use this profile; current P4 does not. The hidden
+snapshot path is retained only to reproduce frozen P3 evidence.
 
 The initial portable layout has no mandatory calendar-year directories. Each semantic table is
 date-sorted where applicable and exposes one or a small number of parts through

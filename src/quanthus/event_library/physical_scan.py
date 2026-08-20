@@ -1,4 +1,4 @@
-"""Physical DWD V2.1 projection and deterministic P4 forward event scan."""
+"""P4 Research ADM materialization and deterministic forward event scan."""
 
 from __future__ import annotations
 
@@ -34,10 +34,11 @@ from quanthus.event_library.source import EventScanSourcePolicy, load_event_scan
 from quanthus.event_library.splits import SplitPolicy, load_split_policy
 from quanthus.industry_mapping import StaticIndustryMapping, load_static_industry_mapping
 from quanthus.policy import find_project_root
+from quanthus.research_adm import P4ResearchADMPolicy, load_p4_research_adm_policy
 
 MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
-PROJECTION_SCHEMA = "quanthus.p4-event-candidate-projection.v1"
-PACKAGE_SCHEMA = "quanthus.p4-event-library.v1"
+ADM_SCHEMA = "quanthus.p4-research-adm.v1"
+PACKAGE_SCHEMA = "quanthus.p4-event-library.v2"
 MATCHER_POLICY_VERSION = "p2-daily-research-v1"
 
 
@@ -46,16 +47,37 @@ class PhysicalEventScanError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class EventCandidateProjection:
+class P4ResearchADM:
+    """Immutable application-data-mart input package consumed by the P4 Event Library."""
+
     root: Path
+    policy: P4ResearchADMPolicy
     candidate_path: Path
     industry_mapping: StaticIndustryMapping
-    projection_manifest_path: Path
-    projection_manifest_sha256: str
-    projection_content_digest: str
+    manifest_path: Path
+    manifest_sha256: str
+    content_digest: str
     snapshot_id: str
     trading_dates: tuple[date, ...]
     row_count: int
+
+    @property
+    def projection_manifest_path(self) -> Path:
+        """Compatibility alias for pre-ADM callers."""
+        return self.manifest_path
+
+    @property
+    def projection_manifest_sha256(self) -> str:
+        """Compatibility alias for pre-ADM callers."""
+        return self.manifest_sha256
+
+    @property
+    def projection_content_digest(self) -> str:
+        """Compatibility alias for pre-ADM callers."""
+        return self.content_digest
+
+
+EventCandidateProjection = P4ResearchADM
 
 
 @dataclass(frozen=True)
@@ -461,19 +483,23 @@ def _audit_projection_static_industry_coverage(
     return payload
 
 
-def _projection_identity(
+def _adm_identity(
     *,
+    adm_policy: P4ResearchADMPolicy,
     source_policy: EventScanSourcePolicy,
     provider_identity: Mapping[str, Any],
     candidate_path: Path,
     industry_mapping: StaticIndustryMapping,
+    coverage_audit_path: Path,
     row_count: int,
     trading_dates: Sequence[date],
 ) -> dict[str, Any]:
     if not trading_dates:
-        raise PhysicalEventScanError("P4 projection has no trading dates")
+        raise PhysicalEventScanError("P4 Research ADM has no trading dates")
     return {
-        "schema_version": PROJECTION_SCHEMA,
+        "schema_version": ADM_SCHEMA,
+        "logical_layer": "research_adm",
+        "adm_policy": adm_policy.to_dict(),
         "source_policy_id": source_policy.policy_id,
         "source_policy_version": source_policy.policy_version,
         "source_policy_digest": source_policy.semantic_digest,
@@ -483,18 +509,22 @@ def _projection_identity(
         "dwd_correction": source_policy.correction_release.to_dict(),
         "static_industry_reference": source_policy.static_industry_reference.to_dict(),
         "static_industry_projection": {
-            "path": "static_industry_mapping.json",
+            "path": adm_policy.assets["static_industry_mapping"],
             "mapping_version": industry_mapping.mapping_version,
             "artifact_digest": industry_mapping.artifact_digest,
             "sha256": _sha256(industry_mapping.path),
             "membership_count": len(industry_mapping.memberships),
+        },
+        "static_industry_coverage_audit": {
+            "path": adm_policy.assets["static_industry_coverage_audit"],
+            "sha256": _sha256(coverage_audit_path),
         },
         "provider_id": provider_identity.get("provider_id"),
         "provider_version": provider_identity.get("provider_version"),
         "provider_config_digest": provider_identity.get("provider_config_digest"),
         "provider_lineage_digest": provider_identity.get("provider_lineage_digest"),
         "candidate_projection": {
-            "path": "candidate_daily.parquet",
+            "path": adm_policy.assets["candidate_daily"],
             "sha256": _sha256(candidate_path),
             "row_count": row_count,
         },
@@ -506,15 +536,16 @@ def _projection_identity(
     }
 
 
-def materialize_event_candidate_projection(
+def materialize_p4_research_adm(
     *,
     reader: HistoricalReplayFrameReader,
     dwd_root: Path,
     source_policy: EventScanSourcePolicy,
     provider_identity: Mapping[str, Any],
     output_root: Path,
-) -> EventCandidateProjection:
-    """Materialize the strict T-close input surface from the accepted direct DWD provider."""
+    adm_policy: P4ResearchADMPolicy | None = None,
+) -> P4ResearchADM:
+    """Materialize the governed application data mart consumed by the P4 Event Library."""
 
     try:
         import duckdb
@@ -522,8 +553,12 @@ def materialize_event_candidate_projection(
         raise PhysicalEventScanError("P4 physical scan requires duckdb") from exc
 
     source_policy.historical_visibility.require_full_scan_authority()
+    if adm_policy is None:
+        adm_policy = load_p4_research_adm_policy(
+            find_project_root(source_policy.path) / "config/p4-research-adm.v1.json"
+        )
     output_root.mkdir(parents=True, exist_ok=False)
-    candidate_path = output_root / "candidate_daily.parquet"
+    candidate_path = output_root / adm_policy.assets["candidate_daily"]
     bars_path = reader.bundle.partition_paths("daily_ohlcv_none")[0]
     universe_path = reader.bundle.partition_paths("daily_universe")[0]
     limits_path = reader.bundle.partition_paths("price_limit_execution_daily")[0]
@@ -647,13 +682,14 @@ def materialize_event_candidate_projection(
         dwd_root=dwd_root,
         candidate_path=candidate_path,
         source_policy=source_policy,
-        output_path=output_root / "static_industry_mapping.json",
+        output_path=output_root / adm_policy.assets["static_industry_mapping"],
     )
+    coverage_audit_path = output_root / adm_policy.assets["static_industry_coverage_audit"]
     coverage_audit = _audit_projection_static_industry_coverage(
         dwd_root=dwd_root,
         candidate_path=candidate_path,
         industry_mapping=industry_mapping,
-        output_path=output_root / "static_industry_coverage_audit.json",
+        output_path=coverage_audit_path,
     )
     missing_security_count = int(coverage_audit["missing_security_count"])
     if missing_security_count:
@@ -668,31 +704,38 @@ def materialize_event_candidate_projection(
             f"historical_only={coverage_audit['missing_historical_only']} "
             f"reasons={reason_text}"
         )
-    identity = _projection_identity(
+    identity = _adm_identity(
+        adm_policy=adm_policy,
         source_policy=source_policy,
         provider_identity=provider_identity,
         candidate_path=candidate_path,
         industry_mapping=industry_mapping,
+        coverage_audit_path=coverage_audit_path,
         row_count=row_count,
         trading_dates=trading_dates,
     )
     content_digest = _digest(identity)
-    projection_manifest = {**identity, "content_digest": content_digest}
-    manifest_path = output_root / "projection.json"
-    _write_json(manifest_path, projection_manifest)
+    adm_manifest = {**identity, "content_digest": content_digest}
+    manifest_path = output_root / "adm.json"
+    _write_json(manifest_path, adm_manifest)
     manifest_sha = _sha256(manifest_path)
-    snapshot_id = f"p4-development-{content_digest.removeprefix('sha256:')[:24]}"
-    return EventCandidateProjection(
+    snapshot_id = f"p4-adm-development-{content_digest.removeprefix('sha256:')[:24]}"
+    return P4ResearchADM(
         root=output_root.resolve(),
+        policy=adm_policy,
         candidate_path=candidate_path.resolve(),
         industry_mapping=industry_mapping,
-        projection_manifest_path=manifest_path.resolve(),
-        projection_manifest_sha256=manifest_sha,
-        projection_content_digest=content_digest,
+        manifest_path=manifest_path.resolve(),
+        manifest_sha256=manifest_sha,
+        content_digest=content_digest,
         snapshot_id=snapshot_id,
         trading_dates=trading_dates,
         row_count=row_count,
     )
+
+
+# Compatibility alias for callers created before the P4 Research ADM boundary was named.
+materialize_event_candidate_projection = materialize_p4_research_adm
 
 
 def _source_evidence_digest(
@@ -804,7 +847,7 @@ def _candidate_input(
 
 
 def iter_projected_candidate_series(
-    projection: EventCandidateProjection,
+    projection: P4ResearchADM,
     *,
     source_policy: EventScanSourcePolicy,
     industry_mapping: StaticIndustryMapping,
@@ -911,7 +954,7 @@ def _entry_bindings(
 
 
 def scan_event_candidate_projection(
-    projection: EventCandidateProjection,
+    projection: P4ResearchADM,
     *,
     reader: HistoricalReplayFrameReader,
     industry_mapping: StaticIndustryMapping,
@@ -929,7 +972,7 @@ def scan_event_candidate_projection(
         ),
         trading_dates=projection.trading_dates,
         snapshot_id=projection.snapshot_id,
-        snapshot_manifest_digest=projection.projection_manifest_sha256,
+        snapshot_manifest_digest=projection.manifest_sha256,
         card=card,
         split_policy=split_policy,
         source_policy=source_policy,
@@ -1005,7 +1048,7 @@ def _publish_package(
     source_policy: EventScanSourcePolicy,
     card: CandidateRuleCard,
     split_policy: SplitPolicy,
-    projection: EventCandidateProjection,
+    projection: P4ResearchADM,
     scan: CandidateScanResult,
     entries: EntryPartitionResult,
     code_revision: str,
@@ -1022,8 +1065,8 @@ def _publish_package(
             "source_policy_digest": source_policy.semantic_digest,
             "candidate_rule_digest": card.semantic_digest,
             "split_policy_digest": split_policy.semantic_digest,
-            "projection_manifest_sha256": projection.projection_manifest_sha256,
-            "projection_content_digest": projection.projection_content_digest,
+            "adm_manifest_sha256": projection.manifest_sha256,
+            "adm_content_digest": projection.content_digest,
             "scan_counters": scan.counters.to_dict(),
             "entry_partition": {
                 "executable_events": entries.executable_events,
@@ -1055,10 +1098,13 @@ def _publish_package(
             "version": split_policy.policy_version,
             "digest": split_policy.semantic_digest,
         },
-        "projection": {
+        "adm": {
+            "id": projection.policy.adm_id,
+            "version": projection.policy.adm_version,
+            "policy_digest": projection.policy.semantic_digest,
             "snapshot_id": projection.snapshot_id,
-            "manifest_sha256": projection.projection_manifest_sha256,
-            "content_digest": projection.projection_content_digest,
+            "manifest_sha256": projection.manifest_sha256,
+            "content_digest": projection.content_digest,
         },
         "candidate_events": scan.counters.candidate_events,
         "executable_events": entries.executable_events,
@@ -1132,6 +1178,32 @@ def verify_physical_event_scan(root: Path) -> PhysicalEventScanResult:
     content_digest = _digest(tuple(observed))
     if content_digest != manifest.get("content_digest"):
         raise PhysicalEventScanError("P4 event library content digest differs")
+    adm_binding = manifest.get("adm")
+    if not isinstance(adm_binding, dict):
+        raise PhysicalEventScanError("P4 event library ADM binding is missing")
+    adm_manifest_path = root / "adm" / "adm.json"
+    try:
+        adm_manifest = json.loads(adm_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PhysicalEventScanError("P4 Research ADM manifest is unreadable") from exc
+    if not isinstance(adm_manifest, dict) or adm_manifest.get("schema_version") != ADM_SCHEMA:
+        raise PhysicalEventScanError("P4 Research ADM manifest schema differs")
+    adm_policy = adm_manifest.get("adm_policy")
+    if not isinstance(adm_policy, dict):
+        raise PhysicalEventScanError("P4 Research ADM policy binding is missing")
+    observed_adm = {
+        "id": adm_policy.get("adm_id"),
+        "version": adm_policy.get("adm_version"),
+        "policy_digest": adm_policy.get("semantic_digest"),
+        "snapshot_id": (
+            "p4-adm-development-"
+            + str(adm_manifest.get("content_digest", "")).removeprefix("sha256:")[:24]
+        ),
+        "manifest_sha256": _sha256(adm_manifest_path),
+        "content_digest": adm_manifest.get("content_digest"),
+    }
+    if observed_adm != adm_binding:
+        raise PhysicalEventScanError("P4 event library ADM binding differs")
     return PhysicalEventScanResult(
         root=root.resolve(),
         manifest_sha256=manifest_sha,
@@ -1175,12 +1247,12 @@ def build_physical_event_scan(
             scope_start=date(2012, 1, 4),
             scope_end=date(2021, 12, 30),
         ) as session:
-            projection = materialize_event_candidate_projection(
+            projection = materialize_p4_research_adm(
                 reader=session.reader,
                 dwd_root=provider_config.dwd_root,
                 source_policy=source_policy,
                 provider_identity=session.identity,
-                output_root=staging / "projection",
+                output_root=staging / "adm",
             )
             scan, entries = scan_event_candidate_projection(
                 projection,

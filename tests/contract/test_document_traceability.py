@@ -1114,6 +1114,17 @@ class DocumentTraceabilityTests(unittest.TestCase):
         correction = correction_path.read_text(encoding="utf-8")
         self.assertIn(adm.semantic_digest, correction)
         self.assertIn(adm.historical_industry_reference.source_content_digest, correction)
+        entry_binding_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-entry-snapshot-binding-remediation-20260821.md"
+        )
+        self.assertTrue(entry_binding_path.is_file())
+        entry_binding = entry_binding_path.read_text(encoding="utf-8")
+        self.assertIn("job_26d5e6f679aa4852948af716c0d245a1", entry_binding)
+        self.assertIn("candidate_snapshot_id", entry_binding)
+        self.assertIn("entry_source_snapshot_id", entry_binding)
         adm_checkpoint_path = (
             root / "docs" / "acceptance" / "p4-research-adm-consolidation-20260820.md"
         )

@@ -1045,6 +1045,8 @@ def _p1_evidence_payload(evidence: P1DailyExecutionEvidence) -> dict[str, Any]:
 def _entry_bindings(
     candidates: Sequence[ScannedCandidate],
     reader: HistoricalReplayFrameReader,
+    *,
+    candidate_snapshot_id: str,
 ) -> dict[str, CandidateEntryEvidence]:
     requests = tuple(
         sorted({(candidate.listing_code, candidate.entry_date) for candidate in candidates})
@@ -1052,9 +1054,12 @@ def _entry_bindings(
     evidence = reader.execution_evidence_batch(requests)
     result: dict[str, CandidateEntryEvidence] = {}
     for candidate in candidates:
+        if candidate.record.identity.snapshot_id != candidate_snapshot_id:
+            raise PhysicalEventScanError("candidate set contains a different ADM snapshot")
         item = evidence[(candidate.listing_code, candidate.entry_date)]
         result[candidate.event_id] = CandidateEntryEvidence(
             event_id=candidate.event_id,
+            candidate_snapshot_id=candidate_snapshot_id,
             evidence=item,
             evidence_digest=sha256_digest(_p1_evidence_payload(item)),
             matcher_policy_version=MATCHER_POLICY_VERSION,
@@ -1096,7 +1101,11 @@ def scan_event_candidate_projection(
         )
     entries = partition_executable_entries(
         scan.candidates,
-        evidence_by_event_id=_entry_bindings(scan.candidates, reader),
+        evidence_by_event_id=_entry_bindings(
+            scan.candidates,
+            reader,
+            candidate_snapshot_id=projection.snapshot_id,
+        ),
     )
     return scan, entries
 
@@ -1127,6 +1136,8 @@ def _entry_rows(entries: EntryPartitionResult) -> tuple[dict[str, Any], ...]:
             "entry_open_price": (
                 str(item.entry_open_price) if item.entry_open_price is not None else None
             ),
+            "candidate_snapshot_id": item.candidate.record.identity.snapshot_id,
+            "entry_source_snapshot_id": item.entry_source_snapshot_id,
             "entry_evidence_digest": item.entry_evidence_digest,
             "matcher_policy_version": item.matcher_policy_version,
         }

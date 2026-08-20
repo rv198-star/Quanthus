@@ -144,8 +144,12 @@ around that ADM. `run-p4-event-scan` builds the combined immutable Run package a
 
 The T+1 partition reuses the exact `P1DailyExecutionEvidence` constructed by the historical reader
 and the same P1-to-P2 buy-open adapter and rejection mapping used by `BacktestEngine`, including the
-accepted `NON_TRADING_OBSERVED` cancellation state. It classifies executable versus
-`not_executable` without creating an order or fill and without changing the candidate event id.
+accepted `NON_TRADING_OBSERVED` cancellation state. Candidate and source identities remain separate:
+`CandidateEntryEvidence.candidate_snapshot_id` must equal the event's exact ADM snapshot, while the
+original P1 execution-date `evidence.snapshot.snapshot_id` is preserved as source lineage and
+published as `entry_source_snapshot_id`. A distinct source snapshot is therefore valid; relabelling
+P1 evidence as the ADM snapshot is forbidden. It classifies executable versus `not_executable`
+without creating an order or fill and without changing the candidate event id.
 The remaining #74 acceptance work runs through the statically admitted
 `quanthus.p4-event-scan.v1` Event Worker (`queue=event`) rather than granting DevSpace direct DWD
 access. The Worker receives the protected DWD Base/correction and frozen research references as

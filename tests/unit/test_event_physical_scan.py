@@ -62,7 +62,7 @@ class _Bundle:
 class _Reader:
     def __init__(self, paths: dict[str, Path]) -> None:
         self.bundle = _Bundle(paths)
-        self.snapshot_id = ""
+        self.snapshot_id = "synthetic-direct-dwd-execution-source-v1"
 
     def execution_evidence_batch(
         self, requests: tuple[tuple[str, date], ...]
@@ -292,7 +292,6 @@ class EventPhysicalScanTests(unittest.TestCase):
             },
             output_root=self.root / "adm",
         )
-        reader.snapshot_id = projection.snapshot_id
         adm_manifest = json.loads(projection.manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(adm_manifest["schema_version"], "quanthus.p4-research-adm.v1")
         self.assertEqual(adm_manifest["logical_layer"], "research_adm")
@@ -333,6 +332,14 @@ class EventPhysicalScanTests(unittest.TestCase):
         self.assertEqual(entries.executable_events, 1)
         self.assertEqual(entries.not_executable_events, 0)
         self.assertEqual(scan.candidates[0].record.identity.security_id, "opaque-security-001")
+        self.assertEqual(
+            entries.records[0].entry_source_snapshot_id,
+            "synthetic-direct-dwd-execution-source-v1",
+        )
+        self.assertNotEqual(
+            entries.records[0].entry_source_snapshot_id,
+            scan.candidates[0].record.identity.snapshot_id,
+        )
 
     def test_event_package_binds_research_adm(self) -> None:
         reader, dwd_root = self._write_inputs()
@@ -350,7 +357,6 @@ class EventPhysicalScanTests(unittest.TestCase):
             },
             output_root=staging / "adm",
         )
-        reader.snapshot_id = adm.snapshot_id
         scan, entries = scan_event_candidate_projection(
             adm,
             reader=reader,  # type: ignore[arg-type]
@@ -539,7 +545,6 @@ class EventPhysicalScanTests(unittest.TestCase):
             },
             output_root=self.root / "adm-missing-industry",
         )
-        reader.snapshot_id = projection.snapshot_id
         unsigned = {
             "schema_version": "1.0.0",
             "mapping_version": "static-level1-concentration-research-v1",

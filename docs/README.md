@@ -143,8 +143,10 @@ nodes.
   concentration membership, and coverage evidence have one application-data boundary without
   expanding DWD or reviving ADS. ADM 1.1 resolves the 259 historical-only industry memberships via
   a checksum-bound fixed-date BaoStock/CSRC supplement while retaining DWD as the first authority.
-  The Event Worker remains unaccepted until two real 2012-2021 Jobs with identical governed input
-  reproduce identical Event Library identities and digests under Issue #74.
+  T+1 entry binding keeps the event's ADM snapshot identity separate from the original P1/P2
+  execution-source snapshot rather than rewriting source provenance. The Event Worker remains
+  unaccepted until two real 2012-2021 Jobs with identical governed input reproduce identical Event
+  Library identities and digests under Issue #74.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,
   retained PostgreSQL and candidate-Run volumes, and Traefik as the only product edge. The former

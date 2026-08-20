@@ -1050,7 +1050,10 @@ class DocumentTraceabilityTests(unittest.TestCase):
         recovery_path = root / "docs" / "acceptance" / "p4-event-v21-source-recovery-20260819.md"
         self.assertTrue(recovery_path.is_file())
         recovery = recovery_path.read_text(encoding="utf-8")
-        self.assertIn(source.semantic_digest, recovery)
+        self.assertIn(
+            "sha256:3b4992128ee40f8896e8b703806ea19b67da71e2ce60567a5f95021ee9a64489",
+            recovery,
+        )
         self.assertIn("74 passed", recovery)
         self.assertIn("1,158 passed and 3 skipped", recovery)
         physical_path = (
@@ -1058,9 +1061,23 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertTrue(physical_path.is_file())
         physical = physical_path.read_text(encoding="utf-8")
-        self.assertIn(source.semantic_digest, physical)
+        self.assertIn(
+            "sha256:3b4992128ee40f8896e8b703806ea19b67da71e2ce60567a5f95021ee9a64489",
+            physical,
+        )
         self.assertIn("run-p4-event-scan", physical)
         self.assertIn("two independently", physical)
+        remediation_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-production-zero-candidate-remediation-20260820.md"
+        )
+        self.assertTrue(remediation_path.is_file())
+        remediation = remediation_path.read_text(encoding="utf-8")
+        self.assertIn(source.semantic_digest, remediation)
+        self.assertIn("53,527", remediation)
+        self.assertIn("46,522", remediation)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

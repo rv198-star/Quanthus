@@ -9,7 +9,7 @@ import shutil
 import tempfile
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -23,6 +23,7 @@ from quanthus.event_library.rule_card import CandidateRuleCard, load_candidate_r
 from quanthus.event_library.scan import (
     CandidateDailyInput,
     CandidateEntryEvidence,
+    CandidateReason,
     CandidateScanResult,
     EntryPartitionResult,
     ScannedCandidate,
@@ -31,7 +32,7 @@ from quanthus.event_library.scan import (
 )
 from quanthus.event_library.source import EventScanSourcePolicy, load_event_scan_source_policy
 from quanthus.event_library.splits import SplitPolicy, load_split_policy
-from quanthus.industry_mapping import StaticIndustryMapping
+from quanthus.industry_mapping import StaticIndustryMapping, load_static_industry_mapping
 from quanthus.policy import find_project_root
 
 MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
@@ -48,6 +49,7 @@ class PhysicalEventScanError(RuntimeError):
 class EventCandidateProjection:
     root: Path
     candidate_path: Path
+    industry_mapping: StaticIndustryMapping
     projection_manifest_path: Path
     projection_manifest_sha256: str
     projection_content_digest: str
@@ -178,11 +180,137 @@ def _decimal(value: object | None) -> Decimal | None:
     return parsed
 
 
+def _materialize_dwd_static_industry_mapping(
+    *,
+    dwd_root: Path,
+    candidate_path: Path,
+    source_policy: EventScanSourcePolicy,
+    output_path: Path,
+) -> StaticIndustryMapping:
+    """Project current DWD company industry membership onto governed P4 security ids.
+
+    The mapping is deliberately static and non-PIT. It is used only after a raw event trigger
+    exists, for concentration control, and never as candidate signal input.
+    """
+
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise PhysicalEventScanError("P4 static industry projection requires duckdb") from exc
+
+    membership_paths = _table_paths(dwd_root, "dwd_company_industry_membership")
+    node_paths = _table_paths(dwd_root, "dwd_industry_node")
+    membership_expression = _read_parquet_expression(membership_paths)
+    node_expression = _read_parquet_expression(node_paths)
+    connection = duckdb.connect(":memory:")
+    try:
+        connection.execute(
+            f"""
+            CREATE VIEW p4_candidate_identities AS
+            SELECT DISTINCT dwd_security_id, dwd_company_id, listing_code, venue_id
+            FROM read_parquet({_sql_path(candidate_path)});
+
+            CREATE VIEW p4_static_industry_resolved AS
+            WITH membership AS (
+              SELECT * FROM {membership_expression}
+              WHERE knowledge_to IS NULL
+                AND membership_type='PRIMARY_CLASSIFICATION'
+            ),
+            nodes AS (
+              SELECT * FROM {node_expression}
+              WHERE knowledge_to IS NULL
+            )
+            SELECT candidate.dwd_security_id,
+                   candidate.dwd_company_id,
+                   candidate.listing_code,
+                   candidate.venue_id,
+                   CASE
+                     WHEN node.node_level=1 THEN node.industry_node_id
+                     WHEN node.node_level=2 AND parent.node_level=1
+                       THEN parent.industry_node_id
+                   END AS level1_industry_id
+            FROM p4_candidate_identities candidate
+            JOIN membership
+              ON membership.company_id=candidate.dwd_company_id
+            JOIN nodes node
+              ON node.industry_node_id=membership.industry_node_id
+            LEFT JOIN nodes parent
+              ON parent.industry_node_id=node.parent_node_id;
+            """
+        )
+        ambiguity = connection.execute(
+            """
+            SELECT count(*) FROM (
+              SELECT dwd_security_id
+              FROM p4_static_industry_resolved
+              WHERE level1_industry_id IS NOT NULL
+              GROUP BY dwd_security_id
+              HAVING count(DISTINCT level1_industry_id) <> 1
+            )
+            """
+        ).fetchone()
+        if ambiguity is None or int(ambiguity[0]):
+            raise PhysicalEventScanError(
+                "P4 DWD static industry projection contains ambiguous security membership"
+            )
+        rows = connection.execute(
+            """
+            WITH ranked AS (
+              SELECT dwd_security_id, listing_code, venue_id, level1_industry_id,
+                     row_number() OVER (
+                       PARTITION BY dwd_security_id
+                       ORDER BY listing_code, venue_id
+                     ) AS identity_rank
+              FROM p4_static_industry_resolved
+              WHERE level1_industry_id IS NOT NULL
+            )
+            SELECT dwd_security_id, listing_code, venue_id, level1_industry_id
+            FROM ranked
+            WHERE identity_rank=1
+            ORDER BY dwd_security_id
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    retrieved_at = datetime.combine(
+        source_policy.base_release.through_date,
+        time(23, 59, 59),
+        tzinfo=timezone.utc,
+    ).isoformat()
+    unsigned = {
+        "schema_version": "1.0.0",
+        "mapping_version": source_policy.static_industry_reference.version,
+        "usage": source_policy.static_industry_reference.usage,
+        "source": {
+            "provider": "quanthus-dwd-v2.1",
+            "endpoint": "dwd://industry_classification/static-level1-company-membership",
+            "retrieved_at": retrieved_at,
+            "source_revision": source_policy.base_release.package_id,
+        },
+        "memberships": [
+            {
+                "security_id": str(security_id),
+                "stock_code": str(stock_code),
+                "exchange": str(exchange),
+                "level1_industry_id": str(level1_industry_id),
+            }
+            for security_id, stock_code, exchange, level1_industry_id in rows
+        ],
+    }
+    _write_json(output_path, {**unsigned, "artifact_digest": _digest(unsigned)})
+    return load_static_industry_mapping(
+        output_path,
+        expected_version=source_policy.static_industry_reference.version,
+    )
+
+
 def _projection_identity(
     *,
     source_policy: EventScanSourcePolicy,
     provider_identity: Mapping[str, Any],
     candidate_path: Path,
+    industry_mapping: StaticIndustryMapping,
     row_count: int,
     trading_dates: Sequence[date],
 ) -> dict[str, Any]:
@@ -198,6 +326,13 @@ def _projection_identity(
         "dwd_base": source_policy.base_release.to_dict(),
         "dwd_correction": source_policy.correction_release.to_dict(),
         "static_industry_reference": source_policy.static_industry_reference.to_dict(),
+        "static_industry_projection": {
+            "path": "static_industry_mapping.json",
+            "mapping_version": industry_mapping.mapping_version,
+            "artifact_digest": industry_mapping.artifact_digest,
+            "sha256": _sha256(industry_mapping.path),
+            "membership_count": len(industry_mapping.memberships),
+        },
         "provider_id": provider_identity.get("provider_id"),
         "provider_version": provider_identity.get("provider_version"),
         "provider_config_digest": provider_identity.get("provider_config_digest"),
@@ -352,10 +487,17 @@ def materialize_event_candidate_projection(
             raise PhysicalEventScanError("P4 trading calendar returned a non-date value")
         source_policy.require_development_date(value)
 
+    industry_mapping = _materialize_dwd_static_industry_mapping(
+        dwd_root=dwd_root,
+        candidate_path=candidate_path,
+        source_policy=source_policy,
+        output_path=output_root / "static_industry_mapping.json",
+    )
     identity = _projection_identity(
         source_policy=source_policy,
         provider_identity=provider_identity,
         candidate_path=candidate_path,
+        industry_mapping=industry_mapping,
         row_count=row_count,
         trading_dates=trading_dates,
     )
@@ -368,6 +510,7 @@ def materialize_event_candidate_projection(
     return EventCandidateProjection(
         root=output_root.resolve(),
         candidate_path=candidate_path.resolve(),
+        industry_mapping=industry_mapping,
         projection_manifest_path=manifest_path.resolve(),
         projection_manifest_sha256=manifest_sha,
         projection_content_digest=content_digest,
@@ -616,6 +759,14 @@ def scan_event_candidate_projection(
         split_policy=split_policy,
         source_policy=source_policy,
     )
+    missing_industry = int(
+        scan.counters.reason_counts.get(CandidateReason.STATIC_INDUSTRY_MISSING.value, 0)
+    )
+    if missing_industry:
+        raise PhysicalEventScanError(
+            "P4 static industry projection does not cover all isolated candidates: "
+            f"missing={missing_industry}"
+        )
     entries = partition_executable_entries(
         scan.candidates,
         evidence_by_event_id=_entry_bindings(scan.candidates, reader),
@@ -856,15 +1007,10 @@ def build_physical_event_scan(
                 provider_identity=session.identity,
                 output_root=staging / "projection",
             )
-            industry = session.reader.load_industry_mapping(
-                expected_version=source_policy.static_industry_reference.version
-            )
-            if _sha256(industry.path) != source_policy.static_industry_reference.sha256:
-                raise PhysicalEventScanError("P4 static industry mapping checksum differs")
             scan, entries = scan_event_candidate_projection(
                 projection,
                 reader=session.reader,
-                industry_mapping=industry,
+                industry_mapping=projection.industry_mapping,
                 source_policy=source_policy,
                 card=card,
                 split_policy=split_policy,

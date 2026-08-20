@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, development-only economic-availability projection, streaming physical event projection, pure forward-trigger, reconciliation, and P1/P2-backed T+1 entry partition implemented; full 2012-2021 runtime scan and independent digest replay pending |
+| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, development-only economic-availability projection, DWD-native static-industry identity projection, streaming physical event projection, pure forward-trigger, reconciliation, and P1/P2-backed T+1 entry partition implemented; production rerun and independent digest replay pending |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -62,9 +62,11 @@ intraday range and CNY turnover, normalizes each against its own previous 20 eli
 defines quiet as both activity ratios at or below `0.80`, and defines active as both at or above
 `1.50`. The edge is `quiet(T-1) -> active(T)`. The card also freezes PIT inputs, 22-session minimum
 history, listing/tradability/corporate-action exclusions, 22-session same-security isolation, and
-deterministic static-level-one-industry concentration sampling. The industry mapping is the
-versioned `static_non_pit_concentration_only` artifact already authorized by P0; it is never a
-candidate signal or reconstructed historical membership.
+deterministic static-level-one-industry concentration sampling. The industry mapping remains the
+versioned `static_non_pit_concentration_only` contract already authorized by P0; the physical P4
+path materializes that static grouping from the current DWD V2.1 company-industry classification
+onto governed DWD `security_id` values. It is never a candidate signal or reconstructed historical
+membership.
 
 The exact card digest is human-approved and bound to the approval record in GitHub Issue #73.
 `CandidateRuleCard.require_stage_b_authority()` now admits Stage B only for this approved semantic
@@ -81,10 +83,12 @@ validation rejects duplicate identities or one event assigned to multiple splits
 `config/p4-event-scan-source.research.v1.json` now binds the accepted
 `dwd-base-202607-v2.1` plus `dwd-base-202607-v2.1-correction-20260813-001` and reuses the exact
 research-only direct-DWD contract in `config/replay-data-provider.development.v2.json`. The source
-contract is development-only, requires the immutable Base/correction identities and static-industry
-reference digest, and explicitly forbids the old dual-lane DWD/DWS, operational or portable ADS,
-release sets, and mutable `CURRENT` pointers. Post-2021 Daily increments are not inputs to the
-initial 2012-2021 event scan.
+contract is development-only and requires the immutable Base/correction identities. Source-policy
+2.1 projects static concentration membership from `dwd_company_industry_membership` and
+`dwd_industry_node` onto governed DWD securities, instead of treating the P3 1,687-security replay
+mapping as a P4 full-market identity authority. The old dual-lane DWD/DWS, operational or portable
+ADS, release sets, and mutable `CURRENT` pointers remain forbidden. Post-2021 Daily increments are
+not inputs to the initial 2012-2021 event scan.
 
 V2.1 closes the Base-remediation work but intentionally does not claim that its reconstructed
 historical `knowledge_from` values were published with the same content on the original dates. P4
@@ -110,19 +114,23 @@ has no hidden floating-point or rounding policy. The production API streams one 
 series at a time and retains only raw triggers globally, avoiding a full-market Python row materialization.
 It permits non-overlapping relisting intervals for one security while keeping cooldown/isolation at
 the security level. Static industry membership is intentionally applied only after raw-trigger
-formation for concentration control; missing industry mapping can reject a triggered event but
-cannot manufacture or suppress the underlying trigger. The implementation reconciles evaluated
-rows, raw triggers, same-security isolation, deterministic concentration sampling, split rejection,
-and retained candidate events with zero unexplained loss. It does not accept returns, labels, fills,
-or post-T features.
+formation for concentration control and is keyed by the same governed DWD `security_id` used by
+event identity. A physical scan now fails closed if any isolated raw trigger lacks static-industry
+coverage; missing membership cannot silently turn a valid full-market trigger set into an empty or
+partial event library. The implementation reconciles evaluated rows, raw triggers, same-security
+isolation, deterministic concentration sampling, split rejection, and retained candidate events
+with zero unexplained loss. It does not accept returns, labels, fills, or post-T features.
 
 `src/quanthus/event_library/physical_scan.py` now implements the bounded physical path. It reuses
 the accepted Direct-DWD job-local provider, carries DWD internal security/listing/company identity,
 retains exact Decimal OHLC/turnover alongside the legacy replay columns, preserves raw DWD
 knowledge/source lineage, applies correction-001 tradability, and emits a checksum-bound candidate
-projection before scanning. The projection, events, entry partition, summary, manifest, and READY
-marker are published as one immutable research-only package. `run-p4-event-scan` builds that package
-and `verify-p4-event-scan` independently verifies its physical inventory and digests.
+projection before scanning. The same projection materializes a deterministic static level-one
+industry artifact by joining candidate `dwd_company_id` to current DWD company-industry membership
+and resolving its level-one parent, then keys the result by candidate `dwd_security_id`. The
+projection, static-industry artifact, events, entry partition, summary, manifest, and READY marker
+are published as one immutable research-only package. `run-p4-event-scan` builds that package and
+`verify-p4-event-scan` independently verifies its physical inventory and digests.
 
 The T+1 partition reuses the exact `P1DailyExecutionEvidence` constructed by the historical reader
 and the same P1-to-P2 buy-open adapter and rejection mapping used by `BacktestEngine`, including the

@@ -15,8 +15,16 @@ import time
 from pathlib import Path
 from typing import Any
 
-from quanthus.platform.jobs import CANDIDATE_REPLAY_JOB
+from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput
+from quanthus.platform.jobs import CANDIDATE_REPLAY_JOB, EXPERT_EVALUATION_JOB
 from quanthus.platform.persistence import PostgresPlatformStore
+from quanthus.platform.worker_handlers import (
+    EXPERT_STAGE_PROGRESS,
+    ExpertChildResult,
+    expert_child_command,
+    find_expert_run_for_input,
+    validate_expert_child_result,
+)
 
 STAGE_PROGRESS = {
     "loading-contracts": 2,
@@ -145,6 +153,8 @@ class ReplayWorker:
         lease_seconds: int,
         renew_seconds: float,
         terminate_seconds: float,
+        expert_run_root: Path | None = None,
+        expert_registry_root: Path | None = None,
     ) -> None:
         self.store = store
         self.worker_id = worker_id
@@ -152,13 +162,22 @@ class ReplayWorker:
         self.lease_seconds = lease_seconds
         self.renew_seconds = renew_seconds
         self.terminate_seconds = terminate_seconds
+        self.expert_run_root = (expert_run_root or self.run_root / "expert-evaluations").resolve()
+        self.expert_registry_root = (
+            expert_registry_root or Path("config/expert-evaluations")
+        ).resolve()
         self.stopping = False
 
     def run_once(self) -> bool:
         job = self.store.claim_job("replay", self.worker_id, self.lease_seconds)
         if job is None:
             return False
-        if job.kind != CANDIDATE_REPLAY_JOB:
+        handlers = {
+            CANDIDATE_REPLAY_JOB: self._execute,
+            EXPERT_EVALUATION_JOB: self._execute_expert,
+        }
+        handler = handlers.get(job.kind)
+        if handler is None:
             self.store.finish_claimed_job(
                 job.job_id,
                 job.claim_generation,
@@ -168,7 +187,7 @@ class ReplayWorker:
             )
             return True
         try:
-            self._execute(job.job_id, job.claim_generation, job.input_ref)
+            handler(job.job_id, job.claim_generation, job.input_ref)
         except Exception as exc:
             reason = f"worker_error:{type(exc).__name__}:{exc}"[:500]
             try:
@@ -183,6 +202,172 @@ class ReplayWorker:
                 if str(stale) != "stale_claim_generation":
                     raise
         return True
+
+    def _execute_expert(
+        self, job_id: str, generation: int, input_ref: dict[str, Any]
+    ) -> None:
+        observed = self.store.get_job(job_id)
+        if observed is None or observed.claim_generation != generation:
+            return
+        job_input = ExpertEvaluationJobInput.from_dict(input_ref)
+        if job_input.input_digest != observed.input_digest:
+            raise RuntimeError("expert_input_digest_mismatch")
+        run_root = self.expert_run_root / "runs"
+        existing = self.store.expert_evaluation_run_for_input(observed.input_digest)
+        recovered: ExpertChildResult | None
+        if existing is not None:
+            recovered = validate_expert_child_result(
+                {
+                    "run_id": existing.run_id,
+                    "artifact_ref": existing.artifact_ref,
+                    "manifest_digest": existing.manifest_digest,
+                    "evaluation_identities": list(existing.evaluation_identities),
+                    "strategy_identity": existing.strategy_identity,
+                    "summary": existing.summary,
+                },
+                run_root,
+            )
+        else:
+            recovered = find_expert_run_for_input(run_root, observed.input_digest)
+        if recovered is not None:
+            self.store.update_claimed_job(
+                job_id,
+                generation,
+                stage="recovering-sealed-run",
+                progress=98,
+                progress_detail={"run_id": recovered.run.run_id},
+            )
+            self.store.publish_expert_evaluation_run(
+                job_id,
+                generation,
+                run_id=recovered.run.run_id,
+                artifact_ref=str(recovered.run.root),
+                manifest_digest=recovered.run.manifest_digest,
+                evaluation_identities=recovered.evaluation_identities,
+                strategy_identity=recovered.strategy_identity,
+                summary=recovered.summary,
+            )
+            return
+        attempt = self.expert_run_root / ".staging" / job_id / str(generation)
+        if attempt.exists():
+            shutil.rmtree(attempt)
+        attempt.mkdir(parents=True)
+        input_path = attempt / "input.json"
+        input_path.write_bytes(job_input.canonical_bytes)
+        stdout_path = attempt / "result.json"
+        stderr_path = attempt / "progress.log"
+        command = expert_child_command(
+            input_path=input_path,
+            registry_root=self.expert_registry_root,
+            staging=attempt / "work",
+            run_root=run_root,
+        )
+        with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+            process = subprocess.Popen(command, stdout=stdout, stderr=stderr)  # noqa: S603
+        last_renewal = time.monotonic()
+        progress_offset = 0
+        canceled = False
+        lost_lease = False
+        while process.poll() is None:
+            time.sleep(1)
+            progress_offset = self._publish_expert_progress(
+                stderr_path, progress_offset, job_id, generation
+            )
+            current = self.store.get_job(job_id)
+            if current is None or current.claim_generation != generation:
+                lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
+            if current.cancel_requested:
+                canceled = True
+                _terminate(process, self.terminate_seconds)
+                break
+            if self.stopping:
+                lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
+            if time.monotonic() - last_renewal >= self.renew_seconds:
+                if not self.store.renew_job_lease(
+                    job_id, generation, self.worker_id, self.lease_seconds
+                ):
+                    lost_lease = True
+                    _terminate(process, self.terminate_seconds)
+                    break
+                last_renewal = time.monotonic()
+        self._publish_expert_progress(stderr_path, progress_offset, job_id, generation)
+        if lost_lease:
+            return
+        if canceled:
+            self.store.finish_claimed_job(
+                job_id, generation, state="canceled", result_ref=None, error_reason=None
+            )
+            return
+        if process.returncode != 0 or not stdout_path.is_file():
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="failed",
+                result_ref=None,
+                error_reason=f"expert_child_exit_{process.returncode}",
+            )
+            return
+        try:
+            payload = json.loads(stdout_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError("expert_child_result_unreadable") from exc
+        child = validate_expert_child_result(payload, run_root)
+        manifest_input = ExpertEvaluationJobInput.from_dict(child.run.manifest["job_input"])
+        if manifest_input.input_digest != observed.input_digest:
+            raise RuntimeError("expert_run_input_mismatch")
+        self.store.update_claimed_job(
+            job_id,
+            generation,
+            stage="publishing-run",
+            progress=99,
+            progress_detail={"run_id": child.run.run_id},
+        )
+        self.store.publish_expert_evaluation_run(
+            job_id,
+            generation,
+            run_id=child.run.run_id,
+            artifact_ref=str(child.run.root),
+            manifest_digest=child.run.manifest_digest,
+            evaluation_identities=child.evaluation_identities,
+            strategy_identity=child.strategy_identity,
+            summary=child.summary,
+        )
+
+    def _publish_expert_progress(
+        self, path: Path, offset: int, job_id: str, generation: int
+    ) -> int:
+        with path.open("rb") as stream:
+            stream.seek(offset)
+            lines = stream.readlines()
+            next_offset = stream.tell()
+        for raw_line in lines:
+            try:
+                event = json.loads(raw_line.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if event.get("event") != "expert-evaluation-progress":
+                continue
+            stage = str(event.get("stage", "running"))
+            detail = event.get("detail")
+            if not isinstance(detail, dict):
+                detail = {}
+            try:
+                self.store.update_claimed_job(
+                    job_id,
+                    generation,
+                    stage=stage,
+                    progress=EXPERT_STAGE_PROGRESS.get(stage, 5),
+                    progress_detail=detail,
+                )
+            except RuntimeError as exc:
+                if str(exc) == "stale_claim_generation":
+                    return next_offset
+                raise
+        return next_offset
 
     def _execute(self, job_id: str, generation: int, input_ref: dict[str, Any]) -> None:
         observed = self.store.get_job(job_id)
@@ -385,6 +570,12 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError("QUANTHUS_PLATFORM_DATABASE_URL is required")
     worker_id = os.environ.get("QUANTHUS_WORKER_ID", "").strip() or socket.gethostname()
     run_root = Path(os.environ.get("QUANTHUS_CANDIDATE_RUN_ROOT", "/data/candidate-runs"))
+    expert_run_root = Path(
+        os.environ.get("QUANTHUS_EXPERT_RUN_ROOT", "/data/expert-evaluation-runs")
+    )
+    expert_registry_root = Path(
+        os.environ.get("QUANTHUS_EXPERT_REGISTRY_ROOT", "/app/config/expert-evaluations")
+    )
     worker = ReplayWorker(
         PostgresPlatformStore(dsn),
         worker_id=worker_id,
@@ -392,6 +583,8 @@ def main(argv: list[str] | None = None) -> int:
         lease_seconds=args.lease_seconds,
         renew_seconds=args.renew_seconds,
         terminate_seconds=args.terminate_seconds,
+        expert_run_root=expert_run_root,
+        expert_registry_root=expert_registry_root,
     )
 
     def stop(_signum: int, _frame: object) -> None:

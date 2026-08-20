@@ -124,3 +124,17 @@ class CandidateActiveRunRecord:
     run_id: str
     evidence_digest: str
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ExpertEvaluationRunRecord:
+    run_id: str
+    job_id: str
+    claim_generation: int
+    input_digest: str
+    artifact_ref: str
+    manifest_digest: str
+    evaluation_identities: tuple[dict[str, Any], ...]
+    strategy_identity: dict[str, Any] | None
+    summary: dict[str, Any]
+    created_at: datetime

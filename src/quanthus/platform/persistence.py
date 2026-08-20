@@ -15,6 +15,7 @@ from quanthus.platform.models import (
     CandidateApprovalEventRecord,
     CandidateReviewRecord,
     CandidateRunRecord,
+    ExpertEvaluationRunRecord,
     JobRecord,
     SecurityAuditRecord,
     SessionRecord,
@@ -119,6 +120,25 @@ class PlatformStore(Protocol):
         expected_active_runs: dict[str, str | None],
     ) -> tuple[CandidateRunRecord, JobRecord]: ...
 
+    def expert_evaluation_run(self, run_id: str) -> ExpertEvaluationRunRecord | None: ...
+
+    def expert_evaluation_run_for_input(
+        self, input_digest: str
+    ) -> ExpertEvaluationRunRecord | None: ...
+
+    def publish_expert_evaluation_run(
+        self,
+        job_id: str,
+        claim_generation: int,
+        *,
+        run_id: str,
+        artifact_ref: str,
+        manifest_digest: str,
+        evaluation_identities: tuple[dict[str, Any], ...],
+        strategy_identity: dict[str, Any] | None,
+        summary: dict[str, Any],
+    ) -> tuple[ExpertEvaluationRunRecord, JobRecord]: ...
+
     def append_candidate_review(self, review: CandidateReviewRecord) -> None: ...
 
     def candidate_reviews(
@@ -146,6 +166,7 @@ class InMemoryPlatformStore:
         self._candidate_approval_events: list[CandidateApprovalEventRecord] = []
         self._candidate_runs: dict[str, CandidateRunRecord] = {}
         self._candidate_active_runs: dict[tuple[str, str], CandidateActiveRunRecord] = {}
+        self._expert_evaluation_runs: dict[str, ExpertEvaluationRunRecord] = {}
         self._migrations: set[str] = set()
         self._lock = threading.RLock()
 
@@ -464,6 +485,48 @@ class InMemoryPlatformStore:
         )
         raise RuntimeError("candidate Run publication requires PostgreSQL")
 
+    def expert_evaluation_run(self, run_id: str) -> ExpertEvaluationRunRecord | None:
+        with self._lock:
+            return self._expert_evaluation_runs.get(run_id)
+
+    def expert_evaluation_run_for_input(
+        self, input_digest: str
+    ) -> ExpertEvaluationRunRecord | None:
+        with self._lock:
+            runs = (
+                item
+                for item in self._expert_evaluation_runs.values()
+                if item.input_digest == input_digest
+            )
+            return next(
+                iter(sorted(runs, key=lambda item: (item.created_at, item.run_id), reverse=True)),
+                None,
+            )
+
+    def publish_expert_evaluation_run(
+        self,
+        job_id: str,
+        claim_generation: int,
+        *,
+        run_id: str,
+        artifact_ref: str,
+        manifest_digest: str,
+        evaluation_identities: tuple[dict[str, Any], ...],
+        strategy_identity: dict[str, Any] | None,
+        summary: dict[str, Any],
+    ) -> tuple[ExpertEvaluationRunRecord, JobRecord]:
+        del (
+            job_id,
+            claim_generation,
+            run_id,
+            artifact_ref,
+            manifest_digest,
+            evaluation_identities,
+            strategy_identity,
+            summary,
+        )
+        raise RuntimeError("expert-evaluation Run publication requires PostgreSQL")
+
     def append_candidate_review(self, review: CandidateReviewRecord) -> None:
         with self._lock:
             if any(item.review_id == review.review_id for item in self._candidate_reviews):
@@ -525,8 +588,8 @@ class PostgresPlatformStore:
         if self._connect_override is not None:
             return self._connect_override(self._dsn)
         try:
-            import psycopg  # type: ignore[import-not-found]
-            from psycopg.rows import dict_row  # type: ignore[import-not-found]
+            import psycopg
+            from psycopg.rows import dict_row
         except ImportError as exc:
             raise RuntimeError("install Quanthus with the platform dependency group") from exc
         return psycopg.connect(self._dsn, row_factory=dict_row)
@@ -1034,7 +1097,7 @@ class PostgresPlatformStore:
                 """,
                 (lease_seconds, job_id, claim_generation, worker_id),
             )
-            return cursor.rowcount == 1
+            return bool(cursor.rowcount == 1)
 
     def update_claimed_job(
         self,
@@ -1266,6 +1329,153 @@ class PostgresPlatformStore:
                 "result_sha256": result_sha256,
                 "candidate_count": len(candidates),
                 "active_switch_applied": switch,
+            }
+            cursor.execute(
+                """
+                UPDATE platform_jobs SET
+                    state = 'succeeded', stage = 'succeeded', progress = 100,
+                    result_ref = %s::jsonb, error_reason = NULL,
+                    lease_expires_at = NULL, updated_at = CURRENT_TIMESTAMP,
+                    completed_at = CURRENT_TIMESTAMP
+                WHERE job_id = %s AND claim_generation = %s AND state = 'running'
+                  AND NOT cancel_requested
+                RETURNING *
+                """,
+                (
+                    json.dumps(result_ref, ensure_ascii=True, sort_keys=True),
+                    job_id,
+                    claim_generation,
+                ),
+            )
+            terminal = self._job(cursor.fetchone())
+            if terminal is None:
+                raise RuntimeError("stale_claim_generation")
+            return run, terminal
+
+    @staticmethod
+    def _expert_evaluation_run(row: dict[str, Any]) -> ExpertEvaluationRunRecord:
+        return ExpertEvaluationRunRecord(
+            run_id=row["run_id"],
+            job_id=row["job_id"],
+            claim_generation=row["claim_generation"],
+            input_digest=row["input_digest"],
+            artifact_ref=row["artifact_ref"],
+            manifest_digest=row["manifest_digest"],
+            evaluation_identities=tuple(row["evaluation_identities"]),
+            strategy_identity=row["strategy_identity"],
+            summary=row["summary"],
+            created_at=row["created_at"],
+        )
+
+    def expert_evaluation_run(self, run_id: str) -> ExpertEvaluationRunRecord | None:
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM platform_expert_evaluation_runs WHERE run_id = %s",
+                (run_id,),
+            )
+            row = cursor.fetchone()
+            return self._expert_evaluation_run(row) if row else None
+
+    def expert_evaluation_run_for_input(
+        self, input_digest: str
+    ) -> ExpertEvaluationRunRecord | None:
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM platform_expert_evaluation_runs
+                WHERE input_digest = %s
+                ORDER BY created_at DESC, run_id DESC
+                LIMIT 1
+                """,
+                (input_digest,),
+            )
+            row = cursor.fetchone()
+            return self._expert_evaluation_run(row) if row else None
+
+    def publish_expert_evaluation_run(
+        self,
+        job_id: str,
+        claim_generation: int,
+        *,
+        run_id: str,
+        artifact_ref: str,
+        manifest_digest: str,
+        evaluation_identities: tuple[dict[str, Any], ...],
+        strategy_identity: dict[str, Any] | None,
+        summary: dict[str, Any],
+    ) -> tuple[ExpertEvaluationRunRecord, JobRecord]:
+        identities = {
+            (item.get("assessment_id"), item.get("assessment_version"), item.get("digest"))
+            for item in evaluation_identities
+        }
+        if not evaluation_identities or len(identities) != len(evaluation_identities):
+            raise ValueError("expert-evaluation identities must be non-empty and unique")
+        encoded_identities = json.dumps(
+            evaluation_identities, ensure_ascii=True, sort_keys=True
+        )
+        encoded_strategy = (
+            json.dumps(strategy_identity, ensure_ascii=True, sort_keys=True)
+            if strategy_identity is not None
+            else None
+        )
+        encoded_summary = json.dumps(summary, ensure_ascii=True, sort_keys=True)
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM platform_jobs
+                WHERE job_id = %s AND claim_generation = %s AND state = 'running'
+                FOR UPDATE
+                """,
+                (job_id, claim_generation),
+            )
+            job = self._job(cursor.fetchone())
+            if job is None or job.cancel_requested:
+                raise RuntimeError("stale_claim_generation")
+            cursor.execute(
+                """
+                INSERT INTO platform_expert_evaluation_runs
+                    (run_id, job_id, claim_generation, input_digest, artifact_ref,
+                     manifest_digest, evaluation_identities, strategy_identity, summary)
+                VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
+                ON CONFLICT DO NOTHING
+                RETURNING *
+                """,
+                (
+                    run_id,
+                    job_id,
+                    claim_generation,
+                    job.input_digest,
+                    artifact_ref,
+                    manifest_digest,
+                    encoded_identities,
+                    encoded_strategy,
+                    encoded_summary,
+                ),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                cursor.execute(
+                    "SELECT * FROM platform_expert_evaluation_runs WHERE run_id = %s",
+                    (run_id,),
+                )
+                row = cursor.fetchone()
+            if row is None:
+                raise RuntimeError("expert_run_registration_conflict")
+            run = self._expert_evaluation_run(row)
+            if (
+                run.input_digest != job.input_digest
+                or run.artifact_ref != artifact_ref
+                or run.manifest_digest != manifest_digest
+                or run.evaluation_identities != evaluation_identities
+                or run.strategy_identity != strategy_identity
+                or run.summary != summary
+            ):
+                raise RuntimeError("expert_run_registration_conflict")
+            result_ref = {
+                "run_id": run_id,
+                "artifact_ref": artifact_ref,
+                "manifest_digest": manifest_digest,
+                "evaluation_count": len(evaluation_identities),
             }
             cursor.execute(
                 """

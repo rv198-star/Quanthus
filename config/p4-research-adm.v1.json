@@ -22,7 +22,7 @@
     "expected_security_count": 259,
     "hierarchy_path": "config/pipelines/csrc-industry-hierarchy.v1.json",
     "hierarchy_sha256": "sha256:fedcd39375e4de8a1dd6da28e63e119f0f50c6d818f429f58e8e30e62e6ff8e6",
-    "source_content_digest": "sha256:609fe99ea5eb2d29237a5c0112779ae58491270a80f390f099fb798de07382c9"
+    "source_content_digest": "sha256:20b51d52070b8976f9f8989ff0f54124aea098ca749167bedbddbed947c3196b"
   },
   "allowed_uses": [
     "candidate_signal_input",
@@ -37,5 +37,5 @@
     "operational_ads",
     "execution_authority"
   ],
-  "semantic_digest": "sha256:ace9e9a864e143f6b37bdea7539d83114d2d0102e6acd4def4865441f316213c"
+  "semantic_digest": "sha256:4ac838ac190d89847edfd93b29a876028dc599818be24f123810311c36e0c7c1"
 }

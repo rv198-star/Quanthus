@@ -135,7 +135,7 @@ thin `P4 Research ADM` under `adm/`: `candidate_daily.parquet`, `static_industry
 Current DWD industry membership remains the first mapping authority; the 259 historical-only
 securities are filled only by ADM 1.1's checksum-bound fixed-date BaoStock `证监会行业分类`
 supplement. Its complete selected source content must reproduce
-`sha256:609fe99ea5eb2d29237a5c0112779ae58491270a80f390f099fb798de07382c9`
+`sha256:20b51d52070b8976f9f8989ff0f54124aea098ca749167bedbddbed947c3196b`
 before scanning continues. The ADM is application data only: it is not
 DWD, generic DWS, operational ADS, or an execution authority. Event identity binds the exact ADM
 snapshot manifest. The Event Library then adds events, entry partition, summary, manifest, and READY

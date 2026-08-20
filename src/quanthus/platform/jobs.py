@@ -22,6 +22,7 @@ EXPERT_EVALUATION_JOB = "quanthus.expert-evaluation.v1"
 P4_EVENT_SCAN_JOB = "quanthus.p4-event-scan.v1"
 EVENT_RUN_ROOT = Path("/data/event-runs")
 EVENT_SUMMARY_MAX_BYTES = 1024 * 1024
+EVENT_FAILURE_LOG_MAX_BYTES = 64 * 1024
 P4_INDUSTRY_MAPPING_PATH = Path(
     "/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1/"
     "tables/static_industry_mapping.json"
@@ -107,6 +108,36 @@ def _industry_mapping_identity_summary() -> dict[str, Any]:
         "mapping_version": raw.get("mapping_version"),
         "membership_count": len(memberships),
         "security_id_namespace_counts": counts,
+    }
+
+
+def _event_scan_failure(job: JobRecord) -> dict[str, Any] | None:
+    if job.kind != P4_EVENT_SCAN_JOB or job.state != "failed":
+        return None
+    generation = job.claim_generation
+    if generation <= 0:
+        return {"status": "generation_missing"}
+    try:
+        root = EVENT_RUN_ROOT.resolve()
+        staging = (root / ".staging" / job.job_id / str(generation)).resolve()
+    except OSError:
+        return {"status": "staging_path_unresolvable"}
+    if root not in staging.parents:
+        return {"status": "staging_outside_event_root"}
+    stderr_path = staging / "stderr.log"
+    try:
+        if not stderr_path.is_file():
+            return {"status": "stderr_missing"}
+        size = stderr_path.stat().st_size
+        if size > EVENT_FAILURE_LOG_MAX_BYTES:
+            return {"status": "stderr_too_large", "size_bytes": size}
+        stderr = stderr_path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return {"status": "stderr_unreadable"}
+    return {
+        "status": "available",
+        "stderr": stderr,
+        "size_bytes": size,
     }
 
 
@@ -210,6 +241,9 @@ def public_job(job: JobRecord) -> dict[str, Any]:
     event_summary = _event_scan_summary(job)
     if event_summary is not None:
         value["event_scan_summary"] = event_summary
+    event_failure = _event_scan_failure(job)
+    if event_failure is not None:
+        value["event_scan_failure"] = event_failure
     return value
 
 

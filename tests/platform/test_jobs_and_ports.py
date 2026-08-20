@@ -113,6 +113,47 @@ def test_public_event_job_exposes_bounded_scan_counters(tmp_path, monkeypatch) -
     }
 
 
+def test_public_failed_event_job_exposes_bounded_stderr(tmp_path, monkeypatch) -> None:
+    job_id = "job_abcdefabcdefabcdefabcdefabcdefab"
+    staging = tmp_path / ".staging" / job_id / "2"
+    staging.mkdir(parents=True)
+    (staging / "stderr.log").write_text(
+        "P4 static industry coverage missing 17 isolated trigger securities\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("quanthus.platform.jobs.EVENT_RUN_ROOT", tmp_path)
+    now = datetime.now(timezone.utc)
+    job = JobRecord(
+        job_id=job_id,
+        kind=P4_EVENT_SCAN_JOB,
+        actor_user_id="usr_test",
+        idempotency_key="event-failure-test",
+        input_ref={},
+        input_digest="sha256:test",
+        queue="event",
+        concurrency_key="p4-event-scan:test",
+        state="failed",
+        stage="failed",
+        progress=5,
+        cancel_requested=False,
+        attempt=1,
+        result_ref=None,
+        error_reason="event_scan_child_exit_2",
+        created_at=now,
+        updated_at=now,
+        started_at=now,
+        completed_at=now,
+        claimed_by="event-test",
+        claim_generation=2,
+    )
+
+    assert public_job(job)["event_scan_failure"] == {
+        "status": "available",
+        "stderr": "P4 static industry coverage missing 17 isolated trigger securities",
+        "size_bytes": 67,
+    }
+
+
 def test_public_event_job_does_not_read_summary_outside_event_root(tmp_path, monkeypatch) -> None:
     outside = tmp_path.parent / "outside-event-run-test"
     event_library = outside / "event-library"

@@ -69,7 +69,8 @@ nodes.
   predecessor of the first target/resolver. Its result-bearing DWD evaluation also waits for
   `P3-EXPERT-002`. The additive v2 protocol and deterministic PostgreSQL Worker pipeline are
   accepted under `P3-EXPERT-001` and `P3-EXPERT-002`. `P4-LABEL-001` is now accepted and
-  `P3-EXPERT-003` has an outcome-blind exact target-reuse proposal awaiting human approval; later
+  `P3-EXPERT-003` has a human-approved exact target-reuse decision for a 2020-2021
+  engineering-only proof; later
   formal-strategy, attribution, workbench, and forward-Shadow-disposition work remains
   dependency-gated, development-only, and unable to open P5/P6 or sealed data.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio

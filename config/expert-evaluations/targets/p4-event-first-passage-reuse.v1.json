@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "decision_id": "expert-target.p4-event-first-passage-reuse",
   "decision_version": "1.0.0",
-  "lifecycle": "draft",
+  "lifecycle": "approved",
   "owner": "P3-EXPERT-003",
   "purpose": "Evaluate one outcome-blind T-close trend-stability assessment against the already approved P4 first-passage event outcome without creating a second settlement truth.",
   "reuse_decision": "reuse_p4_label_cards",
@@ -30,15 +30,18 @@
     "split_policy_version": "1.0.0",
     "split_policy_digest": "sha256:10c58c9f402327b2c1e9e3ba9782cce909216b795018b89586bc5a9b210fb684",
     "required_partition": "development",
-    "inclusion_rule": "all_retained_p4_candidates_before_entry_or_outcome_evidence; observation_input_failure_becomes_abstention",
+    "evaluation_start": "2020-01-01",
+    "evaluation_end": "2021-12-31",
+    "inclusion_rule": "all_retained_p4_candidates_from_2020-01-01_through_2021-12-31_before_entry_or_outcome_evidence; observation_input_failure_becomes_abstention",
     "outcome_independent": true,
-    "predicate_digest": "sha256:e3fe6155dc33169b9eba7cfcbd6a669d50737902d4a23e9005bfc9ce71ec1308"
+    "predicate_digest": "sha256:a66195a194933ca3b0e3850c7fb515a28b5125eff1b29241d13f953565c9961c"
   },
   "intended_strategy_population": {
-    "role": "mandatory_predeclared_slice",
+    "role": "engineering_proof_only",
+    "action_use": "blocked_until_formal_strategy_population_evaluation",
     "predicate_id": "population.p4-development-candidates",
     "predicate_version": "1.0.0",
-    "predicate_digest": "sha256:e3fe6155dc33169b9eba7cfcbd6a669d50737902d4a23e9005bfc9ce71ec1308"
+    "predicate_digest": "sha256:a66195a194933ca3b0e3850c7fb515a28b5125eff1b29241d13f953565c9961c"
   },
   "observation": {
     "anchor_rule": "candidate_t_close",
@@ -68,9 +71,10 @@
       "baseline_version": "1.0.0",
       "definition": "predict neutral for every settled applicable event without reading class frequencies"
     },
+    "claim_scope": "engineering_settleability_only",
     "hypothesis_family": [
-      "confirmatory_single_expert_single_target",
-      "trend_stability_maoe_is_lower_than_always_neutral"
+      "technical_single_expert_single_target",
+      "worker_produces_reproducible_observations_settlements_ledger_and_scorecard"
     ],
     "slices": [
       {
@@ -116,24 +120,19 @@
         "disposition": "block_publication"
       },
       {
-        "condition_id": "stop.coverage-below-0.80",
-        "rule": "applicable_divided_by_eligible_below_0.80",
+        "condition_id": "stop.pit-leakage",
+        "rule": "observation_identity_or_feature_lineage_contains_post_t_close_evidence",
+        "disposition": "block_publication"
+      },
+      {
+        "condition_id": "stop.empty-engineering-corpus",
+        "rule": "eligible_or_settled_observation_count_is_zero",
         "disposition": "inconclusive"
       },
       {
-        "condition_id": "stop.unavailable-rate-above-0.05",
-        "rule": "unavailable_divided_by_applicable_above_0.05",
-        "disposition": "inconclusive"
-      },
-      {
-        "condition_id": "stop.effective-blocks-below-24",
-        "rule": "settled_effective_nonoverlap_time_blocks_below_24",
-        "disposition": "inconclusive"
-      },
-      {
-        "condition_id": "stop.no-primary-improvement",
-        "rule": "upper_95pct_block_bootstrap_bound_of_expert_minus_baseline_maoe_is_not_below_0",
-        "disposition": "inconclusive"
+        "condition_id": "stop.artifact-verification-failure",
+        "rule": "published_observation_settlement_ledger_or_scorecard_artifact_fails_checksum_or_row_count_verification",
+        "disposition": "block_publication"
       }
     ]
   },
@@ -141,12 +140,13 @@
     "This decision does not authorize opening arbitration or permanent-blind data.",
     "Ordinal assessment quality does not establish strategy profitability or action authority.",
     "The always-neutral baseline is predeclared and is not selected from observed class frequencies.",
+    "The 2020-2021 scorecard is descriptive engineering evidence and cannot establish expert effectiveness or strategy admission.",
     "The target, metric, slices, or stop conditions cannot be changed in place after result access."
   ],
   "governance": {
-    "approval_state": "pending_human_approval",
+    "approval_state": "approved",
     "approval_authority": "human",
-    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/148"
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/148#issuecomment-5371293034"
   },
-  "semantic_digest": "sha256:b15ce3f844e31c485ee982449276324d1c3c53a3f4ee41e6d60468a08c1e6c40"
+  "semantic_digest": "sha256:a67accc8688b2a63ef01afff160666119b72b5c0ec4adc421d266104e76087f5"
 }

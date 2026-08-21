@@ -65,7 +65,7 @@ predecessors are accepted and its own human decision gate has a recorded, digest
 | --- | --- | --- | --- |
 | `P3-EXPERT-001` | Additive v2 contracts and canonical identities | `evaluation-protocol-v2.md` | accepted; evidence: `docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md` |
 | `P3-EXPERT-002` | PostgreSQL Worker evaluation and immutable publication | `worker-evaluation-pipeline.md` | accepted; evidence: `docs/acceptance/p3-expert-evaluation-worker-20260820.md` |
-| `P3-EXPERT-003` | First target, resolver, assessment expert, and scorecard | `first-target-resolver-expert.md` | dependencies accepted; exact target reuse proposal awaits human approval |
+| `P3-EXPERT-003` | First target, resolver, assessment expert, and scorecard | `first-target-resolver-expert.md` | exact 2020-2021 engineering-proof target decision approved; implementation in progress |
 | `P3-STRAT-002` | Executable two-expert strategy topology | `first-formal-topology.md` | blocked by `P3-EXPERT-002` and `P3-EXPERT-003` |
 | `P3-ATTR-001` | Bounded formal-strategy counterfactual evidence | `../../10-monitoring-attribution/formal-strategy-attribution.md` | blocked by `P3-STRAT-002` |
 | `P3-EXPERT-004` | Read-only candidate-detail evidence projection | `candidate-detail-evidence.md` | blocked by `P3-ATTR-001` |

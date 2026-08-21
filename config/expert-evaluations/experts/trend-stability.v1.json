@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "expert_id": "expert.trend-stability",
+  "expert_version": "1.0.0",
+  "lifecycle": "active",
+  "feature_registry_digest": "sha256:4bcf56d2b6d32741f212dccebd4fcdd44596b836a7f11691462ae7190abcd798",
+  "required_features": [
+    "price.total_return_index",
+    "price.sma20",
+    "price.sma60",
+    "price.momentum20"
+  ],
+  "stable_rule": "total_return_index >= sma20 > sma60 and momentum20 > 0",
+  "fragile_rule": "total_return_index < sma60 and sma20 <= sma60",
+  "fallback_state": "neutral",
+  "missing_reason": "missing_required_t_close_trend_feature",
+  "semantic_digest": "sha256:e66ee7024dc28ddca5059e0aa74a7333988eeacfa5cdc5743fa0933dd5b96fa7"
+}

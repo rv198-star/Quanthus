@@ -5,9 +5,9 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-003` |
 | Design status | approved |
-| Delivery gate | dependencies accepted; blocked by the exact `P3-EXPERT-003` target decision |
-| Implementation readiness | outcome-blind target reuse proposal ready for human decision |
-| Result access | forbidden until the target decision record is sealed |
+| Delivery gate | dependencies and exact 2020-2021 engineering-proof target decision accepted |
+| Implementation readiness | implementation in progress |
+| Result access | authorized only for the approved 2020-2021 development engineering proof |
 
 ## 1. Outcome and boundary
 

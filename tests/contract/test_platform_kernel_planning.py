@@ -269,12 +269,15 @@ def test_platform_kernel_event_worker_recovery_assets_remain_self_contained() ->
     assert "event-runs:/data/event-runs:ro" in recovery
     assert "QUANTHUS_EVENT_IMAGE" in backup
     assert "event-runs.tar.gz" in backup
+    assert "expert-runs.tar.gz" in backup
     assert "QUANTHUS_RECOVERY_EVENT_IMAGE_ID" in backup
     assert "QUANTHUS_RECOVERY_EVENT_JOB_COUNT" in backup
     assert "QUANTHUS_EVENT_IMAGE" in restore
     assert "event-runs.tar.gz" in restore
+    assert "expert-runs.tar.gz" in restore
     assert "QUANTHUS_RECOVERY_EVENT_JOB_COUNT" in restore
     assert "quanthus.p4-event-scan.v1" in restore
+    assert "platform_expert_evaluation_runs" in restore
 
 
 def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:

@@ -6,6 +6,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -87,6 +88,17 @@ def _positive_int(value: object, path: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ExpertEvaluationError("field_mismatch", f"{path} must be a positive integer")
     return value
+
+
+def _date(value: object, path: str) -> date:
+    text = _text(value, path)
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError as exc:
+        raise ExpertEvaluationError("field_mismatch", f"{path} must be an ISO date") from exc
+    if parsed.isoformat() != text:
+        raise ExpertEvaluationError("field_mismatch", f"{path} must be a canonical ISO date")
+    return parsed
 
 
 def _unique_texts(value: object, path: str) -> tuple[str, ...]:
@@ -184,6 +196,8 @@ class PopulationPredicate:
     split_policy_version: str
     split_policy_digest: str
     required_partition: str
+    evaluation_start: date
+    evaluation_end: date
     inclusion_rule: str
     outcome_independent: bool
     predicate_digest: str
@@ -202,6 +216,8 @@ class PopulationPredicate:
             "split_policy_version": self.split_policy_version,
             "split_policy_digest": self.split_policy_digest,
             "required_partition": self.required_partition,
+            "evaluation_start": self.evaluation_start.isoformat(),
+            "evaluation_end": self.evaluation_end.isoformat(),
             "inclusion_rule": self.inclusion_rule,
             "outcome_independent": self.outcome_independent,
         }
@@ -228,6 +244,8 @@ class PopulationPredicate:
             "split_policy_version",
             "split_policy_digest",
             "required_partition",
+            "evaluation_start",
+            "evaluation_end",
             "inclusion_rule",
             "outcome_independent",
             "predicate_digest",
@@ -263,6 +281,10 @@ class PopulationPredicate:
             required_partition=_text(
                 raw["required_partition"], "eligible_population.required_partition"
             ),
+            evaluation_start=_date(
+                raw["evaluation_start"], "eligible_population.evaluation_start"
+            ),
+            evaluation_end=_date(raw["evaluation_end"], "eligible_population.evaluation_end"),
             inclusion_rule=_text(raw["inclusion_rule"], "eligible_population.inclusion_rule"),
             outcome_independent=_boolean(
                 raw["outcome_independent"], "eligible_population.outcome_independent"
@@ -279,6 +301,14 @@ class PopulationPredicate:
             raise ExpertEvaluationError(
                 "sealed_partition_access",
                 "first target population must be outcome-blind development",
+            )
+        if (result.evaluation_start, result.evaluation_end) != (
+            date(2020, 1, 1),
+            date(2021, 12, 31),
+        ):
+            raise ExpertEvaluationError(
+                "sealed_partition_access",
+                "engineering proof must remain inside the approved 2020-2021 window",
             )
         if result.predicate_digest != result.computed_digest:
             raise ExpertEvaluationError("digest_mismatch", "population predicate digest differs")
@@ -399,6 +429,8 @@ class TargetDecisionCard:
             "subject_kind": self.eligible_population.subject_kind,
             "subject_identity_field": self.eligible_population.subject_identity_field,
             "population_digest": self.eligible_population.predicate_digest,
+            "evaluation_start": self.eligible_population.evaluation_start.isoformat(),
+            "evaluation_end": self.eligible_population.evaluation_end.isoformat(),
             "observation_anchor": self.observation["anchor_rule"],
             "target_entry_anchor": outcome.entry_anchor,
             "horizon_trading_sessions": outcome.observation_sessions,
@@ -411,6 +443,7 @@ class TargetDecisionCard:
             "baseline_id": _object(self.evaluation["naive_baseline"], "evaluation.naive_baseline")[
                 "baseline_id"
             ],
+            "claim_scope": self.evaluation["claim_scope"],
         }
 
 
@@ -462,7 +495,13 @@ def _parse_card(path: Path) -> TargetDecisionCard:
     intended = _object(raw["intended_strategy_population"], "intended_strategy_population")
     _exact_keys(
         intended,
-        {"role", "predicate_id", "predicate_version", "predicate_digest"},
+        {
+            "role",
+            "action_use",
+            "predicate_id",
+            "predicate_version",
+            "predicate_digest",
+        },
         "intended_strategy_population",
     )
     observation = _object(raw["observation"], "observation")
@@ -483,6 +522,7 @@ def _parse_card(path: Path) -> TargetDecisionCard:
         {
             "primary_metric",
             "naive_baseline",
+            "claim_scope",
             "hypothesis_family",
             "slices",
             "uncertainty",
@@ -523,9 +563,11 @@ def _parse_card(path: Path) -> TargetDecisionCard:
             "target_reference_mismatch",
             "intended strategy population must reuse the frozen predicate",
         )
-    if intended["role"] != "mandatory_predeclared_slice":
+    if intended["role"] != "engineering_proof_only" or intended["action_use"] != (
+        "blocked_until_formal_strategy_population_evaluation"
+    ):
         raise ExpertEvaluationError(
-            "field_mismatch", "intended strategy population must remain a mandatory slice"
+            "field_mismatch", "engineering proof must not authorize formal strategy action use"
         )
     if observation["anchor_rule"] != "candidate_t_close":
         raise ExpertEvaluationError(
@@ -561,6 +603,10 @@ def _parse_card(path: Path) -> TargetDecisionCard:
     )
     _identifier(baseline["baseline_id"], "evaluation.naive_baseline.baseline_id")
     _version(baseline["baseline_version"], "evaluation.naive_baseline.baseline_version")
+    if evaluation["claim_scope"] != "engineering_settleability_only":
+        raise ExpertEvaluationError(
+            "field_mismatch", "first scorecard cannot claim expert effectiveness"
+        )
     _unique_texts(evaluation["hypothesis_family"], "evaluation.hypothesis_family")
     slices = _array(evaluation["slices"], "evaluation.slices")
     if not slices:

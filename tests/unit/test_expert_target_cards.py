@@ -37,15 +37,18 @@ def test_first_target_reuses_approved_p4_cards_without_result_access() -> None:
     card = load_target_decision_card(CARD, ROOT)
 
     assert card.semantic_digest == (
-        "sha256:b15ce3f844e31c485ee982449276324d1c3c53a3f4ee41e6d60468a08c1e6c40"
+        "sha256:a67accc8688b2a63ef01afff160666119b72b5c0ec4adc421d266104e76087f5"
     )
     assert card.eligible_population.predicate_digest == (
-        "sha256:e3fe6155dc33169b9eba7cfcbd6a669d50737902d4a23e9005bfc9ce71ec1308"
+        "sha256:a66195a194933ca3b0e3850c7fb515a28b5125eff1b29241d13f953565c9961c"
     )
+    card.require_result_access_authority()
     assert card.resolved_decision(ROOT) == {
         "subject_kind": "opportunity",
         "subject_identity_field": "event_id",
         "population_digest": card.eligible_population.predicate_digest,
+        "evaluation_start": "2020-01-01",
+        "evaluation_end": "2021-12-31",
         "observation_anchor": "candidate_t_close",
         "target_entry_anchor": "T_plus_1_actual_executable_open",
         "horizon_trading_sessions": 20,
@@ -56,11 +59,19 @@ def test_first_target_reuses_approved_p4_cards_without_result_access() -> None:
         ),
         "primary_metric_id": "metric.mean-absolute-ordinal-error",
         "baseline_id": "baseline.always-neutral-ordinal",
+        "claim_scope": "engineering_settleability_only",
     }
 
 
-def test_draft_target_blocks_result_bearing_access() -> None:
-    card = load_target_decision_card(CARD, ROOT)
+def test_draft_target_blocks_result_bearing_access(tmp_path: Path) -> None:
+    raw = _raw_card()
+    raw["lifecycle"] = "draft"
+    raw["governance"] = {
+        "approval_state": "pending_human_approval",
+        "approval_authority": "human",
+        "decision_reference": "https://github.com/rv198-star/Quanthus/issues/148",
+    }
+    card = load_target_decision_card(_write_card(tmp_path, raw), ROOT)
 
     with pytest.raises(ExpertEvaluationError) as error:
         card.require_result_access_authority()
@@ -68,17 +79,16 @@ def test_draft_target_blocks_result_bearing_access() -> None:
     assert error.value.reason_code == "target_decision_not_approved"
 
 
-def test_human_approval_metadata_can_seal_the_exact_semantics(tmp_path: Path) -> None:
+def test_lifecycle_metadata_does_not_change_exact_semantics(tmp_path: Path) -> None:
     raw = _raw_card()
-    raw["lifecycle"] = "approved"
+    raw["lifecycle"] = "draft"
     raw["governance"] = {
-        "approval_state": "approved",
+        "approval_state": "pending_human_approval",
         "approval_authority": "human",
-        "decision_reference": "https://github.com/rv198-star/Quanthus/issues/148#issuecomment-test",
+        "decision_reference": "https://github.com/rv198-star/Quanthus/issues/148",
     }
     card = load_target_decision_card(_write_card(tmp_path, raw), ROOT)
 
-    card.require_result_access_authority()
     assert card.semantic_digest == _raw_card()["semantic_digest"]
 
 
@@ -95,7 +105,7 @@ def test_reused_p4_target_digest_drift_fails_closed(tmp_path: Path) -> None:
 
 def test_population_predicate_drift_fails_before_target_resolution(tmp_path: Path) -> None:
     raw = _raw_card()
-    raw["eligible_population"]["required_partition"] = "arbitration"
+    raw["eligible_population"]["evaluation_end"] = "2022-01-03"
     raw["semantic_digest"] = _semantic_digest(raw)
 
     with pytest.raises(ExpertEvaluationError) as error:

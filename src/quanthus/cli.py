@@ -68,6 +68,11 @@ from quanthus.delisted_coverage import (
     DelistedCoverageReport,
     run_delisted_coverage,
 )
+from quanthus.event_library.label_corpus import (
+    LabelCorpusError,
+    build_physical_label_corpus,
+    verify_physical_label_corpus,
+)
 from quanthus.event_library.physical_scan import (
     PhysicalEventScanError,
     build_physical_event_scan,
@@ -633,6 +638,83 @@ def _parser() -> argparse.ArgumentParser:
         help="deeply verify one immutable P4 event-library package",
     )
     p4_event_verify.add_argument("--root", type=Path, required=True)
+
+    p4_labeled_event_scan = subparsers.add_parser(
+        "run-p4-labeled-event-scan",
+        help="build the sealed P4 Event Library and approved development label sidecar",
+    )
+    p4_labeled_event_scan.add_argument(
+        "--source-policy",
+        type=Path,
+        default=Path("config/p4-event-scan-source.research.v1.json"),
+    )
+    p4_labeled_event_scan.add_argument(
+        "--provider-config",
+        type=Path,
+        default=Path("config/replay-data-provider.development.v2.json"),
+    )
+    p4_labeled_event_scan.add_argument(
+        "--rule-card",
+        type=Path,
+        default=Path("config/p4-candidate-price-volume-transition.research.v1.json"),
+    )
+    p4_labeled_event_scan.add_argument(
+        "--split-policy",
+        type=Path,
+        default=Path("config/p4-event-split-policy.research.v1.json"),
+    )
+    p4_labeled_event_scan.add_argument(
+        "--outcome-card",
+        type=Path,
+        default=Path("config/p4-event-outcome-label.research.v1.json"),
+    )
+    p4_labeled_event_scan.add_argument(
+        "--structural-break-card",
+        type=Path,
+        default=Path("config/p4-event-structural-break.research.v1.json"),
+    )
+    p4_labeled_event_scan.add_argument(
+        "--feature-registry",
+        type=Path,
+        default=Path("config/p3-baseline-features.research.v1.json"),
+    )
+    p4_labeled_event_scan.add_argument("--event-output", type=Path, required=True)
+    p4_labeled_event_scan.add_argument("--label-output", type=Path, required=True)
+    p4_labeled_event_scan.add_argument("--code-revision", required=True)
+
+    p4_label_corpus = subparsers.add_parser(
+        "build-p4-label-corpus",
+        help="build an immutable P4 development label sidecar from a sealed Event Library",
+    )
+    p4_label_corpus.add_argument("--event-root", type=Path, required=True)
+    p4_label_corpus.add_argument(
+        "--provider-config",
+        type=Path,
+        default=Path("config/replay-data-provider.development.v2.json"),
+    )
+    p4_label_corpus.add_argument(
+        "--outcome-card",
+        type=Path,
+        default=Path("config/p4-event-outcome-label.research.v1.json"),
+    )
+    p4_label_corpus.add_argument(
+        "--structural-break-card",
+        type=Path,
+        default=Path("config/p4-event-structural-break.research.v1.json"),
+    )
+    p4_label_corpus.add_argument(
+        "--feature-registry",
+        type=Path,
+        default=Path("config/p3-baseline-features.research.v1.json"),
+    )
+    p4_label_corpus.add_argument("--output", type=Path, required=True)
+    p4_label_corpus.add_argument("--code-revision", required=True)
+
+    p4_label_verify = subparsers.add_parser(
+        "verify-p4-label-corpus",
+        help="deeply verify one immutable P4 label-corpus package",
+    )
+    p4_label_verify.add_argument("--root", type=Path, required=True)
 
     st_status = subparsers.add_parser(
         "build-st-status",
@@ -1551,6 +1633,90 @@ def main(argv: Sequence[str] | None = None) -> int:
                     sort_keys=True,
                 )
             )
+        elif args.command == "run-p4-labeled-event-scan":
+            event_scan_result = build_physical_event_scan(
+                source_policy_path=args.source_policy,
+                provider_config_path=args.provider_config,
+                rule_card_path=args.rule_card,
+                split_policy_path=args.split_policy,
+                output=args.event_output,
+                code_revision=args.code_revision,
+            )
+            label_result = build_physical_label_corpus(
+                event_root=event_scan_result.root,
+                provider_config_path=args.provider_config,
+                outcome_card_path=args.outcome_card,
+                structural_card_path=args.structural_break_card,
+                feature_registry_path=args.feature_registry,
+                output=args.label_output,
+                code_revision=args.code_revision,
+            )
+            print(
+                json.dumps(
+                    {
+                        "event_root": str(event_scan_result.root),
+                        "event_manifest_sha256": event_scan_result.manifest_sha256,
+                        "event_content_digest": event_scan_result.content_digest,
+                        "label_root": str(label_result.root),
+                        "label_manifest_sha256": label_result.manifest_sha256,
+                        "label_content_digest": label_result.content_digest,
+                        "candidate_events": event_scan_result.candidate_events,
+                        "positive_events": label_result.positive_events,
+                        "neutral_events": label_result.neutral_events,
+                        "failure_events": label_result.failure_events,
+                        "not_executable_events": label_result.not_executable_events,
+                        "censored_events": label_result.censored_events,
+                        "unavailable_events": label_result.unavailable_events,
+                    },
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "build-p4-label-corpus":
+            label_result = build_physical_label_corpus(
+                event_root=args.event_root,
+                provider_config_path=args.provider_config,
+                outcome_card_path=args.outcome_card,
+                structural_card_path=args.structural_break_card,
+                feature_registry_path=args.feature_registry,
+                output=args.output,
+                code_revision=args.code_revision,
+            )
+            print(
+                json.dumps(
+                    {
+                        "root": str(label_result.root),
+                        "manifest_sha256": label_result.manifest_sha256,
+                        "content_digest": label_result.content_digest,
+                        "total_events": label_result.total_events,
+                        "positive_events": label_result.positive_events,
+                        "neutral_events": label_result.neutral_events,
+                        "failure_events": label_result.failure_events,
+                        "not_executable_events": label_result.not_executable_events,
+                        "censored_events": label_result.censored_events,
+                        "unavailable_events": label_result.unavailable_events,
+                    },
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "verify-p4-label-corpus":
+            label_result = verify_physical_label_corpus(args.root)
+            print(
+                json.dumps(
+                    {
+                        "root": str(label_result.root),
+                        "manifest_sha256": label_result.manifest_sha256,
+                        "content_digest": label_result.content_digest,
+                        "total_events": label_result.total_events,
+                        "positive_events": label_result.positive_events,
+                        "neutral_events": label_result.neutral_events,
+                        "failure_events": label_result.failure_events,
+                        "not_executable_events": label_result.not_executable_events,
+                        "censored_events": label_result.censored_events,
+                        "unavailable_events": label_result.unavailable_events,
+                    },
+                    sort_keys=True,
+                )
+            )
         elif args.command == "run-candidate-strategy-replay":
             project_root = find_project_root()
             candidate_manifest = load_candidate_manifest(args.candidate)
@@ -2197,6 +2363,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         CandidateContractError,
         QuantDingerCandidateAdapterError,
         PhysicalEventScanError,
+        LabelCorpusError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

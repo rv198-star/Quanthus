@@ -1184,6 +1184,23 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(outcome.semantic_digest, label_approval)
         self.assertIn(structural.semantic_digest, label_approval)
         self.assertIn("#issuecomment-5366610770", label_approval)
+        label_implementation_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-label-corpus-implementation-20260821.md"
+        )
+        self.assertTrue(label_implementation_path.is_file())
+        label_implementation = label_implementation_path.read_text(encoding="utf-8")
+        self.assertIn(outcome.semantic_digest, label_implementation)
+        self.assertIn(structural.semantic_digest, label_implementation)
+        self.assertIn("quanthus.p4-event-run.v2", label_implementation)
+        self.assertIn("run-p4-labeled-event-scan", label_implementation)
+        self.assertTrue(
+            (root / "src" / "quanthus" / "event_library" / "label_corpus.py").is_file()
+        )
+        self.assertIn("label-corpus", lld)
+        self.assertIn("quanthus.p4-event-run.v2", lld)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

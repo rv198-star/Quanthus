@@ -181,8 +181,9 @@ def test_event_worker_stays_a_control_plane_supervisor() -> None:
     dockerfile = PROJECT_ROOT.joinpath("ops/event/Dockerfile").read_text(encoding="utf-8")
 
     assert "quanthus.p4-event-scan.v1" not in worker
-    assert "run-p4-event-scan" in worker
+    assert "run-p4-labeled-event-scan" in worker
     assert "verify-p4-event-scan" in worker
+    assert "verify-p4-label-corpus" in worker
     assert all(
         forbidden not in worker
         for forbidden in (

@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` and `P4-EVENT-002` accepted after deterministic production A/B replay of 36,820 events; `P4-LABEL-001` outcome and structural-break digests approved, with reproducible development label-corpus build now authorized and still open |
+| Implementation status | `P4-EVENT-001` and `P4-EVENT-002` accepted after deterministic production A/B replay of 36,820 events; `P4-LABEL-001` exact label digests approved and deterministic label-corpus/Worker v2 implementation complete, with real development A/B corpus acceptance still open |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -235,8 +235,26 @@ produces `unavailable`, not failure or neutral.
 
 The approved cards keep the 22-session split overlap unchanged because the 20-session outcome
 window fits within it. Synthetic counterexamples freeze overlap ordering, neutral settlement,
-not-executable inheritance, censoring, and unavailable-evidence behavior. The next gate is a
-reproducible real development label corpus under these exact digests.
+not-executable inheritance, censoring, and unavailable-evidence behavior.
+
+`src/quanthus/event_library/label_corpus.py` now implements the authorized development build as an
+immutable sidecar to a sealed Event Library. It reuses `BaselineFeaturePanel.build` and
+`config/p3-baseline-features.research.v1.json` for the accepted corporate-action-normalized
+`total_return_index`/SMA20/SMA60 semantics rather than creating a parallel structural-feature
+implementation. Threshold evidence uses the event's actual T+1 executable open and a hypothetical
+one-share economic-value path. A new holding does not receive an action effective before its entry
+open; accepted cash/bonus actions strictly after entry update the path before that session's
+threshold checks. Suspension consumes a session but does not fabricate price or structural
+evidence. Missing required non-suspension evidence becomes `unavailable`.
+
+The existing static `event-worker` remains the only P4 worker and still admits only
+`quanthus.p4-event-scan.v1`. Its governed input now also binds the outcome card, structural-break
+card, and P3 feature registry. One lease-governed `run-p4-labeled-event-scan` child first rebuilds
+the Event Library and then publishes `label-corpus/{labels.jsonl,summary.json,manifest.json,READY}`.
+Run manifest schema `quanthus.p4-event-run.v2` binds both independent package digests and rejects
+recovery unless both verifiers pass, event counts match, and inherited `not_executable` counts
+reconcile. The remaining gate is two real development runs with identical governed input and
+identical label-corpus content/manifest digests.
 
 ## 7. Comparative report
 
@@ -252,7 +270,7 @@ unexecutable group.
 | --- | --- | --- | --- |
 | P4-EVENT-001 | Freeze candidate-source hypothesis; define event, isolation, and split schemas | Accepted P3 replay and audit contracts | Exact rule-card and split-policy digests approved; deterministic contract tests and acceptance record pass |
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Accepted production A/B replay: 36,820 candidates, 36,022 executable, 798 not-executable, identical manifest/content digests |
-| P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Exact outcome/structural digests human-approved; reproducible development label corpus required |
+| P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Exact digests approved; label-corpus/Worker v2 implemented; reproducible production A/B corpus acceptance required |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Three leading features |
 
 ## 9. Acceptance

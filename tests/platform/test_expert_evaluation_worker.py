@@ -151,7 +151,7 @@ def test_first_production_job_constructor_freezes_scope_dwd_parent_and_dispatch(
     assert job_input.partition.decision_end == date(2021, 12, 31)
     assert job_input.expected_parent_run_digests == (parent,)
     assert producer.event_run_root == (tmp_path / "event-runs").resolve()
-    assert job_input.producer.producer_version == "1.0.1"
+    assert job_input.producer.producer_version == "1.0.2"
     invalid = job_input.to_dict()
     invalid["job_id"] = "transport-field-must-not-enter-semantics"
     with pytest.raises(ExpertEvaluationError, match="field_mismatch"):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from contextlib import nullcontext
+from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -165,8 +166,8 @@ class _Panel:
         return None
 
     def feature(self, market_date: date, security_id: str) -> BaselineFeatureRow:
-        assert (market_date, security_id) == (date(2020, 6, 30), "security-cn-000001")
-        return _feature()
+        assert (market_date, security_id) == (date(2020, 6, 30), "000001")
+        return replace(_feature(), security_id=security_id)
 
 
 class _Provider:
@@ -209,7 +210,7 @@ def test_production_worker_path_is_deterministic_and_emits_v2_scorecard(
     monkeypatch.setattr(
         production,
         "_load_events",
-        lambda *_args: (production._EventInput(event, "industry.test"),),
+        lambda *_args: (production._EventInput(event, "industry.test", "000001"),),
     )
     monkeypatch.setattr(
         production,

@@ -7,7 +7,7 @@ import json
 import os
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -31,7 +31,11 @@ from quanthus.expert_evaluation.runner import (
     ProducerBinding,
     RegistryArtifactRef,
 )
-from quanthus.expert_evaluation.scoring import EvaluationRow, build_descriptive_scorecard
+from quanthus.expert_evaluation.scoring import (
+    EvaluationRow,
+    build_descriptive_scorecard,
+    close_sample_ledger,
+)
 from quanthus.expert_evaluation.serialization import (
     ExpertEvaluationError,
     canonical_json_bytes,
@@ -42,7 +46,7 @@ from quanthus.expert_evaluation.target_cards import load_target_decision_card
 from quanthus.feature_registry import load_feature_registry
 
 PRODUCER_ID = "producer.trend-stability-development"
-PRODUCER_VERSION = "1.0.1"
+PRODUCER_VERSION = "1.0.2"
 PRODUCER_CONFIGURATION_DIGEST = digest_value(
     {
         "producer_id": PRODUCER_ID,
@@ -83,6 +87,7 @@ _PARTITION_DIGEST = (
 class _EventInput:
     record: EventRecord
     static_industry_id: str | None
+    panel_security_id: str
 
 
 def production_binding() -> ProducerBinding:
@@ -140,8 +145,17 @@ def _load_events(root: Path, start: date, end: date) -> tuple[_EventInput, ...]:
         record = event_record_from_dict(value.get("event"))
         if start <= record.identity.signal_date <= end:
             industry = value.get("static_level1_industry_id")
+            panel_security_id = value.get("listing_code")
+            if not isinstance(panel_security_id, str) or not panel_security_id:
+                raise ExpertEvaluationError(
+                    "field_mismatch", "P4 event listing code is missing"
+                )
             result.append(
-                _EventInput(record, None if industry is None else str(industry))
+                _EventInput(
+                    record,
+                    None if industry is None else str(industry),
+                    panel_security_id,
+                )
             )
     result.sort(key=lambda item: item.record.event_id)
     if not result:
@@ -377,8 +391,13 @@ class TrendStabilityOperationProducer:
                         raise ExpertEvaluationError("canceled", "evaluation was canceled")
                     feature = panel.feature(
                         event.record.identity.signal_date,
-                        event.record.identity.security_id,
+                        event.panel_security_id,
                     )
+                    if feature is not None:
+                        feature = replace(
+                            feature,
+                            security_id=event.record.identity.security_id,
+                        )
                     observation = evaluate_trend_stability(
                         event=event.record,
                         feature=feature,
@@ -401,7 +420,8 @@ class TrendStabilityOperationProducer:
                             "producing-observations",
                             {"completed": index, "total": len(events)},
                         )
-        progress("settling-outcomes", {"event_count": len(events)})
+        ledger = close_sample_ledger(evaluation_rows)
+        progress("settling-outcomes", ledger.semantic_dict())
         scorecard = build_descriptive_scorecard(
             evaluation_rows,
             spec=spec,

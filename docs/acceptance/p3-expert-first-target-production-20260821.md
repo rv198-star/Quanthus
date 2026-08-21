@@ -67,6 +67,11 @@ external-PostgreSQL-DSN skips. Focused Ruff, strict MyPy, shell syntax, image im
 production mount checks passed. The replay Worker used read-only DWD, correction, research
 reference, and Event Run mounts plus a dedicated writable expert-run volume.
 
+GitHub Actions run `32501185961` did not execute a test step. All three check annotations state
+that the jobs were not started because recent account payments failed or the spending limit must
+be increased. This is external CI unavailable evidence, not a code-test failure; the complete
+local and production evidence above is the acceptance basis.
+
 ## Production findings closed during acceptance
 
 Production attempts exposed and closed four integration defects before a Run was accepted:

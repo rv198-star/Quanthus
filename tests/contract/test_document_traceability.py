@@ -1199,6 +1199,26 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(
             (root / "src" / "quanthus" / "event_library" / "label_corpus.py").is_file()
         )
+        label_acceptance_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-label-corpus-production-ab-20260821.md"
+        )
+        self.assertTrue(label_acceptance_path.is_file())
+        label_acceptance = label_acceptance_path.read_text(encoding="utf-8")
+        self.assertIn(outcome.semantic_digest, label_acceptance)
+        self.assertIn(structural.semantic_digest, label_acceptance)
+        self.assertIn("36,820", label_acceptance)
+        self.assertIn("34,641", label_acceptance)
+        self.assertIn(
+            "sha256:02fa0057936d9b59d0058325448b7ef638cda3ef28803cd8306e43b0675c1580",
+            label_acceptance,
+        )
+        self.assertIn(
+            "sha256:31ed3e95771390c4df3cb4cff21ba2b3415458456cf6b6f02621c7c81bdc5b12",
+            label_acceptance,
+        )
         self.assertIn("label-corpus", lld)
         self.assertIn("quanthus.p4-event-run.v2", lld)
 

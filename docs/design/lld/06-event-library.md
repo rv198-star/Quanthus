@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` and `P4-EVENT-002` accepted after deterministic production A/B replay of 36,820 events; `P4-LABEL-001` exact label digests approved and deterministic label-corpus/Worker v2 implementation complete, with real development A/B corpus acceptance still open |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, and `P4-LABEL-001` accepted after deterministic production A/B replay; the accepted label corpus contains 36,820 total events and 34,641 settled three-class events with identical Event/Label digests across A/B |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -253,8 +253,9 @@ card, and P3 feature registry. One lease-governed `run-p4-labeled-event-scan` ch
 the Event Library and then publishes `label-corpus/{labels.jsonl,summary.json,manifest.json,READY}`.
 Run manifest schema `quanthus.p4-event-run.v2` binds both independent package digests and rejects
 recovery unless both verifiers pass, event counts match, and inherited `not_executable` counts
-reconcile. The remaining gate is two real development runs with identical governed input and
-identical label-corpus content/manifest digests.
+reconcile. Production A/B acceptance now proves identical governed input reproduces the same six
+outcome-state counts and identical Event/Label content and manifest digests; evidence is recorded in
+`docs/acceptance/p4-event-label-corpus-production-ab-20260821.md`.
 
 ## 7. Comparative report
 
@@ -270,7 +271,7 @@ unexecutable group.
 | --- | --- | --- | --- |
 | P4-EVENT-001 | Freeze candidate-source hypothesis; define event, isolation, and split schemas | Accepted P3 replay and audit contracts | Exact rule-card and split-policy digests approved; deterministic contract tests and acceptance record pass |
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Accepted production A/B replay: 36,820 candidates, 36,022 executable, 798 not-executable, identical manifest/content digests |
-| P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Exact digests approved; label-corpus/Worker v2 implemented; reproducible production A/B corpus acceptance required |
+| P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Accepted production A/B corpus: 36,820 total, 34,641 settled three-class, identical Event/Label content and manifest digests |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Three leading features |
 
 ## 9. Acceptance

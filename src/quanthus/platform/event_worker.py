@@ -22,7 +22,7 @@ from quanthus.platform.jobs import P4_EVENT_SCAN_JOB
 from quanthus.platform.persistence import PostgresPlatformStore
 
 EVENT_QUEUE = "event"
-RUN_SCHEMA = "quanthus.p4-event-run.v2"
+RUN_SCHEMA = "quanthus.p4-event-run.v3"
 _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
@@ -32,6 +32,7 @@ _EXPECTED_INPUT = {
     "outcome_card": "config/p4-event-outcome-label.research.v1.json",
     "structural_break_card": "config/p4-event-structural-break.research.v1.json",
     "feature_registry": "config/p3-baseline-features.research.v1.json",
+    "report_policy": "config/p4-event-comparison-report.research.v1.json",
 }
 
 
@@ -102,6 +103,17 @@ class LabelCorpusEnvelope:
     not_executable_events: int
     censored_events: int
     unavailable_events: int
+
+
+@dataclass(frozen=True)
+class ComparisonReportEnvelope:
+    root: Path
+    manifest_sha256: str
+    content_digest: str
+    candidate_events: int
+    three_class_events: int
+    leading_features: tuple[str, ...]
+    acceptance_pass: bool
 
 
 def _verify_event_library(root: Path) -> EventLibraryEnvelope:
@@ -192,12 +204,58 @@ def _verify_label_corpus(root: Path) -> LabelCorpusEnvelope:
     )
 
 
+def _verify_comparison_report(root: Path) -> ComparisonReportEnvelope:
+    completed = subprocess.run(
+        (
+            sys.executable,
+            "-m",
+            "quanthus",
+            "verify-p4-comparison-report",
+            "--root",
+            str(root),
+        ),
+        check=False,
+        capture_output=True,
+        timeout=300,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("comparison_report_verifier_failed")
+    try:
+        payload = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
+    except (UnicodeDecodeError, json.JSONDecodeError, IndexError) as exc:
+        raise RuntimeError("comparison_report_verifier_response_invalid") from exc
+    required = {
+        "root",
+        "manifest_sha256",
+        "content_digest",
+        "candidate_events",
+        "three_class_events",
+        "leading_features",
+        "acceptance_pass",
+    }
+    if not isinstance(payload, dict) or set(payload) != required:
+        raise RuntimeError("comparison_report_verifier_response_invalid")
+    leading = payload["leading_features"]
+    if not isinstance(leading, list) or any(not isinstance(item, str) for item in leading):
+        raise RuntimeError("comparison_report_verifier_response_invalid")
+    return ComparisonReportEnvelope(
+        root=Path(str(payload["root"])).resolve(),
+        manifest_sha256=str(payload["manifest_sha256"]),
+        content_digest=str(payload["content_digest"]),
+        candidate_events=int(payload["candidate_events"]),
+        three_class_events=int(payload["three_class_events"]),
+        leading_features=tuple(leading),
+        acceptance_pass=bool(payload["acceptance_pass"]),
+    )
+
+
 def _result_ref(
     *,
     run_id: str,
     artifact_ref: Path,
     event_result: EventLibraryEnvelope,
     label_result: LabelCorpusEnvelope,
+    report_result: ComparisonReportEnvelope,
 ) -> dict[str, Any]:
     return {
         "run_id": run_id,
@@ -214,6 +272,10 @@ def _result_ref(
         "failure_events": label_result.failure_events,
         "censored_events": label_result.censored_events,
         "unavailable_events": label_result.unavailable_events,
+        "report_manifest_sha256": report_result.manifest_sha256,
+        "report_content_digest": report_result.content_digest,
+        "leading_features": list(report_result.leading_features),
+        "report_acceptance_pass": report_result.acceptance_pass,
     }
 
 
@@ -224,7 +286,12 @@ def _validate_run_directory(
     job_id: str,
     input_digest: str,
     code_revision: str,
-) -> tuple[EventLibraryEnvelope, LabelCorpusEnvelope, dict[str, Any]]:
+) -> tuple[
+    EventLibraryEnvelope,
+    LabelCorpusEnvelope,
+    ComparisonReportEnvelope,
+    dict[str, Any],
+]:
     try:
         manifest = json.loads((path / "run-manifest.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -233,10 +300,20 @@ def _validate_run_directory(
         raise RuntimeError("event_run_manifest_invalid")
     event_result = _verify_event_library(path / "event-library")
     label_result = _verify_label_corpus(path / "label-corpus")
+    report_result = _verify_comparison_report(path / "comparison-report")
     if label_result.total_events != event_result.candidate_events:
         raise RuntimeError("label_corpus_event_count_mismatch")
     if label_result.not_executable_events != event_result.not_executable_events:
         raise RuntimeError("label_corpus_not_executable_count_mismatch")
+    if report_result.candidate_events != event_result.candidate_events:
+        raise RuntimeError("comparison_report_event_count_mismatch")
+    three_class_events = (
+        label_result.positive_events
+        + label_result.neutral_events
+        + label_result.failure_events
+    )
+    if report_result.three_class_events != three_class_events:
+        raise RuntimeError("comparison_report_three_class_count_mismatch")
     try:
         event_manifest = json.loads(
             (path / "event-library" / "manifest.json").read_text(encoding="utf-8")
@@ -244,8 +321,11 @@ def _validate_run_directory(
         label_manifest = json.loads(
             (path / "label-corpus" / "manifest.json").read_text(encoding="utf-8")
         )
+        report_manifest = json.loads(
+            (path / "comparison-report" / "manifest.json").read_text(encoding="utf-8")
+        )
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError("event_or_label_manifest_unreadable") from exc
+        raise RuntimeError("event_label_or_report_manifest_unreadable") from exc
     expected = {
         "schema_version": RUN_SCHEMA,
         "run_id": run_id,
@@ -264,6 +344,10 @@ def _validate_run_directory(
         "failure_events": label_result.failure_events,
         "censored_events": label_result.censored_events,
         "unavailable_events": label_result.unavailable_events,
+        "report_manifest_sha256": report_result.manifest_sha256,
+        "report_content_digest": report_result.content_digest,
+        "leading_features": list(report_result.leading_features),
+        "report_acceptance_pass": report_result.acceptance_pass,
     }
     if manifest != expected:
         raise RuntimeError("event_run_manifest_mismatch")
@@ -271,14 +355,21 @@ def _validate_run_directory(
         raise RuntimeError("event_library_code_revision_mismatch")
     if not isinstance(label_manifest, dict) or label_manifest.get("code_revision") != code_revision:
         raise RuntimeError("label_corpus_code_revision_mismatch")
+    if (
+        not isinstance(report_manifest, dict)
+        or report_manifest.get("code_revision") != code_revision
+    ):
+        raise RuntimeError("comparison_report_code_revision_mismatch")
     return (
         event_result,
         label_result,
+        report_result,
         _result_ref(
             run_id=run_id,
             artifact_ref=path,
             event_result=event_result,
             label_result=label_result,
+            report_result=report_result,
         ),
     )
 
@@ -353,7 +444,7 @@ class EventWorker:
         run_id = f"run_{job_id.removeprefix('job_')}"
         final = self.run_root / "runs" / run_id
         if final.exists():
-            event_result, label_result, result_ref = _validate_run_directory(
+            event_result, label_result, report_result, result_ref = _validate_run_directory(
                 final,
                 run_id=run_id,
                 job_id=job_id,
@@ -368,11 +459,8 @@ class EventWorker:
                 progress_detail={
                     "run_id": run_id,
                     "candidate_events": event_result.candidate_events,
-                    "three_class_events": (
-                        label_result.positive_events
-                        + label_result.neutral_events
-                        + label_result.failure_events
-                    ),
+                    "three_class_events": report_result.three_class_events,
+                    "leading_features": list(report_result.leading_features),
                 },
             )
             self.store.finish_claimed_job(
@@ -392,11 +480,12 @@ class EventWorker:
         stderr_path = staging / "stderr.log"
         event_root = staging / "event-library"
         label_root = staging / "label-corpus"
+        report_root = staging / "comparison-report"
         command = (
             sys.executable,
             "-m",
             "quanthus",
-            "run-p4-labeled-event-scan",
+            "run-p4-reported-event-scan",
             "--source-policy",
             governed["source_policy"],
             "--provider-config",
@@ -411,10 +500,14 @@ class EventWorker:
             governed["structural_break_card"],
             "--feature-registry",
             governed["feature_registry"],
+            "--report-policy",
+            governed["report_policy"],
             "--event-output",
             str(event_root),
             "--label-output",
             str(label_root),
+            "--report-output",
+            str(report_root),
             "--code-revision",
             governed["code_revision"],
         )
@@ -460,7 +553,12 @@ class EventWorker:
                 error_reason=None,
             )
             return
-        if process.returncode != 0 or not event_root.is_dir() or not label_root.is_dir():
+        if (
+            process.returncode != 0
+            or not event_root.is_dir()
+            or not label_root.is_dir()
+            or not report_root.is_dir()
+        ):
             self.store.finish_claimed_job(
                 job_id,
                 generation,
@@ -473,16 +571,26 @@ class EventWorker:
         self.store.update_claimed_job(
             job_id,
             generation,
-            stage="validating-labeled-event-run",
+            stage="validating-reported-event-run",
             progress=90,
             progress_detail={"run_id": run_id},
         )
         event_result = _verify_event_library(event_root)
         label_result = _verify_label_corpus(label_root)
+        report_result = _verify_comparison_report(report_root)
         if label_result.total_events != event_result.candidate_events:
             raise RuntimeError("label_corpus_event_count_mismatch")
         if label_result.not_executable_events != event_result.not_executable_events:
             raise RuntimeError("label_corpus_not_executable_count_mismatch")
+        if report_result.candidate_events != event_result.candidate_events:
+            raise RuntimeError("comparison_report_event_count_mismatch")
+        three_class_events = (
+            label_result.positive_events
+            + label_result.neutral_events
+            + label_result.failure_events
+        )
+        if report_result.three_class_events != three_class_events:
+            raise RuntimeError("comparison_report_three_class_count_mismatch")
         run_manifest = {
             "schema_version": RUN_SCHEMA,
             "run_id": run_id,
@@ -501,6 +609,10 @@ class EventWorker:
             "failure_events": label_result.failure_events,
             "censored_events": label_result.censored_events,
             "unavailable_events": label_result.unavailable_events,
+            "report_manifest_sha256": report_result.manifest_sha256,
+            "report_content_digest": report_result.content_digest,
+            "leading_features": list(report_result.leading_features),
+            "report_acceptance_pass": report_result.acceptance_pass,
         }
         (staging / "run-manifest.json").write_text(
             json.dumps(run_manifest, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
@@ -509,23 +621,20 @@ class EventWorker:
         self.store.update_claimed_job(
             job_id,
             generation,
-            stage="sealing-labeled-event-run",
+            stage="sealing-reported-event-run",
             progress=97,
             progress_detail={
                 "run_id": run_id,
                 "candidate_events": event_result.candidate_events,
-                "three_class_events": (
-                    label_result.positive_events
-                    + label_result.neutral_events
-                    + label_result.failure_events
-                ),
+                "three_class_events": report_result.three_class_events,
+                "leading_features": list(report_result.leading_features),
             },
         )
         final.parent.mkdir(parents=True, exist_ok=True)
         if final.exists():
             raise RuntimeError("immutable_event_run_already_exists")
         os.replace(staging, final)
-        _event_result, _label_result, result_ref = _validate_run_directory(
+        _event_result, _label_result, _report_result, result_ref = _validate_run_directory(
             final,
             run_id=run_id,
             job_id=job_id,

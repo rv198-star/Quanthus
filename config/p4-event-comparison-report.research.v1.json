@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "p4-event.daily-group-comparison",
+  "policy_version": "1.0.0",
+  "lifecycle": "approved",
+  "owner": "P4-REPORT-001",
+  "research_question": "Which pre-entry observable feature paths most reproducibly distinguish positive from neutral P4 events, while retaining failure-group context and candidate-to-report attrition without converting the result into a trading rule?",
+  "outcomes": ["positive", "neutral", "failure"],
+  "primary_contrast": ["positive", "neutral"],
+  "lookback_sessions": 21,
+  "features": [
+    {"feature_id": "price.price_to_sma20", "formula": "total_return_index / sma20 - 1", "unit": "ratio"},
+    {"feature_id": "price.sma20_to_sma60", "formula": "sma20 / sma60 - 1", "unit": "ratio"},
+    {"feature_id": "price.momentum20", "formula": "momentum20", "unit": "ratio"},
+    {"feature_id": "price.breakout20", "formula": "total_return_index / prior_high20 - 1", "unit": "ratio"},
+    {"feature_id": "price.rsi14", "formula": "rsi14", "unit": "score_0_100"},
+    {"feature_id": "liquidity.volume_ratio20", "formula": "volume_ratio20", "unit": "ratio"},
+    {"feature_id": "risk.realized_volatility20", "formula": "realized_volatility20", "unit": "annualized_ratio"}
+  ],
+  "statistics": {
+    "effect_size": "hedges_g",
+    "uncertainty": "normal_95pct_ci_mean_difference",
+    "multiple_testing": "benjamini_hochberg_by_contrast",
+    "fdr_alpha": "0.05"
+  },
+  "selection": {
+    "reliable_consecutive_lags": 2,
+    "adjacent_q_max": "0.10",
+    "minimum_group_count": 500,
+    "minimum_perturbation_group_count": 200,
+    "perturbations": [
+      "deterministic_event_id_hash_halves",
+      "adjacent_lag_sign_consistency"
+    ],
+    "leading_feature_count": 3
+  },
+  "bindings": {
+    "feature_registry_version": "p3-baseline-features-research-v1",
+    "feature_registry_digest": "sha256:4bcf56d2b6d32741f212dccebd4fcdd44596b836a7f11691462ae7190abcd798",
+    "outcome_card_digest": "sha256:b623a647116a69a0d6559bd265b51bdd3ac0654826cf54ba38b87d819ea165ca",
+    "structural_break_card_digest": "sha256:1294e0550361bafe9ecfbcfddb32a7bb1ff378332c4fb173db662f95debad9fc"
+  },
+  "governance": {
+    "approval_state": "approved",
+    "approval_authority": "human",
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/76#issuecomment-5370987743"
+  },
+  "semantic_digest": "sha256:4b7e6f931b06615940a9a72a5bd05f800be40f825716093e04637ab5fd8134a0"
+}

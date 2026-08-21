@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from quanthus.platform.event_worker import (
+    ComparisonReportEnvelope,
     EventLibraryEnvelope,
     EventWorker,
     LabelCorpusEnvelope,
@@ -25,6 +26,7 @@ GOVERNED_INPUT = {
     "outcome_card": "config/p4-event-outcome-label.research.v1.json",
     "structural_break_card": "config/p4-event-structural-break.research.v1.json",
     "feature_registry": "config/p3-baseline-features.research.v1.json",
+    "report_policy": "config/p4-event-comparison-report.research.v1.json",
 }
 
 
@@ -132,6 +134,15 @@ def test_event_worker_recovers_sealed_run_without_rerunning_child(
         censored_events=0,
         unavailable_events=0,
     )
+    expected_report_result = ComparisonReportEnvelope(
+        root=final / "comparison-report",
+        manifest_sha256="sha256:" + "5" * 64,
+        content_digest="sha256:" + "6" * 64,
+        candidate_events=12,
+        three_class_events=10,
+        leading_features=("price.momentum20", "price.rsi14", "liquidity.volume_ratio20"),
+        acceptance_pass=True,
+    )
     expected_ref = {
         "run_id": run_id,
         "artifact_ref": str(final),
@@ -163,7 +174,12 @@ def test_event_worker_recovers_sealed_run_without_rerunning_child(
     store = Store()
     monkeypatch.setattr(
         "quanthus.platform.event_worker._validate_run_directory",
-        lambda *_args, **_kwargs: (expected_result, expected_label_result, expected_ref),
+        lambda *_args, **_kwargs: (
+            expected_result,
+            expected_label_result,
+            expected_report_result,
+            expected_ref,
+        ),
     )
     worker = EventWorker(
         store,  # type: ignore[arg-type]
@@ -184,6 +200,11 @@ def test_event_worker_recovers_sealed_run_without_rerunning_child(
                 "run_id": run_id,
                 "candidate_events": 12,
                 "three_class_events": 10,
+                "leading_features": [
+                    "price.momentum20",
+                    "price.rsi14",
+                    "liquidity.volume_ratio20",
+                ],
             },
         }
     ]
@@ -217,14 +238,28 @@ def test_validate_event_run_rejects_manifest_identity_mismatch(
         censored_events=0,
         unavailable_events=0,
     )
+    report_result = ComparisonReportEnvelope(
+        root=tmp_path / "comparison-report",
+        manifest_sha256="sha256:" + "5" * 64,
+        content_digest="sha256:" + "6" * 64,
+        candidate_events=4,
+        three_class_events=3,
+        leading_features=("price.momentum20", "price.rsi14", "liquidity.volume_ratio20"),
+        acceptance_pass=True,
+    )
     event_root = tmp_path / "event-library"
     event_root.mkdir()
     label_root = tmp_path / "label-corpus"
     label_root.mkdir()
+    report_root = tmp_path / "comparison-report"
+    report_root.mkdir()
     (event_root / "manifest.json").write_text(
         '{"code_revision":"' + "a" * 40 + '"}\n', encoding="utf-8"
     )
     (label_root / "manifest.json").write_text(
+        '{"code_revision":"' + "a" * 40 + '"}\n', encoding="utf-8"
+    )
+    (report_root / "manifest.json").write_text(
         '{"code_revision":"' + "a" * 40 + '"}\n', encoding="utf-8"
     )
     (tmp_path / "run-manifest.json").write_text("{}\n", encoding="utf-8")
@@ -235,6 +270,10 @@ def test_validate_event_run_rejects_manifest_identity_mismatch(
     monkeypatch.setattr(
         "quanthus.platform.event_worker._verify_label_corpus",
         lambda _path: label_result,
+    )
+    monkeypatch.setattr(
+        "quanthus.platform.event_worker._verify_comparison_report",
+        lambda _path: report_result,
     )
 
     with pytest.raises(RuntimeError, match="event_run_manifest_mismatch"):

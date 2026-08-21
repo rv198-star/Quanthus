@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -98,8 +99,8 @@ def production_dwd_identity() -> DwdIdentity:
     )
 
 
-def production_job_input(label_parent_digest: str) -> ExpertEvaluationJobInput:
-    """Construct the only admitted #148 Job after a verified label parent is selected."""
+def production_job_input(parent_run_digest: str) -> ExpertEvaluationJobInput:
+    """Construct the only admitted #148 Job after a verified P4 Run is selected."""
 
     return ExpertEvaluationJobInput(
         operation="development_evaluation",
@@ -121,7 +122,7 @@ def production_job_input(label_parent_digest: str) -> ExpertEvaluationJobInput:
             date(2021, 12, 31),
         ),
         requested_interventions=(),
-        expected_parent_run_digests=(label_parent_digest,),
+        expected_parent_run_digests=(parent_run_digest,),
         producer=production_binding(),
     )
 
@@ -151,19 +152,35 @@ def _load_events(root: Path, start: date, end: date) -> tuple[_EventInput, ...]:
 def _find_parent_package(
     event_run_root: Path, expected_parent_digests: Sequence[str]
 ) -> tuple[Path, Path]:
+    if len(expected_parent_digests) != 1:
+        raise ExpertEvaluationError(
+            "parent_run_binding_invalid", "exactly one outer P4 Run digest must be admitted"
+        )
+    inventory_root = (
+        event_run_root / "runs" if (event_run_root / "runs").is_dir() else event_run_root
+    )
     matches: list[tuple[Path, Path]] = []
-    for run in sorted(event_run_root.iterdir() if event_run_root.is_dir() else ()):
+    for run in sorted(inventory_root.iterdir() if inventory_root.is_dir() else ()):
         event_root = run / "event-library"
         label_root = run / "label-corpus"
-        if not event_root.is_dir() or not label_root.is_dir():
+        run_manifest_path = run / "run-manifest.json"
+        if (
+            not event_root.is_dir()
+            or not label_root.is_dir()
+            or not run_manifest_path.is_file()
+        ):
             continue
         try:
             label = verify_physical_label_corpus(label_root)
             event = verify_physical_event_scan(event_root)
+            run_manifest_payload = run_manifest_path.read_bytes()
+            run_manifest = json.loads(run_manifest_payload)
             label_manifest = json.loads(
                 (label_root / "manifest.json").read_text(encoding="utf-8")
             )
-        except Exception:
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(run_manifest, dict):
             continue
         event_binding = (
             label_manifest.get("event_library")
@@ -175,13 +192,25 @@ def _find_parent_package(
             event_binding.get("content_digest"),
         ) != (event.manifest_sha256, event.content_digest):
             continue
-        admitted = {
-            label.manifest_sha256,
-            label.content_digest,
+        outer_bindings = (
+            run_manifest.get("schema_version"),
+            run_manifest.get("run_id"),
+            run_manifest.get("event_manifest_sha256"),
+            run_manifest.get("event_content_digest"),
+            run_manifest.get("label_manifest_sha256"),
+            run_manifest.get("label_content_digest"),
+        )
+        if outer_bindings != (
+            "quanthus.p4-event-run.v2",
+            run.name,
             event.manifest_sha256,
             event.content_digest,
-        }
-        if admitted.intersection(expected_parent_digests):
+            label.manifest_sha256,
+            label.content_digest,
+        ):
+            continue
+        outer_digest = f"sha256:{hashlib.sha256(run_manifest_payload).hexdigest()}"
+        if outer_digest == expected_parent_digests[0]:
             matches.append((event_root, label_root))
     if len(matches) != 1:
         reason = "parent_run_missing" if not matches else "parent_run_ambiguous"
@@ -274,8 +303,10 @@ class TrendStabilityOperationProducer:
             "2021-12-31",
         ):
             raise ExpertEvaluationError("partition_mismatch", "first proof is fixed to 2020-2021")
-        if not job_input.expected_parent_run_digests:
-            raise ExpertEvaluationError("parent_run_missing", "accepted P4 parent is required")
+        if len(job_input.expected_parent_run_digests) != 1:
+            raise ExpertEvaluationError(
+                "parent_run_binding_invalid", "one accepted outer P4 Run is required"
+            )
         target = load_target_decision_card(
             self.registry_root / "targets/p4-event-first-passage-reuse.v1.json",
             self.repository_root,
@@ -303,10 +334,6 @@ class TrendStabilityOperationProducer:
             target.eligible_population.evaluation_end,
         )
         labels, label_ref = load_verified_p4_labels(label_root)
-        if label_ref.digest not in job_input.expected_parent_run_digests:
-            verified_label = verify_physical_label_corpus(label_root)
-            if verified_label.manifest_sha256 not in job_input.expected_parent_run_digests:
-                raise ExpertEvaluationError("parent_run_mismatch", "P4 label parent is not exact")
         provider_config = load_replay_data_provider_config(
             self.repository_root / "config/replay-data-provider.development.v2.json"
         )

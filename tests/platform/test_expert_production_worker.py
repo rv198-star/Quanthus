@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from contextlib import nullcontext
 from datetime import date, datetime
 from decimal import Decimal
@@ -15,7 +17,7 @@ from quanthus.event_library.contracts import EventIdentity, EventRecord, SplitAs
 from quanthus.expert_evaluation.contracts import ArtifactRef, ExpertEvaluationSpec, ExpertScorecard
 from quanthus.expert_evaluation.resolver import P4LabelRow
 from quanthus.expert_evaluation.runner import bind_evaluation_specs
-from quanthus.expert_evaluation.serialization import decode_artifact
+from quanthus.expert_evaluation.serialization import ExpertEvaluationError, decode_artifact
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "config/expert-evaluations"
@@ -66,6 +68,93 @@ def _feature() -> BaselineFeatureRow:
         True,
         True,
     )
+
+
+def test_parent_package_binds_one_outer_run_when_ab_contents_are_identical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    digest = "sha256:" + "d" * 64
+    event = SimpleNamespace(manifest_sha256=digest, content_digest=digest)
+    label = SimpleNamespace(manifest_sha256=digest, content_digest=digest)
+    monkeypatch.setattr(production, "verify_physical_event_scan", lambda _root: event)
+    monkeypatch.setattr(production, "verify_physical_label_corpus", lambda _root: label)
+
+    admitted_digest = ""
+    for run_id in ("run_a", "run_b"):
+        run = tmp_path / "runs" / run_id
+        (run / "event-library").mkdir(parents=True)
+        (run / "label-corpus").mkdir()
+        (run / "label-corpus" / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "event_library": {
+                        "manifest_sha256": digest,
+                        "content_digest": digest,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        payload = json.dumps(
+            {
+                "schema_version": "quanthus.p4-event-run.v2",
+                "run_id": run_id,
+                "event_manifest_sha256": digest,
+                "event_content_digest": digest,
+                "label_manifest_sha256": digest,
+                "label_content_digest": digest,
+            },
+            sort_keys=True,
+        ).encode()
+        (run / "run-manifest.json").write_bytes(payload)
+        if run_id == "run_a":
+            admitted_digest = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+    event_root, label_root = production._find_parent_package(
+        tmp_path, (admitted_digest,)
+    )
+
+    assert event_root.parent.name == "run_a"
+    assert label_root.parent.name == "run_a"
+
+
+def test_parent_package_rejects_inner_digest_as_parent_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    digest = "sha256:" + "d" * 64
+    run = tmp_path / "run_a"
+    (run / "event-library").mkdir(parents=True)
+    (run / "label-corpus").mkdir()
+    (run / "label-corpus" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "event_library": {
+                    "manifest_sha256": digest,
+                    "content_digest": digest,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run / "run-manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "quanthus.p4-event-run.v2",
+                "run_id": "run_a",
+                "event_manifest_sha256": digest,
+                "event_content_digest": digest,
+                "label_manifest_sha256": digest,
+                "label_content_digest": digest,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = SimpleNamespace(manifest_sha256=digest, content_digest=digest)
+    monkeypatch.setattr(production, "verify_physical_event_scan", lambda _root: result)
+    monkeypatch.setattr(production, "verify_physical_label_corpus", lambda _root: result)
+
+    with pytest.raises(ExpertEvaluationError, match="parent_run_missing"):
+        production._find_parent_package(tmp_path, (digest,))
 
 
 class _Panel:

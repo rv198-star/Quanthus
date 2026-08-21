@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum, IntEnum
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 
 class EventOutcome(str, Enum):
     POSITIVE = "positive"
-    MIDDLE = "middle"
+    NEUTRAL = "neutral"
     FAILURE = "failure"
     NOT_EXECUTABLE = "not_executable"
 

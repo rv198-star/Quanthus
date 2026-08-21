@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "card_id": "p4-event.outcome-first-passage",
+  "card_version": "1.0.0",
+  "lifecycle": "draft",
+  "owner": "P4-LABEL-001",
+  "purpose": "Settle each accepted P4 candidate into positive, neutral, failure, or retained not-executable status using one frozen post-entry first-passage path without tuning against realized development outcomes.",
+  "entry_anchor": "T_plus_1_actual_executable_open",
+  "observation_sessions": 20,
+  "entry_session_is_session_one": true,
+  "positive_threshold": "0.15",
+  "adverse_threshold": "0.07",
+  "price_path_basis": "hypothetical_one_share_economic_value_using_daily_high_low",
+  "corporate_action_policy": "apply_accepted_cash_dividend_and_bonus_share_actions_before_session_thresholds",
+  "transaction_cost_policy": "exclude_costs_label_price_path_not_trade_pnl",
+  "evaluation_order": [
+    "not_executable",
+    "failure",
+    "positive",
+    "neutral"
+  ],
+  "same_session_overlap_policy": "failure_wins_when_positive_and_adverse_both_cross",
+  "structural_break_same_session_policy": "failure_wins_over_positive",
+  "end_of_window_policy": "neutral_after_session_20_when_no_terminal_condition",
+  "incomplete_tail_policy": "censored_excluded_from_three_class_corpus",
+  "missing_future_evidence_policy": "unavailable_not_neutral_or_failure",
+  "suspension_policy": "market_session_counts_no_threshold_without_valid_bar",
+  "output_values": [
+    "positive",
+    "neutral",
+    "failure",
+    "not_executable"
+  ],
+  "non_claims": [
+    "Positive does not mean an executable exit at the favorable threshold or a profitable strategy trade after costs.",
+    "Neutral means no terminal condition within the frozen 20-session window, not zero return or weak failure.",
+    "Failure is not every negative terminal return; it requires the frozen adverse threshold or structural-break card.",
+    "Not-executable is inherited from the accepted T+1 entry partition and is excluded from the three-class training corpus.",
+    "Censored or unavailable evidence is not coerced into any terminal outcome."
+  ],
+  "structural_break": {
+    "card_id": "p4-event.structural-break-trend",
+    "card_version": "1.0.0",
+    "semantic_digest": "sha256:1294e0550361bafe9ecfbcfddb32a7bb1ff378332c4fb173db662f95debad9fc"
+  },
+  "bindings": {
+    "accepted_profile": "close-to-next-open-v1",
+    "p0_policy_version": "p0-2026-07-23",
+    "candidate_rule_id": "p4-event.price-volume-state-transition",
+    "candidate_rule_version": "1.0.0",
+    "candidate_rule_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+    "split_policy_id": "p4-event-date-split",
+    "split_policy_version": "1.0.0",
+    "split_policy_digest": "sha256:10c58c9f402327b2c1e9e3ba9782cce909216b795018b89586bc5a9b210fb684",
+    "maximum_overlap_sessions": 22
+  },
+  "governance": {
+    "approval_state": "pending_human_approval",
+    "approval_authority": "human",
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/75"
+  },
+  "semantic_digest": "sha256:b623a647116a69a0d6559bd265b51bdd3ac0654826cf54ba38b87d819ea165ca"
+}

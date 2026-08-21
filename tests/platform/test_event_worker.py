@@ -9,6 +9,7 @@ import pytest
 from quanthus.platform.event_worker import (
     EventLibraryEnvelope,
     EventWorker,
+    LabelCorpusEnvelope,
     _event_input,
     _validate_run_directory,
 )
@@ -21,6 +22,9 @@ GOVERNED_INPUT = {
     "provider_config": "config/replay-data-provider.development.v2.json",
     "rule_card": "config/p4-candidate-price-volume-transition.research.v1.json",
     "split_policy": "config/p4-event-split-policy.research.v1.json",
+    "outcome_card": "config/p4-event-outcome-label.research.v1.json",
+    "structural_break_card": "config/p4-event-structural-break.research.v1.json",
+    "feature_registry": "config/p3-baseline-features.research.v1.json",
 }
 
 
@@ -116,6 +120,18 @@ def test_event_worker_recovers_sealed_run_without_rerunning_child(
         executable_events=10,
         not_executable_events=2,
     )
+    expected_label_result = LabelCorpusEnvelope(
+        root=final / "label-corpus",
+        manifest_sha256="sha256:" + "3" * 64,
+        content_digest="sha256:" + "4" * 64,
+        total_events=12,
+        positive_events=4,
+        neutral_events=3,
+        failure_events=3,
+        not_executable_events=2,
+        censored_events=0,
+        unavailable_events=0,
+    )
     expected_ref = {
         "run_id": run_id,
         "artifact_ref": str(final),
@@ -147,7 +163,7 @@ def test_event_worker_recovers_sealed_run_without_rerunning_child(
     store = Store()
     monkeypatch.setattr(
         "quanthus.platform.event_worker._validate_run_directory",
-        lambda *_args, **_kwargs: (expected_result, expected_ref),
+        lambda *_args, **_kwargs: (expected_result, expected_label_result, expected_ref),
     )
     worker = EventWorker(
         store,  # type: ignore[arg-type]
@@ -164,7 +180,11 @@ def test_event_worker_recovers_sealed_run_without_rerunning_child(
         {
             "stage": "recovering-sealed-event-run",
             "progress": 98,
-            "progress_detail": {"run_id": run_id, "candidate_events": 12},
+            "progress_detail": {
+                "run_id": run_id,
+                "candidate_events": 12,
+                "three_class_events": 10,
+            },
         }
     ]
     assert store.finished == {
@@ -185,17 +205,36 @@ def test_validate_event_run_rejects_manifest_identity_mismatch(
         executable_events=3,
         not_executable_events=1,
     )
+    label_result = LabelCorpusEnvelope(
+        root=tmp_path / "label-corpus",
+        manifest_sha256="sha256:" + "3" * 64,
+        content_digest="sha256:" + "4" * 64,
+        total_events=4,
+        positive_events=1,
+        neutral_events=1,
+        failure_events=1,
+        not_executable_events=1,
+        censored_events=0,
+        unavailable_events=0,
+    )
     event_root = tmp_path / "event-library"
     event_root.mkdir()
+    label_root = tmp_path / "label-corpus"
+    label_root.mkdir()
     (event_root / "manifest.json").write_text(
         '{"code_revision":"' + "a" * 40 + '"}\n', encoding="utf-8"
     )
-    (tmp_path / "run-manifest.json").write_text(
-        "{}\n", encoding="utf-8"
+    (label_root / "manifest.json").write_text(
+        '{"code_revision":"' + "a" * 40 + '"}\n', encoding="utf-8"
     )
+    (tmp_path / "run-manifest.json").write_text("{}\n", encoding="utf-8")
     monkeypatch.setattr(
         "quanthus.platform.event_worker._verify_event_library",
         lambda _path: result,
+    )
+    monkeypatch.setattr(
+        "quanthus.platform.event_worker._verify_label_corpus",
+        lambda _path: label_result,
     )
 
     with pytest.raises(RuntimeError, match="event_run_manifest_mismatch"):

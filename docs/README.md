@@ -147,9 +147,9 @@ nodes.
   execution-source snapshot rather than rewriting source provenance. Issue #74 is accepted after
   two real 2012-2021 Jobs reproduced 36,820 candidate identities, 36,022 executable and 798
   not-executable events, and identical Event Library content/manifest digests. `P4-LABEL-001` now
-  has human-approved exact outcome/structural card digests; authorized development outcome reads
-  may proceed only to build the reproducible label corpus, while arbitration/permanent-blind reads
-  remain blocked.
+  has human-approved exact outcome/structural card digests and the deterministic label-corpus /
+  Event Worker v2 implementation is complete. Production development A/B corpus acceptance remains
+  open; arbitration and permanent-blind reads remain blocked.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,
   retained PostgreSQL and candidate-Run volumes, and Traefik as the only product edge. The former

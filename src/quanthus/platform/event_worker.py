@@ -22,13 +22,16 @@ from quanthus.platform.jobs import P4_EVENT_SCAN_JOB
 from quanthus.platform.persistence import PostgresPlatformStore
 
 EVENT_QUEUE = "event"
-RUN_SCHEMA = "quanthus.p4-event-run.v1"
+RUN_SCHEMA = "quanthus.p4-event-run.v2"
 _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
     "provider_config": "config/replay-data-provider.development.v2.json",
     "rule_card": "config/p4-candidate-price-volume-transition.research.v1.json",
     "split_policy": "config/p4-event-split-policy.research.v1.json",
+    "outcome_card": "config/p4-event-outcome-label.research.v1.json",
+    "structural_break_card": "config/p4-event-structural-break.research.v1.json",
+    "feature_registry": "config/p3-baseline-features.research.v1.json",
 }
 
 
@@ -87,6 +90,20 @@ class EventLibraryEnvelope:
     not_executable_events: int
 
 
+@dataclass(frozen=True)
+class LabelCorpusEnvelope:
+    root: Path
+    manifest_sha256: str
+    content_digest: str
+    total_events: int
+    positive_events: int
+    neutral_events: int
+    failure_events: int
+    not_executable_events: int
+    censored_events: int
+    unavailable_events: int
+
+
 def _verify_event_library(root: Path) -> EventLibraryEnvelope:
     completed = subprocess.run(
         (
@@ -127,20 +144,76 @@ def _verify_event_library(root: Path) -> EventLibraryEnvelope:
     )
 
 
+def _verify_label_corpus(root: Path) -> LabelCorpusEnvelope:
+    completed = subprocess.run(
+        (
+            sys.executable,
+            "-m",
+            "quanthus",
+            "verify-p4-label-corpus",
+            "--root",
+            str(root),
+        ),
+        check=False,
+        capture_output=True,
+        timeout=300,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("label_corpus_verifier_failed")
+    try:
+        payload = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
+    except (UnicodeDecodeError, json.JSONDecodeError, IndexError) as exc:
+        raise RuntimeError("label_corpus_verifier_response_invalid") from exc
+    required = {
+        "root",
+        "manifest_sha256",
+        "content_digest",
+        "total_events",
+        "positive_events",
+        "neutral_events",
+        "failure_events",
+        "not_executable_events",
+        "censored_events",
+        "unavailable_events",
+    }
+    if not isinstance(payload, dict) or set(payload) != required:
+        raise RuntimeError("label_corpus_verifier_response_invalid")
+    return LabelCorpusEnvelope(
+        root=Path(str(payload["root"])).resolve(),
+        manifest_sha256=str(payload["manifest_sha256"]),
+        content_digest=str(payload["content_digest"]),
+        total_events=int(payload["total_events"]),
+        positive_events=int(payload["positive_events"]),
+        neutral_events=int(payload["neutral_events"]),
+        failure_events=int(payload["failure_events"]),
+        not_executable_events=int(payload["not_executable_events"]),
+        censored_events=int(payload["censored_events"]),
+        unavailable_events=int(payload["unavailable_events"]),
+    )
+
+
 def _result_ref(
     *,
     run_id: str,
     artifact_ref: Path,
-    result: EventLibraryEnvelope,
+    event_result: EventLibraryEnvelope,
+    label_result: LabelCorpusEnvelope,
 ) -> dict[str, Any]:
     return {
         "run_id": run_id,
         "artifact_ref": str(artifact_ref),
-        "result_sha256": result.manifest_sha256,
-        "content_digest": result.content_digest,
-        "candidate_events": result.candidate_events,
-        "executable_events": result.executable_events,
-        "not_executable_events": result.not_executable_events,
+        "result_sha256": event_result.manifest_sha256,
+        "content_digest": event_result.content_digest,
+        "candidate_events": event_result.candidate_events,
+        "executable_events": event_result.executable_events,
+        "not_executable_events": event_result.not_executable_events,
+        "label_manifest_sha256": label_result.manifest_sha256,
+        "label_content_digest": label_result.content_digest,
+        "positive_events": label_result.positive_events,
+        "neutral_events": label_result.neutral_events,
+        "failure_events": label_result.failure_events,
+        "censored_events": label_result.censored_events,
+        "unavailable_events": label_result.unavailable_events,
     }
 
 
@@ -151,37 +224,63 @@ def _validate_run_directory(
     job_id: str,
     input_digest: str,
     code_revision: str,
-) -> tuple[EventLibraryEnvelope, dict[str, Any]]:
+) -> tuple[EventLibraryEnvelope, LabelCorpusEnvelope, dict[str, Any]]:
     try:
         manifest = json.loads((path / "run-manifest.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("event_run_manifest_unreadable") from exc
     if not isinstance(manifest, dict):
         raise RuntimeError("event_run_manifest_invalid")
-    result = _verify_event_library(path / "event-library")
+    event_result = _verify_event_library(path / "event-library")
+    label_result = _verify_label_corpus(path / "label-corpus")
+    if label_result.total_events != event_result.candidate_events:
+        raise RuntimeError("label_corpus_event_count_mismatch")
+    if label_result.not_executable_events != event_result.not_executable_events:
+        raise RuntimeError("label_corpus_not_executable_count_mismatch")
     try:
         event_manifest = json.loads(
             (path / "event-library" / "manifest.json").read_text(encoding="utf-8")
         )
+        label_manifest = json.loads(
+            (path / "label-corpus" / "manifest.json").read_text(encoding="utf-8")
+        )
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError("event_library_manifest_unreadable") from exc
+        raise RuntimeError("event_or_label_manifest_unreadable") from exc
     expected = {
         "schema_version": RUN_SCHEMA,
         "run_id": run_id,
         "job_id": job_id,
         "input_digest": input_digest,
         "code_revision": code_revision,
-        "event_manifest_sha256": result.manifest_sha256,
-        "event_content_digest": result.content_digest,
-        "candidate_events": result.candidate_events,
-        "executable_events": result.executable_events,
-        "not_executable_events": result.not_executable_events,
+        "event_manifest_sha256": event_result.manifest_sha256,
+        "event_content_digest": event_result.content_digest,
+        "label_manifest_sha256": label_result.manifest_sha256,
+        "label_content_digest": label_result.content_digest,
+        "candidate_events": event_result.candidate_events,
+        "executable_events": event_result.executable_events,
+        "not_executable_events": event_result.not_executable_events,
+        "positive_events": label_result.positive_events,
+        "neutral_events": label_result.neutral_events,
+        "failure_events": label_result.failure_events,
+        "censored_events": label_result.censored_events,
+        "unavailable_events": label_result.unavailable_events,
     }
     if manifest != expected:
         raise RuntimeError("event_run_manifest_mismatch")
     if not isinstance(event_manifest, dict) or event_manifest.get("code_revision") != code_revision:
         raise RuntimeError("event_library_code_revision_mismatch")
-    return result, _result_ref(run_id=run_id, artifact_ref=path, result=result)
+    if not isinstance(label_manifest, dict) or label_manifest.get("code_revision") != code_revision:
+        raise RuntimeError("label_corpus_code_revision_mismatch")
+    return (
+        event_result,
+        label_result,
+        _result_ref(
+            run_id=run_id,
+            artifact_ref=path,
+            event_result=event_result,
+            label_result=label_result,
+        ),
+    )
 
 
 class EventWorker:
@@ -254,7 +353,7 @@ class EventWorker:
         run_id = f"run_{job_id.removeprefix('job_')}"
         final = self.run_root / "runs" / run_id
         if final.exists():
-            result, result_ref = _validate_run_directory(
+            event_result, label_result, result_ref = _validate_run_directory(
                 final,
                 run_id=run_id,
                 job_id=job_id,
@@ -268,7 +367,12 @@ class EventWorker:
                 progress=98,
                 progress_detail={
                     "run_id": run_id,
-                    "candidate_events": result.candidate_events,
+                    "candidate_events": event_result.candidate_events,
+                    "three_class_events": (
+                        label_result.positive_events
+                        + label_result.neutral_events
+                        + label_result.failure_events
+                    ),
                 },
             )
             self.store.finish_claimed_job(
@@ -287,11 +391,12 @@ class EventWorker:
         stdout_path = staging / "stdout.log"
         stderr_path = staging / "stderr.log"
         event_root = staging / "event-library"
+        label_root = staging / "label-corpus"
         command = (
             sys.executable,
             "-m",
             "quanthus",
-            "run-p4-event-scan",
+            "run-p4-labeled-event-scan",
             "--source-policy",
             governed["source_policy"],
             "--provider-config",
@@ -300,8 +405,16 @@ class EventWorker:
             governed["rule_card"],
             "--split-policy",
             governed["split_policy"],
-            "--output",
+            "--outcome-card",
+            governed["outcome_card"],
+            "--structural-break-card",
+            governed["structural_break_card"],
+            "--feature-registry",
+            governed["feature_registry"],
+            "--event-output",
             str(event_root),
+            "--label-output",
+            str(label_root),
             "--code-revision",
             governed["code_revision"],
         )
@@ -347,7 +460,7 @@ class EventWorker:
                 error_reason=None,
             )
             return
-        if process.returncode != 0 or not event_root.is_dir():
+        if process.returncode != 0 or not event_root.is_dir() or not label_root.is_dir():
             self.store.finish_claimed_job(
                 job_id,
                 generation,
@@ -360,22 +473,34 @@ class EventWorker:
         self.store.update_claimed_job(
             job_id,
             generation,
-            stage="validating-event-run",
+            stage="validating-labeled-event-run",
             progress=90,
             progress_detail={"run_id": run_id},
         )
-        result = _verify_event_library(event_root)
+        event_result = _verify_event_library(event_root)
+        label_result = _verify_label_corpus(label_root)
+        if label_result.total_events != event_result.candidate_events:
+            raise RuntimeError("label_corpus_event_count_mismatch")
+        if label_result.not_executable_events != event_result.not_executable_events:
+            raise RuntimeError("label_corpus_not_executable_count_mismatch")
         run_manifest = {
             "schema_version": RUN_SCHEMA,
             "run_id": run_id,
             "job_id": job_id,
             "input_digest": input_digest,
             "code_revision": governed["code_revision"],
-            "event_manifest_sha256": result.manifest_sha256,
-            "event_content_digest": result.content_digest,
-            "candidate_events": result.candidate_events,
-            "executable_events": result.executable_events,
-            "not_executable_events": result.not_executable_events,
+            "event_manifest_sha256": event_result.manifest_sha256,
+            "event_content_digest": event_result.content_digest,
+            "label_manifest_sha256": label_result.manifest_sha256,
+            "label_content_digest": label_result.content_digest,
+            "candidate_events": event_result.candidate_events,
+            "executable_events": event_result.executable_events,
+            "not_executable_events": event_result.not_executable_events,
+            "positive_events": label_result.positive_events,
+            "neutral_events": label_result.neutral_events,
+            "failure_events": label_result.failure_events,
+            "censored_events": label_result.censored_events,
+            "unavailable_events": label_result.unavailable_events,
         }
         (staging / "run-manifest.json").write_text(
             json.dumps(run_manifest, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
@@ -384,18 +509,23 @@ class EventWorker:
         self.store.update_claimed_job(
             job_id,
             generation,
-            stage="sealing-event-run",
+            stage="sealing-labeled-event-run",
             progress=97,
             progress_detail={
                 "run_id": run_id,
-                "candidate_events": result.candidate_events,
+                "candidate_events": event_result.candidate_events,
+                "three_class_events": (
+                    label_result.positive_events
+                    + label_result.neutral_events
+                    + label_result.failure_events
+                ),
             },
         )
         final.parent.mkdir(parents=True, exist_ok=True)
         if final.exists():
             raise RuntimeError("immutable_event_run_already_exists")
         os.replace(staging, final)
-        result, result_ref = _validate_run_directory(
+        _event_result, _label_result, result_ref = _validate_run_directory(
             final,
             run_id=run_id,
             job_id=job_id,

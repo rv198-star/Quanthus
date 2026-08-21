@@ -18,6 +18,12 @@ from quanthus.event_library.label_cards import (
     load_outcome_label_card,
     load_structural_break_card,
 )
+from quanthus.event_library.label_corpus import (
+    LabelCorpusError,
+    LabelCorpusResult,
+    build_physical_label_corpus,
+    verify_physical_label_corpus,
+)
 from quanthus.event_library.physical_scan import (
     EventCandidateProjection,
     P4ResearchADM,
@@ -81,6 +87,8 @@ __all__ = [
     "EventScanSourceError",
     "EventScanSourcePolicy",
     "HistoricalVisibilityPolicy",
+    "LabelCorpusError",
+    "LabelCorpusResult",
     "LabelSettlementStatus",
     "OutcomeLabelCard",
     "ExecutableCandidate",
@@ -95,6 +103,7 @@ __all__ = [
     "StructuralBreakCard",
     "assign_event_split",
     "build_physical_event_scan",
+    "build_physical_label_corpus",
     "calculate_candidate_rule_card_digest",
     "calculate_outcome_label_card_digest",
     "calculate_structural_break_card_digest",
@@ -112,4 +121,5 @@ __all__ = [
     "validate_event_record_set",
     "verify_event_scan_base",
     "verify_physical_event_scan",
+    "verify_physical_label_corpus",
 ]

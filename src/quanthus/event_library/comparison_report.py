@@ -501,6 +501,24 @@ class ComparisonReportResult:
 
 
 @dataclass(frozen=True)
+class _ReportEventInput:
+    event_id: str
+    panel_security_id: str
+    signal_date: str
+    outcome: str
+    hash_half: int
+
+    def as_row(self) -> tuple[object, ...]:
+        return (
+            self.event_id,
+            self.panel_security_id,
+            self.signal_date,
+            self.outcome,
+            self.hash_half,
+        )
+
+
+@dataclass(frozen=True)
 class _Stats:
     count: int
     mean: float | None
@@ -798,17 +816,20 @@ def _files(root: Path) -> tuple[dict[str, Any], ...]:
     return tuple(files)
 
 
-def _event_label_inputs(event_root: Path, label_root: Path) -> tuple[tuple[object, ...], ...]:
+def _event_label_inputs(event_root: Path, label_root: Path) -> tuple[_ReportEventInput, ...]:
     event_rows = _load_jsonl(event_root / "events.jsonl")
     label_rows = _load_jsonl(label_root / "labels.jsonl")
     event_identity: dict[str, tuple[str, str]] = {}
     for row in event_rows:
         event = _mapping(row.get("event"), "event")
         event_id = _text(event.get("event_id"), "event.event_id")
-        security_id = _text(event.get("security_id"), "event.security_id")
+        # EventRecord.security_id is the governed DWD identity. The accepted direct-DWD replay
+        # adapter deliberately keys the P3 feature panel by listing_code instead. Keep those
+        # namespaces distinct and bind the report to the replay-panel identity explicitly.
+        panel_security_id = _text(row.get("listing_code"), "listing_code")
         signal_date = _text(event.get("signal_date"), "event.signal_date")
-        event_identity[event_id] = (security_id, signal_date)
-    inputs: list[tuple[object, ...]] = []
+        event_identity[event_id] = (panel_security_id, signal_date)
+    inputs: list[_ReportEventInput] = []
     for row in label_rows:
         if row.get("settlement_status") != "settled" or row.get("outcome") not in _ALLOWED_OUTCOMES:
             continue
@@ -816,18 +837,26 @@ def _event_label_inputs(event_root: Path, label_root: Path) -> tuple[tuple[objec
         identity = event_identity.get(event_id)
         if identity is None:
             raise ComparisonReportError("label corpus contains unknown event identity")
-        security_id, signal_date = identity
+        panel_security_id, signal_date = identity
         hash_half = hashlib.sha256(event_id.encode("utf-8")).digest()[0] & 1
-        inputs.append((event_id, security_id, signal_date, str(row["outcome"]), hash_half))
-    inputs.sort(key=lambda row: str(row[0]))
-    if len({str(row[0]) for row in inputs}) != len(inputs):
+        inputs.append(
+            _ReportEventInput(
+                event_id=event_id,
+                panel_security_id=panel_security_id,
+                signal_date=signal_date,
+                outcome=str(row["outcome"]),
+                hash_half=hash_half,
+            )
+        )
+    inputs.sort(key=lambda row: row.event_id)
+    if len({row.event_id for row in inputs}) != len(inputs):
         raise ComparisonReportError("report input contains duplicate event ids")
     return tuple(inputs)
 
 
 def _aggregate_feature_rows(
     feature_panel_path: Path,
-    event_inputs: Sequence[tuple[object, ...]],
+    event_inputs: Sequence[_ReportEventInput],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     try:
         import duckdb
@@ -836,12 +865,12 @@ def _aggregate_feature_rows(
     connection = duckdb.connect(":memory:")
     try:
         connection.execute(
-            "CREATE TABLE event_labels (event_id VARCHAR, security_id VARCHAR, signal_date DATE, "
-            "outcome VARCHAR, hash_half INTEGER)"
+            "CREATE TABLE event_labels (event_id VARCHAR, panel_security_id VARCHAR, "
+            "signal_date DATE, outcome VARCHAR, hash_half INTEGER)"
         )
         connection.executemany(
             "INSERT INTO event_labels VALUES (?, ?, CAST(? AS DATE), ?, ?)",
-            list(event_inputs),
+            [item.as_row() for item in event_inputs],
         )
         escaped = str(feature_panel_path).replace("'", "''")
         connection.execute(
@@ -851,11 +880,11 @@ def _aggregate_feature_rows(
         )
         derived = """
             WITH signal_rows AS (
-                SELECT e.event_id, e.security_id, e.signal_date, e.outcome, e.hash_half,
+                SELECT e.event_id, e.panel_security_id, e.signal_date, e.outcome, e.hash_half,
                        p.session_seq AS signal_seq
                 FROM event_labels e
                 JOIN panel_indexed p
-                  ON p.security_id = e.security_id
+                  ON p.security_id = e.panel_security_id
                  AND p.market_date = e.signal_date
             ),
             aligned AS (
@@ -873,7 +902,7 @@ def _aggregate_feature_rows(
                        h.realized_volatility20 AS realized_volatility20
                 FROM signal_rows e
                 JOIN panel_indexed h
-                  ON h.security_id = e.security_id
+                  ON h.security_id = e.panel_security_id
                  AND h.session_seq BETWEEN e.signal_seq - 20 AND e.signal_seq
             ),
             long_features AS (
@@ -895,7 +924,7 @@ def _aggregate_feature_rows(
         """
         aligned_count = connection.execute(
             "WITH signal_rows AS (SELECT e.event_id FROM event_labels e JOIN panel_indexed p "
-            "ON p.security_id=e.security_id AND p.market_date=e.signal_date) "
+            "ON p.security_id=e.panel_security_id AND p.market_date=e.signal_date) "
             "SELECT count(*) FROM signal_rows"
         ).fetchone()
         if aligned_count is None or int(aligned_count[0]) != len(event_inputs):

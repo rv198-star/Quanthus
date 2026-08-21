@@ -288,9 +288,19 @@ The existing Event Worker remains the only P4 worker. Its governed input now add
 report policy; one `run-p4-reported-event-scan` child builds Event Library, Label Corpus, and
 Comparison Report under one lease. Run manifest schema `quanthus.p4-event-run.v3` binds all three
 independent package identities and rejects recovery if their counts, code revision, or verifiers
-disagree. The remaining #76 acceptance gate is two production runs with identical governed input,
-identical report content/manifest digests, identical leading-feature ids, and a true report
-acceptance flag.
+disagree.
+
+The Event Library and P3 feature panel intentionally use different security identity namespaces.
+`EventRecord.identity.security_id` remains the governed DWD identity, while the accepted direct-DWD
+replay adapter keys the P3 feature panel by `listing_code`. The comparison adapter therefore derives
+an explicit `panel_security_id` from each Event Library row's `listing_code` before joining T..T-20
+feature rows; it never assumes the governed DWD event identity equals the replay-panel key. The
+first production Report Run exposed this boundary by failing closed at T-row alignment; remediation
+is recorded in `docs/acceptance/p4-event-comparison-report-identity-remediation-20260822.md` and does
+not change the frozen report-policy digest.
+
+The remaining #76 acceptance gate is two production runs with identical governed input, identical
+report content/manifest digests, identical leading-feature ids, and a true report acceptance flag.
 
 ## 8. Work items
 

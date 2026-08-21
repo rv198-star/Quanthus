@@ -13,7 +13,9 @@ from quanthus.event_library.comparison_report import (
     _aggregate_feature_rows,
     _benjamini_hochberg,
     _effect,
+    _event_label_inputs,
     _feature_ranking,
+    _ReportEventInput,
     _Stats,
     calculate_comparison_report_policy_digest,
     load_comparison_report_policy,
@@ -57,6 +59,44 @@ def test_report_policy_digest_detects_semantic_tampering(tmp_path: Path) -> None
 
     with pytest.raises(ComparisonReportError, match="semantic_digest"):
         load_comparison_report_policy(path)
+
+
+def test_report_inputs_bind_replay_panel_identity_from_listing_code(tmp_path: Path) -> None:
+    event_root = tmp_path / "event-library"
+    label_root = tmp_path / "label-corpus"
+    event_root.mkdir()
+    label_root.mkdir()
+    event_id = "event:dwd-governed-identity"
+    event_row = {
+        "event": {
+            "event_id": event_id,
+            "security_id": "security_governed_dwd_001",
+            "signal_date": "2020-01-31",
+        },
+        "listing_code": "600001",
+    }
+    label_row = {
+        "event_id": event_id,
+        "settlement_status": "settled",
+        "outcome": "positive",
+    }
+    (event_root / "events.jsonl").write_text(
+        json.dumps(event_row, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (label_root / "labels.jsonl").write_text(
+        json.dumps(label_row, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    inputs = _event_label_inputs(event_root, label_root)
+
+    assert len(inputs) == 1
+    assert inputs[0].event_id == event_id
+    assert inputs[0].panel_security_id == "600001"
+    assert inputs[0].panel_security_id != event_row["event"]["security_id"]
+    assert inputs[0].signal_date == "2020-01-31"
+    assert inputs[0].outcome == "positive"
 
 
 def test_hedges_g_and_mean_difference_have_expected_direction() -> None:
@@ -145,7 +185,7 @@ def test_feature_ranking_requires_predeclared_full_and_perturbation_checks() -> 
 def test_feature_panel_alignment_expands_complete_three_group_matrix(tmp_path: Path) -> None:
     start = date(2020, 1, 1)
     rows: list[dict[str, object]] = []
-    event_inputs: list[tuple[object, ...]] = []
+    event_inputs: list[_ReportEventInput] = []
     groups = (
         ("positive", 0),
         ("positive", 1),
@@ -175,7 +215,13 @@ def test_feature_panel_alignment_expands_complete_three_group_matrix(tmp_path: P
                 }
             )
         event_inputs.append(
-            (event_id, security_id, (start + timedelta(days=20)).isoformat(), outcome, half)
+            _ReportEventInput(
+                event_id=event_id,
+                panel_security_id=security_id,
+                signal_date=(start + timedelta(days=20)).isoformat(),
+                outcome=outcome,
+                hash_half=half,
+            )
         )
     panel_path = tmp_path / "panel.parquet"
     pq.write_table(pa.Table.from_pylist(rows), panel_path)

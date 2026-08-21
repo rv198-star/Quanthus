@@ -5,8 +5,8 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-003` |
 | Design status | approved |
-| Delivery gate | dependencies and exact 2020-2021 engineering-proof target decision accepted |
-| Implementation readiness | implementation in progress |
+| Delivery gate | accepted; evidence: `docs/acceptance/p3-expert-first-target-production-20260821.md` |
+| Implementation readiness | production implementation and deterministic reproduction accepted |
 | Result access | authorized only for the approved 2020-2021 development engineering proof |
 
 ## 1. Outcome and boundary

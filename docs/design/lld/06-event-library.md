@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, and `P4-LABEL-001` accepted after deterministic production A/B replay; the accepted label corpus contains 36,820 total events and 34,641 settled three-class events with identical Event/Label digests across A/B |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, and `P4-LABEL-001` accepted through deterministic production A/B evidence; `P4-REPORT-001` comparison policy, report builder, and Event Worker v3 implemented, with real production A/B report acceptance still open |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -259,11 +259,38 @@ outcome-state counts and identical Event/Label content and manifest digests; evi
 
 ## 7. Comparative report
 
-For each feature and label, report group distributions at T through T-(M-1), effect size,
-uncertainty, multiple-testing context, and first reliable divergence date. The primary question
-is which observable state separates positive from neutral events before entry. The report also
-shows candidate-to-executable attrition so that apparently strong results cannot hide a large
-unexecutable group.
+`P4-REPORT-001` freezes `p4-event.daily-group-comparison@1.0.0`, semantic digest
+`sha256:4b7e6f931b06615940a9a72a5bd05f800be40f825716093e04637ab5fd8134a0`, before the
+real development report is read. Its primary question is which observable pre-entry feature path
+most reproducibly separates `positive` from `neutral`; `failure` remains a full contextual group
+rather than the primary ranking target. `not_executable`, `unavailable`, and `censored` remain in
+candidate-to-report attrition and cannot be silently coerced into the three-class comparison.
+
+The report examines T through T-20 and reuses the accepted P3 feature panel rather than inventing
+new price semantics. Seven dimensionless comparison features are frozen: price/SMA20 minus one,
+SMA20/SMA60 minus one, momentum20, total-return price/prior-high20 minus one, RSI14, volume ratio20,
+and realized volatility20. For each feature, lag, and outcome it emits sample count, mean, standard
+deviation, quartiles, and median. Pairwise comparisons emit Hedges g, mean difference, a normal
+95-percent confidence interval for that difference, and two-sided normal-approximation p-values.
+Benjamini-Hochberg FDR is applied independently to the complete 147-test matrix for each contrast.
+
+Leading-feature selection is predeclared rather than chosen after inspection. A primary
+`positive_vs_neutral` feature must have an FDR-significant peak with at least 500 observations per
+group, a first reliable divergence consisting of two consecutive same-direction FDR-significant
+lags, the same effect direction in both deterministic event-id hash halves with at least 200
+observations per group/half, and a same-direction adjacent lag with q <= 0.10. Surviving features
+rank by absolute peak Hedges g and stable feature id; exactly the first three become the leading
+features. This ranking is descriptive research evidence, not a trading rule or promotion claim.
+
+`src/quanthus/event_library/comparison_report.py` materializes
+`comparison-report/{group-distributions.jsonl,pairwise-effects.jsonl,feature-ranking.jsonl,summary.json,manifest.json,READY}`.
+The existing Event Worker remains the only P4 worker. Its governed input now additionally binds the
+report policy; one `run-p4-reported-event-scan` child builds Event Library, Label Corpus, and
+Comparison Report under one lease. Run manifest schema `quanthus.p4-event-run.v3` binds all three
+independent package identities and rejects recovery if their counts, code revision, or verifiers
+disagree. The remaining #76 acceptance gate is two production runs with identical governed input,
+identical report content/manifest digests, identical leading-feature ids, and a true report
+acceptance flag.
 
 ## 8. Work items
 
@@ -272,7 +299,7 @@ unexecutable group.
 | P4-EVENT-001 | Freeze candidate-source hypothesis; define event, isolation, and split schemas | Accepted P3 replay and audit contracts | Exact rule-card and split-policy digests approved; deterministic contract tests and acceptance record pass |
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Accepted production A/B replay: 36,820 candidates, 36,022 executable, 798 not-executable, identical manifest/content digests |
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Accepted production A/B corpus: 36,820 total, 34,641 settled three-class, identical Event/Label content and manifest digests |
-| P4-REPORT-001 | Produce daily group comparison report | Event dataset | Three leading features |
+| P4-REPORT-001 | Produce daily group comparison report | Event dataset | Exact report-policy digest, deterministic report package, three surviving leading features, and production A/B report identity required |
 
 ## 9. Acceptance
 

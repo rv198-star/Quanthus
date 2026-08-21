@@ -146,11 +146,13 @@ nodes.
   T+1 entry binding keeps the event's ADM snapshot identity separate from the original P1/P2
   execution-source snapshot rather than rewriting source provenance. Issue #74 is accepted after
   two real 2012-2021 Jobs reproduced 36,820 candidate identities, 36,022 executable and 798
-  not-executable events, and identical Event Library content/manifest digests. `P4-LABEL-001` now
-  has human-approved exact outcome/structural card digests and accepted deterministic production
-  A/B label-corpus evidence: 36,820 total events, 34,641 settled three-class events, identical
-  Event/Label content and manifest digests across both runs. Arbitration and permanent-blind reads
-  remain blocked.
+  not-executable events, and identical Event Library content/manifest digests. `P4-LABEL-001` has
+  human-approved exact outcome/structural card digests and accepted deterministic production A/B
+  label-corpus evidence: 36,820 total events, 34,641 settled three-class events, identical
+  Event/Label content and manifest digests across both runs. `P4-REPORT-001` now has an approved
+  pre-result comparison-policy digest, deterministic report builder, and Event Worker v3 binding
+  Event + Label + Report under one lease; real production A/B report acceptance remains open.
+  Arbitration and permanent-blind reads remain blocked.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,
   retained PostgreSQL and candidate-Run volumes, and Traefik as the only product edge. The former

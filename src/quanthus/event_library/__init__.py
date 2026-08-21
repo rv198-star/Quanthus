@@ -1,5 +1,14 @@
 """P4 event-library contracts."""
 
+from quanthus.event_library.comparison_report import (
+    ComparisonReportError,
+    ComparisonReportPolicy,
+    ComparisonReportResult,
+    build_physical_comparison_report,
+    calculate_comparison_report_policy_digest,
+    load_comparison_report_policy,
+    verify_physical_comparison_report,
+)
 from quanthus.event_library.contracts import (
     EventContractError,
     EventIdentity,
@@ -77,6 +86,9 @@ __all__ = [
     "CandidateRuleCardError",
     "CandidateScanError",
     "CandidateScanResult",
+    "ComparisonReportError",
+    "ComparisonReportPolicy",
+    "ComparisonReportResult",
     "EventCandidateProjection",
     "EventContractError",
     "EventIdentity",
@@ -102,14 +114,17 @@ __all__ = [
     "SplitPolicyError",
     "StructuralBreakCard",
     "assign_event_split",
+    "build_physical_comparison_report",
     "build_physical_event_scan",
     "build_physical_label_corpus",
     "calculate_candidate_rule_card_digest",
+    "calculate_comparison_report_policy_digest",
     "calculate_outcome_label_card_digest",
     "calculate_structural_break_card_digest",
     "calculate_split_policy_digest",
     "event_record_from_dict",
     "load_candidate_rule_card",
+    "load_comparison_report_policy",
     "load_event_scan_source_policy",
     "load_outcome_label_card",
     "load_split_policy",
@@ -120,6 +135,7 @@ __all__ = [
     "scan_forward_candidates",
     "validate_event_record_set",
     "verify_event_scan_base",
+    "verify_physical_comparison_report",
     "verify_physical_event_scan",
     "verify_physical_label_corpus",
 ]

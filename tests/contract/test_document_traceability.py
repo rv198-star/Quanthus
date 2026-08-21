@@ -3,6 +3,7 @@ import re
 import unittest
 from pathlib import Path
 
+from quanthus.event_library.comparison_report import load_comparison_report_policy
 from quanthus.event_library.label_cards import (
     load_outcome_label_card,
     load_structural_break_card,
@@ -985,7 +986,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
 
         self.assertIn("`P4-EVENT-001`", lld)
         self.assertIn("`P4-EVENT-002`", lld)
-        self.assertIn("accepted after deterministic production A/B replay", lld)
+        self.assertIn("accepted through deterministic production A/B evidence", lld)
+        self.assertIn("`P4-REPORT-001`", lld)
+        self.assertIn("production A/B report acceptance still open", lld)
         self.assertIn("`CandidateRuleCard.require_stage_b_authority()`", lld)
         self.assertEqual(card.lifecycle, "approved")
         self.assertEqual(card.governance.approval_state, "approved")
@@ -1155,13 +1158,20 @@ class DocumentTraceabilityTests(unittest.TestCase):
         structural = load_structural_break_card(
             root / "config" / "p4-event-structural-break.research.v1.json"
         )
+        report_policy = load_comparison_report_policy(
+            root / "config" / "p4-event-comparison-report.research.v1.json"
+        )
         self.assertEqual(outcome.lifecycle, "approved")
         self.assertEqual(structural.lifecycle, "approved")
         self.assertEqual(outcome.governance.approval_state, "approved")
         self.assertEqual(structural.governance.approval_state, "approved")
         self.assertEqual(outcome.structural_break.semantic_digest, structural.semantic_digest)
+        self.assertEqual(report_policy.lifecycle, "approved")
+        self.assertEqual(report_policy.governance.approval_state, "approved")
+        self.assertIn("#issuecomment-5370987743", report_policy.governance.decision_reference)
         self.assertIn(outcome.semantic_digest, lld)
         self.assertIn(structural.semantic_digest, lld)
+        self.assertIn(report_policy.semantic_digest, lld)
         label_proposal_path = (
             root
             / "docs"
@@ -1219,8 +1229,27 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "sha256:31ed3e95771390c4df3cb4cff21ba2b3415458456cf6b6f02621c7c81bdc5b12",
             label_acceptance,
         )
+        report_implementation_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-comparison-report-implementation-20260821.md"
+        )
+        self.assertTrue(report_implementation_path.is_file())
+        report_implementation = report_implementation_path.read_text(encoding="utf-8")
+        self.assertIn(report_policy.semantic_digest, report_implementation)
+        self.assertIn("run-p4-reported-event-scan", report_implementation)
+        self.assertIn("quanthus.p4-event-run.v3", report_implementation)
+        self.assertIn("34,641", report_implementation)
+        self.assertTrue(
+            (root / "src" / "quanthus" / "event_library" / "comparison_report.py").is_file()
+        )
+        self.assertTrue(
+            (root / "tests" / "unit" / "test_event_comparison_report.py").is_file()
+        )
         self.assertIn("label-corpus", lld)
-        self.assertIn("quanthus.p4-event-run.v2", lld)
+        self.assertIn("comparison-report", lld)
+        self.assertIn("quanthus.p4-event-run.v3", lld)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

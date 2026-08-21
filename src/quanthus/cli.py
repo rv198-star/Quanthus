@@ -68,6 +68,11 @@ from quanthus.delisted_coverage import (
     DelistedCoverageReport,
     run_delisted_coverage,
 )
+from quanthus.event_library.comparison_report import (
+    ComparisonReportError,
+    build_physical_comparison_report,
+    verify_physical_comparison_report,
+)
 from quanthus.event_library.label_corpus import (
     LabelCorpusError,
     build_physical_label_corpus,
@@ -682,6 +687,55 @@ def _parser() -> argparse.ArgumentParser:
     p4_labeled_event_scan.add_argument("--label-output", type=Path, required=True)
     p4_labeled_event_scan.add_argument("--code-revision", required=True)
 
+    p4_reported_event_scan = subparsers.add_parser(
+        "run-p4-reported-event-scan",
+        help="build sealed P4 Event, Label, and daily comparison-report packages",
+    )
+    p4_reported_event_scan.add_argument(
+        "--source-policy",
+        type=Path,
+        default=Path("config/p4-event-scan-source.research.v1.json"),
+    )
+    p4_reported_event_scan.add_argument(
+        "--provider-config",
+        type=Path,
+        default=Path("config/replay-data-provider.development.v2.json"),
+    )
+    p4_reported_event_scan.add_argument(
+        "--rule-card",
+        type=Path,
+        default=Path("config/p4-candidate-price-volume-transition.research.v1.json"),
+    )
+    p4_reported_event_scan.add_argument(
+        "--split-policy",
+        type=Path,
+        default=Path("config/p4-event-split-policy.research.v1.json"),
+    )
+    p4_reported_event_scan.add_argument(
+        "--outcome-card",
+        type=Path,
+        default=Path("config/p4-event-outcome-label.research.v1.json"),
+    )
+    p4_reported_event_scan.add_argument(
+        "--structural-break-card",
+        type=Path,
+        default=Path("config/p4-event-structural-break.research.v1.json"),
+    )
+    p4_reported_event_scan.add_argument(
+        "--feature-registry",
+        type=Path,
+        default=Path("config/p3-baseline-features.research.v1.json"),
+    )
+    p4_reported_event_scan.add_argument(
+        "--report-policy",
+        type=Path,
+        default=Path("config/p4-event-comparison-report.research.v1.json"),
+    )
+    p4_reported_event_scan.add_argument("--event-output", type=Path, required=True)
+    p4_reported_event_scan.add_argument("--label-output", type=Path, required=True)
+    p4_reported_event_scan.add_argument("--report-output", type=Path, required=True)
+    p4_reported_event_scan.add_argument("--code-revision", required=True)
+
     p4_label_corpus = subparsers.add_parser(
         "build-p4-label-corpus",
         help="build an immutable P4 development label sidecar from a sealed Event Library",
@@ -715,6 +769,36 @@ def _parser() -> argparse.ArgumentParser:
         help="deeply verify one immutable P4 label-corpus package",
     )
     p4_label_verify.add_argument("--root", type=Path, required=True)
+
+    p4_report = subparsers.add_parser(
+        "build-p4-comparison-report",
+        help="build the immutable P4 daily three-class feature comparison report",
+    )
+    p4_report.add_argument("--event-root", type=Path, required=True)
+    p4_report.add_argument("--label-root", type=Path, required=True)
+    p4_report.add_argument(
+        "--provider-config",
+        type=Path,
+        default=Path("config/replay-data-provider.development.v2.json"),
+    )
+    p4_report.add_argument(
+        "--feature-registry",
+        type=Path,
+        default=Path("config/p3-baseline-features.research.v1.json"),
+    )
+    p4_report.add_argument(
+        "--report-policy",
+        type=Path,
+        default=Path("config/p4-event-comparison-report.research.v1.json"),
+    )
+    p4_report.add_argument("--output", type=Path, required=True)
+    p4_report.add_argument("--code-revision", required=True)
+
+    p4_report_verify = subparsers.add_parser(
+        "verify-p4-comparison-report",
+        help="deeply verify one immutable P4 daily comparison-report package",
+    )
+    p4_report_verify.add_argument("--root", type=Path, required=True)
 
     st_status = subparsers.add_parser(
         "build-st-status",
@@ -1671,6 +1755,53 @@ def main(argv: Sequence[str] | None = None) -> int:
                     sort_keys=True,
                 )
             )
+        elif args.command == "run-p4-reported-event-scan":
+            event_scan_result = build_physical_event_scan(
+                source_policy_path=args.source_policy,
+                provider_config_path=args.provider_config,
+                rule_card_path=args.rule_card,
+                split_policy_path=args.split_policy,
+                output=args.event_output,
+                code_revision=args.code_revision,
+            )
+            label_result = build_physical_label_corpus(
+                event_root=event_scan_result.root,
+                provider_config_path=args.provider_config,
+                outcome_card_path=args.outcome_card,
+                structural_card_path=args.structural_break_card,
+                feature_registry_path=args.feature_registry,
+                output=args.label_output,
+                code_revision=args.code_revision,
+            )
+            report_result = build_physical_comparison_report(
+                event_root=event_scan_result.root,
+                label_root=label_result.root,
+                provider_config_path=args.provider_config,
+                feature_registry_path=args.feature_registry,
+                report_policy_path=args.report_policy,
+                output=args.report_output,
+                code_revision=args.code_revision,
+            )
+            print(
+                json.dumps(
+                    {
+                        "event_root": str(event_scan_result.root),
+                        "event_manifest_sha256": event_scan_result.manifest_sha256,
+                        "event_content_digest": event_scan_result.content_digest,
+                        "label_root": str(label_result.root),
+                        "label_manifest_sha256": label_result.manifest_sha256,
+                        "label_content_digest": label_result.content_digest,
+                        "report_root": str(report_result.root),
+                        "report_manifest_sha256": report_result.manifest_sha256,
+                        "report_content_digest": report_result.content_digest,
+                        "candidate_events": event_scan_result.candidate_events,
+                        "three_class_events": report_result.three_class_events,
+                        "leading_features": list(report_result.leading_features),
+                        "report_acceptance_pass": report_result.acceptance_pass,
+                    },
+                    sort_keys=True,
+                )
+            )
         elif args.command == "build-p4-label-corpus":
             label_result = build_physical_label_corpus(
                 event_root=args.event_root,
@@ -1713,6 +1844,46 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "not_executable_events": label_result.not_executable_events,
                         "censored_events": label_result.censored_events,
                         "unavailable_events": label_result.unavailable_events,
+                    },
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "build-p4-comparison-report":
+            report_result = build_physical_comparison_report(
+                event_root=args.event_root,
+                label_root=args.label_root,
+                provider_config_path=args.provider_config,
+                feature_registry_path=args.feature_registry,
+                report_policy_path=args.report_policy,
+                output=args.output,
+                code_revision=args.code_revision,
+            )
+            print(
+                json.dumps(
+                    {
+                        "root": str(report_result.root),
+                        "manifest_sha256": report_result.manifest_sha256,
+                        "content_digest": report_result.content_digest,
+                        "candidate_events": report_result.candidate_events,
+                        "three_class_events": report_result.three_class_events,
+                        "leading_features": list(report_result.leading_features),
+                        "acceptance_pass": report_result.acceptance_pass,
+                    },
+                    sort_keys=True,
+                )
+            )
+        elif args.command == "verify-p4-comparison-report":
+            report_result = verify_physical_comparison_report(args.root)
+            print(
+                json.dumps(
+                    {
+                        "root": str(report_result.root),
+                        "manifest_sha256": report_result.manifest_sha256,
+                        "content_digest": report_result.content_digest,
+                        "candidate_events": report_result.candidate_events,
+                        "three_class_events": report_result.three_class_events,
+                        "leading_features": list(report_result.leading_features),
+                        "acceptance_pass": report_result.acceptance_pass,
                     },
                     sort_keys=True,
                 )
@@ -2364,6 +2535,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         QuantDingerCandidateAdapterError,
         PhysicalEventScanError,
         LabelCorpusError,
+        ComparisonReportError,
     ) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

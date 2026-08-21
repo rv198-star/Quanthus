@@ -3,6 +3,10 @@ import re
 import unittest
 from pathlib import Path
 
+from quanthus.event_library.label_cards import (
+    load_outcome_label_card,
+    load_structural_break_card,
+)
 from quanthus.event_library.rule_card import load_candidate_rule_card
 from quanthus.event_library.source import load_event_scan_source_policy
 from quanthus.event_library.splits import load_split_policy
@@ -979,7 +983,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
             root / "config" / "p4-event-split-policy.research.v1.json"
         )
 
-        self.assertIn("`P4-EVENT-001` accepted", lld)
+        self.assertIn("`P4-EVENT-001`", lld)
+        self.assertIn("`P4-EVENT-002`", lld)
+        self.assertIn("accepted after deterministic production A/B replay", lld)
         self.assertIn("`CandidateRuleCard.require_stage_b_authority()`", lld)
         self.assertEqual(card.lifecycle, "approved")
         self.assertEqual(card.governance.approval_state, "approved")
@@ -1142,6 +1148,29 @@ class DocumentTraceabilityTests(unittest.TestCase):
             / "adr-0013-p4-research-adm-and-legacy-ads-retirement.md"
         )
         self.assertTrue(adm_adr.is_file())
+
+        outcome = load_outcome_label_card(
+            root / "config" / "p4-event-outcome-label.research.v1.json"
+        )
+        structural = load_structural_break_card(
+            root / "config" / "p4-event-structural-break.research.v1.json"
+        )
+        self.assertEqual(outcome.lifecycle, "draft")
+        self.assertEqual(structural.lifecycle, "draft")
+        self.assertEqual(outcome.structural_break.semantic_digest, structural.semantic_digest)
+        self.assertIn(outcome.semantic_digest, lld)
+        self.assertIn(structural.semantic_digest, lld)
+        label_proposal_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-label-governance-proposal-20260821.md"
+        )
+        self.assertTrue(label_proposal_path.is_file())
+        label_proposal = label_proposal_path.read_text(encoding="utf-8")
+        self.assertIn(outcome.semantic_digest, label_proposal)
+        self.assertIn(structural.semantic_digest, label_proposal)
+        self.assertIn("No real future-outcome corpus may be read", label_proposal)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

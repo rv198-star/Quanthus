@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "card_id": "p4-event.structural-break-trend",
+  "card_version": "1.0.0",
+  "lifecycle": "draft",
+  "owner": "P4-LABEL-001",
+  "purpose": "Provide one independent, replayable structural-break condition for P4 event outcome settlement without calling any expert or strategy decision path.",
+  "evaluation_anchor": "each_market_session_close_after_executable_entry",
+  "formula": "(total_return_index < sma60 and sma20 <= sma60) or authoritative_listing_termination",
+  "short_sma_sessions": 20,
+  "long_sma_sessions": 60,
+  "minimum_history_sessions": 60,
+  "listing_termination_policy": "authoritative_termination_is_structural_break",
+  "suspension_policy": "suspension_counts_session_but_does_not_trigger_break",
+  "missing_data_policy": "unavailable_not_failure_or_neutral",
+  "corporate_action_policy": "use_corporate_action_normalized_total_return_close_path",
+  "non_claims": [
+    "The structural-break card is not an exit order, fill instruction, or trading recommendation.",
+    "The card does not call or depend on the expert that may later be evaluated against this outcome.",
+    "A suspension alone is not a structural break and missing price evidence is not converted to failure.",
+    "The card does not claim the moving-average rule is optimal; it freezes one falsifiable trend-structure definition."
+  ],
+  "bindings": {
+    "accepted_profile": "close-to-next-open-v1",
+    "p0_policy_version": "p0-2026-07-23",
+    "normalized_action_authority": "accepted_p1_normalized_corporate_actions",
+    "price_feature_semantics": "p3_total_return_index_v1"
+  },
+  "governance": {
+    "approval_state": "pending_human_approval",
+    "approval_authority": "human",
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/75"
+  },
+  "semantic_digest": "sha256:1294e0550361bafe9ecfbcfddb32a7bb1ff378332c4fb173db662f95debad9fc"
+}

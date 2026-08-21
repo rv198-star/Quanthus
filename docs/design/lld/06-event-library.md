@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` accepted; `P4-EVENT-002` V2.1/correction source authority, thin P4 Research ADM, checksum-bound 259-security historical industry supplement, development-only economic-availability projection, streaming forward scan, reconciliation, and P1/P2-backed T+1 entry partition implemented; production A/B acceptance remains open |
+| Implementation status | `P4-EVENT-001` and `P4-EVENT-002` accepted after deterministic production A/B replay of 36,820 events; `P4-LABEL-001` outcome-blind governance proposal implemented and awaiting exact-digest human approval before any real future-outcome read |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -204,15 +204,38 @@ mean zero return, missing data, or a weak failure. `Failure` is also not simply 
 return: it requires the declared adverse or structural condition. `Not_executable` describes the
 entry opportunity, not the company's quality or the signal's later direction.
 
-Positive, neutral, and failure definitions use a frozen P4 label card. The draft reference is 20
-sessions, positive maximum favorable excursion of 15 percent without structural break, and
-failure on structural break or 7 percent adverse excursion. Those values are not active policy
-until the P4 proposal freezes them. The card must also declare price basis, corporate-action
-treatment, intraday ordering when thresholds overlap, end-of-window behavior, and incomplete-tail
-handling.
+`P4-LABEL-001` now has an outcome-blind governance proposal with two exact semantic digests. The
+proposal is deliberately not active until those exact digests receive human approval; real
+2012-2021 future-outcome reads remain blocked by contract.
 
-Structural break is an independent, replayable rule version and cannot call the expert under
-evaluation. Overlap resolution and unavailable-entry behavior are explicit tests.
+The proposed outcome card is
+`p4-event.outcome-first-passage@1.0.0`, digest
+`sha256:b623a647116a69a0d6559bd265b51bdd3ac0654826cf54ba38b87d819ea165ca`.
+It anchors at the accepted actual executable T+1 open and observes exactly 20 market sessions,
+counting the entry session as session one. A hypothetical one-share economic-value path applies
+accepted cash-dividend and bonus-share actions before each session's threshold checks. Transaction
+costs are excluded because the card labels the price path rather than a realizable strategy trade.
+The favorable threshold is +15% and the adverse threshold is -7%. The first terminal session wins;
+if favorable and adverse thresholds both cross on one session, or a structural break and favorable
+threshold occur on one session, `failure` wins conservatively. If no terminal condition occurs by
+session 20 the settled result is `neutral`. A partition tail that cannot supply all 20 sessions is
+`censored`; semantically inadmissible future evidence is `unavailable`. Neither state is coerced
+into the three-class corpus. Suspension consumes a market-session slot but does not create a price
+threshold without a valid bar.
+
+The proposed independent structural-break card is
+`p4-event.structural-break-trend@1.0.0`, digest
+`sha256:1294e0550361bafe9ecfbcfddb32a7bb1ff378332c4fb173db662f95debad9fc`.
+It does not call any expert or strategy action mapper. At each post-entry market-session close it
+triggers when `(total_return_index < sma60 and sma20 <= sma60)` using the accepted
+corporate-action-normalized total-return semantics, or when an authoritative listing termination
+becomes effective. Suspension alone is not a structural break. Missing required structural evidence
+produces `unavailable`, not failure or neutral.
+
+The proposal keeps the approved 22-session split overlap unchanged because the 20-session outcome
+window fits within it. Synthetic counterexamples freeze overlap ordering, neutral settlement,
+not-executable inheritance, censoring, and unavailable-evidence behavior before any real outcome
+corpus may be read.
 
 ## 7. Comparative report
 
@@ -227,8 +250,8 @@ unexecutable group.
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
 | P4-EVENT-001 | Freeze candidate-source hypothesis; define event, isolation, and split schemas | Accepted P3 replay and audit contracts | Exact rule-card and split-policy digests approved; deterministic contract tests and acceptance record pass |
-| P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | V2.1/correction source and development availability projection accepted as implementation authority; pure scan and entry partition implemented; physical event projection and full development corpus pending |
-| P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Reproducible label corpus |
+| P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Accepted production A/B replay: 36,820 candidates, 36,022 executable, 798 not-executable, identical manifest/content digests |
+| P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Exact outcome/structural proposal digests frozen; human approval then reproducible label corpus required |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Three leading features |
 
 ## 9. Acceptance

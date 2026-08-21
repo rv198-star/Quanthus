@@ -48,7 +48,10 @@ class ContractTests(unittest.TestCase):
 
         self.assertEqual(action, VetoAction.FORCE_LIQUIDATE)
 
-    def test_not_executable_is_a_first_class_outcome(self) -> None:
+    def test_event_outcome_vocabulary_matches_p4_contract(self) -> None:
+        self.assertEqual(EventOutcome.POSITIVE.value, "positive")
+        self.assertEqual(EventOutcome.NEUTRAL.value, "neutral")
+        self.assertEqual(EventOutcome.FAILURE.value, "failure")
         self.assertEqual(EventOutcome.NOT_EXECUTABLE.value, "not_executable")
 
     def test_run_manifest_rejects_blank_identity(self) -> None:

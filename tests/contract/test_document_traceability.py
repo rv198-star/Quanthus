@@ -1155,8 +1155,10 @@ class DocumentTraceabilityTests(unittest.TestCase):
         structural = load_structural_break_card(
             root / "config" / "p4-event-structural-break.research.v1.json"
         )
-        self.assertEqual(outcome.lifecycle, "draft")
-        self.assertEqual(structural.lifecycle, "draft")
+        self.assertEqual(outcome.lifecycle, "approved")
+        self.assertEqual(structural.lifecycle, "approved")
+        self.assertEqual(outcome.governance.approval_state, "approved")
+        self.assertEqual(structural.governance.approval_state, "approved")
         self.assertEqual(outcome.structural_break.semantic_digest, structural.semantic_digest)
         self.assertIn(outcome.semantic_digest, lld)
         self.assertIn(structural.semantic_digest, lld)
@@ -1171,6 +1173,17 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(outcome.semantic_digest, label_proposal)
         self.assertIn(structural.semantic_digest, label_proposal)
         self.assertIn("No real future-outcome corpus may be read", label_proposal)
+        label_approval_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-label-human-approval-20260821.md"
+        )
+        self.assertTrue(label_approval_path.is_file())
+        label_approval = label_approval_path.read_text(encoding="utf-8")
+        self.assertIn(outcome.semantic_digest, label_approval)
+        self.assertIn(structural.semantic_digest, label_approval)
+        self.assertIn("#issuecomment-5366610770", label_approval)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
         items = work_items(find_project_root())

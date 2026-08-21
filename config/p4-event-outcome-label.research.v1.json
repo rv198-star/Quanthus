@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "card_id": "p4-event.outcome-first-passage",
   "card_version": "1.0.0",
-  "lifecycle": "draft",
+  "lifecycle": "approved",
   "owner": "P4-LABEL-001",
   "purpose": "Settle each accepted P4 candidate into positive, neutral, failure, or retained not-executable status using one frozen post-entry first-passage path without tuning against realized development outcomes.",
   "entry_anchor": "T_plus_1_actual_executable_open",
@@ -55,9 +55,9 @@
     "maximum_overlap_sessions": 22
   },
   "governance": {
-    "approval_state": "pending_human_approval",
+    "approval_state": "approved",
     "approval_authority": "human",
-    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/75"
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/75#issuecomment-5366610770"
   },
   "semantic_digest": "sha256:b623a647116a69a0d6559bd265b51bdd3ac0654826cf54ba38b87d819ea165ca"
 }

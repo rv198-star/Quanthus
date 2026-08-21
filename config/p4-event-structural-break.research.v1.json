@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "card_id": "p4-event.structural-break-trend",
   "card_version": "1.0.0",
-  "lifecycle": "draft",
+  "lifecycle": "approved",
   "owner": "P4-LABEL-001",
   "purpose": "Provide one independent, replayable structural-break condition for P4 event outcome settlement without calling any expert or strategy decision path.",
   "evaluation_anchor": "each_market_session_close_after_executable_entry",
@@ -27,9 +27,9 @@
     "price_feature_semantics": "p3_total_return_index_v1"
   },
   "governance": {
-    "approval_state": "pending_human_approval",
+    "approval_state": "approved",
     "approval_authority": "human",
-    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/75"
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/75#issuecomment-5366610770"
   },
   "semantic_digest": "sha256:1294e0550361bafe9ecfbcfddb32a7bb1ff378332c4fb173db662f95debad9fc"
 }

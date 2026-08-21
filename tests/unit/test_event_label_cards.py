@@ -67,8 +67,12 @@ def test_repository_p4_label_proposals_are_digest_bound_and_outcome_blind() -> N
     structural = load_structural_break_card(STRUCTURAL_PATH)
     outcome = load_outcome_label_card(OUTCOME_PATH)
 
-    assert structural.lifecycle == "draft"
-    assert outcome.lifecycle == "draft"
+    assert structural.lifecycle == "approved"
+    assert outcome.lifecycle == "approved"
+    assert structural.governance.approval_state == "approved"
+    assert outcome.governance.approval_state == "approved"
+    assert structural.governance.decision_reference.endswith("#issuecomment-5366610770")
+    assert outcome.governance.decision_reference.endswith("#issuecomment-5366610770")
     assert structural.semantic_digest == calculate_structural_break_card_digest(STRUCTURAL_PATH)
     assert outcome.semantic_digest == calculate_outcome_label_card_digest(OUTCOME_PATH)
     assert outcome.structural_break.semantic_digest == structural.semantic_digest
@@ -77,10 +81,8 @@ def test_repository_p4_label_proposals_are_digest_bound_and_outcome_blind() -> N
     assert outcome.adverse_threshold == Decimal("0.07")
     assert outcome.bindings.maximum_overlap_sessions == 22
     assert outcome.output_values == ("positive", "neutral", "failure", "not_executable")
-    with pytest.raises(EventLabelCardError, match="real outcome reads are blocked"):
-        structural.require_labeling_authority()
-    with pytest.raises(EventLabelCardError, match="real outcome reads are blocked"):
-        outcome.require_labeling_authority()
+    structural.require_labeling_authority()
+    outcome.require_labeling_authority()
 
 
 def test_label_card_digest_detects_semantic_tampering(tmp_path: Path) -> None:

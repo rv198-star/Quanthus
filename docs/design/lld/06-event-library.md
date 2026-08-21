@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | open |
-| Implementation status | `P4-EVENT-001` and `P4-EVENT-002` accepted after deterministic production A/B replay of 36,820 events; `P4-LABEL-001` outcome-blind governance proposal implemented and awaiting exact-digest human approval before any real future-outcome read |
+| Implementation status | `P4-EVENT-001` and `P4-EVENT-002` accepted after deterministic production A/B replay of 36,820 events; `P4-LABEL-001` outcome and structural-break digests approved, with reproducible development label-corpus build now authorized and still open |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -204,11 +204,12 @@ mean zero return, missing data, or a weak failure. `Failure` is also not simply 
 return: it requires the declared adverse or structural condition. `Not_executable` describes the
 entry opportunity, not the company's quality or the signal's later direction.
 
-`P4-LABEL-001` now has an outcome-blind governance proposal with two exact semantic digests. The
-proposal is deliberately not active until those exact digests receive human approval; real
-2012-2021 future-outcome reads remain blocked by contract.
+`P4-LABEL-001` has two human-approved outcome-blind semantic digests. Approval is bound to
+`https://github.com/rv198-star/Quanthus/issues/75#issuecomment-5366610770`; the cards are active for
+the authorized 2012-2021 development label-corpus build, while arbitration and permanent-blind
+reads remain blocked.
 
-The proposed outcome card is
+The approved outcome card is
 `p4-event.outcome-first-passage@1.0.0`, digest
 `sha256:b623a647116a69a0d6559bd265b51bdd3ac0654826cf54ba38b87d819ea165ca`.
 It anchors at the accepted actual executable T+1 open and observes exactly 20 market sessions,
@@ -223,7 +224,7 @@ session 20 the settled result is `neutral`. A partition tail that cannot supply 
 into the three-class corpus. Suspension consumes a market-session slot but does not create a price
 threshold without a valid bar.
 
-The proposed independent structural-break card is
+The approved independent structural-break card is
 `p4-event.structural-break-trend@1.0.0`, digest
 `sha256:1294e0550361bafe9ecfbcfddb32a7bb1ff378332c4fb173db662f95debad9fc`.
 It does not call any expert or strategy action mapper. At each post-entry market-session close it
@@ -232,10 +233,10 @@ corporate-action-normalized total-return semantics, or when an authoritative lis
 becomes effective. Suspension alone is not a structural break. Missing required structural evidence
 produces `unavailable`, not failure or neutral.
 
-The proposal keeps the approved 22-session split overlap unchanged because the 20-session outcome
+The approved cards keep the 22-session split overlap unchanged because the 20-session outcome
 window fits within it. Synthetic counterexamples freeze overlap ordering, neutral settlement,
-not-executable inheritance, censoring, and unavailable-evidence behavior before any real outcome
-corpus may be read.
+not-executable inheritance, censoring, and unavailable-evidence behavior. The next gate is a
+reproducible real development label corpus under these exact digests.
 
 ## 7. Comparative report
 
@@ -251,7 +252,7 @@ unexecutable group.
 | --- | --- | --- | --- |
 | P4-EVENT-001 | Freeze candidate-source hypothesis; define event, isolation, and split schemas | Accepted P3 replay and audit contracts | Exact rule-card and split-policy digests approved; deterministic contract tests and acceptance record pass |
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Accepted production A/B replay: 36,820 candidates, 36,022 executable, 798 not-executable, identical manifest/content digests |
-| P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Exact outcome/structural proposal digests frozen; human approval then reproducible label corpus required |
+| P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Exact outcome/structural digests human-approved; reproducible development label corpus required |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Three leading features |
 
 ## 9. Acceptance

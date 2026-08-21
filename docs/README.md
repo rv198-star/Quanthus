@@ -146,9 +146,10 @@ nodes.
   T+1 entry binding keeps the event's ADM snapshot identity separate from the original P1/P2
   execution-source snapshot rather than rewriting source provenance. Issue #74 is accepted after
   two real 2012-2021 Jobs reproduced 36,820 candidate identities, 36,022 executable and 798
-  not-executable events, and identical Event Library content/manifest digests. `P4-LABEL-001` is
-  now in outcome-blind governance freeze: exact outcome/structural card proposals exist, but real
-  future-outcome reads remain blocked until both semantic digests receive human approval.
+  not-executable events, and identical Event Library content/manifest digests. `P4-LABEL-001` now
+  has human-approved exact outcome/structural card digests; authorized development outcome reads
+  may proceed only to build the reproducible label corpus, while arbitration/permanent-blind reads
+  remain blocked.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,
   retained PostgreSQL and candidate-Run volumes, and Traefik as the only product edge. The former

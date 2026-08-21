@@ -42,7 +42,7 @@ from quanthus.expert_evaluation.target_cards import load_target_decision_card
 from quanthus.feature_registry import load_feature_registry
 
 PRODUCER_ID = "producer.trend-stability-development"
-PRODUCER_VERSION = "1.0.0"
+PRODUCER_VERSION = "1.0.1"
 PRODUCER_CONFIGURATION_DIGEST = digest_value(
     {
         "producer_id": PRODUCER_ID,
@@ -337,6 +337,14 @@ class TrendStabilityOperationProducer:
         provider_config = load_replay_data_provider_config(
             self.repository_root / "config/replay-data-provider.development.v2.json"
         )
+        projection_end = min(
+            target.eligible_population.evaluation_end,
+            provider_config.scope.decision_end,
+        )
+        if any(item.record.identity.signal_date > projection_end for item in events):
+            raise ExpertEvaluationError(
+                "event_scope_mismatch", "P4 event exceeds the authorized decision boundary"
+            )
         registry = load_feature_registry(
             self.repository_root / "config/p3-baseline-features.research.v1.json"
         )
@@ -348,12 +356,12 @@ class TrendStabilityOperationProducer:
             progress("building-shared-projection", {"event_count": len(events)})
             with provider.open(
                 scope_start=target.eligible_population.evaluation_start,
-                scope_end=target.eligible_population.evaluation_end,
+                scope_end=projection_end,
             ) as session, BaselineFeaturePanel.build(
                 session.reader.bundle,
                 registry,
                 scope_start=target.eligible_population.evaluation_start,
-                scope_end=target.eligible_population.evaluation_end,
+                scope_end=projection_end,
                 output=panel_path,
                 data_content_digest=session.reader.data_content_digest,
                 data_manifest_sha256=session.reader.data_manifest_sha256,
@@ -361,7 +369,7 @@ class TrendStabilityOperationProducer:
                 trading_sessions = _trading_sessions(
                     session.reader.bundle,
                     target.eligible_population.evaluation_start,
-                    target.eligible_population.evaluation_end,
+                    projection_end,
                 )
                 progress("producing-observations", {"event_count": len(events)})
                 for index, event in enumerate(events, start=1):

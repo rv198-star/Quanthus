@@ -173,7 +173,9 @@ class _Provider:
     def __init__(self, _config: object) -> None:
         pass
 
-    def open(self, **_kwargs: object) -> object:
+    def open(self, **kwargs: object) -> object:
+        assert kwargs["scope_start"] == date(2020, 1, 1)
+        assert kwargs["scope_end"] == date(2021, 12, 30)
         reader = SimpleNamespace(
             bundle=object(),
             data_content_digest="sha256:" + "b" * 64,

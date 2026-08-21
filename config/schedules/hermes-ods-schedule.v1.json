@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "hermes-full-ods-scope-cn01-throughput-20260731",
+  "contract_revision": "cn01-throughput-recovery-20260821",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_and_standby_dwd_dws_candidate",
@@ -43,7 +43,7 @@
       "auction_close_time": "15:00:00",
       "final_trading_time": "15:30:00",
       "finalized_acquisition_not_before": "15:40:00",
-      "completion_deadline": "19:46:00",
+      "completion_deadline": "20:20:00",
       "collection_window_experiment": {
         "experiment_id": "baostock-load-window-20260731-v3",
         "minimum_open_sessions": 5,
@@ -60,7 +60,7 @@
             "timer_start": "18:30:00",
             "activation_grace_seconds": 300,
             "start_policy": "throughput_budgeted_window",
-            "service_timeout_seconds": 4800
+            "service_timeout_seconds": 7200
           }
         ],
         "comparison_metrics": [
@@ -91,7 +91,7 @@
         "observed_max_duration_seconds": 7380,
         "safety_margin_percent": 100,
         "allowed_duration_seconds": 14760,
-        "latest_ready_time": "19:46:00"
+        "latest_ready_time": "20:20:00"
       },
       "resource_group": "pve_market_api",
       "session_preflight": {

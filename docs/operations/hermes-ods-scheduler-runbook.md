@@ -44,8 +44,8 @@ sudo systemctl daemon-reload
 The rendered directory includes the generic `quanthus-pipeline-failure@.service` handler. Node
 renaming changes unit names, the protected environment-file path, and the market-window metadata,
 but the repository-owned launcher remains `ops/bin/run-hermes-ods-lane` for each individual lane.
-CN01 renders its daily orchestrator at 18:30; Hermes renders it at 19:30. Both use a 160-minute
-systemd bound. The controller reuses verified same-date READY releases, starts only
+CN01 renders its daily orchestrator at 18:30 with a 220-minute systemd bound; Hermes renders it
+at 19:30 with a 160-minute bound. The controller reuses verified same-date READY releases, starts only
 missing lanes, seals the daily catalog, and builds the node-local DWD increment after all four
 lanes pass. The former four daily lane timers are rendered with
 `ConditionPathExists=/etc/quanthus/<node>-ods-legacy-timers-enabled` as rollback units and must not
@@ -102,7 +102,7 @@ readiness deadline expires. An empty successful response is not a connection err
 cause an immediate logout/login cycle. Provider/network errors have bounded reconnects; each
 successful login applies a 30-second socket timeout. After readiness, the first stock pass is
 followed by one retry of only the missing set. A residual gap or the configured completion
-deadline produces no READY. The CN01 profile uses 19:00/19:46; the Hermes late profile uses
+deadline produces no READY. The CN01 profile uses 19:00/20:20; the Hermes late profile uses
 20:00/20:46.
 
 Minute provider collection is always written under the current attempt. Shared legacy minute

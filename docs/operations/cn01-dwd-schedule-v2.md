@@ -1,7 +1,8 @@
 # Base V2 ODS/DWD recurring schedule
 
-The Base V2 daily path uses the same control plane on CN01 and Hermes. One timer starts at
-`18:30 Asia/Shanghai` and gives ODS acquisition a 90-minute budget. Market and calendar/event
+The Base V2 daily path uses the same control plane on CN01 and Hermes. CN01 starts at
+`18:30 Asia/Shanghai`, gives ODS acquisition a 150-minute budget, and may collect market data
+through `20:20`. Hermes keeps its separately versioned late profile. Market and calendar/event
 start together. After market completes, the controller runs 5m and then 1m. This order matches
 the shared `pve_market_api` resource lock instead of making the three provider lanes race for it.
 
@@ -15,8 +16,8 @@ After all four releases are READY, the controller seals a four-lane catalog and 
 the Base-seeded daily DWD builder. The builder reads the ODS releases and immutable DWD Base,
 writes one audited daily increment under `QUANTHUS_DWD_DAILY_ROOT`, and advances only that
 node-local daily `CURRENT.json` after verification. ODS Base, DWD Base, and ODS releases remain
-read-only. DWD receives its own one-hour execution budget after the ODS gate; the controller's
-systemd bound is 160 minutes.
+read-only. DWD receives its own one-hour execution budget after the ODS gate; CN01's controller
+systemd bound is 220 minutes.
 
 The fixed `19:30` DWD timer is not part of the normal path. Its unit remains an operator fallback
 and requires `/etc/quanthus/cn01-dwd-fixed-timer-enabled`; production keeps the timer disabled.

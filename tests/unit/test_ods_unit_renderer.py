@@ -46,7 +46,7 @@ class OdsUnitRendererTests(unittest.TestCase):
             "Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/cn01-ods-lane.env",
             orchestrator_service,
         )
-        self.assertIn("TimeoutStartSec=160min", orchestrator_service)
+        self.assertIn("TimeoutStartSec=220min", orchestrator_service)
         self.assertIn("StartLimitBurst=3", orchestrator_service)
         self.assertIn("Restart=on-failure", orchestrator_service)
         self.assertIn("RestartSec=10min", orchestrator_service)
@@ -83,7 +83,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", market_service)
         self.assertIn("Environment=HERMES_ODS_NODE_ID=cn01", market_service)
         self.assertIn("check-ods-collection-window --node-id cn01", market_service)
-        self.assertIn("TimeoutStartSec=80min", market_service)
+        self.assertIn("TimeoutStartSec=120min", market_service)
         self.assertIn("ops/bin/run-hermes-ods-lane", market_service)
         self.assertNotIn("ops/bin/run-cn01-ods-lane", market_service)
         self.assertIn("date +%%F", market_service)

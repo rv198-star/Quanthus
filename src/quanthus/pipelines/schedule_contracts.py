@@ -23,14 +23,15 @@ _LANE_IDS = {
     "weekly-corrections",
 }
 _CORRECTION_CLASSES = {"same", "missing_in_daily", "changed_upstream", "conflict"}
-_MARKET_PROFILES: dict[str, dict[str, str]] = {
+_MARKET_PROFILES: dict[str, dict[str, Any]] = {
     "hermes-ods-schedule-v1": {
-        "contract_revision": "hermes-full-ods-scope-cn01-throughput-20260731",
+        "contract_revision": "cn01-throughput-recovery-20260821",
         "trigger_time": "17:30:00",
         "experiment_id": "baostock-load-window-20260731-v3",
         "hermes_timer_start": "17:30:00",
         "readiness_deadline": "19:00:00",
-        "completion_deadline": "19:46:00",
+        "completion_deadline": "20:20:00",
+        "cn01_service_timeout_seconds": 7200,
     },
     "hermes-ods-schedule-late-v1": {
         "contract_revision": "hermes-late-window-cn01-throughput-20260814",
@@ -39,6 +40,7 @@ _MARKET_PROFILES: dict[str, dict[str, str]] = {
         "hermes_timer_start": "19:30:00",
         "readiness_deadline": "20:00:00",
         "completion_deadline": "20:46:00",
+        "cn01_service_timeout_seconds": 4800,
     },
 }
 
@@ -179,7 +181,7 @@ def _validate_bootstrap(lane: Mapping[str, Any]) -> None:
 
 
 def _validate_market_daily(
-    lane: Mapping[str, Any], *, profile: Mapping[str, str]
+    lane: Mapping[str, Any], *, profile: Mapping[str, Any]
 ) -> None:
     trigger = _mapping(lane.get("trigger"), field="market-daily-core.trigger")
     if trigger.get("weekdays") != [1, 2, 3, 4, 5]:
@@ -227,7 +229,7 @@ def _validate_market_daily(
                 "timer_start": "18:30:00",
                 "activation_grace_seconds": 300,
                 "start_policy": "throughput_budgeted_window",
-                "service_timeout_seconds": 4800,
+                "service_timeout_seconds": profile["cn01_service_timeout_seconds"],
             },
         ],
         "comparison_metrics": [

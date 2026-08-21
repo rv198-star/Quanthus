@@ -152,7 +152,11 @@ nodes.
   label-corpus evidence: 36,820 total events, 34,641 settled three-class events, identical
   Event/Label content and manifest digests across both runs. `P4-REPORT-001` now has an approved
   pre-result comparison-policy digest, deterministic report builder, and Event Worker v3 binding
-  Event + Label + Report under one lease; real production A/B report acceptance remains open.
+  Event + Label + Report under one lease. The first production report run exposed an implementation
+  identity-boundary defect: governed DWD event ids were joined directly to the listing-code-keyed P3
+  feature panel. The report adapter now binds an explicit replay `panel_security_id` from each Event
+  Library `listing_code` without changing the frozen report policy; corrected production A/B report
+  acceptance remains open.
   Arbitration and permanent-blind reads remain blocked.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,

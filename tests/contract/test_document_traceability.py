@@ -1241,6 +1241,17 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("run-p4-reported-event-scan", report_implementation)
         self.assertIn("quanthus.p4-event-run.v3", report_implementation)
         self.assertIn("34,641", report_implementation)
+        report_identity_remediation_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-comparison-report-identity-remediation-20260822.md"
+        )
+        self.assertTrue(report_identity_remediation_path.is_file())
+        report_identity_remediation = report_identity_remediation_path.read_text(encoding="utf-8")
+        self.assertIn(report_policy.semantic_digest, report_identity_remediation)
+        self.assertIn("panel_security_id", report_identity_remediation)
+        self.assertIn("job_15a9f9c2d3934b96a1349b0f3ae2a288", report_identity_remediation)
         self.assertTrue(
             (root / "src" / "quanthus" / "event_library" / "comparison_report.py").is_file()
         )
@@ -1264,14 +1275,13 @@ class DocumentTraceabilityTests(unittest.TestCase):
                 "P3-LABEL-004",
                 "P3-ATTR-001",
                 "P3-DASH-001",
-                "P3-STRAT-002",
                 "P3-EXPERT-004",
                 "P3-EXPERT-005",
             },
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-EXPERT-000", "P3-EXPERT-003"},
+            {"P3-EXPERT-000", "P3-STRAT-002"},
         )
         self.assertTrue(
             all(

@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.0.0",
+  "decision_id": "expert-target.p4-event-first-passage-reuse",
+  "decision_version": "1.0.0",
+  "lifecycle": "draft",
+  "owner": "P3-EXPERT-003",
+  "purpose": "Evaluate one outcome-blind T-close trend-stability assessment against the already approved P4 first-passage event outcome without creating a second settlement truth.",
+  "reuse_decision": "reuse_p4_label_cards",
+  "outcome_card": {
+    "card_id": "p4-event.outcome-first-passage",
+    "card_version": "1.0.0",
+    "semantic_digest": "sha256:b623a647116a69a0d6559bd265b51bdd3ac0654826cf54ba38b87d819ea165ca",
+    "repository_key": "config/p4-event-outcome-label.research.v1.json"
+  },
+  "structural_break_card": {
+    "card_id": "p4-event.structural-break-trend",
+    "card_version": "1.0.0",
+    "semantic_digest": "sha256:1294e0550361bafe9ecfbcfddb32a7bb1ff378332c4fb173db662f95debad9fc",
+    "repository_key": "config/p4-event-structural-break.research.v1.json"
+  },
+  "eligible_population": {
+    "predicate_id": "population.p4-development-candidates",
+    "predicate_version": "1.0.0",
+    "subject_kind": "opportunity",
+    "subject_identity_field": "event_id",
+    "candidate_rule_id": "p4-event.price-volume-state-transition",
+    "candidate_rule_version": "1.0.0",
+    "candidate_rule_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+    "split_policy_id": "p4-event-date-split",
+    "split_policy_version": "1.0.0",
+    "split_policy_digest": "sha256:10c58c9f402327b2c1e9e3ba9782cce909216b795018b89586bc5a9b210fb684",
+    "required_partition": "development",
+    "inclusion_rule": "all_retained_p4_candidates_before_entry_or_outcome_evidence; observation_input_failure_becomes_abstention",
+    "outcome_independent": true,
+    "predicate_digest": "sha256:e3fe6155dc33169b9eba7cfcbd6a669d50737902d4a23e9005bfc9ce71ec1308"
+  },
+  "intended_strategy_population": {
+    "role": "mandatory_predeclared_slice",
+    "predicate_id": "population.p4-development-candidates",
+    "predicate_version": "1.0.0",
+    "predicate_digest": "sha256:e3fe6155dc33169b9eba7cfcbd6a669d50737902d4a23e9005bfc9ce71ec1308"
+  },
+  "observation": {
+    "anchor_rule": "candidate_t_close",
+    "knowledge_cutoff_rule": "all_evidence_visible_no_later_than_candidate_t_close",
+    "assessment_value_type": "ordinal",
+    "assessment_ordinal_values": [
+      "fragile",
+      "neutral",
+      "stable"
+    ],
+    "assessment_to_target_order": {
+      "fragile": "failure",
+      "neutral": "neutral",
+      "stable": "positive"
+    }
+  },
+  "evaluation": {
+    "primary_metric": {
+      "metric_id": "metric.mean-absolute-ordinal-error",
+      "metric_version": "1.0.0",
+      "definition": "mean absolute distance in frozen target order failure=0, neutral=1, positive=2",
+      "unit": "ordinal_steps",
+      "direction": "lower_is_better"
+    },
+    "naive_baseline": {
+      "baseline_id": "baseline.always-neutral-ordinal",
+      "baseline_version": "1.0.0",
+      "definition": "predict neutral for every settled applicable event without reading class frequencies"
+    },
+    "hypothesis_family": [
+      "confirmatory_single_expert_single_target",
+      "trend_stability_maoe_is_lower_than_always_neutral"
+    ],
+    "slices": [
+      {
+        "slice_id": "slice.calendar-year",
+        "slice_version": "1.0.0",
+        "definition": "candidate T calendar year"
+      },
+      {
+        "slice_id": "slice.static-level-one-industry",
+        "slice_version": "1.0.0",
+        "definition": "accepted P4 static level-one industry used for stratification only"
+      },
+      {
+        "slice_id": "slice.t-close-trend-regime",
+        "slice_version": "1.0.0",
+        "definition": "fragile, mixed, or stable regime computed only from candidate T-close admitted trend inputs"
+      }
+    ],
+    "uncertainty": {
+      "method_id": "uncertainty.nonoverlap-22-session-block-bootstrap",
+      "method_version": "1.0.0",
+      "block_sessions": 22,
+      "resamples": 2000,
+      "confidence_level": "0.95",
+      "seed_rule": "sha256_of_evaluation_spec_digest",
+      "effective_sample_unit": "non_overlapping_time_blocks",
+      "dependence_disclosure": "Rows sharing event windows, dates, securities, or market shocks are not independent; inference resamples complete 22-session date blocks."
+    },
+    "stop_conditions": [
+      {
+        "condition_id": "stop.target-reference-drift",
+        "rule": "any_reused_card_or_population_digest_drift",
+        "disposition": "block_publication"
+      },
+      {
+        "condition_id": "stop.ledger-not-closed",
+        "rule": "eligible_or_applicable_accounting_does_not_close",
+        "disposition": "block_publication"
+      },
+      {
+        "condition_id": "stop.determinism-mismatch",
+        "rule": "operationally_distinct_rerun_semantic_bytes_differ",
+        "disposition": "block_publication"
+      },
+      {
+        "condition_id": "stop.coverage-below-0.80",
+        "rule": "applicable_divided_by_eligible_below_0.80",
+        "disposition": "inconclusive"
+      },
+      {
+        "condition_id": "stop.unavailable-rate-above-0.05",
+        "rule": "unavailable_divided_by_applicable_above_0.05",
+        "disposition": "inconclusive"
+      },
+      {
+        "condition_id": "stop.effective-blocks-below-24",
+        "rule": "settled_effective_nonoverlap_time_blocks_below_24",
+        "disposition": "inconclusive"
+      },
+      {
+        "condition_id": "stop.no-primary-improvement",
+        "rule": "upper_95pct_block_bootstrap_bound_of_expert_minus_baseline_maoe_is_not_below_0",
+        "disposition": "inconclusive"
+      }
+    ]
+  },
+  "non_claims": [
+    "This decision does not authorize opening arbitration or permanent-blind data.",
+    "Ordinal assessment quality does not establish strategy profitability or action authority.",
+    "The always-neutral baseline is predeclared and is not selected from observed class frequencies.",
+    "The target, metric, slices, or stop conditions cannot be changed in place after result access."
+  ],
+  "governance": {
+    "approval_state": "pending_human_approval",
+    "approval_authority": "human",
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/148"
+  },
+  "semantic_digest": "sha256:b15ce3f844e31c485ee982449276324d1c3c53a3f4ee41e6d60468a08c1e6c40"
+}

@@ -39,6 +39,11 @@ from quanthus.expert_evaluation.serialization import (
     canonical_json_bytes,
     digest_value,
 )
+from quanthus.expert_evaluation.target_cards import (
+    TargetDecisionCard,
+    load_target_decision_card,
+    target_decision_semantic_digest,
+)
 from quanthus.expert_evaluation.validation import validate_artifact_graph
 
 __all__ = [
@@ -72,10 +77,13 @@ __all__ = [
     "ShadowStatus",
     "StabilityEstimate",
     "SubjectKind",
+    "TargetDecisionCard",
     "UncertaintyEstimate",
     "artifact_from_bytes",
     "canonical_json_bytes",
     "derive_prediction_id",
     "digest_value",
+    "load_target_decision_card",
+    "target_decision_semantic_digest",
     "validate_artifact_graph",
 ]

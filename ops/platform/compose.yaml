@@ -58,6 +58,8 @@ services:
       QUANTHUS_PLATFORM_DATABASE_URL: postgresql://quanthus_platform@postgres:5432/quanthus_platform
       QUANTHUS_WORKER_ID: oci-replay-1
       QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
+      QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
+      QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +67,8 @@ services:
     volumes:
       - /srv/quanthus:/srv/quanthus:ro
       - quanthus-candidate-runs:/data/candidate-runs
+      - quanthus-event-runs:/data/event-runs:ro
+      - quanthus-expert-runs:/data/expert-evaluation-runs
 
   event-worker:
     image: ${QUANTHUS_EVENT_IMAGE:-quanthus-event:local}
@@ -133,6 +137,7 @@ volumes:
   quanthus-platform-postgres:
   quanthus-candidate-runs:
   quanthus-event-runs:
+  quanthus-expert-runs:
 
 networks:
   traefik-net:

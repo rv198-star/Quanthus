@@ -34,6 +34,7 @@ POSTGRES_CONTAINER=${QUANTHUS_POSTGRES_CONTAINER:-quanthus-platform-postgres-1}
 POSTGRES_VOLUME=${QUANTHUS_POSTGRES_VOLUME:-quanthus-platform_quanthus-platform-postgres}
 RUN_VOLUME=${QUANTHUS_CANDIDATE_RUN_VOLUME:-quanthus-platform_quanthus-candidate-runs}
 EVENT_RUN_VOLUME=${QUANTHUS_EVENT_RUN_VOLUME:-quanthus-platform_quanthus-event-runs}
+EXPERT_RUN_VOLUME=${QUANTHUS_EXPERT_RUN_VOLUME:-quanthus-platform_quanthus-expert-runs}
 ATTRIBUTION_ROOT=${QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT:-/home/ubuntu/data/quanthus/attribution-releases}
 git -C "$REPOSITORY_ROOT" diff --quiet
 git -C "$REPOSITORY_ROOT" diff --cached --quiet
@@ -46,7 +47,8 @@ REPLAY_IMAGE=${QUANTHUS_REPLAY_IMAGE:-quanthus-replay:git-$GIT_SHORT}
 EVENT_IMAGE=${QUANTHUS_EVENT_IMAGE:-quanthus-event:git-$GIT_SHORT}
 
 docker inspect "$POSTGRES_CONTAINER" >/dev/null
-docker volume inspect "$POSTGRES_VOLUME" "$RUN_VOLUME" "$EVENT_RUN_VOLUME" >/dev/null
+docker volume inspect "$POSTGRES_VOLUME" "$RUN_VOLUME" "$EVENT_RUN_VOLUME" \
+    "$EXPERT_RUN_VOLUME" >/dev/null
 docker image inspect "$API_IMAGE" "$WEB_IMAGE" "$REPLAY_IMAGE" "$EVENT_IMAGE" postgres:16-alpine >/dev/null
 test -d "$ATTRIBUTION_ROOT"
 
@@ -70,6 +72,11 @@ docker run --rm \
     postgres:16-alpine \
     sh -ec 'if [ -d /source/runs ]; then tar -C /source -czf - runs; else tar -czf - --files-from /dev/null; fi' \
     >"$STAGING/event-runs.tar.gz"
+docker run --rm \
+    --volume "$EXPERT_RUN_VOLUME:/source:ro" \
+    postgres:16-alpine \
+    sh -ec 'if [ -d /source/runs ]; then tar -C /source -czf - runs; else tar -czf - --files-from /dev/null; fi' \
+    >"$STAGING/expert-runs.tar.gz"
 tar -C "$ATTRIBUTION_ROOT" -czf "$STAGING/attribution-releases.tar.gz" .
 
 cp "$REPOSITORY_ROOT/ops/platform/compose.yaml" "$STAGING/production.compose.yaml"
@@ -107,9 +114,11 @@ QUANTHUS_RECOVERY_POSTGRES_IMAGE_ID=$POSTGRES_ID
 QUANTHUS_RECOVERY_POSTGRES_VOLUME=$POSTGRES_VOLUME
 QUANTHUS_RECOVERY_RUN_VOLUME=$RUN_VOLUME
 QUANTHUS_RECOVERY_EVENT_RUN_VOLUME=$EVENT_RUN_VOLUME
+QUANTHUS_RECOVERY_EXPERT_RUN_VOLUME=$EXPERT_RUN_VOLUME
 QUANTHUS_RECOVERY_RUN_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_runs"')
 QUANTHUS_RECOVERY_ACTIVE_POINTER_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_active_runs"')
 QUANTHUS_RECOVERY_EVENT_JOB_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_jobs where kind='"'"'quanthus.p4-event-scan.v1'"'"' and state='"'"'succeeded'"'"'"')
+QUANTHUS_RECOVERY_EXPERT_RUN_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_expert_evaluation_runs"')
 QUANTHUS_RECOVERY_USER_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_users"')
 EOF
 
@@ -136,6 +145,7 @@ manifest = {
         "postgres": "postgres.dump",
         "candidate_runs": "candidate-runs.tar.gz",
         "event_runs": "event-runs.tar.gz",
+        "expert_runs": "expert-runs.tar.gz",
         "attribution_releases": "attribution-releases.tar.gz",
     },
     "secret_policy": "secrets-excluded; supply a mode-0600 platform env file at restore time",
@@ -144,6 +154,7 @@ manifest = {
     "excluded_runtime_state": [
         "candidate-runs/.staging",
         "event-runs/.staging",
+        "expert-runs/.staging",
         "sessions outside PostgreSQL",
     ],
 }

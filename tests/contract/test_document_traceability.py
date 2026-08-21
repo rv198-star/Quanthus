@@ -1264,7 +1264,6 @@ class DocumentTraceabilityTests(unittest.TestCase):
                 "P3-LABEL-004",
                 "P3-ATTR-001",
                 "P3-DASH-001",
-                "P3-EXPERT-003",
                 "P3-STRAT-002",
                 "P3-EXPERT-004",
                 "P3-EXPERT-005",
@@ -1272,7 +1271,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-EXPERT-000"},
+            {"P3-EXPERT-000", "P3-EXPERT-003"},
         )
         self.assertTrue(
             all(

@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.0.0",
+  "decision_id": "expert-target.p4-event-first-passage-reuse",
+  "decision_version": "1.0.0",
+  "lifecycle": "approved",
+  "owner": "P3-EXPERT-003",
+  "purpose": "Evaluate one outcome-blind T-close trend-stability assessment against the already approved P4 first-passage event outcome without creating a second settlement truth.",
+  "reuse_decision": "reuse_p4_label_cards",
+  "outcome_card": {
+    "card_id": "p4-event.outcome-first-passage",
+    "card_version": "1.0.0",
+    "semantic_digest": "sha256:b623a647116a69a0d6559bd265b51bdd3ac0654826cf54ba38b87d819ea165ca",
+    "repository_key": "config/p4-event-outcome-label.research.v1.json"
+  },
+  "structural_break_card": {
+    "card_id": "p4-event.structural-break-trend",
+    "card_version": "1.0.0",
+    "semantic_digest": "sha256:1294e0550361bafe9ecfbcfddb32a7bb1ff378332c4fb173db662f95debad9fc",
+    "repository_key": "config/p4-event-structural-break.research.v1.json"
+  },
+  "eligible_population": {
+    "predicate_id": "population.p4-development-candidates",
+    "predicate_version": "1.0.0",
+    "subject_kind": "opportunity",
+    "subject_identity_field": "event_id",
+    "candidate_rule_id": "p4-event.price-volume-state-transition",
+    "candidate_rule_version": "1.0.0",
+    "candidate_rule_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+    "split_policy_id": "p4-event-date-split",
+    "split_policy_version": "1.0.0",
+    "split_policy_digest": "sha256:10c58c9f402327b2c1e9e3ba9782cce909216b795018b89586bc5a9b210fb684",
+    "required_partition": "development",
+    "evaluation_start": "2020-01-01",
+    "evaluation_end": "2021-12-31",
+    "inclusion_rule": "all_retained_p4_candidates_from_2020-01-01_through_2021-12-31_before_entry_or_outcome_evidence; observation_input_failure_becomes_abstention",
+    "outcome_independent": true,
+    "predicate_digest": "sha256:a66195a194933ca3b0e3850c7fb515a28b5125eff1b29241d13f953565c9961c"
+  },
+  "intended_strategy_population": {
+    "role": "engineering_proof_only",
+    "action_use": "blocked_until_formal_strategy_population_evaluation",
+    "predicate_id": "population.p4-development-candidates",
+    "predicate_version": "1.0.0",
+    "predicate_digest": "sha256:a66195a194933ca3b0e3850c7fb515a28b5125eff1b29241d13f953565c9961c"
+  },
+  "observation": {
+    "anchor_rule": "candidate_t_close",
+    "knowledge_cutoff_rule": "all_evidence_visible_no_later_than_candidate_t_close",
+    "assessment_value_type": "ordinal",
+    "assessment_ordinal_values": [
+      "fragile",
+      "neutral",
+      "stable"
+    ],
+    "assessment_to_target_order": {
+      "fragile": "failure",
+      "neutral": "neutral",
+      "stable": "positive"
+    }
+  },
+  "evaluation": {
+    "primary_metric": {
+      "metric_id": "metric.mean-absolute-ordinal-error",
+      "metric_version": "1.0.0",
+      "definition": "mean absolute distance in frozen target order failure=0, neutral=1, positive=2",
+      "unit": "ordinal_steps",
+      "direction": "lower_is_better"
+    },
+    "naive_baseline": {
+      "baseline_id": "baseline.always-neutral-ordinal",
+      "baseline_version": "1.0.0",
+      "definition": "predict neutral for every settled applicable event without reading class frequencies"
+    },
+    "claim_scope": "engineering_settleability_only",
+    "hypothesis_family": [
+      "technical_single_expert_single_target",
+      "worker_produces_reproducible_observations_settlements_ledger_and_scorecard"
+    ],
+    "slices": [
+      {
+        "slice_id": "slice.calendar-year",
+        "slice_version": "1.0.0",
+        "definition": "candidate T calendar year"
+      },
+      {
+        "slice_id": "slice.static-level-one-industry",
+        "slice_version": "1.0.0",
+        "definition": "accepted P4 static level-one industry used for stratification only"
+      },
+      {
+        "slice_id": "slice.t-close-trend-regime",
+        "slice_version": "1.0.0",
+        "definition": "fragile, mixed, or stable regime computed only from candidate T-close admitted trend inputs"
+      }
+    ],
+    "uncertainty": {
+      "method_id": "uncertainty.nonoverlap-22-session-block-bootstrap",
+      "method_version": "1.0.0",
+      "block_sessions": 22,
+      "resamples": 2000,
+      "confidence_level": "0.95",
+      "seed_rule": "sha256_of_evaluation_spec_digest",
+      "effective_sample_unit": "non_overlapping_time_blocks",
+      "dependence_disclosure": "Rows sharing event windows, dates, securities, or market shocks are not independent; inference resamples complete 22-session date blocks."
+    },
+    "stop_conditions": [
+      {
+        "condition_id": "stop.target-reference-drift",
+        "rule": "any_reused_card_or_population_digest_drift",
+        "disposition": "block_publication"
+      },
+      {
+        "condition_id": "stop.ledger-not-closed",
+        "rule": "eligible_or_applicable_accounting_does_not_close",
+        "disposition": "block_publication"
+      },
+      {
+        "condition_id": "stop.determinism-mismatch",
+        "rule": "operationally_distinct_rerun_semantic_bytes_differ",
+        "disposition": "block_publication"
+      },
+      {
+        "condition_id": "stop.pit-leakage",
+        "rule": "observation_identity_or_feature_lineage_contains_post_t_close_evidence",
+        "disposition": "block_publication"
+      },
+      {
+        "condition_id": "stop.empty-engineering-corpus",
+        "rule": "eligible_or_settled_observation_count_is_zero",
+        "disposition": "inconclusive"
+      },
+      {
+        "condition_id": "stop.artifact-verification-failure",
+        "rule": "published_observation_settlement_ledger_or_scorecard_artifact_fails_checksum_or_row_count_verification",
+        "disposition": "block_publication"
+      }
+    ]
+  },
+  "non_claims": [
+    "This decision does not authorize opening arbitration or permanent-blind data.",
+    "Ordinal assessment quality does not establish strategy profitability or action authority.",
+    "The always-neutral baseline is predeclared and is not selected from observed class frequencies.",
+    "The 2020-2021 scorecard is descriptive engineering evidence and cannot establish expert effectiveness or strategy admission.",
+    "The target, metric, slices, or stop conditions cannot be changed in place after result access."
+  ],
+  "governance": {
+    "approval_state": "approved",
+    "approval_authority": "human",
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/148#issuecomment-5371293034"
+  },
+  "semantic_digest": "sha256:a67accc8688b2a63ef01afff160666119b72b5c0ec4adc421d266104e76087f5"
+}

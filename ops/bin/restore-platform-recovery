@@ -81,6 +81,10 @@ docker run --rm \
     --volume "$PACKAGE:/backup:ro" \
     postgres:16-alpine sh -ec 'tar -C /target -xzf /backup/event-runs.tar.gz'
 docker run --rm \
+    --volume "${PROJECT}_expert-runs:/target" \
+    --volume "$PACKAGE:/backup:ro" \
+    postgres:16-alpine sh -ec 'tar -C /target -xzf /backup/expert-runs.tar.gz'
+docker run --rm \
     --volume "${PROJECT}_attribution-releases:/target" \
     --volume "$PACKAGE:/backup:ro" \
     postgres:16-alpine sh -ec 'tar -C /target -xzf /backup/attribution-releases.tar.gz'
@@ -104,11 +108,14 @@ ACTIVE_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_candidate_active_runs"')
 EVENT_JOB_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_jobs where kind='"'"'quanthus.p4-event-scan.v1'"'"' and state='"'"'succeeded'"'"'"')
+EXPERT_RUN_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_expert_evaluation_runs"')
 USER_COUNT=$(docker exec "$POSTGRES_CONTAINER" sh -lc \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from platform_users"')
 test "$RUN_COUNT" = "$QUANTHUS_RECOVERY_RUN_COUNT"
 test "$ACTIVE_COUNT" = "$QUANTHUS_RECOVERY_ACTIVE_POINTER_COUNT"
 test "$EVENT_JOB_COUNT" = "$QUANTHUS_RECOVERY_EVENT_JOB_COUNT"
+test "$EXPERT_RUN_COUNT" = "$QUANTHUS_RECOVERY_EXPERT_RUN_COUNT"
 test "$USER_COUNT" = "$QUANTHUS_RECOVERY_USER_COUNT"
 
 docker exec -i "$API_CONTAINER" python - <<'PY'
@@ -118,6 +125,29 @@ for path in ("/health", "/ready", "/openapi.json"):
     with urllib.request.urlopen("http://127.0.0.1:8080" + path, timeout=3) as response:
         assert response.status == 200
         json.load(response)
+PY
+docker exec -i "$API_CONTAINER" python - <<'PY'
+import os
+from pathlib import Path
+
+import psycopg
+
+from quanthus.expert_evaluation.runner import verify_expert_evaluation_run
+
+with psycopg.connect(os.environ["QUANTHUS_PLATFORM_DATABASE_URL"]) as connection:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT run_id, artifact_ref, manifest_digest "
+            "FROM platform_expert_evaluation_runs ORDER BY run_id"
+        )
+        rows = cursor.fetchall()
+for run_id, artifact_ref, manifest_digest in rows:
+    relative = Path(artifact_ref).relative_to("/data/expert-evaluation-runs")
+    run = verify_expert_evaluation_run(
+        Path("/data/expert-evaluation-runs") / relative,
+        expected_run_id=run_id,
+    )
+    assert run.manifest_digest == manifest_digest
 PY
 docker exec -i "$API_CONTAINER" python - <<'PY'
 import hashlib
@@ -181,6 +211,7 @@ git_commit=$QUANTHUS_RECOVERY_GIT_COMMIT
 run_count=$RUN_COUNT
 active_pointer_count=$ACTIVE_COUNT
 event_job_count=$EVENT_JOB_COUNT
+expert_run_count=$EXPERT_RUN_COUNT
 user_count=$USER_COUNT
 api_image_id=$(docker inspect "$API_CONTAINER" --format '{{.Image}}')
 web_image_id=$(docker inspect "$WEB_CONTAINER" --format '{{.Image}}')

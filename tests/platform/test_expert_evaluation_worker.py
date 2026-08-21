@@ -8,6 +8,12 @@ from typing import Any
 
 import pytest
 
+from quanthus.expert_evaluation.production import (
+    PRODUCER_ID,
+    production_dwd_identity,
+    production_job_input,
+    production_producer_for,
+)
 from quanthus.expert_evaluation.runner import (
     DwdIdentity,
     ExpertEvaluationJobInput,
@@ -128,6 +134,24 @@ def test_job_input_is_exact_canonical_and_derives_transport_keys(tmp_path: Path)
     assert idempotency_key == job_input.idempotency_key
     assert concurrency_key == idempotency_key
     assert input_digest(canonical) == job_input.input_digest
+
+
+def test_first_production_job_constructor_freezes_scope_dwd_parent_and_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = "sha256:" + "e" * 64
+    job_input = production_job_input(parent)
+    monkeypatch.setenv("QUANTHUS_EVENT_RUN_ROOT", str(tmp_path / "event-runs"))
+
+    producer = production_producer_for(job_input, tmp_path / "config/expert-evaluations")
+
+    assert job_input.producer.producer_id == PRODUCER_ID
+    assert job_input.dwd == production_dwd_identity()
+    assert job_input.partition.decision_start == date(2020, 1, 1)
+    assert job_input.partition.decision_end == date(2021, 12, 31)
+    assert job_input.expected_parent_run_digests == (parent,)
+    assert producer.event_run_root == (tmp_path / "event-runs").resolve()
+    assert job_input.producer.producer_version == "1.0.2"
     invalid = job_input.to_dict()
     invalid["job_id"] = "transport-field-must-not-enter-semantics"
     with pytest.raises(ExpertEvaluationError, match="field_mismatch"):

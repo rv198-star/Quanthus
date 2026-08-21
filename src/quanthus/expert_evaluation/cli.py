@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from quanthus.expert_evaluation.production import PRODUCER_ID, production_producer_for
 from quanthus.expert_evaluation.runner import (
     ExpertEvaluationJobInput,
     fixture_producer_for,
@@ -42,12 +43,17 @@ def main(argv: list[str] | None = None) -> int:
         job_input = ExpertEvaluationJobInput.from_dict(
             parse_canonical_object(args.input.read_bytes())
         )
+        producer = (
+            production_producer_for(job_input, args.registry_root)
+            if job_input.producer.producer_id == PRODUCER_ID
+            else fixture_producer_for(job_input)
+        )
         run = run_evaluation(
             job_input,
             registry_root=args.registry_root,
             staging=args.staging,
             run_root=args.run_root,
-            producer=fixture_producer_for(job_input),
+            producer=producer,
             progress=_progress,
         )
     except (OSError, ExpertEvaluationError) as exc:

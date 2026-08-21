@@ -26,6 +26,7 @@ services:
       QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT: /data/attribution-releases
       QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
+      QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,6 +48,7 @@ services:
       - attribution-releases:/data/attribution-releases:ro
       - candidate-runs:/data/candidate-runs:ro
       - event-runs:/data/event-runs:ro
+      - expert-runs:/data/expert-evaluation-runs:ro
 
   web:
     image: ${QUANTHUS_PLATFORM_WEB_IMAGE:?required}
@@ -78,4 +80,5 @@ volumes:
   postgres-data:
   candidate-runs:
   event-runs:
+  expert-runs:
   attribution-releases:

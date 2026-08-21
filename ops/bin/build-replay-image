@@ -19,12 +19,12 @@ while IFS= read -r source; do
     install -D -m 0644 "$source" "$BUILD_CONTEXT/$relative"
 done < <(
     find "$REPOSITORY_ROOT/config" -type f -readable -print
-    find "$REPOSITORY_ROOT/src/quanthus" \
-        -path "$REPOSITORY_ROOT/src/quanthus/event_library" -prune -o \
-        -type f -readable -name '*.py' -print
+    find "$REPOSITORY_ROOT/src/quanthus" -type f -readable -name '*.py' -print
 )
 
 cp "$REPOSITORY_ROOT/ops/replay/Dockerfile" "$BUILD_CONTEXT/Dockerfile"
 docker build --tag "$IMAGE_TAG" "$BUILD_CONTEXT"
+docker run --rm --entrypoint python "$IMAGE_TAG" -c \
+    'import quanthus.expert_evaluation.production; import quanthus.platform.worker'
 
 printf 'Replay image built: %s\n' "$IMAGE_TAG"

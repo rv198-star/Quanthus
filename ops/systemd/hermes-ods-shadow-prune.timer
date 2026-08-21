@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Hermes ODS shadow staging retention daily
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 Asia/Shanghai
+AccuracySec=1min
+RandomizedDelaySec=10min
+Persistent=true
+Unit=hermes-ods-shadow-prune.service
+
+[Install]
+WantedBy=timers.target

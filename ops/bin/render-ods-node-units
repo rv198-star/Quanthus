@@ -30,6 +30,8 @@ UNITS=(
   hermes-ods-weekly-corrections.timer
   hermes-ods-daily-orchestrator.service
   hermes-ods-daily-orchestrator.timer
+  hermes-ods-shadow-prune.service
+  hermes-ods-shadow-prune.timer
   hermes-dwd-success-notification.service
   hermes-dwd-failure-notification.service
 )

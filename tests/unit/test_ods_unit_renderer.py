@@ -27,7 +27,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         output = self._render("cn01")
 
         units = sorted(output.iterdir())
-        self.assertEqual(len(units), 15)
+        self.assertEqual(len(units), 17)
         node_units = [path for path in units if path.name != "quanthus-pipeline-failure@.service"]
         self.assertTrue(
             all(path.name.startswith(("cn01-ods-", "cn01-dwd-")) for path in node_units)
@@ -55,6 +55,15 @@ class OdsUnitRendererTests(unittest.TestCase):
         weekly_service = (output / "cn01-ods-weekly-corrections.service").read_text()
         self.assertIn("TimeoutStartSec=8h", weekly_service)
         self.assertIn("Restart=on-failure", weekly_service)
+
+        prune_service = (output / "cn01-ods-shadow-prune.service").read_text()
+        prune_timer = (output / "cn01-ods-shadow-prune.timer").read_text()
+        self.assertIn("prune-ods-shadow --node-id cn01", prune_service)
+        self.assertIn("--failed-bulk-days 3 --audit-days 90 --apply", prune_service)
+        self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", prune_service)
+        self.assertIn("OnCalendar=*-*-* 04:30:00 Asia/Shanghai", prune_timer)
+        self.assertIn("Persistent=true", prune_timer)
+        self.assertIn("Unit=cn01-ods-shadow-prune.service", prune_timer)
 
         success_notification = (output / "cn01-dwd-success-notification.service").read_text()
         failure_notification = (output / "cn01-dwd-failure-notification.service").read_text()
@@ -110,6 +119,8 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("Restart=on-failure", orchestrator_service)
         self.assertIn("--event hermes_dwd_completed", success_notification)
         self.assertIn("--node Hermes", success_notification)
+        prune_service = (output / "hermes-ods-shadow-prune.service").read_text()
+        self.assertIn("prune-ods-shadow --node-id hermes", prune_service)
 
     def test_collection_window_checker_enforces_each_node_start(self) -> None:
         config = ROOT / "config/schedules/hermes-ods-schedule.v1.json"

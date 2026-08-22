@@ -68,6 +68,7 @@ from quanthus.expert_strategy.runner import (
     position_facts_evidence,
 )
 from quanthus.feature_registry import load_feature_registry
+from quanthus.industry_mapping import StaticIndustryMapping, load_static_industry_mapping
 from quanthus.policy import load_policy
 from quanthus.position_lifecycle import (
     POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION,
@@ -110,6 +111,28 @@ def _decision_digest_in_window(
     return digest_value(
         sorted(item for market_date, item in decisions if start <= market_date <= end)
     )
+
+
+def _load_parent_industry_mapping(
+    event_library: Path, events: tuple[_EventInput, ...]
+) -> StaticIndustryMapping:
+    industry = load_static_industry_mapping(
+        event_library / "adm" / "static_industry_mapping.json",
+        expected_version="static-level1-concentration-research-v1",
+        required_security_ids=tuple(
+            sorted({item.record.identity.security_id for item in events})
+        ),
+    )
+    if any(
+        item.static_industry_id
+        != industry.by_security_id[item.record.identity.security_id].level1_industry_id
+        for item in events
+    ):
+        raise ExpertEvaluationError(
+            "formal_attribution_industry_mismatch",
+            "event industry differs from its verified parent mapping",
+        )
+    return industry
 
 
 def _ledger(state: UnitState) -> dict[str, Any]:
@@ -221,6 +244,7 @@ class FormalP2ReplayRuntime:
                 "formal_attribution_population_duplicate",
                 "formal event population duplicates a security-date",
             )
+        self.industry = _load_parent_industry_mapping(event_library, self.events)
         provider_config = load_replay_data_provider_config(
             self.repository_root / "config/replay-data-provider.development.v2.json"
         )
@@ -249,9 +273,6 @@ class FormalP2ReplayRuntime:
                 data_manifest_sha256=self.session.reader.data_manifest_sha256,
                 allowed_security_ids=selected,
             )
-        )
-        self.industry = self.session.reader.load_industry_mapping(
-            expected_version="static-level1-concentration-research-v1"
         )
         self.p0_policy = load_policy(self.repository_root / "config/p0-policy.v1.json")
         self.engine = BacktestEngine(
@@ -813,7 +834,7 @@ class FormalP2ReplayRuntime:
                 str(item.opportunity_id),
                 item.lifecycle.stage,
                 item.lifecycle.digest,
-                self.industry.by_security_id[str(item.panel_security_id)],
+                self.industry.by_security_id[str(item.formal_security_id)],
             )
             for item in runtimes.values()
             if item.lifecycle.stage
@@ -829,7 +850,7 @@ class FormalP2ReplayRuntime:
                 _stable_id("allocation", item.opportunity_id),
                 item.opportunity_id,
                 item.decision.action.aggregate_score,
-                self.industry.by_security_id[item.item.panel_security_id],
+                self.industry.by_security_id[item.item.record.identity.security_id],
             )
             for item in candidates
             if item.decision.action.final_action is GovernedAction.TRIAL_ENTRY

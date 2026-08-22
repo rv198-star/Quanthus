@@ -7,10 +7,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
 from quanthus.expert_evaluation import cli
+from quanthus.expert_evaluation.production import _EventInput
 from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput, ProducerBinding
 from quanthus.expert_evaluation.serialization import (
     ExpertEvaluationError,
@@ -30,6 +32,7 @@ from quanthus.expert_strategy.formal_p2_replay import (
     PARENT_EVENT_RUN_DIGEST,
     FormalP2ReplayRuntime,
     _decision_digest_in_window,
+    _load_parent_industry_mapping,
     run_paired_block_bootstrap,
 )
 from quanthus.expert_strategy.registry import ExpertStrategyRegistry
@@ -305,3 +308,69 @@ def test_sentinel_digest_excludes_later_january_decisions() -> None:
     )
 
     assert observed == digest_value(["digest-2020-a", "digest-2020-b"])
+
+
+def test_formal_replay_loads_industry_from_parent_event_run_by_governed_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = cast(
+        tuple[_EventInput, ...],
+        (
+            SimpleNamespace(
+                record=SimpleNamespace(identity=SimpleNamespace(security_id="security-b")),
+                static_industry_id="industry-2",
+            ),
+            SimpleNamespace(
+                record=SimpleNamespace(identity=SimpleNamespace(security_id="security-a")),
+                static_industry_id="industry-1",
+            ),
+        ),
+    )
+    observed: dict[str, object] = {}
+    mapping = SimpleNamespace(
+        by_security_id={
+            "security-a": SimpleNamespace(level1_industry_id="industry-1"),
+            "security-b": SimpleNamespace(level1_industry_id="industry-2"),
+        }
+    )
+
+    def load(path: Path, **kwargs: object) -> object:
+        observed.update(path=path, **kwargs)
+        return mapping
+
+    monkeypatch.setattr(
+        "quanthus.expert_strategy.formal_p2_replay.load_static_industry_mapping", load
+    )
+
+    assert _load_parent_industry_mapping(tmp_path, events) is mapping
+    assert observed == {
+        "path": tmp_path / "adm" / "static_industry_mapping.json",
+        "expected_version": "static-level1-concentration-research-v1",
+        "required_security_ids": ("security-a", "security-b"),
+    }
+
+
+def test_formal_replay_rejects_event_industry_drift_from_parent_mapping(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = cast(
+        tuple[_EventInput, ...],
+        (
+            SimpleNamespace(
+                record=SimpleNamespace(identity=SimpleNamespace(security_id="security-a")),
+                static_industry_id="event-industry",
+            ),
+        ),
+    )
+    mapping = SimpleNamespace(
+        by_security_id={
+            "security-a": SimpleNamespace(level1_industry_id="parent-industry")
+        }
+    )
+    monkeypatch.setattr(
+        "quanthus.expert_strategy.formal_p2_replay.load_static_industry_mapping",
+        lambda *_args, **_kwargs: mapping,
+    )
+
+    with pytest.raises(ExpertEvaluationError, match="formal_attribution_industry_mismatch"):
+        _load_parent_industry_mapping(tmp_path, events)

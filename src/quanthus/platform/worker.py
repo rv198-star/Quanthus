@@ -46,6 +46,9 @@ STAGE_PROGRESS = {
     "external-candidate-failed": 95,
     "batch-complete": 99,
 }
+DEFAULT_MEMORY_CURRENT_PATH = Path("/sys/fs/cgroup/memory.current")
+DEFAULT_MEMORY_STAT_PATH = Path("/sys/fs/cgroup/memory.stat")
+DEFAULT_MEMORY_STOP_BYTES = 14 * 1024**3
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -55,6 +58,31 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--lease-seconds", type=int, default=300)
     parser.add_argument("--renew-seconds", type=float, default=30.0)
     parser.add_argument("--terminate-seconds", type=float, default=20.0)
+    parser.add_argument(
+        "--memory-current-path",
+        type=Path,
+        default=Path(
+            os.environ.get(
+                "QUANTHUS_REPLAY_MEMORY_CURRENT_PATH", str(DEFAULT_MEMORY_CURRENT_PATH)
+            )
+        ),
+    )
+    parser.add_argument(
+        "--memory-stop-bytes",
+        type=int,
+        default=int(
+            os.environ.get(
+                "QUANTHUS_REPLAY_MEMORY_STOP_BYTES", str(DEFAULT_MEMORY_STOP_BYTES)
+            )
+        ),
+    )
+    parser.add_argument(
+        "--memory-stat-path",
+        type=Path,
+        default=Path(
+            os.environ.get("QUANTHUS_REPLAY_MEMORY_STAT_PATH", str(DEFAULT_MEMORY_STAT_PATH))
+        ),
+    )
     return parser
 
 
@@ -155,7 +183,12 @@ class ReplayWorker:
         terminate_seconds: float,
         expert_run_root: Path | None = None,
         expert_registry_root: Path | None = None,
+        memory_current_path: Path | None = None,
+        memory_stat_path: Path | None = None,
+        memory_stop_bytes: int = DEFAULT_MEMORY_STOP_BYTES,
     ) -> None:
+        if memory_stop_bytes < 1:
+            raise ValueError("memory_stop_bytes must be positive")
         self.store = store
         self.worker_id = worker_id
         self.run_root = run_root.resolve()
@@ -166,7 +199,93 @@ class ReplayWorker:
         self.expert_registry_root = (
             expert_registry_root or Path("config/expert-evaluations")
         ).resolve()
+        self.memory_current_path = memory_current_path
+        self.memory_stat_path = memory_stat_path
+        self.memory_stop_bytes = memory_stop_bytes
         self.stopping = False
+
+    def _memory_guard_failure(self) -> tuple[str, dict[str, Any]] | None:
+        if self.memory_current_path is None:
+            return None
+        if self.memory_stat_path is None:
+            return (
+                "replay_memory_monitor_unavailable",
+                {"error_type": "memory_stat_path_missing"},
+            )
+        try:
+            current_bytes = int(self.memory_current_path.read_text(encoding="ascii").strip())
+            stat_values = {
+                key: int(value)
+                for key, value in (
+                    line.split()
+                    for line in self.memory_stat_path.read_text(encoding="ascii").splitlines()
+                )
+            }
+            inactive_file_bytes = stat_values["inactive_file"]
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            return (
+                "replay_memory_monitor_unavailable",
+                {"error_type": type(exc).__name__},
+            )
+        except (KeyError, TypeError):
+            return (
+                "replay_memory_monitor_unavailable",
+                {"error_type": "inactive_file_missing"},
+            )
+        if current_bytes < 0 or inactive_file_bytes < 0:
+            return (
+                "replay_memory_monitor_unavailable",
+                {"error_type": "negative_memory_measurement"},
+            )
+        working_set_bytes = max(current_bytes - inactive_file_bytes, 0)
+        if working_set_bytes >= self.memory_stop_bytes:
+            return (
+                "replay_memory_guard_exceeded",
+                {
+                    "memory_current_bytes": current_bytes,
+                    "memory_inactive_file_bytes": inactive_file_bytes,
+                    "memory_working_set_bytes": working_set_bytes,
+                    "memory_stop_bytes": self.memory_stop_bytes,
+                },
+            )
+        return None
+
+    def _record_memory_failure(
+        self,
+        job_id: str,
+        generation: int,
+        failure: tuple[str, dict[str, Any]],
+    ) -> bool:
+        reason, detail = failure
+        try:
+            self.store.update_claimed_job(
+                job_id,
+                generation,
+                stage="resource-limit-exceeded",
+                progress=5,
+                progress_detail={"reason": reason, **detail},
+            )
+        except RuntimeError as exc:
+            if str(exc) == "stale_claim_generation":
+                return False
+            raise
+        return True
+
+    def _finish_memory_failure(
+        self,
+        job_id: str,
+        generation: int,
+        failure: tuple[str, dict[str, Any]],
+    ) -> None:
+        reason, detail = failure
+        detail_text = ":".join(f"{key}={value}" for key, value in sorted(detail.items()))
+        self.store.finish_claimed_job(
+            job_id,
+            generation,
+            state="failed",
+            result_ref=None,
+            error_reason=f"{reason}:{detail_text}"[:500],
+        )
 
     def run_once(self) -> bool:
         job = self.store.claim_job("replay", self.worker_id, self.lease_seconds)
@@ -268,7 +387,14 @@ class ReplayWorker:
         progress_offset = 0
         canceled = False
         lost_lease = False
+        memory_failure: tuple[str, dict[str, Any]] | None = None
         while process.poll() is None:
+            memory_failure = self._memory_guard_failure()
+            if memory_failure is not None:
+                if not self._record_memory_failure(job_id, generation, memory_failure):
+                    lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
             time.sleep(1)
             progress_offset = self._publish_expert_progress(
                 stderr_path, progress_offset, job_id, generation
@@ -294,9 +420,12 @@ class ReplayWorker:
                     _terminate(process, self.terminate_seconds)
                     break
                 last_renewal = time.monotonic()
-        self._publish_expert_progress(stderr_path, progress_offset, job_id, generation)
         if lost_lease:
             return
+        if memory_failure is not None:
+            self._finish_memory_failure(job_id, generation, memory_failure)
+            return
+        self._publish_expert_progress(stderr_path, progress_offset, job_id, generation)
         if canceled:
             self.store.finish_claimed_job(
                 job_id, generation, state="canceled", result_ref=None, error_reason=None
@@ -429,7 +558,14 @@ class ReplayWorker:
         progress_offset = 0
         canceled = False
         lost_lease = False
+        memory_failure: tuple[str, dict[str, Any]] | None = None
         while process.poll() is None:
+            memory_failure = self._memory_guard_failure()
+            if memory_failure is not None:
+                if not self._record_memory_failure(job_id, generation, memory_failure):
+                    lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
             time.sleep(1)
             progress_offset = self._publish_progress(
                 stderr_path, progress_offset, job_id, generation
@@ -451,10 +587,13 @@ class ReplayWorker:
                     _terminate(process, self.terminate_seconds)
                     break
                 last_renewal = time.monotonic()
-        progress_offset = self._publish_progress(stderr_path, progress_offset, job_id, generation)
-        del progress_offset
         if lost_lease:
             return
+        if memory_failure is not None:
+            self._finish_memory_failure(job_id, generation, memory_failure)
+            return
+        progress_offset = self._publish_progress(stderr_path, progress_offset, job_id, generation)
+        del progress_offset
         if canceled:
             self.store.finish_claimed_job(
                 job_id, generation, state="canceled", result_ref=None, error_reason=None
@@ -585,6 +724,9 @@ def main(argv: list[str] | None = None) -> int:
         terminate_seconds=args.terminate_seconds,
         expert_run_root=expert_run_root,
         expert_registry_root=expert_registry_root,
+        memory_current_path=args.memory_current_path,
+        memory_stat_path=args.memory_stat_path,
+        memory_stop_bytes=args.memory_stop_bytes,
     )
 
     def stop(_signum: int, _frame: object) -> None:

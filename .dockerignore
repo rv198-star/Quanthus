@@ -16,7 +16,3 @@ research/
 scripts/
 tests/
 web/
-
-# The Platform Kernel does not import the P4 event library. It is also owned by
-# a separate restricted delivery lane on this host and must not enter this image.
-src/quanthus/event_library/

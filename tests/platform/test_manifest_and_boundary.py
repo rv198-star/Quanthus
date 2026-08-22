@@ -128,7 +128,7 @@ def test_docker_acceptance_runtime_is_disposable_and_not_host_exposed() -> None:
     assert 'PROJECT_NAME="quanthus-pk-acceptance-20260812"' in runner
 
 
-def test_production_docker_context_excludes_unneeded_or_restricted_surfaces() -> None:
+def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     ignored = PROJECT_ROOT.joinpath(".dockerignore").read_text(encoding="utf-8").splitlines()
     dockerfile = PROJECT_ROOT.joinpath("ops/platform/Dockerfile").read_text(encoding="utf-8")
     builder = PROJECT_ROOT.joinpath("ops/bin/build-platform-image").read_text(encoding="utf-8")
@@ -145,7 +145,7 @@ def test_production_docker_context_excludes_unneeded_or_restricted_surfaces() ->
         "tests/",
         "web/",
     }.issubset(ignored)
-    assert "src/quanthus/event_library/" in ignored
+    assert "src/quanthus/event_library/" not in ignored
     assert all(required not in ignored for required in ("config/", "src/"))
     assert "COPY config ./config" not in dockerfile
     assert "config/platform-features.v1.json config/platform-kernel-gates.v1.json" in dockerfile
@@ -171,6 +171,23 @@ def test_production_docker_context_excludes_unneeded_or_restricted_surfaces() ->
     assert "condition: service_healthy" in compose
     assert compose.count("healthcheck:") == 3
     assert "build:" not in compose
+
+
+def test_replay_image_context_includes_formal_expert_runtime() -> None:
+    ignored = PROJECT_ROOT.joinpath(".dockerignore").read_text(encoding="utf-8").splitlines()
+    dockerfile = PROJECT_ROOT.joinpath("ops/replay/Dockerfile").read_text(encoding="utf-8")
+    production = PROJECT_ROOT.joinpath(
+        "src/quanthus/expert_strategy/production.py"
+    ).read_text(encoding="utf-8")
+
+    assert "src/quanthus/event_library/" not in ignored
+    assert "COPY src ./src" in dockerfile
+    assert "from quanthus.expert_evaluation.production import" in production
+    assert "from quanthus.event_library" in (
+        PROJECT_ROOT.joinpath("src/quanthus/expert_evaluation/production.py").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 def test_event_worker_stays_a_control_plane_supervisor() -> None:

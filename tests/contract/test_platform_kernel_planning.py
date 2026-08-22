@@ -312,3 +312,8 @@ def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:
     assert event_worker.count(":ro") == 3
     assert "/dwd-base-202607-v2.1:ro" in event_worker
     assert "correction-20260813-001:ro" in event_worker
+    assert "mem_limit: 16g" in replay_worker
+    assert "memswap_limit: 16g" in replay_worker
+    assert "QUANTHUS_REPLAY_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current" in replay_worker
+    assert "QUANTHUS_REPLAY_MEMORY_STAT_PATH: /sys/fs/cgroup/memory.stat" in replay_worker
+    assert 'QUANTHUS_REPLAY_MEMORY_STOP_BYTES: "15032385536"' in replay_worker

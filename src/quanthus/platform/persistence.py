@@ -22,6 +22,9 @@ from quanthus.platform.models import (
     UserRecord,
 )
 
+HEAVY_WORKER_QUEUES = frozenset({"event", "replay"})
+_HEAVY_JOB_CLAIM_LOCK_ID = 0x5155414E54485553
+
 
 class DuplicateRecordError(RuntimeError):
     pass
@@ -1049,12 +1052,29 @@ class PostgresPlatformStore:
         if lease_seconds < 1:
             raise ValueError("lease_seconds must be positive")
         with self._connect() as connection, connection.cursor() as cursor:
+            heavy_queue = queue in HEAVY_WORKER_QUEUES
+            if heavy_queue:
+                cursor.execute(
+                    "SELECT pg_advisory_xact_lock(%s)", (_HEAVY_JOB_CLAIM_LOCK_ID,)
+                )
             cursor.execute(
                 """
                 WITH candidate AS (
                     SELECT job_id FROM platform_jobs
                     WHERE queue = %s
                       AND cancel_requested = FALSE
+                      AND (
+                        %s = FALSE
+                        OR NOT EXISTS (
+                            SELECT 1 FROM platform_jobs AS active
+                            WHERE active.queue IN ('event', 'replay')
+                              AND active.state = 'running'
+                              AND (
+                                active.lease_expires_at IS NULL
+                                OR active.lease_expires_at >= CURRENT_TIMESTAMP
+                              )
+                        )
+                      )
                       AND (
                         (state = 'queued' AND available_at <= CURRENT_TIMESTAMP)
                         OR (state = 'running' AND lease_expires_at < CURRENT_TIMESTAMP)
@@ -1079,7 +1099,7 @@ class PostgresPlatformStore:
                 WHERE job.job_id = candidate.job_id
                 RETURNING job.*
                 """,
-                (queue, worker_id, lease_seconds),
+                (queue, heavy_queue, worker_id, lease_seconds),
             )
             return self._job(cursor.fetchone())
 

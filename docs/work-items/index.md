@@ -213,7 +213,7 @@ predeclared questions.
 | P3-EXPERT-001 | Implement additive expert evaluation protocol v2 | P3-EXP-001, P3-AGG-001 | closed by `docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md` |
 | P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | closed by `docs/acceptance/p3-expert-evaluation-worker-20260820.md` |
 | P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-EXPERT-002, P3-FEAT-001, P3-REPLAY-001, P4-LABEL-001 | closed by `docs/acceptance/p3-expert-first-target-production-20260821.md` |
-| P3-STRAT-002 | Freeze and implement the first formal two-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | ready; exact strategy decision and human approval required |
+| P3-STRAT-002 | Freeze and implement the first formal two-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | closed by `docs/acceptance/p3-strat-first-formal-topology-production-20260822.md` |
 | P3-POS-001 | Implement unit/position state machine | P2 ledger | closed |
 | P3-POLICY-001 | Freeze trial/add/hold/cooldown parameters | P2 acceptance | closed for fixture scope |
 | P3-RISK-001 | Implement concentration caps | P3-POS-001 | closed |
@@ -221,7 +221,7 @@ predeclared questions.
 | P3-EXIT-001 | Implement four-source exit arbitration | P3 aggregator | closed |
 | P3-POS-003 | Implement cooldown and carried exit | P2 matcher | closed |
 | P3-FUNNEL-001 | Implement opportunity funnel | P3 vertical slice | closed |
-| P3-ATTR-001 | Run bounded attribution for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002 | deferred pending P3-STRAT-002 and an explicit gate change |
+| P3-ATTR-001 | Run bounded attribution for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002 | blocked; predecessor accepted, pending explicit resume and outcome-blind questions |
 | P3-DASH-001 | Produce monitoring report | Funnel and attribution | deferred pending recurring formal strategy |
 | P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | blocked by P3-ATTR-001 |
 | P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | blocked by P3-EXPERT-004 and P3-ATTR-001 |

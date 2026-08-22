@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -668,6 +669,21 @@ class BaselineFeaturePanelReport:
     continuity_excluded_security_count: int
     data_content_digest: str | None = None
     data_manifest_sha256: str | None = None
+    security_selection_digest: str | None = None
+    selected_security_count: int | None = None
+
+    def __post_init__(self) -> None:
+        selection = (self.security_selection_digest, self.selected_security_count)
+        if any(value is None for value in selection) and any(
+            value is not None for value in selection
+        ):
+            raise BaselineResearchError(
+                "feature panel security selection identity is incomplete"
+            )
+        if self.selected_security_count is not None and self.selected_security_count <= 0:
+            raise BaselineResearchError(
+                "feature panel selected security count must be positive"
+            )
 
     @property
     def digest(self) -> str:
@@ -696,6 +712,12 @@ class BaselineFeaturePanelReport:
             payload["data_content_digest"] = self.data_content_digest
         if self.data_manifest_sha256 is not None:
             payload["data_manifest_sha256"] = self.data_manifest_sha256
+        if self.security_selection_digest is not None:
+            assert self.selected_security_count is not None
+            payload["security_selection"] = {
+                "digest": self.security_selection_digest,
+                "selected_security_count": self.selected_security_count,
+            }
         return payload
 
     def to_dict(self) -> dict[str, Any]:
@@ -1123,11 +1145,23 @@ class BaselineFeaturePanel:
         output: Path,
         data_content_digest: str | None = None,
         data_manifest_sha256: str | None = None,
+        allowed_security_ids: Sequence[str] | None = None,
     ) -> BaselineFeaturePanel:
         """Build the PIT total-return panel with one vectorized historical scan."""
 
         if scope_start > scope_end:
             raise BaselineResearchError("scope_start must not follow scope_end")
+        selected_security_ids: tuple[str, ...] | None = None
+        if allowed_security_ids is not None:
+            selected_security_ids = tuple(sorted(allowed_security_ids))
+            if (
+                not selected_security_ids
+                or any(not item.strip() for item in selected_security_ids)
+                or len(selected_security_ids) != len(set(selected_security_ids))
+            ):
+                raise BaselineResearchError(
+                    "feature panel security selection must be non-empty and unique"
+                )
         required_features = {
             "price.total_return_index",
             "price.sma20",
@@ -1166,13 +1200,23 @@ class BaselineFeaturePanel:
         resolved = output.resolve()
         resolved.parent.mkdir(parents=True, exist_ok=True)
         temporary = resolved.with_name(f".{resolved.name}.{uuid.uuid4().hex}.tmp")
+        spill = resolved.with_name(f".{resolved.name}.{uuid.uuid4().hex}.spill")
         connection = duckdb.connect(":memory:")
         try:
-            for name, dataset_paths in paths.items():
+            if selected_security_ids is not None:
+                spill.mkdir()
+                connection.execute("SET memory_limit='10GB'")
+                connection.execute("SET threads=2")
+                connection.execute("SET preserve_insertion_order=false")
                 connection.execute(
-                    f"CREATE VIEW source_{name} AS "
-                    f"SELECT * FROM {_read_parquet_expression(dataset_paths)}"
+                    f"SET temp_directory={_sql_string(str(spill))}"
                 )
+            _create_feature_source_views(
+                connection,
+                paths,
+                selected_security_ids,
+                scope_end=scope_end,
+            )
             connection.execute(
                 """
                 CREATE VIEW feature_identity_map AS
@@ -1246,6 +1290,8 @@ class BaselineFeaturePanel:
             connection.close()
             if temporary.exists():
                 temporary.unlink()
+            if spill.exists():
+                shutil.rmtree(spill)
         report = BaselineFeaturePanelReport(
             evaluator_version=FEATURE_EVALUATOR_VERSION,
             feature_registry_version=registry.registry_version,
@@ -1262,10 +1308,92 @@ class BaselineFeaturePanel:
             continuity_excluded_security_count=int(counts[5]),
             data_content_digest=data_content_digest,
             data_manifest_sha256=data_manifest_sha256,
+            security_selection_digest=(
+                None
+                if selected_security_ids is None
+                else _digest({"allowed_security_ids": list(selected_security_ids)})
+            ),
+            selected_security_count=(
+                None if selected_security_ids is None else len(selected_security_ids)
+            ),
         )
         if report.row_count == 0 or report.feature_ready_count == 0:
             raise BaselineResearchError("feature panel contains no research-ready observations")
         return cls(resolved, report)
+
+
+def _create_feature_source_views(
+    connection: Any,
+    paths: Mapping[str, Sequence[Path]],
+    selected_security_ids: tuple[str, ...] | None,
+    *,
+    scope_end: date,
+) -> None:
+    if selected_security_ids is None:
+        for name, dataset_paths in paths.items():
+            connection.execute(
+                f"CREATE VIEW raw_source_{name} AS "
+                f"SELECT * FROM {_read_parquet_expression(dataset_paths)}"
+            )
+            connection.execute(
+                f"CREATE VIEW source_{name} AS SELECT * FROM raw_source_{name}"
+            )
+        return
+
+    security_literals = ", ".join(_sql_string(item) for item in selected_security_ids)
+    validity_expression = _read_parquet_expression(paths["security_code_validity"])
+    connection.execute(
+        "CREATE VIEW raw_source_security_code_validity AS "
+        f"SELECT * FROM {validity_expression} "
+        f"WHERE security_id IN ({security_literals})"
+    )
+    connection.execute(
+        "CREATE TEMP TABLE source_security_code_validity AS "
+        "SELECT * FROM raw_source_security_code_validity"
+    )
+    selected_stock_codes = tuple(
+        str(row[0])
+        for row in connection.execute(
+            "SELECT DISTINCT stock_code "
+            "FROM source_security_code_validity ORDER BY stock_code"
+        ).fetchall()
+    )
+    if not selected_stock_codes:
+        raise BaselineResearchError("selected feature securities have no code validity")
+    stock_code_literals = ", ".join(_sql_string(item) for item in selected_stock_codes)
+    daily_date_columns = {
+        "daily_ohlcv_none": "date",
+        "daily_universe": "market_date",
+        "price_limit_execution_daily": "execution_date",
+    }
+    cutoff = _sql_string(scope_end.isoformat())
+    for name, dataset_paths in paths.items():
+        if name == "security_code_validity":
+            continue
+        expression = _read_parquet_expression(dataset_paths)
+        columns = {
+            str(row[0])
+            for row in connection.execute(f"DESCRIBE SELECT * FROM {expression}").fetchall()
+        }
+        if "security_id" in columns:
+            predicates = [f"security_id IN ({security_literals})"]
+        elif "security_code" in columns:
+            predicates = [f"security_code IN ({stock_code_literals})"]
+        else:
+            raise BaselineResearchError(
+                f"feature source {name} cannot apply security selection"
+            )
+        date_column = daily_date_columns.get(name)
+        if date_column is not None:
+            predicates.append(f"CAST({date_column} AS DATE) <= CAST({cutoff} AS DATE)")
+        where = " AND ".join(predicates)
+        connection.execute(
+            f"CREATE VIEW raw_source_{name} AS "
+            f"SELECT * FROM {expression} WHERE {where}"
+        )
+        connection.execute(
+            f"CREATE TEMP TABLE source_{name} AS SELECT * FROM raw_source_{name}"
+        )
 
 
 def _validate_feature_sources(connection: Any) -> None:
@@ -1311,7 +1439,10 @@ def _validate_feature_sources(connection: Any) -> None:
             SELECT count(*)
             FROM source_corporate_action_exceptions
             WHERE security_code IS NULL OR blocked_from IS NULL
-               OR (blocked_through IS NOT NULL AND blocked_through < blocked_from)
+               OR (
+                    blocked_through IS NOT NULL
+                    AND CAST(blocked_through AS DATE) < CAST(blocked_from AS DATE)
+               )
         """,
         "duplicate universe row": """
             SELECT count(*) FROM (

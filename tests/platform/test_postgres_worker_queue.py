@@ -128,6 +128,68 @@ def test_two_workers_reclaim_expired_lease_and_fence_old_generation() -> None:
         assert current.state == "running"
         assert current.claim_generation == 2
         assert current.claimed_by == "worker-recovery"
+
+        store.finish_claimed_job(
+            current.job_id,
+            current.claim_generation,
+            state="succeeded",
+            result_ref={"status": "queue-test-complete"},
+            error_reason=None,
+        )
+        replay_job = JobRecord(
+            **{
+                **job.__dict__,
+                "job_id": "job_heavy_replay",
+                "idempotency_key": "heavy-replay",
+                "input_digest": input_digest({"request": "heavy-replay"}),
+                "input_ref": {"request": "heavy-replay"},
+                "concurrency_key": "heavy-replay",
+                "state": "queued",
+                "progress": 0,
+                "attempt": 0,
+                "claimed_by": None,
+                "claim_generation": 0,
+                "lease_expires_at": None,
+            }
+        )
+        event_job = JobRecord(
+            **{
+                **replay_job.__dict__,
+                "job_id": "job_heavy_event",
+                "kind": "quanthus.p4-event-scan.v1",
+                "idempotency_key": "heavy-event",
+                "input_digest": input_digest({"request": "heavy-event"}),
+                "input_ref": {"request": "heavy-event"},
+                "queue": "event",
+                "concurrency_key": "heavy-event",
+            }
+        )
+        store.create_job(replay_job)
+        store.create_job(event_job)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            heavy_claims = tuple(
+                executor.map(
+                    lambda request: store.claim_job(request[0], request[1], 300),
+                    (("replay", "replay-worker"), ("event", "event-worker")),
+                )
+            )
+        heavy_winners = [claim for claim in heavy_claims if claim is not None]
+        assert len(heavy_winners) == 1
+        winner = heavy_winners[0]
+        blocked_queue = "event" if winner.queue == "replay" else "replay"
+        assert store.claim_job(blocked_queue, "blocked-heavy-worker", 300) is None
+
+        store.finish_claimed_job(
+            winner.job_id,
+            winner.claim_generation,
+            state="succeeded",
+            result_ref={"status": "heavy-queue-test-complete"},
+            error_reason=None,
+        )
+        unblocked = store.claim_job(blocked_queue, "unblocked-heavy-worker", 300)
+        assert unblocked is not None
+        assert unblocked.queue == blocked_queue
     finally:
         with psycopg.connect(dsn, autocommit=True) as connection:
             connection.execute(

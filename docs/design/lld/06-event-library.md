@@ -4,8 +4,8 @@
 | --- | --- |
 | Phase | P4 |
 | Design status | approved |
-| Delivery gate | open |
-| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, and `P4-LABEL-001` accepted through deterministic production A/B evidence; `P4-REPORT-001` comparison policy, report builder, and Event Worker v3 implemented, with real production A/B report acceptance still open |
+| Delivery gate | accepted |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, and `P4-REPORT-001` accepted through deterministic production A/B evidence; the final report A/B reproduced 36,820 candidates, 34,641 settled three-class events, byte-identical report content/manifest identities, and the same three leading features |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -302,8 +302,10 @@ first production Report Run exposed this boundary by failing closed at T-row ali
 is recorded in `docs/acceptance/p4-event-comparison-report-identity-remediation-20260822.md` and does
 not change the frozen report-policy digest.
 
-The remaining #76 acceptance gate is two production runs with identical governed input, identical
-report content/manifest digests, identical leading-feature ids, and a true report acceptance flag.
+Production A/B acceptance now proves two independent Jobs with the same Worker revision and governed
+input reproduce identical Event/Label identities, byte-identical report content/manifest digests,
+the same leading-feature ids, and a true report acceptance flag. Evidence is recorded in
+`docs/acceptance/p4-event-comparison-report-production-ab-20260823.md`.
 
 ## 8. Work items
 
@@ -312,7 +314,7 @@ report content/manifest digests, identical leading-feature ids, and a true repor
 | P4-EVENT-001 | Freeze candidate-source hypothesis; define event, isolation, and split schemas | Accepted P3 replay and audit contracts | Exact rule-card and split-policy digests approved; deterministic contract tests and acceptance record pass |
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Accepted production A/B replay: 36,820 candidates, 36,022 executable, 798 not-executable, identical manifest/content digests |
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Accepted production A/B corpus: 36,820 total, 34,641 settled three-class, identical Event/Label content and manifest digests |
-| P4-REPORT-001 | Produce daily group comparison report | Event dataset | Exact report-policy digest, deterministic report package, three surviving leading features, and production A/B report identity required |
+| P4-REPORT-001 | Produce daily group comparison report | Event dataset | Accepted production A/B: byte-identical report content/manifest identities and the same three leading features |
 
 ## 9. Acceptance
 

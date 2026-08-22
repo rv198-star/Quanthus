@@ -345,7 +345,7 @@ CHAPTERS = (
         "closed",
     ),
     ChapterSpec(
-        "06", "docs/design/lld/06-event-library.md", "P4", "events", MILESTONES[3], "ready"
+        "06", "docs/design/lld/06-event-library.md", "P4", "events", MILESTONES[3], "closed"
     ),
     ChapterSpec(
         "07", "docs/design/lld/07-research-scoring.md", "P5", "ml", MILESTONES[4], "blocked"
@@ -391,7 +391,10 @@ PHASE_GATES = {
         "Accepted as a rule-only historical capability slice under config/p3-gates.v1.json; "
         "the frozen fixture is not a strategy lineage."
     ),
-    "P4": "Allowed for event-library implementation under config/p3-gates.v1.json.",
+    "P4": (
+        "Accepted for the development Event Library, outcome corpus, and daily comparison report "
+        "under frozen P4 authorities."
+    ),
     "P5": "Blocked until the P4 event library and frozen rule baselines are accepted.",
     "P6": "Simulation governance starts after the P3 baseline is frozen.",
     "P7": "Blocked until frozen simulation supports an explicit live/no-live decision.",
@@ -539,8 +542,10 @@ def work_items(root: Path) -> list[WorkItem]:
                 status = "closed"
             else:
                 status = "blocked"
+        elif phase == "P4":
+            status = "closed"
         else:
-            status = "ready" if phase in {"P1", "P2", "P3", "P4"} else "blocked"
+            status = "ready" if phase in {"P1", "P2", "P3"} else "blocked"
         if stable_id in CRITICAL_IDS:
             priority = "critical"
         elif stable_id in HIGH_IDS:

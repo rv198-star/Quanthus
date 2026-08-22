@@ -163,7 +163,10 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         for fields in (p3_labels, p3_experts, p3_positions):
             self.assertEqual(fields["Delivery gate"], expected_p3)
-        self.assertEqual(p4_events["Delivery gate"], "open" if p3_gate.p4_can_start else "blocked")
+        self.assertEqual(
+            p4_events["Delivery gate"],
+            "accepted" if p3_gate.p4_can_start else "blocked",
+        )
         for fields in (
             docs_map,
             prd,
@@ -988,7 +991,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("`P4-EVENT-002`", lld)
         self.assertIn("accepted through deterministic production A/B evidence", lld)
         self.assertIn("`P4-REPORT-001`", lld)
-        self.assertIn("production A/B report acceptance still open", lld)
+        self.assertIn("Accepted production A/B", lld)
         self.assertIn("`CandidateRuleCard.require_stage_b_authority()`", lld)
         self.assertEqual(card.lifecycle, "approved")
         self.assertEqual(card.governance.approval_state, "approved")
@@ -1252,6 +1255,28 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(report_policy.semantic_digest, report_identity_remediation)
         self.assertIn("panel_security_id", report_identity_remediation)
         self.assertIn("job_15a9f9c2d3934b96a1349b0f3ae2a288", report_identity_remediation)
+        report_acceptance_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p4-event-comparison-report-production-ab-20260823.md"
+        )
+        self.assertTrue(report_acceptance_path.is_file())
+        report_acceptance = report_acceptance_path.read_text(encoding="utf-8")
+        self.assertIn(report_policy.semantic_digest, report_acceptance)
+        self.assertIn("job_870e174940e947b785d9663efd28b169", report_acceptance)
+        self.assertIn("job_121bc870861248cc827361d8e1879a59", report_acceptance)
+        self.assertIn(
+            "sha256:d4fe89b80d8d2b1322a99669935a9eff1758c7857cd5f2af06607347e99db158",
+            report_acceptance,
+        )
+        self.assertIn(
+            "sha256:daec6f84da1b4535b74f8f48b42f424ca7991a32980c2b9a02cbb00ec95b1184",
+            report_acceptance,
+        )
+        self.assertIn("risk.realized_volatility20", report_acceptance)
+        self.assertIn("price.breakout20", report_acceptance)
+        self.assertIn("price.sma20_to_sma60", report_acceptance)
         self.assertTrue(
             (root / "src" / "quanthus" / "event_library" / "comparison_report.py").is_file()
         )
@@ -1291,7 +1316,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             )
         )
         self.assertTrue(p4_items)
-        self.assertTrue(all(item.status == "ready" for item in p4_items))
+        self.assertTrue(all(item.status == "closed" for item in p4_items))
         self.assertTrue(
             all(item.status == "blocked" for item in items if item.phase in {"P5", "P6", "P7"})
         )

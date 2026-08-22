@@ -102,7 +102,11 @@ def _rate(value: Decimal) -> Decimal:
 
 
 def _stable_id(prefix: str, *values: object) -> str:
-    return f"{prefix}_{hashlib.sha256(canonical_json_bytes(values)).hexdigest()[:24]}"
+    normalized = tuple(
+        value.isoformat() if isinstance(value, (date, datetime)) else value
+        for value in values
+    )
+    return f"{prefix}_{hashlib.sha256(canonical_json_bytes(normalized)).hexdigest()[:24]}"
 
 
 def _decision_digest_in_window(

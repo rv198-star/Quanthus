@@ -34,6 +34,7 @@ from quanthus.expert_strategy.formal_p2_replay import (
     FormalP2ReplayRuntime,
     _decision_digest_in_window,
     _load_parent_industry_mapping,
+    _stable_id,
     _transition,
     _UnitRuntime,
     run_paired_block_bootstrap,
@@ -413,3 +414,9 @@ def test_formal_replay_builds_cooldown_transition_with_atomic_evidence() -> None
     )
 
     assert transition.evidence == evidence
+
+
+def test_formal_replay_stable_id_normalizes_calendar_dates() -> None:
+    assert _stable_id("calendar", "capital-unit-01", date(2020, 1, 2)) == _stable_id(
+        "calendar", "capital-unit-01", "2020-01-02"
+    )

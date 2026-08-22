@@ -11,7 +11,7 @@ from quanthus.expert_evaluation.runner import FormalStrategyRef
 from quanthus.expert_evaluation.serialization import ExpertEvaluationError, digest_value
 from quanthus.expert_strategy.contracts import load_expert_strategy_card
 
-STRATEGY_REGISTRY_KEY = "config/expert-strategies/p4-trend-risk.v1.json"
+STRATEGY_REGISTRY_KEY = "config/expert-strategies/p4-trend-risk.v1.0.1.json"
 POSITION_SPEC_REGISTRY_KEY = "specs/position-risk-formal-policy.evaluation.v1.json"
 SENTINEL_PLAN_ID = "plan.p4-trend-risk-january-2020-sentinel"
 SENTINEL_PLAN_VERSION = "1.0.0"

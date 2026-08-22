@@ -7,6 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import ANY
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -150,11 +151,13 @@ def test_formal_sentinel_closes_registry_and_reproduces_byte_identically(
         lambda *_args: (_EventInput(event, "industry.test", "000001"),),
     )
     monkeypatch.setattr(formal, "ReplayDataProvider", _Provider)
-    monkeypatch.setattr(
-        formal.BaselineFeaturePanel,
-        "build",
-        lambda *_args, **_kwargs: _Panel(),
-    )
+    build_calls: list[object] = []
+
+    def build_panel(*_args: object, **kwargs: object) -> _Panel:
+        build_calls.append(kwargs)
+        return _Panel()
+
+    monkeypatch.setattr(formal.BaselineFeaturePanel, "build", build_panel)
     producer = formal.FormalStrategySentinelProducer(registry, tmp_path / "event-runs")
 
     first = run_evaluation(
@@ -182,6 +185,19 @@ def test_formal_sentinel_closes_registry_and_reproduces_byte_identically(
     assert scorecard["sealed_partition_access"] is False
     assert scorecard["decision_count"] == 1
     assert scorecard["action_counts"] == {"trial_entry": 1}
+    assert len(build_calls) == 2
+    assert all(
+        call
+        == {
+            "scope_start": date(2020, 1, 1),
+            "scope_end": date(2020, 1, 31),
+            "output": ANY,
+            "data_content_digest": "sha256:" + "d" * 64,
+            "data_manifest_sha256": "sha256:" + "e" * 64,
+            "allowed_security_ids": ("000001",),
+        }
+        for call in build_calls
+    )
     assert first.manifest["strategy_identity"] == {
         "strategy_id": registry.card.strategy_id,
         "strategy_version": registry.card.strategy_version,

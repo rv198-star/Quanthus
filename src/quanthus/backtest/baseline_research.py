@@ -668,6 +668,21 @@ class BaselineFeaturePanelReport:
     continuity_excluded_security_count: int
     data_content_digest: str | None = None
     data_manifest_sha256: str | None = None
+    security_selection_digest: str | None = None
+    selected_security_count: int | None = None
+
+    def __post_init__(self) -> None:
+        selection = (self.security_selection_digest, self.selected_security_count)
+        if any(value is None for value in selection) and any(
+            value is not None for value in selection
+        ):
+            raise BaselineResearchError(
+                "feature panel security selection identity is incomplete"
+            )
+        if self.selected_security_count is not None and self.selected_security_count <= 0:
+            raise BaselineResearchError(
+                "feature panel selected security count must be positive"
+            )
 
     @property
     def digest(self) -> str:
@@ -696,6 +711,12 @@ class BaselineFeaturePanelReport:
             payload["data_content_digest"] = self.data_content_digest
         if self.data_manifest_sha256 is not None:
             payload["data_manifest_sha256"] = self.data_manifest_sha256
+        if self.security_selection_digest is not None:
+            assert self.selected_security_count is not None
+            payload["security_selection"] = {
+                "digest": self.security_selection_digest,
+                "selected_security_count": self.selected_security_count,
+            }
         return payload
 
     def to_dict(self) -> dict[str, Any]:
@@ -1123,11 +1144,23 @@ class BaselineFeaturePanel:
         output: Path,
         data_content_digest: str | None = None,
         data_manifest_sha256: str | None = None,
+        allowed_security_ids: Sequence[str] | None = None,
     ) -> BaselineFeaturePanel:
         """Build the PIT total-return panel with one vectorized historical scan."""
 
         if scope_start > scope_end:
             raise BaselineResearchError("scope_start must not follow scope_end")
+        selected_security_ids: tuple[str, ...] | None = None
+        if allowed_security_ids is not None:
+            selected_security_ids = tuple(sorted(allowed_security_ids))
+            if (
+                not selected_security_ids
+                or any(not item.strip() for item in selected_security_ids)
+                or len(selected_security_ids) != len(set(selected_security_ids))
+            ):
+                raise BaselineResearchError(
+                    "feature panel security selection must be non-empty and unique"
+                )
         required_features = {
             "price.total_return_index",
             "price.sma20",
@@ -1168,6 +1201,15 @@ class BaselineFeaturePanel:
         temporary = resolved.with_name(f".{resolved.name}.{uuid.uuid4().hex}.tmp")
         connection = duckdb.connect(":memory:")
         try:
+            if selected_security_ids is not None:
+                connection.execute(
+                    "CREATE TEMP TABLE selected_feature_security_ids "
+                    "(security_id VARCHAR PRIMARY KEY)"
+                )
+                connection.executemany(
+                    "INSERT INTO selected_feature_security_ids VALUES (?)",
+                    [(item,) for item in selected_security_ids],
+                )
             for name, dataset_paths in paths.items():
                 connection.execute(
                     f"CREATE VIEW source_{name} AS "
@@ -1220,7 +1262,11 @@ class BaselineFeaturePanel:
             if ambiguous:
                 raise BaselineResearchError("feature inputs contain ambiguous code identities")
             _validate_feature_sources(connection)
-            query = _feature_panel_query(scope_start, scope_end)
+            query = _feature_panel_query(
+                scope_start,
+                scope_end,
+                restrict_security_ids=selected_security_ids is not None,
+            )
             connection.execute(
                 f"COPY ({query}) TO {_sql_string(str(temporary))} "
                 "(FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000)"
@@ -1262,6 +1308,14 @@ class BaselineFeaturePanel:
             continuity_excluded_security_count=int(counts[5]),
             data_content_digest=data_content_digest,
             data_manifest_sha256=data_manifest_sha256,
+            security_selection_digest=(
+                None
+                if selected_security_ids is None
+                else _digest({"allowed_security_ids": list(selected_security_ids)})
+            ),
+            selected_security_count=(
+                None if selected_security_ids is None else len(selected_security_ids)
+            ),
         )
         if report.row_count == 0 or report.feature_ready_count == 0:
             raise BaselineResearchError("feature panel contains no research-ready observations")
@@ -1346,9 +1400,20 @@ def _validate_feature_sources(connection: Any) -> None:
             raise BaselineResearchError(f"feature inputs contain {label}")
 
 
-def _feature_panel_query(scope_start: date, scope_end: date) -> str:
+def _feature_panel_query(
+    scope_start: date,
+    scope_end: date,
+    *,
+    restrict_security_ids: bool = False,
+) -> str:
     start = _sql_string(scope_start.isoformat())
     end = _sql_string(scope_end.isoformat())
+    selection_join = (
+        "JOIN selected_feature_security_ids selected "
+        "ON selected.security_id = universe.security_id"
+        if restrict_security_ids
+        else ""
+    )
     return f"""
         WITH mapped_actions AS (
             SELECT actions.security_id,
@@ -1408,6 +1473,7 @@ def _feature_panel_query(scope_start: date, scope_end: date) -> str:
                          )
                    ) AS exception_active
             FROM source_daily_universe universe
+            {selection_join}
             LEFT JOIN source_daily_ohlcv_none bars
               ON bars.security_id = universe.security_id
              AND CAST(bars.date AS DATE) = CAST(universe.market_date AS DATE)

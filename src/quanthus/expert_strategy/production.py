@@ -45,7 +45,8 @@ from quanthus.expert_strategy.runner import FormalStrategyRunner, build_formal_e
 from quanthus.feature_registry import load_feature_registry
 
 FORMAL_PRODUCER_ID = "producer.formal-p4-trend-risk-development"
-FORMAL_PRODUCER_VERSION = "1.0.0"
+FORMAL_PRODUCER_VERSION = "1.0.1"
+FORMAL_PROJECTION_POLICY = "event-security-set-feature-panel-v1"
 SENTINEL_START = date(2020, 1, 1)
 SENTINEL_END = date(2020, 1, 31)
 
@@ -62,6 +63,7 @@ def formal_producer_binding(registry: ExpertStrategyRegistry) -> ProducerBinding
                 "topology_manifest_digest": registry.topology_manifest.digest,
                 "sentinel_plan_digest": registry.sentinel_plan_digest,
                 "evaluation_specs": registry.evaluation_spec_identities,
+                "projection_policy": FORMAL_PROJECTION_POLICY,
             }
         ),
     )
@@ -152,6 +154,13 @@ class FormalStrategySentinelProducer:
             self.event_run_root, job_input.expected_parent_run_digests
         )
         events = _load_events(event_root, SENTINEL_START, SENTINEL_END)
+        selected_security_ids = tuple(
+            sorted({item.panel_security_id for item in events})
+        )
+        if not selected_security_ids:
+            raise ExpertEvaluationError(
+                "sentinel_population_empty", "January Sentinel contains no event securities"
+            )
         provider_config = load_replay_data_provider_config(
             self.repository_root / "config/replay-data-provider.development.v2.json"
         )
@@ -172,7 +181,14 @@ class FormalStrategySentinelProducer:
         provider = ReplayDataProvider(provider_config)
         with tempfile.TemporaryDirectory(prefix="quanthus-formal-sentinel-") as temporary:
             panel_path = Path(temporary) / "feature-panel.parquet"
-            progress("building-shared-projection", {"event_count": len(events)})
+            progress(
+                "building-shared-projection",
+                {
+                    "event_count": len(events),
+                    "selected_security_count": len(selected_security_ids),
+                    "projection_policy": FORMAL_PROJECTION_POLICY,
+                },
+            )
             with provider.open(scope_start=SENTINEL_START, scope_end=SENTINEL_END) as session, (
                 BaselineFeaturePanel.build(
                     session.reader.bundle,
@@ -182,6 +198,7 @@ class FormalStrategySentinelProducer:
                     output=panel_path,
                     data_content_digest=session.reader.data_content_digest,
                     data_manifest_sha256=session.reader.data_manifest_sha256,
+                    allowed_security_ids=selected_security_ids,
                 )
             ) as panel:
                 progress("producing-observations", {"event_count": len(events)})

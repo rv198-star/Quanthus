@@ -52,6 +52,8 @@ services:
   replay-worker:
     image: ${QUANTHUS_REPLAY_IMAGE:-quanthus-replay:local}
     restart: unless-stopped
+    mem_limit: 16g
+    memswap_limit: 16g
     entrypoint: ["python", "-m", "quanthus.platform.worker"]
     environment:
       PGPASSWORD: ${QUANTHUS_PLATFORM_POSTGRES_PASSWORD:?required}
@@ -60,6 +62,8 @@ services:
       QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
       QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
+      QUANTHUS_REPLAY_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current
+      QUANTHUS_REPLAY_MEMORY_STOP_BYTES: "15032385536"
     depends_on:
       postgres:
         condition: service_healthy

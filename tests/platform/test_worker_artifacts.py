@@ -225,3 +225,110 @@ def test_worker_persists_bounded_candidate_failure_detail(tmp_path: Path) -> Non
             },
         }
     ]
+
+
+def test_worker_stops_child_before_hard_memory_ceiling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = datetime.now(timezone.utc)
+    input_ref = {
+        "provider_config": "provider.json",
+        "scope_start": "2020-01-01",
+        "scope_end": "2020-01-31",
+    }
+    job = JobRecord(
+        job_id="job_memory_guard",
+        kind="quanthus.candidate-replay.v1",
+        actor_user_id="usr_test",
+        idempotency_key="memory-guard",
+        input_ref=input_ref,
+        state="running",
+        progress=1,
+        cancel_requested=False,
+        attempt=1,
+        result_ref=None,
+        error_reason=None,
+        created_at=now,
+        updated_at=now,
+        queue="replay",
+        input_digest=input_digest(input_ref),
+        concurrency_key="memory-guard",
+        available_at=now,
+        stage="starting",
+        claimed_by="worker-test",
+        claim_generation=1,
+    )
+
+    class Store:
+        terminal: dict[str, object] | None = None
+        update: dict[str, object] | None = None
+
+        def claim_job(self, *_args: object) -> JobRecord:
+            return job
+
+        def get_job(self, _job_id: str) -> JobRecord:
+            return job
+
+        def update_claimed_job(
+            self, _job_id: str, _generation: int, **values: object
+        ) -> JobRecord:
+            self.update = values
+            return job
+
+        def finish_claimed_job(
+            self, _job_id: str, _generation: int, **values: object
+        ) -> JobRecord:
+            self.terminal = values
+            return job
+
+    class Process:
+        returncode = -15
+        terminated = False
+
+        def poll(self) -> int | None:
+            return self.returncode if self.terminated else None
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def wait(self, timeout: float) -> int:
+            del timeout
+            return self.returncode
+
+        def kill(self) -> None:
+            self.terminated = True
+
+    process = Process()
+    monkeypatch.setattr("quanthus.platform.worker.subprocess.Popen", lambda *_a, **_k: process)
+    memory_current = tmp_path / "memory.current"
+    memory_current.write_text(str(15 * 1024**3), encoding="ascii")
+    store = Store()
+    worker = ReplayWorker(
+        store,  # type: ignore[arg-type]
+        worker_id="worker-test",
+        run_root=tmp_path / "runs",
+        lease_seconds=300,
+        renew_seconds=30,
+        terminate_seconds=1,
+        memory_current_path=memory_current,
+        memory_stop_bytes=14 * 1024**3,
+    )
+
+    assert worker.run_once() is True
+    assert process.terminated is True
+    assert store.update == {
+        "stage": "resource-limit-exceeded",
+        "progress": 5,
+        "progress_detail": {
+            "reason": "replay_memory_guard_exceeded",
+            "memory_current_bytes": 15 * 1024**3,
+            "memory_stop_bytes": 14 * 1024**3,
+        },
+    }
+    assert store.terminal is not None
+    assert store.terminal["state"] == "failed"
+    assert store.terminal["result_ref"] is None
+    assert str(store.terminal["error_reason"]).startswith(
+        "replay_memory_guard_exceeded:"
+    )
+    assert not (tmp_path / "runs" / "runs").exists()

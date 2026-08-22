@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -1199,8 +1200,17 @@ class BaselineFeaturePanel:
         resolved = output.resolve()
         resolved.parent.mkdir(parents=True, exist_ok=True)
         temporary = resolved.with_name(f".{resolved.name}.{uuid.uuid4().hex}.tmp")
+        spill = resolved.with_name(f".{resolved.name}.{uuid.uuid4().hex}.spill")
         connection = duckdb.connect(":memory:")
         try:
+            if selected_security_ids is not None:
+                spill.mkdir()
+                connection.execute("SET memory_limit='10GB'")
+                connection.execute("SET threads=2")
+                connection.execute("SET preserve_insertion_order=false")
+                connection.execute(
+                    f"SET temp_directory={_sql_string(str(spill))}"
+                )
             _create_feature_source_views(connection, paths, selected_security_ids)
             connection.execute(
                 """
@@ -1275,6 +1285,8 @@ class BaselineFeaturePanel:
             connection.close()
             if temporary.exists():
                 temporary.unlink()
+            if spill.exists():
+                shutil.rmtree(spill)
         report = BaselineFeaturePanelReport(
             evaluator_version=FEATURE_EVALUATOR_VERSION,
             feature_registry_version=registry.registry_version,
@@ -1332,7 +1344,7 @@ def _create_feature_source_views(
     )
     connection.execute(
         """
-        CREATE TEMP VIEW selected_feature_stock_codes AS
+        CREATE TEMP TABLE selected_feature_stock_codes AS
         SELECT DISTINCT validity.stock_code
         FROM raw_source_security_code_validity validity
         JOIN selected_feature_security_ids selected
@@ -1347,7 +1359,7 @@ def _create_feature_source_views(
         if "security_id" in columns:
             connection.execute(
                 f"""
-                CREATE VIEW source_{name} AS
+                CREATE TEMP TABLE source_{name} AS
                 SELECT source.*
                 FROM {raw} source
                 JOIN selected_feature_security_ids selected
@@ -1357,7 +1369,7 @@ def _create_feature_source_views(
         elif "security_code" in columns:
             connection.execute(
                 f"""
-                CREATE VIEW source_{name} AS
+                CREATE TEMP TABLE source_{name} AS
                 SELECT source.*
                 FROM {raw} source
                 JOIN selected_feature_stock_codes selected
@@ -1413,7 +1425,10 @@ def _validate_feature_sources(connection: Any) -> None:
             SELECT count(*)
             FROM source_corporate_action_exceptions
             WHERE security_code IS NULL OR blocked_from IS NULL
-               OR (blocked_through IS NOT NULL AND blocked_through < blocked_from)
+               OR (
+                    blocked_through IS NOT NULL
+                    AND CAST(blocked_through AS DATE) < CAST(blocked_from AS DATE)
+               )
         """,
         "duplicate universe row": """
             SELECT count(*) FROM (

@@ -5,8 +5,8 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-STRAT-002` |
 | Design status | approved |
-| Delivery gate | blocked by `P3-EXPERT-002`, `P3-EXPERT-003`, and `P3-POS-003` |
-| Implementation readiness | ready after dependencies and strategy-card decision |
+| Delivery gate | dependencies accepted; exact strategy-card proposal awaits human approval |
+| Implementation readiness | blocked until the exact `candidate.p4-trend-risk@1.0.0` semantic digest is approved |
 | Historical authority | development partition only |
 
 ## 1. Outcome and boundary

@@ -235,14 +235,24 @@ def test_paired_block_bootstrap_is_deterministic_and_rejects_date_drift(
         intervention_root=intervention,
         question_id="question.trend-policy-effect",
         method="uncertainty.paired-nonoverlap-22-session-block-bootstrap@1.0.0",
+        strategy_card_digest="sha256:" + "1" * 64,
     )
     second = run_paired_block_bootstrap(
         baseline_root=baseline,
         intervention_root=intervention,
         question_id="question.trend-policy-effect",
         method="uncertainty.paired-nonoverlap-22-session-block-bootstrap@1.0.0",
+        strategy_card_digest="sha256:" + "1" * 64,
+    )
+    differently_bound = run_paired_block_bootstrap(
+        baseline_root=baseline,
+        intervention_root=intervention,
+        question_id="question.trend-policy-effect",
+        method="uncertainty.paired-nonoverlap-22-session-block-bootstrap@1.0.0",
+        strategy_card_digest="sha256:" + "2" * 64,
     )
     assert first == second
+    assert first["seed"] != differently_bound["seed"]
     assert first["complete_block_count"] == 2
     assert first["resamples"] == 2000
 
@@ -253,6 +263,7 @@ def test_paired_block_bootstrap_is_deterministic_and_rejects_date_drift(
             intervention_root=intervention,
             question_id="question.trend-policy-effect",
             method="uncertainty.paired-nonoverlap-22-session-block-bootstrap@1.0.0",
+            strategy_card_digest="sha256:" + "1" * 64,
         )
 
 

@@ -127,10 +127,16 @@ class FormalReplayEvidence:
 class FormalP2ReplayBackend:
     """Persist and resume exact semantic variants independently of Pipeline memory."""
 
-    def __init__(self, repository_root: Path, workspace_root: Path) -> None:
+    def __init__(
+        self,
+        repository_root: Path,
+        workspace_root: Path,
+        strategy_card_digest: str,
+    ) -> None:
         self.repository_root = repository_root.resolve()
         self.workspace_root = workspace_root.resolve()
         self.workspace_root.mkdir(parents=True, exist_ok=True)
+        self.strategy_card_digest = strategy_card_digest
         self._runtime: Any | None = None
 
     @staticmethod
@@ -216,6 +222,7 @@ class FormalP2ReplayBackend:
             intervention_root=self._variant_root(intervention_id),
             question_id=question_id,
             method=method,
+            strategy_card_digest=self.strategy_card_digest,
         )
         digest = digest_value(payload)
         target = self.workspace_root / "uncertainty" / f"{question_id}.json"
@@ -235,7 +242,11 @@ class FormalAttributionExecutor:
     def __init__(self, repository_root: Path, workspace_root: Path) -> None:
         self.repository_root = repository_root.resolve()
         self.adapter = FormalStrategyAttributionAdapter(self.repository_root)
-        self.backend = FormalP2ReplayBackend(self.repository_root, workspace_root)
+        self.backend = FormalP2ReplayBackend(
+            self.repository_root,
+            workspace_root,
+            self.adapter.registry.card.semantic_digest,
+        )
 
     def binding(self) -> ExecutorBinding:
         return ExecutorBinding(

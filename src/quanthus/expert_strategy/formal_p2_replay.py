@@ -1308,6 +1308,7 @@ def run_paired_block_bootstrap(
     intervention_root: Path,
     question_id: str,
     method: str,
+    strategy_card_digest: str,
 ) -> dict[str, Any]:
     baseline = json.loads((baseline_root / "daily-returns.json").read_bytes())
     intervention = json.loads((intervention_root / "daily-returns.json").read_bytes())
@@ -1327,9 +1328,7 @@ def run_paired_block_bootstrap(
         hashlib.sha256(
             canonical_json_bytes(
                 {
-                    "strategy_card_digest": ExpertStrategyRegistry(
-                        Path(__file__).resolve().parents[3]
-                    ).card.semantic_digest,
+                    "strategy_card_digest": strategy_card_digest,
                     "question_id": question_id,
                 }
             )

@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-POS-001` accepted; `P3-RISK-001` accepted; `P3-EXIT-001` accepted; fixture allocation, execution, review, and cooldown accepted after byte-identical rerun |
+| Implementation status | `P3-POS-001` accepted; `P3-RISK-001` accepted; `P3-EXIT-001` accepted; fixture allocation, execution, review, and cooldown accepted after byte-identical rerun; `P3-POS-004` accepts versioned Trial reduction compatibility |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-004/005, FR-BT-003/004 |
 
@@ -21,6 +21,7 @@ stateDiagram-v2
     [*] --> Empty
     Empty --> Trial: "entry filled"
     Trial --> Dynamic: "validated add filled"
+    Trial --> Trial: "validated reduction fill [v1.1]"
     Trial --> Exiting: "exit trigger"
     Dynamic --> Dynamic: "validated add/reduce"
     Dynamic --> Exiting: "exit trigger"
@@ -39,6 +40,13 @@ an untradable carry cannot mutate position quantity, a full exit must leave the 
 closed-to-empty reset requires both settlement and calendar evidence. Unit, security, and
 opportunity identity cannot change inside one lifecycle; transition ids and source evidence are
 consumed once. Evidence: `docs/acceptance/p3-position-lifecycle-slice-20260728.md`.
+
+Lifecycle `1.0.0` remains frozen. Additive lifecycle `1.1.0` permits a validated partial-sell Fill
+to reduce a Trial position while retaining Trial state; it does not permit zero quantity, a
+security change, unit settlement, or a full exit through the reduction route. P2 releases
+proportional cost and retains the residual position. The exact formal strategy rebind and
+production/isolated deterministic proof are accepted under `P3-POS-004`; evidence:
+`docs/acceptance/p3-pos-trial-reduction-compatibility-production-20260822.md`.
 
 This slice freezes only legal state transitions. It does not choose trial/add sizes, define hold or
 cooldown durations, arbitrate an exit trigger, or create a `BacktestSignal`, `OrderIntent`, `Order`,
@@ -173,6 +181,7 @@ All transfers are ledger events and report separately from trading PnL.
 | P3-POS-002 | Implement trial/add/review rules | Experts | Lifecycle replay |
 | P3-EXIT-001 | Implement four-source exit arbitration | Aggregator | Precedence fixtures |
 | P3-POS-003 | Implement cooldown and carried-exit behavior | Calendar/matcher | Consecutive limit-down case |
+| P3-POS-004 | Add versioned Trial-position reduction compatibility | P3-POS-001, P2 ledger, P3-STRAT-002 | Partial-sell ledger proof and byte-identical bounded Sentinel |
 | P3-STRAT-001 | Implement three one-unit research baselines | P3-FEAT-002, P3-REPLAY-001 | Development-period deterministic suite |
 | P3-ACCEPT-001 | Run vertical-slice multi-year replay | All P3 release blockers | Auditable closed loop |
 

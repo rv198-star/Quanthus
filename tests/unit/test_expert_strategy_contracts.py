@@ -11,7 +11,8 @@ from quanthus.expert_evaluation.serialization import ExpertEvaluationError, dige
 from quanthus.expert_strategy import load_expert_strategy_card
 
 ROOT = Path(__file__).resolve().parents[2]
-CARD = ROOT / "config/expert-strategies/p4-trend-risk.v1.json"
+CARD = ROOT / "config/expert-strategies/p4-trend-risk.v1.0.1.json"
+LEGACY_CARD = ROOT / "config/expert-strategies/p4-trend-risk.v1.json"
 SEMANTIC_EXCLUDES = {"lifecycle", "owner", "governance", "semantic_digest"}
 
 
@@ -47,7 +48,13 @@ def test_proposal_closes_exact_two_expert_topology_without_results() -> None:
     card = load_expert_strategy_card(CARD, ROOT)
 
     assert card.semantic_digest == (
-        "sha256:b0a37af05f14bf9cd23e4bf3fe22b546d88646dbad5696f4700dcfd7204a0716"
+        "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c"
+    )
+    assert card.strategy_version == "1.0.1"
+    assert card.semantic_sections["product_candidate"]["strategy_version"] == "1.0.1"
+    assert (
+        card.semantic_sections["position_and_execution"]["position_state_machine_version"]
+        == "1.1.0"
     )
     assert tuple(item["expert_id"] for item in card.experts) == (
         "expert.trend-stability",
@@ -211,7 +218,8 @@ def test_card_contains_no_observed_strategy_result_fields() -> None:
 
 def test_trial_reduction_compatibility_patch_has_exact_outcome_blind_digest() -> None:
     active = _raw()
-    proposed = copy.deepcopy(active)
+    legacy = cast(dict[str, Any], json.loads(LEGACY_CARD.read_text(encoding="utf-8")))
+    proposed = copy.deepcopy(legacy)
     proposed["strategy_version"] = "1.0.1"
     proposed["product_candidate"]["strategy_version"] = "1.0.1"
     proposed["position_and_execution"]["position_state_machine_version"] = "1.1.0"
@@ -219,14 +227,23 @@ def test_trial_reduction_compatibility_patch_has_exact_outcome_blind_digest() ->
     assert _semantic_digest(proposed) == (
         "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c"
     )
-    proposed["strategy_version"] = active["strategy_version"]
-    proposed["product_candidate"]["strategy_version"] = active["product_candidate"][
-        "strategy_version"
-    ]
-    proposed["position_and_execution"]["position_state_machine_version"] = active[
-        "position_and_execution"
-    ]["position_state_machine_version"]
-    assert proposed == active
+    assert _semantic_digest(active) == active["semantic_digest"]
+    assert {
+        key: value for key, value in active.items() if key not in SEMANTIC_EXCLUDES
+    } == {key: value for key, value in proposed.items() if key not in SEMANTIC_EXCLUDES}
+
+
+def test_legacy_strategy_card_remains_immutable_and_loadable() -> None:
+    legacy = load_expert_strategy_card(LEGACY_CARD, ROOT)
+
+    assert legacy.strategy_version == "1.0.0"
+    assert legacy.semantic_digest == (
+        "sha256:b0a37af05f14bf9cd23e4bf3fe22b546d88646dbad5696f4700dcfd7204a0716"
+    )
+    assert (
+        legacy.semantic_sections["position_and_execution"]["position_state_machine_version"]
+        == "1.0.0"
+    )
 
 
 def test_unknown_nested_strategy_parameter_is_rejected(tmp_path: Path) -> None:

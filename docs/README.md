@@ -74,8 +74,11 @@ nodes.
   reproduction. `P3-STRAT-002` is accepted under
   `acceptance/p3-strat-first-formal-topology-production-20260822.md`: its exact approved two-expert
   topology completed a production January 2020 Worker Run and an isolated PostgreSQL/Run-root
-  reproduction with all seven artifacts byte-identical. `P3-ATTR-001` has its predecessor but
-  remains blocked pending an explicit resume and persisted outcome-blind questions; later
+  reproduction with all seven artifacts byte-identical. Additive lifecycle `1.1.0` and formal
+  strategy `candidate.p4-trend-risk@1.0.1` are accepted under
+  `acceptance/p3-pos-trial-reduction-compatibility-production-20260822.md`; the legacy lifecycle
+  and card remain immutable. `P3-ATTR-001` has its compatibility predecessor but remains blocked
+  pending persisted outcome-blind preregistration and complete-P2 execution; later
   workbench and forward-Shadow work remains dependency-gated, development-only, and unable to open
   P5/P6 or sealed data.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio

@@ -220,6 +220,7 @@ predeclared questions.
 | P3-POS-002 | Implement trial/add/review rules | P3 experts | closed for no-add fixture scope |
 | P3-EXIT-001 | Implement four-source exit arbitration | P3 aggregator | closed |
 | P3-POS-003 | Implement cooldown and carried exit | P2 matcher | closed |
+| P3-POS-004 | Add versioned Trial-position reduction compatibility | P3-POS-001, P2 ledger, P3-STRAT-002 | closed by `docs/acceptance/p3-pos-trial-reduction-compatibility-production-20260822.md` |
 | P3-FUNNEL-001 | Implement opportunity funnel | P3 vertical slice | closed |
 | P3-ATTR-001 | Run bounded attribution for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002 | blocked; predecessor accepted, pending explicit resume and outcome-blind questions |
 | P3-DASH-001 | Produce monitoring report | Funnel and attribution | deferred pending recurring formal strategy |

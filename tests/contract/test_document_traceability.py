@@ -686,6 +686,28 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(source_path.is_file())
         self.assertTrue((root / "tests" / "unit" / "test_position_lifecycle.py").is_file())
 
+    def test_p3_trial_reduction_compatibility_is_versioned_and_reproduced(self) -> None:
+        root = find_project_root()
+        lld = (root / "docs" / "design" / "lld" / "05-position-execution.md").read_text(
+            encoding="utf-8"
+        )
+        evidence = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p3-pos-trial-reduction-compatibility-production-20260822.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Lifecycle `1.0.0` remains frozen", lld)
+        self.assertIn("`P3-POS-004`", lld)
+        self.assertIn(
+            "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+            evidence,
+        )
+        self.assertIn("job_75c48f2c52c04283884e7b3e3092b1fe", evidence)
+        self.assertIn("job_24b97ddc00da48fcbe0eee6df56427b6", evidence)
+        self.assertIn("all seven files were byte\nidentical", evidence)
+
     def test_p3_concentration_slice_uses_frozen_limits_without_execution(self) -> None:
         root = find_project_root()
         lld_path = root / "docs" / "design" / "lld" / "05-position-execution.md"

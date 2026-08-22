@@ -2,7 +2,7 @@
   "schema_version": "quanthus.expert-strategy-card.v1",
   "strategy_id": "candidate.p4-trend-risk",
   "strategy_version": "1.0.0",
-  "lifecycle": "draft",
+  "lifecycle": "approved",
   "owner": "P3-STRAT-002",
   "hypothesis": "For retained P4 price-volume transition opportunities, trend stability supplies directional entry value while a separate extension-and-loss risk review improves the capital-constrained risk-return path by limiting entry size and intervening on deteriorating held positions.",
   "product_candidate": {
@@ -374,9 +374,9 @@
     "A complete negative, negligible, harmful, or inconclusive attribution result is valid evidence and does not authorize in-place tuning."
   ],
   "governance": {
-    "approval_state": "pending_human_approval",
+    "approval_state": "approved",
     "approval_authority": "human",
-    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/149"
+    "decision_reference": "https://github.com/rv198-star/Quanthus/issues/149#issuecomment-5377943091"
   },
   "semantic_digest": "sha256:b0a37af05f14bf9cd23e4bf3fe22b546d88646dbad5696f4700dcfd7204a0716"
 }

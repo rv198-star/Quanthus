@@ -5,8 +5,8 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-STRAT-002` |
 | Design status | approved |
-| Delivery gate | dependencies accepted; exact strategy-card proposal awaits human approval |
-| Implementation readiness | blocked until the exact `candidate.p4-trend-risk@1.0.0` semantic digest is approved |
+| Delivery gate | open under the approved exact strategy-card digest |
+| Implementation readiness | ready for implementation and the two bounded January 2020 Sentinel Worker Jobs |
 | Historical authority | development partition only |
 
 ## 1. Outcome and boundary

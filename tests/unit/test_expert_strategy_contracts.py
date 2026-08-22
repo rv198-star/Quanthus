@@ -60,8 +60,21 @@ def test_proposal_closes_exact_two_expert_topology_without_results() -> None:
     )
 
 
-def test_pending_human_approval_blocks_implementation_and_worker_access() -> None:
+def test_approved_card_allows_implementation_and_worker_access() -> None:
     card = load_expert_strategy_card(CARD, ROOT)
+
+    card.require_implementation_authority()
+
+
+def test_pending_human_approval_blocks_implementation_and_worker_access(tmp_path: Path) -> None:
+    raw = _raw()
+    raw["lifecycle"] = "draft"
+    raw["governance"] = {
+        "approval_state": "pending_human_approval",
+        "approval_authority": "human",
+        "decision_reference": "https://github.com/rv198-star/Quanthus/issues/149",
+    }
+    card = load_expert_strategy_card(_write(tmp_path, raw), ROOT)
 
     with pytest.raises(ExpertEvaluationError) as error:
         card.require_implementation_authority()
@@ -71,16 +84,16 @@ def test_pending_human_approval_blocks_implementation_and_worker_access() -> Non
 
 def test_human_approval_metadata_can_change_without_rewriting_semantics(tmp_path: Path) -> None:
     raw = _raw()
-    raw["lifecycle"] = "approved"
+    raw["lifecycle"] = "draft"
     raw["governance"] = {
-        "approval_state": "approved",
+        "approval_state": "pending_human_approval",
         "approval_authority": "human",
-        "decision_reference": "https://github.com/rv198-star/Quanthus/issues/149#approved",
+        "decision_reference": "https://github.com/rv198-star/Quanthus/issues/149",
     }
     card = load_expert_strategy_card(_write(tmp_path, raw), ROOT)
 
-    card.require_implementation_authority()
     assert card.semantic_digest == _raw()["semantic_digest"]
+    assert card.computed_semantic_digest == _raw()["semantic_digest"]
 
 
 def test_assessment_population_must_match_the_accepted_target(tmp_path: Path) -> None:

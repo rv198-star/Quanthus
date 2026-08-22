@@ -72,8 +72,8 @@ Each phase has a GitHub milestone and an epic issue. Child issues carry stable i
 changes only through configuration, tests, and evidence in one pull request.
 
 The cross-phase Expert Strategy Layer MVP has its own GitHub milestone and `P3-EXPERT-000` epic.
-`P3-EXPERT-001`, `P3-EXPERT-002`, and `P3-EXPERT-003` are accepted. `P3-STRAT-002` now has an
-outcome-blind exact strategy proposal but still awaits human approval of its semantic digest;
+`P3-EXPERT-001`, `P3-EXPERT-002`, and `P3-EXPERT-003` are accepted. `P3-STRAT-002` now has a
+human-approved outcome-blind exact strategy proposal and is implementing its bounded Sentinel;
 later children remain blocked by explicit predecessors, and the existing
 `P3-ATTR-001` gate remains deferred until
 the formal strategy and predeclared questions exist. This product increment may use development

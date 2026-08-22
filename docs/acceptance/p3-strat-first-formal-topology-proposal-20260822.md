@@ -2,12 +2,13 @@
 
 | Field | Value |
 | --- | --- |
-| Status | outcome-blind proposal; awaiting exact human approval; not acceptance evidence |
+| Status | outcome-blind proposal approved by the project owner; implementation acceptance remains pending |
 | Work item | `P3-STRAT-002` / Issue #149 |
 | Strategy card | `candidate.p4-trend-risk@1.0.0` |
 | Proposed semantic digest | `sha256:b0a37af05f14bf9cd23e4bf3fe22b546d88646dbad5696f4700dcfd7204a0716` |
 | Result access | blocked |
 | Governing issue | `https://github.com/rv198-star/Quanthus/issues/149` |
+| Approval | `https://github.com/rv198-star/Quanthus/issues/149#issuecomment-5377943091` |
 
 This proposal was prepared without querying a new strategy Run, intervention result, observed
 portfolio metric, or sealed partition. The accepted #148 assessment result is not used to select a
@@ -122,9 +123,9 @@ version.
 | Search thresholds, weights, or combinations | It would turn the development result into an optimizer and invalidate the preregistration. |
 | Run full 2020-2021 attribution inside #149 | Full economic effects are owned by the separately gated `P3-ATTR-001`. |
 
-## Human decision gate
+## Human decision
 
-Approval must name `candidate.p4-trend-risk@1.0.0` and semantic digest
+The project owner approved `candidate.p4-trend-risk@1.0.0` and semantic digest
 `sha256:b0a37af05f14bf9cd23e4bf3fe22b546d88646dbad5696f4700dcfd7204a0716`.
-It authorizes only the implementation and bounded sentinel budget above. Any semantic change
+The approval authorizes only the implementation and bounded sentinel budget above. Any semantic change
 requires a new digest and approval before implementation, Worker submission, or result access.

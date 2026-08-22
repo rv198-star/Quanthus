@@ -213,7 +213,7 @@ predeclared questions.
 | P3-EXPERT-001 | Implement additive expert evaluation protocol v2 | P3-EXP-001, P3-AGG-001 | closed by `docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md` |
 | P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | closed by `docs/acceptance/p3-expert-evaluation-worker-20260820.md` |
 | P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-EXPERT-002, P3-FEAT-001, P3-REPLAY-001, P4-LABEL-001 | closed by `docs/acceptance/p3-expert-first-target-production-20260821.md` |
-| P3-STRAT-002 | Freeze and implement the first formal two-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | proposal: `docs/acceptance/p3-strat-first-formal-topology-proposal-20260822.md`; exact digest awaits human approval |
+| P3-STRAT-002 | Freeze and implement the first formal two-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | exact digest approved; implementation and bounded Sentinel evidence in progress |
 | P3-POS-001 | Implement unit/position state machine | P2 ledger | closed |
 | P3-POLICY-001 | Freeze trial/add/hold/cooldown parameters | P2 acceptance | closed for fixture scope |
 | P3-RISK-001 | Implement concentration caps | P3-POS-001 | closed |

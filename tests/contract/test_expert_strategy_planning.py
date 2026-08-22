@@ -39,7 +39,7 @@ def test_expert_strategy_mvp_is_one_epic_with_seven_dependency_gated_children() 
     assert items["P3-EXPERT-002"].status == "closed"
     assert items["P3-EXPERT-003"].status == "closed"
     assert items["P3-EXPERT-000"].status == "ready"
-    assert items["P3-STRAT-002"].status == "ready"
+    assert items["P3-STRAT-002"].status == "closed"
     assert all(
         items[item_id].status == "blocked"
         for item_id in {"P3-ATTR-001", "P3-EXPERT-004", "P3-EXPERT-005"}

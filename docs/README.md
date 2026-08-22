@@ -70,10 +70,13 @@ nodes.
   `P3-EXPERT-002`. The additive v2 protocol and deterministic PostgreSQL Worker pipeline are
   accepted under `P3-EXPERT-001` and `P3-EXPERT-002`. `P4-LABEL-001` is now accepted and
   `P3-EXPERT-003` is accepted on a production 2020-2021 Worker Run and byte-identical independent
-  reproduction. `P3-STRAT-002` now has a human-approved outcome-blind exact strategy proposal under
-  `acceptance/p3-strat-first-formal-topology-proposal-20260822.md`; implementation and bounded
-  Sentinel evidence are in progress, while later attribution, workbench, and forward-Shadow work remains
-  dependency-gated, development-only, and unable to open P5/P6 or sealed data.
+  reproduction. `P3-STRAT-002` is accepted under
+  `acceptance/p3-strat-first-formal-topology-production-20260822.md`: its exact approved two-expert
+  topology completed a production January 2020 Worker Run and an isolated PostgreSQL/Run-root
+  reproduction with all seven artifacts byte-identical. `P3-ATTR-001` has its predecessor but
+  remains blocked pending an explicit resume and persisted outcome-blind questions; later
+  workbench and forward-Shadow work remains dependency-gated, development-only, and unable to open
+  P5/P6 or sealed data.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

@@ -21,6 +21,8 @@ VERIFIER_ID = "quanthus.strategy-attribution-evidence-verifier"
 VERIFIER_VERSION = "1.0.0"
 SYNTHETIC_ARTIFACT_PRODUCER_ID = "quanthus.synthetic-attribution-executor"
 SYNTHETIC_ARTIFACT_PRODUCER_VERSION = "1.0.0"
+FORMAL_ARTIFACT_PRODUCER_ID = "quanthus.formal-strategy-attribution-executor"
+FORMAL_ARTIFACT_PRODUCER_VERSION = "1.0.0"
 MAX_DECIMAL_EXPONENT = 10_000
 
 
@@ -179,6 +181,8 @@ INTERACTION_EFFECT_METHOD = "pairwise_interaction_contrast_v1"
 PRIMARY_CLASSIFICATION_METHOD = "primary_metric_dominance_with_materiality_v1"
 NO_CROSS_MODULE_RANKING_METHOD = "no_cross_module_ranking:synthetic_fixture_v1"
 NOT_REQUIRED_CHECK_METHOD = "not_required:synthetic_contract_fixture_v1"
+FORMAL_NO_RANKING_METHOD = "no_cross_expert_ranking:formal_strategy_v1"
+PAIRED_BLOCK_BOOTSTRAP_METHOD = "uncertainty.paired-nonoverlap-22-session-block-bootstrap"
 
 
 def _require_text(value: object, field_name: str) -> str:
@@ -337,10 +341,25 @@ _METHOD_REGISTRATIONS = (
         kinds=(AttributionMethodKind.UNCERTAINTY, AttributionMethodKind.STABILITY),
         implementation_id="quanthus.strategy_attribution.not_required_check",
     ),
+    AttributionMethodRegistration(
+        method_id=FORMAL_NO_RANKING_METHOD,
+        method_version="1.0.0",
+        kinds=(AttributionMethodKind.MULTIPLE_COMPARISON,),
+        implementation_id="quanthus.formal_attribution.no_cross_expert_ranking",
+    ),
+    AttributionMethodRegistration(
+        method_id=PAIRED_BLOCK_BOOTSTRAP_METHOD,
+        method_version="1.0.0",
+        kinds=(AttributionMethodKind.UNCERTAINTY,),
+        implementation_id="quanthus.formal_attribution.paired_block_bootstrap",
+    ),
 )
 _METHOD_REGISTRY = MappingProxyType({item.method_id: item for item in _METHOD_REGISTRATIONS})
 _REGISTERED_ARTIFACT_PRODUCERS = frozenset(
-    {(SYNTHETIC_ARTIFACT_PRODUCER_ID, SYNTHETIC_ARTIFACT_PRODUCER_VERSION)}
+    {
+        (SYNTHETIC_ARTIFACT_PRODUCER_ID, SYNTHETIC_ARTIFACT_PRODUCER_VERSION),
+        (FORMAL_ARTIFACT_PRODUCER_ID, FORMAL_ARTIFACT_PRODUCER_VERSION),
+    }
 )
 
 

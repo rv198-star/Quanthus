@@ -16,6 +16,10 @@ from quanthus.expert_evaluation.runner import (
     run_evaluation,
 )
 from quanthus.expert_evaluation.serialization import ExpertEvaluationError, parse_canonical_object
+from quanthus.expert_strategy.formal_attribution_production import (
+    FORMAL_ATTRIBUTION_PRODUCER_ID,
+    formal_attribution_producer_for,
+)
 from quanthus.expert_strategy.production import FORMAL_PRODUCER_ID, formal_producer_for
 
 
@@ -52,6 +56,10 @@ def main(argv: list[str] | None = None) -> int:
             producer = production_producer_for(job_input, args.registry_root)
         elif job_input.producer.producer_id == FORMAL_PRODUCER_ID:
             producer, formal_strategy_resolver = formal_producer_for(
+                job_input, args.registry_root
+            )
+        elif job_input.producer.producer_id == FORMAL_ATTRIBUTION_PRODUCER_ID:
+            producer, formal_strategy_resolver = formal_attribution_producer_for(
                 job_input, args.registry_root
             )
         else:

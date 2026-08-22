@@ -558,7 +558,7 @@ class BacktestEngine:
         opening_state: UnitState,
         corporate_actions: Sequence[CorporateActionStep] = (),
     ) -> BacktestResult:
-        """Carry one full-position sell order until the first executable open."""
+        """Carry one bounded sell order until the first executable open."""
 
         if signal.side is not OrderSide.SELL:
             raise BacktestInputError("run_sell_sequence requires a sell signal")
@@ -573,8 +573,8 @@ class BacktestEngine:
             raise BacktestInputError("opening unit does not match signal unit")
         if opening_state.security_code != signal.security_code:
             raise BacktestInputError("opening position security does not match signal security")
-        if opening_state.settled_quantity != signal.quantity:
-            raise UnsupportedModeError("the first sell slice requires a full-position quantity")
+        if signal.quantity > opening_state.settled_quantity:
+            raise BacktestInputError("sell quantity exceeds the settled position")
         self._validate_unit_state(opening_state)
         for session in sessions:
             profile = self._validate_inputs(run, signal, session, opening_state.cash)
@@ -702,6 +702,7 @@ class BacktestEngine:
 
         carried_sessions = 0
         current_state = opening_state
+        pending_quantity = signal.quantity
         current_mark_price = opening_state.last_mark_price
         current_mark_snapshot_id = opening_state.last_mark_snapshot_id
         sell_carry_reasons = {
@@ -717,7 +718,8 @@ class BacktestEngine:
                     raise BacktestInputError(
                         "sell sequence corporate action must apply no later than session open"
                     )
-                quantity_before = current_state.settled_quantity
+                position_quantity_before = current_state.settled_quantity
+                pending_quantity_before = pending_quantity
                 application = self.apply_corporate_action(
                     run=run,
                     opening_state=current_state,
@@ -736,7 +738,13 @@ class BacktestEngine:
                         action_event.reason_code,
                         dict(action_event.payload),
                     )
-                if current_state.settled_quantity != quantity_before:
+                if current_state.settled_quantity != position_quantity_before:
+                    adjusted = pending_quantity * current_state.settled_quantity
+                    if adjusted % position_quantity_before:
+                        raise UnsupportedModeError(
+                            "corporate action cannot preserve the pending sell proportion"
+                        )
+                    pending_quantity = adjusted // position_quantity_before
                     transition = (
                         "created_to_created_adjusted"
                         if carried_sessions == 0
@@ -750,8 +758,8 @@ class BacktestEngine:
                             "order_id": order.order_id,
                             "transition": transition,
                             "action_id": step.action.action_id,
-                            "quantity_before": quantity_before,
-                            "quantity_after": current_state.settled_quantity,
+                            "quantity_before": pending_quantity_before,
+                            "quantity_after": pending_quantity,
                             "source_snapshot_id": step.action.snapshot_id,
                         },
                     )
@@ -818,7 +826,7 @@ class BacktestEngine:
                 signal=signal,
                 session=session,
                 fill_state=current_state,
-                fill_quantity=current_state.settled_quantity,
+                fill_quantity=pending_quantity,
                 order=order,
                 events=events,
                 carried_sessions=carried_sessions,
@@ -878,7 +886,17 @@ class BacktestEngine:
         transfer_fee = self._quantize_cash(gross_amount * self.policy.sell_cost.transfer_fee_rate)
         total_fees = commission + stamp_duty + transfer_fee
         net_proceeds = gross_amount - total_fees
-        gross_gain = self._quantize_cash(gross_amount - fill_state.position_cost)
+        full_exit = fill_quantity == fill_state.settled_quantity
+        sold_position_cost = (
+            fill_state.position_cost
+            if full_exit
+            else self._quantize_cash(
+                fill_state.position_cost
+                * Decimal(fill_quantity)
+                / Decimal(fill_state.settled_quantity)
+            )
+        )
+        gross_gain = self._quantize_cash(gross_amount - sold_position_cost)
         realized_pnl = self._quantize_cash(gross_gain - total_fees)
 
         fill = FillRecord(
@@ -899,7 +917,12 @@ class BacktestEngine:
             source_revision=session.source_revision,
             snapshot_id=session.snapshot_id,
         )
-        append_event(EventType.FILL, session.open_at, "full_position_sell_fill", fill.to_dict())
+        append_event(
+            EventType.FILL,
+            session.open_at,
+            "full_position_sell_fill" if full_exit else "partial_position_sell_fill",
+            fill.to_dict(),
+        )
 
         trade_ledger = LedgerEntry(
             entry_id=_stable_id("led", run.run_id, fill.fill_id, "trade"),
@@ -912,7 +935,7 @@ class BacktestEngine:
                 LedgerPosting(f"unit/{signal.unit_id}/cash", net_proceeds),
                 LedgerPosting(
                     f"unit/{signal.unit_id}/position_cost/{signal.security_code}",
-                    -fill_state.position_cost,
+                    -sold_position_cost,
                 ),
                 LedgerPosting(f"unit/{signal.unit_id}/commission_expense", commission),
                 LedgerPosting(f"unit/{signal.unit_id}/stamp_duty_expense", stamp_duty),
@@ -923,11 +946,67 @@ class BacktestEngine:
         append_event(
             EventType.LEDGER_ENTRY,
             session.open_at,
-            "balanced_full_sell_entry",
+            "balanced_full_sell_entry" if full_exit else "balanced_partial_sell_entry",
             trade_ledger.to_dict(),
         )
 
         cash_before_settlement = self._quantize_cash(fill_state.cash + net_proceeds)
+        total_realized_pnl = self._quantize_cash(fill_state.realized_pnl + realized_pnl)
+        if not full_exit:
+            remaining_quantity = fill_state.settled_quantity - fill_quantity
+            remaining_position_cost = self._quantize_cash(
+                fill_state.position_cost - sold_position_cost
+            )
+            if session.close_price is None:
+                raise BacktestInputError("partial sell requires an observable close mark")
+            market_value = self._quantize_cash(session.close_price * remaining_quantity)
+            snapshot = LedgerSnapshot(
+                snapshot_id=_stable_id("lsnap", run.run_id, session.session_date, signal.unit_id),
+                session_date=session.session_date,
+                as_of=session.close_at,
+                unit_id=signal.unit_id,
+                cash=cash_before_settlement,
+                security_code=signal.security_code,
+                position_quantity=remaining_quantity,
+                position_cost=remaining_position_cost,
+                market_value=market_value,
+                commission_expense=fill_state.commission_expense + commission,
+                stamp_duty_expense=fill_state.stamp_duty_expense + stamp_duty,
+                transfer_fee_expense=fill_state.transfer_fee_expense + transfer_fee,
+                realized_pnl=total_realized_pnl,
+                dividend_income=fill_state.dividend_income,
+                external_pool=fill_state.external_pool,
+                total_equity=self._quantize_cash(cash_before_settlement + market_value),
+                mark_status=MarkStatus.OBSERVED_CLOSE,
+                mark_price=session.close_price,
+                mark_snapshot_id=session.snapshot_id,
+            )
+            append_event(
+                EventType.DAILY_SNAPSHOT,
+                session.close_at,
+                "partial_sell_session_mark_complete",
+                snapshot.to_dict(),
+            )
+            return BacktestResult(
+                run=run,
+                events=tuple(events),
+                result_summary={
+                    "status": "completed_partial_sell",
+                    "signals": 1,
+                    "orders": 1,
+                    "fills": 1,
+                    "rejections": 0,
+                    "cancellations": 0,
+                    "carries": carried_sessions,
+                    "ending_cash": decimal_text(cash_before_settlement),
+                    "position_quantity": remaining_quantity,
+                    "market_value": decimal_text(market_value),
+                    "realized_pnl": decimal_text(total_realized_pnl),
+                    "external_pool": decimal_text(fill_state.external_pool),
+                    "underfunded_amount": "0.00",
+                },
+            )
+
         pool_before = fill_state.external_pool
         gap = self._quantize_cash(cash_before_settlement - fill_state.target_notional)
         profit_transfer = max(gap, Decimal("0.00"))
@@ -996,7 +1075,6 @@ class BacktestEngine:
                 settlement_ledger.to_dict(),
             )
 
-        total_realized_pnl = self._quantize_cash(fill_state.realized_pnl + realized_pnl)
         snapshot = LedgerSnapshot(
             snapshot_id=_stable_id("lsnap", run.run_id, session.session_date, signal.unit_id),
             session_date=session.session_date,

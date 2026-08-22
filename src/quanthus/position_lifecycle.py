@@ -13,6 +13,7 @@ from typing import Any
 from quanthus.backtest.contracts import UnitState
 
 POSITION_STATE_MACHINE_VERSION = "1.0.0"
+POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION = "1.1.0"
 
 _SEMANTIC_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _REASON_CODE = re.compile(r"^[a-z][a-z0-9_.-]{1,127}$")
@@ -52,7 +53,7 @@ class PositionEvidenceKind(str, Enum):
     CALENDAR = "calendar"
 
 
-_TRANSITIONS = {
+_TRANSITIONS_V1 = {
     (PositionStage.EMPTY, PositionTransitionKind.ENTRY_FILLED): PositionStage.TRIAL,
     (PositionStage.TRIAL, PositionTransitionKind.ADD_FILLED): PositionStage.DYNAMIC,
     (PositionStage.TRIAL, PositionTransitionKind.EXIT_REQUESTED): PositionStage.EXITING,
@@ -62,6 +63,14 @@ _TRANSITIONS = {
     (PositionStage.EXITING, PositionTransitionKind.EXIT_CARRIED): PositionStage.EXITING,
     (PositionStage.EXITING, PositionTransitionKind.EXIT_FILLED): PositionStage.CLOSED,
     (PositionStage.CLOSED, PositionTransitionKind.COOLDOWN_COMPLETED): PositionStage.EMPTY,
+}
+
+_TRANSITIONS_BY_VERSION = {
+    POSITION_STATE_MACHINE_VERSION: _TRANSITIONS_V1,
+    POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION: {
+        **_TRANSITIONS_V1,
+        (PositionStage.TRIAL, PositionTransitionKind.REDUCE_FILLED): PositionStage.TRIAL,
+    },
 }
 
 _REQUIRED_EVIDENCE = {
@@ -203,6 +212,10 @@ class PositionLifecycleState:
         if not _SEMANTIC_VERSION.fullmatch(self.state_machine_version):
             raise PositionLifecycleError(
                 "invalid_lifecycle_state", "state_machine_version must use MAJOR.MINOR.PATCH"
+            )
+        if self.state_machine_version not in _TRANSITIONS_BY_VERSION:
+            raise PositionLifecycleError(
+                "invalid_lifecycle_state", "state_machine_version is not admitted"
             )
         _require_aware(self.as_of, "as_of")
         if self.stage is PositionStage.EMPTY:
@@ -370,7 +383,8 @@ def apply_position_transition(
             "duplicate_evidence", "transition evidence has already been consumed"
         )
 
-    next_stage = _TRANSITIONS.get((current.stage, transition.kind))
+    transitions = _TRANSITIONS_BY_VERSION[current.state_machine_version]
+    next_stage = transitions.get((current.stage, transition.kind))
     if next_stage is None:
         raise PositionLifecycleError(
             "illegal_transition",

@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from quanthus.backtest.contracts import UnitState
 from quanthus.position_lifecycle import (
+    POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION,
     PositionEvidenceKind,
     PositionEvidenceRef,
     PositionLifecycleError,
@@ -180,6 +181,32 @@ class PositionLifecycleTests(unittest.TestCase):
             )
 
         self.assertEqual(raised.exception.reason_code, "illegal_transition")
+
+    def test_v11_trial_can_reduce_and_remains_trial(self) -> None:
+        empty = ledger(0)
+        trial_ledger = ledger(100)
+        reduced_ledger = ledger(50)
+        state = apply_position_transition(
+            initialize_position_lifecycle(
+                ledger_state=empty,
+                as_of=BASE_TIME,
+                state_machine_version=POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION,
+            ),
+            transition(PositionTransitionKind.ENTRY_FILLED, 1),
+            ledger_before=empty,
+            ledger_after=trial_ledger,
+        )
+
+        state = apply_position_transition(
+            state,
+            transition(PositionTransitionKind.REDUCE_FILLED, 2),
+            ledger_before=trial_ledger,
+            ledger_after=reduced_ledger,
+        )
+
+        self.assertEqual(state.stage, PositionStage.TRIAL)
+        self.assertEqual(state.state_machine_version, "1.1.0")
+        self.assertEqual(state.security_code, "600000")
 
     def test_add_and_reduce_require_proven_quantity_direction(self) -> None:
         empty = ledger(0)

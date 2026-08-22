@@ -22,6 +22,16 @@ from quanthus.backtest import (
 )
 from quanthus.contracts import SnapshotRef
 from quanthus.policy import find_project_root
+from quanthus.position_lifecycle import (
+    POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION,
+    PositionEvidenceKind,
+    PositionEvidenceRef,
+    PositionStage,
+    PositionTransition,
+    PositionTransitionKind,
+    apply_position_transition,
+    initialize_position_lifecycle,
+)
 
 ROOT = find_project_root()
 POLICY_PATH = ROOT / "tests" / "fixtures" / "p2" / "execution-policy.synthetic.v1.json"
@@ -485,6 +495,100 @@ class BacktestEngineTests(unittest.TestCase):
         self.assertEqual(final_snapshot["external_pool"], expected["ending_external_pool"])
         self.assertEqual(final_snapshot["realized_pnl"], expected["realized_pnl"])
         self.assertEqual(result.result_summary["underfunded_amount"], "0.00")
+
+    def test_partial_sell_preserves_position_and_proves_v11_trial_reduction(self) -> None:
+        opening = self.sell_opening_state()
+        signal = replace(
+            self.sell_signal(),
+            signal_id="signal-formal-risk-reduce-001",
+            quantity=50,
+            reason_code="formal_position_risk_reduce",
+        )
+        result = self.engine.run_sell_sequence(
+            run=replace(self.sell_run_spec(), run_id="p2-formal-risk-reduce-001"),
+            signal=signal,
+            sessions=(self.sell_sessions()[-1],),
+            opening_state=opening,
+        )
+
+        self.assertEqual(result.result_summary["status"], "completed_partial_sell")
+        self.assertFalse(
+            any(item.event_type is EventType.UNIT_SETTLEMENT for item in result.events)
+        )
+        fill = next(item for item in result.events if item.event_type is EventType.FILL)
+        snapshot = next(
+            item for item in reversed(result.events) if item.event_type is EventType.DAILY_SNAPSHOT
+        )
+        self.assertEqual(fill.payload["quantity"], 50)
+        self.assertEqual(snapshot.payload["position_quantity"], 50)
+        self.assertEqual(snapshot.payload["position_cost"], "500.50")
+        self.assertEqual(snapshot.payload["mark_price"], "10.10")
+
+        empty = UnitState.empty(unit_id=opening.unit_id, cash=opening.target_notional)
+        lifecycle = initialize_position_lifecycle(
+            ledger_state=empty,
+            as_of=signal.decision_at.replace(day=signal.decision_at.day - 2),
+            state_machine_version=POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION,
+        )
+        lifecycle = apply_position_transition(
+            lifecycle,
+            PositionTransition(
+                transition_id="transition-entry-001",
+                kind=PositionTransitionKind.ENTRY_FILLED,
+                unit_id=opening.unit_id,
+                opportunity_id="opportunity-formal-001",
+                security_code=str(opening.security_code),
+                occurred_at=signal.decision_at.replace(day=signal.decision_at.day - 1),
+                reason_codes=("trial_entry_filled",),
+                evidence=(
+                    PositionEvidenceRef(
+                        PositionEvidenceKind.FILL,
+                        "fill-entry-001",
+                        self.policy.policy_version,
+                    ),
+                ),
+            ),
+            ledger_before=empty,
+            ledger_after=opening,
+        )
+        after = UnitState(
+            unit_id=opening.unit_id,
+            target_notional=opening.target_notional,
+            cash=Decimal(str(snapshot.payload["cash"])),
+            security_code=str(snapshot.payload["security_code"]),
+            settled_quantity=int(snapshot.payload["position_quantity"]),
+            position_cost=Decimal(str(snapshot.payload["position_cost"])),
+            commission_expense=Decimal(str(snapshot.payload["commission_expense"])),
+            stamp_duty_expense=Decimal(str(snapshot.payload["stamp_duty_expense"])),
+            transfer_fee_expense=Decimal(str(snapshot.payload["transfer_fee_expense"])),
+            realized_pnl=Decimal(str(snapshot.payload["realized_pnl"])),
+            dividend_income=Decimal(str(snapshot.payload["dividend_income"])),
+            external_pool=Decimal(str(snapshot.payload["external_pool"])),
+            last_mark_price=Decimal(str(snapshot.payload["mark_price"])),
+            last_mark_snapshot_id=str(snapshot.payload["mark_snapshot_id"]),
+        )
+        lifecycle = apply_position_transition(
+            lifecycle,
+            PositionTransition(
+                transition_id="transition-reduce-001",
+                kind=PositionTransitionKind.REDUCE_FILLED,
+                unit_id=opening.unit_id,
+                opportunity_id="opportunity-formal-001",
+                security_code=str(opening.security_code),
+                occurred_at=fill.event_time,
+                reason_codes=("formal_position_risk_reduce",),
+                evidence=(
+                    PositionEvidenceRef(
+                        PositionEvidenceKind.FILL,
+                        str(fill.payload["fill_id"]),
+                        self.policy.policy_version,
+                    ),
+                ),
+            ),
+            ledger_before=opening,
+            ledger_after=after,
+        )
+        self.assertEqual(lifecycle.stage, PositionStage.TRIAL)
 
     def test_carried_sell_remains_pending_without_duplicate_order(self) -> None:
         result = self.engine.run_sell_sequence(

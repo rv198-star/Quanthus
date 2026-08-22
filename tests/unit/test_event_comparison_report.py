@@ -13,6 +13,7 @@ from quanthus.event_library.comparison_report import (
     _aggregate_feature_rows,
     _benjamini_hochberg,
     _effect,
+    _event_label_inputs,
     _feature_ranking,
     _Stats,
     calculate_comparison_report_policy_digest,
@@ -140,6 +141,48 @@ def test_feature_ranking_requires_predeclared_full_and_perturbation_checks() -> 
         "price.rsi14",
     ]
     assert all(row["first_reliable_lag"] == 20 for row in ranking)
+
+
+def test_event_label_inputs_bind_feature_panel_to_listing_code_not_dwd_identity(
+    tmp_path: Path,
+) -> None:
+    event_root = tmp_path / "event"
+    label_root = tmp_path / "label"
+    event_root.mkdir()
+    label_root.mkdir()
+    event_id = "event:test:identity-namespace"
+    (event_root / "events.jsonl").write_text(
+        json.dumps(
+            {
+                "event": {
+                    "event_id": event_id,
+                    "security_id": "security_dwd_opaque_identity",
+                    "signal_date": "2020-01-31",
+                },
+                "listing_code": "600000",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (label_root / "labels.jsonl").write_text(
+        json.dumps(
+            {
+                "event_id": event_id,
+                "settlement_status": "settled",
+                "outcome": "positive",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    inputs = _event_label_inputs(event_root, label_root)
+
+    assert len(inputs) == 1
+    assert inputs[0][0] == event_id
+    assert inputs[0][1] == "600000"
+    assert inputs[0][2] == "2020-01-31"
 
 
 def test_feature_panel_alignment_expands_complete_three_group_matrix(tmp_path: Path) -> None:

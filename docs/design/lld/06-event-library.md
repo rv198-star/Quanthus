@@ -267,7 +267,10 @@ rather than the primary ranking target. `not_executable`, `unavailable`, and `ce
 candidate-to-report attrition and cannot be silently coerced into the three-class comparison.
 
 The report examines T through T-20 and reuses the accepted P3 feature panel rather than inventing
-new price semantics. Seven dimensionless comparison features are frozen: price/SMA20 minus one,
+new price semantics. Event identity remains the DWD `security_id`; feature-panel alignment uses the
+Event Library's explicit `listing_code`, because the accepted P3 panel's compatibility key
+`security_id` is the listing code rather than the DWD security identity. These namespaces must not
+be joined directly. Seven dimensionless comparison features are frozen: price/SMA20 minus one,
 SMA20/SMA60 minus one, momentum20, total-return price/prior-high20 minus one, RSI14, volume ratio20,
 and realized volatility20. For each feature, lag, and outcome it emits sample count, mean, standard
 deviation, quartiles, and median. Pairwise comparisons emit Hedges g, mean difference, a normal

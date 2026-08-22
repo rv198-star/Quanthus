@@ -12,6 +12,7 @@ from quanthus.event_library.comparison_report import (
     ComparisonReportError,
     _aggregate_feature_rows,
     _benjamini_hochberg,
+    _configure_deterministic_report_connection,
     _effect,
     _event_label_inputs,
     _feature_ranking,
@@ -97,6 +98,21 @@ def test_report_inputs_bind_replay_panel_identity_from_listing_code(tmp_path: Pa
     assert inputs[0].panel_security_id != event_row["event"]["security_id"]
     assert inputs[0].signal_date == "2020-01-31"
     assert inputs[0].outcome == "positive"
+
+
+def test_report_duckdb_connection_freezes_reduction_order() -> None:
+    import duckdb
+
+    connection = duckdb.connect(":memory:")
+    try:
+        _configure_deterministic_report_connection(connection)
+        settings = connection.execute(
+            "SELECT current_setting('threads'), current_setting('preserve_insertion_order')"
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert settings == (1, True)
 
 
 def test_hedges_g_and_mean_difference_have_expected_direction() -> None:

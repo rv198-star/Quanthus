@@ -273,6 +273,9 @@ and realized volatility20. For each feature, lag, and outcome it emits sample co
 deviation, quartiles, and median. Pairwise comparisons emit Hedges g, mean difference, a normal
 95-percent confidence interval for that difference, and two-sided normal-approximation p-values.
 Benjamini-Hochberg FDR is applied independently to the complete 147-test matrix for each contrast.
+Publication aggregation fixes DuckDB to one execution thread and preserved insertion order so
+floating-point reductions have one reproducible evaluation order; this changes no statistical
+threshold or feature semantics.
 
 Leading-feature selection is predeclared rather than chosen after inspection. A primary
 `positive_vs_neutral` feature must have an FDR-significant peak with at least 500 observations per

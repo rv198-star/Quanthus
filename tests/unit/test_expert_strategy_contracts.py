@@ -209,6 +209,26 @@ def test_card_contains_no_observed_strategy_result_fields() -> None:
         assert forbidden not in serialized
 
 
+def test_trial_reduction_compatibility_patch_has_exact_outcome_blind_digest() -> None:
+    active = _raw()
+    proposed = copy.deepcopy(active)
+    proposed["strategy_version"] = "1.0.1"
+    proposed["product_candidate"]["strategy_version"] = "1.0.1"
+    proposed["position_and_execution"]["position_state_machine_version"] = "1.1.0"
+
+    assert _semantic_digest(proposed) == (
+        "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c"
+    )
+    proposed["strategy_version"] = active["strategy_version"]
+    proposed["product_candidate"]["strategy_version"] = active["product_candidate"][
+        "strategy_version"
+    ]
+    proposed["position_and_execution"]["position_state_machine_version"] = active[
+        "position_and_execution"
+    ]["position_state_machine_version"]
+    assert proposed == active
+
+
 def test_unknown_nested_strategy_parameter_is_rejected(tmp_path: Path) -> None:
     raw = _raw()
     raw["aggregation"]["runtime_weight_search"] = True

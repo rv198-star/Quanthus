@@ -854,6 +854,13 @@ def _event_label_inputs(event_root: Path, label_root: Path) -> tuple[_ReportEven
     return tuple(inputs)
 
 
+def _configure_deterministic_report_connection(connection: Any) -> None:
+    """Freeze DuckDB reduction order for byte-identical report publication."""
+
+    connection.execute("SET threads = 1")
+    connection.execute("SET preserve_insertion_order = true")
+
+
 def _aggregate_feature_rows(
     feature_panel_path: Path,
     event_inputs: Sequence[_ReportEventInput],
@@ -864,6 +871,7 @@ def _aggregate_feature_rows(
         raise ComparisonReportError("P1 dependencies are required for P4 reporting") from exc
     connection = duckdb.connect(":memory:")
     try:
+        _configure_deterministic_report_connection(connection)
         connection.execute(
             "CREATE TABLE event_labels (event_id VARCHAR, panel_security_id VARCHAR, "
             "signal_date DATE, outcome VARCHAR, hash_half INTEGER)"

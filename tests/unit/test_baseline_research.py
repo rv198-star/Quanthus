@@ -322,7 +322,17 @@ class BaselineResearchTests(unittest.TestCase):
         duplicate_unselected = next(
             row for row in bars if row["security_id"] == "SSE-600001"
         )
-        pq.write_table(pa.Table.from_pylist([*bars, duplicate_unselected]), bars_path)
+        duplicate_selected_after_scope = next(
+            row
+            for row in bars
+            if row["security_id"] == "SZSE-000002" and row["date"] == self.dates[-1]
+        )
+        pq.write_table(
+            pa.Table.from_pylist(
+                [*bars, duplicate_unselected, duplicate_selected_after_scope]
+            ),
+            bars_path,
+        )
         with BaselineFeaturePanel.build(
             self.bundle,
             self.registry,
@@ -332,6 +342,7 @@ class BaselineResearchTests(unittest.TestCase):
             allowed_security_ids=("SZSE-000002",),
         ) as panel:
             self.assertEqual(panel.report.selected_security_count, 1)
+            self.assertEqual(panel.report.scope_end, self.dates[-2])
         with self.assertRaisesRegex(BaselineResearchError, "duplicate bar row"):
             BaselineFeaturePanel.build(
                 self.bundle,

@@ -45,8 +45,8 @@ from quanthus.expert_strategy.runner import FormalStrategyRunner, build_formal_e
 from quanthus.feature_registry import load_feature_registry
 
 FORMAL_PRODUCER_ID = "producer.formal-p4-trend-risk-development"
-FORMAL_PRODUCER_VERSION = "1.0.3"
-FORMAL_PROJECTION_POLICY = "event-security-materialized-source-projection-v3"
+FORMAL_PRODUCER_VERSION = "1.0.4"
+FORMAL_PROJECTION_POLICY = "literal-pushdown-materialized-source-projection-v4"
 SENTINEL_START = date(2020, 1, 1)
 SENTINEL_END = date(2020, 1, 31)
 

@@ -1211,7 +1211,12 @@ class BaselineFeaturePanel:
                 connection.execute(
                     f"SET temp_directory={_sql_string(str(spill))}"
                 )
-            _create_feature_source_views(connection, paths, selected_security_ids)
+            _create_feature_source_views(
+                connection,
+                paths,
+                selected_security_ids,
+                scope_end=scope_end,
+            )
             connection.execute(
                 """
                 CREATE VIEW feature_identity_map AS
@@ -1321,65 +1326,74 @@ def _create_feature_source_views(
     connection: Any,
     paths: Mapping[str, Sequence[Path]],
     selected_security_ids: tuple[str, ...] | None,
+    *,
+    scope_end: date,
 ) -> None:
-    for name, dataset_paths in paths.items():
-        connection.execute(
-            f"CREATE VIEW raw_source_{name} AS "
-            f"SELECT * FROM {_read_parquet_expression(dataset_paths)}"
-        )
     if selected_security_ids is None:
-        for name in paths:
+        for name, dataset_paths in paths.items():
+            connection.execute(
+                f"CREATE VIEW raw_source_{name} AS "
+                f"SELECT * FROM {_read_parquet_expression(dataset_paths)}"
+            )
             connection.execute(
                 f"CREATE VIEW source_{name} AS SELECT * FROM raw_source_{name}"
             )
         return
 
+    security_literals = ", ".join(_sql_string(item) for item in selected_security_ids)
+    validity_expression = _read_parquet_expression(paths["security_code_validity"])
     connection.execute(
-        "CREATE TEMP TABLE selected_feature_security_ids "
-        "(security_id VARCHAR PRIMARY KEY)"
-    )
-    connection.executemany(
-        "INSERT INTO selected_feature_security_ids VALUES (?)",
-        [(item,) for item in selected_security_ids],
+        "CREATE VIEW raw_source_security_code_validity AS "
+        f"SELECT * FROM {validity_expression} "
+        f"WHERE security_id IN ({security_literals})"
     )
     connection.execute(
-        """
-        CREATE TEMP TABLE selected_feature_stock_codes AS
-        SELECT DISTINCT validity.stock_code
-        FROM raw_source_security_code_validity validity
-        JOIN selected_feature_security_ids selected
-          ON selected.security_id = validity.security_id
-        """
+        "CREATE TEMP TABLE source_security_code_validity AS "
+        "SELECT * FROM raw_source_security_code_validity"
     )
-    for name in paths:
-        raw = f"raw_source_{name}"
+    selected_stock_codes = tuple(
+        str(row[0])
+        for row in connection.execute(
+            "SELECT DISTINCT stock_code "
+            "FROM source_security_code_validity ORDER BY stock_code"
+        ).fetchall()
+    )
+    if not selected_stock_codes:
+        raise BaselineResearchError("selected feature securities have no code validity")
+    stock_code_literals = ", ".join(_sql_string(item) for item in selected_stock_codes)
+    daily_date_columns = {
+        "daily_ohlcv_none": "date",
+        "daily_universe": "market_date",
+        "price_limit_execution_daily": "execution_date",
+    }
+    cutoff = _sql_string(scope_end.isoformat())
+    for name, dataset_paths in paths.items():
+        if name == "security_code_validity":
+            continue
+        expression = _read_parquet_expression(dataset_paths)
         columns = {
-            str(row[0]) for row in connection.execute(f"DESCRIBE {raw}").fetchall()
+            str(row[0])
+            for row in connection.execute(f"DESCRIBE SELECT * FROM {expression}").fetchall()
         }
         if "security_id" in columns:
-            connection.execute(
-                f"""
-                CREATE TEMP TABLE source_{name} AS
-                SELECT source.*
-                FROM {raw} source
-                JOIN selected_feature_security_ids selected
-                  ON selected.security_id = source.security_id
-                """
-            )
+            predicates = [f"security_id IN ({security_literals})"]
         elif "security_code" in columns:
-            connection.execute(
-                f"""
-                CREATE TEMP TABLE source_{name} AS
-                SELECT source.*
-                FROM {raw} source
-                JOIN selected_feature_stock_codes selected
-                  ON selected.stock_code = source.security_code
-                """
-            )
+            predicates = [f"security_code IN ({stock_code_literals})"]
         else:
             raise BaselineResearchError(
                 f"feature source {name} cannot apply security selection"
             )
+        date_column = daily_date_columns.get(name)
+        if date_column is not None:
+            predicates.append(f"CAST({date_column} AS DATE) <= CAST({cutoff} AS DATE)")
+        where = " AND ".join(predicates)
+        connection.execute(
+            f"CREATE VIEW raw_source_{name} AS "
+            f"SELECT * FROM {expression} WHERE {where}"
+        )
+        connection.execute(
+            f"CREATE TEMP TABLE source_{name} AS SELECT * FROM raw_source_{name}"
+        )
 
 
 def _validate_feature_sources(connection: Any) -> None:

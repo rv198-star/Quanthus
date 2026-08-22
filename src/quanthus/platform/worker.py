@@ -47,6 +47,7 @@ STAGE_PROGRESS = {
     "batch-complete": 99,
 }
 DEFAULT_MEMORY_CURRENT_PATH = Path("/sys/fs/cgroup/memory.current")
+DEFAULT_MEMORY_STAT_PATH = Path("/sys/fs/cgroup/memory.stat")
 DEFAULT_MEMORY_STOP_BYTES = 14 * 1024**3
 
 
@@ -73,6 +74,13 @@ def _parser() -> argparse.ArgumentParser:
             os.environ.get(
                 "QUANTHUS_REPLAY_MEMORY_STOP_BYTES", str(DEFAULT_MEMORY_STOP_BYTES)
             )
+        ),
+    )
+    parser.add_argument(
+        "--memory-stat-path",
+        type=Path,
+        default=Path(
+            os.environ.get("QUANTHUS_REPLAY_MEMORY_STAT_PATH", str(DEFAULT_MEMORY_STAT_PATH))
         ),
     )
     return parser
@@ -176,6 +184,7 @@ class ReplayWorker:
         expert_run_root: Path | None = None,
         expert_registry_root: Path | None = None,
         memory_current_path: Path | None = None,
+        memory_stat_path: Path | None = None,
         memory_stop_bytes: int = DEFAULT_MEMORY_STOP_BYTES,
     ) -> None:
         if memory_stop_bytes < 1:
@@ -191,29 +200,51 @@ class ReplayWorker:
             expert_registry_root or Path("config/expert-evaluations")
         ).resolve()
         self.memory_current_path = memory_current_path
+        self.memory_stat_path = memory_stat_path
         self.memory_stop_bytes = memory_stop_bytes
         self.stopping = False
 
     def _memory_guard_failure(self) -> tuple[str, dict[str, Any]] | None:
         if self.memory_current_path is None:
             return None
+        if self.memory_stat_path is None:
+            return (
+                "replay_memory_monitor_unavailable",
+                {"error_type": "memory_stat_path_missing"},
+            )
         try:
             current_bytes = int(self.memory_current_path.read_text(encoding="ascii").strip())
+            stat_values = {
+                key: int(value)
+                for key, value in (
+                    line.split()
+                    for line in self.memory_stat_path.read_text(encoding="ascii").splitlines()
+                )
+            }
+            inactive_file_bytes = stat_values["inactive_file"]
         except (OSError, UnicodeDecodeError, ValueError) as exc:
             return (
                 "replay_memory_monitor_unavailable",
                 {"error_type": type(exc).__name__},
             )
-        if current_bytes < 0:
+        except (KeyError, TypeError):
             return (
                 "replay_memory_monitor_unavailable",
-                {"error_type": "negative_memory_current"},
+                {"error_type": "inactive_file_missing"},
             )
-        if current_bytes >= self.memory_stop_bytes:
+        if current_bytes < 0 or inactive_file_bytes < 0:
+            return (
+                "replay_memory_monitor_unavailable",
+                {"error_type": "negative_memory_measurement"},
+            )
+        working_set_bytes = max(current_bytes - inactive_file_bytes, 0)
+        if working_set_bytes >= self.memory_stop_bytes:
             return (
                 "replay_memory_guard_exceeded",
                 {
                     "memory_current_bytes": current_bytes,
+                    "memory_inactive_file_bytes": inactive_file_bytes,
+                    "memory_working_set_bytes": working_set_bytes,
                     "memory_stop_bytes": self.memory_stop_bytes,
                 },
             )
@@ -694,6 +725,7 @@ def main(argv: list[str] | None = None) -> int:
         expert_run_root=expert_run_root,
         expert_registry_root=expert_registry_root,
         memory_current_path=args.memory_current_path,
+        memory_stat_path=args.memory_stat_path,
         memory_stop_bytes=args.memory_stop_bytes,
     )
 

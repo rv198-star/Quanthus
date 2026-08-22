@@ -63,6 +63,7 @@ services:
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
       QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
       QUANTHUS_REPLAY_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current
+      QUANTHUS_REPLAY_MEMORY_STAT_PATH: /sys/fs/cgroup/memory.stat
       QUANTHUS_REPLAY_MEMORY_STOP_BYTES: "15032385536"
     depends_on:
       postgres:

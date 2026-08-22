@@ -315,4 +315,5 @@ def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:
     assert "mem_limit: 16g" in replay_worker
     assert "memswap_limit: 16g" in replay_worker
     assert "QUANTHUS_REPLAY_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current" in replay_worker
+    assert "QUANTHUS_REPLAY_MEMORY_STAT_PATH: /sys/fs/cgroup/memory.stat" in replay_worker
     assert 'QUANTHUS_REPLAY_MEMORY_STOP_BYTES: "15032385536"' in replay_worker

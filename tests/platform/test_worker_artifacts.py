@@ -301,7 +301,9 @@ def test_worker_stops_child_before_hard_memory_ceiling(
     process = Process()
     monkeypatch.setattr("quanthus.platform.worker.subprocess.Popen", lambda *_a, **_k: process)
     memory_current = tmp_path / "memory.current"
+    memory_stat = tmp_path / "memory.stat"
     memory_current.write_text(str(15 * 1024**3), encoding="ascii")
+    memory_stat.write_text("inactive_file 0\n", encoding="ascii")
     store = Store()
     worker = ReplayWorker(
         store,  # type: ignore[arg-type]
@@ -311,6 +313,7 @@ def test_worker_stops_child_before_hard_memory_ceiling(
         renew_seconds=30,
         terminate_seconds=1,
         memory_current_path=memory_current,
+        memory_stat_path=memory_stat,
         memory_stop_bytes=14 * 1024**3,
     )
 
@@ -322,6 +325,8 @@ def test_worker_stops_child_before_hard_memory_ceiling(
         "progress_detail": {
             "reason": "replay_memory_guard_exceeded",
             "memory_current_bytes": 15 * 1024**3,
+            "memory_inactive_file_bytes": 0,
+            "memory_working_set_bytes": 15 * 1024**3,
             "memory_stop_bytes": 14 * 1024**3,
         },
     }
@@ -332,3 +337,23 @@ def test_worker_stops_child_before_hard_memory_ceiling(
         "replay_memory_guard_exceeded:"
     )
     assert not (tmp_path / "runs" / "runs").exists()
+
+
+def test_worker_memory_guard_excludes_reclaimable_inactive_file_cache(tmp_path: Path) -> None:
+    memory_current = tmp_path / "memory.current"
+    memory_stat = tmp_path / "memory.stat"
+    memory_current.write_text(str(15 * 1024**3), encoding="ascii")
+    memory_stat.write_text(f"inactive_file {2 * 1024**3}\n", encoding="ascii")
+    worker = ReplayWorker(
+        object(),  # type: ignore[arg-type]
+        worker_id="worker-test",
+        run_root=tmp_path / "runs",
+        lease_seconds=300,
+        renew_seconds=30,
+        terminate_seconds=1,
+        memory_current_path=memory_current,
+        memory_stat_path=memory_stat,
+        memory_stop_bytes=14 * 1024**3,
+    )
+
+    assert worker._memory_guard_failure() is None

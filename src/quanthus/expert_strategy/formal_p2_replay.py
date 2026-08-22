@@ -159,19 +159,25 @@ def _transition(
     kind: PositionTransitionKind,
     occurred_at: datetime,
     reason_codes: tuple[str, ...],
-    evidence: PositionEvidenceRef,
+    evidence: PositionEvidenceRef | tuple[PositionEvidenceRef, ...],
 ) -> PositionTransition:
     if runtime.opportunity_id is None or runtime.formal_security_id is None:
         raise ExpertEvaluationError(
             "formal_position_identity_missing", "position transition lacks identity"
         )
+    evidence_items = evidence if isinstance(evidence, tuple) else (evidence,)
+    evidence_identity: object = (
+        evidence.evidence_id
+        if isinstance(evidence, PositionEvidenceRef)
+        else tuple(item.evidence_id for item in evidence_items)
+    )
     return PositionTransition(
         transition_id=_stable_id(
             "transition",
             runtime.lifecycle.unit_id,
             kind.value,
             occurred_at.isoformat(),
-            evidence.evidence_id,
+            evidence_identity,
         ),
         kind=kind,
         unit_id=runtime.lifecycle.unit_id,
@@ -179,7 +185,7 @@ def _transition(
         security_code=str(runtime.ledger.security_code or runtime.panel_security_id),
         occurred_at=occurred_at,
         reason_codes=reason_codes,
-        evidence=(evidence,),
+        evidence=evidence_items,
     )
 
 
@@ -998,18 +1004,19 @@ class FormalP2ReplayRuntime:
                             tzinfo=MARKET_TIMEZONE,
                         ),
                         ("cooldown_completed",),
-                        PositionEvidenceRef(
-                            PositionEvidenceKind.UNIT_SETTLEMENT,
-                            settlement.event_id,
-                            self.engine.policy.policy_version,
+                        (
+                            PositionEvidenceRef(
+                                PositionEvidenceKind.UNIT_SETTLEMENT,
+                                settlement.event_id,
+                                self.engine.policy.policy_version,
+                            ),
+                            PositionEvidenceRef(
+                                PositionEvidenceKind.CALENDAR,
+                                _stable_id("calendar", unit_id, frame.execution_date),
+                                run.schedule_version,
+                            ),
                         ),
                     )
-                    calendar = PositionEvidenceRef(
-                        PositionEvidenceKind.CALENDAR,
-                        _stable_id("calendar", unit_id, frame.execution_date),
-                        run.schedule_version,
-                    )
-                    transition = replace(transition, evidence=(transition.evidence[0], calendar))
                     runtime.lifecycle = apply_position_transition(
                         runtime.lifecycle,
                         transition,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +11,7 @@ from typing import cast
 
 import pytest
 
+from quanthus.backtest.contracts import UnitState
 from quanthus.expert_evaluation import cli
 from quanthus.expert_evaluation.production import _EventInput
 from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput, ProducerBinding
@@ -33,9 +34,17 @@ from quanthus.expert_strategy.formal_p2_replay import (
     FormalP2ReplayRuntime,
     _decision_digest_in_window,
     _load_parent_industry_mapping,
+    _transition,
+    _UnitRuntime,
     run_paired_block_bootstrap,
 )
 from quanthus.expert_strategy.registry import ExpertStrategyRegistry
+from quanthus.position_lifecycle import (
+    PositionEvidenceKind,
+    PositionEvidenceRef,
+    PositionTransitionKind,
+    initialize_position_lifecycle,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -374,3 +383,33 @@ def test_formal_replay_rejects_event_industry_drift_from_parent_mapping(
 
     with pytest.raises(ExpertEvaluationError, match="formal_attribution_industry_mismatch"):
         _load_parent_industry_mapping(tmp_path, events)
+
+
+def test_formal_replay_builds_cooldown_transition_with_atomic_evidence() -> None:
+    ledger = UnitState.empty(unit_id="capital-unit-01", cash=Decimal("100000.00"))
+    runtime = _UnitRuntime(
+        ledger=ledger,
+        lifecycle=initialize_position_lifecycle(
+            ledger_state=ledger,
+            as_of=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        ),
+        panel_security_id="000001",
+        formal_security_id="security-a",
+        opportunity_id="opportunity-a",
+    )
+    evidence = (
+        PositionEvidenceRef(
+            PositionEvidenceKind.UNIT_SETTLEMENT, "settlement-a", "policy-v1"
+        ),
+        PositionEvidenceRef(PositionEvidenceKind.CALENDAR, "calendar-a", "schedule-v1"),
+    )
+
+    transition = _transition(
+        runtime,
+        PositionTransitionKind.COOLDOWN_COMPLETED,
+        datetime(2020, 1, 2, tzinfo=timezone.utc),
+        ("cooldown_completed",),
+        evidence,
+    )
+
+    assert transition.evidence == evidence

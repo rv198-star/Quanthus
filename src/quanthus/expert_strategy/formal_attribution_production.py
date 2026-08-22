@@ -33,7 +33,12 @@ from quanthus.expert_strategy.formal_attribution_semantics import (
 from quanthus.expert_strategy.formal_p2_replay import (
     DECISION_END,
     DECISION_START,
+    JANUARY_SENTINEL_DECISION_DIGEST,
     PARENT_EVENT_RUN_DIGEST,
+)
+from quanthus.expert_strategy.production import (
+    FormalStrategySentinelProducer,
+    formal_sentinel_job_input,
 )
 from quanthus.expert_strategy.registry import (
     POSITION_SPEC_REGISTRY_KEY,
@@ -49,6 +54,36 @@ FORMAL_RELEASE_SCHEMA = "quanthus.formal-attribution-release.v1"
 
 def _sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def _verify_sentinel_reproduction(
+    artifacts: tuple[ProducedArtifact, ...],
+) -> dict[str, Any]:
+    matches = tuple(item for item in artifacts if item.path == "scorecard.json")
+    if len(matches) != 1 or matches[0].payload is None:
+        raise ExpertEvaluationError(
+            "baseline_reproduction_missing", "January Sentinel scorecard is missing"
+        )
+    try:
+        scorecard = json.loads(matches[0].payload)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExpertEvaluationError(
+            "baseline_reproduction_invalid", "January Sentinel scorecard is unreadable"
+        ) from exc
+    if (
+        not isinstance(scorecard, dict)
+        or scorecard.get("decision_set_digest") != JANUARY_SENTINEL_DECISION_DIGEST
+        or scorecard.get("decision_count") != 267
+        or scorecard.get("strategy_id") != "candidate.p4-trend-risk"
+        or scorecard.get("strategy_version") != "1.0.1"
+        or scorecard.get("window")
+        != {"start": "2020-01-01", "end": "2020-01-31"}
+        or scorecard.get("sealed_partition_access") is not False
+    ):
+        raise ExpertEvaluationError(
+            "baseline_reproduction_mismatch", "January Sentinel reproduction differs"
+        )
+    return scorecard
 
 
 def formal_attribution_producer_binding(
@@ -209,6 +244,16 @@ class FormalAttributionOperationProducer:
             )
         ).resolve()
         release_root.mkdir(parents=True, exist_ok=True)
+        event_root = Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs"))
+        sentinel_artifacts = FormalStrategySentinelProducer(
+            self.registry, event_root
+        ).produce(
+            formal_sentinel_job_input(PARENT_EVENT_RUN_DIGEST, self.registry),
+            specs,
+            lambda *_args: None,
+            canceled,
+        )
+        sentinel_scorecard = _verify_sentinel_reproduction(sentinel_artifacts)
         with tempfile.TemporaryDirectory(
             prefix="formal-attribution-", dir=release_root
         ) as temporary:
@@ -289,6 +334,12 @@ class FormalAttributionOperationProducer:
                 ],
                 "sealed_partition_access": False,
                 "execution_authorized": False,
+                "sentinel_reproduction": {
+                    "decision_count": sentinel_scorecard["decision_count"],
+                    "decision_set_digest": sentinel_scorecard["decision_set_digest"],
+                    "parent_event_run_digest": PARENT_EVENT_RUN_DIGEST,
+                    "window": sentinel_scorecard["window"],
+                },
             }
             progress("building-scorecard", {"claim_count": len(claims)})
             files = [

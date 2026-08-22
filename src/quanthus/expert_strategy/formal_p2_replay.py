@@ -362,7 +362,6 @@ class FormalP2ReplayRuntime:
             data_manifest_sha256=self.session.reader.data_manifest_sha256,
         )
         decisions: list[dict[str, Any]] = []
-        entry_decision_digests: list[tuple[date, str]] = []
         transitions: list[PositionTransition] = []
         events: list[EngineEvent] = []
         equity: list[dict[str, Any]] = [
@@ -388,9 +387,6 @@ class FormalP2ReplayRuntime:
                 events,
             )
             candidates = self._entry_candidates(frame, runner, intervention_id)
-            entry_decision_digests.extend(
-                (frame.snapshot.market_date, item.decision.digest) for item in candidates
-            )
             self._execute_frame(
                 frame_index,
                 frame,
@@ -421,18 +417,6 @@ class FormalP2ReplayRuntime:
                 }
             )
 
-        if intervention_id is None:
-            budget = self.registry.card.semantic_sections["resource_budget"]
-            observed = _decision_digest_in_window(
-                entry_decision_digests,
-                date.fromisoformat(str(budget["sentinel_window_start"])),
-                date.fromisoformat(str(budget["sentinel_window_end"])),
-            )
-            if observed != JANUARY_SENTINEL_DECISION_DIGEST:
-                raise ExpertEvaluationError(
-                    "baseline_reproduction_mismatch",
-                    f"January formal decision digest differs: {observed}",
-                )
         metrics, daily_returns = self._metrics(
             initial_equity, equity, events, decisions, output_root, intervention_id
         )

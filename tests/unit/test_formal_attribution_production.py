@@ -14,7 +14,11 @@ import pytest
 from quanthus.backtest.contracts import UnitState
 from quanthus.expert_evaluation import cli
 from quanthus.expert_evaluation.production import _EventInput
-from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput, ProducerBinding
+from quanthus.expert_evaluation.runner import (
+    ExpertEvaluationJobInput,
+    ProducedArtifact,
+    ProducerBinding,
+)
 from quanthus.expert_evaluation.serialization import (
     ExpertEvaluationError,
     canonical_json_bytes,
@@ -24,6 +28,7 @@ from quanthus.expert_strategy.formal_attribution_production import (
     FORMAL_ATTRIBUTION_PRODUCER_ID,
     FORMAL_ATTRIBUTION_PRODUCER_VERSION,
     FORMAL_RELEASE_SCHEMA,
+    _verify_sentinel_reproduction,
     formal_attribution_job_input,
     formal_attribution_producer_for,
     verify_formal_attribution_release,
@@ -420,3 +425,25 @@ def test_formal_replay_stable_id_normalizes_calendar_dates() -> None:
     assert _stable_id("calendar", "capital-unit-01", date(2020, 1, 2)) == _stable_id(
         "calendar", "capital-unit-01", "2020-01-02"
     )
+
+
+def test_formal_attribution_accepts_only_the_approved_sentinel_reproduction() -> None:
+    scorecard = {
+        "decision_count": 267,
+        "decision_set_digest": JANUARY_SENTINEL_DECISION_DIGEST,
+        "sealed_partition_access": False,
+        "strategy_id": "candidate.p4-trend-risk",
+        "strategy_version": "1.0.1",
+        "window": {"start": "2020-01-01", "end": "2020-01-31"},
+    }
+    artifacts = (
+        ProducedArtifact("scorecard.json", canonical_json_bytes(scorecard), 1),
+    )
+
+    assert _verify_sentinel_reproduction(artifacts) == scorecard
+
+    drifted = {**scorecard, "decision_count": 266}
+    with pytest.raises(ExpertEvaluationError, match="baseline_reproduction_mismatch"):
+        _verify_sentinel_reproduction(
+            (ProducedArtifact("scorecard.json", canonical_json_bytes(drifted), 1),)
+        )

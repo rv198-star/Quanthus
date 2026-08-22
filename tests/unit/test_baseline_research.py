@@ -286,6 +286,9 @@ class BaselineResearchTests(unittest.TestCase):
         self.assertEqual(restricted, ())
 
     def test_feature_panel_security_selection_filters_before_window_evaluation(self) -> None:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
         output = self.root / "selected-baseline-features.parquet"
         with BaselineFeaturePanel.build(
             self.bundle,
@@ -312,6 +315,30 @@ class BaselineResearchTests(unittest.TestCase):
                 scope_end=self.dates[-2],
                 output=self.root / "duplicate-selection.parquet",
                 allowed_security_ids=("SZSE-000002", "SZSE-000002"),
+            )
+
+        bars_path = self.bundle.partition_paths("daily_ohlcv_none")[0]
+        bars = pq.read_table(bars_path).to_pylist()
+        duplicate_unselected = next(
+            row for row in bars if row["security_id"] == "SSE-600001"
+        )
+        pq.write_table(pa.Table.from_pylist([*bars, duplicate_unselected]), bars_path)
+        with BaselineFeaturePanel.build(
+            self.bundle,
+            self.registry,
+            scope_start=self.dates[0],
+            scope_end=self.dates[-2],
+            output=self.root / "selected-with-unselected-duplicate.parquet",
+            allowed_security_ids=("SZSE-000002",),
+        ) as panel:
+            self.assertEqual(panel.report.selected_security_count, 1)
+        with self.assertRaisesRegex(BaselineResearchError, "duplicate bar row"):
+            BaselineFeaturePanel.build(
+                self.bundle,
+                self.registry,
+                scope_start=self.dates[0],
+                scope_end=self.dates[-2],
+                output=self.root / "unrestricted-with-duplicate.parquet",
             )
 
     def test_suite_runs_all_baselines_and_rejects_non_development_scope(self) -> None:

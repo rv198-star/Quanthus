@@ -15,8 +15,9 @@ nodes.
 - P2 is conditionally accepted for historical and paper research under the frozen
   `close-to-next-open-v1` profile. Its matcher, unit accounting, audit persistence, decision and
   shadow records, diagnostic replay, P1 execution-state adapter, and golden round trip pass.
-- P3 rule-only historical capability acceptance is closed under `config/p3-gates.v1.json`; P4
-  event-library implementation is open through the same accepted daily profile.
+- P3 rule-only historical capability acceptance is closed under `config/p3-gates.v1.json`; the P4
+  event-library/outcome/report slice is accepted through deterministic production A/B evidence under
+  the same accepted daily profile.
 - The strategy-neutral daily replay substrate is accepted under `P3-REPLAY-001`, including strict
   typed P1-frame adaptation, carried-sell company actions, immutable replay packaging, the lazy
   continuous PIT frame reader, full 2012-2025 input audit, and a real-corpus round-trip smoke.
@@ -150,13 +151,13 @@ nodes.
   not-executable events, and identical Event Library content/manifest digests. `P4-LABEL-001` has
   human-approved exact outcome/structural card digests and accepted deterministic production A/B
   label-corpus evidence: 36,820 total events, 34,641 settled three-class events, identical
-  Event/Label content and manifest digests across both runs. `P4-REPORT-001` now has an approved
-  pre-result comparison-policy digest, deterministic report builder, and Event Worker v3 binding
-  Event + Label + Report under one lease. The first production report run exposed an implementation
-  identity-boundary defect: governed DWD event ids were joined directly to the listing-code-keyed P3
-  feature panel. The report adapter now binds an explicit replay `panel_security_id` from each Event
-  Library `listing_code` without changing the frozen report policy; corrected production A/B report
-  acceptance remains open.
+  Event/Label content and manifest digests across both runs. `P4-REPORT-001` is also accepted after
+  the pre-result comparison-policy digest, deterministic report builder, Event Worker v3, explicit
+  Event-Library-to-P3 identity bridge, and deterministic floating-point reduction order were proven
+  in production. Final A/B Jobs reproduced 36,820 candidates and 34,641 settled three-class events,
+  byte-identical Event/Label/Report content and manifest identities, and the same leading features:
+  `risk.realized_volatility20`, `price.breakout20`, and `price.sma20_to_sma60`. Evidence is recorded
+  in `acceptance/p4-event-comparison-report-production-ab-20260823.md`.
   Arbitration and permanent-blind reads remain blocked.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,

@@ -5,7 +5,9 @@ import unittest
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+from unittest import mock
 
+import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -134,8 +136,7 @@ class DirectDwdProjectionTests(unittest.TestCase):
                 [state],
             )
             self._write_empty_state(
-                correction
-                / "payload/tradability_state/dwd_tradability_state_replacement.parquet"
+                correction / "payload/tradability_state/dwd_tradability_state_replacement.parquet"
             )
             self._write(
                 correction / "payload/replay/corporate_actions_normalized.parquet",
@@ -151,15 +152,32 @@ class DirectDwdProjectionTests(unittest.TestCase):
                 correction / "payload/replay/corporate_action_exceptions.parquet"
             )
 
-            counts = _materialize(
-                output,
-                dwd_root=dwd,
-                correction_root=correction,
-                history_start=day,
-                execution_end=day,
-            )
+            opened_connections = []
+            actual_connect = duckdb.connect
+
+            def tracked_connect(*args: object, **kwargs: object) -> object:
+                connection = actual_connect(*args, **kwargs)
+                opened_connections.append(connection)
+                return connection
+
+            with mock.patch("duckdb.connect", side_effect=tracked_connect):
+                counts = _materialize(
+                    output,
+                    dwd_root=dwd,
+                    correction_root=correction,
+                    history_start=day,
+                    execution_end=day,
+                )
 
             self.assertEqual(counts["daily_ohlcv_none"], 1)
+            self.assertEqual(len(opened_connections), 4)
+            for connection in opened_connections:
+                with self.assertRaises(duckdb.Error):
+                    connection.execute("SELECT 1")
+            self.assertEqual(
+                list(output.glob(".duckdb-materialize-spill-*")),
+                [],
+            )
             bar = pq.read_table(output / "tables/daily_ohlcv_none.parquet").to_pylist()[0]
             self.assertEqual(bar["dwd_security_id"], "security-001")
             self.assertEqual(bar["dwd_company_id"], "company-001")

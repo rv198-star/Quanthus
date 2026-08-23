@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, `PERF-BATCH-001`, and `PERF-EVENT-001` accepted through deterministic production A/B evidence; optimized cold Jobs reproduced all three governed package trees byte identically and reduced average complete runtime by 72.3 percent while retaining one scan process |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, `PERF-BATCH-001`, and `PERF-EVENT-001` accepted through deterministic production A/B evidence; `PERF-ENTRY-001` is open to replace per-session T+1 reads without changing evidence semantics |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -364,6 +364,13 @@ entry partition now averages 552.634 seconds; memory reduction and any entry-bin
 remain separate work. Evidence is recorded in
 `docs/acceptance/perf-event-001-production-ab-20260823.md`.
 
+`PERF-ENTRY-001` materializes the unique `(listing_code, execution_date)` request set as one
+Job-local DuckDB temporary relation and resolves universe, execution limits, bars, validity, and
+corporate-action blocks with one set-based join. It must construct the existing P1 evidence objects,
+retain deterministic request ordering and fail-closed coverage/reason semantics, and remove the
+temporary relation after the call. It may use bounded date-range chunks only if measured memory
+requires them; per-session full-market scans are not an accepted fallback.
+
 ## 8. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -374,6 +381,7 @@ remain separate work. Evidence is recorded in
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Accepted production A/B: byte-identical report content/manifest identities and the same three leading features |
 | PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | Accepted production A/B: one provider projection and two scope-bound TMP Feature Panels per Job, three byte-identical governed package trees, and 3.92 percent improvement against matched recent production Jobs |
 | PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Accepted production A/B: three byte-identical governed package trees, unchanged accepted semantics and counts, generation-fenced progress, and 72.3 percent lower average complete runtime |
+| PERF-ENTRY-001 | Replace T+1 entry-evidence reads with one set-based join | PERF-EVENT-001 | Open; scalar/batch equivalence, one-query contract, full checks, and deterministic production A/B package reproduction |
 
 ## 9. Acceptance
 

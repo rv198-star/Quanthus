@@ -4,6 +4,7 @@ import unittest
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
+from unittest import mock
 from zoneinfo import ZoneInfo
 
 from quanthus.backtest import (
@@ -488,6 +489,61 @@ class HistoricalReplayFrameReaderTests(unittest.TestCase):
             )
             report = reader.audit(d1, d1)
             self.assertEqual(report.unexplained_price_transition_count, 1)
+
+    def test_execution_evidence_batch_is_one_set_join_equivalent_to_scalar_reads(self) -> None:
+        d1, d2, d3, _ = self.dates
+        requests = (
+            (ECONOMIC, d2),
+            ("SZSE-000010", d2),
+            ("SZSE-000011", d2),
+            (EXCEPTION_SECURITY, d3),
+            ("SZSE-000010", date(1990, 1, 1)),
+            (ECONOMIC, date(2030, 1, 1)),
+            ("UNKNOWN-000001", d1),
+        )
+        with HistoricalReplayFrameReader(self.bundle) as reader:
+            expected = {
+                request: reader.execution_evidence(*request) for request in requests
+            }
+            with (
+                mock.patch.object(
+                    reader,
+                    "_bars_for_date",
+                    side_effect=AssertionError("batch must not scan by date"),
+                ),
+                mock.patch.object(
+                    reader,
+                    "_missing_coverage",
+                    side_effect=AssertionError("batch must not query missing rows individually"),
+                ),
+                mock.patch.object(reader, "_rows", wraps=reader._rows) as rows,
+            ):
+                observed = reader.execution_evidence_batch(requests)
+
+        self.assertEqual(observed, expected)
+        self.assertEqual(rows.call_count, 1)
+        self.assertEqual(
+            observed[("SZSE-000010", date(1990, 1, 1))].coverage_status.value,
+            "not_listed",
+        )
+        self.assertEqual(
+            observed[(ECONOMIC, date(2030, 1, 1))].coverage_status.value,
+            "delisted",
+        )
+        self.assertEqual(
+            observed[("UNKNOWN-000001", d1)].coverage_status.value,
+            "missing",
+        )
+
+    def test_execution_evidence_batch_rejects_duplicates_and_accepts_empty_input(self) -> None:
+        _, d2, _, _ = self.dates
+        with HistoricalReplayFrameReader(self.bundle) as reader:
+            self.assertEqual(reader.execution_evidence_batch(()), {})
+            with self.assertRaisesRegex(
+                HistoricalFrameReaderError,
+                "execution evidence requests must be unique",
+            ):
+                reader.execution_evidence_batch(((ECONOMIC, d2), (ECONOMIC, d2)))
 
     def test_missing_whole_session_universe_fails_continuous_frame_construction(self) -> None:
         import pyarrow as pa

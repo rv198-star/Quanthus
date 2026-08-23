@@ -150,6 +150,22 @@ def _market_time(market_date: date, value: time) -> datetime:
     return datetime.combine(market_date, value, tzinfo=MARKET_TIMEZONE)
 
 
+def _missing_coverage_from_bounds(
+    market_date: date,
+    *,
+    valid_from: date | None,
+    valid_to: date | None,
+    interval_count: int,
+) -> CoverageStatus:
+    if interval_count == 0:
+        return CoverageStatus.MISSING
+    if valid_from is not None and market_date < valid_from:
+        return CoverageStatus.NOT_LISTED
+    if valid_to is not None and market_date > valid_to:
+        return CoverageStatus.DELISTED
+    return CoverageStatus.MISSING
+
+
 def _data_valid(row: dict[str, Any]) -> bool:
     values = tuple(
         _decimal(row[name])
@@ -1067,13 +1083,36 @@ class HistoricalReplayFrameReader:
             (security_code,),
         )
         row = rows[0]
-        if int(row["interval_count"]) == 0:
-            return CoverageStatus.MISSING
-        if row["valid_from"] is not None and market_date < row["valid_from"]:
-            return CoverageStatus.NOT_LISTED
-        if row["valid_to"] is not None and market_date > row["valid_to"]:
-            return CoverageStatus.DELISTED
-        return CoverageStatus.MISSING
+        return _missing_coverage_from_bounds(
+            market_date,
+            valid_from=row["valid_from"],
+            valid_to=row["valid_to"],
+            interval_count=int(row["interval_count"]),
+        )
+
+    def _missing_execution_evidence(
+        self,
+        security_code: str,
+        execution_date: date,
+        coverage: CoverageStatus,
+    ) -> P1DailyExecutionEvidence:
+        return P1DailyExecutionEvidence(
+            snapshot=self._snapshot(execution_date, role="execution"),
+            security_code=security_code,
+            open_at=_market_time(execution_date, time(9, 30)),
+            close_at=_market_time(execution_date, time(15, 0)),
+            coverage_status=coverage,
+            data_valid=False,
+            is_executable=False,
+            entry_policy_allows=False,
+            reason_code=f"{coverage.value}_or_out_of_scope",
+            open_price=None,
+            high_price=None,
+            low_price=None,
+            close_price=None,
+            upper_limit_price=None,
+            lower_limit_price=None,
+        )
 
     def _execution_evidence_from_bar(
         self,
@@ -1081,26 +1120,14 @@ class HistoricalReplayFrameReader:
         execution_date: date,
         bar: PITDailyBar | None,
     ) -> P1DailyExecutionEvidence:
-        snapshot = self._snapshot(execution_date, role="execution")
         if bar is None:
             coverage = self._missing_coverage(security_code, execution_date)
-            return P1DailyExecutionEvidence(
-                snapshot=snapshot,
-                security_code=security_code,
-                open_at=_market_time(execution_date, time(9, 30)),
-                close_at=_market_time(execution_date, time(15, 0)),
-                coverage_status=coverage,
-                data_valid=False,
-                is_executable=False,
-                entry_policy_allows=False,
-                reason_code=f"{coverage.value}_or_out_of_scope",
-                open_price=None,
-                high_price=None,
-                low_price=None,
-                close_price=None,
-                upper_limit_price=None,
-                lower_limit_price=None,
+            return self._missing_execution_evidence(
+                security_code,
+                execution_date,
+                coverage,
             )
+        snapshot = self._snapshot(execution_date, role="execution")
         keep_prices = bar.coverage_status is CoverageStatus.TRADING and bar.data_valid
         return P1DailyExecutionEvidence(
             snapshot=snapshot,
@@ -1136,28 +1163,137 @@ class HistoricalReplayFrameReader:
         self,
         requests: Sequence[tuple[str, date]],
     ) -> dict[tuple[str, date], P1DailyExecutionEvidence]:
-        """Resolve many T+1 requests with one full-market evidence read per execution date."""
+        """Resolve unique T+1 requests with one set-based evidence join."""
 
         ordered = tuple(requests)
         if len(ordered) != len(set(ordered)):
             raise HistoricalFrameReaderError("execution evidence requests must be unique")
-        by_date: dict[date, set[str]] = {}
-        for security_code, execution_date in ordered:
-            by_date.setdefault(execution_date, set()).add(security_code)
+        if not ordered:
+            return {}
+        connection = self._ensure_open()
+        table = "execution_evidence_requests"
+        connection.execute(f"DROP TABLE IF EXISTS {table}")
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE {table} (
+                security_code VARCHAR NOT NULL,
+                execution_date DATE NOT NULL,
+                PRIMARY KEY (security_code, execution_date)
+            )
+            """
+        )
+        try:
+            connection.executemany(
+                f"INSERT INTO {table} VALUES (?, ?)",
+                ordered,
+            )
+            rows = self._rows(
+                f"""
+                WITH requested_validity AS (
+                    SELECT requests.security_code,
+                           min(CAST(validity.valid_from AS DATE)) AS valid_from,
+                           max(CAST(validity.valid_to AS DATE)) AS valid_to,
+                           count(validity.security_id) AS interval_count
+                    FROM {table} requests
+                    LEFT JOIN replay_validity validity
+                      ON validity.security_id = requests.security_code
+                    GROUP BY requests.security_code
+                ),
+                request_block_rows AS (
+                    SELECT requests.security_code,
+                           requests.execution_date,
+                           exceptions.reason_code
+                    FROM {table} requests
+                    JOIN replay_action_exceptions_mapped exceptions
+                      ON exceptions.security_id = requests.security_code
+                     AND exceptions.blocked_from <= requests.execution_date
+                     AND (
+                            exceptions.blocked_through IS NULL
+                         OR exceptions.blocked_through >= requests.execution_date
+                     )
+                    UNION ALL
+                    SELECT requests.security_code,
+                           requests.execution_date,
+                           transitions.reason_code
+                    FROM {table} requests
+                    JOIN replay_unexplained_price_transitions transitions
+                      ON transitions.security_id = requests.security_code
+                     AND transitions.market_date = requests.execution_date
+                ),
+                request_blocks AS (
+                    SELECT security_code,
+                           execution_date,
+                           string_agg(reason_code, ',' ORDER BY reason_code) AS reason_codes
+                    FROM request_block_rows
+                    GROUP BY security_code, execution_date
+                )
+                SELECT requests.security_code,
+                       requests.security_code AS security_id,
+                       requests.execution_date,
+                       universe.security_id AS universe_security_id,
+                       universe.exchange,
+                       universe.market_date,
+                       limits.security_id AS execution_security_id,
+                       bars.security_id AS bar_security_id,
+                       bars.open AS open_price,
+                       bars.high AS high_price,
+                       bars.low AS low_price,
+                       bars.close AS close_price,
+                       bars.volume,
+                       bars.amount,
+                       limits.observed_tradestatus,
+                       limits.entry_policy_allows AS source_entry_policy_allows,
+                       limits.is_executable AS source_is_executable,
+                       limits.reason_code AS source_reason_code,
+                       limits.upper_limit_price,
+                       limits.lower_limit_price,
+                       blocks.reason_codes AS corporate_action_block_reason,
+                       validity.valid_from,
+                       validity.valid_to,
+                       validity.interval_count
+                FROM {table} requests
+                LEFT JOIN replay_universe universe
+                  ON universe.security_id = requests.security_code
+                 AND universe.market_date = requests.execution_date
+                LEFT JOIN replay_limits limits
+                  ON limits.security_id = universe.security_id
+                 AND limits.execution_date = universe.market_date
+                LEFT JOIN replay_bars bars
+                  ON bars.security_id = universe.security_id
+                 AND bars.date = universe.market_date
+                LEFT JOIN request_blocks blocks
+                  ON blocks.security_code = requests.security_code
+                 AND blocks.execution_date = requests.execution_date
+                JOIN requested_validity validity
+                  ON validity.security_code = requests.security_code
+                ORDER BY requests.execution_date, requests.security_code
+                """
+            )
+        finally:
+            connection.execute(f"DROP TABLE IF EXISTS {table}")
+
         result: dict[tuple[str, date], P1DailyExecutionEvidence] = {}
-        for execution_date in sorted(by_date):
-            requested = by_date[execution_date]
-            bars = {
-                bar.security_code: bar
-                for bar in self._bars_for_date(execution_date)
-                if bar.security_code in requested
-            }
-            for security_code in sorted(requested):
-                result[(security_code, execution_date)] = self._execution_evidence_from_bar(
+        for row in rows:
+            security_code = str(row["security_code"])
+            execution_date = row["execution_date"]
+            if row["universe_security_id"] is None:
+                item = self._missing_execution_evidence(
                     security_code,
                     execution_date,
-                    bars.get(security_code),
+                    _missing_coverage_from_bounds(
+                        execution_date,
+                        valid_from=row["valid_from"],
+                        valid_to=row["valid_to"],
+                        interval_count=int(row["interval_count"]),
+                    ),
                 )
+            else:
+                item = self._execution_evidence_from_bar(
+                    security_code,
+                    execution_date,
+                    _bar_from_row(row),
+                )
+            result[(security_code, execution_date)] = item
         return result
 
     def _session(self, security_code: str, execution_date: date) -> MarketSession:

@@ -24,7 +24,7 @@ from quanthus.platform.persistence import PostgresPlatformStore
 
 EVENT_QUEUE = "event"
 RUN_SCHEMA = "quanthus.p4-event-run.v3"
-REPORTED_BATCH_RUNTIME_SCHEMA = "quanthus.p4-reported-batch-runtime.v1"
+REPORTED_BATCH_RUNTIME_SCHEMA = "quanthus.p4-reported-batch-runtime.v2"
 REPORTED_BATCH_PROGRESS_SCHEMA = "quanthus.p4-reported-batch-progress.v1"
 _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -303,6 +303,7 @@ def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | Non
     max_rss = payload.get("max_rss_bytes") if isinstance(payload, dict) else None
     provider_digest = payload.get("provider_config_digest") if isinstance(payload, dict) else None
     registry_digest = payload.get("feature_registry_digest") if isinstance(payload, dict) else None
+    memory = payload.get("memory") if isinstance(payload, dict) else None
     if (
         not isinstance(payload, dict)
         or payload.get("schema_version") != REPORTED_BATCH_RUNTIME_SCHEMA
@@ -317,6 +318,7 @@ def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | Non
         or _SHA256_RE.fullmatch(provider_digest) is None
         or not isinstance(registry_digest, str)
         or _SHA256_RE.fullmatch(registry_digest) is None
+        or not _valid_memory_sample(memory)
         or scope
         != {
             "start": "2012-01-04",
@@ -363,10 +365,31 @@ def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | Non
         expected_scope_end = required_stage_scopes.get(name)
         if expected_scope_end is not None and stage.get("scope_end") != expected_scope_end:
             raise RuntimeError("event_runtime_receipt_invalid")
+        if not _valid_memory_sample(stage.get("memory")):
+            raise RuntimeError("event_runtime_receipt_invalid")
         observed_stages.add(name)
     if not required_stages.issubset(observed_stages):
         raise RuntimeError("event_runtime_receipt_invalid")
     return payload
+
+
+def _valid_memory_sample(value: object) -> bool:
+    required = {
+        "process_current_rss_bytes",
+        "process_peak_rss_bytes",
+        "cgroup_memory_current_bytes",
+        "cgroup_memory_peak_bytes",
+        "cgroup_swap_current_bytes",
+        "cgroup_swap_peak_bytes",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        return False
+    for name, observed in value.items():
+        if observed is None and name.startswith("cgroup_"):
+            continue
+        if not isinstance(observed, int) or isinstance(observed, bool) or observed < 0:
+            return False
+    return True
 
 
 def _load_progress_receipt(path: Path) -> dict[str, Any] | None:

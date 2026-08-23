@@ -77,10 +77,19 @@ def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "runtime-metrics.json"
+    memory = {
+        "process_current_rss_bytes": 512,
+        "process_peak_rss_bytes": 1024,
+        "cgroup_memory_current_bytes": 2048,
+        "cgroup_memory_peak_bytes": 4096,
+        "cgroup_swap_current_bytes": 0,
+        "cgroup_swap_peak_bytes": 0,
+    }
     payload = {
-        "schema_version": "quanthus.p4-reported-batch-runtime.v1",
+        "schema_version": "quanthus.p4-reported-batch-runtime.v2",
         "total_elapsed_seconds": 12.5,
         "max_rss_bytes": 1024,
+        "memory": memory,
         "provider_config_digest": "sha256:" + "1" * 64,
         "feature_registry_digest": "sha256:" + "2" * 64,
         "scope": {
@@ -92,6 +101,7 @@ def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
             {
                 "stage": stage,
                 "elapsed_seconds": 1.0,
+                "memory": memory,
                 **(
                     {"scope_end": "2021-12-31"}
                     if stage == "feature-panel.label-scope"
@@ -124,6 +134,18 @@ def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     with pytest.raises(RuntimeError, match="runtime_receipt_invalid"):
         _load_runtime_receipt(path, required=True)
+
+    payload["reuse"] = {
+        "provider_materializations": 1,
+        "feature_panel_materializations": 2,
+        "cross_job_cache": False,
+        "adm_published": False,
+    }
+    payload["stages"][0]["memory"] = {**memory, "process_peak_rss_bytes": -1}
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="runtime_receipt_invalid"):
+        _load_runtime_receipt(path, required=True)
+    payload["stages"][0]["memory"] = memory
     payload["stages"][2]["scope_end"] = "2021-12-31"
 
     payload["reuse"] = {

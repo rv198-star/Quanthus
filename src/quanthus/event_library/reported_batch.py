@@ -26,7 +26,7 @@ from quanthus.event_library.physical_scan import (
 )
 from quanthus.feature_registry import load_feature_registry
 
-REPORTED_BATCH_RUNTIME_SCHEMA = "quanthus.p4-reported-batch-runtime.v1"
+REPORTED_BATCH_RUNTIME_SCHEMA = "quanthus.p4-reported-batch-runtime.v2"
 REPORTED_BATCH_PROGRESS_SCHEMA = "quanthus.p4-reported-batch-progress.v1"
 _DEVELOPMENT_START = date(2012, 1, 4)
 _DECISION_END = date(2021, 12, 30)
@@ -48,6 +48,55 @@ def _tree_bytes(root: Path) -> int:
     return sum(path.stat().st_size for path in root.rglob("*") if path.is_file())
 
 
+def _memory_file(name: str, default: str) -> int | None:
+    path = Path(os.environ.get(name, default))
+    try:
+        value = path.read_text(encoding="ascii").strip()
+    except OSError:
+        return None
+    if not value.isdigit():
+        return None
+    return int(value)
+
+
+def _process_current_rss_bytes() -> int:
+    try:
+        lines = Path("/proc/self/status").read_text(encoding="ascii").splitlines()
+    except OSError:
+        return 0
+    for line in lines:
+        if line.startswith("VmRSS:"):
+            fields = line.split()
+            if len(fields) >= 2 and fields[1].isdigit():
+                return int(fields[1]) * 1024
+    return 0
+
+
+def _memory_sample() -> dict[str, int | None]:
+    return {
+        "process_current_rss_bytes": _process_current_rss_bytes(),
+        "process_peak_rss_bytes": (
+            int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * 1024
+        ),
+        "cgroup_memory_current_bytes": _memory_file(
+            "QUANTHUS_EVENT_MEMORY_CURRENT_PATH",
+            "/sys/fs/cgroup/memory.current",
+        ),
+        "cgroup_memory_peak_bytes": _memory_file(
+            "QUANTHUS_EVENT_MEMORY_PEAK_PATH",
+            "/sys/fs/cgroup/memory.peak",
+        ),
+        "cgroup_swap_current_bytes": _memory_file(
+            "QUANTHUS_EVENT_SWAP_CURRENT_PATH",
+            "/sys/fs/cgroup/memory.swap.current",
+        ),
+        "cgroup_swap_peak_bytes": _memory_file(
+            "QUANTHUS_EVENT_SWAP_PEAK_PATH",
+            "/sys/fs/cgroup/memory.swap.peak",
+        ),
+    }
+
+
 def _run_stage(
     stages: list[dict[str, Any]],
     stage: str,
@@ -55,11 +104,14 @@ def _run_stage(
     details: Callable[[T], Mapping[str, Any]],
 ) -> T:
     started = time.perf_counter()
+    memory_before = _memory_sample()
     result = operation()
     stages.append(
         {
             "stage": stage,
             "elapsed_seconds": round(time.perf_counter() - started, 3),
+            "memory_before": memory_before,
+            "memory": _memory_sample(),
             **details(result),
         }
     )
@@ -164,6 +216,7 @@ def build_physical_reported_event_batch(
                 "stage": f"provider.{stage}",
                 "elapsed_seconds": round(now - provider_stage_started, 3),
                 "disposition": "built",
+                "memory": _memory_sample(),
                 **dict(details),
             }
         )
@@ -204,6 +257,7 @@ def build_physical_reported_event_batch(
                 {
                     "stage": "event.candidate-row-decode",
                     "elapsed_seconds": decode_elapsed,
+                    "memory": _memory_sample(),
                     **observed,
                 }
             )
@@ -211,11 +265,12 @@ def build_physical_reported_event_batch(
                 {
                     "stage": "event.security-scan",
                     "elapsed_seconds": scan_elapsed,
+                    "memory": _memory_sample(),
                     **observed,
                 }
             )
             return
-        stages.append({"stage": f"event.{stage}", **observed})
+        stages.append({"stage": f"event.{stage}", "memory": _memory_sample(), **observed})
 
     session_started = time.perf_counter()
     session = provider.open(
@@ -243,6 +298,7 @@ def build_physical_reported_event_batch(
                 "rows": provider_rows,
                 "bytes": provider_bytes,
                 "disposition": "built_once",
+                "memory": _memory_sample(),
             }
         )
         event = _run_stage(
@@ -352,6 +408,7 @@ def build_physical_reported_event_batch(
         "schema_version": REPORTED_BATCH_RUNTIME_SCHEMA,
         "total_elapsed_seconds": round(time.perf_counter() - batch_started, 3),
         "max_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * 1024,
+        "memory": _memory_sample(),
         "provider_config_digest": provider_config.digest,
         "feature_registry_digest": registry.digest,
         "scope": {

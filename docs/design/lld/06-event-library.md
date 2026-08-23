@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, `PERF-BATCH-001`, and `PERF-EVENT-001` accepted through deterministic production A/B evidence; `PERF-ENTRY-001` is open to replace per-session T+1 reads without changing evidence semantics |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, `PERF-BATCH-001`, and `PERF-EVENT-001` accepted through deterministic production A/B evidence; `PERF-ENTRY-001` is implemented and `PERF-MEM-001` is open for shared production acceptance under a hard 16 GiB cgroup |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -382,6 +382,7 @@ requires them; per-session full-market scans are not an accepted fallback.
 | PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | Accepted production A/B: one provider projection and two scope-bound TMP Feature Panels per Job, three byte-identical governed package trees, and 3.92 percent improvement against matched recent production Jobs |
 | PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Accepted production A/B: three byte-identical governed package trees, unchanged accepted semantics and counts, generation-fenced progress, and 72.3 percent lower average complete runtime |
 | PERF-ENTRY-001 | Replace T+1 entry-evidence reads with one set-based join | PERF-EVENT-001 | Open; scalar/batch equivalence, one-query contract, full checks, and deterministic production A/B package reproduction |
+| PERF-MEM-001 | Publish stage memory evidence and keep the complete Event batch below 16 GiB | PERF-ENTRY-001 | Open; two complete cold Jobs under a 16 GiB memory-and-swap cgroup, no OOM, negligible swap, and byte-identical governed package trees |
 
 ## 9. Acceptance
 

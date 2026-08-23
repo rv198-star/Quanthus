@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, and `P4-REPORT-001` accepted through deterministic production A/B evidence; the final report A/B reproduced 36,820 candidates, 34,641 settled three-class events, byte-identical report content/manifest identities, and the same three leading features |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, and `PERF-BATCH-001` accepted through deterministic production A/B evidence; the job-local reuse A/B built one Direct-DWD projection and two scope-bound TMP Feature Panels per Job while reproducing all three governed package trees byte identically |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -330,6 +330,14 @@ input reproduce identical Event/Label identities, byte-identical report content/
 the same leading-feature ids, and a true report acceptance flag. Evidence is recorded in
 `docs/acceptance/p4-event-comparison-report-production-ab-20260823.md`.
 
+The independent `PERF-BATCH-001` production A/B additionally proves the complete job-local reuse
+contract: each Job materialized one provider projection and exactly two scope-bound TMP Feature
+Panels, then reproduced every file in all three governed package trees byte identically. Matched
+recent production wall time improved by 3.92 percent, but Event scanning still consumed about 95.9
+percent of receipt wall time and peak RSS remained above 16 GiB. The reuse boundary is accepted;
+Issue #195 separately owns material Event-scan speed and memory optimization. Evidence is recorded
+in `docs/acceptance/perf-batch-001-production-ab-20260823.md`.
+
 ## 8. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -338,7 +346,7 @@ the same leading-feature ids, and a true report acceptance flag. Evidence is rec
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Accepted production A/B replay: 36,820 candidates, 36,022 executable, 798 not-executable, identical manifest/content digests |
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Accepted production A/B corpus: 36,820 total, 34,641 settled three-class, identical Event/Label content and manifest digests |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Accepted production A/B: byte-identical report content/manifest identities and the same three leading features |
-| PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | One provider projection and two scope-bound TMP Feature Panels per Job; unchanged accepted content, independent cold-run reproduction, and measured wall-time improvement |
+| PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | Accepted production A/B: one provider projection and two scope-bound TMP Feature Panels per Job, three byte-identical governed package trees, and 3.92 percent improvement against matched recent production Jobs |
 
 ## 9. Acceptance
 

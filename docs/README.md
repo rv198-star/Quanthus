@@ -165,6 +165,12 @@ nodes.
   byte-identical Event/Label/Report content and manifest identities, and the same leading features:
   `risk.realized_volatility20`, `price.breakout20`, and `price.sma20_to_sma60`. Evidence is recorded
   in `acceptance/p4-event-comparison-report-production-ab-20260823.md`.
+  `PERF-BATCH-001` is accepted separately after two independent production Jobs each built one
+  Direct-DWD projection and two scope-bound TMP Feature Panels, reproduced all files in the three
+  governed package trees byte identically, and improved matched recent production wall time by
+  3.92 percent. Event scanning still owns about 95.9 percent of runtime and remains active
+  optimization work under Issue #195. Evidence is recorded in
+  `acceptance/perf-batch-001-production-ab-20260823.md`.
   Arbitration and permanent-blind reads remain blocked.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,

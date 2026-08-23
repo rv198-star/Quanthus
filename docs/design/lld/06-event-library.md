@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, and `PERF-BATCH-001` accepted through deterministic production A/B evidence; the job-local reuse A/B built one Direct-DWD projection and two scope-bound TMP Feature Panels per Job while reproducing all three governed package trees byte identically |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, `PERF-BATCH-001`, and `PERF-EVENT-001` accepted through deterministic production A/B evidence; optimized cold Jobs reproduced all three governed package trees byte identically and reduced average complete runtime by 72.3 percent while retaining one scan process |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -353,9 +353,16 @@ The independent `PERF-BATCH-001` production A/B additionally proves the complete
 contract: each Job materialized one provider projection and exactly two scope-bound TMP Feature
 Panels, then reproduced every file in all three governed package trees byte identically. Matched
 recent production wall time improved by 3.92 percent, but Event scanning still consumed about 95.9
-percent of receipt wall time and peak RSS remained above 16 GiB. The reuse boundary is accepted;
-Issue #195 separately owns material Event-scan speed and memory optimization. Evidence is recorded
-in `docs/acceptance/perf-batch-001-production-ab-20260823.md`.
+percent of receipt wall time. Evidence is recorded in
+`docs/acceptance/perf-batch-001-production-ab-20260823.md`.
+
+`PERF-EVENT-001` production A/B then reduced average complete receipt time from 7,434.109 seconds to
+2,058.870 seconds and average Event time from 7,129.430 seconds to 1,757.842 seconds. Both optimized
+Jobs independently rebuilt their inputs and reproduced every file in all three governed package
+trees byte identically. Peak RSS remained about 19.5 GiB, above the desired 16 GiB ceiling, and T+1
+entry partition now averages 552.634 seconds; memory reduction and any entry-binding optimization
+remain separate work. Evidence is recorded in
+`docs/acceptance/perf-event-001-production-ab-20260823.md`.
 
 ## 8. Work items
 
@@ -366,7 +373,7 @@ in `docs/acceptance/perf-batch-001-production-ab-20260823.md`.
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Accepted production A/B corpus: 36,820 total, 34,641 settled three-class, identical Event/Label content and manifest digests |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Accepted production A/B: byte-identical report content/manifest identities and the same three leading features |
 | PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | Accepted production A/B: one provider projection and two scope-bound TMP Feature Panels per Job, three byte-identical governed package trees, and 3.92 percent improvement against matched recent production Jobs |
-| PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Reference-equivalent scan; same-revision production A/B preserves all accepted package identities while recording lower wall time, peak RSS, and internal stage timings |
+| PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Accepted production A/B: three byte-identical governed package trees, unchanged accepted semantics and counts, generation-fenced progress, and 72.3 percent lower average complete runtime |
 
 ## 9. Acceptance
 

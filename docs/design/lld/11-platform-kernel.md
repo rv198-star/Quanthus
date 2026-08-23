@@ -259,6 +259,12 @@ receipt is deleted before Run sealing. Its stage, counters, percentage, and timi
 operational metadata: PostgreSQL Job state, generation fencing, package verification, and atomic
 Run publication remain the lifecycle authorities.
 
+Production cold A/B on Event Worker revision `120c6ac` accepted this progress path and the
+single-process exact-scan optimization after all three governed package trees reproduced byte
+identically and average complete runtime fell by 72.3 percent. Process-wide peak RSS remained about
+19.5 GiB, so the desired 16 GiB ceiling remains separate resource work. Evidence is recorded in
+`docs/acceptance/perf-event-001-production-ab-20260823.md`.
+
 This activation does not admit a Worker registry, dynamic capability documents, resource classes,
 or separate QA/build/artifact/publication services. Those remain deferred until additional named
 workflows demonstrate a routing or permission need.

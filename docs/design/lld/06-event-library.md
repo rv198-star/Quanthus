@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, `PERF-BATCH-001`, and `PERF-EVENT-001` accepted through deterministic production A/B evidence; `PERF-ENTRY-001` is open to replace per-session T+1 reads without changing evidence semantics |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, `PERF-BATCH-001`, `PERF-EVENT-001`, `PERF-ENTRY-001`, and `PERF-MEM-001` accepted through deterministic production A/B evidence |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -371,6 +371,17 @@ retain deterministic request ordering and fail-closed coverage/reason semantics,
 temporary relation after the call. It may use bounded date-range chunks only if measured memory
 requires them; per-session full-market scans are not an accepted fallback.
 
+The combined `PERF-ENTRY-001` and `PERF-MEM-001` production A/B uses one 16 GiB Event Worker with
+swap disabled. Direct-DWD closes and removes each large projection connection and spill directory
+before opening the next one; ordinary projections use a 6 GB DuckDB budget and the two proven large
+sort/window projections use 12 GB with one thread. Two independent cold Jobs completed with cgroup
+peaks of 16,144,474,112 and 16,558,063,616 bytes, zero limit hits, zero OOM, zero swap, and zero
+container restarts. T+1 entry partition averaged 32.233 seconds, 94.2 percent below the preceding
+552.634-second optimized baseline. All 20 files in the Event, Label, and Report trees were byte
+identical across the two Jobs, and all accepted content digests and counts remained unchanged.
+Evidence is recorded in
+`docs/acceptance/perf-entry-memory-production-ab-20260823.md`.
+
 ## 8. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -381,7 +392,8 @@ requires them; per-session full-market scans are not an accepted fallback.
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Accepted production A/B: byte-identical report content/manifest identities and the same three leading features |
 | PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | Accepted production A/B: one provider projection and two scope-bound TMP Feature Panels per Job, three byte-identical governed package trees, and 3.92 percent improvement against matched recent production Jobs |
 | PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Accepted production A/B: three byte-identical governed package trees, unchanged accepted semantics and counts, generation-fenced progress, and 72.3 percent lower average complete runtime |
-| PERF-ENTRY-001 | Replace T+1 entry-evidence reads with one set-based join | PERF-EVENT-001 | Open; scalar/batch equivalence, one-query contract, full checks, and deterministic production A/B package reproduction |
+| PERF-ENTRY-001 | Replace T+1 entry-evidence reads with one set-based join | PERF-EVENT-001 | Accepted; scalar/batch equivalence, one-query contract, full checks, 32.233-second production average, and byte-identical production A/B package reproduction |
+| PERF-MEM-001 | Publish stage memory evidence and keep the complete Event batch below 16 GiB | PERF-ENTRY-001 | Accepted; two complete cold Jobs below a hard 16 GiB cgroup with swap disabled, zero OOM/restarts/limit hits, and byte-identical governed package trees |
 
 ## 9. Acceptance
 

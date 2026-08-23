@@ -238,6 +238,7 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 | PERF-BATCH-001 | Reuse composite-Job prerequisites and publish runtime telemetry | P4 |
 | PERF-EVENT-001 | Accelerate exact Event scanning and expose internal progress | P4 |
 | PERF-ENTRY-001 | Replace T+1 evidence reads with a set-based join | P4 |
+| PERF-MEM-001 | Keep the complete P4 Event batch below 16 GiB | P4 |
 | P5-TARGET-001 | Define independent target cards and metrics | P5 |
 | P5-BASE-001 | Build rule and logistic baseline scoreboard | P5 |
 | P5-GBDT-001 | Train constrained GBDT research pipeline | P5 |

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import tempfile
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, time
@@ -19,6 +20,8 @@ from quanthus.industry_mapping import StaticIndustryMapping, load_static_industr
 from quanthus.policy import ConfigurationError
 
 MATERIALIZER_VERSION = "direct-dwd-job-local-v1"
+DUCKDB_MEMORY_LIMIT = "6GB"
+DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT = "12GB"
 MARKET_TIMEZONE_NAME = "Asia/Shanghai"
 DATASETS = (
     "corporate_action_exceptions",
@@ -40,9 +43,9 @@ def _sha256(path: Path) -> str:
 
 
 def _digest(value: object) -> str:
-    encoded = json.dumps(
-        value, ensure_ascii=True, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    encoded = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
 
@@ -116,6 +119,122 @@ def _copy(connection: Any, query: str, output: Path) -> None:
     )
 
 
+class _ProjectionConnections:
+    """Own one bounded DuckDB connection at a time for DWD projections."""
+
+    def __init__(
+        self,
+        duckdb: Any,
+        *,
+        root: Path,
+        payload: Path,
+        correction: Path,
+        start: str,
+        end: str,
+    ) -> None:
+        self._duckdb = duckdb
+        self._root = root
+        self._payload = payload
+        self._correction = correction
+        self._start = start
+        self._end = end
+        self._connection: Any | None = None
+        self._spill: Path | None = None
+
+    def open(self, projection: str, *, memory_limit: str = DUCKDB_MEMORY_LIMIT) -> Any:
+        self.close()
+        spill = self._root / f".duckdb-materialize-spill-{projection}"
+        spill.mkdir()
+        connection = self._duckdb.connect(":memory:")
+        try:
+            connection.execute(f"SET memory_limit='{memory_limit}'")
+            connection.execute("SET threads=1")
+            connection.execute("SET preserve_insertion_order=false")
+            connection.execute(f"SET temp_directory={_sql_path(spill)}")
+            connection.execute(
+                f"""
+                CREATE VIEW dwd_security AS
+                SELECT * FROM read_parquet({
+                    _sql_path(self._payload / "listed_company/dwd_security.parquet")
+                })
+                WHERE knowledge_to IS NULL;
+                CREATE VIEW dwd_listing AS
+                SELECT * FROM read_parquet({
+                    _sql_path(self._payload / "listed_company/dwd_listing.parquet")
+                })
+                WHERE knowledge_to IS NULL;
+                CREATE VIEW dwd_bar AS
+                SELECT * FROM read_parquet(
+                  {
+                    _sql_path(
+                        self._payload / "security_market_observation/dwd_security_bar/**/*.parquet"
+                    )
+                },
+                  hive_partitioning=true
+                )
+                WHERE interval_size='1d' AND price_basis='UNADJUSTED'
+                  AND knowledge_to IS NULL
+                  AND CAST(observation_start AS DATE)
+                      BETWEEN DATE '{self._start}' AND DATE '{self._end}';
+                CREATE VIEW dwd_calendar AS
+                SELECT * FROM read_parquet(
+                  {
+                    _sql_path(self._payload / "tradability_state/dwd_trading_calendar/**/*.parquet")
+                },
+                  hive_partitioning=true
+                )
+                WHERE knowledge_to IS NULL AND is_open
+                  AND CAST(trade_date AS DATE)
+                      BETWEEN DATE '{self._start}' AND DATE '{self._end}';
+                CREATE VIEW correction_state AS
+                SELECT * FROM read_parquet(
+                  {
+                    _sql_path(
+                        self._correction
+                        / "tradability_state/dwd_tradability_state_replacement.parquet"
+                    )
+                }
+                )
+                WHERE knowledge_to IS NULL
+                  AND CAST(observation_start AS DATE)
+                      BETWEEN DATE '{self._start}' AND DATE '{self._end}';
+                CREATE VIEW dwd_state AS
+                SELECT base.* FROM read_parquet(
+                  {
+                    _sql_path(
+                        self._payload / "tradability_state/dwd_tradability_state/**/*.parquet"
+                    )
+                },
+                  hive_partitioning=true
+                ) base
+                WHERE base.knowledge_to IS NULL
+                  AND CAST(base.observation_start AS DATE)
+                      BETWEEN DATE '{self._start}' AND DATE '{self._end}'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM correction_state replacement
+                    WHERE replacement.listing_id=base.listing_id
+                      AND replacement.calendar_session_id=base.calendar_session_id
+                  )
+                UNION ALL BY NAME SELECT * FROM correction_state;
+                """
+            )
+        except BaseException:
+            connection.close()
+            shutil.rmtree(spill, ignore_errors=True)
+            raise
+        self._connection = connection
+        self._spill = spill
+        return connection
+
+    def close(self) -> None:
+        connection, self._connection = self._connection, None
+        spill, self._spill = self._spill, None
+        if connection is not None:
+            connection.close()
+        if spill is not None:
+            shutil.rmtree(spill, ignore_errors=True)
+
+
 def _materialize(
     root: Path,
     *,
@@ -136,62 +255,18 @@ def _materialize(
 
     payload = dwd_root / "payload"
     correction = correction_root / "payload"
-    connection = duckdb.connect(":memory:")
-    connection.execute("SET preserve_insertion_order=false")
     start = history_start.isoformat()
     end = execution_end.isoformat()
+    connections = _ProjectionConnections(
+        duckdb,
+        root=root,
+        payload=payload,
+        correction=correction,
+        start=start,
+        end=end,
+    )
+    connection = connections.open("daily-ohlcv")
     try:
-        connection.execute(
-            f"""
-            CREATE VIEW dwd_security AS
-            SELECT * FROM read_parquet({_sql_path(payload / 'listed_company/dwd_security.parquet')})
-            WHERE knowledge_to IS NULL;
-            CREATE VIEW dwd_listing AS
-            SELECT * FROM read_parquet({_sql_path(payload / 'listed_company/dwd_listing.parquet')})
-            WHERE knowledge_to IS NULL;
-            CREATE VIEW dwd_bar AS
-            SELECT * FROM read_parquet(
-              {_sql_path(
-                  payload / 'security_market_observation/dwd_security_bar/**/*.parquet'
-              )},
-              hive_partitioning=true
-            )
-            WHERE interval_size='1d' AND price_basis='UNADJUSTED'
-              AND knowledge_to IS NULL
-              AND CAST(observation_start AS DATE)
-                  BETWEEN DATE '{start}' AND DATE '{end}';
-            CREATE VIEW dwd_calendar AS
-            SELECT * FROM read_parquet(
-              {_sql_path(payload / 'tradability_state/dwd_trading_calendar/**/*.parquet')},
-              hive_partitioning=true
-            )
-            WHERE knowledge_to IS NULL AND is_open
-              AND CAST(trade_date AS DATE) BETWEEN DATE '{start}' AND DATE '{end}';
-            CREATE VIEW correction_state AS
-            SELECT * FROM read_parquet(
-              {_sql_path(
-                  correction / 'tradability_state/dwd_tradability_state_replacement.parquet'
-              )}
-            )
-            WHERE knowledge_to IS NULL
-              AND CAST(observation_start AS DATE)
-                  BETWEEN DATE '{start}' AND DATE '{end}';
-            CREATE VIEW dwd_state AS
-            SELECT base.* FROM read_parquet(
-              {_sql_path(payload / 'tradability_state/dwd_tradability_state/**/*.parquet')},
-              hive_partitioning=true
-            ) base
-            WHERE base.knowledge_to IS NULL
-              AND CAST(base.observation_start AS DATE)
-                  BETWEEN DATE '{start}' AND DATE '{end}'
-              AND NOT EXISTS (
-                SELECT 1 FROM correction_state replacement
-                WHERE replacement.listing_id=base.listing_id
-                  AND replacement.calendar_session_id=base.calendar_session_id
-              )
-            UNION ALL BY NAME SELECT * FROM correction_state;
-            """
-        )
         report("dwd-source-scan-ready")
         directional = connection.execute(
             "SELECT count(*) FROM dwd_state WHERE can_buy <> can_sell"
@@ -271,6 +346,10 @@ def _materialize(
             """,
             tables / "daily_ohlcv_none.parquet",
         )
+        connection = connections.open(
+            "daily-universe",
+            memory_limit=DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT,
+        )
         _copy(
             connection,
             """
@@ -318,6 +397,10 @@ def _materialize(
             ORDER BY market_date, security_id
             """,
             tables / "daily_universe.parquet",
+        )
+        connection = connections.open(
+            "price-limit-execution",
+            memory_limit=DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT,
         )
         _copy(
             connection,
@@ -402,6 +485,7 @@ def _materialize(
             """,
             tables / "price_limit_execution_daily.parquet",
         )
+        connection = connections.open("finalize")
         _copy(
             connection,
             """
@@ -500,17 +584,17 @@ def _materialize(
             SELECT
               (SELECT count(*) FROM (
                 SELECT security_id,date FROM read_parquet(
-                  {_sql_path(tables / 'daily_ohlcv_none.parquet')}
+                  {_sql_path(tables / "daily_ohlcv_none.parquet")}
                 )
                 GROUP BY ALL HAVING count(*)<>1)),
               (SELECT count(*) FROM (
                 SELECT security_id,market_date FROM read_parquet(
-                  {_sql_path(tables / 'daily_universe.parquet')}
+                  {_sql_path(tables / "daily_universe.parquet")}
                 )
                 GROUP BY ALL HAVING count(*)<>1)),
               (SELECT count(*) FROM (
                 SELECT security_id,execution_date FROM read_parquet(
-                  {_sql_path(tables / 'price_limit_execution_daily.parquet')}
+                  {_sql_path(tables / "price_limit_execution_daily.parquet")}
                 )
                 GROUP BY ALL HAVING count(*)<>1))
             """
@@ -522,7 +606,7 @@ def _materialize(
         report("dwd-projection-validated", row_count=sum(counts.values()), datasets=counts)
         return counts
     finally:
-        connection.close()
+        connections.close()
 
 
 def open_direct_dwd_session(
@@ -596,9 +680,7 @@ def open_direct_dwd_session(
             execution_end=config.scope.execution_end,
             progress=progress,
         )
-        files = {
-            name: _sha256(root / "tables" / f"{name}.parquet") for name in DATASETS
-        }
+        files = {name: _sha256(root / "tables" / f"{name}.parquet") for name in DATASETS}
         created_at = datetime.fromisoformat(
             str(correction_manifest["built_at"]).replace("Z", "+00:00")
         )

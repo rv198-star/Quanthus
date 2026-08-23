@@ -28,6 +28,7 @@ from quanthus.expert_strategy.formal_attribution_production import (
     FORMAL_ATTRIBUTION_PRODUCER_ID,
     FORMAL_ATTRIBUTION_PRODUCER_VERSION,
     FORMAL_RELEASE_SCHEMA,
+    _seal_release_permissions,
     _verify_sentinel_reproduction,
     formal_attribution_job_input,
     formal_attribution_producer_for,
@@ -53,6 +54,20 @@ from quanthus.position_lifecycle import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_formal_release_permissions_are_read_only_and_traversable(tmp_path: Path) -> None:
+    root = tmp_path / "release"
+    nested = root / "nested"
+    nested.mkdir(parents=True)
+    artifact = nested / "artifact.json"
+    artifact.write_text("{}", encoding="ascii")
+
+    _seal_release_permissions(root)
+
+    assert root.stat().st_mode & 0o777 == 0o555
+    assert nested.stat().st_mode & 0o777 == 0o555
+    assert artifact.stat().st_mode & 0o777 == 0o444
 
 
 def _sha256(payload: bytes) -> str:
@@ -91,7 +106,7 @@ def _formal_release(root: Path) -> dict[str, object]:
     }
     manifest["release_digest"] = digest_value(manifest)
     (root / "release.json").write_bytes(canonical_json_bytes(manifest))
-    (root / "READY").write_text(f'{manifest["release_digest"]}\n', encoding="ascii")
+    (root / "READY").write_text(f"{manifest['release_digest']}\n", encoding="ascii")
     return manifest
 
 
@@ -139,9 +154,10 @@ def test_formal_producer_dispatch_rejects_a_foreign_producer() -> None:
     )
 
     assert producer.registry.card.semantic_digest == registry.card.semantic_digest
-    assert resolver.expected_bindings(job_input.formal_strategy, resolver.expert_registry_root)[
-        0
-    ] == registry.evaluation_spec_identities
+    assert (
+        resolver.expected_bindings(job_input.formal_strategy, resolver.expert_registry_root)[0]
+        == registry.evaluation_spec_identities
+    )
     foreign = replace(
         job_input,
         producer=ProducerBinding(
@@ -151,9 +167,7 @@ def test_formal_producer_dispatch_rejects_a_foreign_producer() -> None:
         ),
     )
     with pytest.raises(ExpertEvaluationError, match="producer_not_admitted"):
-        formal_attribution_producer_for(
-            foreign, ROOT / "config" / "expert-evaluations"
-        )
+        formal_attribution_producer_for(foreign, ROOT / "config" / "expert-evaluations")
 
 
 def test_cli_routes_formal_attribution_to_its_registered_producer(
@@ -283,9 +297,7 @@ def test_action_change_metrics_count_each_held_review_date(tmp_path: Path) -> No
         },
     ]
     (baseline / "decisions.json").write_bytes(canonical_json_bytes(baseline_decisions))
-    intervention_decisions = [
-        {**item, "final_action": "hold"} for item in baseline_decisions
-    ]
+    intervention_decisions = [{**item, "final_action": "hold"} for item in baseline_decisions]
     equity = [
         {
             "market_date": "2020-01-01",
@@ -389,9 +401,7 @@ def test_formal_replay_rejects_event_industry_drift_from_parent_mapping(
         ),
     )
     mapping = SimpleNamespace(
-        by_security_id={
-            "security-a": SimpleNamespace(level1_industry_id="parent-industry")
-        }
+        by_security_id={"security-a": SimpleNamespace(level1_industry_id="parent-industry")}
     )
     monkeypatch.setattr(
         "quanthus.expert_strategy.formal_p2_replay.load_static_industry_mapping",
@@ -415,9 +425,7 @@ def test_formal_replay_builds_cooldown_transition_with_atomic_evidence() -> None
         opportunity_id="opportunity-a",
     )
     evidence = (
-        PositionEvidenceRef(
-            PositionEvidenceKind.UNIT_SETTLEMENT, "settlement-a", "policy-v1"
-        ),
+        PositionEvidenceRef(PositionEvidenceKind.UNIT_SETTLEMENT, "settlement-a", "policy-v1"),
         PositionEvidenceRef(PositionEvidenceKind.CALENDAR, "calendar-a", "schedule-v1"),
     )
 
@@ -447,9 +455,7 @@ def test_formal_attribution_accepts_only_the_approved_sentinel_reproduction() ->
         "strategy_version": "1.0.1",
         "window": {"start": "2020-01-01", "end": "2020-01-31"},
     }
-    artifacts = (
-        ProducedArtifact("scorecard.json", canonical_json_bytes(scorecard), 1),
-    )
+    artifacts = (ProducedArtifact("scorecard.json", canonical_json_bytes(scorecard), 1),)
 
     assert _verify_sentinel_reproduction(artifacts) == scorecard
 

@@ -1,6 +1,6 @@
 {
-  "catalog_version": "2026-08-13.4",
-  "content_digest": "sha256:49465c85a311481038642a1f48fabb0b677c2189bf0422c936ea03456af8919b",
+  "catalog_version": "2026-08-23.1",
+  "content_digest": "sha256:140af257c89545c3e6712b8d432ef753ad1b8c5dc748448a5e593d2d2bfd5a97",
   "generated_from": "accepted-replay-artifacts",
   "schema_version": "quanthus.product-candidate-evidence.v1",
   "strategies": [
@@ -13600,6 +13600,71 @@
           "security_code": "600519"
         }
       ],
+      "validation": []
+    },
+    {
+      "equity_curve": [
+        {"market_date": "2020-01-02", "system_equity": 500000.0},
+        {"market_date": "2020-01-23", "system_equity": 501012.14},
+        {"market_date": "2020-02-28", "system_equity": 489576.58},
+        {"market_date": "2020-03-31", "system_equity": 480854.42},
+        {"market_date": "2020-04-30", "system_equity": 478922.22},
+        {"market_date": "2020-05-29", "system_equity": 472606.78},
+        {"market_date": "2020-06-30", "system_equity": 483364.1},
+        {"market_date": "2020-07-31", "system_equity": 509378.1},
+        {"market_date": "2020-08-31", "system_equity": 513008.25},
+        {"market_date": "2020-09-30", "system_equity": 509957.57},
+        {"market_date": "2020-10-30", "system_equity": 510805.61},
+        {"market_date": "2020-11-30", "system_equity": 510478.7},
+        {"market_date": "2020-12-31", "system_equity": 514465.01},
+        {"market_date": "2021-01-29", "system_equity": 523604.14},
+        {"market_date": "2021-02-26", "system_equity": 519606.7},
+        {"market_date": "2021-03-31", "system_equity": 516532.34},
+        {"market_date": "2021-04-30", "system_equity": 520801.78},
+        {"market_date": "2021-05-31", "system_equity": 520469.51},
+        {"market_date": "2021-06-30", "system_equity": 521798.38},
+        {"market_date": "2021-07-30", "system_equity": 521243.76},
+        {"market_date": "2021-08-31", "system_equity": 529978.05},
+        {"market_date": "2021-09-30", "system_equity": 534783.42},
+        {"market_date": "2021-10-29", "system_equity": 528931.65},
+        {"market_date": "2021-11-30", "system_equity": 529723.37},
+        {"market_date": "2021-12-31", "system_equity": 533523.09}
+      ],
+      "parameters": {
+        "capital_per_unit": 100000,
+        "execution_profile": "close-to-next-open-v1",
+        "portfolio_units": 5,
+        "selection": "p4-trend-risk-two-expert-topology"
+      },
+      "performance": {
+        "average_holding_sessions": null,
+        "capital_matched_benchmark_total_return": null,
+        "ending_equity": 533523.09,
+        "exposure_rate": 14.813335,
+        "initial_equity": 500000.0,
+        "profit_factor": null,
+        "return_excluding_top_3_closed_trades": null,
+        "sharpe_ratio": null,
+        "total_fees": 1608.91,
+        "total_pnl": 33523.09,
+        "turnover": 5.69166,
+        "win_rate": null
+      },
+      "run_manifest": {
+        "data_snapshot_id": "dwd-base-202607-v2.1+dwd-base-202607-v2.1-correction-20260813-001",
+        "execution_policy_version": "p2-daily-research-v1",
+        "execution_profile_id": "close-to-next-open-v1",
+        "feature_version": "formal-expert-topology|sha256:b53e9b424080c4a051419c20a4777d6afcf51bf209eb5705b09ba6ca6d4768a3",
+        "official": false,
+        "parameter_hash": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+        "rule_version": "1.0.1",
+        "run_id": "expert_run_481e6181930f6e031e479c65d40a7fa04e2f0ebf4d9b6290c3605810d1cc60c0",
+        "schedule_version": "development-2020-2021"
+      },
+      "source_artifact_sha256": "sha256:3a934980cf9bd921aa2c5a081892856797e8a1c7929c78b027e746572c715faa",
+      "strategy_id": "candidate.p4-trend-risk",
+      "strategy_version": "1.0.1",
+      "trades": [],
       "validation": []
     }
   ]

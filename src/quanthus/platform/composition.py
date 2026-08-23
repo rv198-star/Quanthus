@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from quanthus.expert_evaluation.product_view import ProductExpertEvidence
 from quanthus.platform.adapters.quanthus import (
     QuanthusAttributionVerificationAdapter,
     QuanthusGateQueryAdapter,
@@ -44,6 +45,7 @@ class PlatformKernel:
     attribution_verification: AttributionVerificationPort
     product_catalog: ProductResearchCatalog
     candidate_evidence: ProductCandidateEvidence
+    expert_evidence: ProductExpertEvidence
     candidate_approvals: CandidateApprovalService
     metrics: Metrics
     app: PlatformHttpApp
@@ -73,6 +75,8 @@ def create_platform_kernel(
     product_catalog_path: Path | None = None,
     candidate_evidence_path: Path | None = None,
     candidate_run_root: Path | None = None,
+    expert_evidence_path: Path | None = None,
+    expert_run_root: Path | None = None,
 ) -> PlatformKernel:
     root = find_project_root()
     manifest = load_feature_manifest(manifest_path)
@@ -105,6 +109,11 @@ def create_platform_kernel(
         run_root=candidate_run_root,
     )
     candidate_evidence.warm_active()
+    expert_evidence = ProductExpertEvidence(
+        expert_evidence_path or root / "config" / "product-expert-evidence.v1.json",
+        root,
+        expert_run_root,
+    )
     candidate_approvals = CandidateApprovalService(store)
     if (cipher_key is None) == (cipher is None):
         raise ValueError("provide exactly one of cipher_key or cipher")
@@ -135,6 +144,7 @@ def create_platform_kernel(
         gate_query=gate_query,
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
+        expert_evidence=expert_evidence,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
     )
@@ -148,6 +158,7 @@ def create_platform_kernel(
         attribution_verification=attribution_verification,
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
+        expert_evidence=expert_evidence,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
         app=app,
@@ -165,6 +176,7 @@ def platform_kernel_from_env() -> PlatformKernel:
     gate_value = os.environ.get("QUANTHUS_PLATFORM_GATE_PATH", "").strip()
     attribution_value = os.environ.get("QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT", "").strip()
     candidate_run_value = os.environ.get("QUANTHUS_CANDIDATE_RUN_ROOT", "").strip()
+    expert_run_value = os.environ.get("QUANTHUS_EXPERT_RUN_ROOT", "").strip()
     return create_platform_kernel(
         store=PostgresPlatformStore(dsn),
         cipher_key=cipher_key,
@@ -172,4 +184,5 @@ def platform_kernel_from_env() -> PlatformKernel:
         gate_path=Path(gate_value) if gate_value else None,
         attribution_root=Path(attribution_value) if attribution_value else None,
         candidate_run_root=Path(candidate_run_value) if candidate_run_value else None,
+        expert_run_root=Path(expert_run_value) if expert_run_value else None,
     )

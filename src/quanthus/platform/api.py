@@ -12,6 +12,10 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Any
 
+from quanthus.expert_evaluation.product_view import (
+    ProductExpertEvidence,
+    ProductExpertEvidenceError,
+)
 from quanthus.platform.candidate_approval import (
     CandidateApprovalService,
     public_candidate_approval_event,
@@ -152,6 +156,7 @@ class PlatformHttpApp:
         gate_query: GateQueryPort,
         product_catalog: ProductResearchCatalog,
         candidate_evidence: ProductCandidateEvidence,
+        expert_evidence: ProductExpertEvidence,
         candidate_approvals: CandidateApprovalService,
         metrics: Metrics,
     ) -> None:
@@ -163,6 +168,7 @@ class PlatformHttpApp:
         self._gate_query = gate_query
         self._product_catalog = product_catalog
         self._candidate_evidence = candidate_evidence
+        self._expert_evidence = expert_evidence
         self._candidate_approvals = candidate_approvals
         self._metrics = metrics
         self._routes: list[Route] = []
@@ -531,9 +537,7 @@ class PlatformHttpApp:
         )
 
     @staticmethod
-    def _apply_evidence_summary(
-        candidate: dict[str, Any], evidence: Mapping[str, Any]
-    ) -> None:
+    def _apply_evidence_summary(candidate: dict[str, Any], evidence: Mapping[str, Any]) -> None:
         summary = evidence.get("summary")
         if not isinstance(summary, Mapping):
             return
@@ -567,8 +571,7 @@ class PlatformHttpApp:
             (
                 item.run_id
                 for item in self._store.candidate_active_runs()
-                if item.strategy_id == strategy_id
-                and item.strategy_version == candidate["version"]
+                if item.strategy_id == strategy_id and item.strategy_version == candidate["version"]
             ),
             None,
         )
@@ -593,10 +596,17 @@ class PlatformHttpApp:
                     "summary": item.get("summary", {}),
                 }
             )
+        try:
+            expert_evidence = self._expert_evidence.candidate(
+                strategy_id, str(candidate["version"])
+            )
+        except ProductExpertEvidenceError as exc:
+            return _error(exc.reason_code, 503, observed_request.request_id)
         return _json_response(
             {
                 "candidate": candidate,
                 "evidence": evidence,
+                "expert_evidence": expert_evidence,
                 "approval": approval,
                 "run_history": run_history,
             }
@@ -684,6 +694,7 @@ class PlatformHttpApp:
         candidate_identities = (
             f"{item['strategy_id']}@{item['version']}"
             for item in self._product_catalog.read()["strategies"]
+            if item.get("replay_submission_eligible", True) is True
         )
         input_ref = {
             "scope_start": "2012-01-04",
@@ -750,6 +761,7 @@ def create_http_app(
     gate_query: GateQueryPort,
     product_catalog: ProductResearchCatalog,
     candidate_evidence: ProductCandidateEvidence,
+    expert_evidence: ProductExpertEvidence,
     candidate_approvals: CandidateApprovalService,
     metrics: Metrics,
 ) -> PlatformHttpApp:
@@ -762,6 +774,7 @@ def create_http_app(
         gate_query=gate_query,
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
+        expert_evidence=expert_evidence,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
     )

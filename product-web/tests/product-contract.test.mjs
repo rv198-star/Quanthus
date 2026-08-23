@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const app = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../src/api.js', import.meta.url), 'utf8')
+const candidateDetail = readFileSync(new URL('../src/views/CandidateDetail.vue', import.meta.url), 'utf8')
 const provenance = readFileSync(new URL('../UPSTREAM.md', import.meta.url), 'utf8')
 const catalog = JSON.parse(readFileSync(new URL('../../config/product-research-catalog.v1.json', import.meta.url), 'utf8'))
 const sources = [
@@ -63,7 +64,7 @@ test('research-only and attribution honesty remain visible', () => {
 })
 
 test('catalog exposes candidates without implicit admission or execution authority', () => {
-  assert.equal(catalog.strategies.length, 5)
+  assert.equal(catalog.strategies.length, 6)
   assert.ok(catalog.strategies.every(item => item.kind === 'candidate-version'))
   assert.equal(catalog.strategies.filter(item => item.governance_decision === 'research-admitted').length, 0)
   assert.equal(catalog.strategies.filter(item => item.execution_authorized === true).length, 0)
@@ -90,6 +91,30 @@ test('catalog exposes candidates without implicit admission or execution authori
   assert.equal(quantdinger.external_conformance.signal_match, '37 shared + 1 governed downstream divergence')
   assert.equal(quantdinger.external_conformance.fill_date_side_match, '36 shared / 38 native')
   assert.equal(quantdinger.external_conformance.legacy_direct_dwd_v2_1, false)
+  const expert = catalog.strategies.find(item => item.strategy_id === 'candidate.p4-trend-risk')
+  assert.equal(expert.version, '1.0.1')
+  assert.equal(expert.replay_submission_eligible, false)
+  assert.equal(expert.execution_authorized, false)
+})
+
+test('candidate expert evidence remains digest-bound and read-only', () => {
+  for (const field of [
+    'expert_evidence',
+    'strategy_binding',
+    'assessment_scorecards',
+    'economic_effects',
+    'disagreement_cases',
+    'lifecycle_decision',
+    'source_digests'
+  ]) {
+    assert.match(candidateDetail, new RegExp(field))
+  }
+  assert.match(candidateDetail, /评估 Run/)
+  assert.match(candidateDetail, /归因发布/)
+  assert.match(candidateDetail, /待生命周期决定/)
+  assert.match(candidateDetail, /执行授权<\/span><b class="negative">未授权/)
+  assert.doesNotMatch(api, /expert[^'"\n]*(create|update|approve|decide|promote|execute)/i)
+  assert.doesNotMatch(candidateDetail, /triggerAction\(['"]expert/)
 })
 
 test('pinned upstream provenance is recorded', () => {

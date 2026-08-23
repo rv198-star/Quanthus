@@ -11,7 +11,9 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-install -d "$BUILD_CONTEXT/config" "$BUILD_CONTEXT/src/quanthus"
+install -d \
+    "$BUILD_CONTEXT/config/expert-strategies" \
+    "$BUILD_CONTEXT/src/quanthus/expert_evaluation"
 cp "$REPOSITORY_ROOT/.dockerignore" \
     "$REPOSITORY_ROOT/pyproject.toml" \
     "$REPOSITORY_ROOT/README.md" \
@@ -20,7 +22,10 @@ cp "$REPOSITORY_ROOT/config/platform-features.v1.json" \
     "$REPOSITORY_ROOT/config/platform-kernel-gates.v1.json" \
     "$REPOSITORY_ROOT/config/product-research-catalog.v1.json" \
     "$REPOSITORY_ROOT/config/product-candidate-evidence.v1.json" \
+    "$REPOSITORY_ROOT/config/product-expert-evidence.v1.json" \
     "$BUILD_CONTEXT/config/"
+cp "$REPOSITORY_ROOT/config/expert-strategies/p4-trend-risk.v1.0.1.json" \
+    "$BUILD_CONTEXT/config/expert-strategies/"
 cp "$REPOSITORY_ROOT/src/quanthus/__init__.py" \
     "$REPOSITORY_ROOT/src/quanthus/policy.py" \
     "$REPOSITORY_ROOT/src/quanthus/strategy_attribution.py" \
@@ -28,6 +33,13 @@ cp "$REPOSITORY_ROOT/src/quanthus/__init__.py" \
     "$REPOSITORY_ROOT/src/quanthus/strategy_attribution_planning.py" \
     "$REPOSITORY_ROOT/src/quanthus/strategy_attribution_publication.py" \
     "$BUILD_CONTEXT/src/quanthus/"
+cp "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/__init__.py" \
+    "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/contracts.py" \
+    "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/product_view.py" \
+    "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/release_verification.py" \
+    "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/runner.py" \
+    "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/serialization.py" \
+    "$BUILD_CONTEXT/src/quanthus/expert_evaluation/"
 cp -a "$REPOSITORY_ROOT/src/quanthus/platform" "$BUILD_CONTEXT/src/quanthus/"
 
 docker build \

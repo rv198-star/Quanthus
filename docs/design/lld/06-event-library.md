@@ -332,6 +332,8 @@ publication, and verification. Cumulative decoded rows against projected rows dr
 progress; timing counters remain operational telemetry. The Event Worker polls this receipt and
 generation-fences every PostgreSQL update. The receipt is not copied into a sealed Run, and neither
 its percentage nor its timing fields define Job lifecycle authority or governed package identity.
+The first optimization remains one scan process and records `worker_count=1`; process parallelism
+stays deferred until its production benchmark demonstrates a remaining need.
 
 The Event Library and P3 feature panel intentionally use different security identity namespaces.
 `EventRecord.identity.security_id` remains the governed DWD identity, while the accepted direct-DWD

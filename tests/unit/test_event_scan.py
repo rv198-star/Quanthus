@@ -399,6 +399,7 @@ class EventForwardScanTests(unittest.TestCase):
         terminal = {stage: details for stage, details in observed if details["terminal"]}
         self.assertEqual(set(terminal), {"candidate-scan", "candidate-finalization"})
         self.assertEqual(terminal["candidate-scan"]["rows_decoded"], len(rows))
+        self.assertEqual(terminal["candidate-scan"]["worker_count"], 1)
         self.assertEqual(
             terminal["candidate-scan"]["evaluated_rows"], result.counters.evaluated_rows
         )

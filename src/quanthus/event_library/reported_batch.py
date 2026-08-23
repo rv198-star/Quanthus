@@ -59,6 +59,28 @@ def _memory_file(name: str, default: str) -> int | None:
     return int(value)
 
 
+def _memory_events() -> tuple[int | None, int | None]:
+    path = Path(
+        os.environ.get(
+            "QUANTHUS_EVENT_MEMORY_EVENTS_PATH",
+            "/sys/fs/cgroup/memory.events",
+        )
+    )
+    try:
+        fields = dict(
+            line.split(maxsplit=1)
+            for line in path.read_text(encoding="ascii").splitlines()
+        )
+    except (OSError, ValueError):
+        return None, None
+    oom = fields.get("oom")
+    oom_kill = fields.get("oom_kill")
+    return (
+        int(oom) if oom is not None and oom.isdigit() else None,
+        int(oom_kill) if oom_kill is not None and oom_kill.isdigit() else None,
+    )
+
+
 def _process_current_rss_bytes() -> int:
     try:
         lines = Path("/proc/self/status").read_text(encoding="ascii").splitlines()
@@ -73,6 +95,7 @@ def _process_current_rss_bytes() -> int:
 
 
 def _memory_sample() -> dict[str, int | None]:
+    oom_count, oom_kill_count = _memory_events()
     return {
         "process_current_rss_bytes": _process_current_rss_bytes(),
         "process_peak_rss_bytes": (
@@ -86,6 +109,10 @@ def _memory_sample() -> dict[str, int | None]:
             "QUANTHUS_EVENT_MEMORY_PEAK_PATH",
             "/sys/fs/cgroup/memory.peak",
         ),
+        "cgroup_memory_limit_bytes": _memory_file(
+            "QUANTHUS_EVENT_MEMORY_LIMIT_PATH",
+            "/sys/fs/cgroup/memory.max",
+        ),
         "cgroup_swap_current_bytes": _memory_file(
             "QUANTHUS_EVENT_SWAP_CURRENT_PATH",
             "/sys/fs/cgroup/memory.swap.current",
@@ -94,6 +121,12 @@ def _memory_sample() -> dict[str, int | None]:
             "QUANTHUS_EVENT_SWAP_PEAK_PATH",
             "/sys/fs/cgroup/memory.swap.peak",
         ),
+        "cgroup_swap_limit_bytes": _memory_file(
+            "QUANTHUS_EVENT_SWAP_LIMIT_PATH",
+            "/sys/fs/cgroup/memory.swap.max",
+        ),
+        "cgroup_oom_count": oom_count,
+        "cgroup_oom_kill_count": oom_kill_count,
     }
 
 

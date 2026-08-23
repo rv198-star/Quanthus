@@ -34,6 +34,7 @@ from quanthus.backtest.strategy_replay import (
 from quanthus.feature_registry import FeatureRegistry
 
 FEATURE_EVALUATOR_VERSION = "1.0.0"
+FEATURE_DUCKDB_MEMORY_LIMIT = "6GB"
 BASELINE_RUNNER_VERSION = "2.2.0"
 BASELINE_BENCHMARK_INSTRUMENT_ID = "sh000300"
 _STRATEGY_KINDS = {"ma_trend", "breakout20", "oversold_rebound"}
@@ -1238,14 +1239,11 @@ class BaselineFeaturePanel:
         spill = resolved.with_name(f".{resolved.name}.{uuid.uuid4().hex}.spill")
         connection = duckdb.connect(":memory:")
         try:
-            if selected_security_ids is not None:
-                spill.mkdir()
-                connection.execute("SET memory_limit='10GB'")
-                connection.execute("SET threads=2")
-                connection.execute("SET preserve_insertion_order=false")
-                connection.execute(
-                    f"SET temp_directory={_sql_string(str(spill))}"
-                )
+            spill.mkdir()
+            connection.execute(f"SET memory_limit='{FEATURE_DUCKDB_MEMORY_LIMIT}'")
+            connection.execute("SET threads=2")
+            connection.execute("SET preserve_insertion_order=false")
+            connection.execute(f"SET temp_directory={_sql_string(str(spill))}")
             _create_feature_source_views(
                 connection,
                 paths,

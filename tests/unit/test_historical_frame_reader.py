@@ -294,6 +294,20 @@ class HistoricalReplayFrameReaderTests(unittest.TestCase):
             )
             self.assertFalse(hasattr(first.decision_view, "session"))
 
+    def test_reader_bounds_duckdb_memory_and_enables_spill(self) -> None:
+        with HistoricalReplayFrameReader(self.bundle) as reader:
+            connection = reader._ensure_open()
+            memory_limit = str(
+                connection.execute("SELECT current_setting('memory_limit')").fetchone()[0]
+            )
+            temp_directory = str(
+                connection.execute("SELECT current_setting('temp_directory')").fetchone()[0]
+            )
+
+            self.assertIn("GiB", memory_limit)
+            self.assertLessEqual(float(memory_limit.split()[0]), 6.0)
+            self.assertIn("quanthus-replay-duckdb-", temp_directory)
+
     def test_execution_states_alias_action_and_exception_are_fail_closed(self) -> None:
         d1, d2, d3, _ = self.dates
         with HistoricalReplayFrameReader(self.bundle) as reader:

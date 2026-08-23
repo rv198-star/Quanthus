@@ -82,8 +82,12 @@ def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
         "process_peak_rss_bytes": 1024,
         "cgroup_memory_current_bytes": 2048,
         "cgroup_memory_peak_bytes": 4096,
+        "cgroup_memory_limit_bytes": 16384,
         "cgroup_swap_current_bytes": 0,
         "cgroup_swap_peak_bytes": 0,
+        "cgroup_swap_limit_bytes": 0,
+        "cgroup_oom_count": 0,
+        "cgroup_oom_kill_count": 0,
     }
     payload = {
         "schema_version": "quanthus.p4-reported-batch-runtime.v2",

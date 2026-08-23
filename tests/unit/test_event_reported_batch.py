@@ -92,13 +92,18 @@ def test_memory_sample_reads_process_and_configured_cgroup_files(
     values = {
         "QUANTHUS_EVENT_MEMORY_CURRENT_PATH": 100,
         "QUANTHUS_EVENT_MEMORY_PEAK_PATH": 200,
+        "QUANTHUS_EVENT_MEMORY_LIMIT_PATH": 1000,
         "QUANTHUS_EVENT_SWAP_CURRENT_PATH": 0,
         "QUANTHUS_EVENT_SWAP_PEAK_PATH": 10,
+        "QUANTHUS_EVENT_SWAP_LIMIT_PATH": 0,
     }
     for name, value in values.items():
         path = tmp_path / name.lower()
         path.write_text(f"{value}\n", encoding="ascii")
         monkeypatch.setenv(name, str(path))
+    events = tmp_path / "memory.events"
+    events.write_text("low 0\nhigh 0\nmax 0\noom 2\noom_kill 0\n", encoding="ascii")
+    monkeypatch.setenv("QUANTHUS_EVENT_MEMORY_EVENTS_PATH", str(events))
 
     sample = _memory_sample()
 
@@ -106,8 +111,12 @@ def test_memory_sample_reads_process_and_configured_cgroup_files(
     assert sample["process_peak_rss_bytes"] > 0
     assert sample["cgroup_memory_current_bytes"] == 100
     assert sample["cgroup_memory_peak_bytes"] == 200
+    assert sample["cgroup_memory_limit_bytes"] == 1000
     assert sample["cgroup_swap_current_bytes"] == 0
     assert sample["cgroup_swap_peak_bytes"] == 10
+    assert sample["cgroup_swap_limit_bytes"] == 0
+    assert sample["cgroup_oom_count"] == 2
+    assert sample["cgroup_oom_kill_count"] == 0
 
 
 def test_job_local_panel_rejects_partial_or_drifted_identity(tmp_path: Path) -> None:

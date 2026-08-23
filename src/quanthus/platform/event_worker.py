@@ -379,8 +379,12 @@ def _valid_memory_sample(value: object) -> bool:
         "process_peak_rss_bytes",
         "cgroup_memory_current_bytes",
         "cgroup_memory_peak_bytes",
+        "cgroup_memory_limit_bytes",
         "cgroup_swap_current_bytes",
         "cgroup_swap_peak_bytes",
+        "cgroup_swap_limit_bytes",
+        "cgroup_oom_count",
+        "cgroup_oom_kill_count",
     }
     if not isinstance(value, dict) or set(value) != required:
         return False

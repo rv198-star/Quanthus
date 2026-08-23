@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
 
 FRAME_READER_VERSION = "1.1.0"
 PRICE_TICK = Decimal("0.01")
+DUCKDB_MEMORY_LIMIT = "6GB"
 
 _VIEW_DATASETS = {
     "replay_actions": "corporate_actions_normalized",
@@ -475,8 +477,18 @@ class HistoricalReplayFrameReader:
             raise HistoricalFrameReaderError(
                 "P1 dependencies are missing; run `make bootstrap-p1`"
             ) from exc
+        self._duckdb_temporary = tempfile.TemporaryDirectory(
+            prefix="quanthus-replay-duckdb-"
+        )
         self._connection: Any | None = duckdb.connect(":memory:")
         try:
+            self._connection.execute(f"SET memory_limit='{DUCKDB_MEMORY_LIMIT}'")
+            self._connection.execute("SET threads=2")
+            self._connection.execute("SET preserve_insertion_order=false")
+            self._connection.execute(
+                "SET temp_directory="
+                + _sql_string(str(Path(self._duckdb_temporary.name).resolve()))
+            )
             self._create_views()
             self._validate_sources()
         except BaseException:
@@ -519,6 +531,7 @@ class HistoricalReplayFrameReader:
         if self._connection is not None:
             self._connection.close()
             self._connection = None
+        self._duckdb_temporary.cleanup()
 
     def _ensure_open(self) -> Any:
         if self._connection is None:

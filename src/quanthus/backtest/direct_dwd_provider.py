@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import tempfile
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, time
@@ -19,6 +20,7 @@ from quanthus.industry_mapping import StaticIndustryMapping, load_static_industr
 from quanthus.policy import ConfigurationError
 
 MATERIALIZER_VERSION = "direct-dwd-job-local-v1"
+DUCKDB_MEMORY_LIMIT = "6GB"
 MARKET_TIMEZONE_NAME = "Asia/Shanghai"
 DATASETS = (
     "corporate_action_exceptions",
@@ -136,8 +138,13 @@ def _materialize(
 
     payload = dwd_root / "payload"
     correction = correction_root / "payload"
+    spill = root / ".duckdb-materialize-spill"
+    spill.mkdir()
     connection = duckdb.connect(":memory:")
+    connection.execute(f"SET memory_limit='{DUCKDB_MEMORY_LIMIT}'")
+    connection.execute("SET threads=2")
     connection.execute("SET preserve_insertion_order=false")
+    connection.execute(f"SET temp_directory={_sql_path(spill)}")
     start = history_start.isoformat()
     end = execution_end.isoformat()
     try:
@@ -523,6 +530,7 @@ def _materialize(
         return counts
     finally:
         connection.close()
+        shutil.rmtree(spill, ignore_errors=True)
 
 
 def open_direct_dwd_session(

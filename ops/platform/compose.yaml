@@ -80,12 +80,21 @@ services:
   event-worker:
     image: ${QUANTHUS_EVENT_IMAGE:-quanthus-event:local}
     restart: unless-stopped
+    mem_limit: 16g
+    memswap_limit: 16g
     entrypoint: ["python", "-m", "quanthus.platform.event_worker"]
     environment:
       PGPASSWORD: ${QUANTHUS_PLATFORM_POSTGRES_PASSWORD:?required}
       QUANTHUS_PLATFORM_DATABASE_URL: postgresql://quanthus_platform@postgres:5432/quanthus_platform
       QUANTHUS_WORKER_ID: oci-event-1
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
+      QUANTHUS_EVENT_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current
+      QUANTHUS_EVENT_MEMORY_PEAK_PATH: /sys/fs/cgroup/memory.peak
+      QUANTHUS_EVENT_MEMORY_LIMIT_PATH: /sys/fs/cgroup/memory.max
+      QUANTHUS_EVENT_SWAP_CURRENT_PATH: /sys/fs/cgroup/memory.swap.current
+      QUANTHUS_EVENT_SWAP_PEAK_PATH: /sys/fs/cgroup/memory.swap.peak
+      QUANTHUS_EVENT_SWAP_LIMIT_PATH: /sys/fs/cgroup/memory.swap.max
+      QUANTHUS_EVENT_MEMORY_EVENTS_PATH: /sys/fs/cgroup/memory.events
     depends_on:
       postgres:
         condition: service_healthy

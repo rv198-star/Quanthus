@@ -174,6 +174,15 @@ class ExpertStrategyRegistry:
             STRATEGY_REGISTRY_KEY,
         )
 
+    def formal_attribution_ref(self, plan_digest: str) -> FormalStrategyRef:
+        return FormalStrategyRef(
+            self.card.strategy_id,
+            self.card.strategy_version,
+            self.card.semantic_digest,
+            plan_digest,
+            STRATEGY_REGISTRY_KEY,
+        )
+
     def expected_bindings(
         self, strategy: FormalStrategyRef, registry_root: Path
     ) -> tuple[tuple[tuple[str, str, str], ...], tuple[str, ...]]:
@@ -181,10 +190,33 @@ class ExpertStrategyRegistry:
             raise ExpertEvaluationError(
                 "strategy_registry_mismatch", "formal strategy registry root differs"
             )
-        if strategy != self.formal_strategy_ref():
+        if (
+            strategy.strategy_id,
+            strategy.strategy_version,
+            strategy.card_digest,
+            strategy.registry_key,
+        ) != (
+            self.card.strategy_id,
+            self.card.strategy_version,
+            self.card.semantic_digest,
+            STRATEGY_REGISTRY_KEY,
+        ):
             raise ExpertEvaluationError(
                 "formal_strategy_identity_mismatch", "formal strategy reference differs"
             )
+        if strategy.attribution_plan_digest != self.sentinel_plan_digest:
+            from quanthus.expert_strategy.formal_attribution_semantics import (
+                FormalStrategyAttributionAdapter,
+            )
+            from quanthus.strategy_attribution_planning import compile_attribution_plan
+
+            formal_plan_digest = compile_attribution_plan(
+                FormalStrategyAttributionAdapter(self.repository_root).run_request()
+            ).digest
+            if strategy.attribution_plan_digest != formal_plan_digest:
+                raise ExpertEvaluationError(
+                    "formal_strategy_plan_mismatch", "formal strategy plan differs"
+                )
         return self.evaluation_spec_identities, self.intervention_ids
 
     def _verify_position_spec(self) -> None:

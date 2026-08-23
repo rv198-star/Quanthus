@@ -860,7 +860,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(source_path.is_file())
         self.assertTrue((root / "tests" / "unit" / "test_opportunity_funnel.py").is_file())
 
-    def test_strategy_attribution_design_is_blocked_and_traceable(self) -> None:
+    def test_strategy_attribution_formal_runtime_is_accepted_and_traceable(self) -> None:
         root = find_project_root()
         parent_path = root / "docs" / "design" / "lld" / "10-monitoring-attribution.md"
         child_path = (
@@ -879,6 +879,12 @@ class DocumentTraceabilityTests(unittest.TestCase):
             / "docs"
             / "acceptance"
             / "p3-attribution-synthetic-publication-20260731.md"
+        )
+        formal_acceptance_path = (
+            root
+            / "docs"
+            / "acceptance"
+            / "p3-attr-formal-production-20260823.md"
         )
         fields = _header_fields(child_path)
         child = child_path.read_text(encoding="utf-8")
@@ -899,13 +905,17 @@ class DocumentTraceabilityTests(unittest.TestCase):
             encoding="utf-8"
         )
         acceptance = acceptance_path.read_text(encoding="utf-8")
+        formal_acceptance = formal_acceptance_path.read_text(encoding="utf-8")
         gate = json.loads(gate_path.read_text(encoding="utf-8"))
         p0 = json.loads(p0_path.read_text(encoding="utf-8"))
 
         self.assertEqual(fields["Parent"], "`../10-monitoring-attribution.md`")
         self.assertEqual(fields["Design status"], "approved")
-        self.assertEqual(fields["Delivery gate"], "blocked")
-        self.assertIn("bounded synthetic closure accepted", fields["Implementation status"])
+        self.assertEqual(
+            fields["Delivery gate"],
+            "formal runtime accepted; recurring reporting remains deferred",
+        )
+        self.assertIn("first formal-strategy Pipeline", fields["Implementation status"])
         self.assertEqual(fields["Counterfactual policy"], "`config/p0-policy.v1.json`")
         self.assertIn("`P3-ATTR-001`", fields["Governing work"])
         self.assertIn("`P3-DASH-001`", fields["Governing work"])
@@ -934,6 +944,12 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("checkpointed local Pipeline execution", work_items)
         self.assertIn("no formal strategy", acceptance.lower())
         self.assertIn("`P3-ATTR-001` remains `deferred`", acceptance)
+        self.assertIn(
+            "sha256:1754a4a3a185420734e6addab71110ee82ecd71fb4fbd182f9ee1506c49c98ff",
+            formal_acceptance,
+        )
+        self.assertIn("`execution_authorized=false`", formal_acceptance)
+        self.assertIn("All 104 release", formal_acceptance)
         self.assertTrue((root / "src" / "quanthus" / "strategy_attribution.py").is_file())
         self.assertTrue(
             (root / "src" / "quanthus" / "strategy_attribution_pipeline.py").is_file()
@@ -1320,15 +1336,13 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {item.stable_id for item in p3_items if item.status == "blocked"},
             {
                 "P3-LABEL-004",
-                "P3-ATTR-001",
                 "P3-DASH-001",
-                "P3-EXPERT-004",
                 "P3-EXPERT-005",
             },
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-EXPERT-000"},
+            {"P3-EXPERT-000", "P3-EXPERT-004"},
         )
         self.assertTrue(
             all(

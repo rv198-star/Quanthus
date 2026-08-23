@@ -189,10 +189,9 @@ panel, result, and scoreboard byte-identically. The bounded conformance review t
 
 The approved Expert Strategy Layer MVP is a separate post-P3 product increment governed by
 `docs/design/lld/04-experts-aggregator/expert-strategy-layer.md`. It does not reopen the accepted P3
-fixture or alter the current P4 gate. `P3-EXPERT-000` tracks seven blocking children; the additive
-v2 contract is accepted and the Worker evaluation pipeline is ready. The formal attribution item
-retains its machine-readable `deferred` state until `P3-STRAT-002` supplies the strategy adapter and
-predeclared questions.
+fixture or alter the current P4 gate. The historical `p3-gates.v1.json` snapshot retains its
+original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted separately by
+`docs/acceptance/p3-attr-formal-production-20260823.md`.
 
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
@@ -222,10 +221,10 @@ predeclared questions.
 | P3-POS-003 | Implement cooldown and carried exit | P2 matcher | closed |
 | P3-POS-004 | Add versioned Trial-position reduction compatibility | P3-POS-001, P2 ledger, P3-STRAT-002 | closed by `docs/acceptance/p3-pos-trial-reduction-compatibility-production-20260822.md` |
 | P3-FUNNEL-001 | Implement opportunity funnel | P3 vertical slice | closed |
-| P3-ATTR-001 | Run bounded attribution for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002 | blocked; predecessor accepted, pending explicit resume and outcome-blind questions |
+| P3-ATTR-001 | Run bounded attribution for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002 | closed by `docs/acceptance/p3-attr-formal-production-20260823.md` |
 | P3-DASH-001 | Produce monitoring report | Funnel and attribution | deferred pending recurring formal strategy |
-| P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | blocked by P3-ATTR-001 |
-| P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | blocked by P3-EXPERT-004 and P3-ATTR-001 |
+| P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | ready after P3-ATTR-001 acceptance |
+| P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | blocked only by P3-EXPERT-004 |
 | P3-ACCEPT-001 | Execute multi-year vertical-slice acceptance | All P3 release blockers | closed |
 
 ## P4-P7

@@ -13,6 +13,9 @@ from quanthus.expert_strategy import load_expert_strategy_card
 ROOT = Path(__file__).resolve().parents[2]
 CARD = ROOT / "config/expert-strategies/p4-trend-risk.v1.0.1.json"
 LEGACY_CARD = ROOT / "config/expert-strategies/p4-trend-risk.v1.json"
+ATTRIBUTION_PREREGISTRATION = (
+    ROOT / "config/expert-strategies/p4-trend-risk-attribution.v1.json"
+)
 SEMANTIC_EXCLUDES = {"lifecycle", "owner", "governance", "semantic_digest"}
 
 
@@ -244,6 +247,35 @@ def test_legacy_strategy_card_remains_immutable_and_loadable() -> None:
         legacy.semantic_sections["position_and_execution"]["position_state_machine_version"]
         == "1.0.0"
     )
+
+
+def test_formal_attribution_is_preregistered_before_result_access() -> None:
+    card = _raw()
+    preregistration = cast(
+        dict[str, Any], json.loads(ATTRIBUTION_PREREGISTRATION.read_text(encoding="utf-8"))
+    )
+    declared_digest = preregistration.pop("semantic_digest")
+
+    assert digest_value(preregistration) == declared_digest == (
+        "sha256:a9057b028a52a4794c333fe9ca7ae3e8d936df96912375f148f11fb419bb19bb"
+    )
+    assert preregistration["result_access_before_persistence"] is False
+    assert preregistration["strategy"]["strategy_card_digest"] == card["semantic_digest"]
+    assert [item["question_id"] for item in preregistration["questions"]] == [
+        item["question_id"] for item in card["attribution_questions"]
+    ]
+    assert [item["intervention_id"] for item in preregistration["questions"]] == [
+        item["intervention_id"] for item in card["attribution_questions"]
+    ]
+    assert [item["materiality_rule"] for item in preregistration["questions"]] == [
+        item["materiality_rule"] for item in card["attribution_questions"]
+    ]
+    assert preregistration["uncertainty"] == card["uncertainty"] | {
+        "paired_observation_unit": "nonoverlapping_22_session_blocks"
+    }
+    assert len(preregistration["execution_variants"]) == 4
+    assert preregistration["resource_budget"]["hard_container_gib"] == 16
+    assert preregistration["resource_budget"]["sealed_partition_access"] is False
 
 
 def test_unknown_nested_strategy_parameter_is_rejected(tmp_path: Path) -> None:

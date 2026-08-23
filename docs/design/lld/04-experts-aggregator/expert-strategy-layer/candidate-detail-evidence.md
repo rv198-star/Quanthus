@@ -5,8 +5,8 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-004` |
 | Design status | approved |
-| Delivery gate | blocked by `P3-ATTR-001` and `P3-EXPERT-002` |
-| Implementation readiness | ready after trusted evidence artifacts exist |
+| Delivery gate | ready after `P3-ATTR-001` and `P3-EXPERT-002` acceptance |
+| Implementation readiness | trusted evaluation and attribution artifacts are available |
 | Authority | read-only projection; no calculation, approval, or execution rights |
 
 ## 1. Outcome and boundary

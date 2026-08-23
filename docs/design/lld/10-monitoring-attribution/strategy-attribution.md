@@ -5,15 +5,15 @@
 | Parent | `../10-monitoring-attribution.md` |
 | Phase | P3+ |
 | Design status | approved |
-| Delivery gate | blocked |
-| Implementation status | bounded synthetic closure accepted with a versioned method registry, resolver-backed receipts, an outcome-blind immutable planner, a resumable synchronous Pipeline, an atomic publisher, five local CLI commands, and a checksum-gated read-only viewer; formal attribution runtime and recurring reporting remain deferred |
+| Delivery gate | formal runtime accepted; recurring reporting remains deferred |
+| Implementation status | bounded synthetic closure and the first formal-strategy Pipeline, complete-P2 counterfactuals, uncertainty checks, immutable release, and isolated byte-identical reproduction are accepted |
 | Gate source | `config/p3-gates.v1.json` |
 | Counterfactual policy | `config/p0-policy.v1.json` |
 | Governing work | `P3-ATTR-001`, `P3-DASH-001` |
 | Governing requirements | FR-AUDIT-001 through FR-AUDIT-005 |
 | Governing code | `src/quanthus/strategy_attribution.py`, `src/quanthus/strategy_attribution_planning.py`, `src/quanthus/strategy_attribution_pipeline.py`, `src/quanthus/strategy_attribution_publication.py`, `src/quanthus/strategy_attribution_demo.py`, `web/app/` |
 | Focused verification | `tests/unit/test_strategy_attribution*.py`, `web/tests/rendered-html.test.mjs` |
-| Acceptance evidence | `docs/acceptance/p3-attribution-synthetic-publication-20260731.md`; synthetic plumbing only, with no formal-strategy or gate-resume evidence |
+| Acceptance evidence | `docs/acceptance/p3-attribution-synthetic-publication-20260731.md`; `docs/acceptance/p3-attr-formal-production-20260823.md` |
 
 ## 1. Purpose
 

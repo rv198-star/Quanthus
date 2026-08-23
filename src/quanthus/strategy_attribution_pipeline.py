@@ -19,6 +19,8 @@ from typing import Any, Protocol, runtime_checkable
 
 from quanthus.strategy_attribution import (
     ATTRIBUTION_SCHEMA_VERSION,
+    FORMAL_ARTIFACT_PRODUCER_ID,
+    FORMAL_ARTIFACT_PRODUCER_VERSION,
     SYNTHETIC_ARTIFACT_PRODUCER_ID,
     SYNTHETIC_ARTIFACT_PRODUCER_VERSION,
     AnalysisCheckEvidence,
@@ -34,6 +36,8 @@ from quanthus.strategy_attribution import (
     InMemoryArtifactResolver,
     InteractionComparison,
     SemanticArtifactEnvelope,
+    analysis_check_result_envelope,
+    analysis_check_target_digest,
     canonical_bytes,
     condition_analysis_result_envelope,
     digest,
@@ -65,6 +69,7 @@ PIPELINE_VERIFIER_VERSION = "1.0.0"
 PIPELINE_EVALUATOR_ID = "quanthus.strategy-attribution-kernel-evaluator"
 PIPELINE_EVALUATOR_VERSION = "1.0.0"
 SYNTHETIC_SOURCE_KIND = "synthetic_fixture_not_strategy_evidence"
+FORMAL_SOURCE_KIND = "formal_strategy_evidence"
 
 _RAW_TRACE_RESERVED_KEYS = frozenset(
     {
@@ -154,6 +159,29 @@ def register_synthetic_executor_implementation(executor_type: type[Any]) -> None
         SYNTHETIC_ARTIFACT_PRODUCER_ID,
         SYNTHETIC_ARTIFACT_PRODUCER_VERSION,
     )
+    existing = _REGISTERED_EXECUTOR_TYPES.get(key)
+    if existing is not None and existing is not executor_type:
+        raise AttributionError(
+            "executor_registration_conflict",
+            "the executor identity is already registered",
+        )
+    _REGISTERED_EXECUTOR_TYPES[key] = executor_type
+
+
+def register_formal_executor_implementation(executor_type: type[Any]) -> None:
+    """Register the exact built-in formal executor by concrete class identity."""
+
+    if not isinstance(executor_type, type):
+        raise AttributionError("invalid_executor_registration", "executor type is invalid")
+    if (executor_type.__module__, executor_type.__qualname__) != (
+        "quanthus.expert_strategy.formal_attribution",
+        "FormalAttributionExecutor",
+    ):
+        raise AttributionError(
+            "untrusted_executor_registration",
+            "the formal identity is reserved for its built-in implementation",
+        )
+    key = (FORMAL_ARTIFACT_PRODUCER_ID, FORMAL_ARTIFACT_PRODUCER_VERSION)
     existing = _REGISTERED_EXECUTOR_TYPES.get(key)
     if existing is not None and existing is not executor_type:
         raise AttributionError(
@@ -595,6 +623,78 @@ class RawConditionSlice:
 
 
 @dataclass(frozen=True)
+class RawAnalysisCheck:
+    kind: AnalysisCheckKind
+    method: str
+    completed: bool
+    passed: bool
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.kind, AnalysisCheckKind):
+            raise AttributionError("invalid_check_kind", "raw check kind is invalid")
+        _require_text(self.method, "analysis_check_method")
+        if not isinstance(self.completed, bool) or not isinstance(self.passed, bool):
+            raise AttributionError("invalid_boolean", "raw check flags must be boolean")
+        if self.passed and not self.completed:
+            raise AttributionError("invalid_analysis_check", "an incomplete check cannot pass")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind.value,
+            "method": self.method,
+            "completed": self.completed,
+            "passed": self.passed,
+        }
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> RawAnalysisCheck:
+        _require_exact_fields(
+            raw,
+            {"kind", "method", "completed", "passed"},
+            "raw_analysis_check_field_mismatch",
+        )
+        try:
+            return cls(
+                kind=AnalysisCheckKind(raw["kind"]),
+                method=raw["method"],
+                completed=raw["completed"],
+                passed=raw["passed"],
+            )
+        except (TypeError, ValueError) as exc:
+            if isinstance(exc, AttributionError):
+                raise
+            raise AttributionError("invalid_raw_analysis_check", "check is invalid") from exc
+
+
+def raw_observation_basis(
+    source_kind: str,
+    work_digest: str,
+    planned_experiment_digest: str,
+    metrics: Mapping[str, Decimal],
+    condition_slices: Sequence[RawConditionSlice],
+    analysis_check: RawAnalysisCheck | None,
+) -> dict[str, Any]:
+    """Build the verifier-owned observation basis used by trusted executors."""
+
+    if source_kind == SYNTHETIC_SOURCE_KIND:
+        return {
+            "fixture": "synthetic_raw_execution_not_strategy_evidence",
+            "work_digest": work_digest,
+            "planned_experiment_digest": planned_experiment_digest,
+            "metrics": dict(metrics),
+            "condition_slices": [item.to_dict() for item in condition_slices],
+        }
+    return {
+        "source_kind": source_kind,
+        "work_digest": work_digest,
+        "planned_experiment_digest": planned_experiment_digest,
+        "metrics": dict(metrics),
+        "condition_slices": [item.to_dict() for item in condition_slices],
+        "analysis_check": None if analysis_check is None else analysis_check.to_dict(),
+    }
+
+
+@dataclass(frozen=True)
 class RawExecutionResult:
     work_id: str
     work_digest: str
@@ -621,6 +721,7 @@ class RawExecutionResult:
     authorization_scope_digest: str
     capital_constrained_observed: bool
     trace_payload: Mapping[str, Any]
+    analysis_check: RawAnalysisCheck | None = None
     schema_version: str = RAW_EXECUTION_SCHEMA
 
     def __post_init__(self) -> None:
@@ -680,6 +781,10 @@ class RawExecutionResult:
             "condition_slices",
             tuple(sorted(slices, key=lambda item: item.condition_spec_digest)),
         )
+        if self.analysis_check is not None and not isinstance(
+            self.analysis_check, RawAnalysisCheck
+        ):
+            raise AttributionError("invalid_raw_analysis_check", "analysis check is invalid")
         if not isinstance(self.capital_constrained_observed, bool):
             raise AttributionError(
                 "invalid_boolean", "capital_constrained_observed must be boolean"
@@ -715,6 +820,9 @@ class RawExecutionResult:
             "metric_spec_digests": dict(self.metric_spec_digests),
             "metrics": dict(self.metrics),
             "condition_slices": [item.to_dict() for item in self.condition_slices],
+            "analysis_check": (
+                None if self.analysis_check is None else self.analysis_check.to_dict()
+            ),
             "replay_reference_digest": self.replay_reference_digest,
             "replay_observation_digest": self.replay_observation_digest,
             "reconciliation_reference_digest": self.reconciliation_reference_digest,
@@ -756,6 +864,7 @@ class RawExecutionResult:
             "metric_spec_digests",
             "metrics",
             "condition_slices",
+            "analysis_check",
             "replay_reference_digest",
             "replay_observation_digest",
             "reconciliation_reference_digest",
@@ -804,6 +913,11 @@ class RawExecutionResult:
                 metrics={key: Decimal(value) for key, value in raw["metrics"].items()},
                 condition_slices=tuple(
                     RawConditionSlice.from_dict(item) for item in raw["condition_slices"]
+                ),
+                analysis_check=(
+                    None
+                    if raw["analysis_check"] is None
+                    else RawAnalysisCheck.from_dict(raw["analysis_check"])
                 ),
                 replay_reference_digest=raw["replay_reference_digest"],
                 replay_observation_digest=raw["replay_observation_digest"],
@@ -1806,6 +1920,17 @@ class DeterministicAttributionNodeVerifier:
                 result=result,
                 dependencies=dependencies,
             )
+        if work.experiment.kind in {
+            PlanNodeKind.UNCERTAINTY_CHECK,
+            PlanNodeKind.STABILITY_CHECK,
+        }:
+            return self._project_analysis_check(
+                request=request,
+                binding=binding,
+                work=work,
+                result=result,
+                dependencies=dependencies,
+            )
         return self._failed_projection(
             work,
             result,
@@ -1888,13 +2013,14 @@ class DeterministicAttributionNodeVerifier:
             reasons.append("raw_authorization_scope_mismatch")
         if result.capital_constrained_observed is not True:
             reasons.append("raw_not_capital_constrained")
-        observation_basis = {
-            "fixture": "synthetic_raw_execution_not_strategy_evidence",
-            "work_digest": work.digest,
-            "planned_experiment_digest": node.digest,
-            "metrics": dict(result.metrics),
-            "condition_slices": [item.to_dict() for item in result.condition_slices],
-        }
+        observation_basis = raw_observation_basis(
+            binding.source_kind,
+            work.digest,
+            node.digest,
+            result.metrics,
+            result.condition_slices,
+            result.analysis_check,
+        )
         expected_observations = {
             label: digest({**observation_basis, "observation": label})
             for label in (
@@ -1946,6 +2072,8 @@ class DeterministicAttributionNodeVerifier:
                 reasons.append("raw_metric_set_mismatch")
             if result.condition_slices:
                 reasons.append("unexpected_condition_slice")
+            if result.analysis_check is not None:
+                reasons.append("unexpected_analysis_check")
         elif node.kind is PlanNodeKind.CONDITION_ANALYSIS:
             if result.metrics:
                 reasons.append("unexpected_condition_node_metrics")
@@ -1958,6 +2086,26 @@ class DeterministicAttributionNodeVerifier:
                     reasons.append("raw_condition_metric_set_mismatch")
                 if set(item.intervention_metrics) != set(node.metric_spec_digests):
                     reasons.append("raw_condition_metric_set_mismatch")
+            if result.analysis_check is not None:
+                reasons.append("unexpected_analysis_check")
+        elif node.kind in {
+            PlanNodeKind.UNCERTAINTY_CHECK,
+            PlanNodeKind.STABILITY_CHECK,
+        }:
+            expected_kind = (
+                AnalysisCheckKind.UNCERTAINTY
+                if node.kind is PlanNodeKind.UNCERTAINTY_CHECK
+                else AnalysisCheckKind.STABILITY
+            )
+            if result.metrics or result.condition_slices:
+                reasons.append("unexpected_analysis_check_payload")
+            if result.analysis_check is None:
+                reasons.append("missing_analysis_check")
+            elif (
+                result.analysis_check.kind is not expected_kind
+                or result.analysis_check.method != node.method_id
+            ):
+                reasons.append("raw_analysis_check_binding_mismatch")
         return tuple(sorted(set(reasons)))
 
     def _project_physical(
@@ -2166,6 +2314,99 @@ class DeterministicAttributionNodeVerifier:
             result=result,
             dependencies=dependencies,
             conditions=tuple(comparisons),
+            artifacts=tuple(artifacts),
+        )
+
+    def _project_analysis_check(
+        self,
+        *,
+        request: AttributionRunRequest,
+        binding: ExecutorBinding,
+        work: PlannedExecutionWork,
+        result: RawExecutionResult,
+        dependencies: Mapping[str, VerifiedNodeProjection],
+    ) -> VerifiedNodeProjection:
+        raw_check = result.analysis_check
+        if raw_check is None:
+            return self._failed_projection(
+                work, result, dependencies, ("missing_analysis_check",)
+            )
+        questions = {item.digest: item for item in request.questions}
+        checks: list[AnalysisCheckEvidence] = []
+        artifacts: list[SemanticArtifactEnvelope] = []
+        for consumer in work.consumers:
+            question = questions.get(consumer.question_digest)
+            if question is None or question.question_id != consumer.question_id:
+                return self._failed_projection(
+                    work,
+                    result,
+                    dependencies,
+                    ("analysis_check_consumer_mismatch",),
+                )
+            baseline = self._dependency_experiment(
+                dependencies,
+                question.digest,
+                ExperimentRole.BASELINE,
+            )
+            intervention = self._dependency_experiment(
+                dependencies,
+                question.digest,
+                ExperimentRole.INTERVENTION,
+            )
+            if baseline is None or intervention is None:
+                return self._failed_projection(
+                    work,
+                    result,
+                    dependencies,
+                    ("analysis_check_parent_projection_missing",),
+                )
+            metric_ids = tuple(item.metric_id for item in question.metric_specs)
+            check_token = hashlib.sha256(
+                canonical_bytes(
+                    {
+                        "planned_experiment_digest": work.experiment.digest,
+                        "question_digest": question.digest,
+                        "kind": raw_check.kind.value,
+                    }
+                )
+            ).hexdigest()[:24]
+            draft = AnalysisCheckEvidence(
+                check_id=f"check.pipeline.{check_token}",
+                kind=raw_check.kind,
+                method=raw_check.method,
+                scope=AnalysisCheckScope.OVERALL_METRIC_VECTOR,
+                metric_ids=metric_ids,
+                target_evidence_digest=analysis_check_target_digest(
+                    metric_ids=metric_ids,
+                    baseline_experiment_digest=baseline.digest,
+                    intervention_experiment_digest=intervention.digest,
+                ),
+                question_digest=question.digest,
+                adapter_capability_digest=request.adapter_manifest.digest,
+                baseline_experiment_digest=baseline.digest,
+                intervention_experiment_digest=intervention.digest,
+                result_digest=digest(
+                    {
+                        "unbound_pipeline_analysis_check": work.experiment.digest,
+                        "question_digest": question.digest,
+                    }
+                ),
+                completed=raw_check.completed,
+                passed=raw_check.passed,
+            )
+            evidence = analysis_check_result_envelope(
+                draft,
+                producer_id=binding.producer_id,
+                producer_version=binding.producer_version,
+                source_kind=binding.source_kind,
+            )
+            checks.append(replace(draft, result_digest=evidence.digest))
+            artifacts.append(evidence)
+        return self._passing_projection(
+            work=work,
+            result=result,
+            dependencies=dependencies,
+            analysis_checks=tuple(checks),
             artifacts=tuple(artifacts),
         )
 
@@ -2943,29 +3184,45 @@ class AttributionPipeline:
     ) -> None:
         if not isinstance(binding, ExecutorBinding):
             raise AttributionError("invalid_executor_binding", "binding is invalid")
-        expected_identity = (
+        synthetic_identity = (
             SYNTHETIC_ARTIFACT_PRODUCER_ID,
             SYNTHETIC_ARTIFACT_PRODUCER_VERSION,
         )
-        if (binding.executor_id, binding.executor_version) != expected_identity:
+        formal_identity = (
+            FORMAL_ARTIFACT_PRODUCER_ID,
+            FORMAL_ARTIFACT_PRODUCER_VERSION,
+        )
+        executor_identity = (binding.executor_id, binding.executor_version)
+        producer_identity = (binding.producer_id, binding.producer_version)
+        if executor_identity not in {synthetic_identity, formal_identity}:
             raise AttributionError(
                 "prototype_executor_not_registered",
-                "only the bounded synthetic executor is registered",
+                "the executor identity is not registered",
             )
-        if (binding.producer_id, binding.producer_version) != expected_identity:
+        if producer_identity != executor_identity:
             raise AttributionError(
                 "prototype_producer_not_registered",
-                "only the bounded synthetic producer is registered",
+                "the producer identity does not match the registered executor",
             )
-        if binding.source_kind != SYNTHETIC_SOURCE_KIND or not binding.synthetic_fixture:
+        expected_source = (
+            SYNTHETIC_SOURCE_KIND
+            if executor_identity == synthetic_identity
+            else FORMAL_SOURCE_KIND
+        )
+        if binding.source_kind != expected_source:
             raise AttributionError(
                 "formal_strategy_source_blocked",
-                "the prototype accepts synthetic fixture evidence only",
+                "executor evidence source differs from its registered identity",
             )
-        if request.adapter_manifest.evidence_source_kind != SYNTHETIC_SOURCE_KIND:
+        if binding.synthetic_fixture != (executor_identity == synthetic_identity):
             raise AttributionError(
                 "formal_strategy_source_blocked",
-                "formal strategy execution remains gated",
+                "executor fixture classification differs from its registered identity",
+            )
+        if request.adapter_manifest.evidence_source_kind != expected_source:
+            raise AttributionError(
+                "formal_strategy_source_blocked",
+                "request evidence source differs from the registered executor",
             )
         if (
             binding.metric_calculator_id,

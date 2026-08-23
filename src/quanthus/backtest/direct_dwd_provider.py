@@ -142,7 +142,7 @@ def _materialize(
     spill.mkdir()
     connection = duckdb.connect(":memory:")
     connection.execute(f"SET memory_limit='{DUCKDB_MEMORY_LIMIT}'")
-    connection.execute("SET threads=2")
+    connection.execute("SET threads=1")
     connection.execute("SET preserve_insertion_order=false")
     connection.execute(f"SET temp_directory={_sql_path(spill)}")
     start = history_start.isoformat()

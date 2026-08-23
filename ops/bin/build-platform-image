@@ -12,6 +12,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 install -d \
+    "$BUILD_CONTEXT/config/expert-evaluations/lifecycle" \
     "$BUILD_CONTEXT/config/expert-strategies" \
     "$BUILD_CONTEXT/src/quanthus/expert_evaluation"
 cp "$REPOSITORY_ROOT/.dockerignore" \
@@ -26,6 +27,8 @@ cp "$REPOSITORY_ROOT/config/platform-features.v1.json" \
     "$BUILD_CONTEXT/config/"
 cp "$REPOSITORY_ROOT/config/expert-strategies/p4-trend-risk.v1.0.1.json" \
     "$BUILD_CONTEXT/config/expert-strategies/"
+cp "$REPOSITORY_ROOT/config/expert-evaluations/lifecycle/candidate-p4-trend-risk-1.0.1.inconclusive.v1.json" \
+    "$BUILD_CONTEXT/config/expert-evaluations/lifecycle/"
 cp "$REPOSITORY_ROOT/src/quanthus/__init__.py" \
     "$REPOSITORY_ROOT/src/quanthus/policy.py" \
     "$REPOSITORY_ROOT/src/quanthus/strategy_attribution.py" \

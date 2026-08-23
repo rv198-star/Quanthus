@@ -10,7 +10,8 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY config/platform-features.v1.json config/platform-kernel-gates.v1.json config/product-research-catalog.v1.json config/product-candidate-evidence.v1.json config/product-expert-evidence.v1.json ./config/
 COPY config/expert-strategies/p4-trend-risk.v1.0.1.json ./config/expert-strategies/
-RUN chmod 0444 ./config/platform-features.v1.json ./config/platform-kernel-gates.v1.json ./config/product-research-catalog.v1.json ./config/product-candidate-evidence.v1.json ./config/product-expert-evidence.v1.json ./config/expert-strategies/p4-trend-risk.v1.0.1.json
+COPY config/expert-evaluations/lifecycle/candidate-p4-trend-risk-1.0.1.inconclusive.v1.json ./config/expert-evaluations/lifecycle/
+RUN chmod 0444 ./config/platform-features.v1.json ./config/platform-kernel-gates.v1.json ./config/product-research-catalog.v1.json ./config/product-candidate-evidence.v1.json ./config/product-expert-evidence.v1.json ./config/expert-strategies/p4-trend-risk.v1.0.1.json ./config/expert-evaluations/lifecycle/candidate-p4-trend-risk-1.0.1.inconclusive.v1.json
 RUN mkdir -p ./src/quanthus/expert_evaluation
 COPY src/quanthus/__init__.py \
     src/quanthus/policy.py \

@@ -339,6 +339,15 @@ class ProductExpertEvidence:
         assessment_scorecards = self._assessment_scorecards(package, formal_scorecard)
         experts = self._experts(card, assessment_scorecards, formal_scorecard)
         lifecycle = self._lifecycle_decision(package)
+        if lifecycle is not None:
+            self._verify_lifecycle_chain(
+                lifecycle,
+                card=card,
+                run_manifest=run.manifest,
+                formal_scorecard=formal_scorecard,
+                scorecard_digest=str(run_ref["scorecard_digest"]),
+                attribution_digest=str(release_ref["release_digest"]),
+            )
         disagreement = self._disagreement_cases(package, release_root)
         effects = self._economic_effects(formal_scorecard)
         source_digests: dict[str, Any] = {
@@ -824,3 +833,41 @@ class ProductExpertEvidence:
                 "expert_evidence_decision_mismatch", "lifecycle decision identity differs"
             )
         return artifact.to_dict()
+
+    @staticmethod
+    def _verify_lifecycle_chain(
+        lifecycle: Mapping[str, Any],
+        *,
+        card: Mapping[str, Any],
+        run_manifest: Mapping[str, Any],
+        formal_scorecard: Mapping[str, Any],
+        scorecard_digest: str,
+        attribution_digest: str,
+    ) -> None:
+        dwd = _object(_object(run_manifest["job_input"], "job_input")["dwd"], "dwd")
+        population = _object(card["population"], "population")
+        split = _object(population["split"], "population.split")
+        policies = sorted(
+            str(_object(_object(item, "experts[]")["policy_mapping"], "policy_mapping")[
+                "mapping_digest"
+            ])
+            for item in _array(card["experts"], "experts")
+        )
+        claims = _array(formal_scorecard["claims"], "claims")
+        claim_digests = {
+            str(_object(item, "claims[]")["digest"])
+            for item in claims
+            if isinstance(item, dict)
+        }
+        if (
+            lifecycle["strategy_digest"] != card["semantic_digest"]
+            or lifecycle["scorecard_digest"] != scorecard_digest
+            or lifecycle["attribution_digest"] != attribution_digest
+            or lifecycle["dwd_digest"] != dwd["effective_view_digest"]
+            or lifecycle["split_digest"] != split["digest"]
+            or lifecycle["policy_digests"] != policies
+            or lifecycle["assessment_digest"] not in claim_digests
+        ):
+            raise ProductExpertEvidenceError(
+                "expert_evidence_decision_mismatch", "lifecycle decision chain differs"
+            )

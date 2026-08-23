@@ -25,6 +25,7 @@ from quanthus.platform.persistence import PostgresPlatformStore
 EVENT_QUEUE = "event"
 RUN_SCHEMA = "quanthus.p4-event-run.v3"
 REPORTED_BATCH_RUNTIME_SCHEMA = "quanthus.p4-reported-batch-runtime.v1"
+REPORTED_BATCH_PROGRESS_SCHEMA = "quanthus.p4-reported-batch-progress.v1"
 _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _EXPECTED_INPUT = {
@@ -368,6 +369,32 @@ def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | Non
     return payload
 
 
+def _load_progress_receipt(path: Path) -> dict[str, Any] | None:
+    try:
+        if not path.is_file() or path.stat().st_size > 64 * 1024:
+            return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    stage = payload.get("stage") if isinstance(payload, dict) else None
+    progress = payload.get("progress") if isinstance(payload, dict) else None
+    detail = payload.get("detail") if isinstance(payload, dict) else None
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != {"schema_version", "stage", "progress", "detail"}
+        or payload.get("schema_version") != REPORTED_BATCH_PROGRESS_SCHEMA
+        or not isinstance(stage, str)
+        or not stage
+        or len(stage) > 100
+        or not isinstance(progress, int)
+        or isinstance(progress, bool)
+        or not 5 <= progress <= 89
+        or not isinstance(detail, dict)
+    ):
+        return None
+    return payload
+
+
 def _validate_run_directory(
     path: Path,
     *,
@@ -573,6 +600,7 @@ class EventWorker:
         label_root = staging / "label-corpus"
         report_root = staging / "comparison-report"
         runtime_path = staging / "runtime-metrics.json"
+        progress_path = staging / "progress.json"
         command = (
             sys.executable,
             "-m",
@@ -602,6 +630,8 @@ class EventWorker:
             str(report_root),
             "--runtime-receipt",
             str(runtime_path),
+            "--progress-receipt",
+            str(progress_path),
             "--code-revision",
             governed["code_revision"],
         )
@@ -615,6 +645,7 @@ class EventWorker:
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
             process = subprocess.Popen(command, stdout=stdout, stderr=stderr)  # noqa: S603
         last_renewal = time.monotonic()
+        last_progress_mtime_ns: int | None = None
         canceled = False
         lost_lease = False
         while process.poll() is None:
@@ -628,6 +659,33 @@ class EventWorker:
                 canceled = observed.cancel_requested
                 _terminate(process, self.terminate_seconds)
                 break
+            try:
+                progress_mtime_ns = progress_path.stat().st_mtime_ns
+            except OSError:
+                progress_mtime_ns = None
+            if (
+                progress_mtime_ns is not None
+                and progress_mtime_ns != last_progress_mtime_ns
+            ):
+                receipt = _load_progress_receipt(progress_path)
+                last_progress_mtime_ns = progress_mtime_ns
+                if receipt is not None:
+                    detail = dict(receipt["detail"])
+                    detail["run_id"] = run_id
+                    try:
+                        self.store.update_claimed_job(
+                            job_id,
+                            generation,
+                            stage=str(receipt["stage"]),
+                            progress=max(observed.progress, int(receipt["progress"])),
+                            progress_detail=detail,
+                        )
+                    except RuntimeError as exc:
+                        if str(exc) != "stale_claim_generation":
+                            raise
+                        lost_lease = True
+                        _terminate(process, self.terminate_seconds)
+                        break
             if time.monotonic() - last_renewal >= self.renew_seconds:
                 if not self.store.renew_job_lease(
                     job_id, generation, self.worker_id, self.lease_seconds
@@ -675,6 +733,7 @@ class EventWorker:
         report_result = _verify_comparison_report(report_root)
         runtime = _load_runtime_receipt(runtime_path, required=True)
         assert runtime is not None
+        progress_path.unlink(missing_ok=True)
         if label_result.total_events != event_result.candidate_events:
             raise RuntimeError("label_corpus_event_count_mismatch")
         if label_result.not_executable_events != event_result.not_executable_events:

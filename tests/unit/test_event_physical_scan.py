@@ -9,6 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -17,6 +18,7 @@ from quanthus.contracts import SnapshotRef
 from quanthus.event_library.physical_scan import (
     PhysicalEventScanError,
     _audit_projection_static_industry_coverage,
+    _candidate_input,
     _publish_package,
     iter_projected_candidate_series,
     materialize_p4_research_adm,
@@ -314,7 +316,25 @@ class EventPhysicalScanTests(unittest.TestCase):
                 fetch_rows=7,
             )
         )
+        connection = duckdb.connect(":memory:")
+        try:
+            cursor = connection.execute(
+                "SELECT * FROM read_parquet(?) ORDER BY session_date LIMIT 1",
+                [str(projection.candidate_path)],
+            )
+            names = [str(item[0]) for item in cursor.description]
+            values = cursor.fetchone()
+        finally:
+            connection.close()
+        self.assertIsNotNone(values)
+        assert values is not None
+        legacy_row = _candidate_input(
+            dict(zip(names, values, strict=True)),
+            source_policy=self.source,
+            industry_mapping=industry,
+        )
         self.assertEqual(len(series), 1)
+        self.assertEqual(series[0][0], legacy_row)
         self.assertTrue(all(row.security_id == "opaque-security-001" for row in series[0]))
         self.assertTrue(all(row.knowledge_cutoff <= row.close_at for row in series[0]))
 

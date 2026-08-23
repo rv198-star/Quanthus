@@ -736,6 +736,7 @@ def _parser() -> argparse.ArgumentParser:
     p4_reported_event_scan.add_argument("--label-output", type=Path, required=True)
     p4_reported_event_scan.add_argument("--report-output", type=Path, required=True)
     p4_reported_event_scan.add_argument("--runtime-receipt", type=Path)
+    p4_reported_event_scan.add_argument("--progress-receipt", type=Path)
     p4_reported_event_scan.add_argument("--code-revision", required=True)
 
     p4_label_corpus = subparsers.add_parser(
@@ -1772,6 +1773,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 report_output=args.report_output,
                 code_revision=args.code_revision,
                 runtime_receipt_path=args.runtime_receipt,
+                progress_receipt_path=args.progress_receipt,
             )
             print(
                 json.dumps(

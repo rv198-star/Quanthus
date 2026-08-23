@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import time
+from bisect import bisect_left, insort
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -452,6 +454,139 @@ def _feature_evidence(window: Sequence[CandidateDailyInput]) -> CandidateFeature
     )
 
 
+def _static_row_reason(item: CandidateDailyInput) -> CandidateReason | None:
+    prices = (item.open_price, item.high_price, item.low_price, item.close_price)
+    if any(value is None for value in prices) or item.turnover is None:
+        return CandidateReason.MISSING_INPUT
+    assert item.open_price is not None
+    assert item.high_price is not None
+    assert item.low_price is not None
+    assert item.close_price is not None
+    assert item.turnover is not None
+    valid_prices = (
+        item.open_price,
+        item.high_price,
+        item.low_price,
+        item.close_price,
+    )
+    if any(not value.is_finite() or value <= 0 for value in valid_prices):
+        return CandidateReason.INVALID_OHLC
+    if not (
+        item.low_price <= item.open_price <= item.high_price
+        and item.low_price <= item.close_price <= item.high_price
+    ):
+        return CandidateReason.INVALID_OHLC
+    if not item.turnover.is_finite() or item.turnover <= 0:
+        return CandidateReason.NON_POSITIVE_TURNOVER
+    return None
+
+
+def _rolling_medians(
+    values: Sequence[Fraction | None], *, window_size: int
+) -> tuple[Fraction | None, ...]:
+    """Return exact trailing medians while retaining invalid-window boundaries."""
+
+    if window_size <= 0:
+        raise ValueError("rolling median window must be positive")
+    ordered: list[Fraction] = []
+    invalid = 0
+    medians: list[Fraction | None] = []
+    for index, value in enumerate(values):
+        if value is None:
+            invalid += 1
+        else:
+            insort(ordered, value)
+        if index >= window_size:
+            expired = values[index - window_size]
+            if expired is None:
+                invalid -= 1
+            else:
+                position = bisect_left(ordered, expired)
+                if position >= len(ordered) or ordered[position] != expired:
+                    raise CandidateScanError("rolling median state differs")
+                ordered.pop(position)
+        if index + 1 < window_size or invalid:
+            medians.append(None)
+            continue
+        middle = window_size // 2
+        median = (
+            ordered[middle]
+            if window_size % 2
+            else (ordered[middle - 1] + ordered[middle]) / 2
+        )
+        medians.append(median)
+    return tuple(medians)
+
+
+def _exact_series_values(
+    rows: Sequence[CandidateDailyInput],
+) -> tuple[
+    tuple[CandidateReason | None, ...],
+    tuple[Fraction | None, ...],
+    tuple[Fraction | None, ...],
+    tuple[Fraction | None, ...],
+    tuple[Fraction | None, ...],
+]:
+    row_reasons: list[CandidateReason | None] = []
+    ranges: list[Fraction | None] = []
+    turnovers: list[Fraction | None] = []
+    for item in rows:
+        reason = _static_row_reason(item)
+        row_reasons.append(reason)
+        if reason is not None:
+            ranges.append(None)
+            turnovers.append(None)
+            continue
+        assert item.open_price is not None
+        assert item.high_price is not None
+        assert item.low_price is not None
+        assert item.turnover is not None
+        ranges.append(_fraction(item.high_price - item.low_price) / _fraction(item.open_price))
+        turnovers.append(_fraction(item.turnover))
+    return (
+        tuple(row_reasons),
+        tuple(ranges),
+        tuple(turnovers),
+        _rolling_medians(ranges, window_size=20),
+        _rolling_medians(turnovers, window_size=20),
+    )
+
+
+def _precomputed_window_reason(
+    rows: Sequence[CandidateDailyInput],
+    row_reasons: Sequence[CandidateReason | None],
+    *,
+    first_index: int,
+    current_index: int,
+    expected_dates: Sequence[date],
+    card: CandidateRuleCard,
+) -> CandidateReason | None:
+    window = rows[first_index : current_index + 1]
+    if tuple(item.session_date for item in window) != tuple(expected_dates):
+        return CandidateReason.OBSERVATION_GAP
+    current = rows[current_index]
+    prior = rows[current_index - 1]
+    if current.venue_id not in card.eligibility.allowed_venues:
+        return CandidateReason.VENUE_NOT_ALLOWED
+    if current.instrument_type not in card.eligibility.instrument_types:
+        return CandidateReason.INSTRUMENT_NOT_ALLOWED
+    if current.listing_sessions < card.eligibility.minimum_listing_sessions:
+        return CandidateReason.INSUFFICIENT_LISTING_HISTORY
+    if prior.is_tradable is not True:
+        return CandidateReason.T_MINUS_1_NOT_TRADABLE
+    if current.is_tradable is not True:
+        return CandidateReason.T_NOT_TRADABLE
+    if prior.adjustment_effective is not False or current.adjustment_effective is not False:
+        return CandidateReason.CORPORATE_ACTION_BOUNDARY
+    for index in range(first_index, current_index + 1):
+        if rows[index].knowledge_cutoff > current.close_at:
+            return CandidateReason.KNOWLEDGE_AFTER_T_CLOSE
+        reason = row_reasons[index]
+        if reason is not None:
+            return reason
+    return None
+
+
 def _triggered(features: CandidateFeatureEvidence, card: CandidateRuleCard) -> bool:
     thresholds = {item.threshold_id: Fraction(item.value) for item in card.thresholds}
     return (
@@ -523,6 +658,14 @@ def _scan_security_series(
     reasons: Counter[str] = Counter()
     raw: list[_RawCandidate] = []
     evaluated = 0
+    (
+        row_reasons,
+        ranges,
+        turnovers,
+        range_medians,
+        turnover_medians,
+    ) = _exact_series_values(rows)
+    thresholds = {item.threshold_id: Fraction(item.value) for item in card.thresholds}
     for local_index in range(history_sessions - 1, len(rows)):
         current = rows[local_index]
         evaluated += 1
@@ -533,19 +676,79 @@ def _scan_security_series(
         if trading_index + 1 >= len(ordered_dates):
             reasons[CandidateReason.MISSING_T_PLUS_1_SESSION.value] += 1
             continue
-        window = rows[local_index - history_sessions + 1 : local_index + 1]
+        first_index = local_index - history_sessions + 1
+        window = rows[first_index : local_index + 1]
         expected_dates = ordered_dates[trading_index - history_sessions + 1 : trading_index + 1]
-        reason = _window_reason(window, expected_dates=expected_dates, card=card)
+        reason = _precomputed_window_reason(
+            rows,
+            row_reasons,
+            first_index=first_index,
+            current_index=local_index,
+            expected_dates=expected_dates,
+            card=card,
+        )
         if reason is not None:
             reasons[reason.value] += 1
             continue
-        features = _feature_evidence(window)
-        if features is None:
+        prior_range = ranges[local_index - 1]
+        current_range = ranges[local_index]
+        prior_turnover = turnovers[local_index - 1]
+        current_turnover = turnovers[local_index]
+        prior_range_median = range_medians[local_index - 2]
+        current_range_median = range_medians[local_index - 1]
+        prior_turnover_median = turnover_medians[local_index - 2]
+        current_turnover_median = turnover_medians[local_index - 1]
+        if any(
+            value is None
+            for value in (
+                prior_range,
+                current_range,
+                prior_turnover,
+                current_turnover,
+                prior_range_median,
+                current_range_median,
+                prior_turnover_median,
+                current_turnover_median,
+            )
+        ):
+            raise CandidateScanError("precomputed exact feature window differs")
+        assert prior_range is not None
+        assert current_range is not None
+        assert prior_turnover is not None
+        assert current_turnover is not None
+        assert prior_range_median is not None
+        assert current_range_median is not None
+        assert prior_turnover_median is not None
+        assert current_turnover_median is not None
+        if 0 in {
+            prior_range_median,
+            current_range_median,
+            prior_turnover_median,
+            current_turnover_median,
+        }:
             reasons[CandidateReason.ZERO_ACTIVITY_BASELINE.value] += 1
             continue
-        if not _triggered(features, card):
+        prior_range_ratio = prior_range / prior_range_median
+        prior_turnover_ratio = prior_turnover / prior_turnover_median
+        current_range_ratio = current_range / current_range_median
+        current_turnover_ratio = current_turnover / current_turnover_median
+        if not (
+            prior_range_ratio <= thresholds["quiet_range_ratio_max"]
+            and prior_turnover_ratio <= thresholds["quiet_turnover_ratio_max"]
+            and current_range_ratio >= thresholds["active_range_ratio_min"]
+            and current_turnover_ratio >= thresholds["active_turnover_ratio_min"]
+        ):
             reasons[CandidateReason.NOT_TRIGGERED.value] += 1
             continue
+        features = CandidateFeatureEvidence(
+            feature_start=window[0].session_date,
+            signal_date=current.session_date,
+            t_minus_1_range_activity_ratio=prior_range_ratio,
+            t_minus_1_turnover_activity_ratio=prior_turnover_ratio,
+            t_range_activity_ratio=current_range_ratio,
+            t_turnover_activity_ratio=current_turnover_ratio,
+            source_evidence_digests=tuple(item.source_evidence_digest for item in window),
+        )
         eligibility_payload: dict[str, Any] = {
             "security_id": security_id,
             "listing_id": current.listing_id,
@@ -748,6 +951,7 @@ def scan_forward_candidate_series(
     card: CandidateRuleCard,
     split_policy: SplitPolicy,
     source_policy: EventScanSourcePolicy,
+    progress: Callable[[str, Mapping[str, Any]], None] | None = None,
 ) -> CandidateScanResult:
     """Scan sorted one-security series while keeping only triggers globally in memory."""
 
@@ -763,10 +967,22 @@ def scan_forward_candidate_series(
     raw: list[_RawCandidate] = []
     evaluated = 0
     last_series_end: dict[str, date] = {}
-    for security_rows in series:
+    series_count = 0
+    decoded_rows = 0
+    decode_elapsed = 0.0
+    scan_elapsed = 0.0
+    series_iterator = iter(series)
+    while True:
+        decode_started = time.perf_counter()
+        try:
+            security_rows = next(series_iterator)
+        except StopIteration:
+            break
         rows = tuple(security_rows)
+        decode_elapsed += time.perf_counter() - decode_started
         if not rows:
             continue
+        decoded_rows += len(rows)
         security_id = rows[0].security_id
         previous_end = last_series_end.get(security_id)
         if previous_end is not None and rows[0].session_date <= previous_end:
@@ -774,6 +990,7 @@ def scan_forward_candidate_series(
                 "multiple scan series for one security_id must be ordered and non-overlapping"
             )
         last_series_end[security_id] = rows[-1].session_date
+        scan_started = time.perf_counter()
         child_raw, child_reasons, child_evaluated = _scan_security_series(
             rows,
             ordered_dates=ordered_dates,
@@ -784,10 +1001,39 @@ def scan_forward_candidate_series(
             card=card,
             source_policy=source_policy,
         )
+        scan_elapsed += time.perf_counter() - scan_started
         raw.extend(child_raw)
         reasons.update(child_reasons)
         evaluated += child_evaluated
-    return _finalize_raw_candidates(
+        series_count += 1
+        if progress is not None and series_count % 100 == 0:
+            progress(
+                "candidate-scan",
+                {
+                    "terminal": False,
+                    "series_completed": series_count,
+                    "rows_decoded": decoded_rows,
+                    "evaluated_rows": evaluated,
+                    "raw_triggers": len(raw),
+                    "row_decode_elapsed_seconds": round(decode_elapsed, 3),
+                    "security_scan_elapsed_seconds": round(scan_elapsed, 3),
+                },
+            )
+    if progress is not None:
+        progress(
+            "candidate-scan",
+            {
+                "terminal": True,
+                "series_completed": series_count,
+                "rows_decoded": decoded_rows,
+                "evaluated_rows": evaluated,
+                "raw_triggers": len(raw),
+                "row_decode_elapsed_seconds": round(decode_elapsed, 3),
+                "security_scan_elapsed_seconds": round(scan_elapsed, 3),
+            },
+        )
+    finalization_started = time.perf_counter()
+    result = _finalize_raw_candidates(
         raw,
         reasons=reasons,
         evaluated=evaluated,
@@ -798,6 +1044,19 @@ def scan_forward_candidate_series(
         card=card,
         split_policy=split_policy,
     )
+    if progress is not None:
+        progress(
+            "candidate-finalization",
+            {
+                "terminal": True,
+                "elapsed_seconds": round(time.perf_counter() - finalization_started, 3),
+                "raw_triggers": result.counters.raw_triggers,
+                "isolated_candidates": result.counters.isolated_candidates,
+                "concentration_retained": result.counters.concentration_retained,
+                "candidate_events": result.counters.candidate_events,
+            },
+        )
+    return result
 
 
 def scan_forward_candidates(

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import unittest
+from collections import Counter
 from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from random import Random
 from zoneinfo import ZoneInfo
 
 from quanthus.backtest.inputs import CoverageStatus, P1DailyExecutionEvidence
 from quanthus.contracts import SnapshotRef
+from quanthus.event_library import scan as scan_module
 from quanthus.event_library.contracts import sha256_digest
 from quanthus.event_library.rule_card import load_candidate_rule_card
 from quanthus.event_library.scan import (
@@ -125,6 +128,90 @@ def _scan(rows: list[CandidateDailyInput]):
     )
 
 
+def _reference_security_scan(rows: list[CandidateDailyInput]):
+    ordered_dates, date_index, history_sessions = scan_module._scan_context(
+        trading_dates=TRADING_DATES,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        split_policy=SPLIT,
+        source_policy=SOURCE,
+    )
+    ordered_rows = tuple(rows)
+    reasons: Counter[str] = Counter()
+    raw: list[scan_module._RawCandidate] = []
+    evaluated = 0
+    security_id = ordered_rows[0].security_id
+    for local_index in range(history_sessions - 1, len(ordered_rows)):
+        current = ordered_rows[local_index]
+        evaluated += 1
+        trading_index = date_index.get(current.session_date)
+        if trading_index is None or trading_index < history_sessions - 1:
+            reasons[CandidateReason.OBSERVATION_GAP.value] += 1
+            continue
+        if trading_index + 1 >= len(ordered_dates):
+            reasons[CandidateReason.MISSING_T_PLUS_1_SESSION.value] += 1
+            continue
+        window = ordered_rows[
+            local_index - history_sessions + 1 : local_index + 1
+        ]
+        expected_dates = ordered_dates[
+            trading_index - history_sessions + 1 : trading_index + 1
+        ]
+        reason = scan_module._window_reason(window, expected_dates=expected_dates, card=CARD)
+        if reason is not None:
+            reasons[reason.value] += 1
+            continue
+        features = scan_module._feature_evidence(window)
+        if features is None:
+            reasons[CandidateReason.ZERO_ACTIVITY_BASELINE.value] += 1
+            continue
+        if not scan_module._triggered(features, CARD):
+            reasons[CandidateReason.NOT_TRIGGERED.value] += 1
+            continue
+        eligibility_payload = {
+            "security_id": security_id,
+            "listing_id": current.listing_id,
+            "signal_date": current.session_date.isoformat(),
+            "source_evidence_digests": list(features.source_evidence_digests),
+            "candidate_rule_digest": CARD.semantic_digest,
+            "snapshot_manifest_digest": SNAPSHOT_MANIFEST,
+        }
+        raw.append(
+            scan_module._RawCandidate(
+                security_id=security_id,
+                listing_id=current.listing_id,
+                listing_code=current.listing_code,
+                company_id=current.company_id,
+                industry_id=current.static_level1_industry_id,
+                signal_date=current.session_date,
+                signal_close=current.close_at,
+                knowledge_cutoff=max(item.knowledge_cutoff for item in window),
+                feature_start=features.feature_start,
+                entry_date=ordered_dates[trading_index + 1],
+                feature_evidence=features,
+                eligibility_evidence_digest=sha256_digest(eligibility_payload),
+                rank_digest=scan_module._rank_digest(
+                    rule_digest=CARD.semantic_digest,
+                    snapshot_id=SNAPSHOT_ID,
+                    signal_date=current.session_date,
+                    security_id=security_id,
+                ),
+            )
+        )
+    optimized = scan_module._scan_security_series(
+        ordered_rows,
+        ordered_dates=ordered_dates,
+        date_index=date_index,
+        history_sessions=history_sessions,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        source_policy=SOURCE,
+    )
+    return (raw, reasons, evaluated), optimized
+
+
 def _entry_evidence(
     candidate,
     *,
@@ -193,6 +280,91 @@ def _entry_evidence(
 
 
 class EventForwardScanTests(unittest.TestCase):
+    def test_exact_rolling_scan_matches_reference_for_deterministic_random_series(
+        self,
+    ) -> None:
+        random = Random(195)
+        for case in range(6):
+            rows = [
+                _row(
+                    security=f"61{case:04d}",
+                    session_date=TRADING_DATES[index],
+                    range_fraction=random.choice(
+                        (
+                            Decimal("0"),
+                            Decimal("0.0037"),
+                            Decimal("0.008"),
+                            Decimal("0.0113"),
+                            Decimal("0.026"),
+                        )
+                    ),
+                    turnover=random.choice(
+                        (
+                            Decimal("17.5"),
+                            Decimal("83.01"),
+                            Decimal("100"),
+                            Decimal("241.9"),
+                        )
+                    ),
+                )
+                for index in range(20, 260)
+            ]
+            for index in random.sample(range(22, len(rows) - 1), 8):
+                mutation = random.randrange(5)
+                if mutation == 0:
+                    rows[index] = replace(rows[index], is_tradable=False)
+                elif mutation == 1:
+                    rows[index] = replace(rows[index], adjustment_effective=True)
+                elif mutation == 2:
+                    rows[index] = replace(rows[index], turnover=None)
+                elif mutation == 3:
+                    rows[index] = replace(rows[index], high_price=Decimal("99"))
+                else:
+                    rows[index] = replace(
+                        rows[index],
+                        knowledge_cutoff=datetime(2026, 1, 1, 15, 0, tzinfo=SHANGHAI),
+                    )
+            rows.pop(random.randrange(60, 180))
+
+            reference, optimized = _reference_security_scan(rows)
+
+            self.assertEqual(optimized, reference)
+
+    def test_exact_rolling_scan_matches_reference_across_reason_boundaries(self) -> None:
+        rows = [
+            _row(
+                security="600099",
+                session_date=TRADING_DATES[index],
+                range_fraction=(
+                    Decimal("0.005")
+                    if index % 29 == 27
+                    else Decimal("0.02")
+                    if index % 29 == 28
+                    else Decimal("0.01")
+                ),
+                turnover=(
+                    Decimal("50")
+                    if index % 29 == 27
+                    else Decimal("200")
+                    if index % 29 == 28
+                    else Decimal("100")
+                ),
+            )
+            for index in range(20, 240)
+        ]
+        rows[37] = replace(rows[37], is_tradable=False)
+        rows[61] = replace(rows[61], adjustment_effective=True)
+        rows[89] = replace(rows[89], open_price=None)
+        rows[117] = replace(
+            rows[117],
+            knowledge_cutoff=datetime(2026, 1, 1, 15, 0, tzinfo=SHANGHAI),
+        )
+        rows.pop(145)
+
+        reference, optimized = _reference_security_scan(rows)
+
+        self.assertEqual(optimized, reference)
+
     def test_streaming_series_matches_in_memory_scan_exactly(self) -> None:
         first = _series("600001", signal_indices=(43, 80), industry="industry-01")
         second = _series("000001", signal_indices=(50,), industry="industry-02")
@@ -208,6 +380,32 @@ class EventForwardScanTests(unittest.TestCase):
         )
 
         self.assertEqual(streamed, in_memory)
+
+    def test_streaming_scan_reports_decode_scan_and_finalization_progress(self) -> None:
+        rows = tuple(_series("600011", signal_indices=(43, 80)))
+        observed: list[tuple[str, dict[str, object]]] = []
+
+        result = scan_forward_candidate_series(
+            (rows,),
+            trading_dates=TRADING_DATES,
+            snapshot_id=SNAPSHOT_ID,
+            snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+            card=CARD,
+            split_policy=SPLIT,
+            source_policy=SOURCE,
+            progress=lambda stage, details: observed.append((stage, dict(details))),
+        )
+
+        terminal = {stage: details for stage, details in observed if details["terminal"]}
+        self.assertEqual(set(terminal), {"candidate-scan", "candidate-finalization"})
+        self.assertEqual(terminal["candidate-scan"]["rows_decoded"], len(rows))
+        self.assertEqual(
+            terminal["candidate-scan"]["evaluated_rows"], result.counters.evaluated_rows
+        )
+        self.assertEqual(
+            terminal["candidate-finalization"]["candidate_events"],
+            result.counters.candidate_events,
+        )
 
     def test_static_industry_is_applied_only_after_raw_trigger(self) -> None:
         rows = [

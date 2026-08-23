@@ -236,6 +236,7 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 | P4-LABEL-001 | Freeze outcome and structural-break cards | P4 |
 | P4-REPORT-001 | Produce daily group comparison report | P4 |
 | PERF-BATCH-001 | Reuse composite-Job prerequisites and publish runtime telemetry | P4 |
+| PERF-EVENT-001 | Accelerate exact Event scanning and expose internal progress | P4 |
 | P5-TARGET-001 | Define independent target cards and metrics | P5 |
 | P5-BASE-001 | Build rule and logistic baseline scoreboard | P5 |
 | P5-GBDT-001 | Train constrained GBDT research pipeline | P5 |

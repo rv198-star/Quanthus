@@ -7,7 +7,8 @@ import json
 import os
 import shutil
 import tempfile
-from collections.abc import Iterator, Mapping, Sequence
+import time as runtime_clock
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
@@ -117,6 +118,12 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return f"sha256:{digest.hexdigest()}"
+
+
+def _tree_bytes(root: Path) -> int:
+    if root.is_file():
+        return root.stat().st_size
+    return sum(path.stat().st_size for path in root.rglob("*") if path.is_file())
 
 
 def _digest(value: object) -> str:
@@ -853,30 +860,95 @@ def materialize_p4_research_adm(
 materialize_event_candidate_projection = materialize_p4_research_adm
 
 
+_CANDIDATE_SCAN_COLUMNS = (
+    "dwd_security_id",
+    "dwd_listing_id",
+    "listing_code",
+    "dwd_company_id",
+    "venue_id",
+    "instrument_type",
+    "session_date",
+    "open_price",
+    "high_price",
+    "low_price",
+    "close_price",
+    "turnover",
+    "is_tradable",
+    "listing_sessions",
+    "adjustment_effective",
+    "factor_effective_from",
+    "dwd_bar_knowledge_from",
+    "dwd_security_knowledge_from",
+    "dwd_listing_knowledge_from",
+    "dwd_state_knowledge_from",
+    "dwd_factor_knowledge_from",
+    "dwd_bar_source_record_id",
+    "dwd_bar_source_revision",
+    "dwd_bar_source_artifact_sha256",
+    "factor_boundary_count",
+    "dwd_security_effective_from",
+    "dwd_listing_effective_from",
+)
+
+
+def _source_evidence_digest_values(
+    *,
+    source_policy: EventScanSourcePolicy,
+    security_id: object,
+    listing_id: object,
+    session_date: object,
+    bar_knowledge_from: object,
+    security_knowledge_from: object,
+    listing_knowledge_from: object,
+    state_knowledge_from: object,
+    factor_knowledge_from: object,
+    bar_source_record_id: object,
+    bar_source_revision: object,
+    bar_source_artifact_sha256: object,
+    factor_boundary_count: object,
+) -> str:
+    return sha256_digest(
+        {
+            "projection_id": source_policy.historical_visibility.projection_id,
+            "source_policy_digest": source_policy.semantic_digest,
+            "security_id": security_id,
+            "listing_id": listing_id,
+            "session_date": _json_scalar(session_date),
+            "raw_dwd_knowledge": {
+                "bar": _json_scalar(bar_knowledge_from),
+                "security": _json_scalar(security_knowledge_from),
+                "listing": _json_scalar(listing_knowledge_from),
+                "tradability": _json_scalar(state_knowledge_from),
+                "adjustment_factor": _json_scalar(factor_knowledge_from),
+            },
+            "bar_source": {
+                "record_id": _json_scalar(bar_source_record_id),
+                "revision": _json_scalar(bar_source_revision),
+                "artifact_sha256": _json_scalar(bar_source_artifact_sha256),
+            },
+            "factor_boundary_count": _json_scalar(factor_boundary_count),
+        }
+    )
+
+
 def _source_evidence_digest(
     row: Mapping[str, Any], source_policy: EventScanSourcePolicy
 ) -> str:
-    payload = {
-        "projection_id": source_policy.historical_visibility.projection_id,
-        "source_policy_digest": source_policy.semantic_digest,
-        "security_id": row["dwd_security_id"],
-        "listing_id": row["dwd_listing_id"],
-        "session_date": _json_scalar(row["session_date"]),
-        "raw_dwd_knowledge": {
-            "bar": _json_scalar(row.get("dwd_bar_knowledge_from")),
-            "security": _json_scalar(row.get("dwd_security_knowledge_from")),
-            "listing": _json_scalar(row.get("dwd_listing_knowledge_from")),
-            "tradability": _json_scalar(row.get("dwd_state_knowledge_from")),
-            "adjustment_factor": _json_scalar(row.get("dwd_factor_knowledge_from")),
-        },
-        "bar_source": {
-            "record_id": _json_scalar(row.get("dwd_bar_source_record_id")),
-            "revision": _json_scalar(row.get("dwd_bar_source_revision")),
-            "artifact_sha256": _json_scalar(row.get("dwd_bar_source_artifact_sha256")),
-        },
-        "factor_boundary_count": _json_scalar(row.get("factor_boundary_count")),
-    }
-    return sha256_digest(payload)
+    return _source_evidence_digest_values(
+        source_policy=source_policy,
+        security_id=row["dwd_security_id"],
+        listing_id=row["dwd_listing_id"],
+        session_date=row["session_date"],
+        bar_knowledge_from=row.get("dwd_bar_knowledge_from"),
+        security_knowledge_from=row.get("dwd_security_knowledge_from"),
+        listing_knowledge_from=row.get("dwd_listing_knowledge_from"),
+        state_knowledge_from=row.get("dwd_state_knowledge_from"),
+        factor_knowledge_from=row.get("dwd_factor_knowledge_from"),
+        bar_source_record_id=row.get("dwd_bar_source_record_id"),
+        bar_source_revision=row.get("dwd_bar_source_revision"),
+        bar_source_artifact_sha256=row.get("dwd_bar_source_artifact_sha256"),
+        factor_boundary_count=row.get("factor_boundary_count"),
+    )
 
 
 def _projected_knowledge_cutoff(
@@ -961,6 +1033,107 @@ def _candidate_input(
     )
 
 
+def _candidate_input_values(
+    values: Sequence[Any],
+    *,
+    source_policy: EventScanSourcePolicy,
+    industry_mapping: StaticIndustryMapping,
+) -> CandidateDailyInput:
+    if len(values) != len(_CANDIDATE_SCAN_COLUMNS):
+        raise PhysicalEventScanError("projected candidate column count differs")
+    (
+        raw_security_id,
+        raw_listing_id,
+        raw_listing_code,
+        raw_company_id,
+        raw_venue_id,
+        raw_instrument_type,
+        raw_session_date,
+        raw_open_price,
+        raw_high_price,
+        raw_low_price,
+        raw_close_price,
+        raw_turnover,
+        raw_is_tradable,
+        raw_listing_sessions,
+        raw_adjustment_effective,
+        raw_factor_effective_from,
+        raw_bar_knowledge_from,
+        raw_security_knowledge_from,
+        raw_listing_knowledge_from,
+        raw_state_knowledge_from,
+        raw_factor_knowledge_from,
+        raw_bar_source_record_id,
+        raw_bar_source_revision,
+        raw_bar_source_artifact_sha256,
+        raw_factor_boundary_count,
+        raw_security_effective_from,
+        raw_listing_effective_from,
+    ) = values
+    if not isinstance(raw_session_date, date):
+        raise PhysicalEventScanError("projected candidate session date is invalid")
+    security_id = str(raw_security_id)
+    membership = industry_mapping.by_security_id.get(security_id)
+    close_at = datetime.combine(raw_session_date, time(15, 0), MARKET_TIMEZONE)
+    visibility = source_policy.historical_visibility
+    visibility.project_candidate_knowledge(
+        table="dwd_security",
+        session_close=close_at,
+        effective_from=_aware(raw_security_effective_from, "dwd_security_effective_from"),
+    )
+    visibility.project_candidate_knowledge(
+        table="dwd_listing",
+        session_close=close_at,
+        effective_from=_aware(raw_listing_effective_from, "dwd_listing_effective_from"),
+    )
+    adjustment_effective = (
+        bool(raw_adjustment_effective) if raw_adjustment_effective is not None else None
+    )
+    if adjustment_effective is True:
+        visibility.project_candidate_knowledge(
+            table="dwd_adjustment_factor",
+            session_close=close_at,
+            effective_from=_aware(raw_factor_effective_from, "factor_effective_from"),
+        )
+    return CandidateDailyInput(
+        security_id=security_id,
+        listing_id=str(raw_listing_id),
+        listing_code=str(raw_listing_code),
+        company_id=str(raw_company_id),
+        venue_id=str(raw_venue_id),
+        instrument_type=str(raw_instrument_type),
+        static_level1_industry_id=(
+            membership.level1_industry_id if membership is not None else None
+        ),
+        session_date=raw_session_date,
+        close_at=close_at,
+        knowledge_cutoff=close_at,
+        open_price=_decimal(raw_open_price),
+        high_price=_decimal(raw_high_price),
+        low_price=_decimal(raw_low_price),
+        close_price=_decimal(raw_close_price),
+        turnover=_decimal(raw_turnover),
+        is_tradable=(bool(raw_is_tradable) if raw_is_tradable is not None else None),
+        listing_sessions=int(raw_listing_sessions),
+        adjustment_effective=adjustment_effective,
+        source_evidence_digest=_source_evidence_digest_values(
+            source_policy=source_policy,
+            security_id=raw_security_id,
+            listing_id=raw_listing_id,
+            session_date=raw_session_date,
+            bar_knowledge_from=raw_bar_knowledge_from,
+            security_knowledge_from=raw_security_knowledge_from,
+            listing_knowledge_from=raw_listing_knowledge_from,
+            state_knowledge_from=raw_state_knowledge_from,
+            factor_knowledge_from=raw_factor_knowledge_from,
+            bar_source_record_id=raw_bar_source_record_id,
+            bar_source_revision=raw_bar_source_revision,
+            bar_source_artifact_sha256=raw_bar_source_artifact_sha256,
+            factor_boundary_count=raw_factor_boundary_count,
+        ),
+    )
+
+
 def iter_projected_candidate_series(
     projection: P4ResearchADM,
     *,
@@ -978,16 +1151,20 @@ def iter_projected_candidate_series(
         raise PhysicalEventScanError("P4 physical scan requires duckdb") from exc
     connection = duckdb.connect(":memory:")
     try:
+        selected_columns = ", ".join(_CANDIDATE_SCAN_COLUMNS)
         cursor = connection.execute(
             f"""
-            SELECT * FROM read_parquet({_sql_path(projection.candidate_path)})
+            SELECT {selected_columns}
+            FROM read_parquet({_sql_path(projection.candidate_path)})
             ORDER BY dwd_security_id,
                      dwd_listing_effective_from,
                      dwd_listing_id,
                      session_date
             """
         )
-        names = [str(item[0]) for item in cursor.description]
+        names = tuple(str(item[0]) for item in cursor.description)
+        if names != _CANDIDATE_SCAN_COLUMNS:
+            raise PhysicalEventScanError("projected candidate columns differ")
         current_key: tuple[str, str, str, str] | None = None
         current: list[CandidateDailyInput] = []
         while True:
@@ -995,20 +1172,19 @@ def iter_projected_candidate_series(
             if not batch:
                 break
             for values in batch:
-                row = dict(zip(names, values, strict=True))
                 key = (
-                    str(row["dwd_security_id"]),
-                    str(row["dwd_listing_id"]),
-                    str(row["listing_code"]),
-                    str(row["dwd_company_id"]),
+                    str(values[0]),
+                    str(values[1]),
+                    str(values[2]),
+                    str(values[3]),
                 )
                 if current_key is not None and key != current_key:
                     yield tuple(current)
                     current = []
                 current_key = key
                 current.append(
-                    _candidate_input(
-                        row,
+                    _candidate_input_values(
+                        values,
                         source_policy=source_policy,
                         industry_mapping=industry_mapping,
                     )
@@ -1081,8 +1257,13 @@ def scan_event_candidate_projection(
     source_policy: EventScanSourcePolicy,
     card: CandidateRuleCard,
     split_policy: SplitPolicy,
+    progress: Callable[[str, Mapping[str, Any]], None] | None = None,
 ) -> tuple[CandidateScanResult, EntryPartitionResult]:
     """Run the frozen forward scan and P2-backed T+1 partition over one projection."""
+
+    def scan_progress(stage: str, details: Mapping[str, Any]) -> None:
+        if progress is not None:
+            progress(stage, {"projection_rows": projection.row_count, **dict(details)})
 
     scan = scan_forward_candidate_series(
         iter_projected_candidate_series(
@@ -1096,6 +1277,7 @@ def scan_event_candidate_projection(
         card=card,
         split_policy=split_policy,
         source_policy=source_policy,
+        progress=scan_progress if progress is not None else None,
     )
     missing_industry = int(
         scan.counters.reason_counts.get(CandidateReason.STATIC_INDUSTRY_MISSING.value, 0)
@@ -1105,6 +1287,7 @@ def scan_event_candidate_projection(
             "P4 static industry projection does not cover all isolated candidates: "
             f"missing={missing_industry}"
         )
+    entry_started = runtime_clock.perf_counter()
     entries = partition_executable_entries(
         scan.candidates,
         evidence_by_event_id=_entry_bindings(
@@ -1113,6 +1296,17 @@ def scan_event_candidate_projection(
             candidate_snapshot_id=projection.snapshot_id,
         ),
     )
+    if progress is not None:
+        progress(
+            "entry-partition",
+            {
+                "terminal": True,
+                "elapsed_seconds": round(runtime_clock.perf_counter() - entry_started, 3),
+                "candidate_events": scan.counters.candidate_events,
+                "executable_events": entries.executable_events,
+                "not_executable_events": entries.not_executable_events,
+            },
+        )
     return scan, entries
 
 
@@ -1349,6 +1543,7 @@ def build_physical_event_scan(
     output: Path,
     code_revision: str,
     provider_session: ReplayDataSession | None = None,
+    progress: Callable[[str, Mapping[str, Any]], None] | None = None,
 ) -> PhysicalEventScanResult:
     """Build one real-corpus P4 event library from DWD V2.1 + correction-001."""
 
@@ -1383,6 +1578,7 @@ def build_physical_event_scan(
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output_parent))
     try:
         with session_context as session:
+            adm_started = runtime_clock.perf_counter()
             projection = materialize_p4_research_adm(
                 reader=session.reader,
                 dwd_root=provider_config.dwd_root,
@@ -1390,6 +1586,18 @@ def build_physical_event_scan(
                 provider_identity=session.identity,
                 output_root=staging / "adm",
             )
+            if progress is not None:
+                progress(
+                    "adm-materialization",
+                    {
+                        "terminal": True,
+                        "elapsed_seconds": round(
+                            runtime_clock.perf_counter() - adm_started, 3
+                        ),
+                        "rows": projection.row_count,
+                        "bytes": _tree_bytes(projection.root),
+                    },
+                )
             scan, entries = scan_event_candidate_projection(
                 projection,
                 reader=session.reader,
@@ -1397,7 +1605,9 @@ def build_physical_event_scan(
                 source_policy=source_policy,
                 card=card,
                 split_policy=split_policy,
+                progress=progress,
             )
+            publication_started = runtime_clock.perf_counter()
             result = _publish_package(
                 staging,
                 output=output,
@@ -1409,7 +1619,32 @@ def build_physical_event_scan(
                 entries=entries,
                 code_revision=code_revision,
             )
-        return verify_physical_event_scan(result.root)
+            if progress is not None:
+                progress(
+                    "package-publication",
+                    {
+                        "terminal": True,
+                        "elapsed_seconds": round(
+                            runtime_clock.perf_counter() - publication_started, 3
+                        ),
+                        "candidate_events": result.candidate_events,
+                        "bytes": _tree_bytes(result.root),
+                    },
+                )
+        verification_started = runtime_clock.perf_counter()
+        verified = verify_physical_event_scan(result.root)
+        if progress is not None:
+            progress(
+                "package-verification",
+                {
+                    "terminal": True,
+                    "elapsed_seconds": round(
+                        runtime_clock.perf_counter() - verification_started, 3
+                    ),
+                    "candidate_events": verified.candidate_events,
+                },
+            )
+        return verified
     except BaseException:
         if staging.exists():
             shutil.rmtree(staging)

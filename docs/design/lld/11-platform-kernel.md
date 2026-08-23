@@ -251,6 +251,14 @@ materialization counts without importing Event or feature-construction domain mo
 sealed Run is deep-verified before reuse. The API may read `/data/event-runs` read-only for bounded
 Run metadata; it never executes the scan.
 
+During the child run, a replace-atomic `progress.json` may exist only below the active attempt
+staging root. It is capped at 64 KiB, schema-validated, limited to child progress 5 through 89, and
+polled by the Event Worker. Each accepted update is conditioned on the current PostgreSQL
+`claim_generation`; a stale generation terminates its child and cannot update authority. The
+receipt is deleted before Run sealing. Its stage, counters, percentage, and timings are derived
+operational metadata: PostgreSQL Job state, generation fencing, package verification, and atomic
+Run publication remain the lifecycle authorities.
+
 This activation does not admit a Worker registry, dynamic capability documents, resource classes,
 or separate QA/build/artifact/publication services. Those remain deferred until additional named
 workflows demonstrate a routing or permission need.

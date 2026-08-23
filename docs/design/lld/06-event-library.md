@@ -113,6 +113,12 @@ version and renewed approval.
 strict typed daily inputs. Activity ratios use exact rational arithmetic, so candidate membership
 has no hidden floating-point or rounding policy. The production API streams one stable listing
 series at a time and retains only raw triggers globally, avoiding a full-market Python row materialization.
+The physical reader requests one fixed Parquet column order and converts each row
+directly from its positional tuple. For each listing series, static validity and exact range/
+turnover values are computed once per row; two sorted 20-session windows maintain the exact
+rolling medians by deterministic insertion and removal. Full 22-session evidence-digest tuples are
+constructed only after all exact thresholds pass. This changes scan complexity and allocation,
+not `Fraction` arithmetic, PIT checks, reason precedence, trigger membership, or evidence identity.
 It permits non-overlapping relisting intervals for one security while keeping cooldown/isolation at
 the security level. Static industry membership is intentionally applied only after raw-trigger
 formation for concentration control and is keyed by the same governed DWD `security_id` used by
@@ -316,6 +322,14 @@ provider projection and exactly two scope-bound panel materializations before su
 the receipt in bounded Job result metadata; runtime values do not enter Event, Label, or Report
 content identities.
 
+The composite child also emits a replace-atomic, bounded `progress.json` below the attempt staging
+root. Internal Event stages distinguish ADM materialization, projected-row decode, exact
+per-security scan, global isolation/concentration finalization, T+1 entry binding, package
+publication, and verification. Cumulative decoded rows against projected rows drive candidate-scan
+progress; timing counters remain operational telemetry. The Event Worker polls this receipt and
+generation-fences every PostgreSQL update. The receipt is not copied into a sealed Run, and neither
+its percentage nor its timing fields define Job lifecycle authority or governed package identity.
+
 The Event Library and P3 feature panel intentionally use different security identity namespaces.
 `EventRecord.identity.security_id` remains the governed DWD identity, while the accepted direct-DWD
 replay adapter keys the P3 feature panel by `listing_code`. The comparison adapter therefore derives
@@ -347,6 +361,7 @@ in `docs/acceptance/perf-batch-001-production-ab-20260823.md`.
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Accepted production A/B corpus: 36,820 total, 34,641 settled three-class, identical Event/Label content and manifest digests |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Accepted production A/B: byte-identical report content/manifest identities and the same three leading features |
 | PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | Accepted production A/B: one provider projection and two scope-bound TMP Feature Panels per Job, three byte-identical governed package trees, and 3.92 percent improvement against matched recent production Jobs |
+| PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Reference-equivalent scan; same-revision production A/B preserves all accepted package identities while recording lower wall time, peak RSS, and internal stage timings |
 
 ## 9. Acceptance
 

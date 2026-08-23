@@ -42,7 +42,7 @@ def _report(*, end: date, rows: int = 2) -> BaselineFeaturePanelReport:
     )
 
 
-def test_job_local_panel_derives_report_scope_without_rebuilding(tmp_path: Path) -> None:
+def test_job_local_panel_rejects_derived_scope_reuse(tmp_path: Path) -> None:
     panel_path = tmp_path / "feature-panel.parquet"
     pq.write_table(
         pa.Table.from_pylist(
@@ -78,13 +78,12 @@ def test_job_local_panel_derives_report_scope_without_rebuilding(tmp_path: Path)
         parquet_bytes=panel_path.stat().st_size,
     )
 
-    scoped = panel.scoped(scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 30))
-
-    assert scoped.path == panel.path
-    assert scoped.materialized_report.digest == panel.materialized_report.digest
-    assert scoped.report.scope_end == date(2021, 12, 30)
-    assert scoped.report.row_count == 1
-    assert scoped.report.digest != panel.report.digest
+    with pytest.raises(JobLocalArtifactError, match="scope_mismatch"):
+        panel.scoped(scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 30))
+    assert (
+        panel.scoped(scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 31))
+        is panel
+    )
 
 
 def test_job_local_panel_rejects_partial_or_drifted_identity(tmp_path: Path) -> None:
@@ -118,7 +117,7 @@ def test_job_local_panel_rejects_partial_or_drifted_identity(tmp_path: Path) -> 
         )
 
 
-def test_reported_batch_builds_each_expensive_prerequisite_once(
+def test_reported_batch_builds_each_scope_bound_prerequisite_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     provider_part = tmp_path / "provider.parquet"
@@ -179,22 +178,26 @@ def test_reported_batch_builds_each_expensive_prerequisite_once(
             progress("dwd-projection-validated", {"row_count": 10})
             return shared_session
 
-    panel_report = SimpleNamespace(row_count=20)
+    panel_scopes: list[date] = []
 
     class Panel:
-        report = panel_report
-        parquet_bytes = 30
+        def __init__(self, path: Path, scope_end: date) -> None:
+            self.path = path
+            self.report = SimpleNamespace(row_count=20, scope_end=scope_end)
+            self.parquet_bytes = path.stat().st_size
 
-        def scoped(self, **_kwargs: Any) -> Panel:
-            return self
-
-    shared_panel = Panel()
+    panels: dict[date, Panel] = {}
 
     def materialize_panel(**kwargs: Any) -> Panel:
         calls["panel_build"] += 1
         assert kwargs["session"] is shared_session
-        Path(kwargs["output"]).write_bytes(b"panel")
-        return shared_panel
+        scope_end = kwargs["scope_end"]
+        panel_scopes.append(scope_end)
+        output = Path(kwargs["output"])
+        output.write_bytes(b"panel")
+        panel = Panel(output, scope_end)
+        panels[scope_end] = panel
+        return panel
 
     def output_root(name: str) -> Path:
         root = tmp_path / name
@@ -212,7 +215,7 @@ def test_reported_batch_builds_each_expensive_prerequisite_once(
     def build_label(**kwargs: Any) -> LabelCorpusResult:
         calls["label"] += 1
         assert kwargs["provider_session"] is shared_session
-        assert kwargs["feature_panel"] is shared_panel
+        assert kwargs["feature_panel"] is panels[date(2021, 12, 31)]
         return LabelCorpusResult(
             output_root("label"),
             "sha256:label",
@@ -229,7 +232,7 @@ def test_reported_batch_builds_each_expensive_prerequisite_once(
     def build_report(**kwargs: Any) -> ComparisonReportResult:
         calls["report"] += 1
         assert kwargs["provider_session"] is shared_session
-        assert kwargs["feature_panel"] is shared_panel
+        assert kwargs["feature_panel"] is panels[date(2021, 12, 30)]
         return ComparisonReportResult(
             output_root("report"),
             "sha256:report",
@@ -281,14 +284,15 @@ def test_reported_batch_builds_each_expensive_prerequisite_once(
 
     assert calls == {
         "provider_open": 1,
-        "panel_build": 1,
+        "panel_build": 2,
         "event": 1,
         "label": 1,
         "report": 1,
     }
+    assert panel_scopes == [date(2021, 12, 31), date(2021, 12, 30)]
     assert result.runtime["reuse"] == {
         "provider_materializations": 1,
-        "feature_panel_materializations": 1,
+        "feature_panel_materializations": 2,
         "cross_job_cache": False,
         "adm_published": False,
     }

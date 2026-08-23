@@ -173,9 +173,9 @@ def build_physical_reported_event_batch(
         with tempfile.TemporaryDirectory(
             prefix=".p4-job-local-", dir=event_output.parent.resolve()
         ) as temporary:
-            panel = _run_stage(
+            label_panel = _run_stage(
                 stages,
-                "feature-panel",
+                "feature-panel.label-scope",
                 lambda: build_job_local_feature_panel(
                     session=session,
                     provider_config=provider_config,
@@ -188,19 +188,7 @@ def build_physical_reported_event_batch(
                     "rows": result.report.row_count,
                     "bytes": result.parquet_bytes,
                     "disposition": "built_once_tmp",
-                },
-            )
-            report_panel = _run_stage(
-                stages,
-                "feature-panel.report-scope",
-                lambda: panel.scoped(
-                    scope_start=_DEVELOPMENT_START,
-                    scope_end=_DECISION_END,
-                ),
-                lambda result: {
-                    "rows": result.report.row_count,
-                    "bytes": result.parquet_bytes,
-                    "disposition": "derived_view",
+                    "scope_end": _EXECUTION_END.isoformat(),
                 },
             )
             label = _run_stage(
@@ -215,13 +203,32 @@ def build_physical_reported_event_batch(
                     output=label_output,
                     code_revision=code_revision,
                     provider_session=session,
-                    feature_panel=panel,
+                    feature_panel=label_panel,
                 ),
                 lambda result: {
                     "rows": result.total_events,
                     "bytes": _tree_bytes(result.root),
                     "provider_disposition": "reused",
-                    "feature_panel_disposition": "reused",
+                    "feature_panel_disposition": "supplied_scope_bound_tmp",
+                },
+            )
+            label_panel.path.unlink()
+            report_panel = _run_stage(
+                stages,
+                "feature-panel.report-scope",
+                lambda: build_job_local_feature_panel(
+                    session=session,
+                    provider_config=provider_config,
+                    registry=registry,
+                    scope_start=_DEVELOPMENT_START,
+                    scope_end=_DECISION_END,
+                    output=Path(temporary) / "report-feature-panel.parquet",
+                ),
+                lambda result: {
+                    "rows": result.report.row_count,
+                    "bytes": result.parquet_bytes,
+                    "disposition": "built_once_tmp",
+                    "scope_end": _DECISION_END.isoformat(),
                 },
             )
             report = _run_stage(
@@ -242,7 +249,7 @@ def build_physical_reported_event_batch(
                     "rows": result.three_class_events,
                     "bytes": _tree_bytes(result.root),
                     "provider_disposition": "reused",
-                    "feature_panel_disposition": "reused",
+                    "feature_panel_disposition": "supplied_scope_bound_tmp",
                 },
             )
 
@@ -259,7 +266,7 @@ def build_physical_reported_event_batch(
         },
         "reuse": {
             "provider_materializations": 1,
-            "feature_panel_materializations": 1,
+            "feature_panel_materializations": 2,
             "cross_job_cache": False,
             "adm_published": False,
         },

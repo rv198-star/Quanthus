@@ -69,13 +69,14 @@ def test_exact_package_binding_fails_closed(tmp_path: Path, tamper: str) -> None
 
 def test_cross_candidate_package_is_rejected_before_artifact_read(tmp_path: Path) -> None:
     payload = json.loads(CONFIG.read_text(encoding="utf-8"))
-    package = payload["packages"][0]
+    package = payload["packages"][-1]
     package["candidate"]["strategy_id"] = "candidate.foreign"
     digest_payload = dict(package)
     digest_payload.pop("package_digest")
     package["package_digest"] = digest_value(digest_payload)
     payload["bindings"][0].update(
         strategy_id="candidate.foreign",
+        package_id=package["package_id"],
         package_digest=package["package_digest"],
     )
     path = tmp_path / "foreign.json"
@@ -100,7 +101,16 @@ def test_production_projection_is_digest_resolved_and_authority_free() -> None:
     assert len(result["assessment_scorecards"]) == 2
     assert len(result["disagreement_cases"]) == 2
     assert len(result["economic_effects"]) == 4
-    assert result["lifecycle_decision"] is None
+    decision = result["lifecycle_decision"]
+    assert decision["decision"] == "inconclusive"
+    assert decision["actor_type"] == "human"
+    assert decision["shadow_disposition"] == {
+        "status": "disabled",
+        "reason_code": "forward_shadow_not_explicitly_authorized",
+        "effective_boundary": "2026-08-23T02:10:00Z",
+        "observation_budget": None,
+    }
+    assert result["source_digests"]["lifecycle_decision"] == decision["digest"]
     assert result["source_digests"]["attribution_release"] == (
         "sha256:1754a4a3a185420734e6addab71110ee82ecd71fb4fbd182f9ee1506c49c98ff"
     )

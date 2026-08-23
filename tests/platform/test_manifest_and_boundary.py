@@ -154,6 +154,7 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert "config/product-candidate-evidence.v1.json" in dockerfile
     assert "config/product-expert-evidence.v1.json" in dockerfile
     assert "config/expert-strategies/p4-trend-risk.v1.0.1.json" in dockerfile
+    assert "candidate-p4-trend-risk-1.0.1.inconclusive.v1.json" in dockerfile
     assert "chmod 0444 ./config/platform-features.v1.json" in dockerfile
     assert "COPY src ./src" not in dockerfile
     assert "COPY src/quanthus/platform ./src/quanthus/platform" in dockerfile
@@ -169,6 +170,10 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert '"$REPOSITORY_ROOT/config/product-candidate-evidence.v1.json"' in builder
     assert '"$REPOSITORY_ROOT/config/product-expert-evidence.v1.json"' in builder
     assert '"$REPOSITORY_ROOT/config/expert-strategies/p4-trend-risk.v1.0.1.json"' in builder
+    assert (
+        '"$REPOSITORY_ROOT/config/expert-evaluations/lifecycle/'
+        'candidate-p4-trend-risk-1.0.1.inconclusive.v1.json"' in builder
+    )
     assert '"$REPOSITORY_ROOT/src/quanthus/expert_evaluation/product_view.py"' in builder
     assert '"$REPOSITORY_ROOT/src/quanthus/expert_evaluation/release_verification.py"' in builder
     assert all(

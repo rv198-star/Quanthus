@@ -25,6 +25,7 @@ from quanthus.backtest.baseline_research import BaselineHistoricalStrategy
 from quanthus.backtest.historical_bundle import HistoricalReplayBundle
 from quanthus.contracts import SnapshotRef
 from quanthus.data_foundation import DatasetManifest
+from quanthus.event_library.job_local import JobLocalFeaturePanel
 from quanthus.feature_registry import load_feature_registry
 from quanthus.policy import find_project_root
 
@@ -224,6 +225,68 @@ class BaselineResearchTests(unittest.TestCase):
             scope_end=self.dates[-2],
             output=self.root / "baseline-features.parquet",
         )
+
+    def test_materialized_panel_matches_queryable_build_without_opening_a_copy(self) -> None:
+        artifact = BaselineFeaturePanel.materialize(
+            self.bundle,
+            self.registry,
+            scope_start=self.dates[0],
+            scope_end=self.dates[-2],
+            output=self.root / "materialized-features.parquet",
+        )
+        with BaselineFeaturePanel.build(
+            self.bundle,
+            self.registry,
+            scope_start=self.dates[0],
+            scope_end=self.dates[-2],
+            output=self.root / "queryable-features.parquet",
+        ) as panel:
+            self.assertEqual(artifact.report, panel.report)
+        self.assertEqual(artifact.path.read_bytes(), panel.path.read_bytes())
+
+    def test_scoped_job_local_panel_preserves_independent_report_identity(self) -> None:
+        full = BaselineFeaturePanel.materialize(
+            self.bundle,
+            self.registry,
+            scope_start=self.dates[0],
+            scope_end=self.dates[-1],
+            output=self.root / "full-features.parquet",
+        )
+        independent = BaselineFeaturePanel.materialize(
+            self.bundle,
+            self.registry,
+            scope_start=self.dates[0],
+            scope_end=self.dates[-2],
+            output=self.root / "independent-short-features.parquet",
+        )
+        shared = JobLocalFeaturePanel(
+            path=full.path,
+            report=full.report,
+            materialized_report=full.report,
+            provider_config_digest="sha256:" + "5" * 64,
+            parquet_bytes=full.path.stat().st_size,
+        )
+
+        scoped = shared.scoped(scope_start=self.dates[0], scope_end=self.dates[-2])
+
+        self.assertEqual(scoped.report, independent.report)
+        self.assertEqual(scoped.report.digest, independent.report.digest)
+        import duckdb
+
+        connection = duckdb.connect(":memory:")
+        try:
+            full_rows = connection.execute(
+                "SELECT * FROM read_parquet(?) WHERE market_date BETWEEN ? AND ? "
+                "ORDER BY market_date, security_id",
+                [str(full.path), self.dates[0], self.dates[-2]],
+            ).fetchall()
+            independent_rows = connection.execute(
+                "SELECT * FROM read_parquet(?) ORDER BY market_date, security_id",
+                [str(independent.path)],
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(full_rows, independent_rows)
 
     def test_total_return_index_is_continuous_across_a_split(self) -> None:
         split_index = 30

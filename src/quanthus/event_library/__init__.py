@@ -42,6 +42,10 @@ from quanthus.event_library.physical_scan import (
     materialize_p4_research_adm,
     verify_physical_event_scan,
 )
+from quanthus.event_library.reported_batch import (
+    ReportedBatchResult,
+    build_physical_reported_event_batch,
+)
 from quanthus.event_library.rule_card import (
     CandidateRuleCard,
     CandidateRuleCardError,
@@ -111,12 +115,14 @@ __all__ = [
     "SplitAssignment",
     "SplitPolicy",
     "ScannedCandidate",
+    "ReportedBatchResult",
     "SplitPolicyError",
     "StructuralBreakCard",
     "assign_event_split",
     "build_physical_comparison_report",
     "build_physical_event_scan",
     "build_physical_label_corpus",
+    "build_physical_reported_event_batch",
     "calculate_candidate_rule_card_digest",
     "calculate_comparison_report_policy_digest",
     "calculate_outcome_label_card_digest",

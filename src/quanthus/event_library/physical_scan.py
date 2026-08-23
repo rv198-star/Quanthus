@@ -8,6 +8,7 @@ import os
 import shutil
 import tempfile
 from collections.abc import Iterator, Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
@@ -15,10 +16,15 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from quanthus.backtest.data_provider import ReplayDataProvider, load_replay_data_provider_config
+from quanthus.backtest.data_provider import (
+    ReplayDataProvider,
+    ReplayDataSession,
+    load_replay_data_provider_config,
+)
 from quanthus.backtest.historical_frames import HistoricalReplayFrameReader
 from quanthus.backtest.inputs import P1DailyExecutionEvidence
 from quanthus.event_library.contracts import sha256_digest
+from quanthus.event_library.job_local import require_job_local_session
 from quanthus.event_library.rule_card import CandidateRuleCard, load_candidate_rule_card
 from quanthus.event_library.scan import (
     CandidateDailyInput,
@@ -1342,6 +1348,7 @@ def build_physical_event_scan(
     split_policy_path: Path,
     output: Path,
     code_revision: str,
+    provider_session: ReplayDataSession | None = None,
 ) -> PhysicalEventScanResult:
     """Build one real-corpus P4 event library from DWD V2.1 + correction-001."""
 
@@ -1359,14 +1366,23 @@ def build_physical_event_scan(
     if provider_config.mode != "direct-dwd-job-local":
         raise PhysicalEventScanError("P4 physical scan requires direct DWD provider mode")
     provider = ReplayDataProvider(provider_config)
+    if provider_session is not None:
+        require_job_local_session(
+            provider_session,
+            provider_config,
+            scope_start=date(2012, 1, 4),
+            scope_end=date(2021, 12, 30),
+        )
+    session_context = (
+        provider.open(scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 30))
+        if provider_session is None
+        else nullcontext(provider_session)
+    )
     output_parent = output.parent.resolve()
     output_parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output_parent))
     try:
-        with provider.open(
-            scope_start=date(2012, 1, 4),
-            scope_end=date(2021, 12, 30),
-        ) as session:
+        with session_context as session:
             projection = materialize_p4_research_adm(
                 reader=session.reader,
                 dwd_root=provider_config.dwd_root,

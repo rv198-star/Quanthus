@@ -14,6 +14,7 @@ import shutil
 import tempfile
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -21,9 +22,18 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quanthus.backtest.baseline_research import BaselineFeaturePanel
-from quanthus.backtest.data_provider import ReplayDataProvider, load_replay_data_provider_config
+from quanthus.backtest.data_provider import (
+    ReplayDataProvider,
+    ReplayDataSession,
+    load_replay_data_provider_config,
+)
 from quanthus.contracts import EventOutcome
 from quanthus.event_library.contracts import event_record_from_dict, sha256_digest
+from quanthus.event_library.job_local import (
+    JobLocalArtifactError,
+    JobLocalFeaturePanel,
+    require_job_local_session,
+)
 from quanthus.event_library.label_cards import (
     LabelSettlementStatus,
     OutcomeLabelCard,
@@ -659,6 +669,8 @@ def build_physical_label_corpus(
     feature_registry_path: Path,
     output: Path,
     code_revision: str,
+    provider_session: ReplayDataSession | None = None,
+    feature_panel: JobLocalFeaturePanel | None = None,
 ) -> LabelCorpusResult:
     """Build one immutable development label sidecar from a sealed Event Library."""
 
@@ -673,28 +685,56 @@ def build_physical_label_corpus(
     if provider_config.mode != "direct-dwd-job-local":
         raise LabelCorpusError("P4 label corpus requires direct DWD provider mode")
     provider = ReplayDataProvider(provider_config)
+    if provider_session is not None:
+        try:
+            require_job_local_session(
+                provider_session,
+                provider_config,
+                scope_start=_DEVELOPMENT_START,
+                scope_end=date(2021, 12, 30),
+            )
+        except JobLocalArtifactError as exc:
+            raise LabelCorpusError(str(exc)) from exc
+    session_context = (
+        provider.open(scope_start=_DEVELOPMENT_START, scope_end=date(2021, 12, 30))
+        if provider_session is None
+        else nullcontext(provider_session)
+    )
     output_parent = output.parent.resolve()
     output_parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output_parent))
     feature_panel_path = staging / ".feature-panel.parquet"
     try:
-        with provider.open(scope_start=_DEVELOPMENT_START, scope_end=date(2021, 12, 30)) as session:
-            panel = BaselineFeaturePanel.build(
-                session.reader.bundle,
-                registry,
-                scope_start=_DEVELOPMENT_START,
-                scope_end=_DEVELOPMENT_END,
-                output=feature_panel_path,
-                data_content_digest=session.reader.data_content_digest,
-                data_manifest_sha256=session.reader.data_manifest_sha256,
-            )
-            try:
-                panel_report = panel.report
-            finally:
-                panel.close()
+        with session_context as session:
+            owns_feature_panel = feature_panel is None
+            if feature_panel is None:
+                panel_artifact = BaselineFeaturePanel.materialize(
+                    session.reader.bundle,
+                    registry,
+                    scope_start=_DEVELOPMENT_START,
+                    scope_end=_DEVELOPMENT_END,
+                    output=feature_panel_path,
+                    data_content_digest=session.reader.data_content_digest,
+                    data_manifest_sha256=session.reader.data_manifest_sha256,
+                )
+                panel_path = panel_artifact.path
+                panel_report = panel_artifact.report
+            else:
+                try:
+                    feature_panel.require_compatible(
+                        session=session,
+                        provider_config=provider_config,
+                        registry=registry,
+                        scope_start=_DEVELOPMENT_START,
+                        scope_end=_DEVELOPMENT_END,
+                    )
+                except JobLocalArtifactError as exc:
+                    raise LabelCorpusError(str(exc)) from exc
+                panel_path = feature_panel.path
+                panel_report = feature_panel.report
             observations = _source_observations(
                 bundle=session.reader.bundle,
-                feature_panel_path=feature_panel_path,
+                feature_panel_path=panel_path,
                 events=events,
             )
             label_rows: list[dict[str, Any]] = []
@@ -731,7 +771,7 @@ def build_physical_label_corpus(
                         "outcome_evidence_digest": settlement.evidence_digest,
                     }
                 )
-            if feature_panel_path.exists():
+            if owns_feature_panel and feature_panel_path.exists():
                 feature_panel_path.unlink()
             label_rows.sort(key=lambda row: str(row["event_id"]))
             status_counts = Counter(str(row["settlement_status"]) for row in label_rows)

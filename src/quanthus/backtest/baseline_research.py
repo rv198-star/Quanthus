@@ -724,6 +724,14 @@ class BaselineFeaturePanelReport:
         return {**self.payload_dict(), "digest": self.digest}
 
 
+@dataclass(frozen=True)
+class BaselineFeaturePanelArtifact:
+    """A materialized panel that has not been loaded into a query connection."""
+
+    path: Path
+    report: BaselineFeaturePanelReport
+
+
 class BaselineFeaturePanel:
     """A date-sorted Parquet panel evaluated once and queried by cross-section."""
 
@@ -1147,7 +1155,34 @@ class BaselineFeaturePanel:
         data_manifest_sha256: str | None = None,
         allowed_security_ids: Sequence[str] | None = None,
     ) -> BaselineFeaturePanel:
-        """Build the PIT total-return panel with one vectorized historical scan."""
+        """Build and open the PIT total-return panel for point queries."""
+
+        artifact = cls.materialize(
+            bundle,
+            registry,
+            scope_start=scope_start,
+            scope_end=scope_end,
+            output=output,
+            data_content_digest=data_content_digest,
+            data_manifest_sha256=data_manifest_sha256,
+            allowed_security_ids=allowed_security_ids,
+        )
+        return cls(artifact.path, artifact.report)
+
+    @classmethod
+    def materialize(
+        cls,
+        bundle: HistoricalReplayBundle,
+        registry: FeatureRegistry,
+        *,
+        scope_start: date,
+        scope_end: date,
+        output: Path,
+        data_content_digest: str | None = None,
+        data_manifest_sha256: str | None = None,
+        allowed_security_ids: Sequence[str] | None = None,
+    ) -> BaselineFeaturePanelArtifact:
+        """Materialize the PIT panel without loading a second in-memory query copy."""
 
         if scope_start > scope_end:
             raise BaselineResearchError("scope_start must not follow scope_end")
@@ -1319,7 +1354,7 @@ class BaselineFeaturePanel:
         )
         if report.row_count == 0 or report.feature_ready_count == 0:
             raise BaselineResearchError("feature panel contains no research-ready observations")
-        return cls(resolved, report)
+        return BaselineFeaturePanelArtifact(resolved, report)
 
 
 def _create_feature_source_views(

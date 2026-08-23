@@ -83,6 +83,7 @@ from quanthus.event_library.physical_scan import (
     build_physical_event_scan,
     verify_physical_event_scan,
 )
+from quanthus.event_library.reported_batch import build_physical_reported_event_batch
 from quanthus.feature_registry import FeatureRegistryError, load_feature_registry
 from quanthus.gates import (
     GateReport,
@@ -734,6 +735,7 @@ def _parser() -> argparse.ArgumentParser:
     p4_reported_event_scan.add_argument("--event-output", type=Path, required=True)
     p4_reported_event_scan.add_argument("--label-output", type=Path, required=True)
     p4_reported_event_scan.add_argument("--report-output", type=Path, required=True)
+    p4_reported_event_scan.add_argument("--runtime-receipt", type=Path)
     p4_reported_event_scan.add_argument("--code-revision", required=True)
 
     p4_label_corpus = subparsers.add_parser(
@@ -1756,48 +1758,42 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             )
         elif args.command == "run-p4-reported-event-scan":
-            event_scan_result = build_physical_event_scan(
+            reported_batch_result = build_physical_reported_event_batch(
                 source_policy_path=args.source_policy,
                 provider_config_path=args.provider_config,
                 rule_card_path=args.rule_card,
                 split_policy_path=args.split_policy,
-                output=args.event_output,
-                code_revision=args.code_revision,
-            )
-            label_result = build_physical_label_corpus(
-                event_root=event_scan_result.root,
-                provider_config_path=args.provider_config,
                 outcome_card_path=args.outcome_card,
                 structural_card_path=args.structural_break_card,
                 feature_registry_path=args.feature_registry,
-                output=args.label_output,
-                code_revision=args.code_revision,
-            )
-            report_result = build_physical_comparison_report(
-                event_root=event_scan_result.root,
-                label_root=label_result.root,
-                provider_config_path=args.provider_config,
-                feature_registry_path=args.feature_registry,
                 report_policy_path=args.report_policy,
-                output=args.report_output,
+                event_output=args.event_output,
+                label_output=args.label_output,
+                report_output=args.report_output,
                 code_revision=args.code_revision,
+                runtime_receipt_path=args.runtime_receipt,
             )
             print(
                 json.dumps(
                     {
-                        "event_root": str(event_scan_result.root),
-                        "event_manifest_sha256": event_scan_result.manifest_sha256,
-                        "event_content_digest": event_scan_result.content_digest,
-                        "label_root": str(label_result.root),
-                        "label_manifest_sha256": label_result.manifest_sha256,
-                        "label_content_digest": label_result.content_digest,
-                        "report_root": str(report_result.root),
-                        "report_manifest_sha256": report_result.manifest_sha256,
-                        "report_content_digest": report_result.content_digest,
-                        "candidate_events": event_scan_result.candidate_events,
-                        "three_class_events": report_result.three_class_events,
-                        "leading_features": list(report_result.leading_features),
-                        "report_acceptance_pass": report_result.acceptance_pass,
+                        "event_root": str(reported_batch_result.event.root),
+                        "event_manifest_sha256": reported_batch_result.event.manifest_sha256,
+                        "event_content_digest": reported_batch_result.event.content_digest,
+                        "label_root": str(reported_batch_result.label.root),
+                        "label_manifest_sha256": reported_batch_result.label.manifest_sha256,
+                        "label_content_digest": reported_batch_result.label.content_digest,
+                        "report_root": str(reported_batch_result.report.root),
+                        "report_manifest_sha256": reported_batch_result.report.manifest_sha256,
+                        "report_content_digest": reported_batch_result.report.content_digest,
+                        "candidate_events": reported_batch_result.event.candidate_events,
+                        "three_class_events": reported_batch_result.report.three_class_events,
+                        "leading_features": list(
+                            reported_batch_result.report.leading_features
+                        ),
+                        "report_acceptance_pass": (
+                            reported_batch_result.report.acceptance_pass
+                        ),
+                        "runtime": reported_batch_result.runtime,
                     },
                     sort_keys=True,
                 )

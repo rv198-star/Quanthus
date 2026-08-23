@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from quanthus.platform.event_worker import (
     EventWorker,
     LabelCorpusEnvelope,
     _event_input,
+    _load_runtime_receipt,
     _validate_run_directory,
 )
 from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, input_digest
@@ -67,6 +69,52 @@ def test_event_input_is_exact_and_rejects_path_substitution() -> None:
     changed["arbitrary_command"] = "bash"
     with pytest.raises(RuntimeError, match="input_contract_mismatch"):
         _event_input(changed)
+
+
+def test_runtime_receipt_requires_exact_single_job_reuse_counts(tmp_path: Path) -> None:
+    path = tmp_path / "runtime-metrics.json"
+    payload = {
+        "schema_version": "quanthus.p4-reported-batch-runtime.v1",
+        "total_elapsed_seconds": 12.5,
+        "max_rss_bytes": 1024,
+        "provider_config_digest": "sha256:" + "1" * 64,
+        "feature_registry_digest": "sha256:" + "2" * 64,
+        "scope": {
+            "start": "2012-01-04",
+            "decision_end": "2021-12-30",
+            "execution_end": "2021-12-31",
+        },
+        "stages": [
+            {"stage": stage, "elapsed_seconds": 1.0}
+            for stage in (
+                "provider.direct-dwd-projection",
+                "event-library",
+                "feature-panel",
+                "feature-panel.report-scope",
+                "label-corpus",
+                "comparison-report",
+            )
+        ],
+        "reuse": {
+            "provider_materializations": 1,
+            "feature_panel_materializations": 1,
+            "cross_job_cache": False,
+            "adm_published": False,
+        },
+    }
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    assert _load_runtime_receipt(path, required=True) is not None
+
+    payload["reuse"] = {
+        "provider_materializations": 3,
+        "feature_panel_materializations": 2,
+        "cross_job_cache": False,
+        "adm_published": False,
+    }
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="runtime_receipt_invalid"):
+        _load_runtime_receipt(path, required=True)
 
 
 def test_event_worker_claims_only_event_queue_and_kind(tmp_path: Path) -> None:

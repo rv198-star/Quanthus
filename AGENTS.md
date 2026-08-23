@@ -32,6 +32,30 @@
 - Prefer deterministic ordering and explicit reason codes over implicit behavior.
 - Run `make check` before a handoff.
 
+## Batch data construction
+
+- Design warehouse, feature, replay, attribution, and other data-heavy batches as an explicit
+  stage dependency graph. Before implementation, identify which deterministic prerequisites are
+  shared, which stage owns each materialization, and which downstream stages consume it.
+- Do not rebuild semantically identical prerequisite data more than once inside one Job. Build one
+  immutable job-local intermediate and pass it to every in-Job consumer. Record stage elapsed time,
+  row counts, bytes, and reuse/build disposition so repeated work is visible.
+- Classify every materialized intermediate by lifecycle: `TMP` is job-local and removed with its
+  staging root; a content-addressed cache may be reused across Jobs under an explicit retention and
+  invalidation policy; `ADM` is a governed, published data product with stable downstream consumers.
+  Do not promote temporary implementation data to ADM merely to avoid recomputation.
+- A reusable identity must cover the complete semantic input closure, including the authoritative
+  data/effective-view digest, configuration and policy digests, evaluator or code version, schema
+  version, time/partition scope, and security universe or subset. A partial key, identity mismatch,
+  or unreadable manifest is a cache miss or fail-closed error, never a reason to reuse stale data.
+- When the same expensive prerequisite recurs across Jobs, measure its cost first and then choose
+  the smallest sufficient reuse boundary: job-local sharing, content-addressed cache, or governed
+  ADM. Preserve immutable publication, lineage, PIT rules, and sealed-partition boundaries at every
+  level.
+- Formal independent reproduction and cold-run acceptance must remain explicit modes. A cache hit
+  may accelerate routine experiments, but it must not replace an independently rebuilt artifact
+  when the governing acceptance contract requires independent construction.
+
 ## Deployment and remote access
 
 - GitHub is the only normal code-distribution path. Hermes, CN01, and future nodes each use a

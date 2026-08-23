@@ -16,14 +16,24 @@ import re
 import shutil
 import tempfile
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quanthus.backtest.baseline_research import BaselineFeaturePanel
-from quanthus.backtest.data_provider import ReplayDataProvider, load_replay_data_provider_config
+from quanthus.backtest.data_provider import (
+    ReplayDataProvider,
+    ReplayDataSession,
+    load_replay_data_provider_config,
+)
 from quanthus.event_library.contracts import require_sha256_digest, sha256_digest
+from quanthus.event_library.job_local import (
+    JobLocalArtifactError,
+    JobLocalFeaturePanel,
+    require_job_local_session,
+)
 from quanthus.event_library.label_corpus import verify_physical_label_corpus
 from quanthus.event_library.physical_scan import verify_physical_event_scan
 from quanthus.feature_registry import load_feature_registry
@@ -528,7 +538,7 @@ class _Stats:
     q75: float | None = None
 
 
-def _finite_or_none(value: object) -> float | None:
+def _finite_or_none(value: Any) -> float | None:
     if value is None:
         return None
     parsed = float(value)
@@ -557,6 +567,7 @@ def _effect(
         (left.count - 1) * var_left + (right.count - 1) * var_right
     ) / pooled_denom
     mean_diff = left.mean - right.mean
+    hedges_g: float | None
     if pooled_var <= 0:
         hedges_g = 0.0 if mean_diff == 0 else math.copysign(float("inf"), mean_diff)
     else:
@@ -998,6 +1009,8 @@ def build_physical_comparison_report(
     report_policy_path: Path,
     output: Path,
     code_revision: str,
+    provider_session: ReplayDataSession | None = None,
+    feature_panel: JobLocalFeaturePanel | None = None,
 ) -> ComparisonReportResult:
     """Build the sealed development daily group report from accepted immutable inputs."""
 
@@ -1041,27 +1054,57 @@ def build_physical_comparison_report(
     if provider_config.mode != "direct-dwd-job-local":
         raise ComparisonReportError("P4 reporting requires direct DWD job-local provider")
     provider = ReplayDataProvider(provider_config)
+    if provider_session is not None:
+        try:
+            require_job_local_session(
+                provider_session,
+                provider_config,
+                scope_start=_DEVELOPMENT_START,
+                scope_end=_DEVELOPMENT_END,
+            )
+        except JobLocalArtifactError as exc:
+            raise ComparisonReportError(str(exc)) from exc
+    session_context = (
+        provider.open(scope_start=_DEVELOPMENT_START, scope_end=_DEVELOPMENT_END)
+        if provider_session is None
+        else nullcontext(provider_session)
+    )
     output_parent = output.parent.resolve()
     output_parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output_parent))
     panel_path = staging / ".feature-panel.parquet"
     try:
-        with provider.open(scope_start=_DEVELOPMENT_START, scope_end=_DEVELOPMENT_END) as session:
-            panel = BaselineFeaturePanel.build(
-                session.reader.bundle,
-                registry,
-                scope_start=_DEVELOPMENT_START,
-                scope_end=_DEVELOPMENT_END,
-                output=panel_path,
-                data_content_digest=session.reader.data_content_digest,
-                data_manifest_sha256=session.reader.data_manifest_sha256,
+        with session_context as session:
+            owns_feature_panel = feature_panel is None
+            if feature_panel is None:
+                panel_artifact = BaselineFeaturePanel.materialize(
+                    session.reader.bundle,
+                    registry,
+                    scope_start=_DEVELOPMENT_START,
+                    scope_end=_DEVELOPMENT_END,
+                    output=panel_path,
+                    data_content_digest=session.reader.data_content_digest,
+                    data_manifest_sha256=session.reader.data_manifest_sha256,
+                )
+                active_panel_path = panel_artifact.path
+                panel_report = panel_artifact.report
+            else:
+                try:
+                    feature_panel.require_compatible(
+                        session=session,
+                        provider_config=provider_config,
+                        registry=registry,
+                        scope_start=_DEVELOPMENT_START,
+                        scope_end=_DEVELOPMENT_END,
+                    )
+                except JobLocalArtifactError as exc:
+                    raise ComparisonReportError(str(exc)) from exc
+                active_panel_path = feature_panel.path
+                panel_report = feature_panel.report
+            group_rows_raw, half_rows_raw = _aggregate_feature_rows(
+                active_panel_path, event_inputs
             )
-            try:
-                panel_report = panel.report
-            finally:
-                panel.close()
-            group_rows_raw, half_rows_raw = _aggregate_feature_rows(panel_path, event_inputs)
-        if panel_path.exists():
+        if owns_feature_panel and panel_path.exists():
             panel_path.unlink()
         expected_groups = len(_ALLOWED_FEATURES) * 21 * len(_ALLOWED_OUTCOMES)
         if len(group_rows_raw) != expected_groups:

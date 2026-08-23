@@ -50,7 +50,7 @@ module internals unless a named application port crosses that boundary.
 | `03-label-feature-system.md` | P3 | Accepted capability substrate; formal vocabularies are proposal-driven | Labels, features, state vocabularies, or feature lineage |
 | `04-experts-aggregator.md` | P3 | Accepted v1 capability substrate; Expert Strategy Layer MVP v2 evaluation design approved and implementation open | Expert contracts, vetoes, constraints, scores, aggregation, evaluation, scorecards, or expert lifecycle |
 | `05-position-execution.md` | P3 | Accepted capability substrate | Strategy position lifecycle, sizing, exits, or cooldown |
-| `06-event-library.md` | P4 | Implementation open | Event cohorts, outcomes, or event-window definitions |
+| `06-event-library.md` | P4 | Event, label, report, and job-local batch reuse accepted; scan optimization open | Event cohorts, outcomes, event-window definitions, or Event batch performance |
 | `07-research-scoring.md` | P5 | Deferred | Statistical/ML research and promotion |
 | `08-validation-governance.md` | P6 policy | Approved future governance | Arbitration, blind data, change budgets, or model promotion |
 | `09-roadmap.md` | All | Delivery sequence | Phase gates, milestones, or stop rules |

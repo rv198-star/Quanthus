@@ -325,7 +325,7 @@ def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | Non
         or reuse
         != {
             "provider_materializations": 1,
-            "feature_panel_materializations": 1,
+            "feature_panel_materializations": 2,
             "cross_job_cache": False,
             "adm_published": False,
         }
@@ -335,10 +335,14 @@ def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | Non
     required_stages = {
         "provider.direct-dwd-projection",
         "event-library",
-        "feature-panel",
+        "feature-panel.label-scope",
         "feature-panel.report-scope",
         "label-corpus",
         "comparison-report",
+    }
+    required_stage_scopes = {
+        "feature-panel.label-scope": "2021-12-31",
+        "feature-panel.report-scope": "2021-12-30",
     }
     observed_stages: set[str] = set()
     for stage in stages:
@@ -354,6 +358,9 @@ def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | Non
             or not math.isfinite(elapsed)
             or elapsed < 0
         ):
+            raise RuntimeError("event_runtime_receipt_invalid")
+        expected_scope_end = required_stage_scopes.get(name)
+        if expected_scope_end is not None and stage.get("scope_end") != expected_scope_end:
             raise RuntimeError("event_runtime_receipt_invalid")
         observed_stages.add(name)
     if not required_stages.issubset(observed_stages):

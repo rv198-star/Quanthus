@@ -71,7 +71,9 @@ def test_event_input_is_exact_and_rejects_path_substitution() -> None:
         _event_input(changed)
 
 
-def test_runtime_receipt_requires_exact_single_job_reuse_counts(tmp_path: Path) -> None:
+def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "runtime-metrics.json"
     payload = {
         "schema_version": "quanthus.p4-reported-batch-runtime.v1",
@@ -85,11 +87,21 @@ def test_runtime_receipt_requires_exact_single_job_reuse_counts(tmp_path: Path) 
             "execution_end": "2021-12-31",
         },
         "stages": [
-            {"stage": stage, "elapsed_seconds": 1.0}
+            {
+                "stage": stage,
+                "elapsed_seconds": 1.0,
+                **(
+                    {"scope_end": "2021-12-31"}
+                    if stage == "feature-panel.label-scope"
+                    else {"scope_end": "2021-12-30"}
+                    if stage == "feature-panel.report-scope"
+                    else {}
+                ),
+            }
             for stage in (
                 "provider.direct-dwd-projection",
                 "event-library",
-                "feature-panel",
+                "feature-panel.label-scope",
                 "feature-panel.report-scope",
                 "label-corpus",
                 "comparison-report",
@@ -97,7 +109,7 @@ def test_runtime_receipt_requires_exact_single_job_reuse_counts(tmp_path: Path) 
         ],
         "reuse": {
             "provider_materializations": 1,
-            "feature_panel_materializations": 1,
+            "feature_panel_materializations": 2,
             "cross_job_cache": False,
             "adm_published": False,
         },
@@ -105,6 +117,12 @@ def test_runtime_receipt_requires_exact_single_job_reuse_counts(tmp_path: Path) 
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
     assert _load_runtime_receipt(path, required=True) is not None
+
+    payload["stages"][2]["scope_end"] = "2021-12-30"
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="runtime_receipt_invalid"):
+        _load_runtime_receipt(path, required=True)
+    payload["stages"][2]["scope_end"] = "2021-12-31"
 
     payload["reuse"] = {
         "provider_materializations": 3,

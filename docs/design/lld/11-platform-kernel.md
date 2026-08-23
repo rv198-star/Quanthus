@@ -243,11 +243,13 @@ references, plus a separate writable `/data/event-runs` volume. The request is e
 exact-code-revision bound; the Worker executes the composite `run-p4-reported-event-scan` child
 process, validates the immutable Event Library, Label Corpus, and Comparison Report packages,
 writes one generation-bound `run-manifest.json`, and only then marks the PostgreSQL Job succeeded.
-The child owns one Direct-DWD session and one disposable TMP Feature Panel for the attempt. The
-Worker remains control-plane-only: it validates the runtime receipt and exact reuse counts without
-importing Event or feature-construction domain modules. A reclaimed sealed Run is deep-verified
-before reuse. The API may read `/data/event-runs` read-only for bounded Run metadata; it never
-executes the scan.
+The child owns one Direct-DWD session and two disposable, scope-bound TMP Feature Panels for the
+attempt: execution scope for Label and decision scope for Report. The ranges are separate semantic
+identities under the current floating-window evaluator and are each built once from the shared DWD
+projection. The Worker remains control-plane-only: it validates the runtime receipt and exact
+materialization counts without importing Event or feature-construction domain modules. A reclaimed
+sealed Run is deep-verified before reuse. The API may read `/data/event-runs` read-only for bounded
+Run metadata; it never executes the scan.
 
 This activation does not admit a Worker registry, dynamic capability documents, resource classes,
 or separate QA/build/artifact/publication services. Those remain deferred until additional named

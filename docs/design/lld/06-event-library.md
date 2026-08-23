@@ -294,21 +294,27 @@ independent package identities and rejects recovery if their counts, code revisi
 disagree.
 
 The composite child opens one verified Direct-DWD session for the complete Job and passes that
-session to all three builders. After Event Library publication, it materializes one immutable
-Job-local `TMP` Feature Panel through the label execution boundary (`2021-12-31`). Label Corpus
-consumes that panel directly; Comparison Report derives its `2021-12-30` scope report and counts
-from the same Parquet file before consuming it. The derived scope must reproduce the independently
-built report identity and cannot change feature values, PIT cutoffs, security selection, or DWD and
-registry lineage. Provider, evaluator, schema, registry, data, scope, or selection mismatch fails
-closed.
+session to all three builders. After Event Library publication, it materializes two immutable,
+scope-bound Job-local `TMP` Feature Panels: Label Corpus consumes the execution-scope panel through
+`2021-12-31`, while Comparison Report consumes the decision-scope panel through `2021-12-30`.
+Each is built exactly once from the shared provider projection and removed after its last consumer.
 
-The TMP panel lives only below the attempt staging root and is removed before the composite command
-returns. It is neither the governed P4 Research ADM nor a cross-Job cache. Standalone Event, Label,
-and Report commands retain independent provider/panel construction, and formal cold-run A/B
-acceptance continues to rebuild each Job independently. A non-governing `runtime-metrics.json`
-receipt records per-stage elapsed time, row and byte counts, build/reuse disposition, total elapsed
-time, and peak RSS. The Worker validates the receipt before success and exposes it in bounded Job
-result metadata, but runtime values do not enter Event, Label, or Report content identities.
+The two panels cannot be represented as one derived view under the current evaluator. Its floating
+window reductions make the time-range closure part of feature-value identity: a production probe
+found millions of bit-level differences on the overlapping rows when one future session was added,
+even though counts, classifications, rankings, and signs were unchanged. Reusing the execution
+panel for Report therefore changes the accepted Report content digest. Provider, evaluator, schema,
+registry, data, scope, or selection mismatch fails closed; a scope mismatch requires a separate TMP
+materialization rather than stale reuse.
+
+Both TMP panels live only below the attempt staging root. Neither is the governed P4 Research ADM
+nor a cross-Job cache. Standalone Event, Label, and Report commands retain independent
+provider/panel construction, and formal cold-run A/B acceptance continues to rebuild each Job
+independently. A non-governing `runtime-metrics.json` receipt records per-stage elapsed time, row
+and byte counts, build/reuse disposition, total elapsed time, and peak RSS. The Worker requires one
+provider projection and exactly two scope-bound panel materializations before success and exposes
+the receipt in bounded Job result metadata; runtime values do not enter Event, Label, or Report
+content identities.
 
 The Event Library and P3 feature panel intentionally use different security identity namespaces.
 `EventRecord.identity.security_id` remains the governed DWD identity, while the accepted direct-DWD
@@ -332,7 +338,7 @@ the same leading-feature ids, and a true report acceptance flag. Evidence is rec
 | P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4-EVENT-001 | Accepted production A/B replay: 36,820 candidates, 36,022 executable, 798 not-executable, identical manifest/content digests |
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Accepted production A/B corpus: 36,820 total, 34,641 settled three-class, identical Event/Label content and manifest digests |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Accepted production A/B: byte-identical report content/manifest identities and the same three leading features |
-| PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | One provider projection and one TMP Feature Panel per Job; unchanged semantic content, independent cold-run reproduction, and measured wall-time improvement |
+| PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | One provider projection and two scope-bound TMP Feature Panels per Job; unchanged accepted content, independent cold-run reproduction, and measured wall-time improvement |
 
 ## 9. Acceptance
 

@@ -183,11 +183,15 @@ class DirectDwdProjectionTests(unittest.TestCase):
 
             self.assertEqual(counts["daily_ohlcv_none"], 1)
             self.assertEqual(len(opened_connections), 4)
-            for connection in opened_connections:
+            for connection, memory_limit in zip(
+                opened_connections,
+                ("6GB", "10GB", "10GB", "6GB"),
+                strict=True,
+            ):
                 self.assertEqual(
                     connection.queries[:3],
                     [
-                        "SET memory_limit='8GB'",
+                        f"SET memory_limit='{memory_limit}'",
                         "SET threads=1",
                         "SET preserve_insertion_order=false",
                     ],

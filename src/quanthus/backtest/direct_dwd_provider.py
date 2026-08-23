@@ -20,7 +20,8 @@ from quanthus.industry_mapping import StaticIndustryMapping, load_static_industr
 from quanthus.policy import ConfigurationError
 
 MATERIALIZER_VERSION = "direct-dwd-job-local-v1"
-DUCKDB_MEMORY_LIMIT = "8GB"
+DUCKDB_MEMORY_LIMIT = "6GB"
+DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT = "10GB"
 MARKET_TIMEZONE_NAME = "Asia/Shanghai"
 DATASETS = (
     "corporate_action_exceptions",
@@ -140,13 +141,13 @@ class _ProjectionConnections:
         self._connection: Any | None = None
         self._spill: Path | None = None
 
-    def open(self, projection: str) -> Any:
+    def open(self, projection: str, *, memory_limit: str = DUCKDB_MEMORY_LIMIT) -> Any:
         self.close()
         spill = self._root / f".duckdb-materialize-spill-{projection}"
         spill.mkdir()
         connection = self._duckdb.connect(":memory:")
         try:
-            connection.execute(f"SET memory_limit='{DUCKDB_MEMORY_LIMIT}'")
+            connection.execute(f"SET memory_limit='{memory_limit}'")
             connection.execute("SET threads=1")
             connection.execute("SET preserve_insertion_order=false")
             connection.execute(f"SET temp_directory={_sql_path(spill)}")
@@ -345,7 +346,10 @@ def _materialize(
             """,
             tables / "daily_ohlcv_none.parquet",
         )
-        connection = connections.open("daily-universe")
+        connection = connections.open(
+            "daily-universe",
+            memory_limit=DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT,
+        )
         _copy(
             connection,
             """
@@ -394,7 +398,10 @@ def _materialize(
             """,
             tables / "daily_universe.parquet",
         )
-        connection = connections.open("price-limit-execution")
+        connection = connections.open(
+            "price-limit-execution",
+            memory_limit=DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT,
+        )
         _copy(
             connection,
             """

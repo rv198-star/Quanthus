@@ -39,7 +39,11 @@ from quanthus.event_library.scan import (
 )
 from quanthus.event_library.source import EventScanSourcePolicy, load_event_scan_source_policy
 from quanthus.event_library.splits import SplitPolicy, load_split_policy
-from quanthus.industry_mapping import StaticIndustryMapping, load_static_industry_mapping
+from quanthus.industry_mapping import (
+    StaticIndustryMapping,
+    StaticIndustryMembership,
+    load_static_industry_mapping,
+)
 from quanthus.policy import find_project_root
 from quanthus.research_adm import (
     HistoricalIndustryReference,
@@ -1037,7 +1041,7 @@ def _candidate_input_values(
     values: Sequence[Any],
     *,
     source_policy: EventScanSourcePolicy,
-    industry_mapping: StaticIndustryMapping,
+    industry_by_security_id: Mapping[str, StaticIndustryMembership],
 ) -> CandidateDailyInput:
     if len(values) != len(_CANDIDATE_SCAN_COLUMNS):
         raise PhysicalEventScanError("projected candidate column count differs")
@@ -1073,7 +1077,7 @@ def _candidate_input_values(
     if not isinstance(raw_session_date, date):
         raise PhysicalEventScanError("projected candidate session date is invalid")
     security_id = str(raw_security_id)
-    membership = industry_mapping.by_security_id.get(security_id)
+    membership = industry_by_security_id.get(security_id)
     close_at = datetime.combine(raw_session_date, time(15, 0), MARKET_TIMEZONE)
     visibility = source_policy.historical_visibility
     visibility.project_candidate_knowledge(
@@ -1151,44 +1155,58 @@ def iter_projected_candidate_series(
         raise PhysicalEventScanError("P4 physical scan requires duckdb") from exc
     connection = duckdb.connect(":memory:")
     try:
+        connection.execute("SET threads=1")
         selected_columns = ", ".join(_CANDIDATE_SCAN_COLUMNS)
         cursor = connection.execute(
             f"""
             SELECT {selected_columns}
             FROM read_parquet({_sql_path(projection.candidate_path)})
-            ORDER BY dwd_security_id,
-                     dwd_listing_effective_from,
-                     dwd_listing_id,
-                     session_date
             """
         )
         names = tuple(str(item[0]) for item in cursor.description)
         if names != _CANDIDATE_SCAN_COLUMNS:
             raise PhysicalEventScanError("projected candidate columns differ")
+        industry_by_security_id = industry_mapping.by_security_id
         current_key: tuple[str, str, str, str] | None = None
         current: list[CandidateDailyInput] = []
+        previous_sort_key: tuple[str, datetime, str, date] | None = None
         while True:
             batch = cursor.fetchmany(fetch_rows)
             if not batch:
                 break
             for values in batch:
+                candidate = _candidate_input_values(
+                    values,
+                    source_policy=source_policy,
+                    industry_by_security_id=industry_by_security_id,
+                )
+                listing_effective_from = values[26]
+                if not isinstance(listing_effective_from, datetime):
+                    raise PhysicalEventScanError(
+                        "projected candidate listing effective coordinate is invalid"
+                    )
+                sort_key = (
+                    candidate.security_id,
+                    listing_effective_from,
+                    candidate.listing_id,
+                    candidate.session_date,
+                )
+                if previous_sort_key is not None and sort_key < previous_sort_key:
+                    raise PhysicalEventScanError(
+                        "projected candidate physical order differs"
+                    )
+                previous_sort_key = sort_key
                 key = (
-                    str(values[0]),
-                    str(values[1]),
-                    str(values[2]),
-                    str(values[3]),
+                    candidate.security_id,
+                    candidate.listing_id,
+                    candidate.listing_code,
+                    candidate.company_id,
                 )
                 if current_key is not None and key != current_key:
                     yield tuple(current)
                     current = []
                 current_key = key
-                current.append(
-                    _candidate_input_values(
-                        values,
-                        source_policy=source_policy,
-                        industry_mapping=industry_mapping,
-                    )
-                )
+                current.append(candidate)
         if current:
             yield tuple(current)
     finally:

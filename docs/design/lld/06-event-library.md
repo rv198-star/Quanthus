@@ -114,7 +114,10 @@ strict typed daily inputs. Activity ratios use exact rational arithmetic, so can
 has no hidden floating-point or rounding policy. The production API streams one stable listing
 series at a time and retains only raw triggers globally, avoiding a full-market Python row materialization.
 The physical reader requests one fixed Parquet column order and converts each row
-directly from its positional tuple. For each listing series, static validity and exact range/
+directly from its positional tuple. The ADM writer already seals rows in scan-key order, so the
+reader avoids a second full-market sort and instead validates that physical order while streaming;
+any regression fails closed. The immutable static-industry membership map is indexed once per scan,
+not rebuilt for every decoded row. For each listing series, static validity and exact range/
 turnover values are computed once per row; two sorted 20-session windows maintain the exact
 rolling medians by deterministic insertion and removal. Full 22-session evidence-digest tuples are
 constructed only after all exact thresholds pass. This changes scan complexity and allocation,

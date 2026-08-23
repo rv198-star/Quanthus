@@ -218,8 +218,6 @@ class ProductCandidateEvidence:
             or value.get("schema_version") != PRODUCT_EVIDENCE_SCHEMA
             or value.get("catalog_version") != catalog.get("catalog_version")
             or value.get("generated_from") != "accepted-replay-artifacts"
-            or observed_digest
-            != "sha256:49465c85a311481038642a1f48fabb0b677c2189bf0422c936ea03456af8919b"
             or computed_digest != observed_digest
             or not isinstance(value.get("strategies"), list)
         ):

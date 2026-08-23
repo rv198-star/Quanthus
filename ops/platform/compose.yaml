@@ -25,6 +25,7 @@ services:
       QUANTHUS_PLATFORM_MFA_KEY: ${QUANTHUS_PLATFORM_MFA_KEY:?required}
       QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT: /data/attribution-releases
       QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
+      QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
     depends_on:
       postgres:
@@ -47,6 +48,7 @@ services:
       - ${QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT:?required}:/data/attribution-releases:ro
       - quanthus-candidate-runs:/data/candidate-runs:ro
       - quanthus-event-runs:/data/event-runs:ro
+      - quanthus-expert-runs:/data/expert-evaluation-runs:ro
       - /srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:ro
 
   replay-worker:

@@ -1,6 +1,6 @@
 {
   "schema_version": "quanthus.product-research-catalog.v1",
-  "catalog_version": "2026-08-13.4",
+  "catalog_version": "2026-08-23.1",
   "as_of": "2026-07-31",
   "market": "A-share",
   "research_only": true,
@@ -219,6 +219,36 @@
         "legacy_compatibility_return": 69.630054,
         "legacy_direct_dwd_v2_1": false
       }
+    },
+    {
+      "strategy_id": "candidate.p4-trend-risk",
+      "name": "P4 趋势稳定与持仓风控",
+      "version": "1.0.1",
+      "kind": "candidate-version",
+      "source_system": "quanthus-native-experts",
+      "replay_submission_eligible": false,
+      "pipeline_state": "replayed",
+      "replay_state": "replay-succeeded",
+      "governance_decision": "not-submitted",
+      "execution_authorized": false,
+      "evidence_scope": {
+        "partition": "development",
+        "decision_start": "2020-01-01",
+        "decision_end": "2021-12-30",
+        "execution_end": "2021-12-31"
+      },
+      "summary": "首个正式双专家候选：趋势稳定负责入场评分，持仓风控负责约束与风险动作；完整 P2 反事实归因已发布，等待专家生命周期决定。",
+      "operations": 149,
+      "closed_trades": 72,
+      "total_return": 6.704618,
+      "max_drawdown": 7.102827,
+      "win_rate": null,
+      "sharpe": null,
+      "exposure": 14.813335,
+      "benchmark_return": null,
+      "capital_matched_benchmark_return": null,
+      "return_ex_top3": null,
+      "evidence_ref": "docs/acceptance/p3-attr-formal-production-20260823.md"
     }
   ]
 }

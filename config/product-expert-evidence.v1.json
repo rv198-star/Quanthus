@@ -1,0 +1,63 @@
+{
+  "schema_version": "quanthus.product-expert-evidence.v1",
+  "config_version": "2026-08-23.1",
+  "bindings": [
+    {
+      "strategy_id": "candidate.p4-trend-risk",
+      "strategy_version": "1.0.1",
+      "package_id": "expert-evidence-candidate-p4-trend-risk-1.0.1-undecided-v1",
+      "package_digest": "sha256:aa650f5188ad3929a673cf544c61f3ae97ace4da07a8ef52fd403fa0a5a2d2a8",
+      "missing_reason_codes": []
+    }
+  ],
+  "packages": [
+    {
+      "package_digest": "sha256:aa650f5188ad3929a673cf544c61f3ae97ace4da07a8ef52fd403fa0a5a2d2a8",
+      "schema_version": "quanthus.product-expert-evidence-package.v1",
+      "package_id": "expert-evidence-candidate-p4-trend-risk-1.0.1-undecided-v1",
+      "candidate": {
+        "strategy_id": "candidate.p4-trend-risk",
+        "strategy_version": "1.0.1"
+      },
+      "strategy_card": {
+        "repository_key": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+        "digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c"
+      },
+      "evaluation_run": {
+        "run_id": "expert_run_481e6181930f6e031e479c65d40a7fa04e2f0ebf4d9b6290c3605810d1cc60c0",
+        "manifest_digest": "sha256:481e6181930f6e031e479c65d40a7fa04e2f0ebf4d9b6290c3605810d1cc60c0",
+        "scorecard_digest": "sha256:538978540758343a452c37ee2598b12cb61875890018da741a684fdb75333ac0"
+      },
+      "assessment_runs": [
+        {
+          "assessment_id": "expert.trend-stability",
+          "assessment_version": "1.0.0",
+          "run_id": "expert_run_eff9bef52ddd7eba83c7acf75ec75189fba503a0f6f210983bcc99092b8833a2",
+          "manifest_digest": "sha256:eff9bef52ddd7eba83c7acf75ec75189fba503a0f6f210983bcc99092b8833a2",
+          "scorecard_digest": "sha256:241f67222f9cf2233bf24460157d49e106982d24fc3f8b488e5f546dbf04e9ee"
+        }
+      ],
+      "attribution_release": {
+        "release_id": "formal-attribution-711220040b90681feb6bd50f",
+        "release_digest": "sha256:1754a4a3a185420734e6addab71110ee82ecd71fb4fbd182f9ee1506c49c98ff"
+      },
+      "disagreement_cases": [
+        {
+          "case_id": "case.trend-entry-2021-06-25",
+          "expert_id": "expert.trend-stability",
+          "native_variant": "variant.native-baseline",
+          "comparison_variant": "variant.trend-fallback",
+          "decision_key": "entry:event:0007369300a61d66431d90ba491f4a6785862dc9c7e0f5b058c18bd813b34e83"
+        },
+        {
+          "case_id": "case.position-size-2021-06-25",
+          "expert_id": "expert.position-risk-review",
+          "native_variant": "variant.native-baseline",
+          "comparison_variant": "variant.position-risk-fallback",
+          "decision_key": "entry:event:0007369300a61d66431d90ba491f4a6785862dc9c7e0f5b058c18bd813b34e83"
+        }
+      ],
+      "lifecycle_decision": null
+    }
+  ]
+}

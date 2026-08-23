@@ -33,7 +33,7 @@ def test_current_product_catalog_contains_candidates_only() -> None:
         "permanent_blind",
         "recent_research",
     }
-    assert len(catalog["strategies"]) == 5
+    assert len(catalog["strategies"]) == 6
     assert all(item["kind"] == "candidate-version" for item in catalog["strategies"])
     assert catalog["latest_candidate_batch"] == {
         "batch_id": "candidate-batch-e8a022725bee32e6",
@@ -60,7 +60,20 @@ def test_current_product_catalog_contains_candidates_only() -> None:
         item["evidence_scope"]["decision_start"] == "2012-01-04"
         and item["evidence_scope"]["decision_end"] == "2021-12-30"
         for item in catalog["strategies"]
+        if item.get("replay_submission_eligible", True)
     )
+    expert = next(
+        item
+        for item in catalog["strategies"]
+        if item["strategy_id"] == "candidate.p4-trend-risk"
+    )
+    assert expert["evidence_scope"] == {
+        "partition": "development",
+        "decision_start": "2020-01-01",
+        "decision_end": "2021-12-30",
+        "execution_end": "2021-12-31",
+    }
+    assert expert["replay_submission_eligible"] is False
     external = next(
         item for item in catalog["strategies"] if item["source_system"] == "quantdinger"
     )
@@ -161,7 +174,15 @@ def test_catalog_rejects_quantdinger_result_not_bound_to_correction(tmp_path: Pa
 def test_candidate_evidence_covers_catalog_with_real_curves_and_trades() -> None:
     catalog = ProductResearchCatalog(CATALOG)
     evidence = ProductCandidateEvidence(EVIDENCE, catalog).read()
-    assert len(evidence["strategies"]) == 5
+    assert len(evidence["strategies"]) == 6
+    expert = next(
+        item
+        for item in evidence["strategies"]
+        if item["strategy_id"] == "candidate.p4-trend-risk"
+    )
+    assert expert["strategy_version"] == "1.0.1"
+    assert len(expert["equity_curve"]) == 25
+    assert expert["trades"] == []
     quantdinger = next(
         item
         for item in evidence["strategies"]

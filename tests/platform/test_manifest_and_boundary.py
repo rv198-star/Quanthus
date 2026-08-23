@@ -87,7 +87,7 @@ def test_platform_schema_contains_only_approved_control_state() -> None:
 def test_minimal_dependency_group_excludes_upstream_product_packages() -> None:
     raw = PROJECT_ROOT.joinpath("pyproject.toml").read_text(encoding="utf-8")
     lowered = raw.casefold()
-    platform_section = lowered.split("platform = [", 1)[1].split("]", 1)[0]
+    platform_section = lowered.split("platform = [", 1)[1].split("\np1 = [", 1)[0]
 
     assert all(
         package not in platform_section
@@ -105,6 +105,7 @@ def test_minimal_dependency_group_excludes_upstream_product_packages() -> None:
             "reportlab",
         )
     )
+    assert '"pyarrow>=18,<24"' in platform_section
 
 
 def test_docker_acceptance_runtime_is_disposable_and_not_host_exposed() -> None:
@@ -151,9 +152,13 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert "config/platform-features.v1.json config/platform-kernel-gates.v1.json" in dockerfile
     assert "config/product-research-catalog.v1.json" in dockerfile
     assert "config/product-candidate-evidence.v1.json" in dockerfile
+    assert "config/product-expert-evidence.v1.json" in dockerfile
+    assert "config/expert-strategies/p4-trend-risk.v1.0.1.json" in dockerfile
     assert "chmod 0444 ./config/platform-features.v1.json" in dockerfile
     assert "COPY src ./src" not in dockerfile
     assert "COPY src/quanthus/platform ./src/quanthus/platform" in dockerfile
+    assert "src/quanthus/expert_evaluation/product_view.py" in dockerfile
+    assert "src/quanthus/expert_evaluation/release_verification.py" in dockerfile
     assert all(
         forbidden not in dockerfile
         for forbidden in ("src/quanthus/providers", "src/quanthus/backtest", "event_library")
@@ -162,6 +167,10 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert 'cp -a "$REPOSITORY_ROOT/src/quanthus/platform"' in builder
     assert '"$REPOSITORY_ROOT/config/product-research-catalog.v1.json"' in builder
     assert '"$REPOSITORY_ROOT/config/product-candidate-evidence.v1.json"' in builder
+    assert '"$REPOSITORY_ROOT/config/product-expert-evidence.v1.json"' in builder
+    assert '"$REPOSITORY_ROOT/config/expert-strategies/p4-trend-risk.v1.0.1.json"' in builder
+    assert '"$REPOSITORY_ROOT/src/quanthus/expert_evaluation/product_view.py"' in builder
+    assert '"$REPOSITORY_ROOT/src/quanthus/expert_evaluation/release_verification.py"' in builder
     assert all(
         forbidden not in builder
         for forbidden in ("src/quanthus/providers", "src/quanthus/backtest", "event_library")
@@ -176,9 +185,9 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
 def test_replay_image_context_includes_formal_expert_runtime() -> None:
     ignored = PROJECT_ROOT.joinpath(".dockerignore").read_text(encoding="utf-8").splitlines()
     dockerfile = PROJECT_ROOT.joinpath("ops/replay/Dockerfile").read_text(encoding="utf-8")
-    production = PROJECT_ROOT.joinpath(
-        "src/quanthus/expert_strategy/production.py"
-    ).read_text(encoding="utf-8")
+    production = PROJECT_ROOT.joinpath("src/quanthus/expert_strategy/production.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "src/quanthus/event_library/" not in ignored
     assert "COPY src ./src" in dockerfile
@@ -216,12 +225,8 @@ def test_event_worker_stays_a_control_plane_supervisor() -> None:
 
 
 def test_operator_web_is_source_built_and_independently_removable() -> None:
-    builder = PROJECT_ROOT.joinpath("ops/bin/build-platform-web-image").read_text(
-        encoding="utf-8"
-    )
-    dockerfile = PROJECT_ROOT.joinpath("ops/platform/Web.Dockerfile").read_text(
-        encoding="utf-8"
-    )
+    builder = PROJECT_ROOT.joinpath("ops/bin/build-platform-web-image").read_text(encoding="utf-8")
+    dockerfile = PROJECT_ROOT.joinpath("ops/platform/Web.Dockerfile").read_text(encoding="utf-8")
     server = PROJECT_ROOT.joinpath("ops/platform/web-server.mjs").read_text(encoding="utf-8")
 
     assert 'cp -a "$REPOSITORY_ROOT/web/.openai"' in builder
@@ -230,8 +235,7 @@ def test_operator_web_is_source_built_and_independently_removable() -> None:
     assert "npm run build" in dockerfile
     assert "COPY web/dist" not in dockerfile
     assert (
-        'const proxiedPaths = ["/api/", "/health", "/ready", "/metrics", "/openapi.json"]'
-        in server
+        'const proxiedPaths = ["/api/", "/health", "/ready", "/metrics", "/openapi.json"]' in server
     )
     assert 'const productRoot = resolve(serverRoot, "product-dist")' in server
     assert 'pathname.startsWith("/candidates/")' in server
@@ -310,13 +314,14 @@ def test_unknown_manifest_route_fails_composition(kernel) -> None:
             manifest=invalid,
             store=kernel.store,
             identity=kernel.identity,
-                jobs=kernel.jobs,
-                replay_jobs=kernel.replay_jobs,
-                gate_query=kernel.gate_query,
-                product_catalog=kernel.product_catalog,
-                candidate_evidence=kernel.candidate_evidence,
-                candidate_approvals=kernel.candidate_approvals,
-                metrics=kernel.metrics,
+            jobs=kernel.jobs,
+            replay_jobs=kernel.replay_jobs,
+            gate_query=kernel.gate_query,
+            product_catalog=kernel.product_catalog,
+            candidate_evidence=kernel.candidate_evidence,
+            expert_evidence=kernel.expert_evidence,
+            candidate_approvals=kernel.candidate_approvals,
+            metrics=kernel.metrics,
         )
 
 

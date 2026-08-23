@@ -13,6 +13,10 @@ from typing import Any
 
 from quanthus.expert_evaluation.contracts import ExpertEvaluationSpec
 from quanthus.expert_evaluation.production import _parquet, production_dwd_identity
+from quanthus.expert_evaluation.release_verification import (
+    FORMAL_RELEASE_SCHEMA,
+    verify_formal_attribution_release,
+)
 from quanthus.expert_evaluation.runner import (
     ExpertEvaluationJobInput,
     PartitionBinding,
@@ -49,11 +53,23 @@ from quanthus.strategy_attribution_planning import PlanNodeKind, compile_attribu
 
 FORMAL_ATTRIBUTION_PRODUCER_ID = "producer.formal-p4-trend-risk-attribution"
 FORMAL_ATTRIBUTION_PRODUCER_VERSION = "1.0.0"
-FORMAL_RELEASE_SCHEMA = "quanthus.formal-attribution-release.v1"
 
 
 def _sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def _seal_release_permissions(root: Path) -> None:
+    for path in root.rglob("*"):
+        if path.is_file():
+            path.chmod(0o444)
+    for path in sorted(
+        (item for item in root.rglob("*") if item.is_dir()),
+        key=lambda item: len(item.parts),
+        reverse=True,
+    ):
+        path.chmod(0o555)
+    root.chmod(0o555)
 
 
 def _verify_sentinel_reproduction(
@@ -76,8 +92,7 @@ def _verify_sentinel_reproduction(
         or scorecard.get("decision_count") != 267
         or scorecard.get("strategy_id") != "candidate.p4-trend-risk"
         or scorecard.get("strategy_version") != "1.0.1"
-        or scorecard.get("window")
-        != {"start": "2020-01-01", "end": "2020-01-31"}
+        or scorecard.get("window") != {"start": "2020-01-01", "end": "2020-01-31"}
         or scorecard.get("sealed_partition_access") is not False
     ):
         raise ExpertEvaluationError(
@@ -154,61 +169,6 @@ def formal_attribution_job_input(
     )
 
 
-def verify_formal_attribution_release(root: Path) -> dict[str, Any]:
-    resolved = root.resolve()
-    try:
-        manifest_bytes = (resolved / "release.json").read_bytes()
-        manifest = json.loads(manifest_bytes)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ExpertEvaluationError(
-            "formal_release_unreadable", "formal attribution release is unreadable"
-        ) from exc
-    if (
-        not isinstance(manifest, dict)
-        or manifest.get("schema_version") != FORMAL_RELEASE_SCHEMA
-        or canonical_json_bytes(manifest) != manifest_bytes
-    ):
-        raise ExpertEvaluationError(
-            "formal_release_invalid", "formal attribution release manifest is invalid"
-        )
-    declared = manifest.get("files")
-    if not isinstance(declared, list):
-        raise ExpertEvaluationError("formal_release_invalid", "release files are invalid")
-    expected = set()
-    for item in declared:
-        if not isinstance(item, dict) or set(item) != {"path", "sha256", "size_bytes"}:
-            raise ExpertEvaluationError("formal_release_invalid", "release file record differs")
-        path = resolved / str(item["path"])
-        if resolved not in path.resolve().parents or path.is_symlink():
-            raise ExpertEvaluationError("path_escape", "formal release file escapes root")
-        if (
-            not path.is_file()
-            or _sha256(path) != item["sha256"]
-            or path.stat().st_size != item["size_bytes"]
-        ):
-            raise ExpertEvaluationError(
-                "formal_release_checksum_mismatch", "formal release file differs"
-            )
-        expected.add(str(item["path"]))
-    physical = {
-        item.relative_to(resolved).as_posix() for item in resolved.rglob("*") if item.is_file()
-    }
-    if physical != expected.union({"release.json", "READY"}):
-        raise ExpertEvaluationError(
-            "formal_release_inventory_mismatch", "formal release inventory differs"
-        )
-    observed_digest = digest_value(
-        {key: value for key, value in manifest.items() if key != "release_digest"}
-    )
-    if manifest.get("release_digest") != observed_digest:
-        raise ExpertEvaluationError(
-            "formal_release_digest_mismatch", "formal release digest differs"
-        )
-    if (resolved / "READY").read_text(encoding="ascii") != observed_digest + "\n":
-        raise ExpertEvaluationError("formal_release_not_ready", "READY differs")
-    return manifest
-
-
 class FormalAttributionOperationProducer:
     def __init__(self, registry: ExpertStrategyRegistry) -> None:
         self.registry = registry
@@ -245,9 +205,7 @@ class FormalAttributionOperationProducer:
         ).resolve()
         release_root.mkdir(parents=True, exist_ok=True)
         event_root = Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs"))
-        sentinel_artifacts = FormalStrategySentinelProducer(
-            self.registry, event_root
-        ).produce(
+        sentinel_artifacts = FormalStrategySentinelProducer(self.registry, event_root).produce(
             formal_sentinel_job_input(PARENT_EVENT_RUN_DIGEST, self.registry),
             specs,
             lambda *_args: None,
@@ -376,6 +334,7 @@ class FormalAttributionOperationProducer:
             manifest["release_digest"] = digest_value(manifest)
             (work / "release.json").write_bytes(canonical_json_bytes(manifest))
             (work / "READY").write_text(str(manifest["release_digest"]) + "\n", encoding="ascii")
+            _seal_release_permissions(work)
             verify_formal_attribution_release(work)
             final = release_root / str(manifest["release_id"])
             if final.exists():

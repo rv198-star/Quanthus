@@ -17,6 +17,7 @@ platform = [
   "cryptography>=45,<46",
   "gunicorn>=26,<27",
   "psycopg[binary]>=3.2,<4",
+  "pyarrow>=18,<24",
 ]
 p1 = [
   "duckdb>=1.1,<2",

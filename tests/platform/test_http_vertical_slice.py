@@ -123,8 +123,9 @@ def test_admin_query_and_real_job_http_vertical_slice(kernel, attribution_releas
         "baseline.ma-trend",
         "baseline.breakout20",
         "baseline.oversold-rebound",
-        "quantdinger.strategy-v2-bullish-three-lines",
-    ]
+            "quantdinger.strategy-v2-bullish-three-lines",
+            "candidate.p4-trend-risk",
+        ]
 
     job_headers = {
         **operator_auth,

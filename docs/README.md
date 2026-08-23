@@ -168,9 +168,13 @@ nodes.
   `PERF-BATCH-001` is accepted separately after two independent production Jobs each built one
   Direct-DWD projection and two scope-bound TMP Feature Panels, reproduced all files in the three
   governed package trees byte identically, and improved matched recent production wall time by
-  3.92 percent. Event scanning still owns about 95.9 percent of runtime and remains active
-  optimization work under Issue #195. Evidence is recorded in
+  3.92 percent. Evidence is recorded in
   `acceptance/perf-batch-001-production-ab-20260823.md`.
+  `PERF-EVENT-001` is accepted after same-revision cold A/B reproduced all three package trees byte
+  identically and reduced average complete runtime from 7,434 to 2,059 seconds. The optimized scan
+  remains single-process and exposes generation-fenced internal progress. Peak RSS remains about
+  19.5 GiB and does not satisfy the desired 16 GiB ceiling. Evidence is recorded in
+  `acceptance/perf-event-001-production-ab-20260823.md`.
   Arbitration and permanent-blind reads remain blocked.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,

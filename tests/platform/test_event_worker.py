@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ from quanthus.platform.event_worker import (
     EventWorker,
     LabelCorpusEnvelope,
     _event_input,
+    _load_progress_receipt,
     _load_runtime_receipt,
     _validate_run_directory,
 )
@@ -135,6 +137,187 @@ def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
         _load_runtime_receipt(path, required=True)
 
 
+def test_progress_receipt_is_bounded_and_fail_closed(tmp_path: Path) -> None:
+    path = tmp_path / "progress.json"
+    payload = {
+        "schema_version": "quanthus.p4-reported-batch-progress.v1",
+        "stage": "event-candidate-scan",
+        "progress": 47,
+        "detail": {"rows_decoded": 1200, "projection_rows": 2400},
+    }
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    assert _load_progress_receipt(path) == payload
+
+    payload["progress"] = 90
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    assert _load_progress_receipt(path) is None
+    payload["progress"] = 47
+    payload["extra"] = True
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    assert _load_progress_receipt(path) is None
+
+
+def test_event_worker_polls_child_progress_and_removes_receipt_before_sealing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job = _job()
+    run_id = f"run_{job.job_id.removeprefix('job_')}"
+    event_result = EventLibraryEnvelope(
+        root=tmp_path / "event-library",
+        manifest_sha256="sha256:" + "1" * 64,
+        content_digest="sha256:" + "2" * 64,
+        candidate_events=12,
+        executable_events=10,
+        not_executable_events=2,
+    )
+    label_result = LabelCorpusEnvelope(
+        root=tmp_path / "label-corpus",
+        manifest_sha256="sha256:" + "3" * 64,
+        content_digest="sha256:" + "4" * 64,
+        total_events=12,
+        positive_events=4,
+        neutral_events=3,
+        failure_events=3,
+        not_executable_events=2,
+        censored_events=0,
+        unavailable_events=0,
+    )
+    report_result = ComparisonReportEnvelope(
+        root=tmp_path / "comparison-report",
+        manifest_sha256="sha256:" + "5" * 64,
+        content_digest="sha256:" + "6" * 64,
+        candidate_events=12,
+        three_class_events=10,
+        leading_features=(
+            "price.momentum20",
+            "price.rsi14",
+            "liquidity.volume_ratio20",
+        ),
+        acceptance_pass=True,
+    )
+    runtime = {
+        "total_elapsed_seconds": 12.5,
+        "reuse": {
+            "provider_materializations": 1,
+            "feature_panel_materializations": 2,
+            "cross_job_cache": False,
+            "adm_published": False,
+        },
+    }
+
+    class Store:
+        def __init__(self) -> None:
+            self.current = job
+            self.updates: list[dict[str, Any]] = []
+            self.finished: dict[str, Any] | None = None
+
+        def get_job(self, job_id: str) -> JobRecord:
+            assert job_id == job.job_id
+            return self.current
+
+        def update_claimed_job(self, job_id: str, generation: int, **kwargs: Any) -> JobRecord:
+            assert (job_id, generation) == (job.job_id, job.claim_generation)
+            self.updates.append(kwargs)
+            self.current = replace(
+                self.current,
+                stage=str(kwargs["stage"]),
+                progress=max(self.current.progress, int(kwargs["progress"])),
+            )
+            return self.current
+
+        def renew_job_lease(self, *_args: Any) -> bool:
+            return True
+
+        def finish_claimed_job(self, job_id: str, generation: int, **kwargs: Any) -> JobRecord:
+            assert (job_id, generation) == (job.job_id, job.claim_generation)
+            self.finished = kwargs
+            return self.current
+
+    class Process:
+        returncode: int | None = None
+
+        def __init__(self, command: tuple[str, ...], **_kwargs: Any) -> None:
+            arguments = {
+                command[index]: Path(command[index + 1]) for index in range(len(command) - 1)
+            }
+            for option in ("--event-output", "--label-output", "--report-output"):
+                arguments[option].mkdir(parents=True)
+            arguments["--runtime-receipt"].write_text("{}\n", encoding="utf-8")
+            arguments["--progress-receipt"].write_text(
+                json.dumps(
+                    {
+                        "schema_version": "quanthus.p4-reported-batch-progress.v1",
+                        "stage": "event-candidate-scan",
+                        "progress": 47,
+                        "detail": {"rows_decoded": 1200, "projection_rows": 2400},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            self.polls = 0
+
+        def poll(self) -> int | None:
+            self.polls += 1
+            if self.polls == 1:
+                return None
+            self.returncode = 0
+            return self.returncode
+
+    store = Store()
+    monkeypatch.setattr("quanthus.platform.event_worker.subprocess.Popen", Process)
+    monkeypatch.setattr("quanthus.platform.event_worker.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        "quanthus.platform.event_worker._verify_event_library", lambda _path: event_result
+    )
+    monkeypatch.setattr(
+        "quanthus.platform.event_worker._verify_label_corpus", lambda _path: label_result
+    )
+    monkeypatch.setattr(
+        "quanthus.platform.event_worker._verify_comparison_report", lambda _path: report_result
+    )
+    monkeypatch.setattr(
+        "quanthus.platform.event_worker._load_runtime_receipt",
+        lambda _path, *, required: runtime if required else None,
+    )
+    monkeypatch.setattr(
+        "quanthus.platform.event_worker._validate_run_directory",
+        lambda *_args, **_kwargs: (
+            event_result,
+            label_result,
+            report_result,
+            {"run_id": run_id},
+        ),
+    )
+    worker = EventWorker(
+        store,  # type: ignore[arg-type]
+        worker_id="event-test",
+        run_root=tmp_path,
+        lease_seconds=300,
+        renew_seconds=30,
+        terminate_seconds=1,
+    )
+
+    worker._execute(job.job_id, job.claim_generation, job.input_ref, job.input_digest)
+
+    assert {
+        "stage": "event-candidate-scan",
+        "progress": 47,
+        "progress_detail": {
+            "rows_decoded": 1200,
+            "projection_rows": 2400,
+            "run_id": run_id,
+        },
+    } in store.updates
+    assert not (tmp_path / "runs" / run_id / "progress.json").exists()
+    assert store.finished == {
+        "state": "succeeded",
+        "result_ref": {"run_id": run_id},
+        "error_reason": None,
+    }
+
+
 def test_event_worker_claims_only_event_queue_and_kind(tmp_path: Path) -> None:
     job = _job(kind="quanthus.candidate-replay.v1")
 
@@ -231,9 +414,7 @@ def test_event_worker_recovers_sealed_run_without_rerunning_child(
             self.updates.append(kwargs)
             return job
 
-        def finish_claimed_job(
-            self, _job_id: str, _generation: int, **kwargs: Any
-        ) -> JobRecord:
+        def finish_claimed_job(self, _job_id: str, _generation: int, **kwargs: Any) -> JobRecord:
             self.finished = kwargs
             return job
 

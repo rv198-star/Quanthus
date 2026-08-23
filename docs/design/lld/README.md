@@ -50,12 +50,12 @@ module internals unless a named application port crosses that boundary.
 | `03-label-feature-system.md` | P3 | Accepted capability substrate; formal vocabularies are proposal-driven | Labels, features, state vocabularies, or feature lineage |
 | `04-experts-aggregator.md` | P3 | Accepted v1 capability substrate; Expert Strategy Layer MVP v2 evaluation design approved and implementation open | Expert contracts, vetoes, constraints, scores, aggregation, evaluation, scorecards, or expert lifecycle |
 | `05-position-execution.md` | P3 | Accepted capability substrate | Strategy position lifecycle, sizing, exits, or cooldown |
-| `06-event-library.md` | P4 | Event, label, report, and job-local batch reuse accepted; scan optimization open | Event cohorts, outcomes, event-window definitions, or Event batch performance |
+| `06-event-library.md` | P4 | Event, label, report, job-local reuse, and exact scan optimization accepted; peak-memory reduction remains open | Event cohorts, outcomes, event-window definitions, or Event batch performance |
 | `07-research-scoring.md` | P5 | Deferred | Statistical/ML research and promotion |
 | `08-validation-governance.md` | P6 policy | Approved future governance | Arbitration, blind data, change budgets, or model promotion |
 | `09-roadmap.md` | All | Delivery sequence | Phase gates, milestones, or stop rules |
 | `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts, synthetic attribution closure, and first formal-strategy attribution release; recurring reports remain proposal-triggered | Decision or notification logs, hypothetical paths, funnels, or attribution |
-| `11-platform-kernel.md` | PK, orthogonal | PK1-PK4, Replay Worker, and PK6 accepted; P4 Event Worker extension open under #74; first-cutover Authoring not applicable | Authentication, API composition, jobs/workers, platform persistence, Web shell, QuantDinger extraction, or module recovery |
+| `11-platform-kernel.md` | PK, orthogonal | PK1-PK4, Replay Worker, P4 Event Worker, and PK6 accepted; first-cutover Authoring not applicable | Authentication, API composition, jobs/workers, platform persistence, Web shell, QuantDinger extraction, or module recovery |
 
 Detailed child files are added beneath a same-named module directory only after one module becomes
 too large to load usefully as a single node. The parent LLD remains the stable entry point and owns

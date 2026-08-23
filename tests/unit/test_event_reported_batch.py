@@ -208,6 +208,27 @@ def test_reported_batch_builds_each_scope_bound_prerequisite_once(
     def build_event(**kwargs: Any) -> PhysicalEventScanResult:
         calls["event"] += 1
         assert kwargs["provider_session"] is shared_session
+        progress = kwargs["progress"]
+        progress(
+            "adm-materialization",
+            {"terminal": True, "elapsed_seconds": 1.0, "rows": 10, "bytes": 20},
+        )
+        progress(
+            "candidate-scan",
+            {
+                "terminal": True,
+                "series_completed": 2,
+                "rows_decoded": 10,
+                "evaluated_rows": 8,
+                "raw_triggers": 3,
+                "row_decode_elapsed_seconds": 2.0,
+                "security_scan_elapsed_seconds": 3.0,
+            },
+        )
+        progress(
+            "candidate-finalization",
+            {"terminal": True, "elapsed_seconds": 0.5, "candidate_events": 12},
+        )
         return PhysicalEventScanResult(
             output_root("event"), "sha256:event", "sha256:event-content", 12, 10, 2
         )
@@ -265,6 +286,7 @@ def test_reported_batch_builds_each_scope_bound_prerequisite_once(
         "quanthus.event_library.reported_batch.build_physical_comparison_report", build_report
     )
     receipt = tmp_path / "runtime.json"
+    progress_receipt = tmp_path / "progress.json"
 
     result = build_physical_reported_event_batch(
         source_policy_path=Path("source.json"),
@@ -280,6 +302,7 @@ def test_reported_batch_builds_each_scope_bound_prerequisite_once(
         report_output=tmp_path / "report-output",
         code_revision="a" * 40,
         runtime_receipt_path=receipt,
+        progress_receipt_path=progress_receipt,
     )
 
     assert calls == {
@@ -297,3 +320,12 @@ def test_reported_batch_builds_each_scope_bound_prerequisite_once(
         "adm_published": False,
     }
     assert json.loads(receipt.read_text(encoding="utf-8"))["reuse"] == result.runtime["reuse"]
+    stage_names = [stage["stage"] for stage in result.runtime["stages"]]
+    assert "event.adm-materialization" in stage_names
+    assert "event.candidate-row-decode" in stage_names
+    assert "event.security-scan" in stage_names
+    assert "event.candidate-finalization" in stage_names
+    progress = json.loads(progress_receipt.read_text(encoding="utf-8"))
+    assert progress["schema_version"] == "quanthus.p4-reported-batch-progress.v1"
+    assert progress["stage"] == "event-candidate-finalization"
+    assert progress["progress"] == 81

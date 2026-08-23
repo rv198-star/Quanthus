@@ -5,7 +5,7 @@
 | Phase | P4 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, and `PERF-BATCH-001` accepted through deterministic production A/B evidence; the job-local reuse A/B built one Direct-DWD projection and two scope-bound TMP Feature Panels per Job while reproducing all three governed package trees byte identically |
+| Implementation status | `P4-EVENT-001`, `P4-EVENT-002`, `P4-LABEL-001`, `P4-REPORT-001`, `PERF-BATCH-001`, and `PERF-EVENT-001` accepted through deterministic production A/B evidence; optimized cold Jobs reproduced all three governed package trees byte identically and reduced average complete runtime by 72.3 percent while retaining one scan process |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-EVENT-001 through FR-EVENT-004 |
 
@@ -113,6 +113,15 @@ version and renewed approval.
 strict typed daily inputs. Activity ratios use exact rational arithmetic, so candidate membership
 has no hidden floating-point or rounding policy. The production API streams one stable listing
 series at a time and retains only raw triggers globally, avoiding a full-market Python row materialization.
+The physical reader requests one fixed Parquet column order and converts each row
+directly from its positional tuple. The ADM writer already seals rows in scan-key order, so the
+reader avoids a second full-market sort and instead validates that physical order while streaming;
+any regression fails closed. The immutable static-industry membership map is indexed once per scan,
+not rebuilt for every decoded row. For each listing series, static validity and exact range/
+turnover values are computed once per row; two sorted 20-session windows maintain the exact
+rolling medians by deterministic insertion and removal. Full 22-session evidence-digest tuples are
+constructed only after all exact thresholds pass. This changes scan complexity and allocation,
+not `Fraction` arithmetic, PIT checks, reason precedence, trigger membership, or evidence identity.
 It permits non-overlapping relisting intervals for one security while keeping cooldown/isolation at
 the security level. Static industry membership is intentionally applied only after raw-trigger
 formation for concentration control and is keyed by the same governed DWD `security_id` used by
@@ -316,6 +325,16 @@ provider projection and exactly two scope-bound panel materializations before su
 the receipt in bounded Job result metadata; runtime values do not enter Event, Label, or Report
 content identities.
 
+The composite child also emits a replace-atomic, bounded `progress.json` below the attempt staging
+root. Internal Event stages distinguish ADM materialization, projected-row decode, exact
+per-security scan, global isolation/concentration finalization, T+1 entry binding, package
+publication, and verification. Cumulative decoded rows against projected rows drive candidate-scan
+progress; timing counters remain operational telemetry. The Event Worker polls this receipt and
+generation-fences every PostgreSQL update. The receipt is not copied into a sealed Run, and neither
+its percentage nor its timing fields define Job lifecycle authority or governed package identity.
+The first optimization remains one scan process and records `worker_count=1`; process parallelism
+stays deferred until its production benchmark demonstrates a remaining need.
+
 The Event Library and P3 feature panel intentionally use different security identity namespaces.
 `EventRecord.identity.security_id` remains the governed DWD identity, while the accepted direct-DWD
 replay adapter keys the P3 feature panel by `listing_code`. The comparison adapter therefore derives
@@ -334,9 +353,16 @@ The independent `PERF-BATCH-001` production A/B additionally proves the complete
 contract: each Job materialized one provider projection and exactly two scope-bound TMP Feature
 Panels, then reproduced every file in all three governed package trees byte identically. Matched
 recent production wall time improved by 3.92 percent, but Event scanning still consumed about 95.9
-percent of receipt wall time and peak RSS remained above 16 GiB. The reuse boundary is accepted;
-Issue #195 separately owns material Event-scan speed and memory optimization. Evidence is recorded
-in `docs/acceptance/perf-batch-001-production-ab-20260823.md`.
+percent of receipt wall time. Evidence is recorded in
+`docs/acceptance/perf-batch-001-production-ab-20260823.md`.
+
+`PERF-EVENT-001` production A/B then reduced average complete receipt time from 7,434.109 seconds to
+2,058.870 seconds and average Event time from 7,129.430 seconds to 1,757.842 seconds. Both optimized
+Jobs independently rebuilt their inputs and reproduced every file in all three governed package
+trees byte identically. Peak RSS remained about 19.5 GiB, above the desired 16 GiB ceiling, and T+1
+entry partition now averages 552.634 seconds; memory reduction and any entry-binding optimization
+remain separate work. Evidence is recorded in
+`docs/acceptance/perf-event-001-production-ab-20260823.md`.
 
 ## 8. Work items
 
@@ -347,6 +373,7 @@ in `docs/acceptance/perf-batch-001-production-ab-20260823.md`.
 | P4-LABEL-001 | Freeze three-class and structural-break cards | Governance proposal | Accepted production A/B corpus: 36,820 total, 34,641 settled three-class, identical Event/Label content and manifest digests |
 | P4-REPORT-001 | Produce daily group comparison report | Event dataset | Accepted production A/B: byte-identical report content/manifest identities and the same three leading features |
 | PERF-BATCH-001 | Reuse deterministic P4 prerequisites within one composite Job and publish runtime telemetry | P4-REPORT-001 | Accepted production A/B: one provider projection and two scope-bound TMP Feature Panels per Job, three byte-identical governed package trees, and 3.92 percent improvement against matched recent production Jobs |
+| PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Accepted production A/B: three byte-identical governed package trees, unchanged accepted semantics and counts, generation-fenced progress, and 72.3 percent lower average complete runtime |
 
 ## 9. Acceptance
 

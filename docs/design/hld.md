@@ -267,9 +267,9 @@ evidence, rank components, aggregate money, or recommend a policy. Manually impo
 remain unverified because browser envelope checks do not establish semantic attribution trust.
 
 Synthetic releases remain explicitly `synthetic_fixture_not_strategy_evidence` and cannot be
-resealed as formal evidence. The bounded synthetic chain is implemented and accepted as reusable
-infrastructure, while `P3-ATTR-001` and `P3-DASH-001` remain deferred until their formal-strategy
-and recurring-report resume conditions are met. The stable cross-module trust boundary is indexed
+resealed as formal evidence. The bounded synthetic chain is accepted as reusable infrastructure;
+`P3-ATTR-001` subsequently resumed as a bounded post-P3 increment and published its first formal
+release, while `P3-DASH-001` remains deferred. The stable cross-module trust boundary is indexed
 by `docs/architecture/strategy-attribution-publication.md`; detailed algorithms and failure
 semantics are owned by LLD 10's strategy-attribution child.
 

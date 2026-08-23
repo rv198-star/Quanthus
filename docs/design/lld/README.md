@@ -34,8 +34,8 @@ boundaries; the child owns the strategy-adapter boundary, attribution questions,
 outcome-blind planning, resumable Pipeline, evidence validation, atomic publication, and read-only
 explanation views. Load `../../architecture/strategy-attribution-publication.md` when changing the
 publisher-to-browser trust boundary. Strategy topology remains native and may be coarser than the
-current candidate/expert path. Its bounded synthetic implementation does not reopen the deferred
-formal P3 attribution or dashboard work items.
+current candidate/expert path. Its first formal runtime is accepted as a bounded post-P3 increment;
+recurring dashboard work remains deferred.
 
 For Platform Kernel extraction, load `11-platform-kernel.md`, ADR 0010, and its machine-readable
 gate. Load the non-governing QuantDinger audit only to verify upstream facts. Do not load P1-P7
@@ -54,7 +54,7 @@ module internals unless a named application port crosses that boundary.
 | `07-research-scoring.md` | P5 | Deferred | Statistical/ML research and promotion |
 | `08-validation-governance.md` | P6 policy | Approved future governance | Arbitration, blind data, change budgets, or model promotion |
 | `09-roadmap.md` | All | Delivery sequence | Phase gates, milestones, or stop rules |
-| `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts and bounded synthetic attribution closure; formal attribution and recurring reports remain proposal-triggered | Decision or notification logs, hypothetical paths, funnels, or attribution |
+| `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts, synthetic attribution closure, and first formal-strategy attribution release; recurring reports remain proposal-triggered | Decision or notification logs, hypothetical paths, funnels, or attribution |
 | `11-platform-kernel.md` | PK, orthogonal | PK1-PK4, Replay Worker, and PK6 accepted; P4 Event Worker extension open under #74; first-cutover Authoring not applicable | Authentication, API composition, jobs/workers, platform persistence, Web shell, QuantDinger extraction, or module recovery |
 
 Detailed child files are added beneath a same-named module directory only after one module becomes

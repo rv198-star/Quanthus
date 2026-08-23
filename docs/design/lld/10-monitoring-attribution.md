@@ -5,7 +5,7 @@
 | Phase | Instrumentation in P2; reports after P3 |
 | Design status | approved |
 | Delivery gate | accepted-conditional |
-| Implementation status | P2 event contracts accepted; `P3-FUNNEL-001` reconciliation contracts accepted; fixture funnel populated; bounded synthetic attribution Pipeline/publication/viewer closure accepted; formal attribution and recurring reports are proposal-triggered |
+| Implementation status | P2 event contracts accepted; `P3-FUNNEL-001` reconciliation contracts accepted; bounded synthetic closure and the first formal-strategy attribution release accepted; recurring reports remain proposal-triggered |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-AUDIT-001 through FR-AUDIT-005 |
 
@@ -18,8 +18,8 @@ quality changed. Monitoring is an event contract, not a dashboard added after th
 
 | Child | Ownership | Delivery state |
 | --- | --- | --- |
-| `10-monitoring-attribution/strategy-attribution.md` | Strategy-owned topology adapter, predeclared questions, legal interventions, evidence validation, paired replay effects, interactions, and three-layer explanations | Bounded synthetic Pipeline/publication/viewer closure accepted; `P3-ATTR-001` and `P3-DASH-001` remain deferred by the P3 gate |
-| `10-monitoring-attribution/formal-strategy-attribution.md` | First formal two-expert adapter, outcome-blind questions, two single fallbacks, required joint fallback, complete P2 reruns, and publication acceptance | Design approved; implementation remains deferred until `P3-STRAT-002` is accepted and the gate is explicitly resumed |
+| `10-monitoring-attribution/strategy-attribution.md` | Strategy-owned topology adapter, predeclared questions, legal interventions, evidence validation, paired replay effects, interactions, and three-layer explanations | Synthetic closure and first formal-strategy runtime accepted; `P3-DASH-001` remains deferred |
+| `10-monitoring-attribution/formal-strategy-attribution.md` | First formal two-expert adapter, outcome-blind questions, two single fallbacks, required joint fallback, complete P2 reruns, and publication acceptance | Accepted by `docs/acceptance/p3-attr-formal-production-20260823.md` |
 
 ## 2. North-star metrics
 

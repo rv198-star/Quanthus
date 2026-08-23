@@ -72,10 +72,10 @@ Each phase has a GitHub milestone and an epic issue. Child issues carry stable i
 changes only through configuration, tests, and evidence in one pull request.
 
 The cross-phase Expert Strategy Layer MVP has its own GitHub milestone and `P3-EXPERT-000` epic.
-`P3-EXPERT-001`, `P3-EXPERT-002`, `P3-EXPERT-003`, and `P3-STRAT-002` are accepted.
+`P3-EXPERT-001`, `P3-EXPERT-002`, `P3-EXPERT-003`, `P3-STRAT-002`, and `P3-ATTR-001` are accepted.
 The formal two-expert topology passed production and isolated byte-identical January 2020 Worker
-Runs. `P3-ATTR-001` has its predecessor but remains blocked until its explicit resume and
-predeclared outcome-blind questions; later children remain blocked by explicit predecessors.
+Runs. Its bounded 2020-2021 attribution release then passed production and isolated byte-identical
+verification; `P3-EXPERT-004` is the next dependency-eligible child.
 This product increment may use development
 data but cannot open arbitration, permanent-blind, P6 promotion, notification, or execution
 authority.

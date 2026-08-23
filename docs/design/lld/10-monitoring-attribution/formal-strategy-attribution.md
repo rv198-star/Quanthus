@@ -6,8 +6,8 @@
 | Expert-layer parent | `../04-experts-aggregator/expert-strategy-layer.md` |
 | Work item | `P3-ATTR-001` |
 | Design status | approved |
-| Delivery gate | deferred until `P3-STRAT-002` is accepted and explicitly resumed |
-| Implementation readiness | ready after dependency acceptance and question preregistration |
+| Delivery gate | accepted by `docs/acceptance/p3-attr-formal-production-20260823.md` |
+| Implementation readiness | delivered through the PostgreSQL Worker and immutable formal release |
 
 ## 1. Outcome and boundary
 

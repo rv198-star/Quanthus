@@ -5,7 +5,7 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-005` |
 | Design status | approved |
-| Delivery gate | blocked by `P3-EXPERT-004`, `P3-ATTR-001`, and `P3-SHADOW-001` |
+| Delivery gate | blocked only by `P3-EXPERT-004`; other predecessors accepted |
 | Implementation readiness | ready after dependencies and human lifecycle decision |
 | Authority after closure | forward Shadow only when explicitly enabled; no promotion, notification, or execution |
 

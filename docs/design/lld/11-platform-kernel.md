@@ -240,10 +240,14 @@ Issue #74 is the first named workflow that justifies a second static Worker kind
 Worker uses `queue=event`, concurrency one, and admits only `quanthus.p4-event-scan.v1`. It receives
 read-only mounts for the exact DWD Base V2.1, correction-001, and the frozen development research
 references, plus a separate writable `/data/event-runs` volume. The request is exact-path and
-exact-code-revision bound; the Worker executes the existing `run-p4-event-scan` child process,
-validates the immutable Event Library package, writes one generation-bound `run-manifest.json`, and
-only then marks the PostgreSQL Job succeeded. A reclaimed sealed Run is deep-verified before reuse.
-The API may read `/data/event-runs` read-only for bounded Run metadata; it never executes the scan.
+exact-code-revision bound; the Worker executes the composite `run-p4-reported-event-scan` child
+process, validates the immutable Event Library, Label Corpus, and Comparison Report packages,
+writes one generation-bound `run-manifest.json`, and only then marks the PostgreSQL Job succeeded.
+The child owns one Direct-DWD session and one disposable TMP Feature Panel for the attempt. The
+Worker remains control-plane-only: it validates the runtime receipt and exact reuse counts without
+importing Event or feature-construction domain modules. A reclaimed sealed Run is deep-verified
+before reuse. The API may read `/data/event-runs` read-only for bounded Run metadata; it never
+executes the scan.
 
 This activation does not admit a Worker registry, dynamic capability documents, resource classes,
 or separate QA/build/artifact/publication services. Those remain deferred until additional named
@@ -264,12 +268,14 @@ window, P2 execution policy/profile, code version, and request reason. Ordinary 
 the DWD/PIT provider directly and may build disposable Job-local frames; it does not require one
 maintained ADS per candidate.
 
-P4 full-market event scanning uses `quanthus.p4-event-scan.v1`. Its input contains only the exact
-code revision and the four frozen repository contracts for source authority, direct-DWD provider,
-candidate rule, and split policy. The first two acceptance Jobs intentionally use identical
-`input_ref` with different idempotency keys so deterministic equivalence is measured rather than
-created by changing a run label. Their Event Library candidate count, event identities, manifest
-SHA-256, and content digest must match before Issue #74 may close.
+P4 full-market event scanning uses `quanthus.p4-event-scan.v1`. Its input contains the exact code
+revision and frozen repository contracts for source authority, Direct-DWD provider, candidate rule,
+split policy, outcome card, structural-break card, feature registry, and comparison policy.
+Independent acceptance Jobs intentionally use identical `input_ref` with different idempotency keys
+so deterministic equivalence is measured rather than created by changing a run label. Event,
+Label, and Report semantic content, counts, and leading features must reproduce; manifests must
+reproduce when the same code revision is under test. Job-local prerequisite reuse cannot replace
+an independently rebuilt cold run.
 
 Direct DWD availability does not redefine a versioned strategy's research universe. A candidate
 whose policy binds a frozen static mapping or universe must apply that identity set before ranking

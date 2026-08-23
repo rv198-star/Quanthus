@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -23,7 +24,9 @@ from quanthus.platform.persistence import PostgresPlatformStore
 
 EVENT_QUEUE = "event"
 RUN_SCHEMA = "quanthus.p4-event-run.v3"
+REPORTED_BATCH_RUNTIME_SCHEMA = "quanthus.p4-reported-batch-runtime.v1"
 _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
+_SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
     "provider_config": "config/replay-data-provider.development.v2.json",
@@ -256,8 +259,9 @@ def _result_ref(
     event_result: EventLibraryEnvelope,
     label_result: LabelCorpusEnvelope,
     report_result: ComparisonReportEnvelope,
+    runtime: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    result = {
         "run_id": run_id,
         "artifact_ref": str(artifact_ref),
         "result_sha256": event_result.manifest_sha256,
@@ -277,6 +281,84 @@ def _result_ref(
         "leading_features": list(report_result.leading_features),
         "report_acceptance_pass": report_result.acceptance_pass,
     }
+    if runtime is not None:
+        result["runtime"] = dict(runtime)
+    return result
+
+
+def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | None:
+    if not path.is_file():
+        if required:
+            raise RuntimeError("event_runtime_receipt_missing")
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("event_runtime_receipt_unreadable") from exc
+    reuse = payload.get("reuse") if isinstance(payload, dict) else None
+    scope = payload.get("scope") if isinstance(payload, dict) else None
+    stages = payload.get("stages") if isinstance(payload, dict) else None
+    total_elapsed = payload.get("total_elapsed_seconds") if isinstance(payload, dict) else None
+    max_rss = payload.get("max_rss_bytes") if isinstance(payload, dict) else None
+    provider_digest = payload.get("provider_config_digest") if isinstance(payload, dict) else None
+    registry_digest = payload.get("feature_registry_digest") if isinstance(payload, dict) else None
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != REPORTED_BATCH_RUNTIME_SCHEMA
+        or not isinstance(total_elapsed, (int, float))
+        or isinstance(total_elapsed, bool)
+        or not math.isfinite(total_elapsed)
+        or total_elapsed < 0
+        or not isinstance(max_rss, int)
+        or isinstance(max_rss, bool)
+        or max_rss < 0
+        or not isinstance(provider_digest, str)
+        or _SHA256_RE.fullmatch(provider_digest) is None
+        or not isinstance(registry_digest, str)
+        or _SHA256_RE.fullmatch(registry_digest) is None
+        or scope
+        != {
+            "start": "2012-01-04",
+            "decision_end": "2021-12-30",
+            "execution_end": "2021-12-31",
+        }
+        or reuse
+        != {
+            "provider_materializations": 1,
+            "feature_panel_materializations": 1,
+            "cross_job_cache": False,
+            "adm_published": False,
+        }
+        or not isinstance(stages, list)
+    ):
+        raise RuntimeError("event_runtime_receipt_invalid")
+    required_stages = {
+        "provider.direct-dwd-projection",
+        "event-library",
+        "feature-panel",
+        "feature-panel.report-scope",
+        "label-corpus",
+        "comparison-report",
+    }
+    observed_stages: set[str] = set()
+    for stage in stages:
+        if not isinstance(stage, dict):
+            raise RuntimeError("event_runtime_receipt_invalid")
+        name = stage.get("stage")
+        elapsed = stage.get("elapsed_seconds")
+        if (
+            not isinstance(name, str)
+            or not name
+            or not isinstance(elapsed, (int, float))
+            or isinstance(elapsed, bool)
+            or not math.isfinite(elapsed)
+            or elapsed < 0
+        ):
+            raise RuntimeError("event_runtime_receipt_invalid")
+        observed_stages.add(name)
+    if not required_stages.issubset(observed_stages):
+        raise RuntimeError("event_runtime_receipt_invalid")
+    return payload
 
 
 def _validate_run_directory(
@@ -360,6 +442,7 @@ def _validate_run_directory(
         or report_manifest.get("code_revision") != code_revision
     ):
         raise RuntimeError("comparison_report_code_revision_mismatch")
+    runtime = _load_runtime_receipt(path / "runtime-metrics.json", required=False)
     return (
         event_result,
         label_result,
@@ -370,6 +453,7 @@ def _validate_run_directory(
             event_result=event_result,
             label_result=label_result,
             report_result=report_result,
+            runtime=runtime,
         ),
     )
 
@@ -481,6 +565,7 @@ class EventWorker:
         event_root = staging / "event-library"
         label_root = staging / "label-corpus"
         report_root = staging / "comparison-report"
+        runtime_path = staging / "runtime-metrics.json"
         command = (
             sys.executable,
             "-m",
@@ -508,6 +593,8 @@ class EventWorker:
             str(label_root),
             "--report-output",
             str(report_root),
+            "--runtime-receipt",
+            str(runtime_path),
             "--code-revision",
             governed["code_revision"],
         )
@@ -558,6 +645,7 @@ class EventWorker:
             or not event_root.is_dir()
             or not label_root.is_dir()
             or not report_root.is_dir()
+            or not runtime_path.is_file()
         ):
             self.store.finish_claimed_job(
                 job_id,
@@ -578,6 +666,8 @@ class EventWorker:
         event_result = _verify_event_library(event_root)
         label_result = _verify_label_corpus(label_root)
         report_result = _verify_comparison_report(report_root)
+        runtime = _load_runtime_receipt(runtime_path, required=True)
+        assert runtime is not None
         if label_result.total_events != event_result.candidate_events:
             raise RuntimeError("label_corpus_event_count_mismatch")
         if label_result.not_executable_events != event_result.not_executable_events:
@@ -628,6 +718,8 @@ class EventWorker:
                 "candidate_events": event_result.candidate_events,
                 "three_class_events": report_result.three_class_events,
                 "leading_features": list(report_result.leading_features),
+                "total_elapsed_seconds": runtime["total_elapsed_seconds"],
+                "reuse": runtime["reuse"],
             },
         )
         final.parent.mkdir(parents=True, exist_ok=True)

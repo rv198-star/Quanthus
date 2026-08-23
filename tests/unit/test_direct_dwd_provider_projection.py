@@ -152,11 +152,23 @@ class DirectDwdProjectionTests(unittest.TestCase):
                 correction / "payload/replay/corporate_action_exceptions.parquet"
             )
 
-            opened_connections = []
+            class TrackedConnection:
+                def __init__(self, connection: object) -> None:
+                    self.connection = connection
+                    self.queries: list[str] = []
+
+                def execute(self, query: str) -> object:
+                    self.queries.append(query)
+                    return self.connection.execute(query)
+
+                def close(self) -> None:
+                    self.connection.close()
+
+            opened_connections: list[TrackedConnection] = []
             actual_connect = duckdb.connect
 
             def tracked_connect(*args: object, **kwargs: object) -> object:
-                connection = actual_connect(*args, **kwargs)
+                connection = TrackedConnection(actual_connect(*args, **kwargs))
                 opened_connections.append(connection)
                 return connection
 
@@ -172,8 +184,17 @@ class DirectDwdProjectionTests(unittest.TestCase):
             self.assertEqual(counts["daily_ohlcv_none"], 1)
             self.assertEqual(len(opened_connections), 4)
             for connection in opened_connections:
+                self.assertEqual(
+                    connection.queries[:3],
+                    [
+                        "SET memory_limit='8GB'",
+                        "SET threads=1",
+                        "SET preserve_insertion_order=false",
+                    ],
+                )
+                self.assertTrue(connection.queries[3].startswith("SET temp_directory="))
                 with self.assertRaises(duckdb.Error):
-                    connection.execute("SELECT 1")
+                    connection.connection.execute("SELECT 1")
             self.assertEqual(
                 list(output.glob(".duckdb-materialize-spill-*")),
                 [],

@@ -20,7 +20,7 @@ from quanthus.industry_mapping import StaticIndustryMapping, load_static_industr
 from quanthus.policy import ConfigurationError
 
 MATERIALIZER_VERSION = "direct-dwd-job-local-v1"
-DUCKDB_MEMORY_LIMIT = "6GB"
+DUCKDB_MEMORY_LIMIT = "8GB"
 MARKET_TIMEZONE_NAME = "Asia/Shanghai"
 DATASETS = (
     "corporate_action_exceptions",

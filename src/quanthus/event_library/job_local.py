@@ -177,6 +177,9 @@ def build_job_local_feature_panel(
     output: Path,
     duckdb_memory_limit: str = "6GB",
     duckdb_threads: int = 2,
+    release_source_cache: bool = False,
+    output_order: str = "date-security",
+    spill_cache_release_interval_seconds: float | None = None,
 ) -> JobLocalFeaturePanel:
     require_job_local_session(
         session,
@@ -198,6 +201,9 @@ def build_job_local_feature_panel(
         data_manifest_sha256=session.reader.data_manifest_sha256,
         duckdb_memory_limit=duckdb_memory_limit,
         duckdb_threads=duckdb_threads,
+        release_source_cache=release_source_cache,
+        output_order=output_order,
+        spill_cache_release_interval_seconds=spill_cache_release_interval_seconds,
     )
     return JobLocalFeaturePanel(
         path=artifact.path,

@@ -251,7 +251,7 @@ class BaselineResearchTests(unittest.TestCase):
             scope_start=self.dates[0],
             scope_end=self.dates[-2],
             output=self.root / "low-ram-features.parquet",
-            duckdb_memory_limit="1GB",
+            duckdb_memory_limit="256MB",
             duckdb_threads=1,
         )
         self.assertGreater(artifact.path.stat().st_size, 0)
@@ -264,6 +264,57 @@ class BaselineResearchTests(unittest.TestCase):
                 output=self.root / "unadmitted-features.parquet",
                 duckdb_memory_limit="2GB",
                 duckdb_threads=1,
+            )
+
+    def test_low_ram_physical_order_preserves_panel_rows(self) -> None:
+        canonical = BaselineFeaturePanel.materialize(
+            self.bundle,
+            self.registry,
+            scope_start=self.dates[0],
+            scope_end=self.dates[-2],
+            output=self.root / "canonical-order-features.parquet",
+        )
+        low_ram = BaselineFeaturePanel.materialize(
+            self.bundle,
+            self.registry,
+            scope_start=self.dates[0],
+            scope_end=self.dates[-2],
+            output=self.root / "security-order-features.parquet",
+            duckdb_memory_limit="256MB",
+            duckdb_threads=1,
+            output_order="security-date",
+        )
+
+        import duckdb
+
+        connection = duckdb.connect(":memory:")
+        try:
+            canonical_rows = connection.execute(
+                "SELECT * FROM read_parquet(?) ORDER BY market_date, security_id",
+                [str(canonical.path)],
+            ).fetchall()
+            low_ram_rows = connection.execute(
+                "SELECT * FROM read_parquet(?) ORDER BY market_date, security_id",
+                [str(low_ram.path)],
+            ).fetchall()
+            physical_keys = connection.execute(
+                "SELECT security_id, market_date FROM read_parquet(?)",
+                [str(low_ram.path)],
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(canonical.report, low_ram.report)
+        self.assertEqual(canonical_rows, low_ram_rows)
+        self.assertEqual(physical_keys, sorted(physical_keys))
+
+        with self.assertRaisesRegex(BaselineResearchError, "output order is not admitted"):
+            BaselineFeaturePanel.materialize(
+                self.bundle,
+                self.registry,
+                scope_start=self.dates[0],
+                scope_end=self.dates[-2],
+                output=self.root / "invalid-order-features.parquet",
+                output_order="unspecified",
             )
 
     def test_job_local_panel_scope_identity_is_exact_even_when_fixture_rows_overlap(

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
 import shutil
+import threading
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -42,6 +44,42 @@ _STRATEGY_KINDS = {"ma_trend", "breakout20", "oversold_rebound"}
 
 class BaselineResearchError(ValueError):
     """Raised when baseline research inputs violate their frozen contract."""
+
+
+def _release_read_cache(paths: Sequence[Path]) -> None:
+    advice = getattr(os, "POSIX_FADV_DONTNEED", None)
+    advise = getattr(os, "posix_fadvise", None)
+    if advice is None or advise is None:
+        raise BaselineResearchError("low-RAM feature panel requires POSIX_FADV_DONTNEED")
+    for path in sorted({item.resolve() for item in paths}):
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            advise(descriptor, 0, 0, advice)
+        finally:
+            os.close(descriptor)
+
+
+def _trim_process_heap() -> None:
+    trim = getattr(ctypes.CDLL(None), "malloc_trim", None)
+    if trim is not None:
+        trim(0)
+
+
+def _release_spill_cache_until_stopped(
+    spill: Path,
+    stop: threading.Event,
+    errors: list[Exception],
+    *,
+    interval_seconds: float,
+) -> None:
+    while not stop.wait(interval_seconds):
+        try:
+            _release_read_cache(tuple(path for path in spill.iterdir() if path.is_file()))
+        except FileNotFoundError:
+            continue
+        except Exception as exc:
+            errors.append(exc)
+            return
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -1184,15 +1222,31 @@ class BaselineFeaturePanel:
         allowed_security_ids: Sequence[str] | None = None,
         duckdb_memory_limit: str = FEATURE_DUCKDB_MEMORY_LIMIT,
         duckdb_threads: int = 2,
+        release_source_cache: bool = False,
+        output_order: str = "date-security",
+        spill_cache_release_interval_seconds: float | None = None,
     ) -> BaselineFeaturePanelArtifact:
         """Materialize the PIT panel without loading a second in-memory query copy."""
 
         if scope_start > scope_end:
             raise BaselineResearchError("scope_start must not follow scope_end")
-        if duckdb_memory_limit not in {"1GB", "1500MB", FEATURE_DUCKDB_MEMORY_LIMIT}:
+        if duckdb_memory_limit not in {
+            "256MB",
+            "512MB",
+            "1GB",
+            "1500MB",
+            FEATURE_DUCKDB_MEMORY_LIMIT,
+        }:
             raise BaselineResearchError("feature panel DuckDB memory limit is not admitted")
         if duckdb_threads not in {1, 2}:
             raise BaselineResearchError("feature panel DuckDB threads are not admitted")
+        if output_order not in {"date-security", "security-date"}:
+            raise BaselineResearchError("feature panel output order is not admitted")
+        if (
+            spill_cache_release_interval_seconds is not None
+            and spill_cache_release_interval_seconds <= 0
+        ):
+            raise BaselineResearchError("feature panel spill cache interval is invalid")
         selected_security_ids: tuple[str, ...] | None = None
         if allowed_security_ids is not None:
             selected_security_ids = tuple(sorted(allowed_security_ids))
@@ -1303,13 +1357,57 @@ class BaselineFeaturePanel:
             if ambiguous:
                 raise BaselineResearchError("feature inputs contain ambiguous code identities")
             _validate_feature_sources(connection)
-            query = _feature_panel_query(scope_start, scope_end)
-            connection.execute(
-                f"COPY ({query}) TO {_sql_string(str(temporary))} "
-                "(FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000)"
+            query = _feature_panel_query(
+                scope_start,
+                scope_end,
+                output_order=output_order,
             )
+            spill_stop = threading.Event()
+            spill_errors: list[Exception] = []
+            spill_releaser: threading.Thread | None = None
+            if spill_cache_release_interval_seconds is not None:
+                _release_read_cache(())
+                spill_releaser = threading.Thread(
+                    target=_release_spill_cache_until_stopped,
+                    args=(spill, spill_stop, spill_errors),
+                    kwargs={
+                        "interval_seconds": spill_cache_release_interval_seconds,
+                    },
+                    daemon=True,
+                    name="feature-panel-spill-cache-releaser",
+                )
+                spill_releaser.start()
+            try:
+                connection.execute(
+                    f"COPY ({query}) TO {_sql_string(str(temporary))} "
+                    "(FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000)"
+                )
+            finally:
+                spill_stop.set()
+                if spill_releaser is not None:
+                    spill_releaser.join()
+            if spill_errors:
+                raise BaselineResearchError("feature panel spill cache release failed") from (
+                    spill_errors[0]
+                )
             os.replace(temporary, resolved)
-            counts = connection.execute(
+        finally:
+            connection.close()
+            if temporary.exists():
+                temporary.unlink()
+            if spill.exists():
+                shutil.rmtree(spill)
+        if release_source_cache:
+            _release_read_cache(
+                tuple(path for dataset_paths in paths.values() for path in dataset_paths)
+            )
+            _trim_process_heap()
+
+        summary = duckdb.connect(":memory:")
+        try:
+            summary.execute(f"SET memory_limit='{duckdb_memory_limit}'")
+            summary.execute(f"SET threads={duckdb_threads}")
+            counts = summary.execute(
                 f"""
                 SELECT count(*) AS row_count,
                        count(*) FILTER (WHERE feature_ready) AS feature_ready_count,
@@ -1326,11 +1424,10 @@ class BaselineFeaturePanel:
             ).fetchone()
             assert counts is not None
         finally:
-            connection.close()
-            if temporary.exists():
-                temporary.unlink()
-            if spill.exists():
-                shutil.rmtree(spill)
+            summary.close()
+        if release_source_cache:
+            _release_read_cache((resolved,))
+            _trim_process_heap()
         report = BaselineFeaturePanelReport(
             evaluator_version=FEATURE_EVALUATOR_VERSION,
             feature_registry_version=registry.registry_version,
@@ -1516,7 +1613,18 @@ def _validate_feature_sources(connection: Any) -> None:
             raise BaselineResearchError(f"feature inputs contain {label}")
 
 
-def _feature_panel_query(scope_start: date, scope_end: date) -> str:
+def _feature_panel_query(
+    scope_start: date,
+    scope_end: date,
+    *,
+    output_order: str = "date-security",
+) -> str:
+    if output_order == "date-security":
+        order_by = "market_date, security_id"
+    elif output_order == "security-date":
+        order_by = "security_id, market_date"
+    else:
+        raise BaselineResearchError("feature panel output order is not admitted")
     start = _sql_string(scope_start.isoformat())
     end = _sql_string(scope_end.isoformat())
     return f"""
@@ -1754,7 +1862,7 @@ def _feature_panel_query(scope_start: date, scope_end: date) -> str:
                scope_continuity_excluded
         FROM final
         WHERE market_date BETWEEN DATE {start} AND DATE {end}
-        ORDER BY market_date, security_id
+        ORDER BY {order_by}
     """
 
 

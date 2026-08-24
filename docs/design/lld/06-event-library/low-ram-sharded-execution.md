@@ -78,8 +78,15 @@ complete-security candidate buckets, and the two scope-bound Feature Panels. Dir
 Research ADM construction, global candidate finalization, set-based T+1 binding, Label, Report,
 verification, and sealing remain parent/global stages. Only the profile-gated
 `event-shard-worker` role executes shard tasks. Each instance has hard Docker `3g` memory and swap
-limits and shares the existing read-only DWD mounts plus Event Run volume. DuckDB-heavy shard
-tasks use a 1 GB, one-thread analytical budget; table merge spill lives only below its
+limits and shares the existing read-only DWD mounts plus Event Run volume. Direct-DWD and candidate
+shards use a 1 GB, one-thread analytical budget; the two full-universe Feature Panel shards use a
+1,500 MB, one-thread budget. Their job-local Parquet keeps the window engine's native
+`security_id, market_date` physical order instead of paying for a second full-volume sort; Label and
+Report retain their own governed canonical output ordering. While DuckDB owns its generation-local
+spill, a low-RAM cache maintainer periodically releases only clean spill pages with
+`POSIX_FADV_DONTNEED`. Each panel then closes its build connection, releases only the bound
+read-only projection cache, trims the process heap, and opens a fresh bounded connection for
+summary counts so the two memory phases do not overlap. Table merge spill lives only below its
 generation-specific TMP root. Candidate filtering preserves the ADM's already-frozen physical
 order and rejects any non-monotonic row instead of repairing it with a second global sort. After
 each child task closes its readers and writers, it

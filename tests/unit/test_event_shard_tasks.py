@@ -82,4 +82,8 @@ def test_feature_panel_opens_decision_scope_but_materializes_execution_scope(
         "counts": {"daily": 1},
     }
     assert observed["panel"]["scope_end"] == execution_end  # type: ignore[index]
+    assert observed["panel"]["duckdb_memory_limit"] == "1500MB"  # type: ignore[index]
+    assert observed["panel"]["release_source_cache"] is True  # type: ignore[index]
+    assert observed["panel"]["output_order"] == "security-date"  # type: ignore[index]
+    assert observed["panel"]["spill_cache_release_interval_seconds"] == 1.0  # type: ignore[index]
     assert result["rows"] == 7

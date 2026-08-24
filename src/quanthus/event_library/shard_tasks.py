@@ -200,17 +200,21 @@ def _feature_panel(payload: Mapping[str, Any], project_root: Path) -> dict[str, 
             scope_start=scope_start,
             scope_end=scope_end,
             output=output,
-            duckdb_memory_limit="1GB",
+            duckdb_memory_limit="1500MB",
             duckdb_threads=1,
+            release_source_cache=True,
+            output_order="security-date",
+            spill_cache_release_interval_seconds=1.0,
         )
     receipt = Path(str(payload["receipt"]))
     _write_json(receipt, panel.to_receipt())
+    panel_sha256 = _sha256(panel.path)
     _release_file_cache((panel.path,), flush=True)
     _release_file_cache((Path(str(payload["projection_root"])),), flush=False)
     return {
         "output": str(panel.path),
         "receipt": str(receipt.resolve()),
-        "sha256": _sha256(panel.path),
+        "sha256": panel_sha256,
         "bytes": panel.parquet_bytes,
         "rows": panel.report.row_count,
     }

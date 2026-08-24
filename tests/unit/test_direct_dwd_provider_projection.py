@@ -11,7 +11,11 @@ import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from quanthus.backtest.direct_dwd_provider import _materialize
+from quanthus.backtest.direct_dwd_provider import (
+    DATASETS,
+    _materialize,
+    materialize_sharded_direct_dwd,
+)
 
 SSE = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
 
@@ -223,6 +227,38 @@ class DirectDwdProjectionTests(unittest.TestCase):
             self.assertEqual(limits["dwd_security_id"], "security-001")
             self.assertEqual(limits["dwd_state_knowledge_from"], known)
 
+            sharded_output = root / "sharded-output"
+            sharded_counts = materialize_sharded_direct_dwd(
+                sharded_output,
+                dwd_root=dwd,
+                correction_root=correction,
+                history_start=day,
+                execution_end=day,
+                workers=1,
+            )
+            self.assertEqual(sharded_counts, counts)
+            for dataset in DATASETS:
+                self.assertEqual(
+                    (sharded_output / "tables" / f"{dataset}.parquet").read_bytes(),
+                    (output / "tables" / f"{dataset}.parquet").read_bytes(),
+                )
+
+            self._write_empty_actions(
+                correction / "payload/replay/corporate_actions_normalized.parquet"
+            )
+            empty_action_partition = root / "empty-action-partition"
+            empty_action_partition.mkdir()
+            partition_counts = _materialize(
+                empty_action_partition,
+                dwd_root=dwd,
+                correction_root=correction,
+                history_start=day,
+                execution_end=day,
+                allow_empty_non_partitioned=True,
+            )
+            self.assertEqual(partition_counts["corporate_actions_normalized"], 0)
+            self.assertEqual(partition_counts["daily_ohlcv_none"], 1)
+
     @staticmethod
     def _write(path: Path, rows: list[dict[str, object]]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -259,6 +295,17 @@ class DirectDwdProjectionTests(unittest.TestCase):
                 ("blocked_from", pa.date32()),
                 ("blocked_through", pa.date32()),
                 ("reason_code", pa.string()),
+            ]
+        )
+        pq.write_table(pa.Table.from_pylist([], schema=schema), path)
+
+    @staticmethod
+    def _write_empty_actions(path: Path) -> None:
+        schema = pa.schema(
+            [
+                ("security_code", pa.string()),
+                ("effective_date", pa.date32()),
+                ("action_id", pa.string()),
             ]
         )
         pq.write_table(pa.Table.from_pylist([], schema=schema), path)

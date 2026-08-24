@@ -382,6 +382,19 @@ identical across the two Jobs, and all accepted content digests and counts remai
 Evidence is recorded in
 `docs/acceptance/perf-entry-memory-production-ab-20260823.md`.
 
+`PERF-SHARD-001` adds an evidence-gated low-RAM physical plan using 3 GiB resource units. It first
+partitions complete security-series evaluation behind the existing global isolation,
+concentration, split, and publication gates, then admits PostgreSQL shard leases only if two
+isolated units prove at least 1.80x end-to-end speedup over one unit. The exact resource contract,
+stage ownership, excluded infrastructure, and byte-identical acceptance gates live in
+`docs/design/lld/06-event-library/low-ram-sharded-execution.md`.
+
+The isolated-process algorithm gate is accepted. Two 12-partition Direct-DWD pairs reached 2.034x
+and 2.076x speedup while retaining ordered row equivalence, and two candidate S3x2 scans reproduced
+the production candidate JSONL byte identically below the frozen time ceiling. PostgreSQL shard
+leasing and full Event/Label/Report production A/B remain open. Evidence is recorded in
+`docs/acceptance/perf-shard-001-algorithm-benchmark-20260824.md`.
+
 ## 8. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -394,6 +407,7 @@ Evidence is recorded in
 | PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Accepted production A/B: three byte-identical governed package trees, unchanged accepted semantics and counts, generation-fenced progress, and 72.3 percent lower average complete runtime |
 | PERF-ENTRY-001 | Replace T+1 entry-evidence reads with one set-based join | PERF-EVENT-001 | Accepted; scalar/batch equivalence, one-query contract, full checks, 32.233-second production average, and byte-identical production A/B package reproduction |
 | PERF-MEM-001 | Publish stage memory evidence and keep the complete Event batch below 16 GiB | PERF-ENTRY-001 | Accepted; two complete cold Jobs below a hard 16 GiB cgroup with swap disabled, zero OOM/restarts/limit hits, and byte-identical governed package trees |
+| PERF-SHARD-001 | Prove 3 GiB deterministic multi-Worker Event execution | PERF-MEM-001 | Open; requires two-run S3x1/S3x2/U16 resource, scaling, and byte-identical production evidence |
 
 ## 9. Acceptance
 

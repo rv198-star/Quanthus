@@ -24,6 +24,7 @@ from quanthus.backtest.data_provider import (
 )
 from quanthus.backtest.historical_frames import HistoricalReplayFrameReader
 from quanthus.backtest.inputs import P1DailyExecutionEvidence
+from quanthus.concentration import StaticIndustryMembership
 from quanthus.event_library.contracts import sha256_digest
 from quanthus.event_library.job_local import require_job_local_session
 from quanthus.event_library.rule_card import CandidateRuleCard, load_candidate_rule_card
@@ -41,7 +42,6 @@ from quanthus.event_library.source import EventScanSourcePolicy, load_event_scan
 from quanthus.event_library.splits import SplitPolicy, load_split_policy
 from quanthus.industry_mapping import (
     StaticIndustryMapping,
-    StaticIndustryMembership,
     load_static_industry_mapping,
 )
 from quanthus.policy import find_project_root
@@ -148,6 +148,10 @@ def _write_jsonl(path: Path, values: Sequence[Mapping[str, Any]]) -> None:
 
 def _sql_path(path: Path) -> str:
     return "'" + str(path.resolve()).replace("'", "''") + "'"
+
+
+def _sql_text(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
 def _read_parquet_expression(paths: Sequence[Path]) -> str:
@@ -1144,6 +1148,7 @@ def iter_projected_candidate_series(
     source_policy: EventScanSourcePolicy,
     industry_mapping: StaticIndustryMapping,
     fetch_rows: int = 4096,
+    allowed_security_ids: Sequence[str] | None = None,
 ) -> Iterator[tuple[CandidateDailyInput, ...]]:
     """Stream one stable listing series at a time from the materialized projection."""
 
@@ -1156,11 +1161,35 @@ def iter_projected_candidate_series(
     connection = duckdb.connect(":memory:")
     try:
         connection.execute("SET threads=1")
+        selected_security_ids: tuple[str, ...] | None = None
+        selection_clause = ""
+        selection_order_clause = ""
+        if allowed_security_ids is not None:
+            selected_security_ids = tuple(sorted(allowed_security_ids))
+            if (
+                not selected_security_ids
+                or any(not value.strip() for value in selected_security_ids)
+                or len(selected_security_ids) != len(set(selected_security_ids))
+            ):
+                raise PhysicalEventScanError(
+                    "candidate projection security selection must be non-empty and unique"
+                )
+            selection_clause = (
+                " WHERE dwd_security_id IN ("
+                + ",".join(_sql_text(value) for value in selected_security_ids)
+                + ")"
+            )
+            selection_order_clause = (
+                " ORDER BY dwd_security_id, dwd_listing_effective_from, "
+                "dwd_listing_id, session_date"
+            )
         selected_columns = ", ".join(_CANDIDATE_SCAN_COLUMNS)
         cursor = connection.execute(
             f"""
             SELECT {selected_columns}
             FROM read_parquet({_sql_path(projection.candidate_path)})
+            {selection_clause}
+            {selection_order_clause}
             """
         )
         names = tuple(str(item[0]) for item in cursor.description)

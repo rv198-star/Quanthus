@@ -7,8 +7,10 @@ import json
 import shutil
 import tempfile
 from collections.abc import Callable, Mapping
-from datetime import date, datetime, time
+from concurrent.futures import ProcessPoolExecutor
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from quanthus.backtest.benchmark import BenchmarkCurve, load_benchmark_curve
@@ -30,6 +32,18 @@ DATASETS = (
     "daily_universe",
     "price_limit_execution_daily",
     "security_code_validity",
+    "trading_calendar",
+)
+_DAILY_PARTITIONED_DATASETS = (
+    "daily_ohlcv_none",
+    "daily_universe",
+    "price_limit_execution_daily",
+    "trading_calendar",
+)
+_DAILY_MERGE_PRIORITY = (
+    "daily_ohlcv_none",
+    "price_limit_execution_daily",
+    "daily_universe",
     "trading_calendar",
 )
 
@@ -243,6 +257,10 @@ def _materialize(
     history_start: date,
     execution_end: date,
     progress: Callable[[str, Mapping[str, Any]], None] | None = None,
+    output_start: date | None = None,
+    duckdb_memory_limit: str = DUCKDB_MEMORY_LIMIT,
+    duckdb_large_projection_memory_limit: str = DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT,
+    allow_empty_non_partitioned: bool = False,
 ) -> dict[str, int]:
     def report(stage: str, **details: Any) -> None:
         if progress is not None:
@@ -255,7 +273,12 @@ def _materialize(
 
     payload = dwd_root / "payload"
     correction = correction_root / "payload"
+    if output_start is None:
+        output_start = history_start
+    if not history_start <= output_start <= execution_end:
+        raise ConfigurationError("direct DWD output scope is outside its scan scope")
     start = history_start.isoformat()
+    output = output_start.isoformat()
     end = execution_end.isoformat()
     connections = _ProjectionConnections(
         duckdb,
@@ -265,7 +288,7 @@ def _materialize(
         start=start,
         end=end,
     )
-    connection = connections.open("daily-ohlcv")
+    connection = connections.open("daily-ohlcv", memory_limit=duckdb_memory_limit)
     try:
         report("dwd-source-scan-ready")
         directional = connection.execute(
@@ -280,7 +303,7 @@ def _materialize(
         tables.mkdir(parents=True)
         _copy(
             connection,
-            """
+            f"""
             SELECT listing.listing_code AS security_id,
                    listing.listing_code AS stock_code,
                    security.security_id AS dwd_security_id,
@@ -342,17 +365,19 @@ def _materialize(
               'venue_bec59e31eb6bb28111a10d7e6d2c689f',
               'venue_8c0bd9088a0dc88f28e5e7fa8efdce87'
             )
+              AND CAST(calendar.trade_date AS DATE)
+                  BETWEEN DATE '{output}' AND DATE '{end}'
             ORDER BY date, security_id
             """,
             tables / "daily_ohlcv_none.parquet",
         )
         connection = connections.open(
             "daily-universe",
-            memory_limit=DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT,
+            memory_limit=duckdb_large_projection_memory_limit,
         )
         _copy(
             connection,
-            """
+            f"""
             SELECT listing.listing_code AS security_id,
                    listing.listing_code AS stock_code,
                    security.security_id AS dwd_security_id,
@@ -394,17 +419,19 @@ def _materialize(
               'venue_bec59e31eb6bb28111a10d7e6d2c689f',
               'venue_8c0bd9088a0dc88f28e5e7fa8efdce87'
             )
+              AND CAST(calendar.trade_date AS DATE)
+                  BETWEEN DATE '{output}' AND DATE '{end}'
             ORDER BY market_date, security_id
             """,
             tables / "daily_universe.parquet",
         )
         connection = connections.open(
             "price-limit-execution",
-            memory_limit=DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT,
+            memory_limit=duckdb_large_projection_memory_limit,
         )
         _copy(
             connection,
-            """
+            f"""
             WITH joined AS (
               SELECT listing.listing_code AS security_id,
                      listing.listing_code AS stock_code,
@@ -481,11 +508,13 @@ def _materialize(
                    reason_code, execution_date AS knowledge_cutoff,
                    NULL::VARCHAR AS ipo_interval_id, NULL::VARCHAR AS ipo_source,
                    source_revision AS revision
-            FROM joined ORDER BY execution_date, security_id
+            FROM joined
+            WHERE execution_date BETWEEN DATE '{output}' AND DATE '{end}'
+            ORDER BY execution_date, security_id
             """,
             tables / "price_limit_execution_daily.parquet",
         )
-        connection = connections.open("finalize")
+        connection = connections.open("finalize", memory_limit=duckdb_memory_limit)
         _copy(
             connection,
             """
@@ -513,7 +542,7 @@ def _materialize(
         )
         _copy(
             connection,
-            """
+            f"""
             SELECT CASE venue_id
                      WHEN 'venue_bec59e31eb6bb28111a10d7e6d2c689f' THEN 'SSE'
                      WHEN 'venue_8c0bd9088a0dc88f28e5e7fa8efdce87' THEN 'SZSE'
@@ -527,6 +556,7 @@ def _materialize(
               'venue_bec59e31eb6bb28111a10d7e6d2c689f',
               'venue_8c0bd9088a0dc88f28e5e7fa8efdce87'
             )
+              AND CAST(trade_date AS DATE) BETWEEN DATE '{output}' AND DATE '{end}'
             ORDER BY trade_date, exchange
             """,
             tables / "trading_calendar.parquet",
@@ -577,7 +607,14 @@ def _materialize(
             )
             for name in DATASETS
         }
-        if any(counts[name] <= 0 for name in DATASETS if name != "corporate_action_exceptions"):
+        required_datasets = (
+            _DAILY_PARTITIONED_DATASETS
+            if allow_empty_non_partitioned
+            else tuple(
+                name for name in DATASETS if name != "corporate_action_exceptions"
+            )
+        )
+        if any(counts[name] <= 0 for name in required_datasets):
             raise ConfigurationError("direct DWD materialization produced an empty required table")
         duplicate_pairs = connection.execute(
             f"""
@@ -607,6 +644,208 @@ def _materialize(
         return counts
     finally:
         connections.close()
+
+
+def _materialize_date_partition(
+    partition_id: str,
+    root: str,
+    dwd_root: str,
+    correction_root: str,
+    scan_start: date,
+    output_start: date,
+    output_end: date,
+) -> tuple[str, dict[str, int], float]:
+    started = perf_counter()
+    partition_root = Path(root)
+    partition_root.mkdir(parents=True, exist_ok=False)
+    counts = _materialize(
+        partition_root,
+        dwd_root=Path(dwd_root),
+        correction_root=Path(correction_root),
+        history_start=scan_start,
+        execution_end=output_end,
+        output_start=output_start,
+        duckdb_memory_limit="1500MB",
+        duckdb_large_projection_memory_limit="1500MB",
+        allow_empty_non_partitioned=True,
+    )
+    return partition_id, counts, perf_counter() - started
+
+
+def _ordered_parquet_expression(paths: tuple[Path, ...]) -> str:
+    if not paths:
+        raise ConfigurationError("direct DWD shard merge requires input partitions")
+    return "read_parquet([" + ",".join(_sql_path(path) for path in paths) + "])"
+
+
+def _merge_direct_dwd_date_partitions(
+    dataset: str,
+    paths: tuple[str, ...],
+    output: str,
+    spill: str,
+) -> str:
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise ConfigurationError("direct DWD replay requires duckdb") from exc
+    spill_path = Path(spill)
+    spill_path.mkdir()
+    connection = duckdb.connect(":memory:")
+    try:
+        connection.execute("SET memory_limit='1GB'")
+        connection.execute("SET threads=1")
+        connection.execute("SET preserve_insertion_order=true")
+        connection.execute(f"SET temp_directory={_sql_path(spill_path)}")
+        _copy(
+            connection,
+            f"SELECT * FROM {_ordered_parquet_expression(tuple(Path(path) for path in paths))}",
+            Path(output),
+        )
+    finally:
+        connection.close()
+        shutil.rmtree(spill_path, ignore_errors=True)
+    return dataset
+
+
+def materialize_sharded_direct_dwd(
+    root: Path,
+    *,
+    dwd_root: Path,
+    correction_root: Path,
+    history_start: date,
+    execution_end: date,
+    workers: int,
+    progress: Callable[[str, Mapping[str, Any]], None] | None = None,
+) -> dict[str, int]:
+    """Build the existing single-file projection through bounded date shard tasks."""
+
+    if workers not in {1, 2, 3, 4}:
+        raise ConfigurationError("direct DWD shard workers must be between one and four")
+    if history_start > execution_end:
+        raise ConfigurationError("direct DWD shard scope is invalid")
+    root.mkdir(parents=True, exist_ok=False)
+    partition_root = root / ".partitions"
+    partition_root.mkdir()
+    specs: list[tuple[str, Path, date, date, date]] = []
+    for year in range(history_start.year, execution_end.year + 1):
+        year_start = max(history_start, date(year, 1, 1))
+        year_end = min(execution_end, date(year, 12, 31))
+        ranges = [(year_start, year_end)]
+        if year == execution_end.year and year_start < date(year, 7, 1) <= year_end:
+            ranges = [
+                (year_start, date(year, 6, 30)),
+                (date(year, 7, 1), year_end),
+            ]
+        for output_start, output_end in ranges:
+            scan_start = (
+                output_start
+                if output_start == history_start
+                else max(history_start, output_start - timedelta(days=31))
+            )
+            partition_id = f"{output_start.isoformat()}--{output_end.isoformat()}"
+            specs.append(
+                (
+                    partition_id,
+                    partition_root / f"range-{partition_id}",
+                    scan_start,
+                    output_start,
+                    output_end,
+                )
+            )
+    try:
+        execution_specs = tuple(
+            sorted(specs, key=lambda item: item[4], reverse=True)
+        )
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            futures = tuple(
+                executor.submit(
+                    _materialize_date_partition,
+                    partition_id,
+                    str(partition_path),
+                    str(dwd_root),
+                    str(correction_root),
+                    scan_start,
+                    output_start,
+                    output_end,
+                )
+                for (
+                    partition_id,
+                    partition_path,
+                    scan_start,
+                    output_start,
+                    output_end,
+                ) in execution_specs
+            )
+            completed = tuple(future.result() for future in futures)
+        by_partition = {
+            partition_id: counts for partition_id, counts, _elapsed in completed
+        }
+        elapsed_by_partition = {
+            partition_id: round(elapsed, 3)
+            for partition_id, _counts, elapsed in completed
+        }
+        if set(by_partition) != {partition_id for partition_id, *_rest in specs}:
+            raise ConfigurationError("direct DWD shard completion set differs")
+        if progress is not None:
+            progress(
+                "dwd-date-partitions-ready",
+                {
+                    "partitions": len(specs),
+                    "elapsed_by_partition": elapsed_by_partition,
+                },
+            )
+
+        tables = root / "tables"
+        tables.mkdir()
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            merge_futures = tuple(
+                executor.submit(
+                    _merge_direct_dwd_date_partitions,
+                    name,
+                    tuple(
+                        str(partition_path / "tables" / f"{name}.parquet")
+                        for _partition_id, partition_path, *_rest in specs
+                    ),
+                    str(tables / f"{name}.parquet"),
+                    str(root / f".duckdb-materialize-spill-merge-{name}"),
+                )
+                for name in _DAILY_MERGE_PRIORITY
+            )
+            merged = {future.result() for future in merge_futures}
+        if merged != set(_DAILY_PARTITIONED_DATASETS):
+            raise ConfigurationError("direct DWD shard merge completion set differs")
+
+        final_partition = specs[-1][1] / "tables"
+        for name in set(DATASETS).difference(_DAILY_PARTITIONED_DATASETS):
+            shutil.copyfile(final_partition / f"{name}.parquet", tables / f"{name}.parquet")
+
+        counts = {
+            name: (
+                sum(
+                    by_partition[partition_id][name]
+                    for partition_id, *_rest in specs
+                )
+                if name in _DAILY_PARTITIONED_DATASETS
+                else by_partition[specs[-1][0]][name]
+            )
+            for name in DATASETS
+        }
+        if any(
+            counts[name] <= 0
+            for name in DATASETS
+            if name != "corporate_action_exceptions"
+        ):
+            raise ConfigurationError(
+                "merged direct DWD shards produced an empty required table"
+            )
+        if progress is not None:
+            progress(
+                "dwd-shard-merge-ready",
+                {"workers": workers, "partitions": len(specs), "datasets": counts},
+            )
+        return counts
+    finally:
+        shutil.rmtree(partition_root, ignore_errors=True)
 
 
 def open_direct_dwd_session(

@@ -371,6 +371,34 @@ class _RawCandidate:
     rank_digest: str
 
 
+@dataclass(frozen=True)
+class CandidateScanShard:
+    """Mergeable result of scanning a disjoint set of complete security series."""
+
+    raw_candidates: tuple[_RawCandidate, ...]
+    reason_counts: Mapping[str, int]
+    evaluated_rows: int
+    series_count: int
+    decoded_rows: int
+    row_decode_elapsed_seconds: float
+    security_scan_elapsed_seconds: float
+
+    def __post_init__(self) -> None:
+        integer_values = (
+            self.evaluated_rows,
+            self.series_count,
+            self.decoded_rows,
+            *self.reason_counts.values(),
+        )
+        if any(
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+            for value in integer_values
+        ):
+            raise CandidateScanError("candidate scan shard counters must be non-negative")
+        if self.row_decode_elapsed_seconds < 0 or self.security_scan_elapsed_seconds < 0:
+            raise CandidateScanError("candidate scan shard elapsed time must be non-negative")
+
+
 def _window_reason(
     window: Sequence[CandidateDailyInput],
     *,
@@ -942,7 +970,7 @@ def _finalize_raw_candidates(
     )
 
 
-def scan_forward_candidate_series(
+def scan_candidate_series_shard(
     series: Iterable[Sequence[CandidateDailyInput]],
     *,
     trading_dates: Sequence[date],
@@ -952,8 +980,8 @@ def scan_forward_candidate_series(
     split_policy: SplitPolicy,
     source_policy: EventScanSourcePolicy,
     progress: Callable[[str, Mapping[str, Any]], None] | None = None,
-) -> CandidateScanResult:
-    """Scan sorted one-security series while keeping only triggers globally in memory."""
+) -> CandidateScanShard:
+    """Scan disjoint complete security series without applying global candidate gates."""
 
     ordered_dates, date_index, history_sessions = _scan_context(
         trading_dates=trading_dates,
@@ -1034,8 +1062,47 @@ def scan_forward_candidate_series(
                 "security_scan_elapsed_seconds": round(scan_elapsed, 3),
             },
         )
-    finalization_started = time.perf_counter()
-    result = _finalize_raw_candidates(
+    return CandidateScanShard(
+        raw_candidates=tuple(raw),
+        reason_counts=dict(reasons),
+        evaluated_rows=evaluated,
+        series_count=series_count,
+        decoded_rows=decoded_rows,
+        row_decode_elapsed_seconds=decode_elapsed,
+        security_scan_elapsed_seconds=scan_elapsed,
+    )
+
+
+def finalize_candidate_scan_shards(
+    shards: Sequence[CandidateScanShard],
+    *,
+    trading_dates: Sequence[date],
+    snapshot_id: str,
+    snapshot_manifest_digest: str,
+    card: CandidateRuleCard,
+    split_policy: SplitPolicy,
+    source_policy: EventScanSourcePolicy,
+) -> CandidateScanResult:
+    """Apply global isolation, concentration and split rules after shard reconciliation."""
+
+    if not shards:
+        raise CandidateScanError("candidate scan requires at least one shard")
+    ordered_dates, date_index, _history_sessions = _scan_context(
+        trading_dates=trading_dates,
+        snapshot_id=snapshot_id,
+        snapshot_manifest_digest=snapshot_manifest_digest,
+        card=card,
+        split_policy=split_policy,
+        source_policy=source_policy,
+    )
+    raw: list[_RawCandidate] = []
+    reasons: Counter[str] = Counter()
+    evaluated = 0
+    for shard in shards:
+        raw.extend(shard.raw_candidates)
+        reasons.update(shard.reason_counts)
+        evaluated += shard.evaluated_rows
+    return _finalize_raw_candidates(
         raw,
         reasons=reasons,
         evaluated=evaluated,
@@ -1045,6 +1112,41 @@ def scan_forward_candidate_series(
         snapshot_manifest_digest=snapshot_manifest_digest,
         card=card,
         split_policy=split_policy,
+    )
+
+
+def scan_forward_candidate_series(
+    series: Iterable[Sequence[CandidateDailyInput]],
+    *,
+    trading_dates: Sequence[date],
+    snapshot_id: str,
+    snapshot_manifest_digest: str,
+    card: CandidateRuleCard,
+    split_policy: SplitPolicy,
+    source_policy: EventScanSourcePolicy,
+    progress: Callable[[str, Mapping[str, Any]], None] | None = None,
+) -> CandidateScanResult:
+    """Scan sorted one-security series while keeping only triggers globally in memory."""
+
+    shard = scan_candidate_series_shard(
+        series,
+        trading_dates=trading_dates,
+        snapshot_id=snapshot_id,
+        snapshot_manifest_digest=snapshot_manifest_digest,
+        card=card,
+        split_policy=split_policy,
+        source_policy=source_policy,
+        progress=progress,
+    )
+    finalization_started = time.perf_counter()
+    result = finalize_candidate_scan_shards(
+        (shard,),
+        trading_dates=trading_dates,
+        snapshot_id=snapshot_id,
+        snapshot_manifest_digest=snapshot_manifest_digest,
+        card=card,
+        split_policy=split_policy,
+        source_policy=source_policy,
     )
     if progress is not None:
         progress(

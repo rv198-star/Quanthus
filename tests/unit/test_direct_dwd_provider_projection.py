@@ -13,8 +13,10 @@ import pyarrow.parquet as pq
 
 from quanthus.backtest.direct_dwd_provider import (
     DATASETS,
+    _copy,
     _materialize,
     materialize_sharded_direct_dwd,
+    merge_direct_dwd_date_partitions,
 )
 from quanthus.event_library.sharded_batch import SHARDED_DWD_DAILY_DATASETS
 
@@ -32,6 +34,53 @@ class DirectDwdProjectionTests(unittest.TestCase):
                 "trading_calendar",
             },
         )
+
+    def test_merge_reconstitutes_canonical_row_groups_across_partitions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths = []
+            rows_per_partition = 40_000
+            for partition in range(3):
+                start = partition * rows_per_partition
+                path = root / f"part-{partition}.parquet"
+                pq.write_table(
+                    pa.table(
+                        {
+                            "security_id": [
+                                f"{index:06d}" for index in range(start, start + rows_per_partition)
+                            ],
+                            "date": [date(2012, 1, 4)] * rows_per_partition,
+                            "value": list(range(start, start + rows_per_partition)),
+                        }
+                    ),
+                    path,
+                    compression="zstd",
+                    row_group_size=50_000,
+                )
+                paths.append(path)
+
+            standard = root / "standard.parquet"
+            connection = duckdb.connect(":memory:")
+            try:
+                # Parameters cannot bind inside COPY, so use DuckDB's normalized path literals.
+                quoted = ",".join("'" + str(path).replace("'", "''") + "'" for path in paths)
+                _copy(
+                    connection,
+                    f"SELECT * FROM read_parquet([{quoted}]) ORDER BY date,security_id",
+                    standard,
+                )
+            finally:
+                connection.close()
+
+            merged = root / "merged.parquet"
+            merge_direct_dwd_date_partitions(
+                "daily_ohlcv_none",
+                tuple(str(path) for path in paths),
+                str(merged),
+                str(root / "spill"),
+            )
+
+            self.assertEqual(merged.read_bytes(), standard.read_bytes())
 
     def test_materialization_retains_additive_p4_identity_decimal_and_lineage_columns(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

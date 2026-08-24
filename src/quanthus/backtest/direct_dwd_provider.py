@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 from collections.abc import Callable, Mapping
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -48,6 +49,12 @@ _DAILY_MERGE_PRIORITY = (
     "daily_universe",
     "trading_calendar",
 )
+_DAILY_CANONICAL_ORDER = {
+    "daily_ohlcv_none": "date,security_id",
+    "daily_universe": "market_date,security_id",
+    "price_limit_execution_daily": "execution_date,security_id",
+    "trading_calendar": "trade_date,exchange",
+}
 
 
 @dataclass(frozen=True)
@@ -750,6 +757,37 @@ def _ordered_parquet_expression(paths: tuple[Path, ...]) -> str:
     return "read_parquet([" + ",".join(_sql_path(path) for path in paths) + "])"
 
 
+def _release_spill_cache_until_stopped(
+    spill: Path,
+    stop: threading.Event,
+    errors: list[Exception],
+    *,
+    interval_seconds: float,
+) -> None:
+    advice = getattr(os, "POSIX_FADV_DONTNEED", None)
+    advise = getattr(os, "posix_fadvise", None)
+    if advice is None or advise is None:
+        errors.append(ConfigurationError("direct DWD merge requires POSIX_FADV_DONTNEED"))
+        return
+    while not stop.wait(interval_seconds):
+        try:
+            files = tuple(path for path in spill.iterdir() if path.is_file())
+        except FileNotFoundError:
+            continue
+        try:
+            for path in files:
+                descriptor = os.open(path, os.O_RDONLY)
+                try:
+                    advise(descriptor, 0, 0, advice)
+                finally:
+                    os.close(descriptor)
+        except FileNotFoundError:
+            continue
+        except Exception as exc:
+            errors.append(exc)
+            return
+
+
 def merge_direct_dwd_date_partitions(
     dataset: str,
     paths: tuple[str, ...],
@@ -760,20 +798,47 @@ def merge_direct_dwd_date_partitions(
         import duckdb
     except ModuleNotFoundError as exc:
         raise ConfigurationError("direct DWD replay requires duckdb") from exc
+    order = _DAILY_CANONICAL_ORDER.get(dataset)
+    if order is None:
+        raise ConfigurationError("direct DWD shard merge dataset is not admitted")
     spill_path = Path(spill)
     spill_path.mkdir()
     connection = duckdb.connect(":memory:")
+    spill_stop = threading.Event()
+    spill_errors: list[Exception] = []
+    spill_releaser: threading.Thread | None = None
     try:
         connection.execute("SET memory_limit='1GB'")
         connection.execute("SET threads=1")
-        connection.execute("SET preserve_insertion_order=true")
+        connection.execute("SET preserve_insertion_order=false")
         connection.execute(f"SET temp_directory={_sql_path(spill_path)}")
-        _copy(
-            connection,
-            f"SELECT * FROM {_ordered_parquet_expression(tuple(Path(path) for path in paths))}",
-            Path(output),
+        spill_releaser = threading.Thread(
+            target=_release_spill_cache_until_stopped,
+            args=(spill_path, spill_stop, spill_errors),
+            kwargs={"interval_seconds": 1.0},
+            daemon=True,
+            name="direct-dwd-merge-spill-cache-releaser",
         )
+        spill_releaser.start()
+        try:
+            _copy(
+                connection,
+                "SELECT * FROM "
+                f"{_ordered_parquet_expression(tuple(Path(path) for path in paths))} "
+                f"ORDER BY {order}",
+                Path(output),
+            )
+        finally:
+            spill_stop.set()
+            spill_releaser.join()
+        if spill_errors:
+            raise ConfigurationError("direct DWD merge spill cache release failed") from (
+                spill_errors[0]
+            )
     finally:
+        spill_stop.set()
+        if spill_releaser is not None and spill_releaser.is_alive():
+            spill_releaser.join()
         connection.close()
         shutil.rmtree(spill_path, ignore_errors=True)
     return dataset

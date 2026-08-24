@@ -159,6 +159,8 @@ def _scan(payload: Mapping[str, Any], project_root: Path) -> dict[str, Any]:
             split_policy=split,
             source_policy=source,
         )
+        if shard.security_ids != tuple(sorted(security_ids)):
+            raise RuntimeError("candidate shard security ownership differs")
     finally:
         shutil.rmtree(spill, ignore_errors=True)
     output = Path(str(payload["output"]))

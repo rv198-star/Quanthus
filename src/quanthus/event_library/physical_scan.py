@@ -8,11 +8,13 @@ import os
 import shutil
 import tempfile
 import time as runtime_clock
+from bisect import bisect_left
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
+from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -949,7 +951,7 @@ def load_p4_research_adm(adm_root: Path, *, project_root: Path | None = None) ->
 def plan_candidate_security_buckets(
     projection: P4ResearchADM, workers: int
 ) -> tuple[tuple[str, ...], ...]:
-    """Plan deterministic LPT buckets over complete security series."""
+    """Plan row-balanced contiguous ranges over complete security series."""
 
     if workers not in {1, 2, 3, 4}:
         raise PhysicalEventScanError("candidate shard workers must be between one and four")
@@ -965,22 +967,46 @@ def plan_candidate_security_buckets(
                 """
                 SELECT dwd_security_id, count(*) AS row_count
                 FROM read_parquet(?) GROUP BY dwd_security_id
-                ORDER BY row_count DESC, dwd_security_id
+                ORDER BY dwd_security_id
                 """,
                 [str(projection.candidate_path)],
             ).fetchall()
         )
     finally:
         connection.close()
-    if workers > len(weighted):
-        raise PhysicalEventScanError("candidate shard count exceeds security count")
-    buckets: list[list[str]] = [[] for _ in range(workers)]
-    weights = [0] * workers
-    for security_id, row_count in weighted:
-        selected = min(range(workers), key=lambda index: (weights[index], index))
-        buckets[selected].append(security_id)
-        weights[selected] += row_count
-    return tuple(tuple(sorted(bucket)) for bucket in buckets)
+    return _contiguous_weight_buckets(weighted, workers)
+
+
+def _contiguous_weight_buckets(
+    weighted: Sequence[tuple[str, int]], workers: int
+) -> tuple[tuple[str, ...], ...]:
+    security_ids = tuple(security_id for security_id, _ in weighted)
+    if (
+        workers < 1
+        or workers > len(weighted)
+        or tuple(sorted(security_ids)) != security_ids
+        or len(set(security_ids)) != len(security_ids)
+        or any(not security_id.strip() or row_count <= 0 for security_id, row_count in weighted)
+    ):
+        raise PhysicalEventScanError("candidate shard weights are invalid")
+    cumulative = [0]
+    for _security_id, row_count in weighted:
+        cumulative.append(cumulative[-1] + row_count)
+    cuts = [0]
+    for boundary in range(1, workers):
+        desired = cumulative[-1] * boundary / workers
+        minimum = cuts[-1] + 1
+        maximum = len(weighted) - (workers - boundary)
+        position = bisect_left(cumulative, desired, minimum, maximum + 1)
+        choices = tuple(
+            cut for cut in (position - 1, position) if minimum <= cut <= maximum
+        )
+        cuts.append(min(choices, key=lambda cut: (abs(cumulative[cut] - desired), cut)))
+    cuts.append(len(weighted))
+    return tuple(
+        tuple(security_id for security_id, _row_count in weighted[start:end])
+        for start, end in pairwise(cuts)
+    )
 
 
 # Compatibility alias for callers created before the P4 Research ADM boundary was named.
@@ -1303,9 +1329,9 @@ def iter_projected_candidate_series(
                     "candidate projection security selection must be non-empty and unique"
                 )
             selection_clause = (
-                " WHERE dwd_security_id IN ("
-                + ",".join(_sql_text(value) for value in selected_security_ids)
-                + ")"
+                " WHERE dwd_security_id BETWEEN "
+                f"{_sql_text(selected_security_ids[0])} AND "
+                f"{_sql_text(selected_security_ids[-1])}"
             )
         selected_columns = ", ".join(_CANDIDATE_SCAN_COLUMNS)
         cursor = connection.execute(
@@ -1322,6 +1348,7 @@ def iter_projected_candidate_series(
         current_key: tuple[str, str, str, str] | None = None
         current: list[CandidateDailyInput] = []
         previous_sort_key: tuple[str, datetime, str, date] | None = None
+        observed_security_ids: set[str] = set()
         while True:
             batch = cursor.fetchmany(fetch_rows)
             if not batch:
@@ -1348,6 +1375,7 @@ def iter_projected_candidate_series(
                         "projected candidate physical order differs"
                     )
                 previous_sort_key = sort_key
+                observed_security_ids.add(candidate.security_id)
                 key = (
                     candidate.security_id,
                     candidate.listing_id,
@@ -1361,6 +1389,12 @@ def iter_projected_candidate_series(
                 current.append(candidate)
         if current:
             yield tuple(current)
+        if selected_security_ids is not None and tuple(sorted(observed_security_ids)) != (
+            selected_security_ids
+        ):
+            raise PhysicalEventScanError(
+                "candidate projection contiguous security range differs"
+            )
     finally:
         connection.close()
 

@@ -20,6 +20,7 @@ from quanthus.event_library.physical_scan import (
     PhysicalEventScanError,
     _audit_projection_static_industry_coverage,
     _candidate_input,
+    _contiguous_weight_buckets,
     _publish_package,
     iter_projected_candidate_series,
     materialize_p4_research_adm,
@@ -99,6 +100,18 @@ class _Reader:
 
 
 class EventPhysicalScanTests(unittest.TestCase):
+    def test_candidate_buckets_are_contiguous_and_row_balanced(self) -> None:
+        weighted = (("a", 4), ("b", 3), ("c", 2), ("d", 1))
+
+        self.assertEqual(
+            _contiguous_weight_buckets(weighted, 2),
+            (("a",), ("b", "c", "d")),
+        )
+        self.assertEqual(
+            _contiguous_weight_buckets(weighted, 4),
+            (("a",), ("b",), ("c",), ("d",)),
+        )
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -359,6 +372,31 @@ class EventPhysicalScanTests(unittest.TestCase):
                 ),
             ]
         )
+        contiguous_path = self.root / "candidate-contiguous.parquet"
+        pq.write_table(duplicated_table, contiguous_path)
+        contiguous_projection = replace(projection, candidate_path=contiguous_path)
+        selected_industry = replace(
+            industry,
+            memberships=industry.memberships
+            + (
+                replace(
+                    industry.memberships[0], security_code="opaque-security-002"
+                ),
+            ),
+        )
+        contiguous_series = tuple(
+            iter_projected_candidate_series(
+                contiguous_projection,
+                source_policy=self.source,
+                industry_mapping=selected_industry,
+                fetch_rows=7,
+                allowed_security_ids=("opaque-security-002", "opaque-security-001"),
+            )
+        )
+        self.assertEqual(
+            [item[0].security_id for item in contiguous_series],
+            ["opaque-security-001", "opaque-security-002"],
+        )
         interleaved_path = self.root / "candidate-interleaved.parquet"
         pq.write_table(
             duplicated_table.take(
@@ -374,15 +412,6 @@ class EventPhysicalScanTests(unittest.TestCase):
             interleaved_path,
         )
         selected_projection = replace(projection, candidate_path=interleaved_path)
-        selected_industry = replace(
-            industry,
-            memberships=industry.memberships
-            + (
-                replace(
-                    industry.memberships[0], security_code="opaque-security-002"
-                ),
-            ),
-        )
         with self.assertRaisesRegex(
             PhysicalEventScanError, "projected candidate physical order differs"
         ):

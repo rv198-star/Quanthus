@@ -32,7 +32,8 @@ stages may create disjoint shard tasks:
 
 1. Direct-DWD physical projections use bounded date partitions and deterministic chronological
    concatenation.
-2. Candidate decoding and per-security trigger evaluation use complete security-series buckets.
+2. Candidate decoding and per-security trigger evaluation use row-balanced contiguous ranges of
+   complete security series.
 3. All raw triggers return to one global isolation, concentration and split finalizer. These rules
    never execute independently inside a shard.
 4. The execution-scope and decision-scope Feature Panels are two independent full-universe tasks.
@@ -99,9 +100,11 @@ spill, a low-RAM cache maintainer periodically releases only clean spill pages w
 `POSIX_FADV_DONTNEED`. Each panel then closes its build connection, releases only the bound
 read-only projection cache, trims the process heap, and opens a fresh bounded connection for
 summary counts so the two memory phases do not overlap. Table merge spill lives only below its
-generation-specific TMP root. Candidate filtering preserves the ADM's already-frozen physical
-order and rejects any non-monotonic row instead of repairing it with a second global sort. After
-each child task closes its readers and writers, it
+generation-specific TMP root. Candidate planning cuts the ADM's ordered security ids at cumulative
+row-count boundaries nearest to equal work. Each child uses one inclusive security-id range,
+preserves the ADM's already-frozen physical order, verifies exact assigned-security coverage, and
+rejects any non-monotonic row instead of repairing it with a second global sort. After each child
+task closes its readers and writers, it
 releases only the explicitly bound input/output file cache with `POSIX_FADV_DONTNEED`; this keeps
 cache charged to the long-lived Worker cgroup from accumulating across unrelated shard claims.
 The parent Event Worker alone mounts the checksum-bound historical-industry source receipt used

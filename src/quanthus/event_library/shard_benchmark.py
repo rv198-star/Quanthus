@@ -13,6 +13,7 @@ from typing import Any
 
 from quanthus.event_library.physical_scan import (
     P4ResearchADM,
+    _contiguous_weight_buckets,
     iter_projected_candidate_series,
 )
 from quanthus.event_library.rule_card import load_candidate_rule_card
@@ -109,22 +110,14 @@ def _balanced_buckets(candidate_path: Path, workers: int) -> tuple[tuple[str, ..
                 SELECT dwd_security_id, count(*) AS row_count
                 FROM read_parquet(?)
                 GROUP BY dwd_security_id
-                ORDER BY row_count DESC, dwd_security_id
+                ORDER BY dwd_security_id
                 """,
                 [str(candidate_path)],
             ).fetchall()
         )
     finally:
         connection.close()
-    if workers < 1 or workers > len(weighted):
-        raise ValueError("workers must fit the projected security count")
-    buckets: list[list[str]] = [[] for _ in range(workers)]
-    weights = [0] * workers
-    for security_id, row_count in weighted:
-        selected = min(range(workers), key=lambda index: (weights[index], index))
-        buckets[selected].append(security_id)
-        weights[selected] += row_count
-    return tuple(tuple(sorted(bucket)) for bucket in buckets)
+    return _contiguous_weight_buckets(weighted, workers)
 
 
 def _load_scan_contract(project_root: Path) -> tuple[Any, Any, Any]:

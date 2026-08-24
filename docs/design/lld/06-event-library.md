@@ -145,7 +145,14 @@ Current DWD industry membership remains the first mapping authority; the 259 his
 securities are filled only by ADM 1.1's checksum-bound fixed-date BaoStock `证监会行业分类`
 supplement. Its complete selected source content must reproduce
 `sha256:20b51d52070b8976f9f8989ff0f54124aea098ca749167bedbddbed947c3196b`
-before scanning continues. The ADM is application data only: it is not
+before scanning continues. Production Event Workers consume that exact provider receipt from a
+read-only deployment reference rather than making every cold research Job depend on BaoStock
+availability. The loader independently verifies the receipt digest, policy header, 259-security
+set, query dates, resolution method, and CSRC hierarchy mapping; a missing or different reference
+fails closed. An unconfigured development process may still collect the fixed-date provider
+receipt directly, but it must pass the same digest gate. The frozen receipt is source evidence, not
+a cross-Job computed intermediate, and each Job still independently rebuilds its DWD projection,
+ADM, Event, Label, and Report packages. The ADM is application data only: it is not
 DWD, generic DWS, operational ADS, or an execution authority. Event identity binds the exact ADM
 snapshot manifest. The Event Library then adds events, entry partition, summary, manifest, and READY
 around that ADM. `run-p4-event-scan` builds the combined immutable Run package and

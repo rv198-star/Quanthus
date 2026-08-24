@@ -320,10 +320,12 @@ def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:
     assert "traefik-net" not in event_shard_worker
     assert "QUANTHUS_EVENT_RUN_ROOT: /data/event-runs" in event_worker
     assert "quanthus-event-runs:/data/event-runs" in event_worker
-    assert event_worker.count(":ro") == 3
+    assert event_worker.count(":ro") == 4
     assert event_shard_worker.count(":ro") == 3
     assert "/dwd-base-202607-v2.1:ro" in event_worker
     assert "correction-20260813-001:ro" in event_worker
+    assert "QUANTHUS_P4_HISTORICAL_INDUSTRY_RECEIPT_PATH:" in event_worker
+    assert "historical-industry-source-20b51d52070b.json:ro" in event_worker
     assert "mem_limit: 16g" in replay_worker
     assert "memswap_limit: 16g" in replay_worker
     assert "mem_limit: 16g" in event_worker

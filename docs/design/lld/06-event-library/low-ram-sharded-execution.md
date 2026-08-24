@@ -85,6 +85,8 @@ order and rejects any non-monotonic row instead of repairing it with a second gl
 each child task closes its readers and writers, it
 releases only the explicitly bound input/output file cache with `POSIX_FADV_DONTNEED`; this keeps
 cache charged to the long-lived Worker cgroup from accumulating across unrelated shard claims.
+The parent Event Worker alone mounts the checksum-bound historical-industry source receipt used
+during ADM construction; analytical shard Workers neither contact BaoStock nor read that reference.
 
 The table and role are Event-specific. They do not admit arbitrary task kinds, cross-Job reuse,
 Worker registration, automatic resource advertisement, or a second queue transport. Stage TMP is

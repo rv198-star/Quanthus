@@ -89,6 +89,7 @@ services:
       QUANTHUS_WORKER_ID: oci-event-1
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
       QUANTHUS_EVENT_SHARD_TARGET: ${QUANTHUS_EVENT_SHARD_TARGET:-0}
+      QUANTHUS_P4_HISTORICAL_INDUSTRY_RECEIPT_PATH: /srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json
       QUANTHUS_EVENT_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current
       QUANTHUS_EVENT_MEMORY_PEAK_PATH: /sys/fs/cgroup/memory.peak
       QUANTHUS_EVENT_MEMORY_LIMIT_PATH: /sys/fs/cgroup/memory.max
@@ -104,6 +105,7 @@ services:
       - /srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:ro
       - /srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:ro
       - /srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:ro
+      - /srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json:/srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json:ro
       - quanthus-event-runs:/data/event-runs
 
   event-shard-worker:

@@ -52,6 +52,7 @@ from quanthus.research_adm import (
     P4ResearchADMPolicy,
     ResearchADMError,
     collect_p4_historical_industry_supplement,
+    load_p4_historical_industry_supplement,
     load_p4_research_adm_policy,
 )
 
@@ -356,12 +357,23 @@ def _materialize_dwd_static_industry_mapping(
     if missing_identities:
         missing_codes = tuple(sorted({str(row[1]) for row in missing_identities}))
         try:
-            supplement, supplement_receipt = collect_p4_historical_industry_supplement(
-                missing_codes,
-                hierarchy_path=hierarchy_path,
-                binding=historical_reference,
-                bs_module=bs_module,
-            )
+            frozen_receipt = os.environ.get(
+                "QUANTHUS_P4_HISTORICAL_INDUSTRY_RECEIPT_PATH", ""
+            ).strip()
+            if frozen_receipt:
+                supplement, supplement_receipt = load_p4_historical_industry_supplement(
+                    missing_codes,
+                    receipt_path=Path(frozen_receipt),
+                    hierarchy_path=hierarchy_path,
+                    binding=historical_reference,
+                )
+            else:
+                supplement, supplement_receipt = collect_p4_historical_industry_supplement(
+                    missing_codes,
+                    hierarchy_path=hierarchy_path,
+                    binding=historical_reference,
+                    bs_module=bs_module,
+                )
         except ResearchADMError as exc:
             raise PhysicalEventScanError(
                 f"P4 historical industry supplement failed: {exc}"

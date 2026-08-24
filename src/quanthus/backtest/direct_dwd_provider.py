@@ -737,8 +737,8 @@ def materialize_direct_dwd_date_partition(
         history_start=scan_start,
         execution_end=output_end,
         output_start=output_start,
-        duckdb_memory_limit="1500MB",
-        duckdb_large_projection_memory_limit="1500MB",
+        duckdb_memory_limit="1GB",
+        duckdb_large_projection_memory_limit="1GB",
         allow_empty_non_partitioned=True,
     )
     return partition_id, counts, perf_counter() - started

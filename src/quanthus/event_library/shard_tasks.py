@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import resource
+import shutil
 import time
 from collections.abc import Mapping
 from datetime import date
@@ -110,20 +111,26 @@ def _scan(payload: Mapping[str, Any], project_root: Path) -> dict[str, Any]:
         not isinstance(item, str) for item in security_ids
     ):
         raise RuntimeError("candidate shard security ids are invalid")
-    shard = scan_candidate_series_shard(
-        iter_projected_candidate_series(
-            projection,
+    spill = Path(str(payload["spill"]))
+    try:
+        shard = scan_candidate_series_shard(
+            iter_projected_candidate_series(
+                projection,
+                source_policy=source,
+                industry_mapping=projection.industry_mapping,
+                allowed_security_ids=tuple(security_ids),
+                duckdb_memory_limit="1GB",
+                duckdb_temp_directory=spill,
+            ),
+            trading_dates=projection.trading_dates,
+            snapshot_id=projection.snapshot_id,
+            snapshot_manifest_digest=projection.manifest_sha256,
+            card=card,
+            split_policy=split,
             source_policy=source,
-            industry_mapping=projection.industry_mapping,
-            allowed_security_ids=tuple(security_ids),
-        ),
-        trading_dates=projection.trading_dates,
-        snapshot_id=projection.snapshot_id,
-        snapshot_manifest_digest=projection.manifest_sha256,
-        card=card,
-        split_policy=split,
-        source_policy=source,
-    )
+        )
+    finally:
+        shutil.rmtree(spill, ignore_errors=True)
     output = Path(str(payload["output"]))
     _write_json(output, shard.to_dict())
     return {
@@ -162,7 +169,7 @@ def _feature_panel(payload: Mapping[str, Any], project_root: Path) -> dict[str, 
             scope_start=scope_start,
             scope_end=scope_end,
             output=output,
-            duckdb_memory_limit="1500MB",
+            duckdb_memory_limit="1GB",
             duckdb_threads=1,
         )
     receipt = Path(str(payload["receipt"]))

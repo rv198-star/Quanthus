@@ -1256,6 +1256,8 @@ def iter_projected_candidate_series(
     industry_mapping: StaticIndustryMapping,
     fetch_rows: int = 4096,
     allowed_security_ids: Sequence[str] | None = None,
+    duckdb_memory_limit: str | None = None,
+    duckdb_temp_directory: Path | None = None,
 ) -> Iterator[tuple[CandidateDailyInput, ...]]:
     """Stream one stable listing series at a time from the materialized projection."""
 
@@ -1268,6 +1270,13 @@ def iter_projected_candidate_series(
     connection = duckdb.connect(":memory:")
     try:
         connection.execute("SET threads=1")
+        if duckdb_memory_limit is not None:
+            connection.execute(f"SET memory_limit={_sql_text(duckdb_memory_limit)}")
+        if duckdb_temp_directory is not None:
+            duckdb_temp_directory.mkdir(parents=True, exist_ok=False)
+            connection.execute(
+                f"SET temp_directory={_sql_path(duckdb_temp_directory.resolve())}"
+            )
         selected_security_ids: tuple[str, ...] | None = None
         selection_clause = ""
         selection_order_clause = ""

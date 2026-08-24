@@ -372,6 +372,13 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                         / "generation-{claim_generation}"
                         / "scan.json"
                     ),
+                    "spill": str(
+                        batch.shard_root
+                        / "candidate-scan"
+                        / f"bucket-{ordinal:03d}"
+                        / "generation-{claim_generation}"
+                        / "spill"
+                    ),
                 }
                 for ordinal, bucket in enumerate(buckets)
             )

@@ -78,7 +78,9 @@ complete-security candidate buckets, and the two scope-bound Feature Panels. Dir
 Research ADM construction, global candidate finalization, set-based T+1 binding, Label, Report,
 verification, and sealing remain parent/global stages. Only the profile-gated
 `event-shard-worker` role executes shard tasks. Each instance has hard Docker `3g` memory and swap
-limits and shares the existing read-only DWD mounts plus Event Run volume.
+limits and shares the existing read-only DWD mounts plus Event Run volume. DuckDB-heavy shard
+tasks use a 1 GB, one-thread analytical budget; candidate ordering and table merge spill only below
+their generation-specific TMP roots.
 
 The table and role are Event-specific. They do not admit arbitrary task kinds, cross-Job reuse,
 Worker registration, automatic resource advertisement, or a second queue transport. Stage TMP is

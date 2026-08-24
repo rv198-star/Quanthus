@@ -52,6 +52,29 @@ def _write_json(path: Path, value: Mapping[str, Any]) -> None:
     os.replace(temporary, path)
 
 
+def _release_file_cache(paths: tuple[Path, ...], *, flush: bool) -> None:
+    """Release cache charged to a long-lived 3 GiB Worker after one child task."""
+
+    advice = getattr(os, "POSIX_FADV_DONTNEED", None)
+    advise = getattr(os, "posix_fadvise", None)
+    if advice is None or advise is None:
+        raise RuntimeError("event shard Worker requires POSIX_FADV_DONTNEED")
+    files: set[Path] = set()
+    for path in paths:
+        if path.is_file():
+            files.add(path.resolve())
+        elif path.is_dir():
+            files.update(item.resolve() for item in path.rglob("*") if item.is_file())
+    for path in sorted(files):
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            if flush:
+                os.fsync(descriptor)
+            advise(descriptor, 0, 0, advice)
+        finally:
+            os.close(descriptor)
+
+
 def _project_path(value: object, project_root: Path) -> Path:
     path = Path(str(value))
     return path.resolve() if path.is_absolute() else (project_root / path).resolve()
@@ -71,6 +94,11 @@ def _date_partition(payload: Mapping[str, Any]) -> dict[str, Any]:
     )
     if observed_id != partition_id:
         raise RuntimeError("date partition identity differs")
+    _release_file_cache((root,), flush=True)
+    _release_file_cache(
+        (Path(str(payload["dwd_root"])), Path(str(payload["correction_root"]))),
+        flush=False,
+    )
     return {
         "output_root": str(root.resolve()),
         "counts": counts,
@@ -87,6 +115,8 @@ def _merge(payload: Mapping[str, Any]) -> dict[str, Any]:
         str(output),
         str(payload["spill"]),
     )
+    _release_file_cache((output,), flush=True)
+    _release_file_cache(tuple(Path(str(item)) for item in payload["paths"]), flush=False)
     return {
         "dataset": dataset,
         "output": str(output.resolve()),
@@ -133,6 +163,7 @@ def _scan(payload: Mapping[str, Any], project_root: Path) -> dict[str, Any]:
         shutil.rmtree(spill, ignore_errors=True)
     output = Path(str(payload["output"]))
     _write_json(output, shard.to_dict())
+    _release_file_cache((projection.candidate_path,), flush=False)
     return {
         "output": str(output.resolve()),
         "sha256": _sha256(output),
@@ -174,6 +205,8 @@ def _feature_panel(payload: Mapping[str, Any], project_root: Path) -> dict[str, 
         )
     receipt = Path(str(payload["receipt"]))
     _write_json(receipt, panel.to_receipt())
+    _release_file_cache((panel.path,), flush=True)
+    _release_file_cache((Path(str(payload["projection_root"])),), flush=False)
     return {
         "output": str(panel.path),
         "receipt": str(receipt.resolve()),

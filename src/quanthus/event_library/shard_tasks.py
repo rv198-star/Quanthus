@@ -189,8 +189,8 @@ def _feature_panel(payload: Mapping[str, Any], project_root: Path) -> dict[str, 
     with open_materialized_direct_dwd_session(
         provider_config,
         root=Path(str(payload["projection_root"])),
-        scope_start=scope_start,
-        scope_end=scope_end,
+        scope_start=provider_config.scope.decision_start,
+        scope_end=provider_config.scope.decision_end,
         counts={str(name): int(count) for name, count in counts.items()},
     ) as session:
         panel = build_job_local_feature_panel(

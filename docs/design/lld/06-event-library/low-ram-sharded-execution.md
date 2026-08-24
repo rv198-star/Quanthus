@@ -87,6 +87,9 @@ releases only the explicitly bound input/output file cache with `POSIX_FADV_DONT
 cache charged to the long-lived Worker cgroup from accumulating across unrelated shard claims.
 The parent Event Worker alone mounts the checksum-bound historical-industry source receipt used
 during ADM construction; analytical shard Workers neither contact BaoStock nor read that reference.
+Each Feature Panel shard opens the already-materialized provider under the governed decision scope
+through `2021-12-30`; the label panel may then materialize the separately authorized execution row
+through `2021-12-31`, matching the standard composite path without expanding decision authority.
 
 The table and role are Event-specific. They do not admit arbitrary task kinds, cross-Job reuse,
 Worker registration, automatic resource advertisement, or a second queue transport. Stage TMP is

@@ -383,19 +383,18 @@ class EventPhysicalScanTests(unittest.TestCase):
                 ),
             ),
         )
-        selected_multi_series = tuple(
-            iter_projected_candidate_series(
-                selected_projection,
-                source_policy=self.source,
-                industry_mapping=selected_industry,
-                fetch_rows=7,
-                allowed_security_ids=("opaque-security-002", "opaque-security-001"),
+        with self.assertRaisesRegex(
+            PhysicalEventScanError, "projected candidate physical order differs"
+        ):
+            tuple(
+                iter_projected_candidate_series(
+                    selected_projection,
+                    source_policy=self.source,
+                    industry_mapping=selected_industry,
+                    fetch_rows=7,
+                    allowed_security_ids=("opaque-security-002", "opaque-security-001"),
+                )
             )
-        )
-        self.assertEqual(
-            [item[0].security_id for item in selected_multi_series],
-            ["opaque-security-001", "opaque-security-002"],
-        )
 
         reversed_path = self.root / "candidate-reversed.parquet"
         pq.write_table(

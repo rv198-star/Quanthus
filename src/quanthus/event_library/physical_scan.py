@@ -1270,6 +1270,7 @@ def iter_projected_candidate_series(
     connection = duckdb.connect(":memory:")
     try:
         connection.execute("SET threads=1")
+        connection.execute("SET preserve_insertion_order=true")
         if duckdb_memory_limit is not None:
             connection.execute(f"SET memory_limit={_sql_text(duckdb_memory_limit)}")
         if duckdb_temp_directory is not None:
@@ -1279,7 +1280,6 @@ def iter_projected_candidate_series(
             )
         selected_security_ids: tuple[str, ...] | None = None
         selection_clause = ""
-        selection_order_clause = ""
         if allowed_security_ids is not None:
             selected_security_ids = tuple(sorted(allowed_security_ids))
             if (
@@ -1295,17 +1295,12 @@ def iter_projected_candidate_series(
                 + ",".join(_sql_text(value) for value in selected_security_ids)
                 + ")"
             )
-            selection_order_clause = (
-                " ORDER BY dwd_security_id, dwd_listing_effective_from, "
-                "dwd_listing_id, session_date"
-            )
         selected_columns = ", ".join(_CANDIDATE_SCAN_COLUMNS)
         cursor = connection.execute(
             f"""
             SELECT {selected_columns}
             FROM read_parquet({_sql_path(projection.candidate_path)})
             {selection_clause}
-            {selection_order_clause}
             """
         )
         names = tuple(str(item[0]) for item in cursor.description)

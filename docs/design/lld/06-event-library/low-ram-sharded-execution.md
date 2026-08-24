@@ -79,8 +79,10 @@ Research ADM construction, global candidate finalization, set-based T+1 binding,
 verification, and sealing remain parent/global stages. Only the profile-gated
 `event-shard-worker` role executes shard tasks. Each instance has hard Docker `3g` memory and swap
 limits and shares the existing read-only DWD mounts plus Event Run volume. DuckDB-heavy shard
-tasks use a 1 GB, one-thread analytical budget; candidate ordering and table merge spill only below
-their generation-specific TMP roots. After each child task closes its readers and writers, it
+tasks use a 1 GB, one-thread analytical budget; table merge spill lives only below its
+generation-specific TMP root. Candidate filtering preserves the ADM's already-frozen physical
+order and rejects any non-monotonic row instead of repairing it with a second global sort. After
+each child task closes its readers and writers, it
 releases only the explicitly bound input/output file cache with `POSIX_FADV_DONTNEED`; this keeps
 cache charged to the long-lived Worker cgroup from accumulating across unrelated shard claims.
 

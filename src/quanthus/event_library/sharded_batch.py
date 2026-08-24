@@ -50,10 +50,11 @@ from quanthus.policy import find_project_root
 _DEVELOPMENT_START = date(2012, 1, 4)
 _DECISION_END = date(2021, 12, 30)
 _EXECUTION_END = date(2021, 12, 31)
-_DAILY_DATASETS = (
+SHARDED_DWD_DAILY_DATASETS = (
     "daily_ohlcv_none",
     "daily_universe",
     "price_limit_execution_daily",
+    "trading_calendar",
 )
 
 
@@ -283,7 +284,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                     / "spill"
                 ),
             }
-            for dataset in _DAILY_DATASETS
+            for dataset in SHARDED_DWD_DAILY_DATASETS
         )
         merge_results = batch.dispatch(
             "dwd-merge", merge_payloads, progress_start=35, progress_end=43

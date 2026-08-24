@@ -16,11 +16,23 @@ from quanthus.backtest.direct_dwd_provider import (
     _materialize,
     materialize_sharded_direct_dwd,
 )
+from quanthus.event_library.sharded_batch import SHARDED_DWD_DAILY_DATASETS
 
 SSE = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
 
 
 class DirectDwdProjectionTests(unittest.TestCase):
+    def test_sharded_batch_merges_every_date_partitioned_dataset(self) -> None:
+        self.assertEqual(
+            set(SHARDED_DWD_DAILY_DATASETS),
+            {
+                "daily_ohlcv_none",
+                "daily_universe",
+                "price_limit_execution_daily",
+                "trading_calendar",
+            },
+        )
+
     def test_materialization_retains_additive_p4_identity_decimal_and_lineage_columns(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

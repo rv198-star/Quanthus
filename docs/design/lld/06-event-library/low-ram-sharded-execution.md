@@ -30,7 +30,8 @@ RAM alone. Dynamic Worker discovery and resource advertisement remain out of sco
 The parent Event Job owns one immutable input and one final accepted Run. Its heavy deterministic
 stages may create disjoint shard tasks:
 
-1. Direct-DWD physical projections use bounded date partitions and deterministic ordered merge.
+1. Direct-DWD physical projections use bounded date partitions and deterministic chronological
+   concatenation.
 2. Candidate decoding and per-security trigger evaluation use complete security-series buckets.
 3. All raw triggers return to one global isolation, concentration and split finalizer. These rules
    never execute independently inside a shard.
@@ -47,6 +48,17 @@ Direct-DWD output remains a Job-local TMP projection. Its shard plan must reprod
 projection's schema, row count, canonical row order, and every row value. Parquet byte identity is
 not a TMP contract because partition boundaries may change physical row groups. This exception does
 not apply to governed Event, Label, or Report packages, which remain byte-identical to U16.
+
+The versioned canonical-projection receipt binds the provider configuration, materializer version,
+scope, DWD Base and correction identities, DuckDB version, accepted U16 bundle identity, and
+provider lineage identity. Every TMP table records its actual physical SHA-256 in the provider
+identity. An exact canonical file SHA-256 is accepted directly. A physical mismatch is admitted
+only for the three large date-partitioned tables and only after a bounded one-thread scan matches
+the receipt's column-name/type digest, row count, whole-row hash XOR and sum, and physical-order
+weighted hash sum. The four smaller tables must remain byte-identical. Only a complete match may
+bind the accepted canonical bundle identity; missing, malformed, version-mismatched, reordered, or
+value-mismatched evidence fails closed. This avoids an expensive global Parquet rewrite while
+preventing Job-local row-group boundaries from becoming a strategy or ADM identity input.
 
 ## Evidence-first activation
 
@@ -98,6 +110,11 @@ Each Feature Panel shard opens the already-materialized provider under the gover
 through `2021-12-30`; the label panel may then materialize the separately authorized execution row
 through `2021-12-31`, matching the standard composite path without expanding decision authority.
 
+The parent assembles daily partitions in chronological task order with insertion order preserved
+and a 1 GB, one-thread DuckDB budget. It then applies the canonical-projection receipt before ADM
+construction. Shard Workers do not mint or select canonical identities, and the receipt does not
+authorize reuse of a projection across Jobs.
+
 The table and role are Event-specific. They do not admit arbitrary task kinds, cross-Job reuse,
 Worker registration, automatic resource advertisement, or a second queue transport. Stage TMP is
 removed after success or failure and never enters the sealed Event Run.
@@ -118,3 +135,10 @@ scope, CPU class, and storage path:
 If scaling misses 1.80, the implementation must report the measured serial, storage-contention,
 load-imbalance, merge, and coordination costs. The gate is not lowered to justify the design; the
 parallel topology remains unaccepted until the cause is removed or the approach is rejected.
+
+Governing implementation and contract paths are
+`src/quanthus/backtest/direct_dwd_provider.py`,
+`src/quanthus/backtest/historical_bundle.py`,
+`config/p4-direct-dwd-canonical-projection.v1.json`,
+`tests/unit/test_direct_dwd_provider_projection.py`, and
+`tests/unit/test_historical_replay_bundle.py`.

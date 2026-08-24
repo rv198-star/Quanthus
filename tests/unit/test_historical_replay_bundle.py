@@ -7,6 +7,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from quanthus.backtest import (
+    HistoricalReplayBundle,
     HistoricalReplayBundleError,
     load_historical_replay_bundle,
 )
@@ -131,6 +132,17 @@ class HistoricalReplayBundleTests(unittest.TestCase):
             first.partition_paths("trading_calendar"),
             (location / "datasets" / "trading_calendar" / "trading_calendar.parquet",),
         )
+
+        canonical_digest = "sha256:" + "f" * 64
+        rebound = HistoricalReplayBundle(
+            root=first.root,
+            snapshot=first.snapshot,
+            universe_policy_version=first.universe_policy_version,
+            datasets=first.datasets,
+            canonical_identity_digest=canonical_digest,
+        )
+        self.assertEqual(rebound.digest, canonical_digest)
+        self.assertEqual(rebound.physical_digest, first.digest)
 
     def test_missing_calendar_and_normalized_actions_fail_before_frame_read(self) -> None:
         location = self.publish(

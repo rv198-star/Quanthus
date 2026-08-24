@@ -13,12 +13,13 @@ import pyarrow.parquet as pq
 
 from quanthus.backtest.direct_dwd_provider import (
     DATASETS,
-    _copy,
+    _logical_table_digest,
     _materialize,
+    _validated_logical_digest,
     materialize_sharded_direct_dwd,
-    merge_direct_dwd_date_partitions,
 )
 from quanthus.event_library.sharded_batch import SHARDED_DWD_DAILY_DATASETS
+from quanthus.policy import ConfigurationError
 
 SSE = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
 
@@ -35,52 +36,79 @@ class DirectDwdProjectionTests(unittest.TestCase):
             },
         )
 
-    def test_merge_reconstitutes_canonical_row_groups_across_partitions(self) -> None:
+    def test_logical_digest_ignores_parquet_encoding_but_retains_row_order(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            paths = []
-            rows_per_partition = 40_000
-            for partition in range(3):
-                start = partition * rows_per_partition
-                path = root / f"part-{partition}.parquet"
-                pq.write_table(
-                    pa.table(
-                        {
-                            "security_id": [
-                                f"{index:06d}" for index in range(start, start + rows_per_partition)
-                            ],
-                            "date": [date(2012, 1, 4)] * rows_per_partition,
-                            "value": list(range(start, start + rows_per_partition)),
-                        }
-                    ),
-                    path,
-                    compression="zstd",
-                    row_group_size=50_000,
-                )
-                paths.append(path)
-
-            standard = root / "standard.parquet"
-            connection = duckdb.connect(":memory:")
-            try:
-                # Parameters cannot bind inside COPY, so use DuckDB's normalized path literals.
-                quoted = ",".join("'" + str(path).replace("'", "''") + "'" for path in paths)
-                _copy(
-                    connection,
-                    f"SELECT * FROM read_parquet([{quoted}]) ORDER BY date,security_id",
-                    standard,
-                )
-            finally:
-                connection.close()
-
-            merged = root / "merged.parquet"
-            merge_direct_dwd_date_partitions(
-                "daily_ohlcv_none",
-                tuple(str(path) for path in paths),
-                str(merged),
-                str(root / "spill"),
+            rows = [
+                {"security_id": f"{index:06d}", "date": date(2012, 1, 4), "value": index}
+                for index in range(1_000)
+            ]
+            canonical = root / "canonical.parquet"
+            alternate = root / "alternate.parquet"
+            reversed_path = root / "reversed.parquet"
+            alternate_type_path = root / "alternate-type.parquet"
+            table = pa.Table.from_pylist(rows)
+            pq.write_table(table, canonical, compression="zstd", row_group_size=100)
+            pq.write_table(table, alternate, compression="snappy", row_group_size=137)
+            pq.write_table(
+                table.set_column(
+                    table.schema.get_field_index("value"),
+                    "value",
+                    table["value"].cast(pa.int32()),
+                ),
+                alternate_type_path,
+                compression="snappy",
+                row_group_size=137,
+            )
+            pq.write_table(
+                pa.Table.from_pylist(list(reversed(rows))),
+                reversed_path,
+                compression="snappy",
+                row_group_size=137,
             )
 
-            self.assertEqual(merged.read_bytes(), standard.read_bytes())
+            self.assertNotEqual(canonical.read_bytes(), alternate.read_bytes())
+            self.assertEqual(
+                _logical_table_digest(canonical),
+                _logical_table_digest(alternate),
+            )
+            canonical_digest = _logical_table_digest(canonical)
+            reversed_digest = _logical_table_digest(reversed_path)
+            self.assertEqual(
+                canonical_digest["hash_xor_u64"], reversed_digest["hash_xor_u64"]
+            )
+            self.assertEqual(
+                canonical_digest["hash_sum_i128"], reversed_digest["hash_sum_i128"]
+            )
+            self.assertNotEqual(
+                canonical_digest["order_weighted_hash_sum_i128"],
+                reversed_digest["order_weighted_hash_sum_i128"],
+            )
+            self.assertNotEqual(
+                canonical_digest["columns_digest"],
+                _logical_table_digest(alternate_type_path)["columns_digest"],
+            )
+
+    def test_canonical_logical_receipt_is_strict_and_dataset_scoped(self) -> None:
+        valid = {
+            "algorithm": "duckdb-hash-order-v1",
+            "duckdb_version": "v1.5.5",
+            "columns_digest": "sha256:" + "a" * 64,
+            "column_count": 1,
+            "row_count": 1,
+            "hash_xor_u64": "1",
+            "hash_sum_i128": "1",
+            "order_weighted_hash_sum_i128": "1",
+        }
+        self.assertEqual(
+            _validated_logical_digest(valid, "daily_ohlcv_none"),
+            valid,
+        )
+        with self.assertRaisesRegex(ConfigurationError, "is invalid"):
+            _validated_logical_digest({**valid, "row_count": "1"}, "daily_ohlcv_none")
+        with self.assertRaisesRegex(ConfigurationError, "is not admitted"):
+            _validated_logical_digest(valid, "trading_calendar")
+        self.assertIsNone(_validated_logical_digest(None, "trading_calendar"))
 
     def test_materialization_retains_additive_p4_identity_decimal_and_lineage_columns(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

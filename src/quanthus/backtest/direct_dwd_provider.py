@@ -5,9 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
-import threading
 from collections.abc import Callable, Mapping
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -22,7 +22,7 @@ from quanthus.backtest.historical_frames import HistoricalReplayFrameReader
 from quanthus.contracts import SnapshotRef
 from quanthus.data_foundation import DatasetManifest
 from quanthus.industry_mapping import StaticIndustryMapping, load_static_industry_mapping
-from quanthus.policy import ConfigurationError
+from quanthus.policy import ConfigurationError, find_project_root
 
 MATERIALIZER_VERSION = "direct-dwd-job-local-v1"
 DUCKDB_MEMORY_LIMIT = "6GB"
@@ -49,11 +49,21 @@ _DAILY_MERGE_PRIORITY = (
     "daily_universe",
     "trading_calendar",
 )
-_DAILY_CANONICAL_ORDER = {
-    "daily_ohlcv_none": "date,security_id",
-    "daily_universe": "market_date,security_id",
-    "price_limit_execution_daily": "execution_date,security_id",
-    "trading_calendar": "trade_date,exchange",
+_CANONICAL_PROJECTION_RECEIPT = "config/p4-direct-dwd-canonical-projection.v1.json"
+_SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
+_NONNEGATIVE_INTEGER = re.compile(r"^(0|[1-9][0-9]*)$")
+_LOGICAL_PROJECTION_DATASETS = frozenset(
+    {"daily_ohlcv_none", "daily_universe", "price_limit_execution_daily"}
+)
+_LOGICAL_DIGEST_FIELDS = {
+    "algorithm",
+    "duckdb_version",
+    "columns_digest",
+    "column_count",
+    "row_count",
+    "hash_xor_u64",
+    "hash_sum_i128",
+    "order_weighted_hash_sum_i128",
 }
 
 
@@ -108,6 +118,97 @@ def _digest(value: object) -> str:
         "utf-8"
     )
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _logical_table_digest(path: Path) -> dict[str, Any]:
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise ConfigurationError("direct DWD logical validation requires duckdb") from exc
+    connection = duckdb.connect(":memory:")
+    try:
+        connection.execute("SET memory_limit='1GB'")
+        connection.execute("SET threads=1")
+        connection.execute("SET enable_progress_bar=false")
+        schema = tuple(
+            (str(row[0]), str(row[1]))
+            for row in connection.execute(
+                "DESCRIBE SELECT * FROM read_parquet(?)", [str(path.resolve())]
+            ).fetchall()
+        )
+        if not schema:
+            raise ConfigurationError("direct DWD logical validation found no columns")
+        columns = tuple(name for name, _ in schema)
+        arguments = ",".join('"' + column.replace('"', '""') + '"' for column in columns)
+        row = connection.execute(
+            f"""
+            SELECT count(*),
+                   CAST(bit_xor(row_hash) AS VARCHAR),
+                   CAST(sum(CAST(row_hash AS HUGEINT)) AS VARCHAR),
+                   CAST(sum(CAST(row_number AS HUGEINT) *
+                            CAST(row_hash AS HUGEINT)) AS VARCHAR)
+            FROM (
+              SELECT row_number() OVER () AS row_number,
+                     hash({arguments}) AS row_hash
+              FROM read_parquet(?)
+            )
+            """,
+            [str(path.resolve())],
+        ).fetchone()
+        version = connection.execute("SELECT version()").fetchone()
+    finally:
+        connection.close()
+    if row is None or version is None:
+        raise ConfigurationError("direct DWD logical validation returned no evidence")
+    return {
+        "algorithm": "duckdb-hash-order-v1",
+        "duckdb_version": str(version[0]),
+        "columns_digest": _digest(schema),
+        "column_count": len(columns),
+        "row_count": int(row[0]),
+        "hash_xor_u64": str(row[1]),
+        "hash_sum_i128": str(row[2]),
+        "order_weighted_hash_sum_i128": str(row[3]),
+    }
+
+
+def _validated_logical_digest(value: object, dataset: str) -> dict[str, Any] | None:
+    if dataset not in _LOGICAL_PROJECTION_DATASETS:
+        if value is not None:
+            raise ConfigurationError(
+                f"direct DWD canonical logical evidence is not admitted for {dataset}"
+            )
+        return None
+    if not isinstance(value, Mapping) or set(value) != _LOGICAL_DIGEST_FIELDS:
+        raise ConfigurationError(
+            f"direct DWD canonical logical evidence fields differ for {dataset}"
+        )
+    if (
+        value.get("algorithm") != "duckdb-hash-order-v1"
+        or not isinstance(value.get("duckdb_version"), str)
+        or not str(value["duckdb_version"]).strip()
+        or not isinstance(value.get("columns_digest"), str)
+        or not _SHA256.fullmatch(str(value["columns_digest"]))
+        or not isinstance(value.get("column_count"), int)
+        or isinstance(value.get("column_count"), bool)
+        or int(value["column_count"]) <= 0
+        or not isinstance(value.get("row_count"), int)
+        or isinstance(value.get("row_count"), bool)
+        or int(value["row_count"]) < 0
+        or any(
+            not isinstance(value.get(name), str)
+            or not _NONNEGATIVE_INTEGER.fullmatch(str(value[name]))
+            for name in (
+                "hash_xor_u64",
+                "hash_sum_i128",
+                "order_weighted_hash_sum_i128",
+            )
+        )
+    ):
+        raise ConfigurationError(
+            f"direct DWD canonical logical evidence is invalid for {dataset}"
+        )
+    return dict(value)
 
 
 def _sql_path(path: Path) -> str:
@@ -757,40 +858,6 @@ def _ordered_parquet_expression(paths: tuple[Path, ...]) -> str:
     return "read_parquet([" + ",".join(_sql_path(path) for path in paths) + "])"
 
 
-def _release_merge_cache_until_stopped(
-    spill: Path,
-    paths: tuple[Path, ...],
-    stop: threading.Event,
-    errors: list[Exception],
-    *,
-    interval_seconds: float,
-) -> None:
-    advice = getattr(os, "POSIX_FADV_DONTNEED", None)
-    advise = getattr(os, "posix_fadvise", None)
-    if advice is None or advise is None:
-        errors.append(ConfigurationError("direct DWD merge requires POSIX_FADV_DONTNEED"))
-        return
-    while not stop.wait(interval_seconds):
-        try:
-            files = tuple(path for path in spill.iterdir() if path.is_file()) + tuple(
-                path for path in paths if path.is_file()
-            )
-        except FileNotFoundError:
-            continue
-        try:
-            for path in files:
-                descriptor = os.open(path, os.O_RDONLY)
-                try:
-                    advise(descriptor, 0, 0, advice)
-                finally:
-                    os.close(descriptor)
-        except FileNotFoundError:
-            continue
-        except Exception as exc:
-            errors.append(exc)
-            return
-
-
 def merge_direct_dwd_date_partitions(
     dataset: str,
     paths: tuple[str, ...],
@@ -801,49 +868,20 @@ def merge_direct_dwd_date_partitions(
         import duckdb
     except ModuleNotFoundError as exc:
         raise ConfigurationError("direct DWD replay requires duckdb") from exc
-    order = _DAILY_CANONICAL_ORDER.get(dataset)
-    if order is None:
-        raise ConfigurationError("direct DWD shard merge dataset is not admitted")
     spill_path = Path(spill)
-    input_paths = tuple(Path(path) for path in paths)
-    output_path = Path(output)
     spill_path.mkdir()
     connection = duckdb.connect(":memory:")
-    spill_stop = threading.Event()
-    spill_errors: list[Exception] = []
-    spill_releaser: threading.Thread | None = None
     try:
-        connection.execute("SET memory_limit='512MB'")
+        connection.execute("SET memory_limit='1GB'")
         connection.execute("SET threads=1")
-        connection.execute("SET preserve_insertion_order=false")
+        connection.execute("SET preserve_insertion_order=true")
         connection.execute(f"SET temp_directory={_sql_path(spill_path)}")
-        spill_releaser = threading.Thread(
-            target=_release_merge_cache_until_stopped,
-            args=(spill_path, input_paths + (output_path,), spill_stop, spill_errors),
-            kwargs={"interval_seconds": 1.0},
-            daemon=True,
-            name="direct-dwd-merge-spill-cache-releaser",
+        _copy(
+            connection,
+            f"SELECT * FROM {_ordered_parquet_expression(tuple(Path(path) for path in paths))}",
+            Path(output),
         )
-        spill_releaser.start()
-        try:
-            _copy(
-                connection,
-                "SELECT * FROM "
-                f"{_ordered_parquet_expression(input_paths)} "
-                f"ORDER BY {order}",
-                output_path,
-            )
-        finally:
-            spill_stop.set()
-            spill_releaser.join()
-        if spill_errors:
-            raise ConfigurationError("direct DWD merge spill cache release failed") from (
-                spill_errors[0]
-            )
     finally:
-        spill_stop.set()
-        if spill_releaser is not None and spill_releaser.is_alive():
-            spill_releaser.join()
         connection.close()
         shutil.rmtree(spill_path, ignore_errors=True)
     return dataset
@@ -1118,6 +1156,138 @@ def _direct_dwd_authority(
     return actual_dwd, actual_correction, correction_manifest
 
 
+def _bind_canonical_projection_identity(
+    config: Any,
+    *,
+    physical_bundle: HistoricalReplayBundle,
+    files: Mapping[str, str],
+    counts: Mapping[str, int],
+    actual_dwd: Mapping[str, Any],
+    actual_correction: Mapping[str, Any],
+) -> tuple[HistoricalReplayBundle, str, str]:
+    receipt_path = find_project_root() / _CANONICAL_PROJECTION_RECEIPT
+    receipt = _object(receipt_path, "direct DWD canonical projection receipt")
+    expected_fields = {
+        "schema_version",
+        "receipt_id",
+        "provider_config_digest",
+        "materializer_version",
+        "history_start",
+        "scope",
+        "dwd_authority",
+        "dwd_correction",
+        "canonical_bundle_digest",
+        "provider_lineage_digest",
+        "datasets",
+    }
+    if set(receipt) != expected_fields or receipt.get("schema_version") != (
+        "quanthus.direct-dwd-canonical-projection.v1"
+    ):
+        raise ConfigurationError("direct DWD canonical projection receipt fields differ")
+    receipt_id = receipt.get("receipt_id")
+    if not isinstance(receipt_id, str) or not receipt_id.strip():
+        raise ConfigurationError("direct DWD canonical projection receipt id is invalid")
+    bindings = {
+        "provider_config_digest": config.digest,
+        "materializer_version": MATERIALIZER_VERSION,
+        "history_start": config.history_start.isoformat(),
+        "scope": config.scope.to_dict(),
+        "dwd_authority": dict(actual_dwd),
+        "dwd_correction": dict(actual_correction),
+    }
+    if any(receipt.get(name) != value for name, value in bindings.items()):
+        raise ConfigurationError("direct DWD canonical projection receipt binding differs")
+    raw_datasets = receipt.get("datasets")
+    if not isinstance(raw_datasets, Mapping) or set(raw_datasets) != set(DATASETS):
+        raise ConfigurationError("direct DWD canonical projection receipt datasets differ")
+
+    canonical_manifests: list[DatasetManifest] = []
+    for manifest in physical_bundle.datasets:
+        evidence = raw_datasets.get(manifest.dataset)
+        if not isinstance(evidence, Mapping) or set(evidence) != {
+            "row_count",
+            "canonical_file_sha256",
+            "canonical_file_bytes",
+            "logical_digest",
+        }:
+            raise ConfigurationError(
+                f"direct DWD canonical evidence fields differ for {manifest.dataset}"
+            )
+        canonical_sha = evidence.get("canonical_file_sha256")
+        expected_rows = evidence.get("row_count")
+        canonical_bytes = evidence.get("canonical_file_bytes")
+        if (
+            not isinstance(canonical_sha, str)
+            or not _SHA256.fullmatch(canonical_sha)
+            or not isinstance(expected_rows, int)
+            or isinstance(expected_rows, bool)
+            or expected_rows != counts[manifest.dataset]
+            or not isinstance(canonical_bytes, int)
+            or isinstance(canonical_bytes, bool)
+            or canonical_bytes <= 0
+        ):
+            raise ConfigurationError(
+                f"direct DWD canonical evidence is invalid for {manifest.dataset}"
+            )
+        expected_logical = _validated_logical_digest(
+            evidence.get("logical_digest"), manifest.dataset
+        )
+        if files[manifest.dataset] != canonical_sha and (
+            expected_logical is None
+            or (
+                _logical_table_digest(
+                    physical_bundle.root / "tables" / f"{manifest.dataset}.parquet"
+                )
+                != expected_logical
+            )
+        ):
+            raise ConfigurationError(
+                f"direct DWD logical projection differs for {manifest.dataset}"
+            )
+        canonical_manifests.append(
+            DatasetManifest(
+                dataset=manifest.dataset,
+                version=manifest.version,
+                source_revisions=manifest.source_revisions,
+                row_count=manifest.row_count,
+                partitions=manifest.partitions,
+                schema_hash=canonical_sha,
+                content_checksums={manifest.partitions[0]: canonical_sha},
+                created_at=manifest.created_at,
+                knowledge_cutoff=manifest.knowledge_cutoff,
+                parent_manifest_ids=manifest.parent_manifest_ids,
+            )
+        )
+
+    canonical_bundle = HistoricalReplayBundle(
+        root=physical_bundle.root,
+        snapshot=physical_bundle.snapshot,
+        universe_policy_version=physical_bundle.universe_policy_version,
+        datasets=tuple(canonical_manifests),
+    )
+    expected_bundle_digest = receipt.get("canonical_bundle_digest")
+    expected_lineage_digest = receipt.get("provider_lineage_digest")
+    if (
+        not isinstance(expected_bundle_digest, str)
+        or not _SHA256.fullmatch(expected_bundle_digest)
+        or canonical_bundle.digest != expected_bundle_digest
+        or not isinstance(expected_lineage_digest, str)
+        or not _SHA256.fullmatch(expected_lineage_digest)
+    ):
+        raise ConfigurationError("direct DWD canonical projection identity differs")
+    return (
+        HistoricalReplayBundle(
+            root=physical_bundle.root,
+            snapshot=physical_bundle.snapshot,
+            universe_policy_version=physical_bundle.universe_policy_version,
+            datasets=physical_bundle.datasets,
+            canonical_identity_digest=expected_bundle_digest,
+        ),
+        expected_lineage_digest,
+        _sha256(receipt_path),
+    )
+
+
 def _materialized_direct_dwd_session(
     config: Any,
     *,
@@ -1169,11 +1339,21 @@ def _materialized_direct_dwd_session(
         )
         for name in DATASETS
     )
-    bundle = HistoricalReplayBundle(
+    physical_bundle = HistoricalReplayBundle(
         root=root,
         snapshot=snapshot,
         universe_policy_version="dwd-current-listing-state-v1",
         datasets=manifests,
+    )
+    bundle, expected_lineage_digest, canonical_receipt_sha256 = (
+        _bind_canonical_projection_identity(
+            config,
+            physical_bundle=physical_bundle,
+            files=files,
+            counts=counts,
+            actual_dwd=actual_dwd,
+            actual_correction=actual_correction,
+        )
     )
     materialized_content_digest = bundle.digest
     lineage = {
@@ -1185,6 +1365,9 @@ def _materialized_direct_dwd_session(
         "industry_sha256": config.industry_sha256,
         "materialized_content_digest": materialized_content_digest,
     }
+    provider_lineage_digest = _digest(lineage)
+    if provider_lineage_digest != expected_lineage_digest:
+        raise ConfigurationError("direct DWD canonical provider lineage differs")
     identity = {
         "provider_id": config.provider_id,
         "provider_version": config.provider_version,
@@ -1201,7 +1384,9 @@ def _materialized_direct_dwd_session(
         "history_start": config.history_start.isoformat(),
         "materialized_rows": dict(counts),
         "materialized_content_digest": materialized_content_digest,
-        "provider_lineage_digest": _digest(lineage),
+        "materialized_physical_digest": physical_bundle.physical_digest,
+        "canonical_projection_receipt_sha256": canonical_receipt_sha256,
+        "provider_lineage_digest": provider_lineage_digest,
         "point_in_time": {
             "strategy_cutoff_enforced": True,
             "decision_at_close_execution_at_next_open": True,

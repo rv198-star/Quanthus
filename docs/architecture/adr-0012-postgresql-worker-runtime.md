@@ -74,6 +74,20 @@ This second Worker kind does not introduce a registry, resource classes, dynamic
 Redis/Celery/RabbitMQ, or another scheduler. PostgreSQL remains the queue authority and the same
 lease, cancellation, stale-generation, immutable-Run, and recovery contracts apply.
 
+#### PERF-SHARD named extension: bounded Event subjobs
+
+`PERF-SHARD-001` / Issue #202 permits the static Event Worker to delegate four admitted internal
+stage types to profile-gated 3 GiB Event Shard Workers. The parent Event Worker remains concurrency
+one and retains the Job lease, global semantics, verification, and exactly-one Run publication.
+PostgreSQL table `platform_job_shards` is an Event-specific leasing extension; each shard binds the
+parent claim generation and has an independent lease generation so a stale parent or shard cannot
+publish.
+
+The deployment statically selects zero through four shard units. It does not discover nodes,
+advertise resources, route arbitrary task kinds, or establish a general multi-Worker platform.
+Redis, Celery, a Worker registry, dynamic scheduling, and cross-Job cache remain rejected. This
+extension is accepted only if the frozen S3x2 scaling, resource, and byte-identity gates pass.
+
 ### 4. Lease at least once; publish exactly one accepted result
 
 Queue execution is at least once. A claim records `claimed_by`, a monotonically increasing

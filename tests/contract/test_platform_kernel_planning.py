@@ -294,22 +294,34 @@ def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:
     assert "traefik.http.routers.quanthus.tls.certresolver=letsencrypt" in compose
     assert "traefik.http.services.quanthus-web.loadbalancer.server.port=3100" in compose
     assert compose.count("traefik.enable=true") == 1
-    assert compose.count("restart: unless-stopped") == 5
+    assert compose.count("restart: unless-stopped") == 6
+    assert 'profiles: ["event-shards"]' in compose
+    assert "  event-shard-worker:" in compose
+    assert compose.count("mem_limit: 3g") == 1
+    assert compose.count("memswap_limit: 3g") == 1
 
     postgres = compose.split("  postgres:", 1)[1].split("\n  api:", 1)[0]
     api = compose.split("  api:", 1)[1].split("\n  replay-worker:", 1)[0]
     replay_worker = compose.split("  replay-worker:", 1)[1].split("\n  event-worker:", 1)[0]
-    event_worker = compose.split("  event-worker:", 1)[1].split("\n  web:", 1)[0]
+    event_worker = compose.split("  event-worker:", 1)[1].split(
+        "\n  event-shard-worker:", 1
+    )[0]
+    event_shard_worker = compose.split("  event-shard-worker:", 1)[1].split(
+        "\n  web:", 1
+    )[0]
     assert "ports:" not in postgres
     assert "ports:" not in replay_worker
     assert "ports:" not in event_worker
+    assert "ports:" not in event_shard_worker
     assert "traefik-net" not in postgres
     assert "traefik-net" not in api
     assert "traefik-net" not in replay_worker
     assert "traefik-net" not in event_worker
+    assert "traefik-net" not in event_shard_worker
     assert "QUANTHUS_EVENT_RUN_ROOT: /data/event-runs" in event_worker
     assert "quanthus-event-runs:/data/event-runs" in event_worker
     assert event_worker.count(":ro") == 3
+    assert event_shard_worker.count(":ro") == 3
     assert "/dwd-base-202607-v2.1:ro" in event_worker
     assert "correction-20260813-001:ro" in event_worker
     assert "mem_limit: 16g" in replay_worker

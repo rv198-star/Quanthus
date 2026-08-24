@@ -33,8 +33,10 @@ from quanthus.event_library.scan import (
     CandidateEntryEvidence,
     CandidateReason,
     CandidateScanResult,
+    CandidateScanShard,
     EntryPartitionResult,
     ScannedCandidate,
+    finalize_candidate_scan_shards,
     partition_executable_entries,
     scan_forward_candidate_series,
 )
@@ -864,6 +866,111 @@ def materialize_p4_research_adm(
     )
 
 
+def load_p4_research_adm(adm_root: Path, *, project_root: Path | None = None) -> P4ResearchADM:
+    """Restore and minimally verify a generation-bound P4 Research ADM."""
+
+    root = adm_root.resolve()
+    manifest_path = root / "adm.json"
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PhysicalEventScanError("P4 Research ADM manifest is unreadable") from exc
+    if not isinstance(raw, dict):
+        raise PhysicalEventScanError("P4 Research ADM manifest must be an object")
+    candidate = raw.get("candidate_projection")
+    industry = raw.get("static_industry_projection")
+    dates = raw.get("trading_dates")
+    if (
+        not isinstance(candidate, dict)
+        or not isinstance(industry, dict)
+        or not isinstance(dates, dict)
+    ):
+        raise PhysicalEventScanError("P4 Research ADM manifest bindings are incomplete")
+    project = find_project_root(manifest_path) if project_root is None else project_root.resolve()
+    policy = load_p4_research_adm_policy(project / "config/p4-research-adm.v1.json")
+    candidate_path = root / _safe_relative(candidate.get("path"))
+    if candidate_path.is_symlink() or not candidate_path.is_file():
+        raise PhysicalEventScanError("P4 Research ADM candidate projection is missing")
+    if _sha256(candidate_path) != candidate.get("sha256"):
+        raise PhysicalEventScanError("P4 Research ADM candidate projection checksum differs")
+    mapping = load_static_industry_mapping(
+        root / _safe_relative(industry.get("path")),
+        expected_version=str(industry.get("mapping_version")),
+    )
+    first = date.fromisoformat(str(dates.get("first")))
+    last = date.fromisoformat(str(dates.get("last")))
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise PhysicalEventScanError("P4 physical scan requires duckdb") from exc
+    connection = duckdb.connect(":memory:")
+    try:
+        raw_dates = connection.execute(
+            "SELECT DISTINCT session_date FROM read_parquet(?) ORDER BY session_date",
+            [str(candidate_path)],
+        ).fetchall()
+    finally:
+        connection.close()
+    trading_dates = tuple(item[0] for item in raw_dates)
+    if (
+        not trading_dates
+        or trading_dates[0] != first
+        or trading_dates[-1] != last
+        or len(trading_dates) != int(dates.get("count", -1))
+    ):
+        raise PhysicalEventScanError("P4 Research ADM trading dates differ")
+    content_digest = str(raw.get("content_digest"))
+    return P4ResearchADM(
+        root=root,
+        policy=policy,
+        candidate_path=candidate_path,
+        industry_mapping=mapping,
+        manifest_path=manifest_path,
+        manifest_sha256=_sha256(manifest_path),
+        content_digest=content_digest,
+        snapshot_id=f"p4-adm-development-{content_digest.removeprefix('sha256:')[:24]}",
+        trading_dates=trading_dates,
+        row_count=int(candidate["row_count"]),
+    )
+
+
+def plan_candidate_security_buckets(
+    projection: P4ResearchADM, workers: int
+) -> tuple[tuple[str, ...], ...]:
+    """Plan deterministic LPT buckets over complete security series."""
+
+    if workers not in {1, 2, 3, 4}:
+        raise PhysicalEventScanError("candidate shard workers must be between one and four")
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise PhysicalEventScanError("P4 physical scan requires duckdb") from exc
+    connection = duckdb.connect(":memory:")
+    try:
+        weighted = tuple(
+            (str(row[0]), int(row[1]))
+            for row in connection.execute(
+                """
+                SELECT dwd_security_id, count(*) AS row_count
+                FROM read_parquet(?) GROUP BY dwd_security_id
+                ORDER BY row_count DESC, dwd_security_id
+                """,
+                [str(projection.candidate_path)],
+            ).fetchall()
+        )
+    finally:
+        connection.close()
+    if workers > len(weighted):
+        raise PhysicalEventScanError("candidate shard count exceeds security count")
+    buckets: list[list[str]] = [[] for _ in range(workers)]
+    weights = [0] * workers
+    for security_id, row_count in weighted:
+        selected = min(range(workers), key=lambda index: (weights[index], index))
+        buckets[selected].append(security_id)
+        weights[selected] += row_count
+    return tuple(tuple(sorted(bucket)) for bucket in buckets)
+
+
 # Compatibility alias for callers created before the P4 Research ADM boundary was named.
 materialize_event_candidate_projection = materialize_p4_research_adm
 
@@ -1355,6 +1462,57 @@ def scan_event_candidate_projection(
             },
         )
     return scan, entries
+
+
+def publish_event_candidate_shards(
+    *,
+    projection: P4ResearchADM,
+    reader: HistoricalReplayFrameReader,
+    source_policy: EventScanSourcePolicy,
+    card: CandidateRuleCard,
+    split_policy: SplitPolicy,
+    shards: Sequence[CandidateScanShard],
+    staging: Path,
+    output: Path,
+    code_revision: str,
+) -> PhysicalEventScanResult:
+    """Finalize disjoint scan shards, bind T+1 evidence, and publish the normal package."""
+
+    scan = finalize_candidate_scan_shards(
+        shards,
+        trading_dates=projection.trading_dates,
+        snapshot_id=projection.snapshot_id,
+        snapshot_manifest_digest=projection.manifest_sha256,
+        card=card,
+        split_policy=split_policy,
+        source_policy=source_policy,
+    )
+    missing_industry = int(
+        scan.counters.reason_counts.get(CandidateReason.STATIC_INDUSTRY_MISSING.value, 0)
+    )
+    if missing_industry:
+        raise PhysicalEventScanError(
+            f"P4 static industry projection is incomplete: missing={missing_industry}"
+        )
+    entries = partition_executable_entries(
+        scan.candidates,
+        evidence_by_event_id=_entry_bindings(
+            scan.candidates,
+            reader,
+            candidate_snapshot_id=projection.snapshot_id,
+        ),
+    )
+    return _publish_package(
+        staging,
+        output=output,
+        source_policy=source_policy,
+        card=card,
+        split_policy=split_policy,
+        projection=projection,
+        scan=scan,
+        entries=entries,
+        code_revision=code_revision,
+    )
 
 
 def _event_rows(scan: CandidateScanResult) -> tuple[dict[str, Any], ...]:

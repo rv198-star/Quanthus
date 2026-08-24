@@ -531,6 +531,7 @@ class EventWorker:
         lease_seconds: int,
         renew_seconds: float,
         terminate_seconds: float,
+        shard_target: int = 0,
     ) -> None:
         self.store = store
         self.worker_id = worker_id
@@ -538,6 +539,9 @@ class EventWorker:
         self.lease_seconds = lease_seconds
         self.renew_seconds = renew_seconds
         self.terminate_seconds = terminate_seconds
+        if shard_target not in {0, 1, 2, 3, 4}:
+            raise ValueError("Event shard target must be between zero and four")
+        self.shard_target = shard_target
         self.stopping = False
 
     def run_once(self) -> bool:
@@ -562,6 +566,12 @@ class EventWorker:
             )
         except Exception as exc:
             reason = f"event_worker_error:{type(exc).__name__}:{exc}"[:500]
+            if self.shard_target:
+                try:
+                    self.store.cancel_job_shards(job.job_id, job.claim_generation)
+                except RuntimeError as stale:
+                    if str(stale) != "stale_claim_generation":
+                        raise
             try:
                 self.store.finish_claimed_job(
                     job.job_id,
@@ -628,11 +638,15 @@ class EventWorker:
         report_root = staging / "comparison-report"
         runtime_path = staging / "runtime-metrics.json"
         progress_path = staging / "progress.json"
-        command = (
+        command: tuple[str, ...] = (
             sys.executable,
             "-m",
-            "quanthus",
-            "run-p4-reported-event-scan",
+            (
+                "quanthus.event_library.sharded_batch"
+                if self.shard_target
+                else "quanthus"
+            ),
+            *(("run-p4-reported-event-scan",) if not self.shard_target else ()),
             "--source-policy",
             governed["source_policy"],
             "--provider-config",
@@ -662,6 +676,15 @@ class EventWorker:
             "--code-revision",
             governed["code_revision"],
         )
+        if self.shard_target:
+            command += (
+                "--job-id",
+                job_id,
+                "--parent-generation",
+                str(generation),
+                "--shard-target",
+                str(self.shard_target),
+            )
         self.store.update_claimed_job(
             job_id,
             generation,
@@ -849,6 +872,7 @@ def main(argv: list[str] | None = None) -> int:
         lease_seconds=args.lease_seconds,
         renew_seconds=args.renew_seconds,
         terminate_seconds=args.terminate_seconds,
+        shard_target=int(os.environ.get("QUANTHUS_EVENT_SHARD_TARGET", "0")),
     )
 
     def stop(_signum: int, _frame: object) -> None:

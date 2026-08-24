@@ -268,6 +268,7 @@ class BaselineResearchTests(unittest.TestCase):
             provider_config_digest="sha256:" + "5" * 64,
             parquet_bytes=full.path.stat().st_size,
         )
+        self.assertEqual(JobLocalFeaturePanel.from_receipt(shared.to_receipt()), shared)
 
         import duckdb
 

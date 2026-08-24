@@ -105,6 +105,28 @@ class JobRecord:
 
 
 @dataclass(frozen=True)
+class JobShardRecord:
+    parent_job_id: str
+    parent_claim_generation: int
+    shard_id: str
+    stage: str
+    ordinal: int
+    payload: dict[str, Any]
+    input_digest: str
+    state: str
+    attempt: int
+    result_ref: dict[str, Any] | None
+    error_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    available_at: datetime
+    claimed_by: str | None = None
+    claim_generation: int = 0
+    lease_expires_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class CandidateRunRecord:
     run_id: str
     job_id: str

@@ -18,6 +18,7 @@ from quanthus.event_library.scan import (
     CandidateEntryEvidence,
     CandidateReason,
     CandidateScanError,
+    CandidateScanShard,
     EntryStatus,
     finalize_candidate_scan_shards,
     partition_executable_entries,
@@ -419,6 +420,29 @@ class EventForwardScanTests(unittest.TestCase):
         )
 
         self.assertEqual(observed, expected)
+
+        restored = tuple(CandidateScanShard.from_dict(item.to_dict()) for item in shards)
+        self.assertEqual(restored, shards)
+
+        overlapping = (
+            shards[0],
+            replace(
+                shards[1],
+                security_ids=tuple(
+                    sorted(set(shards[0].security_ids + shards[1].security_ids))
+                ),
+            ),
+        )
+        with self.assertRaisesRegex(CandidateScanError, "overlap security ownership"):
+            finalize_candidate_scan_shards(
+                overlapping,
+                trading_dates=TRADING_DATES,
+                snapshot_id=SNAPSHOT_ID,
+                snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+                card=CARD,
+                split_policy=SPLIT,
+                source_policy=SOURCE,
+            )
 
     def test_streaming_scan_reports_decode_scan_and_finalization_progress(self) -> None:
         rows = tuple(_series("600011", signal_indices=(43, 80)))

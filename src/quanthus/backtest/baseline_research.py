@@ -1182,11 +1182,17 @@ class BaselineFeaturePanel:
         data_content_digest: str | None = None,
         data_manifest_sha256: str | None = None,
         allowed_security_ids: Sequence[str] | None = None,
+        duckdb_memory_limit: str = FEATURE_DUCKDB_MEMORY_LIMIT,
+        duckdb_threads: int = 2,
     ) -> BaselineFeaturePanelArtifact:
         """Materialize the PIT panel without loading a second in-memory query copy."""
 
         if scope_start > scope_end:
             raise BaselineResearchError("scope_start must not follow scope_end")
+        if duckdb_memory_limit not in {"1500MB", FEATURE_DUCKDB_MEMORY_LIMIT}:
+            raise BaselineResearchError("feature panel DuckDB memory limit is not admitted")
+        if duckdb_threads not in {1, 2}:
+            raise BaselineResearchError("feature panel DuckDB threads are not admitted")
         selected_security_ids: tuple[str, ...] | None = None
         if allowed_security_ids is not None:
             selected_security_ids = tuple(sorted(allowed_security_ids))
@@ -1240,8 +1246,8 @@ class BaselineFeaturePanel:
         connection = duckdb.connect(":memory:")
         try:
             spill.mkdir()
-            connection.execute(f"SET memory_limit='{FEATURE_DUCKDB_MEMORY_LIMIT}'")
-            connection.execute("SET threads=2")
+            connection.execute(f"SET memory_limit='{duckdb_memory_limit}'")
+            connection.execute(f"SET threads={duckdb_threads}")
             connection.execute("SET preserve_insertion_order=false")
             connection.execute(f"SET temp_directory={_sql_string(str(spill))}")
             _create_feature_source_views(

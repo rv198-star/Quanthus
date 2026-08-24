@@ -69,6 +69,7 @@ def test_postgres_adapter_migration_contract_is_ordered_locked_and_idempotent() 
         "jobs-0002-lean-worker",
         "jobs-0003-candidate-runs",
         "jobs-0004-expert-evaluation-runs",
+        "jobs-0005-event-shards",
     )
     assert store.migrate(("identity", "jobs")) == ()
     assert store.ready() is True
@@ -90,5 +91,6 @@ def test_postgres_adapter_migration_contract_is_ordered_locked_and_idempotent() 
         ("jobs", "jobs-0002-lean-worker"),
         ("jobs", "jobs-0003-candidate-runs"),
         ("jobs", "jobs-0004-expert-evaluation-runs"),
+        ("jobs", "jobs-0005-event-shards"),
     }
     assert all(connection.committed for connection in connections)

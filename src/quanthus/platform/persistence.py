@@ -17,6 +17,7 @@ from quanthus.platform.models import (
     CandidateRunRecord,
     ExpertEvaluationRunRecord,
     JobRecord,
+    JobShardRecord,
     SecurityAuditRecord,
     SessionRecord,
     UserRecord,
@@ -102,6 +103,45 @@ class PlatformStore(Protocol):
         result_ref: dict[str, Any] | None,
         error_reason: str | None,
     ) -> JobRecord: ...
+
+    def create_job_shards(
+        self,
+        parent_job_id: str,
+        parent_claim_generation: int,
+        shards: tuple[JobShardRecord, ...],
+    ) -> tuple[JobShardRecord, ...]: ...
+
+    def list_job_shards(
+        self, parent_job_id: str, stage: str | None = None
+    ) -> tuple[JobShardRecord, ...]: ...
+
+    def claim_job_shard(
+        self, worker_id: str, lease_seconds: int
+    ) -> JobShardRecord | None: ...
+
+    def renew_job_shard_lease(
+        self,
+        parent_job_id: str,
+        shard_id: str,
+        claim_generation: int,
+        worker_id: str,
+        lease_seconds: int,
+    ) -> bool: ...
+
+    def finish_job_shard(
+        self,
+        parent_job_id: str,
+        shard_id: str,
+        claim_generation: int,
+        *,
+        state: str,
+        result_ref: dict[str, Any] | None,
+        error_reason: str | None,
+    ) -> JobShardRecord: ...
+
+    def cancel_job_shards(
+        self, parent_job_id: str, parent_claim_generation: int
+    ) -> int: ...
 
     def candidate_active_runs(self) -> tuple[CandidateActiveRunRecord, ...]: ...
 
@@ -431,6 +471,55 @@ class InMemoryPlatformStore:
     ) -> JobRecord:
         del job_id, claim_generation, state, result_ref, error_reason
         raise RuntimeError("worker completion requires PostgreSQL")
+
+    def create_job_shards(
+        self,
+        parent_job_id: str,
+        parent_claim_generation: int,
+        shards: tuple[JobShardRecord, ...],
+    ) -> tuple[JobShardRecord, ...]:
+        del parent_job_id, parent_claim_generation, shards
+        raise RuntimeError("Job shard creation requires PostgreSQL")
+
+    def list_job_shards(
+        self, parent_job_id: str, stage: str | None = None
+    ) -> tuple[JobShardRecord, ...]:
+        del parent_job_id, stage
+        raise RuntimeError("Job shard reads require PostgreSQL")
+
+    def claim_job_shard(self, worker_id: str, lease_seconds: int) -> JobShardRecord | None:
+        del worker_id, lease_seconds
+        raise RuntimeError("Job shard claims require PostgreSQL")
+
+    def renew_job_shard_lease(
+        self,
+        parent_job_id: str,
+        shard_id: str,
+        claim_generation: int,
+        worker_id: str,
+        lease_seconds: int,
+    ) -> bool:
+        del parent_job_id, shard_id, claim_generation, worker_id, lease_seconds
+        raise RuntimeError("Job shard leases require PostgreSQL")
+
+    def finish_job_shard(
+        self,
+        parent_job_id: str,
+        shard_id: str,
+        claim_generation: int,
+        *,
+        state: str,
+        result_ref: dict[str, Any] | None,
+        error_reason: str | None,
+    ) -> JobShardRecord:
+        del parent_job_id, shard_id, claim_generation, state, result_ref, error_reason
+        raise RuntimeError("Job shard completion requires PostgreSQL")
+
+    def cancel_job_shards(
+        self, parent_job_id: str, parent_claim_generation: int
+    ) -> int:
+        del parent_job_id, parent_claim_generation
+        raise RuntimeError("Job shard cancellation requires PostgreSQL")
 
     def candidate_active_runs(self) -> tuple[CandidateActiveRunRecord, ...]:
         with self._lock:
@@ -1199,6 +1288,324 @@ class PostgresPlatformStore:
             if observed is None:
                 raise RuntimeError("stale_claim_generation")
             return observed
+
+    @staticmethod
+    def _job_shard(row: dict[str, Any] | None) -> JobShardRecord | None:
+        return JobShardRecord(**row) if row else None
+
+    def create_job_shards(
+        self,
+        parent_job_id: str,
+        parent_claim_generation: int,
+        shards: tuple[JobShardRecord, ...],
+    ) -> tuple[JobShardRecord, ...]:
+        if not shards:
+            raise ValueError("at least one Job shard is required")
+        identities = [(item.shard_id, item.stage, item.ordinal) for item in shards]
+        if (
+            any(item.parent_job_id != parent_job_id for item in shards)
+            or any(
+                item.parent_claim_generation != parent_claim_generation for item in shards
+            )
+            or len({item[0] for item in identities}) != len(identities)
+            or len({(item[1], item[2]) for item in identities}) != len(identities)
+            or any(item.state != "queued" for item in shards)
+        ):
+            raise ValueError("Job shard plan is invalid")
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT job_id FROM platform_jobs
+                WHERE job_id = %s AND claim_generation = %s AND state = 'running'
+                FOR UPDATE
+                """,
+                (parent_job_id, parent_claim_generation),
+            )
+            if cursor.fetchone() is None:
+                raise RuntimeError("stale_claim_generation")
+            for shard in shards:
+                cursor.execute(
+                    """
+                    INSERT INTO platform_job_shards
+                        (parent_job_id, parent_claim_generation, shard_id, stage, ordinal,
+                         payload, input_digest,
+                         state, attempt, result_ref, error_reason, created_at, updated_at,
+                         available_at, claimed_by, claim_generation, lease_expires_at,
+                         completed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s::jsonb, %s,
+                            %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (parent_job_id, shard_id) DO UPDATE SET
+                        parent_claim_generation = EXCLUDED.parent_claim_generation,
+                        stage = EXCLUDED.stage,
+                        ordinal = EXCLUDED.ordinal,
+                        payload = EXCLUDED.payload,
+                        input_digest = EXCLUDED.input_digest,
+                        state = 'queued',
+                        attempt = 0,
+                        result_ref = NULL,
+                        error_reason = NULL,
+                        updated_at = EXCLUDED.updated_at,
+                        available_at = EXCLUDED.available_at,
+                        claimed_by = NULL,
+                        claim_generation = platform_job_shards.claim_generation + 1,
+                        lease_expires_at = NULL,
+                        completed_at = NULL
+                    WHERE platform_job_shards.parent_claim_generation
+                          < EXCLUDED.parent_claim_generation
+                    """,
+                    (
+                        shard.parent_job_id,
+                        shard.parent_claim_generation,
+                        shard.shard_id,
+                        shard.stage,
+                        shard.ordinal,
+                        json.dumps(shard.payload, ensure_ascii=True, sort_keys=True),
+                        shard.input_digest,
+                        shard.state,
+                        shard.attempt,
+                        json.dumps(shard.result_ref, ensure_ascii=True, sort_keys=True)
+                        if shard.result_ref is not None
+                        else None,
+                        shard.error_reason,
+                        shard.created_at,
+                        shard.updated_at,
+                        shard.available_at,
+                        shard.claimed_by,
+                        shard.claim_generation,
+                        shard.lease_expires_at,
+                        shard.completed_at,
+                    ),
+                )
+            cursor.execute(
+                """
+                SELECT * FROM platform_job_shards
+                WHERE parent_job_id = %s AND shard_id = ANY(%s)
+                ORDER BY stage, ordinal, shard_id
+                """,
+                (parent_job_id, [item.shard_id for item in shards]),
+            )
+            observed = tuple(
+                self._job_shard(row) for row in cursor.fetchall()
+            )
+            by_id = {item.shard_id: item for item in observed if item is not None}
+            for expected in shards:
+                actual = by_id.get(expected.shard_id)
+                if actual is None or (
+                    actual.parent_claim_generation,
+                    actual.stage,
+                    actual.ordinal,
+                    actual.payload,
+                    actual.input_digest,
+                ) != (
+                    expected.parent_claim_generation,
+                    expected.stage,
+                    expected.ordinal,
+                    expected.payload,
+                    expected.input_digest,
+                ):
+                    raise IdempotencyConflictError("Job shard identity differs")
+            return tuple(by_id[item.shard_id] for item in shards)
+
+    def list_job_shards(
+        self, parent_job_id: str, stage: str | None = None
+    ) -> tuple[JobShardRecord, ...]:
+        with self._connect() as connection, connection.cursor() as cursor:
+            if stage is None:
+                cursor.execute(
+                    """
+                    SELECT * FROM platform_job_shards
+                    WHERE parent_job_id = %s
+                    ORDER BY stage, ordinal, shard_id
+                    """,
+                    (parent_job_id,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT * FROM platform_job_shards
+                    WHERE parent_job_id = %s AND stage = %s
+                    ORDER BY ordinal, shard_id
+                    """,
+                    (parent_job_id, stage),
+                )
+            shards = tuple(self._job_shard(row) for row in cursor.fetchall())
+            if any(item is None for item in shards):
+                raise RuntimeError("PostgreSQL returned an empty Job shard row")
+            return tuple(item for item in shards if item is not None)
+
+    def claim_job_shard(
+        self, worker_id: str, lease_seconds: int
+    ) -> JobShardRecord | None:
+        if lease_seconds < 1:
+            raise ValueError("lease_seconds must be positive")
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH candidate AS (
+                    SELECT shard.parent_job_id, shard.shard_id
+                    FROM platform_job_shards AS shard
+                    JOIN platform_jobs AS parent
+                      ON parent.job_id = shard.parent_job_id
+                    WHERE parent.state = 'running'
+                      AND parent.claim_generation = shard.parent_claim_generation
+                      AND parent.cancel_requested = FALSE
+                      AND (
+                        (shard.state = 'queued' AND shard.available_at <= CURRENT_TIMESTAMP)
+                        OR (
+                          shard.state = 'running'
+                          AND shard.lease_expires_at < CURRENT_TIMESTAMP
+                        )
+                      )
+                    ORDER BY shard.available_at, parent.created_at,
+                             shard.stage, shard.ordinal, shard.shard_id
+                    FOR UPDATE OF shard SKIP LOCKED
+                    LIMIT 1
+                )
+                UPDATE platform_job_shards AS shard SET
+                    state = 'running',
+                    claimed_by = %s,
+                    claim_generation = shard.claim_generation + 1,
+                    lease_expires_at = CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
+                    attempt = shard.attempt + 1,
+                    result_ref = NULL,
+                    error_reason = NULL,
+                    completed_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                FROM candidate
+                WHERE shard.parent_job_id = candidate.parent_job_id
+                  AND shard.shard_id = candidate.shard_id
+                RETURNING shard.*
+                """,
+                (worker_id, lease_seconds),
+            )
+            return self._job_shard(cursor.fetchone())
+
+    def renew_job_shard_lease(
+        self,
+        parent_job_id: str,
+        shard_id: str,
+        claim_generation: int,
+        worker_id: str,
+        lease_seconds: int,
+    ) -> bool:
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE platform_job_shards AS shard SET
+                    lease_expires_at = CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE shard.parent_job_id = %s AND shard.shard_id = %s
+                  AND shard.claim_generation = %s AND shard.claimed_by = %s
+                  AND shard.state = 'running'
+                  AND EXISTS (
+                    SELECT 1 FROM platform_jobs AS parent
+                    WHERE parent.job_id = shard.parent_job_id
+                      AND parent.claim_generation = shard.parent_claim_generation
+                      AND parent.state = 'running'
+                      AND parent.cancel_requested = FALSE
+                  )
+                """,
+                (lease_seconds, parent_job_id, shard_id, claim_generation, worker_id),
+            )
+            return int(cursor.rowcount) == 1
+
+    def finish_job_shard(
+        self,
+        parent_job_id: str,
+        shard_id: str,
+        claim_generation: int,
+        *,
+        state: str,
+        result_ref: dict[str, Any] | None,
+        error_reason: str | None,
+    ) -> JobShardRecord:
+        if state not in {"succeeded", "failed", "canceled"}:
+            raise ValueError("invalid Job shard terminal state")
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE platform_job_shards AS shard SET
+                    state = CASE
+                      WHEN EXISTS (
+                        SELECT 1 FROM platform_jobs AS parent
+                        WHERE parent.job_id = shard.parent_job_id
+                          AND parent.cancel_requested
+                      ) THEN 'canceled'
+                      ELSE %s
+                    END,
+                    result_ref = CASE
+                      WHEN %s = 'succeeded' AND NOT EXISTS (
+                        SELECT 1 FROM platform_jobs AS parent
+                        WHERE parent.job_id = shard.parent_job_id
+                          AND parent.cancel_requested
+                      ) THEN %s::jsonb ELSE NULL
+                    END,
+                    error_reason = CASE
+                      WHEN %s = 'failed' AND NOT EXISTS (
+                        SELECT 1 FROM platform_jobs AS parent
+                        WHERE parent.job_id = shard.parent_job_id
+                          AND parent.cancel_requested
+                      ) THEN %s ELSE NULL
+                    END,
+                    lease_expires_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP,
+                    completed_at = CURRENT_TIMESTAMP
+                WHERE parent_job_id = %s AND shard_id = %s
+                  AND claim_generation = %s AND state = 'running'
+                  AND EXISTS (
+                    SELECT 1 FROM platform_jobs AS parent
+                    WHERE parent.job_id = shard.parent_job_id
+                      AND parent.claim_generation = shard.parent_claim_generation
+                      AND parent.state = 'running'
+                  )
+                RETURNING *
+                """,
+                (
+                    state,
+                    state,
+                    json.dumps(result_ref, ensure_ascii=True, sort_keys=True)
+                    if result_ref is not None
+                    else None,
+                    state,
+                    error_reason,
+                    parent_job_id,
+                    shard_id,
+                    claim_generation,
+                ),
+            )
+            observed = self._job_shard(cursor.fetchone())
+            if observed is None:
+                raise RuntimeError("stale_shard_claim_generation")
+            return observed
+
+    def cancel_job_shards(
+        self, parent_job_id: str, parent_claim_generation: int
+    ) -> int:
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT job_id FROM platform_jobs
+                WHERE job_id = %s AND claim_generation = %s AND state = 'running'
+                FOR UPDATE
+                """,
+                (parent_job_id, parent_claim_generation),
+            )
+            if cursor.fetchone() is None:
+                raise RuntimeError("stale_claim_generation")
+            cursor.execute(
+                """
+                UPDATE platform_job_shards SET
+                    state = 'canceled', claim_generation = claim_generation + 1,
+                    claimed_by = NULL, lease_expires_at = NULL,
+                    result_ref = NULL, error_reason = NULL,
+                    updated_at = CURRENT_TIMESTAMP, completed_at = CURRENT_TIMESTAMP
+                WHERE parent_job_id = %s
+                  AND parent_claim_generation = %s
+                  AND state IN ('queued', 'running')
+                """,
+                (parent_job_id, parent_claim_generation),
+            )
+            return int(cursor.rowcount)
 
     @staticmethod
     def _candidate_run(row: dict[str, Any]) -> CandidateRunRecord:

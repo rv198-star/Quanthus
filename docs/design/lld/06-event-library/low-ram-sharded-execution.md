@@ -34,8 +34,9 @@ stages may create disjoint shard tasks:
 2. Candidate decoding and per-security trigger evaluation use complete security-series buckets.
 3. All raw triggers return to one global isolation, concentration and split finalizer. These rules
    never execute independently inside a shard.
-4. Feature and label work use the same complete-security ownership so rolling and forward windows
-   do not cross shard ownership.
+4. The execution-scope and decision-scope Feature Panels are two independent full-universe tasks.
+   They may run concurrently, but neither is split across securities in this increment. Label and
+   Report remain global consumers of their exact scope-bound panels.
 5. Final Event, Label, and Report publication retains the existing canonical ordering, manifests,
    content digests, generation fencing, and exactly-one accepted result contract.
 
@@ -58,6 +59,30 @@ Worker registry, cross-Job cache, and new ADM product remain excluded.
 The isolated-process gate was accepted on 2026-08-24. Two Direct-DWD pairs reached 2.034x and
 2.076x speedup, and two candidate S3x2 runs remained byte-identical to production while completing
 below the frozen ceiling. The production leasing and complete package A/B gates remain open.
+
+## Admitted implementation topology
+
+The static parent `event-worker` still claims exactly one `queue=event` Job and owns its lease,
+cancel observation, final verification, immutable Run seal, and terminal transition. A deployment
+value `QUANTHUS_EVENT_SHARD_TARGET=0` selects the accepted U16 child. Values `1..4` select the
+bounded sharded child; they are static operator input, not dynamic node discovery.
+
+The sharded child creates one stage at a time in internal PostgreSQL table
+`platform_job_shards`. Every row binds `parent_job_id + parent_claim_generation`, immutable task
+payload digest, stage/ordinal, its own claim generation, and lease. A reclaim writes only to a
+claim-generation-specific path; the parent consumes only the `result_ref` from the current
+successful claim. Parent cancellation or generation loss fences renewal and publication.
+
+The admitted heavy tasks are Direct-DWD date partitions, deterministic daily-table merges,
+complete-security candidate buckets, and the two scope-bound Feature Panels. Direct-DWD assembly,
+Research ADM construction, global candidate finalization, set-based T+1 binding, Label, Report,
+verification, and sealing remain parent/global stages. Only the profile-gated
+`event-shard-worker` role executes shard tasks. Each instance has hard Docker `3g` memory and swap
+limits and shares the existing read-only DWD mounts plus Event Run volume.
+
+The table and role are Event-specific. They do not admit arbitrary task kinds, cross-Job reuse,
+Worker registration, automatic resource advertisement, or a second queue transport. Stage TMP is
+removed after success or failure and never enters the sealed Event Run.
 
 ## Acceptance
 

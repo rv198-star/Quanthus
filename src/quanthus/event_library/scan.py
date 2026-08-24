@@ -82,6 +82,16 @@ def _fraction_text(value: Fraction) -> str:
     return f"{value.numerator}/{value.denominator}"
 
 
+def _fraction_from_text(value: object, field_name: str) -> Fraction:
+    if not isinstance(value, str):
+        raise CandidateScanError(f"{field_name} must be a rational string")
+    try:
+        result = Fraction(value)
+    except (ValueError, ZeroDivisionError) as exc:
+        raise CandidateScanError(f"{field_name} must be a rational string") from exc
+    return result
+
+
 def _median(values: Sequence[Fraction]) -> Fraction:
     if not values:
         raise CandidateScanError("median requires at least one value")
@@ -376,6 +386,7 @@ class CandidateScanShard:
     """Mergeable result of scanning a disjoint set of complete security series."""
 
     raw_candidates: tuple[_RawCandidate, ...]
+    security_ids: tuple[str, ...]
     reason_counts: Mapping[str, int]
     evaluated_rows: int
     series_count: int
@@ -384,6 +395,16 @@ class CandidateScanShard:
     security_scan_elapsed_seconds: float
 
     def __post_init__(self) -> None:
+        if (
+            not self.security_ids
+            or tuple(sorted(self.security_ids)) != self.security_ids
+            or len(self.security_ids) != len(set(self.security_ids))
+            or any(not value.strip() for value in self.security_ids)
+        ):
+            raise CandidateScanError("candidate scan shard security ids must be sorted and unique")
+        owned_security_ids = set(self.security_ids)
+        if any(item.security_id not in owned_security_ids for item in self.raw_candidates):
+            raise CandidateScanError("candidate scan shard contains an unowned raw candidate")
         integer_values = (
             self.evaluated_rows,
             self.series_count,
@@ -397,6 +418,158 @@ class CandidateScanShard:
             raise CandidateScanError("candidate scan shard counters must be non-negative")
         if self.row_decode_elapsed_seconds < 0 or self.security_scan_elapsed_seconds < 0:
             raise CandidateScanError("candidate scan shard elapsed time must be non-negative")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "security_ids": list(self.security_ids),
+            "raw_candidates": [
+                {
+                    "security_id": item.security_id,
+                    "listing_id": item.listing_id,
+                    "listing_code": item.listing_code,
+                    "company_id": item.company_id,
+                    "industry_id": item.industry_id,
+                    "signal_date": item.signal_date.isoformat(),
+                    "signal_close": item.signal_close.isoformat(),
+                    "knowledge_cutoff": item.knowledge_cutoff.isoformat(),
+                    "feature_start": item.feature_start.isoformat(),
+                    "entry_date": item.entry_date.isoformat(),
+                    "feature_evidence": item.feature_evidence.to_dict(),
+                    "eligibility_evidence_digest": item.eligibility_evidence_digest,
+                    "rank_digest": item.rank_digest,
+                }
+                for item in self.raw_candidates
+            ],
+            "reason_counts": dict(sorted(self.reason_counts.items())),
+            "evaluated_rows": self.evaluated_rows,
+            "series_count": self.series_count,
+            "decoded_rows": self.decoded_rows,
+            "row_decode_elapsed_seconds": self.row_decode_elapsed_seconds,
+            "security_scan_elapsed_seconds": self.security_scan_elapsed_seconds,
+        }
+
+    @classmethod
+    def from_dict(cls, value: object) -> CandidateScanShard:
+        expected = {
+            "security_ids",
+            "raw_candidates",
+            "reason_counts",
+            "evaluated_rows",
+            "series_count",
+            "decoded_rows",
+            "row_decode_elapsed_seconds",
+            "security_scan_elapsed_seconds",
+        }
+        if not isinstance(value, Mapping) or set(value) != expected:
+            raise CandidateScanError("candidate scan shard payload fields differ")
+        security_ids = value["security_ids"]
+        raw_values = value["raw_candidates"]
+        reason_counts = value["reason_counts"]
+        if (
+            not isinstance(security_ids, list)
+            or any(not isinstance(item, str) for item in security_ids)
+            or not isinstance(raw_values, list)
+            or not isinstance(reason_counts, Mapping)
+            or any(
+                not isinstance(key, str)
+                or not isinstance(count, int)
+                or isinstance(count, bool)
+                for key, count in reason_counts.items()
+            )
+        ):
+            raise CandidateScanError("candidate scan shard payload is invalid")
+        raw_candidates: list[_RawCandidate] = []
+        raw_expected = {
+            "security_id",
+            "listing_id",
+            "listing_code",
+            "company_id",
+            "industry_id",
+            "signal_date",
+            "signal_close",
+            "knowledge_cutoff",
+            "feature_start",
+            "entry_date",
+            "feature_evidence",
+            "eligibility_evidence_digest",
+            "rank_digest",
+        }
+        feature_expected = {
+            "feature_start",
+            "signal_date",
+            "t_minus_1_range_activity_ratio",
+            "t_minus_1_turnover_activity_ratio",
+            "t_range_activity_ratio",
+            "t_turnover_activity_ratio",
+            "source_evidence_digests",
+        }
+        try:
+            for raw in raw_values:
+                if not isinstance(raw, Mapping) or set(raw) != raw_expected:
+                    raise CandidateScanError("candidate scan raw payload fields differ")
+                feature = raw["feature_evidence"]
+                if not isinstance(feature, Mapping) or set(feature) != feature_expected:
+                    raise CandidateScanError("candidate feature evidence fields differ")
+                digests = feature["source_evidence_digests"]
+                if not isinstance(digests, list) or any(
+                    not isinstance(item, str) for item in digests
+                ):
+                    raise CandidateScanError("candidate feature evidence digests are invalid")
+                evidence = CandidateFeatureEvidence(
+                    feature_start=date.fromisoformat(str(feature["feature_start"])),
+                    signal_date=date.fromisoformat(str(feature["signal_date"])),
+                    t_minus_1_range_activity_ratio=_fraction_from_text(
+                        feature["t_minus_1_range_activity_ratio"],
+                        "t_minus_1_range_activity_ratio",
+                    ),
+                    t_minus_1_turnover_activity_ratio=_fraction_from_text(
+                        feature["t_minus_1_turnover_activity_ratio"],
+                        "t_minus_1_turnover_activity_ratio",
+                    ),
+                    t_range_activity_ratio=_fraction_from_text(
+                        feature["t_range_activity_ratio"], "t_range_activity_ratio"
+                    ),
+                    t_turnover_activity_ratio=_fraction_from_text(
+                        feature["t_turnover_activity_ratio"],
+                        "t_turnover_activity_ratio",
+                    ),
+                    source_evidence_digests=tuple(digests),
+                )
+                raw_candidates.append(
+                    _RawCandidate(
+                        security_id=str(raw["security_id"]),
+                        listing_id=str(raw["listing_id"]),
+                        listing_code=str(raw["listing_code"]),
+                        company_id=str(raw["company_id"]),
+                        industry_id=(
+                            None if raw["industry_id"] is None else str(raw["industry_id"])
+                        ),
+                        signal_date=date.fromisoformat(str(raw["signal_date"])),
+                        signal_close=datetime.fromisoformat(str(raw["signal_close"])),
+                        knowledge_cutoff=datetime.fromisoformat(
+                            str(raw["knowledge_cutoff"])
+                        ),
+                        feature_start=date.fromisoformat(str(raw["feature_start"])),
+                        entry_date=date.fromisoformat(str(raw["entry_date"])),
+                        feature_evidence=evidence,
+                        eligibility_evidence_digest=str(
+                            raw["eligibility_evidence_digest"]
+                        ),
+                        rank_digest=str(raw["rank_digest"]),
+                    )
+                )
+        except (TypeError, ValueError) as exc:
+            raise CandidateScanError("candidate scan shard payload values are invalid") from exc
+        return cls(
+            raw_candidates=tuple(raw_candidates),
+            security_ids=tuple(security_ids),
+            reason_counts=dict(reason_counts),
+            evaluated_rows=int(value["evaluated_rows"]),
+            series_count=int(value["series_count"]),
+            decoded_rows=int(value["decoded_rows"]),
+            row_decode_elapsed_seconds=float(value["row_decode_elapsed_seconds"]),
+            security_scan_elapsed_seconds=float(value["security_scan_elapsed_seconds"]),
+        )
 
 
 def _window_reason(
@@ -995,6 +1168,7 @@ def scan_candidate_series_shard(
     raw: list[_RawCandidate] = []
     evaluated = 0
     last_series_end: dict[str, date] = {}
+    scanned_security_ids: set[str] = set()
     series_count = 0
     decoded_rows = 0
     decode_elapsed = 0.0
@@ -1012,6 +1186,7 @@ def scan_candidate_series_shard(
             continue
         decoded_rows += len(rows)
         security_id = rows[0].security_id
+        scanned_security_ids.add(security_id)
         previous_end = last_series_end.get(security_id)
         if previous_end is not None and rows[0].session_date <= previous_end:
             raise CandidateScanError(
@@ -1064,6 +1239,7 @@ def scan_candidate_series_shard(
         )
     return CandidateScanShard(
         raw_candidates=tuple(raw),
+        security_ids=tuple(sorted(scanned_security_ids)),
         reason_counts=dict(reasons),
         evaluated_rows=evaluated,
         series_count=series_count,
@@ -1098,7 +1274,15 @@ def finalize_candidate_scan_shards(
     raw: list[_RawCandidate] = []
     reasons: Counter[str] = Counter()
     evaluated = 0
+    owned_security_ids: set[str] = set()
     for shard in shards:
+        overlap = owned_security_ids.intersection(shard.security_ids)
+        if overlap:
+            raise CandidateScanError(
+                "candidate scan shards overlap security ownership: "
+                + ",".join(sorted(overlap)[:5])
+            )
+        owned_security_ids.update(shard.security_ids)
         raw.extend(shard.raw_candidates)
         reasons.update(shard.reason_counts)
         evaluated += shard.evaluated_rows

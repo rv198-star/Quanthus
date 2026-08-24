@@ -244,6 +244,28 @@ class BaselineResearchTests(unittest.TestCase):
             self.assertEqual(artifact.report, panel.report)
         self.assertEqual(artifact.path.read_bytes(), panel.path.read_bytes())
 
+    def test_low_ram_feature_panel_budget_is_explicitly_admitted(self) -> None:
+        artifact = BaselineFeaturePanel.materialize(
+            self.bundle,
+            self.registry,
+            scope_start=self.dates[0],
+            scope_end=self.dates[-2],
+            output=self.root / "low-ram-features.parquet",
+            duckdb_memory_limit="1GB",
+            duckdb_threads=1,
+        )
+        self.assertGreater(artifact.path.stat().st_size, 0)
+        with self.assertRaisesRegex(BaselineResearchError, "memory limit is not admitted"):
+            BaselineFeaturePanel.materialize(
+                self.bundle,
+                self.registry,
+                scope_start=self.dates[0],
+                scope_end=self.dates[-2],
+                output=self.root / "unadmitted-features.parquet",
+                duckdb_memory_limit="2GB",
+                duckdb_threads=1,
+            )
+
     def test_job_local_panel_scope_identity_is_exact_even_when_fixture_rows_overlap(
         self,
     ) -> None:

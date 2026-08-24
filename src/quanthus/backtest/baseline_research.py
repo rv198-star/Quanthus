@@ -1189,7 +1189,7 @@ class BaselineFeaturePanel:
 
         if scope_start > scope_end:
             raise BaselineResearchError("scope_start must not follow scope_end")
-        if duckdb_memory_limit not in {"1500MB", FEATURE_DUCKDB_MEMORY_LIMIT}:
+        if duckdb_memory_limit not in {"1GB", "1500MB", FEATURE_DUCKDB_MEMORY_LIMIT}:
             raise BaselineResearchError("feature panel DuckDB memory limit is not admitted")
         if duckdb_threads not in {1, 2}:
             raise BaselineResearchError("feature panel DuckDB threads are not admitted")

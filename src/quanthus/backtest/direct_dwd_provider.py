@@ -813,7 +813,7 @@ def merge_direct_dwd_date_partitions(
     spill_errors: list[Exception] = []
     spill_releaser: threading.Thread | None = None
     try:
-        connection.execute("SET memory_limit='768MB'")
+        connection.execute("SET memory_limit='512MB'")
         connection.execute("SET threads=1")
         connection.execute("SET preserve_insertion_order=false")
         connection.execute(f"SET temp_directory={_sql_path(spill_path)}")

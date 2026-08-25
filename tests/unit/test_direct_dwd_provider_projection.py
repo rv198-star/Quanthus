@@ -278,7 +278,7 @@ class DirectDwdProjectionTests(unittest.TestCase):
             self.assertEqual(len(opened_connections), 4)
             for connection, memory_limit in zip(
                 opened_connections,
-                ("6GB", "12GB", "12GB", "6GB"),
+                ("6GB", "11500MB", "11500MB", "6GB"),
                 strict=True,
             ):
                 self.assertEqual(

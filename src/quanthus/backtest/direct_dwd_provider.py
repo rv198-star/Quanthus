@@ -26,7 +26,7 @@ from quanthus.policy import ConfigurationError, find_project_root
 
 MATERIALIZER_VERSION = "direct-dwd-job-local-v1"
 DUCKDB_MEMORY_LIMIT = "6GB"
-DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT = "12GB"
+DUCKDB_LARGE_PROJECTION_MEMORY_LIMIT = "11500MB"
 MARKET_TIMEZONE_NAME = "Asia/Shanghai"
 DATASETS = (
     "corporate_action_exceptions",

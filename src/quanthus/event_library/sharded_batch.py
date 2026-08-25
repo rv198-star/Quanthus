@@ -56,21 +56,25 @@ SHARDED_DWD_DAILY_DATASETS = (
     "price_limit_execution_daily",
     "trading_calendar",
 )
-CANDIDATE_ANALYSIS_PARTITIONS = 5
+CANDIDATE_ANALYSIS_PARTITIONS = 6
 
 
 def _schedule_analysis_payloads(
     panel_payloads: Sequence[dict[str, Any]],
     scan_payloads: Sequence[dict[str, Any]],
 ) -> tuple[dict[str, Any], ...]:
-    if len(panel_payloads) != 2 or len(scan_payloads) < 2:
+    if (
+        len(panel_payloads) != 2
+        or len(scan_payloads) != CANDIDATE_ANALYSIS_PARTITIONS
+    ):
         raise RuntimeError("sharded analysis topology differs")
     return (
         panel_payloads[0],
         scan_payloads[0],
         scan_payloads[1],
+        scan_payloads[2],
         panel_payloads[1],
-        *scan_payloads[2:],
+        *scan_payloads[3:],
     )
 
 

@@ -10,6 +10,7 @@ from quanthus.policy import find_project_root
 from quanthus.research_adm import (
     ResearchADMError,
     collect_p4_historical_industry_supplement,
+    load_p4_historical_industry_supplement,
     load_p4_research_adm_policy,
 )
 
@@ -98,7 +99,9 @@ def test_repository_p4_research_adm_contract_is_frozen() -> None:
     assert policy.semantic_digest == policy.computed_semantic_digest
 
 
-def test_historical_industry_supplement_is_deterministic_and_checksum_bound() -> None:
+def test_historical_industry_supplement_is_deterministic_and_checksum_bound(
+    tmp_path: Path,
+) -> None:
     policy = load_p4_research_adm_policy(POLICY)
     provider = _BaoStockFixture()
     memberships, receipt = collect_p4_historical_industry_supplement(
@@ -143,6 +146,41 @@ def test_historical_industry_supplement_is_deterministic_and_checksum_bound() ->
             hierarchy_path=HIERARCHY,
             binding=wrong,
             bs_module=_BaoStockFixture(),
+        )
+
+    receipt_path = tmp_path / "industry-source-receipt.json"
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    loaded, loaded_receipt = load_p4_historical_industry_supplement(
+        ["600001", "000001"],
+        receipt_path=receipt_path,
+        hierarchy_path=HIERARCHY,
+        binding=binding,
+    )
+    assert loaded == memberships
+    assert loaded_receipt == receipt
+
+    changed = dict(receipt)
+    changed["source_rows"] = list(receipt["source_rows"])
+    changed["source_rows"][0] = {
+        **changed["source_rows"][0],
+        "industry_code": "A01",
+    }
+    receipt_path.write_text(json.dumps(changed), encoding="utf-8")
+    with pytest.raises(ResearchADMError, match="source digest differs"):
+        load_p4_historical_industry_supplement(
+            ["000001", "600001"],
+            receipt_path=receipt_path,
+            hierarchy_path=HIERARCHY,
+            binding=binding,
+        )
+
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(ResearchADMError, match="security set differs"):
+        load_p4_historical_industry_supplement(
+            ["000002", "600001"],
+            receipt_path=receipt_path,
+            hierarchy_path=HIERARCHY,
+            binding=binding,
         )
 
 

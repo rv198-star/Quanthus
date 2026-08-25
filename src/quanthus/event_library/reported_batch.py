@@ -436,6 +436,7 @@ def build_physical_reported_event_batch(
                     "feature_panel_disposition": "supplied_scope_bound_tmp",
                 },
             )
+            report_panel.path.unlink()
 
     runtime = {
         "schema_version": REPORTED_BATCH_RUNTIME_SCHEMA,

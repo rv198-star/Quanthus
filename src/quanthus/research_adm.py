@@ -22,6 +22,31 @@ _EXPECTED_ASSETS = {
 _PRIMARY_INDUSTRY_QUERY_DATE = date(2021, 9, 30)
 _LEGACY_INDUSTRY_QUERY_DATE = date(2012, 12, 31)
 _EXPECTED_INDUSTRY_CLASSIFICATION = "证监会行业分类"
+_INDUSTRY_RECEIPT_SCHEMA = "quanthus.p4-adm-industry-source-receipt.v1"
+_INDUSTRY_RECEIPT_KEYS = {
+    "schema_version",
+    "provider",
+    "provider_version",
+    "classification",
+    "primary_query_date",
+    "legacy_query_date",
+    "hierarchy_sha256",
+    "primary_provider_row_count",
+    "legacy_provider_row_count",
+    "selected_security_count",
+    "source_rows",
+    "content_digest",
+}
+_INDUSTRY_SOURCE_ROW_KEYS = {
+    "security_code",
+    "security_name",
+    "industry_code",
+    "industry_name",
+    "provider_industry",
+    "provider_update_date",
+    "query_date",
+    "resolution",
+}
 _EXPECTED_ALLOWED_USES = (
     "candidate_signal_input",
     "eligibility_input",
@@ -66,6 +91,17 @@ def _exact_keys(raw: Mapping[str, Any], expected: set[str]) -> None:
     if missing or unexpected:
         raise ResearchADMError(
             f"P4 Research ADM policy keys differ; missing={missing}, unexpected={unexpected}"
+        )
+
+
+def _exact_receipt_keys(
+    raw: Mapping[str, Any], expected: set[str], *, subject: str
+) -> None:
+    missing = sorted(expected.difference(raw))
+    unexpected = sorted(set(raw).difference(expected))
+    if missing or unexpected:
+        raise ResearchADMError(
+            f"{subject} keys differ; missing={missing}, unexpected={unexpected}"
         )
 
 
@@ -155,9 +191,10 @@ def collect_p4_historical_industry_supplement(
     try:
         provider_version = importlib.metadata.version("baostock")
     except importlib.metadata.PackageNotFoundError:
-        provider_version = getattr(bs_module, "__version__", None)
-        if not isinstance(provider_version, str) or not provider_version.strip():
+        provider_version_raw = getattr(bs_module, "__version__", None)
+        if not isinstance(provider_version_raw, str) or not provider_version_raw.strip():
             raise ResearchADMError("cannot resolve BaoStock provider version") from None
+        provider_version = provider_version_raw
     if binding is not None and provider_version != binding.provider_version:
         raise ResearchADMError("BaoStock provider version differs from ADM policy")
 
@@ -208,11 +245,12 @@ def collect_p4_historical_industry_supplement(
                 )
             industry_name = leaves[industry_code]
         else:
-            source_row = legacy.get(security_code)
-            if source_row is None or not str(source_row[3]).strip():
+            legacy_row = legacy.get(security_code)
+            if legacy_row is None or not str(legacy_row[3]).strip():
                 raise ResearchADMError(
                     f"BaoStock legacy industry snapshot cannot resolve {security_code}"
                 )
+            source_row = legacy_row
             if str(source_row[4]).strip() != _EXPECTED_INDUSTRY_CLASSIFICATION:
                 raise ResearchADMError(
                     f"BaoStock legacy classification differs for {security_code}"
@@ -269,6 +307,115 @@ def collect_p4_historical_industry_supplement(
     if binding is not None and receipt["content_digest"] != binding.source_content_digest:
         raise ResearchADMError("historical industry source digest differs from ADM policy")
     return memberships, receipt
+
+
+def load_p4_historical_industry_supplement(
+    security_codes: Sequence[str],
+    *,
+    receipt_path: Path,
+    hierarchy_path: Path,
+    binding: HistoricalIndustryReference,
+) -> tuple[Mapping[str, Mapping[str, str]], Mapping[str, Any]]:
+    """Load a checksum-bound provider receipt without contacting the fixed-date source again."""
+
+    ordered_codes = tuple(sorted(security_codes))
+    if not ordered_codes or len(ordered_codes) != len(set(ordered_codes)):
+        raise ResearchADMError("historical industry supplement requires unique security codes")
+    if any(re.fullmatch(r"\d{6}", code) is None for code in ordered_codes):
+        raise ResearchADMError("historical industry supplement codes must be six digits")
+    if len(ordered_codes) != binding.expected_security_count:
+        raise ResearchADMError(
+            "historical industry supplement security count differs from policy"
+        )
+
+    leaves = _load_industry_hierarchy(hierarchy_path)
+    hierarchy_sha256 = f"sha256:{hashlib.sha256(hierarchy_path.read_bytes()).hexdigest()}"
+    if hierarchy_sha256 != binding.hierarchy_sha256:
+        raise ResearchADMError("historical industry hierarchy checksum differs from policy")
+    try:
+        raw = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ResearchADMError(
+            f"cannot read historical industry source receipt: {receipt_path}"
+        ) from exc
+    if not isinstance(raw, dict):
+        raise ResearchADMError("historical industry source receipt must be an object")
+    _exact_receipt_keys(
+        raw, _INDUSTRY_RECEIPT_KEYS, subject="historical industry source receipt"
+    )
+    content_digest = raw["content_digest"]
+    payload = {key: value for key, value in raw.items() if key != "content_digest"}
+    if content_digest != _digest(payload) or content_digest != binding.source_content_digest:
+        raise ResearchADMError("historical industry source digest differs from ADM policy")
+    expected_header = {
+        "schema_version": _INDUSTRY_RECEIPT_SCHEMA,
+        "provider": binding.provider,
+        "provider_version": binding.provider_version,
+        "classification": binding.classification,
+        "primary_query_date": binding.primary_query_date.isoformat(),
+        "legacy_query_date": binding.legacy_query_date.isoformat(),
+        "hierarchy_sha256": binding.hierarchy_sha256,
+        "selected_security_count": binding.expected_security_count,
+    }
+    if any(raw.get(key) != value for key, value in expected_header.items()):
+        raise ResearchADMError("historical industry source receipt header differs from policy")
+    for field in ("primary_provider_row_count", "legacy_provider_row_count"):
+        observed = raw[field]
+        if not isinstance(observed, int) or isinstance(observed, bool) or observed < 0:
+            raise ResearchADMError(
+                f"historical industry source receipt {field} is invalid"
+            )
+
+    source_rows = raw["source_rows"]
+    if not isinstance(source_rows, list) or len(source_rows) != len(ordered_codes):
+        raise ResearchADMError("historical industry source receipt row count differs")
+    memberships: dict[str, Mapping[str, str]] = {}
+    observed_codes: list[str] = []
+    for row in source_rows:
+        if not isinstance(row, dict):
+            raise ResearchADMError("historical industry source receipt row must be an object")
+        _exact_receipt_keys(
+            row,
+            _INDUSTRY_SOURCE_ROW_KEYS,
+            subject="historical industry source receipt row",
+        )
+        if any(not isinstance(row[field], str) for field in _INDUSTRY_SOURCE_ROW_KEYS):
+            raise ResearchADMError("historical industry source receipt row fields must be text")
+        security_code = row["security_code"]
+        industry_code = row["industry_code"]
+        industry_name = row["industry_name"]
+        query_date = row["query_date"]
+        resolution = row["resolution"]
+        if industry_code not in leaves or leaves[industry_code] != industry_name:
+            raise ResearchADMError(
+                f"historical industry source receipt hierarchy differs for {security_code}"
+            )
+        expected_resolution = {
+            binding.primary_query_date.isoformat(): "primary_csrc_2012_snapshot",
+            binding.legacy_query_date.isoformat(): "legacy_csrc_name_crosswalk_to_2012",
+        }.get(query_date)
+        if expected_resolution is None or resolution != expected_resolution:
+            raise ResearchADMError(
+                f"historical industry source receipt resolution differs for {security_code}"
+            )
+        try:
+            provider_update_date = date.fromisoformat(row["provider_update_date"])
+        except ValueError as exc:
+            raise ResearchADMError(
+                f"historical industry source receipt date is invalid for {security_code}"
+            ) from exc
+        if provider_update_date > date.fromisoformat(query_date):
+            raise ResearchADMError(
+                f"historical industry source receipt update is after query for {security_code}"
+            )
+        observed_codes.append(security_code)
+        memberships[security_code] = {
+            "industry_code": industry_code,
+            "industry_name": industry_name,
+        }
+    if tuple(observed_codes) != ordered_codes:
+        raise ResearchADMError("historical industry source receipt security set differs")
+    return memberships, dict(raw)
 
 
 @dataclass(frozen=True)

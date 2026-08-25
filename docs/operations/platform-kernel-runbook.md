@@ -31,6 +31,12 @@ process.
    `web/` source. Never deploy a prebuilt upstream Web image.
 5. Confirm `config/platform-features.v1.json` and `config/platform-kernel-gates.v1.json` come from
    the same reviewed revision.
+6. Before starting an Event Worker, provision the fixed-date historical-industry source receipt at
+   `/srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json`. It must be the
+   `historical_supplement` object whose semantic content digest is
+   `sha256:20b51d52070b8976f9f8989ff0f54124aea098ca749167bedbddbed947c3196b`.
+   Keep it read-only and back it up with the other node-local governed source references; the Event
+   Worker validates the full receipt against the ADM policy before use.
 
 Create a node-local environment from `ops/platform/platform.env.example`; never commit it.
 

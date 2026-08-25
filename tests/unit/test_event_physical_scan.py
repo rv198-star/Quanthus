@@ -20,6 +20,7 @@ from quanthus.event_library.physical_scan import (
     PhysicalEventScanError,
     _audit_projection_static_industry_coverage,
     _candidate_input,
+    _contiguous_weight_buckets,
     _publish_package,
     iter_projected_candidate_series,
     materialize_p4_research_adm,
@@ -99,6 +100,23 @@ class _Reader:
 
 
 class EventPhysicalScanTests(unittest.TestCase):
+    def test_candidate_buckets_are_contiguous_and_row_balanced(self) -> None:
+        weighted = (("a", 4), ("b", 3), ("c", 2), ("d", 1))
+
+        self.assertEqual(
+            _contiguous_weight_buckets(weighted, 2),
+            (("a",), ("b", "c", "d")),
+        )
+        self.assertEqual(
+            _contiguous_weight_buckets(weighted, 4),
+            (("a",), ("b",), ("c",), ("d",)),
+        )
+        five_way = (("a", 5), ("b", 4), ("c", 3), ("d", 2), ("e", 1))
+        self.assertEqual(
+            _contiguous_weight_buckets(five_way, 5),
+            (("a",), ("b",), ("c",), ("d",), ("e",)),
+        )
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -338,8 +356,80 @@ class EventPhysicalScanTests(unittest.TestCase):
         self.assertEqual(series[0][0], legacy_row)
         self.assertTrue(all(row.security_id == "opaque-security-001" for row in series[0]))
         self.assertTrue(all(row.knowledge_cutoff <= row.close_at for row in series[0]))
+        selected_series = tuple(
+            iter_projected_candidate_series(
+                projection,
+                source_policy=self.source,
+                industry_mapping=industry,
+                fetch_rows=7,
+                allowed_security_ids=("opaque-security-001",),
+            )
+        )
+        self.assertEqual(selected_series, series)
 
-        candidate_table = pq.read_table(projection.candidate_path)
+        duplicated_table = pa.concat_tables(
+            [
+                candidate_table := pq.read_table(projection.candidate_path),
+                candidate_table.set_column(
+                    candidate_table.schema.get_field_index("dwd_security_id"),
+                    "dwd_security_id",
+                    pa.array(["opaque-security-002"] * candidate_table.num_rows),
+                ),
+            ]
+        )
+        contiguous_path = self.root / "candidate-contiguous.parquet"
+        pq.write_table(duplicated_table, contiguous_path)
+        contiguous_projection = replace(projection, candidate_path=contiguous_path)
+        selected_industry = replace(
+            industry,
+            memberships=industry.memberships
+            + (
+                replace(
+                    industry.memberships[0], security_code="opaque-security-002"
+                ),
+            ),
+        )
+        contiguous_series = tuple(
+            iter_projected_candidate_series(
+                contiguous_projection,
+                source_policy=self.source,
+                industry_mapping=selected_industry,
+                fetch_rows=7,
+                allowed_security_ids=("opaque-security-002", "opaque-security-001"),
+            )
+        )
+        self.assertEqual(
+            [item[0].security_id for item in contiguous_series],
+            ["opaque-security-001", "opaque-security-002"],
+        )
+        interleaved_path = self.root / "candidate-interleaved.parquet"
+        pq.write_table(
+            duplicated_table.take(
+                pa.array(
+                    [
+                        index
+                        for offset in range(candidate_table.num_rows)
+                        for index in (offset, offset + candidate_table.num_rows)
+                    ],
+                    type=pa.int64(),
+                )
+            ),
+            interleaved_path,
+        )
+        selected_projection = replace(projection, candidate_path=interleaved_path)
+        with self.assertRaisesRegex(
+            PhysicalEventScanError, "projected candidate physical order differs"
+        ):
+            tuple(
+                iter_projected_candidate_series(
+                    selected_projection,
+                    source_policy=self.source,
+                    industry_mapping=selected_industry,
+                    fetch_rows=7,
+                    allowed_security_ids=("opaque-security-002", "opaque-security-001"),
+                )
+            )
+
         reversed_path = self.root / "candidate-reversed.parquet"
         pq.write_table(
             candidate_table.take(

@@ -6,8 +6,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-import pyarrow as pa
-import pyarrow.parquet as pq
 import pytest
 
 from quanthus.backtest.baseline_research import BaselineFeaturePanelReport
@@ -19,7 +17,10 @@ from quanthus.event_library.job_local import (
 )
 from quanthus.event_library.label_corpus import LabelCorpusResult
 from quanthus.event_library.physical_scan import PhysicalEventScanResult
-from quanthus.event_library.reported_batch import _memory_sample, build_physical_reported_event_batch
+from quanthus.event_library.reported_batch import (
+    _memory_sample,
+    build_physical_reported_event_batch,
+)
 
 
 def _report(*, end: date, rows: int = 2) -> BaselineFeaturePanelReport:
@@ -44,31 +45,7 @@ def _report(*, end: date, rows: int = 2) -> BaselineFeaturePanelReport:
 
 def test_job_local_panel_rejects_derived_scope_reuse(tmp_path: Path) -> None:
     panel_path = tmp_path / "feature-panel.parquet"
-    pq.write_table(
-        pa.Table.from_pylist(
-            [
-                {
-                    "market_date": date(2021, 12, 30),
-                    "security_id": "600001",
-                    "feature_ready": True,
-                    "entry_eligible": True,
-                    "exception_active": False,
-                    "unexplained_price_transition": False,
-                    "scope_continuity_excluded": False,
-                },
-                {
-                    "market_date": date(2021, 12, 31),
-                    "security_id": "600001",
-                    "feature_ready": True,
-                    "entry_eligible": True,
-                    "exception_active": False,
-                    "unexplained_price_transition": False,
-                    "scope_continuity_excluded": False,
-                },
-            ]
-        ),
-        panel_path,
-    )
+    panel_path.write_bytes(b"panel")
     materialized = _report(end=date(2021, 12, 31))
     panel = JobLocalFeaturePanel(
         path=panel_path,
@@ -84,6 +61,8 @@ def test_job_local_panel_rejects_derived_scope_reuse(tmp_path: Path) -> None:
         panel.scoped(scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 31))
         is panel
     )
+    with pytest.raises(JobLocalArtifactError, match="scope_mismatch"):
+        panel.scoped(scope_start=date(2012, 1, 4), scope_end=date(2022, 1, 1))
 
 
 def test_memory_sample_reads_process_and_configured_cgroup_files(
@@ -218,6 +197,12 @@ def test_reported_batch_builds_each_scope_bound_prerequisite_once(
             self.path = path
             self.report = SimpleNamespace(row_count=20, scope_end=scope_end)
             self.parquet_bytes = path.stat().st_size
+
+        def scoped(self, *, scope_start: date, scope_end: date) -> Panel:
+            assert scope_start == date(2012, 1, 4)
+            panel = Panel(self.path, scope_end)
+            panels[scope_end] = panel
+            return panel
 
     panels: dict[date, Panel] = {}
 

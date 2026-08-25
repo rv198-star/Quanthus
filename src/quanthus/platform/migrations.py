@@ -200,6 +200,43 @@ MIGRATIONS = (
         ),
     ),
     Migration(
+        module_id="jobs",
+        migration_id="jobs-0005-event-shards",
+        statements=(
+            """
+            CREATE TABLE platform_job_shards (
+                parent_job_id TEXT NOT NULL REFERENCES platform_jobs(job_id),
+                parent_claim_generation BIGINT NOT NULL,
+                shard_id TEXT NOT NULL,
+                stage TEXT NOT NULL,
+                ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+                payload JSONB NOT NULL,
+                input_digest TEXT NOT NULL,
+                state TEXT NOT NULL CHECK (
+                    state IN ('queued', 'running', 'succeeded', 'failed', 'canceled')
+                ),
+                attempt INTEGER NOT NULL DEFAULT 0 CHECK (attempt >= 0),
+                result_ref JSONB,
+                error_reason TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                claimed_by TEXT,
+                claim_generation BIGINT NOT NULL DEFAULT 0,
+                lease_expires_at TIMESTAMPTZ,
+                completed_at TIMESTAMPTZ,
+                PRIMARY KEY (parent_job_id, shard_id),
+                UNIQUE (parent_job_id, stage, ordinal)
+            )
+            """.strip(),
+            """
+            CREATE INDEX platform_job_shards_claim_idx
+            ON platform_job_shards (available_at, parent_job_id, stage, ordinal, shard_id)
+            WHERE state IN ('queued', 'running')
+            """.strip(),
+        ),
+    ),
+    Migration(
         module_id="candidate-review",
         migration_id="candidate-review-0001",
         statements=(

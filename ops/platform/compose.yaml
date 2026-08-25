@@ -88,6 +88,8 @@ services:
       QUANTHUS_PLATFORM_DATABASE_URL: postgresql://quanthus_platform@postgres:5432/quanthus_platform
       QUANTHUS_WORKER_ID: oci-event-1
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
+      QUANTHUS_EVENT_SHARD_TARGET: ${QUANTHUS_EVENT_SHARD_TARGET:-0}
+      QUANTHUS_P4_HISTORICAL_INDUSTRY_RECEIPT_PATH: /srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json
       QUANTHUS_EVENT_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current
       QUANTHUS_EVENT_MEMORY_PEAK_PATH: /sys/fs/cgroup/memory.peak
       QUANTHUS_EVENT_MEMORY_LIMIT_PATH: /sys/fs/cgroup/memory.max
@@ -95,6 +97,28 @@ services:
       QUANTHUS_EVENT_SWAP_PEAK_PATH: /sys/fs/cgroup/memory.swap.peak
       QUANTHUS_EVENT_SWAP_LIMIT_PATH: /sys/fs/cgroup/memory.swap.max
       QUANTHUS_EVENT_MEMORY_EVENTS_PATH: /sys/fs/cgroup/memory.events
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 45s
+    volumes:
+      - /srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:ro
+      - /srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:ro
+      - /srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:ro
+      - /srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json:/srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json:ro
+      - quanthus-event-runs:/data/event-runs
+
+  event-shard-worker:
+    profiles: ["event-shards"]
+    image: ${QUANTHUS_EVENT_IMAGE:-quanthus-event:local}
+    restart: unless-stopped
+    mem_limit: 3g
+    memswap_limit: 3g
+    entrypoint: ["python", "-m", "quanthus.platform.event_shard_worker"]
+    environment:
+      PGPASSWORD: ${QUANTHUS_PLATFORM_POSTGRES_PASSWORD:?required}
+      QUANTHUS_PLATFORM_DATABASE_URL: postgresql://quanthus_platform@postgres:5432/quanthus_platform
+      QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
     depends_on:
       postgres:
         condition: service_healthy

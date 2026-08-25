@@ -259,6 +259,15 @@ receipt is deleted before Run sealing. Its stage, counters, percentage, and timi
 operational metadata: PostgreSQL Job state, generation fencing, package verification, and atomic
 Run publication remain the lifecycle authorities.
 
+`PERF-SHARD-001` adds a bounded physical-plan option beneath this same parent Event Job. Static
+target zero retains the U16 child; targets one through four create Event-specific PostgreSQL shard
+leases for Direct-DWD date/merge work, complete-security candidate scans, and the two scope-bound
+Feature Panels. Every shard binds the current parent claim generation and its own monotonically
+increasing lease generation. Profile-gated `event-shard-worker` instances have hard 3 GiB cgroup
+limits. The parent still owns global finalization, T+1, Label, Report, verification, and Run
+publication. No Worker registry, dynamic resource discovery, arbitrary task API, or new transport
+is admitted.
+
 Production cold A/B on Event Worker revision `120c6ac` accepted this progress path and the
 single-process exact-scan optimization after all three governed package trees reproduced byte
 identically and average complete runtime fell by 72.3 percent. Process-wide peak RSS remained about

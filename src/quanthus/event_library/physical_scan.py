@@ -8,11 +8,13 @@ import os
 import shutil
 import tempfile
 import time as runtime_clock
+from bisect import bisect_left
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
+from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -24,6 +26,7 @@ from quanthus.backtest.data_provider import (
 )
 from quanthus.backtest.historical_frames import HistoricalReplayFrameReader
 from quanthus.backtest.inputs import P1DailyExecutionEvidence
+from quanthus.concentration import StaticIndustryMembership
 from quanthus.event_library.contracts import sha256_digest
 from quanthus.event_library.job_local import require_job_local_session
 from quanthus.event_library.rule_card import CandidateRuleCard, load_candidate_rule_card
@@ -32,8 +35,10 @@ from quanthus.event_library.scan import (
     CandidateEntryEvidence,
     CandidateReason,
     CandidateScanResult,
+    CandidateScanShard,
     EntryPartitionResult,
     ScannedCandidate,
+    finalize_candidate_scan_shards,
     partition_executable_entries,
     scan_forward_candidate_series,
 )
@@ -41,7 +46,6 @@ from quanthus.event_library.source import EventScanSourcePolicy, load_event_scan
 from quanthus.event_library.splits import SplitPolicy, load_split_policy
 from quanthus.industry_mapping import (
     StaticIndustryMapping,
-    StaticIndustryMembership,
     load_static_industry_mapping,
 )
 from quanthus.policy import find_project_root
@@ -50,6 +54,7 @@ from quanthus.research_adm import (
     P4ResearchADMPolicy,
     ResearchADMError,
     collect_p4_historical_industry_supplement,
+    load_p4_historical_industry_supplement,
     load_p4_research_adm_policy,
 )
 
@@ -148,6 +153,10 @@ def _write_jsonl(path: Path, values: Sequence[Mapping[str, Any]]) -> None:
 
 def _sql_path(path: Path) -> str:
     return "'" + str(path.resolve()).replace("'", "''") + "'"
+
+
+def _sql_text(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
 def _read_parquet_expression(paths: Sequence[Path]) -> str:
@@ -350,12 +359,23 @@ def _materialize_dwd_static_industry_mapping(
     if missing_identities:
         missing_codes = tuple(sorted({str(row[1]) for row in missing_identities}))
         try:
-            supplement, supplement_receipt = collect_p4_historical_industry_supplement(
-                missing_codes,
-                hierarchy_path=hierarchy_path,
-                binding=historical_reference,
-                bs_module=bs_module,
-            )
+            frozen_receipt = os.environ.get(
+                "QUANTHUS_P4_HISTORICAL_INDUSTRY_RECEIPT_PATH", ""
+            ).strip()
+            if frozen_receipt:
+                supplement, supplement_receipt = load_p4_historical_industry_supplement(
+                    missing_codes,
+                    receipt_path=Path(frozen_receipt),
+                    hierarchy_path=hierarchy_path,
+                    binding=historical_reference,
+                )
+            else:
+                supplement, supplement_receipt = collect_p4_historical_industry_supplement(
+                    missing_codes,
+                    hierarchy_path=hierarchy_path,
+                    binding=historical_reference,
+                    bs_module=bs_module,
+                )
         except ResearchADMError as exc:
             raise PhysicalEventScanError(
                 f"P4 historical industry supplement failed: {exc}"
@@ -860,6 +880,135 @@ def materialize_p4_research_adm(
     )
 
 
+def load_p4_research_adm(adm_root: Path, *, project_root: Path | None = None) -> P4ResearchADM:
+    """Restore and minimally verify a generation-bound P4 Research ADM."""
+
+    root = adm_root.resolve()
+    manifest_path = root / "adm.json"
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PhysicalEventScanError("P4 Research ADM manifest is unreadable") from exc
+    if not isinstance(raw, dict):
+        raise PhysicalEventScanError("P4 Research ADM manifest must be an object")
+    candidate = raw.get("candidate_projection")
+    industry = raw.get("static_industry_projection")
+    dates = raw.get("trading_dates")
+    if (
+        not isinstance(candidate, dict)
+        or not isinstance(industry, dict)
+        or not isinstance(dates, dict)
+    ):
+        raise PhysicalEventScanError("P4 Research ADM manifest bindings are incomplete")
+    project = find_project_root(manifest_path) if project_root is None else project_root.resolve()
+    policy = load_p4_research_adm_policy(project / "config/p4-research-adm.v1.json")
+    candidate_path = root / _safe_relative(candidate.get("path"))
+    if candidate_path.is_symlink() or not candidate_path.is_file():
+        raise PhysicalEventScanError("P4 Research ADM candidate projection is missing")
+    if _sha256(candidate_path) != candidate.get("sha256"):
+        raise PhysicalEventScanError("P4 Research ADM candidate projection checksum differs")
+    mapping = load_static_industry_mapping(
+        root / _safe_relative(industry.get("path")),
+        expected_version=str(industry.get("mapping_version")),
+    )
+    first = date.fromisoformat(str(dates.get("first")))
+    last = date.fromisoformat(str(dates.get("last")))
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise PhysicalEventScanError("P4 physical scan requires duckdb") from exc
+    connection = duckdb.connect(":memory:")
+    try:
+        raw_dates = connection.execute(
+            "SELECT DISTINCT session_date FROM read_parquet(?) ORDER BY session_date",
+            [str(candidate_path)],
+        ).fetchall()
+    finally:
+        connection.close()
+    trading_dates = tuple(item[0] for item in raw_dates)
+    if (
+        not trading_dates
+        or trading_dates[0] != first
+        or trading_dates[-1] != last
+        or len(trading_dates) != int(dates.get("count", -1))
+    ):
+        raise PhysicalEventScanError("P4 Research ADM trading dates differ")
+    content_digest = str(raw.get("content_digest"))
+    return P4ResearchADM(
+        root=root,
+        policy=policy,
+        candidate_path=candidate_path,
+        industry_mapping=mapping,
+        manifest_path=manifest_path,
+        manifest_sha256=_sha256(manifest_path),
+        content_digest=content_digest,
+        snapshot_id=f"p4-adm-development-{content_digest.removeprefix('sha256:')[:24]}",
+        trading_dates=trading_dates,
+        row_count=int(candidate["row_count"]),
+    )
+
+
+def plan_candidate_security_buckets(
+    projection: P4ResearchADM, workers: int
+) -> tuple[tuple[str, ...], ...]:
+    """Plan row-balanced contiguous ranges over complete security series."""
+
+    if not 1 <= workers <= 8:
+        raise PhysicalEventScanError("candidate shard partitions must be between one and eight")
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise PhysicalEventScanError("P4 physical scan requires duckdb") from exc
+    connection = duckdb.connect(":memory:")
+    try:
+        weighted = tuple(
+            (str(row[0]), int(row[1]))
+            for row in connection.execute(
+                """
+                SELECT dwd_security_id, count(*) AS row_count
+                FROM read_parquet(?) GROUP BY dwd_security_id
+                ORDER BY dwd_security_id
+                """,
+                [str(projection.candidate_path)],
+            ).fetchall()
+        )
+    finally:
+        connection.close()
+    return _contiguous_weight_buckets(weighted, workers)
+
+
+def _contiguous_weight_buckets(
+    weighted: Sequence[tuple[str, int]], workers: int
+) -> tuple[tuple[str, ...], ...]:
+    security_ids = tuple(security_id for security_id, _ in weighted)
+    if (
+        workers < 1
+        or workers > len(weighted)
+        or tuple(sorted(security_ids)) != security_ids
+        or len(set(security_ids)) != len(security_ids)
+        or any(not security_id.strip() or row_count <= 0 for security_id, row_count in weighted)
+    ):
+        raise PhysicalEventScanError("candidate shard weights are invalid")
+    cumulative = [0]
+    for _security_id, row_count in weighted:
+        cumulative.append(cumulative[-1] + row_count)
+    cuts = [0]
+    for boundary in range(1, workers):
+        desired = cumulative[-1] * boundary / workers
+        minimum = cuts[-1] + 1
+        maximum = len(weighted) - (workers - boundary)
+        position = bisect_left(cumulative, desired, minimum, maximum + 1)
+        choices = tuple(
+            cut for cut in (position - 1, position) if minimum <= cut <= maximum
+        )
+        cuts.append(min(choices, key=lambda cut: (abs(cumulative[cut] - desired), cut)))
+    cuts.append(len(weighted))
+    return tuple(
+        tuple(security_id for security_id, _row_count in weighted[start:end])
+        for start, end in pairwise(cuts)
+    )
+
+
 # Compatibility alias for callers created before the P4 Research ADM boundary was named.
 materialize_event_candidate_projection = materialize_p4_research_adm
 
@@ -1144,6 +1293,9 @@ def iter_projected_candidate_series(
     source_policy: EventScanSourcePolicy,
     industry_mapping: StaticIndustryMapping,
     fetch_rows: int = 4096,
+    allowed_security_ids: Sequence[str] | None = None,
+    duckdb_memory_limit: str | None = None,
+    duckdb_temp_directory: Path | None = None,
 ) -> Iterator[tuple[CandidateDailyInput, ...]]:
     """Stream one stable listing series at a time from the materialized projection."""
 
@@ -1156,11 +1308,37 @@ def iter_projected_candidate_series(
     connection = duckdb.connect(":memory:")
     try:
         connection.execute("SET threads=1")
+        connection.execute("SET preserve_insertion_order=true")
+        if duckdb_memory_limit is not None:
+            connection.execute(f"SET memory_limit={_sql_text(duckdb_memory_limit)}")
+        if duckdb_temp_directory is not None:
+            duckdb_temp_directory.mkdir(parents=True, exist_ok=False)
+            connection.execute(
+                f"SET temp_directory={_sql_path(duckdb_temp_directory.resolve())}"
+            )
+        selected_security_ids: tuple[str, ...] | None = None
+        selection_clause = ""
+        if allowed_security_ids is not None:
+            selected_security_ids = tuple(sorted(allowed_security_ids))
+            if (
+                not selected_security_ids
+                or any(not value.strip() for value in selected_security_ids)
+                or len(selected_security_ids) != len(set(selected_security_ids))
+            ):
+                raise PhysicalEventScanError(
+                    "candidate projection security selection must be non-empty and unique"
+                )
+            selection_clause = (
+                " WHERE dwd_security_id BETWEEN "
+                f"{_sql_text(selected_security_ids[0])} AND "
+                f"{_sql_text(selected_security_ids[-1])}"
+            )
         selected_columns = ", ".join(_CANDIDATE_SCAN_COLUMNS)
         cursor = connection.execute(
             f"""
             SELECT {selected_columns}
             FROM read_parquet({_sql_path(projection.candidate_path)})
+            {selection_clause}
             """
         )
         names = tuple(str(item[0]) for item in cursor.description)
@@ -1170,6 +1348,7 @@ def iter_projected_candidate_series(
         current_key: tuple[str, str, str, str] | None = None
         current: list[CandidateDailyInput] = []
         previous_sort_key: tuple[str, datetime, str, date] | None = None
+        observed_security_ids: set[str] = set()
         while True:
             batch = cursor.fetchmany(fetch_rows)
             if not batch:
@@ -1196,6 +1375,7 @@ def iter_projected_candidate_series(
                         "projected candidate physical order differs"
                     )
                 previous_sort_key = sort_key
+                observed_security_ids.add(candidate.security_id)
                 key = (
                     candidate.security_id,
                     candidate.listing_id,
@@ -1209,6 +1389,12 @@ def iter_projected_candidate_series(
                 current.append(candidate)
         if current:
             yield tuple(current)
+        if selected_security_ids is not None and tuple(sorted(observed_security_ids)) != (
+            selected_security_ids
+        ):
+            raise PhysicalEventScanError(
+                "candidate projection contiguous security range differs"
+            )
     finally:
         connection.close()
 
@@ -1326,6 +1512,57 @@ def scan_event_candidate_projection(
             },
         )
     return scan, entries
+
+
+def publish_event_candidate_shards(
+    *,
+    projection: P4ResearchADM,
+    reader: HistoricalReplayFrameReader,
+    source_policy: EventScanSourcePolicy,
+    card: CandidateRuleCard,
+    split_policy: SplitPolicy,
+    shards: Sequence[CandidateScanShard],
+    staging: Path,
+    output: Path,
+    code_revision: str,
+) -> PhysicalEventScanResult:
+    """Finalize disjoint scan shards, bind T+1 evidence, and publish the normal package."""
+
+    scan = finalize_candidate_scan_shards(
+        shards,
+        trading_dates=projection.trading_dates,
+        snapshot_id=projection.snapshot_id,
+        snapshot_manifest_digest=projection.manifest_sha256,
+        card=card,
+        split_policy=split_policy,
+        source_policy=source_policy,
+    )
+    missing_industry = int(
+        scan.counters.reason_counts.get(CandidateReason.STATIC_INDUSTRY_MISSING.value, 0)
+    )
+    if missing_industry:
+        raise PhysicalEventScanError(
+            f"P4 static industry projection is incomplete: missing={missing_industry}"
+        )
+    entries = partition_executable_entries(
+        scan.candidates,
+        evidence_by_event_id=_entry_bindings(
+            scan.candidates,
+            reader,
+            candidate_snapshot_id=projection.snapshot_id,
+        ),
+    )
+    return _publish_package(
+        staging,
+        output=output,
+        source_policy=source_policy,
+        card=card,
+        split_policy=split_policy,
+        projection=projection,
+        scan=scan,
+        entries=entries,
+        code_revision=code_revision,
+    )
 
 
 def _event_rows(scan: CandidateScanResult) -> tuple[dict[str, Any], ...]:

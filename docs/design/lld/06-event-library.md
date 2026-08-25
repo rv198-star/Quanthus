@@ -145,7 +145,14 @@ Current DWD industry membership remains the first mapping authority; the 259 his
 securities are filled only by ADM 1.1's checksum-bound fixed-date BaoStock `证监会行业分类`
 supplement. Its complete selected source content must reproduce
 `sha256:20b51d52070b8976f9f8989ff0f54124aea098ca749167bedbddbed947c3196b`
-before scanning continues. The ADM is application data only: it is not
+before scanning continues. Production Event Workers consume that exact provider receipt from a
+read-only deployment reference rather than making every cold research Job depend on BaoStock
+availability. The loader independently verifies the receipt digest, policy header, 259-security
+set, query dates, resolution method, and CSRC hierarchy mapping; a missing or different reference
+fails closed. An unconfigured development process may still collect the fixed-date provider
+receipt directly, but it must pass the same digest gate. The frozen receipt is source evidence, not
+a cross-Job computed intermediate, and each Job still independently rebuilds its DWD projection,
+ADM, Event, Label, and Report packages. The ADM is application data only: it is not
 DWD, generic DWS, operational ADS, or an execution authority. Event identity binds the exact ADM
 snapshot manifest. The Event Library then adds events, entry partition, summary, manifest, and READY
 around that ADM. `run-p4-event-scan` builds the combined immutable Run package and
@@ -382,6 +389,20 @@ identical across the two Jobs, and all accepted content digests and counts remai
 Evidence is recorded in
 `docs/acceptance/perf-entry-memory-production-ab-20260823.md`.
 
+`PERF-SHARD-001` adds an evidence-gated low-RAM physical plan using 3 GiB resource units. It first
+partitions complete security-series evaluation behind the existing global isolation,
+concentration, split, and publication gates, then admits PostgreSQL shard leases only if two
+isolated units prove at least 1.80x end-to-end speedup over one unit. The exact resource contract,
+stage ownership, excluded infrastructure, and byte-identical acceptance gates live in
+`docs/design/lld/06-event-library/low-ram-sharded-execution.md`.
+
+The isolated-process algorithm gate and the PostgreSQL production topology are accepted. The final
+evidence proves hard 3 GiB shard execution without swap or cgroup limit hits, about 1.80x S3x2
+speedup over S3x1, U16 execution below a hard 16 GiB cgroup, and byte-identical Event, Label, and
+Report trees. Evidence is recorded in
+`docs/acceptance/perf-shard-001-algorithm-benchmark-20260824.md` and
+`docs/acceptance/perf-shard-001-production-ab-20260825.md`.
+
 ## 8. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -394,6 +415,7 @@ Evidence is recorded in
 | PERF-EVENT-001 | Accelerate exact Event scanning and expose internal stage progress | PERF-BATCH-001 | Accepted production A/B: three byte-identical governed package trees, unchanged accepted semantics and counts, generation-fenced progress, and 72.3 percent lower average complete runtime |
 | PERF-ENTRY-001 | Replace T+1 entry-evidence reads with one set-based join | PERF-EVENT-001 | Accepted; scalar/batch equivalence, one-query contract, full checks, 32.233-second production average, and byte-identical production A/B package reproduction |
 | PERF-MEM-001 | Publish stage memory evidence and keep the complete Event batch below 16 GiB | PERF-ENTRY-001 | Accepted; two complete cold Jobs below a hard 16 GiB cgroup with swap disabled, zero OOM/restarts/limit hits, and byte-identical governed package trees |
+| PERF-SHARD-001 | Prove 3 GiB deterministic multi-Worker Event execution | PERF-MEM-001 | Accepted; hard 3 GiB shards, about 1.80x two-Worker scaling, bounded U16, and byte-identical production evidence |
 
 ## 9. Acceptance
 

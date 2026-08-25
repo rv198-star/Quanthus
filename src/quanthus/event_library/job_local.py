@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import glob
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from quanthus.backtest.baseline_research import (
     FEATURE_EVALUATOR_VERSION,
@@ -21,6 +24,17 @@ class JobLocalArtifactError(RuntimeError):
     """Raised when an in-Job intermediate does not match its consumer."""
 
 
+def _artifact_files(path: Path) -> tuple[Path, ...]:
+    raw = str(path)
+    if glob.has_magic(raw):
+        files = tuple(Path(item).resolve() for item in sorted(glob.glob(raw)))
+    else:
+        files = (path.resolve(),)
+    if not files or any(item.is_symlink() or not item.is_file() for item in files):
+        raise JobLocalArtifactError("job_local_feature_panel_missing")
+    return files
+
+
 @dataclass(frozen=True)
 class JobLocalFeaturePanel:
     path: Path
@@ -29,6 +43,69 @@ class JobLocalFeaturePanel:
     provider_config_digest: str
     parquet_bytes: int
     schema_version: str = JOB_LOCAL_FEATURE_PANEL_SCHEMA
+
+    def to_receipt(self) -> dict[str, Any]:
+        def report_value(report: BaselineFeaturePanelReport) -> dict[str, Any]:
+            return {
+                name: (
+                    value.isoformat() if isinstance(value, date) else value
+                )
+                for name, value in report.__dict__.items()
+            }
+
+        return {
+            "schema_version": self.schema_version,
+            "path": str(self.path),
+            "report": report_value(self.report),
+            "materialized_report": report_value(self.materialized_report),
+            "provider_config_digest": self.provider_config_digest,
+            "parquet_bytes": self.parquet_bytes,
+        }
+
+    @classmethod
+    def from_receipt(cls, value: Mapping[str, Any]) -> JobLocalFeaturePanel:
+        expected = {
+            "schema_version",
+            "path",
+            "report",
+            "materialized_report",
+            "provider_config_digest",
+            "parquet_bytes",
+        }
+        if set(value) != expected or value.get("schema_version") != JOB_LOCAL_FEATURE_PANEL_SCHEMA:
+            raise JobLocalArtifactError("job_local_feature_panel_receipt_invalid")
+
+        def report_value(raw: object) -> BaselineFeaturePanelReport:
+            if not isinstance(raw, Mapping):
+                raise JobLocalArtifactError("job_local_feature_panel_receipt_invalid")
+            fields = dict(raw)
+            try:
+                fields["scope_start"] = date.fromisoformat(str(fields["scope_start"]))
+                fields["scope_end"] = date.fromisoformat(str(fields["scope_end"]))
+                return BaselineFeaturePanelReport(**fields)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise JobLocalArtifactError(
+                    "job_local_feature_panel_receipt_invalid"
+                ) from exc
+
+        path = Path(str(value["path"])).resolve()
+        parquet_bytes = value["parquet_bytes"]
+        provider_digest = value["provider_config_digest"]
+        if (
+            not isinstance(parquet_bytes, int)
+            or isinstance(parquet_bytes, bool)
+            or parquet_bytes <= 0
+            or not isinstance(provider_digest, str)
+            or not provider_digest
+        ):
+            raise JobLocalArtifactError("job_local_feature_panel_receipt_invalid")
+        return cls(
+            path=path,
+            report=report_value(value["report"]),
+            materialized_report=report_value(value["materialized_report"]),
+            provider_config_digest=provider_digest,
+            parquet_bytes=parquet_bytes,
+        )
 
     def require_compatible(
         self,
@@ -41,9 +118,8 @@ class JobLocalFeaturePanel:
     ) -> None:
         if self.schema_version != JOB_LOCAL_FEATURE_PANEL_SCHEMA:
             raise JobLocalArtifactError("job_local_feature_panel_schema_mismatch")
-        if self.path.is_symlink() or not self.path.is_file():
-            raise JobLocalArtifactError("job_local_feature_panel_missing")
-        if self.path.stat().st_size != self.parquet_bytes:
+        files = _artifact_files(self.path)
+        if sum(item.stat().st_size for item in files) != self.parquet_bytes:
             raise JobLocalArtifactError("job_local_feature_panel_size_mismatch")
         if (
             self.provider_config_digest != provider_config.digest
@@ -110,6 +186,11 @@ def build_job_local_feature_panel(
     scope_start: date,
     scope_end: date,
     output: Path,
+    duckdb_memory_limit: str = "6GB",
+    duckdb_threads: int = 2,
+    release_source_cache: bool = False,
+    output_order: str = "date-security",
+    spill_cache_release_interval_seconds: float | None = None,
 ) -> JobLocalFeaturePanel:
     require_job_local_session(
         session,
@@ -129,6 +210,11 @@ def build_job_local_feature_panel(
         output=output,
         data_content_digest=session.reader.data_content_digest,
         data_manifest_sha256=session.reader.data_manifest_sha256,
+        duckdb_memory_limit=duckdb_memory_limit,
+        duckdb_threads=duckdb_threads,
+        release_source_cache=release_source_cache,
+        output_order=output_order,
+        spill_cache_release_interval_seconds=spill_cache_release_interval_seconds,
     )
     return JobLocalFeaturePanel(
         path=artifact.path,

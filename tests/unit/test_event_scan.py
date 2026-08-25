@@ -18,8 +18,11 @@ from quanthus.event_library.scan import (
     CandidateEntryEvidence,
     CandidateReason,
     CandidateScanError,
+    CandidateScanShard,
     EntryStatus,
+    finalize_candidate_scan_shards,
     partition_executable_entries,
+    scan_candidate_series_shard,
     scan_forward_candidate_series,
     scan_forward_candidates,
 )
@@ -380,6 +383,66 @@ class EventForwardScanTests(unittest.TestCase):
         )
 
         self.assertEqual(streamed, in_memory)
+
+    def test_disjoint_scan_shards_finalize_exactly_like_one_stream(self) -> None:
+        first = tuple(_series("600001", signal_indices=(43, 80), industry="industry-01"))
+        second = tuple(_series("000001", signal_indices=(50,), industry="industry-02"))
+        expected = scan_forward_candidate_series(
+            (first, second),
+            trading_dates=TRADING_DATES,
+            snapshot_id=SNAPSHOT_ID,
+            snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+            card=CARD,
+            split_policy=SPLIT,
+            source_policy=SOURCE,
+        )
+        shards = tuple(
+            scan_candidate_series_shard(
+                (series,),
+                trading_dates=TRADING_DATES,
+                snapshot_id=SNAPSHOT_ID,
+                snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+                card=CARD,
+                split_policy=SPLIT,
+                source_policy=SOURCE,
+            )
+            for series in (first, second)
+        )
+
+        observed = finalize_candidate_scan_shards(
+            tuple(reversed(shards)),
+            trading_dates=TRADING_DATES,
+            snapshot_id=SNAPSHOT_ID,
+            snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+            card=CARD,
+            split_policy=SPLIT,
+            source_policy=SOURCE,
+        )
+
+        self.assertEqual(observed, expected)
+
+        restored = tuple(CandidateScanShard.from_dict(item.to_dict()) for item in shards)
+        self.assertEqual(restored, shards)
+
+        overlapping = (
+            shards[0],
+            replace(
+                shards[1],
+                security_ids=tuple(
+                    sorted(set(shards[0].security_ids + shards[1].security_ids))
+                ),
+            ),
+        )
+        with self.assertRaisesRegex(CandidateScanError, "overlap security ownership"):
+            finalize_candidate_scan_shards(
+                overlapping,
+                trading_dates=TRADING_DATES,
+                snapshot_id=SNAPSHOT_ID,
+                snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+                card=CARD,
+                split_policy=SPLIT,
+                source_policy=SOURCE,
+            )
 
     def test_streaming_scan_reports_decode_scan_and_finalization_progress(self) -> None:
         rows = tuple(_series("600011", signal_indices=(43, 80)))

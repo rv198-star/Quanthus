@@ -175,6 +175,10 @@ nodes.
   remains single-process and exposes generation-fenced internal progress. Peak RSS remains about
   19.5 GiB and does not satisfy the desired 16 GiB ceiling. Evidence is recorded in
   `acceptance/perf-event-001-production-ab-20260823.md`.
+  `PERF-SHARD-001` is accepted after deterministic 3 GiB shard execution, repeated production
+  scaling at about 1.80x with two Workers, two bounded U16 resource runs, and byte-identical Event,
+  Label, and Report reconciliation. Evidence is recorded in
+  `acceptance/perf-shard-001-production-ab-20260825.md`.
   Arbitration and permanent-blind reads remain blocked.
 - PK6 acceptance is recorded in `acceptance/platform-kernel-pk6-cutover-recovery-20260813.md`.
   Production runs from clean GitHub checkout `b9d459a` with commit-tagged API/Web/Replay images,

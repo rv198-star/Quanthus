@@ -48,6 +48,15 @@ class HistoricalReplayBundle:
     snapshot: SnapshotRef
     universe_policy_version: str
     datasets: tuple[DatasetManifest, ...]
+    canonical_identity_digest: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.canonical_identity_digest is not None and not _SHA256.fullmatch(
+            self.canonical_identity_digest
+        ):
+            raise HistoricalReplayBundleError(
+                "historical replay canonical identity must be a sha256 digest"
+            )
 
     @property
     def ready_for_frame_construction(self) -> bool:
@@ -59,6 +68,12 @@ class HistoricalReplayBundle:
 
     @property
     def digest(self) -> str:
+        if self.canonical_identity_digest is not None:
+            return self.canonical_identity_digest
+        return self.physical_digest
+
+    @property
+    def physical_digest(self) -> str:
         return f"sha256:{hashlib.sha256(self.canonical_bytes()).hexdigest()}"
 
     def canonical_bytes(self) -> bytes:

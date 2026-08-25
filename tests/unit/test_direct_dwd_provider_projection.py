@@ -11,12 +11,105 @@ import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from quanthus.backtest.direct_dwd_provider import _materialize
+from quanthus.backtest.direct_dwd_provider import (
+    DATASETS,
+    _logical_table_digest,
+    _materialize,
+    _validated_logical_digest,
+    materialize_sharded_direct_dwd,
+)
+from quanthus.event_library.sharded_batch import SHARDED_DWD_DAILY_DATASETS
+from quanthus.policy import ConfigurationError
 
 SSE = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
 
 
 class DirectDwdProjectionTests(unittest.TestCase):
+    def test_sharded_batch_merges_every_date_partitioned_dataset(self) -> None:
+        self.assertEqual(
+            set(SHARDED_DWD_DAILY_DATASETS),
+            {
+                "daily_ohlcv_none",
+                "daily_universe",
+                "price_limit_execution_daily",
+                "trading_calendar",
+            },
+        )
+
+    def test_logical_digest_ignores_parquet_encoding_but_retains_row_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rows = [
+                {"security_id": f"{index:06d}", "date": date(2012, 1, 4), "value": index}
+                for index in range(1_000)
+            ]
+            canonical = root / "canonical.parquet"
+            alternate = root / "alternate.parquet"
+            reversed_path = root / "reversed.parquet"
+            alternate_type_path = root / "alternate-type.parquet"
+            table = pa.Table.from_pylist(rows)
+            pq.write_table(table, canonical, compression="zstd", row_group_size=100)
+            pq.write_table(table, alternate, compression="snappy", row_group_size=137)
+            pq.write_table(
+                table.set_column(
+                    table.schema.get_field_index("value"),
+                    "value",
+                    table["value"].cast(pa.int32()),
+                ),
+                alternate_type_path,
+                compression="snappy",
+                row_group_size=137,
+            )
+            pq.write_table(
+                pa.Table.from_pylist(list(reversed(rows))),
+                reversed_path,
+                compression="snappy",
+                row_group_size=137,
+            )
+
+            self.assertNotEqual(canonical.read_bytes(), alternate.read_bytes())
+            self.assertEqual(
+                _logical_table_digest(canonical),
+                _logical_table_digest(alternate),
+            )
+            canonical_digest = _logical_table_digest(canonical)
+            reversed_digest = _logical_table_digest(reversed_path)
+            self.assertEqual(
+                canonical_digest["hash_xor_u64"], reversed_digest["hash_xor_u64"]
+            )
+            self.assertEqual(
+                canonical_digest["hash_sum_i128"], reversed_digest["hash_sum_i128"]
+            )
+            self.assertNotEqual(
+                canonical_digest["order_weighted_hash_sum_i128"],
+                reversed_digest["order_weighted_hash_sum_i128"],
+            )
+            self.assertNotEqual(
+                canonical_digest["columns_digest"],
+                _logical_table_digest(alternate_type_path)["columns_digest"],
+            )
+
+    def test_canonical_logical_receipt_is_strict_and_dataset_scoped(self) -> None:
+        valid = {
+            "algorithm": "duckdb-hash-order-v1",
+            "duckdb_version": "v1.5.5",
+            "columns_digest": "sha256:" + "a" * 64,
+            "column_count": 1,
+            "row_count": 1,
+            "hash_xor_u64": "1",
+            "hash_sum_i128": "1",
+            "order_weighted_hash_sum_i128": "1",
+        }
+        self.assertEqual(
+            _validated_logical_digest(valid, "daily_ohlcv_none"),
+            valid,
+        )
+        with self.assertRaisesRegex(ConfigurationError, "is invalid"):
+            _validated_logical_digest({**valid, "row_count": "1"}, "daily_ohlcv_none")
+        with self.assertRaisesRegex(ConfigurationError, "is not admitted"):
+            _validated_logical_digest(valid, "trading_calendar")
+        self.assertIsNone(_validated_logical_digest(None, "trading_calendar"))
+
     def test_materialization_retains_additive_p4_identity_decimal_and_lineage_columns(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -185,7 +278,7 @@ class DirectDwdProjectionTests(unittest.TestCase):
             self.assertEqual(len(opened_connections), 4)
             for connection, memory_limit in zip(
                 opened_connections,
-                ("6GB", "12GB", "12GB", "6GB"),
+                ("6GB", "11500MB", "11500MB", "6GB"),
                 strict=True,
             ):
                 self.assertEqual(
@@ -223,6 +316,38 @@ class DirectDwdProjectionTests(unittest.TestCase):
             self.assertEqual(limits["dwd_security_id"], "security-001")
             self.assertEqual(limits["dwd_state_knowledge_from"], known)
 
+            sharded_output = root / "sharded-output"
+            sharded_counts = materialize_sharded_direct_dwd(
+                sharded_output,
+                dwd_root=dwd,
+                correction_root=correction,
+                history_start=day,
+                execution_end=day,
+                workers=1,
+            )
+            self.assertEqual(sharded_counts, counts)
+            for dataset in DATASETS:
+                self.assertEqual(
+                    (sharded_output / "tables" / f"{dataset}.parquet").read_bytes(),
+                    (output / "tables" / f"{dataset}.parquet").read_bytes(),
+                )
+
+            self._write_empty_actions(
+                correction / "payload/replay/corporate_actions_normalized.parquet"
+            )
+            empty_action_partition = root / "empty-action-partition"
+            empty_action_partition.mkdir()
+            partition_counts = _materialize(
+                empty_action_partition,
+                dwd_root=dwd,
+                correction_root=correction,
+                history_start=day,
+                execution_end=day,
+                allow_empty_non_partitioned=True,
+            )
+            self.assertEqual(partition_counts["corporate_actions_normalized"], 0)
+            self.assertEqual(partition_counts["daily_ohlcv_none"], 1)
+
     @staticmethod
     def _write(path: Path, rows: list[dict[str, object]]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -259,6 +384,17 @@ class DirectDwdProjectionTests(unittest.TestCase):
                 ("blocked_from", pa.date32()),
                 ("blocked_through", pa.date32()),
                 ("reason_code", pa.string()),
+            ]
+        )
+        pq.write_table(pa.Table.from_pylist([], schema=schema), path)
+
+    @staticmethod
+    def _write_empty_actions(path: Path) -> None:
+        schema = pa.schema(
+            [
+                ("security_code", pa.string()),
+                ("effective_date", pa.date32()),
+                ("action_id", pa.string()),
             ]
         )
         pq.write_table(pa.Table.from_pylist([], schema=schema), path)

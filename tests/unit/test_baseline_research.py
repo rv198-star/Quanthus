@@ -25,7 +25,7 @@ from quanthus.backtest.baseline_research import BaselineHistoricalStrategy
 from quanthus.backtest.historical_bundle import HistoricalReplayBundle
 from quanthus.contracts import SnapshotRef
 from quanthus.data_foundation import DatasetManifest
-from quanthus.event_library.job_local import JobLocalFeaturePanel
+from quanthus.event_library.job_local import JobLocalArtifactError, JobLocalFeaturePanel
 from quanthus.feature_registry import load_feature_registry
 from quanthus.policy import find_project_root
 
@@ -359,10 +359,8 @@ class BaselineResearchTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(full_rows, independent_rows)
-        scoped = shared.scoped(scope_start=self.dates[0], scope_end=self.dates[-2])
-        self.assertEqual(scoped.path, shared.path)
-        self.assertEqual(scoped.report, independent.report)
-        self.assertEqual(scoped.materialized_report, full.report)
+        with self.assertRaisesRegex(JobLocalArtifactError, "scope_mismatch"):
+            shared.scoped(scope_start=self.dates[0], scope_end=self.dates[-2])
 
     def test_total_return_index_is_continuous_across_a_split(self) -> None:
         split_index = 30

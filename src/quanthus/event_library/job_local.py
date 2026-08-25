@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import glob
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -158,55 +158,12 @@ class JobLocalFeaturePanel:
     def scoped(self, *, scope_start: date, scope_end: date) -> JobLocalFeaturePanel:
         if scope_start > scope_end:
             raise JobLocalArtifactError("job_local_feature_panel_scope_invalid")
-        if self.report.scope_start == scope_start and self.report.scope_end == scope_end:
-            return self
         if (
-            scope_start < self.materialized_report.scope_start
-            or scope_end > self.materialized_report.scope_end
+            scope_start != self.materialized_report.scope_start
+            or scope_end != self.materialized_report.scope_end
         ):
             raise JobLocalArtifactError("job_local_feature_panel_scope_mismatch")
-        _artifact_files(self.path)
-        try:
-            import duckdb
-        except ModuleNotFoundError as exc:
-            raise JobLocalArtifactError("job_local_feature_panel_scope_unreadable") from exc
-        connection = duckdb.connect(":memory:")
-        try:
-            counts = connection.execute(
-                """
-                SELECT count(*) AS row_count,
-                       count(*) FILTER (WHERE feature_ready) AS feature_ready_count,
-                       count(*) FILTER (WHERE entry_eligible) AS entry_eligible_count,
-                       count(*) FILTER (WHERE exception_active) AS exception_active_count,
-                       count(*) FILTER (
-                           WHERE unexplained_price_transition
-                       ) AS unexplained_transition_count,
-                       count(DISTINCT security_id) FILTER (
-                           WHERE scope_continuity_excluded
-                       ) AS continuity_excluded_security_count
-                FROM read_parquet(?)
-                WHERE market_date BETWEEN ? AND ?
-                """,
-                [str(self.path), scope_start, scope_end],
-            ).fetchone()
-        except Exception as exc:
-            raise JobLocalArtifactError("job_local_feature_panel_scope_unreadable") from exc
-        finally:
-            connection.close()
-        if counts is None or int(counts[0]) <= 0 or int(counts[1]) <= 0:
-            raise JobLocalArtifactError("job_local_feature_panel_scope_empty")
-        report = replace(
-            self.materialized_report,
-            scope_start=scope_start,
-            scope_end=scope_end,
-            row_count=int(counts[0]),
-            feature_ready_count=int(counts[1]),
-            entry_eligible_count=int(counts[2]),
-            exception_active_count=int(counts[3]),
-            unexplained_transition_count=int(counts[4]),
-            continuity_excluded_security_count=int(counts[5]),
-        )
-        return replace(self, report=report)
+        return self
 
 
 def require_job_local_session(

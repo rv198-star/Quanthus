@@ -328,7 +328,7 @@ def _load_runtime_receipt(path: Path, *, required: bool) -> dict[str, Any] | Non
         or reuse
         != {
             "provider_materializations": 1,
-            "feature_panel_materializations": 1,
+            "feature_panel_materializations": 2,
             "cross_job_cache": False,
             "adm_published": False,
         }

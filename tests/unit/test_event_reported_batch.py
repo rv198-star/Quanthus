@@ -6,8 +6,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-import pyarrow as pa
-import pyarrow.parquet as pq
 import pytest
 
 from quanthus.backtest.baseline_research import BaselineFeaturePanelReport
@@ -45,33 +43,9 @@ def _report(*, end: date, rows: int = 2) -> BaselineFeaturePanelReport:
     )
 
 
-def test_job_local_panel_derives_exact_bounded_scope_view(tmp_path: Path) -> None:
+def test_job_local_panel_rejects_derived_scope_reuse(tmp_path: Path) -> None:
     panel_path = tmp_path / "feature-panel.parquet"
-    pq.write_table(
-        pa.Table.from_pylist(
-            [
-                {
-                    "market_date": date(2021, 12, 30),
-                    "security_id": "600001",
-                    "feature_ready": True,
-                    "entry_eligible": True,
-                    "exception_active": False,
-                    "unexplained_price_transition": False,
-                    "scope_continuity_excluded": False,
-                },
-                {
-                    "market_date": date(2021, 12, 31),
-                    "security_id": "600001",
-                    "feature_ready": True,
-                    "entry_eligible": True,
-                    "exception_active": False,
-                    "unexplained_price_transition": False,
-                    "scope_continuity_excluded": False,
-                },
-            ]
-        ),
-        panel_path,
-    )
+    panel_path.write_bytes(b"panel")
     materialized = _report(end=date(2021, 12, 31))
     panel = JobLocalFeaturePanel(
         path=panel_path,
@@ -81,13 +55,8 @@ def test_job_local_panel_derives_exact_bounded_scope_view(tmp_path: Path) -> Non
         parquet_bytes=panel_path.stat().st_size,
     )
 
-    scoped = panel.scoped(
-        scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 30)
-    )
-    assert scoped.path == panel.path
-    assert scoped.report.scope_end == date(2021, 12, 30)
-    assert scoped.report.row_count == 1
-    assert scoped.materialized_report == materialized
+    with pytest.raises(JobLocalArtifactError, match="scope_mismatch"):
+        panel.scoped(scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 30))
     assert (
         panel.scoped(scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 31))
         is panel
@@ -356,15 +325,15 @@ def test_reported_batch_builds_each_scope_bound_prerequisite_once(
 
     assert calls == {
         "provider_open": 1,
-        "panel_build": 1,
+        "panel_build": 2,
         "event": 1,
         "label": 1,
         "report": 1,
     }
-    assert panel_scopes == [date(2021, 12, 31)]
+    assert panel_scopes == [date(2021, 12, 31), date(2021, 12, 30)]
     assert result.runtime["reuse"] == {
         "provider_materializations": 1,
-        "feature_panel_materializations": 1,
+        "feature_panel_materializations": 2,
         "cross_job_cache": False,
         "adm_published": False,
     }

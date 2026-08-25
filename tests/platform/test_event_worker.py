@@ -125,7 +125,7 @@ def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
         ],
         "reuse": {
             "provider_materializations": 1,
-            "feature_panel_materializations": 1,
+            "feature_panel_materializations": 2,
             "cross_job_cache": False,
             "adm_published": False,
         },
@@ -141,7 +141,7 @@ def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
 
     payload["reuse"] = {
         "provider_materializations": 1,
-        "feature_panel_materializations": 1,
+        "feature_panel_materializations": 2,
         "cross_job_cache": False,
         "adm_published": False,
     }
@@ -154,7 +154,7 @@ def test_runtime_receipt_requires_exact_scope_bound_materialization_counts(
 
     payload["reuse"] = {
         "provider_materializations": 3,
-        "feature_panel_materializations": 1,
+        "feature_panel_materializations": 2,
         "cross_job_cache": False,
         "adm_published": False,
     }
@@ -226,7 +226,7 @@ def test_event_worker_polls_child_progress_and_removes_receipt_before_sealing(
         "total_elapsed_seconds": 12.5,
         "reuse": {
             "provider_materializations": 1,
-            "feature_panel_materializations": 1,
+            "feature_panel_materializations": 2,
             "cross_job_cache": False,
             "adm_published": False,
         },

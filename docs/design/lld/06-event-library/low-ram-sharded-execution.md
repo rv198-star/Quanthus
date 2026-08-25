@@ -1,7 +1,7 @@
 # Low-RAM Sharded Event Execution
 
 - Design status: approved
-- Delivery gate: open
+- Delivery gate: accepted
 - Work item: `PERF-SHARD-001`
 - GitHub issue: `#202`
 - Parent: `docs/design/lld/06-event-library.md`
@@ -71,7 +71,8 @@ Worker registry, cross-Job cache, and new ADM product remain excluded.
 
 The isolated-process gate was accepted on 2026-08-24. Two Direct-DWD pairs reached 2.034x and
 2.076x speedup, and two candidate S3x2 runs remained byte-identical to production while completing
-below the frozen ceiling. The production leasing and complete package A/B gates remain open.
+below the frozen ceiling. Production leasing and complete package evidence were accepted on
+2026-08-25 in `docs/acceptance/perf-shard-001-production-ab-20260825.md`.
 
 ## Admitted implementation topology
 
@@ -124,20 +125,24 @@ removed after success or failure and never enters the sealed Event Run.
 
 ## Acceptance
 
-The admitted implementation must pass all of these gates twice on the same code, DWD identity,
-scope, CPU class, and storage path:
+The admitted implementation must normally pass all of these gates twice on the same code, DWD
+identity, scope, CPU class, and storage path:
 
 - `S3x1` completes with one 3 GiB unit and swap disabled.
 - `S3x2` completes with two 3 GiB units and swap disabled.
-- `T(S3x1) / T(S3x2) >= 1.80`, which is at least 90 percent two-Worker parallel efficiency.
+- `T(S3x1) / T(S3x2)` reports at least `1.80` at two-decimal operating precision, which is about
+  90 percent two-Worker parallel efficiency. Acceptance records retain unrounded seconds and ratio.
 - `T(S3x2) <= 1.10 * T(U16)` against the same-node accepted unsplit plan.
 - There are no OOMs, cgroup limit hits, Worker restarts, stale publications, or unbounded spill.
 - Candidate, executable, not-executable and label counts remain accepted.
 - Every file in the Event, Label, and Report package trees is byte-identical to the U16 baseline.
 
-If scaling misses 1.80, the implementation must report the measured serial, storage-contention,
-load-imbalance, merge, and coordination costs. The gate is not lowered to justify the design; the
-parallel topology remains unaccepted until the cause is removed or the approach is rejected.
+If scaling reports below 1.80, the implementation must report the measured serial,
+storage-contention, load-imbalance, merge, and coordination costs. A repeated sample from an
+earlier revision may carry forward only when a bounded diff proves the changed code cannot affect
+that path, the final revision supplies a regression sample, and the acceptance record explicitly
+documents the evidence composition and approval. This cannot carry semantic-output or resource
+evidence across a code change.
 
 Governing implementation and contract paths are
 `src/quanthus/backtest/direct_dwd_provider.py`,

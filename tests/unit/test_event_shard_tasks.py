@@ -51,7 +51,7 @@ def test_feature_panel_opens_decision_scope_but_materializes_execution_scope(
         return SimpleNamespace(
             path=output,
             parquet_bytes=5,
-            report=SimpleNamespace(row_count=7),
+            report=SimpleNamespace(row_count=7, selected_security_count=1),
             to_receipt=lambda: {"panel": "receipt"},
         )
 
@@ -68,6 +68,7 @@ def test_feature_panel_opens_decision_scope_but_materializes_execution_scope(
             "counts": {"daily": 1},
             "scope_start": decision_start.isoformat(),
             "scope_end": execution_end.isoformat(),
+            "security_ids": ["600001"],
             "projection_root": str(tmp_path / "projection"),
             "output": str(output),
             "receipt": str(tmp_path / "panel" / "receipt.json"),
@@ -82,8 +83,10 @@ def test_feature_panel_opens_decision_scope_but_materializes_execution_scope(
         "counts": {"daily": 1},
     }
     assert observed["panel"]["scope_end"] == execution_end  # type: ignore[index]
-    assert observed["panel"]["duckdb_memory_limit"] == "1500MB"  # type: ignore[index]
+    assert observed["panel"]["allowed_security_ids"] == ("600001",)  # type: ignore[index]
+    assert observed["panel"]["duckdb_memory_limit"] == "1GB"  # type: ignore[index]
     assert observed["panel"]["release_source_cache"] is True  # type: ignore[index]
     assert observed["panel"]["output_order"] == "security-date"  # type: ignore[index]
     assert observed["panel"]["spill_cache_release_interval_seconds"] == 1.0  # type: ignore[index]
+    assert observed["panel"]["materialize_selected_sources"] is False  # type: ignore[index]
     assert result["rows"] == 7

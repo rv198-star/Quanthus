@@ -396,22 +396,17 @@ def build_physical_reported_event_batch(
                     "feature_panel_disposition": "supplied_scope_bound_tmp",
                 },
             )
-            label_panel.path.unlink()
             report_panel = _run_stage(
                 stages,
                 "feature-panel.report-scope",
-                lambda: build_job_local_feature_panel(
-                    session=session,
-                    provider_config=provider_config,
-                    registry=registry,
+                lambda: label_panel.scoped(
                     scope_start=_DEVELOPMENT_START,
                     scope_end=_DECISION_END,
-                    output=Path(temporary) / "report-feature-panel.parquet",
                 ),
                 lambda result: {
                     "rows": result.report.row_count,
                     "bytes": result.parquet_bytes,
-                    "disposition": "built_once_tmp",
+                    "disposition": "derived_scope_view_tmp",
                     "scope_end": _DECISION_END.isoformat(),
                 },
             )
@@ -436,6 +431,7 @@ def build_physical_reported_event_batch(
                     "feature_panel_disposition": "supplied_scope_bound_tmp",
                 },
             )
+            label_panel.path.unlink()
 
     runtime = {
         "schema_version": REPORTED_BATCH_RUNTIME_SCHEMA,
@@ -451,7 +447,7 @@ def build_physical_reported_event_batch(
         },
         "reuse": {
             "provider_materializations": 1,
-            "feature_panel_materializations": 2,
+            "feature_panel_materializations": 1,
             "cross_job_cache": False,
             "adm_published": False,
         },

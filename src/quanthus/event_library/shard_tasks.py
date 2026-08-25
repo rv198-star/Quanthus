@@ -186,18 +186,6 @@ def _feature_panel(payload: Mapping[str, Any], project_root: Path) -> dict[str, 
         raise RuntimeError("feature panel DWD counts are invalid")
     scope_start = date.fromisoformat(str(payload["scope_start"]))
     scope_end = date.fromisoformat(str(payload["scope_end"]))
-    raw_security_ids = payload.get("security_ids")
-    security_ids: tuple[str, ...] | None = None
-    if raw_security_ids is not None:
-        if (
-            not isinstance(raw_security_ids, list)
-            or not raw_security_ids
-            or any(not isinstance(item, str) or not item.strip() for item in raw_security_ids)
-        ):
-            raise RuntimeError("feature panel shard security ids are invalid")
-        security_ids = tuple(raw_security_ids)
-        if security_ids != tuple(sorted(set(security_ids))):
-            raise RuntimeError("feature panel shard security ids are invalid")
     output = Path(str(payload["output"]))
     output.parent.mkdir(parents=True, exist_ok=False)
     with open_materialized_direct_dwd_session(
@@ -214,13 +202,11 @@ def _feature_panel(payload: Mapping[str, Any], project_root: Path) -> dict[str, 
             scope_start=scope_start,
             scope_end=scope_end,
             output=output,
-            duckdb_memory_limit="1GB",
+            duckdb_memory_limit="1500MB",
             duckdb_threads=1,
             release_source_cache=True,
             output_order="security-date",
             spill_cache_release_interval_seconds=1.0,
-            allowed_security_ids=security_ids,
-            materialize_selected_sources=False,
         )
     receipt = Path(str(payload["receipt"]))
     _write_json(receipt, panel.to_receipt())
@@ -233,7 +219,6 @@ def _feature_panel(payload: Mapping[str, Any], project_root: Path) -> dict[str, 
         "sha256": panel_sha256,
         "bytes": panel.parquet_bytes,
         "rows": panel.report.row_count,
-        "security_count": panel.report.selected_security_count,
     }
 
 

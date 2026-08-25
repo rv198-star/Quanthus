@@ -21,11 +21,7 @@ from quanthus.backtest.direct_dwd_provider import (
     open_materialized_direct_dwd_session,
 )
 from quanthus.event_library.comparison_report import build_physical_comparison_report
-from quanthus.event_library.job_local import (
-    JobLocalFeaturePanel,
-    merge_job_local_feature_panel_parts,
-    plan_feature_panel_security_buckets,
-)
+from quanthus.event_library.job_local import JobLocalFeaturePanel
 from quanthus.event_library.label_corpus import build_physical_label_corpus
 from quanthus.event_library.physical_scan import (
     load_p4_research_adm,
@@ -60,15 +56,7 @@ SHARDED_DWD_DAILY_DATASETS = (
     "price_limit_execution_daily",
     "trading_calendar",
 )
-MINIMUM_FEATURE_PANEL_PARTS = 2
-
-
-def feature_panel_partition_count(worker_target: int) -> int:
-    """Keep numerical work units stable between one- and two-Worker runs."""
-
-    if worker_target not in {1, 2, 3, 4}:
-        raise ValueError("feature panel Worker target is invalid")
-    return max(MINIMUM_FEATURE_PANEL_PARTS, worker_target)
+CANDIDATE_ANALYSIS_PARTITIONS = 5
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -367,7 +355,9 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                 provider_identity=session.identity,
                 output_root=package_staging / "adm",
             )
-            buckets = plan_candidate_security_buckets(projection, args.shard_target)
+            buckets = plan_candidate_security_buckets(
+                projection, CANDIDATE_ANALYSIS_PARTITIONS
+            )
             scan_payloads = tuple(
                 {
                     "schema_version": TASK_SCHEMA,
@@ -395,8 +385,42 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                 }
                 for ordinal, bucket in enumerate(buckets)
             )
-            scan_results = batch.dispatch(
-                "candidate-scan", scan_payloads, progress_start=48, progress_end=78
+            panel_payload = {
+                "schema_version": TASK_SCHEMA,
+                "kind": "feature-panel",
+                "provider_config": args.provider_config,
+                "feature_registry": args.feature_registry,
+                "projection_root": str(projection_root),
+                "counts": counts,
+                "scope_start": _DEVELOPMENT_START.isoformat(),
+                "scope_end": _EXECUTION_END.isoformat(),
+                "output": str(
+                    batch.shard_root
+                    / "feature-panel"
+                    / "shared"
+                    / "generation-{claim_generation}"
+                    / "panel.parquet"
+                ),
+                "receipt": str(
+                    batch.shard_root
+                    / "feature-panel"
+                    / "shared"
+                    / "generation-{claim_generation}"
+                    / "receipt.json"
+                ),
+            }
+            analysis_started = time.perf_counter()
+            analysis_results = batch.dispatch(
+                "analysis",
+                (panel_payload, *scan_payloads),
+                progress_start=48,
+                progress_end=80,
+            )
+            analysis_elapsed = time.perf_counter() - analysis_started
+            panel_result = analysis_results[0]
+            scan_results = analysis_results[1:]
+            label_panel = JobLocalFeaturePanel.from_receipt(
+                _read_object(Path(str(panel_result["receipt"])))
             )
             scan_shards = tuple(
                 CandidateScanShard.from_dict(_read_object(Path(str(result["output"]))))
@@ -420,70 +444,18 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                     rows=event.candidate_events,
                     bytes=_tree_bytes(event.root),
                     provider_disposition="reused",
-                    candidate_shards=args.shard_target,
+                    candidate_shards=len(buckets),
+                    analysis_elapsed_seconds=round(analysis_elapsed, 3),
                 )
             )
-
-            panel_started = time.perf_counter()
-            panel_partition_count = feature_panel_partition_count(args.shard_target)
-            panel_buckets = plan_feature_panel_security_buckets(
-                projection_root,
-                panel_partition_count,
-                scope_start=_DEVELOPMENT_START,
-                scope_end=_EXECUTION_END,
-            )
-            panel_payloads = tuple(
-                {
-                    "schema_version": TASK_SCHEMA,
-                    "kind": "feature-panel",
-                    "provider_config": args.provider_config,
-                    "feature_registry": args.feature_registry,
-                    "projection_root": str(projection_root),
-                    "counts": counts,
-                    "scope_start": _DEVELOPMENT_START.isoformat(),
-                    "scope_end": _EXECUTION_END.isoformat(),
-                    "security_ids": list(bucket),
-                    "output": str(
-                        batch.shard_root
-                        / "feature-panel"
-                        / f"part-{ordinal:03d}"
-                        / "generation-{claim_generation}"
-                        / "panel.parquet"
-                    ),
-                    "receipt": str(
-                        batch.shard_root
-                        / "feature-panel"
-                        / f"part-{ordinal:03d}"
-                        / "generation-{claim_generation}"
-                        / "receipt.json"
-                    ),
-                }
-                for ordinal, bucket in enumerate(panel_buckets)
-            )
-            panel_results = batch.dispatch(
-                "feature-panel", panel_payloads, progress_start=80, progress_end=86
-            )
-            panel_parts = tuple(
-                JobLocalFeaturePanel.from_receipt(
-                    _read_object(Path(str(result["receipt"])))
-                )
-                for result in panel_results
-            )
-            label_panel = merge_job_local_feature_panel_parts(
-                panel_parts,
-                panel_buckets,
-                output_root=batch.shard_root / "feature-panel" / "accepted",
-            )
-            panel_elapsed = time.perf_counter() - panel_started
             stages.append(
                 _stage_receipt(
                     "feature-panel.label-scope",
-                    panel_elapsed,
+                    float(panel_result["wall_seconds"]),
                     rows=label_panel.report.row_count,
                     bytes=label_panel.parquet_bytes,
-                    disposition="built_once_sharded_tmp",
-                    parts=len(panel_parts),
-                    logical_partitions=len(panel_buckets),
+                    disposition="built_once_concurrent_tmp",
+                    overlapped_with="event-library",
                     scope_end=_EXECUTION_END.isoformat(),
                 )
             )
@@ -499,8 +471,6 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                     rows=report_panel.report.row_count,
                     bytes=report_panel.parquet_bytes,
                     disposition="derived_scope_view_tmp",
-                    parts=len(panel_parts),
-                    logical_partitions=len(panel_buckets),
                     scope_end=_DECISION_END.isoformat(),
                 )
             )
@@ -571,7 +541,8 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
             "sharded_execution": {
                 "worker_memory_gib": 3,
                 "target": args.shard_target,
-                "feature_panel_parts": len(panel_parts),
+                "analysis_candidate_partitions": len(buckets),
+                "feature_panel_parts": 1,
                 "job_id": args.job_id,
             },
             "stages": stages,

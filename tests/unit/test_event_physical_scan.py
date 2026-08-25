@@ -111,6 +111,11 @@ class EventPhysicalScanTests(unittest.TestCase):
             _contiguous_weight_buckets(weighted, 4),
             (("a",), ("b",), ("c",), ("d",)),
         )
+        five_way = (("a", 5), ("b", 4), ("c", 3), ("d", 2), ("e", 1))
+        self.assertEqual(
+            _contiguous_weight_buckets(five_way, 5),
+            (("a",), ("b",), ("c",), ("d",), ("e",)),
+        )
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()

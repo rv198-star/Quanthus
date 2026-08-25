@@ -953,8 +953,8 @@ def plan_candidate_security_buckets(
 ) -> tuple[tuple[str, ...], ...]:
     """Plan row-balanced contiguous ranges over complete security series."""
 
-    if workers not in {1, 2, 3, 4}:
-        raise PhysicalEventScanError("candidate shard workers must be between one and four")
+    if not 1 <= workers <= 8:
+        raise PhysicalEventScanError("candidate shard partitions must be between one and eight")
     try:
         import duckdb
     except ModuleNotFoundError as exc:

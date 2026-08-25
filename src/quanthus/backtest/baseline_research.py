@@ -1225,7 +1225,6 @@ class BaselineFeaturePanel:
         release_source_cache: bool = False,
         output_order: str = "date-security",
         spill_cache_release_interval_seconds: float | None = None,
-        materialize_selected_sources: bool = True,
     ) -> BaselineFeaturePanelArtifact:
         """Materialize the PIT panel without loading a second in-memory query copy."""
 
@@ -1310,7 +1309,6 @@ class BaselineFeaturePanel:
                 paths,
                 selected_security_ids,
                 scope_end=scope_end,
-                materialize_selected_sources=materialize_selected_sources,
             )
             connection.execute(
                 """
@@ -1466,7 +1464,6 @@ def _create_feature_source_views(
     selected_security_ids: tuple[str, ...] | None,
     *,
     scope_end: date,
-    materialize_selected_sources: bool,
 ) -> None:
     if selected_security_ids is None:
         for name, dataset_paths in paths.items():
@@ -1486,9 +1483,8 @@ def _create_feature_source_views(
         f"SELECT * FROM {validity_expression} "
         f"WHERE security_id IN ({security_literals})"
     )
-    validity_kind = "TEMP TABLE" if materialize_selected_sources else "VIEW"
     connection.execute(
-        f"CREATE {validity_kind} source_security_code_validity AS "
+        "CREATE TEMP TABLE source_security_code_validity AS "
         "SELECT * FROM raw_source_security_code_validity"
     )
     selected_stock_codes = tuple(
@@ -1531,9 +1527,8 @@ def _create_feature_source_views(
             f"CREATE VIEW raw_source_{name} AS "
             f"SELECT * FROM {expression} WHERE {where}"
         )
-        source_kind = "TEMP TABLE" if materialize_selected_sources else "VIEW"
         connection.execute(
-            f"CREATE {source_kind} source_{name} AS SELECT * FROM raw_source_{name}"
+            f"CREATE TEMP TABLE source_{name} AS SELECT * FROM raw_source_{name}"
         )
 
 

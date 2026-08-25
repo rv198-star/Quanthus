@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,8 +16,6 @@ from quanthus.event_library.job_local import (
     JOB_LOCAL_FEATURE_PANEL_SCHEMA,
     JobLocalArtifactError,
     JobLocalFeaturePanel,
-    merge_job_local_feature_panel_parts,
-    plan_feature_panel_security_buckets,
 )
 from quanthus.event_library.label_corpus import LabelCorpusResult
 from quanthus.event_library.physical_scan import PhysicalEventScanResult
@@ -26,7 +23,6 @@ from quanthus.event_library.reported_batch import (
     _memory_sample,
     build_physical_reported_event_batch,
 )
-from quanthus.platform.jobs import input_digest
 
 
 def _report(*, end: date, rows: int = 2) -> BaselineFeaturePanelReport:
@@ -98,91 +94,6 @@ def test_job_local_panel_derives_exact_bounded_scope_view(tmp_path: Path) -> Non
     )
     with pytest.raises(JobLocalArtifactError, match="scope_mismatch"):
         panel.scoped(scope_start=date(2012, 1, 4), scope_end=date(2022, 1, 1))
-
-
-def test_job_local_panel_merges_contiguous_security_parts_without_rewrite(
-    tmp_path: Path,
-) -> None:
-    buckets = (("600001",), ("600002",))
-    parts: list[JobLocalFeaturePanel] = []
-    for ordinal, bucket in enumerate(buckets):
-        path = tmp_path / f"source-{ordinal}.parquet"
-        pq.write_table(
-            pa.Table.from_pylist(
-                [
-                    {
-                        "market_date": market_date,
-                        "security_id": bucket[0],
-                        "feature_ready": True,
-                        "entry_eligible": True,
-                        "exception_active": False,
-                        "unexplained_price_transition": False,
-                        "scope_continuity_excluded": False,
-                    }
-                    for market_date in (date(2021, 12, 30), date(2021, 12, 31))
-                ]
-            ),
-            path,
-        )
-        report = replace(
-            _report(end=date(2021, 12, 31)),
-            security_selection_digest=input_digest(
-                {"allowed_security_ids": list(bucket)}
-            ),
-            selected_security_count=1,
-        )
-        parts.append(
-            JobLocalFeaturePanel(
-                path=path,
-                report=report,
-                materialized_report=report,
-                provider_config_digest="sha256:" + "5" * 64,
-                parquet_bytes=path.stat().st_size,
-            )
-        )
-
-    merged = merge_job_local_feature_panel_parts(
-        parts,
-        buckets,
-        output_root=tmp_path / "accepted",
-    )
-
-    assert merged.report.row_count == 4
-    assert merged.report.security_selection_digest is None
-    assert len(list((tmp_path / "accepted").glob("part-*.parquet"))) == 2
-    scoped = merged.scoped(
-        scope_start=date(2012, 1, 4), scope_end=date(2021, 12, 30)
-    )
-    assert scoped.report.row_count == 2
-    assert scoped.materialized_report == merged.report
-
-
-def test_feature_panel_shard_plan_uses_panel_security_identity_and_row_weights(
-    tmp_path: Path,
-) -> None:
-    source = tmp_path / "projection" / "tables" / "daily_ohlcv_none.parquet"
-    source.parent.mkdir(parents=True)
-    pq.write_table(
-        pa.Table.from_pylist(
-            [
-                {"security_id": security_id, "date": market_date}
-                for security_id, dates in (
-                    ("000001", (date(2021, 12, 29), date(2021, 12, 30), date(2021, 12, 31))),
-                    ("000002", (date(2021, 12, 30),)),
-                    ("000003", (date(2021, 12, 30), date(2021, 12, 31))),
-                )
-                for market_date in dates
-            ]
-        ),
-        source,
-    )
-
-    assert plan_feature_panel_security_buckets(
-        source.parents[1],
-        2,
-        scope_start=date(2021, 12, 29),
-        scope_end=date(2021, 12, 31),
-    ) == (("000001",), ("000002", "000003"))
 
 
 def test_memory_sample_reads_process_and_configured_cgroup_files(

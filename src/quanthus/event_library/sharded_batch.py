@@ -59,6 +59,21 @@ SHARDED_DWD_DAILY_DATASETS = (
 CANDIDATE_ANALYSIS_PARTITIONS = 5
 
 
+def _schedule_analysis_payloads(
+    panel_payloads: Sequence[dict[str, Any]],
+    scan_payloads: Sequence[dict[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    if len(panel_payloads) != 2 or len(scan_payloads) < 2:
+        raise RuntimeError("sharded analysis topology differs")
+    return (
+        panel_payloads[0],
+        scan_payloads[0],
+        scan_payloads[1],
+        panel_payloads[1],
+        *scan_payloads[2:],
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the sharded P4 reported batch")
     for name in (
@@ -415,16 +430,30 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                     ("report", _DECISION_END),
                 )
             )
+            analysis_payloads = _schedule_analysis_payloads(
+                panel_payloads, scan_payloads
+            )
             analysis_started = time.perf_counter()
             analysis_results = batch.dispatch(
                 "analysis",
-                (*panel_payloads, *scan_payloads),
+                analysis_payloads,
                 progress_start=48,
                 progress_end=80,
             )
             analysis_elapsed = time.perf_counter() - analysis_started
-            panel_results = analysis_results[: len(panel_payloads)]
-            scan_results = analysis_results[len(panel_payloads) :]
+            scheduled_results = tuple(
+                zip(analysis_payloads, analysis_results, strict=True)
+            )
+            panel_results = tuple(
+                result
+                for payload, result in scheduled_results
+                if payload["kind"] == "feature-panel"
+            )
+            scan_results = tuple(
+                result
+                for payload, result in scheduled_results
+                if payload["kind"] == "candidate-scan"
+            )
             panels = tuple(
                 JobLocalFeaturePanel.from_receipt(
                     _read_object(Path(str(result["receipt"])))

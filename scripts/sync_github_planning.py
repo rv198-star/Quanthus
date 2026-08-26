@@ -308,7 +308,222 @@ EXPERT_STRATEGY_IMPLEMENTATION_SPECS = {
         ),
     ),
 }
-PROGRAM_EPIC_IDS = frozenset({"PK-WORKER-000", "P3-EXPERT-000"})
+P6_DESIGN_PATH = "docs/design/lld/08-validation-governance/p6-forward-validation.md"
+P6_CHILD_IDS = (
+    "P6-GOV-001",
+    "P6-DATA-001",
+    "P6-SCORE-001",
+    "P6-GOV-002",
+    "P6-PAPER-001",
+    "P6-WEB-001",
+    "P6-ACTIVATE-001",
+    "P6-REVIEW-001",
+)
+P6_IDS = frozenset({"P6-000", *P6_CHILD_IDS})
+P6_IMPLEMENTATION_SPECS = {
+    "P6-000": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "Coordinate one bounded prospective-validation program. Keep engineering readiness, "
+            "activation authority, evidence maturity, and human review as separate gates; close "
+            "the Epic only when every child is accepted."
+        ),
+        owned_paths=(P6_DESIGN_PATH, "docs/work-items/index.md"),
+        decision_gates=(
+            "P5 remains optional and is not a predecessor.",
+            "No child opens notification, broker, or live-capital authority.",
+        ),
+        verification=(
+            "All eight dependency-gated children have linked acceptance evidence.",
+            "The final review binds a genuinely prospective sequence and closed paper ledger.",
+        ),
+    ),
+    "P6-GOV-001": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "Publish one immutable entry proposal binding the frozen strategy/evaluation/data "
+            "closure, finite observation budget, expected behavior, controls, stop rules, and "
+            "rollback before result-bearing P6 reads."
+        ),
+        owned_paths=(
+            "src/quanthus/forward_validation/{contracts,serialization,validation}.py",
+            "config/forward-validation/entry/",
+            "tests/unit/test_forward_validation_entry.py",
+        ),
+        decision_gates=(
+            "A human selects the exact candidate, budget unit/value, trigger independence rule, "
+            "activation-boundary rule, and longest maturity tail.",
+            "The proposal explicitly excludes P5, sealed-partition access, notification, broker, "
+            "and live capital.",
+        ),
+        verification=(
+            "Canonical identity, invalid budget, policy drift, and incompatible lifecycle cases "
+            "fail closed.",
+            "The proposal is published before any result-bearing P6 data access.",
+        ),
+    ),
+    "P6-DATA-001": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "Enforce the first-post-activation prospective boundary, deep DWD effective-view "
+            "identity, knowledge cutoff, append-only access ledger, and versioned late-correction "
+            "disposition without rewriting observations."
+        ),
+        owned_paths=(
+            "src/quanthus/forward_validation/{data_boundary,access_ledger}.py",
+            "config/forward-validation/data/",
+            "tests/unit/test_forward_validation_data_boundary.py",
+        ),
+        decision_gates=(
+            "Pre-activation 2026 history is engineering rehearsal only and never consumes the "
+            "official budget.",
+            "Arbitration and permanent blind remain sealed until separately authorized review.",
+        ),
+        verification=(
+            "Boundary, cutoff, late/missing release, correction, retry, and sealed-access negative "
+            "cases pass.",
+            "Every admitted cycle binds one verified DWD identity and auditable access record.",
+        ),
+    ),
+    "P6-SCORE-001": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "Freeze role-specific expert, veto, constraint, aggregator, complete-strategy, and "
+            "paper-operation scorecards plus loss attribution before official observations."
+        ),
+        owned_paths=(
+            "src/quanthus/forward_validation/{scorecards,loss_attribution}.py",
+            "config/forward-validation/scorecards/",
+            "tests/unit/test_forward_validation_scorecards.py",
+        ),
+        decision_gates=(
+            "A human freezes primary metrics, guardrails, slices, and material-loss threshold.",
+            "No universal expert accuracy score or result-driven metric edit is admitted.",
+        ),
+        verification=(
+            "Scorecards distinguish roles, abstention, dependence-aware uncertainty, and coverage.",
+            "Unclassified material loss blocks review readiness.",
+        ),
+    ),
+    "P6-GOV-002": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "Admit one `quanthus.p6-forward-cycle.v1` composite Job to the existing PostgreSQL "
+            "Replay Worker and `queue=replay`; build shared DWD prerequisites once, then append "
+            "Shadow, settlement, scorecard, and bounded Run artifacts."
+        ),
+        owned_paths=(
+            "src/quanthus/platform/{jobs,worker,worker_handlers}.py",
+            "src/quanthus/forward_validation/{runner,cli}.py",
+            "tests/platform/test_forward_validation_worker.py",
+        ),
+        decision_gates=(
+            "Do not add Redis, Celery, a Worker registry, a new queue, or a new transport without "
+            "a measured trigger.",
+            "Activation remains disabled and is not implied by successful implementation.",
+        ),
+        verification=(
+            "Idempotency, lease loss, retry, cancellation, stale fencing, partial publication, "
+            "resource bounds, and rollback rehearsal pass.",
+            "API/Web processes perform no DWD analysis and one Job reuses one prerequisite build.",
+        ),
+    ),
+    "P6-PAPER-001": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "Consume the sealed aggregate decision through P2's accepted Signal-to-Fill contracts "
+            "in an isolated paper authority, with balanced cash/position state and non-compounding "
+            "fixed-capital-unit accounting."
+        ),
+        owned_paths=(
+            "src/quanthus/forward_validation/{paper_ledger,paper_projection}.py",
+            "tests/unit/test_forward_validation_paper_ledger.py",
+            "tests/acceptance/test_forward_validation_paper_round_trip.py",
+        ),
+        decision_gates=(
+            "Paper ids and authority cannot be promoted to actual execution records.",
+            "The initial profile is exactly `close-to-next-open-v1`; two-window behavior remains "
+            "out of scope.",
+        ),
+        verification=(
+            "Pending intents, fills, costs, rejections, carry, positions, and cash reconcile.",
+            "The paper lane matches honest P2 replay under identical frozen inputs and "
+            "assumptions.",
+        ),
+    ),
+    "P6-WEB-001": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "Add one read-only Forward Validation section to candidate detail, projecting bounded "
+            "PostgreSQL references to admission/evidence/Job/review state, scorecards, and paper "
+            "ledger without creating another dashboard product."
+        ),
+        owned_paths=(
+            "src/quanthus/forward_validation/product_view.py",
+            "src/quanthus/platform/{product_query,api}.py",
+            "product-web/src/views/CandidateDetail.vue",
+            "tests/e2e/forward-validation.spec.ts",
+        ),
+        decision_gates=(
+            "The page cannot activate, tune, promote, reveal sealed data, or run DWD analysis.",
+        ),
+        verification=(
+            "Invalid, partial, stale, and mismatched artifact references fail closed.",
+            "Desktop/mobile acceptance proves complete read-only evidence and no authority leak.",
+        ),
+    ),
+    "P6-ACTIVATE-001": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "After every engineering predecessor passes, publish a signed enabled binding, run "
+            "the first official post-activation DWD cycle, and independently reproduce its sealed "
+            "outputs."
+        ),
+        owned_paths=(
+            "config/forward-validation/activation/",
+            "docs/acceptance/p6-forward-activation-*.md",
+            "tests/acceptance/test_forward_validation_activation.py",
+        ),
+        decision_gates=(
+            "A human authorizes the exact deployment, proposal digest, activation boundary, and "
+            "rollback after a clean disabled rehearsal.",
+            "Historical rehearsal cannot satisfy this prospective gate.",
+        ),
+        verification=(
+            "The first official cycle is post-activation, byte-verifiable, and independently "
+            "reproduced.",
+            "Pause/disable rollback prevents new admission without deleting evidence.",
+        ),
+    ),
+    "P6-REVIEW-001": IssueImplementationSpec(
+        design_path=P6_DESIGN_PATH,
+        approach=(
+            "Wait for the declared real-calendar budget and maturity tail, close all eligible "
+            "settlements, reconcile the paper account, and record one append-only human review "
+            "decision with any separately authorized arbitration reveal."
+        ),
+        owned_paths=(
+            "src/quanthus/forward_validation/review.py",
+            "docs/acceptance/p6-forward-review-*.md",
+            "tests/acceptance/test_forward_validation_review.py",
+        ),
+        decision_gates=(
+            "A human chooses continue, narrow, remap, retire, or inconclusive.",
+            "Arbitration reveal is separate and permanent blind remains sealed; no result "
+            "automatically authorizes P7.",
+        ),
+        verification=(
+            "Budget, maturity, ledger closure, incident attribution, scorecards, and paper "
+            "reconciliation are complete.",
+            "The signed review preserves negative/inconclusive outcomes and zero live authority.",
+        ),
+    ),
+}
+IMPLEMENTATION_SPECS = {
+    **EXPERT_STRATEGY_IMPLEMENTATION_SPECS,
+    **P6_IMPLEMENTATION_SPECS,
+}
+PROGRAM_EPIC_IDS = frozenset({"PK-WORKER-000", "P3-EXPERT-000", "P6-000"})
 
 MILESTONES = (
     "P1 Data Foundation",
@@ -356,7 +571,7 @@ CHAPTERS = (
         "P6",
         "governance",
         MILESTONES[5],
-        "blocked",
+        "ready",
     ),
     ChapterSpec("09", "docs/design/lld/09-roadmap.md", "meta", "roadmap", MILESTONES[0], "ready"),
     ChapterSpec(
@@ -395,8 +610,11 @@ PHASE_GATES = {
         "Accepted for the development Event Library, outcome corpus, and daily comparison report "
         "under frozen P4 authorities."
     ),
-    "P5": "Blocked until the P4 event library and frozen rule baselines are accepted.",
-    "P6": "Simulation governance starts after the P3 baseline is frozen.",
+    "P5": "Optional research is deferred and is not a predecessor of P6.",
+    "P6": (
+        "Prospective validation implementation is open at P6-GOV-001. Later work remains "
+        "dependency-gated, and full acceptance waits for real-calendar evidence maturity."
+    ),
     "P7": "Blocked until frozen simulation supports an explicit live/no-live decision.",
     "PK": (
         "Platform Kernel is orthogonal to P1-P7. PK1-PK4, the ADR 0010 PostgreSQL Worker "
@@ -417,6 +635,8 @@ HIGH_IDS = {
     "P3-EXPERT-000",
     "P3-EXPERT-001",
     "P3-STRAT-002",
+    "P6-000",
+    "P6-GOV-001",
 }
 
 
@@ -533,13 +753,12 @@ def work_items(root: Path) -> list[WorkItem]:
             status = "ready" if state == "active" else "triage"
         elif disposition.startswith(("accepted", "closed")):
             status = "closed"
-        elif phase == "P3" and disposition.startswith(("blocked", "deferred")):
+        elif disposition.startswith(("blocked", "deferred")):
             status = "blocked"
+        elif disposition in {"open", "ready", "open epic"}:
+            status = "ready"
         elif phase == "PK":
-            if disposition in {"open", "ready", "open epic"}:
-                status = "ready"
-            else:
-                status = "blocked"
+            status = "blocked"
         elif phase == "P4":
             status = "closed"
         else:
@@ -574,8 +793,8 @@ def work_items(root: Path) -> list[WorkItem]:
                 priority=priority,
                 milestone=milestone,
                 design_path=(
-                    EXPERT_STRATEGY_IMPLEMENTATION_SPECS[stable_id].design_path
-                    if stable_id in EXPERT_STRATEGY_IMPLEMENTATION_SPECS
+                    IMPLEMENTATION_SPECS[stable_id].design_path
+                    if stable_id in IMPLEMENTATION_SPECS
                     else chapter.path
                 ),
                 issue_type="epic" if stable_id in PROGRAM_EPIC_IDS else "task",
@@ -592,7 +811,7 @@ def task_body(item: WorkItem, repository: str) -> str:
     blocked_note = ""
     worker_decision = ""
     expert_design = ""
-    expert_gate_note = ""
+    authority_note = ""
     implementation_contract = ""
     product_requirements = (
         f"- [Product requirements]({repo_url(repository, 'docs/product/prd.md')})\n"
@@ -609,12 +828,18 @@ def task_body(item: WorkItem, repository: str) -> str:
                 "- [Expert Strategy Layer MVP]("
                 f"{repo_url(repository, EXPERT_STRATEGY_DESIGN_PATH)})\n"
             )
-        expert_gate_note = (
+        authority_note = (
             "\n\nThis is a bounded post-P3 development increment. It does not reopen P3 "
             "acceptance or authorize arbitration, permanent-blind, P6 promotion, notification, "
             "or execution access."
         )
-        implementation = EXPERT_STRATEGY_IMPLEMENTATION_SPECS[item.stable_id]
+    elif item.stable_id in P6_IDS:
+        authority_note = (
+            "\n\nThis is a bounded prospective-validation increment. It does not depend on P5 "
+            "or authorize notification, broker connection, actual fills, or live capital."
+        )
+    if item.stable_id in IMPLEMENTATION_SPECS:
+        implementation = IMPLEMENTATION_SPECS[item.stable_id]
         owned_paths = "\n".join(f"- `{path}`" for path in implementation.owned_paths)
         decision_gates = "\n".join(f"- {gate}" for gate in implementation.decision_gates)
         verification = "\n".join(f"- {check}" for check in implementation.verification)
@@ -652,7 +877,7 @@ def task_body(item: WorkItem, repository: str) -> str:
 
 ## Phase and gate
 
-{PHASE_GATES[item.phase]}{blocked_note}{expert_gate_note}
+{PHASE_GATES[item.phase]}{blocked_note}{authority_note}
 
 ## Dependencies
 
@@ -681,6 +906,17 @@ def task_body(item: WorkItem, repository: str) -> str:
 def expert_strategy_epic_body(item: WorkItem, repository: str, task_urls: dict[str, str]) -> str:
     checklist = "\n".join(
         f"- [ ] [{stable_id}]({task_urls[stable_id]})" for stable_id in EXPERT_STRATEGY_CHILD_IDS
+    )
+    return task_body(item, repository).replace(
+        "## Acceptance evidence\n",
+        f"## Blocking work items\n\n{checklist}\n\n## Acceptance evidence\n",
+        1,
+    )
+
+
+def p6_epic_body(item: WorkItem, repository: str, task_urls: dict[str, str]) -> str:
+    checklist = "\n".join(
+        f"- [ ] [{stable_id}]({task_urls[stable_id]})" for stable_id in P6_CHILD_IDS
     )
     return task_body(item, repository).replace(
         "## Acceptance evidence\n",
@@ -930,8 +1166,9 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
 
     task_results = {"created": 0, "updated": 0, "reused": 0}
     task_urls: dict[str, str] = {}
-    ordered_items = [item for item in items if item.stable_id != "P3-EXPERT-000"]
-    ordered_items.extend(item for item in items if item.stable_id == "P3-EXPERT-000")
+    deferred_epics = {"P3-EXPERT-000", "P6-000"}
+    ordered_items = [item for item in items if item.stable_id not in deferred_epics]
+    ordered_items.extend(item for item in items if item.stable_id in deferred_epics)
     for item in ordered_items:
         labels = [
             f"type:{item.issue_type}",
@@ -941,11 +1178,12 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
             f"area:{item.area}",
         ]
         milestone = None if item.milestone is None else milestone_numbers[item.milestone]
-        body = (
-            expert_strategy_epic_body(item, repository, task_urls)
-            if item.stable_id == "P3-EXPERT-000"
-            else task_body(item, repository)
-        )
+        if item.stable_id == "P3-EXPERT-000":
+            body = expert_strategy_epic_body(item, repository, task_urls)
+        elif item.stable_id == "P6-000":
+            body = p6_epic_body(item, repository, task_urls)
+        else:
+            body = task_body(item, repository)
         issue, result = github.upsert_issue(
             issues_by_id.get(item.stable_id),
             f"[{item.stable_id}] {item.title}",

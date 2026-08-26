@@ -229,29 +229,33 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 
 ## P4-P7
 
-| ID | Title | Phase |
-| --- | --- | --- |
-| P4-EVENT-001 | Freeze first research question and event/split contracts | P4 |
-| P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4 |
-| P4-LABEL-001 | Freeze outcome and structural-break cards | P4 |
-| P4-REPORT-001 | Produce daily group comparison report | P4 |
-| PERF-BATCH-001 | Reuse composite-Job prerequisites and publish runtime telemetry | P4 |
-| PERF-EVENT-001 | Accelerate exact Event scanning and expose internal progress | P4 |
-| PERF-ENTRY-001 | Replace T+1 evidence reads with a set-based join | P4 |
-| PERF-MEM-001 | Keep the complete P4 Event batch below 16 GiB | P4 |
-| PERF-SHARD-001 | Prove 3 GiB deterministic multi-Worker Event execution | P4 |
-| P5-TARGET-001 | Define independent target cards and metrics | P5 |
-| P5-BASE-001 | Build rule and logistic baseline scoreboard | P5 |
-| P5-GBDT-001 | Train constrained GBDT research pipeline | P5 |
-| P5-PROMOTE-001 | Implement model promotion/shadow gate | P5 |
-| P6-GOV-001 | Implement proposal and expectation record | P6 |
-| P6-GOV-002 | Implement shadow lifecycle gate | P6 |
-| P6-SCORE-001 | Implement expert and aggregator scorecards | P6 |
-| P6-DATA-001 | Enforce partition access and reveal logging | P6 |
-| P6-REVIEW-001 | Run first quarterly arbitration review | P6 |
-| P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | P7 |
-| P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | P7 |
-| P7-SCALE-001 | Implement explicit unit expansion decision | P7 |
+| ID | Title | Phase | Disposition |
+| --- | --- | --- | --- |
+| P4-EVENT-001 | Freeze first research question and event/split contracts | P4 | accepted |
+| P4-EVENT-002 | Implement forward candidate scan and not-executable partition | P4 | accepted |
+| P4-LABEL-001 | Freeze outcome and structural-break cards | P4 | accepted |
+| P4-REPORT-001 | Produce daily group comparison report | P4 | accepted |
+| PERF-BATCH-001 | Reuse composite-Job prerequisites and publish runtime telemetry | P4 | accepted |
+| PERF-EVENT-001 | Accelerate exact Event scanning and expose internal progress | P4 | accepted |
+| PERF-ENTRY-001 | Replace T+1 evidence reads with a set-based join | P4 | accepted |
+| PERF-MEM-001 | Keep the complete P4 Event batch below 16 GiB | P4 | accepted |
+| PERF-SHARD-001 | Prove 3 GiB deterministic multi-Worker Event execution | P4 | accepted |
+| P5-TARGET-001 | Define independent target cards and metrics | P5 | deferred; optional research |
+| P5-BASE-001 | Build rule and logistic baseline scoreboard | P5 | deferred; optional research |
+| P5-GBDT-001 | Train constrained GBDT research pipeline | P5 | deferred; optional research |
+| P5-PROMOTE-001 | Implement model promotion/shadow gate | P5 | deferred; optional research |
+| P6-000 | Coordinate the bounded P6 prospective-validation program | P6 | open epic |
+| P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6 | ready |
+| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6 | blocked by P6-GOV-001 |
+| P6-SCORE-001 | Freeze role-specific forward scorecards and loss attribution | P6 | blocked by P6-DATA-001 |
+| P6-GOV-002 | Implement composite Forward Worker and disabled-state rehearsal | P6 | blocked by P6-SCORE-001 |
+| P6-PAPER-001 | Implement isolated P2 paper lane and fixed-unit ledger | P6 | blocked by P6-GOV-002 |
+| P6-WEB-001 | Project forward and paper evidence in candidate detail | P6 | blocked by P6-PAPER-001 |
+| P6-ACTIVATE-001 | Authorize and run the first official prospective cycle | P6 | blocked by P6-WEB-001 |
+| P6-REVIEW-001 | Complete the time-matured simulation review | P6 | blocked by P6-ACTIVATE-001 and closed budget |
+| P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | P7 | blocked by P6 review |
+| P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | P7 | blocked by P7-LIVE-001 |
+| P7-SCALE-001 | Implement explicit unit expansion decision | P7 | blocked by P7 reconciliation |
 
 ## Platform Kernel
 

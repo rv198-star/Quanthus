@@ -6,7 +6,7 @@ nodes.
 
 | Field | Value |
 | --- | --- |
-| Current phase | P4 accepted; P5 research and P6 simulation preparation open |
+| Current phase | P6 implementation open; P5 optional research deferred |
 | Gate source | `config/p3-gates.v1.json` |
 
 ## Current branch
@@ -92,7 +92,12 @@ nodes.
   release publication, and a checksum-gated read-only Web workbench. Recurring dashboards, human
   label review, and any enabled forward Shadow remain separately proposal- and evidence-gated.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
-  evidence; forward email transport remains P6 work. P4 and later keep their existing gates.
+  evidence. It and forward email transport are outside the initial P6 daily-profile scope.
+- P6 is now one bounded prospective-validation program: freeze entry/budget, enforce the
+  post-activation DWD boundary, freeze scorecards, add one composite Replay Worker cycle, maintain
+  separate Shadow and fixed-unit paper lanes, project read-only evidence, activate explicitly, and
+  wait for the real-calendar budget before review. Only `P6-GOV-001` is initially ready; P5 remains
+  optional deferred research and is not a predecessor.
 - ADR 0007 defines the current data operating path. CN01 and Hermes each run one 18:30
   `Asia/Shanghai` four-lane ODS controller, gate DWD on four verified READY releases, and emit
   node-specific success or failure notifications. OCI mirrors CN01's verified immutable DWD

@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P4 accepted; P5 research and P6 simulation preparation open |
+| Current phase | P6 implementation open; P5 optional research deferred |
 | Version | 0.13 |
 | Effective date | 2026-08-26 |
 | Governing policy | `config/p0-policy.v1.json` |
@@ -99,6 +99,13 @@ receive an isolated complete-strategy replay plus one predeclared joint replay. 
 budget, not a permanent architectural maximum; adding experts requires a later versioned proposal.
 Its terminal lifecycle decision also owns the forward-Shadow disposition: negative or replacement
 decisions close with the current version disabled instead of forcing it into prospective operation.
+
+P6 activates one frozen formal strategy only through a separate human entry and activation
+decision. The existing PostgreSQL Replay Worker consumes one composite daily forward-cycle Job,
+builds shared DWD prerequisites once, records outcome-blind Shadow evidence, and projects the exact
+aggregate decision into an isolated P2 fixed-unit paper ledger. P5 is not a predecessor. Earlier
+2026 history may rehearse engineering but cannot be relabeled as prospective evidence; official
+evidence starts with the first accepted DWD release after activation.
 
 ## 3. Data platform and storage design
 

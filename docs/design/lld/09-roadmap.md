@@ -15,12 +15,12 @@ and live operation. A later phase cannot compensate for an untrusted earlier pha
 | P2 | Matcher, unit ledger, audit, metrics | Golden cases reconcile and rerun identically | P1 |
 | P3 | Rule-only vertical slice and shadow experts | Multi-year closed loop is auditable | P2 |
 | P4 | Event library and daily group report | Three leading differentiators | P3 |
-| P5 | Research scoring layer | Beats rule baseline and passes promotion gate | P4 |
-| P6 | Frozen paper operation and two-window notification rehearsal | Distribution aligns with honest backtest; no live-fill claims | P3 baseline |
+| P5 | Optional research scoring layer | Beats rule baseline and passes promotion gate | P4; deferred and not a P6 predecessor |
+| P6 | Prospective Shadow and fixed-unit paper operation | Frozen behavior accumulates time-matured evidence; no notification or live-fill claims | P3/P4 and Expert Strategy MVP |
 | P7 | Operator-assisted small-capital operation | Every advice closes with an accepted actual/no-action report and reconciliation | P6 |
 
-P5 research may run beside P6 frozen simulation, but a development build cannot alter the
-simulation policy.
+P5 research may run beside P6 frozen simulation but is optional and deferred; P6 does not wait for
+it. A development build cannot alter the active simulation policy.
 
 Platform Kernel is a separate engineering track rather than P8. It may proceed beside P4 when its
 own predecessor gate passes, but it cannot weaken a P1-P7 domain gate or redefine Quanthus data,
@@ -31,8 +31,9 @@ Current state: P2 remains conditionally accepted for the active daily research p
 replay, rule contracts, position/risk path, audit funnel, and one frozen capability fixture prove
 the multi-year closed loop. That fixture is not a formal strategy lineage and cannot be tuned or
 promoted. The P4 Event Library, Label Corpus, Comparison Report, and bounded Worker execution are
-accepted. P5 target research and P6 simulation preparation are dependency-eligible, while target
-two-window activation and forward notification retain their separate blockers.
+accepted. P6 implementation is open at `P6-GOV-001`; later P6 work remains dependency-gated. P5
+is optional research and remains deferred. Target two-window activation and forward notification
+retain their separate blockers and are outside the initial P6 profile.
 
 ## 3. Milestones
 
@@ -40,8 +41,8 @@ two-window activation and forward notification retain their separate blockers.
 - **M1**: accepted data foundation and simple baseline strategy through the trusted engine.
 - **M2**: rule-only vertical slice over multiple years with complete decision trace.
 - **M3**: first event differentiation report and proposal-to-shadow-to-decision loop.
-- **M4**: frozen paper operation and idempotent signal notification begin and continuously record
-  arbitration evidence without live-fill claims.
+- **M4**: frozen prospective Shadow and isolated fixed-unit paper operation begin, then accumulate
+  a predeclared time-matured evidence budget without notification or live-fill claims.
 - **M5**: first operator-assisted live review and explicit continue/stop decision.
 - **Platform Kernel**: selectively extract the operator platform from QuantDinger through PK0-PK6
   while retaining Quanthus domain authority.

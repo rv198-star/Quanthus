@@ -137,7 +137,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertEqual(prd["Design status"], "approved")
         self.assertEqual(hld["Design status"], "approved")
         if p3_gate.p4_can_start:
-            expected_phase = "P4 accepted; P5 research and P6 simulation preparation open"
+            expected_phase = "P6 implementation open; P5 optional research deferred"
         elif p2_gate.p3_can_start:
             expected_phase = "P3 implementation open"
         else:
@@ -1357,7 +1357,24 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(p4_items)
         self.assertTrue(all(item.status == "closed" for item in p4_items))
         self.assertTrue(
-            all(item.status == "blocked" for item in items if item.phase in {"P5", "P6", "P7"})
+            all(item.status == "blocked" for item in items if item.phase in {"P5", "P7"})
+        )
+        p6_items = [item for item in items if item.phase == "P6"]
+        self.assertEqual(
+            {item.stable_id for item in p6_items if item.status == "ready"},
+            {"P6-000", "P6-GOV-001"},
+        )
+        self.assertEqual(
+            {item.stable_id for item in p6_items if item.status == "blocked"},
+            {
+                "P6-DATA-001",
+                "P6-SCORE-001",
+                "P6-GOV-002",
+                "P6-PAPER-001",
+                "P6-WEB-001",
+                "P6-ACTIVATE-001",
+                "P6-REVIEW-001",
+            },
         )
         self.assertTrue(pk_items)
         self.assertEqual({item.stable_id for item in pk_items if item.status == "ready"}, set())

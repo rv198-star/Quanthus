@@ -4,7 +4,7 @@
 | --- | --- |
 | Parent | `../04-experts-aggregator.md` |
 | Design status | approved |
-| Delivery gate | `P3-EXPERT-001` and `P3-EXPERT-002` accepted; later work remains dependency-gated |
+| Delivery gate | accepted; all seven `P3-EXPERT-000` children closed with immutable evidence |
 | Milestone | Expert Strategy Layer MVP |
 | Governing work | `P3-EXPERT-000` |
 | Effective date | 2026-08-19 |
@@ -344,9 +344,9 @@ P3-EXPERT-001 --> P3-EXPERT-002 --> P3-EXPERT-003 --> P3-STRAT-002 --> P3-ATTR-0
                                                               P3-EXPERT-005
 ```
 
-`P3-EXPERT-000` is the tracking epic for every node above. `P3-EXPERT-001` is accepted by its
-linked protocol evidence, making `P3-EXPERT-002` the active implementation gate. Creating the
-issues does not satisfy any delivery gate.
+`P3-EXPERT-000` tracked every node above and is accepted after all seven children closed with
+linked evidence. The terminal lifecycle decision is `inconclusive` with forward Shadow disabled;
+creating or closing an Issue alone never satisfied a delivery gate.
 
 ### `P3-EXPERT-000` - Expert Strategy Layer MVP epic
 
@@ -415,6 +415,8 @@ issues does not satisfy any delivery gate.
 - Acceptance: browser/API contract tests prove the view cannot compute or upgrade evidence, mutate
   an observation, create an approval state, or authorize execution; every displayed value resolves
   to a trusted artifact digest.
+- Delivery: accepted by
+  `docs/acceptance/p3-expert-candidate-detail-evidence-20260823.md`.
 - Non-goals: a new dashboard product, role system, expert leaderboard, or second approval flow.
 
 ### `P3-EXPERT-005` - end-to-end MVP acceptance and Shadow disposition
@@ -425,6 +427,8 @@ issues does not satisfy any delivery gate.
 - Acceptance: deterministic rerun, scorecard, bounded attribution, workbench trace, lifecycle
   decision, Shadow disposition proof, resource-cost report, rollback package, and zero
   sealed-partition access are preserved in one acceptance record.
+- Delivery: accepted by `docs/acceptance/p3-expert-mvp-shadow-handoff-20260823.md`; the decision is
+  `inconclusive` and forward Shadow is disabled.
 - Non-goals: P6 quarterly acceptance, blind reveal, execution authorization, or live capital.
 
 ## 15. Follow-on boundary
@@ -432,4 +436,5 @@ issues does not satisfy any delivery gate.
 The MVP deliberately does not close `P5-TARGET-001`, `P6-SCORE-001`, `P6-GOV-001`, or
 `P6-GOV-002`. Later work may generalize the accepted artifact family, but P5 model research still
 depends on its phase gate and P6 promotion still requires its own scorecard, partition, Shadow, and
-review evidence. Forward Shadow produced here is input evidence only.
+review evidence. Any later enabled forward Shadow produces input evidence only; the accepted MVP
+did not enable it.

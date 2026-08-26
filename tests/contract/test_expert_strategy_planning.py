@@ -38,11 +38,11 @@ def test_expert_strategy_mvp_is_one_epic_with_seven_dependency_gated_children() 
     assert items["P3-EXPERT-001"].status == "closed"
     assert items["P3-EXPERT-002"].status == "closed"
     assert items["P3-EXPERT-003"].status == "closed"
-    assert items["P3-EXPERT-000"].status == "ready"
+    assert items["P3-EXPERT-000"].status == "closed"
     assert items["P3-STRAT-002"].status == "closed"
     assert items["P3-ATTR-001"].status == "closed"
-    assert items["P3-EXPERT-004"].status == "ready"
-    assert items["P3-EXPERT-005"].status == "blocked"
+    assert items["P3-EXPERT-004"].status == "closed"
+    assert items["P3-EXPERT-005"].status == "closed"
     assert items["P3-DASH-001"].milestone != EXPERT_STRATEGY_MILESTONE
     assert "P4-LABEL-001" in items["P3-EXPERT-003"].dependencies
     assert "P3-EXPERT-002" in items["P3-EXPERT-003"].dependencies

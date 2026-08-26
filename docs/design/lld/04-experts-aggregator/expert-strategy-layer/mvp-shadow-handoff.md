@@ -5,8 +5,8 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-005` |
 | Design status | approved |
-| Delivery gate | blocked only by `P3-EXPERT-004`; other predecessors accepted |
-| Implementation readiness | ready after dependencies and human lifecycle decision |
+| Delivery gate | accepted; evidence: `docs/acceptance/p3-expert-mvp-shadow-handoff-20260823.md` |
+| Implementation readiness | complete; lifecycle decision inconclusive and Shadow disabled |
 | Authority after closure | forward Shadow only when explicitly enabled; no promotion, notification, or execution |
 
 ## 1. Outcome and boundary

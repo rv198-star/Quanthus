@@ -5,7 +5,7 @@
 | Parent | `../expert-strategy-layer.md` |
 | Work item | `P3-EXPERT-004` |
 | Design status | approved |
-| Delivery gate | ready after `P3-ATTR-001` and `P3-EXPERT-002` acceptance |
+| Delivery gate | accepted; evidence: `docs/acceptance/p3-expert-candidate-detail-evidence-20260823.md` |
 | Implementation readiness | trusted evaluation and attribution artifacts are available |
 | Authority | read-only projection; no calculation, approval, or execution rights |
 

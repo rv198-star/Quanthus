@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-EXP-001` accepted; `P3-AGG-001` accepted; `P3-SHADOW-001` comparison contract accepted; fixture scoring/action and experts accepted; accepted v1 remains frozen; the Expert Strategy Layer MVP child opens additive v2 evaluation work under `P3-EXPERT-000` without reopening P3 acceptance |
+| Implementation status | `P3-EXP-001` accepted; `P3-AGG-001` accepted; `P3-SHADOW-001` comparison contract accepted; fixture v1 remains frozen; the additive Expert Strategy Layer MVP is accepted with one formal two-expert topology, formal attribution, read-only evidence, and an inconclusive lifecycle decision with Shadow disabled |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-002/003/006, FR-AUDIT-001 |
 
@@ -20,7 +20,7 @@ complete strategy topology remains the final unit of economic acceptance.
 
 | Child | Ownership | Delivery state |
 | --- | --- | --- |
-| `04-experts-aggregator/expert-strategy-layer.md` | Additive v2 evaluation artifacts, assessment/policy separation, scorecards, lifecycle, Worker boundary, formal-strategy MVP, stop conditions, and routing to work-item child designs | Design approved; `P3-EXPERT-001` and `P3-EXPERT-002` accepted; later work dependency-gated |
+| `04-experts-aggregator/expert-strategy-layer.md` | Additive v2 evaluation artifacts, assessment/policy separation, scorecards, lifecycle, Worker boundary, formal-strategy MVP, stop conditions, and routing to work-item child designs | MVP accepted; all seven child work items closed with immutable evidence |
 
 ## 2. Interfaces
 

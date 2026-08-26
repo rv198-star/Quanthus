@@ -6,7 +6,7 @@ nodes.
 
 | Field | Value |
 | --- | --- |
-| Current phase | P4 implementation open |
+| Current phase | P4 accepted; P5 research and P6 simulation preparation open |
 | Gate source | `config/p3-gates.v1.json` |
 
 ## Current branch
@@ -77,20 +77,20 @@ nodes.
   reproduction with all seven artifacts byte-identical. Additive lifecycle `1.1.0` and formal
   strategy `candidate.p4-trend-risk@1.0.1` are accepted under
   `acceptance/p3-pos-trial-reduction-compatibility-production-20260822.md`; the legacy lifecycle
-  and card remain immutable. `P3-ATTR-001` has its compatibility predecessor but remains blocked
-  pending persisted outcome-blind preregistration and complete-P2 execution; later
-  workbench and forward-Shadow work remains dependency-gated, development-only, and unable to open
-  P5/P6 or sealed data.
+  and card remain immutable. `P3-ATTR-001` is accepted after persisted outcome-blind
+  preregistration, complete-P2 counterfactual execution, and byte-identical independent
+  reproduction. `P3-EXPERT-004` then accepted the digest-bound read-only candidate-detail view,
+  and `P3-EXPERT-005` closed the MVP with an `inconclusive` lifecycle decision and disabled
+  forward-Shadow disposition. No sealed data, notification, promotion, or execution authority was
+  opened.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.
-- The reusable strategy-attribution and report-viewing substrate is implemented and accepted for
-  bounded synthetic plumbing: strategy-owned adapters feed an outcome-blind immutable plan, a
-  resumable local Pipeline, deterministic kernel verification, atomic release publication, and a
-  checksum-gated read-only Web workbench. This proves analysis/report transport, not a strategy
-  conclusion. Formal constrained attribution, recurring dashboards, human label review, and
-  concrete shadow decision production still resume only when a formal label or strategy proposal
-  supplies their missing semantic input. They are not reasons to extend the frozen P3 fixture.
+- The reusable strategy-attribution and report-viewing substrate is accepted for both bounded
+  synthetic plumbing and the first formal two-expert strategy. Strategy-owned adapters feed an
+  outcome-blind immutable plan, a resumable Pipeline, deterministic kernel verification, atomic
+  release publication, and a checksum-gated read-only Web workbench. Recurring dashboards, human
+  label review, and any enabled forward Shadow remain separately proposal- and evidence-gated.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
   evidence; forward email transport remains P6 work. P4 and later keep their existing gates.
 - ADR 0007 defines the current data operating path. CN01 and Hermes each run one 18:30

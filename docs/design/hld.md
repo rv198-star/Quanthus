@@ -4,9 +4,9 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P4 implementation open |
-| Version | 0.12 |
-| Effective date | 2026-08-19 |
+| Current phase | P4 accepted; P5 research and P6 simulation preparation open |
+| Version | 0.13 |
+| Effective date | 2026-08-26 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
 | Platform gate | `config/platform-kernel-gates.v1.json` |

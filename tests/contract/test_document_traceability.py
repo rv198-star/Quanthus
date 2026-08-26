@@ -137,7 +137,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertEqual(prd["Design status"], "approved")
         self.assertEqual(hld["Design status"], "approved")
         if p3_gate.p4_can_start:
-            expected_phase = "P4 implementation open"
+            expected_phase = "P4 accepted; P5 research and P6 simulation preparation open"
         elif p2_gate.p3_can_start:
             expected_phase = "P3 implementation open"
         else:
@@ -1337,12 +1337,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {
                 "P3-LABEL-004",
                 "P3-DASH-001",
-                "P3-EXPERT-005",
             },
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-EXPERT-000", "P3-EXPERT-004"},
+            set(),
         )
         self.assertTrue(
             all(

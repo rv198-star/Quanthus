@@ -30,8 +30,9 @@ Current state: P2 remains conditionally accepted for the active daily research p
 `config/p2-gates.v1.json`, and P3 is accepted by `config/p3-gates.v1.json`. Its strategy-neutral
 replay, rule contracts, position/risk path, audit funnel, and one frozen capability fixture prove
 the multi-year closed loop. That fixture is not a formal strategy lineage and cannot be tuned or
-promoted. P4 event-library implementation is open; target two-window activation and forward
-notification retain their separate blockers.
+promoted. The P4 Event Library, Label Corpus, Comparison Report, and bounded Worker execution are
+accepted. P5 target research and P6 simulation preparation are dependency-eligible, while target
+two-window activation and forward notification retain their separate blockers.
 
 ## 3. Milestones
 
@@ -62,8 +63,8 @@ notification retain their separate blockers.
 | PK6 Cutover and Recovery | Deploy, rollback, restoration drill, and old-path closure | PK4 accepted and PK5 accepted/not-applicable | Rollback/restoration fails or an old service remains required |
 
 `config/platform-kernel-gates.v1.json` is the stage authority. LLD 11 owns the detailed module
-matrix, entry evidence, stop conditions, and work items. PK0 was accepted on 2026-08-12 with the
-six default boundary decisions; PK1 is now open and begins with `PK-COMPOSE-001` only.
+matrix, entry evidence, stop conditions, and work items. PK1 through PK4 and PK6 are accepted; PK5
+optional authoring is not applicable to the first cutover and remains separately activation-gated.
 
 ## 4. Release mechanics
 
@@ -71,14 +72,13 @@ Each phase has a GitHub milestone and an epic issue. Child issues carry stable i
 `docs/work-items/index.md`, list dependency ids, and link the governing LLD section. A gate
 changes only through configuration, tests, and evidence in one pull request.
 
-The cross-phase Expert Strategy Layer MVP has its own GitHub milestone and `P3-EXPERT-000` epic.
-`P3-EXPERT-001`, `P3-EXPERT-002`, `P3-EXPERT-003`, `P3-STRAT-002`, and `P3-ATTR-001` are accepted.
-The formal two-expert topology passed production and isolated byte-identical January 2020 Worker
-Runs. Its bounded 2020-2021 attribution release then passed production and isolated byte-identical
-verification; `P3-EXPERT-004` is the next dependency-eligible child.
-This product increment may use development
-data but cannot open arbitration, permanent-blind, P6 promotion, notification, or execution
-authority.
+The cross-phase Expert Strategy Layer MVP is accepted and its `P3-EXPERT-000` tracking epic is
+closed. All seven blocking children have accepted evidence. The formal two-expert topology passed
+production and isolated reproduction, bounded 2020-2021 attribution reproduced byte-identically,
+and the read-only candidate detail binds the resulting evidence. The terminal lifecycle decision
+is `inconclusive`; forward Shadow is disabled because no explicit observation budget was
+authorized. This product increment used development data only and did not open arbitration,
+permanent-blind, P6 promotion, notification, or execution authority.
 
 ## 5. Stop rules
 

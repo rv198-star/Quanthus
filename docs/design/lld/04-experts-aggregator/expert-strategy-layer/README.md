@@ -4,7 +4,7 @@
 | --- | --- |
 | Parent | `../expert-strategy-layer.md` |
 | Design status | approved |
-| Delivery gate | `P3-EXPERT-001` and `P3-EXPERT-002` accepted; later children dependency-gated |
+| Delivery gate | accepted; all seven child work items closed with immutable evidence |
 | Governing work | `P3-EXPERT-000` |
 | Review | `implementation-readiness-review.md` |
 
@@ -68,8 +68,8 @@ predecessors are accepted and its own human decision gate has a recorded, digest
 | `P3-EXPERT-003` | First target, resolver, assessment expert, and scorecard | `first-target-resolver-expert.md` | accepted; evidence: `docs/acceptance/p3-expert-first-target-production-20260821.md` |
 | `P3-STRAT-002` | Executable two-expert strategy topology | `first-formal-topology.md` | accepted; evidence: `docs/acceptance/p3-strat-first-formal-topology-production-20260822.md` |
 | `P3-ATTR-001` | Bounded formal-strategy counterfactual evidence | `../../10-monitoring-attribution/formal-strategy-attribution.md` | accepted; evidence: `docs/acceptance/p3-attr-formal-production-20260823.md` |
-| `P3-EXPERT-004` | Read-only candidate-detail evidence projection | `candidate-detail-evidence.md` | ready after `P3-ATTR-001` acceptance |
-| `P3-EXPERT-005` | Development acceptance and forward-Shadow disposition | `mvp-shadow-handoff.md` | blocked by `P3-EXPERT-004` |
+| `P3-EXPERT-004` | Read-only candidate-detail evidence projection | `candidate-detail-evidence.md` | accepted; `docs/acceptance/p3-expert-candidate-detail-evidence-20260823.md` |
+| `P3-EXPERT-005` | Development acceptance and forward-Shadow disposition | `mvp-shadow-handoff.md` | accepted; inconclusive decision and Shadow disabled |
 
 ## 5. Human authority
 

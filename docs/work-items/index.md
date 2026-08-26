@@ -208,7 +208,7 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |
 | P3-SHADOW-001 | Implement shadow execution and divergence log | P3-AGG-001 | closed for comparison-contract scope |
 | P3-EXP-002 | Add vertical-slice rule experts | P3 aggregator | closed for fixture scope |
-| P3-EXPERT-000 | Deliver the bounded Expert Strategy Layer MVP | META-DOC-001 | open epic |
+| P3-EXPERT-000 | Deliver the bounded Expert Strategy Layer MVP | META-DOC-001 | closed by `docs/acceptance/p3-expert-mvp-shadow-handoff-20260823.md` after all seven children were accepted |
 | P3-EXPERT-001 | Implement additive expert evaluation protocol v2 | P3-EXP-001, P3-AGG-001 | closed by `docs/acceptance/p3-expert-evaluation-protocol-v2-20260819.md` |
 | P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | closed by `docs/acceptance/p3-expert-evaluation-worker-20260820.md` |
 | P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-EXPERT-002, P3-FEAT-001, P3-REPLAY-001, P4-LABEL-001 | closed by `docs/acceptance/p3-expert-first-target-production-20260821.md` |
@@ -223,8 +223,8 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 | P3-FUNNEL-001 | Implement opportunity funnel | P3 vertical slice | closed |
 | P3-ATTR-001 | Run bounded attribution for the first formal expert strategy | P3-STRAT-002, P3-EXPERT-002 | closed by `docs/acceptance/p3-attr-formal-production-20260823.md` |
 | P3-DASH-001 | Produce monitoring report | Funnel and attribution | deferred pending recurring formal strategy |
-| P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | ready after P3-ATTR-001 acceptance |
-| P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | blocked only by P3-EXPERT-004 |
+| P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | closed by `docs/acceptance/p3-expert-candidate-detail-evidence-20260823.md` |
+| P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | closed by `docs/acceptance/p3-expert-mvp-shadow-handoff-20260823.md`; decision inconclusive, Shadow disabled |
 | P3-ACCEPT-001 | Execute multi-year vertical-slice acceptance | All P3 release blockers | closed |
 
 ## P4-P7

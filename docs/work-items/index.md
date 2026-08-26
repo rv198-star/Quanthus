@@ -40,21 +40,21 @@ event-library projection.
 
 ## P1 data foundation
 
-| ID | Title | Depends on |
-| --- | --- | --- |
-| P1-DATA-001 | Define storage layout, schemas, and dataset manifests | Bootstrap |
-| C1 | Rebuild effective-date adjustment factors | P1-DATA-001 |
-| C2 | Classify every security-calendar gap | S4, security master |
-| S1 | Measure and complete delisted-security coverage | Security master |
-| S2 | Derive historical ST state from announcements | Landing data |
-| S3 | Derive board-specific price limits | S2, security master |
-| S4 | Build authoritative trading calendar | Source ingestion |
-| P1-UNIVERSE-001 | Implement daily point-in-time universe policy | Status and bars |
-| P1-SNAPSHOT-001 | Implement atomic point-in-time snapshots | Canonical datasets |
-| P1-ACCEPT-001 | Execute Chapter 01 acceptance suite | All P1 blockers |
-| P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit |
-| P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 |
-| P1-DATA-004 | Normalize mixed-unit corporate actions for continuous historical replay | C1, S4, P1-SNAPSHOT-001 |
+| ID | Title | Depends on | Disposition |
+| --- | --- | --- | --- |
+| P1-DATA-001 | Define storage layout, schemas, and dataset manifests | Bootstrap | |
+| C1 | Rebuild effective-date adjustment factors | P1-DATA-001 | |
+| C2 | Classify every security-calendar gap | S4, security master | |
+| S1 | Measure and complete delisted-security coverage | Security master | |
+| S2 | Derive historical ST state from announcements | Landing data | |
+| S3 | Derive board-specific price limits | S2, security master | |
+| S4 | Build authoritative trading calendar | Source ingestion | |
+| P1-UNIVERSE-001 | Implement daily point-in-time universe policy | Status and bars | |
+| P1-SNAPSHOT-001 | Implement atomic point-in-time snapshots | Canonical datasets | |
+| P1-ACCEPT-001 | Execute Chapter 01 acceptance suite | All P1 blockers | |
+| P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | |
+| P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | |
+| P1-DATA-004 | Normalize mixed-unit corporate actions for continuous historical replay | C1, S4, P1-SNAPSHOT-001 | closed by `docs/acceptance/p1-corporate-action-normalization-audit-20260728.md` |
 
 ## P2 backtest and observability
 

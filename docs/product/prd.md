@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P4 accepted; P5 research and P6 simulation preparation open |
+| Current phase | P6 implementation open; P5 optional research deferred |
 | Version | 0.6 |
 | Effective date | 2026-08-26 |
 | Product type | Internal research and trading decision system |
@@ -155,8 +155,8 @@ One person may hold several roles, but the artifacts and gates remain separate.
 | P2 | Auditable event-driven backtester | Golden trades reconcile exactly and runs repeat |
 | P3 | Rule-only vertical slice | Multi-year replay survives and every decision is auditable |
 | P4 | Event library and three-class dataset | Three leading differentiators are reproducible |
-| P5 | Research scoring layer | Model beats frozen baseline without regime collapse |
-| P6 | Frozen paper operation and signal notification | Results remain inside the expected backtest distribution; no live-fill claims |
+| P5 | Optional research scoring layer | Model beats frozen baseline without regime collapse |
+| P6 | Prospective Shadow and fixed-unit paper operation | Frozen behavior accumulates a predeclared, time-matured evidence budget; no notification or live-fill claims |
 | P7 | Operator-assisted small-capital operation | Every advice reconciles to reported fills, modified/partial action, or no action |
 
 ## 9. Data and validation partitions
@@ -198,10 +198,14 @@ low-memory Worker execution are accepted by their production evidence. The froze
 an acceptance fixture, not an approved strategy lineage; it cannot be tuned or promoted by that
 gate. The separate two-expert strategy MVP is also accepted for development evidence, but its
 lifecycle decision is `inconclusive` and its forward-Shadow disposition is disabled. None of these
-acceptances activates the target intraday profile or opens the 2022-2025 partitions.
-The next executable work is listed in `docs/work-items/index.md`. The approved
+acceptances activates the target intraday profile or opens the 2022-2025 partitions. P6
+implementation is open at `P6-GOV-001` under the daily `close-to-next-open-v1` profile; P5 model
+research is optional, deferred, and not a P6 dependency. Official prospective evidence begins
+only after a separate immutable activation decision and cannot be backfilled from earlier 2026
+history. The next executable work is listed in `docs/work-items/index.md`. The approved
 near-term operating direction is `operator-assisted-two-window-v1`: exactly two versioned action
 windows at `09:45-10:15` and `14:15-session close` in `Asia/Shanghai`, email notification, manual
-operator action, and no broker connection. The clock bounds are approved; evaluation cadence,
+operator action, and no broker connection. This later direction is outside the initial P6 scope.
+The clock bounds are approved; evaluation cadence,
 data-latency, and fill policy remain blocked until a versioned executable configuration and
 acceptance evidence are committed. `close-to-next-open-v1` remains the active executable profile.

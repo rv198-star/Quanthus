@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Phase | P5 |
-| Status | Deferred until rule baselines and target cards exist |
+| Status | Optional research deferred; not a P6 predecessor |
 | Governing requirements | FR-ML-001 through FR-ML-003 |
 
 ## 1. Role
@@ -11,6 +11,10 @@
 The scoring layer is a research instrument. It produces feature importance, calibrated state
 assessments, and hypotheses for expert-rule proposals. It does not emit an order or bypass the
 aggregator. Remaining in research-only mode is an acceptable permanent outcome.
+
+P5 may resume independently when a concrete model-research proposal and suitable compute exist.
+P6 prospective validation evaluates a frozen rule/expert strategy and does not wait for, require,
+or manufacture a learned model.
 
 ## 2. Tasks
 

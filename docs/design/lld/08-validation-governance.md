@@ -2,9 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Phase | Starts after P3 baseline; simulation in P6 |
-| Status | Approved policy baseline |
+| Phase | P6 implementation open; P5 optional research deferred |
+| Status | Approved; execution opens at `P6-GOV-001` |
 | Governing requirements | FR-GOV-001/002, NFR-004 |
+| Detailed design | `08-validation-governance/p6-forward-validation.md` |
 
 ## 1. Goal
 
@@ -16,7 +17,8 @@ discipline has higher priority than a favorable performance number.
 - Development: 2012-2021; iterative work is allowed and logged.
 - Arbitration: 2022-2024; revealed on the quarterly schedule, then rolled into development.
 - Permanent blind: 2025; reserved for major promotion decisions and never ordinary tuning.
-- Simulation: 2026 onward; continuously accumulated under frozen behavior.
+- Simulation: 2026 onward by partition policy, but official prospective evidence begins only after
+  an immutable P6 activation boundary and accumulates under frozen behavior.
 
 Reports state which partitions were accessed. A result without arbitration remains a research
 result even if it is profitable.
@@ -26,7 +28,8 @@ result even if it is profitable.
 1. Proposal: cite attribution evidence and the observed failure mode.
 2. Written expectation: name cases that should change and controls that should not.
 3. Development replay: verify mechanism and side effects.
-4. Shadow trial: record proposed actions without execution for a predeclared trigger count.
+4. Shadow and paper trial: record frozen assessments/actions and isolated P2 paper outcomes for a
+   predeclared observation budget without notification, broker, or live-capital authority.
 5. Promote or rollback: apply the predeclared criteria and preserve both versions.
 
 Construction mode permits logged baseline iteration. Once a policy enters shadow or simulation,
@@ -52,14 +55,20 @@ emergency fix. Exceeding the budget downgrades that period's research credibilit
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P6-GOV-001 | Implement proposal and expectation record | P3 audit | Immutable proposal artifact |
-| P6-GOV-002 | Implement shadow lifecycle and trigger-count gate | P3 shadow log | Promote/rollback rehearsal |
-| P6-SCORE-001 | Implement expert and aggregator scorecards | Attribution data | Quarterly report fixture |
-| P6-DATA-001 | Enforce partition access and reveal logging | Run manifest | Access-control audit |
-| P6-REVIEW-001 | Run first quarterly arbitration review | Simulation | Signed decision package |
+| P6-000 | Coordinate the bounded P6 prospective-validation program | META-DOC-001, accepted P3/P4 and Expert Strategy MVP | All eight children accepted |
+| P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6-000 entry authority | Immutable entry proposal |
+| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6-GOV-001 | Boundary and access-control audit |
+| P6-SCORE-001 | Freeze role-specific expert, aggregator, strategy, and paper scorecards | P6-DATA-001, P3-ATTR-001 | Outcome-blind scorecard cards |
+| P6-GOV-002 | Implement the composite Forward Worker and disabled-state lifecycle rehearsal | P6-SCORE-001, PK-WORKER-000 | Recovery and rollback rehearsal |
+| P6-PAPER-001 | Implement the isolated P2 paper lane and fixed-unit ledger | P6-GOV-002, P2-ACCEPT-001 | Balanced paper-account fixture |
+| P6-WEB-001 | Project forward and paper evidence in candidate detail | P6-PAPER-001 | Read-only product acceptance |
+| P6-ACTIVATE-001 | Authorize and run the first official post-activation forward cycle | P6-WEB-001 | Signed activation and reproduced first cycle |
+| P6-REVIEW-001 | Complete the time-matured simulation review and any authorized reveal | P6-ACTIVATE-001 plus closed budget | Signed review package and closed ledger |
 
 ## 7. Acceptance
 
-The scorecard, failure ranking, and proposal form complete one full quarterly cycle; at least
-one proposal reaches promote or rollback through shadow; and the arbitration reveal is logged
-without tuning against its result.
+The engineering checkpoint requires an authorized first prospective cycle and independent
+reproduction. Full P6 acceptance additionally waits for the predeclared real-calendar observation
+budget and target-maturity tail, closes and reconciles the paper ledger, records a signed human
+review, and proves zero notification, broker, or live-capital authority. A negative or
+inconclusive result may close P6 honestly; missing prospective time may not.

@@ -528,18 +528,16 @@ def work_items(root: Path) -> list[WorkItem]:
         dependencies = design_row.get("Dependency") or row.get("Depends on") or "None"
         evidence = design_row.get("Acceptance evidence", "Linked implementation evidence")
         state = row.get("State", "")
+        disposition = row.get("Disposition", "")
         if phase == "meta":
             status = "ready" if state == "active" else "triage"
-        elif phase == "P3" and row.get("Disposition", "").startswith("closed"):
+        elif disposition.startswith(("accepted", "closed")):
             status = "closed"
-        elif phase == "P3" and row.get("Disposition", "").startswith(("blocked", "deferred")):
+        elif phase == "P3" and disposition.startswith(("blocked", "deferred")):
             status = "blocked"
         elif phase == "PK":
-            disposition = row.get("Disposition", "")
             if disposition in {"open", "ready", "open epic"}:
                 status = "ready"
-            elif disposition.startswith("accepted"):
-                status = "closed"
             else:
                 status = "blocked"
         elif phase == "P4":

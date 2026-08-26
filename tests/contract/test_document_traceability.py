@@ -1331,6 +1331,10 @@ class DocumentTraceabilityTests(unittest.TestCase):
         p4_items = [item for item in items if item.phase == "P4"]
         pk_items = [item for item in items if item.phase == "PK"]
 
+        self.assertEqual(
+            next(item for item in items if item.stable_id == "P1-DATA-004").status,
+            "closed",
+        )
         self.assertTrue(p3_items)
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "blocked"},

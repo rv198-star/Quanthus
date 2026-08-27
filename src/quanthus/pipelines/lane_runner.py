@@ -4394,8 +4394,15 @@ def _publish(
         release_dir = (
             release_root / schedule / stream / market_date.isoformat() / attempt_id
         )
-    else:
+    elif lane_id == "market-daily-core" or schedule != "daily":
         release_dir = release_root / schedule / market_date.isoformat() / attempt_id
+    else:
+        release_dir = (
+            release_root
+            / schedule
+            / market_date.isoformat()
+            / f"{lane_id}-{attempt_id}"
+        )
     spec_path = landing / "release-spec.json"
     _atomic_json(spec_path, spec)
     try:

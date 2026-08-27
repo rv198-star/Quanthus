@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "usage: $0 <daily-orchestrator> [arguments...]" >&2
+}
+
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 2
+fi
+
+max_attempts="${QUANTHUS_ODS_DAILY_MAX_ATTEMPTS:-2}"
+retry_delay_seconds="${QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS:-600}"
+if [[ ! "$max_attempts" =~ ^[1-9][0-9]*$ ]]; then
+  echo "QUANTHUS_ODS_DAILY_MAX_ATTEMPTS must be a positive integer" >&2
+  exit 2
+fi
+if [[ ! "$retry_delay_seconds" =~ ^[0-9]+$ ]]; then
+  echo "QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS must be a non-negative integer" >&2
+  exit 2
+fi
+
+for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+  last_status=0
+  "$@" || last_status=$?
+  if (( last_status == 0 )); then
+    exit 0
+  fi
+  if (( attempt < max_attempts )); then
+    echo "daily orchestrator attempt ${attempt}/${max_attempts} failed; retrying in ${retry_delay_seconds}s" >&2
+    sleep "$retry_delay_seconds"
+  fi
+done
+
+exit "$last_status"

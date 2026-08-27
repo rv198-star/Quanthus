@@ -39,6 +39,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("OnCalendar=Mon..Fri *-*-* 18:30:00 Asia/Shanghai", orchestrator_timer)
         self.assertIn("READY-gated", orchestrator_timer)
         self.assertIn("Unit=cn01-ods-daily-orchestrator.service", orchestrator_timer)
+        self.assertIn("run-ods-daily-with-retry", orchestrator_service)
         self.assertIn("run-cn01-ods-daily", orchestrator_service)
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", orchestrator_service)
         self.assertIn("Environment=HERMES_ODS_NODE_ID=cn01", orchestrator_service)
@@ -46,10 +47,11 @@ class OdsUnitRendererTests(unittest.TestCase):
             "Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/cn01-ods-lane.env",
             orchestrator_service,
         )
-        self.assertIn("TimeoutStartSec=220min", orchestrator_service)
-        self.assertIn("StartLimitBurst=3", orchestrator_service)
-        self.assertIn("Restart=on-failure", orchestrator_service)
-        self.assertIn("RestartSec=10min", orchestrator_service)
+        self.assertIn("QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=2", orchestrator_service)
+        self.assertIn("QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS=600", orchestrator_service)
+        self.assertIn("TimeoutStartSec=450min", orchestrator_service)
+        self.assertNotIn("Restart=on-failure", orchestrator_service)
+        self.assertNotIn("RestartSec=10min", orchestrator_service)
         self.assertIn("OnSuccess=cn01-dwd-success-notification.service", orchestrator_service)
 
         weekly_service = (output / "cn01-ods-weekly-corrections.service").read_text()
@@ -116,7 +118,8 @@ class OdsUnitRendererTests(unittest.TestCase):
         )
         self.assertIn("OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai", orchestrator)
         orchestrator_service = (output / "hermes-ods-daily-orchestrator.service").read_text()
-        self.assertIn("Restart=on-failure", orchestrator_service)
+        self.assertIn("run-ods-daily-with-retry", orchestrator_service)
+        self.assertNotIn("Restart=on-failure", orchestrator_service)
         self.assertIn("--event hermes_dwd_completed", success_notification)
         self.assertIn("--node Hermes", success_notification)
         prune_service = (output / "hermes-ods-shadow-prune.service").read_text()

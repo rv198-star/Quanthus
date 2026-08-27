@@ -4,8 +4,6 @@ After=network-online.target
 Wants=network-online.target
 OnFailure=hermes-dwd-failure-notification.service quanthus-pipeline-failure@%n.service
 OnSuccess=hermes-dwd-success-notification.service
-StartLimitIntervalSec=12h
-StartLimitBurst=3
 
 [Service]
 Type=oneshot
@@ -16,11 +14,11 @@ EnvironmentFile=-/etc/quanthus/hermes-dwd.env
 Environment=HERMES_ODS_NODE_ID=hermes
 Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/hermes-ods-lane.env
 WorkingDirectory=/root/work/Quanthus
-ExecStart=/root/work/Quanthus/ops/bin/run-cn01-ods-daily
-TimeoutStartSec=160min
+Environment=QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=2
+Environment=QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS=600
+ExecStart=/root/work/Quanthus/ops/bin/run-ods-daily-with-retry /root/work/Quanthus/ops/bin/run-cn01-ods-daily
+TimeoutStartSec=330min
 SuccessExitStatus=0
-Restart=on-failure
-RestartSec=10min
 Nice=5
 UMask=0027
 StandardOutput=journal

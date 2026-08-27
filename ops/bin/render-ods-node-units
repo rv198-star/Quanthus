@@ -67,7 +67,7 @@ for unit in "${UNITS[@]}"; do
     sed -i "s/19:30:00/18:30:00/g; s/(19:30, READY-gated)/(18:30, READY-gated)/g" "$tmp_path"
   fi
   if [[ "$NODE_ID" == "cn01" && "$unit" == "hermes-ods-daily-orchestrator.service" ]]; then
-    sed -i "s/TimeoutStartSec=160min/TimeoutStartSec=220min/" "$tmp_path"
+    sed -i "s/TimeoutStartSec=330min/TimeoutStartSec=450min/" "$tmp_path"
   fi
   if [[ "$NODE_ID" == "cn01" && "$unit" == "hermes-ods-market-daily-core.timer" ]]; then
     sed -i "s/Hermes ODS/CN01 ODS/g; s/17:30:00/18:30:00/g; s/contract 17:30/contract 18:30/g; s/collection window/throughput-budgeted collection window/g" "$tmp_path"

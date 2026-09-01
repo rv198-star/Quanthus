@@ -23,6 +23,9 @@ from quanthus.pipelines.lane_runner import (
     run_lane,
     session_preflight,
 )
+from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
+    find_ready_daily_ods_lanes,
+)
 
 SCHEDULE = Path("config/schedules/hermes-ods-schedule.v1.json")
 
@@ -1326,6 +1329,47 @@ def test_calendar_events_do_not_replace_market_daily_current(
     assert event_result.status == "ready"
     assert event_result.release_dir is not None
     assert current_path.read_bytes() == market_current
+
+
+def test_daily_market_and_calendar_publish_independently_with_same_attempt_id(
+    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shadow = tmp_path / "shadow"
+    paths = _paths(fixture_home, shadow)
+    started = datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(lane_runner, "_now", lambda: started)
+
+    calendar_result = run_lane(
+        lane_id="calendar-daily-events",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+    )
+    market_result = run_lane(
+        lane_id="market-daily-core",
+        market_date=date(2026, 7, 24),
+        schedule_config=SCHEDULE,
+        paths=paths,
+        force_preflight="both_open",
+    )
+
+    assert calendar_result.status == "ready"
+    assert market_result.status == "ready"
+    assert calendar_result.attempt_id == market_result.attempt_id
+    assert calendar_result.release_dir is not None
+    assert market_result.release_dir is not None
+    assert calendar_result.release_dir.name == (
+        f"calendar-daily-events-{calendar_result.attempt_id}"
+    )
+    assert market_result.release_dir.name == market_result.attempt_id
+    assert (calendar_result.release_dir / "READY").is_file()
+    assert (market_result.release_dir / "READY").is_file()
+    ready_lanes = find_ready_daily_ods_lanes(
+        release_root=shadow / "releases",
+        market_date=date(2026, 7, 24),
+    )
+    assert ready_lanes["calendar_daily_events"].release_dir == calendar_result.release_dir
+    assert ready_lanes["market_daily_core"].release_dir == market_result.release_dir
 
 
 def test_weekly_reconciliation_classes(fixture_home: Path, tmp_path: Path) -> None:

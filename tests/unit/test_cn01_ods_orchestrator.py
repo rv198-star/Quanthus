@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ORCHESTRATOR = ROOT / "ops/bin/run-cn01-ods-daily"
+RETRY_WRAPPER = ROOT / "ops/bin/run-ods-daily-with-retry"
 
 
 def _write_executable(path: Path, text: str) -> None:
@@ -257,12 +258,80 @@ def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
         encoding="ascii"
     )
     timer = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.timer").read_text(encoding="ascii")
+    assert "run-ods-daily-with-retry" in service
     assert "run-cn01-ods-daily" in service
-    assert "TimeoutStartSec=160min" in service
+    assert "TimeoutStartSec=330min" in service
     assert "SuccessExitStatus=0" in service
     assert "OnSuccess=hermes-dwd-success-notification.service" in service
     assert "OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai" in timer
     assert "Persistent=false" in timer
+
+
+def test_daily_retry_wrapper_returns_success_after_a_retry(tmp_path: Path) -> None:
+    attempts = tmp_path / "attempts"
+    runner = tmp_path / "runner"
+    _write_executable(
+        runner,
+        "#!/usr/bin/env bash\n"
+        f"attempts={str(attempts)!r}\n"
+        "count=0\n"
+        "[[ -f $attempts ]] && count=$(<\"$attempts\")\n"
+        "count=$((count + 1))\n"
+        "printf '%s\\n' \"$count\" > \"$attempts\"\n"
+        "[[ $count -gt 1 ]]\n",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "QUANTHUS_ODS_DAILY_MAX_ATTEMPTS": "2",
+            "QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS": "0",
+        }
+    )
+
+    completed = subprocess.run(
+        [str(RETRY_WRAPPER), str(runner)],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert attempts.read_text(encoding="ascii") == "2\n"
+
+
+def test_daily_retry_wrapper_returns_final_failure_status(tmp_path: Path) -> None:
+    attempts = tmp_path / "attempts"
+    runner = tmp_path / "runner"
+    _write_executable(
+        runner,
+        "#!/usr/bin/env bash\n"
+        f"attempts={str(attempts)!r}\n"
+        "count=0\n"
+        "[[ -f $attempts ]] && count=$(<\"$attempts\")\n"
+        "printf '%s\\n' \"$((count + 1))\" > \"$attempts\"\n"
+        "exit 23\n",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "QUANTHUS_ODS_DAILY_MAX_ATTEMPTS": "2",
+            "QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS": "0",
+        }
+    )
+
+    completed = subprocess.run(
+        [str(RETRY_WRAPPER), str(runner)],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 23
+    assert attempts.read_text(encoding="ascii") == "2\n"
 
 
 def test_orchestrator_reuses_existing_ready_lane_and_preserves_node(tmp_path: Path) -> None:

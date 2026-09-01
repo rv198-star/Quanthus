@@ -119,7 +119,6 @@ class WarehouseDocumentationContractTest(unittest.TestCase):
             "corporate_actions_delta",
             "dividends_delta",
             "factor_evidence_delta",
-            "financial_disclosures_delta",
         }
         daily_code = (
             ROOT / "src" / "quanthus" / "pipelines" / "securities_warehouse" / "daily_domain.py"
@@ -129,6 +128,9 @@ class WarehouseDocumentationContractTest(unittest.TestCase):
                 self.assertIn(f"`{artifact}`", daily)
                 self.assertIn(f'"{artifact}"', daily_code)
         self.assertIn("非空时 builder 必须失败", daily)
+        self.assertIn("`financial_disclosures_delta`", daily)
+        self.assertIn("`ods_only`", daily)
+        self.assertIn('"financial_disclosures_delta"', daily_code)
 
         weekly = self.lineage.split("## 7. 当前周更血缘", 1)[1].split("## 8. 外键和回放主链", 1)[0]
         self.assertIn("DWD correction 发布尚未启用", weekly)

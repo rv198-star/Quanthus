@@ -219,14 +219,18 @@ F10 raw content + content_sha256 + source offsets
 | daily status | `dwd_tradability_state` |
 | announcements delta | `dwd_disclosure`, `dwd_disclosure_subject` |
 
+`financial_disclosures_delta` 是从已经进入受治理 Base 的 `financial_quarterly` 静态快照按
+`publish_deadline` 筛出的重复证据。截止日不是实际公告时间，不能授权新的 disclosure
+事件；其中的季度报告业务键也已由 Base 建模。因此它显式归类为 `ods_only`：日包审计
+必须记录 lane、artifact、行数、源哈希和原因，但不重复输出 DWD 业务行。
+
 这条日更链不等于全量 9-builder DAG。当前未实现日增量 handler 的 artifact 是：
 
 - `adjustment_evidence_delta`；
 - `suspensions_delta`；
 - `corporate_actions_delta`；
 - `dividends_delta`；
-- `factor_evidence_delta`；
-- `financial_disclosures_delta`。
+- `factor_evidence_delta`。
 
 它们非空时 builder 必须失败，而不是静默丢弃。因此目前“日更完成”只证明上述 7 表的
 当日增量完成，不代表 33 表全部按日更新。

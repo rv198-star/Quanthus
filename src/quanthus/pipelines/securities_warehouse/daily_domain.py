@@ -52,6 +52,21 @@ _TABLE_KEYS = {
     "dwd_disclosure_subject": ("disclosure_id", "disclosure_subject_id", "effective_at"),
 }
 
+_RECOGNIZED_ODS_ONLY_DAILY_ARTIFACTS = {
+    ("calendar_daily_events", "financial_disclosures_delta"): (
+        "deadline-filtered quarterly snapshot rows are already modeled in the governed "
+        "financial-reporting Base; publish_deadline is not disclosure-event evidence"
+    ),
+}
+
+_DEFERRED_DAILY_ARTIFACTS = (
+    ("market_daily_core", "adjustment_evidence_delta"),
+    ("calendar_daily_events", "suspensions_delta"),
+    ("calendar_daily_events", "corporate_actions_delta"),
+    ("calendar_daily_events", "dividends_delta"),
+    ("calendar_daily_events", "factor_evidence_delta"),
+)
+
 
 def _canonical_bytes(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode(
@@ -162,6 +177,37 @@ def _artifact(selected: Mapping[str, Any], lane: str, name: str) -> tuple[Path, 
         return selected[lane]["artifacts"][name]
     except KeyError as exc:
         raise DailyDomainBuildError(f"required daily artifact is absent: {lane}/{name}") from exc
+
+
+def _audit_non_output_daily_artifacts(
+    selected: Mapping[str, Any], *, parquet: Any
+) -> list[dict[str, Any]]:
+    """Account for recognized ODS-only inputs and fail closed on deferred non-empty inputs."""
+
+    audited: list[dict[str, Any]] = []
+    for (lane, name), reason in sorted(_RECOGNIZED_ODS_ONLY_DAILY_ARTIFACTS.items()):
+        path, artifact = _artifact(selected, lane, name)
+        row_count = int(parquet.ParquetFile(path).metadata.num_rows)
+        audited.append(
+            {
+                "lane": lane,
+                "artifact": name,
+                "disposition": "ods_only",
+                "row_count": row_count,
+                "source_artifact_sha256": str(artifact.sha256),
+                "reason": reason,
+            }
+        )
+
+    for lane, name in _DEFERRED_DAILY_ARTIFACTS:
+        path, _artifact_contract = _artifact(selected, lane, name)
+        row_count = int(parquet.ParquetFile(path).metadata.num_rows)
+        if row_count:
+            raise DailyDomainBuildError(
+                f"non-empty daily artifact has no daily DWD handler: {lane}/{name} "
+                f"({row_count} rows)"
+            )
+    return audited
 
 
 def _copy(connection: Any, query: str, output: Path) -> None:
@@ -280,17 +326,7 @@ def build_daily_domain_increment(
     announcements_path, announcements_artifact = _artifact(
         selected, "calendar_daily_events", "announcements_delta"
     )
-    deferred_daily_artifacts = [
-        (lane, name, _artifact(selected, lane, name)[0])
-        for lane, name in (
-            ("market_daily_core", "adjustment_evidence_delta"),
-            ("calendar_daily_events", "suspensions_delta"),
-            ("calendar_daily_events", "corporate_actions_delta"),
-            ("calendar_daily_events", "dividends_delta"),
-            ("calendar_daily_events", "factor_evidence_delta"),
-            ("calendar_daily_events", "financial_disclosures_delta"),
-        )
-    ]
+    ods_only_artifacts = _audit_non_output_daily_artifacts(selected, parquet=pq)
 
     listing_files = _base_files(base_root, base_manifest, "dwd_listing")
     security_files = _base_files(base_root, base_manifest, "dwd_security")
@@ -305,13 +341,6 @@ def build_daily_domain_increment(
     connection.execute("SET preserve_insertion_order=true")
     connection.execute("SET memory_limit='2GB'")
     try:
-        for lane, name, path in deferred_daily_artifacts:
-            row_count = pq.ParquetFile(path).metadata.num_rows
-            if row_count:
-                raise DailyDomainBuildError(
-                    f"non-empty daily artifact has no daily DWD handler: {lane}/{name} "
-                    f"({row_count} rows)"
-                )
         connection.execute(
             f"CREATE VIEW base_listing AS SELECT * FROM {_path_relation(listing_files)}"
         )
@@ -574,6 +603,7 @@ def build_daily_domain_increment(
             "covered_after_date": covered_after.isoformat(),
             "tables": audit_tables,
             "source_conservation": expected,
+            "ods_only_artifacts": ods_only_artifacts,
             "result": "accepted",
         }
         audit_path = work / "audit.json"

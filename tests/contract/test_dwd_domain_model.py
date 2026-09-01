@@ -471,6 +471,7 @@ class DwdDwsDomainModelContractTests(unittest.TestCase):
                 "static_sources",
                 "release_artifacts",
                 "weekly_artifacts",
+                "container_members",
                 "hotfix_artifacts",
             )
             for mapping in contract[group]

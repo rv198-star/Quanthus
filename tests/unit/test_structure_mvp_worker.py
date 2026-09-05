@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -11,6 +12,7 @@ from quanthus.platform.event_worker import (
     EventWorker,
     _seed_structure_mvp_qualification_jobs,
     _structure_input,
+    _write_structure_qualification_seed_receipt,
 )
 from quanthus.platform.jobs import STRUCTURE_MVP_JOB, DurableJobQueue, input_digest
 from quanthus.platform.models import JobRecord, UserRecord
@@ -249,6 +251,23 @@ class StructureMvpWorkerTests(unittest.TestCase):
                 enabled_value="1",
                 code_revision="not-a-revision",
             )
+
+    def test_seed_receipt_is_bounded_and_explicit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            jobs = ("job_" + "1" * 32, "job_" + "2" * 32)
+            _write_structure_qualification_seed_receipt(
+                root,
+                code_revision="a" * 40,
+                status="submitted",
+                job_ids=jobs,
+            )
+            payload = json.loads(
+                (root / "structure-qualification-seed.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(payload["job_ids"], list(jobs))
+            self.assertEqual(payload["status"], "submitted")
+            self.assertIsNone(payload["reason"])
 
     def test_structure_input_is_exact_and_cannot_substitute_config(self) -> None:
         self.assertEqual(_structure_input(STRUCTURE_INPUT), STRUCTURE_INPUT)

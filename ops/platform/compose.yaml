@@ -27,6 +27,7 @@ services:
       QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
       QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
+      QUANTHUS_STRUCTURE_MVP_HEALTH_PROBE: "1"
     depends_on:
       postgres:
         condition: service_healthy

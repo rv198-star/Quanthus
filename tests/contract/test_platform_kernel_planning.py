@@ -318,6 +318,7 @@ def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:
     assert "traefik-net" not in replay_worker
     assert "traefik-net" not in event_worker
     assert "traefik-net" not in event_shard_worker
+    assert 'QUANTHUS_STRUCTURE_MVP_HEALTH_PROBE: "1"' in api
     assert "QUANTHUS_EVENT_RUN_ROOT: /data/event-runs" in event_worker
     assert 'QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED: "1"' in event_worker
     assert "quanthus-event-runs:/data/event-runs" in event_worker

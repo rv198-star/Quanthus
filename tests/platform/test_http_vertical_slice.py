@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from quanthus.platform import api as api_module
+from quanthus.platform.event_worker import (
+    _seed_structure_mvp_qualification_jobs,
+    _write_structure_qualification_seed_receipt,
+)
 from quanthus.platform.identity import totp_code
 
 from .conftest import login, wsgi_request
@@ -39,6 +44,35 @@ def test_health_openapi_request_id_and_removed_routes(kernel) -> None:
         )
     )
     assert wsgi_request(kernel, "GET", "/api/mcp/tools")[0] == 404
+
+
+def test_health_can_project_bounded_structure_mvp_qualification(
+    kernel, tmp_path, monkeypatch
+) -> None:
+    revision = "f" * 40
+    job_ids = _seed_structure_mvp_qualification_jobs(
+        kernel.store,
+        enabled_value="1",
+        code_revision=revision,
+    )
+    receipt = tmp_path / "structure-qualification-seed.json"
+    _write_structure_qualification_seed_receipt(
+        tmp_path,
+        code_revision=revision,
+        status="submitted",
+        job_ids=job_ids,
+    )
+    monkeypatch.setattr(api_module, "_STRUCTURE_MVP_SEED_RECEIPT", receipt)
+    monkeypatch.setenv("QUANTHUS_STRUCTURE_MVP_HEALTH_PROBE", "1")
+
+    status, _, payload = wsgi_request(kernel, "GET", "/health")
+
+    assert status == 200
+    qualification = payload["structure_mvp_qualification"]
+    assert qualification["status"] == "running"
+    assert qualification["code_revision"] == revision
+    assert [item["job_id"] for item in qualification["runs"]] == list(job_ids)
+    assert {item["state"] for item in qualification["runs"]} == {"queued"}
 
 
 def test_admin_query_and_real_job_http_vertical_slice(kernel, attribution_release) -> None:

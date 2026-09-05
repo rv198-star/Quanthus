@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ _STRUCTURE_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
 _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
 _BUILD_REVISION_ENV = "QUANTHUS_CODE_REVISION"
 _EXTERNAL_MCP_ACTOR_USER_ID = "usr_18c14af81a06cf878f177579efec3727"
+_STRUCTURE_QUALIFICATION_SEED_RECEIPT = "structure-qualification-seed.json"
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
@@ -172,6 +174,38 @@ def _seed_structure_mvp_qualification_jobs(
     return tuple(jobs)
 
 
+def _write_structure_qualification_seed_receipt(
+    run_root: Path,
+    *,
+    code_revision: str,
+    status: str,
+    job_ids: tuple[str, ...] = (),
+    reason: str | None = None,
+) -> None:
+    if status not in {"submitted", "rejected"}:
+        raise ValueError("structure qualification seed receipt status is invalid")
+    if status == "submitted" and (len(job_ids) != 2 or reason is not None):
+        raise ValueError("submitted structure qualification receipt is invalid")
+    if status == "rejected" and (job_ids or not reason):
+        raise ValueError("rejected structure qualification receipt is invalid")
+    root = run_root.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / _STRUCTURE_QUALIFICATION_SEED_RECEIPT
+    temporary = root / f".{_STRUCTURE_QUALIFICATION_SEED_RECEIPT}.tmp"
+    payload = {
+        "schema_version": "quanthus.structure-mvp-qualification-seed.v1",
+        "code_revision": code_revision,
+        "status": status,
+        "job_ids": list(job_ids),
+        "reason": reason,
+    }
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary, path)
+
+
 def _canonical_digest(value: object) -> str:
     payload = json.dumps(
         value,
@@ -295,6 +329,7 @@ def _verify_structure_mvp_artifact(
         "adm_manifest_digest": str(manifest["adm_manifest_digest"]),
         "row_count": int(adm_manifest["row_count"]),
         "state_counts": dict(state_counts),
+        "decision_counts": dict(decision_counts),
         "p2_probe_count": len(probes),
         "p2_fill_count": sum(int(item["fill_count"]) for item in probes),
     }
@@ -1232,13 +1267,30 @@ def main(argv: list[str] | None = None) -> int:
     worker_id = os.environ.get("QUANTHUS_WORKER_ID", "").strip() or socket.gethostname()
     run_root = Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs"))
     store = PostgresPlatformStore(dsn)
+    seed_value = os.environ.get(_STRUCTURE_QUALIFICATION_SEED_ENV, "0")
+    code_revision = os.environ.get(_BUILD_REVISION_ENV, "").strip()
     try:
-        _seed_structure_mvp_qualification_jobs(
+        seeded_jobs = _seed_structure_mvp_qualification_jobs(
             store,
-            enabled_value=os.environ.get(_STRUCTURE_QUALIFICATION_SEED_ENV, "0"),
-            code_revision=os.environ.get(_BUILD_REVISION_ENV, "").strip(),
+            enabled_value=seed_value,
+            code_revision=code_revision,
         )
+        if seed_value.strip() == "1":
+            _write_structure_qualification_seed_receipt(
+                run_root,
+                code_revision=code_revision,
+                status="submitted",
+                job_ids=seeded_jobs,
+            )
     except RuntimeError as exc:
+        if seed_value.strip() == "1":
+            with suppress(OSError, ValueError):
+                _write_structure_qualification_seed_receipt(
+                    run_root,
+                    code_revision=code_revision,
+                    status="rejected",
+                    reason=str(exc),
+                )
         print(f"structure qualification seed rejected: {exc}", file=sys.stderr)
     worker = EventWorker(
         store,

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 import urllib.parse
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 
 from quanthus.expert_evaluation.product_view import (
@@ -31,6 +33,7 @@ from quanthus.platform.identity import (
 from quanthus.platform.jobs import (
     ATTRIBUTION_VERIFICATION_JOB,
     CANDIDATE_REPLAY_JOB,
+    STRUCTURE_MVP_JOB,
     DurableJobQueue,
     JobNotCancelableError,
     LocalJobRunner,
@@ -48,6 +51,9 @@ from quanthus.platform.product_query import ProductCandidateEvidence, ProductRes
 
 OPENAPI_VERSION = "3.1.0"
 MAX_BODY_BYTES = 64 * 1024
+_STRUCTURE_MVP_HEALTH_PROBE_ENV = "QUANTHUS_STRUCTURE_MVP_HEALTH_PROBE"
+_STRUCTURE_MVP_SEED_RECEIPT = Path("/data/event-runs/structure-qualification-seed.json")
+_STRUCTURE_MVP_RECEIPT_MAX_BYTES = 64 * 1024
 StartResponse = Callable[[str, list[tuple[str, str]]], object]
 Handler = Callable[["HttpRequest", Mapping[str, str]], "HttpResponse"]
 
@@ -394,10 +400,104 @@ class PlatformHttpApp:
         self._add("jobs.read", "/api/platform/v1/jobs/<job_id>", "GET", self._read_job)
         self._add("jobs.cancel", "/api/platform/v1/jobs/<job_id>/cancel", "POST", self._cancel_job)
 
+    def _structure_mvp_qualification_health(self) -> dict[str, Any] | None:
+        enabled = os.environ.get(_STRUCTURE_MVP_HEALTH_PROBE_ENV, "0").strip()
+        if enabled != "1":
+            return None
+        try:
+            if (
+                not _STRUCTURE_MVP_SEED_RECEIPT.is_file()
+                or _STRUCTURE_MVP_SEED_RECEIPT.stat().st_size
+                > _STRUCTURE_MVP_RECEIPT_MAX_BYTES
+            ):
+                return {"status": "seed_receipt_unavailable"}
+            receipt = json.loads(_STRUCTURE_MVP_SEED_RECEIPT.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {"status": "seed_receipt_invalid"}
+        if (
+            not isinstance(receipt, dict)
+            or receipt.get("schema_version")
+            != "quanthus.structure-mvp-qualification-seed.v1"
+            or receipt.get("status") not in {"submitted", "rejected"}
+        ):
+            return {"status": "seed_receipt_invalid"}
+        if receipt["status"] == "rejected":
+            return {
+                "status": "seed_rejected",
+                "code_revision": receipt.get("code_revision"),
+                "reason": receipt.get("reason"),
+            }
+        job_ids = receipt.get("job_ids")
+        if (
+            not isinstance(job_ids, list)
+            or len(job_ids) != 2
+            or any(not isinstance(item, str) for item in job_ids)
+        ):
+            return {"status": "seed_receipt_invalid"}
+        runs: list[dict[str, Any]] = []
+        for job_id in job_ids:
+            job = self._replay_jobs.get(job_id)
+            if job is None or job.kind != STRUCTURE_MVP_JOB:
+                runs.append({"job_id": job_id, "state": "missing"})
+                continue
+            item: dict[str, Any] = {
+                "job_id": job.job_id,
+                "state": job.state,
+                "stage": job.stage,
+                "progress": job.progress,
+            }
+            if job.error_reason is not None:
+                item["error_reason"] = job.error_reason
+            if job.result_ref:
+                for key in (
+                    "result_digest",
+                    "adm_manifest_digest",
+                    "row_count",
+                    "state_counts",
+                    "decision_counts",
+                    "p2_probe_count",
+                    "p2_fill_count",
+                ):
+                    if key in job.result_ref:
+                        item[key] = job.result_ref[key]
+            runs.append(item)
+        response: dict[str, Any] = {
+            "status": "running"
+            if any(item.get("state") in {"queued", "running"} for item in runs)
+            else "complete",
+            "code_revision": receipt.get("code_revision"),
+            "runs": runs,
+        }
+        if len(runs) == 2 and all(item.get("state") == "succeeded" for item in runs):
+            result_match = runs[0].get("result_digest") == runs[1].get("result_digest")
+            adm_match = runs[0].get("adm_manifest_digest") == runs[1].get(
+                "adm_manifest_digest"
+            )
+            response["reproduced"] = bool(result_match and adm_match)
+            response["result_digest"] = (
+                runs[0].get("result_digest") if result_match else None
+            )
+            response["adm_manifest_digest"] = (
+                runs[0].get("adm_manifest_digest") if adm_match else None
+            )
+            if result_match and adm_match:
+                response["row_count"] = runs[0].get("row_count")
+                response["state_counts"] = runs[0].get("state_counts")
+                response["decision_counts"] = runs[0].get("decision_counts")
+                response["p2_probe_count"] = runs[0].get("p2_probe_count")
+                response["p2_fill_count"] = runs[0].get("p2_fill_count")
+        return response
+
     def _health(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
-        return _json_response(
-            {"status": "healthy", "role": "api", "manifest": self.manifest.version}
-        )
+        payload: dict[str, Any] = {
+            "status": "healthy",
+            "role": "api",
+            "manifest": self.manifest.version,
+        }
+        qualification = self._structure_mvp_qualification_health()
+        if qualification is not None:
+            payload["structure_mvp_qualification"] = qualification
+        return _json_response(payload)
 
     def _ready(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
         available = self._store.ready()

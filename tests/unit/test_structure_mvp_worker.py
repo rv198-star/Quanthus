@@ -155,6 +155,27 @@ class StructureMvpWorkerTests(unittest.TestCase):
             {"usr_structure_operator"},
         )
 
+    def test_qualification_seed_prefers_existing_mcp_service_principal(self) -> None:
+        store = InMemoryPlatformStore()
+        store.create_user(
+            _qualification_user(
+                user_id="usr_18c14af81a06cf878f177579efec3727",
+                username="mcp-service",
+                role="viewer",
+                active=False,
+            )
+        )
+        store.create_user(_qualification_user())
+        _seed_structure_mvp_qualification_jobs(
+            store,
+            enabled_value="1",
+            code_revision="e" * 40,
+        )
+        self.assertEqual(
+            {item.actor_user_id for item in store.list_jobs()},
+            {"usr_18c14af81a06cf878f177579efec3727"},
+        )
+
     def test_qualification_seed_prefers_active_operator_and_fails_without_eligible_actor(
         self,
     ) -> None:

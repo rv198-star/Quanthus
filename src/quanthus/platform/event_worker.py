@@ -31,6 +31,7 @@ _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _STRUCTURE_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
 _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
 _BUILD_REVISION_ENV = "QUANTHUS_CODE_REVISION"
+_EXTERNAL_MCP_ACTOR_USER_ID = "usr_18c14af81a06cf878f177579efec3727"
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
@@ -105,6 +106,9 @@ def _structure_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
 
 
 def _structure_qualification_actor_user_id(store: PlatformStore) -> str:
+    mcp_actor = store.get_user(_EXTERNAL_MCP_ACTOR_USER_ID)
+    if mcp_actor is not None:
+        return mcp_actor.user_id
     eligible = tuple(
         sorted(
             (

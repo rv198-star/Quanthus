@@ -119,6 +119,43 @@ def load_trend_stability_config(path: Path) -> TrendStabilityConfig:
     return config
 
 
+def classify_trend_stability(
+    feature: BaselineFeatureRow | None,
+    config: TrendStabilityConfig,
+) -> tuple[str | None, str]:
+    """Return the accepted trend-state semantics without constructing an opportunity artifact.
+
+    This helper preserves the exact v1 rule so bounded research adapters can reuse the already
+    accepted assessment semantics on a different subject population without pretending that the
+    original opportunity-level assessment identity applies unchanged.
+    """
+
+    required_values = None if feature is None else (
+        feature.total_return_index,
+        feature.sma20,
+        feature.sma60,
+        feature.momentum20,
+    )
+    missing = feature is None or not feature.feature_ready or any(
+        value is None for value in required_values or ()
+    )
+    if missing:
+        return None, config.missing_reason
+    assert feature is not None
+    assert feature.total_return_index is not None
+    assert feature.sma20 is not None
+    assert feature.sma60 is not None
+    assert feature.momentum20 is not None
+    if (
+        feature.total_return_index >= feature.sma20 > feature.sma60
+        and feature.momentum20 > 0
+    ):
+        return "stable", "eligible"
+    if feature.total_return_index < feature.sma60 and feature.sma20 <= feature.sma60:
+        return "fragile", "eligible"
+    return config.fallback_state, "eligible"
+
+
 def _feature_payload(row: BaselineFeatureRow) -> dict[str, Any]:
     return {
         "market_date": row.market_date.isoformat(),
@@ -175,37 +212,12 @@ def evaluate_trend_stability(
         evidence_digest,
         knowledge_cutoff,
     )
-    required_values = None if feature is None else (
-        feature.total_return_index,
-        feature.sma20,
-        feature.sma60,
-        feature.momentum20,
+    raw_value, applicability_reason = classify_trend_stability(feature, config)
+    applicability = (
+        ObservationApplicability.ABSTAINED
+        if raw_value is None
+        else ObservationApplicability.APPLICABLE
     )
-    missing = feature is None or not feature.feature_ready or any(
-        value is None for value in required_values or ()
-    )
-    raw_value: str | None
-    if missing:
-        applicability = ObservationApplicability.ABSTAINED
-        applicability_reason = config.missing_reason
-        raw_value = None
-    else:
-        assert feature is not None
-        assert feature.total_return_index is not None
-        assert feature.sma20 is not None
-        assert feature.sma60 is not None
-        assert feature.momentum20 is not None
-        applicability = ObservationApplicability.APPLICABLE
-        applicability_reason = "eligible"
-        if (
-            feature.total_return_index >= feature.sma20 > feature.sma60
-            and feature.momentum20 > 0
-        ):
-            raw_value = "stable"
-        elif feature.total_return_index < feature.sma60 and feature.sma20 <= feature.sma60:
-            raw_value = "fragile"
-        else:
-            raw_value = config.fallback_state
     prediction_id = derive_prediction_id(
         assessment_binding_digest=spec.assessment_binding_digest,
         subject_id=event.event_id,

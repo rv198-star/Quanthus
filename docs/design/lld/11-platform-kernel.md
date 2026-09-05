@@ -237,12 +237,24 @@ one, a read-only exact DWD view, and a writable Run root. It performs replay, me
 sealing, and candidate-active-evidence CAS as stages of one Job. It has no DWD mutation authority.
 
 Issue #74 is the first named workflow that justifies a second static Worker kind. The P4 Event
-Worker uses `queue=event`, concurrency one, and admits only `quanthus.p4-event-scan.v1`. It receives
-read-only mounts for the exact DWD Base V2.1, correction-001, and the frozen development research
-references, plus a separate writable `/data/event-runs` volume. The request is exact-path and
-exact-code-revision bound; the Worker executes the composite `run-p4-reported-event-scan` child
-process, validates the immutable Event Library, Label Corpus, and Comparison Report packages,
-writes one generation-bound `run-manifest.json`, and only then marks the PostgreSQL Job succeeded.
+Worker uses `queue=event`, concurrency one, and originally admits only
+`quanthus.p4-event-scan.v1`. It receives read-only mounts for the exact DWD Base V2.1,
+correction-001, and the frozen development research references, plus a separate writable
+`/data/event-runs` volume. The P4 request is exact-path and exact-code-revision bound; the Worker
+executes the composite `run-p4-reported-event-scan` child process, validates the immutable Event
+Library, Label Corpus, and Comparison Report packages, writes one generation-bound
+`run-manifest.json`, and only then marks the PostgreSQL Job succeeded.
+
+`P3-STRUCT-001` adds exactly one second research Job kind to this same static Event Worker:
+`quanthus.structure-mvp.v1`. It does not create a new Worker family, routing registry, or service.
+Its request permits only the repository-bound `config/structure-mvp-run.development.v1.json` plus
+an exact code revision; path substitution and arbitrary commands fail closed. The Worker launches
+only `python -m quanthus.structure_mvp_run`, retains the same read-only DWD mounts and generation
+fencing, publishes below a separate immutable `structure-runs/` namespace, and deep-verifies the
+ADM content digest, semantic result digest, manifest, and READY receipt before success. This job is
+research-only: it cannot mutate DWD, enable the draft stock-stage vocabulary, authorize orders,
+open Shadow/P6, or claim economic value. Real-DWD qualification and independent reproduction are
+required before `P3-STRUCT-001` may close.
 The child owns one Direct-DWD session and two disposable, scope-bound TMP Feature Panels for the
 attempt: execution scope for Label and decision scope for Report. The ranges are separate semantic
 identities under the current floating-window evaluator and are each built once from the shared DWD

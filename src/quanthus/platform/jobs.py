@@ -20,6 +20,7 @@ ATTRIBUTION_VERIFICATION_JOB = "quanthus.attribution.verify.v1"
 CANDIDATE_REPLAY_JOB = "quanthus.candidate-replay.v1"
 EXPERT_EVALUATION_JOB = "quanthus.expert-evaluation.v1"
 P4_EVENT_SCAN_JOB = "quanthus.p4-event-scan.v1"
+STRUCTURE_MVP_JOB = "quanthus.structure-mvp.v1"
 EVENT_RUN_ROOT = Path("/data/event-runs")
 EVENT_SUMMARY_MAX_BYTES = 1024 * 1024
 EVENT_FAILURE_LOG_MAX_BYTES = 64 * 1024

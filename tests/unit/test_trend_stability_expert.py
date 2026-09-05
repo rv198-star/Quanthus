@@ -16,6 +16,7 @@ from quanthus.event_library.contracts import (
 )
 from quanthus.expert_evaluation.contracts import ExpertEvaluationSpec, ObservationApplicability
 from quanthus.expert_evaluation.experts.trend_stability import (
+    classify_trend_stability,
     evaluate_trend_stability,
     load_trend_stability_config,
 )
@@ -97,6 +98,26 @@ def test_trend_expert_is_outcome_blind_ordinal_and_normalizes_utc() -> None:
     assert observation.applicability is ObservationApplicability.APPLICABLE
     assert observation.knowledge_cutoff.isoformat() == "2020-06-30T07:00:00+00:00"
     assert "outcome" not in observation.canonical_bytes().decode("utf-8")
+
+
+def test_trend_state_helper_reuses_exact_accepted_semantics() -> None:
+    config = _config()
+    assert classify_trend_stability(_feature(), config) == ("stable", "eligible")  # type: ignore[arg-type]
+    assert classify_trend_stability(
+        _feature(
+            total_return_index=Decimal("90"),
+            sma20=Decimal("95"),
+            sma60=Decimal("100"),
+        ),
+        config,  # type: ignore[arg-type]
+    ) == ("fragile", "eligible")
+    assert classify_trend_stability(
+        _feature(momentum20=Decimal("0")), config  # type: ignore[arg-type]
+    ) == ("neutral", "eligible")
+    assert classify_trend_stability(None, config) == (  # type: ignore[arg-type]
+        None,
+        "missing_required_t_close_trend_feature",
+    )
 
 
 def test_trend_expert_fragile_neutral_and_missing_are_explicit() -> None:

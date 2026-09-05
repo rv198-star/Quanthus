@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.1.0",
+  "adm_id": "structure-research-adm",
+  "adm_version": "0.1.0",
+  "status": "development_only",
+  "research_only": true,
+  "execution_authorized": false,
+  "upstream_authority": "admitted_dwd_daily_projection",
+  "purpose": "prove_dwd_structure_expert_p2_plumbing",
+  "lookback_sessions": 20,
+  "coarse_states": [
+    "unavailable",
+    "range_intact",
+    "breakout_attempt",
+    "breakout_accepted",
+    "support_threatened",
+    "support_breach"
+  ],
+  "allowed_uses": [
+    "structure_mvp_expert_input",
+    "deterministic_pipeline_proof",
+    "bounded_counterfactual_comparison"
+  ],
+  "forbidden_claims": [
+    "canonical_dwd_fact",
+    "generic_dws",
+    "operational_ads",
+    "production_stage_model",
+    "thirteen_state_acceptance",
+    "execution_authority",
+    "economic_value_proven"
+  ],
+  "mvp_policy": {
+    "breakout_volume_ratio_minimum": "1.20",
+    "support_threatened_distance_ratio": "0.02",
+    "breakout_acceptance_post_attempt_closes": 2,
+    "note": "These parameters are plumbing fixtures for the technical proof, not approved trading thresholds."
+  }
+}

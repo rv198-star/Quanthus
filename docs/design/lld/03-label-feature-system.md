@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; additive `P3-STRUCT-001` real-DWD structure MVP qualification open |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -167,6 +167,17 @@ percentile, volume-direction interaction, gap frequency, multi-day open/close re
 and range contraction/expansion. Minute sequences are not direct model inputs; later minute
 features must be predeclared summaries.
 
+### Structure Intelligence MVP boundary
+
+`P3-STRUCT-001` is an additive post-P3 research proof governed by
+`../structure-intelligence-mvp.md`. It does not activate the draft twelve-state vocabulary. The
+MVP consumes the accepted replay/DWD decision view into one thin, purpose-specific Structure
+Research ADM, derives only coarse causal structure facts, reuses the accepted trend-stability rule
+semantics through a new security-day research adapter identity, and compares baseline versus
+structure-assisted decisions through the existing aggregator and P2 execution contracts. The ADM
+is not DWD, generic DWS, or operational ADS. The MVP remains development-only and gains no Shadow,
+paper, notification, or execution authority from successful technical qualification.
+
 ## 6. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -177,6 +188,7 @@ features must be predeclared summaries.
 | P3-LABEL-002 | Implement vertical-slice tradability/stage/risk labels | P3-LABEL-001 | Golden label cases |
 | P3-LABEL-003 | Build label frequency and conflict audit | Registry | No invalid coexistence |
 | P3-LABEL-004 | Build human review corpus and adjudication form | Evaluators | 100 reviewed cases |
+| P3-STRUCT-001 | Prove the bounded DWD -> Structure ADM -> trend-semantics adapter -> aggregator -> P2 path | P3-FEAT-002, P3 expert/aggregator contracts, P4 Event Worker | Real-DWD immutable artifact, independent reproduction, decision/P2 probe reconciliation |
 
 ## 7. Acceptance
 

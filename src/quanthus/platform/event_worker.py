@@ -1,4 +1,4 @@
-"""Lean PostgreSQL Event Worker for governed P4 event scans."""
+"""Lean PostgreSQL Event Worker for governed DWD-backed research jobs."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quanthus.platform.jobs import P4_EVENT_SCAN_JOB
+from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB
 from quanthus.platform.persistence import PostgresPlatformStore
 
 EVENT_QUEUE = "event"
@@ -28,6 +28,8 @@ REPORTED_BATCH_RUNTIME_SCHEMA = "quanthus.p4-reported-batch-runtime.v2"
 REPORTED_BATCH_PROGRESS_SCHEMA = "quanthus.p4-reported-batch-progress.v1"
 _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_STRUCTURE_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
     "provider_config": "config/replay-data-provider.development.v2.json",
@@ -83,6 +85,149 @@ def _event_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
             raise RuntimeError(f"event_scan_{field}_not_governed")
         normalized[field] = expected
     return normalized
+
+
+def _structure_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
+    expected_keys = {"code_revision", "run_config"}
+    if set(input_ref) != expected_keys:
+        raise RuntimeError("structure_mvp_input_contract_mismatch")
+    code_revision = str(input_ref.get("code_revision") or "")
+    if _CODE_REVISION_RE.fullmatch(code_revision) is None:
+        raise RuntimeError("structure_mvp_code_revision_invalid")
+    if input_ref.get("run_config") != _STRUCTURE_RUN_CONFIG:
+        raise RuntimeError("structure_mvp_run_config_not_governed")
+    return {
+        "code_revision": code_revision,
+        "run_config": _STRUCTURE_RUN_CONFIG,
+    }
+
+
+def _canonical_digest(value: object) -> str:
+    payload = json.dumps(
+        value,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+def _structure_request_digest(run_config: str) -> str:
+    path = (_REPOSITORY_ROOT / run_config).resolve()
+    if _REPOSITORY_ROOT not in path.parents:
+        raise RuntimeError("structure_mvp_run_config_outside_repository")
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("structure_mvp_run_config_unreadable") from exc
+    if not isinstance(raw, dict) or raw.get("schema_version") != "quanthus.structure-mvp-run.v1":
+        raise RuntimeError("structure_mvp_run_config_invalid")
+    return _canonical_digest(raw)
+
+
+def _verify_structure_mvp_artifact(
+    root: Path,
+    *,
+    code_revision: str,
+    request_digest: str,
+) -> dict[str, Any]:
+    manifest_path = root / "manifest.json"
+    ready_path = root / "READY"
+    summary_path = root / "summary.json"
+    rows_path = root / "structure-adm.jsonl"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        ready = json.loads(ready_path.read_text(encoding="utf-8"))
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("structure_mvp_artifact_unreadable") from exc
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != "quanthus.structure-mvp-artifact-manifest.v1"
+        or manifest.get("research_only") is not True
+        or manifest.get("execution_authorized") is not False
+        or manifest.get("code_revision") != code_revision
+        or manifest.get("request_digest") != request_digest
+    ):
+        raise RuntimeError("structure_mvp_manifest_invalid")
+    files = manifest.get("files")
+    if not isinstance(files, dict) or set(files) != {"structure-adm.jsonl", "summary.json"}:
+        raise RuntimeError("structure_mvp_manifest_files_invalid")
+    for name, path in (("structure-adm.jsonl", rows_path), ("summary.json", summary_path)):
+        try:
+            payload = path.read_bytes()
+        except OSError as exc:
+            raise RuntimeError("structure_mvp_artifact_file_unreadable") from exc
+        observed = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+        if files.get(name) != observed:
+            raise RuntimeError("structure_mvp_artifact_digest_mismatch")
+    try:
+        manifest_sha = f"sha256:{hashlib.sha256(manifest_path.read_bytes()).hexdigest()}"
+    except OSError as exc:
+        raise RuntimeError("structure_mvp_manifest_unreadable") from exc
+    if (
+        not isinstance(ready, dict)
+        or ready.get("schema_version") != "quanthus.structure-mvp-ready.v1"
+        or ready.get("manifest_sha256") != manifest_sha
+        or ready.get("result_digest") != manifest.get("result_digest")
+    ):
+        raise RuntimeError("structure_mvp_ready_invalid")
+    if (
+        not isinstance(summary, dict)
+        or summary.get("schema_version") != "quanthus.structure-mvp-result.v1"
+        or summary.get("code_revision") != code_revision
+        or summary.get("request_digest") != request_digest
+        or summary.get("result_digest") != manifest.get("result_digest")
+        or summary.get("research_only") is not True
+        or summary.get("execution_authorized") is not False
+        or summary.get("economic_acceptance_claim") is not False
+    ):
+        raise RuntimeError("structure_mvp_summary_invalid")
+    semantic_summary = dict(summary)
+    semantic_summary.pop("result_digest", None)
+    semantic_summary.pop("code_revision", None)
+    if _canonical_digest(semantic_summary) != manifest.get("result_digest"):
+        raise RuntimeError("structure_mvp_semantic_result_digest_mismatch")
+    adm_manifest = summary.get("adm_manifest")
+    state_counts = summary.get("state_counts")
+    trend_semantics = summary.get("trend_semantics")
+    decision_counts = summary.get("decision_counts")
+    decisions = summary.get("decisions")
+    probes = summary.get("probes")
+    if (
+        not isinstance(adm_manifest, dict)
+        or not isinstance(state_counts, dict)
+        or not isinstance(trend_semantics, dict)
+        or not isinstance(decision_counts, dict)
+        or not isinstance(decisions, list)
+        or not isinstance(probes, list)
+    ):
+        raise RuntimeError("structure_mvp_summary_shape_invalid")
+    if _canonical_digest(adm_manifest) != manifest.get("adm_manifest_digest"):
+        raise RuntimeError("structure_mvp_adm_manifest_digest_mismatch")
+    try:
+        row_values = [
+            json.loads(line)
+            for line in rows_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("structure_mvp_adm_rows_invalid") from exc
+    if (
+        len(row_values) != int(adm_manifest.get("row_count", -1))
+        or _canonical_digest(row_values) != adm_manifest.get("content_digest")
+    ):
+        raise RuntimeError("structure_mvp_adm_content_digest_mismatch")
+    return {
+        "artifact_ref": str(root.resolve()),
+        "manifest_sha256": manifest_sha,
+        "result_digest": str(manifest["result_digest"]),
+        "adm_manifest_digest": str(manifest["adm_manifest_digest"]),
+        "row_count": int(adm_manifest["row_count"]),
+        "state_counts": dict(state_counts),
+        "p2_probe_count": len(probes),
+        "p2_fill_count": sum(int(item["fill_count"]) for item in probes),
+    }
 
 
 @dataclass(frozen=True)
@@ -520,7 +665,7 @@ def _validate_run_directory(
 
 
 class EventWorker:
-    """One static worker that executes only governed P4 development event scans."""
+    """One static read-only-DWD worker for exact admitted event and structure research Jobs."""
 
     def __init__(
         self,
@@ -548,7 +693,7 @@ class EventWorker:
         job = self.store.claim_job(EVENT_QUEUE, self.worker_id, self.lease_seconds)
         if job is None:
             return False
-        if job.kind != P4_EVENT_SCAN_JOB:
+        if job.kind not in {P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB}:
             self.store.finish_claimed_job(
                 job.job_id,
                 job.claim_generation,
@@ -558,15 +703,23 @@ class EventWorker:
             )
             return True
         try:
-            self._execute(
-                job.job_id,
-                job.claim_generation,
-                job.input_ref,
-                job.input_digest,
-            )
+            if job.kind == STRUCTURE_MVP_JOB:
+                self._execute_structure(
+                    job.job_id,
+                    job.claim_generation,
+                    job.input_ref,
+                    job.input_digest,
+                )
+            else:
+                self._execute(
+                    job.job_id,
+                    job.claim_generation,
+                    job.input_ref,
+                    job.input_digest,
+                )
         except Exception as exc:
             reason = f"event_worker_error:{type(exc).__name__}:{exc}"[:500]
-            if self.shard_target:
+            if job.kind == P4_EVENT_SCAN_JOB and self.shard_target:
                 try:
                     self.store.cancel_job_shards(job.job_id, job.claim_generation)
                 except RuntimeError as stale:
@@ -584,6 +737,149 @@ class EventWorker:
                 if str(stale) != "stale_claim_generation":
                     raise
         return True
+
+    def _execute_structure(
+        self,
+        job_id: str,
+        generation: int,
+        input_ref: Mapping[str, Any],
+        input_digest: str,
+    ) -> None:
+        governed = _structure_input(input_ref)
+        observed = self.store.get_job(job_id)
+        if observed is None or observed.claim_generation != generation:
+            return
+        request_digest = _structure_request_digest(governed["run_config"])
+        run_id = f"run_{job_id.removeprefix('job_')}"
+        final = self.run_root / "structure-runs" / run_id
+        if final.exists():
+            result_ref = _verify_structure_mvp_artifact(
+                final,
+                code_revision=governed["code_revision"],
+                request_digest=request_digest,
+            )
+            result_ref["input_digest"] = input_digest
+            self.store.update_claimed_job(
+                job_id,
+                generation,
+                stage="recovering-sealed-structure-mvp-run",
+                progress=98,
+                progress_detail={
+                    "run_id": run_id,
+                    "row_count": result_ref["row_count"],
+                    "p2_probe_count": result_ref["p2_probe_count"],
+                    "p2_fill_count": result_ref["p2_fill_count"],
+                },
+            )
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="succeeded",
+                result_ref=result_ref,
+                error_reason=None,
+            )
+            return
+
+        staging = self.run_root / ".staging" / job_id / str(generation)
+        if staging.exists():
+            shutil.rmtree(staging)
+        staging.mkdir(parents=True)
+        stdout_path = staging / "stdout.log"
+        stderr_path = staging / "stderr.log"
+        artifact_root = staging / "structure-mvp"
+        command = (
+            sys.executable,
+            "-m",
+            "quanthus.structure_mvp_run",
+            "--request",
+            governed["run_config"],
+            "--output",
+            str(artifact_root),
+            "--code-revision",
+            governed["code_revision"],
+        )
+        self.store.update_claimed_job(
+            job_id,
+            generation,
+            stage="running-structure-mvp",
+            progress=5,
+            progress_detail={"run_id": run_id},
+        )
+        with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+            process = subprocess.Popen(command, stdout=stdout, stderr=stderr)  # noqa: S603
+        last_renewal = time.monotonic()
+        canceled = False
+        lost_lease = False
+        while process.poll() is None:
+            time.sleep(1)
+            observed = self.store.get_job(job_id)
+            if observed is None or observed.claim_generation != generation:
+                lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
+            if observed.cancel_requested or self.stopping:
+                canceled = observed.cancel_requested
+                _terminate(process, self.terminate_seconds)
+                break
+            if time.monotonic() - last_renewal >= self.renew_seconds:
+                if not self.store.renew_job_lease(
+                    job_id, generation, self.worker_id, self.lease_seconds
+                ):
+                    lost_lease = True
+                    _terminate(process, self.terminate_seconds)
+                    break
+                last_renewal = time.monotonic()
+        if lost_lease:
+            return
+        if canceled:
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="canceled",
+                result_ref=None,
+                error_reason=None,
+            )
+            return
+        if process.returncode != 0 or not artifact_root.is_dir():
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="failed",
+                result_ref=None,
+                error_reason=f"structure_mvp_child_exit_{process.returncode}",
+            )
+            return
+
+        self.store.update_claimed_job(
+            job_id,
+            generation,
+            stage="validating-structure-mvp-run",
+            progress=92,
+            progress_detail={"run_id": run_id},
+        )
+        result_ref = _verify_structure_mvp_artifact(
+            artifact_root,
+            code_revision=governed["code_revision"],
+            request_digest=request_digest,
+        )
+        final.parent.mkdir(parents=True, exist_ok=True)
+        if final.exists():
+            raise RuntimeError("immutable_structure_mvp_run_already_exists")
+        os.replace(artifact_root, final)
+        shutil.rmtree(staging, ignore_errors=True)
+        result_ref = _verify_structure_mvp_artifact(
+            final,
+            code_revision=governed["code_revision"],
+            request_digest=request_digest,
+        )
+        result_ref["input_digest"] = input_digest
+        self.store.finish_claimed_job(
+            job_id,
+            generation,
+            state="succeeded",
+            result_ref=result_ref,
+            error_reason=None,
+        )
 
     def _execute(
         self,

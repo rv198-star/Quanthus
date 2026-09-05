@@ -12,7 +12,7 @@ from quanthus.platform.event_worker import (
     _structure_input,
 )
 from quanthus.platform.jobs import STRUCTURE_MVP_JOB, input_digest
-from quanthus.platform.models import JobRecord
+from quanthus.platform.models import JobRecord, UserRecord
 from quanthus.platform.persistence import InMemoryPlatformStore
 
 STRUCTURE_INPUT = {
@@ -75,6 +75,25 @@ class _Store:
         )
 
 
+def _qualification_user(
+    *,
+    user_id: str = "usr_structure_operator",
+    username: str = "structure-operator",
+    role: str = "operator",
+    active: bool = True,
+) -> UserRecord:
+    return UserRecord(
+        user_id=user_id,
+        username=username,
+        password_hash="not-used",
+        role=role,
+        active=active,
+        mfa_secret_ciphertext=None,
+        mfa_enabled=False,
+        created_at=datetime.now(timezone.utc),
+    )
+
+
 class StructureMvpWorkerTests(unittest.TestCase):
     def test_qualification_seed_is_disabled_by_default_and_rejects_invalid_values(self) -> None:
         store = InMemoryPlatformStore()
@@ -96,6 +115,7 @@ class StructureMvpWorkerTests(unittest.TestCase):
 
     def test_qualification_seed_creates_exactly_two_idempotent_structure_jobs(self) -> None:
         store = InMemoryPlatformStore()
+        store.create_user(_qualification_user())
         revision = "b" * 40
         first = _seed_structure_mvp_qualification_jobs(
             store,
@@ -121,6 +141,53 @@ class StructureMvpWorkerTests(unittest.TestCase):
             {"config/structure-mvp-run.development.v1.json"},
         )
         self.assertEqual(len({job.concurrency_key for job in jobs}), 2)
+        self.assertEqual(
+            {job.actor_user_id for job in jobs},
+            {"usr_structure_operator"},
+        )
+
+    def test_qualification_seed_prefers_active_operator_and_fails_without_eligible_actor(
+        self,
+    ) -> None:
+        store = InMemoryPlatformStore()
+        store.create_user(
+            _qualification_user(
+                user_id="usr_admin",
+                username="aaa-admin",
+                role="admin",
+            )
+        )
+        store.create_user(
+            _qualification_user(
+                user_id="usr_inactive_operator",
+                username="aaa-operator",
+                active=False,
+            )
+        )
+        store.create_user(
+            _qualification_user(
+                user_id="usr_active_operator",
+                username="zzz-operator",
+            )
+        )
+        jobs = _seed_structure_mvp_qualification_jobs(
+            store,
+            enabled_value="1",
+            code_revision="c" * 40,
+        )
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(
+            {item.actor_user_id for item in store.list_jobs()},
+            {"usr_active_operator"},
+        )
+
+        empty = InMemoryPlatformStore()
+        with self.assertRaisesRegex(RuntimeError, "qualification_actor_unavailable"):
+            _seed_structure_mvp_qualification_jobs(
+                empty,
+                enabled_value="1",
+                code_revision="d" * 40,
+            )
 
     def test_qualification_seed_requires_exact_build_revision(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "qualification_revision_invalid"):

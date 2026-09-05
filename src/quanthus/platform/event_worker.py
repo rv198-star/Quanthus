@@ -31,7 +31,6 @@ _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _STRUCTURE_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
 _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
 _BUILD_REVISION_ENV = "QUANTHUS_CODE_REVISION"
-_STRUCTURE_QUALIFICATION_ACTOR = "system_structure_mvp_qualification"
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
@@ -105,6 +104,26 @@ def _structure_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
     }
 
 
+def _structure_qualification_actor_user_id(store: PlatformStore) -> str:
+    eligible = tuple(
+        sorted(
+            (
+                user
+                for user in store.list_users()
+                if user.active and user.role in {"operator", "admin"}
+            ),
+            key=lambda user: (
+                0 if user.role == "operator" else 1,
+                user.username.casefold(),
+                user.user_id,
+            ),
+        )
+    )
+    if not eligible:
+        raise RuntimeError("structure_mvp_qualification_actor_unavailable")
+    return eligible[0].user_id
+
+
 def _seed_structure_mvp_qualification_jobs(
     store: PlatformStore,
     *,
@@ -120,6 +139,7 @@ def _seed_structure_mvp_qualification_jobs(
         return ()
     if _CODE_REVISION_RE.fullmatch(code_revision) is None:
         raise RuntimeError("structure_mvp_qualification_revision_invalid")
+    actor_user_id = _structure_qualification_actor_user_id(store)
     queue = DurableJobQueue(store, {STRUCTURE_MVP_JOB: EVENT_QUEUE})
     input_ref = {
         "code_revision": code_revision,
@@ -129,7 +149,7 @@ def _seed_structure_mvp_qualification_jobs(
     for suffix in ("a", "b"):
         job, _created = queue.submit(
             kind=STRUCTURE_MVP_JOB,
-            actor_user_id=_STRUCTURE_QUALIFICATION_ACTOR,
+            actor_user_id=actor_user_id,
             idempotency_key=(
                 f"structure-mvp-qualification-{suffix}-{code_revision[:12]}"
             ),
@@ -1204,11 +1224,14 @@ def main(argv: list[str] | None = None) -> int:
     worker_id = os.environ.get("QUANTHUS_WORKER_ID", "").strip() or socket.gethostname()
     run_root = Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs"))
     store = PostgresPlatformStore(dsn)
-    _seed_structure_mvp_qualification_jobs(
-        store,
-        enabled_value=os.environ.get(_STRUCTURE_QUALIFICATION_SEED_ENV, "0"),
-        code_revision=os.environ.get(_BUILD_REVISION_ENV, "").strip(),
-    )
+    try:
+        _seed_structure_mvp_qualification_jobs(
+            store,
+            enabled_value=os.environ.get(_STRUCTURE_QUALIFICATION_SEED_ENV, "0"),
+            code_revision=os.environ.get(_BUILD_REVISION_ENV, "").strip(),
+        )
+    except RuntimeError as exc:
+        print(f"structure qualification seed rejected: {exc}", file=sys.stderr)
     worker = EventWorker(
         store,
         worker_id=worker_id,

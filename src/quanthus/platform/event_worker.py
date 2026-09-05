@@ -22,6 +22,7 @@ from typing import Any
 
 from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB, DurableJobQueue
 from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
+from quanthus.policy import find_project_root
 
 EVENT_QUEUE = "event"
 RUN_SCHEMA = "quanthus.p4-event-run.v3"
@@ -34,7 +35,7 @@ _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
 _BUILD_REVISION_ENV = "QUANTHUS_CODE_REVISION"
 _EXTERNAL_MCP_ACTOR_USER_ID = "usr_18c14af81a06cf878f177579efec3727"
 _STRUCTURE_QUALIFICATION_SEED_RECEIPT = "structure-qualification-seed.json"
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+_REPOSITORY_ROOT = find_project_root()
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
     "provider_config": "config/replay-data-provider.development.v2.json",

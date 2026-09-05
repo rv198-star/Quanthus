@@ -6,9 +6,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from quanthus.platform.event_worker import EventWorker, _structure_input
+from quanthus.platform.event_worker import (
+    EventWorker,
+    _seed_structure_mvp_qualification_jobs,
+    _structure_input,
+)
 from quanthus.platform.jobs import STRUCTURE_MVP_JOB, input_digest
 from quanthus.platform.models import JobRecord
+from quanthus.platform.persistence import InMemoryPlatformStore
 
 STRUCTURE_INPUT = {
     "code_revision": "a" * 40,
@@ -71,6 +76,60 @@ class _Store:
 
 
 class StructureMvpWorkerTests(unittest.TestCase):
+    def test_qualification_seed_is_disabled_by_default_and_rejects_invalid_values(self) -> None:
+        store = InMemoryPlatformStore()
+        self.assertEqual(
+            _seed_structure_mvp_qualification_jobs(
+                store,
+                enabled_value="0",
+                code_revision="a" * 40,
+            ),
+            (),
+        )
+        self.assertEqual(store.list_jobs(), ())
+        with self.assertRaisesRegex(RuntimeError, "qualification_seed_invalid"):
+            _seed_structure_mvp_qualification_jobs(
+                store,
+                enabled_value="yes",
+                code_revision="a" * 40,
+            )
+
+    def test_qualification_seed_creates_exactly_two_idempotent_structure_jobs(self) -> None:
+        store = InMemoryPlatformStore()
+        revision = "b" * 40
+        first = _seed_structure_mvp_qualification_jobs(
+            store,
+            enabled_value="1",
+            code_revision=revision,
+        )
+        second = _seed_structure_mvp_qualification_jobs(
+            store,
+            enabled_value="1",
+            code_revision=revision,
+        )
+        self.assertEqual(first, second)
+        jobs = tuple(sorted(store.list_jobs(), key=lambda item: item.idempotency_key))
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual({job.kind for job in jobs}, {STRUCTURE_MVP_JOB})
+        self.assertEqual({job.queue for job in jobs}, {"event"})
+        self.assertEqual(
+            {job.input_ref["code_revision"] for job in jobs},
+            {revision},
+        )
+        self.assertEqual(
+            {job.input_ref["run_config"] for job in jobs},
+            {"config/structure-mvp-run.development.v1.json"},
+        )
+        self.assertEqual(len({job.concurrency_key for job in jobs}), 2)
+
+    def test_qualification_seed_requires_exact_build_revision(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "qualification_revision_invalid"):
+            _seed_structure_mvp_qualification_jobs(
+                InMemoryPlatformStore(),
+                enabled_value="1",
+                code_revision="not-a-revision",
+            )
+
     def test_structure_input_is_exact_and_cannot_substitute_config(self) -> None:
         self.assertEqual(_structure_input(STRUCTURE_INPUT), STRUCTURE_INPUT)
         with self.assertRaisesRegex(RuntimeError, "run_config_not_governed"):

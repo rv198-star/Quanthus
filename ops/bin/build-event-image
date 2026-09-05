@@ -4,6 +4,15 @@ set -euo pipefail
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 IMAGE_TAG=${1:-quanthus-event:local}
+CODE_REVISION=$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)
+if [[ ! "$CODE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "event image build requires an exact git revision" >&2
+    exit 2
+fi
+if [[ -n "$(git -C "$REPOSITORY_ROOT" status --porcelain)" ]]; then
+    echo "event image build requires a clean git checkout" >&2
+    exit 2
+fi
 BUILD_CONTEXT=$(mktemp -d /tmp/quanthus-event-image.XXXXXX)
 
 cleanup() {
@@ -23,6 +32,9 @@ done < <(
 )
 
 cp "$REPOSITORY_ROOT/ops/event/Dockerfile" "$BUILD_CONTEXT/Dockerfile"
-docker build --tag "$IMAGE_TAG" "$BUILD_CONTEXT"
+docker build \
+    --build-arg "QUANTHUS_CODE_REVISION=$CODE_REVISION" \
+    --tag "$IMAGE_TAG" \
+    "$BUILD_CONTEXT"
 
 printf 'Event image built: %s\n' "$IMAGE_TAG"

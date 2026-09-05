@@ -117,7 +117,11 @@ Fill. This proves that no separate matcher or execution path is required for str
 Additional fixtures prove invalid/missing observation gaps reset structure history instead of being
 silently bridged, P2 probes are selected round-robin across the frozen security scope, Worker input
 cannot substitute arbitrary config paths or commands, sealed artifacts reject tampering, and the
-accepted trend helper preserves the existing stable/neutral/fragile/abstain semantics.
+accepted trend helper preserves the existing stable/neutral/fragile/abstain semantics. The Event
+image is also bound to an exact clean Git revision. A default-off qualification seeder can submit
+exactly two fixed Structure MVP A/B Jobs through the normal DurableJobQueue when the external MCP
+submission whitelist has not yet been updated; it exposes no caller-selected command, policy,
+universe, or data path.
 
 Focused MVP, traceability, and Platform-boundary verification currently reports `59 passed`.
 Repository-wide `make check` reports `1391 passed, 7 skipped`; the skips are existing environment-
@@ -159,12 +163,14 @@ The real-DWD qualification remains small and falsifiable:
 5. only after that proof, define a separate complete-P2 baseline-versus-structure-assisted economic
    comparison. The current independent P2 probes are execution-compatibility evidence only.
 
-The development worktree now has the P1 research dependencies needed for tests, but it does not
-have the DWD Base or frozen research-bundle mounts. Production Event Worker has those exact
-read-only mounts, but the current deployed revision and MCP submission schema do not yet admit
-`quanthus.structure-mvp.v1`. The source implementation therefore cannot legally perform step 1
-until the exact repository revision is published, the Event Worker is deployed from that revision,
-and the typed Job kind is admitted. Do not bypass that gate by overloading an unrelated Job kind.
+The development worktree has the P1 research dependencies needed for tests but does not have the
+DWD Base or frozen research-bundle mounts. Production Event Worker has those exact read-only mounts.
+The normal external MCP submission whitelist may lag the newly deployed typed Job kind; in that
+specific case the default-off qualification seeder in `lld/11-platform-kernel.md` may be enabled for
+one exact image revision to create the two fixed A/B Durable Jobs. This is a bounded admission
+bridge, not a second execution path: the Jobs retain normal queue state, lease fencing, exact input
+contract, child execution, immutable publication, and verification. Do not overload an unrelated
+Job kind or bypass the DurableJobQueue.
 
 Do not expand to the thirteen-state vocabulary, train a model, add a generic DWS, revive ADS, or
 make economic claims until this bounded experiment shows a concrete reason to do so.

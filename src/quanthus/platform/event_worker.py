@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB
-from quanthus.platform.persistence import PostgresPlatformStore
+from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB, DurableJobQueue
+from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
 
 EVENT_QUEUE = "event"
 RUN_SCHEMA = "quanthus.p4-event-run.v3"
@@ -29,6 +29,9 @@ REPORTED_BATCH_PROGRESS_SCHEMA = "quanthus.p4-reported-batch-progress.v1"
 _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _STRUCTURE_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
+_STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
+_BUILD_REVISION_ENV = "QUANTHUS_CODE_REVISION"
+_STRUCTURE_QUALIFICATION_ACTOR = "system_structure_mvp_qualification"
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _EXPECTED_INPUT = {
     "source_policy": "config/p4-event-scan-source.research.v1.json",
@@ -100,6 +103,45 @@ def _structure_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
         "code_revision": code_revision,
         "run_config": _STRUCTURE_RUN_CONFIG,
     }
+
+
+def _seed_structure_mvp_qualification_jobs(
+    store: PlatformStore,
+    *,
+    enabled_value: str,
+    code_revision: str,
+) -> tuple[str, ...]:
+    """Idempotently seed exactly two fixed qualification Jobs when explicitly enabled."""
+
+    normalized = enabled_value.strip()
+    if normalized not in {"", "0", "1"}:
+        raise RuntimeError("structure_mvp_qualification_seed_invalid")
+    if normalized != "1":
+        return ()
+    if _CODE_REVISION_RE.fullmatch(code_revision) is None:
+        raise RuntimeError("structure_mvp_qualification_revision_invalid")
+    queue = DurableJobQueue(store, {STRUCTURE_MVP_JOB: EVENT_QUEUE})
+    input_ref = {
+        "code_revision": code_revision,
+        "run_config": _STRUCTURE_RUN_CONFIG,
+    }
+    jobs: list[str] = []
+    for suffix in ("a", "b"):
+        job, _created = queue.submit(
+            kind=STRUCTURE_MVP_JOB,
+            actor_user_id=_STRUCTURE_QUALIFICATION_ACTOR,
+            idempotency_key=(
+                f"structure-mvp-qualification-{suffix}-{code_revision[:12]}"
+            ),
+            input_ref=input_ref,
+            concurrency_key=(
+                f"structure-mvp:qualification-{suffix}:{code_revision[:12]}"
+            ),
+        )
+        if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
+            raise RuntimeError("structure_mvp_qualification_seed_mismatch")
+        jobs.append(job.job_id)
+    return tuple(jobs)
 
 
 def _canonical_digest(value: object) -> str:
@@ -1161,8 +1203,14 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError("QUANTHUS_PLATFORM_DATABASE_URL is required")
     worker_id = os.environ.get("QUANTHUS_WORKER_ID", "").strip() or socket.gethostname()
     run_root = Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs"))
+    store = PostgresPlatformStore(dsn)
+    _seed_structure_mvp_qualification_jobs(
+        store,
+        enabled_value=os.environ.get(_STRUCTURE_QUALIFICATION_SEED_ENV, "0"),
+        code_revision=os.environ.get(_BUILD_REVISION_ENV, "").strip(),
+    )
     worker = EventWorker(
-        PostgresPlatformStore(dsn),
+        store,
         worker_id=worker_id,
         run_root=run_root,
         lease_seconds=args.lease_seconds,

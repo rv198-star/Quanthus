@@ -226,6 +226,11 @@ def test_event_worker_stays_a_control_plane_supervisor() -> None:
     )
     assert 'find "$REPOSITORY_ROOT/src/quanthus" -type f' in builder
     assert "event_library" not in builder.split("find", 1)[1].split("cp", 1)[0]
+    assert 'CODE_REVISION=$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)' in builder
+    assert 'git -C "$REPOSITORY_ROOT" status --porcelain' in builder
+    assert '--build-arg "QUANTHUS_CODE_REVISION=$CODE_REVISION"' in builder
+    assert "ARG QUANTHUS_CODE_REVISION" in dockerfile
+    assert "QUANTHUS_CODE_REVISION=${QUANTHUS_CODE_REVISION}" in dockerfile
     assert 'RUN python -m pip install --no-cache-dir ".[p1,platform]"' in dockerfile
 
 

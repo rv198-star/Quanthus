@@ -255,6 +255,15 @@ ADM content digest, semantic result digest, manifest, and READY receipt before s
 research-only: it cannot mutate DWD, enable the draft stock-stage vocabulary, authorize orders,
 open Shadow/P6, or claim economic value. Real-DWD qualification and independent reproduction are
 required before `P3-STRUCT-001` may close.
+
+A default-off qualification seeder exists only to bridge an external control-plane admission lag.
+The Event image is build-bound to one clean 40-character Git revision. When and only when
+`QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED=1`, startup idempotently submits exactly two fixed
+`quanthus.structure-mvp.v1` Jobs (`A` and `B`) through the normal `DurableJobQueue`; both bind that
+image revision and the frozen Structure MVP run config. The seeder admits no caller-supplied path,
+command, universe, or policy, and the Jobs still use normal queue state, lease fencing, child
+execution, immutable publication, and verification. The default is `0`; normal Event Worker
+operation therefore does not self-submit research work.
 The child owns one Direct-DWD session and two disposable, scope-bound TMP Feature Panels for the
 attempt: execution scope for Label and decision scope for Report. The ranges are separate semantic
 identities under the current floating-window evaluator and are each built once from the shared DWD

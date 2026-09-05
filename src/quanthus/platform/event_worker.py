@@ -147,16 +147,20 @@ def _seed_structure_mvp_qualification_jobs(
     }
     jobs: list[str] = []
     for suffix in ("a", "b"):
+        stable_job_id = "job_" + hashlib.sha256(
+            f"{STRUCTURE_MVP_JOB}:{code_revision}:{suffix}".encode()
+        ).hexdigest()[:32]
         job, _created = queue.submit(
             kind=STRUCTURE_MVP_JOB,
             actor_user_id=actor_user_id,
             idempotency_key=(
-                f"structure-mvp-qualification-{suffix}-{code_revision[:12]}"
+                f"structure-mvp-qualification-v2-{suffix}-{code_revision[:12]}"
             ),
             input_ref=input_ref,
             concurrency_key=(
-                f"structure-mvp:qualification-{suffix}:{code_revision[:12]}"
+                f"structure-mvp:qualification-v2-{suffix}:{code_revision[:12]}"
             ),
+            requested_job_id=stable_job_id,
         )
         if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
             raise RuntimeError("structure_mvp_qualification_seed_mismatch")

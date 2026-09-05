@@ -474,16 +474,25 @@ class DurableJobQueue:
         idempotency_key: str,
         input_ref: Mapping[str, Any],
         concurrency_key: str | None = None,
+        requested_job_id: str | None = None,
     ) -> tuple[JobRecord, bool]:
         queue = self._queues.get(kind)
         if queue is None:
             raise ValueError("job kind is not admitted")
         if not 1 <= len(idempotency_key) <= 128:
             raise ValueError("idempotency_key must be 1-128 characters")
+        if requested_job_id is not None:
+            suffix = requested_job_id.removeprefix("job_")
+            if (
+                not requested_job_id.startswith("job_")
+                or len(suffix) != 32
+                or any(character not in "0123456789abcdef" for character in suffix)
+            ):
+                raise ValueError("requested_job_id must be job_ followed by 32 lowercase hex chars")
         now = _utc_now()
         return self._store.create_job(
             JobRecord(
-                job_id=f"job_{uuid.uuid4().hex}",
+                job_id=requested_job_id or f"job_{uuid.uuid4().hex}",
                 kind=kind,
                 actor_user_id=actor_user_id,
                 idempotency_key=idempotency_key,

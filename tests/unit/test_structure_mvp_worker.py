@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -11,7 +12,7 @@ from quanthus.platform.event_worker import (
     _seed_structure_mvp_qualification_jobs,
     _structure_input,
 )
-from quanthus.platform.jobs import STRUCTURE_MVP_JOB, input_digest
+from quanthus.platform.jobs import STRUCTURE_MVP_JOB, DurableJobQueue, input_digest
 from quanthus.platform.models import JobRecord, UserRecord
 from quanthus.platform.persistence import InMemoryPlatformStore
 
@@ -128,6 +129,14 @@ class StructureMvpWorkerTests(unittest.TestCase):
             code_revision=revision,
         )
         self.assertEqual(first, second)
+        expected_ids = tuple(
+            "job_"
+            + hashlib.sha256(
+                f"{STRUCTURE_MVP_JOB}:{revision}:{suffix}".encode()
+            ).hexdigest()[:32]
+            for suffix in ("a", "b")
+        )
+        self.assertEqual(first, expected_ids)
         jobs = tuple(sorted(store.list_jobs(), key=lambda item: item.idempotency_key))
         self.assertEqual(len(jobs), 2)
         self.assertEqual({job.kind for job in jobs}, {STRUCTURE_MVP_JOB})
@@ -187,6 +196,29 @@ class StructureMvpWorkerTests(unittest.TestCase):
                 empty,
                 enabled_value="1",
                 code_revision="d" * 40,
+            )
+
+    def test_durable_queue_accepts_only_well_formed_requested_job_id(self) -> None:
+        store = InMemoryPlatformStore()
+        store.create_user(_qualification_user())
+        queue = DurableJobQueue(store, {STRUCTURE_MVP_JOB: "event"})
+        requested = "job_" + "1" * 32
+        job, created = queue.submit(
+            kind=STRUCTURE_MVP_JOB,
+            actor_user_id="usr_structure_operator",
+            idempotency_key="structure-requested-id",
+            input_ref=STRUCTURE_INPUT,
+            requested_job_id=requested,
+        )
+        self.assertTrue(created)
+        self.assertEqual(job.job_id, requested)
+        with self.assertRaisesRegex(ValueError, "requested_job_id"):
+            queue.submit(
+                kind=STRUCTURE_MVP_JOB,
+                actor_user_id="usr_structure_operator",
+                idempotency_key="structure-bad-requested-id",
+                input_ref=STRUCTURE_INPUT,
+                requested_job_id="job_NOT_HEX",
             )
 
     def test_qualification_seed_requires_exact_build_revision(self) -> None:

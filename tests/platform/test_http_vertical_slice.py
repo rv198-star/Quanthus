@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from quanthus.platform import api as api_module
 from quanthus.platform.event_worker import (
     _seed_structure_mvp_qualification_jobs,
@@ -44,6 +46,45 @@ def test_health_openapi_request_id_and_removed_routes(kernel) -> None:
         )
     )
     assert wsgi_request(kernel, "GET", "/api/mcp/tools")[0] == 404
+
+
+def test_structure_mvp_review_sample_is_stratified_and_t_close_only(tmp_path) -> None:
+    job_id = "job_" + "1" * 32
+    run = tmp_path / "structure-runs" / ("run_" + "1" * 32)
+    run.mkdir(parents=True)
+    rows = [
+        {
+            "market_date": f"2020-01-0{index + 2}",
+            "security_code": "600519",
+            "state": state,
+            "close": "10.10",
+            "prior_high20": "10.00",
+            "prior_low20": "9.00",
+            "volume_ratio20": "1.30",
+            "reason_code": reason,
+            "knowledge_cutoff": f"2020-01-0{index + 2}T15:00:00+08:00",
+            "future_return": "MUST_NOT_LEAK",
+        }
+        for index, (state, reason) in enumerate(
+            (
+                ("range_intact", "no_mvp_structure_trigger"),
+                ("range_intact", "no_mvp_structure_trigger"),
+                ("range_intact", "no_mvp_structure_trigger"),
+                ("support_breach", "close_below_prior_low20"),
+            )
+        )
+    ]
+    (run / "structure-adm.jsonl").write_text(
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    sample = api_module._structure_mvp_review_sample(tmp_path, job_id)
+
+    assert len(sample) == 3
+    assert [row["state"] for row in sample].count("range_intact") == 2
+    assert [row["state"] for row in sample].count("support_breach") == 1
+    assert all("future_return" not in row for row in sample)
 
 
 def test_health_can_project_bounded_structure_mvp_qualification(

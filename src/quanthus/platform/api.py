@@ -52,8 +52,11 @@ from quanthus.platform.product_query import ProductCandidateEvidence, ProductRes
 OPENAPI_VERSION = "3.1.0"
 MAX_BODY_BYTES = 64 * 1024
 _STRUCTURE_MVP_HEALTH_PROBE_ENV = "QUANTHUS_STRUCTURE_MVP_HEALTH_PROBE"
-_STRUCTURE_MVP_SEED_RECEIPT = Path("/data/event-runs/structure-qualification-seed.json")
+_STRUCTURE_MVP_EVENT_RUN_ROOT = Path("/data/event-runs")
+_STRUCTURE_MVP_SEED_RECEIPT = _STRUCTURE_MVP_EVENT_RUN_ROOT / "structure-qualification-seed.json"
 _STRUCTURE_MVP_RECEIPT_MAX_BYTES = 64 * 1024
+_STRUCTURE_MVP_REVIEW_MAX_BYTES = 2 * 1024 * 1024
+_STRUCTURE_MVP_JOB_RE = re.compile(r"^job_[0-9a-f]{32}$")
 StartResponse = Callable[[str, list[tuple[str, str]]], object]
 Handler = Callable[["HttpRequest", Mapping[str, str]], "HttpResponse"]
 
@@ -135,6 +138,59 @@ def _principal(
     principal = identity.authenticate(_bearer_token(observed_request))
     identity.require(principal, permission)
     return principal
+
+
+def _structure_mvp_review_sample(
+    event_run_root: Path,
+    job_id: str,
+) -> list[dict[str, Any]]:
+    if _STRUCTURE_MVP_JOB_RE.fullmatch(job_id) is None:
+        return []
+    run_id = f"run_{job_id.removeprefix('job_')}"
+    root = event_run_root.resolve()
+    path = (root / "structure-runs" / run_id / "structure-adm.jsonl").resolve()
+    if root not in path.parents:
+        return []
+    try:
+        if not path.is_file() or path.stat().st_size > _STRUCTURE_MVP_REVIEW_MAX_BYTES:
+            return []
+        rows = [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except (OSError, json.JSONDecodeError):
+        return []
+    if any(not isinstance(row, dict) for row in rows):
+        return []
+    selected: list[dict[str, Any]] = []
+    counts: dict[str, int] = {}
+    fields = (
+        "market_date",
+        "security_code",
+        "state",
+        "close",
+        "prior_high20",
+        "prior_low20",
+        "volume_ratio20",
+        "reason_code",
+        "knowledge_cutoff",
+    )
+    for row in rows:
+        state = row.get("state")
+        if not isinstance(state, str):
+            return []
+        count = counts.get(state, 0)
+        if count >= 2:
+            continue
+        if any(field not in row for field in fields):
+            return []
+        selected.append({field: row[field] for field in fields})
+        counts[state] = count + 1
+    return sorted(
+        selected,
+        key=lambda row: (str(row["state"]), str(row["market_date"]), str(row["security_code"])),
+    )
 
 
 def _compile_path(path: str) -> re.Pattern[str]:
@@ -486,6 +542,10 @@ class PlatformHttpApp:
                 response["decision_counts"] = runs[0].get("decision_counts")
                 response["p2_probe_count"] = runs[0].get("p2_probe_count")
                 response["p2_fill_count"] = runs[0].get("p2_fill_count")
+                response["review_sample"] = _structure_mvp_review_sample(
+                    _STRUCTURE_MVP_EVENT_RUN_ROOT,
+                    str(runs[0]["job_id"]),
+                )
         return response
 
     def _health(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:

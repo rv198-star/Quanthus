@@ -28,7 +28,7 @@ services:
       QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
       QUANTHUS_STRUCTURE_MVP_HEALTH_PROBE: "0"
-      QUANTHUS_STRUCTURE_FACTS_HEALTH_PROBE: "1"
+      QUANTHUS_STRUCTURE_FACTS_HEALTH_PROBE: "0"
     depends_on:
       postgres:
         condition: service_healthy

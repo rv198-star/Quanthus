@@ -265,8 +265,11 @@ consistent. This Job kind remains research-only: it cannot mutate DWD, enable th
 vocabulary, authorize orders, or open Shadow/P6.
 Real-DWD qualification and independent reproduction closed
 `P3-STRUCT-001` under
-`../../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`; this acceptance does
-not widen the Job's authority.
+`../../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`. Continuous Structure
+Facts v1 later closed `P3-STRUCT-003` after exact Real-DWD A/B reproduction and a preregistered
+12-row outcome-blind review under
+`../../acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md`. Neither acceptance
+widens the Job's execution authority.
 
 Default-off qualification seeders exist only for bounded, revision-bound A/B acceptance where the
 current client tool schema cannot yet express the admitted Structure Job kind/config. The Structure

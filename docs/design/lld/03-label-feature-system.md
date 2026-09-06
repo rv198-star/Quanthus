@@ -189,13 +189,15 @@ the same facts into coarse states. C2-C1 is the primary comparison, so a positiv
 created merely by giving the state variant additional history or episode memory. The exact mapping
 and no-tuning rule are frozen before results.
 
-`P3-STRUCT-003` is the owner-approved fact-product successor governed by
-`../continuous-structure-facts-v1.md`. It publishes prior-20 rolling support/resistance anchors,
-signed margins, independent volume ratio, and row-local frozen breakout episode identity/progress.
-Episode creation is price-only; volume is never hidden inside episode existence. Experts consume
-continuous facts directly through ordinary `FeatureFact`/expert ports. The coarse state vocabulary
-is a replaceable explanation renderer and is forbidden from the fact-row identity. Missing data
-resets causal continuity without implying bearish structure or exit authority.
+`P3-STRUCT-003` is the accepted fact-product successor governed by
+`../continuous-structure-facts-v1.md` and closed by
+`../../acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md`. It publishes
+prior-20 rolling support/resistance anchors, signed margins, independent volume ratio, and row-local
+frozen breakout episode identity/progress. Episode creation is price-only; volume is never hidden
+inside episode existence. Experts consume continuous facts directly through ordinary
+`FeatureFact`/expert ports. The coarse state vocabulary is a replaceable explanation renderer and
+is forbidden from the fact-row identity. Missing data resets causal continuity without implying
+bearish structure or exit authority.
 
 ## 6. Work items
 

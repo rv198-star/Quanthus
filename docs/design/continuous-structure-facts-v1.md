@@ -1,9 +1,9 @@
-# Continuous Structure Facts v1 proposal
+# Continuous Structure Facts v1
 
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open; Real-DWD qualification pending |
+| Delivery gate | accepted by `../acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md` |
 | Authority | Owner-approved fact-product design; development qualification only |
 | Governing work item | `P3-STRUCT-003` |
 | Predecessor | `P3-STRUCT-002` complete-P2 economic comparison |
@@ -216,8 +216,12 @@ three architecture decisions:
 3. coarse states remain only a deterministic read-only explanation projection over continuous
    facts, not the primary computational representation.
 
-Implementation and bounded production qualification are authorized. `P3-STRUCT-002` subsequently
+Implementation and bounded production qualification were authorized. `P3-STRUCT-002` subsequently
 closed after its owner-authorized same-revision A/B reproduction accepted
-`prefer_continuous_structure_facts`, so this milestone may proceed to its fixed Real-DWD A/B and
-outcome-blind review. This approval does not authorize thirteen-state expansion, model training,
-Shadow, paper, or live execution.
+`prefer_continuous_structure_facts`. `P3-STRUCT-003` then passed fixed Real-DWD A/B reproduction and
+a preregistered 12-row outcome-blind semantic review and is accepted by
+`../acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md`.
+
+This acceptance does not authorize thirteen-state expansion, model training, Shadow, paper, live
+execution, or a claim that the compatibility consumer is an economically accepted Structure
+Expert.

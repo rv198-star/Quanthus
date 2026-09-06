@@ -97,12 +97,14 @@ nodes.
   return was 0.715524 percentage points lower. The accepted bounded disposition is
   `prefer_continuous_structure_facts`; bootstrap intervals cross zero and no forward-value claim is
   made. Evidence: `acceptance/structure-intelligence-economic-final-acceptance-20260906.md`.
-- `P3-STRUCT-003` is the owner-approved next Structure Intelligence milestone and is open for
-  Real-DWD qualification. Continuous Structure Facts v1 makes prior-20 anchors, signed margins,
-  independent volume, and frozen breakout episode identity/progress first-class research facts.
-  Episode creation is price-only and coarse states are explanation-only projections. The isolated
-  implementation passes repository tests, but acceptance still requires fixed Real-DWD A/B and an
-  outcome-blind semantic review. Design: `design/continuous-structure-facts-v1.md`.
+- `P3-STRUCT-003` is accepted and closed. Continuous Structure Facts v1 makes prior-20 anchors,
+  signed margins, independent volume, and frozen breakout episode identity/progress first-class
+  research facts. Episode creation is price-only and coarse states are explanation-only
+  projections. Two independent Real-DWD Runs reproduced the exact 174-row fact package, consumer
+  counts, renderer counts, and five P2 compatibility probes/fills; the preregistered 12-row
+  outcome-blind review passed 12/12. No economic, production-expert, thirteen-state, model,
+  Shadow, paper, or live authority is opened. Evidence:
+  `acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

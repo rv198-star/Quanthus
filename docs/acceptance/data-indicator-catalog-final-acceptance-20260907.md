@@ -1,4 +1,4 @@
-# P3-DICT-001: Data & Indicator Catalog repository acceptance checkpoint
+# P3-DICT-001: Data & Indicator Catalog final acceptance
 
 | Field | Value |
 | --- | --- |
@@ -7,7 +7,7 @@
 | Children | #223-#227 |
 | Governing design | `../design/data-indicator-catalog.md` |
 | Repository scope | ACCEPTED: read-only Catalog, Platform GET API and `/catalog` UI implementation |
-| Production scope | BLOCKED / NOT ACCEPTED; see `data-indicator-catalog-production-deploy-blocker-20260907.md` |
+| Production scope | ACCEPTED at `f06a8882c33caa6e5442bf17e21fed8786939929`; see `data-indicator-catalog-production-deploy-blocker-20260907.md` |
 | Formula / strategy / execution authority | NONE |
 
 ## 1. Final product
@@ -131,18 +131,27 @@ DWD, Run, PostgreSQL, repository history or unrelated project data was removed. 
 existing dependency audit findings (1 moderate, 4 high); no automatic dependency upgrade was made
 under this work item.
 
-## 6. Production disposition
+## 6. Production acceptance
 
-The repository implementation is not a final production acceptance. Governed API/Web deployment
-failed on the Web image path because Compose attempted an unintended registry pull. The rollback
-then left one rootful Quanthus container in a restart loop, and both admitted production-status
-interfaces are blocked by that container. `P3-DICT-001-E` and parent `P3-DICT-001` remain open until
-rootful production recovery, exact API/Web deployment, and authenticated Catalog smoke succeed.
-The active evidence is `data-indicator-catalog-production-deploy-blocker-20260907.md`.
+The production incident is resolved and retained in
+`data-indicator-catalog-production-deploy-blocker-20260907.md`. Exact revision
+`f06a8882c33caa6e5442bf17e21fed8786939929` is deployed for both API and Web. Production reports a
+clean checkout, healthy API/Web/PostgreSQL, `/ready` 200 and `web_ready` 200. The Event Worker remains
+on the independently accepted Structure Facts v2 runtime revision `723f22f`; this Catalog deployment
+did not rebuild or modify DWD.
+
+Production-edge smoke verified `/catalog` HTTP 200, the four Catalog GET operations in OpenAPI,
+`/ready`, and HTTP 401 for unauthenticated Catalog API access. Because production credentials were
+not accessed or fabricated, successful bearer-auth behavior was additionally exercised with the
+exact final API image against an isolated PostgreSQL instance: login succeeded and authenticated
+Catalog summary returned 664 entries / 8 gaps. Repository RBAC tests independently cover
+viewer/operator/admin `catalog:read` and the absence of Catalog write operations.
+
+`P3-DICT-001-E` and parent `P3-DICT-001` therefore satisfy their closeout gates.
 
 ## 7. Claim ceiling
 
-This repository checkpoint proves a versioned discovery and maintenance surface, not completeness of every
+This acceptance proves a versioned discovery and maintenance surface, not completeness of every
 possible financial concept or indicator. It does not add MACD/CCI/KDJ/ATR calculation specs, prove
 missing ODS schemas, change existing Feature formulas, open Structure B6-B11, train models, or grant
 Shadow/paper/live execution authority. Catalog entries describe the authority that exists; they do

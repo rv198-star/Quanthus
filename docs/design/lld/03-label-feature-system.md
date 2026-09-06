@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001` repository implementation complete but production deployment/smoke blocked |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001` Data & Indicator Catalog accepted in repository and production |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 

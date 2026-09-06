@@ -7,7 +7,7 @@
       "id": "P3-DICT-001",
       "title": "Deliver the Quanthus Data & Indicator Catalog",
       "kind": "epic",
-      "status": "blocked",
+      "status": "closed",
       "depends_on": ["P3-FEAT-001"],
       "scope": "Build a deterministic read-only catalog over existing data, feature, label and semantic authorities, expose it through API and /catalog UI, and freeze maintenance gates.",
       "acceptance": [
@@ -88,7 +88,7 @@
       "id": "P3-DICT-001-E",
       "title": "Freeze Catalog drift gates and maintenance closeout",
       "kind": "task",
-      "status": "blocked",
+      "status": "closed",
       "depends_on": ["P3-DICT-001-D"],
       "scope": "Make generated snapshot drift, missing authority metadata, orphan relations and silent formula/namespace substitutions repository-gating failures; close documentation and issue lifecycle.",
       "acceptance": [

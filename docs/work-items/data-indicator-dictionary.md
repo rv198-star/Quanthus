@@ -3,14 +3,14 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | blocked on production recovery/deployment |
+| Delivery gate | accepted |
 | Governing work item | `P3-DICT-001` |
 | GitHub epic | `rv198-star/Quanthus#215` |
 | Children | #223 A; #224 B; #225 C; #226 D; #227 E |
 | Governing design | `../design/data-indicator-catalog.md` |
 | Parent/owner | `../design/lld/03-label-feature-system.md` |
 | Platform surface | read-only API + `/catalog`; no new metadata database |
-| Current status | A-D closed; E/parent blocked by production Web deploy rollback and rootful container restart |
+| Current status | A-E closed; parent accepted after production API/Web deployment and Catalog smoke |
 
 ## 1. Purpose
 
@@ -86,13 +86,12 @@ The Catalog must continue to make these distinctions explicit:
 ## 4. Maintenance child E
 
 `P3-DICT-001-E` freezes maintenance and drift checks, synchronizes design/work-item/Platform docs,
-and requires full repository and Web gates plus production deployment/smoke before parent closeout.
-Repository gates have passed, but production deployment is currently blocked after the governed Web
-path attempted an unintended registry pull and the rollback left one rootful Quanthus container in
-a restart loop. A source change that changes the deterministic Catalog must refresh the snapshot
-manifest in the same repository change. Repository evidence remains in
-`../acceptance/data-indicator-catalog-final-acceptance-20260907.md`; the active production blocker is
-`../acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`.
+and requires full repository/Web gates plus production deployment/smoke before parent closeout.
+Those gates are now satisfied at production revision `f06a8882c33caa6e5442bf17e21fed8786939929`.
+A source change that changes the deterministic Catalog must refresh the snapshot manifest in the
+same repository change. Final evidence is in
+`../acceptance/data-indicator-catalog-final-acceptance-20260907.md`; the resolved deployment incident
+is retained in `../acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`.
 
 ## 5. Non-goals and claim ceiling
 

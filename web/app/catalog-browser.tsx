@@ -457,10 +457,12 @@ export function CatalogBrowser() {
               </div>
 
               <div className={styles.badges}>
-                <StatusBadge value={selected.lifecycle} />
-                <StatusBadge value={selected.implementation_status} />
-                <StatusBadge value={selected.verification_status} />
-                {selected.accepted_scope ? <span className={`${styles.badge} ${styles.good}`}>{selected.accepted_scope}</span> : null}
+                <span className={styles.statusAxis}><small>注册 / 生命周期</small><StatusBadge value={selected.lifecycle} /></span>
+                <span className={styles.statusAxis}><small>实现状态</small><StatusBadge value={selected.implementation_status} /></span>
+                <span className={styles.statusAxis}><small>验证状态</small><StatusBadge value={selected.verification_status} /></span>
+                {selected.accepted_scope ? (
+                  <span className={styles.statusAxis}><small>验收范围</small><span className={`${styles.badge} ${styles.good}`}>{selected.accepted_scope}</span></span>
+                ) : null}
               </div>
 
               <p className={styles.description}>{selected.description}</p>

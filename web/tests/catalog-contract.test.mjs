@@ -40,6 +40,10 @@ test("catalog UI exposes authority, lifecycle and relation semantics instead of 
     "仅合同",
     "已实现",
     "源缺口",
+    "注册 / 生命周期",
+    "实现状态",
+    "验证状态",
+    "验收范围",
   ]) {
     assert.match(browser, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }

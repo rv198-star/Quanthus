@@ -469,8 +469,23 @@
 .badges {
   margin: 18px 0 16px;
   display: flex;
-  gap: 7px;
+  gap: 10px;
   flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.statusAxis {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.statusAxis small {
+  color: #9299a8;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .description {

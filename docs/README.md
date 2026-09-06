@@ -112,6 +112,9 @@ nodes.
   v2 market-data build or acceptance. B2-B5 cover verified source/consumer integration, anchor,
   interaction and minimal episode route. Full geometry/activity extensions remain planned.
   `P3-DICT-001` is a separately deferred data/indicator dictionary task, not a prerequisite.
+  Final design-entry review supports bounded B2-B5 implementation details, with explicit qualified
+  relation-grain and complete admission requirements; it does not accept a v2 runtime. Evidence:
+  `acceptance/structure-facts-v2-design-entry-review-20260907.md`.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;

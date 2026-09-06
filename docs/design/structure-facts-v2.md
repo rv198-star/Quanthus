@@ -9,6 +9,7 @@
 | Runtime v2 acceptance | NOT RUN / NOT CLAIMED |
 | B1 checkpoint | `../acceptance/structure-facts-v2-contract-checkpoint-20260906.md` |
 | B1-R checkpoint | `../acceptance/structure-facts-v2-temporal-ownership-checkpoint-20260906.md` |
+| Design-entry review | `../acceptance/structure-facts-v2-design-entry-review-20260907.md`; PASS for bounded detailed implementation, not runtime acceptance |
 | Parent | `lld/03-label-feature-system.md`; `hld.md` |
 | Architecture decision | `../architecture/adr-0014-time-first-structure-semantics.md` |
 | Executable catalog | `../../config/structure-semantic-catalog.v1.json` |
@@ -350,6 +351,43 @@ The contract path is B1 -> B1-R; the first runtime path is B2 -> B3 -> B4 -> B5.
 specifications, rejected counterexamples, outcome-blind samples and independent reconstruction
 before result-bearing qualification. Do not repeat the already completed v1 or C0/C1/C2 experiments
 merely to validate names. Do not start B6/B7 to make an impressive inventory without a consumer need.
+
+### Detailed implementation handoff constraints
+
+The final entry review accepts the boundary and staged plan, not an already integrated v2 data
+product. B2 may now deepen the bounded source/coordinate/audit implementation. Its first deliverable
+must bind the actual sources needed by B3-B5, not expand into every planned fact family.
+
+1. **Complete result grain before multi-anchor construction.** A security/date/concept/spec key is
+   not sufficient when the SAME measurement specification is applied to two anchors or process
+   instances at that date. Bind the semantic relation subject or explicitly extend the qualified
+   observation key with stable target/context identity. Define source revisions separately from
+   distinct simultaneous target slots. Merely putting a different anchor in source_closure_digest
+   would turn two legitimate observations into apparent revisions of one slot. Freeze the exact
+   serialization, listing/security binding and correction behavior before B3, and test simultaneous
+   targets, same-valued distinct anchors, source corrections, and package/rebuild independence. The
+   generic B1-R ObservationRevision is not a complete multi-anchor row schema.
+2. **Compose admission rather than promote a helper.** B2 must check the registered specification,
+   permitted partition and view, authenticated exact source versions and complete dependencies,
+   business-time applicability where required, finality, quality and coordinate compatibility,
+   confirmation/readiness, and then the applicable consumer/audit bindings. confirmed_by() does not
+   mean a future-effective reference is already effective; validate_consumption_binding() does not
+   reject partial data by itself. A final-daily profile must reject partial/unknown data; a separately
+   declared partial-data profile can have different requirements. Required checks cannot be skipped
+   because another helper returned true, and failed checks cannot create a Fact labelled as bearish.
+3. **Preserve insufficient evidence as an explicit profile result.** Report the supported knowledge
+   view per required source. Unproven public/platform time cannot be imputed or silently downgraded.
+   An explicitly admitted retrospective lane may continue under its weaker claim. Failure of a
+   source-view proof must not become a future-informed exclusion of earlier securities or a forced
+   sale. The frozen reporting denominator includes attempted, eligible, unavailable and rejected
+   observations with their reasons; repeated logging does not change Fact identities.
+
+Before result-bearing B3-B5 qualification, freeze the first question, required inputs and exact data
+revisions, daily observation/decision/execution profile, bounded scope and warm-up, minimal anchor
+specifications, crossing/equality/gap rules, source-view permissions, consumer compatibility mapping,
+resource and run budget, and independent cold-rebuild criteria. No numerical parameters are selected
+by this entry review. The dictionary remains off the critical path. An inability to establish this
+bounded contract stops its runtime admission, not the entire broader architecture.
 
 ### Exit criteria for the first runtime slice
 

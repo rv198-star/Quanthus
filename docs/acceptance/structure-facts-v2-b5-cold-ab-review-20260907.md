@@ -52,7 +52,7 @@ Run A physical manifest: sha256:93e3c94967f460285655c68468365eeb10de46b50ef41fec
 Run B physical manifest: sha256:09922b6438a25f79d7f247ed286f6bdd389ba2218e4ed47ccf23053424332167
 ```
 
-This difference is expected and is evidence that actual-use/generation times were not falsified to make A/B byte-identical.
+This difference is expected and is consistent with independently recorded operation clocks; physical hash differences alone do not authenticate timestamps. Each receipt chain is validated separately, and no wall-clock equality is required for semantic A/B reproduction.
 
 ## 2. Process and consumer evidence
 

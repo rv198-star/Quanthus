@@ -156,7 +156,8 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert "config/product-expert-evidence.v1.json" in dockerfile
     assert "config/expert-strategies/p4-trend-risk.v1.0.1.json" in dockerfile
     assert "candidate-p4-trend-risk-1.0.1.inconclusive.v1.json" in dockerfile
-    assert "chmod -R a-w ./config" in dockerfile
+    assert "find ./config -type d -exec chmod 0555" in dockerfile
+    assert "find ./config -type f -exec chmod 0444" in dockerfile
     assert "COPY src ./src" not in dockerfile
     assert "COPY src/quanthus/platform ./src/quanthus/platform" in dockerfile
     assert "src/quanthus/expert_evaluation/product_view.py" in dockerfile
@@ -256,7 +257,8 @@ def test_platform_image_contains_data_catalog_authority_closure() -> None:
     ):
         assert required in builder
         assert required in dockerfile
-    assert "chmod -R a-w ./config" in dockerfile
+    assert "find ./config -type d -exec chmod 0555" in dockerfile
+    assert "find ./config -type f -exec chmod 0444" in dockerfile
 
 
 def test_operator_web_is_source_built_and_independently_removable() -> None:

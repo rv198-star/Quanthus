@@ -13,7 +13,8 @@ COPY config/pipelines/ods-base-final-through-20260731.v2.json config/pipelines/d
 COPY config/releases/v2-build202607.json ./config/releases/
 COPY config/expert-strategies/p4-trend-risk.v1.0.1.json ./config/expert-strategies/
 COPY config/expert-evaluations/lifecycle/candidate-p4-trend-risk-1.0.1.inconclusive.v1.json ./config/expert-evaluations/lifecycle/
-RUN chmod -R a-w ./config
+RUN find ./config -type d -exec chmod 0555 {} + \
+    && find ./config -type f -exec chmod 0444 {} +
 RUN mkdir -p ./src/quanthus/expert_evaluation
 COPY src/quanthus/__init__.py \
     src/quanthus/data_catalog.py \

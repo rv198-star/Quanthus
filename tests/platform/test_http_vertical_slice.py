@@ -4,6 +4,7 @@ import json
 
 from quanthus.platform import api as api_module
 from quanthus.platform.event_worker import (
+    _seed_structure_facts_qualification_jobs,
     _seed_structure_mvp_qualification_jobs,
     _write_structure_qualification_seed_receipt,
 )
@@ -85,6 +86,119 @@ def test_structure_mvp_review_sample_is_stratified_and_t_close_only(tmp_path) ->
     assert [row["state"] for row in sample].count("range_intact") == 2
     assert [row["state"] for row in sample].count("support_breach") == 1
     assert all("future_return" not in row for row in sample)
+
+
+def test_structure_facts_review_sample_uses_preregistered_lifecycle_then_round_robin(
+    tmp_path,
+) -> None:
+    job_id = "job_" + "2" * 32
+    run = tmp_path / "structure-runs" / ("run_" + "2" * 32)
+    run.mkdir(parents=True)
+    securities = ("000001", "300750", "600519")
+
+    def fact_row(code: str, day: int, status: str | None, age: int | None) -> dict[str, object]:
+        has_episode = status is not None
+        return {
+            "market_date": f"2020-01-{day:02d}",
+            "security_code": code,
+            "dwd_security_id": f"dwd-{code}",
+            "snapshot_id": f"snapshot-{code}-{day}",
+            "knowledge_cutoff": f"2020-01-{day:02d}T15:00:00+08:00",
+            "source_revision": "sha256:" + "1" * 64,
+            "source_artifact_sha256": "sha256:" + "2" * 64,
+            "source_close": "101",
+            "available": True,
+            "availability_reason": None,
+            "history_reset": False,
+            "source_window_start": "2019-12-01",
+            "source_window_end": f"2020-01-{day - 1:02d}",
+            "rolling_resistance20": "100",
+            "rolling_support20": "90",
+            "resistance_margin": "0.01",
+            "support_margin": "0.1222222222222222222222222222",
+            "volume_ratio20": "0.5",
+            "episode_id": f"episode-{code}" if has_episode else None,
+            "episode_status": status,
+            "episode_termination_reason": (
+                "close_below_breakout_level" if status == "ended" else None
+            ),
+            "attempt_at": "2020-01-02" if has_episode else None,
+            "attempt_snapshot_id": f"attempt-{code}" if has_episode else None,
+            "breakout_level": "100" if has_episode else None,
+            "episode_support_level": "90" if has_episode else None,
+            "attempt_volume_ratio20": "0.5" if has_episode else None,
+            "episode_anchor_window_start": "2019-12-01" if has_episode else None,
+            "episode_anchor_window_end": "2020-01-01" if has_episode else None,
+            "breakout_margin": "0.01" if has_episode else None,
+            "episode_support_margin": (
+                "0.1222222222222222222222222222" if has_episode else None
+            ),
+            "post_attempt_hold_count": age if has_episode else None,
+            "episode_age_sessions": age,
+            "future_return": "MUST_NOT_LEAK",
+            "coarse_state": "MUST_NOT_LEAK",
+        }
+
+    rows: list[dict[str, object]] = []
+    for index, code in enumerate(securities):
+        base = 2 + index * 4
+        rows.extend(
+            (
+                fact_row(code, base, "active", 0),
+                fact_row(code, base + 1, "active", 1),
+                fact_row(code, base + 2, "ended", 2),
+                fact_row(code, base + 3, None, None),
+            )
+        )
+    (run / "structure-facts.jsonl").write_text(
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    sample = api_module._structure_facts_review_sample(tmp_path, job_id, securities)
+
+    assert len(sample) == 12
+    assert [(row["security_code"], row["episode_status"]) for row in sample[:9]] == [
+        ("000001", "active"),
+        ("000001", "active"),
+        ("000001", "ended"),
+        ("300750", "active"),
+        ("300750", "active"),
+        ("300750", "ended"),
+        ("600519", "active"),
+        ("600519", "active"),
+        ("600519", "ended"),
+    ]
+    assert [row["security_code"] for row in sample[9:]] == list(securities)
+    assert all("future_return" not in row and "coarse_state" not in row for row in sample)
+    assert all(str(row["row_digest"]).startswith("sha256:") for row in sample)
+
+
+def test_health_can_project_bounded_structure_facts_qualification(
+    kernel, tmp_path, monkeypatch
+) -> None:
+    revision = "e" * 40
+    job_ids = _seed_structure_facts_qualification_jobs(
+        kernel.store,
+        enabled_value="1",
+        code_revision=revision,
+    )
+    config = tmp_path / "structure-facts-run.json"
+    config.write_text(
+        json.dumps({"security_codes": ["000001", "300750", "600519"]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(api_module, "_STRUCTURE_FACTS_RUN_CONFIG_PATH", config)
+    monkeypatch.setenv("QUANTHUS_STRUCTURE_FACTS_HEALTH_PROBE", "1")
+
+    status, _, payload = wsgi_request(kernel, "GET", "/health")
+
+    assert status == 200
+    qualification = payload["structure_facts_qualification"]
+    assert qualification["status"] == "running"
+    assert qualification["code_revision"] == revision
+    assert [item["job_id"] for item in qualification["runs"]] == list(job_ids)
+    assert {item["state"] for item in qualification["runs"]} == {"queued"}
 
 
 def test_health_can_project_bounded_structure_mvp_qualification(

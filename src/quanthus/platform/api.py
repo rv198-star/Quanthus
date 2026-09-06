@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -57,6 +58,13 @@ _STRUCTURE_MVP_SEED_RECEIPT = _STRUCTURE_MVP_EVENT_RUN_ROOT / "structure-qualifi
 _STRUCTURE_MVP_RECEIPT_MAX_BYTES = 64 * 1024
 _STRUCTURE_MVP_REVIEW_MAX_BYTES = 2 * 1024 * 1024
 _STRUCTURE_MVP_JOB_RE = re.compile(r"^job_[0-9a-f]{32}$")
+_STRUCTURE_FACTS_HEALTH_PROBE_ENV = "QUANTHUS_STRUCTURE_FACTS_HEALTH_PROBE"
+_STRUCTURE_FACTS_RUN_CONFIG = "config/structure-facts-run.development.v1.json"
+_STRUCTURE_FACTS_RUN_CONFIG_PATH = (
+    Path(__file__).resolve().parents[3] / _STRUCTURE_FACTS_RUN_CONFIG
+)
+_STRUCTURE_FACTS_REVIEW_MAX_BYTES = 2 * 1024 * 1024
+_STRUCTURE_FACTS_REVIEW_TARGET = 12
 StartResponse = Callable[[str, list[tuple[str, str]]], object]
 Handler = Callable[["HttpRequest", Mapping[str, str]], "HttpResponse"]
 
@@ -191,6 +199,142 @@ def _structure_mvp_review_sample(
         selected,
         key=lambda row: (str(row["state"]), str(row["market_date"]), str(row["security_code"])),
     )
+
+
+def _structure_facts_review_sample(
+    event_run_root: Path,
+    job_id: str,
+    security_order: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    if _STRUCTURE_MVP_JOB_RE.fullmatch(job_id) is None or not security_order:
+        return []
+    run_id = f"run_{job_id.removeprefix('job_')}"
+    root = event_run_root.resolve()
+    path = (root / "structure-runs" / run_id / "structure-facts.jsonl").resolve()
+    if root not in path.parents:
+        return []
+    try:
+        if not path.is_file() or path.stat().st_size > _STRUCTURE_FACTS_REVIEW_MAX_BYTES:
+            return []
+        rows = [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except (OSError, json.JSONDecodeError):
+        return []
+    if any(not isinstance(row, dict) for row in rows):
+        return []
+    rows = sorted(
+        rows,
+        key=lambda row: (str(row.get("security_code", "")), str(row.get("market_date", ""))),
+    )
+    by_security = {
+        code: [row for row in rows if row.get("security_code") == code]
+        for code in security_order
+    }
+    selected: list[dict[str, Any]] = []
+    selected_keys: set[tuple[str, str]] = set()
+
+    def add_first(code: str, predicate: Callable[[dict[str, Any]], bool]) -> None:
+        for row in by_security[code]:
+            if not predicate(row):
+                continue
+            key = (str(row.get("security_code")), str(row.get("market_date")))
+            if key not in selected_keys:
+                selected.append(row)
+                selected_keys.add(key)
+            return
+
+    for code in security_order:
+        add_first(
+            code,
+            lambda row: row.get("episode_status") == "active"
+            and row.get("episode_age_sessions") == 0,
+        )
+        add_first(
+            code,
+            lambda row: row.get("episode_status") == "active"
+            and isinstance(row.get("episode_age_sessions"), int)
+            and int(row["episode_age_sessions"]) >= 1,
+        )
+        add_first(code, lambda row: row.get("episode_status") == "ended")
+
+    fill_buckets = {
+        code: [
+            row
+            for row in by_security[code]
+            if row.get("available") is True
+            and (str(row.get("security_code")), str(row.get("market_date")))
+            not in selected_keys
+        ]
+        for code in security_order
+    }
+    fill_index = 0
+    while len(selected) < _STRUCTURE_FACTS_REVIEW_TARGET:
+        added = False
+        for code in security_order:
+            bucket = fill_buckets[code]
+            if fill_index >= len(bucket):
+                continue
+            row = bucket[fill_index]
+            key = (str(row.get("security_code")), str(row.get("market_date")))
+            if key not in selected_keys:
+                selected.append(row)
+                selected_keys.add(key)
+                added = True
+                if len(selected) >= _STRUCTURE_FACTS_REVIEW_TARGET:
+                    break
+        if not added:
+            break
+        fill_index += 1
+
+    fields = (
+        "market_date",
+        "security_code",
+        "dwd_security_id",
+        "snapshot_id",
+        "knowledge_cutoff",
+        "source_close",
+        "available",
+        "availability_reason",
+        "history_reset",
+        "source_window_start",
+        "source_window_end",
+        "rolling_resistance20",
+        "rolling_support20",
+        "resistance_margin",
+        "support_margin",
+        "volume_ratio20",
+        "episode_id",
+        "episode_status",
+        "episode_termination_reason",
+        "attempt_at",
+        "attempt_snapshot_id",
+        "breakout_level",
+        "episode_support_level",
+        "attempt_volume_ratio20",
+        "episode_anchor_window_start",
+        "episode_anchor_window_end",
+        "breakout_margin",
+        "episode_support_margin",
+        "post_attempt_hold_count",
+        "episode_age_sessions",
+    )
+    projected: list[dict[str, Any]] = []
+    for row in selected[:_STRUCTURE_FACTS_REVIEW_TARGET]:
+        if any(field not in row for field in fields):
+            return []
+        payload = {field: row[field] for field in fields}
+        canonical = json.dumps(
+            row,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        payload["row_digest"] = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
+        projected.append(payload)
+    return projected
 
 
 def _compile_path(path: str) -> re.Pattern[str]:
@@ -548,6 +692,91 @@ class PlatformHttpApp:
                 )
         return response
 
+    def _structure_facts_qualification_health(self) -> dict[str, Any] | None:
+        enabled = os.environ.get(_STRUCTURE_FACTS_HEALTH_PROBE_ENV, "0").strip()
+        if enabled != "1":
+            return None
+        try:
+            request = json.loads(_STRUCTURE_FACTS_RUN_CONFIG_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {"status": "run_config_invalid"}
+        security_codes = request.get("security_codes") if isinstance(request, dict) else None
+        if (
+            not isinstance(security_codes, list)
+            or not security_codes
+            or any(not isinstance(item, str) or not item for item in security_codes)
+        ):
+            return {"status": "run_config_invalid"}
+        jobs = [
+            job
+            for job in self._replay_jobs.list(STRUCTURE_MVP_JOB, 50)
+            if job.input_ref.get("run_config") == _STRUCTURE_FACTS_RUN_CONFIG
+            and job.idempotency_key.startswith("structure-facts-qualification-v1-")
+        ]
+        grouped: dict[str, dict[str, Any]] = {}
+        revision_order: list[str] = []
+        for job in jobs:
+            revision = job.input_ref.get("code_revision")
+            parts = job.idempotency_key.split("-")
+            if not isinstance(revision, str) or len(parts) < 6 or parts[4] not in {"a", "b"}:
+                continue
+            if revision not in grouped:
+                grouped[revision] = {}
+                revision_order.append(revision)
+            grouped[revision].setdefault(parts[4], job)
+        revision = next(
+            (item for item in revision_order if set(grouped[item]) == {"a", "b"}),
+            None,
+        )
+        if revision is None:
+            return {"status": "runs_unavailable"}
+        pair = (grouped[revision]["a"], grouped[revision]["b"])
+        result_keys = (
+            "result_digest",
+            "adm_manifest_digest",
+            "manifest_sha256",
+            "row_count",
+            "fact_counts",
+            "renderer_counts",
+            "consumer_counts",
+            "p2_probe_count",
+            "p2_fill_count",
+        )
+        runs: list[dict[str, Any]] = []
+        for job in pair:
+            item: dict[str, Any] = {
+                "job_id": job.job_id,
+                "state": job.state,
+                "stage": job.stage,
+                "progress": job.progress,
+            }
+            if job.error_reason is not None:
+                item["error_reason"] = job.error_reason
+            if job.result_ref:
+                for key in result_keys:
+                    if key in job.result_ref:
+                        item[key] = job.result_ref[key]
+            runs.append(item)
+        response: dict[str, Any] = {
+            "status": "running"
+            if any(item["state"] in {"queued", "running"} for item in runs)
+            else "complete",
+            "code_revision": revision,
+            "runs": runs,
+        }
+        if all(item["state"] == "succeeded" for item in runs):
+            reproduced = all(runs[0].get(key) == runs[1].get(key) for key in result_keys)
+            response["reproduced"] = reproduced
+            if reproduced:
+                for key in result_keys:
+                    response[key] = runs[0].get(key)
+                response["review_sample"] = _structure_facts_review_sample(
+                    _STRUCTURE_MVP_EVENT_RUN_ROOT,
+                    str(pair[0].job_id),
+                    tuple(security_codes),
+                )
+        return response
+
     def _health(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
         payload: dict[str, Any] = {
             "status": "healthy",
@@ -557,6 +786,9 @@ class PlatformHttpApp:
         qualification = self._structure_mvp_qualification_health()
         if qualification is not None:
             payload["structure_mvp_qualification"] = qualification
+        facts_qualification = self._structure_facts_qualification_health()
+        if facts_qualification is not None:
+            payload["structure_facts_qualification"] = facts_qualification
         return _json_response(payload)
 
     def _ready(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:

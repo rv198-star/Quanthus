@@ -406,6 +406,15 @@ This boundary proves engineering/semantic fitness, not predictive sufficiency or
 An unsatisfied gate stays visible as missing. No new full-market PIT claim follows from a small
 slice. Next milestone expansion requires an explicit decision, not a change in the coverage label.
 
+### Issue-managed first delivery
+
+The owner subsequently authorized issue-managed completion of the bounded B1-B5 batch. Parent
+#216 (`P3-STRUCT-004`) and children #217-#222 are projected from
+`config/structure-v2-delivery.v1.json`. B1 and B1-R reuse retained accepted contract evidence;
+B2-B5 require their new delivery gates. Exact algorithms, initial scope, counters, sample rule and
+run budget are specified in `structure-facts-v2-delivery.md`. This authorization permits the fixed
+research qualification of that slice only, not B6-B11 or economic/forward expansion.
+
 ## 7. Data and indicator dictionary work (non-blocking)
 
 `P3-DICT-001`, specified in `../work-items/data-indicator-dictionary.md`, consolidates discovery and

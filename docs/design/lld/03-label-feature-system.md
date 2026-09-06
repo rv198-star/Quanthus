@@ -230,7 +230,13 @@ machine-readable ledger. `P3-DICT-001` separately consolidates existing warehous
 | P3-STRUCT-001 | Prove the bounded DWD -> Structure ADM -> trend-semantics adapter -> aggregator -> P2 path | P3-FEAT-002, P3 expert/aggregator contracts, P4 Event Worker | Real-DWD immutable artifact, independent reproduction, decision/P2 probe reconciliation |
 | P3-STRUCT-002 | Compare continuous versus coarse Structure Intelligence through complete P2 | P3-STRUCT-001, P3-ATTR-001, P3-STRAT-002 | Preregistered C0/C1/C2 A/B replay, exact baseline reproduction, paired comparisons, lifecycle decision |
 | P3-STRUCT-003 | Build Continuous Structure Facts v1 | P3-STRUCT-002 | Contract/adversarial semantics, Real-DWD A/B fact digests, direct expert/aggregator consumption, P2 compatibility, outcome-blind review |
-| P3-STRUCT-004 | Implement time-first Structure Facts v2 in bounded slices | P3-STRUCT-003 | `docs/design/structure-facts-v2.md`: B1/B1-R namespace, time ownership and audit contracts; B2-B5 verified source/consumer integration and Real-DWD qualification remain open |
+| P3-STRUCT-004 | Deliver the bounded Facts v2 B1-B5 vertical slice | P3-STRUCT-003 | `docs/design/structure-facts-v2-delivery.md`; parent #216 closes only after all six child gates |
+| P3-STRUCT-004-B1 | Freeze Facts v2 domains, semantic naming and coverage blueprint | P3-STRUCT-003 | Existing B1 checkpoint and design-entry review; #217 |
+| P3-STRUCT-004-B1-R | Separate business clocks, production receipts and consumption audit | P3-STRUCT-004-B1 | Existing temporal ownership checkpoint and design-entry review; #218 |
+| P3-STRUCT-004-B2 | Qualify bounded Facts v2 input, time view, identity and coordinates | P3-STRUCT-004-B1-R | Source/view/identity/coordinate readiness, denominator and negative tests; #219 |
+| P3-STRUCT-004-B3 | Build prior-20/60 references with qualified target identity | P3-STRUCT-004-B2 | Excluded-T references, target grain, revision and prefix identity tests; #220 |
+| P3-STRUCT-004-B4 | Record same-anchor close crossings, loss and reclaim | P3-STRUCT-004-B3 | Equality, frozen target, no fabricated reclaim, gap/action censoring; #221 |
+| P3-STRUCT-004-B5 | Qualify minimal episodes, audited consumer and P2 through cold A/B | P3-STRUCT-004-B4 | Exact semantic A/B, persisted audit receipts, P2 compatibility and blinded review; #222 |
 | P3-DICT-001 | Maintain data and indicator dictionaries | P3-FEAT-001 | `docs/work-items/data-indicator-dictionary.md`: source-owned inventory, exact specs/units/clocks, legacy compatibility and change checks; separately deferred, not a dependency of P3-STRUCT-004 |
 
 ## 7. Acceptance

@@ -252,16 +252,26 @@ path substitution and arbitrary commands fail closed. `P3-STRUCT-001` binds
 `config/structure-mvp-run.development.v1.json` to `python -m quanthus.structure_mvp_run`.
 `P3-STRUCT-002` adds exactly one second allowed config,
 `config/structure-economic-run.development.v1.json`, bound to
-`python -m quanthus.structure_economic_experiment`. Both retain the same read-only DWD mounts and
-generation fencing, publish below the separate immutable `structure-runs/` namespace, and are
-deep-verified by stdlib-only Worker contracts before success. The economic verifier additionally
-requires exact C0 baseline reproduction, exactly C0/C1/C2 variants, the frozen three comparisons,
-no sealed-partition access, and no execution authority. This Job kind remains research-only: it
-cannot mutate DWD, enable the draft stock-stage vocabulary, authorize orders, or open Shadow/P6.
+`python -m quanthus.structure_economic_experiment`. `P3-STRUCT-003` adds a third fixed config,
+`config/structure-facts-run.development.v1.json`, bound only to
+`python -m quanthus.structure_facts_run`. All retain the same read-only DWD mounts and generation
+fencing, publish below the separate immutable `structure-runs/` namespace, and are deep-verified by
+stdlib-only Worker contracts before success. The economic verifier additionally requires exact C0
+baseline reproduction, exactly C0/C1/C2 variants, the frozen three comparisons, no sealed-partition
+access, and no execution authority. The facts verifier requires the Continuous Structure Facts ADM
+identity, content/row digests, direct-consumer/P2 compatibility summaries, and rejects any fact row
+that contains coarse/state authority even when all file and semantic hashes are internally
+consistent. This Job kind remains research-only: it cannot mutate DWD, enable the draft stock-stage
+vocabulary, authorize orders, or open Shadow/P6.
 Real-DWD qualification and independent reproduction closed
 `P3-STRUCT-001` under
 `../../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`; this acceptance does
 not widen the Job's authority.
+
+Default-off qualification seeders exist only for bounded, revision-bound A/B acceptance where the
+current client tool schema cannot yet express the admitted Structure Job kind/config. The Structure
+MVP, economic comparison, and Continuous Structure Facts paths each use separate fixed environment
+switches; normal production keeps them disabled outside the exact qualification window.
 
 A default-off qualification seeder exists only to bridge an external control-plane admission lag.
 The Event image is build-bound to one clean 40-character Git revision. When and only when

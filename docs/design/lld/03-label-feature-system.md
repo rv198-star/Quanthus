@@ -189,6 +189,14 @@ the same facts into coarse states. C2-C1 is the primary comparison, so a positiv
 created merely by giving the state variant additional history or episode memory. The exact mapping
 and no-tuning rule are frozen before results.
 
+`P3-STRUCT-003` is the owner-approved fact-product successor governed by
+`../continuous-structure-facts-v1.md`. It publishes prior-20 rolling support/resistance anchors,
+signed margins, independent volume ratio, and row-local frozen breakout episode identity/progress.
+Episode creation is price-only; volume is never hidden inside episode existence. Experts consume
+continuous facts directly through ordinary `FeatureFact`/expert ports. The coarse state vocabulary
+is a replaceable explanation renderer and is forbidden from the fact-row identity. Missing data
+resets causal continuity without implying bearish structure or exit authority.
+
 ## 6. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -201,6 +209,7 @@ and no-tuning rule are frozen before results.
 | P3-LABEL-004 | Build human review corpus and adjudication form | Evaluators | 100 reviewed cases |
 | P3-STRUCT-001 | Prove the bounded DWD -> Structure ADM -> trend-semantics adapter -> aggregator -> P2 path | P3-FEAT-002, P3 expert/aggregator contracts, P4 Event Worker | Real-DWD immutable artifact, independent reproduction, decision/P2 probe reconciliation |
 | P3-STRUCT-002 | Compare continuous versus coarse Structure Intelligence through complete P2 | P3-STRUCT-001, P3-ATTR-001, P3-STRAT-002 | Preregistered C0/C1/C2 A/B replay, exact baseline reproduction, paired comparisons, lifecycle decision |
+| P3-STRUCT-003 | Build Continuous Structure Facts v1 | P3-STRUCT-002 | Contract/adversarial semantics, Real-DWD A/B fact digests, direct expert/aggregator consumption, P2 compatibility, outcome-blind review |
 
 ## 7. Acceptance
 

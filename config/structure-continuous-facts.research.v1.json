@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0.0",
+  "adm_id": "structure-continuous-facts",
+  "adm_version": "1.0.0",
+  "status": "development_only",
+  "research_only": true,
+  "execution_authorized": false,
+  "upstream_authority": "admitted_dwd_daily_projection",
+  "purpose": "publish_auditable_continuous_structure_facts_for_direct_expert_consumption",
+  "lookback_sessions": 20,
+  "rolling_anchors": {
+    "resistance": "maximum_high_over_preceding_20_valid_sessions_excluding_t",
+    "support": "minimum_low_over_preceding_20_valid_sessions_excluding_t"
+  },
+  "episode_policy": {
+    "creation": "t_close_strictly_above_prior_rolling_resistance20",
+    "volume_role": "independent_fact_not_episode_gate",
+    "frozen_breakout_level": true,
+    "frozen_attempt_support_level": true,
+    "hold": "later_close_at_or_above_frozen_breakout_level",
+    "termination": "later_close_below_frozen_breakout_level",
+    "same_row_restart_after_termination": false
+  },
+  "missing_data_policy": {
+    "gap_resets_history": true,
+    "gap_ends_active_episode": true,
+    "missing_never_implies_structural_damage": true,
+    "missing_never_authorizes_exit": true
+  },
+  "coarse_renderer": {
+    "authority": "explanation_only",
+    "fact_identity_dependency": false,
+    "compatibility_support_threatened_ratio": "0.02",
+    "compatibility_breakout_accepted_hold_count": 2
+  },
+  "allowed_uses": [
+    "continuous_structure_expert_input",
+    "deterministic_pipeline_proof",
+    "bounded_real_dwd_reproduction",
+    "read_only_coarse_explanation_projection"
+  ],
+  "forbidden_claims": [
+    "canonical_dwd_fact",
+    "generic_dws",
+    "operational_ads",
+    "authoritative_market_state",
+    "thirteen_state_acceptance",
+    "model_training_authority",
+    "shadow_authority",
+    "paper_authority",
+    "live_execution_authority",
+    "economic_value_proven"
+  ]
+}

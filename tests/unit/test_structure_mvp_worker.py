@@ -13,11 +13,13 @@ from quanthus.platform.event_worker import (
     _bounded_child_failure,
     _canonical_digest,
     _seed_structure_economic_qualification_jobs,
+    _seed_structure_facts_qualification_jobs,
     _seed_structure_mvp_qualification_jobs,
     _sha256,
     _structure_input,
     _structure_request_digest,
     _verify_structure_economic_artifact,
+    _verify_structure_facts_artifact,
     _write_structure_qualification_seed_receipt,
 )
 from quanthus.platform.jobs import STRUCTURE_MVP_JOB, DurableJobQueue, input_digest
@@ -31,6 +33,10 @@ STRUCTURE_INPUT = {
 ECONOMIC_INPUT = {
     "code_revision": "a" * 40,
     "run_config": "config/structure-economic-run.development.v1.json",
+}
+FACTS_INPUT = {
+    "code_revision": "a" * 40,
+    "run_config": "config/structure-facts-run.development.v1.json",
 }
 
 
@@ -177,6 +183,44 @@ class StructureMvpWorkerTests(unittest.TestCase):
         self.assertEqual({item.kind for item in jobs}, {STRUCTURE_MVP_JOB})
         with self.assertRaisesRegex(RuntimeError, "economic_qualification_seed_invalid"):
             _seed_structure_economic_qualification_jobs(
+                store,
+                enabled_value="yes",
+                code_revision=revision,
+            )
+
+    def test_facts_qualification_seed_is_fixed_and_default_off(self) -> None:
+        store = InMemoryPlatformStore()
+        store.create_user(_qualification_user())
+        revision = "e" * 40
+        self.assertEqual(
+            _seed_structure_facts_qualification_jobs(
+                store,
+                enabled_value="0",
+                code_revision=revision,
+            ),
+            (),
+        )
+        first = _seed_structure_facts_qualification_jobs(
+            store,
+            enabled_value="1",
+            code_revision=revision,
+        )
+        second = _seed_structure_facts_qualification_jobs(
+            store,
+            enabled_value="1",
+            code_revision=revision,
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 2)
+        jobs = store.list_jobs()
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(
+            {item.input_ref["run_config"] for item in jobs},
+            {"config/structure-facts-run.development.v1.json"},
+        )
+        self.assertEqual({item.kind for item in jobs}, {STRUCTURE_MVP_JOB})
+        with self.assertRaisesRegex(RuntimeError, "facts_qualification_seed_invalid"):
+            _seed_structure_facts_qualification_jobs(
                 store,
                 enabled_value="yes",
                 code_revision=revision,
@@ -338,18 +382,22 @@ class StructureMvpWorkerTests(unittest.TestCase):
     def test_structure_input_is_exact_and_cannot_substitute_config(self) -> None:
         self.assertEqual(_structure_input(STRUCTURE_INPUT), STRUCTURE_INPUT)
         self.assertEqual(_structure_input(ECONOMIC_INPUT), ECONOMIC_INPUT)
+        self.assertEqual(_structure_input(FACTS_INPUT), FACTS_INPUT)
         with self.assertRaisesRegex(RuntimeError, "run_config_not_governed"):
             _structure_input({**STRUCTURE_INPUT, "run_config": "/tmp/anything.json"})
         with self.assertRaisesRegex(RuntimeError, "input_contract_mismatch"):
             _structure_input({**STRUCTURE_INPUT, "command": "bash"})
 
-    def test_structure_request_digest_accepts_both_governed_configs(self) -> None:
+    def test_structure_request_digest_accepts_all_governed_configs(self) -> None:
         self.assertTrue(
             _structure_request_digest(STRUCTURE_INPUT["run_config"]).startswith("sha256:")
         )
         self.assertEqual(
             _structure_request_digest(ECONOMIC_INPUT["run_config"]),
             "sha256:9a8a14a4855ddb189da2d8303c558a460ce781e63425942cda845e45e3ef66de",
+        )
+        self.assertTrue(
+            _structure_request_digest(FACTS_INPUT["run_config"]).startswith("sha256:")
         )
 
     def test_economic_artifact_verifier_closes_semantic_and_file_digests(self) -> None:
@@ -434,6 +482,165 @@ class StructureMvpWorkerTests(unittest.TestCase):
             tampered.write_text('{"tampered":true}', encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "artifact_digest_mismatch"):
                 _verify_structure_economic_artifact(
+                    root,
+                    code_revision=code_revision,
+                    request_digest=request_digest,
+                )
+
+    def test_facts_artifact_verifier_rejects_coarse_authority_in_fact_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            code_revision = "a" * 40
+            request_digest = "sha256:" + "b" * 64
+            rows = [
+                {
+                    "market_date": "2020-01-02",
+                    "security_code": "000001",
+                    "dwd_security_id": "dwd-security-a",
+                    "snapshot_id": "snapshot-a",
+                    "knowledge_cutoff": "2020-01-02T15:00:00+08:00",
+                    "source_revision": "sha256:" + "1" * 64,
+                    "source_artifact_sha256": "sha256:" + "2" * 64,
+                    "source_close": "10.1",
+                    "available": True,
+                    "availability_reason": None,
+                    "history_reset": False,
+                    "source_window_start": "2019-12-03",
+                    "source_window_end": "2020-01-01",
+                    "rolling_resistance20": "10",
+                    "rolling_support20": "9",
+                    "resistance_margin": "0.01",
+                    "support_margin": "0.1222222222222222222222222222",
+                    "volume_ratio20": "0.8",
+                    "episode_id": "episode-a",
+                    "episode_status": "active",
+                    "episode_termination_reason": None,
+                    "attempt_at": "2020-01-02",
+                    "attempt_snapshot_id": "snapshot-a",
+                    "breakout_level": "10",
+                    "episode_support_level": "9",
+                    "attempt_volume_ratio20": "0.8",
+                    "episode_anchor_window_start": "2019-12-03",
+                    "episode_anchor_window_end": "2020-01-01",
+                    "breakout_margin": "0.01",
+                    "episode_support_margin": "0.1222222222222222222222222222",
+                    "post_attempt_hold_count": 0,
+                    "episode_age_sessions": 0,
+                }
+            ]
+            rows_path = root / "structure-facts.jsonl"
+            rows_path.write_text(
+                "".join(json.dumps(item, sort_keys=True) + "\n" for item in rows),
+                encoding="utf-8",
+            )
+            adm_manifest = {
+                "schema_version": "1.0.0",
+                "adm_id": "structure-continuous-facts",
+                "adm_version": "1.0.0",
+                "research_only": True,
+                "execution_authorized": False,
+                "upstream_identity": "upstream-a",
+                "policy_digest": "sha256:" + "c" * 64,
+                "row_count": 1,
+                "content_digest": _canonical_digest(rows),
+                "allowed_use": "continuous_structure_fact_consumption",
+                "forbidden_claims": [],
+            }
+            semantic_summary = {
+                "schema_version": "quanthus.structure-facts-result.v1",
+                "research_only": True,
+                "execution_authorized": False,
+                "economic_acceptance_claim": False,
+                "coarse_renderer_authority": "explanation_only",
+                "consumer_authority": "compatibility_proof_only",
+                "request_digest": request_digest,
+                "provider_identity": {},
+                "adm_manifest": adm_manifest,
+                "unavailable_counts": {},
+                "fact_counts": {"rows": 1},
+                "renderer_counts": {"breakout_attempt": 1},
+                "consumer_counts": {"applicable": 1},
+                "decisions": [],
+                "p2_probe_semantics": "execution compatibility only; no portfolio/economic claim",
+                "probes": [],
+            }
+            result_digest = _canonical_digest(semantic_summary)
+            summary = {
+                **semantic_summary,
+                "result_digest": result_digest,
+                "code_revision": code_revision,
+            }
+            summary_path = root / "summary.json"
+            summary_path.write_text(json.dumps(summary, sort_keys=True), encoding="utf-8")
+            manifest = {
+                "schema_version": "quanthus.structure-facts-artifact-manifest.v1",
+                "research_only": True,
+                "execution_authorized": False,
+                "code_revision": code_revision,
+                "request_digest": request_digest,
+                "files": {
+                    "structure-facts.jsonl": _sha256(rows_path),
+                    "summary.json": _sha256(summary_path),
+                },
+                "result_digest": result_digest,
+                "adm_manifest_digest": _canonical_digest(adm_manifest),
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+            (root / "READY").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "quanthus.structure-facts-ready.v1",
+                        "manifest_sha256": _sha256(manifest_path),
+                        "result_digest": result_digest,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+
+            verified = _verify_structure_facts_artifact(
+                root,
+                code_revision=code_revision,
+                request_digest=request_digest,
+            )
+            self.assertEqual(verified["row_count"], 1)
+
+            rows[0]["state"] = "breakout_attempt"
+            rows_path.write_text(
+                "".join(json.dumps(item, sort_keys=True) + "\n" for item in rows),
+                encoding="utf-8",
+            )
+            adm_manifest["content_digest"] = _canonical_digest(rows)
+            semantic_summary["adm_manifest"] = adm_manifest
+            tampered_result_digest = _canonical_digest(semantic_summary)
+            tampered_summary = {
+                **semantic_summary,
+                "result_digest": tampered_result_digest,
+                "code_revision": code_revision,
+            }
+            summary_path.write_text(
+                json.dumps(tampered_summary, sort_keys=True),
+                encoding="utf-8",
+            )
+            manifest["files"]["structure-facts.jsonl"] = _sha256(rows_path)
+            manifest["files"]["summary.json"] = _sha256(summary_path)
+            manifest["result_digest"] = tampered_result_digest
+            manifest["adm_manifest_digest"] = _canonical_digest(adm_manifest)
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+            (root / "READY").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "quanthus.structure-facts-ready.v1",
+                        "manifest_sha256": _sha256(manifest_path),
+                        "result_digest": tampered_result_digest,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "row_schema_invalid"):
+                _verify_structure_facts_artifact(
                     root,
                     code_revision=code_revision,
                     request_digest=request_digest,

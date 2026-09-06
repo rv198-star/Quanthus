@@ -90,12 +90,19 @@ nodes.
   structure -> expert -> aggregator -> P2 engineering chain. Economic value, the draft stock-stage
   vocabulary, model training, Shadow, paper, and live authority remain unopened. Evidence:
   `acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`.
-- `P3-STRUCT-002` is the preregistered next Structure Intelligence increment. It keeps the accepted
-  2020-2021 formal candidate population, funding, costs, position-risk/held-review policy, exits,
-  and P2 path fixed while comparing native C0 against continuous-structure C1 and coarse-state C2
-  entry scoring. C2-C1 is primary; C1-C0 and C2-C0 are secondary. The exact score mapping,
-  materiality rules, paired block bootstrap, sealed-partition prohibition, and no-tuning rule are
-  frozen before results in `acceptance/structure-intelligence-economic-preregistration-20260906.md`.
+- `P3-STRUCT-002` is accepted and closed after an owner-authorized same-revision A/B complete-P2
+  reproduction. C0 reproduced the accepted native baseline; C1 continuous structure finished at
+  6.433900% return / 6.168277% maximum drawdown and C2 coarse at 5.718376% / 7.360706%. The primary
+  C2-C1 comparison was material because C2 drawdown was 1.192429 percentage points higher while
+  return was 0.715524 percentage points lower. The accepted bounded disposition is
+  `prefer_continuous_structure_facts`; bootstrap intervals cross zero and no forward-value claim is
+  made. Evidence: `acceptance/structure-intelligence-economic-final-acceptance-20260906.md`.
+- `P3-STRUCT-003` is the owner-approved next Structure Intelligence milestone and is open for
+  Real-DWD qualification. Continuous Structure Facts v1 makes prior-20 anchors, signed margins,
+  independent volume, and frozen breakout episode identity/progress first-class research facts.
+  Episode creation is price-only and coarse states are explanation-only projections. The isolated
+  implementation passes repository tests, but acceptance still requires fixed Real-DWD A/B and an
+  outcome-blind semantic review. Design: `design/continuous-structure-facts-v1.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

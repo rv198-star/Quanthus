@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Authority | Development-only research comparison; no Shadow, paper, live, or state-family promotion |
 | Governing work item | `P3-STRUCT-002` |
 | Technical predecessor | `P3-STRUCT-001`; evidence `../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md` |
@@ -11,6 +11,7 @@
 | Preregistration | `../acceptance/structure-intelligence-economic-preregistration-20260906.md` |
 | Pre-result repair evidence | `../acceptance/structure-intelligence-economic-pre-result-repair-20260906.md` |
 | Derived-lifecycle repair evidence | `../acceptance/structure-intelligence-economic-derived-lifecycle-repair-20260906.md` |
+| Final acceptance | `../acceptance/structure-intelligence-economic-final-acceptance-20260906.md` |
 
 ## 1. Question
 
@@ -134,3 +135,15 @@ work item can close.
 Stop without interpretation on baseline reproduction mismatch, incomplete P2 reconciliation,
 request/config drift, undeclared scoring change, sealed-partition access, DWD/PIT failure, or
 artifact verification failure.
+
+## 8. Accepted outcome
+
+The final owner-authorized same-revision A/B reproduction at `f77a69e9c3307c0af9d9bd74b6f9bdf7b79fd0a5`
+reproduced the complete C0/C1/C2 artifact set and closed this work item. The primary C2-C1
+comparison is material because C2 maximum drawdown is `0.01192429` higher than C1 while C2 return is
+`0.00715524` lower. The accepted bounded disposition is therefore
+`prefer_continuous_structure_facts`.
+
+This is development historical simulator evidence only. C1 is not proven materially better than C0,
+the bootstrap intervals cross zero, and no forward, Shadow, paper, live, model-training, or
+thirteen-state authority is opened.

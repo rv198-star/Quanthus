@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Design status | draft |
-| Delivery gate | blocked pending `P3-STRUCT-002` closeout and owner approval |
-| Authority | Non-governing proposal; no implementation authority |
-| Proposed work item | `P3-STRUCT-003` |
+| Design status | approved |
+| Delivery gate | open; Real-DWD qualification pending |
+| Authority | Owner-approved fact-product design; development qualification only |
+| Governing work item | `P3-STRUCT-003` |
 | Predecessor | `P3-STRUCT-002` complete-P2 economic comparison |
 | Data boundary | DWD -> thin Structure Research ADM |
 | Execution authority | none |
@@ -205,14 +205,19 @@ Stop or redesign before implementation if:
 - missing-data behavior cannot remain fail-closed; or
 - the product expands into a generic DWS/state engine before a concrete consumer justifies it.
 
-## 9. Decision required before implementation
+## 9. Owner decision and implementation authority
 
-This proposal intentionally stops before implementation authority. Owner approval should decide:
+The owner approved construction after reviewing the milestone effect and explicitly accepted all
+three architecture decisions:
 
-1. whether `P3-STRUCT-003` should become the next milestone;
-2. whether episode creation should indeed use **price-only crossing** while publishing volume as an
-   independent fact, instead of preserving the MVP's `volume_ratio20 >= 1.20` episode trigger; and
-3. whether coarse states should be retained only as a read-only explanation projection.
+1. `P3-STRUCT-003` is the next Structure Intelligence engineering milestone;
+2. breakout episode creation uses **price-only crossing**, while volume is published as an
+   independent fact and never hidden inside episode existence; and
+3. coarse states remain only a deterministic read-only explanation projection over continuous
+   facts, not the primary computational representation.
 
-Until those three points are approved, this file remains a non-governing proposal and no
-`P3-STRUCT-003` implementation should start.
+Implementation and bounded production qualification are authorized. `P3-STRUCT-002` subsequently
+closed after its owner-authorized same-revision A/B reproduction accepted
+`prefer_continuous_structure_facts`, so this milestone may proceed to its fixed Real-DWD A/B and
+outcome-blind review. This approval does not authorize thirteen-state expansion, model training,
+Shadow, paper, or live execution.

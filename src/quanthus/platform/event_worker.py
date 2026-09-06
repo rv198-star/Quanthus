@@ -32,12 +32,56 @@ _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _STRUCTURE_MVP_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
 _STRUCTURE_ECONOMIC_RUN_CONFIG = "config/structure-economic-run.development.v1.json"
-_STRUCTURE_RUN_CONFIGS = frozenset({_STRUCTURE_MVP_RUN_CONFIG, _STRUCTURE_ECONOMIC_RUN_CONFIG})
+_STRUCTURE_FACTS_RUN_CONFIG = "config/structure-facts-run.development.v1.json"
+_STRUCTURE_RUN_CONFIGS = frozenset(
+    {
+        _STRUCTURE_MVP_RUN_CONFIG,
+        _STRUCTURE_ECONOMIC_RUN_CONFIG,
+        _STRUCTURE_FACTS_RUN_CONFIG,
+    }
+)
 # Backward-compatible name retained for the technical-MVP qualification seeder/tests.
 _STRUCTURE_RUN_CONFIG = _STRUCTURE_MVP_RUN_CONFIG
 _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
 _STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV = (
     "QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED"
+)
+_STRUCTURE_FACTS_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_FACTS_QUALIFICATION_SEED"
+_STRUCTURE_FACT_ROW_FIELDS = frozenset(
+    {
+        "market_date",
+        "security_code",
+        "dwd_security_id",
+        "snapshot_id",
+        "knowledge_cutoff",
+        "source_revision",
+        "source_artifact_sha256",
+        "source_close",
+        "available",
+        "availability_reason",
+        "history_reset",
+        "source_window_start",
+        "source_window_end",
+        "rolling_resistance20",
+        "rolling_support20",
+        "resistance_margin",
+        "support_margin",
+        "volume_ratio20",
+        "episode_id",
+        "episode_status",
+        "episode_termination_reason",
+        "attempt_at",
+        "attempt_snapshot_id",
+        "breakout_level",
+        "episode_support_level",
+        "attempt_volume_ratio20",
+        "episode_anchor_window_start",
+        "episode_anchor_window_end",
+        "breakout_margin",
+        "episode_support_margin",
+        "post_attempt_hold_count",
+        "episode_age_sessions",
+    }
 )
 _BUILD_REVISION_ENV = "QUANTHUS_CODE_REVISION"
 _EXTERNAL_MCP_ACTOR_USER_ID = "usr_18c14af81a06cf878f177579efec3727"
@@ -244,6 +288,53 @@ def _seed_structure_economic_qualification_jobs(
     return tuple(jobs)
 
 
+def _seed_structure_facts_qualification_jobs(
+    store: PlatformStore,
+    *,
+    enabled_value: str,
+    code_revision: str,
+) -> tuple[str, ...]:
+    """Idempotently seed exactly two fixed Continuous Structure Facts A/B Jobs."""
+
+    normalized = enabled_value.strip()
+    if normalized not in {"", "0", "1"}:
+        raise RuntimeError("structure_facts_qualification_seed_invalid")
+    if normalized != "1":
+        return ()
+    if _CODE_REVISION_RE.fullmatch(code_revision) is None:
+        raise RuntimeError("structure_facts_qualification_revision_invalid")
+    actor_user_id = _structure_qualification_actor_user_id(store)
+    queue = DurableJobQueue(store, {STRUCTURE_MVP_JOB: EVENT_QUEUE})
+    input_ref = {
+        "code_revision": code_revision,
+        "run_config": _STRUCTURE_FACTS_RUN_CONFIG,
+    }
+    jobs: list[str] = []
+    for suffix in ("a", "b"):
+        stable_job_id = "job_" + hashlib.sha256(
+            (
+                f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_FACTS_RUN_CONFIG}:"
+                f"{code_revision}:{suffix}"
+            ).encode()
+        ).hexdigest()[:32]
+        job, _created = queue.submit(
+            kind=STRUCTURE_MVP_JOB,
+            actor_user_id=actor_user_id,
+            idempotency_key=(
+                f"structure-facts-qualification-v1-{suffix}-{code_revision[:12]}"
+            ),
+            input_ref=input_ref,
+            concurrency_key=(
+                f"structure-facts:qualification-v1-{suffix}:{code_revision[:12]}"
+            ),
+            requested_job_id=stable_job_id,
+        )
+        if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
+            raise RuntimeError("structure_facts_qualification_seed_mismatch")
+        jobs.append(job.job_id)
+    return tuple(jobs)
+
+
 def _write_structure_qualification_seed_receipt(
     run_root: Path,
     *,
@@ -297,6 +388,7 @@ def _structure_request_digest(run_config: str) -> str:
     expected_schema = {
         _STRUCTURE_MVP_RUN_CONFIG: "quanthus.structure-mvp-run.v1",
         _STRUCTURE_ECONOMIC_RUN_CONFIG: "quanthus.structure-economic-run.v1",
+        _STRUCTURE_FACTS_RUN_CONFIG: "quanthus.structure-facts-run.v1",
     }[run_config]
     if not isinstance(raw, dict) or raw.get("schema_version") != expected_schema:
         raise RuntimeError("structure_mvp_run_config_invalid")
@@ -530,6 +622,124 @@ def _verify_structure_economic_artifact(
         "variants": dict(variants),
         "sealed_partition_access": False,
         "execution_authorized": False,
+    }
+
+
+def _verify_structure_facts_artifact(
+    root: Path,
+    *,
+    code_revision: str,
+    request_digest: str,
+) -> dict[str, Any]:
+    """Deep-verify one Continuous Structure Facts v1 package using stdlib only."""
+
+    resolved = root.resolve()
+    manifest_path = resolved / "manifest.json"
+    ready_path = resolved / "READY"
+    summary_path = resolved / "summary.json"
+    rows_path = resolved / "structure-facts.jsonl"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        ready = json.loads(ready_path.read_text(encoding="utf-8"))
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("structure_facts_artifact_unreadable") from exc
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version")
+        != "quanthus.structure-facts-artifact-manifest.v1"
+        or manifest.get("research_only") is not True
+        or manifest.get("execution_authorized") is not False
+        or manifest.get("code_revision") != code_revision
+        or manifest.get("request_digest") != request_digest
+    ):
+        raise RuntimeError("structure_facts_manifest_invalid")
+    files = manifest.get("files")
+    if not isinstance(files, dict) or set(files) != {"structure-facts.jsonl", "summary.json"}:
+        raise RuntimeError("structure_facts_manifest_files_invalid")
+    for name, path in (("structure-facts.jsonl", rows_path), ("summary.json", summary_path)):
+        try:
+            payload = path.read_bytes()
+        except OSError as exc:
+            raise RuntimeError("structure_facts_artifact_file_unreadable") from exc
+        observed = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+        if files.get(name) != observed:
+            raise RuntimeError("structure_facts_artifact_digest_mismatch")
+    manifest_sha = _sha256(manifest_path)
+    if (
+        not isinstance(ready, dict)
+        or ready.get("schema_version") != "quanthus.structure-facts-ready.v1"
+        or ready.get("manifest_sha256") != manifest_sha
+        or ready.get("result_digest") != manifest.get("result_digest")
+    ):
+        raise RuntimeError("structure_facts_ready_invalid")
+    if (
+        not isinstance(summary, dict)
+        or summary.get("schema_version") != "quanthus.structure-facts-result.v1"
+        or summary.get("code_revision") != code_revision
+        or summary.get("request_digest") != request_digest
+        or summary.get("result_digest") != manifest.get("result_digest")
+        or summary.get("research_only") is not True
+        or summary.get("execution_authorized") is not False
+        or summary.get("economic_acceptance_claim") is not False
+        or summary.get("coarse_renderer_authority") != "explanation_only"
+        or summary.get("consumer_authority") != "compatibility_proof_only"
+    ):
+        raise RuntimeError("structure_facts_summary_invalid")
+    semantic_summary = dict(summary)
+    semantic_summary.pop("result_digest", None)
+    semantic_summary.pop("code_revision", None)
+    if _canonical_digest(semantic_summary) != manifest.get("result_digest"):
+        raise RuntimeError("structure_facts_semantic_result_digest_mismatch")
+    adm_manifest = summary.get("adm_manifest")
+    fact_counts = summary.get("fact_counts")
+    renderer_counts = summary.get("renderer_counts")
+    consumer_counts = summary.get("consumer_counts")
+    probes = summary.get("probes")
+    if (
+        not isinstance(adm_manifest, dict)
+        or not isinstance(fact_counts, dict)
+        or not isinstance(renderer_counts, dict)
+        or not isinstance(consumer_counts, dict)
+        or not isinstance(probes, list)
+    ):
+        raise RuntimeError("structure_facts_summary_shape_invalid")
+    if (
+        adm_manifest.get("adm_id") != "structure-continuous-facts"
+        or adm_manifest.get("adm_version") != "1.0.0"
+        or adm_manifest.get("execution_authorized") is not False
+        or _canonical_digest(adm_manifest) != manifest.get("adm_manifest_digest")
+    ):
+        raise RuntimeError("structure_facts_adm_manifest_invalid")
+    try:
+        row_values = [
+            json.loads(line)
+            for line in rows_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("structure_facts_rows_invalid") from exc
+    if (
+        len(row_values) != int(adm_manifest.get("row_count", -1))
+        or _canonical_digest(row_values) != adm_manifest.get("content_digest")
+    ):
+        raise RuntimeError("structure_facts_content_digest_mismatch")
+    if any(
+        not isinstance(row, dict) or set(row) != _STRUCTURE_FACT_ROW_FIELDS
+        for row in row_values
+    ):
+        raise RuntimeError("structure_facts_row_schema_invalid")
+    return {
+        "artifact_ref": str(resolved),
+        "manifest_sha256": manifest_sha,
+        "result_digest": str(manifest["result_digest"]),
+        "adm_manifest_digest": str(manifest["adm_manifest_digest"]),
+        "row_count": int(adm_manifest["row_count"]),
+        "fact_counts": dict(fact_counts),
+        "renderer_counts": dict(renderer_counts),
+        "consumer_counts": dict(consumer_counts),
+        "p2_probe_count": len(probes),
+        "p2_fill_count": sum(int(item["fill_count"]) for item in probes),
     }
 
 
@@ -1053,14 +1263,30 @@ class EventWorker:
         if observed is None or observed.claim_generation != generation:
             return
         request_digest = _structure_request_digest(governed["run_config"])
-        economic = governed["run_config"] == _STRUCTURE_ECONOMIC_RUN_CONFIG
-        verifier = (
-            _verify_structure_economic_artifact if economic else _verify_structure_mvp_artifact
-        )
-        module = (
-            "quanthus.structure_economic_experiment" if economic else "quanthus.structure_mvp_run"
-        )
-        artifact_name = "structure-economic" if economic else "structure-mvp"
+        run_config = governed["run_config"]
+        economic = run_config == _STRUCTURE_ECONOMIC_RUN_CONFIG
+        facts = run_config == _STRUCTURE_FACTS_RUN_CONFIG
+        if economic:
+            verifier = _verify_structure_economic_artifact
+            module = "quanthus.structure_economic_experiment"
+            artifact_name = "structure-economic"
+            running_stage = "running-structure-economic"
+            validating_stage = "validating-structure-economic-run"
+            recovering_stage = "recovering-sealed-structure-economic-run"
+        elif facts:
+            verifier = _verify_structure_facts_artifact
+            module = "quanthus.structure_facts_run"
+            artifact_name = "structure-facts"
+            running_stage = "running-structure-facts"
+            validating_stage = "validating-structure-facts-run"
+            recovering_stage = "recovering-sealed-structure-facts-run"
+        else:
+            verifier = _verify_structure_mvp_artifact
+            module = "quanthus.structure_mvp_run"
+            artifact_name = "structure-mvp"
+            running_stage = "running-structure-mvp"
+            validating_stage = "validating-structure-mvp-run"
+            recovering_stage = "recovering-sealed-structure-mvp-run"
         run_id = f"run_{job_id.removeprefix('job_')}"
         final = self.run_root / "structure-runs" / run_id
         if final.exists():
@@ -1084,11 +1310,7 @@ class EventWorker:
             self.store.update_claimed_job(
                 job_id,
                 generation,
-                stage=(
-                    "recovering-sealed-structure-economic-run"
-                    if economic
-                    else "recovering-sealed-structure-mvp-run"
-                ),
+                stage=recovering_stage,
                 progress=98,
                 progress_detail=progress_detail,
             )
@@ -1122,7 +1344,7 @@ class EventWorker:
         self.store.update_claimed_job(
             job_id,
             generation,
-            stage="running-structure-economic" if economic else "running-structure-mvp",
+            stage=running_stage,
             progress=5,
             progress_detail={"run_id": run_id},
         )
@@ -1174,9 +1396,7 @@ class EventWorker:
         self.store.update_claimed_job(
             job_id,
             generation,
-            stage=(
-                "validating-structure-economic-run" if economic else "validating-structure-mvp-run"
-            ),
+            stage=validating_stage,
             progress=92,
             progress_detail={"run_id": run_id},
         )
@@ -1521,6 +1741,15 @@ def main(argv: list[str] | None = None) -> int:
         )
     except RuntimeError as exc:
         print(f"structure economic qualification seed rejected: {exc}", file=sys.stderr)
+    facts_seed_value = os.environ.get(_STRUCTURE_FACTS_QUALIFICATION_SEED_ENV, "0")
+    try:
+        _seed_structure_facts_qualification_jobs(
+            store,
+            enabled_value=facts_seed_value,
+            code_revision=code_revision,
+        )
+    except RuntimeError as exc:
+        print(f"structure facts qualification seed rejected: {exc}", file=sys.stderr)
     worker = EventWorker(
         store,
         worker_id=worker_id,

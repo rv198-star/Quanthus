@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | accepted |
+| Delivery gate | blocked on production recovery/deployment |
 | Governing work item | `P3-DICT-001` |
 | GitHub parent | #215 |
 | Parent LLD | `lld/03-label-feature-system.md` |

@@ -1341,6 +1341,8 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {
                 "P3-LABEL-004",
                 "P3-DASH-001",
+                "P3-DICT-001",
+                "P3-DICT-001-E",
             },
         )
         self.assertEqual(

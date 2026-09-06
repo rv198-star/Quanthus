@@ -7,7 +7,7 @@
       "id": "P3-DICT-001",
       "title": "Deliver the Quanthus Data & Indicator Catalog",
       "kind": "epic",
-      "status": "closed",
+      "status": "blocked",
       "depends_on": ["P3-FEAT-001"],
       "scope": "Build a deterministic read-only catalog over existing data, feature, label and semantic authorities, expose it through API and /catalog UI, and freeze maintenance gates.",
       "acceptance": [
@@ -15,9 +15,10 @@
         "Catalog snapshot is deterministic and authority-backed",
         "Viewer/operator/admin can search and inspect through read-only API/UI",
         "Drift gates prevent silent formula, field, namespace or relation changes",
-        "No new indicator formula or execution authority is created by catalog delivery"
+        "No new indicator formula or execution authority is created by catalog delivery",
+        "Production API/Web deployment and authenticated Catalog smoke pass"
       ],
-      "evidence": ["docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md"]
+      "evidence": ["docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md", "docs/acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md"]
     },
     {
       "id": "P3-DICT-001-A",
@@ -87,7 +88,7 @@
       "id": "P3-DICT-001-E",
       "title": "Freeze Catalog drift gates and maintenance closeout",
       "kind": "task",
-      "status": "closed",
+      "status": "blocked",
       "depends_on": ["P3-DICT-001-D"],
       "scope": "Make generated snapshot drift, missing authority metadata, orphan relations and silent formula/namespace substitutions repository-gating failures; close documentation and issue lifecycle.",
       "acceptance": [
@@ -95,9 +96,10 @@
         "All registered source definitions are covered or explicitly gapped",
         "Legacy related-not-equivalent links cannot become aliases silently",
         "Full repository and Web gates pass",
-        "Parent and child issues close in dependency order with final evidence"
+        "Parent and child issues close in dependency order with final evidence",
+        "Production API/Web deployment and authenticated Catalog smoke pass"
       ],
-      "evidence": ["docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md"]
+      "evidence": ["docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md", "docs/acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md"]
     }
   ]
 }

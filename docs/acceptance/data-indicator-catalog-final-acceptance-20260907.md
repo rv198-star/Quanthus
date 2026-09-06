@@ -1,4 +1,4 @@
-# P3-DICT-001: Data & Indicator Catalog final acceptance
+# P3-DICT-001: Data & Indicator Catalog repository acceptance checkpoint
 
 | Field | Value |
 | --- | --- |
@@ -6,7 +6,8 @@
 | Parent | P3-DICT-001 / #215 |
 | Children | #223-#227 |
 | Governing design | `../design/data-indicator-catalog.md` |
-| Accepted scope | Repository-authoritative read-only Catalog, Platform GET API and `/catalog` UI |
+| Repository scope | ACCEPTED: read-only Catalog, Platform GET API and `/catalog` UI implementation |
+| Production scope | BLOCKED / NOT ACCEPTED; see `data-indicator-catalog-production-deploy-blocker-20260907.md` |
 | Formula / strategy / execution authority | NONE |
 
 ## 1. Final product
@@ -103,11 +104,11 @@ Ruff on changed Python: PASS
 git diff --check: PASS
 ```
 
-Repository gate before lifecycle closeout:
+Repository gate after the API image-packaging repair:
 
 ```text
 make check:
-1553 passed
+1554 passed
 7 skipped
 ```
 
@@ -130,9 +131,18 @@ DWD, Run, PostgreSQL, repository history or unrelated project data was removed. 
 existing dependency audit findings (1 moderate, 4 high); no automatic dependency upgrade was made
 under this work item.
 
-## 6. Claim ceiling
+## 6. Production disposition
 
-This acceptance proves a versioned discovery and maintenance surface, not completeness of every
+The repository implementation is not a final production acceptance. Governed API/Web deployment
+failed on the Web image path because Compose attempted an unintended registry pull. The rollback
+then left one rootful Quanthus container in a restart loop, and both admitted production-status
+interfaces are blocked by that container. `P3-DICT-001-E` and parent `P3-DICT-001` remain open until
+rootful production recovery, exact API/Web deployment, and authenticated Catalog smoke succeed.
+The active evidence is `data-indicator-catalog-production-deploy-blocker-20260907.md`.
+
+## 7. Claim ceiling
+
+This repository checkpoint proves a versioned discovery and maintenance surface, not completeness of every
 possible financial concept or indicator. It does not add MACD/CCI/KDJ/ATR calculation specs, prove
 missing ODS schemas, change existing Feature formulas, open Structure B6-B11, train models, or grant
 Shadow/paper/live execution authority. Catalog entries describe the authority that exists; they do

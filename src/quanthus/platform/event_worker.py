@@ -84,6 +84,20 @@ def _terminate(process: subprocess.Popen[bytes], deadline_seconds: float) -> Non
         process.wait(timeout=deadline_seconds)
 
 
+def _bounded_child_failure(stderr_path: Path, returncode: int | None) -> str:
+    prefix = f"structure_mvp_child_exit_{returncode}"
+    try:
+        payload = stderr_path.read_bytes()
+    except OSError:
+        return prefix
+    tail = payload[-8192:].decode("utf-8", errors="replace")
+    lines = [line.strip() for line in tail.splitlines() if line.strip()]
+    if not lines:
+        return prefix
+    detail = lines[-1].replace("\x00", "")[:350]
+    return f"{prefix}:{detail}"[:500]
+
+
 def _event_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
     expected_keys = {"code_revision", *_EXPECTED_INPUT}
     if set(input_ref) != expected_keys:
@@ -1153,7 +1167,7 @@ class EventWorker:
                 generation,
                 state="failed",
                 result_ref=None,
-                error_reason=f"structure_mvp_child_exit_{process.returncode}",
+                error_reason=_bounded_child_failure(stderr_path, process.returncode),
             )
             return
 

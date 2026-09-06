@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from quanthus.platform.event_worker import (
     EventWorker,
+    _bounded_child_failure,
     _canonical_digest,
     _seed_structure_economic_qualification_jobs,
     _seed_structure_mvp_qualification_jobs,
@@ -107,6 +108,24 @@ def _qualification_user(
 
 
 class StructureMvpWorkerTests(unittest.TestCase):
+    def test_bounded_child_failure_reports_only_the_last_bounded_stderr_line(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "stderr.log"
+            path.write_text(
+                "trace line\nValueError: comparison population differs\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                _bounded_child_failure(path, 1),
+                "structure_mvp_child_exit_1:ValueError: comparison population differs",
+            )
+            path.write_text("x" * 10000 + "\nRuntimeError: final detail\n", encoding="utf-8")
+            observed = _bounded_child_failure(path, 2)
+            self.assertTrue(
+                observed.startswith("structure_mvp_child_exit_2:RuntimeError: final detail")
+            )
+            self.assertLessEqual(len(observed), 500)
+
     def test_qualification_seed_is_disabled_by_default_and_rejects_invalid_values(self) -> None:
         store = InMemoryPlatformStore()
         self.assertEqual(

@@ -788,6 +788,30 @@ def _load_decisions(path: Path) -> list[dict[str, Any]]:
     return value
 
 
+def _entry_action_map(decisions: list[dict[str, Any]]) -> dict[tuple[str, str], str]:
+    """Pair only the stable candidate-entry surface across capital-path variants.
+
+    Structure intervenes only on entry scoring. Held-review decision identities are downstream
+    consequences of earlier entry/allocation changes and therefore are not a stable paired
+    population. Their economic effects remain fully represented in the complete P2 equity,
+    drawdown, turnover, fee, and exposure paths.
+    """
+
+    pairs = [
+        (
+            (str(item["market_date"]), str(item["decision_key"])),
+            str(item["final_action"]),
+        )
+        for item in decisions
+        if item.get("surface") == "entry"
+    ]
+    if not pairs or any(not key[1].startswith("entry:") for key, _action in pairs):
+        raise ValueError("structure economic entry decision population is invalid")
+    if len(pairs) != len({key for key, _action in pairs}):
+        raise ValueError("structure economic entry decision population contains duplicates")
+    return dict(pairs)
+
+
 def _comparison(
     *,
     candidate_id: str,
@@ -801,16 +825,10 @@ def _comparison(
 ) -> dict[str, Any]:
     candidate_decisions = _load_decisions(candidate_root / "decisions.json")
     baseline_decisions = _load_decisions(baseline_root / "decisions.json")
-    baseline_map = {
-        (str(item["market_date"]), str(item["decision_key"])): str(item["final_action"])
-        for item in baseline_decisions
-    }
-    candidate_map = {
-        (str(item["market_date"]), str(item["decision_key"])): str(item["final_action"])
-        for item in candidate_decisions
-    }
+    baseline_map = _entry_action_map(baseline_decisions)
+    candidate_map = _entry_action_map(candidate_decisions)
     if set(candidate_map) != set(baseline_map):
-        raise ValueError("structure economic comparison decision populations differ")
+        raise ValueError("structure economic entry decision populations differ")
     changed = sum(candidate_map[key] != baseline_map[key] for key in sorted(baseline_map))
     action_rate = (
         Decimal(changed) / Decimal(len(baseline_map)) if baseline_map else Decimal("0")

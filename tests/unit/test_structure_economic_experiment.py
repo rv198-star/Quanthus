@@ -12,6 +12,7 @@ from quanthus.structure_economic_experiment import (
     C2_KEY,
     EXPECTED_SCORE_MAPPING,
     StructureEconomicP2ReplayRuntime,
+    _entry_action_map,
     _lifecycle_decision,
     build_economic_structure_observations,
     load_structure_economic_request,
@@ -221,6 +222,60 @@ def test_structure_runtime_keeps_held_path_native_and_accepts_only_three_variant
     assert runtime._variant_id(C2_KEY) == "variant.structure-coarse"
     with pytest.raises(ValueError, match="not admitted"):
         runtime._validate_intervention_id("anything-else")
+
+
+def test_entry_action_pairing_ignores_downstream_held_path_divergence() -> None:
+    baseline = [
+        {
+            "market_date": "2020-01-02",
+            "decision_key": "entry:event-a",
+            "surface": "entry",
+            "final_action": "trial_entry",
+        },
+        {
+            "market_date": "2020-01-03",
+            "decision_key": "held:capital-unit-01",
+            "surface": "held",
+            "final_action": "no_action",
+        },
+    ]
+    candidate = [
+        {
+            "market_date": "2020-01-02",
+            "decision_key": "entry:event-a",
+            "surface": "entry",
+            "final_action": "no_action",
+        },
+        {
+            "market_date": "2020-01-03",
+            "decision_key": "held:capital-unit-02",
+            "surface": "held",
+            "final_action": "reduce",
+        },
+    ]
+
+    assert set(_entry_action_map(baseline)) == set(_entry_action_map(candidate))
+    assert _entry_action_map(baseline) != _entry_action_map(candidate)
+
+
+def test_entry_action_pairing_rejects_candidate_population_drift() -> None:
+    with pytest.raises(ValueError, match="duplicates"):
+        _entry_action_map(
+            [
+                {
+                    "market_date": "2020-01-02",
+                    "decision_key": "entry:event-a",
+                    "surface": "entry",
+                    "final_action": "trial_entry",
+                },
+                {
+                    "market_date": "2020-01-02",
+                    "decision_key": "entry:event-a",
+                    "surface": "entry",
+                    "final_action": "no_action",
+                },
+            ]
+        )
 
 
 def test_expected_score_mapping_matches_preregistered_surface() -> None:

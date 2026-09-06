@@ -9,6 +9,7 @@
 | Technical predecessor | `P3-STRUCT-001`; evidence `../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md` |
 | Frozen run config | `../../config/structure-economic-run.development.v1.json` |
 | Preregistration | `../acceptance/structure-intelligence-economic-preregistration-20260906.md` |
+| Pre-result repair evidence | `../acceptance/structure-intelligence-economic-pre-result-repair-20260906.md` |
 
 ## 1. Question
 

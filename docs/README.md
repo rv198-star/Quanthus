@@ -105,6 +105,12 @@ nodes.
   outcome-blind review passed 12/12. No economic, production-expert, thirteen-state, model,
   Shadow, paper, or live authority is opened. Evidence:
   `acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md`.
+- `P3-STRUCT-004` advances the reviewed time-first Facts v2 boundary in bounded slices. B1 supplies
+  a semantic namespace catalog/resolver, local multi-clock contracts and an explicit coverage ledger;
+  it is not a v2 market-data build or acceptance. B2-B5 cover the next source/coordinate, anchor,
+  interaction and minimal episode route. Full geometry/activity extensions remain planned.
+  `P3-DICT-001` is a separately deferred data/indicator dictionary task, not a prerequisite.
+  Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.
@@ -248,6 +254,7 @@ gate is a conformance defect rather than an alternate project state.
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
 | Platform Kernel extraction or restoration | root `AGENTS.md`, this map, HLD, ADR 0010, LLD 11, `config/platform-kernel-gates.v1.json` | QuantDinger audit record, exact upstream source path, selected Web ownership/source evidence, and adapter contract |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
+| Structure semantics, time, names or delivery gaps | HLD, LLD 03, `design/structure-facts-v2.md`, ADR 0014 | Catalog and coverage JSON; dictionary work-item page only when relevant |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child, LLD 01 `strategy-replay-ads.md` | Exact strategy, authorized ADS bundle, and P2 execution evidence; load the legacy P1 snapshot only for frozen P3 reproduction |

@@ -5,8 +5,8 @@
 | Design status | approved |
 | Delivery gate | not-applicable |
 | Current phase | P6 implementation open; P5 optional research deferred |
-| Version | 0.13 |
-| Effective date | 2026-08-26 |
+| Version | 0.14 |
+| Effective date | 2026-09-06 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
 | Platform gate | `config/platform-kernel-gates.v1.json` |
@@ -77,6 +77,21 @@ and rebuildable serving projections. Workers poll and claim transactionally for 
 workload, without Redis, Celery, RabbitMQ, or an initial registry/event stream. It does not replace immutable
 analytical artifacts. Optional AI authoring may create an untrusted draft only and has no direct
 edge to strategy publication, decisions, notifications, orders, or fills.
+
+### Time-first analytical semantics
+
+ADR 0014 defines a lightweight temporal evidence model rather than a static stock/state ontology.
+Structure facts and shared indicators are parallel application computations over admitted DWD and
+required reference data; disclosures, fundamentals and market context retain independent domain
+ownership. Experts may consume their admissible evidence directly; labels are optional projections.
+No graph database, general-purpose reasoner, generic DWS or ADS is introduced.
+
+Concept names express domain/family/meaning; evaluation specifications separately bind parameters,
+coordinates, input versions and time semantics. Observations and event/episode versions distinguish
+phenomenon, confirmation, public availability, platform knowledge and computation times. A
+retrospective replay is not silently promoted to proof of historical availability. Existing v1
+identities and accepted Runs remain unchanged. The staged contract, coverage gaps and independent
+non-blocking dictionary task are owned by `structure-facts-v2.md` and its machine-readable blueprint.
 
 ### Expert strategy research authority
 

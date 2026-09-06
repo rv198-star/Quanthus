@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001` technical MVP accepted; `P3-STRUCT-002` economic-value experiment preregistered/open |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` time-first v2 contract slice implemented, runtime open; `P3-DICT-001` separately deferred |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -199,6 +199,21 @@ inside episode existence. Experts consume continuous facts directly through ordi
 is forbidden from the fact-row identity. Missing data resets causal continuity without implying
 bearish structure or exit authority.
 
+### Time-first Structure Facts v2
+
+`P3-STRUCT-004` implements the reviewed modeling boundaries under
+`../structure-facts-v2.md` and ADR 0014. The additive naming catalog classifies complete
+`domain.family.concept` identifiers and distinguishes reserved concepts from executable specs.
+Anchor/geometry/activity/interaction/episode are Structure-owned; indicators and other evidence
+domains are parallel, with required DWD reference dependencies. Event/confirmation/public/platform
+knowledge/computation clocks are distinct. Existing v1 formulas, FeatureFact IDs, source-view limits
+and artifacts are not rewritten.
+
+The local namespace/time-envelope module is B1 contract work only. Integrated source-evidence
+verification and v2 data/runtime qualification remain B2-B5 work in the machine-readable coverage
+ledger. `P3-DICT-001` separately consolidates existing warehouse and feature dictionaries under
+`../../work-items/data-indicator-dictionary.md`; its deferred scheduling does not block B1-B5.
+
 ## 6. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -212,6 +227,8 @@ bearish structure or exit authority.
 | P3-STRUCT-001 | Prove the bounded DWD -> Structure ADM -> trend-semantics adapter -> aggregator -> P2 path | P3-FEAT-002, P3 expert/aggregator contracts, P4 Event Worker | Real-DWD immutable artifact, independent reproduction, decision/P2 probe reconciliation |
 | P3-STRUCT-002 | Compare continuous versus coarse Structure Intelligence through complete P2 | P3-STRUCT-001, P3-ATTR-001, P3-STRAT-002 | Preregistered C0/C1/C2 A/B replay, exact baseline reproduction, paired comparisons, lifecycle decision |
 | P3-STRUCT-003 | Build Continuous Structure Facts v1 | P3-STRUCT-002 | Contract/adversarial semantics, Real-DWD A/B fact digests, direct expert/aggregator consumption, P2 compatibility, outcome-blind review |
+| P3-STRUCT-004 | Implement time-first Structure Facts v2 in bounded slices | P3-STRUCT-003 | `docs/design/structure-facts-v2.md`: B1 namespace/time contracts and coverage; B2-B5 source, coordinate, interaction/episode and Real-DWD qualification remain open |
+| P3-DICT-001 | Maintain data and indicator dictionaries | P3-FEAT-001 | `docs/work-items/data-indicator-dictionary.md`: source-owned inventory, exact specs/units/clocks, legacy compatibility and change checks; separately deferred, not a dependency of P3-STRUCT-004 |
 
 ## 7. Acceptance
 

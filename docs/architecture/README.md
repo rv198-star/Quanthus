@@ -27,6 +27,7 @@ a parallel current-state architecture.
 | `adr-0011-quantdinger-vue-product-web.md` | Pinned QuantDinger-Vue selective derivative and candidate-only product semantics | Changing the primary product Web, candidate status model, or frontend provenance |
 | `adr-0012-postgresql-worker-runtime.md` | PostgreSQL-backed static Worker Runtime for candidate replay and named heavy-analysis Jobs, including the P4 Event Worker extension | Changing Job transport, Worker topology, batch execution, warehouse-operation routing, or Run publication |
 | `adr-0013-p4-research-adm-and-legacy-ads-retirement.md` | Thin P4 Research ADM boundary and retirement policy for superseded ADS artifacts | Changing P4 application-data preparation, static research references, or ADS retirement/cleanup |
+| `adr-0014-time-first-structure-semantics.md` | Time-first evidence model, bounded semantic namespaces and staged Facts v2 coverage | Changing structure ontology/naming, clock views, legacy mapping or scope boundaries |
 
 ## Topic contracts
 

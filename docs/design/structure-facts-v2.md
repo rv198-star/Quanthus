@@ -5,10 +5,11 @@
 | Design status | approved |
 | Delivery gate | open |
 | Governing work item | `P3-STRUCT-004` |
-| Current delivery | B1-R: time ownership, source-clock selection and consumption-audit contracts; no runtime integration |
+| Current delivery | B2-B5 implementation release-ready under `structure-facts-v2-delivery.md`; real qualification pending |
 | Runtime v2 acceptance | NOT RUN / NOT CLAIMED |
 | B1 checkpoint | `../acceptance/structure-facts-v2-contract-checkpoint-20260906.md` |
 | B1-R checkpoint | `../acceptance/structure-facts-v2-temporal-ownership-checkpoint-20260906.md` |
+| B2-B5 implementation | `../acceptance/structure-facts-v2-b2-b5-implementation-20260907.md`; not runtime acceptance |
 | Design-entry review | `../acceptance/structure-facts-v2-design-entry-review-20260907.md`; PASS for bounded detailed implementation, not runtime acceptance |
 | Parent | `lld/03-label-feature-system.md`; `hld.md` |
 | Architecture decision | `../architecture/adr-0014-time-first-structure-semantics.md` |

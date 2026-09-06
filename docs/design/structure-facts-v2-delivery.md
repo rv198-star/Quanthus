@@ -143,9 +143,10 @@ boundary, never backdated `failed`. Scope end is reported as right-censored/open
 not injected into a last-day historical business row. Session age, valid-observation count and
 post-cross hold count are separate. Episode ID binds initial interaction and window/target.
 
-The compatibility expert consumes continuous distances and active/loss/reclaim evidence directly
-through existing FeatureFact/ExpertContext and aggregator contracts. No renderer is used to compute
-its score. Its mapping is deterministic and research-only; it proves ingestion, not good investment
+The compatibility adapter selects non-censored process targets and invokes the existing
+FeatureFact/ExpertContext and aggregator contracts once per qualified target. Each expert invocation
+consumes exactly one continuous signed distance; active/loss/reclaim observations remain explicit
+selection/audit evidence, not a hidden coarse-state score. No renderer is used to compute its score. Its mapping is deterministic and research-only; it proves ingestion, not good investment
 advice. No modification to accepted formal strategy or economic metrics.
 
 P2 uses existing BacktestSignal/BacktestEngine with accepted next-open execution. Up to five probes
@@ -173,6 +174,31 @@ A/B must be new independent Jobs with different idempotency keys and no cross-ru
 reuse. Semantic identities must match; receipt timestamps/run IDs need not. Worker control-plane
 integration remains static and stdlib-only at the artifact boundary.
 
+### Implemented ownership and identity binding
+
+`structure_v2_inputs.py` owns the explicit retrospective admission/denominator; `structure_v2.py`
+owns pure references, qualified relations and process observations; `structure_v2_consumer.py`
+owns the compatibility adapter and physical consumption receipts; `structure_v2_review.py` owns
+pure report/sampling rules. `structure_v2_run.py` builds the expensive source once and publishes;
+`structure_v2_artifact.py` is a bounded stdlib-only verifier used by the static Event Worker.
+
+CalculationSpec identity excludes report dates, selected securities, execution probes and physical
+run budgets; those belong to the immutable Run request. Extending report scope cannot change an
+old business observation. Reference/calendar/action semantic coordinates are distinct from their
+source-version evidence. A change in provenance revises evidence without inventing a new target.
+Signed distances use a local Decimal precision of 28, independent of ambient caller context.
+
+The input adapter reads exact original record/revision and listing fields retained in the verified
+job-local projection, plus individual calendar and effective-action evidence. It does not claim
+that publication timestamps are known. Public/platform historical views remain refused, not silently
+relabelled. Broader multi-clock runtime capability is outside this first retrospectively qualified
+lane. The inline ADM manifest has its own digest; P2 binds it separately from content digest.
+
+Only `config/structure-facts-v2-run.development.v1.json` maps to the fixed new runner. Existing
+configs and seeders are untouched. Children have sequential acceptance gates but share the one
+provider build in each A/B Job; local downstream development is not false predecessor acceptance.
+The small verifier reconstruction reuses published inputs and does not reopen/rebuild DWD.
+
 ## 8. Acceptance and stop conditions
 
 Reuse retained B1/B1-R evidence. For B2-B5 require synthetic counterexamples before real runs:
@@ -183,7 +209,9 @@ independent semantic reconstruction and artifact tampering.
 
 Outcome-blind sample rule is frozen here: fixed security order, then earliest start, loss and reclaim
 per 20/60 window; deduplicate logical observation keys and fill in security round-robin by earliest
-remaining report row to at most 12. Missing categories are explicitly reported, not manufactured.
+remaining non-censored report episode observation to at most 12. If category picks exceed 12,
+keep the first 12 in the declared security/window/category order. Missing categories are explicitly
+reported, not manufactured. This pre-result clarification is implemented in `structure_v2_review.py`.
 Inspect T-visible inputs, frozen targets, arithmetic, transition evidence and provenance only. No
 future returns or P2 outcomes participate in sample selection or semantic judgment.
 

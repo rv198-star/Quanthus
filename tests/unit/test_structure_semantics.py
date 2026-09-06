@@ -177,14 +177,14 @@ def test_blueprint_preserves_gaps_and_has_no_dictionary_dependency_cycle() -> No
     raw = json.loads((ROOT / "config/structure-facts-v2-blueprint.v1.json").read_text())
     assert raw["v2_runtime_accepted"] is False
     assert raw["dictionary_blocks_current_slice"] is False
-    assert raw["current_slice"] == "B1-R"
+    assert raw["current_slice"] == "B2-B5"
     rows = {item["id"]: item for item in raw["capabilities"]}
     assert len(rows) == len(raw["capabilities"])
     assert rows["B1"]["implementation_status"] == "contract_only"
     assert rows["B1-R"]["implementation_status"] == "contract_only"
     assert rows["B1-R"]["depends_on"] == ["B1"]
     assert rows["B2"]["depends_on"] == ["B1-R"]
-    assert rows["B2"]["implementation_status"] == "not_started"
+    assert rows["B2"]["implementation_status"] == "implemented_pending_real"
     assert rows["B8"]["implementation_status"] == "separate_backlog"
     assert rows["B9"]["implementation_status"] == "outside_structure_scope"
 

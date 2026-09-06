@@ -1,0 +1,21 @@
+{
+  "schema_version": "quanthus.structure-facts-v2-run.v1",
+  "provider_config": "config/replay-data-provider.development.v2.json",
+  "execution_policy": "config/p2-execution-policy.research.v1.json",
+  "scan_start": "2019-10-08",
+  "report_start": "2020-01-02",
+  "report_end": "2020-03-31",
+  "security_codes": ["000001", "300750", "600519"],
+  "lookbacks": [20, 60],
+  "knowledge_view": "retrospective",
+  "coordinate_policy": "raw-cny-action-epoch-reset-v1",
+  "consumer_mapping": "one-qualified-target-per-invocation-clamped-signed-distance-v1",
+  "maximum_p2_probes": 5,
+  "p2_probe_quantity": 100,
+  "maximum_wall_seconds": 1200,
+  "cold_result_job_budget": 2,
+  "review_sample_limit": 12,
+  "research_only": true,
+  "execution_authorized": false,
+  "economic_claim": false
+}

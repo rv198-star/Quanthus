@@ -271,6 +271,18 @@ Facts v1 later closed `P3-STRUCT-003` after exact Real-DWD A/B reproduction and 
 `../../acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md`. Neither acceptance
 widens the Job's execution authority.
 
+`P3-STRUCT-004` adds one fourth exact input config,
+`config/structure-facts-v2-run.development.v1.json`, mapped only to
+`python -m quanthus.structure_v2_run`. It uses the same supervised child, generation fencing and
+immutable structure-runs root. The bounded stdlib-only `structure_v2_artifact` verifier rebuilds
+small published source members without reading DWD or importing backtests; it verifies qualified
+business objects, separate physical consumption receipts and P2 event reconciliation. It returns
+bounded source/fact/consumer/probe counts and the preregistered outcome-blind sample. The runner
+builds one cold Direct-DWD prerequisite shared across B2-B5; a fixed 1,200-second child budget is
+not permission for unlimited retries. Submission uses the explicit governed API; all seeders stay
+off. Runtime acceptance remains separate from this static dispatch implementation. Detailed scope
+and issue gates are `../structure-facts-v2-delivery.md`.
+
 Default-off qualification seeders exist only for bounded, revision-bound A/B acceptance where the
 current client tool schema cannot yet express the admitted Structure Job kind/config. The Structure
 MVP, economic comparison, and Continuous Structure Facts paths each use separate fixed environment

@@ -212,9 +212,11 @@ consumer, consumed-at or decision-cutoff usage attribute; logs reference exact r
 append-only audit-event/receipt shapes and local binding checks. Neither rewrites v1 formulas,
 FeatureFact IDs, source-view limits or accepted artifacts.
 
-B1 and B1-R are local contract work only. Source authentication, full dependency closure, finality,
-as-of runtime joins, decision-log integration and v2 data qualification remain B2-B5 work in the
-machine-readable ledger. `P3-DICT-001` separately consolidates existing warehouse and feature dictionaries under
+B1 and B1-R are local contract work only. The bounded B2-B5 retrospective adapter, qualified
+references/interactions/episodes, separate consumption audit and fixed Worker entry are now
+implemented under `../structure-facts-v2-delivery.md`; real qualification remains pending. Stronger
+source availability/as-of capabilities remain unsupported by this retained data view. The
+machine-readable ledger keeps implementation separate from runtime acceptance. `P3-DICT-001` separately consolidates existing warehouse and feature dictionaries under
 `../../work-items/data-indicator-dictionary.md`; its deferred scheduling does not block B1-B5.
 
 ## 6. Work items

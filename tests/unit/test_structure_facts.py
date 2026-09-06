@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+
+import pytest
 
 from quanthus.aggregator import (
     ScoreActionPolicy,
@@ -188,6 +191,16 @@ def test_row_local_episode_explanation_and_coarse_renderer_are_separate() -> Non
     assert render_coarse_structure_state(observed) is StructureMvpState.BREAKOUT_ACCEPTED
     assert "state" not in observed.to_dict()
     assert "coarse" not in observed.to_dict()
+
+
+def test_attempt_volume_cannot_exist_without_episode_identity() -> None:
+    rows = _warmup()
+    rows.append(_row(20, close="99", high="100"))
+    observed = _build(rows).rows[-1]
+
+    assert observed.episode_id is None
+    with pytest.raises(ValueError, match="attempt volume without episode identity"):
+        replace(observed, attempt_volume_ratio20=Decimal("1"))
 
 
 def test_continuous_fact_expert_consumes_direct_features_through_aggregator() -> None:

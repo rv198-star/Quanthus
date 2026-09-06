@@ -159,6 +159,8 @@ class ContinuousStructureFactRow:
         )
         if self.episode_id is None and any(value is not None for value in episode_fields):
             raise ValueError("continuous structure row has episode fields without episode identity")
+        if self.episode_id is None and self.attempt_volume_ratio20 is not None:
+            raise ValueError("continuous structure row has attempt volume without episode identity")
         if self.episode_id is not None and any(value is None for value in episode_fields):
             raise ValueError("continuous structure episode is not row-locally explainable")
         if self.episode_status not in {None, "active", "ended"}:
@@ -569,9 +571,9 @@ def continuous_structure_feature_facts(
 class ContinuousStructureFactsCompatibilityExpert:
     """Research-only consumer proving direct fact ingestion through the expert protocol.
 
-    The score is the bounded signed breakout margin when an episode exists, otherwise the bounded
-    rolling-resistance margin.  It is deliberately not an accepted investment mapping and carries
-    no economic or execution claim.
+    The score is the bounded signed breakout margin only while an active episode exists. Rows
+    without an active episode abstain. It is deliberately not an accepted investment mapping and
+    carries no economic or execution claim.
     """
 
     expert_id = COMPATIBILITY_EXPERT_ID

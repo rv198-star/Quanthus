@@ -15,6 +15,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
+from quanthus.data_catalog import DataCatalogError, DataIndicatorCatalog
 from quanthus.expert_evaluation.product_view import (
     ProductExpertEvidence,
     ProductExpertEvidenceError,
@@ -74,6 +75,7 @@ class HttpRequest:
     headers: Mapping[str, str]
     body: bytes
     request_id: str
+    query_string: str = ""
 
     def json_object(self) -> dict[str, Any]:
         try:
@@ -361,6 +363,7 @@ class PlatformHttpApp:
         product_catalog: ProductResearchCatalog,
         candidate_evidence: ProductCandidateEvidence,
         expert_evidence: ProductExpertEvidence,
+        data_catalog: DataIndicatorCatalog,
         candidate_approvals: CandidateApprovalService,
         metrics: Metrics,
     ) -> None:
@@ -373,6 +376,7 @@ class PlatformHttpApp:
         self._product_catalog = product_catalog
         self._candidate_evidence = candidate_evidence
         self._expert_evidence = expert_evidence
+        self._data_catalog = data_catalog
         self._candidate_approvals = candidate_approvals
         self._metrics = metrics
         self._routes: list[Route] = []
@@ -417,6 +421,7 @@ class PlatformHttpApp:
                 headers=headers,
                 body=body,
                 request_id=observed_request_id,
+                query_string=str(environ.get("QUERY_STRING", "")),
             )
             route, params = self._match(method, path)
             if route is None:
@@ -570,6 +575,30 @@ class PlatformHttpApp:
             "/api/platform/v1/product/catalog",
             "GET",
             self._read_product_catalog,
+        )
+        self._add(
+            "quanthus.catalog.summary.read",
+            "/api/platform/v1/catalog/summary",
+            "GET",
+            self._read_data_catalog_summary,
+        )
+        self._add(
+            "quanthus.catalog.search.read",
+            "/api/platform/v1/catalog/search",
+            "GET",
+            self._search_data_catalog,
+        )
+        self._add(
+            "quanthus.catalog.item.read",
+            "/api/platform/v1/catalog/items/<entry_id>",
+            "GET",
+            self._read_data_catalog_item,
+        )
+        self._add(
+            "quanthus.catalog.relations.read",
+            "/api/platform/v1/catalog/items/<entry_id>/relations",
+            "GET",
+            self._read_data_catalog_relations,
         )
         self._add(
             "quanthus.product.candidate.read",
@@ -894,6 +923,67 @@ class PlatformHttpApp:
         _principal(self._identity, observed_request, "gates:read")
         return _json_response(self._gate_query.read().to_dict())
 
+    @staticmethod
+    def _catalog_query_values(observed_request: HttpRequest) -> dict[str, str]:
+        parsed = urllib.parse.parse_qs(
+            observed_request.query_string,
+            keep_blank_values=True,
+            strict_parsing=False,
+        )
+        allowed = {"q", "kind", "domain", "family", "status", "limit"}
+        if set(parsed).difference(allowed) or any(len(values) != 1 for values in parsed.values()):
+            raise ValueError("catalog_query_parameters_invalid")
+        return {key: values[0] for key, values in parsed.items()}
+
+    def _read_data_catalog_summary(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        _principal(self._identity, observed_request, "catalog:read")
+        return _json_response(self._data_catalog.summary())
+
+    def _search_data_catalog(
+        self, observed_request: HttpRequest, _params: Mapping[str, str]
+    ) -> HttpResponse:
+        _principal(self._identity, observed_request, "catalog:read")
+        values = self._catalog_query_values(observed_request)
+        try:
+            limit = int(values.get("limit", "30"))
+        except ValueError as exc:
+            raise ValueError("catalog_limit_invalid") from exc
+        result = self._data_catalog.search(
+            values.get("q", ""),
+            kind=values.get("kind") or None,
+            domain=values.get("domain") or None,
+            family=values.get("family") or None,
+            status=values.get("status") or None,
+            limit=limit,
+        )
+        return _json_response(result)
+
+    def _read_data_catalog_item(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        _principal(self._identity, observed_request, "catalog:read")
+        entry_id = urllib.parse.unquote(params["entry_id"])
+        try:
+            return _json_response(self._data_catalog.item(entry_id))
+        except DataCatalogError as exc:
+            if str(exc) == "catalog_entry_not_found":
+                return _error(str(exc), 404, observed_request.request_id)
+            raise
+
+    def _read_data_catalog_relations(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        _principal(self._identity, observed_request, "catalog:read")
+        entry_id = urllib.parse.unquote(params["entry_id"])
+        try:
+            return _json_response(self._data_catalog.relations(entry_id))
+        except DataCatalogError as exc:
+            if str(exc) == "catalog_entry_not_found":
+                return _error(str(exc), 404, observed_request.request_id)
+            raise
+
     def _read_product_catalog(
         self, observed_request: HttpRequest, _params: Mapping[str, str]
     ) -> HttpResponse:
@@ -1142,6 +1232,7 @@ def create_http_app(
     product_catalog: ProductResearchCatalog,
     candidate_evidence: ProductCandidateEvidence,
     expert_evidence: ProductExpertEvidence,
+    data_catalog: DataIndicatorCatalog,
     candidate_approvals: CandidateApprovalService,
     metrics: Metrics,
 ) -> PlatformHttpApp:
@@ -1155,6 +1246,7 @@ def create_http_app(
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
         expert_evidence=expert_evidence,
+        data_catalog=data_catalog,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
     )

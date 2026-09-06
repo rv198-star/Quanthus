@@ -11,6 +11,7 @@ import {
   CircleCheck,
   ClipboardCheck,
   Copy,
+  Database,
   KeyRound,
   LoaderCircle,
   LockKeyhole,
@@ -326,6 +327,9 @@ export function OperatorConsole() {
           ))}
         </nav>
         <div className={styles.accountActions}>
+          <Link href="/catalog" className={styles.iconButton} title="数据与指标目录">
+            <Database aria-hidden="true" />
+          </Link>
           <Link href="/" className={styles.iconButton} title="返回策略归因工作台">
             <ArrowLeft aria-hidden="true" />
           </Link>

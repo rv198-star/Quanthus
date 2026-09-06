@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001` separately deferred |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001` Data & Indicator Catalog accepted |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -219,8 +219,18 @@ accepted under `../structure-facts-v2-delivery.md` and
 168 audited consumer invocations, five P2 fills per Run and 12/12 outcome-blind review. Stronger
 source availability/as-of capabilities remain unsupported by this retained data view. The
 machine-readable ledger records this bounded runtime acceptance while retaining B6-B11 as separate
-unimplemented or unauthorized capability. `P3-DICT-001` separately consolidates existing warehouse and feature dictionaries under
-`../../work-items/data-indicator-dictionary.md`; its deferred scheduling does not block B1-B5.
+unimplemented or unauthorized capability.
+
+### Data & Indicator Catalog
+
+`P3-DICT-001` is now an active read-only Catalog delivery governed by
+`../data-indicator-catalog.md` and `../../work-items/data-indicator-dictionary.md`. It projects
+existing ODS/DWD machine contracts, Feature/Label registries and semantic catalogs into one
+versioned query surface; it does not become a parallel formula or warehouse authority. A small
+snapshot manifest binds the deterministic full projection digest and counts. The Platform exposes
+GET-only summary/search/detail/relation routes under `catalog:read`, and `/catalog` provides the
+human query surface. Missing machine-readable metadata remains an explicit gap. This Catalog still
+has no dependency edge back into P3-STRUCT-004 B1-B5 and grants no strategy or execution authority.
 
 ## 6. Work items
 
@@ -242,7 +252,12 @@ unimplemented or unauthorized capability. `P3-DICT-001` separately consolidates 
 | P3-STRUCT-004-B3 | Build prior-20/60 references with qualified target identity | P3-STRUCT-004-B2 | Excluded-T references, target grain, revision and prefix identity tests; #220 |
 | P3-STRUCT-004-B4 | Record same-anchor close crossings, loss and reclaim | P3-STRUCT-004-B3 | Equality, frozen target, no fabricated reclaim, gap/action censoring; #221 |
 | P3-STRUCT-004-B5 | Qualify minimal episodes, audited consumer and P2 through cold A/B | P3-STRUCT-004-B4 | Exact semantic A/B, persisted audit receipts, P2 compatibility and blinded review; #222 |
-| P3-DICT-001 | Maintain data and indicator dictionaries | P3-FEAT-001 | `docs/work-items/data-indicator-dictionary.md`: source-owned inventory, exact specs/units/clocks, legacy compatibility and change checks; separately deferred, not a dependency of P3-STRUCT-004 |
+| P3-DICT-001 | Deliver the Quanthus Data & Indicator Catalog | P3-FEAT-001 | `docs/design/data-indicator-catalog.md`; #215 with children #223-#227; deterministic authority projection, read-only API/UI and drift gates; no dependency of P3-STRUCT-004 |
+| P3-DICT-001-A | Freeze Catalog schema, authority and relation semantics | P3-FEAT-001 | #223; `docs/acceptance/data-indicator-catalog-schema-snapshot-20260907.md` |
+| P3-DICT-001-B | Generate deterministic Catalog snapshot from authoritative sources | P3-DICT-001-A | #224; source adapters, deterministic digest/count manifest and required semantic regressions |
+| P3-DICT-001-C | Expose authenticated read-only Catalog API | P3-DICT-001-B | #225; GET-only summary/search/detail/relations and `catalog:read` RBAC |
+| P3-DICT-001-D | Build the `/catalog` search and detail UI | P3-DICT-001-C | #226; authenticated read-only Web search/detail/relations surface and build/SSR contracts |
+| P3-DICT-001-E | Freeze Catalog drift gates and maintenance closeout | P3-DICT-001-D | #227; snapshot/source drift, traceability and full repository/Web gates |
 
 ## 7. Acceptance
 

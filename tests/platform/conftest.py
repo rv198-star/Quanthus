@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import urllib.parse
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -69,10 +70,12 @@ def wsgi_request(
     )
     environ: dict[str, Any] = {}
     setup_testing_defaults(environ)
+    parsed_path = urllib.parse.urlsplit(path)
     environ.update(
         {
             "REQUEST_METHOD": method,
-            "PATH_INFO": path,
+            "PATH_INFO": parsed_path.path,
+            "QUERY_STRING": parsed_path.query,
             "CONTENT_LENGTH": str(len(body)),
             "CONTENT_TYPE": "application/json",
             "wsgi.input": io.BytesIO(body),

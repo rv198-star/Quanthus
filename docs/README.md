@@ -116,9 +116,17 @@ nodes.
   differ by design because actual generation/use clocks are not Fact identity. Earlier resource and
   canonical-receipt failures remain retained pre-result evidence rather than hidden retries.
   Acceptance: `acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md`.
-  This does not close B6/B7, dictionary #215, parallel disclosure/fundamental/market domains, a
-  formal Structure Expert/economic gate, thirteen-state/ML work, or Shadow/paper/live execution.
+  This does not close B6/B7, parallel disclosure/fundamental/market domains, a formal Structure
+  Expert/economic gate, thirteen-state/ML work, or Shadow/paper/live execution. Catalog work #215
+  is a later independent read-only discovery surface and does not retroactively expand this scope.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
+- `P3-DICT-001` is accepted as the Quanthus Data & Indicator Catalog. Children #223-#227 close the
+  authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog` Web
+  surface and drift/maintenance gates. The current projection contains 664 entries and 8 explicit
+  gaps. It is rebuilt from an explicit source manifest and checked against a small digest/count
+  snapshot manifest rather than maintained as a second formula authority. Catalog search
+  annotations cannot create entries or equivalence. Design: `design/data-indicator-catalog.md`;
+  acceptance: `acceptance/data-indicator-catalog-final-acceptance-20260907.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.
@@ -262,7 +270,8 @@ gate is a conformance defect rather than an alternate project state.
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
 | Platform Kernel extraction or restoration | root `AGENTS.md`, this map, HLD, ADR 0010, LLD 11, `config/platform-kernel-gates.v1.json` | QuantDinger audit record, exact upstream source path, selected Web ownership/source evidence, and adapter contract |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
-| Structure semantics, time, names or delivery gaps | HLD, LLD 03, `design/structure-facts-v2.md`, ADR 0014 | Catalog and coverage JSON; dictionary work-item page only when relevant |
+| Structure semantics, time, names or delivery gaps | HLD, LLD 03, `design/structure-facts-v2.md`, ADR 0014 | Structure semantic/coverage JSON; Catalog only when discovery/compatibility is relevant |
+| Data, indicator, Feature, Label or semantic-definition discovery | this map, LLD 03, `design/data-indicator-catalog.md`, `work-items/data-indicator-dictionary.md` | Explicit Catalog source/snapshot manifests; LLD 01 when inspecting ODS/DWD authority, LLD 11 for API/Web transport |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child, LLD 01 `strategy-replay-ads.md` | Exact strategy, authorized ADS bundle, and P2 execution evidence; load the legacy P1 snapshot only for frozen P3 reproduction |

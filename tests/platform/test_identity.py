@@ -39,6 +39,7 @@ def test_password_session_rbac_and_security_audit(kernel) -> None:
 
     assert result.principal.user_id == viewer.user_id
     kernel.identity.require(result.principal, "gates:read")
+    kernel.identity.require(result.principal, "catalog:read")
     try:
         kernel.identity.require(result.principal, "jobs:run")
     except AuthorizationError as exc:

@@ -1,0 +1,103 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-DICT-001",
+  "design": "docs/design/data-indicator-catalog.md",
+  "items": [
+    {
+      "id": "P3-DICT-001",
+      "title": "Deliver the Quanthus Data & Indicator Catalog",
+      "kind": "epic",
+      "status": "closed",
+      "depends_on": ["P3-FEAT-001"],
+      "scope": "Build a deterministic read-only catalog over existing data, feature, label and semantic authorities, expose it through API and /catalog UI, and freeze maintenance gates.",
+      "acceptance": [
+        "All five child issues closed with repository evidence",
+        "Catalog snapshot is deterministic and authority-backed",
+        "Viewer/operator/admin can search and inspect through read-only API/UI",
+        "Drift gates prevent silent formula, field, namespace or relation changes",
+        "No new indicator formula or execution authority is created by catalog delivery"
+      ],
+      "evidence": ["docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md"]
+    },
+    {
+      "id": "P3-DICT-001-A",
+      "title": "Freeze Catalog schema, authority and relation semantics",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": [],
+      "scope": "Define stable entry kinds, identities, lifecycle/verification states, authority bindings, relation types and gap semantics without creating a parallel formula authority.",
+      "acceptance": [
+        "Entry identity and exact kind vocabulary frozen",
+        "Authority references and source digests mandatory",
+        "Relation types distinguish exact equivalence from related/replacement",
+        "Usage clocks remain outside Fact/indicator catalog semantics",
+        "Invalid/dangling/duplicate entries fail closed"
+      ],
+      "evidence": ["docs/acceptance/data-indicator-catalog-schema-snapshot-20260907.md"]
+    },
+    {
+      "id": "P3-DICT-001-B",
+      "title": "Generate deterministic Catalog snapshot from authoritative sources",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-DICT-001-A"],
+      "scope": "Implement explicit ODS, DWD, Feature, Label and Semantic source adapters and generate the checked catalog snapshot plus gap ledger.",
+      "acceptance": [
+        "DWD 33 tables and inherited/time-profile fields projected from machine schema",
+        "ODS machine-declared datasets projected without prose scraping",
+        "Feature specs, LabelCards and semantic concepts/families projected",
+        "SMA20, RSI14, MACD-reserved and turnover-vs-rate regression cases pass",
+        "Independent generation is byte-identical"
+      ],
+      "evidence": ["docs/acceptance/data-indicator-catalog-schema-snapshot-20260907.md"]
+    },
+    {
+      "id": "P3-DICT-001-C",
+      "title": "Expose authenticated read-only Catalog API",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-DICT-001-B"],
+      "scope": "Add a manifest-governed read-only Platform feature providing summary, search, detail and relations over the frozen snapshot.",
+      "acceptance": [
+        "viewer/operator/admin receive catalog:read permission",
+        "Summary/search/detail/relations routes admitted by feature manifest",
+        "Query and page-size bounds enforced",
+        "OpenAPI and API authorization tests pass",
+        "No database writes or market-value queries are introduced"
+      ],
+      "evidence": ["docs/acceptance/data-indicator-catalog-api-ui-20260907.md"]
+    },
+    {
+      "id": "P3-DICT-001-D",
+      "title": "Build the /catalog search and detail UI",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-DICT-001-C"],
+      "scope": "Create a first-class authenticated /catalog page with search, filters, result list, detail, relations, authority/time metadata and gap visibility.",
+      "acceptance": [
+        "First-class /catalog route admitted in Web manifest",
+        "Free-text search and structured filters usable from desktop UI",
+        "Reserved concept vs executable spec and accepted scope visibly distinct",
+        "Authority, time semantics, formula/spec and relations are inspectable",
+        "Web build, lint and UI contract/e2e tests pass"
+      ],
+      "evidence": ["docs/acceptance/data-indicator-catalog-api-ui-20260907.md"]
+    },
+    {
+      "id": "P3-DICT-001-E",
+      "title": "Freeze Catalog drift gates and maintenance closeout",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-DICT-001-D"],
+      "scope": "Make generated snapshot drift, missing authority metadata, orphan relations and silent formula/namespace substitutions repository-gating failures; close documentation and issue lifecycle.",
+      "acceptance": [
+        "Regeneration drift test is exact and deterministic",
+        "All registered source definitions are covered or explicitly gapped",
+        "Legacy related-not-equivalent links cannot become aliases silently",
+        "Full repository and Web gates pass",
+        "Parent and child issues close in dependency order with final evidence"
+      ],
+      "evidence": ["docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md"]
+    }
+  ]
+}

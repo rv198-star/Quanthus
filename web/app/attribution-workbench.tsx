@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleHelp,
   Copy,
+  Database,
   Download,
   FileJson,
   FlaskConical,
@@ -1306,6 +1307,9 @@ export function AttributionWorkbench() {
             : "尚未接入正式归因数据"}
         </span>
         <div className="topbar-actions">
+          <a className="icon-button" href="/catalog" title="打开数据与指标目录" aria-label="打开数据与指标目录">
+            <Database aria-hidden="true" />
+          </a>
           <a className="icon-button" href="/operator" title="打开平台控制台" aria-label="打开平台控制台">
             <Settings aria-hidden="true" />
           </a>

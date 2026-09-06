@@ -44,6 +44,7 @@ def test_manifest_admits_only_minimal_runtime_and_operator_web_surfaces() -> Non
         "/candidates/:strategy_id",
         "/attribution",
         "/operator",
+        "/catalog",
     )
     validate_manifest_against_capability_gate(manifest)
     assert len(manifest.admitted_capabilities) == 11
@@ -330,6 +331,7 @@ def test_unknown_manifest_route_fails_composition(kernel) -> None:
             product_catalog=kernel.product_catalog,
             candidate_evidence=kernel.candidate_evidence,
             expert_evidence=kernel.expert_evidence,
+            data_catalog=kernel.data_catalog,
             candidate_approvals=kernel.candidate_approvals,
             metrics=kernel.metrics,
         )

@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from quanthus.data_catalog import DataIndicatorCatalog
 from quanthus.expert_evaluation.product_view import ProductExpertEvidence
 from quanthus.platform.adapters.quanthus import (
     QuanthusAttributionVerificationAdapter,
@@ -46,6 +47,7 @@ class PlatformKernel:
     product_catalog: ProductResearchCatalog
     candidate_evidence: ProductCandidateEvidence
     expert_evidence: ProductExpertEvidence
+    data_catalog: DataIndicatorCatalog
     candidate_approvals: CandidateApprovalService
     metrics: Metrics
     app: PlatformHttpApp
@@ -77,6 +79,8 @@ def create_platform_kernel(
     candidate_run_root: Path | None = None,
     expert_evidence_path: Path | None = None,
     expert_run_root: Path | None = None,
+    data_catalog_sources_path: Path | None = None,
+    data_catalog_snapshot_path: Path | None = None,
 ) -> PlatformKernel:
     root = find_project_root()
     manifest = load_feature_manifest(manifest_path)
@@ -114,6 +118,10 @@ def create_platform_kernel(
         root,
         expert_run_root,
     )
+    data_catalog = DataIndicatorCatalog(
+        data_catalog_sources_path,
+        data_catalog_snapshot_path,
+    )
     candidate_approvals = CandidateApprovalService(store)
     if (cipher_key is None) == (cipher is None):
         raise ValueError("provide exactly one of cipher_key or cipher")
@@ -145,6 +153,7 @@ def create_platform_kernel(
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
         expert_evidence=expert_evidence,
+        data_catalog=data_catalog,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
     )
@@ -159,6 +168,7 @@ def create_platform_kernel(
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
         expert_evidence=expert_evidence,
+        data_catalog=data_catalog,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
         app=app,

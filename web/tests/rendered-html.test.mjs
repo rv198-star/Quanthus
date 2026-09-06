@@ -23,13 +23,13 @@ const demoArtifactUrl = new URL(
   import.meta.url,
 );
 
-async function render() {
+async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
+    new Request(`http://localhost${path}`, {
       headers: { accept: "text/html" },
     }),
     {
@@ -95,6 +95,15 @@ function publicationFileFetcher(publicationRoot) {
     }
   };
 }
+
+test("server-renders the catalog route as an authenticated read-only knowledge surface", async () => {
+  const response = await render("/catalog");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /数据、指标与语义目录/);
+  assert.match(html, /Catalog 是只读知识面/);
+  assert.match(html, /前往登录/);
+});
 
 test("server-renders an honest empty state before formal attribution data exists", async () => {
   const [{ workspace }, response] = await Promise.all([

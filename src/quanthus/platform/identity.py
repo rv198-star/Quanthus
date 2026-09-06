@@ -32,14 +32,22 @@ ROLE_PERMISSIONS = {
             "jobs:read",
             "jobs:run",
             "product:read",
+            "catalog:read",
             "product:review",
             "product:govern",
         }
     ),
     "operator": frozenset(
-        {"gates:read", "jobs:read", "jobs:run", "product:read", "product:review"}
+        {
+            "gates:read",
+            "jobs:read",
+            "jobs:run",
+            "product:read",
+            "product:review",
+            "catalog:read",
+        }
     ),
-    "viewer": frozenset({"gates:read", "jobs:read", "product:read"}),
+    "viewer": frozenset({"gates:read", "jobs:read", "product:read", "catalog:read"}),
 }
 
 

@@ -213,7 +213,12 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 | P3-STRUCT-004-B3 | Build prior-20/60 references with qualified target identity | P3-STRUCT-004-B2 | closed; #220; `docs/acceptance/structure-facts-v2-b3-b4-real-object-interaction-20260907.md`; target-qualified 20/60 objects reproduced |
 | P3-STRUCT-004-B4 | Record same-anchor close crossings, loss and reclaim | P3-STRUCT-004-B3 | closed; #221; `docs/acceptance/structure-facts-v2-b3-b4-real-object-interaction-20260907.md`; nine report interactions reproduced with frozen-target evidence |
 | P3-STRUCT-004-B5 | Qualify minimal episodes, audited consumer and P2 through cold A/B | P3-STRUCT-004-B4 | closed; #222; `docs/acceptance/structure-facts-v2-b5-cold-ab-review-20260907.md`; same-revision A/B, 168 audit records, 5/5 P2 and 12/12 review per defined scope |
-| P3-DICT-001 | Maintain data and indicator dictionaries | P3-FEAT-001 | deferred independent backlog under `docs/work-items/data-indicator-dictionary.md`; not a predecessor or blocker of P3-STRUCT-004 |
+| P3-DICT-001 | Deliver the Quanthus Data & Indicator Catalog | P3-FEAT-001 | closed; #215; all A-E children accepted under `docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md`; read-only discovery only, independent of P3-STRUCT-004 |
+| P3-DICT-001-A | Freeze Catalog schema, authority and relation semantics | P3-FEAT-001 | closed; #223; `docs/acceptance/data-indicator-catalog-schema-snapshot-20260907.md` |
+| P3-DICT-001-B | Generate deterministic Catalog snapshot from authoritative sources | P3-DICT-001-A | closed; #224; 664 entries / 8 explicit gaps; exact snapshot manifest; same acceptance evidence as A |
+| P3-DICT-001-C | Expose authenticated read-only Catalog API | P3-DICT-001-B | closed; #225; GET-only summary/search/detail/relations, viewer/operator/admin `catalog:read`; `docs/acceptance/data-indicator-catalog-api-ui-20260907.md` |
+| P3-DICT-001-D | Build the `/catalog` search and detail UI | P3-DICT-001-C | closed; #226; real Vinext build and SSR/source contract PASS; same API/UI acceptance evidence |
+| P3-DICT-001-E | Freeze Catalog drift gates and maintenance closeout | P3-DICT-001-D | closed; #227; snapshot/source drift, traceability and full repository/Web gates PASS; `docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md` |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

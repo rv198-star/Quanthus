@@ -61,6 +61,82 @@ export interface PublicationCatalog {
   releases: PublishedRelease[];
 }
 
+export type CatalogKind =
+  | "ods_dataset"
+  | "dwd_table"
+  | "dwd_field"
+  | "feature_spec"
+  | "label_card"
+  | "semantic_family"
+  | "semantic_concept";
+
+export interface CatalogEntrySummary {
+  entry_id: string;
+  kind: CatalogKind;
+  canonical_id: string;
+  display_name: string;
+  domain: string;
+  family: string;
+  lifecycle: string;
+  implementation_status: string;
+  verification_status: string;
+  accepted_scope: string | null;
+}
+
+export interface CatalogRelation {
+  type: string;
+  target_entry_id: string;
+}
+
+export interface CatalogEntry extends CatalogEntrySummary {
+  description: string;
+  authority: { path: string; pointer: string; sha256: string };
+  aliases: string[];
+  keywords: string[];
+  relations: CatalogRelation[];
+  details: Record<string, unknown>;
+}
+
+export interface CatalogGap {
+  gap_id: string;
+  category: string;
+  description: string;
+  affected_entry_ids: string[];
+  authority_refs: string[];
+}
+
+export interface DataCatalogSummary {
+  schema_version: string;
+  catalog_id: string;
+  builder_version: string;
+  snapshot_digest: string;
+  release_identity: Record<string, string>;
+  summary: {
+    entry_count: number;
+    gap_count: number;
+    counts_by_kind: Record<string, number>;
+  };
+  gaps: CatalogGap[];
+}
+
+export interface DataCatalogSearchResult {
+  query: string;
+  filters: Record<string, string | null>;
+  total: number;
+  limit: number;
+  items: CatalogEntrySummary[];
+}
+
+export interface DataCatalogRelations {
+  entry_id: string;
+  outgoing: Array<CatalogRelation & { target: CatalogEntrySummary }>;
+  incoming: Array<{
+    type: string;
+    source_entry_id: string;
+    source: CatalogEntrySummary;
+  }>;
+}
+
 export class PlatformApiError extends Error {
   constructor(
     public readonly status: number,

@@ -143,6 +143,22 @@
         "/attribution",
         "/operator"
       ]
+    },
+    {
+      "id": "quanthus-data-catalog-v1",
+      "enabled": true,
+      "source_capabilities": [],
+      "routes": [
+        "quanthus.catalog.summary.read",
+        "quanthus.catalog.search.read",
+        "quanthus.catalog.item.read",
+        "quanthus.catalog.relations.read"
+      ],
+      "startup_hooks": [],
+      "migrations": [],
+      "web_routes": [
+        "/catalog"
+      ]
     }
   ],
   "excluded_capabilities": [

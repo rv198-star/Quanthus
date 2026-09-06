@@ -425,7 +425,18 @@ The accepted Web carrier is the source-built `web/` Vinext application plus the 
 `ops/platform/Web.Dockerfile` and `web-server.mjs` runtime. `/operator` keeps its bearer session in
 same-tab browser storage and calls the API through the same origin. The Web carrier proxies only
 the admitted Platform API, health, readiness, metrics, OpenAPI, and read-only attribution-release
-paths. Docker keeps API and Web host ports bound to loopback. The Web container alone also joins
+paths.
+
+`P3-DICT-001` adds the independently manifest-governed `quanthus-data-catalog-v1` read-only feature.
+It has no Platform migration, startup hook, job type or write operation. Viewer/operator/admin roles
+receive only `catalog:read`; four GET routes serve summary, bounded search, exact detail and typed
+relations from the deterministic repository authority projection. `/catalog` reuses the same bearer
+session and makes gaps, lifecycle, authority and relation type explicit. The Platform does not scan
+arbitrary repository files at request time: composition rebuilds the Catalog from an explicit source
+manifest and checks the frozen digest/count manifest before serving. No Catalog surface edits schemas,
+formulas, labels, Facts, strategies or execution state.
+
+Docker keeps API and Web host ports bound to loopback. The Web container alone also joins
 the external `traefik-net`; Traefik terminates public HTTPS for `quanthus.oci.061718.xyz` and
 forwards container-network traffic to port 3100. PostgreSQL and API never join that proxy network.
 The public router excludes `/metrics`; metrics remain available through loopback or the tailnet

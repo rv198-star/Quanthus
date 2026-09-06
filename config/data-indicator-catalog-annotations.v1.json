@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0.0",
+  "authority": "catalog_search_and_caution_annotations_only",
+  "governing_design": "docs/design/data-indicator-catalog.md",
+  "annotations": [
+    {
+      "entry_id": "feature_spec:price.sma20@1.0.0",
+      "display_name": "SMA20（总回报指数）",
+      "search_terms": ["SMA20", "MA20", "20日均线", "移动平均"],
+      "cautions": ["该既有规格输入为 price.total_return_index，单位为 index；不得当作原始收盘价 MA20。"]
+    },
+    {
+      "entry_id": "feature_spec:price.rsi14@1.0.0",
+      "display_name": "RSI14（既有总回报简单窗口定义）",
+      "search_terms": ["RSI", "RSI14", "相对强弱"],
+      "cautions": ["该既有规格使用总回报正负部分的简单窗口均值；不得静默替换为 Wilder RSI。"]
+    },
+    {
+      "entry_id": "semantic_concept:indicator.momentum.macd",
+      "display_name": "MACD",
+      "search_terms": ["MACD", "指数平滑异同移动平均"],
+      "cautions": ["当前仅登记语义概念；没有已验收的可执行 MACD 规格。"]
+    },
+    {
+      "entry_id": "dwd_field:dwd_security_bar.turnover",
+      "display_name": "dwd_security_bar.turnover（成交额）",
+      "search_terms": ["turnover", "amount", "成交额", "换手率"],
+      "cautions": ["此字段表示成交额/turnover value，不是换手率百分比；换手率需要独立、合格的历史分母与计算规格。"]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import os
 import re
 import signal
 import time
+from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
@@ -34,6 +35,17 @@ from quanthus.structure_v2_review import report_counts, select_review_sample
 
 REQUEST_PATH = "config/structure-facts-v2-run.development.v1.json"
 SCHEMA = "quanthus.structure-facts-v2-run.v1"
+
+
+@contextmanager
+def diagnosed_stage(name: str):
+    """Retain root exception and stage when the Worker exports only the final stderr line."""
+    try:
+        yield
+    except Exception as exc:
+        first = next((line.strip() for line in str(exc).splitlines() if line.strip()), "no_detail")
+        detail = f"structure_v2_failure:{name}:{type(exc).__name__}:{first[:300]}"
+        raise RuntimeError(detail) from exc
 
 
 def load_request(path: Path) -> dict[str, Any]:
@@ -301,10 +313,13 @@ def main(argv: list[str] | None = None) -> int:
     config.scope.authorize(first, last)
     started = time.perf_counter()
     provider = ReplayDataProvider(config)
-    with provider.open(scope_start=first, scope_end=last) as session:
+    with diagnosed_stage("provider-open"):
+        opened = provider.open(scope_start=first, scope_end=last)
+    with opened as session:
         provider_seconds = time.perf_counter() - started
         extract_start = time.perf_counter()
-        admissions, frames, policy = extract_admissions(session, request)
+        with diagnosed_stage("source-extraction"):
+            admissions, frames, policy = extract_admissions(session, request)
         extract_seconds = time.perf_counter() - extract_start
         readiness, structure, summary, audit, stages = run_from_admissions(
             request, admissions, frames, policy, session.identity, code_revision=args.code_revision,

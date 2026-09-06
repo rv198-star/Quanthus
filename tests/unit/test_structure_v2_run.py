@@ -16,13 +16,25 @@ from quanthus.structure_v2_inputs import (
     canonical,
     digest,
 )
-from quanthus.structure_v2_run import REQUEST_PATH, load_request, run_from_admissions, write_result
+from quanthus.structure_v2_run import (
+    REQUEST_PATH,
+    diagnosed_stage,
+    load_request,
+    run_from_admissions,
+    write_result,
+)
 
 from .test_structure_facts_run import _frames
 from .test_structure_v2_inputs import provider, row
 
 ROOT = find_project_root()
 CODE = "b" * 40
+
+
+def test_diagnostic_retains_stage_and_root_error_not_trailing_help_url():
+    expected = "structure_v2_failure:provider-open:RuntimeError:alloc"
+    with pytest.raises(RuntimeError, match=expected), diagnosed_stage("provider-open"):
+        raise RuntimeError("allocation failed\n\nSee also documentation")
 
 
 def fixture():

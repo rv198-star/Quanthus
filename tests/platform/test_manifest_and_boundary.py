@@ -156,7 +156,7 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert "config/product-expert-evidence.v1.json" in dockerfile
     assert "config/expert-strategies/p4-trend-risk.v1.0.1.json" in dockerfile
     assert "candidate-p4-trend-risk-1.0.1.inconclusive.v1.json" in dockerfile
-    assert "chmod 0444 ./config/platform-features.v1.json" in dockerfile
+    assert "chmod -R a-w ./config" in dockerfile
     assert "COPY src ./src" not in dockerfile
     assert "COPY src/quanthus/platform ./src/quanthus/platform" in dockerfile
     assert "src/quanthus/expert_evaluation/product_view.py" in dockerfile
@@ -233,6 +233,30 @@ def test_event_worker_stays_a_control_plane_supervisor() -> None:
     assert "ARG QUANTHUS_CODE_REVISION" in dockerfile
     assert "QUANTHUS_CODE_REVISION=${QUANTHUS_CODE_REVISION}" in dockerfile
     assert 'RUN python -m pip install --no-cache-dir ".[p1,platform]"' in dockerfile
+
+
+def test_platform_image_contains_data_catalog_authority_closure() -> None:
+    builder = PROJECT_ROOT.joinpath("ops/bin/build-platform-image").read_text(encoding="utf-8")
+    dockerfile = PROJECT_ROOT.joinpath("ops/platform/Dockerfile").read_text(encoding="utf-8")
+
+    for required in (
+        "data-indicator-catalog-annotations.v1.json",
+        "data-indicator-catalog-snapshot.v1.json",
+        "data-indicator-catalog-sources.v1.json",
+        "p3-baseline-features.research.v1.json",
+        "p3-governed-feature-extension.research.v1.json",
+        "p3-governed-labels.research.v1.json",
+        "structure-semantic-catalog.v1.json",
+        "structure-facts-v2-blueprint.v1.json",
+        "ods-base-final-through-20260731.v2.json",
+        "dwd-domain-model.v1.json",
+        "dwd-domain-model.v1.1-extension.json",
+        "v2-build202607.json",
+        "src/quanthus/data_catalog.py",
+    ):
+        assert required in builder
+        assert required in dockerfile
+    assert "chmod -R a-w ./config" in dockerfile
 
 
 def test_operator_web_is_source_built_and_independently_removable() -> None:

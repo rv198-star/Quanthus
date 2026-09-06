@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; additive `P3-STRUCT-001` real-DWD structure MVP qualification open |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; additive `P3-STRUCT-001` technical MVP accepted on real-DWD A/B reproduction |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -175,8 +175,11 @@ MVP consumes the accepted replay/DWD decision view into one thin, purpose-specif
 Research ADM, derives only coarse causal structure facts, reuses the accepted trend-stability rule
 semantics through a new security-day research adapter identity, and compares baseline versus
 structure-assisted decisions through the existing aggregator and P2 execution contracts. The ADM
-is not DWD, generic DWS, or operational ADS. The MVP remains development-only and gains no Shadow,
-paper, notification, or execution authority from successful technical qualification.
+is not DWD, generic DWS, or operational ADS. Real-DWD A/B qualification and the bounded outcome-
+blind review are accepted in
+`../../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`. The accepted MVP
+remains development-only and gains no economic-value, Shadow, paper, notification, or execution
+authority.
 
 ## 6. Work items
 

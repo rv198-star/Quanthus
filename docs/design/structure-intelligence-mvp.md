@@ -3,10 +3,11 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Authority | Research-only additive MVP; does not activate the draft stock-stage model or execution |
 | Governing work item | `P3-STRUCT-001` |
 | Implementation checkpoint | `../acceptance/structure-intelligence-mvp-implementation-checkpoint-20260906.md` |
+| Final acceptance | `../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md` |
 | Parent design | `lld/03-label-feature-system.md`; Worker boundary in `lld/11-platform-kernel.md` |
 | Base revision | `6d2d94a9296df27beca9567f63d3fb5e9ae55b6e` |
 | Date | 2026-09-06 |
@@ -123,17 +124,17 @@ exactly two fixed Structure MVP A/B Jobs through the normal DurableJobQueue when
 submission whitelist has not yet been updated; it exposes no caller-selected command, policy,
 universe, or data path.
 
-Focused MVP, traceability, and Platform-boundary verification currently reports `59 passed`.
-Repository-wide `make check` reports `1391 passed, 7 skipped`; the skips are existing environment-
-bound PostgreSQL or mounted-production-artifact checks. Ruff on every changed Python path and
-`git diff --check` also pass. A local source-built Event image containing the MVP runner builds
-successfully.
+Focused MVP, traceability, and Platform-boundary closeout verification reports `61 passed`.
+Repository-wide `make check` reports `1400 passed, 7 skipped`; the skips are existing environment-
+bound PostgreSQL or mounted-production-artifact checks. `git diff --check` also passes. The
+result-bearing Event Worker image was deployed from an exact Git revision and completed both
+real-DWD qualification Runs.
 
 ## 4. What this does not prove
 
 This proof does not establish any of the following:
 
-- that real DWD historical rows satisfy the required PIT-admission contract;
+- that the retrospective Direct-DWD record view proves stronger per-decision historical-publication visibility or a canonical `AS_KNOWN` contract;
 - that the six coarse structure outcomes are statistically or economically useful;
 - that any of the synthetic thresholds are suitable for A-share trading;
 - that the draft thirteen-state model should be activated or fully implemented;
@@ -149,31 +150,25 @@ the active provider identity. Therefore a successful real run can prove engineer
 and T-close replay behavior, but it cannot by itself promote the retrospective record view into a
 stronger historical-publication claim.
 
-## 5. Next bounded real-data proof
+## 5. Accepted real-data proof and next evidence boundary
 
-The real-DWD qualification remains small and falsifiable:
+The preregistered real-DWD qualification is now accepted under
+`../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`.
 
-1. run the frozen `structure-mvp-run.development.v1.json` request inside a Worker image that has the
-   existing read-only DWD Base/correction mounts and P1 dependency group;
-2. verify the sealed Structure MVP package and record input identity, row counts, coverage,
-   invalidity reasons, build time, bytes, and memory;
-3. repeat the same request in an isolated attempt and require the ADM semantic digest and result
-   digest to match;
-4. inspect a stratified sample of the coarse structure observations without future bars; and
-5. only after that proof, define a separate complete-P2 baseline-versus-structure-assisted economic
-   comparison. The current independent P2 probes are execution-compatibility evidence only.
+Two independent Durable Jobs on exact Event Worker revision
+`269e73304090ba8296a0413ed8b0a0c01430b2b3` reproduced the same 174-row ADM, state counts,
+decision counts, five P2 probes/fills, ADM manifest digest, and semantic result digest. The bounded
+outcome-blind review projected two rows for each actually observed coarse state; all 10 manually
+reviewed cases showed no obvious T-close semantic contradiction.
 
-The development worktree has the P1 research dependencies needed for tests but does not have the
-DWD Base or frozen research-bundle mounts. Production Event Worker has those exact read-only mounts.
-The normal external MCP submission whitelist may lag the newly deployed typed Job kind; in that
-specific case the default-off qualification seeder in `lld/11-platform-kernel.md` may be enabled for
-one exact image revision to create the two fixed A/B Durable Jobs. This is a bounded admission
-bridge, not a second execution path: the Jobs retain normal queue state, lease fencing, exact input
-contract, child execution, immutable publication, and verification. Do not overload an unrelated
-Job kind or bypass the DurableJobQueue.
+The accepted MVP therefore proves the real DWD -> thin ADM -> coarse structure -> expert ->
+aggregator -> P2 technical chain and deterministic reproduction. It still does not prove economic
+value or stronger historical-publication PIT than the Direct-DWD provider itself declares.
 
-Do not expand to the thirteen-state vocabulary, train a model, add a generic DWS, revive ADS, or
-make economic claims until this bounded experiment shows a concrete reason to do so.
+The next authorized evidence step, if pursued, is a separately preregistered complete-P2
+baseline-versus-structure-assisted economic comparison under the same information/history budget.
+Do not expand to the thirteen-state vocabulary, train a model, add generic DWS, revive ADS, or make
+trading-value claims merely because the technical MVP is accepted.
 
 ## 6. Stop conditions
 

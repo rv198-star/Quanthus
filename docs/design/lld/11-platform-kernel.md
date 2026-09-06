@@ -253,8 +253,10 @@ only `python -m quanthus.structure_mvp_run`, retains the same read-only DWD moun
 fencing, publishes below a separate immutable `structure-runs/` namespace, and deep-verifies the
 ADM content digest, semantic result digest, manifest, and READY receipt before success. This job is
 research-only: it cannot mutate DWD, enable the draft stock-stage vocabulary, authorize orders,
-open Shadow/P6, or claim economic value. Real-DWD qualification and independent reproduction are
-required before `P3-STRUCT-001` may close.
+open Shadow/P6, or claim economic value. Real-DWD qualification and independent reproduction closed
+`P3-STRUCT-001` under
+`../../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`; this acceptance does
+not widen the Job's authority.
 
 A default-off qualification seeder exists only to bridge an external control-plane admission lag.
 The Event image is build-bound to one clean 40-character Git revision. When and only when
@@ -263,7 +265,9 @@ The Event image is build-bound to one clean 40-character Git revision. When and 
 image revision and the frozen Structure MVP run config. The seeder admits no caller-supplied path,
 command, universe, or policy, and the Jobs still use normal queue state, lease fencing, child
 execution, immutable publication, and verification. The default is `0`; normal Event Worker
-operation therefore does not self-submit research work.
+operation therefore does not self-submit research work. The one-time `P3-STRUCT-001` qualification
+enabled the seeder only long enough to create the fixed A/B Jobs and returned it to `0` in the
+acceptance closeout.
 The child owns one Direct-DWD session and two disposable, scope-bound TMP Feature Panels for the
 attempt: execution scope for Label and decision scope for Report. The ranges are separate semantic
 identities under the current floating-window evaluator and are each built once from the shared DWD

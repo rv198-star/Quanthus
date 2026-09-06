@@ -27,7 +27,7 @@ services:
       QUANTHUS_CANDIDATE_RUN_ROOT: /data/candidate-runs
       QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
-      QUANTHUS_STRUCTURE_MVP_HEALTH_PROBE: "1"
+      QUANTHUS_STRUCTURE_MVP_HEALTH_PROBE: "0"
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,7 +90,7 @@ services:
       QUANTHUS_WORKER_ID: oci-event-1
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
       QUANTHUS_EVENT_SHARD_TARGET: ${QUANTHUS_EVENT_SHARD_TARGET:-0}
-      QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED: "1"
+      QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED: "0"
       QUANTHUS_P4_HISTORICAL_INDUSTRY_RECEIPT_PATH: /srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json
       QUANTHUS_EVENT_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current
       QUANTHUS_EVENT_MEMORY_PEAK_PATH: /sys/fs/cgroup/memory.peak

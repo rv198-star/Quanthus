@@ -83,6 +83,13 @@ nodes.
   and `P3-EXPERT-005` closed the MVP with an `inconclusive` lifecycle decision and disabled
   forward-Shadow disposition. No sealed data, notification, promotion, or execution authority was
   opened.
+- `P3-STRUCT-001` is accepted as a bounded Structure Intelligence technical MVP. Two independent
+  real-DWD Event Worker Jobs reproduced the same 174-row thin Structure Research ADM, coarse state
+  counts, decision counts, and five P2 execution probes/fills; a 10-case outcome-blind manual
+  semantic review found no obvious T-close contradiction. This closes only the DWD -> ADM ->
+  structure -> expert -> aggregator -> P2 engineering chain. Economic value, the draft stock-stage
+  vocabulary, model training, Shadow, paper, and live authority remain unopened. Evidence:
+  `acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

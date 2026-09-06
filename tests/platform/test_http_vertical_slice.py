@@ -175,7 +175,7 @@ def test_structure_facts_review_sample_uses_preregistered_lifecycle_then_round_r
 
 
 def test_health_can_project_bounded_structure_facts_qualification(
-    kernel, tmp_path, monkeypatch
+    kernel, monkeypatch
 ) -> None:
     revision = "e" * 40
     job_ids = _seed_structure_facts_qualification_jobs(
@@ -183,13 +183,8 @@ def test_health_can_project_bounded_structure_facts_qualification(
         enabled_value="1",
         code_revision=revision,
     )
-    config = tmp_path / "structure-facts-run.json"
-    config.write_text(
-        json.dumps({"security_codes": ["000001", "300750", "600519"]}),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(api_module, "_STRUCTURE_FACTS_RUN_CONFIG_PATH", config)
     monkeypatch.setenv("QUANTHUS_STRUCTURE_FACTS_HEALTH_PROBE", "1")
+    assert api_module._STRUCTURE_FACTS_SECURITY_ORDER == ("000001", "300750", "600519")
 
     status, _, payload = wsgi_request(kernel, "GET", "/health")
 

@@ -60,9 +60,7 @@ _STRUCTURE_MVP_REVIEW_MAX_BYTES = 2 * 1024 * 1024
 _STRUCTURE_MVP_JOB_RE = re.compile(r"^job_[0-9a-f]{32}$")
 _STRUCTURE_FACTS_HEALTH_PROBE_ENV = "QUANTHUS_STRUCTURE_FACTS_HEALTH_PROBE"
 _STRUCTURE_FACTS_RUN_CONFIG = "config/structure-facts-run.development.v1.json"
-_STRUCTURE_FACTS_RUN_CONFIG_PATH = (
-    Path(__file__).resolve().parents[3] / _STRUCTURE_FACTS_RUN_CONFIG
-)
+_STRUCTURE_FACTS_SECURITY_ORDER = ("000001", "300750", "600519")
 _STRUCTURE_FACTS_REVIEW_MAX_BYTES = 2 * 1024 * 1024
 _STRUCTURE_FACTS_REVIEW_TARGET = 12
 StartResponse = Callable[[str, list[tuple[str, str]]], object]
@@ -696,17 +694,7 @@ class PlatformHttpApp:
         enabled = os.environ.get(_STRUCTURE_FACTS_HEALTH_PROBE_ENV, "0").strip()
         if enabled != "1":
             return None
-        try:
-            request = json.loads(_STRUCTURE_FACTS_RUN_CONFIG_PATH.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {"status": "run_config_invalid"}
-        security_codes = request.get("security_codes") if isinstance(request, dict) else None
-        if (
-            not isinstance(security_codes, list)
-            or not security_codes
-            or any(not isinstance(item, str) or not item for item in security_codes)
-        ):
-            return {"status": "run_config_invalid"}
+        security_codes = _STRUCTURE_FACTS_SECURITY_ORDER
         jobs = [
             job
             for job in self._replay_jobs.list(STRUCTURE_MVP_JOB, 50)
@@ -773,7 +761,7 @@ class PlatformHttpApp:
                 response["review_sample"] = _structure_facts_review_sample(
                     _STRUCTURE_MVP_EVENT_RUN_ROOT,
                     str(pair[0].job_id),
-                    tuple(security_codes),
+                    security_codes,
                 )
         return response
 

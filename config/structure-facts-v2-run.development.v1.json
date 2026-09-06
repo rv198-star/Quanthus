@@ -1,6 +1,6 @@
 {
   "schema_version": "quanthus.structure-facts-v2-run.v1",
-  "provider_config": "config/replay-data-provider.development.v2.json",
+  "provider_config": "config/replay-data-provider.structure-v2.development.v1.json",
   "execution_policy": "config/p2-execution-policy.research.v1.json",
   "scan_start": "2019-10-08",
   "report_start": "2020-01-02",

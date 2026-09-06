@@ -58,7 +58,7 @@ def load_request(path: Path) -> dict[str, Any]:
     if not isinstance(raw, dict) or set(raw) != keys or raw["schema_version"] != SCHEMA:
         raise ValueError("v2 fixed request schema differs")
     fixed = {
-        "provider_config": "config/replay-data-provider.development.v2.json",
+        "provider_config": "config/replay-data-provider.structure-v2.development.v1.json",
         "execution_policy": "config/p2-execution-policy.research.v1.json",
         "lookbacks": [20, 60], "knowledge_view": "retrospective",
         "coordinate_policy": "raw-cny-action-epoch-reset-v1",

@@ -164,6 +164,14 @@ TMP and job-local; business objects and consumption evidence form a governed thi
 Record stage elapsed seconds, attempted/admitted/rejected/output rows, bytes and build/reuse counts.
 Do not call the provider separately for each stage or stock.
 
+The v2 runtime uses `config/replay-data-provider.structure-v2.development.v1.json`: materialize
+2019-09-30 predecessor context through 2020-04-01 execution context, while retaining the original
+2019-10-08 scan start and 2020Q1 report. The shared general-purpose 2011-2021 provider is not the
+physical scope for this small batch. This is a pre-result resource repair, not a new market
+population or calculation rule; full market rows inside the bounded window and all exact DWD,
+correction and reference authorities are preserved. Evidence:
+`../acceptance/structure-facts-v2-provider-scope-repair-20260907.md`.
+
 Artifact includes the pinned input-readiness receipt, schema-qualified business objects, rejected
 attempts, consumer outputs, P2 reconciliation, bounded outcome-blind sample and physical runtime/
 audit receipts. Manifest binds exact filenames, byte hashes, row counts, code/config/source and

@@ -3,15 +3,17 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | blocked |
+| Delivery gate | accepted |
 | Governing work item | `P3-STRUCT-004` |
-| Current delivery | B2-B5 implementation release-ready under `structure-facts-v2-delivery.md`; real qualification pending |
-| Runtime v2 acceptance | BLOCKED before result publication / NOT ACCEPTED |
-| Runtime blocker | pre-result provider provenance repair pending; `../acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md` |
+| Current delivery | B1-B5 bounded retrospective vertical accepted; B6-B11 remain separately gated |
+| Runtime v2 acceptance | ACCEPTED for the fixed development retrospective slice only |
+| Runtime acceptance | `../acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md` |
+| Retained pre-result repair | `../acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md`; resolved by independent A/B |
 | B1 checkpoint | `../acceptance/structure-facts-v2-contract-checkpoint-20260906.md` |
 | B1-R checkpoint | `../acceptance/structure-facts-v2-temporal-ownership-checkpoint-20260906.md` |
-| B2-B5 implementation | `../acceptance/structure-facts-v2-b2-b5-implementation-20260907.md`; not runtime acceptance |
-| Design-entry review | `../acceptance/structure-facts-v2-design-entry-review-20260907.md`; PASS for bounded detailed implementation, not runtime acceptance |
+| B2-B5 implementation | `../acceptance/structure-facts-v2-b2-b5-implementation-20260907.md` |
+| B2-B5 runtime evidence | `../acceptance/structure-facts-v2-b2-input-readiness-20260907.md`; `../acceptance/structure-facts-v2-b3-b4-real-object-interaction-20260907.md`; `../acceptance/structure-facts-v2-b5-cold-ab-review-20260907.md` |
+| Design-entry review | `../acceptance/structure-facts-v2-design-entry-review-20260907.md`; pre-runtime design PASS |
 | Parent | `lld/03-label-feature-system.md`; `hld.md` |
 | Architecture decision | `../architecture/adr-0014-time-first-structure-semantics.md` |
 | Executable catalog | `../../config/structure-semantic-catalog.v1.json` |
@@ -412,10 +414,13 @@ slice. Next milestone expansion requires an explicit decision, not a change in t
 
 The owner subsequently authorized issue-managed completion of the bounded B1-B5 batch. Parent
 #216 (`P3-STRUCT-004`) and children #217-#222 are projected from
-`config/structure-v2-delivery.v1.json`. B1 and B1-R reuse retained accepted contract evidence;
-B2-B5 require their new delivery gates. Exact algorithms, initial scope, counters, sample rule and
-run budget are specified in `structure-facts-v2-delivery.md`. This authorization permits the fixed
-research qualification of that slice only, not B6-B11 or economic/forward expansion.
+`config/structure-v2-delivery.v1.json`. All six child gates have now closed under their exact
+repository evidence, and the parent is accepted by
+`../acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md`. The result-bearing runtime is
+revision `723f22f`, with two independent cold Jobs reproducing the semantic input-readiness,
+Structure, ADM and result identities. Exact algorithms, scope, counters and sample rule remain those
+frozen in `structure-facts-v2-delivery.md`. This closes only the fixed retrospective B1-B5 vertical;
+B6-B11 and economic/forward expansion remain separately gated.
 
 ## 7. Data and indicator dictionary work (non-blocking)
 

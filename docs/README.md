@@ -105,23 +105,19 @@ nodes.
   outcome-blind review passed 12/12. No economic, production-expert, thirteen-state, model,
   Shadow, paper, or live authority is opened. Evidence:
   `acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md`.
-- `P3-STRUCT-004` advances the reviewed time-first Facts v2 boundary in bounded slices. B1 supplies
-  a semantic namespace catalog/resolver, local multi-clock contracts and an explicit coverage ledger.
-  B1-R separates business Fact time, source/generation/publication metadata and consumption audit
-  events; actual use never mutates a Fact or its semantic digest. These are local contracts, not a
-  v2 market-data build or acceptance. B2-B5 cover verified source/consumer integration, anchor,
-  interaction and minimal episode route. Full geometry/activity extensions remain planned.
-  `P3-DICT-001` is a separately deferred data/indicator dictionary task, not a prerequisite.
-  Final design-entry review supports bounded B2-B5 implementation details, with explicit qualified
-  relation-grain and complete admission requirements; it does not accept a v2 runtime. Evidence:
-  `acceptance/structure-facts-v2-design-entry-review-20260907.md`.
-  B2-B5 implementation is tested but real qualification remains blocked before any result-bearing
-  publication. Earlier attempts exposed Direct-DWD temporary-storage pressure; the bounded scope
-  repair then exposed an incorrect canonical-receipt equality assumption. The current pre-result
-  repair models the small projection explicitly as a derivative of the accepted canonical parent.
-  Parent #216 and #219-#222 remain open. Evidence:
-  `acceptance/structure-facts-v2-runtime-capacity-blocker-20260907.md` and
-  `acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md`.
+- `P3-STRUCT-004` is accepted and closed for the fixed B1-B5 development-retrospective Facts v2
+  vertical. B1/B1-R own the semantic namespace and time/audit boundaries; B2 qualifies the bounded
+  real-DWD derivative lane; B3/B4 add target-qualified 20/60 references and same-anchor
+  cross/loss/reclaim relations; B5 closes the append-only process, direct consumer/audit and P2
+  compatibility path. Result-bearing revision `723f22f` completed two independent cold Jobs with
+  identical input-readiness, Structure, ADM and result identities: 174/174 admitted report rows,
+  861 measurements, 9 interactions, 168 episode observations, 168 consumer/audit events, and 5/5
+  P2 probes/fills. The preregistered outcome-blind sample passed 12/12. Physical audit/runtime hashes
+  differ by design because actual generation/use clocks are not Fact identity. Earlier resource and
+  canonical-receipt failures remain retained pre-result evidence rather than hidden retries.
+  Acceptance: `acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md`.
+  This does not close B6/B7, dictionary #215, parallel disclosure/fundamental/market domains, a
+  formal Structure Expert/economic gate, thirteen-state/ML work, or Shadow/paper/live execution.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;

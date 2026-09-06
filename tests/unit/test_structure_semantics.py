@@ -175,16 +175,23 @@ def test_timezone_equivalence_and_unknown_views() -> None:
 
 def test_blueprint_preserves_gaps_and_has_no_dictionary_dependency_cycle() -> None:
     raw = json.loads((ROOT / "config/structure-facts-v2-blueprint.v1.json").read_text())
-    assert raw["v2_runtime_accepted"] is False
+    assert raw["v2_runtime_accepted"] is True
+    assert raw["runtime_qualification_status"] == "accepted_bounded_retrospective_b1_b5"
+    assert raw["runtime_blocker"] is None
+    assert (ROOT / raw["runtime_acceptance_evidence"]).is_file()
     assert raw["dictionary_blocks_current_slice"] is False
-    assert raw["current_slice"] == "B2-B5"
+    assert raw["current_slice"] == "B1-B5-accepted-bounded"
     rows = {item["id"]: item for item in raw["capabilities"]}
     assert len(rows) == len(raw["capabilities"])
     assert rows["B1"]["implementation_status"] == "contract_only"
     assert rows["B1-R"]["implementation_status"] == "contract_only"
     assert rows["B1-R"]["depends_on"] == ["B1"]
     assert rows["B2"]["depends_on"] == ["B1-R"]
-    assert rows["B2"]["implementation_status"] == "implemented_pending_real"
+    assert all(
+        rows[key]["implementation_status"] == "accepted_bounded_v2"
+        and rows[key]["verification_status"] == "real_dwd_ab"
+        for key in ("B2", "B3", "B4", "B5")
+    )
     assert rows["B8"]["implementation_status"] == "separate_backlog"
     assert rows["B9"]["implementation_status"] == "outside_structure_scope"
 

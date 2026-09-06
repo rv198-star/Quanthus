@@ -3,7 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
+| Accepted scope | Fixed B1-B5 development retrospective vertical; not all blueprint capabilities |
+| Acceptance evidence | `../acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md` |
+| Result-bearing revision | `723f22feeb7dfbecb2bffbc83662ced7bb29822d` |
 | Parent | `structure-facts-v2.md`; `lld/03-label-feature-system.md` |
 | Work item | `P3-STRUCT-004` and its B1, B1-R, B2, B3, B4, B5 children |
 | Owner instruction | Issue-manage the whole bounded batch, deepen the design, then complete children in dependency order |

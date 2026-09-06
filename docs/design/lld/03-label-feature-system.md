@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` time-first v2 contract slice implemented, runtime open; `P3-DICT-001` separately deferred |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001` separately deferred |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -214,9 +214,12 @@ FeatureFact IDs, source-view limits or accepted artifacts.
 
 B1 and B1-R are local contract work only. The bounded B2-B5 retrospective adapter, qualified
 references/interactions/episodes, separate consumption audit and fixed Worker entry are now
-implemented under `../structure-facts-v2-delivery.md`; real qualification remains pending. Stronger
+accepted under `../structure-facts-v2-delivery.md` and
+`../../acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md`: exact A/B reproduction,
+168 audited consumer invocations, five P2 fills per Run and 12/12 outcome-blind review. Stronger
 source availability/as-of capabilities remain unsupported by this retained data view. The
-machine-readable ledger keeps implementation separate from runtime acceptance. `P3-DICT-001` separately consolidates existing warehouse and feature dictionaries under
+machine-readable ledger records this bounded runtime acceptance while retaining B6-B11 as separate
+unimplemented or unauthorized capability. `P3-DICT-001` separately consolidates existing warehouse and feature dictionaries under
 `../../work-items/data-indicator-dictionary.md`; its deferred scheduling does not block B1-B5.
 
 ## 6. Work items
@@ -232,7 +235,7 @@ machine-readable ledger keeps implementation separate from runtime acceptance. `
 | P3-STRUCT-001 | Prove the bounded DWD -> Structure ADM -> trend-semantics adapter -> aggregator -> P2 path | P3-FEAT-002, P3 expert/aggregator contracts, P4 Event Worker | Real-DWD immutable artifact, independent reproduction, decision/P2 probe reconciliation |
 | P3-STRUCT-002 | Compare continuous versus coarse Structure Intelligence through complete P2 | P3-STRUCT-001, P3-ATTR-001, P3-STRAT-002 | Preregistered C0/C1/C2 A/B replay, exact baseline reproduction, paired comparisons, lifecycle decision |
 | P3-STRUCT-003 | Build Continuous Structure Facts v1 | P3-STRUCT-002 | Contract/adversarial semantics, Real-DWD A/B fact digests, direct expert/aggregator consumption, P2 compatibility, outcome-blind review |
-| P3-STRUCT-004 | Deliver the bounded Facts v2 B1-B5 vertical slice | P3-STRUCT-003 | `docs/design/structure-facts-v2-delivery.md`; parent #216 closes only after all six child gates |
+| P3-STRUCT-004 | Deliver the bounded Facts v2 B1-B5 vertical slice | P3-STRUCT-003 | `docs/acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md`; all six child gates accepted within bounded scope, parent #216 |
 | P3-STRUCT-004-B1 | Freeze Facts v2 domains, semantic naming and coverage blueprint | P3-STRUCT-003 | Existing B1 checkpoint and design-entry review; #217 |
 | P3-STRUCT-004-B1-R | Separate business clocks, production receipts and consumption audit | P3-STRUCT-004-B1 | Existing temporal ownership checkpoint and design-entry review; #218 |
 | P3-STRUCT-004-B2 | Qualify bounded Facts v2 input, time view, identity and coordinates | P3-STRUCT-004-B1-R | Source/view/identity/coordinate readiness, denominator and negative tests; #219 |

@@ -36,6 +36,9 @@ _STRUCTURE_RUN_CONFIGS = frozenset({_STRUCTURE_MVP_RUN_CONFIG, _STRUCTURE_ECONOM
 # Backward-compatible name retained for the technical-MVP qualification seeder/tests.
 _STRUCTURE_RUN_CONFIG = _STRUCTURE_MVP_RUN_CONFIG
 _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
+_STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV = (
+    "QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED"
+)
 _BUILD_REVISION_ENV = "QUANTHUS_CODE_REVISION"
 _EXTERNAL_MCP_ACTOR_USER_ID = "usr_18c14af81a06cf878f177579efec3727"
 _STRUCTURE_QUALIFICATION_SEED_RECEIPT = "structure-qualification-seed.json"
@@ -176,6 +179,53 @@ def _seed_structure_mvp_qualification_jobs(
         )
         if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
             raise RuntimeError("structure_mvp_qualification_seed_mismatch")
+        jobs.append(job.job_id)
+    return tuple(jobs)
+
+
+def _seed_structure_economic_qualification_jobs(
+    store: PlatformStore,
+    *,
+    enabled_value: str,
+    code_revision: str,
+) -> tuple[str, ...]:
+    """Idempotently seed exactly two fixed economic A/B Jobs when explicitly enabled."""
+
+    normalized = enabled_value.strip()
+    if normalized not in {"", "0", "1"}:
+        raise RuntimeError("structure_economic_qualification_seed_invalid")
+    if normalized != "1":
+        return ()
+    if _CODE_REVISION_RE.fullmatch(code_revision) is None:
+        raise RuntimeError("structure_economic_qualification_revision_invalid")
+    actor_user_id = _structure_qualification_actor_user_id(store)
+    queue = DurableJobQueue(store, {STRUCTURE_MVP_JOB: EVENT_QUEUE})
+    input_ref = {
+        "code_revision": code_revision,
+        "run_config": _STRUCTURE_ECONOMIC_RUN_CONFIG,
+    }
+    jobs: list[str] = []
+    for suffix in ("a", "b"):
+        stable_job_id = "job_" + hashlib.sha256(
+            (
+                f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_ECONOMIC_RUN_CONFIG}:"
+                f"{code_revision}:{suffix}"
+            ).encode()
+        ).hexdigest()[:32]
+        job, _created = queue.submit(
+            kind=STRUCTURE_MVP_JOB,
+            actor_user_id=actor_user_id,
+            idempotency_key=(
+                f"structure-economic-qualification-v1-{suffix}-{code_revision[:12]}"
+            ),
+            input_ref=input_ref,
+            concurrency_key=(
+                f"structure-economic:qualification-v1-{suffix}:{code_revision[:12]}"
+            ),
+            requested_job_id=stable_job_id,
+        )
+        if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
+            raise RuntimeError("structure_economic_qualification_seed_mismatch")
         jobs.append(job.job_id)
     return tuple(jobs)
 
@@ -1446,6 +1496,17 @@ def main(argv: list[str] | None = None) -> int:
                     reason=str(exc),
                 )
         print(f"structure qualification seed rejected: {exc}", file=sys.stderr)
+    economic_seed_value = os.environ.get(
+        _STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV, "0"
+    )
+    try:
+        _seed_structure_economic_qualification_jobs(
+            store,
+            enabled_value=economic_seed_value,
+            code_revision=code_revision,
+        )
+    except RuntimeError as exc:
+        print(f"structure economic qualification seed rejected: {exc}", file=sys.stderr)
     worker = EventWorker(
         store,
         worker_id=worker_id,

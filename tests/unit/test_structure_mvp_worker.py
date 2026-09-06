@@ -11,6 +11,7 @@ from unittest.mock import patch
 from quanthus.platform.event_worker import (
     EventWorker,
     _canonical_digest,
+    _seed_structure_economic_qualification_jobs,
     _seed_structure_mvp_qualification_jobs,
     _sha256,
     _structure_input,
@@ -122,6 +123,44 @@ class StructureMvpWorkerTests(unittest.TestCase):
                 store,
                 enabled_value="yes",
                 code_revision="a" * 40,
+            )
+
+    def test_economic_qualification_seed_is_fixed_and_default_off(self) -> None:
+        store = InMemoryPlatformStore()
+        store.create_user(_qualification_user())
+        revision = "f" * 40
+        self.assertEqual(
+            _seed_structure_economic_qualification_jobs(
+                store,
+                enabled_value="0",
+                code_revision=revision,
+            ),
+            (),
+        )
+        first = _seed_structure_economic_qualification_jobs(
+            store,
+            enabled_value="1",
+            code_revision=revision,
+        )
+        second = _seed_structure_economic_qualification_jobs(
+            store,
+            enabled_value="1",
+            code_revision=revision,
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 2)
+        jobs = store.list_jobs()
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(
+            {item.input_ref["run_config"] for item in jobs},
+            {"config/structure-economic-run.development.v1.json"},
+        )
+        self.assertEqual({item.kind for item in jobs}, {STRUCTURE_MVP_JOB})
+        with self.assertRaisesRegex(RuntimeError, "economic_qualification_seed_invalid"):
+            _seed_structure_economic_qualification_jobs(
+                store,
+                enabled_value="yes",
+                code_revision=revision,
             )
 
     def test_qualification_seed_creates_exactly_two_idempotent_structure_jobs(self) -> None:

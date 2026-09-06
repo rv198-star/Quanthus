@@ -10,6 +10,7 @@
 | Frozen run config | `../../config/structure-economic-run.development.v1.json` |
 | Preregistration | `../acceptance/structure-intelligence-economic-preregistration-20260906.md` |
 | Pre-result repair evidence | `../acceptance/structure-intelligence-economic-pre-result-repair-20260906.md` |
+| Derived-lifecycle repair evidence | `../acceptance/structure-intelligence-economic-derived-lifecycle-repair-20260906.md` |
 
 ## 1. Question
 

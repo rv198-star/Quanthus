@@ -202,6 +202,46 @@ def test_lifecycle_decision_prioritizes_primary_coarse_vs_continuous_question() 
     }
     assert _lifecycle_decision(dominated) == "prefer_continuous_structure_facts"
 
+    primary_dominated_with_nonmaterial_secondaries = {
+        "C1-C0": {
+            "material": False,
+            "return_delta": "-0.002",
+            "maximum_drawdown_delta": "-0.009",
+        },
+        "C2-C0": {
+            "material": False,
+            "return_delta": "-0.009",
+            "maximum_drawdown_delta": "0.003",
+        },
+        "C2-C1": {
+            "material": True,
+            "return_delta": "-0.007",
+            "maximum_drawdown_delta": "0.012",
+        },
+    }
+    assert (
+        _lifecycle_decision(primary_dominated_with_nonmaterial_secondaries)
+        == "prefer_continuous_structure_facts"
+    )
+
+    primary_material_not_dominated = {
+        **primary_dominated_with_nonmaterial_secondaries,
+        "C2-C0": {
+            "material": False,
+            "return_delta": "0.009",
+            "maximum_drawdown_delta": "0.003",
+        },
+        "C2-C1": {
+            "material": True,
+            "return_delta": "0.011",
+            "maximum_drawdown_delta": "0.012",
+        },
+    }
+    assert (
+        _lifecycle_decision(primary_material_not_dominated)
+        == "coarse_state_increment_detected_requires_human_review"
+    )
+
     none = {
         key: {
             "material": False,

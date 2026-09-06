@@ -871,17 +871,23 @@ def _lifecycle_decision(comparisons: Mapping[str, Mapping[str, Any]]) -> str:
     c1_c0 = comparisons["C1-C0"]
     c2_c0 = comparisons["C2-C0"]
     c2_c1 = comparisons["C2-C1"]
-    if not c1_c0["material"] and not c2_c0["material"]:
-        return "no_material_structure_signal"
     c1_return = Decimal(str(c1_c0["return_delta"]))
     c2_return = Decimal(str(c2_c0["return_delta"]))
     c1_dd = Decimal(str(c1_c0["maximum_drawdown_delta"]))
     c2_dd = Decimal(str(c2_c0["maximum_drawdown_delta"]))
-    if c2_return <= c1_return and c2_dd >= c1_dd and (c2_return < c1_return or c2_dd > c1_dd):
-        return "prefer_continuous_structure_facts"
-    if not c2_c1["material"]:
+
+    # The preregistration explicitly makes C2-C1 the primary question. Evaluate that
+    # comparison before the C1/C2-vs-C0 secondary questions.
+    if c2_c1["material"]:
+        c2_dominated = c2_return <= c1_return and c2_dd >= c1_dd and (
+            c2_return < c1_return or c2_dd > c1_dd
+        )
+        if c2_dominated:
+            return "prefer_continuous_structure_facts"
+        return "coarse_state_increment_detected_requires_human_review"
+    if c1_c0["material"] or c2_c0["material"]:
         return "continuous_facts_sufficient_no_material_coarse_increment"
-    return "coarse_state_increment_detected_requires_human_review"
+    return "no_material_structure_signal"
 
 
 def run_structure_economic_experiment(

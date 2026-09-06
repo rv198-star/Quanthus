@@ -434,9 +434,10 @@ relations from the deterministic repository authority projection. `/catalog` reu
 session and makes gaps, lifecycle, authority and relation type explicit. The Platform does not scan
 arbitrary repository files at request time: composition rebuilds the Catalog from an explicit source
 manifest and checks the frozen digest/count manifest before serving. No Catalog surface edits schemas,
-formulas, labels, Facts, strategies or execution state. Production API and Web are accepted at exact
-revision `f06a8882c33caa6e5442bf17e21fed8786939929`; the resolved deployment incident and smoke evidence
-are retained in `../../acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`.
+formulas, labels, Facts, strategies or execution state. Current audited production checkout is
+`d47abf8544e9612b75dd77ab2c166a9c75abfda2`, with Catalog API image `8d78073` and Web image
+`d47abf8`; the post-acceptance production evidence is retained in
+`../../acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
 
 Docker keeps API and Web host ports bound to loopback. A governed Web image build also performs a
 repository-scoped retention pass for `quanthus-platform-web:git-*`: the target release tag and every

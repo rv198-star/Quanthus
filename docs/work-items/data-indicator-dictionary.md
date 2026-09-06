@@ -72,7 +72,8 @@ A post-acceptance semantic audit found and repaired two Catalog projection defec
 source formulas: `related_not_equivalent` links for legacy SMA/RSI no longer suppress missing
 executable-spec gaps, and the Structure blueprint now explicitly projects the seven B3-B5 concepts
 that have bounded accepted runtime evidence. Current audit evidence is
-`../acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`.
+`../acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`; the audited production
+closeout is `../acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
 
 ## 3. Required regression examples
 
@@ -93,11 +94,12 @@ The Catalog must continue to make these distinctions explicit:
 
 `P3-DICT-001-E` freezes maintenance and drift checks, synchronizes design/work-item/Platform docs,
 and requires full repository/Web gates plus production deployment/smoke before parent closeout.
-Those gates are now satisfied at production revision `f06a8882c33caa6e5442bf17e21fed8786939929`.
-A source change that changes the deterministic Catalog must refresh the snapshot manifest in the
-same repository change. Final evidence is in
-`../acceptance/data-indicator-catalog-final-acceptance-20260907.md`; the resolved deployment incident
-is retained in `../acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`.
+Those gates remain satisfied after the post-acceptance audit. Current production checkout is
+`d47abf8544e9612b75dd77ab2c166a9c75abfda2`, with Catalog API image `8d78073` and Web image
+`d47abf8`. A source change that changes the deterministic Catalog must refresh the snapshot manifest
+in the same repository change. Initial final evidence remains in
+`../acceptance/data-indicator-catalog-final-acceptance-20260907.md`; the latest audited production
+closeout is `../acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
 
 ## 5. Non-goals and claim ceiling
 

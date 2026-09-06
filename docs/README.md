@@ -122,8 +122,9 @@ nodes.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
-  Web surface and drift/maintenance gates. Production API and Web run exact revision `f06a888` and
-  are healthy; production-edge smoke confirms `/catalog`, OpenAPI, readiness and authentication
+  Web surface and drift/maintenance gates. Current production checkout is `d47abf8`, with Catalog
+  API image `8d78073` and Web image `d47abf8`; both are healthy. Production-edge smoke confirms
+  `/catalog`, OpenAPI, readiness and authentication
   enforcement, while exact-image PostgreSQL smoke confirms successful authenticated Catalog access.
   The current projection contains 664 entries and 10 explicit gaps after the post-acceptance
   semantic audit. It is rebuilt from an explicit
@@ -132,7 +133,8 @@ nodes.
   Design: `design/data-indicator-catalog.md`; acceptance:
   `acceptance/data-indicator-catalog-final-acceptance-20260907.md`; resolved deployment incident:
   `acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`; post-acceptance semantic
-  audit: `acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`.
+  audit: `acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`; final audited
+  production closeout: `acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

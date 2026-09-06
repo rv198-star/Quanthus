@@ -438,7 +438,12 @@ formulas, labels, Facts, strategies or execution state. Production API and Web a
 revision `f06a8882c33caa6e5442bf17e21fed8786939929`; the resolved deployment incident and smoke evidence
 are retained in `../../acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`.
 
-Docker keeps API and Web host ports bound to loopback. The Web container alone also joins
+Docker keeps API and Web host ports bound to loopback. A governed Web image build also performs a
+repository-scoped retention pass for `quanthus-platform-web:git-*`: the target release tag and every
+image reference still owned by any running or stopped container are retained, while only older
+unreferenced Web release tags are removed. The GC never uses `--force`, global `image prune`, or
+volume cleanup, so rollback and unrelated Docker workloads remain outside its deletion scope.
+The Web container alone also joins
 the external `traefik-net`; Traefik terminates public HTTPS for `quanthus.oci.061718.xyz` and
 forwards container-network traffic to port 3100. PostgreSQL and API never join that proxy network.
 The public router excludes `/metrics`; metrics remain available through loopback or the tailnet

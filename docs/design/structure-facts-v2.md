@@ -346,7 +346,7 @@ next gate and evidence. A planned row is not implemented; a contract test is not
 | B5 | Minimal loss/reclaim process and one consumer | First v2 vertical qualification boundary, not all possible repair geometry |
 | B6 | Geometry/width/compression extensions | Planned; demand and counterexample driven |
 | B7 | Episode activity relations | Planned; shared primitives, independent volume availability |
-| B8 | Complete data/indicator dictionaries | Separate P3-DICT-001 backlog, no dependency of B1-B5 |
+| B8 | Shared indicators and Data & Indicator Catalog | P3-DICT-001 accepted as an independent read-only catalog; no dependency of B1-B5 and no claim that every reserved indicator has an executable spec |
 | B9 | Disclosure/fundamental/market context | Parallel domains, not missing Structure-owned capabilities |
 | B10 | Formal Structure Expert and economic value | Separate assessment/mapping experiment after a sufficient slice, not after every planned family |
 | B11 | 13-state, ML and forward execution | Separate authorization; unopened by this blueprint |
@@ -424,9 +424,11 @@ B6-B11 and economic/forward expansion remain separately gated.
 
 ## 7. Data and indicator dictionary work (non-blocking)
 
-`P3-DICT-001`, specified in `../work-items/data-indicator-dictionary.md`, consolidates discovery and
-maintenance over existing warehouse/feature/label contracts. The minimal in-scope catalog above is
-needed now; complete inventories, generation/UI, broad indicator libraries and migration are not.
+`P3-DICT-001`, specified in `../work-items/data-indicator-dictionary.md`, is accepted as the
+independent read-only Data & Indicator Catalog over existing warehouse/feature/label/semantic
+authorities. It remains off the B1-B5 dependency path. Its current projection is an inventory and
+trust surface, not proof that every reserved indicator concept has an executable specification;
+non-equivalent legacy SMA/RSI features remain discovery links rather than generic-spec authority.
 Authoritative formulas and source dictionaries keep their present owners. Derived indicators are
 normally computed once under Quanthus-owned specifications (existing implementation or pinned
 library); vendor outputs have separate identities and are corroboration until separately qualified.

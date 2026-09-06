@@ -265,9 +265,20 @@ def test_operator_web_is_source_built_and_independently_removable() -> None:
     builder = PROJECT_ROOT.joinpath("ops/bin/build-platform-web-image").read_text(encoding="utf-8")
     dockerfile = PROJECT_ROOT.joinpath("ops/platform/Web.Dockerfile").read_text(encoding="utf-8")
     server = PROJECT_ROOT.joinpath("ops/platform/web-server.mjs").read_text(encoding="utf-8")
+    gc_script = PROJECT_ROOT.joinpath("ops/bin/prune-platform-web-images").read_text(
+        encoding="utf-8"
+    )
 
     assert 'cp -a "$REPOSITORY_ROOT/web/.openai"' in builder
     assert '"$REPOSITORY_ROOT/web/app"' in builder
+    assert 'bash "$REPOSITORY_ROOT/ops/bin/prune-platform-web-images" "$IMAGE_TAG"' in builder
+    assert "docker ps -aq" in gc_script
+    assert "{{.Config.Image}}" in gc_script
+    assert "quanthus-platform-web:git-" in gc_script
+    assert '[[ "$candidate" == "$KEEP_TAG" ]] || is_used_ref "$candidate"' in gc_script
+    assert "docker image rm \"$candidate\"" in gc_script
+    assert "--force" not in gc_script
+    assert "docker image prune" not in gc_script
     assert "COPY --from=builder" in dockerfile
     assert "npm run build" in dockerfile
     assert "COPY web/dist" not in dockerfile

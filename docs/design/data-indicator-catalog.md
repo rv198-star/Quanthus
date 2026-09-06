@@ -89,6 +89,12 @@ the full projection from explicit authority sources and refuses startup when it 
 manifest. Contract tests perform the same comparison. Neither the manifest nor Catalog-only search
 annotations may redefine formulas, schemas or authority relationships.
 
+The Structure blueprint is also an implementation-coverage authority. It may explicitly bind a
+registered Structure concept to an accepted bounded runtime capability. The Catalog may project
+`implemented` / `accepted` only from those explicit bindings; it must never infer runtime status by
+matching code names, prefixes or source-file presence. Semantic registration remains a separate
+axis, so a naming concept may remain `reserved` while a bounded runtime implementation is accepted.
+
 ## 4. Catalog entry model
 
 Every entry has a stable `entry_id`, one `kind`, its original `canonical_id`, source authority, a
@@ -134,6 +140,10 @@ details {}
 - `exact_equivalent` only when independently proven
 - `replacement` only when the governing source says so
 
+A `related_not_equivalent` relationship is discovery-only and can never satisfy the claim that the
+semantic concept has an executable specification. Only an explicit `exact_equivalent` executable
+binding may suppress the `executable_spec_missing` gap for an indicator concept.
+
 Physical run ids, last-used times and mutable latest pointers never enter semantic Catalog identity.
 Actual usage stays in operation/decision audit logs.
 
@@ -161,9 +171,11 @@ into memory and needs no search engine.
 The first release must prove these examples without manual UI exceptions:
 
 - `price.sma20@1.0.0`: feature spec input is the total-return continuity index and unit is `index`;
-  it is related to `indicator.trend.sma` but is not silently equal to a raw-price MA20.
+  it is related to `indicator.trend.sma` but is not silently equal to a raw-price MA20. That
+  non-equivalent relation does not make the generic SMA concept executable.
 - `price.rsi14@1.0.0`: retained total-return/simple-window formula; not silently replaced by Wilder
-  RSI.
+  RSI. Its non-equivalent legacy relation likewise does not satisfy the generic RSI executable-spec
+  requirement.
 - `indicator.momentum.macd`: discoverable reserved semantic concept with no accepted executable spec
   unless/until one is registered.
 - DWD `dwd_security_bar.turnover`: amount/turnover value from the DWD contract is not a turnover-rate
@@ -226,8 +238,11 @@ The release adds contract checks for:
 - DWD fields omitted from the generated table projection;
 - registered Feature/Label definitions absent from the Catalog;
 - semantic family/concept registration drift;
+- Structure runtime bindings that are duplicated, point at undeclared concepts, or are not backed
+  by accepted B2-B5 runtime evidence;
 - stale deterministic snapshot manifest or source-manifest digest;
-- legacy links accidentally promoted to exact equivalence;
+- legacy links accidentally promoted to exact equivalence or incorrectly treated as executable
+  specifications;
 - required regression examples above.
 
 A source change must refresh the small snapshot manifest in the same change. The full projection is

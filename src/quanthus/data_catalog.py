@@ -14,7 +14,7 @@ from typing import Any
 from quanthus.policy import find_project_root
 
 CATALOG_SCHEMA = "quanthus.data-indicator-catalog.v1"
-BUILDER_VERSION = "data-indicator-catalog-builder-v1"
+BUILDER_VERSION = "data-indicator-catalog-builder-v1.1"
 SOURCE_MANIFEST = "config/data-indicator-catalog-sources.v1.json"
 SNAPSHOT_MANIFEST = "config/data-indicator-catalog-snapshot.v1.json"
 ENTRY_KINDS = frozenset(
@@ -540,6 +540,59 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
             )
         )
 
+    # Structure runtime coverage is owned by the approved blueprint, not inferred from names or
+    # implementation imports. A semantic registration may remain reserved while a bounded runtime
+    # implementation is separately accepted.
+    blueprint = payloads["structure_blueprint"]
+    capabilities = blueprint.get("capabilities")
+    bindings = blueprint.get("semantic_runtime_bindings")
+    if not isinstance(capabilities, list) or not isinstance(bindings, list):
+        raise DataCatalogError("structure blueprint runtime bindings are invalid")
+    capability_map = {
+        str(item.get("id")): item
+        for item in capabilities
+        if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+    }
+    seen_runtime_concepts: set[str] = set()
+    for raw in bindings:
+        if not isinstance(raw, Mapping) or set(raw) != {
+            "concept_id", "capability_id", "accepted_scope"
+        }:
+            raise DataCatalogError("structure runtime binding fields differ")
+        concept_id = _text(raw.get("concept_id"), "structure_binding.concept_id")
+        capability_id = _text(raw.get("capability_id"), "structure_binding.capability_id")
+        accepted_scope = _text(raw.get("accepted_scope"), "structure_binding.accepted_scope")
+        if concept_id in seen_runtime_concepts:
+            raise DataCatalogError("duplicate structure runtime concept binding")
+        seen_runtime_concepts.add(concept_id)
+        entry_id = f"semantic_concept:{concept_id}"
+        item = entries.get(entry_id)
+        capability = capability_map.get(capability_id)
+        if item is None or item["domain"] != "structure" or not isinstance(capability, Mapping):
+            raise DataCatalogError("structure runtime binding target is invalid")
+        if (
+            capability.get("implementation_status") != "accepted_bounded_v2"
+            or capability.get("verification_status") != "real_dwd_ab"
+        ):
+            raise DataCatalogError("structure runtime binding is not backed by accepted runtime evidence")
+        item = {
+            **item,
+            "implementation_status": "implemented",
+            "verification_status": "accepted",
+            "accepted_scope": accepted_scope,
+            "details": {
+                **item["details"],
+                "runtime_binding": {
+                    "capability_id": capability_id,
+                    "blueprint_implementation_status": capability.get("implementation_status"),
+                    "blueprint_verification_status": capability.get("verification_status"),
+                    "evidence": list(capability.get("evidence") or []),
+                },
+            },
+        }
+        validate_entry(item)
+        entries[entry_id] = item
+
     # Features: project exact registered formulas, never re-implement them here.
     feature_paths = {
         "feature_registry": _source_path(sources, "feature_registry"),
@@ -686,17 +739,17 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
         )
 
     # Reserved indicator concepts without an executable feature spec stay visibly incomplete.
-    related_targets = {
+    executable_targets = {
         relation["target_entry_id"]
         for item in entries.values()
         for relation in item["relations"]
-        if relation["type"] in {"related_not_equivalent", "exact_equivalent", "replacement"}
+        if relation["type"] == "exact_equivalent"
     }
     for item in sorted(entries.values(), key=lambda value: value["entry_id"]):
         if (
             item["kind"] == "semantic_concept"
             and item["canonical_id"].startswith("indicator.")
-            and item["entry_id"] not in related_targets
+            and item["entry_id"] not in executable_targets
         ):
             gaps.append(
                 {

@@ -229,8 +229,12 @@ existing ODS/DWD machine contracts, Feature/Label registries and semantic catalo
 versioned query surface; it does not become a parallel formula or warehouse authority. A small
 snapshot manifest binds the deterministic full projection digest and counts. The Platform exposes
 GET-only summary/search/detail/relation routes under `catalog:read`, and `/catalog` provides the
-human query surface. Missing machine-readable metadata remains an explicit gap. This Catalog still
-has no dependency edge back into P3-STRUCT-004 B1-B5 and grants no strategy or execution authority.
+human query surface. Missing machine-readable metadata remains an explicit gap. The Structure
+blueprint may explicitly bind registered concepts to accepted B3-B5 runtime capabilities; only
+those bindings may project `implemented`/`accepted` status into the Catalog. A discovery-only
+`related_not_equivalent` legacy link never satisfies an executable-spec requirement. This Catalog
+still has no dependency edge back into P3-STRUCT-004 B1-B5 and grants no strategy or execution
+authority.
 
 ## 6. Work items
 

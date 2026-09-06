@@ -41,4 +41,6 @@ docker build \
     --tag "$IMAGE_TAG" \
     "$BUILD_CONTEXT"
 
+bash "$REPOSITORY_ROOT/ops/bin/prune-platform-web-images" "$IMAGE_TAG"
+
 printf 'Platform Web image built: %s\n' "$IMAGE_TAG"

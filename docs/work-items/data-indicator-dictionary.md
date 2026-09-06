@@ -45,7 +45,7 @@ The explicit source manifest projects the current repository authority into 664 
 4 LabelCards
 20 semantic families
 21 semantic concepts
-8 explicit gaps
+10 explicit gaps
 ```
 
 The full projection is reconstructed deterministically. A small checked snapshot manifest binds the
@@ -67,6 +67,12 @@ authority/time/spec presentation, visible gap ledger and outgoing/incoming relat
 Operator and attribution surfaces link to it. No editor or promotion action is exposed.
 
 Evidence: `../acceptance/data-indicator-catalog-api-ui-20260907.md`.
+
+A post-acceptance semantic audit found and repaired two Catalog projection defects without changing
+source formulas: `related_not_equivalent` links for legacy SMA/RSI no longer suppress missing
+executable-spec gaps, and the Structure blueprint now explicitly projects the seven B3-B5 concepts
+that have bounded accepted runtime evidence. Current audit evidence is
+`../acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`.
 
 ## 3. Required regression examples
 

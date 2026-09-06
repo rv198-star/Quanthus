@@ -38,6 +38,8 @@ test("catalog UI exposes authority, lifecycle and relation semantics instead of 
     "Reserved",
     "Registry 已校验",
     "仅合同",
+    "已实现",
+    "源缺口",
   ]) {
     assert.match(browser, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }

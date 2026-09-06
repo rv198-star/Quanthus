@@ -39,7 +39,7 @@ def test_viewer_can_read_catalog_summary_and_search(kernel) -> None:
     assert status == 200
     assert summary["summary"]["entry_count"] == 664
     assert summary["summary"]["counts_by_kind"]["dwd_table"] == 33
-    assert summary["summary"]["gap_count"] == 8
+    assert summary["summary"]["gap_count"] == 10
 
     status, _, result = wsgi_request(
         kernel,

@@ -25,7 +25,7 @@ def test_catalog_build_is_deterministic_and_matches_snapshot_manifest() -> None:
     assert catalog.snapshot["snapshot_digest"] == first["snapshot_digest"]
     assert first["summary"] == {
         "entry_count": 664,
-        "gap_count": 8,
+        "gap_count": 10,
         "counts_by_kind": {
             "dwd_field": 524,
             "dwd_table": 33,
@@ -77,19 +77,45 @@ def test_sma20_is_total_return_index_spec_not_raw_price_alias() -> None:
     assert catalog.search("MA20")["items"][0]["entry_id"] == item["entry_id"]
 
 
-def test_rsi14_retains_existing_formula_and_macd_is_reserved_only() -> None:
+def test_rsi14_retains_existing_formula_and_indicator_concepts_do_not_gain_false_specs() -> None:
     catalog = DataIndicatorCatalog()
     rsi = catalog.item("feature_spec:price.rsi14@1.0.0")
     assert "mean(max(total_return, 0), 14)" in rsi["details"]["formula"]
     assert any("Wilder RSI" in note for note in rsi["details"]["cautions"])
-    macd = catalog.item("semantic_concept:indicator.momentum.macd")
-    assert macd["lifecycle"] == "reserved"
-    assert macd["implementation_status"] == "declared_only"
-    assert macd["verification_status"] == "contract_only"
-    assert any(
-        gap["gap_id"] == "gap:no-executable-spec:indicator.momentum.macd"
-        for gap in catalog.summary()["gaps"]
-    )
+    gaps = {gap["gap_id"] for gap in catalog.summary()["gaps"]}
+    for concept_id in (
+        "indicator.trend.sma",
+        "indicator.oscillator.rsi",
+        "indicator.momentum.macd",
+    ):
+        concept = catalog.item(f"semantic_concept:{concept_id}")
+        assert concept["lifecycle"] == "reserved"
+        assert concept["implementation_status"] == "declared_only"
+        assert concept["verification_status"] == "contract_only"
+        assert f"gap:no-executable-spec:{concept_id}" in gaps
+
+
+def test_structure_runtime_bindings_project_only_blueprint_accepted_concepts() -> None:
+    catalog = DataIndicatorCatalog()
+    accepted = {
+        "structure.anchor.rolling-high": "B3",
+        "structure.anchor.rolling-low": "B3",
+        "structure.geometry.signed-distance": "B3",
+        "structure.interaction.close-cross-above": "B4",
+        "structure.interaction.close-cross-below": "B4",
+        "structure.interaction.close-reclaim": "B4",
+        "structure.episode.reclaim-sequence": "B5",
+    }
+    for concept_id, capability_id in accepted.items():
+        item = catalog.item(f"semantic_concept:{concept_id}")
+        assert item["implementation_status"] == "implemented"
+        assert item["verification_status"] == "accepted"
+        assert item["accepted_scope"] == "bounded_retrospective_b1_b5"
+        assert item["details"]["runtime_binding"]["capability_id"] == capability_id
+    planned = catalog.item("semantic_concept:structure.anchor.confirmed-pivot")
+    assert planned["implementation_status"] == "declared_only"
+    assert planned["verification_status"] == "contract_only"
+    assert "runtime_binding" not in planned["details"]
 
 
 def test_turnover_field_is_not_silently_promoted_to_turnover_rate() -> None:

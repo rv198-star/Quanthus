@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+KEEP_TAG=${1:-}
+if [[ ! "$KEEP_TAG" =~ ^quanthus-platform-web:git-[0-9a-f]{7,40}$ ]]; then
+    printf 'Platform Web image GC skipped for non-release tag: %s\n' "$KEEP_TAG"
+    exit 0
+fi
+
+mapfile -t USED_REFS < <(
+    docker ps -aq | while IFS= read -r container_id; do
+        [[ -n "$container_id" ]] || continue
+        docker inspect --format '{{.Config.Image}}' "$container_id"
+    done | sort -u
+)
+
+is_used_ref() {
+    local candidate=$1
+    local observed
+    for observed in "${USED_REFS[@]}"; do
+        if [[ "$candidate" == "$observed" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+mapfile -t CANDIDATES < <(
+    docker image ls quanthus-platform-web --format '{{.Repository}}:{{.Tag}}' |
+        grep '^quanthus-platform-web:git-[0-9a-f]\{7,40\}$' |
+        sort -u
+)
+
+removed=0
+retained=0
+for candidate in "${CANDIDATES[@]}"; do
+    if [[ "$candidate" == "$KEEP_TAG" ]] || is_used_ref "$candidate"; then
+        retained=$((retained + 1))
+        continue
+    fi
+    docker image rm "$candidate" >/dev/null
+    printf 'Pruned obsolete Platform Web image: %s\n' "$candidate"
+    removed=$((removed + 1))
+done
+
+printf 'Platform Web image GC complete: removed=%d retained=%d keep=%s\n' \
+    "$removed" "$retained" "$KEEP_TAG"

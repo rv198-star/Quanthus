@@ -125,12 +125,14 @@ nodes.
   Web surface and drift/maintenance gates. Production API and Web run exact revision `f06a888` and
   are healthy; production-edge smoke confirms `/catalog`, OpenAPI, readiness and authentication
   enforcement, while exact-image PostgreSQL smoke confirms successful authenticated Catalog access.
-  The current projection contains 664 entries and 8 explicit gaps. It is rebuilt from an explicit
+  The current projection contains 664 entries and 10 explicit gaps after the post-acceptance
+  semantic audit. It is rebuilt from an explicit
   source manifest and checked against a small digest/count snapshot manifest rather than maintained
   as a second formula authority. Catalog search annotations cannot create entries or equivalence.
   Design: `design/data-indicator-catalog.md`; acceptance:
   `acceptance/data-indicator-catalog-final-acceptance-20260907.md`; resolved deployment incident:
-  `acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`.
+  `acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`; post-acceptance semantic
+  audit: `acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

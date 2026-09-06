@@ -81,12 +81,18 @@ const searchKinds: Array<{ value: "" | CatalogKind; label: string }> = [
 const searchStatuses = [
   ["", "全部状态"],
   ["accepted", "已验收"],
+  ["implemented", "已实现"],
   ["registry_validated", "Registry 已校验"],
   ["contract_only", "仅合同"],
+  ["declared_only", "仅定义"],
+  ["planned", "计划中"],
   ["reserved", "Reserved"],
   ["active", "Active"],
+  ["deprecated", "已废弃"],
   ["source_available", "源可用"],
-  ["declared_only", "仅定义"],
+  ["source_gap", "源缺口"],
+  ["unverified", "未验证"],
+  ["unknown", "未知"],
 ] as const;
 
 function badgeTone(value: string) {

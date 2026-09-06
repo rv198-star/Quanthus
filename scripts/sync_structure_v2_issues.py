@@ -66,6 +66,13 @@ def issue_body(row: dict, raw: dict, mapping: dict) -> str:
         "family, 13-state/ML or forward orders. Dictionary #215 is independently scheduled. "
         "Reuse existing contracts and pipeline; actual use belongs to audit, not Fact attributes.",
     ]
+    if row["id"] not in {PARENT + "-B1", PARENT + "-B1-R"}:
+        runtime = raw.get("runtime_qualification")
+        if runtime is not None:
+            content.append(
+                "## Runtime qualification record\n```json\n"
+                + json.dumps(runtime, ensure_ascii=False, indent=2) + "\n```"
+            )
     if row["id"] == PARENT:
         content.append("## Children\n" + "\n".join(
             f"- [{'x' if child['status'] == 'closed' else ' '}] {link(child['id'])}: "

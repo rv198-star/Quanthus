@@ -115,6 +115,13 @@ nodes.
   Final design-entry review supports bounded B2-B5 implementation details, with explicit qualified
   relation-grain and complete admission requirements; it does not accept a v2 runtime. Evidence:
   `acceptance/structure-facts-v2-design-entry-review-20260907.md`.
+  B2-B5 implementation is tested but real qualification remains blocked before any result-bearing
+  publication. Earlier attempts exposed Direct-DWD temporary-storage pressure; the bounded scope
+  repair then exposed an incorrect canonical-receipt equality assumption. The current pre-result
+  repair models the small projection explicitly as a derivative of the accepted canonical parent.
+  Parent #216 and #219-#222 remain open. Evidence:
+  `acceptance/structure-facts-v2-runtime-capacity-blocker-20260907.md` and
+  `acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md`.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;

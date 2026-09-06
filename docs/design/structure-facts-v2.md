@@ -3,10 +3,11 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | blocked |
 | Governing work item | `P3-STRUCT-004` |
 | Current delivery | B2-B5 implementation release-ready under `structure-facts-v2-delivery.md`; real qualification pending |
-| Runtime v2 acceptance | NOT RUN / NOT CLAIMED |
+| Runtime v2 acceptance | BLOCKED before result publication / NOT ACCEPTED |
+| Runtime blocker | pre-result provider provenance repair pending; `../acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md` |
 | B1 checkpoint | `../acceptance/structure-facts-v2-contract-checkpoint-20260906.md` |
 | B1-R checkpoint | `../acceptance/structure-facts-v2-temporal-ownership-checkpoint-20260906.md` |
 | B2-B5 implementation | `../acceptance/structure-facts-v2-b2-b5-implementation-20260907.md`; not runtime acceptance |

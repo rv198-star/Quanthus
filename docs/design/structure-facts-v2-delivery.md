@@ -169,8 +169,18 @@ The v2 runtime uses `config/replay-data-provider.structure-v2.development.v1.jso
 2019-10-08 scan start and 2020Q1 report. The shared general-purpose 2011-2021 provider is not the
 physical scope for this small batch. This is a pre-result resource repair, not a new market
 population or calculation rule; full market rows inside the bounded window and all exact DWD,
-correction and reference authorities are preserved. Evidence:
-`../acceptance/structure-facts-v2-provider-scope-repair-20260907.md`.
+correction and reference authorities are preserved.
+
+The bounded projection is **not** the accepted full canonical projection and must never reuse its
+canonical identity digest. Facts v2 opens it only through the explicit
+`open_bounded_direct_dwd_session()` path. That path validates the exact DWD Base/correction and the
+accepted canonical projection receipt as a parent authority (same materializer and source
+authority), then gives the bounded TMP projection its own provider config/scope/content/physical
+identity plus `projection_kind=bounded_derivative` and parent receipt/bundle references. Ordinary
+Direct-DWD callers retain strict canonical-receipt equality. Cold A/B must independently reproduce
+the bounded derivative and downstream semantic identities; no cross-Job cache is permitted.
+Evidence: `../acceptance/structure-facts-v2-provider-scope-repair-20260907.md` and
+`../acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md`.
 
 Artifact includes the pinned input-readiness receipt, schema-qualified business objects, rejected
 attempts, consumer outputs, P2 reconciliation, bounded outcome-blind sample and physical runtime/

@@ -15,7 +15,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from quanthus.backtest.data_provider import ReplayDataProvider, load_replay_data_provider_config
+from quanthus.backtest.data_provider import load_replay_data_provider_config
+from quanthus.backtest.direct_dwd_provider import open_bounded_direct_dwd_session
 from quanthus.backtest.policy import load_execution_policy
 from quanthus.policy import find_project_root
 from quanthus.structure_v2 import StructureV2Result, build_structure_v2
@@ -85,7 +86,9 @@ def _stable_provider(identity: dict[str, Any]) -> dict[str, Any]:
     keys = ("provider_id", "provider_version", "provider_config_digest", "mode", "scope",
             "dwd_authority", "dwd_correction", "research_references", "materializer_version",
             "history_start", "materialized_rows", "materialized_content_digest",
-            "provider_lineage_digest", "point_in_time")
+            "projection_kind", "parent_canonical_bundle_digest",
+            "parent_canonical_projection_receipt_sha256",
+            "parent_canonical_projection_receipt_id", "provider_lineage_digest", "point_in_time")
     return {key: identity[key] for key in keys if key in identity}
 
 
@@ -312,9 +315,12 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("v2 sealed/non-development scope forbidden")
     config.scope.authorize(first, last)
     started = time.perf_counter()
-    provider = ReplayDataProvider(config)
     with diagnosed_stage("provider-open"):
-        opened = provider.open(scope_start=first, scope_end=last)
+        opened = open_bounded_direct_dwd_session(
+            config,
+            scope_start=first,
+            scope_end=last,
+        )
     with opened as session:
         provider_seconds = time.perf_counter() - started
         extract_start = time.perf_counter()

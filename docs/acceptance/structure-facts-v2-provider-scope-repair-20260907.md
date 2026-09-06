@@ -69,6 +69,8 @@ Ruff passed. This proves the configuration contract, not completed real-data equ
 acceptance. The first real retry must validate its actual prerequisite extent and complete evidence.
 
 A/B at e5b9b03 and the diagnostic Job remain visible failed attempts; no published values have been
-selected or inspected for tuning. Start only corrected A first. If it succeeds, perform exactly one
-same-revision independent B and inspect both. If resource or semantic gates remain unsatisfied, stop
-with that precise failure rather than launching repeated speculative experiments.
+selected or inspected for tuning. The next retry at `fd7224b` subsequently proved that this physical
+scope repair must be modeled as a bounded derivative rather than canonical-receipt equality. That
+provenance correction is governed by
+`structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md`; this document remains the
+resource-scope evidence and does not by itself authorize a result-bearing retry.

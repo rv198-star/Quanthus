@@ -1288,6 +1288,56 @@ def _bind_canonical_projection_identity(
     )
 
 
+def _validate_parent_canonical_projection_authority(
+    *,
+    actual_dwd: Mapping[str, Any],
+    actual_correction: Mapping[str, Any],
+) -> tuple[str, str, str]:
+    """Bind a bounded derivative projection to the accepted canonical parent authority.
+
+    This deliberately does not require the bounded provider config/scope to equal the parent
+    canonical provider. It validates only the immutable parent receipt schema, materializer, DWD
+    Base/correction authority, and canonical identity. The bounded projection keeps its own
+    physical/content identity and must be independently reproduced by its consumer qualification.
+    """
+
+    receipt_path = find_project_root() / _CANONICAL_PROJECTION_RECEIPT
+    receipt = _object(receipt_path, "direct DWD canonical projection receipt")
+    expected_fields = {
+        "schema_version",
+        "receipt_id",
+        "provider_config_digest",
+        "materializer_version",
+        "history_start",
+        "scope",
+        "dwd_authority",
+        "dwd_correction",
+        "canonical_bundle_digest",
+        "provider_lineage_digest",
+        "datasets",
+    }
+    if set(receipt) != expected_fields or receipt.get("schema_version") != (
+        "quanthus.direct-dwd-canonical-projection.v1"
+    ):
+        raise ConfigurationError("direct DWD parent canonical receipt fields differ")
+    receipt_id = receipt.get("receipt_id")
+    canonical_bundle_digest = receipt.get("canonical_bundle_digest")
+    provider_lineage_digest = receipt.get("provider_lineage_digest")
+    if (
+        not isinstance(receipt_id, str)
+        or not receipt_id.strip()
+        or receipt.get("materializer_version") != MATERIALIZER_VERSION
+        or receipt.get("dwd_authority") != dict(actual_dwd)
+        or receipt.get("dwd_correction") != dict(actual_correction)
+        or not isinstance(canonical_bundle_digest, str)
+        or not _SHA256.fullmatch(canonical_bundle_digest)
+        or not isinstance(provider_lineage_digest, str)
+        or not _SHA256.fullmatch(provider_lineage_digest)
+    ):
+        raise ConfigurationError("direct DWD parent canonical authority binding differs")
+    return canonical_bundle_digest, _sha256(receipt_path), receipt_id
+
+
 def _materialized_direct_dwd_session(
     config: Any,
     *,
@@ -1297,6 +1347,7 @@ def _materialized_direct_dwd_session(
     actual_correction: Mapping[str, Any],
     correction_manifest: Mapping[str, Any],
     temporary: tempfile.TemporaryDirectory[str] | None,
+    projection_binding: str = "canonical",
 ) -> Any:
     from quanthus.backtest.data_provider import ReplayDataSession
 
@@ -1345,29 +1396,67 @@ def _materialized_direct_dwd_session(
         universe_policy_version="dwd-current-listing-state-v1",
         datasets=manifests,
     )
-    bundle, expected_lineage_digest, canonical_receipt_sha256 = (
-        _bind_canonical_projection_identity(
-            config,
-            physical_bundle=physical_bundle,
-            files=files,
-            counts=counts,
+    if projection_binding == "canonical":
+        bundle, expected_lineage_digest, canonical_receipt_sha256 = (
+            _bind_canonical_projection_identity(
+                config,
+                physical_bundle=physical_bundle,
+                files=files,
+                counts=counts,
+                actual_dwd=actual_dwd,
+                actual_correction=actual_correction,
+            )
+        )
+        materialized_content_digest = bundle.digest
+        lineage = {
+            "materializer_version": MATERIALIZER_VERSION,
+            "history_start": config.history_start.isoformat(),
+            "dwd": dict(actual_dwd),
+            "correction": dict(actual_correction),
+            "benchmark_sha256": config.benchmark_sha256,
+            "industry_sha256": config.industry_sha256,
+            "materialized_content_digest": materialized_content_digest,
+        }
+        provider_lineage_digest = _digest(lineage)
+        if provider_lineage_digest != expected_lineage_digest:
+            raise ConfigurationError("direct DWD canonical provider lineage differs")
+        projection_identity = {
+            "canonical_projection_receipt_sha256": canonical_receipt_sha256,
+        }
+    elif projection_binding == "bounded_derivative":
+        (
+            parent_canonical_bundle_digest,
+            parent_canonical_receipt_sha256,
+            parent_canonical_receipt_id,
+        ) = _validate_parent_canonical_projection_authority(
             actual_dwd=actual_dwd,
             actual_correction=actual_correction,
         )
-    )
-    materialized_content_digest = bundle.digest
-    lineage = {
-        "materializer_version": MATERIALIZER_VERSION,
-        "history_start": config.history_start.isoformat(),
-        "dwd": dict(actual_dwd),
-        "correction": dict(actual_correction),
-        "benchmark_sha256": config.benchmark_sha256,
-        "industry_sha256": config.industry_sha256,
-        "materialized_content_digest": materialized_content_digest,
-    }
-    provider_lineage_digest = _digest(lineage)
-    if provider_lineage_digest != expected_lineage_digest:
-        raise ConfigurationError("direct DWD canonical provider lineage differs")
+        bundle = physical_bundle
+        materialized_content_digest = bundle.digest
+        lineage = {
+            "projection_kind": "bounded_derivative",
+            "parent_canonical_bundle_digest": parent_canonical_bundle_digest,
+            "parent_canonical_projection_receipt_sha256": parent_canonical_receipt_sha256,
+            "provider_config_digest": config.digest,
+            "scope": config.scope.to_dict(),
+            "materializer_version": MATERIALIZER_VERSION,
+            "history_start": config.history_start.isoformat(),
+            "dwd": dict(actual_dwd),
+            "correction": dict(actual_correction),
+            "benchmark_sha256": config.benchmark_sha256,
+            "industry_sha256": config.industry_sha256,
+            "materialized_content_digest": materialized_content_digest,
+        }
+        provider_lineage_digest = _digest(lineage)
+        projection_identity = {
+            "projection_kind": "bounded_derivative",
+            "parent_canonical_bundle_digest": parent_canonical_bundle_digest,
+            "parent_canonical_projection_receipt_sha256": parent_canonical_receipt_sha256,
+            "parent_canonical_projection_receipt_id": parent_canonical_receipt_id,
+        }
+    else:
+        raise ConfigurationError("unsupported direct DWD projection binding mode")
     identity = {
         "provider_id": config.provider_id,
         "provider_version": config.provider_version,
@@ -1385,7 +1474,7 @@ def _materialized_direct_dwd_session(
         "materialized_rows": dict(counts),
         "materialized_content_digest": materialized_content_digest,
         "materialized_physical_digest": physical_bundle.physical_digest,
-        "canonical_projection_receipt_sha256": canonical_receipt_sha256,
+        **projection_identity,
         "provider_lineage_digest": provider_lineage_digest,
         "point_in_time": {
             "strategy_cutoff_enforced": True,
@@ -1432,6 +1521,49 @@ def open_materialized_direct_dwd_session(
         correction_manifest=correction_manifest,
         temporary=None,
     )
+
+
+def open_bounded_direct_dwd_session(
+    config: Any,
+    *,
+    scope_start: date,
+    scope_end: date,
+    progress: Callable[[str, Mapping[str, Any]], None] | None = None,
+) -> Any:
+    """Build a bounded TMP projection explicitly derived from the accepted canonical authority.
+
+    This is intentionally separate from ordinary ReplayDataProvider.open(): callers must opt into
+    derivative semantics and independently qualify their bounded projection identity.
+    """
+
+    config.scope.authorize(scope_start, scope_end)
+    actual_dwd, actual_correction, correction_manifest = _direct_dwd_authority(
+        config, progress
+    )
+    temporary = tempfile.TemporaryDirectory(prefix="quanthus-direct-dwd-bounded-")
+    root = Path(temporary.name)
+    try:
+        counts = _materialize(
+            root,
+            dwd_root=config.dwd_root,
+            correction_root=config.correction_root,
+            history_start=config.history_start,
+            execution_end=config.scope.execution_end,
+            progress=progress,
+        )
+        return _materialized_direct_dwd_session(
+            config,
+            root=root,
+            counts=counts,
+            actual_dwd=actual_dwd,
+            actual_correction=actual_correction,
+            correction_manifest=correction_manifest,
+            temporary=temporary,
+            projection_binding="bounded_derivative",
+        )
+    except BaseException:
+        temporary.cleanup()
+        raise
 
 
 def open_direct_dwd_session(

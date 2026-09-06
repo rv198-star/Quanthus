@@ -5,6 +5,8 @@
   "catalog": "config/structure-semantic-catalog.v1.json",
   "current_slice": "B2-B5",
   "v2_runtime_accepted": false,
+  "runtime_qualification_status": "blocked_pre_result_provider_provenance_repair_pending",
+  "runtime_blocker": "docs/acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md",
   "dictionary_work_item": "P3-DICT-001",
   "dictionary_blocks_current_slice": false,
   "scope_note": "Blueprint approval is not runtime acceptance or authority for all future slices.",

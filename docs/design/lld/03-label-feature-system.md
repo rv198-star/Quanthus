@@ -205,13 +205,16 @@ bearish structure or exit authority.
 `../structure-facts-v2.md` and ADR 0014. The additive naming catalog classifies complete
 `domain.family.concept` identifiers and distinguishes reserved concepts from executable specs.
 Anchor/geometry/activity/interaction/episode are Structure-owned; indicators and other evidence
-domains are parallel, with required DWD reference dependencies. Event/confirmation/public/platform
-knowledge/computation clocks are distinct. Existing v1 formulas, FeatureFact IDs, source-view limits
-and artifacts are not rewritten.
+domains are parallel, with required DWD reference dependencies. B1-R separates Fact business time,
+source/generation/publication metadata, and operation/decision use logs. Facts/indicators carry no
+consumer, consumed-at or decision-cutoff usage attribute; logs reference exact revisions and receipts.
+`temporal_contracts.py` supplies business/source-clock contracts; `evidence_consumption.py` supplies
+append-only audit-event/receipt shapes and local binding checks. Neither rewrites v1 formulas,
+FeatureFact IDs, source-view limits or accepted artifacts.
 
-The local namespace/time-envelope module is B1 contract work only. Integrated source-evidence
-verification and v2 data/runtime qualification remain B2-B5 work in the machine-readable coverage
-ledger. `P3-DICT-001` separately consolidates existing warehouse and feature dictionaries under
+B1 and B1-R are local contract work only. Source authentication, full dependency closure, finality,
+as-of runtime joins, decision-log integration and v2 data qualification remain B2-B5 work in the
+machine-readable ledger. `P3-DICT-001` separately consolidates existing warehouse and feature dictionaries under
 `../../work-items/data-indicator-dictionary.md`; its deferred scheduling does not block B1-B5.
 
 ## 6. Work items
@@ -227,7 +230,7 @@ ledger. `P3-DICT-001` separately consolidates existing warehouse and feature dic
 | P3-STRUCT-001 | Prove the bounded DWD -> Structure ADM -> trend-semantics adapter -> aggregator -> P2 path | P3-FEAT-002, P3 expert/aggregator contracts, P4 Event Worker | Real-DWD immutable artifact, independent reproduction, decision/P2 probe reconciliation |
 | P3-STRUCT-002 | Compare continuous versus coarse Structure Intelligence through complete P2 | P3-STRUCT-001, P3-ATTR-001, P3-STRAT-002 | Preregistered C0/C1/C2 A/B replay, exact baseline reproduction, paired comparisons, lifecycle decision |
 | P3-STRUCT-003 | Build Continuous Structure Facts v1 | P3-STRUCT-002 | Contract/adversarial semantics, Real-DWD A/B fact digests, direct expert/aggregator consumption, P2 compatibility, outcome-blind review |
-| P3-STRUCT-004 | Implement time-first Structure Facts v2 in bounded slices | P3-STRUCT-003 | `docs/design/structure-facts-v2.md`: B1 namespace/time contracts and coverage; B2-B5 source, coordinate, interaction/episode and Real-DWD qualification remain open |
+| P3-STRUCT-004 | Implement time-first Structure Facts v2 in bounded slices | P3-STRUCT-003 | `docs/design/structure-facts-v2.md`: B1/B1-R namespace, time ownership and audit contracts; B2-B5 verified source/consumer integration and Real-DWD qualification remain open |
 | P3-DICT-001 | Maintain data and indicator dictionaries | P3-FEAT-001 | `docs/work-items/data-indicator-dictionary.md`: source-owned inventory, exact specs/units/clocks, legacy compatibility and change checks; separately deferred, not a dependency of P3-STRUCT-004 |
 
 ## 7. Acceptance

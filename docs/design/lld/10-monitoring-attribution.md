@@ -34,6 +34,23 @@ rate, false-veto cost, cash/cooldown misses, add sufficiency, payoff ratio, and 
 
 ## 3. Decision log
 
+### Fact/input consumption boundary
+
+Under `P3-STRUCT-004` B1-R, actual input use is an operation/decision audit event, NOT a market Fact
+attribute. `src/quanthus/evidence_consumption.py` defines additive generation/publication receipts,
+exact consumed-revision bindings and `FactConsumptionEvent`. Each event records actual use,
+decision and log time, consumer/run/decision identity, query cutoff/view/purpose and selected
+revision/spec/artifact/receipt references. Multiple events may reference the same unchanged fact.
+Generation/publication metadata prove output supply, not actual use. The governing temporal and
+identity rules are `../structure-facts-v2.md` section 5.
+
+B1-R defines local contracts only. B2 must connect them to this existing append-only evidence path,
+with verified source/version closure; no new audit database or per-value read logger is required.
+No existing P2 `DecisionEvent`, persisted decision, execution contract or retention policy is changed.
+A later audit may record original events, but cannot invent original consumption from a new replay.
+
+### Existing decision persistence
+
 One record exists for every candidate and held-position review. It includes time, security,
 unit, lifecycle stage, complete expert outputs, aggregate score, vetoes/constraints, proposed
 and final action, reason codes, snapshot, policy versions, and linked order ids. Shadow outputs

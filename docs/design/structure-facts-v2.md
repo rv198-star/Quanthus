@@ -5,14 +5,15 @@
 | Design status | approved |
 | Delivery gate | open |
 | Governing work item | `P3-STRUCT-004` |
-| Current delivery | B1: boundary, naming, time-envelope contracts and coverage blueprint only |
+| Current delivery | B1-R: time ownership, source-clock selection and consumption-audit contracts; no runtime integration |
 | Runtime v2 acceptance | NOT RUN / NOT CLAIMED |
 | B1 checkpoint | `../acceptance/structure-facts-v2-contract-checkpoint-20260906.md` |
+| B1-R checkpoint | `../acceptance/structure-facts-v2-temporal-ownership-checkpoint-20260906.md` |
 | Parent | `lld/03-label-feature-system.md`; `hld.md` |
 | Architecture decision | `../architecture/adr-0014-time-first-structure-semantics.md` |
 | Executable catalog | `../../config/structure-semantic-catalog.v1.json` |
 | Coverage authority | `../../config/structure-facts-v2-blueprint.v1.json` |
-| Contract code/tests | `../../src/quanthus/structure_semantics.py`; `../../tests/unit/test_structure_semantics.py` |
+| Contract code/tests | `../../src/quanthus/structure_semantics.py`; `../../src/quanthus/temporal_contracts.py`; `../../src/quanthus/evidence_consumption.py`; `../../tests/unit/test_structure_semantics.py`; `../../tests/unit/test_temporal_contracts.py` |
 | Predecessor | `continuous-structure-facts-v1.md`; v1 acceptance remains immutable |
 
 ## 1. Purpose and decision
@@ -151,16 +152,42 @@ migration and exact equivalence evidence are future dictionary work. Old Runs re
 
 ## 5. Time is a first-class model, not a suffix on a stock label
 
-### 5.1 Independent clocks
+### 5.1 Three owners, not one oversized Fact timestamp envelope
 
-| Clock | What it answers |
-| --- | --- |
-| `event_start/event_end` or `valid_from/valid_to` | When was the phenomenon observed, or when does the referenced condition apply? |
-| `confirmed_at` | When was the last required confirming observation first available under the declared method? |
-| `public_available_at` + evidence | When was THIS source version publicly available? Unknown stays null |
-| `system_known_from/system_known_to` + receipt | When did the platform possess/select THIS version? Half-open knowledge interval |
-| `computed_at` | When did this physical calculation run? A 2026 rebuild of historical data is allowed |
-| consumer `knowledge_cutoff` | What knowledge was this decision permitted to use? |
+The owner explicitly corrected the temporal review: **actual usage time belongs to operation /
+decision audit logs, not to market Fact modeling**. Adopt that correction for all Facts and indicator
+results. A value can have many consumers and repeated uses, or no use at all. Reading a Fact must
+never mutate its row, last-used field, semantic digest, quality, or business validity.
+
+| Owner | Fields or referenced record | What it answers |
+| --- | --- | --- |
+| Business observation | `result_as_of` | Which business instant does this result describe? |
+| Business observation / spec | `window` with explicit endpoints, inclusion, calendar, counts | Which observations formed it? This is not result time or validity |
+| Event / reference / process observation | `event_at`, optional `confirmation_event_at` | When did the market event occur, and which later market observation completes logical confirmation? |
+| Business rule / reference when applicable | `valid_from/valid_to` | When is the object applicable? Not every scalar measurement expires |
+| Source-version metadata | public bounds, received/validated evidence and view-specific knowledge interval | When was THIS version public or admitted to the platform? |
+| Dependency metadata | view-qualified `confirmation_ready_at` / latest required-input readiness | When were all exact required inputs and confirmation evidence available? |
+| Generation / delivery receipts | actual `completed_at`, `servable_at`, run/code/spec/output/package binding | When was this materialization completed and made available? |
+| Operation / decision audit only | `consumed_at`, `decision_at`, `recorded_at`, consumer/run/decision identity and exact selected revisions | Who actually used which output, when? |
+| Query context, persisted in decision audit | `knowledge_cutoff`, knowledge view, query purpose, selection policy | Which information horizon was the operation allowed to use? |
+
+The first four rows are semantic business time. Source/publication clocks are metadata with distinct
+owners. The last two rows are query/audit concerns and MUST NOT be embedded as usage attributes of
+an `Observation`, `Anchor`, `Episode`, indicator value, or their semantic identity. Source evidence
+can be referenced by immutable IDs; no arbitrary duplication of every timestamp on every fact row.
+
+`BusinessTime` separates result time, input window and validity. A measurement can describe an old
+business instant while its physical creation is recent. A delayed pivot retains its occurrence time
+without becoming confirmed earlier. Ordinary indicators need a declared window/finality rule, not
+an invented pattern-confirmation stage. `partial/final/unknown` data finality is independent of market
+confirmation. Observation counts and exchange-session counts remain separate; sampling and partial-
+session activity denominators belong to the EvaluationSpec.
+
+`GenerationReceipt` and `PublicationReceipt` may describe an atomic batch, with membership proved by
+the immutable artifact. A shared batch completion timestamp is not fabricated per-row timing. A
+verified direct handoff can stand in for package publication. Both are production provenance, not
+usage attributes or trading authority. Unknown source times remain unknown; received, validated and
+servable are not interchangeable.
 
 Do not force all object types into the same chronology: a financial forecast can refer to a future
 report period, but a Structure observation cannot claim a confirmed future price. Public and system
@@ -194,11 +221,33 @@ Examples:
    no claim of full historical availability. Calculations still cannot read later market events or
    confirmations as inputs to an earlier observation.
 
-The new `TemporalEvidence` and `check_clock_at()` implement local envelope consistency and these
-clock distinctions ONLY. A nonempty evidence-reference string is not proof of its authenticity.
-Integrated source receipt verification, whole-dependency closure, as-of joins, partition permission,
-quality, coordinate compatibility and expert authorization remain mandatory in B2 and existing
-policy. `clock_eligible=true` is never a market-truth, official-PIT or order permission.
+Knowledge view is independent of query purpose. `counterfactual_recomputation` may run today's
+specified algorithm over an authorized historical information view; its actual computation/use
+clocks remain today. `historical_actual_consumption_audit` requires the original platform output,
+delivery and decision-use evidence. A 2026 rebuild cannot prove an expert consumed that output in
+2020. Auditing an old event today may give the audit record a later `recorded_at`, never an invented
+old `consumed_at`. Query context is stored in the decision log, not in the Fact's business attributes.
+
+Retained `TemporalEvidence` / `check_clock_at()` are B1 local source-clock helpers only. Their
+`confirmed_at` is the logical market confirmation endpoint; the original phrase 'first available'
+was ambiguous and is superseded here. Their late `computed_at` support is historical recomputation,
+not proof of actual use. Their old behavior remains available; new contracts do not silently replace
+v1 runs or reinterpret old evidence.
+
+B1-R's `select_source_version()` tests one caller-declared complete revision family using evidenced,
+view-specific selection intervals. It rejects overlapping eligible revisions, unknown availability,
+and ambiguous same-instant boundaries rather than choosing an arbitrary latest file. Retrospective
+selection requires an explicit revision pin. No public supersession interval is guessed from a
+filename or from the existence of another version. Actual-use audit compares the logged selection
+under its recorded selection policy; it does not rewrite that selection to whichever file is latest
+now. A query for currently valid source truth remains a separate policy from audit of actual use.
+
+`dependency_ready_at()` calculates the conservative latest bound of all supplied required inputs
+and confirmation evidence. It is NOT output completion or publication time. A completeness flag or
+nonempty reference is not proof: source receipt authentication, family completeness, actual as-of
+joins, dependency/cross-section completeness, finality, quality, coordinate compatibility, partition
+permission and expert admission remain B2/runtime gates. Local checks grant no official-PIT, market-
+truth or order authority.
 
 Every input contributes its earliest admissible availability; the output cannot be known before the
 latest required input and required confirmation. Any future outcome is isolated until its target
@@ -224,6 +273,57 @@ and is not an automatic instruction to rebuild the whole warehouse.
 - Missing volume suppresses volume-derived measurements only when price evidence remains valid.
   Amount is not turnover rate; a rate additionally needs the right historical denominator.
 
+### 5.4 Precision, revision and operation-log binding
+
+Preserve timestamp precision, timezone, source evidence and conservative bounds. A date-only source
+must not become a fictitious midnight publication. B1-R refuses a cutoff inside the uncertainty
+interval and refuses equal availability/use timestamps without ordering evidence. No artificial
+millisecond offset is allowed. B2 may later consume a verified sequence or causal receipt; it must
+not treat a caller-supplied order flag as evidence. UTC-equivalent instants have the same semantic
+identity. Validity/version intervals remain half-open under their declared time model.
+
+`ObservationRevision` separates a business `observation_key` from the exact source/value revision.
+Spec and coordinate are part of the key. Source corrections, finality changes, confirmation evidence
+or values can create a distinct revision; a new calculation specification is a new evaluated key.
+Wall-clock generation, run inventory, package size and use never enter these semantic digests.
+Generation and publication receipts keep their own physical identities. Existing v1 FeatureLineage
+continues to bind its original ADM package; B2 must bridge exact v2 observations, not silently
+reinterpret v1's package-dependent evidence digest as a v2 stable row identity.
+
+`FactConsumptionEvent` belongs to the append-only operation/decision evidence boundary (LLD 10),
+not the `structure.*` concept catalog. It records consumer/run/decision, actual consumed/decision/log
+clocks, the query context and exact `ConsumedRevision` references: observation key, revision, spec,
+generation receipt, publication receipt and artifact digest. One output may be referenced by many
+events. Fact creation does not require a consumer. Corrections or retractions append events rather
+than overwriting earlier facts/logs. `validate_consumption_binding()` checks local receipt identity
+and delivery-before-use consistency; it does not grant source/PIT or execution approval.
+
+Do not introduce a second audit database, a new event bus, or a data-read log for every arithmetic
+access. B2 integrates the minimal input-use receipt with the existing decision/operation evidence
+path at the declared expert invocation or decision boundary. A physical batch may aggregate input
+references under a manifest, but exact member selection must remain recoverable. Debug text alone
+is not sufficient evidence of historical consumption. The legacy P2 DecisionEvent format is not
+modified by B1-R.
+
+For episodes, a later end/censoring status is a new time-qualified process observation, never a
+backfill of the terminal state into earlier knowledge. Missing bars can censor continuity without
+asserting price failure. Effective rules and forecasts use domain-specific time profiles; do not
+apply observed-price chronology to an already-announced future-effective action.
+
+### 5.5 Bounded observability and remaining runtime gates
+
+Daily high/low ranges cannot establish first-touch order, reseal timing, executable queue position,
+actor identity or fund intent. Every specification declares sampling and its capability ceiling;
+more precise ingestion timestamps do not create missing intrabar observations. Amount, volume and
+turnover rate retain separate units/denominators. Announcement adjacency is not causal attribution.
+Names own classification only; algorithm, unit, initialization and clock profile come from the spec.
+
+B1-R closes ownership/contract ambiguities, not source authentication or integrated consumption
+acceptance. B2 is limited to the necessary inputs and one daily profile for B3-B5. Evidence gaps
+restrict the permitted view/claim or stop that profile; they do not trigger an unlimited all-market
+history rebuild. Dictionary issue #215 stays independently scheduled. No fresh v1/economic replay,
+new research Job, 13-state, model, Shadow or live activation is authorized by this amendment.
+
 ## 6. Blueprint and staged delivery
 
 `config/structure-facts-v2-blueprint.v1.json` is the machine-readable coverage ledger. Each row has
@@ -234,7 +334,8 @@ next gate and evidence. A planned row is not implemented; a contract test is not
 | --- | --- | --- |
 | B0 | Retained Facts v1 | Existing bounded engineering baseline, not full v2 |
 | B1 | This delivery: meaning, namespace, object/time contracts and coverage map | Contract implementation; no v2 market-data build |
-| B2 | Temporal/source/coordinate/identity adapter | Next input-readiness work; verify only the inputs needed by the first slice |
+| B1-R | Temporal ownership and consumption-audit contract revision | Local contract tests only; use belongs to logs, generation/publication to provenance |
+| B2 | Temporal/source/coordinate/identity adapter | Next input-readiness work; verify only the inputs needed by the first slice and bind existing audit ports |
 | B3 | Small multi-scale reference set | Freeze parameters before result access; no global optimum claim |
 | B4 | Same-anchor close crossings and reclaim | Standalone traceable interactions, no inferred intrabar order |
 | B5 | Minimal loss/reclaim process and one consumer | First v2 vertical qualification boundary, not all possible repair geometry |
@@ -245,7 +346,7 @@ next gate and evidence. A planned row is not implemented; a contract test is not
 | B10 | Formal Structure Expert and economic value | Separate assessment/mapping experiment after a sufficient slice, not after every planned family |
 | B11 | 13-state, ML and forward execution | Separate authorization; unopened by this blueprint |
 
-First runtime path is B2 -> B3 -> B4 -> B5. It must freeze a finite resource budget, scope, exact
+The contract path is B1 -> B1-R; the first runtime path is B2 -> B3 -> B4 -> B5. It must freeze a finite resource budget, scope, exact
 specifications, rejected counterexamples, outcome-blind samples and independent reconstruction
 before result-bearing qualification. Do not repeat the already completed v1 or C0/C1/C2 experiments
 merely to validate names. Do not start B6/B7 to make an impressive inventory without a consumer need.

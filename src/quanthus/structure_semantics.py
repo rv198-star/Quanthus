@@ -166,6 +166,10 @@ class TemporalEvidence:
     Public and platform times have separate evidence references. Null is unknown, never the
     market date. This object checks local consistency, not authenticity of those references.
     event_end is an observation endpoint, not a financial-report forecast period.
+
+    Retained B1 helper: confirmed_at denotes the market confirmation endpoint, NOT the later
+    source/confirmation readiness time. computed_at is materialization metadata, not actual-use
+    evidence. New B1-R callers use temporal_contracts and separate evidence_consumption logs.
     """
 
     source_version_ref: str
@@ -214,7 +218,11 @@ class ClockCheck:
 
 
 def check_clock_at(evidence: TemporalEvidence, cutoff: datetime, view: ClockView) -> ClockCheck:
-    """Test clocks only; never grant partition, data-quality, market-truth or order authority."""
+    """Legacy local source-clock check, not output-publication or actual-consumption proof.
+
+    Preserve B1 behavior for existing callers/tests. Version selection, readiness and actual-use
+    bindings use the additive B1-R contracts; neither API grants data or order authority.
+    """
     if cutoff is None:
         raise ValueError("cutoff is required")
     _aware(cutoff, "cutoff")

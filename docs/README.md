@@ -106,8 +106,10 @@ nodes.
   Shadow, paper, or live authority is opened. Evidence:
   `acceptance/continuous-structure-facts-v1-real-dwd-acceptance-20260906.md`.
 - `P3-STRUCT-004` advances the reviewed time-first Facts v2 boundary in bounded slices. B1 supplies
-  a semantic namespace catalog/resolver, local multi-clock contracts and an explicit coverage ledger;
-  it is not a v2 market-data build or acceptance. B2-B5 cover the next source/coordinate, anchor,
+  a semantic namespace catalog/resolver, local multi-clock contracts and an explicit coverage ledger.
+  B1-R separates business Fact time, source/generation/publication metadata and consumption audit
+  events; actual use never mutates a Fact or its semantic digest. These are local contracts, not a
+  v2 market-data build or acceptance. B2-B5 cover verified source/consumer integration, anchor,
   interaction and minimal episode route. Full geometry/activity extensions remain planned.
   `P3-DICT-001` is a separately deferred data/indicator dictionary task, not a prerequisite.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.

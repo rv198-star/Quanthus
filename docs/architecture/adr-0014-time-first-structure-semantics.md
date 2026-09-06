@@ -45,6 +45,25 @@ and next gates. B1 implements the small contract only; B2-B5 define the first ru
 Geometry/activity expansion is planned, not automatically activated. `P3-DICT-001` is a separate
 backlog and never a prerequisite for that route.
 
+## B1-R temporal ownership amendment (2026-09-06)
+
+The owner approved the follow-up temporal review with one explicit correction: actual usage time
+belongs to operation/decision audit logs, not to market facts. Separate three owners:
+
+- business observations own result-as-of, input window, event/market-confirmation and applicable
+  validity; actual consumer identity/use/query-cutoff fields are excluded;
+- source/generation/publication metadata own evidenced availability, version intervals, physical
+  completion and delivery; repeated materialization does not change semantic observation identity;
+- append-only decision/operation evidence owns actual consumption/decision/recording clocks and exact
+  input revision/receipt references. One Fact can be unused or used many times without mutation.
+
+Logical confirmation time is not evidence-ready time. Knowledge basis and query purpose are
+orthogonal: current recomputation using old information is not proof of old actual use. Local
+version selection rejects ambiguity; date-only or equal-clock ordering is not invented. Full source
+receipt verification, complete dependency closure, as-of joins and actual log integration remain B2.
+B1-R supplies additive pure contracts/tests only and preserves the previous B1 helper and all v1
+runtime identities. No new log storage, Worker, DWD build or deployment is introduced.
+
 ## Alternatives and consequences
 
 - Reject 'ontology replaces time-series/replay': vocabulary cannot enforce arrival/version clocks.

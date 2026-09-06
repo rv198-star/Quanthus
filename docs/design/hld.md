@@ -87,11 +87,15 @@ ownership. Experts may consume their admissible evidence directly; labels are op
 No graph database, general-purpose reasoner, generic DWS or ADS is introduced.
 
 Concept names express domain/family/meaning; evaluation specifications separately bind parameters,
-coordinates, input versions and time semantics. Observations and event/episode versions distinguish
-phenomenon, confirmation, public availability, platform knowledge and computation times. A
-retrospective replay is not silently promoted to proof of historical availability. Existing v1
-identities and accepted Runs remain unchanged. The staged contract, coverage gaps and independent
-non-blocking dictionary task are owned by `structure-facts-v2.md` and its machine-readable blueprint.
+coordinates, input versions and time semantics. Business observations distinguish result time,
+input window, event/market confirmation and applicable validity. Source-version and generation /
+publication metadata separately own availability and physical creation. Actual usage time and
+consumer/query/decision context belong only to append-only operation/decision logs referencing exact
+observation revisions and receipts, never to the market Fact or its semantic digest. Repeated use
+or materialization does not rewrite the Fact. Historical recomputation is not evidence of historical
+actual consumption. Existing v1 identities and accepted Runs remain unchanged. B1-R supplies local
+contracts; authenticated source closure and runtime log integration remain B2. The staged contract,
+coverage gaps and independent dictionary task are owned by `structure-facts-v2.md` and its blueprint.
 
 ### Expert strategy research authority
 

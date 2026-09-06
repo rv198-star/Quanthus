@@ -32,6 +32,11 @@ def load_plan() -> dict:
             raise ValueError("closed issue requires repository evidence")
         if any(not (ROOT / path).is_file() for path in row["evidence"]):
             raise ValueError("closure evidence path missing")
+        if row["status"] == "closed" and any(
+            key in by_id and by_id[key]["status"] != "closed"
+            for key in row["depends_on"]
+        ):
+            raise ValueError("child cannot close ahead of its predecessor")
     if by_id[PARENT]["status"] == "closed" and (
         raw["runtime_accepted"] is not True
         or any(by_id[key]["status"] != "closed" for key in IDS[1:])
@@ -50,7 +55,10 @@ def issue_body(row: dict, raw: dict, mapping: dict) -> str:
         f"## Design\n`{raw['design']}`\n\n"
         f"https://github.com/{REPO}/blob/main/{raw['design']}",
         f"## Dependencies\n{', '.join(link(key) for key in row['depends_on'])}",
-        "## Acceptance\n" + "\n".join(f"- [ ] {gate}" for gate in row["acceptance"]),
+        "## Acceptance\n" + "\n".join(
+            f"- [{'x' if row['status'] == 'closed' else ' '}] {gate}"
+            for gate in row["acceptance"]
+        ),
         "## Current disposition\n" + row["status"] + "; status is not an economic/forward claim.",
         "## Evidence\n" + ("\n".join(f"- `{path}`" for path in row["evidence"])
                               or "Not accepted; implementation does not replace runtime evidence."),
@@ -79,7 +87,8 @@ def main() -> int:
         return 0
     github = GitHub(REPO)
     mapping = issue_by_stable_id(github.issues(), set(IDS))
-    for row in raw["items"]:
+    ordered = [*raw["items"][1:], raw["items"][0]]  # Close children before their parent.
+    for row in ordered:
         key = row["id"]
         labels = [f"type:{row['kind']}", f"status:{row['status']}", "phase:P3", "area:labels"]
         observed, _ = github.upsert_issue(
@@ -89,7 +98,7 @@ def main() -> int:
         mapping[key] = observed
     # Reconcile references after all issue numbers exist; preserve every unrelated issue.
     result = []
-    for row in raw["items"]:
+    for row in ordered:
         key = row["id"]
         current = mapping[key]
         body = issue_body(row, raw, mapping)

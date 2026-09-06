@@ -247,13 +247,18 @@ Library, Label Corpus, and Comparison Report packages, writes one generation-bou
 
 `P3-STRUCT-001` adds exactly one second research Job kind to this same static Event Worker:
 `quanthus.structure-mvp.v1`. It does not create a new Worker family, routing registry, or service.
-Its request permits only the repository-bound `config/structure-mvp-run.development.v1.json` plus
-an exact code revision; path substitution and arbitrary commands fail closed. The Worker launches
-only `python -m quanthus.structure_mvp_run`, retains the same read-only DWD mounts and generation
-fencing, publishes below a separate immutable `structure-runs/` namespace, and deep-verifies the
-ADM content digest, semantic result digest, manifest, and READY receipt before success. This job is
-research-only: it cannot mutate DWD, enable the draft stock-stage vocabulary, authorize orders,
-open Shadow/P6, or claim economic value. Real-DWD qualification and independent reproduction closed
+Its request permits only repository-enumerated Structure run configs plus an exact code revision;
+path substitution and arbitrary commands fail closed. `P3-STRUCT-001` binds
+`config/structure-mvp-run.development.v1.json` to `python -m quanthus.structure_mvp_run`.
+`P3-STRUCT-002` adds exactly one second allowed config,
+`config/structure-economic-run.development.v1.json`, bound to
+`python -m quanthus.structure_economic_experiment`. Both retain the same read-only DWD mounts and
+generation fencing, publish below the separate immutable `structure-runs/` namespace, and are
+deep-verified by stdlib-only Worker contracts before success. The economic verifier additionally
+requires exact C0 baseline reproduction, exactly C0/C1/C2 variants, the frozen three comparisons,
+no sealed-partition access, and no execution authority. This Job kind remains research-only: it
+cannot mutate DWD, enable the draft stock-stage vocabulary, authorize orders, or open Shadow/P6.
+Real-DWD qualification and independent reproduction closed
 `P3-STRUCT-001` under
 `../../acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`; this acceptance does
 not widen the Job's authority.
@@ -267,8 +272,10 @@ command, universe, or policy, and the Jobs still use normal queue state, lease f
 execution, immutable publication, and verification. The default is `0`; normal Event Worker
 operation therefore does not self-submit research work. The one-time `P3-STRUCT-001` qualification
 enabled the seeder only long enough to create the fixed A/B Jobs and returned it to `0` in the
-acceptance closeout.
-The child owns one Direct-DWD session and two disposable, scope-bound TMP Feature Panels for the
+acceptance closeout. The external production admission now also recognizes the typed
+`quanthus.structure-mvp.v1` Job, so `P3-STRUCT-002` uses normal submitted Jobs rather than reopening
+the one-time seeder.
+The P4 event child owns one Direct-DWD session and two disposable, scope-bound TMP Feature Panels for the
 attempt: execution scope for Label and decision scope for Report. The ranges are separate semantic
 identities under the current floating-window evaluator and are each built once from the shared DWD
 projection. The Worker remains control-plane-only: it validates the runtime receipt and exact

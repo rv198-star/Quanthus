@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; additive `P3-STRUCT-001` technical MVP accepted on real-DWD A/B reproduction |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001` technical MVP accepted; `P3-STRUCT-002` economic-value experiment preregistered/open |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -181,6 +181,14 @@ blind review are accepted in
 remains development-only and gains no economic-value, Shadow, paper, notification, or execution
 authority.
 
+`P3-STRUCT-002` is the separately gated economic-value step governed by
+`../structure-intelligence-economic-value.md`. It reuses one shared Structure ADM trajectory and
+holds the accepted formal strategy's candidate population, capital, position-risk path, exits,
+costs, and P2 matcher fixed. C1 expresses that trajectory as a continuous entry score; C2 compresses
+the same facts into coarse states. C2-C1 is the primary comparison, so a positive result cannot be
+created merely by giving the state variant additional history or episode memory. The exact mapping
+and no-tuning rule are frozen before results.
+
 ## 6. Work items
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -192,6 +200,7 @@ authority.
 | P3-LABEL-003 | Build label frequency and conflict audit | Registry | No invalid coexistence |
 | P3-LABEL-004 | Build human review corpus and adjudication form | Evaluators | 100 reviewed cases |
 | P3-STRUCT-001 | Prove the bounded DWD -> Structure ADM -> trend-semantics adapter -> aggregator -> P2 path | P3-FEAT-002, P3 expert/aggregator contracts, P4 Event Worker | Real-DWD immutable artifact, independent reproduction, decision/P2 probe reconciliation |
+| P3-STRUCT-002 | Compare continuous versus coarse Structure Intelligence through complete P2 | P3-STRUCT-001, P3-ATTR-001, P3-STRAT-002 | Preregistered C0/C1/C2 A/B replay, exact baseline reproduction, paired comparisons, lifecycle decision |
 
 ## 7. Acceptance
 

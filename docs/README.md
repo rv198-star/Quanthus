@@ -90,6 +90,12 @@ nodes.
   structure -> expert -> aggregator -> P2 engineering chain. Economic value, the draft stock-stage
   vocabulary, model training, Shadow, paper, and live authority remain unopened. Evidence:
   `acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`.
+- `P3-STRUCT-002` is the preregistered next Structure Intelligence increment. It keeps the accepted
+  2020-2021 formal candidate population, funding, costs, position-risk/held-review policy, exits,
+  and P2 path fixed while comparing native C0 against continuous-structure C1 and coarse-state C2
+  entry scoring. C2-C1 is primary; C1-C0 and C2-C0 are secondary. The exact score mapping,
+  materiality rules, paired block bootstrap, sealed-partition prohibition, and no-tuning rule are
+  frozen before results in `acceptance/structure-intelligence-economic-preregistration-20260906.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

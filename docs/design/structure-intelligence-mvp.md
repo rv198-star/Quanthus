@@ -165,8 +165,11 @@ The accepted MVP therefore proves the real DWD -> thin ADM -> coarse structure -
 aggregator -> P2 technical chain and deterministic reproduction. It still does not prove economic
 value or stronger historical-publication PIT than the Direct-DWD provider itself declares.
 
-The next authorized evidence step, if pursued, is a separately preregistered complete-P2
-baseline-versus-structure-assisted economic comparison under the same information/history budget.
+The next authorized evidence step is now preregistered as `P3-STRUCT-002` in
+`structure-intelligence-economic-value.md` and
+`../acceptance/structure-intelligence-economic-preregistration-20260906.md`. It compares the
+accepted native formal strategy against continuous and coarse Structure Intelligence entry scoring
+through the complete P2 capital path under one frozen information/history budget.
 Do not expand to the thirteen-state vocabulary, train a model, add generic DWS, revive ADS, or make
 trading-value claims merely because the technical MVP is accepted.
 

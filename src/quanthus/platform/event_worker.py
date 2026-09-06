@@ -30,7 +30,11 @@ REPORTED_BATCH_RUNTIME_SCHEMA = "quanthus.p4-reported-batch-runtime.v2"
 REPORTED_BATCH_PROGRESS_SCHEMA = "quanthus.p4-reported-batch-progress.v1"
 _CODE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-_STRUCTURE_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
+_STRUCTURE_MVP_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
+_STRUCTURE_ECONOMIC_RUN_CONFIG = "config/structure-economic-run.development.v1.json"
+_STRUCTURE_RUN_CONFIGS = frozenset({_STRUCTURE_MVP_RUN_CONFIG, _STRUCTURE_ECONOMIC_RUN_CONFIG})
+# Backward-compatible name retained for the technical-MVP qualification seeder/tests.
+_STRUCTURE_RUN_CONFIG = _STRUCTURE_MVP_RUN_CONFIG
 _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
 _BUILD_REVISION_ENV = "QUANTHUS_CODE_REVISION"
 _EXTERNAL_MCP_ACTOR_USER_ID = "usr_18c14af81a06cf878f177579efec3727"
@@ -100,11 +104,12 @@ def _structure_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
     code_revision = str(input_ref.get("code_revision") or "")
     if _CODE_REVISION_RE.fullmatch(code_revision) is None:
         raise RuntimeError("structure_mvp_code_revision_invalid")
-    if input_ref.get("run_config") != _STRUCTURE_RUN_CONFIG:
+    run_config = str(input_ref.get("run_config") or "")
+    if run_config not in _STRUCTURE_RUN_CONFIGS:
         raise RuntimeError("structure_mvp_run_config_not_governed")
     return {
         "code_revision": code_revision,
-        "run_config": _STRUCTURE_RUN_CONFIG,
+        "run_config": run_config,
     }
 
 
@@ -225,7 +230,11 @@ def _structure_request_digest(run_config: str) -> str:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("structure_mvp_run_config_unreadable") from exc
-    if not isinstance(raw, dict) or raw.get("schema_version") != "quanthus.structure-mvp-run.v1":
+    expected_schema = {
+        _STRUCTURE_MVP_RUN_CONFIG: "quanthus.structure-mvp-run.v1",
+        _STRUCTURE_ECONOMIC_RUN_CONFIG: "quanthus.structure-economic-run.v1",
+    }[run_config]
+    if not isinstance(raw, dict) or raw.get("schema_version") != expected_schema:
         raise RuntimeError("structure_mvp_run_config_invalid")
     return _canonical_digest(raw)
 
@@ -333,6 +342,130 @@ def _verify_structure_mvp_artifact(
         "decision_counts": dict(decision_counts),
         "p2_probe_count": len(probes),
         "p2_fill_count": sum(int(item["fill_count"]) for item in probes),
+    }
+
+
+def _verify_structure_economic_artifact(
+    root: Path,
+    *,
+    code_revision: str,
+    request_digest: str,
+) -> dict[str, Any]:
+    """Deep-verify the fixed Structure economic package using only stdlib contracts."""
+
+    resolved = root.resolve()
+    manifest_path = resolved / "manifest.json"
+    ready_path = resolved / "READY"
+    summary_path = resolved / "summary.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        ready = json.loads(ready_path.read_text(encoding="utf-8"))
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("structure_economic_artifact_unreadable") from exc
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version")
+        != "quanthus.structure-economic-artifact-manifest.v1"
+        or manifest.get("research_only") is not True
+        or manifest.get("execution_authorized") is not False
+        or manifest.get("code_revision") != code_revision
+        or manifest.get("request_digest") != request_digest
+    ):
+        raise RuntimeError("structure_economic_manifest_invalid")
+    if (
+        not isinstance(summary, dict)
+        or summary.get("schema_version") != "quanthus.structure-economic-result.v1"
+        or summary.get("research_only") is not True
+        or summary.get("execution_authorized") is not False
+        or summary.get("shadow_authorized") is not False
+        or summary.get("sealed_partition_access") is not False
+        or summary.get("code_revision") != code_revision
+        or summary.get("request_digest") != request_digest
+        or summary.get("economic_claim_scope") != "development_counterfactual_only"
+    ):
+        raise RuntimeError("structure_economic_summary_invalid")
+    files = manifest.get("files")
+    if not isinstance(files, dict) or not files or "summary.json" not in files:
+        raise RuntimeError("structure_economic_manifest_files_invalid")
+    expected_inventory: set[str] = {"summary.json"}
+    variants_root = resolved / "variants"
+    try:
+        for path in variants_root.rglob("*"):
+            if path.is_file():
+                expected_inventory.add(path.relative_to(resolved).as_posix())
+    except OSError as exc:
+        raise RuntimeError("structure_economic_inventory_unreadable") from exc
+    if set(files) != expected_inventory:
+        raise RuntimeError("structure_economic_inventory_mismatch")
+    for name, expected in files.items():
+        if (
+            not isinstance(name, str)
+            or not isinstance(expected, str)
+            or not _SHA256_RE.fullmatch(expected)
+        ):
+            raise RuntimeError("structure_economic_file_identity_invalid")
+        path = (resolved / name).resolve()
+        if resolved not in path.parents or not path.is_file() or _sha256(path) != expected:
+            raise RuntimeError("structure_economic_artifact_digest_mismatch")
+    try:
+        manifest_sha = _sha256(manifest_path)
+    except OSError as exc:
+        raise RuntimeError("structure_economic_manifest_unreadable") from exc
+    if (
+        not isinstance(ready, dict)
+        or ready.get("schema_version") != "quanthus.structure-economic-ready.v1"
+        or ready.get("manifest_sha256") != manifest_sha
+        or ready.get("result_digest") != summary.get("result_digest")
+        or manifest.get("result_digest") != summary.get("result_digest")
+    ):
+        raise RuntimeError("structure_economic_ready_invalid")
+    semantic_summary = dict(summary)
+    semantic_summary.pop("result_digest", None)
+    if _canonical_digest(semantic_summary) != summary.get("result_digest"):
+        raise RuntimeError("structure_economic_semantic_result_digest_mismatch")
+    if manifest.get("structure_adm_manifest_digest") != summary.get(
+        "structure_adm_manifest_digest"
+    ):
+        raise RuntimeError("structure_economic_adm_manifest_digest_mismatch")
+    variants = summary.get("variants")
+    comparisons = summary.get("comparisons")
+    if not isinstance(variants, dict) or set(variants) != {
+        "variant.native-baseline",
+        "variant.structure-continuous",
+        "variant.structure-coarse",
+    }:
+        raise RuntimeError("structure_economic_variants_invalid")
+    if not isinstance(comparisons, dict) or set(comparisons) != {"C1-C0", "C2-C0", "C2-C1"}:
+        raise RuntimeError("structure_economic_comparisons_invalid")
+    if summary.get("primary_comparison") != "C2-C1":
+        raise RuntimeError("structure_economic_primary_comparison_invalid")
+    native = variants.get("variant.native-baseline")
+    if not isinstance(native, dict) or not isinstance(native.get("metrics"), dict):
+        raise RuntimeError("structure_economic_native_metrics_invalid")
+    if (
+        native["metrics"].get("capital_constrained_net_total_return_delta") != "0.06704618"
+        or native["metrics"].get("maximum_drawdown_delta") != "0.07102827"
+    ):
+        raise RuntimeError("structure_economic_native_reproduction_mismatch")
+    lifecycle = summary.get("lifecycle_decision")
+    if lifecycle not in {
+        "no_material_structure_signal",
+        "prefer_continuous_structure_facts",
+        "continuous_facts_sufficient_no_material_coarse_increment",
+        "coarse_state_increment_detected_requires_human_review",
+    }:
+        raise RuntimeError("structure_economic_lifecycle_decision_invalid")
+    return {
+        "artifact_ref": str(resolved),
+        "manifest_sha256": manifest_sha,
+        "result_digest": str(summary["result_digest"]),
+        "structure_adm_manifest_digest": str(summary["structure_adm_manifest_digest"]),
+        "lifecycle_decision": str(lifecycle),
+        "comparisons": dict(comparisons),
+        "variants": dict(variants),
+        "sealed_partition_access": False,
+        "execution_authorized": False,
     }
 
 
@@ -856,26 +989,44 @@ class EventWorker:
         if observed is None or observed.claim_generation != generation:
             return
         request_digest = _structure_request_digest(governed["run_config"])
+        economic = governed["run_config"] == _STRUCTURE_ECONOMIC_RUN_CONFIG
+        verifier = (
+            _verify_structure_economic_artifact if economic else _verify_structure_mvp_artifact
+        )
+        module = (
+            "quanthus.structure_economic_experiment" if economic else "quanthus.structure_mvp_run"
+        )
+        artifact_name = "structure-economic" if economic else "structure-mvp"
         run_id = f"run_{job_id.removeprefix('job_')}"
         final = self.run_root / "structure-runs" / run_id
         if final.exists():
-            result_ref = _verify_structure_mvp_artifact(
+            result_ref = verifier(
                 final,
                 code_revision=governed["code_revision"],
                 request_digest=request_digest,
             )
             result_ref["input_digest"] = input_digest
+            progress_detail: dict[str, Any] = {"run_id": run_id}
+            if economic:
+                progress_detail["lifecycle_decision"] = result_ref["lifecycle_decision"]
+            else:
+                progress_detail.update(
+                    {
+                        "row_count": result_ref["row_count"],
+                        "p2_probe_count": result_ref["p2_probe_count"],
+                        "p2_fill_count": result_ref["p2_fill_count"],
+                    }
+                )
             self.store.update_claimed_job(
                 job_id,
                 generation,
-                stage="recovering-sealed-structure-mvp-run",
+                stage=(
+                    "recovering-sealed-structure-economic-run"
+                    if economic
+                    else "recovering-sealed-structure-mvp-run"
+                ),
                 progress=98,
-                progress_detail={
-                    "run_id": run_id,
-                    "row_count": result_ref["row_count"],
-                    "p2_probe_count": result_ref["p2_probe_count"],
-                    "p2_fill_count": result_ref["p2_fill_count"],
-                },
+                progress_detail=progress_detail,
             )
             self.store.finish_claimed_job(
                 job_id,
@@ -892,11 +1043,11 @@ class EventWorker:
         staging.mkdir(parents=True)
         stdout_path = staging / "stdout.log"
         stderr_path = staging / "stderr.log"
-        artifact_root = staging / "structure-mvp"
+        artifact_root = staging / artifact_name
         command = (
             sys.executable,
             "-m",
-            "quanthus.structure_mvp_run",
+            module,
             "--request",
             governed["run_config"],
             "--output",
@@ -907,7 +1058,7 @@ class EventWorker:
         self.store.update_claimed_job(
             job_id,
             generation,
-            stage="running-structure-mvp",
+            stage="running-structure-economic" if economic else "running-structure-mvp",
             progress=5,
             progress_detail={"run_id": run_id},
         )
@@ -959,11 +1110,13 @@ class EventWorker:
         self.store.update_claimed_job(
             job_id,
             generation,
-            stage="validating-structure-mvp-run",
+            stage=(
+                "validating-structure-economic-run" if economic else "validating-structure-mvp-run"
+            ),
             progress=92,
             progress_detail={"run_id": run_id},
         )
-        result_ref = _verify_structure_mvp_artifact(
+        result_ref = verifier(
             artifact_root,
             code_revision=governed["code_revision"],
             request_digest=request_digest,
@@ -973,7 +1126,7 @@ class EventWorker:
             raise RuntimeError("immutable_structure_mvp_run_already_exists")
         os.replace(artifact_root, final)
         shutil.rmtree(staging, ignore_errors=True)
-        result_ref = _verify_structure_mvp_artifact(
+        result_ref = verifier(
             final,
             code_revision=governed["code_revision"],
             request_digest=request_digest,

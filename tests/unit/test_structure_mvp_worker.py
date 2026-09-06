@@ -10,8 +10,12 @@ from unittest.mock import patch
 
 from quanthus.platform.event_worker import (
     EventWorker,
+    _canonical_digest,
     _seed_structure_mvp_qualification_jobs,
+    _sha256,
     _structure_input,
+    _structure_request_digest,
+    _verify_structure_economic_artifact,
     _write_structure_qualification_seed_receipt,
 )
 from quanthus.platform.jobs import STRUCTURE_MVP_JOB, DurableJobQueue, input_digest
@@ -21,6 +25,10 @@ from quanthus.platform.persistence import InMemoryPlatformStore
 STRUCTURE_INPUT = {
     "code_revision": "a" * 40,
     "run_config": "config/structure-mvp-run.development.v1.json",
+}
+ECONOMIC_INPUT = {
+    "code_revision": "a" * 40,
+    "run_config": "config/structure-economic-run.development.v1.json",
 }
 
 
@@ -271,10 +279,107 @@ class StructureMvpWorkerTests(unittest.TestCase):
 
     def test_structure_input_is_exact_and_cannot_substitute_config(self) -> None:
         self.assertEqual(_structure_input(STRUCTURE_INPUT), STRUCTURE_INPUT)
+        self.assertEqual(_structure_input(ECONOMIC_INPUT), ECONOMIC_INPUT)
         with self.assertRaisesRegex(RuntimeError, "run_config_not_governed"):
             _structure_input({**STRUCTURE_INPUT, "run_config": "/tmp/anything.json"})
         with self.assertRaisesRegex(RuntimeError, "input_contract_mismatch"):
             _structure_input({**STRUCTURE_INPUT, "command": "bash"})
+
+    def test_structure_request_digest_accepts_both_governed_configs(self) -> None:
+        self.assertTrue(
+            _structure_request_digest(STRUCTURE_INPUT["run_config"]).startswith("sha256:")
+        )
+        self.assertEqual(
+            _structure_request_digest(ECONOMIC_INPUT["run_config"]),
+            "sha256:9a8a14a4855ddb189da2d8303c558a460ce781e63425942cda845e45e3ef66de",
+        )
+
+    def test_economic_artifact_verifier_closes_semantic_and_file_digests(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for variant in (
+                "variant.native-baseline",
+                "variant.structure-continuous",
+                "variant.structure-coarse",
+            ):
+                path = root / "variants" / variant / "manifest.json"
+                path.parent.mkdir(parents=True)
+                path.write_text("{}", encoding="utf-8")
+            code_revision = "a" * 40
+            request_digest = "sha256:" + "b" * 64
+            variants = {
+                "variant.native-baseline": {
+                    "metrics": {
+                        "capital_constrained_net_total_return_delta": "0.06704618",
+                        "maximum_drawdown_delta": "0.07102827",
+                    }
+                },
+                "variant.structure-continuous": {"metrics": {}},
+                "variant.structure-coarse": {"metrics": {}},
+            }
+            summary = {
+                "schema_version": "quanthus.structure-economic-result.v1",
+                "research_only": True,
+                "execution_authorized": False,
+                "shadow_authorized": False,
+                "sealed_partition_access": False,
+                "economic_claim_scope": "development_counterfactual_only",
+                "code_revision": code_revision,
+                "request_digest": request_digest,
+                "structure_adm_manifest_digest": "sha256:" + "c" * 64,
+                "variants": variants,
+                "comparisons": {
+                    "C1-C0": {},
+                    "C2-C0": {},
+                    "C2-C1": {},
+                },
+                "primary_comparison": "C2-C1",
+                "lifecycle_decision": "no_material_structure_signal",
+            }
+            summary["result_digest"] = _canonical_digest(summary)
+            summary_path = root / "summary.json"
+            summary_path.write_text(json.dumps(summary, sort_keys=True), encoding="utf-8")
+            files = {"summary.json": _sha256(summary_path)}
+            for path in sorted((root / "variants").rglob("*")):
+                if path.is_file():
+                    files[path.relative_to(root).as_posix()] = _sha256(path)
+            manifest = {
+                "schema_version": "quanthus.structure-economic-artifact-manifest.v1",
+                "research_only": True,
+                "execution_authorized": False,
+                "code_revision": code_revision,
+                "request_digest": request_digest,
+                "result_digest": summary["result_digest"],
+                "structure_adm_manifest_digest": summary["structure_adm_manifest_digest"],
+                "files": files,
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+            (root / "READY").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "quanthus.structure-economic-ready.v1",
+                        "manifest_sha256": _sha256(manifest_path),
+                        "result_digest": summary["result_digest"],
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            result = _verify_structure_economic_artifact(
+                root,
+                code_revision=code_revision,
+                request_digest=request_digest,
+            )
+            self.assertEqual(result["lifecycle_decision"], "no_material_structure_signal")
+            tampered = root / "variants" / "variant.structure-coarse" / "manifest.json"
+            tampered.write_text('{"tampered":true}', encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "artifact_digest_mismatch"):
+                _verify_structure_economic_artifact(
+                    root,
+                    code_revision=code_revision,
+                    request_digest=request_digest,
+                )
 
     def test_event_worker_dispatches_structure_job_only_to_structure_executor(self) -> None:
         job = _job()

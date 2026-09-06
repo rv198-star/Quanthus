@@ -260,7 +260,7 @@ class FormalP2ReplayRuntime:
         )
         provider = ReplayDataProvider(provider_config)
         self.session = self.stack.enter_context(
-            provider.open(scope_start=DECISION_START, scope_end=DECISION_END)
+            provider.open(scope_start=self._provider_scope_start(), scope_end=DECISION_END)
         )
         self.frames = self.session.reader.frames(DECISION_START, DECISION_END)
         if self.frames[-1].execution_date != EXECUTION_END:
@@ -305,6 +305,9 @@ class FormalP2ReplayRuntime:
             self.repository_root / "config/expert-evaluations/experts/trend-stability.v1.json"
         )
 
+    def _provider_scope_start(self) -> date:
+        return DECISION_START
+
     def close(self) -> None:
         self.stack.close()
 
@@ -314,14 +317,30 @@ class FormalP2ReplayRuntime:
     def __exit__(self, *_args: object) -> None:
         self.close()
 
-    def run_variant(
-        self, intervention_id: str | None, output_root: Path
-    ) -> tuple[FormalReplayEvidence, dict[str, bytes]]:
+    def _validate_intervention_id(self, intervention_id: str | None) -> None:
         if intervention_id is not None and intervention_id not in self.registry.intervention_ids:
             raise ExpertEvaluationError(
                 "formal_intervention_not_admitted", "formal intervention is not admitted"
             )
+
+    def _held_intervention_id(self, intervention_id: str | None) -> str | None:
+        return intervention_id
+
+    @staticmethod
+    def _variant_id(intervention_id: str | None) -> str:
+        return {
+            None: "variant.native-baseline",
+            "intervention.trend-stability-abstain": "variant.trend-fallback",
+            "intervention.position-risk-base-policy": "variant.position-risk-fallback",
+            "intervention.both-experts-fallback": "variant.joint-fallback",
+        }[intervention_id]
+
+    def run_variant(
+        self, intervention_id: str | None, output_root: Path
+    ) -> tuple[FormalReplayEvidence, dict[str, bytes]]:
+        self._validate_intervention_id(intervention_id)
         topology = self.registry.topology_manifest
+        held_intervention_id = self._held_intervention_id(intervention_id)
         runner = FormalStrategyRunner(self.registry.card, topology.digest)
         position = self.registry.card.semantic_sections["position_and_execution"]
         unit_notional = Decimal(str(position["unit_notional"]))
@@ -380,7 +399,7 @@ class FormalP2ReplayRuntime:
                 frame,
                 runtimes,
                 runner,
-                intervention_id,
+                held_intervention_id,
                 run,
                 decisions,
                 transitions,
@@ -459,12 +478,7 @@ class FormalP2ReplayRuntime:
             {name: digest_value(json.loads(payload)) for name, payload in sorted(artifacts.items())}
         )
         evidence = FormalReplayEvidence(
-            variant_id={
-                None: "variant.native-baseline",
-                "intervention.trend-stability-abstain": "variant.trend-fallback",
-                "intervention.position-risk-base-policy": "variant.position-risk-fallback",
-                "intervention.both-experts-fallback": "variant.joint-fallback",
-            }[intervention_id],
+            variant_id=self._variant_id(intervention_id),
             intervention_id=intervention_id,
             metrics=metrics,
             replay_digest=replay_digest,

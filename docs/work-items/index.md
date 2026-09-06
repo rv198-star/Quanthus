@@ -204,6 +204,7 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 | P3-LABEL-003 | Implement label frequency/conflict audit | P3-LABEL-001 | closed |
 | P3-LABEL-004 | Build human label review corpus | P3-LABEL-002 | deferred pending formal label family |
 | P3-STRUCT-001 | Prove DWD -> thin Structure Research ADM -> accepted trend semantics adapter -> aggregator -> P2 on a bounded development slice | P3-FEAT-002, P3-EXP-001, P3-AGG-002, P4-EVENT-002 | closed by `docs/acceptance/structure-intelligence-mvp-real-dwd-acceptance-20260906.md`; technical MVP only, economic value not claimed |
+| P3-STRUCT-002 | Test continuous versus coarse Structure Intelligence economic value through the accepted formal complete-P2 path | P3-STRUCT-001, P3-ATTR-001, P3-STRAT-002 | ready; preregistered by `docs/acceptance/structure-intelligence-economic-preregistration-20260906.md`; results not yet opened |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

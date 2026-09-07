@@ -145,13 +145,15 @@ nodes.
   `dwd_adjustment_factor`. Field proof remains explicit: 10/524 DWD fields are `field_proven`,
   514/524 are `table_context_only`, and none lack parent-table context. The simplified graph has 259
   registered processing edges; this reduction removes redundant boxes, not source evidence. Lineage
-  canvases now use a fixed-height viewport (520px desktop / 420px narrow) with zoom 45%–180%, 100%
-  reset, fit-all, focus centering and blank-area drag pan; these controls are browser-only and do not
-  change graph semantics. Production checkout/Web are `d485508`; API remains `0c671f9` because the
-  latest release is Web-only. Health/ready and public auth smoke pass. Full repository gate: 1590
-  passed / 7 existing environment skips; Web 18 passed; desktop/mobile/anonymous Chromium 3 passed.
-  Route: `design/data-indicator-catalog-productization.md`; latest closeout:
-  `acceptance/catalog-lineage-view-controls-production-closeout-20260907.md`.
+  canvases now use a fixed-height *infinite viewport* (520px desktop / 420px narrow) with an independent
+  `{x,y,zoom}` world transform instead of DOM scroll offsets. Initial fit truly centers graph bounds;
+  background drag is unclamped, wheel zoom is pointer-anchored, two-pointer pinch is supported, and
+  floating controls plus a clickable/drag-pannable MiniMap provide standard map-style navigation.
+  These controls are browser-only and do not change graph semantics. Production checkout/Web are
+  `73f1b40`; API remains `0c671f9` because the latest release is Web-only. Health/ready and public auth
+  smoke pass. Full repository gate: 1590 passed / 7 existing environment skips; Web 18 passed;
+  desktop/mobile/anonymous Chromium 3 passed. Route: `design/data-indicator-catalog-productization.md`;
+  latest closeout: `acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

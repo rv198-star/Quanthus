@@ -5,7 +5,7 @@
 | Work item | P3-DICT-002 / #232；子项 #228–#231 |
 | Baseline | `27b782fb75705956803ba9c97fa90f1f57fe20d1` |
 | A–C 实现验收 | PASS，限本文定义的目录与静态血缘范围 |
-| D 发布验收 | 完整工程门禁通过；生产发布仍待完成，不以本记录声称上线 |
+| D 发布验收 | 后续已通过；见 `catalog-productization-production-closeout-20260907.md`，运行版本 `10301cd` |
 | Governing design | `../design/data-indicator-catalog-productization.md` |
 
 ## 已交付

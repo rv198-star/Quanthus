@@ -122,8 +122,9 @@ nodes.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
-  Web surface and drift/maintenance gates. Current production checkout is `d47abf8`, with Catalog
-  API image `8d78073` and Web image `d47abf8`; both are healthy. Production-edge smoke confirms
+  Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,
+  API `8d78073` and Web `d47abf8`; current productization is recorded under P3-DICT-002 below.
+  That baseline's production-edge smoke confirmed
   `/catalog`, OpenAPI, readiness and authentication
   enforcement, while exact-image PostgreSQL smoke confirms successful authenticated Catalog access.
   The current projection contains 664 entries and 10 explicit gaps after the post-acceptance
@@ -135,11 +136,16 @@ nodes.
   `acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`; post-acceptance semantic
   audit: `acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`; final audited
   production closeout: `acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
-- `P3-DICT-002` / #232 productizes the Catalog through children #228–#231: Chinese business
-  explanations, collapsed technical evidence, internal-only maintenance gaps, and declared
-  processing lineage with layered overview and bounded field focus. Engineering/browser checks
-  are in progress; production release is not yet accepted. Route:
-  `design/data-indicator-catalog-productization.md`; plan: `work-items/catalog-productization.md`.
+- `P3-DICT-002` / #232 and children #228–#231 are accepted. The Catalog now has Chinese business
+  explanations for all 664 entries, collapsed technical evidence, internal-only maintenance gaps,
+  and 315 declared processing edges with layered overview and bounded field focus. All 33 DWD
+  tables have declared dataset-level sources; this is not full field-level lineage or actual Run
+  consumption. Runtime checkout/API/Web are `10301cd`, with healthy deployment and public
+  authentication smoke. Full repository gate: 1584 passed / 7 existing environment skips;
+  Web: 18 passed; desktop/mobile/anonymous Chromium: 3 passed. Catalog-scoped strict typecheck
+  passes; 11 pre-existing global TypeScript diagnostics remain explicitly outside this repair.
+  Route: `design/data-indicator-catalog-productization.md`; plan: `work-items/catalog-productization.md`;
+  closeout: `acceptance/catalog-productization-production-closeout-20260907.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

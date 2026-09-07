@@ -3,7 +3,8 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
+| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md` |
 | Work item | `P3-DICT-002` |
 | Parent | `data-indicator-catalog.md` |
 | Plan | `../../config/data-indicator-catalog-productization.v1.json` |

@@ -3,7 +3,9 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
+| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md` |
+| Current status | A–D及父工单已完成；API/Web生产版本 `10301cd` |
 | Work item | `P3-DICT-002` / #232 |
 | Parent | `index.md`; `data-indicator-dictionary.md` |
 | Governing design | `../design/data-indicator-catalog-productization.md` |
@@ -36,5 +38,7 @@
 `tests/platform/test_catalog_productization_api.py` 及既有 Catalog 测试。
 浏览器验证：在 `web` 下运行 `npx playwright test --config playwright.catalog.config.ts`。
 浏览器用真实目录查询实现支撑受控 GET 数据，不替代生产 PostgreSQL 或真实登录验收。
+Catalog严格类型检查：在 `web` 下运行 `npx tsc --noEmit --project tsconfig.catalog.json`。
+全库TypeScript的原有11项诊断单独保留，不冒充本检查已覆盖全库。
 
 生产只更新 API/Web；不发布 Worker、不重跑研究、不改数据或数据库结构。

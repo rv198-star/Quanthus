@@ -94,15 +94,18 @@ The Catalog must continue to make these distinctions explicit:
 
 `P3-DICT-001-E` freezes maintenance and drift checks, synchronizes design/work-item/Platform docs,
 and requires full repository/Web gates plus production deployment/smoke before parent closeout.
-Those gates remain satisfied after the post-acceptance audit. Current production checkout is
-`d47abf8544e9612b75dd77ab2c166a9c75abfda2`, with Catalog API image `8d78073` and Web image
-`d47abf8`. A source change that changes the deterministic Catalog must refresh the snapshot manifest
-in the same repository change. Initial final evidence remains in
-`../acceptance/data-indicator-catalog-final-acceptance-20260907.md`; the latest audited production
-closeout is `../acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
+The original post-acceptance production evidence remains in
+`../acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
+Current productization `P3-DICT-002` uses checkout/API/Web `10301cd`, with accepted evidence in
+`../acceptance/catalog-productization-production-closeout-20260907.md` and work items in
+`catalog-productization.md`. A source change that changes the deterministic Catalog must refresh
+the snapshot manifest in the same repository change. Original final evidence remains in
+`../acceptance/data-indicator-catalog-final-acceptance-20260907.md`.
 
 ## 5. Non-goals and claim ceiling
 
 This delivery does not implement every planned MACD/CCI/KDJ/ATR formula, rebuild ODS/DWD, create a
 metadata editing backend, open Structure B6-B11, train a model, or authorize Shadow/paper/live
-execution. Missing metadata stays a visible gap rather than being synthesized from prose or an LLM.
+execution. Missing metadata remains an internal diagnostic rather than being synthesized from
+prose or an LLM. Productization removes the developer dashboard but keeps relevant limitations on
+business cards.

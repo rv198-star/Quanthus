@@ -22,6 +22,36 @@ def test_lineage_rejects_invalid_query(kernel, query):
     assert payload["error"]["reason"].startswith("catalog_")
 
 
+def test_adjustment_effective_from_api_exposes_field_proof_and_table_fallback(kernel):
+    token = viewer_token(kernel)
+    headers = {"Authorization": f"Bearer {token}"}
+    proven = urllib.parse.quote("dwd_field:dwd_adjustment_factor.effective_from", safe="")
+    status, _, payload = wsgi_request(
+        kernel, "GET",
+        f"/api/platform/v1/catalog/items/{proven}/relations?depth=5&limit=100",
+        headers=headers,
+    )
+    assert status == 200
+    lineage = payload["lineage"]
+    assert lineage["coverage_level"] == "field_proven"
+    assert lineage["table_context"] is None
+    assert any(node["id"] == "source-field:adjustment_factors_pit.effective_date"
+               for node in lineage["nodes"])
+    assert any(node["id"] == "projection:p4-event.factor_effective_from"
+               for node in lineage["nodes"])
+
+    fallback = urllib.parse.quote("dwd_field:dwd_adjustment_factor.factor_value", safe="")
+    status, _, payload = wsgi_request(
+        kernel, "GET", f"/api/platform/v1/catalog/items/{fallback}/relations",
+        headers=headers,
+    )
+    assert status == 200
+    lineage = payload["lineage"]
+    assert lineage["coverage_level"] == "table_context_only"
+    assert lineage["edges"] == []
+    assert lineage["table_context"]["edges"]
+
+
 def test_graph_is_authenticated_readonly_and_supports_declared_projection(kernel):
     encoded = urllib.parse.quote("projection:daily-return", safe="")
     path = f"/api/platform/v1/catalog/items/{encoded}/relations?depth=3&limit=20"

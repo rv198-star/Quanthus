@@ -55,6 +55,7 @@ export function LineageOverview({ data, onNavigate }: { data: CatalogLineageOver
       edges={data.edges.map(edge => ({ ...edge, id: `${edge.source}:${edge.target}`, label: `${edge.count} 条跨层依赖` }))} onNode={setGroupId} />
     <p className={styles.graphNote}>{data.coverage}</p>
     <p className={styles.graphNote}>共 {data.registered_edges} 条已登记加工边；同层的 {data.internal_edges} 条关系折叠在分层内，请进入焦点图查看。</p>
+    <p className={styles.graphNote} data-testid="field-lineage-coverage">DWD 字段共 {data.field_coverage.total} 个：{data.field_coverage.field_proven} 个已有字段级加工证据，{data.field_coverage.table_context_only} 个仅能展示所属表加工上下文，{data.field_coverage.unregistered} 个连表级上下文也未登记。这里明确区分，不把表级关系冒充字段级血缘。</p>
     {group ? <section className={styles.groupMembers} aria-label={`${group.label}节点`}>
       <h3>{group.label} · 选择一个节点</h3><div>{group.members.map(node => <button type="button" key={node.id} onClick={() => onNavigate(node)}>
         <strong>{node.label}</strong><span>{grains[node.grain] ?? node.grain}</span>
@@ -77,12 +78,24 @@ export function LineageFocus({ graph, onNavigate, depth, onDepth, busy }: {
       </select></label>
     </div>
     {busy ? <p role="status">正在读取血缘…</p> : null}
+    <div className={styles.coverageNotice} data-level={graph.coverage_level} data-testid="lineage-coverage-level">
+      <strong>{graph.coverage_level === "field_proven" ? "字段级血缘已证明" : graph.coverage_level === "table_context_only" ? "当前仅有表级加工上下文" : "已登记加工关系"}</strong>
+      <p>{graph.coverage_message}</p>
+    </div>
     <Canvas title="字段双向血缘图" nodes={graph.nodes.map(node => ({ id: node.id, label: node.label,
       subtitle: `${node.process ? "加工步骤 · " : ""}${grains[node.grain] ?? node.grain}`, column: node.distance ?? 0,
       process: node.process, center: node.id === graph.center }))}
       edges={graph.edges} onNode={id => { const node = graph.nodes.find(item => item.id === id); if (node) onNavigate(node); }} />
-    {!graph.edges.length ? <p className={styles.graphNote}>当前目录尚未登记此节点的加工关系；不能据此认定它没有上下游。</p> : null}
-    <p className={styles.graphNote}>实线箭头表示加工依赖；归属和概念关联不进入此图。当前显示 {graph.nodes.length} 个节点、{graph.edges.length} 条边。</p>
+    {!graph.edges.length && !graph.table_context ? <p className={styles.graphNote}>当前目录尚未登记此节点的加工关系；不能据此认定它没有上下游。</p> : null}
+    {graph.table_context ? <section className={styles.contextPanel} data-testid="table-lineage-context">
+      <h3>所属表已证明的加工上下文</h3><p>{graph.table_context.message}</p>
+      <Canvas title="所属表加工上下文（非字段映射）" nodes={graph.table_context.nodes.map(node => ({ id: node.id, label: node.label,
+        subtitle: `${node.process ? "加工步骤 · " : ""}${grains[node.grain] ?? node.grain}`, column: node.distance ?? 0,
+        process: node.process, center: node.id === graph.table_context?.center }))}
+        edges={graph.table_context.edges} onNode={id => { const node = graph.table_context?.nodes.find(item => item.id === id); if (node) onNavigate(node); }} />
+      <p className={styles.graphNote}>此图只证明所属表参与这些加工链；没有字段级证据时，不能推断当前字段参与其中每一条关系。</p>
+    </section> : null}
+    <p className={styles.graphNote}>实线箭头表示已登记加工依赖；归属和概念关联不进入主图。当前字段图显示 {graph.nodes.length} 个节点、{graph.edges.length} 条边。</p>
     {graph.boundary_edges || graph.omitted_nodes ? <p className={styles.graphNote} data-testid="lineage-boundary">
       受展开层数和节点预算限制，{graph.boundary_edges} 条边连接到当前视图之外；另有 {graph.omitted_nodes} 个范围内节点未显示。可增加层数或点击节点继续展开。
     </p> : null}

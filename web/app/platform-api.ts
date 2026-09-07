@@ -135,6 +135,7 @@ export interface CatalogLineageNode {
   entry_id: string | null;
   process: boolean;
   evidence: { path: string; sha256: string; locator: string } | null;
+  parent_entry_id: string | null;
   distance?: number;
 }
 
@@ -148,12 +149,25 @@ export interface CatalogLineageEdge {
   evidence: { path: string; sha256: string; locator: string };
 }
 
+export interface CatalogLineageContext {
+  center: string;
+  scope: string;
+  message: string;
+  omitted_nodes: number;
+  boundary_edges: number;
+  nodes: CatalogLineageNode[];
+  edges: CatalogLineageEdge[];
+}
+
 export interface CatalogLineageGraph {
   center: string;
   depth: number;
   limit: number;
   scope: string;
   coverage: string;
+  coverage_level: "registered_node" | "field_proven" | "table_context_only" | "field_unregistered";
+  coverage_message: string;
+  table_context: CatalogLineageContext | null;
   omitted_nodes: number;
   boundary_edges: number;
   nodes: CatalogLineageNode[];
@@ -165,6 +179,7 @@ export interface CatalogLineageOverview {
   coverage: string;
   registered_edges: number;
   internal_edges: number;
+  field_coverage: { total: number; field_proven: number; table_context_only: number; unregistered: number };
   nodes: Array<{ id: string; label: string; layer: string; members: CatalogLineageNode[]; process_count: number }>;
   edges: Array<{ source: string; target: string; count: number }>;
 }

@@ -110,6 +110,56 @@ def test_real_field_flow_is_directed_and_not_membership(catalog):
     }
 
 
+def test_adjustment_factor_effective_from_has_exact_field_lineage(catalog):
+    graph = catalog.snapshot["lineage"]
+    field = "dwd_field:dwd_adjustment_factor.effective_from"
+    source = "source-field:adjustment_factors_pit.effective_date"
+    assert reachable(graph, source, field)
+    assert reachable(graph, field, "dwd_field:dwd_adjustment_factor.effective_to")
+    assert reachable(graph, field, "dwd_field:dwd_adjustment_factor_input.effective_to")
+    assert reachable(graph, field, "projection:p4-event.factor_effective_from")
+    assert reachable(graph, field, "projection:p4-event.adjustment_effective")
+    lineage = catalog.relations(field, depth=5, limit=100)["lineage"]
+    assert lineage["coverage_level"] == "field_proven"
+    assert lineage["table_context"] is None
+    assert len(lineage["edges"]) >= 5
+
+
+def test_every_dwd_field_is_explicitly_field_proven_or_gets_table_context(catalog):
+    summary = catalog.summary()["lineage_overview"]["field_coverage"]
+    assert summary == {
+        "total": 524,
+        "field_proven": 10,
+        "table_context_only": 514,
+        "unregistered": 0,
+    }
+    for entry in catalog.snapshot["entries"]:
+        if entry["kind"] != "dwd_field":
+            continue
+        lineage = catalog.relations(entry["entry_id"], depth=1, limit=20)["lineage"]
+        assert lineage["coverage_level"] in {"field_proven", "table_context_only"}
+        if lineage["coverage_level"] == "field_proven":
+            assert lineage["edges"], entry["entry_id"]
+            assert lineage["table_context"] is None
+        else:
+            assert lineage["edges"] == [], entry["entry_id"]
+            assert lineage["table_context"] is not None, entry["entry_id"]
+            assert lineage["table_context"]["edges"], entry["entry_id"]
+            assert "不代表该字段" in lineage["table_context"]["message"]
+
+
+def test_table_context_fallback_never_becomes_a_fake_field_edge(catalog):
+    field = "dwd_field:dwd_adjustment_factor.factor_value"
+    lineage = catalog.relations(field, depth=2, limit=60)["lineage"]
+    assert lineage["coverage_level"] == "table_context_only"
+    assert lineage["nodes"][0]["id"] == field and lineage["edges"] == []
+    context = lineage["table_context"]
+    assert context is not None
+    assert context["center"] == "dwd_table:dwd_adjustment_factor"
+    assert context["edges"]
+    assert all(edge["source"] != field and edge["target"] != field for edge in context["edges"])
+
+
 def test_dwd_coverage_uses_only_explicit_modeled_contracts(catalog):
     graph = catalog.snapshot["lineage"]
     targets = {edge["target"] for edge in graph["edges"]}

@@ -82,6 +82,13 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await global.getByRole("button", { name: "20期简单均线（总回报指数）", exact: false }).click();
     await expect(page.getByTestId("business-description")).toContainText("包含当前时段");
     await expect(page.getByTestId("catalog-detail")).toContainText("完整研究管道");
+    await search(page, "dwd_adjustment_factor.effective_from");
+    await expect(page.getByTestId("lineage-coverage-level")).toContainText("字段级血缘已证明");
+    await expect(page.locator('[data-lineage-node="source-field:adjustment_factors_pit.effective_date"]')).toBeVisible();
+    await expect(page.locator('[data-lineage-node="projection:p4-event.factor_effective_from"]')).toBeVisible();
+    await search(page, "dwd_adjustment_factor.factor_value");
+    await expect(page.getByTestId("lineage-coverage-level")).toContainText("当前仅有表级加工上下文");
+    await expect(page.getByTestId("table-lineage-context")).toBeVisible();
     await search(page, "indicator.momentum.macd");
     await expect(page.getByTestId("catalog-detail")).toContainText("暂无");
     await expect(page.getByTestId("lineage-focus")).toContainText("不能据此认定");

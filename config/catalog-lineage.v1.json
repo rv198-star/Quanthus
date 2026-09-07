@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "authority": "reviewed_declared_processing_dependencies",
-  "coverage": "展示已登记的静态加工依赖，不是某次运行的实际消费记录。ODS 到 DWD 的概览为数据集级；字段展开仅包含已核对的行情、研究指标、标签和 Facts V2 链。未画出的连线不代表没有其他依赖。",
+  "coverage": "展示已登记的静态加工依赖，不是某次运行的实际消费记录。每个 DWD 字段都会标明字段级证明状态：有精确证据时展示字段加工链；尚未登记字段映射时仅展示所属表已证明的加工上下文并明确不可视为字段映射。未画出的字段连线不代表没有其他依赖。",
   "evidence": {
     "market": {"path":"src/quanthus/pipelines/securities_warehouse/market_observation.py","sha256":"sha256:5b72512cd75c9ee0d2ef17f89174b6e9a044dd354be904b7f20364bbdd6a561f","locator":"_bar_query"},
     "provider": {"path":"src/quanthus/backtest/direct_dwd_provider.py","sha256":"sha256:08fb354bb3386661c20ea19f0de3afd7aadc450cc55c1a6c03cb2241fc3ad063","locator":"daily_ohlcv_none.parquet"},
@@ -9,7 +9,10 @@
     "structure": {"path":"src/quanthus/structure_v2.py","sha256":"sha256:29693a9cf81545e8e7e34db7e5f5403f5e7f782c4d845b8cc64f700390121158","locator":"build_structure_v2"},
     "admission": {"path":"src/quanthus/structure_v2_run.py","sha256":"sha256:ce4d9ea947e5009e362422073503602ef7bef8b30a9970f72eca2b919cda7734","locator":"extract_admissions"},
     "inputs": {"path":"src/quanthus/structure_v2_inputs.py","sha256":"sha256:e895443dc062244c0c36bad92ab9782b21c0739ef72b07c6c2043befaa2cf50d","locator":"admit_daily"},
-    "consumer": {"path":"src/quanthus/structure_v2_consumer.py","sha256":"sha256:6870f9d1d4d2cbc6e27706b4e85998c961cb16458cc1b5d9ef7c0fb770fe4bb2","locator":"StructureV2CompatibilityExpert"}
+    "consumer": {"path":"src/quanthus/structure_v2_consumer.py","sha256":"sha256:6870f9d1d4d2cbc6e27706b4e85998c961cb16458cc1b5d9ef7c0fb770fe4bb2","locator":"StructureV2CompatibilityExpert"},
+    "factor_materialization": {"path":"src/quanthus/pipelines/securities_warehouse/disclosure_event.py","sha256":"sha256:99d456309d352527ab4ca78a0e95d809a087f3743af96f9464bf2471f52ec53f","locator":"materialize_adjustment_factor_rows"},
+    "factor_interval": {"path":"src/quanthus/pipelines/securities_warehouse/disclosure_event.py","sha256":"sha256:99d456309d352527ab4ca78a0e95d809a087f3743af96f9464bf2471f52ec53f","locator":"close_adjustment_factor_intervals"},
+    "event_factor": {"path":"src/quanthus/event_library/physical_scan.py","sha256":"sha256:970a2c97a24edaa4b3823e4a0c70571e01f5562a832d31b06af5db9970722657","locator":"factor_boundary AS"}
   },
   "market_field_mapping": {"open":"open","high":"high","low":"low","close":"close","volume":"volume","amount":"turnover"},
   "nodes": [
@@ -18,11 +21,18 @@
     {"id":"projection:execution-limits","label":"历史执行与限价输入","layer":"projection","grain":"dataset","description":"研究管道用来检查价格转换和准入的限价、可执行性信息。"},
     {"id":"projection:universe","label":"历史证券范围与就绪性","layer":"projection","grain":"dataset","description":"完整截面中的证券范围及就绪条件；不是当前证券名单的历史回填。"},
     {"id":"projection:calendar","label":"研究交易日历","layer":"projection","grain":"dataset","description":"Direct-DWD 导出的权威时段信息，供历史对齐及连续性检查。"},
+    {"id":"source-field:adjustment_factors_pit.effective_date","label":"源复权因子 · 生效日期","layer":"source","grain":"field","description":"adjustment_factors_pit 中被复权因子构建器实际读取的 effective_date；转换后形成 UTC 有效期起点。"},
+    {"id":"projection:p4-event.factor_effective_from","label":"P4 事件候选 · 复权边界起点","layer":"projection","grain":"field","description":"Event Library 从 dwd_adjustment_factor.effective_from 汇总得到的复权边界时间，用于与交易日候选匹配。"},
+    {"id":"projection:p4-event.adjustment_effective","label":"P4 事件候选 · 当日复权生效标记","layer":"projection","grain":"field","description":"当交易日匹配到复权因子边界时形成的候选标记；其存在依赖复权因子边界记录。"},
     {"id":"projection:daily-return","label":"单期总回报","layer":"indicator","grain":"field","description":"依据收盘价格与规范化公司行动计算的单期总回报；指数与波动率共享此计算基础。"},
     {"id":"projection:v2-daily-input","label":"Facts V2 合格日线输入","layer":"structure","grain":"record","description":"通过身份、日历、坐标、质量及版本校验的回溯日线输入。"},
     {"id":"consumer:structure-v2-compatibility","label":"结构事实兼容性消费者","layer":"consumer","grain":"consumer","description":"验证连续事实能够接入专家和聚合器；不是正式投资专家，也不授予交易权限。"}
   ],
   "steps": [
+    {"id":"adjustment-effective-from","label":"生效日期标准化为 UTC 有效期起点","inputs":["source-field:adjustment_factors_pit.effective_date"],"outputs":["dwd_field:dwd_adjustment_factor.effective_from","dwd_field:dwd_adjustment_factor_input.effective_from"],"evidence":"factor_materialization","grain":"field","role":"calculation"},
+    {"id":"adjustment-effective-to","label":"以下一有效期起点关闭当前区间","inputs":["dwd_field:dwd_adjustment_factor.effective_from"],"outputs":["dwd_field:dwd_adjustment_factor.effective_to"],"evidence":"factor_interval","grain":"field","role":"calculation"},
+    {"id":"adjustment-input-effective-to","label":"按因子有效期边界关闭输入证据区间","inputs":["dwd_field:dwd_adjustment_factor.effective_from","dwd_field:dwd_adjustment_factor_input.effective_from"],"outputs":["dwd_field:dwd_adjustment_factor_input.effective_to"],"evidence":"factor_interval","grain":"field","role":"calculation"},
+    {"id":"p4-adjustment-boundary","label":"按证券和生效日汇总复权边界","inputs":["dwd_field:dwd_adjustment_factor.effective_from"],"outputs":["projection:p4-event.factor_effective_from","projection:p4-event.adjustment_effective"],"evidence":"event_factor","grain":"field","role":"calculation"},
     {"id":"calendar-projection","label":"导出研究日历","inputs":["dwd_table:dwd_trading_calendar"],"outputs":["projection:calendar"],"evidence":"provider","grain":"dataset","role":"reference"},
     {"id":"total-return","label":"计算总回报并校验连续性","inputs":["projection:daily_ohlcv_none.close","projection:daily_ohlcv_none.open","projection:daily_ohlcv_none.high","projection:daily_ohlcv_none.low","projection:daily_ohlcv_none.volume","projection:daily_ohlcv_none.amount","projection:normalized-actions","projection:action-exceptions","projection:execution-limits","projection:universe"],"outputs":["projection:daily-return"],"evidence":"panel","grain":"mixed","role":"calculation"},
     {"id":"return-index","label":"从100累计总回报","inputs":["projection:daily-return"],"outputs":["feature_spec:price.total_return_index@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},

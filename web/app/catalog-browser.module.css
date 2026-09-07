@@ -84,6 +84,14 @@
 .centerNode rect { fill: #e9f2ff; stroke: #3269a9; stroke-width: 2.4; }
 .graphNode:hover rect, .graphNode:focus-visible rect { stroke: #1f63af; stroke-width: 3; }
 .graphNote { font-size: 12px !important; line-height: 1.85; color: #62778f !important; }
+.coverageNotice { margin: 14px 0; border: 1px solid #cdd9e7; border-radius: 9px; background: #f6f9fc; padding: 13px 15px; color: #365574; }
+.coverageNotice[data-level="field_proven"] { border-color: #bfd9ca; background: #f3faf6; }
+.coverageNotice[data-level="table_context_only"] { border-color: #ead8ac; background: #fffaf0; }
+.coverageNotice strong { display: block; font-size: 13px; margin-bottom: 5px; }
+.coverageNotice p { margin: 0; font-size: 12px; line-height: 1.75; }
+.contextPanel { margin: 18px 0; border: 1px dashed #d1b973; border-radius: 10px; background: #fffdf7; padding: 15px; }
+.contextPanel h3 { margin: 0 0 5px; font-size: 15px; color: #5c4b23; }
+.contextPanel > p { margin: 0; font-size: 12px; line-height: 1.75; color: #74623a; }
 .groupMembers { margin-top: 18px; border-top: 1px solid #e1e8f1; padding-top: 14px; }
 .groupMembers h3 { font-size: 15px; }
 .groupMembers > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 9px; max-height: 370px; overflow: auto; }

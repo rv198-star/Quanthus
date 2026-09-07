@@ -47,17 +47,21 @@ def build_lineage(entries: dict[str, dict[str, Any]], definition: dict[str, Any]
 
     def node(identifier: str, label: str, layer: str, grain: str, description: str,
              *, entry_id: str | None = None, evidence: dict | None = None,
-             process: bool = False) -> None:
+             process: bool = False, parent_entry_id: str | None = None) -> None:
         if identifier in nodes:
             raise ValueError(f"duplicate lineage node: {identifier}")
         nodes[identifier] = {"id": identifier, "label": label, "layer": layer, "grain": grain,
                              "description": description, "entry_id": entry_id,
-                             "evidence": evidence, "process": process}
+                             "evidence": evidence, "process": process,
+                             "parent_entry_id": parent_entry_id}
 
     for key, item in sorted(entries.items()):
         grain = "field" if item["kind"] == "dwd_field" else (
             "dataset" if item["kind"] in {"dwd_table", "ods_dataset"} else "definition")
-        node(key, item["display_name"], _layer(item), grain, item["description"], entry_id=key)
+        parent_entry_id = (f"dwd_table:{item['details']['table']}"
+                           if item["kind"] == "dwd_field" else None)
+        node(key, item["display_name"], _layer(item), grain, item["description"], entry_id=key,
+             parent_entry_id=parent_entry_id)
     for item in definition["nodes"]:
         node(item["id"], item["label"], item["layer"], item["grain"], item["description"])
 
@@ -215,8 +219,17 @@ def overview(graph: dict[str, Any]) -> dict[str, Any]:
             internal += 1
         else:
             counts[pair] += 1
+    field_nodes = [node for node in graph["nodes"] if node["id"].startswith("dwd_field:")]
+    incident = {edge[side] for edge in graph["edges"] for side in ("source", "target")}
+    field_proven = [node for node in field_nodes if node["id"] in incident]
+    table_context = [node for node in field_nodes if node["id"] not in incident
+                     and node.get("parent_entry_id") in participating]
+    unregistered = len(field_nodes) - len(field_proven) - len(table_context)
     return {"scope": SCOPE, "coverage": graph["coverage"], "internal_edges": internal,
             "registered_edges": len(graph["edges"]),
+            "field_coverage": {"total": len(field_nodes), "field_proven": len(field_proven),
+                               "table_context_only": len(table_context),
+                               "unregistered": unregistered},
             "nodes": [groups[layer] for layer in LAYERS if layer in groups],
             "edges": [{"source": source, "target": target, "count": count}
                       for (source, target), count in sorted(counts.items())]}
@@ -235,22 +248,60 @@ def focus(graph: dict[str, Any], center: str, *, depth: int = 2, limit: int = 60
     for edge in graph["edges"]:
         downstream[edge["source"]].add(edge["target"])
         upstream[edge["target"]].add(edge["source"])
-    positions = {center: 0}
-    for adjacency, sign in ((upstream, -1), (downstream, 1)):
-        frontier, visited = {center}, {center}
-        for distance in range(1, depth + 1):
-            frontier = {target for source in frontier for target in adjacency[source]} - visited
-            visited.update(frontier)
-            for key in sorted(frontier):
-                positions.setdefault(key, sign * distance)
-    ordered = sorted(positions, key=lambda key: (abs(positions[key]), positions[key], key))
-    selected = set(ordered[:limit])
-    visible_edges = [edge for edge in graph["edges"]
-                     if edge["source"] in selected and edge["target"] in selected]
-    boundary_edges = sum((edge["source"] in selected) != (edge["target"] in selected)
-                         for edge in graph["edges"])
-    return {"center": center, "depth": depth, "limit": limit, "scope": SCOPE,
-            "coverage": graph["coverage"], "omitted_nodes": max(0, len(ordered) - limit),
-            "boundary_edges": boundary_edges,
-            "nodes": [{**nodes[key], "distance": positions[key]} for key in ordered[:limit]],
-            "edges": visible_edges}
+
+    def project(start: str, budget: int) -> dict[str, Any]:
+        positions = {start: 0}
+        for adjacency, sign in ((upstream, -1), (downstream, 1)):
+            frontier, visited = {start}, {start}
+            for distance in range(1, depth + 1):
+                frontier = {
+                    target for source in frontier for target in adjacency[source]
+                } - visited
+                visited.update(frontier)
+                for key in sorted(frontier):
+                    positions.setdefault(key, sign * distance)
+        ordered = sorted(positions, key=lambda key: (abs(positions[key]), positions[key], key))
+        selected = set(ordered[:budget])
+        visible_edges = [edge for edge in graph["edges"]
+                         if edge["source"] in selected and edge["target"] in selected]
+        boundary_edges = sum((edge["source"] in selected) != (edge["target"] in selected)
+                             for edge in graph["edges"])
+        return {"center": start, "omitted_nodes": max(0, len(ordered) - budget),
+                "boundary_edges": boundary_edges,
+                "nodes": [{**nodes[key], "distance": positions[key]} for key in ordered[:budget]],
+                "edges": visible_edges}
+
+    result = project(center, limit)
+    result.update({"depth": depth, "limit": limit, "scope": SCOPE,
+                   "coverage": graph["coverage"], "table_context": None,
+                   "coverage_level": "registered_node",
+                   "coverage_message": "展示此节点已登记的静态加工关系。"})
+    center_node = nodes[center]
+    if center.startswith("dwd_field:"):
+        incident = any(edge["source"] == center or edge["target"] == center
+                       for edge in graph["edges"])
+        if incident:
+            result["coverage_level"] = "field_proven"
+            result["coverage_message"] = (
+                "此字段已有字段级加工证据；实线关系可按证据定位到具体转换或消费者。"
+            )
+        else:
+            parent = center_node.get("parent_entry_id")
+            if parent in nodes:
+                context = project(parent, min(limit, 60))
+                context.update({
+                    "scope": "table_processing_context_only",
+                    "message": (
+                        "以下仅为所属表已证明的加工上下文，不代表该字段本身使用了"
+                        "所有这些来源或下游。"
+                    ),
+                })
+                result["table_context"] = context
+                result["coverage_level"] = "table_context_only"
+                result["coverage_message"] = (
+                    "当前尚未登记此字段的精确加工映射；为避免孤立节点误导，改为同时展示所属表已证明的上下文。"
+                )
+            else:
+                result["coverage_level"] = "field_unregistered"
+                result["coverage_message"] = "当前既无字段级映射，也无可展示的所属表加工上下文。"
+    return result

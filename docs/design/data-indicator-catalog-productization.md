@@ -3,8 +3,8 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | accepted |
-| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md` |
+| Delivery gate | open |
+| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; field-lineage requalification in progress |
 | Work item | `P3-DICT-002` |
 | Parent | `data-indicator-catalog.md` |
 | Plan | `../../config/data-indicator-catalog-productization.v1.json` |
@@ -62,6 +62,28 @@ T 是否包含、历史要求、缺失语义；不得把旧 SMA/RSI 改写成另
 全局图和焦点图必须展示覆盖范围，节点/深度截断不能悄悄省略。不登记下游表示“目录尚未
 登记”，不等于没有消费者。图本身只读，无市场值查询和运行发起权限。优先采用现有 Web
 栈和 SVG，不增加搜索引擎、图数据库或图形依赖库。
+
+### 4.1 字段焦点完整性修订
+
+用户以 `dwd_adjustment_factor.effective_from` 发现：原实现虽然有表级 ODS→DWD 血缘，
+但绝大多数 DWD 字段没有字段级加工边，焦点图会只显示字段自身。该行为属于产品语义缺陷；
+免责声明不能把孤立节点变成有效血缘。
+
+每个 DWD 字段焦点现在必须明确返回一种证明级别：
+
+- `field_proven`：存在直接以该字段为输入或输出的、证据绑定的加工边；主图可展示这些实线关系；
+- `table_context_only`：没有精确字段映射，但所属 DWD 表已有声明的加工关系；主图保持字段孤立，
+  另开“所属表加工上下文”视图，明确该上下文不能推断字段参与了表的每个来源或消费者；
+- `field_unregistered`：连所属表加工上下文也不存在，必须显式报未登记，不能只显示自身而无说明。
+
+`field_of` / `contains` 仍不能转成加工边，也不能用 ODS→DWD 表级关系自动生成虚假的
+ODS 字段→DWD 字段映射。全局概览必须公布 DWD 字段三类覆盖数量，使字段级能力边界可审计。
+
+`dwd_adjustment_factor.effective_from` 是强制反例：源码证明
+`adjustment_factors_pit.effective_date` 经日期解析和 `_effective_start()` 形成该字段；
+`close_adjustment_factor_intervals()` 又使用它关闭 `effective_to`；P4 Event Library 的
+`factor_boundary` 读取它形成 `factor_effective_from` 及当日复权边界标记。该链必须作为
+`field_proven` 展示。
 
 ## 5. 工单顺序及验收（D）
 

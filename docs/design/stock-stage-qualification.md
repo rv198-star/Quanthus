@@ -9,10 +9,12 @@
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
 | Dependency contract | `stock-stage-data-dependencies.md` |
-| Proposed delivery | `../work-items/stock-stage-qualification-proposal.md` |
+| Proposed delivery | `../work-items/stock-stage-historical-learning.md`; 原STAGE-A/F提案保留为历史 |
 | Review provenance | 单一助手按量化验证、短线交易、数仓三个视角交叉审查；不是三位独立专家签字或实证验收 |
 
 ## 1. 本次要解决的问题
+
+历史口径学习、有限选参与定稿现在由子设计 `stock-stage-historical-learning.md` 具体化；设备规划见 `stock-stage-training-compute.md`。本文件继续拥有验证与不确定性边界，对外标签资格仅用 SHADOW / QUALIFIED，多维证据不是新增生命周期。方案和工单批准准备不等于训练或数据访问授权。
 
 Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；两者之间必须有可执行的判定机制，不能因为定时任务稳定、图表看起来合理或运行了一段时间就升级。
 

@@ -233,6 +233,15 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-DICT-003-B | Implement full ODS→DWD→ADM asset/field lineage | P3-DICT-003-A | closed; #234; full registered closure, exact field counterexamples and asset-only fallback accepted in implementation audit |
 | P3-DICT-003-C | Separate definition and usage dependency views | P3-DICT-003-B | closed; #235; Data Lineage / Definition Dependency / Usage Dependency split accepted in implementation audit |
 | P3-DICT-003-D | Audit, gate and release Catalog Lineage V2 | P3-DICT-003-C | closed; #236; full gate 1602 passed / 7 existing skips; Web navigation refinement on `c25638a`, API remains `3aa4837`; `docs/acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md` |
+| P3-STAGE-001 | Learn and qualify stock-stage definitions from history | P3-STRUCT-004, P3-DICT-003 | blocked; planning only; `stock-stage-historical-learning.md`; no execution/data access granted |
+| P3-STAGE-001-A | Freeze first-group semantics, scope and experiment budget | P3-STRUCT-004, P3-DICT-003 | ready |
+| P3-STAGE-001-B | Benchmark CPU capacity and qualify the training device | P3-STAGE-001-A | blocked; budget and benchmark authorization required |
+| P3-STAGE-001-C | Implement minimal Facts inputs and historical harness | P3-STAGE-001-A, P3-STAGE-001-B | blocked; depends on A/B and implementation authorization |
+| P3-STAGE-001-D | Build independent T-only references and target settlements | P3-STAGE-001-C | blocked; reference and sample-access authorization required |
+| P3-STAGE-001-E | Learn constrained rules and calibrate adjacent stages | P3-STAGE-001-D | blocked; training execution authorization required |
+| P3-STAGE-001-F | Evaluate held-out evidence and freeze label qualification | P3-STAGE-001-E | blocked; separate held-out access authorization required |
+| P3-STAGE-001-G | Publish observational post-DWD daily labels | P3-STAGE-001-F | blocked; as-known input and schedule qualification required |
+| P3-STAGE-001-H | Expand stage groups and evaluate specific consumers | P3-STAGE-001-F | blocked; new-group and consumer authorization required |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

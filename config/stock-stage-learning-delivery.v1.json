@@ -1,0 +1,116 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STAGE-001",
+  "design": "docs/design/stock-stage-historical-learning.md",
+  "compute_design": "docs/design/stock-stage-training-compute.md",
+  "review": "docs/reviews/stock-stage-learning-review-20260908.md",
+  "work_items": "docs/work-items/stock-stage-historical-learning.md",
+  "authorization": {
+    "scope": "design_review_issue_planning_and_read_only_capacity",
+    "training_authorized": false,
+    "market_result_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "daily_schedule_authorized": false,
+    "cloud_purchase_authorized": false
+  },
+  "data_policy": {
+    "authority": "config/p0-policy.v1.json",
+    "development_years": [2012, 2021],
+    "arbitration_years": [2022, 2024],
+    "permanent_blind_years": [2025, 2025],
+    "preferred_policy": "preserve_existing_partitions",
+    "alternative_2019_2024_training": "requires_explicit_policy_amendment_before_access"
+  },
+  "items": [
+    {
+      "id": "P3-STAGE-001", "kind": "epic", "status": "blocked",
+      "title": "以历史数据学习并验证个股阶段口径",
+      "depends_on": ["P3-STRUCT-004", "P3-DICT-003"],
+      "scope": "以语义约束的有限参数学习为主、CPU优先；逐组形成可解释候选、独立验证和按用途资格，不预设12个状态必须全部保留。",
+      "inputs": ["stock-stage-qualification.md", "stock-stage-data-dependencies.md", "冻结数据分区和既有连续Facts对照"],
+      "deliverables": ["版本化标签定义/学习结果/证据包", "设备准入报告", "每状态或分组的保留/合并/拒绝结论"],
+      "acceptance": ["子项按依赖完成且未授权权限不打开", "无训练/测试泄漏或规则自证真值", "标签资格与具体交易消费权限分离"],
+      "blocked_on": ["当前只授权设计和工单", "新研究实施和训练需范围/预算授权"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-A", "kind": "task", "status": "ready",
+      "title": "冻结首组语义、试验边界与数据访问计划",
+      "depends_on": ["P3-STRUCT-004", "P3-DICT-003"],
+      "scope": "准备3/4及相邻反例的日线profile、hard predicates、允许参数空间、参考和目标角色；保留现有2012-2021/2022-2024/2025分区。ready仅指可继续设计冻结。",
+      "inputs": ["历史学习设计§2-8", "已有源字段依赖矩阵", "P0/P3分区权威"],
+      "deliverables": ["config/stage-learning/experiment.v1.json（拟建）", "0-12依赖/波次表", "有限试标与计算预算、停止规则、待授权访问清单"],
+      "acceptance": ["每个谓词能追到精确字段/版本/单位/坐标/窗口", "共存、歧义、规则冲突与不可用分开", "R0/R1/R2比较、试验次数和校准/测试边界明确", "提出技术默认值，不要求用户凭空选择算法参数"],
+      "blocked_on": ["任何后续真实样本/训练执行仍需明确授权"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-B", "kind": "task", "status": "blocked",
+      "title": "完成CPU优先容量基准与训练设备准入",
+      "depends_on": ["P3-STAGE-001-A"],
+      "scope": "独立虚拟环境；先合成后获准小样本，分阶段测I/O/特征/拟合/评价；核对Win11 CPU/RAM/剩余空间，必要时做可选RX6800 OpenCL比较。",
+      "inputs": ["冻结基准和资源预算", "OCI只读容量记录", "Win11补充硬件信息"],
+      "deliverables": ["环境/资源manifest", "两至三个规模点的time/RSS/scratch报告", "OCI或本机或独立CPU/GPU设备选择"],
+      "acceptance": ["并发/线程/内存/磁盘限制实际可执行且不影响生产", "不把warm缓存时间当冷构建", "GPU方案包含兼容性、传输/构建和总成本", "没跑完整训练就不承诺完成时间，容量超限停止而非扩权限"],
+      "blocked_on": ["A冻结及限额基准执行授权", "本机设备未核验；租机另批"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-C", "kind": "task", "status": "blocked",
+      "title": "实现最小Facts输入与历史逐日验证底座",
+      "depends_on": ["P3-STAGE-001-A", "P3-STAGE-001-B"],
+      "scope": "只补首组必要F家族；共享特征一次构建；additive候选/decision契约，时间折与数据权限门禁，独立oracle及历史/增量一致性。",
+      "inputs": ["精确DWD依赖", "批准的retrospective profile", "设备资源上限"],
+      "deliverables": ["src/quanthus/stage_learning/（拟建）", "版本化候选/decision及输入manifest", "tests/unit/test_stage_learning_*（拟建）"],
+      "acceptance": ["首组字段/公式/缺失闭包可执行且不重命名旧指标", "未来后缀注入、除权/停牌/相等/支撑角色反例通过", "开发读接口拒绝2022-2025与future target读取", "批量与逐日结果一致，跨平台数值容差预登记"],
+      "blocked_on": ["实施授权", "A/B完成"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-D", "kind": "task", "status": "blocked",
+      "title": "建立独立T-only参考集与未来目标结算",
+      "depends_on": ["P3-STAGE-001-C"],
+      "scope": "120个episode-context可行性试标与确认性样本隔离；双人独立标注+第三方分歧复核；复用TargetCard/Resolver，不以未来阶段编号给自身判卷。",
+      "inputs": ["冻结采样总体/种子/参考规范", "人工或明确标注的辅助评审身份", "准入future target卡"],
+      "deliverables": ["definite/coexistence/ambiguous/unjudgeable参考账本", "独立settlement账本", "E前最终冻结的样本量/门槛/参数搜索预算"],
+      "acceptance": ["评审第一轮不见算法输出与未来行情", "弱标签和LLM自评不能充当独立真值", "随机/边界样本与episode相关性正确计量", "pending/censored/unavailable不算成功，日K双触不猜先后"],
+      "blocked_on": ["独立参考来源及访问授权", "C完成"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-E", "kind": "task", "status": "blocked",
+      "title": "执行有限规则学习、相邻状态联合校准和CPU模型对照",
+      "depends_on": ["P3-STAGE-001-D"],
+      "scope": "获准development内比较R0/R1和必要CPU R2；逐折训练预处理，候选与置信度校准隔离；搜索全量留痕，不热改运行批次。",
+      "inputs": ["最终冻结实验manifest", "共享面板/参考集/时间折", "同信息集连续Facts与R0"],
+      "deliverables": ["完整trial ledger含失败/预算", "固定环境模型或参数版本", "每状态及相邻组质量/覆盖/延迟/稳定性报告"],
+      "acceptance": ["不把歧义集合全当阳性，不将unknown全当负例", "不同标签confidence不可比时不使用margin", "在不可区分的配置中选更简单稳健者而非孤立最高分", "无充分证据可保留R0/合并状态/INCONCLUSIVE，不强行上复杂模型"],
+      "blocked_on": ["训练执行与预算授权", "D完成"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-F", "kind": "task", "status": "blocked",
+      "title": "独立保留集检验并冻结标签资格",
+      "depends_on": ["P3-STAGE-001-E"],
+      "scope": "锁定所有参数/校准/阈值后按获准保留集执行一次评价；出按state/profile/view/population/use的资格包，保留失败与限制。",
+      "inputs": ["候选版本冻结digest", "保留集访问与使用次数批准", "预登记资格判据"],
+      "deliverables": ["不可改的外样本报告/访问账本", "SHADOW或QUALIFIED资格决定及用途", "模型CPU消费与数值回归报告"],
+      "acceptance": ["无2022-2024或2025授权就不读取也不宣称外样本通过", "资格分不能平均掉硬错误/低覆盖/样本不足", "看结果后改口径须新版本且声明原测试已消耗", "描述资格不自动声称盈利或授予交易权"],
+      "blocked_on": ["E完成", "单独保留分区授权；不以本工单自动打开"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-G", "kind": "task", "status": "blocked",
+      "title": "接入DWD READY后的观察性日更与漂移监控",
+      "depends_on": ["P3-STAGE-001-F"],
+      "scope": "验收新的as-known输入profile后只读日更；固定模型推断，不每日偷偷重训；受治理ADM发布与独立成熟结算。",
+      "inputs": ["批准的标签版本及允许用途", "逐来源可用时间/水位证据", "日更调度与资源授权"],
+      "deliverables": ["daily builder/ADM policy", "缺失/延迟/修正重放/批量一致性证据", "漂移报警和人工批准再训练流程"],
+      "acceptance": ["不把retrospective资格当as-known资格", "工作日钟点不替代DWD READY", "缺数据冻结而非看空；consumed_at留在审计日志", "不启用P6策略Shadow、交易通知或真实下单"],
+      "blocked_on": ["日更独立授权和as-known证明", "F完成"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-H", "kind": "task", "status": "blocked",
+      "title": "按波次扩展剩余状态并验证具体消费者",
+      "depends_on": ["P3-STAGE-001-F"],
+      "scope": "第二组5/6/7/10/11、第三组0/1/2/8/9/12按同协议研究；业务需要时另做Facts-only与Facts+Stage完整P2对照。",
+      "inputs": ["首组方法与失败经验", "各组最小Facts缺口", "新增分组/消费者范围与预算批准"],
+      "deliverables": ["分组后续实施卡和参数预算", "标签保留/合并/改维度决定", "特定专家/策略消费验收或拒绝"],
+      "acceptance": ["不能用已消耗保留集反复迭代却称新盲测", "不为凑足12状态无限扩特征", "删除未合格候选不得制造虚假单值确定", "消费者经济价值独立于标签描述资格"],
+      "blocked_on": ["新波次及消费者单独授权", "F完成"], "evidence": []
+    }
+  ]
+}

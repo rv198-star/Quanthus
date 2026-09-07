@@ -12,6 +12,8 @@
 
 ## 1. 本轮已经完成什么
 
+后续用户要求已将本提案细化为 `stock-stage-historical-learning.md` 与 `config/stock-stage-learning-delivery.v1.json` 的 P3-STAGE-001 A-H 工单计划。下列 STAGE-A/F 仍保留为最初讨论记录，不是并行执行清单；新的设计、角色评审、容量核查和工单登记不自动授予训练/市场结果/密封分区权限。
+
 核查既有十二状态草案、Facts V2 实际输入/输出、Feature/Label Registry、独立 target/resolver 协议、DWD 字段目录和连续/粗状态经济实验的既有结论。形成两个相互链接的设计草案：验证/歧义机制与逐字段/逐状态依赖矩阵。
 
 本次量化、短线、数仓是单一助手的角色交叉审查，不登记为独立专业人员验收。已有 `P3-LABEL-002` 的 fixture closeout、`P3-STRUCT-004` B1-B5 closeout 和 P6 各 gate 均不重开或改状态。下面代号仅为提案内部引用，不加入自动规划同步清单。

@@ -124,6 +124,11 @@ nodes.
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate
   twelve-state labels, B6/B7 implementation, new result-bearing research, or daily/strategy Shadow.
+  The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,
+  with device assessment in `design/stock-stage-training-compute.md`, three-perspective review in
+  `reviews/stock-stage-learning-review-20260908.md`, and issue-managed steps in
+  `work-items/stock-stage-historical-learning.md` (P3-STAGE-001 A-H). Creating these planning issues
+  grants no training, market-result, sealed-partition, daily-schedule or cloud-purchase authority.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

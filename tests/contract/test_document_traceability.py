@@ -1340,10 +1340,18 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )["items"]
         lineage_ids = {item["id"] for item in lineage_plan}
         self.assertEqual(lineage_ids, {"P3-DICT-003", *[f"P3-DICT-003-{c}" for c in "ABCD"]})
-        for declared in [*catalog_plan, *lineage_plan]:
+        stage_plan = json.loads(
+            (root / "config/stock-stage-learning-delivery.v1.json").read_text()
+        )
+        stage_ids = {item["id"] for item in stage_plan["items"]}
+        self.assertEqual(stage_ids, {"P3-STAGE-001", *[f"P3-STAGE-001-{c}" for c in "ABCDEFGH"]})
+        for key, value in stage_plan["authorization"].items():
+            if key.endswith("_authorized"):
+                self.assertIs(value, False)
+        for declared in [*catalog_plan, *lineage_plan, *stage_plan["items"]]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
-        catalog_owned_ids = catalog_ids | lineage_ids
+        catalog_owned_ids = catalog_ids | lineage_ids | stage_ids
         p3_items = [item for item in items
                     if item.phase == "P3" and item.stable_id not in catalog_owned_ids]
         p4_items = [item for item in items if item.phase == "P4"]

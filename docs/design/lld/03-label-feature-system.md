@@ -292,6 +292,15 @@ authority.
 | P3-DICT-003-B | Implement full registered asset/field closure | P3-DICT-003-A | #234; closed in Lineage V2 implementation audit |
 | P3-DICT-003-C | Separate Definition and Usage dependency graphs | P3-DICT-003-B | #235; closed in Lineage V2 implementation audit |
 | P3-DICT-003-D | Audit and release Catalog Lineage V2 | P3-DICT-003-C | #236; closed; full gate 1602 passed / 7 existing skips; latest Web navigation refinement `c25638a`, API `3aa4837` |
+| P3-STAGE-001 | Learn and qualify stock-stage definitions from history | P3-STRUCT-004, P3-DICT-003 | Planning only; `docs/design/stock-stage-historical-learning.md`; `config/stock-stage-learning-delivery.v1.json`; no training/data-access authority |
+| P3-STAGE-001-A | Freeze first-group semantics, scope and experiment budget | P3-STRUCT-004, P3-DICT-003 | Exact dependencies, reference/target roles, protected partitions and proposed defaults; ready only for design preparation |
+| P3-STAGE-001-B | Benchmark CPU capacity and qualify the training device | P3-STAGE-001-A | `docs/design/stock-stage-training-compute.md`; bounded end-to-end resource and environment report |
+| P3-STAGE-001-C | Implement minimal Facts inputs and historical harness | P3-STAGE-001-A, P3-STAGE-001-B | Additive candidate/decision schema, source/time isolation, independent oracle and incremental parity |
+| P3-STAGE-001-D | Build independent T-only references and target settlements | P3-STAGE-001-C | Pilot/test isolation, preserved ambiguity and independent outcome ledger |
+| P3-STAGE-001-E | Learn constrained rules and calibrate adjacent stages | P3-STAGE-001-D | Frozen-budget R0/R1/CPU R2 comparisons, complete trial ledger and within-fold fitting |
+| P3-STAGE-001-F | Evaluate held-out evidence and freeze label qualification | P3-STAGE-001-E | Independent data-access authorization, locked candidate and per-scope qualification without trading authority |
+| P3-STAGE-001-G | Publish observational post-DWD daily labels | P3-STAGE-001-F | Separately qualified as-known inputs and scheduling; no P6/strategy activation |
+| P3-STAGE-001-H | Expand stage groups and evaluate specific consumers | P3-STAGE-001-F | Separately authorized waves, same-facts comparison and optional complete-P2 consumer test |
 
 ## 7. Acceptance
 

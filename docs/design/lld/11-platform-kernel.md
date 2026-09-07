@@ -444,14 +444,10 @@ viewport owns an independent `{x,y,zoom}` transform, true centered fitView, uncl
 pointer-anchored wheel zoom, two-pointer pinch, floating controls and an interactive MiniMap; none of
 these alter the API graph. `table_context_only` is also a single-canvas Web presentation: the parent-table
 context replaces the redundant isolated-field canvas, while a compact notice preserves the non-field-proof
-boundary. `P3-DICT-003` is the additive Lineage V2 successor on the same four GET routes: the response now carries a formal asset graph (ODS/DWD/Research ADM), a separate Definition Dependency graph, and a separate Usage Dependency graph. The main Data Lineage defaults to full registered closure and accepts `asset_scope=focus` only for explicit 1/2/3/5-hop views; node budget remains bounded. This adds no migration, write route, Worker kind or execution authority. Repository A/B/C gates are accepted; D remains open until the API/Web production release.
+boundary. `P3-DICT-003` is the accepted additive Lineage V2 successor on the same four GET routes: the response carries a formal asset graph (ODS/DWD/Research ADM), a separate Definition Dependency graph, and a separate Usage Dependency graph. The main Data Lineage defaults to full registered closure and accepts `asset_scope=focus` only for explicit 1/2/3/5-hop views; node budget remains bounded. This adds no migration, write route, Worker kind or execution authority. A-D and the parent are accepted.
 
-Current audited production checkout/Web are
-`d4e71585a58a229fa8c7ddbb9515e4038dcb2aeb`; API remains
-`0c671f92e58834d49cdb182d3c58793d052d9814` because this release rebuilt only Web. Every lineage
-node still carries exact technical identity and dataset-level source context avoids redundant generic
-process boxes. Evidence: `../../acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`.
-The original Catalog and earlier productization acceptances remain retained separately.
+Current audited production checkout/API/Web are
+`3aa48377126e28e5e8151c68ff146d2e45894e78`. The API remains a lean serving image: restricted backtest/event-library runtime modules are not added merely to expose static evidence; reviewed evidence digests are frozen in source-bound Catalog configs and verified against source in development/audit checkouts. Evidence: `../../acceptance/catalog-lineage-v2-production-closeout-20260907.md`. The original Catalog and earlier productization acceptances remain retained separately.
 
 Docker keeps API and Web host ports bound to loopback. A governed Web image build also performs a
 repository-scoped retention pass for `quanthus-platform-web:git-*`: the target release tag and every

@@ -5,10 +5,10 @@
 | Design status | approved |
 | Delivery gate | accepted |
 | Governing work item | `P3-DICT-001` foundation; `P3-DICT-002` productization; `P3-DICT-003` Lineage V2 |
-| Productization | `data-indicator-catalog-productization.md`; active Lineage V2 successor: `data-catalog-lineage-v2.md` |
+| Productization | `data-indicator-catalog-productization.md`; accepted Lineage V2 successor: `data-catalog-lineage-v2.md` |
 | GitHub parent | #215 |
 | Parent LLD | `lld/03-label-feature-system.md` |
-| Data authority | existing ODS/DWD contracts, registries and semantic catalogs |
+| Data authority | existing ODS/DWD contracts, governed Research ADM registry, Feature/Label registries and semantic catalogs |
 | Product route | `/catalog` |
 | API prefix | `/api/platform/v1/catalog` |
 

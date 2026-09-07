@@ -10,7 +10,7 @@
 | Governing design | `../design/data-indicator-catalog.md` |
 | Parent/owner | `../design/lld/03-label-feature-system.md` |
 | Platform surface | read-only API + `/catalog`; no new metadata database |
-| Current status | A-E closed; original foundation accepted; `P3-DICT-002` accepted; active Lineage V2 successor `P3-DICT-003` is tracked in `catalog-lineage-v2.md` |
+| Current status | A-E closed; original foundation accepted; `P3-DICT-002` accepted; Lineage V2 successor `P3-DICT-003` accepted in production on API/Web `3aa4837` |
 
 ## 1. Purpose
 
@@ -35,7 +35,7 @@ indicator use-time remains in decision/operation audit logs rather than Catalog 
 
 ### B — Authority adapters and deterministic snapshot (#224, closed)
 
-The explicit source manifest projects the current repository authority into 664 entries:
+The original P3-DICT-001 foundation source manifest projected 664 entries; the accepted P3-DICT-003 successor now projects 748 and is tracked separately:
 
 ```text
 33 DWD tables
@@ -96,13 +96,13 @@ The Catalog must continue to make these distinctions explicit:
 and requires full repository/Web gates plus production deployment/smoke before parent closeout.
 The original post-acceptance production evidence remains in
 `../acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
-Current productization `P3-DICT-002` uses production checkout/Web `d4e7158` while API remains
-`0c671f9`; the latest single-canvas table-context evidence is in
+The retained P3-DICT-002 closeout remains in
 `../acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`. Successor
-`P3-DICT-003` is currently in release qualification: A/B/C are closed in repository evidence with
-748 Catalog entries, 4 governed ADM datasets / 76 ADM fields, and a 94-node formal asset graph;
-D remains open until full gate and API/Web production closeout. Design/work item:
-`../design/data-catalog-lineage-v2.md` / `catalog-lineage-v2.md`. A source change that changes the deterministic Catalog must refresh
+`P3-DICT-003` is accepted in production with 748 Catalog entries, 4 governed ADM datasets / 76 ADM
+fields, and a 94-node / 80-edge formal asset graph. API/Web run `3aa4837`; full gate is 1602 passed /
+7 existing environment skips. Design/work item/evidence:
+`../design/data-catalog-lineage-v2.md` / `catalog-lineage-v2.md` /
+`../acceptance/catalog-lineage-v2-production-closeout-20260907.md`. A source change that changes the deterministic Catalog must refresh
 the snapshot manifest in the same repository change. Original final evidence remains in
 `../acceptance/data-indicator-catalog-final-acceptance-20260907.md`.
 

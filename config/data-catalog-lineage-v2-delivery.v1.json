@@ -7,7 +7,7 @@
       "id": "P3-DICT-003",
       "kind": "epic",
       "title": "重构 Catalog 为正式数据资产血缘 V2",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-DICT-002"],
       "scope": "以 governed ODS/DWD/Research ADM 为 Data Lineage 节点，拆分计算依赖和使用关系，并将默认查询升级为完整资产全链。",
       "acceptance": [
@@ -16,7 +16,10 @@
         "默认 full closure 与聚焦模式均可审计",
         "不修改数据、公式、策略或执行权限"
       ],
-      "evidence": []
+      "evidence": [
+        "docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md",
+        "docs/acceptance/catalog-lineage-v2-production-closeout-20260907.md"
+      ]
     },
     {
       "id": "P3-DICT-003-A",
@@ -65,7 +68,7 @@
       "id": "P3-DICT-003-D",
       "kind": "task",
       "title": "审计、浏览器验收与生产发布",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-DICT-003-C"],
       "scope": "完成语义反例、确定性 Catalog、API/Web、桌面/窄屏无限画布、完整工程门禁、Git 与生产验收。",
       "acceptance": [
@@ -73,7 +76,10 @@
         "专项、Web、浏览器和 make check 通过或明确记录环境 skip",
         "干净提交推送并完成必要 API/Web 生产烟测"
       ],
-      "evidence": []
+      "evidence": [
+        "docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md",
+        "docs/acceptance/catalog-lineage-v2-production-closeout-20260907.md"
+      ]
     }
   ]
 }

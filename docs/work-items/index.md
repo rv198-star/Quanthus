@@ -219,11 +219,11 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 | P3-DICT-001-C | Expose authenticated read-only Catalog API | P3-DICT-001-B | closed; #225; GET-only summary/search/detail/relations, viewer/operator/admin `catalog:read`; `docs/acceptance/data-indicator-catalog-api-ui-20260907.md` |
 | P3-DICT-001-D | Build the `/catalog` search and detail UI | P3-DICT-001-C | closed; #226; real Vinext build and SSR/source contract PASS; same API/UI acceptance evidence |
 | P3-DICT-001-E | Freeze Catalog drift gates and maintenance closeout | P3-DICT-001-D | closed; #227; repository/Web/drift gates plus production API/Web deployment and Catalog authentication smoke PASS; `docs/acceptance/data-indicator-catalog-final-acceptance-20260907.md` |
-| P3-DICT-002 | Productize Chinese Catalog cards and declared processing lineage | P3-DICT-001 | open epic; #232 reopened for exact-node-identity and table-context readability repair |
+| P3-DICT-002 | Productize Chinese Catalog cards and declared processing lineage | P3-DICT-001 | closed; #232 reclosed after exact-node-identity/readability repair; API/Web `0c671f9`; `docs/acceptance/catalog-lineage-node-identity-production-closeout-20260907.md` |
 | P3-DICT-002-A | Separate internal diagnostics from business use limitations | P3-DICT-001 | closed; #228; `docs/acceptance/catalog-productization-implementation-audit-20260907.md` |
 | P3-DICT-002-B | Cover all registered entries with Chinese business explanations | P3-DICT-002-A | closed; #229; Chinese metadata/card acceptance in the productization audit |
 | P3-DICT-002-C | Add layered overview and bounded field-focused processing graphs | P3-DICT-002-B | closed; #230 requalified by `docs/acceptance/catalog-lineage-node-identity-repair-20260907.md`; exact node IDs visible and redundant dataset-level process boxes removed |
-| P3-DICT-002-D | Audit, test and release the productized Catalog | P3-DICT-002-C | open; #231 release/production verification pending after exact-node-identity requalification |
+| P3-DICT-002-D | Audit, test and release the productized Catalog | P3-DICT-002-C | closed; #231; exact-node-identity requalification plus production API/Web `0c671f9`; `docs/acceptance/catalog-lineage-node-identity-production-closeout-20260907.md` |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

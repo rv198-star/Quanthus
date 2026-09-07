@@ -440,9 +440,10 @@ routes. Summary returns a layered overview; relations accepts depth/node budgets
 returns an explicit proof level: exact field processing when evidence exists, or a separately marked
 parent-table context that cannot be interpreted as a field mapping. No new service, database
 migration or Worker kind is introduced. Current audited production checkout, API and Web are
-`c9bbd0721ec45e3437c64d029c4cf5efbd37c64d`; evidence:
-`../../acceptance/catalog-field-lineage-production-closeout-20260907.md`. The original Catalog and
-first productization acceptance remain retained separately.
+`0c671f92e58834d49cdb182d3c58793d052d9814`; every lineage node carries exact technical identity
+and dataset-level source context avoids redundant generic process boxes. Evidence:
+`../../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`. The original
+Catalog and earlier productization acceptances remain retained separately.
 
 Docker keeps API and Web host ports bound to loopback. A governed Web image build also performs a
 repository-scoped retention pass for `quanthus-platform-web:git-*`: the target release tag and every

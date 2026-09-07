@@ -3,8 +3,8 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
-| Prior acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md` |
+| Delivery gate | accepted |
+| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-repair-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md` |
 | Work item | `P3-DICT-002` |
 | Parent | `data-indicator-catalog.md` |
 | Plan | `../../config/data-indicator-catalog-productization.v1.json` |

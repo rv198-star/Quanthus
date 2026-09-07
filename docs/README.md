@@ -136,16 +136,19 @@ nodes.
   `acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`; post-acceptance semantic
   audit: `acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`; final audited
   production closeout: `acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
-- `P3-DICT-002` / #232 is reopened for a focused lineage-readability repair after the accepted
-  field-focus requalification. A user review showed that distinct table-level sources were rendered
-  with repeated generic labels and redundant generic processing boxes, hiding the exact source/table
-  identity. A/B remain accepted; C now requires every visible node to show a business label plus exact
-  technical ID, and dataset-level source context must connect source directly to the target table.
-  The existing field proof boundary remains unchanged: 10/524 DWD fields are `field_proven`, 514/524
-  are `table_context_only`, and none lack parent-table context. Prior production remains `c9bbd07`
-  until C/D are requalified and API/Web are redeployed. Route:
-  `design/data-indicator-catalog-productization.md`; prior field repair:
-  `acceptance/catalog-field-lineage-repair-20260907.md`.
+- `P3-DICT-002` / #232 and children #228–#231 are accepted after field-focus and node-identity
+  requalification. Every lineage node now exposes a business label plus exact technical ID. Dataset-
+  level source context connects source directly to the DWD target table instead of inserting generic
+  normalization boxes; meaningful field/definition transformations still retain process nodes. The
+  adjustment-factor table therefore visibly distinguishes `adjustment_factors_pit`,
+  `adjustment_evidence_delta`, `factor_evidence_delta`, `adjustment_evidence`, and target
+  `dwd_adjustment_factor`. Field proof remains explicit: 10/524 DWD fields are `field_proven`,
+  514/524 are `table_context_only`, and none lack parent-table context. The simplified graph has 259
+  registered processing edges; this reduction removes redundant boxes, not source evidence. Runtime
+  checkout/API/Web are `0c671f9`; health/ready and public auth smoke pass. Full repository gate:
+  1590 passed / 7 existing environment skips; Web 18 passed; desktop/mobile/anonymous Chromium 3
+  passed. Route: `design/data-indicator-catalog-productization.md`; final closeout:
+  `acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

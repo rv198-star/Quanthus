@@ -3,9 +3,9 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
-| Prior acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md` |
-| Current status | A/B/C closed; #230 exact-node-identity/readability repair passed; D and parent remain open for production release |
+| Delivery gate | accepted |
+| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md` |
+| Current status | A–D and parent closed; exact-node-identity/readability repair deployed to API/Web `0c671f9` |
 | Work item | `P3-DICT-002` / #232 |
 | Parent | `index.md`; `data-indicator-dictionary.md` |
 | Governing design | `../design/data-indicator-catalog-productization.md` |

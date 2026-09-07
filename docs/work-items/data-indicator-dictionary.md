@@ -96,9 +96,9 @@ The Catalog must continue to make these distinctions explicit:
 and requires full repository/Web gates plus production deployment/smoke before parent closeout.
 The original post-acceptance production evidence remains in
 `../acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
-Current productization `P3-DICT-002` uses checkout/API/Web `10301cd`, with accepted evidence in
-`../acceptance/catalog-productization-production-closeout-20260907.md` and work items in
-`catalog-productization.md`. A source change that changes the deterministic Catalog must refresh
+Current productization `P3-DICT-002` uses checkout/API/Web `0c671f9`, with final node-identity /
+readability evidence in `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`
+and work items in `catalog-productization.md`. A source change that changes the deterministic Catalog must refresh
 the snapshot manifest in the same repository change. Original final evidence remains in
 `../acceptance/data-indicator-catalog-final-acceptance-20260907.md`.
 

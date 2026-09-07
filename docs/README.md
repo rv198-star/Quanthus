@@ -164,13 +164,15 @@ nodes.
   excluded from the main asset graph. Definition Dependency and Usage Dependency remain separate
   views. Data Lineage defaults to full registered ancestor/descendant closure with optional
   1/2/3/5-hop focus. Full repository gate is 1602 passed / 7 existing environment skips; Web is
-  18/18 and desktop/mobile/anonymous Chromium is 3/3. Production checkout/API/Web are `3aa4837`,
-  health/ready pass and anonymous Catalog API remains fail-closed at 401. The first `17d5329`
+  18/18 and desktop/mobile/anonymous Chromium is 3/3. The latest Web-only navigation refinement keeps
+  graph position stable while switching nodes; production checkout/Web are `c25638a` while API remains
+  `3aa4837`. Health/ready pass and anonymous Catalog API remains fail-closed at 401. The first `17d5329`
   deployment attempt failed the lean API image evidence lookup and was automatically rolled back;
   the final repair preserved the Platform image boundary and then deployed successfully. Design:
   `design/data-catalog-lineage-v2.md`; implementation audit:
   `acceptance/catalog-lineage-v2-implementation-audit-20260907.md`; production closeout:
-  `acceptance/catalog-lineage-v2-production-closeout-20260907.md`.
+  `acceptance/catalog-lineage-v2-production-closeout-20260907.md`; latest Web navigation closeout:
+  `acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

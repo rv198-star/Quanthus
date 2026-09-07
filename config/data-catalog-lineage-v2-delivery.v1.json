@@ -18,7 +18,8 @@
       ],
       "evidence": [
         "docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md",
-        "docs/acceptance/catalog-lineage-v2-production-closeout-20260907.md"
+        "docs/acceptance/catalog-lineage-v2-production-closeout-20260907.md",
+        "docs/acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md"
       ]
     },
     {
@@ -78,7 +79,8 @@
       ],
       "evidence": [
         "docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md",
-        "docs/acceptance/catalog-lineage-v2-production-closeout-20260907.md"
+        "docs/acceptance/catalog-lineage-v2-production-closeout-20260907.md",
+        "docs/acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md"
       ]
     }
   ]

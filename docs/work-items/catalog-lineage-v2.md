@@ -4,8 +4,8 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | accepted |
-| Acceptance | `../acceptance/catalog-lineage-v2-implementation-audit-20260907.md`; `../acceptance/catalog-lineage-v2-production-closeout-20260907.md` |
-| Current status | A-D 与父工单 closed；生产 API/Web `3aa4837` |
+| Acceptance | `../acceptance/catalog-lineage-v2-implementation-audit-20260907.md`; `../acceptance/catalog-lineage-v2-production-closeout-20260907.md`; `../acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md` |
+| Current status | A-D 与父工单 closed；生产 checkout/Web `c25638a`，API `3aa4837` |
 | Work item | `P3-DICT-003` |
 | Parent | `catalog-productization.md`; `index.md` |
 | Governing design | `../design/data-catalog-lineage-v2.md` |
@@ -22,7 +22,7 @@
 | P3-DICT-003-A | 正式资产 ontology + ADM Registry | P3-DICT-002 | closed；`../acceptance/catalog-lineage-v2-implementation-audit-20260907.md` |
 | P3-DICT-003-B | ODS→DWD→ADM 完整资产/字段血缘 + full closure | A | closed；同上 |
 | P3-DICT-003-C | 计算依赖 / 使用关系与 Data Lineage 分离 | B | closed；同上 |
-| P3-DICT-003-D | 独立审计、浏览器/工程门禁与生产发布 | C | closed；`../acceptance/catalog-lineage-v2-production-closeout-20260907.md` |
+| P3-DICT-003-D | 独立审计、浏览器/工程门禁与生产发布 | C | closed；主生产收尾见 `../acceptance/catalog-lineage-v2-production-closeout-20260907.md`，原位节点导航复验见 `../acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md` |
 
 ## 实现边界
 

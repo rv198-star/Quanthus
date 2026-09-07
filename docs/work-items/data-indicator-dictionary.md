@@ -10,7 +10,7 @@
 | Governing design | `../design/data-indicator-catalog.md` |
 | Parent/owner | `../design/lld/03-label-feature-system.md` |
 | Platform surface | read-only API + `/catalog`; no new metadata database |
-| Current status | A-E closed; original foundation accepted; `P3-DICT-002` accepted; Lineage V2 successor `P3-DICT-003` accepted in production on API/Web `3aa4837` |
+| Current status | A-E closed; original foundation accepted; `P3-DICT-002` accepted; Lineage V2 successor `P3-DICT-003` accepted in production on checkout/Web `c25638a`, API `3aa4837` |
 
 ## 1. Purpose
 
@@ -99,10 +99,12 @@ The original post-acceptance production evidence remains in
 The retained P3-DICT-002 closeout remains in
 `../acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`. Successor
 `P3-DICT-003` is accepted in production with 748 Catalog entries, 4 governed ADM datasets / 76 ADM
-fields, and a 94-node / 80-edge formal asset graph. API/Web run `3aa4837`; full gate is 1602 passed /
-7 existing environment skips. Design/work item/evidence:
+fields, and a 94-node / 80-edge formal asset graph. Checkout/Web run `c25638a`; API remains `3aa4837`;
+full gate is 1602 passed / 7 existing environment skips. The latest Web refinement keeps graph node
+navigation in place instead of jumping to the detail card. Design/work item/evidence:
 `../design/data-catalog-lineage-v2.md` / `catalog-lineage-v2.md` /
-`../acceptance/catalog-lineage-v2-production-closeout-20260907.md`. A source change that changes the deterministic Catalog must refresh
+`../acceptance/catalog-lineage-v2-production-closeout-20260907.md` /
+`../acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md`. A source change that changes the deterministic Catalog must refresh
 the snapshot manifest in the same repository change. Original final evidence remains in
 `../acceptance/data-indicator-catalog-final-acceptance-20260907.md`.
 

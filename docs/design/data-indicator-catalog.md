@@ -44,7 +44,7 @@ warehouse. Source contracts remain authoritative when a Catalog entry is incompl
 6. Explicit legacy/compatibility relationships.
 7. Internal maintenance gap records for missing metadata or unsupported equivalence; not a business homepage dashboard.
 8. Reviewed Chinese reading metadata and evidence-bound declared processing graphs under `P3-DICT-002`.
-9. `P3-DICT-003` adds governed Research ADM datasets/fields and separates formal ODS→DWD→ADM Data Lineage from definition and usage dependency graphs; its delivery gate remains separate until production closeout.
+9. `P3-DICT-003` adds governed Research ADM datasets/fields and separates formal ODS→DWD→ADM Data Lineage from definition and usage dependency graphs; it is accepted in production, with the latest Web-only navigation refinement recorded separately.
 
 ### Not included in v1
 

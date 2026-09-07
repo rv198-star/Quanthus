@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | accepted |
-| Acceptance | `../acceptance/catalog-lineage-v2-implementation-audit-20260907.md`; `../acceptance/catalog-lineage-v2-production-closeout-20260907.md` |
+| Acceptance | `../acceptance/catalog-lineage-v2-implementation-audit-20260907.md`; `../acceptance/catalog-lineage-v2-production-closeout-20260907.md`; `../acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md` |
 | Work item | `P3-DICT-003` |
 | Parent | `data-indicator-catalog-productization.md` |
 | Machine plan | `../../config/data-catalog-lineage-v2-delivery.v1.json` |

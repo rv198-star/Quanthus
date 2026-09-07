@@ -224,11 +224,11 @@ original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted sepa
 | P3-DICT-002-B | Cover all registered entries with Chinese business explanations | P3-DICT-002-A | closed; #229; Chinese metadata/card acceptance in the productization audit |
 | P3-DICT-002-C | Add layered overview and bounded field-focused processing graphs | P3-DICT-002-B | closed; #230 single-canvas requalification PASS; `table_context_only` now renders one parent-table context canvas with compact non-field-proof warning; `docs/acceptance/catalog-lineage-single-canvas-20260907.md` |
 | P3-DICT-002-D | Audit, test and release the productized Catalog | P3-DICT-002-C | closed; #231; Web-only production release `d4e7158`, health/ready/auth smoke PASS; `docs/acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md` |
-| P3-DICT-003 | Rebuild Catalog lineage around governed data assets | P3-DICT-002 | closed; #237; 748-entry Catalog, 94 formal assets / 80 asset edges, API/Web production `3aa4837`; `docs/acceptance/catalog-lineage-v2-production-closeout-20260907.md` |
+| P3-DICT-003 | Rebuild Catalog lineage around governed data assets | P3-DICT-002 | closed; #237; 748-entry Catalog, 94 formal assets / 80 asset edges; production checkout/Web `c25638a`, API `3aa4837`; latest navigation closeout `docs/acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md` |
 | P3-DICT-003-A | Freeze asset ontology and Research ADM Registry | P3-DICT-002 | closed; #233; `docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md` |
 | P3-DICT-003-B | Implement full ODS→DWD→ADM asset/field lineage | P3-DICT-003-A | closed; #234; full registered closure, exact field counterexamples and asset-only fallback accepted in implementation audit |
 | P3-DICT-003-C | Separate definition and usage dependency views | P3-DICT-003-B | closed; #235; Data Lineage / Definition Dependency / Usage Dependency split accepted in implementation audit |
-| P3-DICT-003-D | Audit, gate and release Catalog Lineage V2 | P3-DICT-003-C | closed; #236; full gate 1602 passed / 7 existing skips; API/Web production `3aa4837`; `docs/acceptance/catalog-lineage-v2-production-closeout-20260907.md` |
+| P3-DICT-003-D | Audit, gate and release Catalog Lineage V2 | P3-DICT-003-C | closed; #236; full gate 1602 passed / 7 existing skips; Web navigation refinement on `c25638a`, API remains `3aa4837`; `docs/acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md` |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

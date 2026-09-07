@@ -237,8 +237,10 @@ from separately labeled parent-table context; table membership cannot fabricate 
 Every visible node exposes a business label plus exact technical identity, and dataset-level context
 connects sources directly to target tables instead of adding redundant generic processing boxes.
 The Web renders these graphs inside fixed-height infinite viewports with an independent world transform,
-true centered fit, unclamped drag pan, pointer-anchored wheel/pinch zoom, floating controls and MiniMap;
-those controls are presentation-only and cannot alter the graph contract. Membership and
+true centered fit, unclamped drag pan, pointer-anchored wheel/pinch zoom, floating controls and MiniMap.
+For `table_context_only`, the parent-table context is rendered in that same single canvas with a compact
+non-field-proof notice instead of a second large context section; all such controls are presentation-only
+and cannot alter the graph contract. Membership and
 conceptual relationships remain separate from processing edges, and static lineage is not actual
 consumption evidence. The Structure
 blueprint may explicitly bind registered concepts to accepted B3-B5 runtime capabilities; only
@@ -276,8 +278,8 @@ authority.
 | P3-DICT-002 | Productize Chinese Catalog cards and declared processing lineage | P3-DICT-001 | #232; `docs/design/data-indicator-catalog-productization.md`; `config/data-indicator-catalog-productization.v1.json` |
 | P3-DICT-002-A | Separate internal diagnostics from business use limitations | P3-DICT-001 | #228; business response omits maintenance gaps, item limitations remain visible |
 | P3-DICT-002-B | Cover all registered entries with Chinese business explanations | P3-DICT-002-A | #229; all-entry coverage, exact formula/identity and human-readable card tests |
-| P3-DICT-002-C | Add layered overview and bounded field-focused processing graphs | P3-DICT-002-B | #230; final viewport requalification `docs/acceptance/catalog-lineage-infinite-viewport-20260907.md`; 524-field proof/context classification, exact identity and standard infinite navigation |
-| P3-DICT-002-D | Audit, test and release the productized Catalog | P3-DICT-002-C | #231; `docs/acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md`; full gates and Web-only production release `73f1b40` |
+| P3-DICT-002-C | Add layered overview and bounded field-focused processing graphs | P3-DICT-002-B | #230; final single-canvas requalification `docs/acceptance/catalog-lineage-single-canvas-20260907.md`; 524-field proof/context classification, exact identity and standard infinite navigation |
+| P3-DICT-002-D | Audit, test and release the productized Catalog | P3-DICT-002-C | #231; `docs/acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`; full gates and Web-only production release `d4e7158` |
 
 ## 7. Acceptance
 

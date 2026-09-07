@@ -149,11 +149,14 @@ nodes.
   `{x,y,zoom}` world transform instead of DOM scroll offsets. Initial fit truly centers graph bounds;
   background drag is unclamped, wheel zoom is pointer-anchored, two-pointer pinch is supported, and
   floating controls plus a clickable/drag-pannable MiniMap provide standard map-style navigation.
-  These controls are browser-only and do not change graph semantics. Production checkout/Web are
-  `73f1b40`; API remains `0c671f9` because the latest release is Web-only. Health/ready and public auth
-  smoke pass. Full repository gate: 1590 passed / 7 existing environment skips; Web 18 passed;
-  desktop/mobile/anonymous Chromium 3 passed. Route: `design/data-indicator-catalog-productization.md`;
-  latest closeout: `acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md`.
+  These controls are browser-only and do not change graph semantics. `table_context_only` fields now
+  use one parent-table context canvas with a compact non-field-proof notice instead of an isolated
+  field canvas plus a second context section; scope/limits/evidence are collapsed below the canvas.
+  Production checkout/Web are `d4e7158`; API remains `0c671f9` because the latest release is Web-only.
+  Health/ready and public auth smoke pass. Full repository gate: 1590 passed / 7 existing environment
+  skips; Web 18 passed; desktop/mobile/anonymous Chromium 3 passed. Route:
+  `design/data-indicator-catalog-productization.md`; latest closeout:
+  `acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

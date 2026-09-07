@@ -442,11 +442,13 @@ parent-table context that cannot be interpreted as a field mapping. No new servi
 migration or Worker kind is introduced. Lineage view controls are Web-local: a fixed-height infinite
 viewport owns an independent `{x,y,zoom}` transform, true centered fitView, unclamped drag pan,
 pointer-anchored wheel zoom, two-pointer pinch, floating controls and an interactive MiniMap; none of
-these alter the API graph. Current audited production checkout/Web are
-`73f1b409dfce13daccbb690efb3f041cc285a231`; API remains
+these alter the API graph. `table_context_only` is also a single-canvas Web presentation: the parent-table
+context replaces the redundant isolated-field canvas, while a compact notice preserves the non-field-proof
+boundary. Current audited production checkout/Web are
+`d4e71585a58a229fa8c7ddbb9515e4038dcb2aeb`; API remains
 `0c671f92e58834d49cdb182d3c58793d052d9814` because this release rebuilt only Web. Every lineage
 node still carries exact technical identity and dataset-level source context avoids redundant generic
-process boxes. Evidence: `../../acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md`.
+process boxes. Evidence: `../../acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`.
 The original Catalog and earlier productization acceptances remain retained separately.
 
 Docker keeps API and Web host ports bound to loopback. A governed Web image build also performs a

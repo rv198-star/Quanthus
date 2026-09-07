@@ -3,8 +3,8 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
-| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-repair-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`; `../acceptance/catalog-lineage-view-controls-20260907.md`; `../acceptance/catalog-lineage-view-controls-production-closeout-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md`; `../acceptance/catalog-lineage-single-canvas-20260907.md` |
+| Delivery gate | accepted |
+| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-repair-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`; `../acceptance/catalog-lineage-view-controls-20260907.md`; `../acceptance/catalog-lineage-view-controls-production-closeout-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md`; `../acceptance/catalog-lineage-single-canvas-20260907.md`; `../acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md` |
 | Work item | `P3-DICT-002` |
 | Parent | `data-indicator-catalog.md` |
 | Plan | `../../config/data-indicator-catalog-productization.v1.json` |

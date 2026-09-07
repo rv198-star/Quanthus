@@ -132,6 +132,17 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.getByRole("combobox", { name: "血缘查看范围" }).selectOption("full");
     await expect(page.getByTestId("lineage-focus")).toContainText("全链");
 
+    // Node-to-node lineage navigation must keep the graph at the same viewport position instead of
+    // jumping back to the detail card above while the selected entry and graph are refreshed.
+    await focusView.scrollIntoViewIfNeeded();
+    const beforeLineageNavigationTop = await focusView.evaluate(element => element.getBoundingClientRect().top);
+    await page.locator('[data-lineage-node="adm_dataset:p4-event-research-adm.candidate_daily"]').click();
+    await expect(page.getByTestId("business-description")).toContainText("P4 Event Library");
+    await expect.poll(async () => Math.abs(
+      await focusView.evaluate(element => element.getBoundingClientRect().top) - beforeLineageNavigationTop,
+    )).toBeLessThan(16);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+
     await search(page, "dwd_adjustment_factor.effective_from");
     await expect(page.getByTestId("lineage-coverage-level")).toContainText("字段全链已登记");
     await expect(page.locator('[data-lineage-node="ods_dataset:adjustment_factors_pit"]')).toBeVisible();

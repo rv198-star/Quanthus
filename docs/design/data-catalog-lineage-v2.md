@@ -102,6 +102,7 @@ Data Lineage edge 表示 source asset -> target asset 的受治理数据形成�
 - 继续复用已验收无限 viewport、fitView、MiniMap、缩放和平移；
 - Data Lineage node 显示层级、资产业务名、精确 ID；字段焦点时在节点内部显示字段；
 - edge 点击后查看转换说明、字段映射与证据；
+- 图内点击其他节点属于原位追查：详情卡和关系数据可更新，但浏览器必须保持血缘区域在当前视口位置，不得因加载中间态把用户跳回上方详情卡；
 - 默认不显示 process、projection、consumer 等工程节点。
 
 ## 7. 验收反例

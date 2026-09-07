@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BookOpen, Copy, Database, GitBranch, LoaderCircle, Search } from "lucide-react";
 import { LineageFocus, LineageOverview } from "./catalog-lineage";
 import {
@@ -81,6 +81,13 @@ export function CatalogBrowser() {
   const [error, setError] = useState<string | null>(null);
   const [copyResult, setCopyResult] = useState("");
   const searchSequence = useRef(0);
+  const lineageFocusRef = useRef<HTMLDivElement>(null);
+  const lineageNavigationRef = useRef<{
+    targetId: string;
+    viewportTop: number;
+    detailReady: boolean;
+    relationsReady: boolean;
+  } | null>(null);
 
   const handleError = useCallback((observed: unknown) => {
     if (observed instanceof PlatformApiError && observed.status === 401) {
@@ -94,8 +101,19 @@ export function CatalogBrowser() {
   }, []);
   const navigate = useCallback((node: { entry_id: string | null }) => {
     setMode("browse");
-    if (node.entry_id) selectEntry(node.entry_id);
-  }, [selectEntry]);
+    if (!node.entry_id) return;
+    const focus = lineageFocusRef.current;
+    if (focus) {
+      lineageNavigationRef.current = {
+        targetId: node.entry_id,
+        viewportTop: focus.getBoundingClientRect().top,
+        detailReady: false,
+        relationsReady: false,
+      };
+    }
+    setSelectedId(node.entry_id);
+    setCopyResult("");
+  }, []);
 
   const runSearch = useCallback(async (clear = false) => {
     if (!token) return;
@@ -149,10 +167,14 @@ export function CatalogBrowser() {
     if (!token || !selectedId) return;
     let cancelled = false;
     (async () => {
-      setDetailBusy(true); setSelected(null);
+      setDetailBusy(true);
       try {
         const item = await platformRequest<CatalogEntry>(`/api/platform/v1/catalog/items/${encodeURIComponent(selectedId)}`, { token });
-        if (!cancelled) setSelected(item);
+        if (!cancelled) {
+          const pending = lineageNavigationRef.current;
+          if (pending?.targetId === selectedId) pending.detailReady = true;
+          setSelected(item);
+        }
       } catch (observed) { if (!cancelled) setError(handleError(observed)); }
       finally { if (!cancelled) setDetailBusy(false); }
     })();
@@ -169,12 +191,27 @@ export function CatalogBrowser() {
         const depth = lineageRange === "full" ? 2 : Number(lineageRange);
         const response = await platformRequest<DataCatalogRelations>(
           `/api/platform/v1/catalog/items/${encodeURIComponent(selectedId)}/relations?asset_scope=${assetScope}&depth=${depth}&limit=100`, { token });
-        if (!cancelled) setRelations(response);
+        if (!cancelled) {
+          const pending = lineageNavigationRef.current;
+          if (pending?.targetId === selectedId) pending.relationsReady = true;
+          setRelations(response);
+        }
       } catch (observed) { if (!cancelled) { setRelations(null); setError(handleError(observed)); } }
       finally { if (!cancelled) setGraphBusy(false); }
     })();
     return () => { cancelled = true; };
   }, [token, selectedId, lineageRange, handleError]);
+
+  useLayoutEffect(() => {
+    const pending = lineageNavigationRef.current;
+    const focus = lineageFocusRef.current;
+    if (!pending || !focus) return;
+    const delta = focus.getBoundingClientRect().top - pending.viewportTop;
+    if (Math.abs(delta) > 0.5) window.scrollBy(0, delta);
+    if (pending.targetId === selectedId && pending.detailReady && pending.relationsReady && !detailBusy && !graphBusy) {
+      lineageNavigationRef.current = null;
+    }
+  }, [selectedId, selected, relations, detailBusy, graphBusy]);
 
   if (!token) return <main className={styles.loginShell} data-testid="catalog-login-required"><div className={styles.loginCard}>
     <span className={styles.brandMark}>Q</span><p>Quanthus 数据目录</p><h1>数据、指标与语义目录</h1>
@@ -225,7 +262,7 @@ export function CatalogBrowser() {
           <strong>{item.display_name}</strong><small>{kindLabels[item.kind]}</small><code>{item.canonical_id}</code>
         </button>) : <p className={styles.emptyState}>{busy ? "正在搜索…" : "没有匹配条目，请调整关键词。"}</p>}</aside>
         <article className={styles.detailPane} aria-live="polite" data-testid="catalog-detail">
-          {detailBusy ? <p className={styles.emptyState}>正在读取说明…</p> : selected ? <>
+          {!selected && detailBusy ? <p className={styles.emptyState}>正在读取说明…</p> : selected ? <>
             <div className={styles.detailHeader}><div><p className={styles.eyebrow}>{kindLabels[selected.kind]}</p><h2>{selected.display_name}</h2><code>{selected.canonical_id}</code></div>
               <button type="button" className={styles.copyButton} onClick={async () => {
                 try { await navigator.clipboard.writeText(selected.canonical_id); setCopyResult("已复制标识"); }
@@ -255,7 +292,7 @@ export function CatalogBrowser() {
           </> : <p className={styles.emptyState}><Database size={24} />选择左侧条目查看说明。</p>}
         </article>
       </main>
-      {relations ? <div className={styles.focusArea}>
+      {relations ? <div className={styles.focusArea} ref={lineageFocusRef}>
         <LineageFocus
           key={`${selectedId}:${lineageRange}`}
           relations={relations}

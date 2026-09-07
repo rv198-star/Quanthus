@@ -3,7 +3,7 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | accepted |
+| Delivery gate | open |
 | Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-repair-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md` |
 | Work item | `P3-DICT-002` |
 | Parent | `data-indicator-catalog.md` |
@@ -84,6 +84,20 @@ ODS 字段→DWD 字段映射。全局概览必须公布 DWD 字段三类覆盖�
 `close_adjustment_factor_intervals()` 又使用它关闭 `effective_to`；P4 Event Library 的
 `factor_boundary` 读取它形成 `factor_effective_from` 及当日复权边界标记。该链必须作为
 `field_proven` 展示。
+
+### 4.2 固定画布与视图控制
+
+血缘图是可操作的分析画布，不应因节点数量变化无限拉高页面。桌面画布固定为 520px 高，
+窄屏固定为 420px 高；内容超过画布后在画布内部平移，而不是继续撑高页面。
+
+每个全局图、字段焦点图和表级上下文图使用同一套纯展示视图控制：放大、缩小、恢复
+100%、适配全部、居中当前焦点。缩放范围固定在 45%–180%，适配模式根据当前画布和图的
+实际几何范围计算比例；“居中”优先定位 `center` 节点，无中心节点时定位整张图中心。
+空白区域支持鼠标或触控拖拽平移，点击节点仍执行原有重新聚焦操作。缩放、平移、居中只
+改变浏览器视口，不改变图节点、边、证据、查询深度、proof level 或任何业务语义。
+
+工具栏必须可键盘访问、显示当前缩放百分比，并在桌面和窄屏上保持可用。画布自身不得造成
+页面级横向溢出。
 
 ## 5. 工单顺序及验收（D）
 

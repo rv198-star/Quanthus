@@ -66,7 +66,34 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await expect(page.getByTestId("business-description")).toContainText("未复权");
     const technical = page.getByTestId("technical-details");
     await expect(technical).not.toHaveAttribute("open", "");
-    await expect(page.getByTestId("lineage-focus")).toContainText("收盘价");
+    const focusView = page.getByTestId("lineage-focus");
+    await expect(focusView).toContainText("收盘价");
+    const graphViewport = focusView.getByTestId("lineage-viewport").first();
+    const graphBox = await graphViewport.boundingBox();
+    expect(Math.round(graphBox?.height ?? 0)).toBe(viewport.width <= 720 ? 420 : 520);
+    const zoomReadout = focusView.getByTestId("lineage-zoom").first();
+    const initialZoom = await zoomReadout.textContent();
+    await focusView.getByRole("button", { name: "放大血缘图" }).first().click();
+    await expect.poll(() => zoomReadout.textContent()).not.toBe(initialZoom);
+    await focusView.getByRole("button", { name: "恢复100%缩放" }).first().click();
+    await expect(zoomReadout).toHaveText("100%");
+    await focusView.getByRole("button", { name: "适配全部血缘图" }).first().click();
+    await focusView.getByRole("button", { name: "居中当前焦点" }).first().click();
+    await focusView.getByRole("button", { name: "恢复100%缩放" }).first().click();
+    for (let index = 0; index < 5; index += 1) {
+      await focusView.getByRole("button", { name: "放大血缘图" }).first().click();
+    }
+    await expect.poll(() => graphViewport.evaluate(element => element.scrollWidth - element.clientWidth)).toBeGreaterThan(0);
+    const panBox = await graphViewport.boundingBox();
+    if (panBox) {
+      await graphViewport.evaluate(element => { element.scrollLeft = 0; element.scrollTop = 0; });
+      await page.mouse.move(panBox.x + 120, panBox.y + 10);
+      await page.mouse.down();
+      await expect(graphViewport).toHaveAttribute("data-grabbing", "true");
+      await page.mouse.move(panBox.x + 20, panBox.y + 10, { steps: 5 });
+      await page.mouse.up();
+      await expect.poll(() => graphViewport.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+    }
     const upstream = page.locator('[data-lineage-node="source-field:daily_ohlcv_unadjusted.close"]');
     await expect(upstream).toBeVisible();
     await page.getByRole("combobox", { name: "血缘展开层数" }).selectOption("3");

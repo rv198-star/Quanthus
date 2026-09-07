@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { CatalogLineageGraph, CatalogLineageNode, CatalogLineageOverview } from "./platform-api";
 import styles from "./catalog-browser.module.css";
 
@@ -16,7 +16,12 @@ function wrapText(value: string, width: number, maximum: number) {
 
 function Canvas({ nodes, edges, onNode, title }: { nodes: NodeView[]; edges: EdgeView[]; onNode: (id: string) => void; title: string }) {
   const marker = useId().replaceAll(":", "");
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ pointerId: number; x: number; y: number; left: number; top: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [grabbing, setGrabbing] = useState(false);
   const nodeWidth = 268, nodeHeight = 124, columnPitch = 326, rowPitch = 148;
+  const minZoom = 0.45, maxZoom = 1.8, zoomStep = 0.15;
   const columns = [...new Set(nodes.map(node => node.column))].sort((a, b) => a - b);
   const rows = columns.map(column => nodes.filter(node => node.column === column));
   const height = Math.max(1, ...rows.map(row => row.length)) * rowPitch + 52;
@@ -24,33 +29,121 @@ function Canvas({ nodes, edges, onNode, title }: { nodes: NodeView[]; edges: Edg
   const positions = new Map<string, { x: number; y: number }>();
   rows.forEach((row, columnIndex) => row.forEach((node, rowIndex) => positions.set(node.id,
     { x: columnIndex * columnPitch + 14, y: (height - row.length * rowPitch) / 2 + rowIndex * rowPitch })));
-  return <div className={styles.graphScroll} tabIndex={0} aria-label={`${title}，可横向和纵向滚动`}>
-    <svg width={width} height={height} role="group" aria-label={title} data-testid="lineage-svg">
-      <defs><marker id={marker} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="currentColor" /></marker></defs>
-      {edges.map(edge => {
-        const start = positions.get(edge.source), end = positions.get(edge.target);
-        if (!start || !end) return null;
-        const forward = end.x >= start.x;
-        const sx = start.x + (forward ? nodeWidth : 0), ex = end.x + (forward ? 0 : nodeWidth);
-        const sy = start.y + nodeHeight / 2, ey = end.y + nodeHeight / 2, middle = (sx + ex) / 2;
-        const path = start.x === end.x ? `M ${sx} ${sy} C ${sx + 34} ${sy}, ${sx + 34} ${ey}, ${end.x + nodeWidth} ${ey}`
-          : `M ${sx} ${sy} C ${middle} ${sy}, ${middle} ${ey}, ${ex} ${ey}`;
-        return <path key={edge.id} d={path} className={styles.graphEdge} markerEnd={`url(#${marker})`}><title>{edge.label}</title></path>;
-      })}
-      {nodes.map(node => {
-        const position = positions.get(node.id)!;
-        const labelLines = wrapText(node.label, 16, 2);
-        const idLines = wrapText(node.technicalId, 34, 2);
-        return <g key={node.id} transform={`translate(${position.x},${position.y})`} role="button" tabIndex={0}
-          aria-label={`${node.label}，${node.technicalId}`} className={`${styles.graphNode} ${node.process ? styles.processNode : ""} ${node.center ? styles.centerNode : ""}`}
-          onClick={() => onNode(node.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNode(node.id); } }} data-lineage-node={node.id}>
-          <title>{node.label} · {node.technicalId}</title><rect width={nodeWidth} height={nodeHeight} rx="10" />
-          <text x="14" y="25">{labelLines[0]}</text><text x="14" y="44">{labelLines[1]}</text>
-          <text x="14" y="69" className={styles.nodeTechnical}>{idLines[0]}</text><text x="14" y="85" className={styles.nodeTechnical}>{idLines[1]}</text>
-          <text x="14" y="108" className={styles.nodeSubtitle}>{node.meta}</text>
-        </g>;
-      })}
-    </svg>
+  const focusNode = nodes.find(node => node.center);
+
+  function clampZoom(value: number) {
+    return Math.min(maxZoom, Math.max(minZoom, value));
+  }
+
+  function scrollToPoint(graphX: number, graphY: number, targetZoom: number) {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    viewport.scrollTo({
+      left: Math.max(0, graphX * targetZoom - viewport.clientWidth / 2),
+      top: Math.max(0, graphY * targetZoom - viewport.clientHeight / 2),
+      behavior: "smooth",
+    });
+  }
+
+  function changeZoom(rawZoom: number) {
+    const viewport = viewportRef.current;
+    const nextZoom = clampZoom(rawZoom);
+    if (!viewport || nextZoom === zoom) return;
+    const graphX = (viewport.scrollLeft + viewport.clientWidth / 2) / zoom;
+    const graphY = (viewport.scrollTop + viewport.clientHeight / 2) / zoom;
+    setZoom(nextZoom);
+    requestAnimationFrame(() => scrollToPoint(graphX, graphY, nextZoom));
+  }
+
+  function fitView() {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const nextZoom = clampZoom(Math.min(
+      1.35,
+      (viewport.clientWidth - 32) / width,
+      (viewport.clientHeight - 32) / height,
+    ));
+    setZoom(nextZoom);
+    requestAnimationFrame(() => scrollToPoint(width / 2, height / 2, nextZoom));
+  }
+
+  function centerView() {
+    const position = focusNode ? positions.get(focusNode.id) : undefined;
+    scrollToPoint(
+      position ? position.x + nodeWidth / 2 : width / 2,
+      position ? position.y + nodeHeight / 2 : height / 2,
+      zoom,
+    );
+  }
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => fitView());
+    return () => cancelAnimationFrame(frame);
+    // Re-fit only when the graph geometry itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [height, width]);
+
+  return <div className={styles.graphFrame} data-testid="lineage-canvas">
+    <div className={styles.graphToolbar} role="group" aria-label={`${title}视图控制`} data-testid="lineage-controls">
+      <button type="button" aria-label="缩小血缘图" title="缩小" disabled={zoom <= minZoom} onClick={() => changeZoom(zoom - zoomStep)}>−</button>
+      <button type="button" aria-label="恢复100%缩放" title="恢复 100%" className={styles.zoomReadout} data-testid="lineage-zoom" onClick={() => changeZoom(1)}>{Math.round(zoom * 100)}%</button>
+      <button type="button" aria-label="放大血缘图" title="放大" disabled={zoom >= maxZoom} onClick={() => changeZoom(zoom + zoomStep)}>+</button>
+      <span className={styles.toolbarDivider} aria-hidden="true" />
+      <button type="button" aria-label="适配全部血缘图" title="适配全部" onClick={fitView}>适配</button>
+      <button type="button" aria-label="居中当前焦点" title="居中当前焦点" onClick={centerView}>居中</button>
+    </div>
+    <div ref={viewportRef} className={styles.graphScroll} tabIndex={0} data-testid="lineage-viewport" data-grabbing={grabbing ? "true" : "false"}
+      aria-label={`${title}，固定高度画布；空白处拖动平移，使用上方按钮缩放或居中`}
+      onPointerDown={event => {
+        if (event.button !== 0 || (event.target as Element).closest("[data-lineage-node]")) return;
+        event.preventDefault();
+        panRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY,
+          left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setGrabbing(true);
+      }}
+      onPointerMove={event => {
+        const pan = panRef.current;
+        if (!pan || pan.pointerId !== event.pointerId) return;
+        event.preventDefault();
+        event.currentTarget.scrollLeft = pan.left - (event.clientX - pan.x);
+        event.currentTarget.scrollTop = pan.top - (event.clientY - pan.y);
+      }}
+      onPointerUp={event => {
+        if (panRef.current?.pointerId === event.pointerId) panRef.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        setGrabbing(false);
+      }}
+      onPointerCancel={() => { panRef.current = null; setGrabbing(false); }}>
+      <div className={styles.graphStage} style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}>
+        <svg width={width} height={height} style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }} role="group" aria-label={title} data-testid="lineage-svg">
+          <defs><marker id={marker} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="currentColor" /></marker></defs>
+          {edges.map(edge => {
+            const start = positions.get(edge.source), end = positions.get(edge.target);
+            if (!start || !end) return null;
+            const forward = end.x >= start.x;
+            const sx = start.x + (forward ? nodeWidth : 0), ex = end.x + (forward ? 0 : nodeWidth);
+            const sy = start.y + nodeHeight / 2, ey = end.y + nodeHeight / 2, middle = (sx + ex) / 2;
+            const path = start.x === end.x ? `M ${sx} ${sy} C ${sx + 34} ${sy}, ${sx + 34} ${ey}, ${end.x + nodeWidth} ${ey}`
+              : `M ${sx} ${sy} C ${middle} ${sy}, ${middle} ${ey}, ${ex} ${ey}`;
+            return <path key={edge.id} d={path} className={styles.graphEdge} markerEnd={`url(#${marker})`}><title>{edge.label}</title></path>;
+          })}
+          {nodes.map(node => {
+            const position = positions.get(node.id)!;
+            const labelLines = wrapText(node.label, 16, 2);
+            const idLines = wrapText(node.technicalId, 34, 2);
+            return <g key={node.id} transform={`translate(${position.x},${position.y})`} role="button" tabIndex={0}
+              aria-label={`${node.label}，${node.technicalId}`} className={`${styles.graphNode} ${node.process ? styles.processNode : ""} ${node.center ? styles.centerNode : ""}`}
+              onClick={() => onNode(node.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNode(node.id); } }} data-lineage-node={node.id}>
+              <title>{node.label} · {node.technicalId}</title><rect width={nodeWidth} height={nodeHeight} rx="10" />
+              <text x="14" y="25">{labelLines[0]}</text><text x="14" y="44">{labelLines[1]}</text>
+              <text x="14" y="69" className={styles.nodeTechnical}>{idLines[0]}</text><text x="14" y="85" className={styles.nodeTechnical}>{idLines[1]}</text>
+              <text x="14" y="108" className={styles.nodeSubtitle}>{node.meta}</text>
+            </g>;
+          })}
+        </svg>
+      </div>
+    </div>
   </div>;
 }
 

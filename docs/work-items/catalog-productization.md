@@ -3,9 +3,9 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | accepted |
+| Delivery gate | open |
 | Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md` |
-| Current status | A–D and parent closed; exact-node-identity/readability repair deployed to API/Web `0c671f9` |
+| Current status | A/B/C closed；#230 view-control requalification PASS；#231 and parent pending production release |
 | Work item | `P3-DICT-002` / #232 |
 | Parent | `index.md`; `data-indicator-dictionary.md` |
 | Governing design | `../design/data-indicator-catalog-productization.md` |
@@ -22,10 +22,10 @@
 | --- | --- | --- |
 | #228 / P3-DICT-002-A | 分离内部诊断和业务界面 | 首页及业务 summary 无开发缺口；内部检测保留，业务限制留在对应条目 |
 | #229 / P3-DICT-002-B | 中文说明与分层卡片 | 664 个条目、33 表及 524 字段覆盖；英文 ID 可复制，技术详情折叠 |
-| #230 / P3-DICT-002-C | 有依据且可辨认的加工血缘 | 除原字段证明边界外，所有节点显示精确技术 ID；表级来源直接连目标表，不插入无意义的泛化加工方框 |
+| #230 / P3-DICT-002-C | 有依据且可管理视图的加工血缘 | 保留精确身份和 proof boundary；画布固定高度，统一放大/缩小/100%/适配/焦点居中及拖拽平移 |
 | #231 / P3-DICT-002-D | 审计、回归与发布 | 语义反例、权限、桌面/窄屏浏览器、完整工程检查、提交与生产核查 |
 
-机器计划是状态权威，按 A→B→C→D 关闭，父工单最后关闭。字段焦点修复见 `../acceptance/catalog-field-lineage-repair-20260907.md`；节点身份/表级图可读性复验见 `../acceptance/catalog-lineage-node-identity-repair-20260907.md`。
+机器计划是状态权威，按 A→B→C→D 关闭，父工单最后关闭。字段焦点修复见 `../acceptance/catalog-field-lineage-repair-20260907.md`；节点身份/表级图可读性复验见 `../acceptance/catalog-lineage-node-identity-repair-20260907.md`；固定画布与缩放/居中/平移复验见 `../acceptance/catalog-lineage-view-controls-20260907.md`。当前小版本仅改变浏览器画布与视图管理，不改变任何血缘节点、边或数据语义。
 
 ## 代码与验证入口
 

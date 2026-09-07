@@ -73,7 +73,16 @@
 .mapSection > p, .sectionHeading p { font-size: 13px; line-height: 1.8; color: #536b85; }
 .sectionHeading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .sectionHeading label { white-space: nowrap; font-size: 13px; color: #4d6782; }
-.graphScroll { overflow: auto; max-height: 540px; width: 100%; border: 1px solid #e1e8f1; border-radius: 9px; margin: 16px 0; background-color: #fbfcfe; background-image: radial-gradient(#d9e2ed .8px, transparent .8px); background-size: 18px 18px; color: #8ca7c6; }
+.graphFrame { width: 100%; margin: 16px 0; border: 1px solid #e1e8f1; border-radius: 9px; overflow: hidden; background: #fbfcfe; }
+.graphToolbar { min-height: 44px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px 9px; border-bottom: 1px solid #e1e8f1; background: rgba(255,255,255,.96); }
+.graphToolbar button { min-width: 34px; height: 30px; border: 1px solid #ccd8e6; border-radius: 7px; background: white; color: #365d89; font-size: 12px; padding: 0 9px; }
+.graphToolbar button:hover:not(:disabled), .graphToolbar button:focus-visible { border-color: #6f94bd; background: #f2f7fc; outline: none; }
+.graphToolbar button:disabled { opacity: .4; cursor: not-allowed; }
+.zoomReadout { min-width: 58px !important; font-variant-numeric: tabular-nums; }
+.toolbarDivider { width: 1px; height: 20px; background: #dbe3ec; margin: 0 3px; }
+.graphScroll { overflow: auto; height: 520px; width: 100%; border: 0; margin: 0; background-color: #fbfcfe; background-image: radial-gradient(#d9e2ed .8px, transparent .8px); background-size: 18px 18px; color: #8ca7c6; cursor: grab; overscroll-behavior: contain; touch-action: none; user-select: none; }
+.graphScroll[data-grabbing="true"] { cursor: grabbing; }
+.graphStage { position: relative; min-width: 100%; min-height: 100%; }
 .graphScroll svg { display: block; max-width: none; font-family: inherit; }
 .graphEdge { fill: none; stroke: #8ca7c6; stroke-width: 1.8; }
 .graphNode { cursor: pointer; outline: none; }
@@ -136,6 +145,8 @@
   .mapSection { padding: 18px 12px; }
   .sectionHeading { flex-direction: column; gap: 5px; }
   .viewSwitch button { font-size: 13px; padding: 10px 12px; }
-  .graphScroll { max-height: 460px; }
+  .graphScroll { height: 420px; }
+  .graphToolbar { justify-content: flex-start; overflow-x: auto; }
+  .graphToolbar button { flex: 0 0 auto; }
   .loginCard { padding: 28px; }
 }

@@ -3,60 +3,41 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const appRoot = new URL("../app/", import.meta.url);
+async function source(path) { return readFile(new URL(path, appRoot), "utf8"); }
 
-async function source(path) {
-  return readFile(new URL(path, appRoot), "utf8");
-}
-
-test("catalog page is a first-class route backed only by read APIs", async () => {
-  const [page, browser] = await Promise.all([
-    source("catalog/page.tsx"),
-    source("catalog-browser.tsx"),
-  ]);
+test("catalog remains a first-class read-only route without development dashboard", async () => {
+  const [page, browser] = await Promise.all([source("catalog/page.tsx"), source("catalog-browser.tsx")]);
   assert.match(page, /CatalogBrowser/);
-  for (const route of [
-    "/api/platform/v1/catalog/summary",
-    "/api/platform/v1/catalog/search",
-    "/api/platform/v1/catalog/items/",
-    "/relations",
-  ]) {
-    assert.match(browser, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  for (const route of ["/api/platform/v1/catalog/summary", "/api/platform/v1/catalog/search", "/api/platform/v1/catalog/items/", "/relations"]) {
+    assert.ok(browser.includes(route));
   }
-  assert.doesNotMatch(browser, /method:\s*["'](?:POST|DELETE)["']/);
-  assert.match(browser, /已知缺口/);
-  assert.match(browser, /Read-only authority projection/);
+  assert.doesNotMatch(browser, /method:\s*["'](?:POST|DELETE|PUT|PATCH)["']/);
+  assert.doesNotMatch(browser, /已知缺口|gap_count|summary\.gaps|gapsOpen/);
   assert.match(browser, /data-testid="catalog-page"/);
 });
 
-test("catalog UI exposes authority, lifecycle and relation semantics instead of an editor", async () => {
+test("Chinese business card precedes collapsed machine details", async () => {
   const browser = await source("catalog-browser.tsx");
-  for (const term of [
-    "Authority path",
-    "Authority SHA",
-    "定义 / 计算规格",
-    "关系 / Lineage",
-    "Reserved",
-    "Registry 已校验",
-    "仅合同",
-    "已实现",
-    "源缺口",
-    "注册 / 生命周期",
-    "实现状态",
-    "验证状态",
-    "验收范围",
-  ]) {
-    assert.match(browser, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  for (const term of ["如何理解和使用", "使用时请注意", "技术详情：精确规格、版本与来源依据", "注册 / 生命周期", "实现状态", "验证状态", "验收范围", "business-description"]) {
+    assert.ok(browser.includes(term), term);
   }
-  for (const forbidden of ["保存公式", "创建指标", "修改字段", "一键添加到策略"] ) {
-    assert.doesNotMatch(browser, new RegExp(forbidden));
+  assert.match(browser, /<details[^>]*data-testid="technical-details"/);
+  assert.doesNotMatch(browser, /<details[^>]*open[^>]*data-testid="technical-details"/);
+  assert.doesNotMatch(browser, /下游 \/ 引用|上游 \/ 被引用/);
+  assert.match(browser, /相关，但不等价/);
+  assert.match(browser, /所属对象与概念关联（不作为加工箭头）/);
+  for (const term of ["保存公式", "创建指标", "修改字段", "一键添加到策略"]) assert.ok(!browser.includes(term));
+});
+
+test("lineage has overview, focus, keyboard navigation and honest boundaries", async () => {
+  const graph = await source("catalog-lineage.tsx");
+  for (const term of ["lineage-overview", "lineage-focus", "lineage-svg", "lineage-boundary", "lineage-evidence", "markerEnd", "onKeyDown", "不能据此认定", "非运行回执", "graph.omitted_nodes"]) {
+    assert.ok(graph.includes(term), term);
   }
 });
 
 test("existing primary workspaces link to the Catalog", async () => {
-  const [operator, attribution] = await Promise.all([
-    source("operator-console.tsx"),
-    source("attribution-workbench.tsx"),
-  ]);
+  const [operator, attribution] = await Promise.all([source("operator-console.tsx"), source("attribution-workbench.tsx")]);
   assert.match(operator, /href="\/catalog"/);
   assert.match(attribution, /href="\/catalog"/);
 });

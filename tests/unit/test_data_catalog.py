@@ -58,7 +58,7 @@ def test_ods_catalog_does_not_fabricate_missing_package_field_schema() -> None:
     item = catalog.item("ods_dataset:daily_ohlcv_unadjusted")
     assert item["verification_status"] == "contract_only"
     assert item["details"]["package_membership_proven_in_checkout"] is False
-    gaps = {item["gap_id"]: item for item in catalog.summary()["gaps"]}
+    gaps = {item["gap_id"]: item for item in catalog.diagnostics()["gaps"]}
     assert "gap:ods-package-manifest-not-in-checkout" in gaps
 
 
@@ -82,7 +82,7 @@ def test_rsi14_retains_existing_formula_and_indicator_concepts_do_not_gain_false
     rsi = catalog.item("feature_spec:price.rsi14@1.0.0")
     assert "mean(max(total_return, 0), 14)" in rsi["details"]["formula"]
     assert any("Wilder RSI" in note for note in rsi["details"]["cautions"])
-    gaps = {gap["gap_id"] for gap in catalog.summary()["gaps"]}
+    gaps = {gap["gap_id"] for gap in catalog.diagnostics()["gaps"]}
     for concept_id in (
         "indicator.trend.sma",
         "indicator.oscillator.rsi",
@@ -124,7 +124,9 @@ def test_turnover_field_is_not_silently_promoted_to_turnover_rate() -> None:
     assert item["details"]["type"] == "decimal_38_10?"
     assert any("不是换手率" in note for note in item["details"]["cautions"])
     result = catalog.search("换手率", limit=10)
-    assert [value["entry_id"] for value in result["items"]] == [item["entry_id"]]
+    assert {value["entry_id"] for value in result["items"]} == {
+        item["entry_id"], "dwd_field:dwd_index_bar.turnover",
+    }
 
 
 def test_relations_return_outgoing_and_incoming_without_dangling_targets() -> None:

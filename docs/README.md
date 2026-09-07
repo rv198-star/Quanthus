@@ -135,6 +135,11 @@ nodes.
   `acceptance/data-indicator-catalog-production-deploy-blocker-20260907.md`; post-acceptance semantic
   audit: `acceptance/data-indicator-catalog-post-acceptance-audit-20260907.md`; final audited
   production closeout: `acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
+- `P3-DICT-002` / #232 productizes the Catalog through children #228–#231: Chinese business
+  explanations, collapsed technical evidence, internal-only maintenance gaps, and declared
+  processing lineage with layered overview and bounded field focus. Engineering/browser checks
+  are in progress; production release is not yet accepted. Route:
+  `design/data-indicator-catalog-productization.md`; plan: `work-items/catalog-productization.md`.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.
@@ -279,7 +284,7 @@ gate is a conformance defect rather than an alternate project state.
 | Platform Kernel extraction or restoration | root `AGENTS.md`, this map, HLD, ADR 0010, LLD 11, `config/platform-kernel-gates.v1.json` | QuantDinger audit record, exact upstream source path, selected Web ownership/source evidence, and adapter contract |
 | P3 state-model discussion | HLD, LLD 03, state-machine draft | Never load as P2 implementation authority |
 | Structure semantics, time, names or delivery gaps | HLD, LLD 03, `design/structure-facts-v2.md`, ADR 0014 | Structure semantic/coverage JSON; Catalog only when discovery/compatibility is relevant |
-| Data, indicator, Feature, Label or semantic-definition discovery | this map, LLD 03, `design/data-indicator-catalog.md`, `work-items/data-indicator-dictionary.md` | Explicit Catalog source/snapshot manifests; LLD 01 when inspecting ODS/DWD authority, LLD 11 for API/Web transport |
+| Data, indicator, Feature, Label or semantic-definition discovery | this map, LLD 03, `design/data-indicator-catalog.md`, `design/data-indicator-catalog-productization.md`, `work-items/catalog-productization.md` | Explicit Catalog source/snapshot manifests; LLD 01 when inspecting ODS/DWD authority, LLD 11 for API/Web transport |
 | P3 strategy-semantics discussion | HLD, `design/p3-strategy-semantics-checklist.md` | Load LLD 03/04/05 only for the decision group being discussed; the checklist is non-governing |
 | P3 rule-only implementation | root `AGENTS.md`, this map, HLD, LLD 03/04/05, accepted P2 interfaces | Exact P1 input node and P2 evidence for the path under test |
 | P3 strategy historical replay | root `AGENTS.md`, this map, HLD, LLD 02 and its `strategy-replay.md` child, LLD 01 `strategy-replay-ads.md` | Exact strategy, authorized ADS bundle, and P2 execution evidence; load the legacy P1 snapshot only for frozen P3 reproduction |

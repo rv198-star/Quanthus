@@ -11,6 +11,8 @@
     {"adapter": "label_registry", "path": "config/p3-governed-labels.research.v1.json"},
     {"adapter": "semantic_catalog", "path": "config/structure-semantic-catalog.v1.json"},
     {"adapter": "structure_blueprint", "path": "config/structure-facts-v2-blueprint.v1.json"},
-    {"adapter": "catalog_annotations", "path": "config/data-indicator-catalog-annotations.v1.json"}
+    {"adapter": "catalog_annotations", "path": "config/data-indicator-catalog-annotations.v1.json"},
+    {"adapter": "catalog_business", "path": "config/catalog-business-metadata.v1.json"},
+    {"adapter": "catalog_lineage", "path": "config/catalog-lineage.v1.json"}
   ]
 }

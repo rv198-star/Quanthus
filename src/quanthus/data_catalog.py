@@ -11,10 +11,12 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from quanthus.catalog_lineage import build_lineage, focus, overview, validate_lineage
+from quanthus.catalog_presentation import apply_presentation
 from quanthus.policy import find_project_root
 
 CATALOG_SCHEMA = "quanthus.data-indicator-catalog.v1"
-BUILDER_VERSION = "data-indicator-catalog-builder-v1.1"
+BUILDER_VERSION = "data-indicator-catalog-builder-v1.2"
 SOURCE_MANIFEST = "config/data-indicator-catalog-sources.v1.json"
 SNAPSHOT_MANIFEST = "config/data-indicator-catalog-snapshot.v1.json"
 ENTRY_KINDS = frozenset(
@@ -223,6 +225,8 @@ def _load_sources(root: Path, manifest_path: Path) -> tuple[dict[str, Any], list
         "semantic_catalog",
         "structure_blueprint",
         "catalog_annotations",
+        "catalog_business",
+        "catalog_lineage",
     }
     records: list[dict[str, str]] = []
     payloads: dict[str, dict[str, Any]] = {}
@@ -815,6 +819,12 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
         validate_entry(item)
         entries[entry_id] = item
 
+    try:
+        apply_presentation(entries, payloads["catalog_business"])
+        lineage = build_lineage(entries, payloads["catalog_lineage"], dwd, sources)
+    except ValueError as exc:
+        raise DataCatalogError(str(exc)) from exc
+
     ordered_entries = sorted(entries.values(), key=lambda item: item["entry_id"])
     entry_ids = {item["entry_id"] for item in ordered_entries}
     for item in ordered_entries:
@@ -849,6 +859,7 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
         },
         "entries": ordered_entries,
         "gaps": ordered_gaps,
+        "lineage": lineage,
     }
     snapshot["snapshot_digest"] = digest(snapshot)
     validate_catalog(snapshot)
@@ -866,6 +877,7 @@ def validate_catalog(snapshot: Mapping[str, Any]) -> None:
         "summary",
         "entries",
         "gaps",
+        "lineage",
         "snapshot_digest",
     }
     if set(snapshot) != expected or snapshot["schema_version"] != CATALOG_SCHEMA:
@@ -904,6 +916,10 @@ def validate_catalog(snapshot: Mapping[str, Any]) -> None:
         raise DataCatalogError("catalog summary entry count differs")
     if summary.get("gap_count") != len(snapshot["gaps"]):
         raise DataCatalogError("catalog summary gap count differs")
+    try:
+        validate_lineage(snapshot["lineage"])
+    except ValueError as exc:
+        raise DataCatalogError(str(exc)) from exc
     observed_counts = dict(sorted(Counter(item["kind"] for item in entries).items()))
     if summary.get("counts_by_kind") != observed_counts:
         raise DataCatalogError("catalog summary kind counts differ")
@@ -972,8 +988,9 @@ class DataIndicatorCatalog:
             "builder_version": self.snapshot["builder_version"],
             "snapshot_digest": self.snapshot["snapshot_digest"],
             "release_identity": self.snapshot["release_identity"],
-            "summary": self.snapshot["summary"],
-            "gaps": self.snapshot["gaps"],
+            "summary": {key: value for key, value in self.snapshot["summary"].items()
+                        if key != "gap_count"},
+            "lineage_overview": overview(self.snapshot["lineage"]),
         }
 
     def item(self, entry_id: str) -> dict[str, Any]:
@@ -981,8 +998,16 @@ class DataIndicatorCatalog:
             raise DataCatalogError("catalog_entry_not_found")
         return dict(self._entries[entry_id])
 
-    def relations(self, entry_id: str) -> dict[str, Any]:
-        item = self.item(entry_id)
+    def diagnostics(self) -> dict[str, Any]:
+        """Maintenance-only output, deliberately not exposed by the business summary API."""
+        return {"gap_count": len(self.snapshot["gaps"]), "gaps": self.snapshot["gaps"]}
+
+    def relations(self, entry_id: str, *, depth: int = 2, limit: int = 60) -> dict[str, Any]:
+        try:
+            graph = focus(self.snapshot["lineage"], entry_id, depth=depth, limit=limit)
+        except ValueError as exc:
+            raise DataCatalogError(str(exc)) from exc
+        item = self.item(entry_id) if entry_id in self._entries else {"relations": []}
         outgoing = [
             {
                 **relation,
@@ -997,7 +1022,8 @@ class DataIndicatorCatalog:
             }
             for relation in self._reverse.get(entry_id, [])
         ]
-        return {"entry_id": entry_id, "outgoing": outgoing, "incoming": incoming}
+        return {"entry_id": entry_id, "outgoing": outgoing, "incoming": incoming,
+                "lineage": graph}
 
     @staticmethod
     def _summary_entry(item: Mapping[str, Any]) -> dict[str, Any]:

@@ -101,7 +101,7 @@ test("server-renders the catalog route as an authenticated read-only knowledge s
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /数据、指标与语义目录/);
-  assert.match(html, /Catalog 是只读知识面/);
+  assert.match(html, /查清含义、口径、来源和用途/);
   assert.match(html, /前往登录/);
 });
 

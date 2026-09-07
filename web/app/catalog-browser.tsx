@@ -1,171 +1,76 @@
 "use client";
 
-import {
-  AlertTriangle,
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  CircleHelp,
-  Copy,
-  Database,
-  FileCode2,
-  GitBranch,
-  LoaderCircle,
-  LogIn,
-  RefreshCw,
-  Search,
-  Sigma,
-  Tag,
-} from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { BookOpen, Copy, Database, GitBranch, LoaderCircle, Search } from "lucide-react";
+import { LineageFocus, LineageOverview } from "./catalog-lineage";
 import {
-  clearStoredSession,
-  type CatalogEntry,
-  type CatalogEntrySummary,
-  type CatalogKind,
-  type DataCatalogRelations,
-  type DataCatalogSearchResult,
-  type DataCatalogSummary,
-  loadStoredSession,
-  PlatformApiError,
-  platformRequest,
+  clearStoredSession, loadStoredSession, PlatformApiError, platformRequest,
+  type CatalogEntry, type CatalogEntrySummary, type CatalogKind, type CatalogLineageGraph,
+  type CatalogLineageNode, type DataCatalogRelations, type DataCatalogSearchResult, type DataCatalogSummary,
 } from "./platform-api";
 import styles from "./catalog-browser.module.css";
 
 const kindLabels: Record<CatalogKind, string> = {
-  ods_dataset: "ODS 数据集",
-  dwd_table: "DWD 表",
-  dwd_field: "DWD 字段",
-  feature_spec: "指标 / Feature 规格",
-  label_card: "Label Card",
-  semantic_family: "语义分类",
-  semantic_concept: "语义概念",
+  ods_dataset: "原始来源数据集", dwd_table: "规范数据表", dwd_field: "数据字段", feature_spec: "指标规格",
+  label_card: "规则标签", semantic_family: "概念分类", semantic_concept: "语义概念",
 };
-
 const statusLabels: Record<string, string> = {
-  accepted: "已验收",
-  active: "Active",
-  contract_only: "仅合同",
-  declared_only: "仅定义",
-  deprecated: "已废弃",
-  implemented: "已实现",
-  planned: "计划中",
-  registry_validated: "Registry 已校验",
-  reserved: "Reserved",
-  source_available: "源可用",
-  source_gap: "源缺口",
-  unverified: "未验证",
-  unknown: "未知",
+  accepted: "已验收", active: "有效定义", contract_only: "仅定义校验", declared_only: "仅概念定义",
+  deprecated: "已废弃", implemented: "已实现", planned: "尚在规划", registry_validated: "规格已校验",
+  reserved: "已登记概念", source_available: "来源已登记", source_gap: "来源受限", unverified: "尚未验证", unknown: "状态未知",
 };
-
-const kindIcons: Record<CatalogKind, typeof Database> = {
-  ods_dataset: Database,
-  dwd_table: Database,
-  dwd_field: FileCode2,
-  feature_spec: Sigma,
-  label_card: Tag,
-  semantic_family: BookOpen,
-  semantic_concept: CircleHelp,
-};
-
-const searchKinds: Array<{ value: "" | CatalogKind; label: string }> = [
-  { value: "", label: "全部类型" },
-  ...Object.entries(kindLabels).map(([value, label]) => ({
-    value: value as CatalogKind,
-    label,
-  })),
-];
-
-const searchStatuses = [
-  ["", "全部状态"],
-  ["accepted", "已验收"],
-  ["implemented", "已实现"],
-  ["registry_validated", "Registry 已校验"],
-  ["contract_only", "仅合同"],
-  ["declared_only", "仅定义"],
-  ["planned", "计划中"],
-  ["reserved", "Reserved"],
-  ["active", "Active"],
-  ["deprecated", "已废弃"],
-  ["source_available", "源可用"],
-  ["source_gap", "源缺口"],
-  ["unverified", "未验证"],
-  ["unknown", "未知"],
-] as const;
-
-function badgeTone(value: string) {
-  if (["accepted", "active", "implemented", "registry_validated", "source_available"].includes(value)) {
-    return styles.good;
-  }
-  if (["reserved", "contract_only", "declared_only", "planned"].includes(value)) {
-    return styles.neutral;
-  }
-  if (["source_gap", "unverified", "unknown"].includes(value)) return styles.warn;
-  return styles.muted;
-}
+const searchStatuses = ["accepted", "implemented", "registry_validated", "declared_only", "reserved", "active", "deprecated", "source_available", "source_gap", "contract_only", "planned", "unverified", "unknown"];
+type Reading = { facts: Array<{ label: string; value: string }>; cautions: string[] };
 
 function StatusBadge({ value }: { value: string }) {
-  return (
-    <span className={`${styles.badge} ${badgeTone(value)}`}>
-      {statusLabels[value] ?? value}
-    </span>
-  );
+  return <span className={`${styles.badge} ${["accepted", "implemented", "registry_validated"].includes(value) ? styles.good : styles.neutral}`}>
+    {statusLabels[value] ?? "详见技术状态"}
+  </span>;
 }
 
-function shortHash(value: string) {
-  if (!value.startsWith("sha256:") || value.length < 30) return value;
-  return `${value.slice(0, 15)}…${value.slice(-8)}`;
+function contextLinks(relations: DataCatalogRelations | null) {
+  const result = new Map<string, { label: string; entry: CatalogEntrySummary }>();
+  const labels: Record<string, [string, string]> = {
+    contains: ["包含字段", "所属数据表"], field_of: ["所属数据表", "包含字段"],
+    references: ["引用对象", "被此对象引用"], belongs_to_family: ["所属分类", "分类成员"],
+    related_not_equivalent: ["相关，但不等价", "相关，但不等价"], exact_equivalent: ["已证明等价", "已证明等价"],
+    replacement: ["登记替代关系", "登记被替代关系"],
+  };
+  for (const relation of relations?.outgoing ?? []) {
+    const label = labels[relation.type]?.[0];
+    if (label) result.set(`${label}:${relation.target.entry_id}`, { label, entry: relation.target });
+  }
+  for (const relation of relations?.incoming ?? []) {
+    const label = labels[relation.type]?.[1];
+    if (label) result.set(`${label}:${relation.source.entry_id}`, { label, entry: relation.source });
+  }
+  return [...result.values()];
 }
 
-function stringify(value: unknown) {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return JSON.stringify(value, null, 2);
+function subscribeSession(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
 }
-
-function DetailRow({ label, value }: { label: string; value: unknown }) {
-  return (
-    <div className={styles.detailRow}>
-      <dt>{label}</dt>
-      <dd>{stringify(value)}</dd>
-    </div>
-  );
-}
-
-function RelationCard({
-  label,
-  type,
-  entry,
-  onSelect,
-}: {
-  label: string;
-  type: string;
-  entry: CatalogEntrySummary;
-  onSelect: (entryId: string) => void;
-}) {
-  return (
-    <button type="button" className={styles.relationCard} onClick={() => onSelect(entry.entry_id)}>
-      <span>{label}</span>
-      <strong>{entry.display_name}</strong>
-      <small>{type} · {kindLabels[entry.kind]}</small>
-    </button>
-  );
-}
+function readSessionToken() { return loadStoredSession()?.token ?? null; }
+function serverSessionToken() { return null; }
 
 export function CatalogBrowser() {
-  const [session] = useState(() =>
-    typeof window === "undefined" ? null : loadStoredSession(),
-  );
-  const [token, setToken] = useState<string | null>(session?.token ?? null);
+  // The server and first hydration render both have no session. The external store then
+  // restores the browser token without replacing server HTML with a conflicting first tree.
+  const storedToken = useSyncExternalStore(subscribeSession, readSessionToken, serverSessionToken);
+  const [expired, setExpired] = useState(false);
+  const token = expired ? null : storedToken;
   const [summary, setSummary] = useState<DataCatalogSummary | null>(null);
   const [results, setResults] = useState<CatalogEntrySummary[]>([]);
   const [total, setTotal] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<CatalogEntry | null>(null);
   const [relations, setRelations] = useState<DataCatalogRelations | null>(null);
+  const [graph, setGraph] = useState<CatalogLineageGraph | null>(null);
+  const [graphCenter, setGraphCenter] = useState<string | null>(null);
+  const [depth, setDepth] = useState(2);
+  const [mode, setMode] = useState<"browse" | "map">("browse");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"" | CatalogKind>("");
   const [status, setStatus] = useState("");
@@ -173,350 +78,190 @@ export function CatalogBrowser() {
   const [family, setFamily] = useState("");
   const [busy, setBusy] = useState(false);
   const [detailBusy, setDetailBusy] = useState(false);
+  const [graphBusy, setGraphBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [gapsOpen, setGapsOpen] = useState(false);
-
-  const expireSession = useCallback(() => {
-    clearStoredSession();
-    setToken(null);
-  }, []);
+  const [copyResult, setCopyResult] = useState("");
+  const searchSequence = useRef(0);
 
   const handleError = useCallback((observed: unknown) => {
     if (observed instanceof PlatformApiError && observed.status === 401) {
-      expireSession();
+      clearStoredSession(); setExpired(true);
       return "会话已过期，请重新登录。";
     }
-    if (observed instanceof PlatformApiError) {
-      return `目录请求失败：${observed.reason}`;
-    }
-    return "目录暂时不可读取。";
-  }, [expireSession]);
+    return "目录暂时不可读取，请检查查询条件或稍后重试。";
+  }, []);
+  const selectEntry = useCallback((id: string) => {
+    setSelectedId(id); setGraphCenter(id); setRelations(null); setMode("browse"); setCopyResult("");
+  }, []);
+  const navigate = useCallback((node: CatalogLineageNode) => {
+    setMode("browse");
+    if (node.entry_id) selectEntry(node.entry_id);
+    else setGraphCenter(node.id);
+  }, [selectEntry]);
 
-  const runSearch = useCallback(async (
-    nextQuery = query,
-    nextKind = kind,
-    nextStatus = status,
-    nextDomain = domain,
-    nextFamily = family,
-  ) => {
+  const runSearch = useCallback(async (clear = false) => {
     if (!token) return;
-    setBusy(true);
-    setError(null);
-    const params = new URLSearchParams();
-    if (nextQuery.trim()) params.set("q", nextQuery.trim());
-    if (nextKind) params.set("kind", nextKind);
-    if (nextStatus) params.set("status", nextStatus);
-    if (nextDomain.trim()) params.set("domain", nextDomain.trim());
-    if (nextFamily.trim()) params.set("family", nextFamily.trim());
-    params.set("limit", "80");
-    try {
-      const result = await platformRequest<DataCatalogSearchResult>(
-        `/api/platform/v1/catalog/search?${params.toString()}`,
-        { token },
-      );
-      setResults(result.items);
-      setTotal(result.total);
-      if (result.items.length && !selectedId) setSelectedId(result.items[0].entry_id);
-    } catch (observed) {
-      setError(handleError(observed));
-    } finally {
-      setBusy(false);
+    const sequence = ++searchSequence.current;
+    setBusy(true); setError(null);
+    const params = new URLSearchParams({ limit: "100" });
+    if (!clear) {
+      if (query.trim()) params.set("q", query.trim());
+      if (kind) params.set("kind", kind);
+      if (status) params.set("status", status);
+      if (domain.trim()) params.set("domain", domain.trim());
+      if (family.trim()) params.set("family", family.trim());
     }
-  }, [domain, family, handleError, kind, query, selectedId, status, token]);
+    try {
+      const response = await platformRequest<DataCatalogSearchResult>(`/api/platform/v1/catalog/search?${params}`, { token });
+      if (sequence !== searchSequence.current) return;
+      setResults(response.items); setTotal(response.total);
+      if (response.items.length) selectEntry(response.items[0].entry_id);
+      else { setSelectedId(null); setSelected(null); setGraphCenter(null); setGraph(null); }
+    } catch (observed) {
+      if (sequence === searchSequence.current) setError(handleError(observed));
+    } finally {
+      if (sequence === searchSequence.current) setBusy(false);
+    }
+  }, [token, query, kind, status, domain, family, handleError, selectEntry]);
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
+    const sequence = ++searchSequence.current;
     (async () => {
       setBusy(true);
       try {
-        const [observedSummary, observedSearch] = await Promise.all([
+        const [observedSummary, response] = await Promise.all([
           platformRequest<DataCatalogSummary>("/api/platform/v1/catalog/summary", { token }),
-          platformRequest<DataCatalogSearchResult>("/api/platform/v1/catalog/search?limit=80", { token }),
+          platformRequest<DataCatalogSearchResult>("/api/platform/v1/catalog/search?limit=100", { token }),
         ]);
         if (cancelled) return;
         setSummary(observedSummary);
-        setResults(observedSearch.items);
-        setTotal(observedSearch.total);
-        if (observedSearch.items.length) setSelectedId(observedSearch.items[0].entry_id);
-      } catch (observed) {
-        if (!cancelled) setError(handleError(observed));
-      } finally {
-        if (!cancelled) setBusy(false);
-      }
+        if (sequence === searchSequence.current) {
+          setResults(response.items); setTotal(response.total);
+          if (response.items.length) selectEntry(response.items[0].entry_id);
+        }
+      } catch (observed) { if (!cancelled) setError(handleError(observed)); }
+      finally { if (!cancelled && sequence === searchSequence.current) setBusy(false); }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [handleError, token]);
+    return () => { cancelled = true; };
+  }, [token, handleError, selectEntry]);
 
   useEffect(() => {
     if (!token || !selectedId) return;
     let cancelled = false;
     (async () => {
-      setDetailBusy(true);
+      setDetailBusy(true); setSelected(null);
       try {
-        const encoded = encodeURIComponent(selectedId);
-        const [item, relationResult] = await Promise.all([
-          platformRequest<CatalogEntry>(`/api/platform/v1/catalog/items/${encoded}`, { token }),
-          platformRequest<DataCatalogRelations>(
-            `/api/platform/v1/catalog/items/${encoded}/relations`,
-            { token },
-          ),
-        ]);
-        if (!cancelled) {
-          setSelected(item);
-          setRelations(relationResult);
-        }
-      } catch (observed) {
-        if (!cancelled) setError(handleError(observed));
-      } finally {
-        if (!cancelled) setDetailBusy(false);
-      }
+        const item = await platformRequest<CatalogEntry>(`/api/platform/v1/catalog/items/${encodeURIComponent(selectedId)}`, { token });
+        if (!cancelled) setSelected(item);
+      } catch (observed) { if (!cancelled) setError(handleError(observed)); }
+      finally { if (!cancelled) setDetailBusy(false); }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [handleError, selectedId, token]);
+    return () => { cancelled = true; };
+  }, [token, selectedId, handleError]);
 
-  const domains = useMemo(
-    () => Array.from(new Set(results.map((item) => item.domain))).sort(),
-    [results],
-  );
-  const families = useMemo(
-    () => Array.from(new Set(results.map((item) => item.family))).sort(),
-    [results],
-  );
+  useEffect(() => {
+    if (!token || !graphCenter) return;
+    let cancelled = false;
+    (async () => {
+      setGraphBusy(true);
+      try {
+        const response = await platformRequest<DataCatalogRelations>(
+          `/api/platform/v1/catalog/items/${encodeURIComponent(graphCenter)}/relations?depth=${depth}&limit=60`, { token });
+        if (!cancelled) {
+          setGraph(response.lineage);
+          if (graphCenter === selectedId) setRelations(response);
+        }
+      } catch (observed) { if (!cancelled) { setGraph(null); setError(handleError(observed)); } }
+      finally { if (!cancelled) setGraphBusy(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [token, graphCenter, selectedId, depth, handleError]);
 
-  if (!token) {
-    return (
-      <main className={styles.loginShell} data-testid="catalog-login-required">
-        <div className={styles.loginCard}>
-          <span className={styles.brandMark}>Q</span>
-          <p className={styles.eyebrow}>Quanthus Catalog</p>
-          <h1>数据、指标与语义目录</h1>
-          <p>Catalog 是只读知识面，需要使用现有 Platform 账号登录后访问。</p>
-          <Link href="/operator" className={styles.primaryLink}>
-            <LogIn aria-hidden="true" />
-            前往登录
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  if (!token) return <main className={styles.loginShell} data-testid="catalog-login-required"><div className={styles.loginCard}>
+    <span className={styles.brandMark}>Q</span><p>Quanthus 数据目录</p><h1>数据、指标与语义目录</h1>
+    <p>查清含义、口径、来源和用途。请使用现有平台账号登录。</p><Link href="/operator" className={styles.primaryLink}>前往登录</Link>
+  </div></main>;
 
-  return (
-    <div className={styles.shell} data-testid="catalog-page">
-      <header className={styles.header}>
-        <div className={styles.brand}>
-          <span className={styles.brandMark}>Q</span>
-          <div>
-            <strong>Quanthus Catalog</strong>
-            <span>Data · Indicator · Facts · Label</span>
-          </div>
-        </div>
-        <div className={styles.headerActions}>
-          <button type="button" className={styles.iconButton} onClick={() => runSearch()} title="刷新搜索">
-            <RefreshCw className={busy ? styles.spin : undefined} aria-hidden="true" />
-          </button>
-          <Link href="/operator" className={styles.iconButton} title="平台控制台">
-            <ArrowLeft aria-hidden="true" />
-          </Link>
-        </div>
-      </header>
-
-      <section className={styles.hero}>
-        <div>
-          <p className={styles.eyebrow}>Read-only authority projection</p>
-          <h1>Quanthus 到底知道些什么？</h1>
-          <p>
-            搜索数据集、字段、指标规格、Facts、Label 与语义概念，并直接查看定义、时间口径、
-            权威来源、关系和当前可信范围。
-          </p>
-        </div>
-        {summary ? (
-          <div className={styles.summaryGrid}>
-            <div><strong>{summary.summary.entry_count}</strong><span>目录项</span></div>
-            <div><strong>{summary.summary.counts_by_kind.dwd_table ?? 0}</strong><span>DWD 表</span></div>
-            <div><strong>{summary.summary.counts_by_kind.feature_spec ?? 0}</strong><span>Feature 规格</span></div>
-            <button type="button" onClick={() => setGapsOpen((value) => !value)}>
-              <strong>{summary.summary.gap_count}</strong><span>已知缺口</span>
-            </button>
-          </div>
-        ) : null}
-      </section>
-
-      {summary && gapsOpen ? (
-        <section className={styles.gapPanel} data-testid="catalog-gaps">
-          <div className={styles.sectionTitle}>
-            <AlertTriangle aria-hidden="true" />
-            <div><strong>已知缺口不是“空值”</strong><span>Catalog 主动保留无法证明或尚未实现的部分。</span></div>
-          </div>
-          <div className={styles.gapList}>
-            {summary.gaps.map((gap) => (
-              <article key={gap.gap_id}>
-                <code>{gap.category}</code>
-                <p>{gap.description}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <form
-        className={styles.searchBar}
-        onSubmit={(event) => {
-          event.preventDefault();
-          runSearch();
-        }}
-      >
-        <label className={styles.searchInput}>
-          <Search aria-hidden="true" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索 MA20、RSI、MACD、dwd_security_bar.close、structure.anchor…"
-            aria-label="搜索目录"
-          />
-        </label>
-        <select value={kind} onChange={(event) => setKind(event.target.value as "" | CatalogKind)} aria-label="类型">
-          {searchKinds.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+  const reading = selected?.details.reading as Reading | undefined;
+  const technicalDetails = selected ? Object.fromEntries(Object.entries(selected.details).filter(([key]) => key !== "reading")) : {};
+  const links = contextLinks(relations);
+  return <div className={styles.shell} data-testid="catalog-page">
+    <header className={styles.header}><Link href="/catalog" className={styles.brand}><span className={styles.brandMark}>Q</span><strong>Quanthus · 数据目录</strong></Link>
+      <Link href="/operator">返回控制台</Link></header>
+    <section className={styles.hero}><div><p className={styles.eyebrow}>数据说明与加工关系</p><h1>先读懂数据，再使用数据</h1>
+      <p>用中文查找字段、指标和结构事实，了解它们是什么、如何形成，以及使用时需要注意什么。</p></div>
+      {summary ? <div className={styles.summaryGrid}>
+        <div><strong>{summary.summary.entry_count}</strong><span>目录条目</span></div>
+        <div><strong>{summary.summary.counts_by_kind.dwd_table ?? 0}</strong><span>规范数据表</span></div>
+        <div><strong>{summary.summary.counts_by_kind.feature_spec ?? 0}</strong><span>指标规格</span></div>
+        <div><strong>{summary.summary.counts_by_kind.label_card ?? 0}</strong><span>规则标签</span></div>
+      </div> : null}
+    </section>
+    <nav className={styles.viewSwitch} aria-label="目录视图">
+      <button type="button" aria-pressed={mode === "browse"} onClick={() => setMode("browse")}><BookOpen size={18} />查数据与指标</button>
+      <button type="button" aria-pressed={mode === "map"} onClick={() => setMode("map")}><GitBranch size={18} />全局血缘地图</button>
+    </nav>
+    {error ? <p className={styles.errorBanner} role="alert">{error}</p> : null}
+    {mode === "map" && summary ? <LineageOverview data={summary.lineage_overview} onNavigate={navigate} /> : null}
+    {mode === "browse" ? <>
+      <form className={styles.searchBar} onSubmit={event => { event.preventDefault(); void runSearch(); }}>
+        <label className={styles.searchInput}><Search size={20} /><input value={query} maxLength={120} onChange={event => setQuery(event.target.value)}
+          placeholder="搜索收盘价、成交额、20期均线、MACD 或精确字段 ID" aria-label="搜索目录" /></label>
+        <select aria-label="条目类型" value={kind} onChange={event => setKind(event.target.value as "" | CatalogKind)}>
+          <option value="">全部类型</option>{Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="状态">
-          {searchStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <button type="submit" className={styles.searchButton} disabled={busy}>
-          {busy ? <LoaderCircle className={styles.spin} aria-hidden="true" /> : <Search aria-hidden="true" />}
-          搜索
-        </button>
+        <select aria-label="条目状态" value={status} onChange={event => setStatus(event.target.value)}><option value="">全部状态</option>
+          {searchStatuses.map(value => <option key={value} value={value}>{statusLabels[value]}</option>)}
+        </select><button type="submit" className={styles.searchButton} disabled={busy}>{busy ? <LoaderCircle size={18} /> : <Search size={18} />}搜索</button>
       </form>
-
-      <section className={styles.filterStrip}>
-        <label>
-          Domain
-          <input list="catalog-domains" value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="例如 indicator" />
-          <datalist id="catalog-domains">{domains.map((value) => <option key={value} value={value} />)}</datalist>
-        </label>
-        <label>
-          Family
-          <input list="catalog-families" value={family} onChange={(event) => setFamily(event.target.value)} placeholder="例如 structure.anchor" />
-          <datalist id="catalog-families">{families.map((value) => <option key={value} value={value} />)}</datalist>
-        </label>
-        <button type="button" onClick={() => {
-          setQuery(""); setKind(""); setStatus(""); setDomain(""); setFamily("");
-          runSearch("", "", "", "", "");
-        }}>清除过滤</button>
-        <span>{total} 个匹配 · 当前显示 {results.length}</span>
-      </section>
-
-      {error ? <div className={styles.errorBanner}>{error}</div> : null}
-
+      <details className={styles.filterDetails}><summary>按业务领域或分类精确筛选</summary><div className={styles.filterStrip}>
+        <label>业务领域<input value={domain} onChange={event => setDomain(event.target.value)} placeholder="例如 structure、indicator" /></label>
+        <label>概念分类<input value={family} onChange={event => setFamily(event.target.value)} placeholder="例如 structure.anchor" /></label>
+        <button type="button" onClick={() => { setQuery(""); setKind(""); setStatus(""); setDomain(""); setFamily(""); void runSearch(true); }}>清除筛选</button>
+      </div></details>
+      <p className={styles.resultCount}>{total} 个匹配，显示 {results.length} 个。{total > results.length ? "当前最多显示前100项，请用搜索或筛选缩小范围。" : ""}</p>
       <main className={styles.workspace}>
-        <aside className={styles.resultPane} aria-label="目录搜索结果">
-          {results.length ? results.map((item) => {
-            const Icon = kindIcons[item.kind];
-            return (
-              <button
-                type="button"
-                key={item.entry_id}
-                className={`${styles.resultItem} ${selectedId === item.entry_id ? styles.selected : ""}`}
-                onClick={() => setSelectedId(item.entry_id)}
-              >
-                <Icon aria-hidden="true" />
-                <span>
-                  <strong>{item.display_name}</strong>
-                  <code>{item.canonical_id}</code>
-                  <small>{kindLabels[item.kind]} · {item.domain}</small>
-                </span>
-                <StatusBadge value={item.verification_status} />
-              </button>
-            );
-          }) : (
-            <div className={styles.emptyState}>没有找到匹配目录项。</div>
-          )}
-        </aside>
-
-        <article className={styles.detailPane} aria-live="polite">
-          {detailBusy ? (
-            <div className={styles.detailLoading}><LoaderCircle className={styles.spin} /> 正在读取详情…</div>
-          ) : selected ? (
-            <>
-              <div className={styles.detailHeader}>
-                <div>
-                  <p className={styles.eyebrow}>{kindLabels[selected.kind]}</p>
-                  <h2>{selected.display_name}</h2>
-                  <code>{selected.canonical_id}</code>
-                </div>
-                <button
-                  type="button"
-                  className={styles.copyButton}
-                  onClick={() => navigator.clipboard.writeText(selected.canonical_id)}
-                >
-                  <Copy aria-hidden="true" /> 复制 ID
-                </button>
-              </div>
-
-              <div className={styles.badges}>
-                <span className={styles.statusAxis}><small>注册 / 生命周期</small><StatusBadge value={selected.lifecycle} /></span>
-                <span className={styles.statusAxis}><small>实现状态</small><StatusBadge value={selected.implementation_status} /></span>
-                <span className={styles.statusAxis}><small>验证状态</small><StatusBadge value={selected.verification_status} /></span>
-                {selected.accepted_scope ? (
-                  <span className={styles.statusAxis}><small>验收范围</small><span className={`${styles.badge} ${styles.good}`}>{selected.accepted_scope}</span></span>
-                ) : null}
-              </div>
-
-              <p className={styles.description}>{selected.description}</p>
-
-              {Array.isArray(selected.details.cautions) && selected.details.cautions.length ? (
-                <section className={styles.cautionBox}>
-                  <AlertTriangle aria-hidden="true" />
-                  <div>
-                    <strong>口径提醒</strong>
-                    {(selected.details.cautions as string[]).map((note) => <p key={note}>{note}</p>)}
-                  </div>
-                </section>
-              ) : null}
-
-              <section className={styles.detailSection}>
-                <div className={styles.sectionTitle}><CheckCircle2 aria-hidden="true" /><strong>身份与权威</strong></div>
-                <dl>
-                  <DetailRow label="Entry ID" value={selected.entry_id} />
-                  <DetailRow label="Domain" value={selected.domain} />
-                  <DetailRow label="Family" value={selected.family} />
-                  <DetailRow label="Authority path" value={selected.authority.path} />
-                  <DetailRow label="Authority pointer" value={selected.authority.pointer} />
-                  <DetailRow label="Authority SHA" value={shortHash(selected.authority.sha256)} />
-                </dl>
-              </section>
-
-              <section className={styles.detailSection}>
-                <div className={styles.sectionTitle}><FileCode2 aria-hidden="true" /><strong>定义 / 计算规格</strong></div>
-                <dl>
-                  {Object.entries(selected.details).filter(([key]) => key !== "cautions").map(([key, value]) => (
-                    <DetailRow key={key} label={key} value={value} />
-                  ))}
-                </dl>
-              </section>
-
-              <section className={styles.detailSection}>
-                <div className={styles.sectionTitle}><GitBranch aria-hidden="true" /><strong>关系 / Lineage</strong></div>
-                {relations && (relations.outgoing.length || relations.incoming.length) ? (
-                  <div className={styles.relationsGrid}>
-                    {relations.outgoing.map((relation) => (
-                      <RelationCard key={`out-${relation.type}-${relation.target_entry_id}`} label="下游 / 引用" type={relation.type} entry={relation.target} onSelect={setSelectedId} />
-                    ))}
-                    {relations.incoming.map((relation) => (
-                      <RelationCard key={`in-${relation.type}-${relation.source_entry_id}`} label="上游 / 被引用" type={relation.type} entry={relation.source} onSelect={setSelectedId} />
-                    ))}
-                  </div>
-                ) : <div className={styles.emptyRelations}>当前目录没有登记可证明的关系。</div>}
-              </section>
-            </>
-          ) : (
-            <div className={styles.emptyState}>选择左侧目录项查看定义与血缘。</div>
-          )}
+        <aside className={styles.resultPane} aria-label="目录搜索结果">{results.length ? results.map(item => <button type="button" key={item.entry_id}
+          className={`${styles.resultItem} ${selectedId === item.entry_id ? styles.selected : ""}`} onClick={() => selectEntry(item.entry_id)}>
+          <strong>{item.display_name}</strong><small>{kindLabels[item.kind]}</small><code>{item.canonical_id}</code>
+        </button>) : <p className={styles.emptyState}>{busy ? "正在搜索…" : "没有匹配条目，请调整关键词。"}</p>}</aside>
+        <article className={styles.detailPane} aria-live="polite" data-testid="catalog-detail">
+          {detailBusy ? <p className={styles.emptyState}>正在读取说明…</p> : selected ? <>
+            <div className={styles.detailHeader}><div><p className={styles.eyebrow}>{kindLabels[selected.kind]}</p><h2>{selected.display_name}</h2><code>{selected.canonical_id}</code></div>
+              <button type="button" className={styles.copyButton} onClick={async () => {
+                try { await navigator.clipboard.writeText(selected.canonical_id); setCopyResult("已复制标识"); }
+                catch { setCopyResult("复制失败，可手动选择标识"); }
+              }}><Copy size={16} />复制标识</button>
+            </div>
+            {copyResult ? <p role="status">{copyResult}</p> : null}
+            <div className={styles.badges}><StatusBadge value={selected.implementation_status} /><StatusBadge value={selected.verification_status} /></div>
+            <p className={styles.description} data-testid="business-description">{selected.description}</p>
+            <section className={styles.detailSection}><h3>如何理解和使用</h3><dl className={styles.businessFacts}>
+              {reading?.facts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}
+            </dl></section>
+            {reading?.cautions.length ? <section className={styles.cautionBox}><h3>使用时请注意</h3>{reading.cautions.map(note => <p key={note}>{note}</p>)}</section> : null}
+            {links.length ? <details className={styles.technical}><summary>所属对象与概念关联（不作为加工箭头）</summary><div className={styles.relationsGrid}>
+              {links.map(({ label, entry }) => <button type="button" key={`${label}:${entry.entry_id}`} onClick={() => selectEntry(entry.entry_id)}>
+                <small>{label}</small><strong>{entry.display_name}</strong>
+              </button>)}
+            </div></details> : null}
+            <details className={styles.technical} data-testid="technical-details"><summary>技术详情：精确规格、版本与来源依据</summary>
+              <dl className={styles.businessFacts}>
+                <div><dt>精确标识</dt><dd>{selected.entry_id}</dd></div><div><dt>注册 / 生命周期</dt><dd>{statusLabels[selected.lifecycle] ?? selected.lifecycle}</dd></div>
+                <div><dt>实现状态</dt><dd>{statusLabels[selected.implementation_status]}</dd></div><div><dt>验证状态</dt><dd>{statusLabels[selected.verification_status]}</dd></div>
+                <div><dt>验收范围</dt><dd>{selected.accepted_scope ?? "未声明"}</dd></div><div><dt>来源路径</dt><dd>{selected.authority.path}</dd></div>
+                <div><dt>定义位置</dt><dd>{selected.authority.pointer}</dd></div><div><dt>来源校验摘要</dt><dd>{selected.authority.sha256}</dd></div>
+              </dl><h4>原始机器规格（只读）</h4><pre>{JSON.stringify(technicalDetails, null, 2)}</pre>
+            </details>
+          </> : <p className={styles.emptyState}><Database size={24} />选择左侧条目查看说明。</p>}
         </article>
       </main>
-    </div>
-  );
+      {graph ? <div className={styles.focusArea}>
+        {graph.center !== selectedId && selectedId ? <button type="button" onClick={() => setGraphCenter(selectedId)}>返回当前卡片的血缘</button> : null}
+        <LineageFocus key={graph.center} graph={graph} onNavigate={navigate} depth={depth} onDepth={setDepth} busy={graphBusy} />
+      </div> : null}
+    </> : null}
+  </div>;
 }

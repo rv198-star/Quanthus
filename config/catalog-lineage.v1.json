@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "authority": "reviewed_declared_processing_dependencies",
+  "coverage": "展示已登记的静态加工依赖，不是某次运行的实际消费记录。ODS 到 DWD 的概览为数据集级；字段展开仅包含已核对的行情、研究指标、标签和 Facts V2 链。未画出的连线不代表没有其他依赖。",
+  "evidence": {
+    "market": {"path":"src/quanthus/pipelines/securities_warehouse/market_observation.py","sha256":"sha256:5b72512cd75c9ee0d2ef17f89174b6e9a044dd354be904b7f20364bbdd6a561f","locator":"_bar_query"},
+    "provider": {"path":"src/quanthus/backtest/direct_dwd_provider.py","sha256":"sha256:08fb354bb3386661c20ea19f0de3afd7aadc450cc55c1a6c03cb2241fc3ad063","locator":"daily_ohlcv_none.parquet"},
+    "panel": {"path":"src/quanthus/backtest/baseline_research.py","sha256":"sha256:3a3a31010dba64a1fe10fd8500fc4ae96fa6286a421752efc54cbd79b210bff1","locator":"_feature_panel_query"},
+    "structure": {"path":"src/quanthus/structure_v2.py","sha256":"sha256:29693a9cf81545e8e7e34db7e5f5403f5e7f782c4d845b8cc64f700390121158","locator":"build_structure_v2"},
+    "admission": {"path":"src/quanthus/structure_v2_run.py","sha256":"sha256:ce4d9ea947e5009e362422073503602ef7bef8b30a9970f72eca2b919cda7734","locator":"extract_admissions"},
+    "inputs": {"path":"src/quanthus/structure_v2_inputs.py","sha256":"sha256:e895443dc062244c0c36bad92ab9782b21c0739ef72b07c6c2043befaa2cf50d","locator":"admit_daily"},
+    "consumer": {"path":"src/quanthus/structure_v2_consumer.py","sha256":"sha256:6870f9d1d4d2cbc6e27706b4e85998c961cb16458cc1b5d9ef7c0fb770fe4bb2","locator":"StructureV2CompatibilityExpert"}
+  },
+  "market_field_mapping": {"open":"open","high":"high","low":"low","close":"close","volume":"volume","amount":"turnover"},
+  "nodes": [
+    {"id":"projection:normalized-actions","label":"规范化公司行动输入","layer":"projection","grain":"dataset","description":"使用已验收修正包中的 corporate_actions_normalized；此处不把修正包与某张 DWD 表视为等价。"},
+    {"id":"projection:action-exceptions","label":"公司行动例外输入","layer":"projection","grain":"dataset","description":"研究特征使用的公司行动例外及阻断区间。"},
+    {"id":"projection:execution-limits","label":"历史执行与限价输入","layer":"projection","grain":"dataset","description":"研究管道用来检查价格转换和准入的限价、可执行性信息。"},
+    {"id":"projection:universe","label":"历史证券范围与就绪性","layer":"projection","grain":"dataset","description":"完整截面中的证券范围及就绪条件；不是当前证券名单的历史回填。"},
+    {"id":"projection:calendar","label":"研究交易日历","layer":"projection","grain":"dataset","description":"Direct-DWD 导出的权威时段信息，供历史对齐及连续性检查。"},
+    {"id":"projection:daily-return","label":"单期总回报","layer":"indicator","grain":"field","description":"依据收盘价格与规范化公司行动计算的单期总回报；指数与波动率共享此计算基础。"},
+    {"id":"projection:v2-daily-input","label":"Facts V2 合格日线输入","layer":"structure","grain":"record","description":"通过身份、日历、坐标、质量及版本校验的回溯日线输入。"},
+    {"id":"consumer:structure-v2-compatibility","label":"结构事实兼容性消费者","layer":"consumer","grain":"consumer","description":"验证连续事实能够接入专家和聚合器；不是正式投资专家，也不授予交易权限。"}
+  ],
+  "steps": [
+    {"id":"calendar-projection","label":"导出研究日历","inputs":["dwd_table:dwd_trading_calendar"],"outputs":["projection:calendar"],"evidence":"provider","grain":"dataset","role":"reference"},
+    {"id":"total-return","label":"计算总回报并校验连续性","inputs":["projection:daily_ohlcv_none.close","projection:daily_ohlcv_none.open","projection:daily_ohlcv_none.high","projection:daily_ohlcv_none.low","projection:daily_ohlcv_none.volume","projection:daily_ohlcv_none.amount","projection:normalized-actions","projection:action-exceptions","projection:execution-limits","projection:universe"],"outputs":["projection:daily-return"],"evidence":"panel","grain":"mixed","role":"calculation"},
+    {"id":"return-index","label":"从100累计总回报","inputs":["projection:daily-return"],"outputs":["feature_spec:price.total_return_index@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},
+    {"id":"sma20","label":"含当前期的20期平均","inputs":["feature_spec:price.total_return_index@1.0.0"],"outputs":["feature_spec:price.sma20@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},
+    {"id":"sma60","label":"含当前期的60期平均","inputs":["feature_spec:price.total_return_index@1.0.0"],"outputs":["feature_spec:price.sma60@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},
+    {"id":"momentum20","label":"与20期前比较","inputs":["feature_spec:price.total_return_index@1.0.0"],"outputs":["feature_spec:price.momentum20@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},
+    {"id":"prior-high20","label":"取此前20期最大值","inputs":["feature_spec:price.total_return_index@1.0.0"],"outputs":["feature_spec:price.prior_high20@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},
+    {"id":"rsi14","label":"14期正负回报简单均值","inputs":["projection:daily-return"],"outputs":["feature_spec:price.rsi14@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},
+    {"id":"volatility20","label":"20期样本标准差年化","inputs":["projection:daily-return"],"outputs":["feature_spec:risk.realized_volatility20@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},
+    {"id":"volume-ratio20","label":"当前量 / 此前20期均量","inputs":["projection:daily_ohlcv_none.volume"],"outputs":["feature_spec:liquidity.volume_ratio20@1.0.0"],"evidence":"panel","grain":"field","role":"calculation"},
+    {"id":"breadth","label":"完整就绪截面聚合","inputs":["feature_spec:price.total_return_index@1.0.0","feature_spec:price.sma60@1.0.0","projection:universe"],"outputs":["feature_spec:market.breadth_above_sma60@1.0.0"],"evidence":"panel","grain":"mixed","role":"calculation"},
+    {"id":"v2-admission","label":"身份、时段、坐标与质量准入","inputs":["projection:daily_ohlcv_none.dwd_high_decimal","projection:daily_ohlcv_none.dwd_low_decimal","projection:daily_ohlcv_none.dwd_close_decimal","projection:normalized-actions","projection:calendar","projection:universe"],"outputs":["projection:v2-daily-input"],"evidence":"admission","grain":"mixed","role":"validation"},
+    {"id":"v2-anchors","label":"形成不含当日的20/60期参照","inputs":["projection:v2-daily-input"],"outputs":["semantic_concept:structure.anchor.rolling-high","semantic_concept:structure.anchor.rolling-low"],"evidence":"structure","grain":"definition","role":"calculation"},
+    {"id":"v2-distance","label":"同坐标价格 / 指定参照 − 1","inputs":["projection:v2-daily-input","semantic_concept:structure.anchor.rolling-high","semantic_concept:structure.anchor.rolling-low"],"outputs":["semantic_concept:structure.geometry.signed-distance"],"evidence":"structure","grain":"definition","role":"calculation"},
+    {"id":"v2-crossings","label":"比较相邻收盘与同一参照","inputs":["projection:v2-daily-input","semantic_concept:structure.anchor.rolling-high"],"outputs":["semantic_concept:structure.interaction.close-cross-above","semantic_concept:structure.interaction.close-cross-below"],"evidence":"structure","grain":"definition","role":"calculation"},
+    {"id":"v2-reclaim","label":"保留先前失守后判断收复","inputs":["projection:v2-daily-input","semantic_concept:structure.interaction.close-cross-below"],"outputs":["semantic_concept:structure.interaction.close-reclaim"],"evidence":"structure","grain":"definition","role":"calculation"},
+    {"id":"v2-process","label":"追加过程观察而不回写历史","inputs":["semantic_concept:structure.interaction.close-cross-above","semantic_concept:structure.interaction.close-cross-below","semantic_concept:structure.interaction.close-reclaim"],"outputs":["semantic_concept:structure.episode.reclaim-sequence"],"evidence":"structure","grain":"definition","role":"calculation"},
+    {"id":"v2-consumer","label":"按过程目标选择连续测量","inputs":["semantic_concept:structure.geometry.signed-distance","semantic_concept:structure.episode.reclaim-sequence"],"outputs":["consumer:structure-v2-compatibility"],"evidence":"consumer","grain":"definition","role":"declared_consumer"}
+  ]
+}

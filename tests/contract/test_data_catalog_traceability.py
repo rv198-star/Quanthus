@@ -25,6 +25,8 @@ def test_catalog_source_manifest_is_explicit_complete_and_digest_bound() -> None
         "semantic_catalog",
         "structure_blueprint",
         "catalog_annotations",
+        "catalog_business",
+        "catalog_lineage",
     }
     observed = {item["adapter"] for item in sources["sources"]}
     assert observed == expected_adapters

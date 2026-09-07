@@ -4,7 +4,8 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | accepted |
-| Governing work item | `P3-DICT-001` |
+| Governing work item | `P3-DICT-001` foundation; `P3-DICT-002` productization |
+| Productization | `data-indicator-catalog-productization.md` (separate delivery gate) |
 | GitHub parent | #215 |
 | Parent LLD | `lld/03-label-feature-system.md` |
 | Data authority | existing ODS/DWD contracts, registries and semantic catalogs |
@@ -41,7 +42,8 @@ warehouse. Source contracts remain authoritative when a Catalog entry is incompl
 5. Structure/indicator semantic families and concepts from the semantic naming catalog, including
    reserved concepts without executable specifications.
 6. Explicit legacy/compatibility relationships.
-7. Gap records for missing machine-readable metadata or unsupported equivalence claims.
+7. Internal maintenance gap records for missing metadata or unsupported equivalence; not a business homepage dashboard.
+8. Reviewed Chinese reading metadata and evidence-bound declared processing graphs under `P3-DICT-002`.
 
 ### Not included in v1
 
@@ -133,7 +135,6 @@ details {}
 
 - `contains` / `field_of`
 - `references`
-- `input_to` / `depends_on`
 - `requires_feature`
 - `belongs_to_family`
 - `related_not_equivalent`
@@ -143,6 +144,11 @@ details {}
 A `related_not_equivalent` relationship is discovery-only and can never satisfy the claim that the
 semantic concept has an executable specification. Only an explicit `exact_equivalent` executable
 binding may suppress the `executable_spec_missing` gap for an indicator concept.
+
+`details.reading` supplies Chinese business explanations; `details.source_description` retains the
+original authority wording. Processing dependencies live in the separately typed snapshot `lineage`
+graph. Membership, foreign-key and non-equivalent concept relationships never become processing
+arrows. The graph is declared static lineage, not actual Run consumption.
 
 Physical run ids, last-used times and mutable latest pointers never enter semantic Catalog identity.
 Actual usage stays in operation/decision audit logs.
@@ -155,9 +161,7 @@ formula/input text. Structured filters are exact:
 - `kind`
 - `domain`
 - `family`
-- `lifecycle`
-- `implementation_status`
-- `verification_status`
+- `status`, matched against the independent lifecycle, implementation and verification axes
 
 Semantic prefix membership still uses complete dot-segment boundaries. Free text does not grant
 semantic family membership or executable authority.
@@ -197,25 +201,26 @@ GET /api/platform/v1/catalog/items/<entry_id>/relations
 ```
 
 The API reads only the deterministic snapshot. It does not query market-data values or modify
-PostgreSQL. Requests are bounded by maximum query length and maximum page size.
+PostgreSQL. Requests are bounded by maximum query length and maximum result count (1–100; no pagination claim).
+The business summary excludes internal `gaps` / `gap_count` and adds `lineage_overview`;
+maintenance callers use `DataIndicatorCatalog.diagnostics()`. The relations GET adds a bounded
+`lineage` graph with `depth=1..5`, `limit=10..100` (default 2/60) and explicit boundary/omission
+counts. Registered graph-only nodes can be queried for relations, not as ordinary Catalog items.
+This intentional summary response change is released with the matching Web consumer.
 
 ## 8. Web UI
 
 `/catalog` is a first-class read-only product route rather than an admin-only editor. It reuses the
 existing Platform session. Anonymous users are directed to the operator login flow.
 
-Desktop v1 layout:
-
-```text
-search bar + catalog summary
--------------------------------------------------------------
-filters          result list                selected detail
-kind/domain      canonical id               meaning/status
-status/family    aliases/summary             authority/time
-                                             formula/spec
-                                             lineage/relations
-                                             evidence/gaps
-```
+The current productized layout has two views: Chinese search/business cards, and a collapsible
+layered processing overview. Cards show meaning, business/time/unit/window semantics and relevant
+limitations first. Canonical IDs remain copyable; machine details, source hashes, and structural or
+concept relations are collapsed. A full-width field-centered bidirectional graph expands registered
+upstream and downstream processing; it never turns membership or conceptual similarity into data
+flow. On narrow screens the cards stack and graphs scroll internally without shrinking text.
+The former homepage gap dashboard and raw machine-field card are superseded by
+`data-indicator-catalog-productization.md`.
 
 The UI must visibly distinguish:
 
@@ -225,7 +230,10 @@ The UI must visibly distinguish:
 - business time/source availability metadata vs operation usage logs;
 - missing metadata/gaps vs zero/false values.
 
-The initial lineage view is a simple typed relation list/flow, not a graph database.
+Native SVG renders declared processing nodes and arrows without a graph database or new graph
+library. The evidence list preserves a keyboard-readable alternative. Clickable nodes refocus the
+graph; depth/node limits, unsupported field paths, and static-versus-actual-use scope are explicit.
+Session restoration must preserve the server-rendered first tree before reading browser storage.
 
 ## 9. Maintenance and drift gates
 

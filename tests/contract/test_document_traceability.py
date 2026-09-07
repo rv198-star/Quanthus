@@ -1326,8 +1326,20 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("quanthus.p4-event-run.v3", lld)
 
     def test_planning_actionable_work_items_follow_current_phase(self) -> None:
-        items = work_items(find_project_root())
-        p3_items = [item for item in items if item.phase == "P3"]
+        root = find_project_root()
+        items = work_items(root)
+        # Owner-approved post-P3 Catalog delivery has its own exact plan. It cannot
+        # change the unchanged research/strategy phase gates asserted below.
+        catalog_plan = json.loads(
+            (root / "config/data-indicator-catalog-productization.v1.json").read_text()
+        )["items"]
+        catalog_ids = {item["id"] for item in catalog_plan}
+        self.assertEqual(catalog_ids, {"P3-DICT-002", *[f"P3-DICT-002-{c}" for c in "ABCD"]})
+        for declared in catalog_plan:
+            observed = next(item for item in items if item.stable_id == declared["id"])
+            self.assertEqual(observed.status, declared["status"])
+        p3_items = [item for item in items
+                    if item.phase == "P3" and item.stable_id not in catalog_ids]
         p4_items = [item for item in items if item.phase == "P4"]
         pk_items = [item for item in items if item.phase == "PK"]
 

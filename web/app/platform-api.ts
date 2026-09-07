@@ -113,10 +113,9 @@ export interface DataCatalogSummary {
   release_identity: Record<string, string>;
   summary: {
     entry_count: number;
-    gap_count: number;
     counts_by_kind: Record<string, number>;
   };
-  gaps: CatalogGap[];
+  lineage_overview: CatalogLineageOverview;
 }
 
 export interface DataCatalogSearchResult {
@@ -127,8 +126,52 @@ export interface DataCatalogSearchResult {
   items: CatalogEntrySummary[];
 }
 
+export interface CatalogLineageNode {
+  id: string;
+  label: string;
+  layer: string;
+  grain: string;
+  description: string;
+  entry_id: string | null;
+  process: boolean;
+  evidence: { path: string; sha256: string; locator: string } | null;
+  distance?: number;
+}
+
+export interface CatalogLineageEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  role: string;
+  grain: string;
+  evidence: { path: string; sha256: string; locator: string };
+}
+
+export interface CatalogLineageGraph {
+  center: string;
+  depth: number;
+  limit: number;
+  scope: string;
+  coverage: string;
+  omitted_nodes: number;
+  boundary_edges: number;
+  nodes: CatalogLineageNode[];
+  edges: CatalogLineageEdge[];
+}
+
+export interface CatalogLineageOverview {
+  scope: string;
+  coverage: string;
+  registered_edges: number;
+  internal_edges: number;
+  nodes: Array<{ id: string; label: string; layer: string; members: CatalogLineageNode[]; process_count: number }>;
+  edges: Array<{ source: string; target: string; count: number }>;
+}
+
 export interface DataCatalogRelations {
   entry_id: string;
+  lineage: CatalogLineageGraph;
   outgoing: Array<CatalogRelation & { target: CatalogEntrySummary }>;
   incoming: Array<{
     type: string;

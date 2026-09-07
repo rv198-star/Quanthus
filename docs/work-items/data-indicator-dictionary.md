@@ -10,7 +10,7 @@
 | Governing design | `../design/data-indicator-catalog.md` |
 | Parent/owner | `../design/lld/03-label-feature-system.md` |
 | Platform surface | read-only API + `/catalog`; no new metadata database |
-| Current status | A-E closed; parent accepted after production API/Web deployment and Catalog smoke |
+| Current status | A-E closed; original foundation accepted; productization successor `P3-DICT-002` is tracked in `catalog-productization.md` |
 
 ## 1. Purpose
 

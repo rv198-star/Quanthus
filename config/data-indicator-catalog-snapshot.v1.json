@@ -1,9 +1,9 @@
 {
   "schema_version": "quanthus.data-indicator-catalog-snapshot-manifest.v1",
   "catalog_schema_version": "quanthus.data-indicator-catalog.v1",
-  "builder_version": "data-indicator-catalog-builder-v1.1",
-  "source_manifest_sha256": "sha256:0af48ad17ca14fc84e96bd87a3ea10ebd6b6d1dad3206ef21f630b26e7a7235c",
-  "snapshot_digest": "sha256:a21f3595d551378221054a7291652454e61f8281a91d58f766b66776b2692f6b",
+  "builder_version": "data-indicator-catalog-builder-v1.2",
+  "source_manifest_sha256": "sha256:8db55c9d046cde11bd4d42ad185c5f44e88b4f766076401e1cb2fbcf763913be",
+  "snapshot_digest": "sha256:3dc10fc68d3b612ebd6c4a611aa4745830a2712ba0e7bc446aef28d74b0e5737",
   "entry_count": 664,
   "gap_count": 10,
   "counts_by_kind": {

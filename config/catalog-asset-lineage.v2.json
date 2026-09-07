@@ -2,6 +2,10 @@
   "schema_version": "2.0.0",
   "authority": "reviewed_governed_asset_lineage",
   "scope": "Data Lineage nodes are governed ODS/DWD/Research ADM assets only; fields are nested asset coordinates and processing is edge metadata.",
+  "evidence_sha256": {
+    "src/quanthus/pipelines/securities_warehouse/market_observation.py": "sha256:5b72512cd75c9ee0d2ef17f89174b6e9a044dd354be904b7f20364bbdd6a561f",
+    "src/quanthus/pipelines/securities_warehouse/disclosure_event.py": "sha256:99d456309d352527ab4ca78a0e95d809a087f3743af96f9464bf2471f52ec53f"
+  },
   "additional_ods_assets": [
     {"dataset_id":"raw_f10","display_name":"F10 原始业务数据","description":"周度 ODS F10 业务数据，提供股本结构与主要股东研究输入。","contract_section":"weekly_artifacts","contract_index":1},
     {"dataset_id":"financial_statements","display_name":"完整财务报表","description":"周度 ODS 完整三表封装，解码后形成财报、科目与原子事实。","contract_section":"weekly_artifacts","contract_index":2},

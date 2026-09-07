@@ -1,6 +1,12 @@
 {
   "schema_version": "1.0.0",
   "authority": "governed_research_adm_asset_registry",
+  "evidence_sha256": {
+    "src/quanthus/backtest/direct_dwd_provider.py": "sha256:08fb354bb3386661c20ea19f0de3afd7aadc450cc55c1a6c03cb2241fc3ad063",
+    "src/quanthus/event_library/physical_scan.py": "sha256:970a2c97a24edaa4b3823e4a0c70571e01f5562a832d31b06af5db9970722657",
+    "src/quanthus/structure_intelligence.py": "sha256:b4c23a9843160b6c3383e8efb35d7215aead933bf5797629db200e029bb69506",
+    "src/quanthus/structure_facts.py": "sha256:829c520886fb242bedd1d3e4b1ab06b54457a3c82829a94b9a6e6acf040a201e"
+  },
   "assets": [
     {
       "dataset_id": "p4-event-research-adm.candidate_daily",

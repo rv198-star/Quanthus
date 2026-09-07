@@ -31,15 +31,27 @@ def _source(sources: list[dict[str, str]], adapter: str) -> dict[str, str]:
     return next(item for item in sources if item["adapter"] == adapter)
 
 
-def _evidence(root: Path, raw: Mapping[str, object]) -> dict[str, str]:
+def _evidence(
+    root: Path,
+    raw: Mapping[str, object],
+    frozen_hashes: Mapping[str, str],
+) -> dict[str, str]:
     path_text = str(raw.get("path") or "").strip()
     locator = str(raw.get("locator") or "").strip()
     if not path_text or not locator:
         raise ValueError("asset lineage evidence requires path and locator")
+    expected_sha = str(frozen_hashes.get(path_text) or "").strip()
+    if not expected_sha.startswith("sha256:"):
+        raise ValueError(f"asset lineage evidence digest is not frozen: {path_text}")
     path = (root / path_text).resolve()
-    if root.resolve() not in path.parents or not path.is_file():
-        raise ValueError(f"asset lineage evidence path unavailable: {path_text}")
-    return {"path": path_text, "locator": locator, "sha256": _file_sha(path)}
+    if root.resolve() not in path.parents:
+        raise ValueError(f"asset lineage evidence path escapes repository: {path_text}")
+    # Development/review checkouts verify the frozen digest against the actual source. The lean
+    # Platform image deliberately excludes backtest/event-library implementation modules; there the
+    # digest remains trustworthy because this registry/config is itself snapshot- and source-bound.
+    if path.is_file() and _file_sha(path) != expected_sha:
+        raise ValueError(f"asset lineage evidence digest differs: {path_text}")
+    return {"path": path_text, "locator": locator, "sha256": expected_sha}
 
 
 def _field_entry_parent(entry: Mapping[str, Any]) -> tuple[str, str] | None:
@@ -62,6 +74,17 @@ def build_asset_lineage(
         raise ValueError("ADM asset registry authority differs")
     if definition.get("schema_version") != "2.0.0" or definition.get("authority") != "reviewed_governed_asset_lineage":
         raise ValueError("asset lineage definition authority differs")
+
+    evidence_hashes: dict[str, str] = {}
+    for source in (registry, definition):
+        raw_hashes = source.get("evidence_sha256")
+        if not isinstance(raw_hashes, Mapping):
+            raise ValueError("asset lineage evidence digest registry is missing")
+        for path_text, sha in raw_hashes.items():
+            path_key, sha_text = str(path_text), str(sha)
+            if path_key in evidence_hashes and evidence_hashes[path_key] != sha_text:
+                raise ValueError("asset lineage evidence digest registry conflicts")
+            evidence_hashes[path_key] = sha_text
 
     nodes: dict[str, dict[str, Any]] = {}
     for entry_id, item in sorted(entries.items()):
@@ -210,7 +233,7 @@ def build_asset_lineage(
             source_id,
             target_id,
             transformation=str(raw.get("transformation") or "精确字段映射"),
-            evidence=[_evidence(root, raw.get("evidence") or {})],
+            evidence=[_evidence(root, raw.get("evidence") or {}, evidence_hashes)],
             field_mappings=mappings,
         )
 
@@ -256,7 +279,7 @@ def build_asset_lineage(
                 source_id,
                 target_id,
                 transformation=str(upstream.get("transformation") or "DWD 形成 Research ADM"),
-                evidence=[registry_evidence, _evidence(root, upstream.get("evidence") or {})],
+                evidence=[registry_evidence, _evidence(root, upstream.get("evidence") or {}, evidence_hashes)],
                 field_mappings=mappings,
                 notes=["Research ADM 是应用数据资产，不改写 DWD 权威。"],
             )

@@ -262,12 +262,21 @@ def test_packaging_contains_presentation_and_lineage_closure():
         "config/catalog-lineage.v1.json",
         "config/catalog-adm-assets.v1.json",
         "config/catalog-asset-lineage.v2.json",
+        "config/p4-research-adm.v1.json",
+        "config/structure-research-adm.mvp.v1.json",
+        "config/structure-continuous-facts.research.v1.json",
         "src/quanthus/catalog_presentation.py",
         "src/quanthus/catalog_lineage.py",
         "src/quanthus/catalog_asset_lineage.py",
         "src/quanthus/catalog_dependency.py",
     ):
         assert path in script and path in dockerfile
+    for restricted in ("src/quanthus/backtest", "src/quanthus/event_library"):
+        assert restricted not in script and restricted not in dockerfile
+    adm = json.loads((ROOT / "config/catalog-adm-assets.v1.json").read_text())
+    asset = json.loads((ROOT / "config/catalog-asset-lineage.v2.json").read_text())
+    assert all(str(value).startswith("sha256:") for value in adm["evidence_sha256"].values())
+    assert all(str(value).startswith("sha256:") for value in asset["evidence_sha256"].values())
 
 
 def test_source_inventory_and_semantic_ids_stay_exact(catalog):

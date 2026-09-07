@@ -79,13 +79,17 @@ Usage Dependency：11 个静态使用节点 / 6 条使用边。P4 Event Library�
 ## 已执行验证
 
 - Lineage V2 / Catalog unit + Platform + traceability 专项：57 passed；
-- Catalog snapshot exact：748 entries / 10 gaps；
+- Catalog snapshot exact：748 entries / 10 gaps；最终 digest `sha256:d253b6baf4a2c53aaad8eeb52709804071bcce2c7431cbedf1383a7f2e8aa037`；
 - Web lint：PASS；
 - Web unit/contract：18 passed；
 - Catalog TypeScript strict：PASS；
 - Chromium desktop 1440px / narrow 390px / anonymous：3/3 passed。
 
 完整仓库 `make check` 已作为 `P3-DICT-003-D` 发布前门禁执行：1602 passed / 7 个既有环境 skip。Skip 仍仅为未挂载 production expert artifacts 与未配置 PostgreSQL 测试 DSN；没有把 skip 冒充 pass。`git diff --check` 通过。
+
+发布前还执行了真实 lean Platform image 验证。第一次 result commit `17d5329` 的生产尝试因新血缘 evidence loader 读取了未打包的实现源码而使 API unhealthy，受治理部署工具自动回滚到既有 `d4e7158`，生产 health/ready 恢复正常。修复没有把 backtest/event_library 等受限制运行模块塞进 Platform 镜像，而是把审阅过的实现 SHA 冻结到 Catalog authority config：开发/审计 checkout 在源码存在时仍逐文件核对 SHA；lean serving image 只携带 snapshot/source-bound 的冻结 digest。现有 Platform 边界测试继续要求 `src/quanthus/backtest` 与 `src/quanthus/event_library` 不进入镜像。
+
+修复后的真实 `quanthus-platform-kernel:catalog-lineage-v2-local` 镜像已成功构建，并在容器内执行 `DataIndicatorCatalog()`，返回 `748` 条目和 `80` 条 asset-lineage edge；因此生产重试前已证明 lean image 能独立构建并服务 Lineage V2。
 
 ## Claim ceiling
 

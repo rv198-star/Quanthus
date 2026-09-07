@@ -17,132 +17,256 @@ function wrapText(value: string, width: number, maximum: number) {
 function Canvas({ nodes, edges, onNode, title }: { nodes: NodeView[]; edges: EdgeView[]; onNode: (id: string) => void; title: string }) {
   const marker = useId().replaceAll(":", "");
   const viewportRef = useRef<HTMLDivElement>(null);
-  const panRef = useRef<{ pointerId: number; x: number; y: number; left: number; top: number } | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef<
+    | { mode: "pan"; pointerId: number; startX: number; startY: number; originX: number; originY: number }
+    | { mode: "pinch"; distance: number; zoom: number; worldX: number; worldY: number }
+    | null
+  >(null);
+  const miniMapPointerRef = useRef<number | null>(null);
+  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+  const viewportStateRef = useRef(viewport);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [grabbing, setGrabbing] = useState(false);
   const nodeWidth = 268, nodeHeight = 124, columnPitch = 326, rowPitch = 148;
-  const minZoom = 0.45, maxZoom = 1.8, zoomStep = 0.15;
+  const minZoom = 0.35, maxZoom = 2.2, zoomStep = 0.15, fitPadding = 42;
   const columns = [...new Set(nodes.map(node => node.column))].sort((a, b) => a - b);
   const rows = columns.map(column => nodes.filter(node => node.column === column));
-  const height = Math.max(1, ...rows.map(row => row.length)) * rowPitch + 52;
-  const width = columns.length * columnPitch + 28;
+  const worldHeight = Math.max(1, ...rows.map(row => row.length)) * rowPitch + 52;
+  const worldWidth = columns.length * columnPitch + 28;
   const positions = new Map<string, { x: number; y: number }>();
   rows.forEach((row, columnIndex) => row.forEach((node, rowIndex) => positions.set(node.id,
-    { x: columnIndex * columnPitch + 14, y: (height - row.length * rowPitch) / 2 + rowIndex * rowPitch })));
+    { x: columnIndex * columnPitch + 14, y: (worldHeight - row.length * rowPitch) / 2 + rowIndex * rowPitch })));
   const focusNode = nodes.find(node => node.center);
+  const geometryKey = `${worldWidth}:${worldHeight}:${nodes.map(node => `${node.id}@${node.column}`).join("|")}`;
+  const canvasReady = canvasSize.width > 0 && canvasSize.height > 0;
 
   function clampZoom(value: number) {
     return Math.min(maxZoom, Math.max(minZoom, value));
   }
 
-  function scrollToPoint(graphX: number, graphY: number, targetZoom: number) {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    viewport.scrollTo({
-      left: Math.max(0, graphX * targetZoom - viewport.clientWidth / 2),
-      top: Math.max(0, graphY * targetZoom - viewport.clientHeight / 2),
-      behavior: "smooth",
+  function applyViewport(next: { x: number; y: number; zoom: number }) {
+    viewportStateRef.current = next;
+    setViewport(next);
+  }
+
+  function centerOn(worldX: number, worldY: number, zoom = viewportStateRef.current.zoom) {
+    if (!canvasReady) return;
+    applyViewport({
+      x: canvasSize.width / 2 - worldX * zoom,
+      y: canvasSize.height / 2 - worldY * zoom,
+      zoom,
     });
   }
 
-  function changeZoom(rawZoom: number) {
-    const viewport = viewportRef.current;
-    const nextZoom = clampZoom(rawZoom);
-    if (!viewport || nextZoom === zoom) return;
-    const graphX = (viewport.scrollLeft + viewport.clientWidth / 2) / zoom;
-    const graphY = (viewport.scrollTop + viewport.clientHeight / 2) / zoom;
-    setZoom(nextZoom);
-    requestAnimationFrame(() => scrollToPoint(graphX, graphY, nextZoom));
+  function fitView() {
+    if (!canvasReady) return;
+    const nextZoom = clampZoom(Math.min(
+      1,
+      Math.max(1, canvasSize.width - fitPadding * 2) / worldWidth,
+      Math.max(1, canvasSize.height - fitPadding * 2) / worldHeight,
+    ));
+    applyViewport({
+      x: (canvasSize.width - worldWidth * nextZoom) / 2,
+      y: (canvasSize.height - worldHeight * nextZoom) / 2,
+      zoom: nextZoom,
+    });
   }
 
-  function fitView() {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const nextZoom = clampZoom(Math.min(
-      1.35,
-      (viewport.clientWidth - 32) / width,
-      (viewport.clientHeight - 32) / height,
-    ));
-    setZoom(nextZoom);
-    requestAnimationFrame(() => scrollToPoint(width / 2, height / 2, nextZoom));
+  function zoomAt(rawZoom: number, screenX = canvasSize.width / 2, screenY = canvasSize.height / 2) {
+    if (!canvasReady) return;
+    const current = viewportStateRef.current;
+    const nextZoom = clampZoom(rawZoom);
+    if (Math.abs(nextZoom - current.zoom) < 0.0001) return;
+    const worldX = (screenX - current.x) / current.zoom;
+    const worldY = (screenY - current.y) / current.zoom;
+    applyViewport({ x: screenX - worldX * nextZoom, y: screenY - worldY * nextZoom, zoom: nextZoom });
   }
 
   function centerView() {
     const position = focusNode ? positions.get(focusNode.id) : undefined;
-    scrollToPoint(
-      position ? position.x + nodeWidth / 2 : width / 2,
-      position ? position.y + nodeHeight / 2 : height / 2,
-      zoom,
+    centerOn(
+      position ? position.x + nodeWidth / 2 : worldWidth / 2,
+      position ? position.y + nodeHeight / 2 : worldHeight / 2,
     );
   }
 
+  function miniMapCenter(clientX: number, clientY: number, element: SVGSVGElement) {
+    const rect = element.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const scale = Math.min(rect.width / worldWidth, rect.height / worldHeight);
+    const offsetX = (rect.width - worldWidth * scale) / 2;
+    const offsetY = (rect.height - worldHeight * scale) / 2;
+    const worldX = Math.max(0, Math.min(worldWidth, (clientX - rect.left - offsetX) / scale));
+    const worldY = Math.max(0, Math.min(worldHeight, (clientY - rect.top - offsetY) / scale));
+    centerOn(worldX, worldY);
+  }
+
   useEffect(() => {
-    const frame = requestAnimationFrame(() => fitView());
+    const element = viewportRef.current;
+    if (!element) return;
+    const update = () => setCanvasSize({ width: element.clientWidth, height: element.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!canvasReady) return;
+    const frame = requestAnimationFrame(fitView);
     return () => cancelAnimationFrame(frame);
-    // Re-fit only when the graph geometry itself changes.
+    // Geometry changes intentionally reset the viewport to an actual centered fitView.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [height, width]);
+  }, [geometryKey, canvasReady]);
+
+  const current = viewport;
+  const dotPitch = Math.max(7, 18 * current.zoom);
+  const visibleWorld = canvasReady ? {
+    x: -current.x / current.zoom,
+    y: -current.y / current.zoom,
+    width: canvasSize.width / current.zoom,
+    height: canvasSize.height / current.zoom,
+  } : { x: 0, y: 0, width: worldWidth, height: worldHeight };
 
   return <div className={styles.graphFrame} data-testid="lineage-canvas">
-    <div className={styles.graphToolbar} role="group" aria-label={`${title}视图控制`} data-testid="lineage-controls">
-      <button type="button" aria-label="缩小血缘图" title="缩小" disabled={zoom <= minZoom} onClick={() => changeZoom(zoom - zoomStep)}>−</button>
-      <button type="button" aria-label="恢复100%缩放" title="恢复 100%" className={styles.zoomReadout} data-testid="lineage-zoom" onClick={() => changeZoom(1)}>{Math.round(zoom * 100)}%</button>
-      <button type="button" aria-label="放大血缘图" title="放大" disabled={zoom >= maxZoom} onClick={() => changeZoom(zoom + zoomStep)}>+</button>
-      <span className={styles.toolbarDivider} aria-hidden="true" />
-      <button type="button" aria-label="适配全部血缘图" title="适配全部" onClick={fitView}>适配</button>
-      <button type="button" aria-label="居中当前焦点" title="居中当前焦点" onClick={centerView}>居中</button>
-    </div>
-    <div ref={viewportRef} className={styles.graphScroll} tabIndex={0} data-testid="lineage-viewport" data-grabbing={grabbing ? "true" : "false"}
-      aria-label={`${title}，固定高度画布；空白处拖动平移，使用上方按钮缩放或居中`}
+    <div ref={viewportRef} className={styles.graphViewport} tabIndex={0} data-testid="lineage-viewport"
+      data-grabbing={grabbing ? "true" : "false"}
+      aria-label={`${title}，无限画布；拖动平移，滚轮或双指缩放，左下角提供视图控制`}
+      style={{
+        backgroundSize: `${dotPitch}px ${dotPitch}px`,
+        backgroundPosition: `${current.x % dotPitch}px ${current.y % dotPitch}px`,
+      }}
+      onWheel={event => {
+        event.preventDefault();
+        const rect = event.currentTarget.getBoundingClientRect();
+        const factor = Math.exp(-event.deltaY * 0.0015);
+        zoomAt(viewportStateRef.current.zoom * factor, event.clientX - rect.left, event.clientY - rect.top);
+      }}
       onPointerDown={event => {
         if (event.button !== 0 || (event.target as Element).closest("[data-lineage-node]")) return;
         event.preventDefault();
-        panRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY,
-          left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop };
-        event.currentTarget.setPointerCapture(event.pointerId);
+        const element = event.currentTarget;
+        const rect = element.getBoundingClientRect();
+        pointersRef.current.set(event.pointerId, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+        element.setPointerCapture(event.pointerId);
+        const points = [...pointersRef.current.values()];
+        if (points.length === 1) {
+          const view = viewportStateRef.current;
+          gestureRef.current = { mode: "pan", pointerId: event.pointerId, startX: points[0].x, startY: points[0].y,
+            originX: view.x, originY: view.y };
+        } else if (points.length >= 2) {
+          const [a, b] = points;
+          const centerX = (a.x + b.x) / 2, centerY = (a.y + b.y) / 2;
+          const distance = Math.hypot(a.x - b.x, a.y - b.y);
+          const view = viewportStateRef.current;
+          gestureRef.current = { mode: "pinch", distance: Math.max(1, distance), zoom: view.zoom,
+            worldX: (centerX - view.x) / view.zoom, worldY: (centerY - view.y) / view.zoom };
+        }
         setGrabbing(true);
       }}
       onPointerMove={event => {
-        const pan = panRef.current;
-        if (!pan || pan.pointerId !== event.pointerId) return;
+        if (!pointersRef.current.has(event.pointerId)) return;
         event.preventDefault();
-        event.currentTarget.scrollLeft = pan.left - (event.clientX - pan.x);
-        event.currentTarget.scrollTop = pan.top - (event.clientY - pan.y);
+        const rect = event.currentTarget.getBoundingClientRect();
+        pointersRef.current.set(event.pointerId, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+        const points = [...pointersRef.current.values()];
+        const gesture = gestureRef.current;
+        if (points.length >= 2 && gesture?.mode === "pinch") {
+          const [a, b] = points;
+          const centerX = (a.x + b.x) / 2, centerY = (a.y + b.y) / 2;
+          const nextZoom = clampZoom(gesture.zoom * Math.hypot(a.x - b.x, a.y - b.y) / gesture.distance);
+          applyViewport({ x: centerX - gesture.worldX * nextZoom, y: centerY - gesture.worldY * nextZoom, zoom: nextZoom });
+        } else if (points.length === 1 && gesture?.mode === "pan") {
+          const point = points[0];
+          applyViewport({ x: gesture.originX + point.x - gesture.startX, y: gesture.originY + point.y - gesture.startY,
+            zoom: viewportStateRef.current.zoom });
+        }
       }}
       onPointerUp={event => {
-        if (panRef.current?.pointerId === event.pointerId) panRef.current = null;
+        pointersRef.current.delete(event.pointerId);
         if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-        setGrabbing(false);
+        const remaining = [...pointersRef.current.entries()];
+        if (remaining.length === 1) {
+          const [pointerId, point] = remaining[0];
+          const view = viewportStateRef.current;
+          gestureRef.current = { mode: "pan", pointerId, startX: point.x, startY: point.y, originX: view.x, originY: view.y };
+        } else {
+          gestureRef.current = null;
+        }
+        setGrabbing(remaining.length > 0);
       }}
-      onPointerCancel={() => { panRef.current = null; setGrabbing(false); }}>
-      <div className={styles.graphStage} style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}>
-        <svg width={width} height={height} style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }} role="group" aria-label={title} data-testid="lineage-svg">
-          <defs><marker id={marker} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="currentColor" /></marker></defs>
-          {edges.map(edge => {
-            const start = positions.get(edge.source), end = positions.get(edge.target);
-            if (!start || !end) return null;
-            const forward = end.x >= start.x;
-            const sx = start.x + (forward ? nodeWidth : 0), ex = end.x + (forward ? 0 : nodeWidth);
-            const sy = start.y + nodeHeight / 2, ey = end.y + nodeHeight / 2, middle = (sx + ex) / 2;
-            const path = start.x === end.x ? `M ${sx} ${sy} C ${sx + 34} ${sy}, ${sx + 34} ${ey}, ${end.x + nodeWidth} ${ey}`
-              : `M ${sx} ${sy} C ${middle} ${sy}, ${middle} ${ey}, ${ex} ${ey}`;
-            return <path key={edge.id} d={path} className={styles.graphEdge} markerEnd={`url(#${marker})`}><title>{edge.label}</title></path>;
-          })}
-          {nodes.map(node => {
-            const position = positions.get(node.id)!;
-            const labelLines = wrapText(node.label, 16, 2);
-            const idLines = wrapText(node.technicalId, 34, 2);
-            return <g key={node.id} transform={`translate(${position.x},${position.y})`} role="button" tabIndex={0}
-              aria-label={`${node.label}，${node.technicalId}`} className={`${styles.graphNode} ${node.process ? styles.processNode : ""} ${node.center ? styles.centerNode : ""}`}
-              onClick={() => onNode(node.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNode(node.id); } }} data-lineage-node={node.id}>
-              <title>{node.label} · {node.technicalId}</title><rect width={nodeWidth} height={nodeHeight} rx="10" />
-              <text x="14" y="25">{labelLines[0]}</text><text x="14" y="44">{labelLines[1]}</text>
-              <text x="14" y="69" className={styles.nodeTechnical}>{idLines[0]}</text><text x="14" y="85" className={styles.nodeTechnical}>{idLines[1]}</text>
-              <text x="14" y="108" className={styles.nodeSubtitle}>{node.meta}</text>
-            </g>;
-          })}
-        </svg>
-      </div>
+      onPointerCancel={event => {
+        pointersRef.current.delete(event.pointerId);
+        gestureRef.current = null;
+        setGrabbing(false);
+      }}>
+      <svg width={worldWidth} height={worldHeight} className={styles.graphWorld}
+        style={{ transform: `translate(${current.x}px, ${current.y}px) scale(${current.zoom})` }}
+        role="group" aria-label={title} data-testid="lineage-svg" data-viewport-x={Math.round(current.x)}
+        data-viewport-y={Math.round(current.y)} data-viewport-zoom={current.zoom.toFixed(3)}>
+        <defs><marker id={marker} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="currentColor" /></marker></defs>
+        {edges.map(edge => {
+          const start = positions.get(edge.source), end = positions.get(edge.target);
+          if (!start || !end) return null;
+          const forward = end.x >= start.x;
+          const sx = start.x + (forward ? nodeWidth : 0), ex = end.x + (forward ? 0 : nodeWidth);
+          const sy = start.y + nodeHeight / 2, ey = end.y + nodeHeight / 2, middle = (sx + ex) / 2;
+          const path = start.x === end.x ? `M ${sx} ${sy} C ${sx + 34} ${sy}, ${sx + 34} ${ey}, ${end.x + nodeWidth} ${ey}`
+            : `M ${sx} ${sy} C ${middle} ${sy}, ${middle} ${ey}, ${ex} ${ey}`;
+          return <path key={edge.id} d={path} className={styles.graphEdge} markerEnd={`url(#${marker})`}><title>{edge.label}</title></path>;
+        })}
+        {nodes.map(node => {
+          const position = positions.get(node.id)!;
+          const labelLines = wrapText(node.label, 16, 2);
+          const idLines = wrapText(node.technicalId, 34, 2);
+          return <g key={node.id} transform={`translate(${position.x},${position.y})`} role="button" tabIndex={0}
+            aria-label={`${node.label}，${node.technicalId}`} className={`${styles.graphNode} ${node.process ? styles.processNode : ""} ${node.center ? styles.centerNode : ""}`}
+            onClick={() => onNode(node.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNode(node.id); } }} data-lineage-node={node.id}>
+            <title>{node.label} · {node.technicalId}</title><rect width={nodeWidth} height={nodeHeight} rx="10" />
+            <text x="14" y="25">{labelLines[0]}</text><text x="14" y="44">{labelLines[1]}</text>
+            <text x="14" y="69" className={styles.nodeTechnical}>{idLines[0]}</text><text x="14" y="85" className={styles.nodeTechnical}>{idLines[1]}</text>
+            <text x="14" y="108" className={styles.nodeSubtitle}>{node.meta}</text>
+          </g>;
+        })}
+      </svg>
+    </div>
+
+    <div className={styles.graphControls} role="group" aria-label={`${title}视图控制`} data-testid="lineage-controls">
+      <span className={styles.zoomBadge} data-testid="lineage-zoom">{Math.round(current.zoom * 100)}%</span>
+      <button type="button" aria-label="放大血缘图" title="放大" disabled={current.zoom >= maxZoom}
+        onClick={() => zoomAt(current.zoom + zoomStep)}>+</button>
+      <button type="button" aria-label="缩小血缘图" title="缩小" disabled={current.zoom <= minZoom}
+        onClick={() => zoomAt(current.zoom - zoomStep)}>−</button>
+      <button type="button" aria-label="适配并居中全部血缘图" title="适配全部" onClick={fitView}>适</button>
+      <button type="button" aria-label="居中当前焦点" title="居中当前焦点" onClick={centerView}>◎</button>
+      <button type="button" aria-label="恢复100%缩放" title="恢复 100%" onClick={() => zoomAt(1)}>1:1</button>
+    </div>
+
+    <div className={styles.graphMiniMap} aria-label={`${title}小地图`} data-testid="lineage-minimap">
+      <svg viewBox={`0 0 ${worldWidth} ${worldHeight}`} preserveAspectRatio="xMidYMid meet" role="img"
+        onPointerDown={event => {
+          event.preventDefault(); event.stopPropagation();
+          miniMapPointerRef.current = event.pointerId;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          miniMapCenter(event.clientX, event.clientY, event.currentTarget);
+        }}
+        onPointerMove={event => {
+          if (miniMapPointerRef.current !== event.pointerId) return;
+          miniMapCenter(event.clientX, event.clientY, event.currentTarget);
+        }}
+        onPointerUp={event => {
+          if (miniMapPointerRef.current === event.pointerId) miniMapPointerRef.current = null;
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        }}>
+        {nodes.map(node => {
+          const position = positions.get(node.id)!;
+          return <rect key={node.id} x={position.x} y={position.y} width={nodeWidth} height={nodeHeight} rx="8"
+            className={`${styles.miniMapNode} ${node.center ? styles.miniMapCenter : ""}`} />;
+        })}
+        <rect x={visibleWorld.x} y={visibleWorld.y} width={visibleWorld.width} height={visibleWorld.height}
+          className={styles.miniMapViewport} />
+      </svg>
     </div>
   </div>;
 }

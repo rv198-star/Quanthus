@@ -68,31 +68,53 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await expect(technical).not.toHaveAttribute("open", "");
     const focusView = page.getByTestId("lineage-focus");
     await expect(focusView).toContainText("收盘价");
+    const graphCanvas = focusView.getByTestId("lineage-canvas").first();
     const graphViewport = focusView.getByTestId("lineage-viewport").first();
-    const graphBox = await graphViewport.boundingBox();
+    const graphBox = await graphCanvas.boundingBox();
     expect(Math.round(graphBox?.height ?? 0)).toBe(viewport.width <= 720 ? 420 : 520);
     const zoomReadout = focusView.getByTestId("lineage-zoom").first();
+    const graphWorld = focusView.getByTestId("lineage-svg").first();
+    const minimap = focusView.getByTestId("lineage-minimap").first();
+    await expect(minimap).toBeVisible();
+    await expect.poll(async () => graphWorld.evaluate(element => {
+      const world = element.getBoundingClientRect();
+      const canvas = element.parentElement!.getBoundingClientRect();
+      return Math.max(Math.abs((world.left + world.right) / 2 - (canvas.left + canvas.right) / 2),
+        Math.abs((world.top + world.bottom) / 2 - (canvas.top + canvas.bottom) / 2));
+    })).toBeLessThan(3);
     const initialZoom = await zoomReadout.textContent();
     await focusView.getByRole("button", { name: "放大血缘图" }).first().click();
     await expect.poll(() => zoomReadout.textContent()).not.toBe(initialZoom);
     await focusView.getByRole("button", { name: "恢复100%缩放" }).first().click();
     await expect(zoomReadout).toHaveText("100%");
-    await focusView.getByRole("button", { name: "适配全部血缘图" }).first().click();
+    await focusView.getByRole("button", { name: "适配并居中全部血缘图" }).first().click();
+    await expect.poll(async () => graphWorld.evaluate(element => {
+      const world = element.getBoundingClientRect();
+      const canvas = element.parentElement!.getBoundingClientRect();
+      return Math.max(Math.abs((world.left + world.right) / 2 - (canvas.left + canvas.right) / 2),
+        Math.abs((world.top + world.bottom) / 2 - (canvas.top + canvas.bottom) / 2));
+    })).toBeLessThan(3);
     await focusView.getByRole("button", { name: "居中当前焦点" }).first().click();
-    await focusView.getByRole("button", { name: "恢复100%缩放" }).first().click();
-    for (let index = 0; index < 5; index += 1) {
-      await focusView.getByRole("button", { name: "放大血缘图" }).first().click();
-    }
-    await expect.poll(() => graphViewport.evaluate(element => element.scrollWidth - element.clientWidth)).toBeGreaterThan(0);
+    const centerNode = focusView.locator('[data-lineage-node="dwd_field:dwd_security_bar.close"]');
+    await expect.poll(async () => centerNode.evaluate(element => {
+      const node = element.getBoundingClientRect();
+      const canvas = element.closest('[data-testid="lineage-viewport"]')!.getBoundingClientRect();
+      return Math.max(Math.abs((node.left + node.right) / 2 - (canvas.left + canvas.right) / 2),
+        Math.abs((node.top + node.bottom) / 2 - (canvas.top + canvas.bottom) / 2));
+    })).toBeLessThan(3);
     const panBox = await graphViewport.boundingBox();
     if (panBox) {
-      await graphViewport.evaluate(element => { element.scrollLeft = 0; element.scrollTop = 0; });
-      await page.mouse.move(panBox.x + 120, panBox.y + 10);
+      const beforePan = Number(await graphWorld.getAttribute("data-viewport-x"));
+      await page.mouse.move(panBox.x + panBox.width / 2, panBox.y + 45);
       await page.mouse.down();
       await expect(graphViewport).toHaveAttribute("data-grabbing", "true");
-      await page.mouse.move(panBox.x + 20, panBox.y + 10, { steps: 5 });
+      await page.mouse.move(panBox.x + panBox.width / 2 + 180, panBox.y + 145, { steps: 5 });
       await page.mouse.up();
-      await expect.poll(() => graphViewport.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+      await expect.poll(async () => Math.abs(Number(await graphWorld.getAttribute("data-viewport-x")) - beforePan)).toBeGreaterThan(150);
+      const beforeWheel = await zoomReadout.textContent();
+      await page.mouse.move(panBox.x + panBox.width / 2, panBox.y + panBox.height / 2);
+      await page.mouse.wheel(0, -240);
+      await expect.poll(() => zoomReadout.textContent()).not.toBe(beforeWheel);
     }
     const upstream = page.locator('[data-lineage-node="source-field:daily_ohlcv_unadjusted.close"]');
     await expect(upstream).toBeVisible();

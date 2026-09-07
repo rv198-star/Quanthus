@@ -31,9 +31,10 @@ test("Chinese business card precedes collapsed machine details", async () => {
 
 test("lineage has overview, focus, keyboard navigation and honest boundaries", async () => {
   const graph = await source("catalog-lineage.tsx");
-  for (const term of ["lineage-overview", "lineage-focus", "lineage-svg", "lineage-boundary", "lineage-evidence", "lineage-controls", "lineage-viewport", "缩小血缘图", "放大血缘图", "恢复100%缩放", "适配全部血缘图", "居中当前焦点", "onPointerDown", "onPointerMove", "markerEnd", "onKeyDown", "字段级血缘已证明", "当前仅有表级加工上下文", "所属表已证明的加工上下文", "不把表级关系冒充字段级血缘", "非运行回执", "graph.omitted_nodes"]) {
+  for (const term of ["lineage-overview", "lineage-focus", "lineage-svg", "lineage-boundary", "lineage-evidence", "lineage-controls", "lineage-viewport", "lineage-minimap", "缩小血缘图", "放大血缘图", "恢复100%缩放", "适配并居中全部血缘图", "居中当前焦点", "onWheel", "ResizeObserver", "onPointerDown", "onPointerMove", "markerEnd", "onKeyDown", "字段级血缘已证明", "当前仅有表级加工上下文", "所属表已证明的加工上下文", "不把表级关系冒充字段级血缘", "非运行回执", "graph.omitted_nodes"]) {
     assert.ok(graph.includes(term), term);
   }
+  assert.doesNotMatch(graph, /scrollLeft|scrollTop|scrollWidth|scrollTo\(/);
 });
 
 test("existing primary workspaces link to the Catalog", async () => {

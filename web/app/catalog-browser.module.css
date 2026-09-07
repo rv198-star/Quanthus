@@ -73,17 +73,21 @@
 .mapSection > p, .sectionHeading p { font-size: 13px; line-height: 1.8; color: #536b85; }
 .sectionHeading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .sectionHeading label { white-space: nowrap; font-size: 13px; color: #4d6782; }
-.graphFrame { width: 100%; margin: 16px 0; border: 1px solid #e1e8f1; border-radius: 9px; overflow: hidden; background: #fbfcfe; }
-.graphToolbar { min-height: 44px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px 9px; border-bottom: 1px solid #e1e8f1; background: rgba(255,255,255,.96); }
-.graphToolbar button { min-width: 34px; height: 30px; border: 1px solid #ccd8e6; border-radius: 7px; background: white; color: #365d89; font-size: 12px; padding: 0 9px; }
-.graphToolbar button:hover:not(:disabled), .graphToolbar button:focus-visible { border-color: #6f94bd; background: #f2f7fc; outline: none; }
-.graphToolbar button:disabled { opacity: .4; cursor: not-allowed; }
-.zoomReadout { min-width: 58px !important; font-variant-numeric: tabular-nums; }
-.toolbarDivider { width: 1px; height: 20px; background: #dbe3ec; margin: 0 3px; }
-.graphScroll { overflow: auto; height: 520px; width: 100%; border: 0; margin: 0; background-color: #fbfcfe; background-image: radial-gradient(#d9e2ed .8px, transparent .8px); background-size: 18px 18px; color: #8ca7c6; cursor: grab; overscroll-behavior: contain; touch-action: none; user-select: none; }
-.graphScroll[data-grabbing="true"] { cursor: grabbing; }
-.graphStage { position: relative; min-width: 100%; min-height: 100%; }
-.graphScroll svg { display: block; max-width: none; font-family: inherit; }
+.graphFrame { position: relative; width: 100%; height: 520px; margin: 16px 0; border: 1px solid #d9e3ef; border-radius: 10px; overflow: hidden; background: #fbfcfe; box-shadow: inset 0 0 0 1px rgba(255,255,255,.8); }
+.graphViewport { position: absolute; inset: 0; overflow: hidden; background-color: #fbfcfe; background-image: radial-gradient(#d3deeb .85px, transparent .85px); color: #8ca7c6; cursor: grab; overscroll-behavior: contain; touch-action: none; user-select: none; outline: none; }
+.graphViewport[data-grabbing="true"] { cursor: grabbing; }
+.graphViewport:focus-visible { box-shadow: inset 0 0 0 2px #7da4cf; }
+.graphWorld { position: absolute; top: 0; left: 0; overflow: visible; max-width: none; font-family: inherit; transform-origin: 0 0; will-change: transform; }
+.graphControls { position: absolute; left: 14px; bottom: 14px; z-index: 5; display: grid; grid-template-columns: 38px; gap: 5px; padding: 6px; border: 1px solid #cbd8e6; border-radius: 9px; background: rgba(255,255,255,.96); box-shadow: 0 4px 16px rgba(35,68,105,.13); backdrop-filter: blur(4px); }
+.graphControls button { width: 38px; height: 34px; border: 0; border-radius: 6px; background: transparent; color: #315c8b; font-size: 14px; font-weight: 650; }
+.graphControls button:hover:not(:disabled), .graphControls button:focus-visible { background: #eef5fc; outline: 1px solid #8bb0d7; }
+.graphControls button:disabled { opacity: .35; cursor: not-allowed; }
+.zoomBadge { display: grid; place-items: center; min-height: 24px; border-bottom: 1px solid #dde6ef; padding-bottom: 4px; color: #627a94; font-size: 10px; font-variant-numeric: tabular-nums; }
+.graphMiniMap { position: absolute; right: 14px; bottom: 14px; z-index: 5; width: 178px; height: 116px; overflow: hidden; border: 1px solid #cbd8e6; border-radius: 9px; background: rgba(255,255,255,.94); box-shadow: 0 4px 16px rgba(35,68,105,.13); cursor: crosshair; }
+.graphMiniMap svg { width: 100%; height: 100%; display: block; touch-action: none; }
+.miniMapNode { fill: #d9e5f2; stroke: #9db5cf; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.miniMapCenter { fill: #bad1ed; stroke: #3269a9; stroke-width: 3; }
+.miniMapViewport { fill: rgba(55,105,166,.08); stroke: #3269a9; stroke-width: 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 .graphEdge { fill: none; stroke: #8ca7c6; stroke-width: 1.8; }
 .graphNode { cursor: pointer; outline: none; }
 .graphNode rect { fill: white; stroke: #bed0e4; stroke-width: 1.4; }
@@ -145,8 +149,8 @@
   .mapSection { padding: 18px 12px; }
   .sectionHeading { flex-direction: column; gap: 5px; }
   .viewSwitch button { font-size: 13px; padding: 10px 12px; }
-  .graphScroll { height: 420px; }
-  .graphToolbar { justify-content: flex-start; overflow-x: auto; }
-  .graphToolbar button { flex: 0 0 auto; }
+  .graphFrame { height: 420px; }
+  .graphControls { left: 9px; bottom: 9px; transform: scale(.9); transform-origin: bottom left; }
+  .graphMiniMap { right: 9px; bottom: 9px; width: 132px; height: 88px; }
   .loginCard { padding: 28px; }
 }

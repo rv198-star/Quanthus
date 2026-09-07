@@ -3,7 +3,7 @@
   "catalog_schema_version": "quanthus.data-indicator-catalog.v1",
   "builder_version": "data-indicator-catalog-builder-v1.2",
   "source_manifest_sha256": "sha256:8db55c9d046cde11bd4d42ad185c5f44e88b4f766076401e1cb2fbcf763913be",
-  "snapshot_digest": "sha256:e617ed0fe1d7cc4651ea1a1689a9af3310a8dd65845abb40afe7a823dbe38ed2",
+  "snapshot_digest": "sha256:540a4b13be382e27df9475404df8a30174404d7f892224ffe0c01f42ec2ebb8b",
   "entry_count": 664,
   "gap_count": 10,
   "counts_by_kind": {

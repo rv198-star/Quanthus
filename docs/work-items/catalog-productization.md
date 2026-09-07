@@ -3,9 +3,9 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | accepted |
-| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md` |
-| Current status | A–D and parent closed after field-lineage requalification; API/Web production `c9bbd07` |
+| Delivery gate | open |
+| Prior acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md` |
+| Current status | A/B/C closed; #230 exact-node-identity/readability repair passed; D and parent remain open for production release |
 | Work item | `P3-DICT-002` / #232 |
 | Parent | `index.md`; `data-indicator-dictionary.md` |
 | Governing design | `../design/data-indicator-catalog-productization.md` |
@@ -22,10 +22,10 @@
 | --- | --- | --- |
 | #228 / P3-DICT-002-A | 分离内部诊断和业务界面 | 首页及业务 summary 无开发缺口；内部检测保留，业务限制留在对应条目 |
 | #229 / P3-DICT-002-B | 中文说明与分层卡片 | 664 个条目、33 表及 524 字段覆盖；英文 ID 可复制，技术详情折叠 |
-| #230 / P3-DICT-002-C | 有依据的加工血缘 | 33 表声明来源概览；524 字段逐项区分字段级证明和仅表级上下文；`dwd_adjustment_factor.effective_from` 强制字段级反例 |
+| #230 / P3-DICT-002-C | 有依据且可辨认的加工血缘 | 除原字段证明边界外，所有节点显示精确技术 ID；表级来源直接连目标表，不插入无意义的泛化加工方框 |
 | #231 / P3-DICT-002-D | 审计、回归与发布 | 语义反例、权限、桌面/窄屏浏览器、完整工程检查、提交与生产核查 |
 
-机器计划是状态权威，按 A→B→C→D 关闭，父工单最后关闭。字段焦点修复的 C 复验见 `../acceptance/catalog-field-lineage-repair-20260907.md`。
+机器计划是状态权威，按 A→B→C→D 关闭，父工单最后关闭。字段焦点修复见 `../acceptance/catalog-field-lineage-repair-20260907.md`；节点身份/表级图可读性复验见 `../acceptance/catalog-lineage-node-identity-repair-20260907.md`。
 
 ## 代码与验证入口
 

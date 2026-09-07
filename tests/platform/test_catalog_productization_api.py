@@ -22,6 +22,22 @@ def test_lineage_rejects_invalid_query(kernel, query):
     assert payload["error"]["reason"].startswith("catalog_")
 
 
+def test_adjustment_table_api_exposes_distinct_exact_source_identities(kernel):
+    token = viewer_token(kernel)
+    headers = {"Authorization": f"Bearer {token}"}
+    encoded = urllib.parse.quote("dwd_table:dwd_adjustment_factor", safe="")
+    status, _, payload = wsgi_request(
+        kernel, "GET", f"/api/platform/v1/catalog/items/{encoded}/relations?depth=2&limit=60",
+        headers=headers,
+    )
+    assert status == 200
+    lineage = payload["lineage"]
+    identities = {node["technical_id"] for node in lineage["nodes"]}
+    assert {"adjustment_factors_pit", "adjustment_evidence_delta",
+            "factor_evidence_delta", "adjustment_evidence"} <= identities
+    assert not any(node["process"] for node in lineage["nodes"])
+
+
 def test_adjustment_effective_from_api_exposes_field_proof_and_table_fallback(kernel):
     token = viewer_token(kernel)
     headers = {"Authorization": f"Bearer {token}"}

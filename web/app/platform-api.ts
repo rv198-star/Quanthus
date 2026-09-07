@@ -129,6 +129,7 @@ export interface DataCatalogSearchResult {
 export interface CatalogLineageNode {
   id: string;
   label: string;
+  technical_id: string;
   layer: string;
   grain: string;
   description: string;

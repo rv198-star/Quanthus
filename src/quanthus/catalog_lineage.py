@@ -46,13 +46,15 @@ def build_lineage(entries: dict[str, dict[str, Any]], definition: dict[str, Any]
     edges: list[dict[str, Any]] = []
 
     def node(identifier: str, label: str, layer: str, grain: str, description: str,
-             *, entry_id: str | None = None, evidence: dict | None = None,
+             *, technical_id: str, entry_id: str | None = None, evidence: dict | None = None,
              process: bool = False, parent_entry_id: str | None = None) -> None:
         if identifier in nodes:
             raise ValueError(f"duplicate lineage node: {identifier}")
-        nodes[identifier] = {"id": identifier, "label": label, "layer": layer, "grain": grain,
-                             "description": description, "entry_id": entry_id,
-                             "evidence": evidence, "process": process,
+        if not technical_id.strip():
+            raise ValueError(f"lineage node requires exact technical identity: {identifier}")
+        nodes[identifier] = {"id": identifier, "label": label, "technical_id": technical_id,
+                             "layer": layer, "grain": grain, "description": description,
+                             "entry_id": entry_id, "evidence": evidence, "process": process,
                              "parent_entry_id": parent_entry_id}
 
     for key, item in sorted(entries.items()):
@@ -60,10 +62,19 @@ def build_lineage(entries: dict[str, dict[str, Any]], definition: dict[str, Any]
             "dataset" if item["kind"] in {"dwd_table", "ods_dataset"} else "definition")
         parent_entry_id = (f"dwd_table:{item['details']['table']}"
                            if item["kind"] == "dwd_field" else None)
-        node(key, item["display_name"], _layer(item), grain, item["description"], entry_id=key,
-             parent_entry_id=parent_entry_id)
+        node(key, item["display_name"], _layer(item), grain, item["description"],
+             technical_id=item["canonical_id"], entry_id=key, parent_entry_id=parent_entry_id)
     for item in definition["nodes"]:
-        node(item["id"], item["label"], item["layer"], item["grain"], item["description"])
+        node(item["id"], item["label"], item["layer"], item["grain"], item["description"],
+             technical_id=str(item.get("technical_id") or item["id"].split(":", 1)[-1]))
+
+    def direct_edge(source: str, target: str, label: str, evidence: dict,
+                    grain: str, role: str) -> None:
+        if source not in nodes or target not in nodes:
+            raise ValueError(f"lineage edge has unregistered endpoint: {source} -> {target}")
+        edge = {"source": source, "target": target, "role": role, "grain": grain,
+                "evidence": evidence, "label": label}
+        edges.append({"id": _digest(edge), **edge})
 
     def step(identifier: str, label: str, inputs: list[str], outputs: list[str],
              evidence: dict, grain: str, role: str) -> None:
@@ -72,12 +83,11 @@ def build_lineage(entries: dict[str, dict[str, Any]], definition: dict[str, Any]
         process_id = "process:" + identifier
         node(process_id, label, nodes[outputs[0]]["layer"], grain,
              f"{label}。仅描述已登记的加工依赖，不证明某次运行已执行。",
-             evidence=evidence, process=True)
-        pairs = [(key, process_id) for key in inputs] + [(process_id, key) for key in outputs]
-        for source, target in pairs:
-            edge = {"source": source, "target": target, "role": role, "grain": grain,
-                    "evidence": evidence, "label": label}
-            edges.append({"id": _digest(edge), **edge})
+             technical_id=identifier, evidence=evidence, process=True)
+        for source in inputs:
+            direct_edge(source, process_id, label, evidence, grain, role)
+        for target in outputs:
+            direct_edge(process_id, target, label, evidence, grain, role)
 
     model_source = source_by_adapter["dwd_domain_model"]
     for index, item in enumerate(dwd["ods_source_contract"]["static_sources"]):
@@ -89,8 +99,9 @@ def build_lineage(entries: dict[str, dict[str, Any]], definition: dict[str, Any]
         outputs = ["dwd_table:" + name for name in item["target_tables"]]
         evidence = {"path": model_source["path"], "sha256": model_source["sha256"],
                     "locator": f"/ods_source_contract/static_sources/{index}"}
-        step("ods-" + item["source_id"], "源记录规范化 / 证据使用", [source_id], outputs,
-             evidence, "dataset", "declared_input")
+        for output in outputs:
+            direct_edge(source_id, output, "源记录规范化 / 证据使用", evidence,
+                        "dataset", "declared_input")
 
     # These are declared logical source artifacts, not invented physical ODS package members.
     sections = {"release_artifacts": "日发布工件", "weekly_artifacts": "周发布工件",
@@ -105,12 +116,16 @@ def build_lineage(entries: dict[str, dict[str, Any]], definition: dict[str, Any]
             names = [entries[key]["display_name"] for key in outputs]
             evidence = {"path": model_source["path"], "sha256": model_source["sha256"],
                         "locator": f"/ods_source_contract/{section}/{index}"}
-            node(source_id, f"{names[0]}来源 · {section_name}", "source", "dataset",
+            source_label = definition.get("source_labels", {}).get(
+                f"{section}:{identifier}", f"{section_name} · {identifier}"
+            )
+            node(source_id, source_label, "source", "dataset",
                  f"机器契约登记的 {identifier}，用于{'、'.join(names)}。"
                  "此处不宣称已核验实际包成员。",
-                 evidence=evidence)
-            step(f"{section}-{identifier}", f"{section_name}规范化", [source_id], outputs,
-                 evidence, "dataset", "declared_input")
+                 technical_id=identifier, evidence=evidence)
+            for output in outputs:
+                direct_edge(source_id, output, f"{section_name}规范化", evidence,
+                            "dataset", "declared_input")
 
     for source_field, target_field in sorted(definition["market_field_mapping"].items()):
         dwd_id = "dwd_field:dwd_security_bar." + target_field
@@ -118,12 +133,14 @@ def build_lineage(entries: dict[str, dict[str, Any]], definition: dict[str, Any]
         name = entries[dwd_id]["display_name"].split(" · ")[0]
         node(source_id, "源日行情 · " + name, "source", "field",
              "转换代码声明读取的源字段；不等同于本目录已检验完整物理包成员。",
+             technical_id=f"daily_ohlcv_unadjusted.{source_field}",
              evidence=definition["evidence"]["market"])
         step("market-" + source_field, "历史身份 / 时段对齐与定点数转换", [source_id], [dwd_id],
              definition["evidence"]["market"], "field", "calculation")
         projection_id = "projection:daily_ohlcv_none." + source_field
         node(projection_id, "研究日线 · " + name, "projection", "field",
              "Direct-DWD 研究读取器的投影字段；不是新的权威行情表。",
+             technical_id=f"daily_ohlcv_none.{source_field}",
              evidence=definition["evidence"]["provider"])
         step("replay-" + source_field, "按日线范围导出研究字段", [dwd_id], [projection_id],
              definition["evidence"]["provider"], "field", "calculation")
@@ -131,6 +148,7 @@ def build_lineage(entries: dict[str, dict[str, Any]], definition: dict[str, Any]
             exact_id = "projection:daily_ohlcv_none.dwd_" + target_field + "_decimal"
             node(exact_id, "精确回溯日线 · " + name, "projection", "field",
                  "Direct-DWD 保留的精确十进制价格成员，Facts V2 校验其与决策帧的一致性。",
+                 technical_id=f"daily_ohlcv_none.dwd_{target_field}_decimal",
                  evidence=definition["evidence"]["provider"])
             step("exact-" + target_field, "保留精确价格成员", [dwd_id], [exact_id],
                  definition["evidence"]["provider"], "field", "calculation")
@@ -162,7 +180,9 @@ def validate_lineage(graph: dict[str, Any]) -> None:
     if len(nodes) != len(graph["nodes"]):
         raise ValueError("duplicate lineage node")
     for item in nodes.values():
-        if item["layer"] not in LAYERS or item["grain"] not in GRAINS or not item["label"]:
+        if (item["layer"] not in LAYERS or item["grain"] not in GRAINS or not item["label"]
+                or not isinstance(item.get("technical_id"), str)
+                or not item["technical_id"].strip()):
             raise ValueError("invalid lineage node")
     indegree = dict.fromkeys(nodes, 0)
     adjacency: dict[str, list[str]] = defaultdict(list)

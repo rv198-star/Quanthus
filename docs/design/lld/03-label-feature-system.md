@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001` foundation and `P3-DICT-002` Chinese business cards / declared lineage accepted in repository and production |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001` foundation accepted; `P3-DICT-002` prior Chinese cards / declared-lineage release accepted but exact-node-identity readability repair reopened under #230/#232 |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -234,8 +234,10 @@ summary and homepage do not expose a developer gap dashboard. `P3-DICT-002` adds
 metadata and declared processing lineage, governed by `../data-indicator-catalog-productization.md`
 and `../../work-items/catalog-productization.md`. DWD field focus distinguishes exact field proof
 from separately labeled parent-table context; table membership cannot fabricate a field edge.
-Membership and conceptual relationships remain separate from processing edges, and static lineage
-is not actual consumption evidence. The Structure
+The current #230 repair additionally requires business label plus exact technical identity on every
+visible node and removes redundant generic processing boxes from dataset-level context. Membership
+and conceptual relationships remain separate from processing edges, and static lineage is not actual
+consumption evidence. The Structure
 blueprint may explicitly bind registered concepts to accepted B3-B5 runtime capabilities; only
 those bindings may project `implemented`/`accepted` status into the Catalog. A discovery-only
 `related_not_equivalent` legacy link never satisfies an executable-spec requirement. This Catalog

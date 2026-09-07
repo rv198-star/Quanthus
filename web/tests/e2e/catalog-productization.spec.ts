@@ -82,6 +82,13 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await global.getByRole("button", { name: "20期简单均线（总回报指数）", exact: false }).click();
     await expect(page.getByTestId("business-description")).toContainText("包含当前时段");
     await expect(page.getByTestId("catalog-detail")).toContainText("完整研究管道");
+    await search(page, "dwd_adjustment_factor");
+    const factorTableGraph = page.getByTestId("lineage-focus");
+    for (const exactId of ["adjustment_factors_pit", "adjustment_evidence_delta", "factor_evidence_delta", "adjustment_evidence", "dwd_adjustment_factor"]) {
+      await expect(factorTableGraph).toContainText(exactId);
+    }
+    await expect(factorTableGraph).not.toContainText("复权因子来源 · 日发布工件");
+    await expect(page.locator('[data-lineage-node="process:release_artifacts-adjustment_evidence_delta"]')).toHaveCount(0);
     await search(page, "dwd_adjustment_factor.effective_from");
     await expect(page.getByTestId("lineage-coverage-level")).toContainText("字段级血缘已证明");
     await expect(page.locator('[data-lineage-node="source-field:adjustment_factors_pit.effective_date"]')).toBeVisible();

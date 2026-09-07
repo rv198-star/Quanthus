@@ -110,6 +110,24 @@ def test_real_field_flow_is_directed_and_not_membership(catalog):
     }
 
 
+def test_adjustment_factor_table_focus_shows_exact_source_identities_without_generic_boxes(catalog):
+    lineage = catalog.relations("dwd_table:dwd_adjustment_factor", depth=2, limit=60)["lineage"]
+    identities = {node["technical_id"] for node in lineage["nodes"]}
+    assert {
+        "dwd_adjustment_factor",
+        "adjustment_factors_pit",
+        "adjustment_evidence_delta",
+        "factor_evidence_delta",
+        "adjustment_evidence",
+    } <= identities
+    assert not any(node["process"] for node in lineage["nodes"])
+    source_labels = [node["label"] for node in lineage["nodes"] if node["layer"] == "source"]
+    assert len(source_labels) == len(set(source_labels))
+    assert all("复权因子来源 · 日发布工件" not in label for label in source_labels)
+    table = "dwd_table:dwd_adjustment_factor"
+    assert all(edge["target"] == table for edge in lineage["edges"])
+
+
 def test_adjustment_factor_effective_from_has_exact_field_lineage(catalog):
     graph = catalog.snapshot["lineage"]
     field = "dwd_field:dwd_adjustment_factor.effective_from"

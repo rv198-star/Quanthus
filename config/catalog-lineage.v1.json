@@ -15,6 +15,11 @@
     "event_factor": {"path":"src/quanthus/event_library/physical_scan.py","sha256":"sha256:970a2c97a24edaa4b3823e4a0c70571e01f5562a832d31b06af5db9970722657","locator":"factor_boundary AS"}
   },
   "market_field_mapping": {"open":"open","high":"high","low":"low","close":"close","volume":"volume","amount":"turnover"},
+  "source_labels": {
+    "release_artifacts:adjustment_evidence_delta": "日发布复权证据增量",
+    "release_artifacts:factor_evidence_delta": "日发布因子证据增量",
+    "weekly_artifacts:adjustment_evidence": "周发布复权证据"
+  },
   "nodes": [
     {"id":"projection:normalized-actions","label":"规范化公司行动输入","layer":"projection","grain":"dataset","description":"使用已验收修正包中的 corporate_actions_normalized；此处不把修正包与某张 DWD 表视为等价。"},
     {"id":"projection:action-exceptions","label":"公司行动例外输入","layer":"projection","grain":"dataset","description":"研究特征使用的公司行动例外及阻断区间。"},

@@ -13,6 +13,8 @@
     {"adapter": "structure_blueprint", "path": "config/structure-facts-v2-blueprint.v1.json"},
     {"adapter": "catalog_annotations", "path": "config/data-indicator-catalog-annotations.v1.json"},
     {"adapter": "catalog_business", "path": "config/catalog-business-metadata.v1.json"},
-    {"adapter": "catalog_lineage", "path": "config/catalog-lineage.v1.json"}
+    {"adapter": "catalog_lineage", "path": "config/catalog-lineage.v1.json"},
+    {"adapter": "adm_registry", "path": "config/catalog-adm-assets.v1.json"},
+    {"adapter": "asset_lineage", "path": "config/catalog-asset-lineage.v2.json"}
   ]
 }

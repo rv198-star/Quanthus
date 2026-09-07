@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001` foundation and `P3-DICT-002` Chinese cards / exact-identity declared-lineage product accepted in repository and production |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; broader v2 capabilities separately gated; `P3-DICT-001/002` accepted in production; `P3-DICT-003` Lineage V2 A/B/C accepted in repository with D release gate open |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -240,7 +240,10 @@ The Web renders these graphs inside fixed-height infinite viewports with an inde
 true centered fit, unclamped drag pan, pointer-anchored wheel/pinch zoom, floating controls and MiniMap.
 For `table_context_only`, the parent-table context is rendered in that same single canvas with a compact
 non-field-proof notice instead of a second large context section; all such controls are presentation-only
-and cannot alter the graph contract. Membership and
+and cannot alter the graph contract. `P3-DICT-003` then supersedes the mixed processing graph as the
+main Data Lineage model: only governed ODS/DWD/Research ADM assets are nodes, fields stay nested in
+those assets, transformations become edge metadata, and Definition/Usage dependencies are separate
+views. Its repository A/B/C gates are accepted; production release remains gated by D. Membership and
 conceptual relationships remain separate from processing edges, and static lineage is not actual
 consumption evidence. The Structure
 blueprint may explicitly bind registered concepts to accepted B3-B5 runtime capabilities; only
@@ -280,6 +283,11 @@ authority.
 | P3-DICT-002-B | Cover all registered entries with Chinese business explanations | P3-DICT-002-A | #229; all-entry coverage, exact formula/identity and human-readable card tests |
 | P3-DICT-002-C | Add layered overview and bounded field-focused processing graphs | P3-DICT-002-B | #230; final single-canvas requalification `docs/acceptance/catalog-lineage-single-canvas-20260907.md`; 524-field proof/context classification, exact identity and standard infinite navigation |
 | P3-DICT-002-D | Audit, test and release the productized Catalog | P3-DICT-002-C | #231; `docs/acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`; full gates and Web-only production release `d4e7158` |
+| P3-DICT-003 | Rebuild Catalog Lineage around governed ODS/DWD/ADM assets | P3-DICT-002 | #237; `docs/design/data-catalog-lineage-v2.md`; A/B/C accepted in `docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md`, D pending production closeout |
+| P3-DICT-003-A | Freeze asset ontology and Research ADM Registry | P3-DICT-002 | #233; closed in Lineage V2 implementation audit |
+| P3-DICT-003-B | Implement full registered asset/field closure | P3-DICT-003-A | #234; closed in Lineage V2 implementation audit |
+| P3-DICT-003-C | Separate Definition and Usage dependency graphs | P3-DICT-003-B | #235; closed in Lineage V2 implementation audit |
+| P3-DICT-003-D | Audit and release Catalog Lineage V2 | P3-DICT-003-C | #236; ready; full repository gate and API/Web production closeout pending |
 
 ## 7. Acceptance
 

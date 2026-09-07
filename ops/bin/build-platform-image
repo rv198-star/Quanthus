@@ -29,6 +29,11 @@ cp "$REPOSITORY_ROOT/config/platform-features.v1.json" \
     "$REPOSITORY_ROOT/config/data-indicator-catalog-annotations.v1.json" \
     "$REPOSITORY_ROOT/config/catalog-business-metadata.v1.json" \
     "$REPOSITORY_ROOT/config/catalog-lineage.v1.json" \
+    "$REPOSITORY_ROOT/config/catalog-adm-assets.v1.json" \
+    "$REPOSITORY_ROOT/config/catalog-asset-lineage.v2.json" \
+    "$REPOSITORY_ROOT/config/p4-research-adm.v1.json" \
+    "$REPOSITORY_ROOT/config/structure-research-adm.mvp.v1.json" \
+    "$REPOSITORY_ROOT/config/structure-continuous-facts.research.v1.json" \
     "$REPOSITORY_ROOT/config/data-indicator-catalog-snapshot.v1.json" \
     "$REPOSITORY_ROOT/config/data-indicator-catalog-sources.v1.json" \
     "$REPOSITORY_ROOT/config/p3-baseline-features.research.v1.json" \
@@ -51,6 +56,8 @@ cp "$REPOSITORY_ROOT/src/quanthus/__init__.py" \
     "$REPOSITORY_ROOT/src/quanthus/data_catalog.py" \
     "$REPOSITORY_ROOT/src/quanthus/catalog_presentation.py" \
     "$REPOSITORY_ROOT/src/quanthus/catalog_lineage.py" \
+    "$REPOSITORY_ROOT/src/quanthus/catalog_asset_lineage.py" \
+    "$REPOSITORY_ROOT/src/quanthus/catalog_dependency.py" \
     "$REPOSITORY_ROOT/src/quanthus/policy.py" \
     "$REPOSITORY_ROOT/src/quanthus/strategy_attribution.py" \
     "$REPOSITORY_ROOT/src/quanthus/strategy_attribution_pipeline.py" \

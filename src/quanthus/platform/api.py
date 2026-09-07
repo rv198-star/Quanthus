@@ -978,15 +978,22 @@ class PlatformHttpApp:
         _principal(self._identity, observed_request, "catalog:read")
         entry_id = urllib.parse.unquote(params["entry_id"])
         query = urllib.parse.parse_qs(observed_request.query_string, keep_blank_values=True)
-        if set(query) - {"depth", "limit"} or any(len(value) != 1 for value in query.values()):
+        if set(query) - {"depth", "limit", "asset_scope"} or any(len(value) != 1 for value in query.values()):
             raise ValueError("catalog_query_parameters_invalid")
         try:
             depth = int(query.get("depth", ["2"])[0])
             limit = int(query.get("limit", ["60"])[0])
         except ValueError as exc:
             raise ValueError("catalog_lineage_bounds_invalid") from exc
+        asset_scope = query.get("asset_scope", ["full"])[0]
+        if asset_scope not in {"full", "focus"}:
+            raise ValueError("catalog_asset_lineage_scope_invalid")
         try:
-            return _json_response(self._data_catalog.relations(entry_id, depth=depth, limit=limit))
+            return _json_response(
+                self._data_catalog.relations(
+                    entry_id, depth=depth, limit=limit, asset_scope=asset_scope
+                )
+            )
         except DataCatalogError as exc:
             if str(exc) == "catalog_entry_not_found":
                 return _error(str(exc), 404, observed_request.request_id)

@@ -98,6 +98,10 @@
 .centerNode rect { fill: #e9f2ff; stroke: #3269a9; stroke-width: 2.4; }
 .graphNode:hover rect, .graphNode:focus-visible rect { stroke: #1f63af; stroke-width: 3; }
 .graphNote { font-size: 12px !important; line-height: 1.85; color: #62778f !important; }
+.relationTabs { display: inline-flex; gap: 3px; margin: 10px 0 2px; padding: 3px; border: 1px solid #d4deea; border-radius: 9px; background: #f4f7fa; }
+.relationTabs button { border: 0; border-radius: 6px; background: transparent; color: #536b85; padding: 7px 12px; font-size: 12px; }
+.relationTabs button[aria-selected="true"] { background: white; color: #244f80; box-shadow: 0 1px 4px rgba(37,74,115,.12); font-weight: 650; }
+.relationTabs button:focus-visible { outline: 2px solid #7da4cc; outline-offset: 1px; }
 .lineageStatus { display: flex; align-items: baseline; gap: 9px; margin: 9px 0 8px; padding: 7px 10px; border-left: 3px solid #9cb4cd; border-radius: 4px; background: #f6f9fc; font-size: 12px; line-height: 1.55; color: #536b85; }
 .lineageStatus[data-level="field_proven"] { border-left-color: #78aa8c; background: #f4faf6; }
 .lineageStatus[data-level="table_context_only"] { border-left-color: #cda95c; background: #fffaf0; }

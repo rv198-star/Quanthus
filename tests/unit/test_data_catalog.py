@@ -24,14 +24,16 @@ def test_catalog_build_is_deterministic_and_matches_snapshot_manifest() -> None:
     catalog = DataIndicatorCatalog()
     assert catalog.snapshot["snapshot_digest"] == first["snapshot_digest"]
     assert first["summary"] == {
-        "entry_count": 664,
+        "entry_count": 748,
         "gap_count": 10,
         "counts_by_kind": {
+            "adm_dataset": 4,
+            "adm_field": 76,
             "dwd_field": 524,
             "dwd_table": 33,
             "feature_spec": 9,
             "label_card": 4,
-            "ods_dataset": 53,
+            "ods_dataset": 57,
             "semantic_concept": 21,
             "semantic_family": 20,
         },
@@ -125,8 +127,11 @@ def test_turnover_field_is_not_silently_promoted_to_turnover_rate() -> None:
     assert any("不是换手率" in note for note in item["details"]["cautions"])
     result = catalog.search("换手率", limit=10)
     assert {value["entry_id"] for value in result["items"]} == {
-        item["entry_id"], "dwd_field:dwd_index_bar.turnover",
+        item["entry_id"],
+        "dwd_field:dwd_index_bar.turnover",
+        "adm_field:p4-event-research-adm.candidate_daily.turnover",
     }
+    assert "成交金额" in catalog.item("adm_field:p4-event-research-adm.candidate_daily.turnover")["description"]
 
 
 def test_relations_return_outgoing_and_incoming_without_dangling_targets() -> None:

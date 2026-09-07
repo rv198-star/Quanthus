@@ -23,7 +23,7 @@ def catalog():
 
 
 def test_every_existing_entry_has_reviewed_chinese_reading(catalog):
-    assert len(catalog.snapshot["entries"]) == 664
+    assert len(catalog.snapshot["entries"]) == 748
     for entry in catalog.snapshot["entries"]:
         assert ZH.search(entry["display_name"]), entry["entry_id"]
         assert ZH.search(entry["description"]), entry["entry_id"]
@@ -31,7 +31,12 @@ def test_every_existing_entry_has_reviewed_chinese_reading(catalog):
         reading = entry["details"]["reading"]
         assert reading["facts"]
         assert all(ZH.search(item["label"]) for item in reading["facts"])
-        assert reading["metadata_authority"] == "config/catalog-business-metadata.v1.json"
+        expected_authority = (
+            "config/catalog-adm-assets.v1.json"
+            if entry["kind"] in {"adm_dataset", "adm_field"}
+            else "config/catalog-business-metadata.v1.json"
+        )
+        assert reading["metadata_authority"] == expected_authority
 
 
 def test_reading_never_grants_new_identity_formula_or_status(catalog):
@@ -252,15 +257,25 @@ def test_invalid_graphs_are_rejected(catalog, mutation):
 def test_packaging_contains_presentation_and_lineage_closure():
     script = (ROOT / "ops/bin/build-platform-image").read_text()
     dockerfile = (ROOT / "ops/platform/Dockerfile").read_text()
-    for path in ("config/catalog-business-metadata.v1.json", "config/catalog-lineage.v1.json",
-                 "src/quanthus/catalog_presentation.py", "src/quanthus/catalog_lineage.py"):
+    for path in (
+        "config/catalog-business-metadata.v1.json",
+        "config/catalog-lineage.v1.json",
+        "config/catalog-adm-assets.v1.json",
+        "config/catalog-asset-lineage.v2.json",
+        "src/quanthus/catalog_presentation.py",
+        "src/quanthus/catalog_lineage.py",
+        "src/quanthus/catalog_asset_lineage.py",
+        "src/quanthus/catalog_dependency.py",
+    ):
         assert path in script and path in dockerfile
 
 
 def test_source_inventory_and_semantic_ids_stay_exact(catalog):
     built = build_catalog()
     assert built["snapshot_digest"] == catalog.snapshot["snapshot_digest"]
-    assert built["summary"]["entry_count"] == 664
+    assert built["summary"]["entry_count"] == 748
+    assert built["summary"]["counts_by_kind"]["adm_dataset"] == 4
+    assert built["summary"]["counts_by_kind"]["adm_field"] == 76
     assert built["summary"]["counts_by_kind"]["dwd_field"] == 524
     plan = json.loads((ROOT / "config/data-indicator-catalog-productization.v1.json").read_text())
     expected = ["P3-DICT-002", *[f"P3-DICT-002-{c}" for c in "ABCD"]]

@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
-import type { CatalogLineageGraph, CatalogLineageNode, CatalogLineageOverview } from "./platform-api";
+import type {
+  CatalogAssetLineageOverview,
+  DataCatalogRelations,
+} from "./platform-api";
 import styles from "./catalog-browser.module.css";
 
-const grains: Record<string, string> = { dataset: "数据集级", field: "字段级", record: "记录级", definition: "定义级", mixed: "混合输入", consumer: "消费者" };
-type NodeView = { id: string; label: string; technicalId: string; meta: string; column: number; process?: boolean; center?: boolean };
+type NodeView = { id: string; label: string; technicalId: string; meta: string; column: number; center?: boolean };
 type EdgeView = { id: string; source: string; target: string; label: string };
 
 function wrapText(value: string, width: number, maximum: number) {
@@ -221,7 +223,7 @@ function Canvas({ nodes, edges, onNode, title }: { nodes: NodeView[]; edges: Edg
           const labelLines = wrapText(node.label, 16, 2);
           const idLines = wrapText(node.technicalId, 34, 2);
           return <g key={node.id} transform={`translate(${position.x},${position.y})`} role="button" tabIndex={0}
-            aria-label={`${node.label}，${node.technicalId}`} className={`${styles.graphNode} ${node.process ? styles.processNode : ""} ${node.center ? styles.centerNode : ""}`}
+            aria-label={`${node.label}，${node.technicalId}`} className={`${styles.graphNode} ${node.center ? styles.centerNode : ""}`}
             onClick={() => onNode(node.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNode(node.id); } }} data-lineage-node={node.id}>
             <title>{node.label} · {node.technicalId}</title><rect width={nodeWidth} height={nodeHeight} rx="10" />
             <text x="14" y="25">{labelLines[0]}</text><text x="14" y="44">{labelLines[1]}</text>
@@ -271,80 +273,163 @@ function Canvas({ nodes, edges, onNode, title }: { nodes: NodeView[]; edges: Edg
   </div>;
 }
 
-export function LineageOverview({ data, onNavigate }: { data: CatalogLineageOverview; onNavigate: (node: CatalogLineageNode) => void }) {
-  const [groupId, setGroupId] = useState<string | null>(null);
-  const group = data.nodes.find(node => node.id === groupId);
+export function LineageOverview({ data }: { data: CatalogAssetLineageOverview }) {
   return <section className={styles.mapSection} data-testid="lineage-overview">
-    <h2>数据从哪里来，又流向哪里？</h2><p>点击分层查看已登记节点，再进入具体字段。箭头统一从输入指向输出。</p>
-    <Canvas title="全局分层加工地图" nodes={data.nodes.map((node, index) => ({ id: node.id, label: node.label,
-      technicalId: `layer:${node.id}`, meta: `${node.members.length} 个节点 · ${node.process_count} 个加工步骤`, column: index }))}
-      edges={data.edges.map(edge => ({ ...edge, id: `${edge.source}:${edge.target}`, label: `${edge.count} 条跨层依赖` }))} onNode={setGroupId} />
-    <p className={styles.graphNote}>{data.coverage}</p>
-    <p className={styles.graphNote}>共 {data.registered_edges} 条已登记加工边；同层的 {data.internal_edges} 条关系折叠在分层内，请进入焦点图查看。</p>
-    <p className={styles.graphNote} data-testid="field-lineage-coverage">DWD 字段共 {data.field_coverage.total} 个：{data.field_coverage.field_proven} 个已有字段级加工证据，{data.field_coverage.table_context_only} 个仅能展示所属表加工上下文，{data.field_coverage.unregistered} 个连表级上下文也未登记。这里明确区分，不把表级关系冒充字段级血缘。</p>
-    {group ? <section className={styles.groupMembers} aria-label={`${group.label}节点`}>
-      <h3>{group.label} · 选择一个节点</h3><div>{group.members.map(node => <button type="button" key={node.id} onClick={() => onNavigate(node)}>
-        <strong>{node.label}</strong><code>{node.technical_id}</code><span>{grains[node.grain] ?? node.grain}</span>
-      </button>)}</div>
-    </section> : null}
+    <h2>正式数据资产全景</h2>
+    <p>主血缘只展示受治理数据资产：ODS → DWD → Research ADM。加工过程、临时投影、指标定义和消费者不会成为这里的节点。</p>
+    <Canvas
+      title="ODS DWD Research ADM 正式资产分层图"
+      nodes={data.layers.map((layer, index) => ({
+        id: layer.id,
+        label: layer.label,
+        technicalId: `layer:${layer.id}`,
+        meta: `${layer.participating_asset_count}/${layer.registered_asset_count} 个资产已接入血缘`,
+        column: index,
+      }))}
+      edges={data.edges.map(edge => ({ ...edge, id: `${edge.source}:${edge.target}`, label: `${edge.count} 条资产血缘` }))}
+      onNode={() => undefined}
+    />
+    <p className={styles.graphMeta}>{data.participating_asset_count}/{data.registered_asset_count} 个正式资产已接入血缘 · {data.edge_count} 条资产关系</p>
+    <p className={styles.graphNote}>{data.scope}</p>
   </section>;
 }
 
-export function LineageFocus({ graph, onNavigate, depth, onDepth, busy }: {
-  graph: CatalogLineageGraph; onNavigate: (node: CatalogLineageNode) => void; depth: number; onDepth: (depth: number) => void; busy: boolean;
+type RangeValue = "full" | "1" | "2" | "3" | "5";
+type RelationView = "data" | "definition" | "usage";
+type EvidenceView = {
+  id: string;
+  source: string;
+  target: string;
+  transformations: string[];
+  fieldMappings: Array<{ source_field: string; target_field: string }>;
+  evidence: Array<{ path: string; locator: string; sha256: string }>;
+  notes: string[];
+};
+
+const assetLayers: Record<string, string> = { ods: "ODS", dwd: "DWD", adm: "Research ADM" };
+const dependencyKinds: Record<string, string> = {
+  dwd_field: "DWD 字段", adm_field: "ADM 字段", feature_spec: "指标规格",
+  label_card: "规则标签", semantic_concept: "语义定义", adm_dataset: "ADM 数据资产", consumer: "消费者",
+};
+
+export function LineageFocus({ relations, onNavigate, range, onRange, busy }: {
+  relations: DataCatalogRelations;
+  onNavigate: (node: { entry_id: string | null }) => void;
+  range: RangeValue;
+  onRange: (range: RangeValue) => void;
+  busy: boolean;
 }) {
+  const [view, setView] = useState<RelationView>(relations.asset_lineage ? "data" : relations.definition_dependency ? "definition" : "usage");
   const [edgeId, setEdgeId] = useState<string | null>(null);
-  const center = graph.nodes.find(node => node.id === graph.center);
-  const tableContextOnly = graph.coverage_level === "table_context_only" && graph.table_context !== null;
-  const visibleContext = tableContextOnly ? graph.table_context : null;
-  const visibleNodes = visibleContext?.nodes ?? graph.nodes;
-  const visibleEdges = visibleContext?.edges ?? graph.edges;
-  const visibleCenter = visibleContext?.center ?? graph.center;
-  const visibleScope = visibleContext?.scope ?? graph.scope;
-  const visibleOmittedNodes = visibleContext?.omitted_nodes ?? graph.omitted_nodes;
-  const visibleBoundaryEdges = visibleContext?.boundary_edges ?? graph.boundary_edges;
-  const contextCenter = visibleContext?.nodes.find(node => node.id === visibleContext.center);
-  const evidence = visibleEdges.find(edge => edge.id === edgeId);
-  const names = new Map(visibleNodes.map(node => [node.id, node.label]));
-  const statusTitle = tableContextOnly ? "表级上下文" : graph.coverage_level === "field_proven" ? "字段级血缘" : "已登记血缘";
-  const statusMessage = tableContextOnly
-    ? `当前字段尚无精确字段级血缘；下图展示 ${contextCenter?.label ?? "所属表"}${contextCenter?.technical_id ? `（${contextCenter.technical_id}）` : ""} 的加工关系，不代表该字段参与每条关系。`
-    : graph.coverage_level === "field_proven"
-      ? "下图为当前字段已有证据支持的精确加工关系。"
-      : graph.coverage_message;
+
+  let nodes: NodeView[] = [];
+  let edges: EdgeView[] = [];
+  let scope = "";
+  let statusTitle = "";
+  let statusMessage = "";
+  let omittedNodes = 0;
+  let boundaryEdges = 0;
+  let normalizedEvidence: EvidenceView[] = [];
+  let sourceNodes: Array<{ id: string; entry_id: string | null; label: string }> = [];
+
+  if (view === "data" && relations.asset_lineage) {
+    const graph = relations.asset_lineage;
+    scope = graph.scope;
+    omittedNodes = graph.omitted_nodes;
+    boundaryEdges = graph.boundary_edges;
+    statusTitle = graph.coverage_level === "field_proven" ? "字段全链已登记"
+      : graph.coverage_level === "asset_context_only" ? "仅资产级上下文"
+      : graph.scope_mode === "full" ? "完整资产全链" : "资产聚焦视图";
+    statusMessage = graph.coverage_message;
+    nodes = graph.nodes.map(node => ({
+      id: node.id,
+      label: node.label,
+      technicalId: node.technical_id,
+      meta: `${assetLayers[node.layer] ?? node.layer}${node.focus_fields.length ? ` · 字段：${node.focus_fields.slice(0, 2).join(" / ")}${node.focus_fields.length > 2 ? ` +${node.focus_fields.length - 2}` : ""}` : " · 数据资产"}`,
+      column: node.distance,
+      center: node.id === graph.center,
+    }));
+    edges = graph.edges.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      label: edge.transformations.join(" / "),
+    }));
+    normalizedEvidence = graph.edges.map(edge => ({
+      id: edge.id, source: edge.source, target: edge.target,
+      transformations: edge.transformations, fieldMappings: edge.field_mappings,
+      evidence: edge.evidence, notes: edge.notes,
+    }));
+    sourceNodes = graph.nodes.map(node => ({ id: node.id, entry_id: node.entry_id, label: node.label }));
+  } else if (view !== "data") {
+    const graph = view === "definition" ? relations.definition_dependency : relations.usage_dependency;
+    if (graph) {
+      scope = graph.scope;
+      omittedNodes = graph.omitted_nodes;
+      boundaryEdges = graph.boundary_edges;
+      statusTitle = view === "definition" ? "计算 / 语义依赖" : "静态使用关系";
+      statusMessage = view === "definition"
+        ? "指标、Fact、Label 等定义在此视图出现；加工步骤已折叠到箭头，不属于数据资产血缘。"
+        : "消费者只在使用关系中出现；静态登记不等于某次 Job 实际使用。";
+      nodes = graph.nodes.map(node => ({
+        id: node.id,
+        label: node.label,
+        technicalId: node.technical_id,
+        meta: dependencyKinds[node.kind] ?? node.kind,
+        column: node.distance,
+        center: node.id === graph.center,
+      }));
+      edges = graph.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target, label: edge.transformations.join(" / ") }));
+      normalizedEvidence = graph.edges.map(edge => ({
+        id: edge.id, source: edge.source, target: edge.target,
+        transformations: edge.transformations, fieldMappings: [], evidence: edge.evidence, notes: [],
+      }));
+      sourceNodes = graph.nodes.map(node => ({ id: node.id, entry_id: node.entry_id, label: node.label }));
+    }
+  }
+
+  const evidence = normalizedEvidence.find(edge => edge.id === edgeId);
+  const names = new Map(sourceNodes.map(node => [node.id, node.label]));
+  const noGraphMessage = view === "data"
+    ? "当前对象不是已登记正式数据资产；数据血缘只接受 ODS、DWD 和 Research ADM。"
+    : view === "definition" ? "当前对象尚未登记计算 / 语义依赖。" : "当前对象尚未登记静态使用关系。";
+
   return <section className={styles.mapSection} aria-busy={busy} data-testid="lineage-focus">
-    <div className={styles.sectionHeading}><div><h2>血缘关系</h2><p>当前焦点：{center?.label}。点击节点可继续追查。</p></div>
-      <label>展开范围 <select aria-label="血缘展开层数" value={depth} onChange={event => onDepth(Number(event.target.value))}>
-        {[1, 2, 3, 4, 5].map(value => <option key={value} value={value}>{value} 跳</option>)}
+    <div className={styles.sectionHeading}>
+      <div><h2>关系图</h2><p>数据血缘、计算依赖和使用关系分开查看，不再混成一张工程图。</p></div>
+      <label>查看范围 <select aria-label="血缘查看范围" value={range} onChange={event => onRange(event.target.value as RangeValue)}>
+        <option value="full">全链</option><option value="1">1 跳</option><option value="2">2 跳</option><option value="3">3 跳</option><option value="5">5 跳</option>
       </select></label>
     </div>
-    {busy ? <p role="status">正在读取血缘…</p> : null}
-    <div className={styles.lineageStatus} data-level={graph.coverage_level} data-testid="lineage-coverage-level">
-      <strong>{statusTitle}</strong><span>{statusMessage}</span>
+    <div className={styles.relationTabs} role="tablist" aria-label="关系类型">
+      <button type="button" role="tab" aria-selected={view === "data"} onClick={() => { setView("data"); setEdgeId(null); }}>数据血缘</button>
+      <button type="button" role="tab" aria-selected={view === "definition"} onClick={() => { setView("definition"); setEdgeId(null); }}>计算依赖</button>
+      <button type="button" role="tab" aria-selected={view === "usage"} onClick={() => { setView("usage"); setEdgeId(null); }}>使用关系</button>
     </div>
-    <div data-testid={tableContextOnly ? "table-lineage-context" : undefined}>
-      <Canvas title={tableContextOnly ? "所属表加工上下文（非字段映射）" : "字段双向血缘图"} nodes={visibleNodes.map(node => ({ id: node.id, label: node.label,
-        technicalId: node.technical_id, meta: `${node.process ? "加工步骤 · " : ""}${grains[node.grain] ?? node.grain}`,
-        column: node.distance ?? 0, process: node.process, center: node.id === visibleCenter }))}
-        edges={visibleEdges} onNode={id => { const node = visibleNodes.find(item => item.id === id); if (node) onNavigate(node); }} />
+    {busy ? <p role="status">正在读取关系…</p> : null}
+    <div className={styles.lineageStatus} data-testid="lineage-coverage-level">
+      <strong>{nodes.length ? statusTitle : "暂无该类关系"}</strong><span>{nodes.length ? statusMessage : noGraphMessage}</span>
     </div>
-    {!visibleEdges.length ? <p className={styles.graphNote}>当前目录尚未登记此节点的加工关系；不能据此认定它没有上下游。</p> : null}
-    <p className={styles.graphMeta}>{visibleNodes.length} 个节点 · {visibleEdges.length} 条关系 · {tableContextOnly ? "表级上下文" : statusTitle}</p>
-    <details className={styles.technical}><summary>范围、限制与加工依据</summary>
-      {visibleBoundaryEdges || visibleOmittedNodes ? <p className={styles.graphNote} data-testid="lineage-boundary">
-        受展开层数和节点预算限制，{visibleBoundaryEdges} 条边连接到当前视图之外；另有 {visibleOmittedNodes} 个范围内节点未显示。可增加层数或点击节点继续展开。
-      </p> : null}
-      <p className={styles.graphNote}>实线箭头表示已登记加工依赖；归属和概念关联不进入主图。{visibleScope}。{graph.coverage}</p>
-      <ul>{visibleEdges.map(edge => <li key={edge.id}>
-        <button type="button" onClick={() => setEdgeId(edge.id)}>{names.get(edge.source)} → {names.get(edge.target)}：{edge.label}</button>
-      </li>)}</ul>
-    </details>
-    {center && !center.entry_id ? <div className={styles.explanation}><strong>{center.label}</strong><p>{center.description}</p>
-      {center.evidence ? <details><summary>该节点的定义依据</summary><code>{center.evidence.path} · {center.evidence.locator}</code><p>{center.evidence.sha256}</p></details> : null}
-    </div> : null}
+    {nodes.length ? <Canvas
+      title={view === "data" ? "正式数据资产血缘" : view === "definition" ? "计算与语义依赖" : "静态使用关系"}
+      nodes={nodes}
+      edges={edges}
+      onNode={id => { const node = sourceNodes.find(item => item.id === id); if (node?.entry_id) onNavigate(node); }}
+    /> : null}
+    {nodes.length ? <p className={styles.graphMeta}>{nodes.length} 个节点 · {edges.length} 条关系 · {range === "full" ? "全链" : `${range} 跳`}</p> : null}
+    {nodes.length ? <details className={styles.technical}><summary>范围、限制与关系依据</summary>
+      {boundaryEdges || omittedNodes ? <p className={styles.graphNote} data-testid="lineage-boundary">当前视图还有 {boundaryEdges} 条边越过边界；{omittedNodes} 个闭包内节点因预算未显示。</p> : null}
+      <p className={styles.graphNote}>{scope}</p>
+      <ul>{normalizedEvidence.map(edge => <li key={edge.id}><button type="button" onClick={() => setEdgeId(edge.id)}>
+        {names.get(edge.source)} → {names.get(edge.target)}：{edge.transformations.join(" / ")}
+      </button></li>)}</ul>
+    </details> : null}
     {evidence ? <div className={styles.explanation} data-testid="lineage-evidence">
-      <strong>{names.get(evidence.source)} → {names.get(evidence.target)}</strong><p>{evidence.label} · {grains[evidence.grain]}</p>
-      <p>加工定义依据（非运行回执）</p><code>{evidence.evidence.path} · {evidence.evidence.locator}</code><p>{evidence.evidence.sha256}</p>
+      <strong>{names.get(evidence.source)} → {names.get(evidence.target)}</strong>
+      <p>{evidence.transformations.join("；")}</p>
+      {evidence.fieldMappings.length ? <><p>精确字段映射</p><ul>{evidence.fieldMappings.map(mapping => <li key={`${mapping.source_field}:${mapping.target_field}`}><code>{mapping.source_field} → {mapping.target_field}</code></li>)}</ul></> : null}
+      {evidence.notes.map(note => <p key={note}>{note}</p>)}
+      <p>定义依据（非运行回执）</p>{evidence.evidence.map(item => <p key={`${item.path}:${item.locator}`}><code>{item.path} · {item.locator}</code><br /><code>{item.sha256}</code></p>)}
       <button type="button" onClick={() => setEdgeId(null)}>收起依据</button>
     </div> : null}
   </section>;

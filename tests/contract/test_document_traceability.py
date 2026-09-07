@@ -1335,11 +1335,17 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )["items"]
         catalog_ids = {item["id"] for item in catalog_plan}
         self.assertEqual(catalog_ids, {"P3-DICT-002", *[f"P3-DICT-002-{c}" for c in "ABCD"]})
-        for declared in catalog_plan:
+        lineage_plan = json.loads(
+            (root / "config/data-catalog-lineage-v2-delivery.v1.json").read_text()
+        )["items"]
+        lineage_ids = {item["id"] for item in lineage_plan}
+        self.assertEqual(lineage_ids, {"P3-DICT-003", *[f"P3-DICT-003-{c}" for c in "ABCD"]})
+        for declared in [*catalog_plan, *lineage_plan]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
+        catalog_owned_ids = catalog_ids | lineage_ids
         p3_items = [item for item in items
-                    if item.phase == "P3" and item.stable_id not in catalog_ids]
+                    if item.phase == "P3" and item.stable_id not in catalog_owned_ids]
         p4_items = [item for item in items if item.phase == "P4"]
         pk_items = [item for item in items if item.phase == "PK"]
 

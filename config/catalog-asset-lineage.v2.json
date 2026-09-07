@@ -1,0 +1,57 @@
+{
+  "schema_version": "2.0.0",
+  "authority": "reviewed_governed_asset_lineage",
+  "scope": "Data Lineage nodes are governed ODS/DWD/Research ADM assets only; fields are nested asset coordinates and processing is edge metadata.",
+  "additional_ods_assets": [
+    {"dataset_id":"raw_f10","display_name":"F10 原始业务数据","description":"周度 ODS F10 业务数据，提供股本结构与主要股东研究输入。","contract_section":"weekly_artifacts","contract_index":1},
+    {"dataset_id":"financial_statements","display_name":"完整财务报表","description":"周度 ODS 完整三表封装，解码后形成财报、科目与原子事实。","contract_section":"weekly_artifacts","contract_index":2},
+    {"dataset_id":"security_lifecycle","display_name":"证券生命周期","description":"周度 ODS 证券生命周期业务资产，补充公司、证券、标识和上市关系。","contract_section":"weekly_artifacts","contract_index":8},
+    {"dataset_id":"industry_membership","display_name":"行业成员关系","description":"周度 ODS 行业成员业务资产，形成行业方案、节点与公司行业成员关系。","contract_section":"weekly_artifacts","contract_index":9}
+  ],
+  "additional_ods_dwd_relations": [
+    {"source_asset":"raw_f10","contract_section":"weekly_artifacts","contract_index":1},
+    {"source_asset":"financial_statements","contract_section":"weekly_artifacts","contract_index":2},
+    {"source_asset":"security_lifecycle","contract_section":"weekly_artifacts","contract_index":8},
+    {"source_asset":"industry_membership","contract_section":"weekly_artifacts","contract_index":9},
+    {"source_asset":"announcement_archive","contract_section":"container_members","contract_index":4}
+  ],
+  "ods_dwd_field_mappings": [
+    {
+      "source_asset": "daily_ohlcv_unadjusted",
+      "target_asset": "dwd_security_bar",
+      "transformation": "历史身份与交易日对齐后，将未复权行情转换为 DWD 精确定点行情字段。",
+      "evidence": {"path":"src/quanthus/pipelines/securities_warehouse/market_observation.py","locator":"_bar_query"},
+      "field_mappings": [
+        ["open","open"],
+        ["high","high"],
+        ["low","low"],
+        ["close","close"],
+        ["volume","volume"],
+        ["amount","turnover"]
+      ]
+    },
+    {
+      "source_asset": "adjustment_factors_pit",
+      "target_asset": "dwd_adjustment_factor",
+      "transformation": "解析源生效日期并标准化为 UTC 有效期起点。",
+      "evidence": {"path":"src/quanthus/pipelines/securities_warehouse/disclosure_event.py","locator":"materialize_adjustment_factor_rows / _effective_start"},
+      "field_mappings": [["effective_date","effective_from"]]
+    },
+    {
+      "source_asset": "adjustment_factors_pit",
+      "target_asset": "dwd_adjustment_factor_input",
+      "transformation": "保留复权因子输入证据并标准化有效期起点。",
+      "evidence": {"path":"src/quanthus/pipelines/securities_warehouse/disclosure_event.py","locator":"materialize_adjustment_factor_rows / _effective_start"},
+      "field_mappings": [["effective_date","effective_from"]]
+    }
+  ],
+  "definition_dependency": {
+    "include_kinds": ["feature_spec", "label_card", "semantic_concept"],
+    "process_nodes_are_edges": true,
+    "temporary_projection_nodes_visible": false
+  },
+  "usage_dependency": {
+    "sources": ["catalog-adm-assets.v1 consumers", "reviewed declared consumers"],
+    "actual_run_usage_authority": "operation audit log, not static Catalog"
+  }
+}

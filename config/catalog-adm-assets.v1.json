@@ -1,0 +1,172 @@
+{
+  "schema_version": "1.0.0",
+  "authority": "governed_research_adm_asset_registry",
+  "assets": [
+    {
+      "dataset_id": "p4-event-research-adm.candidate_daily",
+      "adm_id": "p4-event-research-adm",
+      "adm_version": "1.1.0",
+      "member": "candidate_daily.parquet",
+      "display_name": "P4 Research ADM · 候选日数据",
+      "description": "P4 Event Library 使用的正式日级候选与资格输入数据集，由受治理 DWD 资产形成并绑定 ADM manifest。",
+      "grain": "证券 × 交易日",
+      "policy_path": "config/p4-research-adm.v1.json",
+      "policy_pointer": "/assets/candidate_daily",
+      "fields": [
+        {"name":"dwd_security_id","display_name":"DWD证券标识","description":"受治理 DWD security_id。"},
+        {"name":"dwd_company_id","display_name":"DWD公司标识","description":"受治理 DWD company_id。"},
+        {"name":"dwd_listing_id","display_name":"DWD上市标识","description":"受治理 DWD listing_id。"},
+        {"name":"listing_code","display_name":"上市代码","description":"当前候选行使用的上市代码。"},
+        {"name":"venue_id","display_name":"交易场所标识","description":"受治理交易场所标识。"},
+        {"name":"instrument_type","display_name":"证券工具类型","description":"由 DWD 证券主数据带入的工具类型。"},
+        {"name":"session_date","display_name":"交易日","description":"候选观察对应的交易日。"},
+        {"name":"listing_sessions","display_name":"上市交易日序号","description":"按上市标识累计的交易日序号。"},
+        {"name":"open_price","display_name":"开盘价","description":"候选日未复权开盘价。"},
+        {"name":"high_price","display_name":"最高价","description":"候选日未复权最高价。"},
+        {"name":"low_price","display_name":"最低价","description":"候选日未复权最低价。"},
+        {"name":"close_price","display_name":"收盘价","description":"候选日未复权收盘价。"},
+        {"name":"turnover","display_name":"成交额","description":"候选日成交金额，不是换手率。"},
+        {"name":"is_tradable","display_name":"是否可交易","description":"由 DWD 可交易状态投影出的候选日可交易标记。"},
+        {"name":"adjustment_effective","display_name":"当日是否存在复权边界","description":"候选交易日是否匹配到复权因子生效边界。"},
+        {"name":"factor_effective_from","display_name":"复权因子有效期起点","description":"与候选交易日匹配的复权因子有效期起点。"},
+        {"name":"factor_boundary_count","display_name":"复权边界记录数","description":"同证券同生效日参与边界汇总的因子记录数。"},
+        {"name":"dwd_bar_knowledge_from","display_name":"行情版本可知起点","description":"上游 DWD 行情记录的 knowledge_from。"},
+        {"name":"dwd_bar_source_record_id","display_name":"行情源记录标识","description":"上游 DWD 行情记录的 source_record_id。"},
+        {"name":"dwd_bar_source_revision","display_name":"行情源修订","description":"上游 DWD 行情记录的 source_revision。"},
+        {"name":"dwd_bar_source_artifact_sha256","display_name":"行情源工件摘要","description":"上游 DWD 行情记录绑定的源工件 SHA-256。"},
+        {"name":"dwd_security_effective_from","display_name":"证券主数据有效期起点","description":"证券主数据版本的业务有效期起点。"},
+        {"name":"dwd_listing_effective_from","display_name":"上市主数据有效期起点","description":"上市关系版本的业务有效期起点。"},
+        {"name":"dwd_security_knowledge_from","display_name":"证券主数据可知起点","description":"证券主数据版本的 knowledge_from。"},
+        {"name":"dwd_listing_knowledge_from","display_name":"上市主数据可知起点","description":"上市关系版本的 knowledge_from。"},
+        {"name":"dwd_state_knowledge_from","display_name":"可交易状态可知起点","description":"DWD 可交易状态版本的 knowledge_from。"},
+        {"name":"dwd_factor_knowledge_from","display_name":"复权因子可知起点","description":"参与候选边界的 DWD 复权因子最大 knowledge_from。"}
+      ],
+      "upstream": [
+        {"source_asset":"dwd_security","transformation":"证券身份字段进入候选日数据。","evidence":{"path":"src/quanthus/backtest/direct_dwd_provider.py","locator":"daily-universe / daily-ohlcv identity projection"},"field_mappings":[["security_id","dwd_security_id"],["company_id","dwd_company_id"],["instrument_type","instrument_type"],["effective_from","dwd_security_effective_from"],["knowledge_from","dwd_security_knowledge_from"]]},
+        {"source_asset":"dwd_listing","transformation":"上市身份、代码与场所字段进入候选日数据。","evidence":{"path":"src/quanthus/backtest/direct_dwd_provider.py","locator":"daily-universe / daily-ohlcv listing projection"},"field_mappings":[["listing_id","dwd_listing_id"],["listing_code","listing_code"],["venue_id","venue_id"],["effective_from","dwd_listing_effective_from"],["knowledge_from","dwd_listing_knowledge_from"]]},
+        {"source_asset":"dwd_trading_calendar","transformation":"权威交易日历对齐候选交易日。","evidence":{"path":"src/quanthus/backtest/direct_dwd_provider.py","locator":"daily-universe calendar join"},"field_mappings":[["trade_date","session_date"]]},
+        {"source_asset":"dwd_security_bar","transformation":"未复权日行情与来源证据进入 P4 候选数据。","evidence":{"path":"src/quanthus/event_library/physical_scan.py","locator":"materialize_p4_research_adm candidate SELECT"},"field_mappings":[["open","open_price"],["high","high_price"],["low","low_price"],["close","close_price"],["turnover","turnover"],["knowledge_from","dwd_bar_knowledge_from"],["source_record_id","dwd_bar_source_record_id"],["source_revision","dwd_bar_source_revision"],["source_artifact_sha256","dwd_bar_source_artifact_sha256"]]},
+        {"source_asset":"dwd_tradability_state","transformation":"DWD 可交易状态投影为候选日 is_tradable，并保留版本可知起点。","evidence":{"path":"src/quanthus/backtest/direct_dwd_provider.py","locator":"price-limit-execution projection"},"field_mappings":[["is_tradable","is_tradable"],["knowledge_from","dwd_state_knowledge_from"]]},
+        {"source_asset":"dwd_adjustment_factor","transformation":"按证券与生效日汇总复权因子边界并与候选交易日匹配。","evidence":{"path":"src/quanthus/event_library/physical_scan.py","locator":"factor_boundary AS"},"field_mappings":[["effective_from","factor_effective_from"],["effective_from","adjustment_effective"],["knowledge_from","dwd_factor_knowledge_from"]]}
+      ],
+      "consumers": [
+        {"consumer_id":"p4-event-library","display_name":"P4 Event Library","kind":"application","description":"消费 P4 Research ADM 生成事件库；不代表某次 Job 已实际执行。"}
+      ]
+    },
+    {
+      "dataset_id": "p4-event-research-adm.static_industry_mapping",
+      "adm_id": "p4-event-research-adm",
+      "adm_version": "1.1.0",
+      "member": "static_industry_mapping.json",
+      "display_name": "P4 Research ADM · 静态行业映射",
+      "description": "P4 浓度控制使用的静态、非 PIT 行业映射数据集；DWD 当前行业成员优先，历史缺口按冻结外部证据补充。",
+      "grain": "证券",
+      "policy_path": "config/p4-research-adm.v1.json",
+      "policy_pointer": "/assets/static_industry_mapping",
+      "fields": [
+        {"name":"security_id","display_name":"证券标识","description":"受治理 DWD security_id。"},
+        {"name":"stock_code","display_name":"证券代码","description":"用于历史补充匹配的上市代码。"},
+        {"name":"exchange","display_name":"交易所","description":"证券上市交易场所。"},
+        {"name":"level1_industry_id","display_name":"一级行业标识","description":"用于静态浓度控制的一级行业节点标识。"}
+      ],
+      "upstream": [
+        {"source_kind":"adm","source_asset":"p4-event-research-adm.candidate_daily","transformation":"以 P4 候选日数据的受治理证券身份集合定义静态行业映射覆盖范围，并带入代码与场所身份。","evidence":{"path":"src/quanthus/event_library/physical_scan.py","locator":"_materialize_dwd_static_industry_mapping candidate_path"},"field_mappings":[["dwd_security_id","security_id"],["listing_code","stock_code"],["venue_id","exchange"]]},
+        {"source_asset":"dwd_company_industry_membership","transformation":"优先使用当前有效 PRIMARY_CLASSIFICATION 公司行业成员关系，并通过行业节点层级归约到一级行业。","evidence":{"path":"src/quanthus/event_library/physical_scan.py","locator":"p4_static_industry_resolved membership"},"field_mappings":[["industry_node_id","level1_industry_id"]]},
+        {"source_asset":"dwd_industry_node","transformation":"沿受治理行业节点父链归约到一级行业节点。","evidence":{"path":"src/quanthus/event_library/physical_scan.py","locator":"p4_static_industry_resolved nodes"},"field_mappings":[["industry_node_id","level1_industry_id"],["parent_node_id","level1_industry_id"]]}
+      ],
+      "consumers": [
+        {"consumer_id":"p4-event-library-concentration","display_name":"P4 行业集中度控制","kind":"application","description":"仅用于静态非 PIT 集中度约束。"}
+      ]
+    },
+    {
+      "dataset_id": "structure-research-adm.rows",
+      "adm_id": "structure-research-adm",
+      "adm_version": "0.1.0",
+      "member": "semantic_rows",
+      "display_name": "Structure Research ADM · 结构状态行",
+      "description": "Structure MVP 的薄 Research ADM，以证券交易日为粒度保存结构状态及其 DWD 证据绑定。",
+      "grain": "证券 × 交易日",
+      "policy_path": "config/structure-research-adm.mvp.v1.json",
+      "policy_pointer": "/",
+      "fields": [
+        {"name":"market_date","display_name":"交易日","description":"结构观察对应的交易日。"},
+        {"name":"security_code","display_name":"证券代码","description":"兼容研究代码。"},
+        {"name":"dwd_security_id","display_name":"DWD证券标识","description":"受治理 DWD security_id。"},
+        {"name":"snapshot_id","display_name":"上游快照标识","description":"该 ADM 行绑定的上游研究快照。"},
+        {"name":"knowledge_cutoff","display_name":"知识截止时间","description":"该结构观察允许使用的信息截止时间。"},
+        {"name":"state","display_name":"结构状态","description":"MVP 粗结构状态，仅用于已批准技术证明范围。"},
+        {"name":"close","display_name":"收盘价","description":"输入结构判断的未复权收盘价。"},
+        {"name":"prior_high20","display_name":"此前20期最高价","description":"不含当日的前20个有效交易日最高价。"},
+        {"name":"prior_low20","display_name":"此前20期最低价","description":"不含当日的前20个有效交易日最低价。"},
+        {"name":"volume_ratio20","display_name":"20期量比","description":"当前成交量相对此前20期均量的比值。"},
+        {"name":"source_revision","display_name":"源修订","description":"绑定上游 DWD 行情源修订。"},
+        {"name":"source_artifact_sha256","display_name":"源工件摘要","description":"绑定上游 DWD 行情源工件 SHA-256。"},
+        {"name":"reason_code","display_name":"状态原因码","description":"结构状态形成的原因码。"}
+      ],
+      "upstream": [
+        {"source_asset":"dwd_security","transformation":"保留受治理 DWD 证券身份。","evidence":{"path":"src/quanthus/structure_intelligence.py","locator":"source_row_from_direct_dwd_projection"},"field_mappings":[["security_id","dwd_security_id"]]},
+        {"source_asset":"dwd_trading_calendar","transformation":"交易日作为结构观察坐标。","evidence":{"path":"src/quanthus/structure_intelligence.py","locator":"source_row_from_direct_dwd_projection"},"field_mappings":[["trade_date","market_date"]]},
+        {"source_asset":"dwd_security_bar","transformation":"从未复权行情形成结构状态、此前20期参照和量比。","evidence":{"path":"src/quanthus/structure_intelligence.py","locator":"build_structure_research_adm"},"field_mappings":[["close","close"],["high","prior_high20"],["low","prior_low20"],["volume","volume_ratio20"],["source_revision","source_revision"],["source_artifact_sha256","source_artifact_sha256"]]}
+      ],
+      "consumers": [
+        {"consumer_id":"structure-mvp-expert","display_name":"Structure MVP Expert","kind":"expert","description":"消费薄 Structure Research ADM 的技术证明专家；非正式投资专家。"}
+      ]
+    },
+    {
+      "dataset_id": "structure-continuous-facts.rows",
+      "adm_id": "structure-continuous-facts",
+      "adm_version": "1.0.0",
+      "member": "semantic_rows",
+      "display_name": "Continuous Structure Facts · 连续结构事实",
+      "description": "受治理的连续结构事实 ADM，以证券交易日为粒度发布滚动参照、距离和 episode 事实供直接消费。",
+      "grain": "证券 × 交易日",
+      "policy_path": "config/structure-continuous-facts.research.v1.json",
+      "policy_pointer": "/",
+      "fields": [
+        {"name":"market_date","display_name":"交易日","description":"事实观察对应的交易日。"},
+        {"name":"security_code","display_name":"证券代码","description":"兼容研究代码。"},
+        {"name":"dwd_security_id","display_name":"DWD证券标识","description":"受治理 DWD security_id。"},
+        {"name":"snapshot_id","display_name":"上游快照标识","description":"该事实行绑定的上游研究快照。"},
+        {"name":"knowledge_cutoff","display_name":"知识截止时间","description":"该事实观察允许使用的信息截止时间。"},
+        {"name":"source_revision","display_name":"源修订","description":"绑定上游 DWD 行情源修订。"},
+        {"name":"source_artifact_sha256","display_name":"源工件摘要","description":"绑定上游 DWD 行情源工件 SHA-256。"},
+        {"name":"source_close","display_name":"源收盘价","description":"形成连续结构事实的未复权收盘价。"},
+        {"name":"available","display_name":"结构事实是否可用","description":"此前历史是否足以形成结构事实。"},
+        {"name":"availability_reason","display_name":"不可用原因","description":"结构事实不可用时的明确原因。"},
+        {"name":"history_reset","display_name":"历史窗口是否重置","description":"输入缺口是否触发历史窗口重置。"},
+        {"name":"source_window_start","display_name":"源窗口起点","description":"滚动参照使用的源窗口起点。"},
+        {"name":"source_window_end","display_name":"源窗口终点","description":"滚动参照使用的源窗口终点，不含当前日。"},
+        {"name":"rolling_resistance20","display_name":"20期滚动阻力","description":"此前20个有效交易日最高价。"},
+        {"name":"rolling_support20","display_name":"20期滚动支撑","description":"此前20个有效交易日最低价。"},
+        {"name":"resistance_margin","display_name":"阻力距离","description":"当前收盘相对滚动阻力的连续距离。"},
+        {"name":"support_margin","display_name":"支撑距离","description":"当前收盘相对滚动支撑的连续距离。"},
+        {"name":"volume_ratio20","display_name":"20期量比","description":"当前成交量相对此前20期均量的比值。"},
+        {"name":"episode_id","display_name":"结构过程标识","description":"冻结结构过程的稳定标识。"},
+        {"name":"episode_status","display_name":"结构过程状态","description":"当前结构过程状态。"},
+        {"name":"episode_termination_reason","display_name":"过程终止原因","description":"结构过程结束时的明确原因。"},
+        {"name":"attempt_at","display_name":"突破尝试日","description":"结构过程首次突破尝试日期。"},
+        {"name":"attempt_snapshot_id","display_name":"尝试快照标识","description":"突破尝试对应的上游快照。"},
+        {"name":"breakout_level","display_name":"冻结突破位","description":"结构过程创建时冻结的突破水平。"},
+        {"name":"episode_support_level","display_name":"冻结支撑位","description":"结构过程创建时冻结的支撑水平。"},
+        {"name":"attempt_volume_ratio20","display_name":"尝试日20期量比","description":"突破尝试日的独立量比事实。"},
+        {"name":"episode_anchor_window_start","display_name":"过程参照窗口起点","description":"过程创建所用参照窗口起点。"},
+        {"name":"episode_anchor_window_end","display_name":"过程参照窗口终点","description":"过程创建所用参照窗口终点。"},
+        {"name":"breakout_margin","display_name":"突破位距离","description":"当前收盘相对冻结突破位的连续距离。"},
+        {"name":"episode_support_margin","display_name":"冻结支撑位距离","description":"当前收盘相对冻结支撑位的连续距离。"},
+        {"name":"post_attempt_hold_count","display_name":"突破后保持次数","description":"突破尝试后满足保持条件的交易日次数。"},
+        {"name":"episode_age_sessions","display_name":"过程年龄","description":"结构过程经历的有效交易日数量。"}
+      ],
+      "upstream": [
+        {"source_asset":"dwd_security","transformation":"保留受治理 DWD 证券身份。","evidence":{"path":"src/quanthus/structure_facts.py","locator":"build_continuous_structure_facts"},"field_mappings":[["security_id","dwd_security_id"]]},
+        {"source_asset":"dwd_trading_calendar","transformation":"交易日作为连续事实时间坐标。","evidence":{"path":"src/quanthus/structure_facts.py","locator":"build_continuous_structure_facts"},"field_mappings":[["trade_date","market_date"]]},
+        {"source_asset":"dwd_security_bar","transformation":"从未复权行情形成连续滚动参照、距离、量比和结构过程。","evidence":{"path":"src/quanthus/structure_facts.py","locator":"build_continuous_structure_facts"},"field_mappings":[["close","source_close"],["high","rolling_resistance20"],["low","rolling_support20"],["close","resistance_margin"],["close","support_margin"],["volume","volume_ratio20"],["source_revision","source_revision"],["source_artifact_sha256","source_artifact_sha256"]]}
+      ],
+      "consumers": [
+        {"consumer_id":"continuous-structure-expert","display_name":"Continuous Structure Expert","kind":"expert","description":"直接消费连续结构事实的受治理研究消费者；实际运行使用另由审计记录证明。"}
+      ]
+    }
+  ],
+  "excluded": [
+    {"identity":"quanthus.structure-v2-adm.v1","reason":"当前是固定 B1-B5 Run 内 manifest-bound 结果面，尚未冻结独立稳定 ADM asset policy；不得由 Catalog 自行提升为长期共享数据资产。"}
+  ]
+}

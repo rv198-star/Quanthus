@@ -15,6 +15,7 @@ TIME_PROFILES = {
 UNITS = {"index": "指数值", "ratio": "比例值（无量纲）", "percent": "百分数",
          "decimal": "按精确规格解释", "percentage": "百分数"}
 KINDS = {"ods_dataset": "原始来源数据集", "dwd_table": "规范业务表", "dwd_field": "规范业务字段",
+         "adm_dataset": "Research ADM 数据资产", "adm_field": "Research ADM 字段",
          "feature_spec": "已登记指标规格", "label_card": "规则标签", "semantic_family": "概念分类",
          "semantic_concept": "语义概念"}
 
@@ -80,8 +81,27 @@ def apply_presentation(entries: dict[str, dict[str, Any]], metadata: dict[str, A
                     else:
                         fact("计量口径", "未复权证券报价；结合该行币种及行情区间")
             cautions.append("历史回溯数据不自动证明当时公开或平台当时可知；实际使用记录属于决策审计。")
+        elif kind in {"adm_dataset", "adm_field"}:
+            name, description = item["display_name"], item["description"]
+            if not CHINESE.search(name) or not CHINESE.search(description):
+                raise ValueError(f"ADM asset Chinese name/description missing: {canonical}")
+            fact("ADM 身份", f"{details['adm_id']}@{details['adm_version']}")
+            fact("数据粒度", details.get("grain"))
+            if kind == "adm_dataset":
+                fact("物理成员", details.get("member"))
+                fact("用途", "受治理 Research ADM 数据资产；不改写 DWD 权威")
+                cautions.append("ADM 是应用数据边界，不是 generic DWS、历史 ADS 或交易执行权限。")
+            else:
+                fact("所属 ADM 数据集", details.get("dataset_id"))
+                fact("字段", details.get("field"))
+                cautions.append("该字段属于 Research ADM 应用数据资产；其计算/转换依据请查看数据血缘箭头。")
         else:
-            name, description = _pair(metadata["objects"].get(canonical), canonical, original)
+            if kind == "ods_dataset" and details.get("lineage_v2_additional_asset"):
+                name, description = item["display_name"], original
+                if not CHINESE.search(name) or not CHINESE.search(description):
+                    raise ValueError(f"catalog Chinese name/description missing: {canonical}")
+            else:
+                name, description = _pair(metadata["objects"].get(canonical), canonical, original)
             if kind == "feature_spec":
                 unit = details.get("unit")
                 fact("结果单位", UNITS.get(unit, "按该规格的精确单位解释；见技术详情"))
@@ -115,4 +135,4 @@ def apply_presentation(entries: dict[str, dict[str, Any]], metadata: dict[str, A
         item["keywords"] = sorted(set([*item["keywords"], name]))
         details["source_description"] = original
         details["reading"] = {"facts": facts, "cautions": list(dict.fromkeys(cautions)),
-                              "metadata_authority": "config/catalog-business-metadata.v1.json"}
+                              "metadata_authority": details.get("reading_authority", "config/catalog-business-metadata.v1.json")}

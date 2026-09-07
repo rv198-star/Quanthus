@@ -4,8 +4,8 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | accepted |
-| Governing work item | `P3-DICT-001` foundation; `P3-DICT-002` productization |
-| Productization | `data-indicator-catalog-productization.md` (separate delivery gate) |
+| Governing work item | `P3-DICT-001` foundation; `P3-DICT-002` productization; `P3-DICT-003` Lineage V2 |
+| Productization | `data-indicator-catalog-productization.md`; active Lineage V2 successor: `data-catalog-lineage-v2.md` |
 | GitHub parent | #215 |
 | Parent LLD | `lld/03-label-feature-system.md` |
 | Data authority | existing ODS/DWD contracts, registries and semantic catalogs |
@@ -44,6 +44,7 @@ warehouse. Source contracts remain authoritative when a Catalog entry is incompl
 6. Explicit legacy/compatibility relationships.
 7. Internal maintenance gap records for missing metadata or unsupported equivalence; not a business homepage dashboard.
 8. Reviewed Chinese reading metadata and evidence-bound declared processing graphs under `P3-DICT-002`.
+9. `P3-DICT-003` adds governed Research ADM datasets/fields and separates formal ODS→DWD→ADM Data Lineage from definition and usage dependency graphs; its delivery gate remains separate until production closeout.
 
 ### Not included in v1
 

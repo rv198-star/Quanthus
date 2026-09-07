@@ -38,6 +38,7 @@ async function installCatalogFixture(page: Page) {
       if (kind === "relations") {
         options.depth = Number(url.searchParams.get("depth") ?? 2);
         options.limit = Number(url.searchParams.get("limit") ?? 60);
+        options.asset_scope = url.searchParams.get("asset_scope") ?? "full";
       }
     }
     const response = await execute(process.env.QUANTHUS_PYTHON ?? "python3", ["-c", pythonQuery, kind, JSON.stringify(options)], {
@@ -67,7 +68,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     const technical = page.getByTestId("technical-details");
     await expect(technical).not.toHaveAttribute("open", "");
     const focusView = page.getByTestId("lineage-focus");
-    await expect(focusView).toContainText("收盘价");
+    await expect(focusView).toContainText("字段：close");
     const graphCanvas = focusView.getByTestId("lineage-canvas").first();
     const graphViewport = focusView.getByTestId("lineage-viewport").first();
     const graphBox = await graphCanvas.boundingBox();
@@ -95,7 +96,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
         Math.abs((world.top + world.bottom) / 2 - (canvas.top + canvas.bottom) / 2));
     })).toBeLessThan(3);
     await focusView.getByRole("button", { name: "居中当前焦点" }).first().click();
-    const centerNode = focusView.locator('[data-lineage-node="dwd_field:dwd_security_bar.close"]');
+    const centerNode = focusView.locator('[data-lineage-node="dwd_table:dwd_security_bar"]');
     await expect.poll(async () => centerNode.evaluate(element => {
       const node = element.getBoundingClientRect();
       const canvas = element.closest('[data-testid="lineage-viewport"]')!.getBoundingClientRect();
@@ -116,40 +117,57 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await page.mouse.wheel(0, -240);
       await expect.poll(() => zoomReadout.textContent()).not.toBe(beforeWheel);
     }
-    const upstream = page.locator('[data-lineage-node="source-field:daily_ohlcv_unadjusted.close"]');
-    await expect(upstream).toBeVisible();
-    await page.getByRole("combobox", { name: "血缘展开层数" }).selectOption("3");
-    await expect(page.getByTestId("lineage-focus")).toContainText("受展开层数和节点预算限制");
-    await page.locator('[data-lineage-node="projection:daily_ohlcv_none.close"]').click();
-    await expect(page.getByTestId("lineage-focus")).toContainText("当前焦点：研究日线 · 收盘价");
-    await page.getByRole("button", { name: "返回当前卡片的血缘" }).click();
+    await expect(page.getByTestId("lineage-coverage-level")).toContainText("字段全链已登记");
+    for (const id of [
+      "ods_dataset:daily_ohlcv_unadjusted",
+      "dwd_table:dwd_security_bar",
+      "adm_dataset:p4-event-research-adm.candidate_daily",
+      "adm_dataset:structure-research-adm.rows",
+      "adm_dataset:structure-continuous-facts.rows",
+    ]) await expect(page.locator(`[data-lineage-node="${id}"]`)).toBeVisible();
+    await expect(page.locator('[data-lineage-node^="process:"]')).toHaveCount(0);
+    await expect(page.locator('[data-lineage-node^="projection:"]')).toHaveCount(0);
+    await page.getByRole("combobox", { name: "血缘查看范围" }).selectOption("1");
+    await expect(page.getByTestId("lineage-focus")).toContainText("1 跳");
+    await page.getByRole("combobox", { name: "血缘查看范围" }).selectOption("full");
+    await expect(page.getByTestId("lineage-focus")).toContainText("全链");
+
+    await search(page, "dwd_adjustment_factor.effective_from");
+    await expect(page.getByTestId("lineage-coverage-level")).toContainText("字段全链已登记");
+    await expect(page.locator('[data-lineage-node="ods_dataset:adjustment_factors_pit"]')).toBeVisible();
+    await expect(page.locator('[data-lineage-node="dwd_table:dwd_adjustment_factor"]')).toBeVisible();
+    await expect(page.locator('[data-lineage-node="adm_dataset:p4-event-research-adm.candidate_daily"]')).toBeVisible();
+    await expect(page.locator('[data-lineage-node^="source-field:"]')).toHaveCount(0);
+    await expect(page.locator('[data-lineage-node^="projection:"]')).toHaveCount(0);
+
+    await search(page, "dwd_adjustment_factor.factor_value");
+    await expect(page.getByTestId("lineage-coverage-level")).toContainText("仅资产级上下文");
+    await expect(page.getByTestId("lineage-focus").getByTestId("lineage-canvas")).toHaveCount(1);
+    await expect(page.getByTestId("lineage-focus")).toContainText("不推断字段映射");
+
+    await search(page, "price.sma20@1.0.0");
+    await expect(page.getByTestId("business-description")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "计算依赖" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("lineage-focus")).toContainText("总回报指数");
+    await expect(page.locator('[data-lineage-node^="process:"]')).toHaveCount(0);
+    await expect(page.locator('[data-lineage-node^="projection:"]')).toHaveCount(0);
+    await page.getByRole("tab", { name: "数据血缘" }).click();
+    await expect(page.getByTestId("lineage-focus")).toContainText("不是已登记正式数据资产");
+    await page.getByRole("tab", { name: "计算依赖" }).click();
+
+    await search(page, "p4-event-research-adm.candidate_daily");
+    await expect(page.getByTestId("business-description")).toContainText("P4 Event Library");
+    await page.getByRole("tab", { name: "使用关系" }).click();
+    await expect(page.getByTestId("lineage-focus")).toContainText("P4 Event Library");
+    await page.getByRole("tab", { name: "数据血缘" }).click();
+    await expect(page.locator('[data-lineage-node="consumer:p4-event-library"]')).toHaveCount(0);
+
     await page.getByRole("button", { name: "全局血缘地图" }).click();
     const global = page.getByTestId("lineage-overview");
     await expect(global).toBeVisible();
-    await global.locator('[data-lineage-node="indicator"]').focus();
-    await page.keyboard.press("Enter");
-    await global.getByRole("button", { name: "20期简单均线（总回报指数）", exact: false }).click();
-    await expect(page.getByTestId("business-description")).toContainText("包含当前时段");
-    await expect(page.getByTestId("catalog-detail")).toContainText("完整研究管道");
-    await search(page, "dwd_adjustment_factor");
-    const factorTableGraph = page.getByTestId("lineage-focus");
-    for (const exactId of ["adjustment_factors_pit", "adjustment_evidence_delta", "factor_evidence_delta", "adjustment_evidence", "dwd_adjustment_factor"]) {
-      await expect(factorTableGraph).toContainText(exactId);
-    }
-    await expect(factorTableGraph).not.toContainText("复权因子来源 · 日发布工件");
-    await expect(page.locator('[data-lineage-node="process:release_artifacts-adjustment_evidence_delta"]')).toHaveCount(0);
-    await search(page, "dwd_adjustment_factor.effective_from");
-    await expect(page.getByTestId("lineage-coverage-level")).toContainText("字段级血缘");
-    await expect(page.locator('[data-lineage-node="source-field:adjustment_factors_pit.effective_date"]')).toBeVisible();
-    await expect(page.locator('[data-lineage-node="projection:p4-event.factor_effective_from"]')).toBeVisible();
-    await search(page, "dwd_adjustment_factor.factor_value");
-    await expect(page.getByTestId("lineage-coverage-level")).toContainText("表级上下文");
-    await expect(page.getByTestId("table-lineage-context")).toBeVisible();
-    await expect(page.getByTestId("lineage-focus").getByTestId("lineage-canvas")).toHaveCount(1);
-    await expect(page.getByTestId("lineage-focus").getByRole("heading", { name: "所属表已证明的加工上下文" })).toHaveCount(0);
-    await search(page, "indicator.momentum.macd");
-    await expect(page.getByTestId("catalog-detail")).toContainText("暂无");
-    await expect(page.getByTestId("lineage-focus")).toContainText("不能据此认定");
+    for (const id of ["ods", "dwd", "adm"]) await expect(global.locator(`[data-lineage-node="${id}"]`)).toBeVisible();
+    await expect(global).toContainText("70/94 个正式资产已接入血缘");
+    await expect(global.locator('[data-lineage-node="indicator"]')).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await page.screenshot({ path: info.outputPath(`catalog-${viewport.width}.png`), fullPage: true });
     expect(errors).toEqual([]);

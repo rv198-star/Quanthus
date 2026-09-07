@@ -65,6 +65,8 @@ export type CatalogKind =
   | "ods_dataset"
   | "dwd_table"
   | "dwd_field"
+  | "adm_dataset"
+  | "adm_field"
   | "feature_spec"
   | "label_card"
   | "semantic_family"
@@ -116,6 +118,7 @@ export interface DataCatalogSummary {
     counts_by_kind: Record<string, number>;
   };
   lineage_overview: CatalogLineageOverview;
+  asset_lineage_overview: CatalogAssetLineageOverview;
 }
 
 export interface DataCatalogSearchResult {
@@ -185,9 +188,97 @@ export interface CatalogLineageOverview {
   edges: Array<{ source: string; target: string; count: number }>;
 }
 
+export interface CatalogAssetLineageNode {
+  id: string;
+  entry_id: string;
+  asset_kind: "ods_dataset" | "dwd_table" | "adm_dataset";
+  layer: "ods" | "dwd" | "adm";
+  label: string;
+  technical_id: string;
+  description: string;
+  distance: number;
+  focus_fields: string[];
+}
+
+export interface CatalogAssetLineageEdge {
+  id: string;
+  source: string;
+  target: string;
+  proof_level: "asset_declared" | "field_proven";
+  transformations: string[];
+  field_mappings: Array<{ source_field: string; target_field: string }>;
+  evidence: Array<{ path: string; locator: string; sha256: string }>;
+  notes: string[];
+}
+
+export interface CatalogAssetLineageGraph {
+  schema_version: string;
+  center: string;
+  center_entry_id: string;
+  center_field: string | null;
+  scope_mode: "full" | "focus";
+  depth: number;
+  limit: number;
+  coverage_level: "asset_full" | "asset_focus" | "field_proven" | "asset_context_only";
+  coverage_message: string;
+  scope: string;
+  omitted_nodes: number;
+  boundary_edges: number;
+  nodes: CatalogAssetLineageNode[];
+  edges: CatalogAssetLineageEdge[];
+}
+
+export interface CatalogAssetLineageOverview {
+  scope: string;
+  registered_asset_count: number;
+  participating_asset_count: number;
+  edge_count: number;
+  layers: Array<{
+    id: "ods" | "dwd" | "adm";
+    label: string;
+    registered_asset_count: number;
+    participating_asset_count: number;
+  }>;
+  edges: Array<{ source: string; target: string; count: number }>;
+}
+
+export interface CatalogDependencyNode {
+  id: string;
+  entry_id: string | null;
+  label: string;
+  technical_id: string;
+  kind: string;
+  description: string;
+  distance: number;
+}
+
+export interface CatalogDependencyEdge {
+  id: string;
+  source: string;
+  target: string;
+  transformations: string[];
+  evidence: Array<{ path: string; locator: string; sha256: string }>;
+}
+
+export interface CatalogDependencyGraph {
+  schema_version: string;
+  scope: string;
+  scope_mode: "full" | "focus";
+  center: string;
+  depth: number;
+  limit: number;
+  omitted_nodes: number;
+  boundary_edges: number;
+  nodes: CatalogDependencyNode[];
+  edges: CatalogDependencyEdge[];
+}
+
 export interface DataCatalogRelations {
   entry_id: string;
   lineage: CatalogLineageGraph;
+  asset_lineage: CatalogAssetLineageGraph | null;
+  definition_dependency: CatalogDependencyGraph | null;
+  usage_dependency: CatalogDependencyGraph | null;
   outgoing: Array<CatalogRelation & { target: CatalogEntrySummary }>;
   incoming: Array<{
     type: string;

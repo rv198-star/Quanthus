@@ -31,10 +31,10 @@ test("Chinese business card precedes collapsed machine details", async () => {
 
 test("lineage has overview, focus, keyboard navigation and honest boundaries", async () => {
   const graph = await source("catalog-lineage.tsx");
-  for (const term of ["lineage-overview", "lineage-focus", "lineage-svg", "lineage-boundary", "lineage-evidence", "lineage-controls", "lineage-viewport", "lineage-minimap", "缩小血缘图", "放大血缘图", "恢复100%缩放", "适配并居中全部血缘图", "居中当前焦点", "onWheel", "ResizeObserver", "onPointerDown", "onPointerMove", "markerEnd", "onKeyDown", "血缘关系", "字段级血缘", "表级上下文", "范围、限制与加工依据", "非运行回执", "visibleEdges"]) {
+  for (const term of ["lineage-overview", "lineage-focus", "lineage-svg", "lineage-boundary", "lineage-evidence", "lineage-controls", "lineage-viewport", "lineage-minimap", "缩小血缘图", "放大血缘图", "恢复100%缩放", "适配并居中全部血缘图", "居中当前焦点", "onWheel", "ResizeObserver", "onPointerDown", "onPointerMove", "markerEnd", "onKeyDown", "正式数据资产全景", "数据血缘", "计算依赖", "使用关系", "完整资产全链", "仅资产级上下文", "范围、限制与关系依据", "非运行回执", "fieldMappings"]) {
     assert.ok(graph.includes(term), term);
   }
-  assert.doesNotMatch(graph, /所属表已证明的加工上下文|上游来源与下游使用/);
+  assert.doesNotMatch(graph, /所属表已证明的加工上下文|上游来源与下游使用|processNode/);
   assert.doesNotMatch(graph, /scrollLeft|scrollTop|scrollWidth|scrollTo\(/);
 });
 

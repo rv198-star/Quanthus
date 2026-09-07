@@ -11,12 +11,24 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from quanthus.catalog_asset_lineage import (
+    build_asset_lineage,
+    focus as focus_asset_lineage,
+    overview as asset_lineage_overview,
+    validate_asset_lineage,
+)
+from quanthus.catalog_dependency import (
+    build_definition_dependency,
+    build_usage_dependency,
+    focus as focus_dependency,
+    validate_dependency_graph,
+)
 from quanthus.catalog_lineage import build_lineage, focus, overview, validate_lineage
 from quanthus.catalog_presentation import apply_presentation
 from quanthus.policy import find_project_root
 
 CATALOG_SCHEMA = "quanthus.data-indicator-catalog.v1"
-BUILDER_VERSION = "data-indicator-catalog-builder-v1.2"
+BUILDER_VERSION = "data-indicator-catalog-builder-v1.3"
 SOURCE_MANIFEST = "config/data-indicator-catalog-sources.v1.json"
 SNAPSHOT_MANIFEST = "config/data-indicator-catalog-snapshot.v1.json"
 ENTRY_KINDS = frozenset(
@@ -24,6 +36,8 @@ ENTRY_KINDS = frozenset(
         "ods_dataset",
         "dwd_table",
         "dwd_field",
+        "adm_dataset",
+        "adm_field",
         "feature_spec",
         "label_card",
         "semantic_family",
@@ -227,6 +241,8 @@ def _load_sources(root: Path, manifest_path: Path) -> tuple[dict[str, Any], list
         "catalog_annotations",
         "catalog_business",
         "catalog_lineage",
+        "adm_registry",
+        "asset_lineage",
     }
     records: list[dict[str, str]] = []
     payloads: dict[str, dict[str, Any]] = {}
@@ -354,6 +370,69 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
     # DWD: merge approved v1.1 extensions into the base machine model before projection.
     dwd = payloads["dwd_domain_model"]
     extension = payloads["dwd_extension"]
+
+    # A small reviewed set of recurring ODS business assets is authoritative in the DWD machine
+    # source contract but absent from the repository's older Base-only Catalog projection. Register
+    # only those exact logical assets here; release/delta/hotfix instances remain edge evidence and
+    # never become separate Data Lineage nodes.
+    asset_definition = payloads["asset_lineage"]
+    additional_ods = asset_definition.get("additional_ods_assets", [])
+    source_contract = dwd.get("ods_source_contract")
+    if not isinstance(additional_ods, list) or not isinstance(source_contract, Mapping):
+        raise DataCatalogError("Catalog Lineage V2 ODS asset registry is invalid")
+    for raw in additional_ods:
+        if not isinstance(raw, Mapping) or set(raw) != {
+            "dataset_id", "display_name", "description", "contract_section", "contract_index"
+        }:
+            raise DataCatalogError("Catalog Lineage V2 ODS asset fields differ")
+        dataset_id = _text(raw.get("dataset_id"), "lineage_v2.ods.dataset_id")
+        section = _text(raw.get("contract_section"), "lineage_v2.ods.contract_section")
+        index = raw.get("contract_index")
+        records = source_contract.get(section)
+        if type(index) is not int or not isinstance(records, list) or not 0 <= index < len(records):
+            raise DataCatalogError("Catalog Lineage V2 ODS contract pointer is invalid")
+        contract_record = records[index]
+        if not isinstance(contract_record, Mapping):
+            raise DataCatalogError("Catalog Lineage V2 ODS contract record is invalid")
+        contract_identity = contract_record.get("artifact") or contract_record.get("member")
+        if contract_identity != dataset_id or contract_record.get("disposition") != "modeled":
+            raise DataCatalogError("Catalog Lineage V2 ODS asset does not match modeled contract")
+        if dataset_id in seen_datasets:
+            raise DataCatalogError(f"duplicate ODS dataset declaration: {dataset_id}")
+        seen_datasets.add(dataset_id)
+        add(
+            _entry(
+                entry_id=f"ods_dataset:{dataset_id}",
+                kind="ods_dataset",
+                canonical_id=dataset_id,
+                display_name=_text(raw.get("display_name"), "lineage_v2.ods.display_name"),
+                description=_text(raw.get("description"), "lineage_v2.ods.description"),
+                domain="ods",
+                family="recurring_business_asset",
+                lifecycle="source_available",
+                implementation_status="implemented",
+                verification_status="contract_only",
+                accepted_scope=None,
+                authority=_authority(
+                    _source_path(sources, "dwd_domain_model"),
+                    f"/ods_source_contract/{section}/{index}",
+                    _source_sha(sources, "dwd_domain_model"),
+                ),
+                keywords=(dataset_id, "ODS", "recurring"),
+                details={
+                    "role": "recurring_business_asset",
+                    "format": "contract_declared",
+                    "source": None,
+                    "target": None,
+                    "key_columns": [],
+                    "date_columns": [],
+                    "package_membership_proven_in_checkout": False,
+                    "lineage_v2_additional_asset": True,
+                },
+            )
+        )
+    gaps[-1]["affected_entry_ids"] = sorted(f"ods_dataset:{item}" for item in seen_datasets)
+
     tables = dwd.get("tables")
     column_sets = dwd.get("column_sets")
     time_profiles = dwd.get("time_profiles")
@@ -479,6 +558,115 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
                         "time_profile": time_profile,
                         "in_business_key": field in business_key,
                         "in_row_key": field in list(raw.get("row_key") or []),
+                    },
+                )
+            )
+
+    # Governed Research ADM assets. Only stable, explicitly registered application datasets enter
+    # the Catalog; TMP/projection/process identities remain outside this asset namespace.
+    adm_registry = payloads["adm_registry"]
+    if (
+        adm_registry.get("schema_version") != "1.0.0"
+        or adm_registry.get("authority") != "governed_research_adm_asset_registry"
+        or not isinstance(adm_registry.get("assets"), list)
+    ):
+        raise DataCatalogError("ADM asset registry schema differs")
+    adm_registry_path = _source_path(sources, "adm_registry")
+    adm_registry_sha = _source_sha(sources, "adm_registry")
+    seen_adm_datasets: set[str] = set()
+    for asset_index, raw in enumerate(adm_registry["assets"]):
+        if not isinstance(raw, Mapping):
+            raise DataCatalogError("ADM asset entry must be an object")
+        dataset_id = _text(raw.get("dataset_id"), "adm.dataset_id")
+        adm_id = _text(raw.get("adm_id"), "adm.adm_id")
+        adm_version = _text(raw.get("adm_version"), "adm.adm_version")
+        member = _text(raw.get("member"), "adm.member")
+        if dataset_id in seen_adm_datasets:
+            raise DataCatalogError(f"duplicate ADM dataset: {dataset_id}")
+        seen_adm_datasets.add(dataset_id)
+        policy_relative = _text(raw.get("policy_path"), "adm.policy_path")
+        policy_pointer = _text(raw.get("policy_pointer"), "adm.policy_pointer")
+        policy_path = (root / policy_relative).resolve()
+        if root.resolve() not in policy_path.parents or not policy_path.is_file():
+            raise DataCatalogError(f"ADM policy path is unavailable: {policy_relative}")
+        policy_sha = file_sha256(policy_path)
+        fields = raw.get("fields")
+        upstream = raw.get("upstream")
+        consumers = raw.get("consumers")
+        if not isinstance(fields, list) or not isinstance(upstream, list) or not isinstance(consumers, list):
+            raise DataCatalogError("ADM asset fields/upstream/consumers are invalid")
+        field_names: list[str] = []
+        for field in fields:
+            if not isinstance(field, Mapping) or set(field) != {"name", "display_name", "description"}:
+                raise DataCatalogError("ADM field declaration differs")
+            field_names.append(_text(field.get("name"), "adm.field.name"))
+            _text(field.get("display_name"), "adm.field.display_name")
+            _text(field.get("description"), "adm.field.description")
+        if len(field_names) != len(set(field_names)):
+            raise DataCatalogError("duplicate ADM field")
+        dataset_entry_id = f"adm_dataset:{dataset_id}"
+        add(
+            _entry(
+                entry_id=dataset_entry_id,
+                kind="adm_dataset",
+                canonical_id=dataset_id,
+                display_name=_text(raw.get("display_name"), "adm.display_name"),
+                description=_text(raw.get("description"), "adm.description"),
+                domain="adm",
+                family=adm_id,
+                lifecycle="active",
+                implementation_status="implemented",
+                verification_status="accepted",
+                accepted_scope=f"{adm_id}@{adm_version}",
+                authority=_authority(policy_relative, policy_pointer, policy_sha),
+                keywords=(adm_id, adm_version, member, str(raw.get("grain") or "")),
+                relations=(
+                    {"type": "contains", "target_entry_id": f"adm_field:{dataset_id}.{field}"}
+                    for field in sorted(field_names)
+                ),
+                details={
+                    "adm_id": adm_id,
+                    "adm_version": adm_version,
+                    "dataset_id": dataset_id,
+                    "member": member,
+                    "grain": raw.get("grain"),
+                    "upstream": list(upstream),
+                    "consumers": list(consumers),
+                    "registry_authority": adm_registry_path,
+                    "reading_authority": adm_registry_path,
+                },
+            )
+        )
+        for field_index, field in enumerate(fields):
+            name = str(field["name"])
+            add(
+                _entry(
+                    entry_id=f"adm_field:{dataset_id}.{name}",
+                    kind="adm_field",
+                    canonical_id=f"{dataset_id}.{name}",
+                    display_name=str(field["display_name"]),
+                    description=str(field["description"]),
+                    domain="adm",
+                    family=adm_id,
+                    lifecycle="active",
+                    implementation_status="implemented",
+                    verification_status="accepted",
+                    accepted_scope=f"{adm_id}@{adm_version}",
+                    authority=_authority(
+                        adm_registry_path,
+                        f"/assets/{asset_index}/fields/{field_index}",
+                        adm_registry_sha,
+                    ),
+                    keywords=(adm_id, dataset_id, name),
+                    relations=({"type": "field_of", "target_entry_id": dataset_entry_id},),
+                    details={
+                        "adm_id": adm_id,
+                        "adm_version": adm_version,
+                        "dataset_id": dataset_id,
+                        "field": name,
+                        "member": member,
+                        "grain": raw.get("grain"),
+                        "reading_authority": adm_registry_path,
                     },
                 )
             )
@@ -822,6 +1010,24 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
     try:
         apply_presentation(entries, payloads["catalog_business"])
         lineage = build_lineage(entries, payloads["catalog_lineage"], dwd, sources)
+        asset_lineage = build_asset_lineage(
+            entries,
+            payloads["adm_registry"],
+            payloads["asset_lineage"],
+            dwd,
+            sources,
+            root,
+        )
+        definition_dependency = build_definition_dependency(entries, lineage)
+        usage_dependency = build_usage_dependency(
+            entries,
+            lineage,
+            payloads["adm_registry"],
+            {
+                "path": _source_path(sources, "adm_registry"),
+                "sha256": _source_sha(sources, "adm_registry"),
+            },
+        )
     except ValueError as exc:
         raise DataCatalogError(str(exc)) from exc
 
@@ -860,6 +1066,9 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
         "entries": ordered_entries,
         "gaps": ordered_gaps,
         "lineage": lineage,
+        "asset_lineage": asset_lineage,
+        "definition_dependency": definition_dependency,
+        "usage_dependency": usage_dependency,
     }
     snapshot["snapshot_digest"] = digest(snapshot)
     validate_catalog(snapshot)
@@ -878,6 +1087,9 @@ def validate_catalog(snapshot: Mapping[str, Any]) -> None:
         "entries",
         "gaps",
         "lineage",
+        "asset_lineage",
+        "definition_dependency",
+        "usage_dependency",
         "snapshot_digest",
     }
     if set(snapshot) != expected or snapshot["schema_version"] != CATALOG_SCHEMA:
@@ -918,6 +1130,9 @@ def validate_catalog(snapshot: Mapping[str, Any]) -> None:
         raise DataCatalogError("catalog summary gap count differs")
     try:
         validate_lineage(snapshot["lineage"])
+        validate_asset_lineage(snapshot["asset_lineage"])
+        validate_dependency_graph(snapshot["definition_dependency"])
+        validate_dependency_graph(snapshot["usage_dependency"])
     except ValueError as exc:
         raise DataCatalogError(str(exc)) from exc
     observed_counts = dict(sorted(Counter(item["kind"] for item in entries).items()))
@@ -991,6 +1206,7 @@ class DataIndicatorCatalog:
             "summary": {key: value for key, value in self.snapshot["summary"].items()
                         if key != "gap_count"},
             "lineage_overview": overview(self.snapshot["lineage"]),
+            "asset_lineage_overview": asset_lineage_overview(self.snapshot["asset_lineage"]),
         }
 
     def item(self, entry_id: str) -> dict[str, Any]:
@@ -1002,12 +1218,43 @@ class DataIndicatorCatalog:
         """Maintenance-only output, deliberately not exposed by the business summary API."""
         return {"gap_count": len(self.snapshot["gaps"]), "gaps": self.snapshot["gaps"]}
 
-    def relations(self, entry_id: str, *, depth: int = 2, limit: int = 60) -> dict[str, Any]:
+    def relations(
+        self,
+        entry_id: str,
+        *,
+        depth: int = 2,
+        limit: int = 60,
+        asset_scope: str = "full",
+    ) -> dict[str, Any]:
+        item = self.item(entry_id) if entry_id in self._entries else {"relations": []}
         try:
             graph = focus(self.snapshot["lineage"], entry_id, depth=depth, limit=limit)
+            asset_graph = None
+            if item.get("kind") in {"ods_dataset", "dwd_table", "dwd_field", "adm_dataset", "adm_field"}:
+                asset_graph = focus_asset_lineage(
+                    self.snapshot["asset_lineage"],
+                    self._entries,
+                    entry_id,
+                    scope=asset_scope,
+                    depth=depth,
+                    limit=min(100, max(10, limit)),
+                )
+            definition_graph = focus_dependency(
+                self.snapshot["definition_dependency"],
+                entry_id,
+                scope=asset_scope,
+                depth=depth,
+                limit=min(100, max(10, limit)),
+            )
+            usage_graph = focus_dependency(
+                self.snapshot["usage_dependency"],
+                entry_id,
+                scope=asset_scope,
+                depth=depth,
+                limit=min(100, max(10, limit)),
+            )
         except ValueError as exc:
             raise DataCatalogError(str(exc)) from exc
-        item = self.item(entry_id) if entry_id in self._entries else {"relations": []}
         outgoing = [
             {
                 **relation,
@@ -1022,8 +1269,15 @@ class DataIndicatorCatalog:
             }
             for relation in self._reverse.get(entry_id, [])
         ]
-        return {"entry_id": entry_id, "outgoing": outgoing, "incoming": incoming,
-                "lineage": graph}
+        return {
+            "entry_id": entry_id,
+            "outgoing": outgoing,
+            "incoming": incoming,
+            "lineage": graph,
+            "asset_lineage": asset_graph,
+            "definition_dependency": definition_graph,
+            "usage_dependency": usage_graph,
+        }
 
     @staticmethod
     def _summary_entry(item: Mapping[str, Any]) -> dict[str, Any]:

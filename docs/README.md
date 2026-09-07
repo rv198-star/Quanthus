@@ -157,6 +157,17 @@ nodes.
   skips; Web 18 passed; desktop/mobile/anonymous Chromium 3 passed. Route:
   `design/data-indicator-catalog-productization.md`; latest closeout:
   `acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`.
+- `P3-DICT-003` / #237 is the active Catalog Lineage V2 successor. Repository implementation gates
+  A/B/C (#233-#235) are closed; D (#236) remains open until the full repository gate and production
+  release. Catalog v1.3 now projects 748 entries, including 4 governed Research ADM datasets and 76
+  ADM fields. Main Data Lineage contains 94 formal ODS/DWD/ADM assets and 80 asset relationships;
+  all 33 DWD tables and all 4 ADM datasets participate. Process/projection/Feature/Label/semantic/
+  consumer identities are excluded from the main asset graph. Definition Dependency and Usage
+  Dependency remain separate views. Data Lineage defaults to full registered ancestor/descendant
+  closure with optional 1/2/3/5-hop focus. Current repository evidence:
+  `acceptance/catalog-lineage-v2-implementation-audit-20260907.md`; design:
+  `design/data-catalog-lineage-v2.md`. Production still remains on the preceding P3-DICT-002 release
+  until D closes.
 - P3 opportunity-funnel reconciliation remains non-executing by contract. The governed portfolio
   runner now supplies complete candidate, score/veto, entry, and held-review source observations;
   the funnel describes research evidence and cannot authorize an order.

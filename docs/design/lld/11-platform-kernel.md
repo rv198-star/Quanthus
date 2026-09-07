@@ -444,7 +444,9 @@ viewport owns an independent `{x,y,zoom}` transform, true centered fitView, uncl
 pointer-anchored wheel zoom, two-pointer pinch, floating controls and an interactive MiniMap; none of
 these alter the API graph. `table_context_only` is also a single-canvas Web presentation: the parent-table
 context replaces the redundant isolated-field canvas, while a compact notice preserves the non-field-proof
-boundary. Current audited production checkout/Web are
+boundary. `P3-DICT-003` is the additive Lineage V2 successor on the same four GET routes: the response now carries a formal asset graph (ODS/DWD/Research ADM), a separate Definition Dependency graph, and a separate Usage Dependency graph. The main Data Lineage defaults to full registered closure and accepts `asset_scope=focus` only for explicit 1/2/3/5-hop views; node budget remains bounded. This adds no migration, write route, Worker kind or execution authority. Repository A/B/C gates are accepted; D remains open until the API/Web production release.
+
+Current audited production checkout/Web are
 `d4e71585a58a229fa8c7ddbb9515e4038dcb2aeb`; API remains
 `0c671f92e58834d49cdb182d3c58793d052d9814` because this release rebuilt only Web. Every lineage
 node still carries exact technical identity and dataset-level source context avoids redundant generic

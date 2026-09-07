@@ -1,18 +1,1 @@
-{
-  "schema_version": "quanthus.data-indicator-catalog-snapshot-manifest.v1",
-  "catalog_schema_version": "quanthus.data-indicator-catalog.v1",
-  "builder_version": "data-indicator-catalog-builder-v1.2",
-  "source_manifest_sha256": "sha256:8db55c9d046cde11bd4d42ad185c5f44e88b4f766076401e1cb2fbcf763913be",
-  "snapshot_digest": "sha256:540a4b13be382e27df9475404df8a30174404d7f892224ffe0c01f42ec2ebb8b",
-  "entry_count": 664,
-  "gap_count": 10,
-  "counts_by_kind": {
-    "dwd_field": 524,
-    "dwd_table": 33,
-    "feature_spec": 9,
-    "label_card": 4,
-    "ods_dataset": 53,
-    "semantic_concept": 21,
-    "semantic_family": 20
-  }
-}
+{"builder_version":"data-indicator-catalog-builder-v1.3","catalog_schema_version":"quanthus.data-indicator-catalog.v1","counts_by_kind":{"adm_dataset":4,"adm_field":76,"dwd_field":524,"dwd_table":33,"feature_spec":9,"label_card":4,"ods_dataset":57,"semantic_concept":21,"semantic_family":20},"entry_count":748,"gap_count":10,"schema_version":"quanthus.data-indicator-catalog-snapshot-manifest.v1","snapshot_digest":"sha256:15f664f1d0ba74038b5edfdba9ef79da8a32f53904a67f83bd909f41207589c0","source_manifest_sha256":"sha256:a4e22f5b88e8f36cd2c6dce08ec1449213a69324e9aa775d3399297c87af367f"}

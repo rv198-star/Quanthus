@@ -27,6 +27,8 @@ def test_catalog_source_manifest_is_explicit_complete_and_digest_bound() -> None
         "catalog_annotations",
         "catalog_business",
         "catalog_lineage",
+        "adm_registry",
+        "asset_lineage",
     }
     observed = {item["adapter"] for item in sources["sources"]}
     assert observed == expected_adapters

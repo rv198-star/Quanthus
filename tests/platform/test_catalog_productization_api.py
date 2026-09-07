@@ -9,7 +9,7 @@ from .test_data_catalog_api import viewer_token
 
 
 @pytest.mark.parametrize("query", [
-    "depth=0", "depth=6", "limit=9", "limit=101", "depth=x", "depth=2&depth=3", "unknown=x",
+    "depth=0", "depth=6", "limit=9", "limit=101", "depth=x", "depth=2&depth=3", "asset_scope=x", "unknown=x",
 ])
 def test_lineage_rejects_invalid_query(kernel, query):
     token = viewer_token(kernel)
@@ -55,6 +55,15 @@ def test_adjustment_effective_from_api_exposes_field_proof_and_table_fallback(ke
                for node in lineage["nodes"])
     assert any(node["id"] == "projection:p4-event.factor_effective_from"
                for node in lineage["nodes"])
+    asset = payload["asset_lineage"]
+    assert asset["coverage_level"] == "field_proven"
+    assert asset["boundary_edges"] == 0
+    assert {node["asset_kind"] for node in asset["nodes"]} == {"ods_dataset", "dwd_table", "adm_dataset"}
+    assert {node["technical_id"] for node in asset["nodes"]} == {
+        "adjustment_factors_pit",
+        "dwd_adjustment_factor",
+        "p4-event-research-adm.candidate_daily",
+    }
 
     fallback = urllib.parse.quote("dwd_field:dwd_adjustment_factor.factor_value", safe="")
     status, _, payload = wsgi_request(
@@ -66,6 +75,32 @@ def test_adjustment_effective_from_api_exposes_field_proof_and_table_fallback(ke
     assert lineage["coverage_level"] == "table_context_only"
     assert lineage["edges"] == []
     assert lineage["table_context"]["edges"]
+    asset = payload["asset_lineage"]
+    assert asset["coverage_level"] == "asset_context_only"
+    assert asset["boundary_edges"] == 0
+    assert all(edge["field_mappings"] == [] for edge in asset["edges"])
+
+
+def test_asset_lineage_defaults_to_full_chain_and_separates_definition_usage(kernel):
+    token = viewer_token(kernel)
+    headers = {"Authorization": f"Bearer {token}"}
+    encoded = urllib.parse.quote("dwd_field:dwd_security_bar.close", safe="")
+    status, _, payload = wsgi_request(
+        kernel, "GET", f"/api/platform/v1/catalog/items/{encoded}/relations?limit=100",
+        headers=headers,
+    )
+    assert status == 200
+    asset = payload["asset_lineage"]
+    assert asset["scope_mode"] == "full"
+    assert asset["boundary_edges"] == 0
+    assert not any(node["id"].startswith(("process:", "projection:", "consumer:")) for node in asset["nodes"])
+    assert payload["definition_dependency"] is not None
+
+    adm = urllib.parse.quote("adm_dataset:p4-event-research-adm.candidate_daily", safe="")
+    status, _, payload = wsgi_request(kernel, "GET", f"/api/platform/v1/catalog/items/{adm}/relations", headers=headers)
+    assert status == 200
+    assert "consumer:p4-event-library" in {node["id"] for node in payload["usage_dependency"]["nodes"]}
+    assert "consumer:p4-event-library" not in {node["id"] for node in payload["asset_lineage"]["nodes"]}
 
 
 def test_graph_is_authenticated_readonly_and_supports_declared_projection(kernel):

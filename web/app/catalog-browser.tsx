@@ -6,13 +6,14 @@ import { BookOpen, Copy, Database, GitBranch, LoaderCircle, Search } from "lucid
 import { LineageFocus, LineageOverview } from "./catalog-lineage";
 import {
   clearStoredSession, loadStoredSession, PlatformApiError, platformRequest,
-  type CatalogEntry, type CatalogEntrySummary, type CatalogKind, type CatalogLineageGraph,
-  type CatalogLineageNode, type DataCatalogRelations, type DataCatalogSearchResult, type DataCatalogSummary,
+  type CatalogEntry, type CatalogEntrySummary, type CatalogKind,
+  type DataCatalogRelations, type DataCatalogSearchResult, type DataCatalogSummary,
 } from "./platform-api";
 import styles from "./catalog-browser.module.css";
 
 const kindLabels: Record<CatalogKind, string> = {
-  ods_dataset: "原始来源数据集", dwd_table: "规范数据表", dwd_field: "数据字段", feature_spec: "指标规格",
+  ods_dataset: "原始来源数据集", dwd_table: "规范数据表", dwd_field: "数据字段",
+  adm_dataset: "Research ADM 数据资产", adm_field: "Research ADM 字段", feature_spec: "指标规格",
   label_card: "规则标签", semantic_family: "概念分类", semantic_concept: "语义概念",
 };
 const statusLabels: Record<string, string> = {
@@ -67,9 +68,7 @@ export function CatalogBrowser() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<CatalogEntry | null>(null);
   const [relations, setRelations] = useState<DataCatalogRelations | null>(null);
-  const [graph, setGraph] = useState<CatalogLineageGraph | null>(null);
-  const [graphCenter, setGraphCenter] = useState<string | null>(null);
-  const [depth, setDepth] = useState(2);
+  const [lineageRange, setLineageRange] = useState<"full" | "1" | "2" | "3" | "5">("full");
   const [mode, setMode] = useState<"browse" | "map">("browse");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"" | CatalogKind>("");
@@ -91,12 +90,11 @@ export function CatalogBrowser() {
     return "目录暂时不可读取，请检查查询条件或稍后重试。";
   }, []);
   const selectEntry = useCallback((id: string) => {
-    setSelectedId(id); setGraphCenter(id); setRelations(null); setMode("browse"); setCopyResult("");
+    setSelectedId(id); setRelations(null); setMode("browse"); setCopyResult("");
   }, []);
-  const navigate = useCallback((node: CatalogLineageNode) => {
+  const navigate = useCallback((node: { entry_id: string | null }) => {
     setMode("browse");
     if (node.entry_id) selectEntry(node.entry_id);
-    else setGraphCenter(node.id);
   }, [selectEntry]);
 
   const runSearch = useCallback(async (clear = false) => {
@@ -116,7 +114,7 @@ export function CatalogBrowser() {
       if (sequence !== searchSequence.current) return;
       setResults(response.items); setTotal(response.total);
       if (response.items.length) selectEntry(response.items[0].entry_id);
-      else { setSelectedId(null); setSelected(null); setGraphCenter(null); setGraph(null); }
+      else { setSelectedId(null); setSelected(null); setRelations(null); }
     } catch (observed) {
       if (sequence === searchSequence.current) setError(handleError(observed));
     } finally {
@@ -162,22 +160,21 @@ export function CatalogBrowser() {
   }, [token, selectedId, handleError]);
 
   useEffect(() => {
-    if (!token || !graphCenter) return;
+    if (!token || !selectedId) return;
     let cancelled = false;
     (async () => {
       setGraphBusy(true);
       try {
+        const assetScope = lineageRange === "full" ? "full" : "focus";
+        const depth = lineageRange === "full" ? 2 : Number(lineageRange);
         const response = await platformRequest<DataCatalogRelations>(
-          `/api/platform/v1/catalog/items/${encodeURIComponent(graphCenter)}/relations?depth=${depth}&limit=60`, { token });
-        if (!cancelled) {
-          setGraph(response.lineage);
-          if (graphCenter === selectedId) setRelations(response);
-        }
-      } catch (observed) { if (!cancelled) { setGraph(null); setError(handleError(observed)); } }
+          `/api/platform/v1/catalog/items/${encodeURIComponent(selectedId)}/relations?asset_scope=${assetScope}&depth=${depth}&limit=100`, { token });
+        if (!cancelled) setRelations(response);
+      } catch (observed) { if (!cancelled) { setRelations(null); setError(handleError(observed)); } }
       finally { if (!cancelled) setGraphBusy(false); }
     })();
     return () => { cancelled = true; };
-  }, [token, graphCenter, selectedId, depth, handleError]);
+  }, [token, selectedId, lineageRange, handleError]);
 
   if (!token) return <main className={styles.loginShell} data-testid="catalog-login-required"><div className={styles.loginCard}>
     <span className={styles.brandMark}>Q</span><p>Quanthus 数据目录</p><h1>数据、指标与语义目录</h1>
@@ -204,7 +201,7 @@ export function CatalogBrowser() {
       <button type="button" aria-pressed={mode === "map"} onClick={() => setMode("map")}><GitBranch size={18} />全局血缘地图</button>
     </nav>
     {error ? <p className={styles.errorBanner} role="alert">{error}</p> : null}
-    {mode === "map" && summary ? <LineageOverview data={summary.lineage_overview} onNavigate={navigate} /> : null}
+    {mode === "map" && summary ? <LineageOverview data={summary.asset_lineage_overview} /> : null}
     {mode === "browse" ? <>
       <form className={styles.searchBar} onSubmit={event => { event.preventDefault(); void runSearch(); }}>
         <label className={styles.searchInput}><Search size={20} /><input value={query} maxLength={120} onChange={event => setQuery(event.target.value)}
@@ -258,9 +255,15 @@ export function CatalogBrowser() {
           </> : <p className={styles.emptyState}><Database size={24} />选择左侧条目查看说明。</p>}
         </article>
       </main>
-      {graph ? <div className={styles.focusArea}>
-        {graph.center !== selectedId && selectedId ? <button type="button" onClick={() => setGraphCenter(selectedId)}>返回当前卡片的血缘</button> : null}
-        <LineageFocus key={graph.center} graph={graph} onNavigate={navigate} depth={depth} onDepth={setDepth} busy={graphBusy} />
+      {relations ? <div className={styles.focusArea}>
+        <LineageFocus
+          key={`${selectedId}:${lineageRange}`}
+          relations={relations}
+          onNavigate={navigate}
+          range={lineageRange}
+          onRange={setLineageRange}
+          busy={graphBusy}
+        />
       </div> : null}
     </> : null}
   </div>;

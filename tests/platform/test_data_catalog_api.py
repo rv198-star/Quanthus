@@ -37,11 +37,16 @@ def test_viewer_can_read_catalog_summary_and_search(kernel) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert status == 200
-    assert summary["summary"]["entry_count"] == 664
+    assert summary["summary"]["entry_count"] == 748
+    assert summary["summary"]["counts_by_kind"]["adm_dataset"] == 4
+    assert summary["summary"]["counts_by_kind"]["adm_field"] == 76
     assert summary["summary"]["counts_by_kind"]["dwd_table"] == 33
     assert "gap_count" not in summary["summary"]
     assert "gaps" not in summary
     assert summary["lineage_overview"]["registered_edges"] > 0
+    assert summary["asset_lineage_overview"]["registered_asset_count"] == 94
+    assert summary["asset_lineage_overview"]["participating_asset_count"] == 70
+    assert summary["asset_lineage_overview"]["edge_count"] == 80
 
     status, _, result = wsgi_request(
         kernel,

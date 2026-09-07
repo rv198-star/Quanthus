@@ -10,7 +10,7 @@
 | Governing design | `../design/data-indicator-catalog.md` |
 | Parent/owner | `../design/lld/03-label-feature-system.md` |
 | Platform surface | read-only API + `/catalog`; no new metadata database |
-| Current status | A-E closed; original foundation accepted; productization successor `P3-DICT-002` is tracked in `catalog-productization.md` |
+| Current status | A-E closed; original foundation accepted; `P3-DICT-002` accepted; active Lineage V2 successor `P3-DICT-003` is tracked in `catalog-lineage-v2.md` |
 
 ## 1. Purpose
 
@@ -98,8 +98,11 @@ The original post-acceptance production evidence remains in
 `../acceptance/data-indicator-catalog-post-acceptance-production-closeout-20260907.md`.
 Current productization `P3-DICT-002` uses production checkout/Web `d4e7158` while API remains
 `0c671f9`; the latest single-canvas table-context evidence is in
-`../acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`, with earlier
-node-identity/infinite-viewport evidence retained separately and work items in `catalog-productization.md`. A source change that changes the deterministic Catalog must refresh
+`../acceptance/catalog-lineage-single-canvas-production-closeout-20260907.md`. Successor
+`P3-DICT-003` is currently in release qualification: A/B/C are closed in repository evidence with
+748 Catalog entries, 4 governed ADM datasets / 76 ADM fields, and a 94-node formal asset graph;
+D remains open until full gate and API/Web production closeout. Design/work item:
+`../design/data-catalog-lineage-v2.md` / `catalog-lineage-v2.md`. A source change that changes the deterministic Catalog must refresh
 the snapshot manifest in the same repository change. Original final evidence remains in
 `../acceptance/data-indicator-catalog-final-acceptance-20260907.md`.
 

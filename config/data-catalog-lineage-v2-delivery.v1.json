@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-DICT-003",
+  "design": "docs/design/data-catalog-lineage-v2.md",
+  "items": [
+    {
+      "id": "P3-DICT-003",
+      "kind": "epic",
+      "title": "重构 Catalog 为正式数据资产血缘 V2",
+      "status": "ready",
+      "depends_on": ["P3-DICT-002"],
+      "scope": "以 governed ODS/DWD/Research ADM 为 Data Lineage 节点，拆分计算依赖和使用关系，并将默认查询升级为完整资产全链。",
+      "acceptance": [
+        "A-D 有证据依序关闭",
+        "Data Lineage 主节点只有正式数据资产",
+        "默认 full closure 与聚焦模式均可审计",
+        "不修改数据、公式、策略或执行权限"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-DICT-003-A",
+      "kind": "task",
+      "title": "冻结正式资产 ontology 与 Research ADM Registry",
+      "status": "closed",
+      "depends_on": ["P3-DICT-002"],
+      "scope": "定义 ODS/DWD/ADM 资产节点、字段容器、TMP 排除和首批正式 ADM dataset/field registry。",
+      "acceptance": [
+        "ADM registry 只登记稳定 governed data asset",
+        "P4/Structure/Continuous Facts 首批 ADM 资产进入 Catalog",
+        "TMP/projection/process/consumer 不得成为 Data Lineage asset"
+      ],
+      "evidence": ["docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md"]
+    },
+    {
+      "id": "P3-DICT-003-B",
+      "kind": "task",
+      "title": "实现资产级与字段级完整 Data Lineage",
+      "status": "closed",
+      "depends_on": ["P3-DICT-003-A"],
+      "scope": "构建 ODS->DWD->ADM asset graph；加工过程降为 edge metadata；字段焦点按精确 mapping 传播；默认 full closure。",
+      "acceptance": [
+        "full 模式递归到所有已登记根上游和最终下游",
+        "1/2/3/5 跳仅作为聚焦模式",
+        "effective_from 和 close 反例形成正式资产字段链",
+        "无字段证据时只回退资产上下文且不猜线"
+      ],
+      "evidence": ["docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md"]
+    },
+    {
+      "id": "P3-DICT-003-C",
+      "kind": "task",
+      "title": "拆分计算依赖与使用关系视图",
+      "status": "closed",
+      "depends_on": ["P3-DICT-003-B"],
+      "scope": "Data Lineage、Definition Dependency、Usage Dependency 三种关系分离，旧工程过程节点不再混入主血缘。",
+      "acceptance": [
+        "Feature/Indicator/Fact/Label 不作为 Data Lineage asset node",
+        "Expert/Strategy/consumer 只进入使用关系",
+        "计算规则和实现步骤保留为依赖边 metadata/evidence"
+      ],
+      "evidence": ["docs/acceptance/catalog-lineage-v2-implementation-audit-20260907.md"]
+    },
+    {
+      "id": "P3-DICT-003-D",
+      "kind": "task",
+      "title": "审计、浏览器验收与生产发布",
+      "status": "ready",
+      "depends_on": ["P3-DICT-003-C"],
+      "scope": "完成语义反例、确定性 Catalog、API/Web、桌面/窄屏无限画布、完整工程门禁、Git 与生产验收。",
+      "acceptance": [
+        "数据资产 ontology 独立审计通过",
+        "专项、Web、浏览器和 make check 通过或明确记录环境 skip",
+        "干净提交推送并完成必要 API/Web 生产烟测"
+      ],
+      "evidence": []
+    }
+  ]
+}

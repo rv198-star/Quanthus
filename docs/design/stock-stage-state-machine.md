@@ -7,7 +7,8 @@
 | Delivery gate | blocked |
 | Authority | Non-governing concept; not active in research, backtest, simulation, or trading |
 | Version | 0.3 |
-| Governing work item | `P3-LABEL-002` |
+| Governing work item | `P3-LABEL-002` (historical vocabulary owner; fixture acceptance does not activate this draft) |
+| Qualification proposal | `stock-stage-qualification.md`; `stock-stage-data-dependencies.md` |
 
 ## 1. Purpose and boundary
 
@@ -181,7 +182,19 @@ confidence/abstention behavior, and counterexamples. Acceptance must include:
 Until these gates pass, the vocabulary is documentation-only and may be used for discussion or
 shadow annotation, never as an official feature, expert input, or action rule.
 
-## 5. Exploration provenance and non-goals
+## 5. Qualification design proposal
+
+The 2026-09-07 proposal in [stock-stage-qualification.md](stock-stage-qualification.md) separates
+rule conformance, as-of semantic identifiability, independent future settlement, and consumer value.
+It treats multi-candidate ambiguity, dimensional overlap, and invalid inputs as different outcomes,
+not as reasons to force a top-1 market stage. Its [field-level dependency matrix](stock-stage-data-dependencies.md)
+traces each state to actual DWD fields and distinguishes existing bounded Facts v2 from unimplemented
+geometry/activity/process extensions. Both documents remain draft; they do not amend the v0.3 codes,
+activate a LabelCard, reopen the accepted fixture, authorize result-bearing research, or start daily
+observation/strategy Shadow. Proposed work is in
+[stock-stage-qualification-proposal.md](../work-items/stock-stage-qualification-proposal.md).
+
+## 6. Exploration provenance and non-goals
 
 This revision selectively records model-level questions raised in a 2026-07-28 exploratory
 platform discussion. It does not adopt that discussion's Pi extension, Python/TypeScript split,

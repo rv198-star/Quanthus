@@ -120,6 +120,10 @@ nodes.
   Expert/economic gate, thirteen-state/ML work, or Shadow/paper/live execution. Catalog work #215
   is a later independent read-only discovery surface and does not retroactively expand this scope.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
+- The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
+  proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
+  proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate
+  twelve-state labels, B6/B7 implementation, new result-bearing research, or daily/strategy Shadow.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

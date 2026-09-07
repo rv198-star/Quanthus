@@ -24,6 +24,10 @@ The draft `docs/design/stock-stage-state-machine.md` records a candidate primary
 twelve directional lifecycle states (`1`-`12`), neutral `0`, and exception sentinel `X`. It is
 documentation-only until exact label cards, transition tests, PIT rules, and validation evidence
 are approved under `P3-LABEL-002`. It must not be confused with the position state machine.
+The non-governing [stage qualification proposal](../stock-stage-qualification.md) and its
+[field-level dependency matrix](../stock-stage-data-dependencies.md) now describe the missing
+identifiability, ambiguity and independent-validation design. They confer no implementation,
+LabelCard, data-read, daily-schedule or strategy-Shadow authority; the existing fixture stays closed.
 
 Historical sector-dependent labels remain disabled in official results while historical
 membership is unavailable. A missing context produces an explicit unknown/context-missing

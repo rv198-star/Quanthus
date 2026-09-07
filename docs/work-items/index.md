@@ -193,6 +193,10 @@ fixture or alter the current P4 gate. The historical `p3-gates.v1.json` snapshot
 original deferred disposition; the post-P3 `P3-ATTR-001` resume is accepted separately by
 `docs/acceptance/p3-attr-formal-production-20260823.md`.
 
+The [stock-stage qualification work proposal](stock-stage-qualification-proposal.md) is a draft
+review packet, not an active addition to the table below or an instruction to reopen the accepted
+label fixture. Its internal proposal steps require separate authorization before implementation.
+
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P3-REPLAY-001 | Implement strategy-neutral daily historical replay | P2-ACCEPT-001 | closed |

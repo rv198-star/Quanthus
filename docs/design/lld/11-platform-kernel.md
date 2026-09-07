@@ -439,11 +439,13 @@ internal-only maintenance diagnostics and bounded static processing graphs to th
 routes. Summary returns a layered overview; relations accepts depth/node budgets. Field focus also
 returns an explicit proof level: exact field processing when evidence exists, or a separately marked
 parent-table context that cannot be interpreted as a field mapping. No new service, database
-migration or Worker kind is introduced. Current audited production checkout, API and Web are
-`0c671f92e58834d49cdb182d3c58793d052d9814`; every lineage node carries exact technical identity
-and dataset-level source context avoids redundant generic process boxes. Evidence:
-`../../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`. The original
-Catalog and earlier productization acceptances remain retained separately.
+migration or Worker kind is introduced. Lineage view controls are Web-local: fixed-height canvas,
+zoom/reset, fit, focus centering and blank-area drag pan do not alter the API graph. Current audited
+production checkout/Web are `d485508f8cac3e5c590d34afb36e963022da05ce`; API remains
+`0c671f92e58834d49cdb182d3c58793d052d9814` because this release rebuilt only Web. Every lineage
+node still carries exact technical identity and dataset-level source context avoids redundant generic
+process boxes. Evidence: `../../acceptance/catalog-lineage-view-controls-production-closeout-20260907.md`.
+The original Catalog and earlier productization acceptances remain retained separately.
 
 Docker keeps API and Web host ports bound to loopback. A governed Web image build also performs a
 repository-scoped retention pass for `quanthus-platform-web:git-*`: the target release tag and every

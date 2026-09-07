@@ -236,8 +236,10 @@ and `../../work-items/catalog-productization.md`. DWD field focus distinguishes 
 from separately labeled parent-table context; table membership cannot fabricate a field edge.
 Every visible node exposes a business label plus exact technical identity, and dataset-level context
 connects sources directly to target tables instead of adding redundant generic processing boxes.
-Membership and conceptual relationships remain separate from processing edges, and static lineage is
-not actual consumption evidence. The Structure
+The Web renders these graphs inside fixed-height canvases with zoom, fit, focus-centering and drag-pan
+controls; those controls are presentation-only and cannot alter the graph contract. Membership and
+conceptual relationships remain separate from processing edges, and static lineage is not actual
+consumption evidence. The Structure
 blueprint may explicitly bind registered concepts to accepted B3-B5 runtime capabilities; only
 those bindings may project `implemented`/`accepted` status into the Catalog. A discovery-only
 `related_not_equivalent` legacy link never satisfies an executable-spec requirement. This Catalog

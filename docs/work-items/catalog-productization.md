@@ -3,9 +3,9 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
-| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; field-lineage requalification pending |
-| Current status | #230 field-lineage requalification accepted; #231/#232 remain open for release and production audit |
+| Delivery gate | accepted |
+| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md` |
+| Current status | A–D and parent closed after field-lineage requalification; API/Web production `c9bbd07` |
 | Work item | `P3-DICT-002` / #232 |
 | Parent | `index.md`; `data-indicator-dictionary.md` |
 | Governing design | `../design/data-indicator-catalog-productization.md` |

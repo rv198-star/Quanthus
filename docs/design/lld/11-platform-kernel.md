@@ -436,11 +436,13 @@ arbitrary repository files at request time: composition rebuilds the Catalog fro
 manifest and checks the frozen digest/count manifest before serving. No Catalog surface edits schemas,
 formulas, labels, Facts, strategies or execution state. `P3-DICT-002` adds Chinese business cards,
 internal-only maintenance diagnostics and bounded static processing graphs to these same GET
-routes. Summary returns a layered overview; relations accepts depth/node budgets. No new service,
-database migration or Worker kind is introduced. Current audited production checkout, API and Web
-are `10301cdad7fed730072442da7921d24d0de65018`; evidence:
-`../../acceptance/catalog-productization-production-closeout-20260907.md`. The original Catalog
-acceptance remains retained separately.
+routes. Summary returns a layered overview; relations accepts depth/node budgets. Field focus also
+returns an explicit proof level: exact field processing when evidence exists, or a separately marked
+parent-table context that cannot be interpreted as a field mapping. No new service, database
+migration or Worker kind is introduced. Current audited production checkout, API and Web are
+`c9bbd0721ec45e3437c64d029c4cf5efbd37c64d`; evidence:
+`../../acceptance/catalog-field-lineage-production-closeout-20260907.md`. The original Catalog and
+first productization acceptance remain retained separately.
 
 Docker keeps API and Web host ports bound to loopback. A governed Web image build also performs a
 repository-scoped retention pass for `quanthus-platform-web:git-*`: the target release tag and every

@@ -232,8 +232,10 @@ GET-only summary/search/detail/relation routes under `catalog:read`, and `/catal
 human query surface. Missing metadata remains an internal maintenance diagnostic; the business
 summary and homepage do not expose a developer gap dashboard. `P3-DICT-002` adds Chinese reading
 metadata and declared processing lineage, governed by `../data-indicator-catalog-productization.md`
-and `../../work-items/catalog-productization.md`. Membership and conceptual relationships remain
-separate from processing edges, and static lineage is not actual consumption evidence. The Structure
+and `../../work-items/catalog-productization.md`. DWD field focus distinguishes exact field proof
+from separately labeled parent-table context; table membership cannot fabricate a field edge.
+Membership and conceptual relationships remain separate from processing edges, and static lineage
+is not actual consumption evidence. The Structure
 blueprint may explicitly bind registered concepts to accepted B3-B5 runtime capabilities; only
 those bindings may project `implemented`/`accepted` status into the Catalog. A discovery-only
 `related_not_equivalent` legacy link never satisfies an executable-spec requirement. This Catalog
@@ -269,8 +271,8 @@ authority.
 | P3-DICT-002 | Productize Chinese Catalog cards and declared processing lineage | P3-DICT-001 | #232; `docs/design/data-indicator-catalog-productization.md`; `config/data-indicator-catalog-productization.v1.json` |
 | P3-DICT-002-A | Separate internal diagnostics from business use limitations | P3-DICT-001 | #228; business response omits maintenance gaps, item limitations remain visible |
 | P3-DICT-002-B | Cover all registered entries with Chinese business explanations | P3-DICT-002-A | #229; all-entry coverage, exact formula/identity and human-readable card tests |
-| P3-DICT-002-C | Add layered overview and bounded field-focused processing graphs | P3-DICT-002-B | #230; evidence, direction, bounded expansion and real browser interaction |
-| P3-DICT-002-D | Audit, test and release the productized Catalog | P3-DICT-002-C | #231; complete repository/Web gates and production API/Web acceptance |
+| P3-DICT-002-C | Add layered overview and bounded field-focused processing graphs | P3-DICT-002-B | #230; `docs/acceptance/catalog-field-lineage-repair-20260907.md`; 524-field proof/context classification and exact adjustment-factor counterexample |
+| P3-DICT-002-D | Audit, test and release the productized Catalog | P3-DICT-002-C | #231; `docs/acceptance/catalog-field-lineage-production-closeout-20260907.md`; full gates and API/Web production release |
 
 ## 7. Acceptance
 

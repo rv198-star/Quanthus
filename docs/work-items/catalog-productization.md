@@ -3,9 +3,9 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | accepted |
+| Delivery gate | open |
 | Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`; `../acceptance/catalog-lineage-view-controls-production-closeout-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md` |
-| Current status | A–D and parent closed；standard infinite viewport deployed on Web `73f1b40`；API remains `0c671f9` |
+| Current status | A/B/C closed；#230 single-canvas table-context compaction PASS；#231 and parent pending production release |
 | Work item | `P3-DICT-002` / #232 |
 | Parent | `index.md`; `data-indicator-dictionary.md` |
 | Governing design | `../design/data-indicator-catalog-productization.md` |
@@ -22,10 +22,10 @@
 | --- | --- | --- |
 | #228 / P3-DICT-002-A | 分离内部诊断和业务界面 | 首页及业务 summary 无开发缺口；内部检测保留，业务限制留在对应条目 |
 | #229 / P3-DICT-002-B | 中文说明与分层卡片 | 664 个条目、33 表及 524 字段覆盖；英文 ID 可复制，技术详情折叠 |
-| #230 / P3-DICT-002-C | 有依据且采用标准无限画布的加工血缘 | 保留精确身份和 proof boundary；独立世界坐标、默认 fit 居中、无限平移、滚轮/双指缩放、悬浮控制器与小地图 |
+| #230 / P3-DICT-002-C | 有依据且采用标准无限画布的加工血缘 | 保留精确身份和 proof boundary；`table_context_only` 单画布紧凑表达；独立世界坐标、默认 fit 居中、无限平移、滚轮/双指缩放、悬浮控制器与小地图 |
 | #231 / P3-DICT-002-D | 审计、回归与发布 | 语义反例、权限、桌面/窄屏浏览器、完整工程检查、提交与生产核查 |
 
-机器计划是状态权威，按 A→B→C→D 关闭，父工单最后关闭。字段焦点修复见 `../acceptance/catalog-field-lineage-repair-20260907.md`；节点身份/表级图可读性复验见 `../acceptance/catalog-lineage-node-identity-repair-20260907.md`；上一版固定画布复验见 `../acceptance/catalog-lineage-view-controls-20260907.md`；当前 #230 无限 viewport 复验见 `../acceptance/catalog-lineage-infinite-viewport-20260907.md`，生产收尾见 `../acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md`；该修订仍只改变浏览器视图管理，不改变任何血缘节点、边或数据语义。
+机器计划是状态权威，按 A→B→C→D 关闭，父工单最后关闭。字段焦点修复见 `../acceptance/catalog-field-lineage-repair-20260907.md`；节点身份/表级图可读性复验见 `../acceptance/catalog-lineage-node-identity-repair-20260907.md`；上一版固定画布复验见 `../acceptance/catalog-lineage-view-controls-20260907.md`；无限 viewport 复验见 `../acceptance/catalog-lineage-infinite-viewport-20260907.md`；当前单画布紧凑表达复验见 `../acceptance/catalog-lineage-single-canvas-20260907.md`。该修订仍只改变浏览器展示，不改变任何血缘节点、边或数据语义。
 
 ## 代码与验证入口
 

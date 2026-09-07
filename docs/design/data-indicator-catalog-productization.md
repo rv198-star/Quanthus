@@ -3,8 +3,8 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | accepted |
-| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-repair-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`; `../acceptance/catalog-lineage-view-controls-20260907.md`; `../acceptance/catalog-lineage-view-controls-production-closeout-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md` |
+| Delivery gate | open |
+| Acceptance | `../acceptance/catalog-productization-production-closeout-20260907.md`; `../acceptance/catalog-field-lineage-repair-20260907.md`; `../acceptance/catalog-field-lineage-production-closeout-20260907.md`; `../acceptance/catalog-lineage-node-identity-repair-20260907.md`; `../acceptance/catalog-lineage-node-identity-production-closeout-20260907.md`; `../acceptance/catalog-lineage-view-controls-20260907.md`; `../acceptance/catalog-lineage-view-controls-production-closeout-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-20260907.md`; `../acceptance/catalog-lineage-infinite-viewport-production-closeout-20260907.md`; `../acceptance/catalog-lineage-single-canvas-20260907.md` |
 | Work item | `P3-DICT-002` |
 | Parent | `data-indicator-catalog.md` |
 | Plan | `../../config/data-indicator-catalog-productization.v1.json` |
@@ -72,8 +72,9 @@ T 是否包含、历史要求、缺失语义；不得把旧 SMA/RSI 改写成另
 每个 DWD 字段焦点现在必须明确返回一种证明级别：
 
 - `field_proven`：存在直接以该字段为输入或输出的、证据绑定的加工边；主图可展示这些实线关系；
-- `table_context_only`：没有精确字段映射，但所属 DWD 表已有声明的加工关系；主图保持字段孤立，
-  另开“所属表加工上下文”视图，明确该上下文不能推断字段参与了表的每个来源或消费者；
+- `table_context_only`：没有精确字段映射，但所属 DWD 表已有声明的加工关系；焦点区只保留一张画布，
+  直接展示所属表的加工上下文，并用紧凑提示明确该上下文不能推断字段参与了表的每个来源或消费者；
+  不再先绘制一张孤立字段画布、再追加第二张表级画布；
 - `field_unregistered`：连所属表加工上下文也不存在，必须显式报未登记，不能只显示自身而无说明。
 
 `field_of` / `contains` 仍不能转成加工边，也不能用 ODS→DWD 表级关系自动生成虚假的

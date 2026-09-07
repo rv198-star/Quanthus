@@ -295,43 +295,53 @@ export function LineageFocus({ graph, onNavigate, depth, onDepth, busy }: {
 }) {
   const [edgeId, setEdgeId] = useState<string | null>(null);
   const center = graph.nodes.find(node => node.id === graph.center);
-  const evidence = graph.edges.find(edge => edge.id === edgeId);
-  const names = new Map(graph.nodes.map(node => [node.id, node.label]));
+  const tableContextOnly = graph.coverage_level === "table_context_only" && graph.table_context !== null;
+  const visibleContext = tableContextOnly ? graph.table_context : null;
+  const visibleNodes = visibleContext?.nodes ?? graph.nodes;
+  const visibleEdges = visibleContext?.edges ?? graph.edges;
+  const visibleCenter = visibleContext?.center ?? graph.center;
+  const visibleScope = visibleContext?.scope ?? graph.scope;
+  const visibleOmittedNodes = visibleContext?.omitted_nodes ?? graph.omitted_nodes;
+  const visibleBoundaryEdges = visibleContext?.boundary_edges ?? graph.boundary_edges;
+  const contextCenter = visibleContext?.nodes.find(node => node.id === visibleContext.center);
+  const evidence = visibleEdges.find(edge => edge.id === edgeId);
+  const names = new Map(visibleNodes.map(node => [node.id, node.label]));
+  const statusTitle = tableContextOnly ? "表级上下文" : graph.coverage_level === "field_proven" ? "字段级血缘" : "已登记血缘";
+  const statusMessage = tableContextOnly
+    ? `当前字段尚无精确字段级血缘；下图展示 ${contextCenter?.label ?? "所属表"}${contextCenter?.technical_id ? `（${contextCenter.technical_id}）` : ""} 的加工关系，不代表该字段参与每条关系。`
+    : graph.coverage_level === "field_proven"
+      ? "下图为当前字段已有证据支持的精确加工关系。"
+      : graph.coverage_message;
   return <section className={styles.mapSection} aria-busy={busy} data-testid="lineage-focus">
-    <div className={styles.sectionHeading}><div><h2>上游来源与下游使用</h2><p>当前焦点：{center?.label}。点击节点继续追查，下方可查看每条关系的加工依据。</p></div>
+    <div className={styles.sectionHeading}><div><h2>血缘关系</h2><p>当前焦点：{center?.label}。点击节点可继续追查。</p></div>
       <label>展开范围 <select aria-label="血缘展开层数" value={depth} onChange={event => onDepth(Number(event.target.value))}>
         {[1, 2, 3, 4, 5].map(value => <option key={value} value={value}>{value} 跳</option>)}
       </select></label>
     </div>
     {busy ? <p role="status">正在读取血缘…</p> : null}
-    <div className={styles.coverageNotice} data-level={graph.coverage_level} data-testid="lineage-coverage-level">
-      <strong>{graph.coverage_level === "field_proven" ? "字段级血缘已证明" : graph.coverage_level === "table_context_only" ? "当前仅有表级加工上下文" : "已登记加工关系"}</strong>
-      <p>{graph.coverage_message}</p>
+    <div className={styles.lineageStatus} data-level={graph.coverage_level} data-testid="lineage-coverage-level">
+      <strong>{statusTitle}</strong><span>{statusMessage}</span>
     </div>
-    <Canvas title="字段双向血缘图" nodes={graph.nodes.map(node => ({ id: node.id, label: node.label,
-      technicalId: node.technical_id, meta: `${node.process ? "加工步骤 · " : ""}${grains[node.grain] ?? node.grain}`,
-      column: node.distance ?? 0, process: node.process, center: node.id === graph.center }))}
-      edges={graph.edges} onNode={id => { const node = graph.nodes.find(item => item.id === id); if (node) onNavigate(node); }} />
-    {!graph.edges.length && !graph.table_context ? <p className={styles.graphNote}>当前目录尚未登记此节点的加工关系；不能据此认定它没有上下游。</p> : null}
-    {graph.table_context ? <section className={styles.contextPanel} data-testid="table-lineage-context">
-      <h3>所属表已证明的加工上下文</h3><p>{graph.table_context.message}</p>
-      <Canvas title="所属表加工上下文（非字段映射）" nodes={graph.table_context.nodes.map(node => ({ id: node.id, label: node.label,
+    <div data-testid={tableContextOnly ? "table-lineage-context" : undefined}>
+      <Canvas title={tableContextOnly ? "所属表加工上下文（非字段映射）" : "字段双向血缘图"} nodes={visibleNodes.map(node => ({ id: node.id, label: node.label,
         technicalId: node.technical_id, meta: `${node.process ? "加工步骤 · " : ""}${grains[node.grain] ?? node.grain}`,
-        column: node.distance ?? 0, process: node.process, center: node.id === graph.table_context?.center }))}
-        edges={graph.table_context.edges} onNode={id => { const node = graph.table_context?.nodes.find(item => item.id === id); if (node) onNavigate(node); }} />
-      <p className={styles.graphNote}>此图只证明所属表参与这些加工链；没有字段级证据时，不能推断当前字段参与其中每一条关系。</p>
-    </section> : null}
-    <p className={styles.graphNote}>实线箭头表示已登记加工依赖；归属和概念关联不进入主图。当前字段图显示 {graph.nodes.length} 个节点、{graph.edges.length} 条边。</p>
-    {graph.boundary_edges || graph.omitted_nodes ? <p className={styles.graphNote} data-testid="lineage-boundary">
-      受展开层数和节点预算限制，{graph.boundary_edges} 条边连接到当前视图之外；另有 {graph.omitted_nodes} 个范围内节点未显示。可增加层数或点击节点继续展开。
-    </p> : null}
-    <p className={styles.graphNote}>{graph.scope}。{graph.coverage}</p>
+        column: node.distance ?? 0, process: node.process, center: node.id === visibleCenter }))}
+        edges={visibleEdges} onNode={id => { const node = visibleNodes.find(item => item.id === id); if (node) onNavigate(node); }} />
+    </div>
+    {!visibleEdges.length ? <p className={styles.graphNote}>当前目录尚未登记此节点的加工关系；不能据此认定它没有上下游。</p> : null}
+    <p className={styles.graphMeta}>{visibleNodes.length} 个节点 · {visibleEdges.length} 条关系 · {tableContextOnly ? "表级上下文" : statusTitle}</p>
+    <details className={styles.technical}><summary>范围、限制与加工依据</summary>
+      {visibleBoundaryEdges || visibleOmittedNodes ? <p className={styles.graphNote} data-testid="lineage-boundary">
+        受展开层数和节点预算限制，{visibleBoundaryEdges} 条边连接到当前视图之外；另有 {visibleOmittedNodes} 个范围内节点未显示。可增加层数或点击节点继续展开。
+      </p> : null}
+      <p className={styles.graphNote}>实线箭头表示已登记加工依赖；归属和概念关联不进入主图。{visibleScope}。{graph.coverage}</p>
+      <ul>{visibleEdges.map(edge => <li key={edge.id}>
+        <button type="button" onClick={() => setEdgeId(edge.id)}>{names.get(edge.source)} → {names.get(edge.target)}：{edge.label}</button>
+      </li>)}</ul>
+    </details>
     {center && !center.entry_id ? <div className={styles.explanation}><strong>{center.label}</strong><p>{center.description}</p>
       {center.evidence ? <details><summary>该节点的定义依据</summary><code>{center.evidence.path} · {center.evidence.locator}</code><p>{center.evidence.sha256}</p></details> : null}
     </div> : null}
-    <details className={styles.technical}><summary>以列表阅读关系与加工依据</summary><ul>{graph.edges.map(edge => <li key={edge.id}>
-      <button type="button" onClick={() => setEdgeId(edge.id)}>{names.get(edge.source)} → {names.get(edge.target)}：{edge.label}</button>
-    </li>)}</ul></details>
     {evidence ? <div className={styles.explanation} data-testid="lineage-evidence">
       <strong>{names.get(evidence.source)} → {names.get(evidence.target)}</strong><p>{evidence.label} · {grains[evidence.grain]}</p>
       <p>加工定义依据（非运行回执）</p><code>{evidence.evidence.path} · {evidence.evidence.locator}</code><p>{evidence.evidence.sha256}</p>

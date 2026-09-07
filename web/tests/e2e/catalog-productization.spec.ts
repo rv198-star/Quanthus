@@ -139,12 +139,14 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await expect(factorTableGraph).not.toContainText("复权因子来源 · 日发布工件");
     await expect(page.locator('[data-lineage-node="process:release_artifacts-adjustment_evidence_delta"]')).toHaveCount(0);
     await search(page, "dwd_adjustment_factor.effective_from");
-    await expect(page.getByTestId("lineage-coverage-level")).toContainText("字段级血缘已证明");
+    await expect(page.getByTestId("lineage-coverage-level")).toContainText("字段级血缘");
     await expect(page.locator('[data-lineage-node="source-field:adjustment_factors_pit.effective_date"]')).toBeVisible();
     await expect(page.locator('[data-lineage-node="projection:p4-event.factor_effective_from"]')).toBeVisible();
     await search(page, "dwd_adjustment_factor.factor_value");
-    await expect(page.getByTestId("lineage-coverage-level")).toContainText("当前仅有表级加工上下文");
+    await expect(page.getByTestId("lineage-coverage-level")).toContainText("表级上下文");
     await expect(page.getByTestId("table-lineage-context")).toBeVisible();
+    await expect(page.getByTestId("lineage-focus").getByTestId("lineage-canvas")).toHaveCount(1);
+    await expect(page.getByTestId("lineage-focus").getByRole("heading", { name: "所属表已证明的加工上下文" })).toHaveCount(0);
     await search(page, "indicator.momentum.macd");
     await expect(page.getByTestId("catalog-detail")).toContainText("暂无");
     await expect(page.getByTestId("lineage-focus")).toContainText("不能据此认定");

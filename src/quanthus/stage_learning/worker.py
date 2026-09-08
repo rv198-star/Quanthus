@@ -226,9 +226,11 @@ class StageWorker:
 
     def _git_env(self) -> dict[str, str]:
         env = dict(os.environ)
+        known_hosts = self.paths.git_key.parent / "known_hosts"
         env["GIT_SSH_COMMAND"] = (
-            f"ssh -i {self.paths.git_key} -o IdentitiesOnly=yes "
-            "-o BatchMode=yes -o StrictHostKeyChecking=yes"
+            f"ssh -F none -i {self.paths.git_key} -o IdentitiesOnly=yes "
+            "-o BatchMode=yes -o StrictHostKeyChecking=yes "
+            f"-o UserKnownHostsFile={known_hosts} -o GlobalKnownHostsFile=/dev/null"
         )
         return env
 

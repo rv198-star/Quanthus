@@ -119,6 +119,9 @@ def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() ->
         '[[ "$(hostname)" == "RX6800" ]]',
         "sudo loginctl enable-linger",
         "StrictHostKeyChecking=yes",
+        "-F none",
+        "UserKnownHostsFile=",
+        "GlobalKnownHostsFile=/dev/null",
         "quanthus-github-ro",
         "bootstrap-stage-training-node",
         "systemctl --user enable quanthus-stage-worker.service",
@@ -134,6 +137,10 @@ def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() ->
 
     assert "quanthus.stage_learning.worker" in wrapper
     assert "QUANTHUS_STAGE_WORKER_CODE_REVISION" in wrapper
+    worker_source = (ROOT / "src/quanthus/stage_learning/worker.py").read_text(encoding="utf-8")
+    assert "ssh -F none" in worker_source
+    assert "UserKnownHostsFile=" in worker_source
+    assert "GlobalKnownHostsFile=/dev/null" in worker_source
     assert "/proc/" not in installer
     assert "MemoryMax=34G" in unit
     assert "CPUQuota=800%" in unit

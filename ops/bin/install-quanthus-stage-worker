@@ -44,7 +44,7 @@ if [[ -n "$(git -C "${repo_root}" status --porcelain)" ]]; then
   fail "control checkout must be clean before worker installation"
 fi
 
-export GIT_SSH_COMMAND="ssh -i ${git_key} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes"
+export GIT_SSH_COMMAND="ssh -F none -i ${git_key} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${HOME}/.ssh/known_hosts -o GlobalKnownHostsFile=/dev/null"
 remote_main="$(git ls-remote git@github.com:rv198-star/Quanthus.git refs/heads/main | awk '{print $1}')"
 [[ "${remote_main}" =~ ^[0-9a-f]{40}$ ]] || fail "cannot resolve GitHub main with the deploy key"
 if ! git -C "${repo_root}" merge-base --is-ancestor "${revision}" "${remote_main}" 2>/dev/null; then

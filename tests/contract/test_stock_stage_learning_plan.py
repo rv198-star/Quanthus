@@ -20,9 +20,12 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     plan = sync.load_plan()
     assert len(plan["items"]) == 9
     ready = {item["id"] for item in plan["items"] if item["status"] == "ready"}
-    assert ready == {"P3-STAGE-001-C"}
-    stage_a = next(item for item in plan["items"] if item["id"] == "P3-STAGE-001-A")
-    assert stage_a["status"] == "closed"
+    assert ready == set()
+    by_id = {item["id"]: item for item in plan["items"]}
+    assert by_id["P3-STAGE-001-A"]["status"] == "closed"
+    assert by_id["P3-STAGE-001-B"]["status"] == "closed"
+    assert by_id["P3-STAGE-001-C"]["status"] == "closed"
+    assert by_id["P3-STAGE-001-D"]["status"] == "blocked"
     assert plan["data_policy"]["development_years"] == [2012, 2021]
     assert plan["data_policy"]["arbitration_years"] == [2022, 2024]
     assert plan["data_policy"]["permanent_blind_years"] == [2025, 2025]

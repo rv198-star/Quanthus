@@ -55,14 +55,14 @@
       "blocked_on": ["分类器训练、GPU云和生产Worker迁移仍关闭"], "evidence": ["docs/acceptance/stock-stage-learning-b-capacity-20260908.md"]
     },
     {
-      "id": "P3-STAGE-001-C", "kind": "task", "status": "ready",
+      "id": "P3-STAGE-001-C", "kind": "task", "status": "closed",
       "title": "实现最小Facts输入与历史逐日验证底座",
       "depends_on": ["P3-STAGE-001-A", "P3-STAGE-001-B"],
       "scope": "只补首组必要F家族；共享特征一次构建；additive候选/decision契约，时间折与数据权限门禁，独立oracle及历史/增量一致性。",
       "inputs": ["精确DWD依赖", "批准的retrospective profile", "设备资源上限"],
       "deliverables": ["src/quanthus/stage_learning/（拟建）", "版本化候选/decision及输入manifest", "tests/unit/test_stage_learning_*（拟建）"],
       "acceptance": ["首组字段/公式/缺失闭包可执行且不重命名旧指标", "未来后缀注入、除权/停牌/相等/支撑角色反例通过", "开发读接口拒绝2022-2025与future target读取", "批量与逐日结果一致，跨平台数值容差预登记"],
-      "blocked_on": ["分类器训练、future target、2022-2025开发读取、正式LabelCard发布仍关闭"], "evidence": []
+      "blocked_on": ["分类器训练、future target、2022-2025开发读取、正式LabelCard发布仍关闭"], "evidence": ["docs/acceptance/stock-stage-learning-c-harness-20260908.md"]
     },
     {
       "id": "P3-STAGE-001-D", "kind": "task", "status": "blocked",

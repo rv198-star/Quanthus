@@ -10,6 +10,7 @@ from quanthus.stage_learning.worker import (
     JOB_KIND,
     JOB_SCHEMA,
     StageJob,
+    StageWorker,
     StageWorkerError,
     StageWorkerPaths,
     cancel_job,
@@ -57,6 +58,22 @@ def test_submit_status_and_preclaim_cancel_are_durable(tmp_path: Path) -> None:
 
     with pytest.raises(StageWorkerError, match="terminal"):
         cancel_job(worker_paths, job_id)
+
+
+def test_worker_reuses_installer_pinned_main_before_network_fetch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker = StageWorker(paths(tmp_path))
+    calls: list[tuple[str, ...]] = []
+    monkeypatch.setattr(worker, "_revision_admitted_locally", lambda revision: revision == REVISION)
+
+    def unexpected_git(*arguments: str, **_kwargs: object) -> object:
+        calls.append(arguments)
+        raise AssertionError("network fetch should not run for installer-pinned revision")
+
+    monkeypatch.setattr(worker, "_git", unexpected_git)
+    worker._authorize_revision(REVISION)
+    assert calls == []
 
 
 def test_stage_job_contract_rejects_branch_kind_and_config_drift() -> None:

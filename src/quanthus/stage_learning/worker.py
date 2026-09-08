@@ -213,24 +213,22 @@ class StageWorker:
         return env
 
     def _git(self, *arguments: str, timeout: float = 120) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            ["git", "-C", str(self.paths.control_repo), *arguments],
-            check=True,
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            env=self._git_env(),
-        )
+        try:
+            return subprocess.run(
+                ["git", "-C", str(self.paths.control_repo), *arguments],
+                check=True,
+                text=True,
+                capture_output=True,
+                timeout=timeout,
+                env=self._git_env(),
+            )
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or exc.stdout or "").strip().splitlines()
+            tail = detail[-1][:400] if detail else f"exit {exc.returncode}"
+            action = " ".join(arguments[:2]) or "command"
+            raise StageWorkerError(f"git {action} failed: {tail}") from exc
 
-    def _authorize_revision(self, revision: str) -> None:
-        self._git(
-            "fetch",
-            "--no-tags",
-            GITHUB_REPOSITORY,
-            f"+refs/heads/main:{MAIN_REF}",
-            timeout=180,
-        )
-        self._git("cat-file", "-e", f"{revision}^{{commit}}")
+    def _revision_admitted_locally(self, revision: str) -> bool:
         result = subprocess.run(
             [
                 "git",
@@ -246,7 +244,33 @@ class StageWorker:
             env=self._git_env(),
             timeout=30,
         )
-        if result.returncode != 0:
+        return result.returncode == 0
+
+    def _authorize_revision(self, revision: str) -> None:
+        # The installer already resolves and pins GitHub main before starting the
+        # service.  Reuse that admitted local authority first so the bootstrap
+        # job does not immediately race a second fetch against the installer.
+        if self._revision_admitted_locally(revision):
+            return
+        last_error: StageWorkerError | None = None
+        for attempt in range(3):
+            try:
+                self._git(
+                    "fetch",
+                    "--no-tags",
+                    GITHUB_REPOSITORY,
+                    f"+refs/heads/main:{MAIN_REF}",
+                    timeout=180,
+                )
+                last_error = None
+                break
+            except StageWorkerError as exc:
+                last_error = exc
+                if attempt < 2:
+                    time.sleep(2**attempt)
+        if last_error is not None:
+            raise last_error
+        if not self._revision_admitted_locally(revision):
             raise StageWorkerError("requested revision is not admitted by GitHub main")
 
     def _status_path(self, job_id: str) -> Path:

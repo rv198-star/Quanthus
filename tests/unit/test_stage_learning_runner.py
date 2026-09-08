@@ -11,9 +11,13 @@ from quanthus.stage_learning.learning_runner import StageLearningRunError, _requ
 ROOT = find_project_root()
 
 
-def test_current_delivery_plan_keeps_real_semantic_training_fail_closed() -> None:
-    with pytest.raises(StageLearningRunError, match="training authority is not open"):
-        _require_authority(ROOT)
+def test_current_delivery_plan_opens_only_synthetic_development_learning() -> None:
+    plan = _require_authority(ROOT)
+    authority = plan["authorization"]
+    assert authority["synthetic_expert_development_learning_authorized"] is True
+    assert authority["synthetic_expert_development_reference_authorized"] is True
+    assert authority["training_authorized"] is False
+    assert authority["sealed_partition_access_authorized"] is False
 
 
 def test_learning_authority_can_open_only_without_downstream_scope(tmp_path: Path) -> None:

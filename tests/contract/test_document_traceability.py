@@ -1359,12 +1359,20 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIs(
             stage_plan["authorization"]["development_learning_implementation_authorized"], True
         )
+        self.assertIs(
+            stage_plan["authorization"]["synthetic_expert_development_reference_authorized"], True
+        )
+        self.assertIs(
+            stage_plan["authorization"]["synthetic_expert_development_learning_authorized"], True
+        )
         positive = {
             "capacity_benchmark_authorized",
             "stage_harness_implementation_authorized",
             "stage_reference_pilot_implementation_authorized",
             "development_future_settlement_authorized",
             "development_learning_implementation_authorized",
+            "synthetic_expert_development_reference_authorized",
+            "synthetic_expert_development_learning_authorized",
         }
         for key, value in stage_plan["authorization"].items():
             if key.endswith("_authorized") and key not in positive:

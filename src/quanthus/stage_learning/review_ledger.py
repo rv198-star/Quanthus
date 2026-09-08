@@ -23,6 +23,7 @@ from quanthus.stage_learning.reference import (
     ReviewerJudgement,
     resolve_reference_reviews,
 )
+from quanthus.stage_learning.synthetic_panel import load_synthetic_panel
 from quanthus.structure_v2_inputs import canonical, digest
 
 REVIEW_SCHEMA = "quanthus.stage-reference-review.v1"
@@ -213,6 +214,8 @@ def publish_resolution(
     primary_paths: Sequence[Path],
     adjudicator_path: Path | None,
     output_root: Path,
+    evidence_tier: str = "HUMAN_EXPERT_REFERENCE",
+    panel_config: Path | None = None,
 ) -> dict[str, Any]:
     contexts = load_reference_contexts(sample_manifest)
     primaries = [load_reviewer_ledger(path, expected_role="primary") for path in primary_paths]
@@ -221,6 +224,27 @@ def publish_resolution(
         if adjudicator_path is None
         else load_reviewer_ledger(adjudicator_path, expected_role="adjudicator")
     )
+    if evidence_tier not in {"HUMAN_EXPERT_REFERENCE", "SYNTHETIC_EXPERT_CONSENSUS"}:
+        raise ReviewLedgerError("reference evidence tier is not admitted")
+    panel_id: str | None = None
+    if evidence_tier == "SYNTHETIC_EXPERT_CONSENSUS":
+        if panel_config is None:
+            raise ReviewLedgerError("synthetic reference requires a frozen panel config")
+        panel = load_synthetic_panel(panel_config)
+        panel_id = str(panel["panel_id"])
+        expected_primary = {
+            str(panel["assignment"]["primary_a"]),
+            str(panel["assignment"]["primary_b"]),
+        }
+        observed_primary = {rows[0].reviewer_id for rows in primaries if rows}
+        if observed_primary != expected_primary:
+            raise ReviewLedgerError("synthetic primary reviewer identities differ from panel")
+        if adjudicator:
+            expected_adjudicator = str(panel["assignment"]["adjudicator"])
+            if adjudicator[0].reviewer_id != expected_adjudicator:
+                raise ReviewLedgerError("synthetic adjudicator identity differs from panel")
+    elif panel_config is not None:
+        raise ReviewLedgerError("human reference must not bind a synthetic panel config")
     resolved = resolve_complete_review(contexts, primaries, adjudicator)
     run_id = "stage-reference-resolution-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     root = output_root.expanduser().resolve() / run_id
@@ -246,6 +270,9 @@ def publish_resolution(
         ),
         "adjudicator_id": None if not adjudicator else adjudicator[0].reviewer_id,
         "semantic_reference_status": "RESOLVED_DEVELOPMENT_PILOT_REFERENCE",
+        "evidence_tier": evidence_tier,
+        "panel_id": panel_id,
+        "human_expert_validated": evidence_tier == "HUMAN_EXPERT_REFERENCE",
         "confirmatory_test_authority": False,
         "future_settlement_used_for_resolution": False,
     }
@@ -267,6 +294,9 @@ def publish_resolution(
         ),
         "files": {name: _sha256(payload) for name, payload in sorted(payloads.items())},
         "resolved_count": len(resolved),
+        "evidence_tier": evidence_tier,
+        "panel_id": panel_id,
+        "human_expert_validated": evidence_tier == "HUMAN_EXPERT_REFERENCE",
         "confirmatory_test_authority": False,
     }
     manifest_bytes = canonical(manifest)
@@ -305,6 +335,10 @@ def verify_resolution_artifact(path: Path) -> dict[str, Any]:
         summary.get("semantic_reference_status")
         != "RESOLVED_DEVELOPMENT_PILOT_REFERENCE"
         or summary.get("resolved_count") != manifest.get("resolved_count")
+        or summary.get("evidence_tier") != manifest.get("evidence_tier")
+        or summary.get("human_expert_validated") != manifest.get("human_expert_validated")
+        or manifest.get("evidence_tier")
+        not in {"HUMAN_EXPERT_REFERENCE", "SYNTHETIC_EXPERT_CONSENSUS"}
         or manifest.get("confirmatory_test_authority") is not False
     ):
         raise ReviewLedgerError("reference resolution semantic authority differs")
@@ -312,6 +346,9 @@ def verify_resolution_artifact(path: Path) -> dict[str, Any]:
         "run_id": manifest["run_id"],
         "manifest_sha256": ready,
         "resolved_count": manifest["resolved_count"],
+        "evidence_tier": manifest["evidence_tier"],
+        "panel_id": manifest.get("panel_id"),
+        "human_expert_validated": manifest["human_expert_validated"],
         "verified": True,
         "confirmatory_test_authority": False,
     }
@@ -323,6 +360,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--primary", type=Path, action="append", required=True)
     parser.add_argument("--adjudicator", type=Path)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument(
+        "--evidence-tier",
+        choices=("HUMAN_EXPERT_REFERENCE", "SYNTHETIC_EXPERT_CONSENSUS"),
+        default="HUMAN_EXPERT_REFERENCE",
+    )
+    parser.add_argument("--panel-config", type=Path)
     return parser
 
 
@@ -335,6 +378,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         primary_paths=args.primary,
         adjudicator_path=args.adjudicator,
         output_root=args.output_root,
+        evidence_tier=args.evidence_tier,
+        panel_config=args.panel_config,
     )
     print(json.dumps(result, ensure_ascii=True, sort_keys=True))
     return 0

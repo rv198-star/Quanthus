@@ -1,8 +1,9 @@
 """Governed P3-STAGE-001-E development R0/R1 runner.
 
-The runner is intentionally unusable until the delivery plan explicitly authorizes development
-semantic training and a complete D reference-resolution artifact is supplied.  It never reads
-future settlements, arbitration, permanent-blind data, or strategy outcomes.
+The runner executes only when the delivery plan authorizes the exact development evidence tier and
+a complete D reference-resolution artifact is supplied.  Current policy admits bounded R0/R1
+learning against SYNTHETIC_EXPERT_CONSENSUS while formal human-validated training remains closed.
+It never reads future settlements, arbitration, permanent-blind data, or strategy outcomes.
 """
 from __future__ import annotations
 
@@ -110,8 +111,11 @@ def _require_authority(root: Path) -> dict[str, Any]:
         raise StageLearningRunError("stage delivery authority is missing")
     if authority.get("development_learning_implementation_authorized") is not True:
         raise StageLearningRunError("E implementation authority is not open")
-    if authority.get("training_authorized") is not True:
-        raise StageLearningRunError("development semantic training authority is not open")
+    if not (
+        authority.get("training_authorized") is True
+        or authority.get("synthetic_expert_development_learning_authorized") is True
+    ):
+        raise StageLearningRunError("development semantic learning authority is not open")
     if any(
         authority.get(key) is not False
         for key in (
@@ -145,9 +149,25 @@ def run_development_learning(
     if pilot_verified.get("independent_reference_complete") is not False:
         raise StageLearningRunError("unexpected D pilot semantic authority")
     if resolution_verified.get("resolved_count") != 120:
-        raise StageLearningRunError(
-            "E requires all 120 D pilot contexts to be independently resolved"
-        )
+        raise StageLearningRunError("E requires all 120 D pilot contexts to be resolved")
+    authority = plan["authorization"]
+    evidence_tier = resolution_verified.get("evidence_tier")
+    if evidence_tier == "SYNTHETIC_EXPERT_CONSENSUS":
+        reference_allowed = authority.get(
+            "synthetic_expert_development_reference_authorized"
+        ) is True
+        learning_allowed = authority.get(
+            "synthetic_expert_development_learning_authorized"
+        ) is True
+        if not (reference_allowed and learning_allowed):
+            raise StageLearningRunError("synthetic expert development learning is not authorized")
+        if resolution_verified.get("human_expert_validated") is not False:
+            raise StageLearningRunError("synthetic reference cannot claim human validation")
+    elif evidence_tier == "HUMAN_EXPERT_REFERENCE":
+        if authority.get("training_authorized") is not True:
+            raise StageLearningRunError("human-expert semantic training authority is not open")
+    else:
+        raise StageLearningRunError("reference evidence tier is not admitted for E")
 
     pilot_manifest = _object(pilot_root / "manifest.json", "D pilot manifest")
     resolution_manifest = _object(resolution_root / "manifest.json", "D resolution manifest")
@@ -230,6 +250,8 @@ def run_development_learning(
         "code_revision": code_revision,
         "pilot_manifest_sha256": pilot_verified["manifest_sha256"],
         "resolution_manifest_sha256": resolution_verified["manifest_sha256"],
+        "reference_evidence_tier": evidence_tier,
+        "human_expert_validated": bool(resolution_verified.get("human_expert_validated")),
         "source_manifest_digest": digest(source_manifest),
         "reference_count": len(references),
         "observation_count": len(observations),
@@ -272,6 +294,8 @@ def run_development_learning(
         "experiment_digest": digest(experiment),
         "pilot_manifest_sha256": pilot_verified["manifest_sha256"],
         "resolution_manifest_sha256": resolution_verified["manifest_sha256"],
+        "reference_evidence_tier": evidence_tier,
+        "human_expert_validated": bool(resolution_verified.get("human_expert_validated")),
         "files": {name: _sha256(payload) for name, payload in sorted(payloads.items())},
         "qualification_authorized": False,
         "future_settlement_read": False,

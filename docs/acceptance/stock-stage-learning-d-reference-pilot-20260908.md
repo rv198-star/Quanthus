@@ -22,11 +22,11 @@ The future ledger produced exactly 120 independent development settlements: 119 
 
 The artifact contains 120 reviewer packets and a separate 120-row settlement ledger. Primary reviewer packets are generated from T-or-earlier Structure/Activity/history evidence and exclude engineering candidate verdicts, future prices, future settlement and strategy results by contract. The pilot keeps the reviewer pack and future ledger as separate artifact members and binds both into the immutable manifest.
 
-The runner does **not** fabricate independent semantic judgement. Its terminal summary therefore correctly reports:
+The governed pilot Run itself does **not** fabricate semantic judgement. Its terminal summary therefore correctly reports:
 
 `INCONCLUSIVE_PENDING_INDEPENDENT_REVIEW`
 
-with `resolved_contexts=0` and `required_contexts=120`. This is an intended semantic gate, not a failed engineering Run. Two distinct primary judgements per context are still required; disagreement requires one independent adjudicator. Rule weak labels, future outcomes, or this same assistant cannot be substituted for that reference authority.
+with `resolved_contexts=0` and `required_contexts=120`. After this engineering evidence was accepted, the owner authorized a separate development-only `SYNTHETIC_EXPERT_CONSENSUS` evidence tier. Under that later policy, every context still requires two mutually hidden style-diverse primary reviews and, on disagreement, one unused third semantic persona; the quantitative auditor may veto evidence-contract violations but does not cast a semantic vote. Public-person names are mnemonic style anchors only and are not impersonation, endorsement, or claims about those people’s actual judgement. Future settlements and rule outputs remain forbidden reviewer evidence.
 
 ## Runtime repair retained as evidence
 
@@ -36,6 +36,6 @@ A separate Worker Git-fetch blocker was traced to an invalid system OpenSSH conf
 
 ## Claim ceiling
 
-This evidence accepts the D engineering substrate only: deterministic sampling, reviewer-blind T-only packets, development-only future settlement, artifact verification, runtime bounds, and review-ledger governance. It does not claim that any of the 120 contexts has an independent semantic label, does not qualify stage 3/4, does not authorize classifier training on fabricated labels, and does not open 2022-2024 arbitration or 2025 permanent-blind data.
+This evidence accepts the D engineering substrate only: deterministic sampling, reviewer-blind T-only packets, development-only future settlement, artifact verification, runtime bounds, and review-ledger governance. The pilot Run itself contains no semantic labels. The later synthetic-panel policy may now produce a complete development reference, but that reference must remain explicitly tagged `SYNTHETIC_EXPERT_CONSENSUS`; it is not `HUMAN_EXPERT_REFERENCE`, does not qualify stage 3/4, and does not open 2022-2024 arbitration or 2025 permanent-blind data.
 
-`P3-STAGE-001-D` therefore remains open until the independent reference ledger is resolved. Downstream E implementation may be prepared fail-closed, but result-bearing semantic learning must refuse to execute without a complete accepted reference ledger.
+`P3-STAGE-001-D` remains open and is ready for the synthetic-panel review run. A complete accepted synthetic reference may unlock development-only R0/R1 learning, while human-expert validation and formal qualification remain separate higher gates.

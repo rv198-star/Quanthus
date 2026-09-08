@@ -20,7 +20,7 @@
 | A | P3-STAGE-001-A | closed / #238 | `config/stage-learning/experiment.v1.json`、3/4语义与反例、有限参数空间、120例试标预算、物理镜像claim ceiling | `docs/acceptance/stock-stage-learning-a-freeze-20260908.md`；不打开分类器训练或结果分区 |
 | B | P3-STAGE-001-B | closed / #239 | RX6800独立CPU环境和100k/500k/1m容量基准、实际2020-2021 DWD I/O、设备选择 | 8线程/32GiB预算通过；CPU-first accepted；见 `../acceptance/stock-stage-learning-b-capacity-20260908.md` |
 | C | P3-STAGE-001-C | closed / #240 | 最小Facts扩展、历史逐日harness、候选/decision、独立oracle | real-DWD governed harness PASS；见 `../acceptance/stock-stage-learning-c-harness-20260908.md`；不训练分类器、不读future target |
-| D | P3-STAGE-001-D | blocked on independent review / #241 | 120例T-only参考包、分歧保留、development-only future settlement、最终试验冻结补充 | 工程pilot已PASS：32只开发样本、120 contexts（80随机+40边界）、120 settlements、52.2s；见 `../acceptance/stock-stage-learning-d-reference-pilot-20260908.md`。独立双评审/分歧裁决未完成，因此语义参考仍INCONCLUSIVE，D不关闭 |
+| D | P3-STAGE-001-D | ready / #241 | 120例T-only参考包、分歧保留、development-only future settlement、Synthetic Expert Panel评审 | 工程pilot已PASS：32只开发样本、120 contexts（80随机+40边界）、120 settlements、52.2s；见 `../acceptance/stock-stage-learning-d-reference-pilot-20260908.md`。当前采用SYNTHETIC_EXPERT_CONSENSUS作为development reference；公开人物姓名仅是风格锚点，不冒充本人或本人观点；真人专家属于更高证据层级 |
 | E | P3-STAGE-001-E | implementation ready / execution blocked by D | R0/R1/必要CPU R2、有限试验台账、相邻组校准、锁定候选 | fail-closed学习器已实现：冻结18个R1 trial、R0、reference角色分离、覆盖/歧义审计；见 `../acceptance/stock-stage-learning-e-implementation-readiness-20260908.md`。`training_authorized=false`，D独立reference未完成前不会跑真实语义训练 |
 | F | P3-STAGE-001-F | blocked by E+保留集授权 | 一次外样本、分状态/profile/用途资格包 | 数据权限与冻结门槛全部满足；测试失败保留，不原地调参后再称盲测 |
 | G | P3-STAGE-001-G | blocked by F+日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | 延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
@@ -32,7 +32,7 @@
 
 算法：规则/轻量模型实现、fold内训练与校准、可重复性、复杂度预算。量化：问题/对照、时序切分、有效样本、区间与试验台账。短线业务：可观察定义、参照角色、相邻反例、时效性、允许灰度。数仓作为跨项基础责任：源字段、单位、身份、知识视图、修正影响与发布。
 
-本次三视角评审由单一助手分别执行，不是真人签字。后续D明确要求独立T-only参考或把缺口如实保留为INCONCLUSIVE；不能让用户因不懂算法而被迫审批任意阈值。
+本次早期三视角评审由单一助手分别执行，不是真人签字。D现采用版本化 `SYNTHETIC_EXPERT_CONSENSUS`：不同风格原型互不可见地评审同一T-only证据，且明确不等同真人独立金标准；未来如获得真实A股专业交易者/基金经理参考，可升级或对照为 `HUMAN_EXPERT_REFERENCE`。不能让用户因不懂算法而被迫审批任意阈值。
 
 ## 3. 建议的第一步
 
@@ -46,4 +46,4 @@
 
 ## 5. 本轮验证
 
-计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub只同步P3-STAGE-001和A-H，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A/B/C 已关闭，D 的工程pilot已通过但独立语义评审未完成；训练、2022+结果/密封分区、日更与租机权限仍保持关闭。
+计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub只同步P3-STAGE-001和A-H，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A/B/C 已关闭，D 工程pilot已通过并进入合成专家评审；完整 `SYNTHETIC_EXPERT_CONSENSUS` 可解锁development-only R0/R1。正式 `training_authorized`、2022+结果/密封分区、资格发布、日更与租机权限仍保持关闭。

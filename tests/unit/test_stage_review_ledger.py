@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from quanthus.policy import find_project_root
 from quanthus.stage_learning.reference import ReferenceContext, ReferenceKind, ReviewerJudgement
 from quanthus.stage_learning.review_ledger import (
     ReviewLedgerError,
@@ -14,6 +15,9 @@ from quanthus.stage_learning.review_ledger import (
     resolve_complete_review,
     verify_resolution_artifact,
 )
+
+ROOT = find_project_root()
+PANEL = ROOT / "config/stage-learning/synthetic-expert-panel.v1.json"
 
 
 def context(name: str) -> ReferenceContext:
@@ -147,6 +151,94 @@ def test_publish_and_verify_complete_resolution_artifact(tmp_path: Path) -> None
     assert verified["verified"] is True
     assert verified["resolved_count"] == 2
     assert verified["confirmatory_test_authority"] is False
+
+
+def test_synthetic_resolution_binds_panel_and_cannot_claim_human_validation(
+    tmp_path: Path,
+) -> None:
+    contexts = (context("a"), context("b"))
+    sample = tmp_path / "sample.json"
+    sample.write_text(
+        json.dumps(
+            {
+                "schema_version": "quanthus.stage-reference-sample-manifest.v1",
+                "contexts": [item.to_dict() for item in contexts],
+            },
+            default=str,
+        ),
+        encoding="utf-8",
+    )
+    primary_paths: list[Path] = []
+    for reviewer in ("youzi-emotion-cycle-v1", "youzi-capacity-trend-v1"):
+        path = tmp_path / f"{reviewer}.jsonl"
+        rows = [
+            {
+                "schema_version": "quanthus.stage-reference-review.v1",
+                "context_id": item.context_id,
+                "reviewer_id": reviewer,
+                "reviewer_role": "primary",
+                "reference_kind": "definite",
+                "supported_stage_codes": [3],
+                "adjacent_contexts": [],
+                "reason_codes": ["synthetic_style_blind_review"],
+                "evidence_digest": item.evidence_digest,
+            }
+            for item in contexts
+        ]
+        path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+        primary_paths.append(path)
+    result = publish_resolution(
+        sample_manifest=sample,
+        primary_paths=primary_paths,
+        adjudicator_path=None,
+        output_root=tmp_path / "out",
+        evidence_tier="SYNTHETIC_EXPERT_CONSENSUS",
+        panel_config=PANEL,
+    )
+    verified = verify_resolution_artifact(Path(result["artifact_root"]))
+    assert verified["evidence_tier"] == "SYNTHETIC_EXPERT_CONSENSUS"
+    assert verified["human_expert_validated"] is False
+    assert verified["panel_id"] == "stage-first-group-a-share-public-style-archetypes-v1"
+
+
+def test_synthetic_resolution_rejects_wrong_persona_identity(tmp_path: Path) -> None:
+    item = context("c")
+    sample = tmp_path / "sample.json"
+    sample.write_text(
+        json.dumps(
+            {
+                "schema_version": "quanthus.stage-reference-sample-manifest.v1",
+                "contexts": [item.to_dict()],
+            },
+            default=str,
+        ),
+        encoding="utf-8",
+    )
+    paths: list[Path] = []
+    for reviewer in ("wrong-persona", "youzi-capacity-trend-v1"):
+        path = tmp_path / f"{reviewer}.jsonl"
+        row = {
+            "schema_version": "quanthus.stage-reference-review.v1",
+            "context_id": item.context_id,
+            "reviewer_id": reviewer,
+            "reviewer_role": "primary",
+            "reference_kind": "definite",
+            "supported_stage_codes": [3],
+            "adjacent_contexts": [],
+            "reason_codes": ["synthetic_style_blind_review"],
+            "evidence_digest": item.evidence_digest,
+        }
+        path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+        paths.append(path)
+    with pytest.raises(ReviewLedgerError, match="identities differ from panel"):
+        publish_resolution(
+            sample_manifest=sample,
+            primary_paths=paths,
+            adjudicator_path=None,
+            output_root=tmp_path / "out",
+            evidence_tier="SYNTHETIC_EXPERT_CONSENSUS",
+            panel_config=PANEL,
+        )
 
 
 def test_ledger_file_has_exact_schema_one_identity_and_role(tmp_path: Path) -> None:

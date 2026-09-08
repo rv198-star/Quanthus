@@ -1,0 +1,122 @@
+{
+  "schema_version": "quanthus.stage-learning-experiment.v1",
+  "experiment_id": "stock-stage-first-group-3-4-v1",
+  "design_status": "frozen_for_capacity_and_implementation_design",
+  "delivery_authority": {
+    "capacity_benchmark_authorized": true,
+    "classifier_training_authorized": false,
+    "future_target_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false
+  },
+  "partition_policy": {
+    "authority": "config/p0-policy.v1.json",
+    "development": {"start": "2012-01-01", "end": "2021-12-31"},
+    "arbitration": {"start": "2022-01-01", "end": "2024-12-31"},
+    "permanent_blind": {"start": "2025-01-01", "end": "2025-12-31"},
+    "development_code_read_guard_required": true
+  },
+  "physical_data_exposure": {
+    "rx6800_full_base_mirror_through": "2026-07-31",
+    "holdout_bytes_physically_present_on_training_node": true,
+    "physical_seal_preserved_on_training_node": false,
+    "holdout_assurance_on_training_node": "logical_read_guard_only",
+    "claim_limit": "2022-2025 can no longer be described as never exposed to the RX6800 node administrator; development code must still reject those dates"
+  },
+  "first_group": {
+    "market_stage_codes": [3, 4],
+    "adjacent_context_codes": [2, 5],
+    "profile": {
+      "observation_grain": "one finalized daily bar",
+      "decision_cutoff": "after_T_close",
+      "first_execution_not_before": "T_plus_1_open",
+      "knowledge_view": "retrospective_dwd_record_view",
+      "price_coordinate": "unadjusted_with_explicit_action_epoch",
+      "anchor_scales": [20, 60],
+      "anchor_scale_is_evaluation_facet_not_tuned_parameter": true
+    },
+    "stage_3": {
+      "name": "试探突破",
+      "observable_claim": "the current close first crosses above one pre-T frozen high anchor and the declared activity evidence is available",
+      "hard_predicates": [
+        "same_anchor_close_cross_above",
+        "episode_started_on_current_session",
+        "anchor_was_formed_only_from_pre_T_observations",
+        "activity_input_available_for_full_stage_label"
+      ],
+      "non_claims": [
+        "future acceptance is not known",
+        "future profitability is not known",
+        "a later rolling-high decrease cannot create a breakout retroactively",
+        "missing activity data cannot be silently converted to a price-only label"
+      ]
+    },
+    "stage_4": {
+      "name": "突破接受",
+      "observable_claim": "a previously recorded stage-3 episode on the same frozen anchor remains accepted for the required hold duration with declared activity evidence",
+      "hard_predicates": [
+        "prior_same_anchor_breakout_episode_required",
+        "not_same_session_as_initial_stage_3_confirmation",
+        "no_same_anchor_close_cross_below_during_required_hold",
+        "signed_distance_meets_frozen_candidate_margin",
+        "activity_input_available_for_full_stage_label"
+      ],
+      "non_claims": [
+        "a complete future pullback is not required to be known at T",
+        "state 4 is not a synonym for a persistent advancing trend",
+        "later failure does not rewrite a valid earlier acceptance observation",
+        "missing activity data cannot be silently converted to a price-only label"
+      ]
+    },
+    "dimension_rules": {
+      "stage_3_vs_stage_4": "same-slot temporal distinction: first probe versus evidence of hold/acceptance",
+      "stage_4_vs_stage_5": "stage 5 is a broader trend-background hypothesis and is not mechanically exclusive with a local accepted-breakout episode",
+      "stage_2_context": "failed probe with intact broader structure may return to consolidation; this is not a new failure stage",
+      "ambiguity": "same-slot unresolved evidence produces AMBIGUOUS or ABSTAIN rather than forced top-1"
+    }
+  },
+  "facts_dependency": {
+    "accepted_reusable": ["F1_reference_distance_partial", "F2_same_anchor_interaction_partial", "F3_minimal_process_memory"],
+    "required_before_full_stage_3_4_training": ["F7_episode_conditioned_activity"],
+    "optional_subtype_dependency": ["F6_retest_geometry_for_stage_4_retest_subtype"],
+    "price_only_engineering_predicates_may_be_built_before_full_label": true,
+    "price_only_predicates_are_not_official_stage_3_or_stage_4_labels": true
+  },
+  "r0_baseline": {
+    "probe_volume_ratio20_min": 1.25,
+    "acceptance_hold_sessions": 2,
+    "acceptance_signed_distance_min": 0.0,
+    "acceptance_window_volume_ratio20_min": 1.0
+  },
+  "r1_search_space": {
+    "per_anchor_scale_max_trials": 18,
+    "probe_volume_ratio20_min": [1.0, 1.25, 1.5],
+    "acceptance_hold_sessions": [1, 2, 3],
+    "acceptance_signed_distance_min": [0.0, 0.0025],
+    "acceptance_window_volume_ratio20_min": [1.0],
+    "cartesian_trial_count_per_scale": 18,
+    "thresholds_are_candidates_not_market_truth": true
+  },
+  "r2_budget": {
+    "enabled_only_if_r1_has_attributable_expression_shortfall": true,
+    "allowed_families": ["regularized_logistic_regression", "one_bounded_shallow_tree_family"],
+    "max_preregistered_configs_total": 12,
+    "deep_learning": false
+  },
+  "reference_plan": {
+    "feasibility_pilot_episode_contexts": 120,
+    "random_sample": 80,
+    "boundary_or_rare_counterexamples": 40,
+    "pilot_is_development_only": true,
+    "pilot_must_not_be_reused_as_confirmatory_test": true,
+    "reference_kinds": ["definite", "coexistence", "ambiguous_set", "unjudgeable"]
+  },
+  "capacity_benchmark_scope": {
+    "real_dwd_dates": {"start": "2020-01-01", "end": "2021-12-31"},
+    "allowed_outputs": ["row_counts", "elapsed_time", "rss", "scratch_bytes", "throughput", "environment_identity"],
+    "forbidden_outputs": ["market_returns", "label_scores", "future_outcomes", "strategy_results"],
+    "purpose": "P3-STAGE-001-B capacity qualification only"
+  }
+}

@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | 本轮仅方案、角色评审、工单及只读资源核查；不批准训练、市场结果读取、密封分区或每日调度 |
+| Authorization | P3-STAGE-001-A已冻结；B的CPU-first容量benchmark已获批准。分类器训练、未来/2022+结果读取、每日调度、云GPU和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -20,7 +20,7 @@
 
 对外标签运行资格只用 SHADOW / QUALIFIED。DRAFT/RETIRED 是定义文档/版本管理状态，不增加四级产品审批。数据、语义、覆盖、稳定性和用途证据是同一个资格包的维度。qualification_score可以做摘要，不是权威加权通行证；消费者和交易权限另行验收。
 
-当前基线 Git `9c805903fcd0b6a0deaf445f0c5a5900fdc8b445`；训练模块尚未实现。此前受限实验的 `prefer_continuous_structure_facts` 仍成立，因此同信息集连续Facts是强制对照，不承诺离散标签必然增加信息或收益。
+首组冻结契约为 `config/stage-learning/experiment.v1.json`；当前新增的 `stage_training_capacity.py` 仅是B阶段容量工具，不是市场分类器实现。此前受限实验的 `prefer_continuous_structure_facts` 仍成立，因此同信息集连续Facts是强制对照，不承诺离散标签必然增加信息或收益。
 
 ## 2. 学习对象：不变的语义骨架与可学习参数
 

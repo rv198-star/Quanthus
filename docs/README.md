@@ -127,8 +127,9 @@ nodes.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,
   with device assessment in `design/stock-stage-training-compute.md`, three-perspective review in
   `reviews/stock-stage-learning-review-20260908.md`, and issue-managed steps in
-  `work-items/stock-stage-historical-learning.md` (P3-STAGE-001 A-H). Creating these planning issues
-  grants no training, market-result, sealed-partition, daily-schedule or cloud-purchase authority.
+  `work-items/stock-stage-historical-learning.md` (P3-STAGE-001 A-H). A is now frozen/closed and B
+  has explicit authority only for CPU-first capacity benchmarking; classifier training, market-result
+  access, 2022+ development reads, daily scheduling and cloud-GPU purchase remain closed.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

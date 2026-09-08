@@ -3,17 +3,17 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | draft |
-| Delivery gate | blocked |
+| Delivery gate | open |
 | Parent | `stock-stage-historical-learning.md` |
 | Work item | `P3-STAGE-001-B` |
-| Evidence | OCI只读快照2026-09-07T16:08:50Z及随后同会话cgroup/DRM核查；Win11为用户申报，未远程测量 |
-| Authority | 容量规划，不是已跑训练基准；不批准租机、安装驱动或启动训练 |
+| Evidence | OCI只读快照；RX6800节点已通过专用SSH独立实测CPU/RAM/WSL/ext4/GPU可见性，并完成DWD Base v2.1+correction只读训练源核验 |
+| Authority | P3-STAGE-001-B CPU-first容量benchmark已获负责人授权；不批准市场分类器训练、2022+开发读取、云GPU采购或生产Worker迁移 |
 
 ## 1. 结论
 
 第一版是日线表格特征、有限规则参数学习和轻量模型，不是大语言模型/图像或深层时序网络训练。先CPU、后实测、再选设备。OCI可承载限额工程试点和小规模学习，不能据硬件清单承诺完整历史搜索耗时。生产共置及磁盘空间是当前比“有没有GPU”更紧迫的限制。
 
-用户Win11+RX6800+1TB SSD可以作为独立CPU训练工作站候选；结论取决于尚未提供的CPU、系统RAM、实际剩余空间。RX6800并非完全不能做机器学习，但不作为本项目主线兼容性前提。Linux GPU云不是唯一替代：独立Linux CPU/大内存节点通常更贴近首轮需求，这仍需B的端到端测量来决定。
+RX6800节点已经从“候选”进入B阶段主容量节点：WSL2实测为 i5-11400 6核12线程、约41GiB可见内存、16GiB swap、1007GiB ext4且解压后约930GiB可用，`/dev/dxg`可见。第一轮冻结为单并发、8线程、32GiB内存/32GiB scratch，仍以CPU为主；RX6800显卡仅保留后续可选加速基准，Linux GPU云当前不需要。
 
 ## 2. OCI现场观测与限制
 

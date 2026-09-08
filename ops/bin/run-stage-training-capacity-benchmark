@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Execute the bounded CPU-first P3-STAGE-001-B capacity benchmark.
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+venv_root="${QUANTHUS_STAGE_TRAINING_VENV:-${repo_root}/.venv-stage-training}"
+training_root="${QUANTHUS_STAGE_TRAINING_ROOT:-${HOME}/quanthus-data/training}"
+config="${QUANTHUS_STAGE_TRAINING_CONFIG:-${repo_root}/config/stage-learning/training-node.v1.json}"
+threads="${QUANTHUS_STAGE_TRAINING_THREADS:-8}"
+
+if [[ ! "$threads" =~ ^[1-9][0-9]*$ ]] || (( threads > 8 )); then
+  echo "stage-training benchmark: threads must be an integer in [1,8]" >&2
+  exit 2
+fi
+if [[ ! -x "$venv_root/bin/python" ]]; then
+  echo "stage-training benchmark: run ops/bin/bootstrap-stage-training-node first" >&2
+  exit 2
+fi
+
+export OMP_NUM_THREADS="$threads"
+export OPENBLAS_NUM_THREADS="$threads"
+export MKL_NUM_THREADS="$threads"
+export NUMEXPR_NUM_THREADS="$threads"
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+exec "$venv_root/bin/python" -m quanthus.stage_training_capacity benchmark \
+  --config "$config" \
+  --training-root "$training_root"

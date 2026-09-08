@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Build one user-scoped CPU-first environment for P3-STAGE-001-B.
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_REPO_ROOT:-$(cd -- "${script_dir}/../.." && pwd)}"
+python_bin="${QUANTHUS_STAGE_TRAINING_PYTHON:-python3}"
+venv_root="${QUANTHUS_STAGE_TRAINING_VENV:-${repo_root}/.venv-stage-training}"
+training_root="${QUANTHUS_STAGE_TRAINING_ROOT:-${HOME}/quanthus-data/training}"
+config="${QUANTHUS_STAGE_TRAINING_CONFIG:-${repo_root}/config/stage-learning/training-node.v1.json}"
+
+fail() {
+  echo "stage-training bootstrap: $*" >&2
+  exit 2
+}
+
+[[ -d "${repo_root}/.git" && -f "$config" ]] || fail "run from a Quanthus Git checkout"
+[[ -x "$(command -v "$python_bin" 2>/dev/null || true)" ]] || fail "Python executable is unavailable: $python_bin"
+[[ -d "$training_root" ]] || fail "training root is missing: $training_root"
+
+"$python_bin" -c 'import sys; assert sys.version_info >= (3, 10), sys.version' || fail "Python >=3.10 is required"
+"$python_bin" -c 'import venv' || fail "Python venv module is required"
+
+if [[ ! -d "$venv_root" ]]; then
+  "$python_bin" -m venv "$venv_root"
+fi
+[[ -x "$venv_root/bin/python" ]] || fail "training virtualenv is incomplete"
+
+"$venv_root/bin/python" -m pip install --upgrade pip setuptools wheel
+"$venv_root/bin/python" -m pip install -e "${repo_root}[stage-training]"
+
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
+"$venv_root/bin/python" -m quanthus.stage_training_capacity preflight \
+  --config "$config" \
+  --training-root "$training_root"
+
+echo "stage-training bootstrap PASS"
+echo "python=${venv_root}/bin/python"
+echo "training_root=${training_root}"

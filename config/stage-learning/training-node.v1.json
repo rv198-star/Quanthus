@@ -1,0 +1,81 @@
+{
+  "schema_version": "quanthus.stage-training-node.v1",
+  "config_id": "rx6800-wsl-cpu-first-v1",
+  "work_item": "P3-STAGE-001-B",
+  "node": {
+    "hostname": "RX6800",
+    "os_profile": "WSL2 Linux",
+    "cpu": "11th Gen Intel(R) Core(TM) i5-11400 @ 2.60GHz",
+    "physical_cores": 6,
+    "logical_cpus_visible": 12,
+    "wsl_memory_observed_gib": 41,
+    "swap_observed_gib": 16,
+    "source_disk_filesystem": "ext4",
+    "source_disk_capacity_gib": 1007,
+    "free_disk_observed_gib_after_extract": 930,
+    "gpu_device": "AMD Radeon RX 6800",
+    "wsl_dxg_visible": true,
+    "gpu_required_for_this_gate": false
+  },
+  "resource_budget": {
+    "job_concurrency": 1,
+    "logical_cpu_threads": 8,
+    "memory_limit_gib": 32,
+    "scratch_limit_gib": 32,
+    "minimum_total_memory_gib": 40,
+    "minimum_available_memory_gib_before_run": 28,
+    "minimum_free_disk_gib_before_run": 200,
+    "leave_logical_cpus_for_host": 4,
+    "swap_is_emergency_only": true
+  },
+  "data_source": {
+    "training_root_default": "~/quanthus-data/training",
+    "source_relative_path": "sources/dwd-v2.1-full-20260908",
+    "source_must_be_read_only": true,
+    "base": {
+      "relative_path": "base/dwd-base-202607-v2.1",
+      "manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b",
+      "content_digest": "sha256:b689a21b2052ca722af35faeb72cb68850b54d00ddb062b3694e443ba29c32b9",
+      "through_date": "2026-07-31",
+      "table_count": 33,
+      "payload_bytes": 14447400032
+    },
+    "correction": {
+      "relative_path": "corrections/dwd-base-202607-v2.1-correction-20260813-001",
+      "manifest_sha256": "sha256:4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde",
+      "content_digest": "sha256:1c1d1f4ea906797255fbc71cc3915bb905e51e7aea202d27042e33692b72e9da"
+    },
+    "full_base_physically_contains_holdout_periods": true,
+    "development_read_end": "2021-12-31",
+    "read_guard_required": true
+  },
+  "benchmark": {
+    "synthetic_rows": [100000, 500000, 1000000],
+    "synthetic_feature_count": 32,
+    "real_dwd": {
+      "table": "dwd_security_bar",
+      "interval_size": "1d",
+      "price_basis": "UNADJUSTED",
+      "years": [2020, 2021],
+      "row_limits": [100000, 500000, 1000000],
+      "forbidden_years": [2022, 2023, 2024, 2025, 2026],
+      "process_cold_then_warm": true,
+      "os_cache_state_is_not_claimed_cold": true
+    },
+    "model_probe": {
+      "r1_vectorized_parameter_candidates": 18,
+      "r2_logistic_regression": true,
+      "deep_model": false
+    },
+    "report_relative_dir": "manifests/capacity",
+    "report_market_values": false
+  },
+  "decision": {
+    "default_compute": "CPU",
+    "rx6800_gpu": "optional_later_benchmark_only",
+    "cloud_gpu": "not_authorized_and_not_required",
+    "existing_production_worker_reuse": false,
+    "future_worker_kind": "quanthus-stage-training-worker",
+    "future_worker_creation_gate": "P3-STAGE-001-C job contract"
+  }
+}

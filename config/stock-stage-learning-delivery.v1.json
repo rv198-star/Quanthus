@@ -6,7 +6,8 @@
   "review": "docs/reviews/stock-stage-learning-review-20260908.md",
   "work_items": "docs/work-items/stock-stage-historical-learning.md",
   "authorization": {
-    "scope": "design_review_issue_planning_and_read_only_capacity",
+    "scope": "design_review_issue_planning_and_capacity_benchmark",
+    "capacity_benchmark_authorized": true,
     "training_authorized": false,
     "market_result_access_authorized": false,
     "sealed_partition_access_authorized": false,
@@ -33,24 +34,24 @@
       "blocked_on": ["当前只授权设计和工单", "新研究实施和训练需范围/预算授权"], "evidence": []
     },
     {
-      "id": "P3-STAGE-001-A", "kind": "task", "status": "ready",
+      "id": "P3-STAGE-001-A", "kind": "task", "status": "closed",
       "title": "冻结首组语义、试验边界与数据访问计划",
       "depends_on": ["P3-STRUCT-004", "P3-DICT-003"],
-      "scope": "准备3/4及相邻反例的日线profile、hard predicates、允许参数空间、参考和目标角色；保留现有2012-2021/2022-2024/2025分区。ready仅指可继续设计冻结。",
+      "scope": "冻结3/4及相邻反例的日线profile、hard predicates、有限参数空间、参考角色和数据使用边界；完整Base已镜像到RX6800，因此保留期在该节点只有逻辑read guard，不再声称物理未暴露。",
       "inputs": ["历史学习设计§2-8", "已有源字段依赖矩阵", "P0/P3分区权威"],
-      "deliverables": ["config/stage-learning/experiment.v1.json（拟建）", "0-12依赖/波次表", "有限试标与计算预算、停止规则、待授权访问清单"],
-      "acceptance": ["每个谓词能追到精确字段/版本/单位/坐标/窗口", "共存、歧义、规则冲突与不可用分开", "R0/R1/R2比较、试验次数和校准/测试边界明确", "提出技术默认值，不要求用户凭空选择算法参数"],
-      "blocked_on": ["任何后续真实样本/训练执行仍需明确授权"], "evidence": []
+      "deliverables": ["config/stage-learning/experiment.v1.json", "3/4首组及相邻维度规则", "有限试标/搜索预算和数据claim ceiling"],
+      "acceptance": ["每个首组谓词能追到F1/F2/F3及待补F7/F6依赖", "共存、歧义、规则冲突与不可用分开", "R0/R1/R2比较及最大试验次数明确", "2022+开发读取仍硬拒绝且物理镜像暴露事实已记录"],
+      "blocked_on": ["分类器训练、未来目标、2022-2025结果读取和C阶段业务实现仍须独立授权"], "evidence": ["docs/acceptance/stock-stage-learning-a-freeze-20260908.md", "config/stage-learning/experiment.v1.json"]
     },
     {
-      "id": "P3-STAGE-001-B", "kind": "task", "status": "blocked",
+      "id": "P3-STAGE-001-B", "kind": "task", "status": "ready",
       "title": "完成CPU优先容量基准与训练设备准入",
       "depends_on": ["P3-STAGE-001-A"],
-      "scope": "独立虚拟环境；先合成后获准小样本，分阶段测I/O/特征/拟合/评价；核对Win11 CPU/RAM/剩余空间，必要时做可选RX6800 OpenCL比较。",
-      "inputs": ["冻结基准和资源预算", "OCI只读容量记录", "Win11补充硬件信息"],
-      "deliverables": ["环境/资源manifest", "两至三个规模点的time/RSS/scratch报告", "OCI或本机或独立CPU/GPU设备选择"],
-      "acceptance": ["并发/线程/内存/磁盘限制实际可执行且不影响生产", "不把warm缓存时间当冷构建", "GPU方案包含兼容性、传输/构建和总成本", "没跑完整训练就不承诺完成时间，容量超限停止而非扩权限"],
-      "blocked_on": ["A冻结及限额基准执行授权", "本机设备未核验；租机另批"], "evidence": []
+      "scope": "在独立RX6800 WSL训练节点执行CPU-first环境初始化和容量benchmark；合成数据后只读2020-2021 DWD日线，分阶段测I/O/特征/拟合/评价，不训练市场分类器。",
+      "inputs": ["config/stage-learning/experiment.v1.json", "config/stage-learning/training-node.v1.json", "已核验只读DWD Base v2.1 + correction训练源"],
+      "deliverables": ["独立stage-training虚拟环境", "两至三个规模点的time/RSS/scratch报告", "CPU/RX6800/云节点设备准入结论"],
+      "acceptance": ["单并发、8线程、32GiB内存/32GiB scratch预算与主机余量通过preflight", "真实DWD只读2020-2021且报告不包含市场结果", "first process pass不冒充cold OS cache", "没跑完整训练就不承诺训练耗时；GPU仍是可选后续基准"],
+      "blocked_on": ["capacity benchmark已获负责人授权；分类器训练、GPU云和生产Worker迁移仍关闭"], "evidence": []
     },
     {
       "id": "P3-STAGE-001-C", "kind": "task", "status": "blocked",

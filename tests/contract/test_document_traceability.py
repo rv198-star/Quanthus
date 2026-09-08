@@ -1345,8 +1345,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         stage_ids = {item["id"] for item in stage_plan["items"]}
         self.assertEqual(stage_ids, {"P3-STAGE-001", *[f"P3-STAGE-001-{c}" for c in "ABCDEFGH"]})
+        self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         for key, value in stage_plan["authorization"].items():
-            if key.endswith("_authorized"):
+            if key.endswith("_authorized") and key != "capacity_benchmark_authorized":
                 self.assertIs(value, False)
         for declared in [*catalog_plan, *lineage_plan, *stage_plan["items"]]:
             observed = next(item for item in items if item.stable_id == declared["id"])

@@ -20,11 +20,17 @@ fail() {
 
 "$python_bin" -c 'import sys; assert sys.version_info >= (3, 10), sys.version' || fail "Python >=3.10 is required"
 "$python_bin" -c 'import venv' || fail "Python venv module is required"
+if ! "$python_bin" -m ensurepip --version >/dev/null 2>&1; then
+  fail "Python ensurepip is unavailable; on Ubuntu/Debian install python3-venv (or the matching pythonX.Y-venv package) and rerun"
+fi
 
 if [[ ! -d "$venv_root" ]]; then
   "$python_bin" -m venv "$venv_root"
 fi
 [[ -x "$venv_root/bin/python" ]] || fail "training virtualenv is incomplete"
+if ! "$venv_root/bin/python" -m pip --version >/dev/null 2>&1; then
+  "$venv_root/bin/python" -m ensurepip --upgrade || fail "training virtualenv has no usable pip"
+fi
 
 "$venv_root/bin/python" -m pip install --upgrade pip setuptools wheel
 "$venv_root/bin/python" -m pip install -e "${repo_root}[stage-training]"

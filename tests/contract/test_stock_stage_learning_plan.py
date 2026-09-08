@@ -115,6 +115,14 @@ def test_issue_body_contains_execution_contract_and_honest_review() -> None:
     assert "未跑基准" in review
 
 
+def test_stage_training_bootstrap_fails_closed_without_ensurepip() -> None:
+    bootstrap = (ROOT / "ops/bin/bootstrap-stage-training-node").read_text()
+    assert "python3-venv" in bootstrap
+    assert "-m ensurepip --version" in bootstrap
+    assert "-m ensurepip --upgrade" in bootstrap
+    assert "training virtualenv has no usable pip" in bootstrap
+
+
 def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     plan = sync.load_plan()
     manifest = json.loads((ROOT / "config/data-indicator-catalog-sources.v1.json").read_text())

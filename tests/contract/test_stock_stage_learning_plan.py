@@ -169,6 +169,13 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert harness["authority"]["classifier_training_authorized"] is False
     assert harness["development_read_guard"]["maximum_date"] == "2021-12-31"
     reference = json.loads((ROOT / "config/stage-learning/reference-pilot.v1.json").read_text())
+    assert reference["population"]["cohort_size"] == 32
+    assert reference["population"]["report_end"] == "2020-11-30"
+    assert reference["population"]["read_end"] == "2020-12-31"
+    assert reference["sampling"]["total_episode_contexts"] == 120
+    assert reference["authority"]["arbitration_access_authorized"] is False
+    assert reference["authority"]["permanent_blind_access_authorized"] is False
+    reference = json.loads((ROOT / "config/stage-learning/reference-pilot.v1.json").read_text())
     assert reference["sampling"]["total_episode_contexts"] == 120
     assert reference["authority"]["development_future_settlement_authorized"] is True
     assert reference["authority"]["classifier_training_authorized"] is False

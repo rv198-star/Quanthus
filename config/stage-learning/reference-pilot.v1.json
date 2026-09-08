@@ -17,12 +17,12 @@
     "scan_start": "2019-07-01",
     "cohort_date": "2020-01-02",
     "report_start": "2020-01-02",
-    "report_end": "2021-11-30",
-    "read_end": "2021-12-31",
-    "cohort_size": 256,
+    "report_end": "2020-11-30",
+    "read_end": "2020-12-31",
+    "cohort_size": 32,
     "minimum_pre_cohort_observations": 60,
     "cohort_seed": "sha256:5b1d4d76978616e902d61028177a58d9d7a391c24bea2e538f04c870fd5ad39d",
-    "claim_limit": "development feasibility cohort fixed at the first report date; not the final qualification population"
+    "claim_limit": "development feasibility cohort fixed at the first report date; 32 securities are sufficient for the 120-context pilot and do not define the final qualification population"
   },
   "sampling": {
     "total_episode_contexts": 120,

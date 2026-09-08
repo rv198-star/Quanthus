@@ -38,6 +38,22 @@ class ReferencePilotRunError(ValueError):
     """Raised when the governed D pilot cannot be executed or verified."""
 
 
+def _progress(started: float, stage: str, **details: Any) -> None:
+    print(
+        json.dumps(
+            {
+                "event": "stage-reference-pilot-progress",
+                "stage": stage,
+                "elapsed_seconds": round(time.perf_counter() - started, 3),
+                **details,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+
+
 def _object(path: Path, label: str) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -179,6 +195,7 @@ def run_reference_pilot(
         cohort_size=_int(population, "cohort_size"),
         seed=str(population["cohort_seed"]),
     )
+    _progress(started, "cohort-ready", cohort_size=len(cohort))
     scope = DevelopmentReadScope(scan_start, report_start, read_end)
     spec_digest = _fact_spec(root, experiment)
     admissions, source_manifest, policy = read_development_admissions(
@@ -188,13 +205,16 @@ def run_reference_pilot(
         security_codes=cohort,
         spec_digest=spec_digest,
     )
+    _progress(started, "source-ready", admissions=len(admissions))
     structure = build_structure_v2(
         admissions,
         spec_digest=spec_digest,
         calendar_ref=policy.calendar_ref,
         lookbacks=(20, 60),
     )
+    _progress(started, "structure-ready", episodes=len(structure.episodes))
     activity = build_activity_observations(admissions, window=20)
+    _progress(started, "activity-ready", activity=len(activity))
     contexts = select_reference_contexts(
         structure.episodes,
         activity,
@@ -204,6 +224,7 @@ def run_reference_pilot(
         random_count=_int(sampling, "random_count"),
         boundary_count=_int(sampling, "boundary_or_rare_count"),
     )
+    _progress(started, "contexts-ready", contexts=len(contexts))
     packets = build_reviewer_packet(
         contexts,
         structure.episodes,
@@ -220,6 +241,7 @@ def run_reference_pilot(
         adverse_threshold=Decimal(str(target["adverse_threshold"])),
         same_session_overlap_policy=str(target["same_session_overlap_policy"]),
     )
+    _progress(started, "settlements-ready", settlements=len(settlements))
     if len(contexts) != _int(sampling, "total_episode_contexts") or len(packets) != len(contexts):
         raise ReferencePilotRunError("reference pilot sample publication count differs")
     if len(settlements) != len(contexts):

@@ -1,0 +1,79 @@
+{
+  "schema_version": "quanthus.stage-learning-harness.v1",
+  "config_id": "stock-stage-3-4-development-harness-v1",
+  "work_item": "P3-STAGE-001-C",
+  "experiment_config": "config/stage-learning/experiment.v1.json",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "authority": {
+    "implementation_authorized": true,
+    "engineering_candidate_output_authorized": true,
+    "official_label_publication_authorized": false,
+    "classifier_training_authorized": false,
+    "future_target_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "strategy_consumption_authorized": false,
+    "daily_schedule_authorized": false
+  },
+  "development_read_guard": {
+    "minimum_date": "2012-01-01",
+    "maximum_date": "2021-12-31",
+    "guard_before_partition_path_construction": true,
+    "reject_post_2021_business_rows": true,
+    "full_base_physical_holdout_exposure_acknowledged": true
+  },
+  "facts": {
+    "structure": {
+      "implementation": "quanthus.structure_v2.build_structure_v2",
+      "lookbacks": [20, 60],
+      "reuse_scope": ["F1_reference_distance_partial", "F2_same_anchor_interaction_partial", "F3_minimal_process_memory"]
+    },
+    "activity": {
+      "concept_id": "stage.activity.volume-ratio20",
+      "version": "1.0.0-engineering",
+      "window": 20,
+      "formula": "V_t / mean(V_{t-20:t-1})",
+      "prior_window_excludes_t": true,
+      "missing_volume_policy": "unavailable_not_zero",
+      "coordinate_change_policy": "reset_and_rewarm",
+      "calendar_gap_policy": "reset_and_rewarm",
+      "publication_authority": "engineering_fact_only"
+    }
+  },
+  "r0_engineering_rules": {
+    "probe_volume_ratio20_min": "1.25",
+    "acceptance_hold_sessions": 2,
+    "acceptance_signed_distance_min": "0.0",
+    "acceptance_window_volume_ratio20_min": "1.0",
+    "acceptance_activity_window": "mean_of_available_daily_volume_ratio20_from_episode_start_through_current_all_members_required",
+    "stage_3_reference_role": "pre_t_frozen_high_breakout_target",
+    "stage_4_reference_role": "same_frozen_high_as_acceptance_support",
+    "thresholds_are_engineering_baseline_not_market_truth": true
+  },
+  "acceptance_slice": {
+    "security_codes": ["000001", "300750", "600519"],
+    "scan_start": "2019-10-08",
+    "report_start": "2020-01-02",
+    "report_end": "2020-03-31",
+    "purpose": "bounded real-DWD C acceptance only"
+  },
+  "runtime": {
+    "job_concurrency": 1,
+    "logical_cpu_threads": 8,
+    "duckdb_memory_limit_gib": 16,
+    "output_root_default": "~/quanthus-data/training/runs/stage-harness",
+    "write_raw_market_prices": false
+  },
+  "required_checks": [
+    "source_manifest_and_ready_exact",
+    "development_read_guard",
+    "activity_batch_incremental_exact",
+    "stage_candidate_batch_incremental_exact",
+    "independent_engineering_oracle",
+    "future_suffix_non_rewrite",
+    "coordinate_reset_rewarm",
+    "missing_volume_abstention",
+    "same_anchor_stage3_stage4_temporal_distinction",
+    "official_label_authority_absent"
+  ]
+}

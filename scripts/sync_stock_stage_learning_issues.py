@@ -22,7 +22,8 @@ DENIED_AUTH_FLAGS = {
     "cloud_purchase_authorized",
 }
 CAPACITY_FLAG = "capacity_benchmark_authorized"
-AUTH_SCOPE = "design_review_issue_planning_and_capacity_benchmark"
+HARNESS_FLAG = "stage_harness_implementation_authorized"
+AUTH_SCOPE = "design_review_capacity_and_stage_harness_implementation"
 
 
 def load_plan() -> dict:
@@ -33,11 +34,11 @@ def load_plan() -> dict:
         raise ValueError("unexpected learning issue scope")
 
     auth = plan["authorization"]
-    expected_auth_fields = DENIED_AUTH_FLAGS | {CAPACITY_FLAG, "scope"}
+    expected_auth_fields = DENIED_AUTH_FLAGS | {CAPACITY_FLAG, HARNESS_FLAG, "scope"}
     if set(auth) != expected_auth_fields or auth["scope"] != AUTH_SCOPE:
         raise ValueError("unexpected authorization scope")
-    if auth[CAPACITY_FLAG] is not True:
-        raise ValueError("capacity benchmark authorization must be explicit")
+    if auth[CAPACITY_FLAG] is not True or auth[HARNESS_FLAG] is not True:
+        raise ValueError("capacity and stage-harness authorizations must be explicit")
     if any(auth[key] is not False for key in DENIED_AUTH_FLAGS):
         raise ValueError(
             "planning synchronization cannot grant training, result, schedule or purchase access"
@@ -74,14 +75,17 @@ def load_plan() -> dict:
         ):
             if not item.get(key):
                 raise ValueError(f"empty work-item contract: {key}")
-        if item["status"] == "ready" and item["id"] != f"{PARENT}-B":
-            raise ValueError("only the capacity task may be ready after A freeze")
+        if item["status"] == "ready" and item["id"] != f"{PARENT}-C":
+            raise ValueError("only the stage-harness task may be ready after A/B close")
         if (
-            item["id"] == f"{PARENT}-B"
+            item["id"] == f"{PARENT}-C"
             and item["status"] == "ready"
-            and by_id[f"{PARENT}-A"]["status"] != "closed"
+            and any(
+                by_id[key]["status"] != "closed"
+                for key in (f"{PARENT}-A", f"{PARENT}-B")
+            )
         ):
-            raise ValueError("capacity task cannot be ready before A closes")
+            raise ValueError("stage-harness task cannot be ready before A/B close")
         for evidence in item["evidence"]:
             path = (ROOT / evidence).resolve()
             if ROOT.resolve() not in path.parents or not path.is_file():
@@ -119,8 +123,9 @@ def body(item: dict, plan: dict, mapping: dict) -> str:
         evidence = "未执行，尚无任务验收证据"
     authority = (
         "## 权限边界\n"
-        "本次允许P3-STAGE-001-B的CPU-first容量benchmark；不授权市场分类器训练、"
-        "未来结果访问、2022-2025开发读取、每日调度、云GPU采购或交易。"
+        "本次允许P3-STAGE-001-C的development-only历史harness实现和engineering candidate输出；"
+        "不授权市场分类器训练、future target访问、2022-2025开发读取、正式LabelCard发布、"
+        "每日调度、云GPU采购或交易。"
     )
     sections = [
         f"<!-- quanthus-planning:v2 id={item['id']} kind={item['kind']} -->",

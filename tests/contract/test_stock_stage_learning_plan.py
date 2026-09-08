@@ -20,13 +20,14 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     plan = sync.load_plan()
     assert len(plan["items"]) == 9
     ready = {item["id"] for item in plan["items"] if item["status"] == "ready"}
-    assert ready == set()
+    assert ready == {"P3-STAGE-001-C"}
     stage_a = next(item for item in plan["items"] if item["id"] == "P3-STAGE-001-A")
     assert stage_a["status"] == "closed"
     assert plan["data_policy"]["development_years"] == [2012, 2021]
     assert plan["data_policy"]["arbitration_years"] == [2022, 2024]
     assert plan["data_policy"]["permanent_blind_years"] == [2025, 2025]
     assert plan["authorization"][sync.CAPACITY_FLAG] is True
+    assert plan["authorization"][sync.HARNESS_FLAG] is True
     assert all(plan["authorization"][key] is False for key in sync.DENIED_AUTH_FLAGS)
 
 
@@ -62,11 +63,12 @@ def test_issue_sync_cannot_enable_execution(copied_plan, flag: str) -> None:
         sync.load_plan()
 
 
-def test_capacity_authorization_must_be_explicit(copied_plan) -> None:
+@pytest.mark.parametrize("flag", [sync.CAPACITY_FLAG, sync.HARNESS_FLAG])
+def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> None:
     plan, path = copied_plan
-    plan["authorization"][sync.CAPACITY_FLAG] = False
+    plan["authorization"][flag] = False
     path.write_text(json.dumps(plan))
-    with pytest.raises(ValueError, match="capacity benchmark authorization"):
+    with pytest.raises(ValueError, match="authorizations must be explicit"):
         sync.load_plan()
 
 
@@ -143,3 +145,7 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert experiment["delivery_authority"]["capacity_benchmark_authorized"] is True
     assert experiment["delivery_authority"]["classifier_training_authorized"] is False
     assert experiment["partition_policy"]["development"]["end"] == "2021-12-31"
+    harness = json.loads((ROOT / "config/stage-learning/harness.v1.json").read_text())
+    assert harness["authority"]["implementation_authorized"] is True
+    assert harness["authority"]["classifier_training_authorized"] is False
+    assert harness["development_read_guard"]["maximum_date"] == "2021-12-31"

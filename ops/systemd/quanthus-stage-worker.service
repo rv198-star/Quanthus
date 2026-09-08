@@ -1,0 +1,24 @@
+[Unit]
+Description=Quanthus RX6800 governed stage-learning worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/quanthus-code/Quanthus
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash %h/quanthus-code/Quanthus/ops/bin/quanthus-stage-worker serve --poll-seconds 2 --wall-seconds 600
+Restart=always
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=30
+Nice=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+MemoryMax=34G
+CPUQuota=800%
+TasksMax=512
+
+[Install]
+WantedBy=default.target

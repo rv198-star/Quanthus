@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Stable node-local entry point for the governed RX6800 stage worker.
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${QUANTHUS_STAGE_CONTROL_REPO:-$(cd -- "${script_dir}/../.." && pwd)}"
+venv_root="${QUANTHUS_STAGE_TRAINING_VENV:-${repo_root}/.venv-stage-training}"
+training_root="${QUANTHUS_STAGE_TRAINING_ROOT:-${HOME}/quanthus-data/training}"
+git_key="${QUANTHUS_STAGE_GIT_KEY:-${HOME}/.ssh/quanthus-github-ro}"
+
+if [[ ! -x "${venv_root}/bin/python" ]]; then
+  echo "quanthus-stage-worker: stage-training virtualenv is missing" >&2
+  exit 2
+fi
+
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
+exec "${venv_root}/bin/python" -m quanthus.stage_learning.worker \
+  --training-root "${training_root}" \
+  --control-repo "${repo_root}" \
+  --git-key "${git_key}" \
+  "$@"

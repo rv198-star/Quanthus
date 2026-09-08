@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# One-time RX6800 installation for the governed Quanthus stage-learning worker.
+set -euo pipefail
+
+fail() {
+  echo "install-quanthus-stage-worker: $*" >&2
+  exit 2
+}
+
+[[ "$(id -u)" -ne 0 ]] || fail "run as the normal RX6800 user, not root"
+[[ "$(hostname)" == "RX6800" ]] || fail "this installer is admitted only on hostname RX6800"
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "${script_dir}/../.." && pwd)"
+expected_repo="${HOME}/quanthus-code/Quanthus"
+training_root="${HOME}/quanthus-data/training"
+git_key="${HOME}/.ssh/quanthus-github-ro"
+unit_source="${repo_root}/ops/systemd/quanthus-stage-worker.service"
+unit_target="${HOME}/.config/systemd/user/quanthus-stage-worker.service"
+
+[[ "${repo_root}" == "${expected_repo}" ]] || \
+  fail "control checkout must be ${expected_repo}; observed ${repo_root}"
+[[ -d "${repo_root}/.git" ]] || fail "control checkout is not a Git checkout"
+[[ -f "${unit_source}" ]] || fail "stage worker systemd unit is missing"
+[[ -d "${training_root}" ]] || fail "training root is missing: ${training_root}"
+[[ -d "${training_root}/sources/dwd-v2.1-full-20260908" ]] || \
+  fail "verified training source is missing"
+[[ -f "${git_key}" ]] || fail "GitHub read-only deploy key is missing: ${git_key}"
+[[ "$(stat -c '%a' "${git_key}")" =~ ^(400|600)$ ]] || \
+  fail "GitHub deploy key permissions must be 0400 or 0600"
+command -v git >/dev/null || fail "git is unavailable"
+command -v ssh >/dev/null || fail "ssh is unavailable"
+command -v systemctl >/dev/null || fail "systemctl is unavailable"
+command -v loginctl >/dev/null || fail "loginctl is unavailable"
+command -v sudo >/dev/null || fail "sudo is required once to enable user lingering"
+
+if ! ssh-keygen -F github.com -f "${HOME}/.ssh/known_hosts" >/dev/null 2>&1; then
+  fail "github.com is not pinned in ~/.ssh/known_hosts"
+fi
+
+revision="$(git -C "${repo_root}" rev-parse HEAD)"
+[[ "${revision}" =~ ^[0-9a-f]{40}$ ]] || fail "control checkout revision is invalid"
+if [[ -n "$(git -C "${repo_root}" status --porcelain)" ]]; then
+  fail "control checkout must be clean before worker installation"
+fi
+
+export GIT_SSH_COMMAND="ssh -i ${git_key} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes"
+remote_main="$(git ls-remote git@github.com:rv198-star/Quanthus.git refs/heads/main | awk '{print $1}')"
+[[ "${remote_main}" =~ ^[0-9a-f]{40}$ ]] || fail "cannot resolve GitHub main with the deploy key"
+if ! git -C "${repo_root}" merge-base --is-ancestor "${revision}" "${remote_main}" 2>/dev/null; then
+  # ls-remote does not necessarily create the object locally; compare exact main or fetch once.
+  git -C "${repo_root}" fetch --no-tags git@github.com:rv198-star/Quanthus.git \
+    "+refs/heads/main:refs/remotes/stage-control/main"
+  git -C "${repo_root}" merge-base --is-ancestor "${revision}" refs/remotes/stage-control/main || \
+    fail "control checkout is not admitted by GitHub main"
+fi
+
+# Bootstrap/repair the shared stage runtime before systemd starts using it.
+bash "${repo_root}/ops/bin/bootstrap-stage-training-node"
+
+mkdir -p \
+  "${training_root}/control/stage-worker/queue" \
+  "${training_root}/control/stage-worker/claimed" \
+  "${training_root}/control/stage-worker/status" \
+  "${training_root}/control/stage-worker/cancel" \
+  "${training_root}/control/stage-worker/worktrees" \
+  "${training_root}/logs/stage-worker" \
+  "${training_root}/runs/stage-worker" \
+  "${HOME}/.config/systemd/user"
+
+chmod 0755 "${training_root}/control" "${training_root}/control/stage-worker"
+chmod 0750 \
+  "${training_root}/control/stage-worker/queue" \
+  "${training_root}/control/stage-worker/claimed" \
+  "${training_root}/control/stage-worker/status" \
+  "${training_root}/control/stage-worker/cancel" \
+  "${training_root}/control/stage-worker/worktrees" \
+  "${training_root}/logs/stage-worker" \
+  "${training_root}/runs/stage-worker"
+
+install -m 0644 "${unit_source}" "${unit_target}"
+
+if [[ "$(loginctl show-user "${USER}" -p Linger --value 2>/dev/null || true)" != "yes" ]]; then
+  echo "Enabling systemd user lingering for ${USER} (one-time sudo)..."
+  sudo loginctl enable-linger "${USER}"
+fi
+[[ "$(loginctl show-user "${USER}" -p Linger --value)" == "yes" ]] || \
+  fail "systemd user lingering is not enabled"
+
+systemctl --user daemon-reload
+systemctl --user enable --now quanthus-stage-worker.service
+
+for _ in $(seq 1 20); do
+  if systemctl --user is-active --quiet quanthus-stage-worker.service; then
+    break
+  fi
+  sleep 1
+done
+systemctl --user is-active --quiet quanthus-stage-worker.service || \
+  fail "stage worker service did not become active"
+
+worker_doctor="$(bash "${repo_root}/ops/bin/quanthus-stage-worker" doctor)"
+printf '%s\n' "${worker_doctor}"
+if ! printf '%s' "${worker_doctor}" | grep -q '"ready": true'; then
+  fail "stage worker doctor did not pass"
+fi
+
+bootstrap_job="$(
+  bash "${repo_root}/ops/bin/quanthus-stage-worker" submit --code-revision "${revision}"
+)"
+bootstrap_job_id="$(
+  printf '%s' "${bootstrap_job}" | "${repo_root}/.venv-stage-training/bin/python" -c \
+    'import json,sys; print(json.load(sys.stdin)["job_id"])'
+)"
+echo "Submitted bootstrap stage job: ${bootstrap_job_id}"
+
+bootstrap_state="queued"
+for _ in $(seq 1 120); do
+  bootstrap_status="$(
+    bash "${repo_root}/ops/bin/quanthus-stage-worker" status --job-id "${bootstrap_job_id}"
+  )"
+  bootstrap_state="$(
+    printf '%s' "${bootstrap_status}" | "${repo_root}/.venv-stage-training/bin/python" -c \
+      'import json,sys; print(json.load(sys.stdin)["state"])'
+  )"
+  case "${bootstrap_state}" in
+    succeeded)
+      printf '%s\n' "${bootstrap_status}"
+      break
+      ;;
+    failed|canceled)
+      printf '%s\n' "${bootstrap_status}" >&2
+      fail "stage worker installed but bootstrap job ended ${bootstrap_state}"
+      ;;
+  esac
+  sleep 1
+done
+[[ "${bootstrap_state}" == "succeeded" ]] || \
+  fail "stage worker bootstrap job did not finish within 120 seconds"
+
+cat <<EOF
+install-quanthus-stage-worker PASS
+control_revision=${revision}
+service=quanthus-stage-worker.service
+training_root=${training_root}
+job_kind=quanthus.stage-harness.v1
+bootstrap_job=${bootstrap_job_id}
+bootstrap_state=${bootstrap_state}
+concurrency=1
+cpu_quota=800%
+memory_max=34G
+EOF

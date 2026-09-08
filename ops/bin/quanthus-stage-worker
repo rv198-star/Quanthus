@@ -13,6 +13,12 @@ if [[ ! -x "${venv_root}/bin/python" ]]; then
   exit 2
 fi
 
+control_revision="$(git -C "${repo_root}" rev-parse HEAD)"
+if [[ ! "${control_revision}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "quanthus-stage-worker: control checkout revision is invalid" >&2
+  exit 2
+fi
+export QUANTHUS_STAGE_WORKER_CODE_REVISION="${control_revision}"
 export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
 exec "${venv_root}/bin/python" -m quanthus.stage_learning.worker \
   --training-root "${training_root}" \

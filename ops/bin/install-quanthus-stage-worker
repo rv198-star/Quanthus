@@ -88,7 +88,10 @@ fi
   fail "systemd user lingering is not enabled"
 
 systemctl --user daemon-reload
-systemctl --user enable --now quanthus-stage-worker.service
+systemctl --user enable quanthus-stage-worker.service
+# `enable --now` does not restart an already-running user service after a code upgrade.
+# Restart explicitly so the process always loads the checkout revision being installed.
+systemctl --user restart quanthus-stage-worker.service
 
 for _ in $(seq 1 20); do
   if systemctl --user is-active --quiet quanthus-stage-worker.service; then
@@ -98,6 +101,14 @@ for _ in $(seq 1 20); do
 done
 systemctl --user is-active --quiet quanthus-stage-worker.service || \
   fail "stage worker service did not become active"
+service_pid="$(systemctl --user show quanthus-stage-worker.service -p MainPID --value)"
+[[ "${service_pid}" =~ ^[1-9][0-9]*$ ]] || fail "stage worker service has no live MainPID"
+service_revision="$(
+  tr '\0' '\n' < "/proc/${service_pid}/environ" | \
+    awk -F= '$1=="QUANTHUS_STAGE_WORKER_CODE_REVISION" {print $2}'
+)"
+[[ "${service_revision}" == "${revision}" ]] || \
+  fail "stage worker process revision differs: expected ${revision}, observed ${service_revision:-missing}"
 
 worker_doctor="$(bash "${repo_root}/ops/bin/quanthus-stage-worker" doctor)"
 printf '%s\n' "${worker_doctor}"

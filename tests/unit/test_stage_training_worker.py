@@ -120,7 +120,10 @@ def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() ->
         "StrictHostKeyChecking=yes",
         "quanthus-github-ro",
         "bootstrap-stage-training-node",
-        "systemctl --user enable --now quanthus-stage-worker.service",
+        "systemctl --user enable quanthus-stage-worker.service",
+        "systemctl --user restart quanthus-stage-worker.service",
+        "QUANTHUS_STAGE_WORKER_CODE_REVISION",
+        "stage worker process revision differs",
         "submit --code-revision",
         "bootstrap_state=${bootstrap_state}",
         "git@github.com:rv198-star/Quanthus.git",
@@ -128,6 +131,7 @@ def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() ->
         assert term in installer
 
     assert "quanthus.stage_learning.worker" in wrapper
+    assert "QUANTHUS_STAGE_WORKER_CODE_REVISION" in wrapper
     assert "MemoryMax=34G" in unit
     assert "CPUQuota=800%" in unit
     assert "Restart=always" in unit

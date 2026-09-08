@@ -97,6 +97,15 @@ def run_synthetic_workflow(
             "institutional_challenge_context_count"
         ],
         "r1_trial_count": learning_summary["r1_trial_count"],
+        "development_selection_policy_id": learning_summary[
+            "development_selection_policy_id"
+        ],
+        "development_selection_disposition": learning_summary[
+            "development_selection_disposition"
+        ],
+        "development_eligible_trial_count": learning_summary[
+            "development_eligible_trial_count"
+        ],
         "development_rank_1_trial_id": learning_summary["development_rank_1_trial_id"],
         "development_rank_1_score": learning_summary["development_rank_1_score"],
         "future_settlement_read_by_semantic_review": False,
@@ -106,7 +115,7 @@ def run_synthetic_workflow(
         "formal_qualification_authorized": False,
         "claim_limits": [
             "synthetic consensus is a development reference, not human expert validation",
-            "development rank 1 is not a qualified label version",
+            "a development rank is emitted only after all development hard gates pass",
             "F held-out qualification remains separately gated",
         ],
     }

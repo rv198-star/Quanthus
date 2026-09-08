@@ -231,6 +231,199 @@ def select_reference_contexts(
     return tuple(sorted(output, key=lambda item: (item.sampling_stratum, item.context_id)))
 
 
+def _reference_context(
+    episode: EpisodeObservation,
+    activity_by_key: dict[tuple[str, date], ActivityObservation],
+    *,
+    stratum: str,
+) -> ReferenceContext:
+    context_id = _context_key(episode)
+    activity_item = activity_by_key.get((episode.security_code, episode.market_date))
+    evidence_digest = digest(
+        {
+            "episode_revision": episode.revision_id,
+            "activity_revision": None if activity_item is None else activity_item.revision_id,
+        }
+    )
+    return ReferenceContext(
+        context_id=context_id,
+        security_code=episode.security_code,
+        market_date=episode.market_date,
+        anchor_scale=episode.scale,
+        episode_id=episode.episode_id,
+        anchor_key=episode.anchor_key,
+        anchor_revision=episode.anchor_revision,
+        sampling_stratum=stratum,
+        boundary_tags=boundary_tags(episode, activity_item),
+        evidence_digest=evidence_digest,
+    )
+
+
+def _take_ranked(
+    rows: Sequence[EpisodeObservation],
+    *,
+    count: int,
+    seed: str,
+) -> tuple[EpisodeObservation, ...]:
+    selected = sorted(
+        rows,
+        key=lambda item: (_rank(seed, _context_key(item)), _context_key(item)),
+    )[:count]
+    if len(selected) != count:
+        raise ReferencePilotError(
+            f"development supplement stratum has {len(selected)} contexts; need {count}"
+        )
+    return tuple(selected)
+
+
+def select_development_supplement_contexts(
+    episodes: Sequence[EpisodeObservation],
+    activity: Sequence[ActivityObservation],
+    *,
+    report_start: date,
+    report_end: date,
+    seed: str,
+    exclude_context_ids: set[str],
+) -> tuple[ReferenceContext, ...]:
+    """Select one 120-context development supplement after the feasibility pilot.
+
+    This is deliberately *not* a confirmatory sample.  The first pilot revealed too few stage-3
+    probes and too little ambiguity coverage, so the supplement is stratified to identify the
+    already-frozen R1 thresholds while staying inside the same development population.  It excludes
+    every context from the deterministic first pilot and uses only T-or-earlier facts for selection.
+    """
+    if not seed or not exclude_context_ids:
+        raise ReferencePilotError(
+            "development supplement requires seed and prior context exclusion"
+        )
+    activity_by_key = {item.key: item for item in activity}
+    if len(activity_by_key) != len(activity):
+        raise ReferencePilotError("duplicate activity observation")
+    eligible: list[EpisodeObservation] = []
+    seen: set[str] = set()
+    for episode in sorted(
+        episodes,
+        key=lambda item: (item.security_code, item.market_date, item.scale, item.episode_id),
+    ):
+        identity = _context_key(episode)
+        if (
+            not report_start <= episode.market_date <= report_end
+            or identity in exclude_context_ids
+            or identity in seen
+        ):
+            continue
+        seen.add(identity)
+        eligible.append(episode)
+
+    started = [item for item in eligible if item.observation == "started"]
+    started_buckets: dict[str, list[EpisodeObservation]] = {
+        "missing_or_lt_1": [],
+        "1_to_1_25": [],
+        "1_25_to_1_5": [],
+        "gte_1_5": [],
+    }
+    for episode in started:
+        item = activity_by_key.get((episode.security_code, episode.market_date))
+        ratio = (
+            item.volume_ratio
+            if item is not None and item.available and item.volume_ratio is not None
+            else None
+        )
+        if ratio is None or ratio < Decimal("1.0"):
+            started_buckets["missing_or_lt_1"].append(episode)
+        elif ratio < Decimal("1.25"):
+            started_buckets["1_to_1_25"].append(episode)
+        elif ratio < Decimal("1.5"):
+            started_buckets["1_25_to_1_5"].append(episode)
+        else:
+            started_buckets["gte_1_5"].append(episode)
+
+    started_selected: list[EpisodeObservation] = []
+    for bucket, maximum in (
+        ("missing_or_lt_1", 5),
+        ("1_to_1_25", 10),
+        ("1_25_to_1_5", 10),
+    ):
+        pool = started_buckets[bucket]
+        take = min(maximum, len(pool))
+        if take:
+            started_selected.extend(
+                _take_ranked(pool, count=take, seed=f"{seed}|started|{bucket}")
+            )
+    high_needed = 40 - len(started_selected)
+    started_selected.extend(
+        _take_ranked(
+            started_buckets["gte_1_5"],
+            count=high_needed,
+            seed=f"{seed}|started|gte_1_5",
+        )
+    )
+
+    early_held: list[EpisodeObservation] = []
+    for hold_count, count in ((1, 10), (2, 10), (3, 10)):
+        pool = [
+            item
+            for item in eligible
+            if (
+                item.observation == "held"
+                and item.phase == "active"
+                and item.hold_count == hold_count
+            )
+        ]
+        early_held.extend(
+            _take_ranked(pool, count=count, seed=f"{seed}|early-held|{hold_count}")
+        )
+
+    loss_pool = [item for item in eligible if item.observation in {"lost", "below"}]
+    loss_ranked = sorted(
+        loss_pool,
+        key=lambda item: (
+            abs(_decimal_distance(item.close, item.frozen_level) or Decimal("999")),
+            _rank(f"{seed}|loss", _context_key(item)),
+        ),
+    )
+    loss_selected = tuple(loss_ranked[:20])
+    if len(loss_selected) != 20:
+        raise ReferencePilotError("development supplement has insufficient loss contexts")
+
+    reclaim_selected = _take_ranked(
+        [item for item in eligible if item.observation == "reclaimed"],
+        count=15,
+        seed=f"{seed}|reclaimed",
+    )
+    mature_selected = _take_ranked(
+        [
+            item
+            for item in eligible
+            if item.observation == "held" and item.phase == "active" and item.hold_count >= 40
+        ],
+        count=15,
+        seed=f"{seed}|mature-held",
+    )
+
+    groups = (
+        ("supplement_started", tuple(started_selected)),
+        ("supplement_early_held", tuple(early_held)),
+        ("supplement_loss_boundary", loss_selected),
+        ("supplement_reclaimed", reclaim_selected),
+        ("supplement_mature_held", mature_selected),
+    )
+    output: list[ReferenceContext] = []
+    selected_ids: set[str] = set()
+    for stratum, rows in groups:
+        for episode in rows:
+            identity = _context_key(episode)
+            if identity in selected_ids or identity in exclude_context_ids:
+                raise ReferencePilotError("development supplement context identity overlaps")
+            selected_ids.add(identity)
+            output.append(_reference_context(episode, activity_by_key, stratum=stratum))
+    if len(output) != 120:
+        raise ReferencePilotError(
+            f"development supplement produced {len(output)} contexts; need 120"
+        )
+    return tuple(sorted(output, key=lambda item: (item.sampling_stratum, item.context_id)))
+
+
 def build_reviewer_packet(
     contexts: Sequence[ReferenceContext],
     episodes: Sequence[EpisodeObservation],

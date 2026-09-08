@@ -1,0 +1,30 @@
+{
+  "schema_version": "quanthus.stage-development-selection.v1",
+  "policy_id": "stage-first-group-development-selection-v1",
+  "work_item": "P3-STAGE-001-E",
+  "purpose": "Post-feasibility development selection gate that implements the pre-existing stock-stage design priorities before any held-out qualification.",
+  "evidence_scope": "development_only_not_confirmatory",
+  "hard_gates": {
+    "minimum_definite_references_per_stage_for_parameter_identifiability": 20,
+    "minimum_ambiguous_references_for_overassertion_audit": 10,
+    "minimum_positive_reference_coverage": 0.60,
+    "maximum_ambiguous_unique_assertion_rate": 0.10,
+    "maximum_definite_negative_false_positive_rate": 0.0,
+    "minimum_stage_precision_one_sided_95_lower": 0.80,
+    "macro_f1_noninferiority_tolerance_vs_r0": 0.03
+  },
+  "ranking_after_hard_gates": [
+    "higher_macro_f1",
+    "higher_positive_reference_coverage",
+    "lower_ambiguous_unique_assertion_rate",
+    "higher_minimum_stage_precision_lower_bound",
+    "lower_parameter_complexity"
+  ],
+  "disposition_when_no_trial_passes": "INCONCLUSIVE_KEEP_R0_AND_SUPPLEMENT_DEVELOPMENT_EVIDENCE",
+  "non_claims": [
+    "These are development selection gates, not F qualification thresholds.",
+    "The 20-reference and 10-ambiguous floors are engineering identifiability floors introduced after the feasibility pilot exposed sparse stage-3 and ambiguity evidence.",
+    "The 0.60 coverage, 0.10 ambiguity, 0.80 precision-lower-bound and 0.03 noninferiority values implement priorities already documented before the first R1 result.",
+    "Passing this policy does not authorize SHADOW, QUALIFIED, 2022-2025 access, strategy use, or trading."
+  ]
+}

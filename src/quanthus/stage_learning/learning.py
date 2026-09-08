@@ -63,6 +63,74 @@ class StageLearningObservation:
     probe_volume_ratio20: Decimal | None
     acceptance_activity_mean: Decimal | None
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "context_id": self.context_id,
+            "anchor_scale": self.anchor_scale,
+            "observation": self.observation,
+            "phase": self.phase,
+            "exchange_session_age": self.exchange_session_age,
+            "hold_count": self.hold_count,
+            "previous_loss": self.previous_loss,
+            "signed_distance": (
+                None if self.signed_distance is None else format(self.signed_distance, "f")
+            ),
+            "probe_volume_ratio20": (
+                None
+                if self.probe_volume_ratio20 is None
+                else format(self.probe_volume_ratio20, "f")
+            ),
+            "acceptance_activity_mean": (
+                None
+                if self.acceptance_activity_mean is None
+                else format(self.acceptance_activity_mean, "f")
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> StageLearningObservation:
+        required = {
+            "context_id",
+            "anchor_scale",
+            "observation",
+            "phase",
+            "exchange_session_age",
+            "hold_count",
+            "previous_loss",
+            "signed_distance",
+            "probe_volume_ratio20",
+            "acceptance_activity_mean",
+        }
+        if set(value) != required:
+            raise StageLearningError("learning observation fields differ")
+        try:
+            return cls(
+                context_id=str(value["context_id"]),
+                anchor_scale=int(value["anchor_scale"]),
+                observation=str(value["observation"]),
+                phase=str(value["phase"]),
+                exchange_session_age=int(value["exchange_session_age"]),
+                hold_count=int(value["hold_count"]),
+                previous_loss=bool(value["previous_loss"]),
+                signed_distance=(
+                    None
+                    if value["signed_distance"] is None
+                    else Decimal(str(value["signed_distance"]))
+                ),
+                probe_volume_ratio20=(
+                    None
+                    if value["probe_volume_ratio20"] is None
+                    else Decimal(str(value["probe_volume_ratio20"]))
+                ),
+                acceptance_activity_mean=(
+                    None
+                    if value["acceptance_activity_mean"] is None
+                    else Decimal(str(value["acceptance_activity_mean"]))
+                ),
+            )
+        except (TypeError, ValueError) as exc:
+            raise StageLearningError("learning observation is invalid") from exc
+
 
 @dataclass(frozen=True)
 class TrialScore:
@@ -70,6 +138,12 @@ class TrialScore:
     definite_count: int
     confirmed_count: int
     coverage: float
+    definite_positive_count: int
+    definite_negative_count: int
+    positive_reference_covered: int
+    positive_reference_coverage: float
+    definite_negative_false_positive_count: int
+    definite_negative_false_positive_rate: float
     macro_f1: float
     stage_metrics: Mapping[int, Mapping[str, float | int | None]]
     ambiguous_count: int
@@ -84,6 +158,13 @@ class TrialScore:
             "definite_count": self.definite_count,
             "confirmed_count": self.confirmed_count,
             "coverage": self.coverage,
+            "coverage_semantics": "legacy_confirmed_prediction_rate_over_all_definite",
+            "definite_positive_count": self.definite_positive_count,
+            "definite_negative_count": self.definite_negative_count,
+            "positive_reference_covered": self.positive_reference_covered,
+            "positive_reference_coverage": self.positive_reference_coverage,
+            "definite_negative_false_positive_count": self.definite_negative_false_positive_count,
+            "definite_negative_false_positive_rate": self.definite_negative_false_positive_rate,
             "macro_f1": self.macro_f1,
             "stage_metrics": {str(key): dict(value) for key, value in self.stage_metrics.items()},
             "ambiguous_count": self.ambiguous_count,
@@ -210,6 +291,31 @@ def build_learning_observations(
     return tuple(output[item.context_id] for item in contexts)
 
 
+def load_learning_observations(path: Path) -> tuple[StageLearningObservation, ...]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise StageLearningError("learning observation artifact is unreadable") from exc
+    output: list[StageLearningObservation] = []
+    for number, line in enumerate(lines, 1):
+        if not line.strip():
+            continue
+        try:
+            raw = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise StageLearningError(
+                f"learning observation line {number} is invalid JSON"
+            ) from exc
+        if not isinstance(raw, Mapping):
+            raise StageLearningError(f"learning observation line {number} must be an object")
+        output.append(StageLearningObservation.from_dict(raw))
+    if not output:
+        raise StageLearningError("learning observation artifact is empty")
+    if len({item.context_id for item in output}) != len(output):
+        raise StageLearningError("learning observation artifact contains duplicate contexts")
+    return tuple(output)
+
+
 def predict_stage(observation: StageLearningObservation, params: R1Parameters) -> int | None:
     if observation.observation == "started":
         if (
@@ -262,6 +368,10 @@ def score_predictions(
     unjudgeable = [item for item in references if item.reference_kind is ReferenceKind.UNJUDGEABLE]
     if not definite:
         raise StageLearningError("resolved corpus has no definite references")
+    definite_positive = [item for item in definite if item.supported_stage_codes]
+    definite_negative = [item for item in definite if not item.supported_stage_codes]
+    if not definite_positive:
+        raise StageLearningError("resolved corpus has no positive definite references")
     stage_metrics: dict[int, dict[str, float | int | None]] = {}
     f1_values: list[float] = []
     for stage in (3, 4):
@@ -281,6 +391,7 @@ def score_predictions(
         f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
         f1_values.append(f1)
         stage_metrics[stage] = {
+            "truth_count": sum(stage in item.supported_stage_codes for item in definite),
             "tp": tp,
             "fp": fp,
             "fn": fn,
@@ -290,6 +401,13 @@ def score_predictions(
             "f1": f1,
         }
     confirmed = sum(predictions[item.context_id] in {3, 4} for item in definite)
+    positive_covered = sum(
+        predictions[item.context_id] in set(item.supported_stage_codes)
+        for item in definite_positive
+    )
+    negative_false_positive = sum(
+        predictions[item.context_id] in {3, 4} for item in definite_negative
+    )
     ambiguous_unique = sum(predictions[item.context_id] in {3, 4} for item in ambiguous)
     unjudgeable_unique = sum(predictions[item.context_id] in {3, 4} for item in unjudgeable)
     return TrialScore(
@@ -297,6 +415,14 @@ def score_predictions(
         definite_count=len(definite),
         confirmed_count=confirmed,
         coverage=confirmed / len(definite),
+        definite_positive_count=len(definite_positive),
+        definite_negative_count=len(definite_negative),
+        positive_reference_covered=positive_covered,
+        positive_reference_coverage=positive_covered / len(definite_positive),
+        definite_negative_false_positive_count=negative_false_positive,
+        definite_negative_false_positive_rate=(
+            negative_false_positive / len(definite_negative) if definite_negative else 0.0
+        ),
         macro_f1=sum(f1_values) / len(f1_values),
         stage_metrics=stage_metrics,
         ambiguous_count=len(ambiguous),

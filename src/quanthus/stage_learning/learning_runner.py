@@ -18,10 +18,9 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.policy import find_project_root
-from quanthus.stage_learning.core import build_activity_observations
 from quanthus.stage_learning.learning import (
-    build_learning_observations,
     enumerate_r1_trials,
+    load_learning_observations,
     load_resolved_references,
     predict_stage,
     r0_parameters,
@@ -32,8 +31,6 @@ from quanthus.stage_learning.review_ledger import (
     load_reference_contexts,
     verify_resolution_artifact,
 )
-from quanthus.stage_learning.source import DevelopmentReadScope, read_development_admissions
-from quanthus.structure_v2 import build_structure_v2
 from quanthus.structure_v2_inputs import canonical, digest
 
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
@@ -95,13 +92,69 @@ def _rank_trial(row: Mapping[str, Any], r0: Mapping[str, Any]) -> tuple[Any, ...
             "acceptance_window_volume_ratio20_min",
         )
     )
+    ambiguous_rate = score.get("ambiguous_unique_assertion_rate")
     return (
         -float(score["macro_f1"]),
+        -float(score["positive_reference_coverage"]),
+        float(ambiguous_rate) if ambiguous_rate is not None else 1.0,
         -_minimum_precision_lower(score),
-        -float(score["coverage"]),
         complexity,
         str(row["trial_id"]),
     )
+
+
+def _development_selection_gate(
+    score: Mapping[str, Any],
+    *,
+    r0_score: Mapping[str, Any],
+    policy: Mapping[str, Any],
+) -> dict[str, Any]:
+    gates = policy.get("hard_gates")
+    if not isinstance(gates, Mapping):
+        raise StageLearningRunError("development selection hard gates are missing")
+    reasons: list[str] = []
+    stage_metrics = score.get("stage_metrics")
+    if not isinstance(stage_metrics, Mapping):
+        raise StageLearningRunError("trial stage metrics are missing")
+    min_stage_refs = int(
+        gates["minimum_definite_references_per_stage_for_parameter_identifiability"]
+    )
+    min_precision = float(gates["minimum_stage_precision_one_sided_95_lower"])
+    for stage in ("3", "4"):
+        metric = stage_metrics.get(stage)
+        if not isinstance(metric, Mapping):
+            reasons.append(f"stage_{stage}_metrics_missing")
+            continue
+        if int(metric.get("truth_count") or 0) < min_stage_refs:
+            reasons.append(f"stage_{stage}_reference_count_below_identifiability_floor")
+        precision_lower = metric.get("precision_wilson_one_sided_95_lower")
+        if not isinstance(precision_lower, (int, float)) or float(precision_lower) < min_precision:
+            reasons.append(f"stage_{stage}_precision_lower_below_gate")
+    if int(score.get("ambiguous_count") or 0) < int(
+        gates["minimum_ambiguous_references_for_overassertion_audit"]
+    ):
+        reasons.append("ambiguous_reference_count_below_audit_floor")
+    ambiguity_rate = score.get("ambiguous_unique_assertion_rate")
+    if not isinstance(ambiguity_rate, (int, float)) or float(ambiguity_rate) > float(
+        gates["maximum_ambiguous_unique_assertion_rate"]
+    ):
+        reasons.append("ambiguous_unique_assertion_rate_above_gate")
+    if float(score.get("positive_reference_coverage") or 0.0) < float(
+        gates["minimum_positive_reference_coverage"]
+    ):
+        reasons.append("positive_reference_coverage_below_gate")
+    if float(score.get("definite_negative_false_positive_rate") or 0.0) > float(
+        gates["maximum_definite_negative_false_positive_rate"]
+    ):
+        reasons.append("definite_negative_false_positive_rate_above_gate")
+    tolerance = float(gates["macro_f1_noninferiority_tolerance_vs_r0"])
+    if float(score.get("macro_f1") or 0.0) < float(r0_score.get("macro_f1") or 0.0) - tolerance:
+        reasons.append("macro_f1_inferior_to_r0_beyond_tolerance")
+    return {
+        "eligible": not reasons,
+        "reason_codes": reasons,
+        "policy_id": policy.get("policy_id"),
+    }
 
 
 def _require_authority(root: Path) -> dict[str, Any]:
@@ -179,41 +232,30 @@ def run_development_learning(
     if pilot_manifest.get("config_digest") != digest(config):
         raise StageLearningRunError("D pilot config drifted since artifact publication")
     experiment = _object(root / str(config["experiment_config"]), "stage experiment")
-    node_config = _object(root / str(config["training_node_config"]), "training node config")
     population = config.get("population")
-    if not isinstance(population, Mapping):
-        raise StageLearningRunError("D population config is missing")
-    scan_start = _date(population.get("scan_start"), "scan_start")
-    report_start = _date(population.get("report_start"), "report_start")
+    workflow_config = config.get("synthetic_workflow")
+    if not isinstance(population, Mapping) or not isinstance(workflow_config, Mapping):
+        raise StageLearningRunError("D population/workflow config is missing")
     read_end = _date(population.get("read_end"), "read_end")
     if read_end > date(2021, 12, 31):
         raise StageLearningRunError("E refuses post-development read scope")
+    selection_path = workflow_config.get("development_selection_policy")
+    if not isinstance(selection_path, str) or not selection_path:
+        raise StageLearningRunError("development selection policy binding is missing")
+    selection_policy = _object(root / selection_path, "development selection policy")
+    if selection_policy.get("schema_version") != "quanthus.stage-development-selection.v1":
+        raise StageLearningRunError("development selection policy schema differs")
 
     contexts = load_reference_contexts(pilot_root / "sample-manifest.json")
     references = load_resolved_references(resolution_root)
     if {item.context_id for item in contexts} != {item.context_id for item in references}:
         raise StageLearningRunError("resolved reference identities differ from D sample contexts")
-    cohort = sample_manifest.get("cohort")
-    if not isinstance(cohort, list) or not cohort:
-        raise StageLearningRunError("D sample cohort is missing")
-    security_codes = tuple(str(item) for item in cohort)
-    spec_digest = str(_object(pilot_root / "summary.json", "D summary")["spec_digest"])
-    scope = DevelopmentReadScope(scan_start, report_start, read_end)
-    admissions, source_manifest, policy = read_development_admissions(
-        training_root=training_root,
-        node_config=node_config,
-        scope=scope,
-        security_codes=security_codes,
-        spec_digest=spec_digest,
-    )
-    structure = build_structure_v2(
-        admissions,
-        spec_digest=spec_digest,
-        calendar_ref=policy.calendar_ref,
-        lookbacks=(20, 60),
-    )
-    activity = build_activity_observations(admissions, window=20)
-    observations = build_learning_observations(contexts, structure, activity)
+    source_manifest = _object(pilot_root / "source-manifest.json", "D source manifest")
+    observations = load_learning_observations(pilot_root / "learning-inputs.jsonl")
+    if {item.context_id for item in observations} != {item.context_id for item in contexts}:
+        raise StageLearningRunError(
+            "learning-input artifact identities differ from D sample contexts"
+        )
 
     r0 = r0_parameters(experiment)
     r0_predictions = {item.context_id: predict_stage(item, r0) for item in observations}
@@ -226,23 +268,38 @@ def run_development_learning(
         "development_pilot_only": True,
     }
 
+    r0_gate = _development_selection_gate(
+        r0_row["score"], r0_score=r0_row["score"], policy=selection_policy
+    )
+    r0_row["development_gate"] = r0_gate
     rows: list[dict[str, Any]] = []
     for params in enumerate_r1_trials(experiment):
         predictions = {item.context_id: predict_stage(item, params) for item in observations}
         score = score_predictions(references, predictions, trial_id=params.trial_id)
-        rows.append(
-            {
-                "family": "R1",
-                "trial_id": params.trial_id,
-                "parameters": params.to_dict(),
-                "score": score.to_dict(),
-                "development_pilot_only": True,
-            }
+        row = {
+            "family": "R1",
+            "trial_id": params.trial_id,
+            "parameters": params.to_dict(),
+            "score": score.to_dict(),
+            "development_pilot_only": True,
+        }
+        row["development_gate"] = _development_selection_gate(
+            row["score"], r0_score=r0_row["score"], policy=selection_policy
         )
-    ranked = sorted(rows, key=lambda item: _rank_trial(item, r0_row))
-    for rank, row in enumerate(ranked, 1):
+        rows.append(row)
+    diagnostic_ranked = sorted(rows, key=lambda item: _rank_trial(item, r0_row))
+    for rank, row in enumerate(diagnostic_ranked, 1):
+        row["diagnostic_rank"] = rank
+    eligible = [item for item in diagnostic_ranked if item["development_gate"]["eligible"]]
+    eligible_ranked = sorted(eligible, key=lambda item: _rank_trial(item, r0_row))
+    for rank, row in enumerate(eligible_ranked, 1):
         row["development_rank"] = rank
-    best = ranked[0]
+    best = eligible_ranked[0] if eligible_ranked else None
+    disposition = (
+        "R1_DEVELOPMENT_CANDIDATE_SELECTED"
+        if best is not None
+        else str(selection_policy["disposition_when_no_trial_passes"])
+    )
 
     summary = {
         "schema_version": "quanthus.stage-learning-summary.v1",
@@ -257,8 +314,12 @@ def run_development_learning(
         "observation_count": len(observations),
         "r0": r0_row,
         "r1_trial_count": len(rows),
-        "development_rank_1_trial_id": best["trial_id"],
-        "development_rank_1_score": best["score"],
+        "development_selection_policy_id": selection_policy["policy_id"],
+        "development_selection_policy_digest": digest(selection_policy),
+        "development_selection_disposition": disposition,
+        "development_eligible_trial_count": len(eligible_ranked),
+        "development_rank_1_trial_id": None if best is None else best["trial_id"],
+        "development_rank_1_score": None if best is None else best["score"],
         "r2_executed": False,
         "qualification_authorized": False,
         "confirmatory_test_authority": False,
@@ -292,6 +353,7 @@ def run_development_learning(
         "code_revision": code_revision,
         "delivery_plan_digest": digest(plan),
         "experiment_digest": digest(experiment),
+        "development_selection_policy_digest": digest(selection_policy),
         "pilot_manifest_sha256": pilot_verified["manifest_sha256"],
         "resolution_manifest_sha256": resolution_verified["manifest_sha256"],
         "reference_evidence_tier": evidence_tier,

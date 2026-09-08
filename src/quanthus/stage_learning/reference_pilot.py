@@ -15,9 +15,11 @@ from typing import Any
 from quanthus.policy import find_project_root
 from quanthus.stage_learning.core import build_activity_observations
 from quanthus.stage_learning.harness import load_harness_config
+from quanthus.stage_learning.learning import build_learning_observations
 from quanthus.stage_learning.reference import (
     ReferencePilotError,
     build_reviewer_packet,
+    select_development_supplement_contexts,
     select_reference_contexts,
 )
 from quanthus.stage_learning.settlement import settle_reference_contexts, settlement_ledger_summary
@@ -110,15 +112,22 @@ def load_reference_pilot_config(path: Path) -> dict[str, Any]:
     if (
         workflow.get("enabled") is not True
         or workflow.get("evidence_tier") != "SYNTHETIC_EXPERT_CONSENSUS"
-        or workflow.get("review_engine") != "versioned_persona_policy_v1"
+        or workflow.get("review_engine")
+        not in {
+            "stage-first-group-synthetic-policy-v1",
+            "stage-first-group-synthetic-policy-v2",
+        }
         or workflow.get("run_development_r0_r1_after_resolution") is not True
         or workflow.get("formal_qualification_authorized") is not False
         or workflow.get("human_expert_validated") is not False
     ):
         raise ReferencePilotRunError("synthetic workflow authority differs")
     panel_config = workflow.get("panel_config")
+    selection_policy = workflow.get("development_selection_policy")
     if not isinstance(panel_config, str) or not panel_config:
         raise ReferencePilotRunError("synthetic workflow panel config is invalid")
+    if not isinstance(selection_policy, str) or not selection_policy:
+        raise ReferencePilotRunError("synthetic workflow development-selection binding is invalid")
     return raw
 
 
@@ -191,10 +200,16 @@ def run_reference_pilot(
     read_end = _date(population, "read_end")
     if not scan_start < cohort_date <= report_start <= report_end < read_end <= date(2021, 12, 31):
         raise ReferencePilotRunError("reference pilot development dates are not ordered")
-    if _int(sampling, "random_count") + _int(sampling, "boundary_or_rare_count") != _int(
-        sampling, "total_episode_contexts"
-    ):
-        raise ReferencePilotRunError("reference pilot sample counts do not close")
+    selection_mode = str(sampling.get("selection_mode") or "feasibility_random_boundary_v1")
+    if selection_mode == "feasibility_random_boundary_v1":
+        if _int(sampling, "random_count") + _int(sampling, "boundary_or_rare_count") != _int(
+            sampling, "total_episode_contexts"
+        ):
+            raise ReferencePilotRunError("reference pilot sample counts do not close")
+    elif selection_mode != "stratified_development_supplement_v1":
+        raise ReferencePilotRunError("reference pilot selection mode is unsupported")
+    elif _int(sampling, "total_episode_contexts") != 120:
+        raise ReferencePilotRunError("development supplement requires exactly 120 contexts")
     if review.get("algorithm_output_visible_to_primary_reviewers") is not False or review.get(
         "future_settlement_visible_to_primary_reviewers"
     ) is not False:
@@ -233,15 +248,34 @@ def run_reference_pilot(
     _progress(started, "structure-ready", episodes=len(structure.episodes))
     activity = build_activity_observations(admissions, window=20)
     _progress(started, "activity-ready", activity=len(activity))
-    contexts = select_reference_contexts(
-        structure.episodes,
-        activity,
-        report_start=report_start,
-        report_end=report_end,
-        seed=str(sampling["sampling_seed"]),
-        random_count=_int(sampling, "random_count"),
-        boundary_count=_int(sampling, "boundary_or_rare_count"),
-    )
+    if selection_mode == "feasibility_random_boundary_v1":
+        contexts = select_reference_contexts(
+            structure.episodes,
+            activity,
+            report_start=report_start,
+            report_end=report_end,
+            seed=str(sampling["sampling_seed"]),
+            random_count=_int(sampling, "random_count"),
+            boundary_count=_int(sampling, "boundary_or_rare_count"),
+        )
+    else:
+        prior_contexts = select_reference_contexts(
+            structure.episodes,
+            activity,
+            report_start=report_start,
+            report_end=report_end,
+            seed=str(sampling["prior_pilot_sampling_seed"]),
+            random_count=80,
+            boundary_count=40,
+        )
+        contexts = select_development_supplement_contexts(
+            structure.episodes,
+            activity,
+            report_start=report_start,
+            report_end=report_end,
+            seed=str(sampling["sampling_seed"]),
+            exclude_context_ids={item.context_id for item in prior_contexts},
+        )
     _progress(started, "contexts-ready", contexts=len(contexts))
     packets = build_reviewer_packet(
         contexts,
@@ -250,6 +284,7 @@ def run_reference_pilot(
         admissions,
         history_sessions=_int(sampling, "review_history_sessions"),
     )
+    learning_observations = build_learning_observations(contexts, structure, activity)
     settlements = settle_reference_contexts(
         contexts,
         structure.episodes,
@@ -287,10 +322,11 @@ def run_reference_pilot(
         "cohort_digest": digest(cohort),
         "sample_counts": {
             "total": len(contexts),
-            "random": sum(item.sampling_stratum == "random" for item in contexts),
-            "boundary_or_rare": sum(
-                item.sampling_stratum == "boundary_or_rare" for item in contexts
-            ),
+            "selection_mode": selection_mode,
+            "strata": {
+                stratum: sum(item.sampling_stratum == stratum for item in contexts)
+                for stratum in sorted({item.sampling_stratum for item in contexts})
+            },
         },
         "review_status": {
             "resolved_contexts": 0,
@@ -335,6 +371,9 @@ def run_reference_pilot(
             }
         ),
         "review-packets.jsonl": _jsonl(tuple(dict(item) for item in packets)),
+        "learning-inputs.jsonl": _jsonl(
+            tuple(item.to_dict() for item in learning_observations)
+        ),
         "review-ledger-template.jsonl": b"",
         "settlements.jsonl": _jsonl(tuple(item.to_dict() for item in settlements)),
         "summary.json": canonical(summary),

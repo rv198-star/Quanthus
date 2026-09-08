@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 
 from quanthus.policy import find_project_root
-from quanthus.stage_learning.learning_runner import StageLearningRunError, _require_authority
+from quanthus.stage_learning.learning_runner import (
+    StageLearningRunError,
+    _development_selection_gate,
+    _require_authority,
+)
 
 ROOT = find_project_root()
 
@@ -35,10 +39,48 @@ def test_learning_authority_can_open_only_without_downstream_scope(tmp_path: Pat
         _require_authority(tmp_path)
 
 
+def test_development_selection_gate_prioritizes_sufficiency_and_ambiguity() -> None:
+    policy = json.loads(
+        (ROOT / "config/stage-learning/development-selection.v1.json").read_text()
+    )
+    base = {
+        "macro_f1": 0.85,
+        "positive_reference_coverage": 0.80,
+        "definite_negative_false_positive_rate": 0.0,
+        "ambiguous_count": 12,
+        "ambiguous_unique_assertion_rate": 0.08,
+        "stage_metrics": {
+            "3": {
+                "truth_count": 20,
+                "precision_wilson_one_sided_95_lower": 0.90,
+            },
+            "4": {
+                "truth_count": 30,
+                "precision_wilson_one_sided_95_lower": 0.92,
+            },
+        },
+    }
+    admitted = _development_selection_gate(base, r0_score={"macro_f1": 0.84}, policy=policy)
+    assert admitted["eligible"] is True
+
+    sparse = json.loads(json.dumps(base))
+    sparse["stage_metrics"]["3"]["truth_count"] = 3
+    sparse["ambiguous_unique_assertion_rate"] = 0.25
+    rejected = _development_selection_gate(
+        sparse, r0_score={"macro_f1": 0.84}, policy=policy
+    )
+    assert rejected["eligible"] is False
+    assert "stage_3_reference_count_below_identifiability_floor" in rejected["reason_codes"]
+    assert "ambiguous_unique_assertion_rate_above_gate" in rejected["reason_codes"]
+
+
 def test_learning_runner_source_has_no_future_settlement_consumer() -> None:
     source = (ROOT / "src/quanthus/stage_learning/learning_runner.py").read_text()
     assert "settlements.jsonl" not in source
     assert "settle_reference_contexts" not in source
+    assert "read_development_admissions" not in source
+    assert "build_structure_v2" not in source
+    assert "learning-inputs.jsonl" in source
     assert '"future_settlement_read": False' in source
     assert '"arbitration_read": False' in source
     assert '"permanent_blind_read": False' in source

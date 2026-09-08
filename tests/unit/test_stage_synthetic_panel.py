@@ -19,6 +19,7 @@ from quanthus.stage_learning.synthetic_panel import (
 
 ROOT = find_project_root()
 PANEL = ROOT / "config/stage-learning/synthetic-expert-panel.v1.json"
+PANEL_V2 = ROOT / "config/stage-learning/synthetic-expert-panel.v2.json"
 
 
 def packet(
@@ -190,6 +191,43 @@ def test_started_is_definite_stage3_and_lost_is_definite_negative() -> None:
     assert negative.reference_kind.value == "definite"
     assert negative.supported_stage_codes == ()
     assert negative.adjacent_contexts == ("breakout_failure",)
+
+
+def test_v2_started_activity_is_semantically_discriminated() -> None:
+    panel = load_synthetic_panel(PANEL_V2)
+    assert panel["semantic_policy_version"] == "stage-first-group-synthetic-policy-v2"
+    evidence = "sha256:" + "9" * 64
+    weak = packet(observation="started", phase="active", hold=0, activity="0.90")
+    borderline = packet(observation="started", phase="active", hold=0, activity="1.10")
+    strong = packet(observation="started", phase="active", hold=0, activity="1.35")
+
+    weak_a = review_packet(
+        weak,
+        evidence_digest=evidence,
+        persona_id="youzi-emotion-cycle-v2",
+        reviewer_role="primary",
+        policy_version=panel["semantic_policy_version"],
+    )
+    borderline_b = review_packet(
+        borderline,
+        evidence_digest=evidence,
+        persona_id="youzi-capacity-trend-v2",
+        reviewer_role="primary",
+        policy_version=panel["semantic_policy_version"],
+    )
+    strong_b = review_packet(
+        strong,
+        evidence_digest=evidence,
+        persona_id="youzi-capacity-trend-v2",
+        reviewer_role="primary",
+        policy_version=panel["semantic_policy_version"],
+    )
+    assert weak_a.reference_kind.value == "definite"
+    assert weak_a.supported_stage_codes == ()
+    assert borderline_b.reference_kind.value == "ambiguous_set"
+    assert borderline_b.supported_stage_codes == (3,)
+    assert strong_b.reference_kind.value == "definite"
+    assert strong_b.supported_stage_codes == (3,)
 
 
 def test_one_session_acceptance_can_disagree_across_persona_policies() -> None:

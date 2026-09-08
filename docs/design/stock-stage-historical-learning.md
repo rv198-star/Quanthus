@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A/B/C已关闭；D的development-only reference/settlement工程pilot已通过，并允许SYNTHETIC_EXPERT_CONSENSUS用于开发语义参考；E的fail-closed学习器实现及基于完整合成参考的development-only R0/R1学习获授权。HUMAN_EXPERT_REFERENCE、2022+读取、正式资格发布、每日调度、云GPU和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A/B/C已关闭；D/E synthetic development v1已完整执行但审计结论INCONCLUSIVE，未冻结R1赢家。D允许在同一2012-2021开发权限内执行不重叠的v2分层补样与Panel v2，E仅对通过hard-gated development selection的R1候选给出开发排名。HUMAN_EXPERT_REFERENCE、2022+读取、正式资格发布、每日调度、云GPU和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -51,11 +51,13 @@
 
 原始规则弱标签只能用于工程测试、教学或明确标注的弱监督训练；不能成为独立资格测试答案。参考证据分层为 `HUMAN_EXPERT_REFERENCE > SYNTHETIC_EXPERT_CONSENSUS > WEAK_RULE_SELF_LABEL`。当前没有合适的真人A股专家资源，因此D允许使用不同交易/机构风格原型的隔离盲审作为development reference；公开人物姓名只作为便于理解的风格锚点，不冒充本人、不声称本人观点，也不把同一模型体系下的角色隔离夸大成真人统计独立性。正式资格报告必须保留该证据等级，不能写成“真人专家验证”。同一学习算法或弱规则不能生成答案再给自己评分。
 
-### 3.1 首轮参考预算（建议默认值，非样本充分性保证）
+### 3.1 开发参考预算与补样纪律
 
-先做120个episode-context的可行性参考：80个按预登记随机种子从合格总体抽样，40个边界/稀有反例。当前合成专家方案中，每个context由一个短线/游资风格原型和一个机构/中周期风格原型互不可见地独立判断；分歧再由未参与该context主评且风格不同的第三原型裁决，量化结构审计员只做PIT/证据闭包否决而不投语义票。未来切换真人专家时沿用同一T-only packet和resolution协议。记录完整时间片段而非只给一张无法判断前序背景的截图。典型和过采样边界分开报告，不能用人工平衡的类别比例代表总体。
+首轮120个episode-context可行性参考按80个预登记随机样本 + 40个边界/稀有反例执行。v1运行后仅得到3个definite Stage-3参考，且原diagnostic rank #1以更高歧义过度断言换取Stage-4 recall，因此该轮只保留为INCONCLUSIVE开发证据，不接受参数赢家。该结果可以指导新的development补样，但不能把首轮重新命名为独立测试。
 
-试标只用于口径可辨识性、标注耗时与评价预算估计，不计入确认性测试。主动学习只在开发池选难例；最终参考集独立抽样并冻结。没有足够独立episode时，不把相邻一百个股票日当一百个独立证据。
+v2补样仍在同一冻结32-security/2020开发池内，显式排除首轮120个context，并固定为40个started活动阈值识别、30个hold=1/2/3接受边界、20个近锚失效负例、15个reclaim歧义控制和15个mature-held共存控制。它是**result-aware development supplement**，不是confirmatory sample。Panel v2同时修正首轮“只要activity可用就把started判为Stage 3”的过宽语义，把活动强弱纳入两位主评和第三裁决的Stage-3判断。
+
+每个context仍由两个互不可见的合成专家原型主评，分歧由第三原型裁决，机构挑战审只提供反证提醒，量化结构审计员只做PIT/证据闭包否决。未来切换真人专家时沿用同一T-only packet和resolution协议。原始/补样都只用于开发口径可辨识性和选参；最终参考集必须另行抽样并冻结。没有足够独立episode时，不把相邻股票日虚增成独立证据。
 
 ## 4. 双账本：描述学习不偷换成获利筛选
 

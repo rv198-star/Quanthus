@@ -33,6 +33,9 @@ def test_synthetic_workflow_binds_d_review_resolution_and_e(
         json.dumps(
             {
                 "r1_trial_count": 18,
+                "development_selection_policy_id": "stage-first-group-development-selection-v1",
+                "development_selection_disposition": "R1_DEVELOPMENT_CANDIDATE_SELECTED",
+                "development_eligible_trial_count": 3,
                 "development_rank_1_trial_id": "trial-7",
                 "development_rank_1_score": {"macro_f1": 0.81},
             }

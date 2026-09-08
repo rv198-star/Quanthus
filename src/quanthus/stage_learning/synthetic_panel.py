@@ -77,10 +77,15 @@ def load_synthetic_panel(path: Path) -> dict[str, Any]:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise SyntheticPanelError(f"cannot read synthetic panel: {path}") from exc
-    if not isinstance(raw, dict) or raw.get("schema_version") != (
-        "quanthus.stage-synthetic-expert-panel.v1"
-    ):
+    if not isinstance(raw, dict) or raw.get("schema_version") not in {
+        "quanthus.stage-synthetic-expert-panel.v1",
+        "quanthus.stage-synthetic-expert-panel.v2",
+    }:
         raise SyntheticPanelError("synthetic panel schema differs")
+    if raw["schema_version"].endswith(".v1"):
+        raw.setdefault("semantic_policy_version", "stage-first-group-synthetic-policy-v1")
+    elif raw.get("semantic_policy_version") != "stage-first-group-synthetic-policy-v2":
+        raise SyntheticPanelError("synthetic panel semantic policy version differs")
     if raw.get("evidence_tier") != "SYNTHETIC_EXPERT_CONSENSUS":
         raise SyntheticPanelError("synthetic panel evidence tier differs")
     personas = raw.get("personas")
@@ -328,6 +333,7 @@ def review_packet(
     evidence_digest: str,
     persona_id: str,
     reviewer_role: str,
+    policy_version: str = "stage-first-group-synthetic-policy-v1",
 ) -> ReviewerJudgement:
     """Execute one frozen persona policy over one T-only packet."""
     features = _packet_features(packet, evidence_digest)
@@ -380,15 +386,115 @@ def review_packet(
                 (),
                 ("activity_evidence_unavailable",),
             )
-        return _judgement(
-            features,
-            persona_id,
-            reviewer_role,
-            ReferenceKind.DEFINITE,
-            (3,),
-            (),
-            ("first_same_anchor_probe_breakout", "t_only_activity_visible"),
-        )
+        if policy_version == "stage-first-group-synthetic-policy-v1":
+            return _judgement(
+                features,
+                persona_id,
+                reviewer_role,
+                ReferenceKind.DEFINITE,
+                (3,),
+                (),
+                ("first_same_anchor_probe_breakout", "t_only_activity_visible"),
+            )
+        if policy_version != "stage-first-group-synthetic-policy-v2":
+            raise SyntheticPanelError("synthetic semantic policy version is unsupported")
+        if persona_id.startswith("youzi-emotion-cycle-"):
+            if activity >= Decimal("1.15") or (
+                activity >= Decimal("1.05") and ret5 is not None and ret5 >= Decimal("3")
+            ):
+                return _judgement(
+                    features,
+                    persona_id,
+                    reviewer_role,
+                    ReferenceKind.DEFINITE,
+                    (3,),
+                    (),
+                    ("probe_has_short_tactical_activity_support",),
+                )
+            if activity >= Decimal("0.95"):
+                return _judgement(
+                    features,
+                    persona_id,
+                    reviewer_role,
+                    ReferenceKind.AMBIGUOUS_SET,
+                    (3,),
+                    ("consolidation_like",),
+                    ("probe_activity_is_borderline_for_short_tactical_acceptance",),
+                )
+            return _judgement(
+                features,
+                persona_id,
+                reviewer_role,
+                ReferenceKind.DEFINITE,
+                (),
+                ("consolidation_like",),
+                ("probe_lacks_short_tactical_activity_support",),
+            )
+        if persona_id.startswith("youzi-capacity-trend-"):
+            if activity >= Decimal("1.25") or (
+                activity >= Decimal("1.10") and ret20 is not None and ret20 >= Decimal("8")
+            ):
+                return _judgement(
+                    features,
+                    persona_id,
+                    reviewer_role,
+                    ReferenceKind.DEFINITE,
+                    (3,),
+                    (),
+                    ("probe_has_capacity_or_medium_term_activity_support",),
+                )
+            if activity >= Decimal("1.00"):
+                return _judgement(
+                    features,
+                    persona_id,
+                    reviewer_role,
+                    ReferenceKind.AMBIGUOUS_SET,
+                    (3,),
+                    ("consolidation_like",),
+                    ("probe_activity_is_borderline_for_capacity_acceptance",),
+                )
+            return _judgement(
+                features,
+                persona_id,
+                reviewer_role,
+                ReferenceKind.DEFINITE,
+                (),
+                ("consolidation_like",),
+                ("probe_lacks_capacity_activity_support",),
+            )
+        if persona_id.startswith("youzi-breakout-tempo-"):
+            if activity >= Decimal("1.20") or (
+                activity >= Decimal("1.05") and ret5 is not None and ret5 >= Decimal("5")
+            ):
+                return _judgement(
+                    features,
+                    persona_id,
+                    reviewer_role,
+                    ReferenceKind.DEFINITE,
+                    (3,),
+                    (),
+                    ("probe_has_breakout_tempo_activity_support",),
+                )
+            if activity >= Decimal("1.00"):
+                return _judgement(
+                    features,
+                    persona_id,
+                    reviewer_role,
+                    ReferenceKind.AMBIGUOUS_SET,
+                    (3,),
+                    ("consolidation_like",),
+                    ("probe_tempo_is_not_yet_decisive",),
+                )
+            return _judgement(
+                features,
+                persona_id,
+                reviewer_role,
+                ReferenceKind.DEFINITE,
+                (),
+                ("consolidation_like",),
+                ("probe_activity_is_too_weak_for_breakout_tempo",),
+            )
+        raise SyntheticPanelError(f"persona has no frozen stage-3 policy: {persona_id}")
     if observation != "held" or features.phase != "active" or distance is None:
         return _judgement(
             features,
@@ -411,7 +517,7 @@ def review_packet(
         )
 
     # Emotion-cycle / near-term acceptance archetype.
-    if persona_id == "youzi-emotion-cycle-v1":
+    if persona_id.startswith("youzi-emotion-cycle-"):
         if hold == 1:
             if activity >= Decimal("1.35") and distance >= Decimal("1.0") and (
                 ret5 is None or ret5 >= 0
@@ -467,7 +573,7 @@ def review_packet(
         )
 
     # Capacity / larger-fund trend archetype.
-    if persona_id == "youzi-capacity-trend-v1":
+    if persona_id.startswith("youzi-capacity-trend-"):
         if hold == 1:
             if distance >= Decimal("2") and (
                 activity >= Decimal("1.50") or (ret20 is not None and ret20 >= Decimal("10"))
@@ -518,7 +624,7 @@ def review_packet(
         )
 
     # Breakout-tempo adjudicator.
-    if persona_id == "youzi-breakout-tempo-v1":
+    if persona_id.startswith("youzi-breakout-tempo-"):
         if hold == 1:
             if activity >= Decimal("1.50") and distance >= Decimal("2"):
                 return _judgement(
@@ -599,7 +705,7 @@ def institutional_challenge(
         if features.hold_count == 1:
             reasons.append("single_session_acceptance_needs_caution")
     if (
-        persona_id == "institutional-cycle-tolerance-v1"
+        persona_id.startswith("institutional-cycle-tolerance-")
         and features.observation in {"below", "lost"}
         and features.distance_pct is not None
         and features.distance_pct > Decimal("-1")
@@ -623,6 +729,12 @@ def evaluate_panel(
 ) -> dict[str, Any]:
     """Execute the full panel deterministically without reading any future settlement."""
     assignment = panel["assignment"]
+    policy_version = str(panel.get("semantic_policy_version") or "")
+    if policy_version not in {
+        "stage-first-group-synthetic-policy-v1",
+        "stage-first-group-synthetic-policy-v2",
+    }:
+        raise SyntheticPanelError("synthetic panel semantic policy version is unsupported")
     primary_a_id = str(assignment["primary_a"])
     primary_b_id = str(assignment["primary_b"])
     adjudicator_id = str(assignment["adjudicator"])
@@ -654,12 +766,14 @@ def evaluate_panel(
             evidence_digest=evidence,
             persona_id=primary_a_id,
             reviewer_role="primary",
+            policy_version=policy_version,
         )
         right = review_packet(
             packet,
             evidence_digest=evidence,
             persona_id=primary_b_id,
             reviewer_role="primary",
+            policy_version=policy_version,
         )
         primary_a.append(left)
         primary_b.append(right)
@@ -677,6 +791,7 @@ def evaluate_panel(
                 evidence_digest=evidence_by_context[context_id],
                 persona_id=adjudicator_id,
                 reviewer_role="adjudicator",
+                policy_version=policy_version,
             )
             adjudicator.append(judgement)
             resolved_for_challenge[context_id] = judgement
@@ -714,7 +829,7 @@ def evaluate_panel(
         "challenges": tuple(challenges),
         "disagreement_context_ids": tuple(sorted(disagreements)),
         "challenge_context_ids": tuple(challenge_contexts),
-        "review_engine": "versioned_persona_policy_v1",
+        "review_engine": policy_version,
         "single_model_role_isolated_policy_authoring": True,
         "row_execution_deterministic": True,
         "future_settlement_read": False,

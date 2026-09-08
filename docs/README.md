@@ -127,11 +127,12 @@ nodes.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,
   with device assessment in `design/stock-stage-training-compute.md`, three-perspective review in
   `reviews/stock-stage-learning-review-20260908.md`, and issue-managed steps in
-  `work-items/stock-stage-historical-learning.md` (P3-STAGE-001 A-H). A/B/C are closed. D's governed
-  development-only 120-context T-only reference/future-settlement pilot has passed; D is now ready for
-  a versioned SYNTHETIC_EXPERT_CONSENSUS panel whose public-name anchors are explicitly archetypes,
-  not impersonation or human validation. Complete synthetic consensus may feed development-only R0/R1;
-  HUMAN_EXPERT_REFERENCE, 2022+ reads, qualification publication, daily scheduling and cloud-GPU purchase remain closed.
+  `work-items/stock-stage-historical-learning.md` (P3-STAGE-001 A-H). A/B/C are closed. D/E synthetic
+  development iteration v1 completed end to end but is retained as INCONCLUSIVE: only three definite
+  Stage-3 references were present and the diagnostic rank #1 increased ambiguous over-assertion. D is
+  ready for a non-overlapping stratified v2 supplement and Panel v2; E will rank only trials that pass
+  the versioned development hard gates. HUMAN_EXPERT_REFERENCE, 2022+ reads, qualification publication,
+  daily scheduling and cloud-GPU purchase remain closed.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

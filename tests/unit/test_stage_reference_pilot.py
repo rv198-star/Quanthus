@@ -14,6 +14,7 @@ from quanthus.stage_learning.reference import (
     ReviewerJudgement,
     build_reviewer_packet,
     resolve_reference_reviews,
+    select_development_supplement_contexts,
     select_reference_contexts,
 )
 from quanthus.stage_learning.reference_pilot import load_reference_pilot_config
@@ -128,6 +129,69 @@ def test_reference_sampling_is_deterministic_and_closes_strata() -> None:
     assert sum(item.sampling_stratum == "random" for item in first) == 6
     assert sum(item.sampling_stratum == "boundary_or_rare" for item in first) == 4
     assert all(item.evidence_digest.startswith("sha256:") for item in first)
+
+
+def test_development_supplement_is_stratified_and_excludes_prior_contexts() -> None:
+    episodes: list[EpisodeObservation] = []
+    activities: list[ActivityObservation] = []
+    index = 0
+    for ratio, count in (("0.90", 5), ("1.10", 10), ("1.35", 10), ("1.80", 25)):
+        for _ in range(count):
+            item = episode(index, observation="started")
+            episodes.append(
+                replace(item, exchange_session_age=0, hold_count=0, observed_bar_count=1)
+            )
+            activities.append(activity(item, ratio))
+            index += 1
+    for hold_count in (1, 2, 3):
+        for _ in range(12):
+            item = episode(index)
+            episodes.append(
+                replace(
+                    item,
+                    exchange_session_age=hold_count,
+                    hold_count=hold_count,
+                    observed_bar_count=hold_count + 1,
+                )
+            )
+            activities.append(activity(item, "1.20"))
+            index += 1
+    for _ in range(25):
+        item = episode(index, observation="below", phase="below")
+        episodes.append(replace(item, close=Decimal("99.8")))
+        activities.append(activity(item, "0.80"))
+        index += 1
+    for _ in range(20):
+        item = episode(index, observation="reclaimed", phase="reclaimed")
+        episodes.append(item)
+        activities.append(activity(item, "1.10"))
+        index += 1
+    for _ in range(20):
+        item = episode(index)
+        episodes.append(replace(item, hold_count=60, exchange_session_age=60, close=Decimal("115")))
+        activities.append(activity(item, "1.10"))
+        index += 1
+
+    selected = select_development_supplement_contexts(
+        tuple(episodes),
+        tuple(activities),
+        report_start=episodes[0].market_date,
+        report_end=episodes[-1].market_date,
+        seed="supplement-seed",
+        exclude_context_ids={"sha256:" + "f" * 64},
+    )
+    counts = {
+        stratum: sum(item.sampling_stratum == stratum for item in selected)
+        for stratum in {item.sampling_stratum for item in selected}
+    }
+    assert len(selected) == 120
+    assert counts == {
+        "supplement_started": 40,
+        "supplement_early_held": 30,
+        "supplement_loss_boundary": 20,
+        "supplement_reclaimed": 15,
+        "supplement_mature_held": 15,
+    }
 
 
 def test_reviewer_packet_is_t_only_and_contains_no_candidate_or_future_verdict() -> None:
@@ -278,10 +342,15 @@ def test_future_settlement_is_separate_and_fail_closed() -> None:
 def test_reference_pilot_config_freezes_120_and_does_not_open_qualification() -> None:
     config = load_reference_pilot_config(ROOT / "config/stage-learning/reference-pilot.v1.json")
     assert config["sampling"]["total_episode_contexts"] == 120
-    assert config["sampling"]["random_count"] == 80
-    assert config["sampling"]["boundary_or_rare_count"] == 40
+    assert config["sampling"]["selection_mode"] == "stratified_development_supplement_v1"
+    assert config["sampling"]["prior_pilot_contexts_excluded"] is True
+    assert sum(config["sampling"]["supplement_strata"].values()) == 120
     assert config["authority"]["development_future_settlement_authorized"] is True
     assert config["authority"]["classifier_training_authorized"] is False
     assert config["authority"]["arbitration_access_authorized"] is False
     assert config["authority"]["permanent_blind_access_authorized"] is False
     assert config["authority"]["qualification_authorized"] is False
+    assert config["synthetic_workflow"]["panel_config"].endswith("synthetic-expert-panel.v2.json")
+    assert config["synthetic_workflow"]["review_engine"] == (
+        "stage-first-group-synthetic-policy-v2"
+    )

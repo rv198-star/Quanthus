@@ -24,16 +24,26 @@
     "cohort_size": 32,
     "minimum_pre_cohort_observations": 60,
     "cohort_seed": "sha256:5b1d4d76978616e902d61028177a58d9d7a391c24bea2e538f04c870fd5ad39d",
-    "claim_limit": "development feasibility cohort fixed at the first report date; 32 securities are sufficient for the 120-context pilot and do not define the final qualification population"
+    "claim_limit": "development cohort remains fixed at the first report date; the second 120-context supplement is a result-aware development iteration inside the same 32-security pool and does not define the final qualification population"
   },
   "sampling": {
+    "selection_mode": "stratified_development_supplement_v1",
     "total_episode_contexts": 120,
     "random_count": 80,
     "boundary_or_rare_count": 40,
-    "sampling_seed": "sha256:614e86ee8d8303a0dc6f0984c1e6dad4fa4946a4a27e84073c586c7663f201f8",
+    "prior_pilot_sampling_seed": "sha256:614e86ee8d8303a0dc6f0984c1e6dad4fa4946a4a27e84073c586c7663f201f8",
+    "sampling_seed": "sha256:2e53323fa219f0c5237b2d70c942c69c838be547bb94de25e71e0783b652d3e7",
+    "supplement_strata": {
+      "started_activity_threshold_identification": 40,
+      "early_held_hold_1_2_3": 30,
+      "near_anchor_loss_negative_controls": 20,
+      "reclaimed_ambiguity_controls": 15,
+      "mature_held_coexistence_controls": 15
+    },
     "review_history_sessions": 60,
     "pilot_is_development_only": true,
-    "pilot_must_not_be_reused_as_confirmatory_test": true
+    "pilot_must_not_be_reused_as_confirmatory_test": true,
+    "prior_pilot_contexts_excluded": true
   },
   "review": {
     "reference_kinds": ["definite", "coexistence", "ambiguous_set", "unjudgeable"],
@@ -46,9 +56,10 @@
   },
   "synthetic_workflow": {
     "enabled": true,
-    "panel_config": "config/stage-learning/synthetic-expert-panel.v1.json",
+    "panel_config": "config/stage-learning/synthetic-expert-panel.v2.json",
+    "development_selection_policy": "config/stage-learning/development-selection.v1.json",
     "evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
-    "review_engine": "versioned_persona_policy_v1",
+    "review_engine": "stage-first-group-synthetic-policy-v2",
     "run_development_r0_r1_after_resolution": true,
     "formal_qualification_authorized": false,
     "human_expert_validated": false

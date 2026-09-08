@@ -1,0 +1,68 @@
+{
+  "schema_version": "quanthus.stage-reference-pilot.v1",
+  "work_item": "P3-STAGE-001-D",
+  "experiment_config": "config/stage-learning/experiment.v1.json",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "authority": {
+    "implementation_authorized": true,
+    "development_reference_pack_authorized": true,
+    "development_future_settlement_authorized": true,
+    "classifier_training_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "qualification_authorized": false,
+    "strategy_consumption_authorized": false
+  },
+  "population": {
+    "scan_start": "2019-07-01",
+    "cohort_date": "2020-01-02",
+    "report_start": "2020-01-02",
+    "report_end": "2021-11-30",
+    "read_end": "2021-12-31",
+    "cohort_size": 256,
+    "minimum_pre_cohort_observations": 60,
+    "cohort_seed": "sha256:5b1d4d76978616e902d61028177a58d9d7a391c24bea2e538f04c870fd5ad39d",
+    "claim_limit": "development feasibility cohort fixed at the first report date; not the final qualification population"
+  },
+  "sampling": {
+    "total_episode_contexts": 120,
+    "random_count": 80,
+    "boundary_or_rare_count": 40,
+    "sampling_seed": "sha256:614e86ee8d8303a0dc6f0984c1e6dad4fa4946a4a27e84073c586c7663f201f8",
+    "review_history_sessions": 60,
+    "pilot_is_development_only": true,
+    "pilot_must_not_be_reused_as_confirmatory_test": true
+  },
+  "review": {
+    "reference_kinds": ["definite", "coexistence", "ambiguous_set", "unjudgeable"],
+    "primary_reviewers_per_context": 2,
+    "third_party_adjudication_on_disagreement": true,
+    "algorithm_output_visible_to_primary_reviewers": false,
+    "future_settlement_visible_to_primary_reviewers": false,
+    "unresolved_reference_disposition": "INCONCLUSIVE",
+    "llm_or_rule_weak_labels_are_not_independent_truth": true
+  },
+  "future_target": {
+    "target_id": "stage-first-group-development-first-passage-v1",
+    "anchor": "T_close_not_execution_price",
+    "horizon_trading_sessions": 20,
+    "positive_threshold": "0.15",
+    "adverse_threshold": "-0.07",
+    "structural_failure": "close_below_same_frozen_high_reference",
+    "same_session_overlap_policy": "failure_wins",
+    "corporate_action_coordinate_change": "censored",
+    "missing_future_evidence": "unavailable",
+    "full_horizon_without_terminal": "neutral",
+    "numeric_precedent": {
+      "repository_key": "config/p4-event-outcome-label.research.v1.json",
+      "semantic_digest": "sha256:b623a647116a69a0d6559bd265b51bdd3ac0654826cf54ba38b87d819ea165ca"
+    },
+    "claim_limit": "future target is an independent development distribution ledger and never semantic truth for stage 3/4"
+  },
+  "artifact": {
+    "output_relative_root": "runs/stage-reference-pilot",
+    "review_packet_contains_future": false,
+    "review_packet_contains_engineering_candidate_verdict": false,
+    "market_data_committed_to_git": false
+  }
+}

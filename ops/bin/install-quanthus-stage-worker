@@ -125,17 +125,20 @@ if ! printf '%s' "${worker_doctor}" | grep -q '"ready": true'; then
   fail "stage worker doctor did not pass"
 fi
 
+bootstrap_kind="quanthus.stage-reference-pilot.v1"
 bootstrap_job="$(
-  bash "${repo_root}/ops/bin/quanthus-stage-worker" submit --code-revision "${revision}"
+  bash "${repo_root}/ops/bin/quanthus-stage-worker" submit \
+    --kind "${bootstrap_kind}" \
+    --code-revision "${revision}"
 )"
 bootstrap_job_id="$(
   printf '%s' "${bootstrap_job}" | "${repo_root}/.venv-stage-training/bin/python" -c \
     'import json,sys; print(json.load(sys.stdin)["job_id"])'
 )"
-echo "Submitted bootstrap stage job: ${bootstrap_job_id}"
+echo "Submitted governed stage bootstrap job: ${bootstrap_job_id} (${bootstrap_kind})"
 
 bootstrap_state="queued"
-for _ in $(seq 1 120); do
+for _ in $(seq 1 600); do
   bootstrap_status="$(
     bash "${repo_root}/ops/bin/quanthus-stage-worker" status --job-id "${bootstrap_job_id}"
   )"
@@ -156,14 +159,14 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 [[ "${bootstrap_state}" == "succeeded" ]] || \
-  fail "stage worker bootstrap job did not finish within 120 seconds"
+  fail "stage worker bootstrap job did not finish within 600 seconds"
 
 cat <<EOF
 install-quanthus-stage-worker PASS
 control_revision=${revision}
 service=quanthus-stage-worker.service
 training_root=${training_root}
-job_kind=quanthus.stage-harness.v1
+job_kind=${bootstrap_kind}
 bootstrap_job=${bootstrap_job_id}
 bootstrap_state=${bootstrap_state}
 concurrency=1

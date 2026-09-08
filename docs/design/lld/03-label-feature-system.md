@@ -296,7 +296,7 @@ authority.
 | P3-STAGE-001-A | Freeze first-group semantics, scope and experiment budget | P3-STRUCT-004, P3-DICT-003 | #238 closed; `config/stage-learning/experiment.v1.json`; 3/4 semantic/search/reference/data boundaries frozen; RX6800 full-base mirror claim ceiling recorded |
 | P3-STAGE-001-B | Benchmark CPU capacity and qualify the training device | P3-STAGE-001-A | #239 closed; RX6800 WSL CPU-first accepted; `docs/acceptance/stock-stage-learning-b-capacity-20260908.md` |
 | P3-STAGE-001-C | Implement minimal Facts inputs and historical harness | P3-STAGE-001-A, P3-STAGE-001-B | #240 closed; real-DWD governed harness accepted; `docs/acceptance/stock-stage-learning-c-harness-20260908.md`; no classifier training |
-| P3-STAGE-001-D | Build independent T-only references and target settlements | P3-STAGE-001-C | Pilot/test isolation, preserved ambiguity and independent outcome ledger |
+| P3-STAGE-001-D | Build independent T-only references and target settlements | P3-STAGE-001-C | #241 ready; development-only 120-context T-only pack and future settlement pilot authorized; reviewer blinding preserved; independent semantic reviews required before D closure |
 | P3-STAGE-001-E | Learn constrained rules and calibrate adjacent stages | P3-STAGE-001-D | Frozen-budget R0/R1/CPU R2 comparisons, complete trial ledger and within-fold fitting |
 | P3-STAGE-001-F | Evaluate held-out evidence and freeze label qualification | P3-STAGE-001-E | Independent data-access authorization, locked candidate and per-scope qualification without trading authority |
 | P3-STAGE-001-G | Publish observational post-DWD daily labels | P3-STAGE-001-F | Separately qualified as-known inputs and scheduling; no P6/strategy activation |

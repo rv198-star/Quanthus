@@ -6,9 +6,11 @@
   "review": "docs/reviews/stock-stage-learning-review-20260908.md",
   "work_items": "docs/work-items/stock-stage-historical-learning.md",
   "authorization": {
-    "scope": "design_review_capacity_and_stage_harness_implementation",
+    "scope": "design_review_capacity_harness_and_development_reference_pilot",
     "capacity_benchmark_authorized": true,
     "stage_harness_implementation_authorized": true,
+    "stage_reference_pilot_implementation_authorized": true,
+    "development_future_settlement_authorized": true,
     "training_authorized": false,
     "market_result_access_authorized": false,
     "sealed_partition_access_authorized": false,
@@ -65,14 +67,14 @@
       "blocked_on": ["分类器训练、future target、2022-2025开发读取、正式LabelCard发布仍关闭"], "evidence": ["docs/acceptance/stock-stage-learning-c-harness-20260908.md"]
     },
     {
-      "id": "P3-STAGE-001-D", "kind": "task", "status": "blocked",
+      "id": "P3-STAGE-001-D", "kind": "task", "status": "ready",
       "title": "建立独立T-only参考集与未来目标结算",
       "depends_on": ["P3-STAGE-001-C"],
       "scope": "120个episode-context可行性试标与确认性样本隔离；双人独立标注+第三方分歧复核；复用TargetCard/Resolver，不以未来阶段编号给自身判卷。",
       "inputs": ["冻结采样总体/种子/参考规范", "人工或明确标注的辅助评审身份", "准入future target卡"],
       "deliverables": ["definite/coexistence/ambiguous/unjudgeable参考账本", "独立settlement账本", "E前最终冻结的样本量/门槛/参数搜索预算"],
       "acceptance": ["评审第一轮不见算法输出与未来行情", "弱标签和LLM自评不能充当独立真值", "随机/边界样本与episode相关性正确计量", "pending/censored/unavailable不算成功，日K双触不猜先后"],
-      "blocked_on": ["独立参考来源及访问授权", "C完成"], "evidence": []
+      "blocked_on": ["工程pilot已获授权；独立双人参考与第三方分歧复核完成前不得关闭D或启动语义训练"], "evidence": []
     },
     {
       "id": "P3-STAGE-001-E", "kind": "task", "status": "blocked",

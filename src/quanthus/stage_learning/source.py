@@ -169,6 +169,115 @@ def _normal_sha(value: object) -> str:
     return text
 
 
+def discover_development_security_codes(
+    *,
+    training_root: Path,
+    node_config: Mapping[str, Any],
+    scan_start: date,
+    cohort_date: date,
+    minimum_observations: int,
+    cohort_size: int,
+    seed: str,
+) -> tuple[str, ...]:
+    """Freeze one historical cohort using only evidence available through ``cohort_date``.
+
+    The cohort is for the development feasibility pilot, not a qualification population.  It is
+    deliberately selected before the report window and never consults later survival or outcomes.
+    """
+    if minimum_observations < 1 or cohort_size < 1 or not seed:
+        raise StageDevelopmentSourceError("development cohort parameters are invalid")
+    scope = DevelopmentReadScope(scan_start, cohort_date, cohort_date)
+    base, correction, _source_binding = _source_roots(training_root, node_config)
+    paths = _partition_paths(base, scope)
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise StageDevelopmentSourceError("development cohort discovery requires duckdb") from exc
+
+    payload = base / "payload"
+    correction_payload = correction / "payload"
+    start = scan_start.isoformat()
+    end = cohort_date.isoformat()
+    connection = duckdb.connect(":memory:")
+    try:
+        connection.execute("SET threads=8")
+        connection.execute("SET memory_limit='8GB'")
+        connection.execute("SET preserve_insertion_order=false")
+        connection.execute(
+            f"""
+            CREATE VIEW dwd_listing AS
+            SELECT * FROM read_parquet({
+                _sql_literal(str(payload / 'listed_company/dwd_listing.parquet'))
+            })
+            WHERE knowledge_to IS NULL;
+            CREATE VIEW dwd_bar AS
+            SELECT * FROM read_parquet({_path_list(paths['bar'])}, hive_partitioning=true)
+            WHERE knowledge_to IS NULL
+              AND interval_size='1d' AND price_basis='UNADJUSTED'
+              AND CAST(observation_start AS DATE) BETWEEN DATE '{start}' AND DATE '{end}';
+            CREATE VIEW dwd_calendar AS
+            SELECT * FROM read_parquet({_path_list(paths['calendar'])}, hive_partitioning=true)
+            WHERE knowledge_to IS NULL AND is_open
+              AND CAST(trade_date AS DATE) BETWEEN DATE '{start}' AND DATE '{end}';
+            CREATE VIEW correction_state AS
+            SELECT * FROM read_parquet({
+                _sql_literal(
+                    str(
+                        correction_payload
+                        / 'tradability_state/dwd_tradability_state_replacement.parquet'
+                    )
+                )
+            })
+            WHERE knowledge_to IS NULL
+              AND CAST(observation_start AS DATE) BETWEEN DATE '{start}' AND DATE '{end}';
+            CREATE VIEW dwd_state AS
+            SELECT base_state.*
+            FROM read_parquet({_path_list(paths['state'])}, hive_partitioning=true) base_state
+            WHERE base_state.knowledge_to IS NULL
+              AND CAST(base_state.observation_start AS DATE) BETWEEN DATE '{start}' AND DATE '{end}'
+              AND NOT EXISTS (
+                SELECT 1 FROM correction_state replacement
+                WHERE replacement.listing_id=base_state.listing_id
+                  AND replacement.calendar_session_id=base_state.calendar_session_id
+              )
+            UNION ALL BY NAME SELECT * FROM correction_state;
+            """
+        )
+        rows = connection.execute(
+            f"""
+            SELECT listing.listing_code, count(bar.source_record_id) AS observed_bars,
+                   max(CAST(calendar.trade_date AS DATE)) AS last_observed
+            FROM dwd_state state
+            JOIN dwd_listing listing USING (listing_id)
+            JOIN dwd_calendar calendar
+              ON calendar.calendar_session_id=state.calendar_session_id
+             AND calendar.venue_id=listing.venue_id
+            LEFT JOIN dwd_bar bar
+              ON bar.listing_id=state.listing_id
+             AND bar.calendar_session_id=state.calendar_session_id
+            WHERE listing.venue_id IN ('{_SSE}','{_SZSE}')
+              AND CAST(calendar.trade_date AS DATE) BETWEEN DATE '{start}' AND DATE '{end}'
+            GROUP BY listing.listing_code
+            HAVING count(bar.source_record_id) >= ?
+               AND max(CAST(calendar.trade_date AS DATE)) = DATE '{end}'
+            ORDER BY listing.listing_code
+            """,
+            [minimum_observations],
+        ).fetchall()
+    finally:
+        connection.close()
+    eligible = tuple(str(row[0]) for row in rows if _CODE.fullmatch(str(row[0])))
+    if len(eligible) < cohort_size:
+        raise StageDevelopmentSourceError(
+            f"development cohort has only {len(eligible)} eligible codes; need {cohort_size}"
+        )
+    ranked = sorted(
+        eligible,
+        key=lambda code: hashlib.sha256(f"{seed}|{code}".encode()).hexdigest(),
+    )
+    return tuple(sorted(ranked[:cohort_size]))
+
+
 def read_development_admissions(
     *,
     training_root: Path,

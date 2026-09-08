@@ -9,6 +9,7 @@ from quanthus.policy import find_project_root
 from quanthus.stage_learning.worker import (
     JOB_KIND,
     JOB_SCHEMA,
+    STAGE_REFERENCE_PILOT_JOB,
     StageJob,
     StageWorker,
     StageWorkerError,
@@ -105,7 +106,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     result = doctor(worker_paths)
     assert result["ready"] is True
     assert result["concurrency"] == 1
-    assert result["job_kind"] == JOB_KIND
+    assert set(result["job_kinds"]) == {JOB_KIND, STAGE_REFERENCE_PILOT_JOB}
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
 
 
@@ -124,7 +125,8 @@ def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() ->
         "systemctl --user restart quanthus-stage-worker.service",
         "worker-runtime.json",
         "stage worker runtime identity differs",
-        "submit --code-revision",
+        "--kind \"${bootstrap_kind}\"",
+        "--code-revision \"${revision}\"",
         "bootstrap_state=${bootstrap_state}",
         "git@github.com:rv198-star/Quanthus.git",
     ):
@@ -155,8 +157,19 @@ def test_worker_publishes_runtime_identity_receipt(
     assert receipt["schema_version"] == "quanthus.stage-worker-runtime.v1"
     assert receipt["code_revision"] == REVISION
     assert receipt["pid"] > 0
-    assert receipt["job_kind"] == JOB_KIND
+    assert set(receipt["job_kinds"]) == {JOB_KIND, STAGE_REFERENCE_PILOT_JOB}
     assert receipt["concurrency"] == 1
+
+def test_reference_pilot_kind_gets_its_frozen_config(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_REFERENCE_PILOT_JOB,
+    )
+    assert submitted["kind"] == STAGE_REFERENCE_PILOT_JOB
+    assert submitted["config"] == "config/stage-learning/reference-pilot.v1.json"
+
 
 def test_queue_job_file_has_exact_schema(tmp_path: Path) -> None:
     worker_paths = paths(tmp_path)

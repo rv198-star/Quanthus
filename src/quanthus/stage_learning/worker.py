@@ -28,12 +28,27 @@ from typing import Any
 
 JOB_SCHEMA = "quanthus.stage-worker-job.v1"
 STATUS_SCHEMA = "quanthus.stage-worker-status.v1"
-JOB_KIND = "quanthus.stage-harness.v1"
+STAGE_HARNESS_JOB = "quanthus.stage-harness.v1"
+STAGE_REFERENCE_PILOT_JOB = "quanthus.stage-reference-pilot.v1"
+JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
 MAIN_REF = "refs/remotes/stage-control/main"
 _JOB_ID = re.compile(r"^stage_[0-9a-f]{32}$")
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
-_ALLOWED_CONFIG = "config/stage-learning/harness.v1.json"
+_JOB_SPECS: dict[str, dict[str, str]] = {
+    STAGE_HARNESS_JOB: {
+        "config": "config/stage-learning/harness.v1.json",
+        "module": "quanthus.stage_learning.harness",
+        "artifact_glob": "stage-harness-*",
+        "process_error": "stage_harness_process_failed",
+    },
+    STAGE_REFERENCE_PILOT_JOB: {
+        "config": "config/stage-learning/reference-pilot.v1.json",
+        "module": "quanthus.stage_learning.reference_pilot",
+        "artifact_glob": "stage-reference-pilot-*",
+        "process_error": "stage_reference_pilot_process_failed",
+    },
+}
 
 
 class StageWorkerError(RuntimeError):
@@ -100,11 +115,12 @@ class StageJob:
         )
         if not _JOB_ID.fullmatch(job.job_id):
             raise StageWorkerError("stage job id is invalid")
-        if job.kind != JOB_KIND:
+        spec = _JOB_SPECS.get(job.kind)
+        if spec is None:
             raise StageWorkerError("stage job kind is not admitted")
         if not _REVISION.fullmatch(job.code_revision):
             raise StageWorkerError("stage job requires an exact Git revision")
-        if job.config != _ALLOWED_CONFIG:
+        if job.config != spec["config"]:
             raise StageWorkerError("stage job config is not admitted")
         try:
             parsed = datetime.fromisoformat(job.submitted_at)
@@ -372,18 +388,19 @@ class StageWorker:
                 self._git("worktree", "prune", timeout=30)
 
     def _verify_result(self, job: StageJob, job_run_root: Path, worktree: Path) -> dict[str, Any]:
+        spec = _JOB_SPECS[job.kind]
         artifacts = sorted(
-            path for path in job_run_root.glob("stage-harness-*") if path.is_dir()
+            path for path in job_run_root.glob(spec["artifact_glob"]) if path.is_dir()
         )
         if len(artifacts) != 1:
-            raise StageWorkerError("stage job did not publish exactly one harness artifact")
+            raise StageWorkerError("stage job did not publish exactly one governed artifact")
         env = dict(os.environ)
         env["PYTHONPATH"] = str(worktree / "src")
         completed = subprocess.run(
             [
                 str(self.paths.python),
                 "-m",
-                "quanthus.stage_learning.harness",
+                spec["module"],
                 "verify",
                 "--artifact",
                 str(artifacts[0]),
@@ -400,9 +417,9 @@ class StageWorker:
         try:
             verified = json.loads(completed.stdout)
         except json.JSONDecodeError as exc:
-            raise StageWorkerError("stage harness verification output is invalid") from exc
+            raise StageWorkerError("stage job verification output is invalid") from exc
         if not isinstance(verified, dict) or verified.get("verified") is not True:
-            raise StageWorkerError("stage harness verification did not pass")
+            raise StageWorkerError("stage job artifact verification did not pass")
         return {
             "artifact_root": str(artifacts[0]),
             "run_id": verified.get("run_id"),
@@ -431,10 +448,11 @@ class StageWorker:
                     "NUMEXPR_NUM_THREADS": "8",
                 }
             )
+            spec = _JOB_SPECS[job.kind]
             command = [
                 str(self.paths.python),
                 "-m",
-                "quanthus.stage_learning.harness",
+                spec["module"],
                 "run",
                 "--config",
                 str(worktree / job.config),
@@ -495,7 +513,7 @@ class StageWorker:
                     stage="terminal",
                     started_at=started_at,
                     completed_at=_utc_now(),
-                    error="stage_harness_process_failed",
+                    error=spec["process_error"],
                     exit_code=exit_code,
                 )
             self._write_status(job, state="running", stage="verifying", started_at=started_at)
@@ -545,7 +563,7 @@ class StageWorker:
                 "code_revision": revision,
                 "pid": os.getpid(),
                 "started_at": _utc_now(),
-                "job_kind": JOB_KIND,
+                "job_kinds": sorted(_JOB_SPECS),
                 "concurrency": 1,
             },
         )
@@ -567,15 +585,23 @@ def _paths(args: argparse.Namespace) -> StageWorkerPaths:
     )
 
 
-def submit_job(paths: StageWorkerPaths, *, code_revision: str) -> dict[str, Any]:
+def submit_job(
+    paths: StageWorkerPaths,
+    *,
+    code_revision: str,
+    kind: str = STAGE_HARNESS_JOB,
+) -> dict[str, Any]:
     paths.ensure()
     if not _REVISION.fullmatch(code_revision):
         raise StageWorkerError("submit requires exact 40-character Git revision")
+    spec = _JOB_SPECS.get(kind)
+    if spec is None:
+        raise StageWorkerError("submit kind is not admitted")
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
-        kind=JOB_KIND,
+        kind=kind,
         code_revision=code_revision,
-        config=_ALLOWED_CONFIG,
+        config=spec["config"],
         submitted_at=_utc_now(),
     )
     path = paths.queue / f"{job.job_id}.json"
@@ -657,7 +683,7 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         "control_repo": str(paths.control_repo),
         "training_root": str(paths.training_root),
         "python": str(paths.python),
-        "job_kind": JOB_KIND,
+        "job_kinds": tuple(sorted(_JOB_SPECS)),
         "concurrency": 1,
     }
 
@@ -683,6 +709,7 @@ def _parser() -> argparse.ArgumentParser:
     serve.add_argument("--wall-seconds", type=int, default=600)
     submit = sub.add_parser("submit")
     submit.add_argument("--code-revision", required=True)
+    submit.add_argument("--kind", choices=tuple(sorted(_JOB_SPECS)), default=STAGE_HARNESS_JOB)
     status = sub.add_parser("status")
     status.add_argument("--job-id", required=True)
     cancel = sub.add_parser("cancel")
@@ -714,7 +741,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 worker.serve()
             return 0
         if args.command == "submit":
-            result = submit_job(paths, code_revision=args.code_revision)
+            result = submit_job(paths, code_revision=args.code_revision, kind=args.kind)
         elif args.command == "status":
             result = read_status(paths, args.job_id)
         elif args.command == "cancel":

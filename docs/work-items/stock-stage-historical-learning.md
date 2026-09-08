@@ -20,13 +20,13 @@
 | A | P3-STAGE-001-A | closed / #238 | `config/stage-learning/experiment.v1.json`、3/4语义与反例、有限参数空间、120例试标预算、物理镜像claim ceiling | `docs/acceptance/stock-stage-learning-a-freeze-20260908.md`；不打开分类器训练或结果分区 |
 | B | P3-STAGE-001-B | closed / #239 | RX6800独立CPU环境和100k/500k/1m容量基准、实际2020-2021 DWD I/O、设备选择 | 8线程/32GiB预算通过；CPU-first accepted；见 `../acceptance/stock-stage-learning-b-capacity-20260908.md` |
 | C | P3-STAGE-001-C | closed / #240 | 最小Facts扩展、历史逐日harness、候选/decision、独立oracle | real-DWD governed harness PASS；见 `../acceptance/stock-stage-learning-c-harness-20260908.md`；不训练分类器、不读future target |
-| D | P3-STAGE-001-D | blocked pending reference/result access authority | T-only独立参考、分歧保留、未来resolver、最终试验冻结补充 | C已完成；仍需独立参考来源及future-target访问授权；试标不复用为测试；没有独立参考不授语义资格 |
+| D | P3-STAGE-001-D | ready / #241 | 120例T-only参考包、分歧保留、development-only future settlement、最终试验冻结补充 | 工程pilot已授权；随机80+边界40、双人+第三方契约与future隔离必须成立；独立参考未完成前D不关闭、E不做语义训练 |
 | E | P3-STAGE-001-E | blocked by D | R0/R1/必要CPU R2、有限试验台账、相邻组校准、锁定候选 | 先硬门槛再稳健选择；保留失败配置；无证据可合并/保留R0/INCONCLUSIVE |
 | F | P3-STAGE-001-F | blocked by E+保留集授权 | 一次外样本、分状态/profile/用途资格包 | 数据权限与冻结门槛全部满足；测试失败保留，不原地调参后再称盲测 |
 | G | P3-STAGE-001-G | blocked by F+日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | 延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
 | H | P3-STAGE-001-H | blocked by F+新增范围授权 | 第二/三组状态及特定消费者对照 | 不凑12个状态；按同协议新增版本；策略用途另做完整P2 |
 
-每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A已冻结并关闭；负责人已明确授权B的CPU-first容量benchmark，但这仍不是市场分类器训练授权。D允许在仅用于开发的有限试标后形成最终阈值/样本补充；它必须在E结果访问前密封，不可事后补门槛。
+每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A/B/C已关闭；D现已获准执行development-only reference/settlement pilot，但这仍不是市场分类器训练授权。D允许在仅用于开发的有限试标后形成最终阈值/样本补充；它必须在E结果访问前密封，不可事后补门槛。
 
 ## 2. 谁负责什么
 

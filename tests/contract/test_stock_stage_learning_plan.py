@@ -20,17 +20,19 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     plan = sync.load_plan()
     assert len(plan["items"]) == 9
     ready = {item["id"] for item in plan["items"] if item["status"] == "ready"}
-    assert ready == set()
+    assert ready == {"P3-STAGE-001-D"}
     by_id = {item["id"]: item for item in plan["items"]}
     assert by_id["P3-STAGE-001-A"]["status"] == "closed"
     assert by_id["P3-STAGE-001-B"]["status"] == "closed"
     assert by_id["P3-STAGE-001-C"]["status"] == "closed"
-    assert by_id["P3-STAGE-001-D"]["status"] == "blocked"
+    assert by_id["P3-STAGE-001-D"]["status"] == "ready"
     assert plan["data_policy"]["development_years"] == [2012, 2021]
     assert plan["data_policy"]["arbitration_years"] == [2022, 2024]
     assert plan["data_policy"]["permanent_blind_years"] == [2025, 2025]
     assert plan["authorization"][sync.CAPACITY_FLAG] is True
     assert plan["authorization"][sync.HARNESS_FLAG] is True
+    assert plan["authorization"][sync.REFERENCE_FLAG] is True
+    assert plan["authorization"][sync.DEVELOPMENT_SETTLEMENT_FLAG] is True
     assert all(plan["authorization"][key] is False for key in sync.DENIED_AUTH_FLAGS)
 
 
@@ -66,7 +68,15 @@ def test_issue_sync_cannot_enable_execution(copied_plan, flag: str) -> None:
         sync.load_plan()
 
 
-@pytest.mark.parametrize("flag", [sync.CAPACITY_FLAG, sync.HARNESS_FLAG])
+@pytest.mark.parametrize(
+    "flag",
+    [
+        sync.CAPACITY_FLAG,
+        sync.HARNESS_FLAG,
+        sync.REFERENCE_FLAG,
+        sync.DEVELOPMENT_SETTLEMENT_FLAG,
+    ],
+)
 def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> None:
     plan, path = copied_plan
     plan["authorization"][flag] = False
@@ -158,3 +168,9 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert harness["authority"]["implementation_authorized"] is True
     assert harness["authority"]["classifier_training_authorized"] is False
     assert harness["development_read_guard"]["maximum_date"] == "2021-12-31"
+    reference = json.loads((ROOT / "config/stage-learning/reference-pilot.v1.json").read_text())
+    assert reference["sampling"]["total_episode_contexts"] == 120
+    assert reference["authority"]["development_future_settlement_authorized"] is True
+    assert reference["authority"]["classifier_training_authorized"] is False
+    assert reference["authority"]["arbitration_access_authorized"] is False
+    assert reference["authority"]["permanent_blind_access_authorized"] is False

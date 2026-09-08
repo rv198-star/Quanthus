@@ -20,12 +20,12 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     plan = sync.load_plan()
     assert len(plan["items"]) == 9
     ready = {item["id"] for item in plan["items"] if item["status"] == "ready"}
-    assert ready == {"P3-STAGE-001-D"}
+    assert ready == set()
     by_id = {item["id"]: item for item in plan["items"]}
     assert by_id["P3-STAGE-001-A"]["status"] == "closed"
     assert by_id["P3-STAGE-001-B"]["status"] == "closed"
     assert by_id["P3-STAGE-001-C"]["status"] == "closed"
-    assert by_id["P3-STAGE-001-D"]["status"] == "ready"
+    assert by_id["P3-STAGE-001-D"]["status"] == "blocked"
     assert plan["data_policy"]["development_years"] == [2012, 2021]
     assert plan["data_policy"]["arbitration_years"] == [2022, 2024]
     assert plan["data_policy"]["permanent_blind_years"] == [2025, 2025]
@@ -33,6 +33,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert plan["authorization"][sync.HARNESS_FLAG] is True
     assert plan["authorization"][sync.REFERENCE_FLAG] is True
     assert plan["authorization"][sync.DEVELOPMENT_SETTLEMENT_FLAG] is True
+    assert plan["authorization"][sync.LEARNING_IMPL_FLAG] is True
     assert all(plan["authorization"][key] is False for key in sync.DENIED_AUTH_FLAGS)
 
 
@@ -75,6 +76,7 @@ def test_issue_sync_cannot_enable_execution(copied_plan, flag: str) -> None:
         sync.HARNESS_FLAG,
         sync.REFERENCE_FLAG,
         sync.DEVELOPMENT_SETTLEMENT_FLAG,
+        sync.LEARNING_IMPL_FLAG,
     ],
 )
 def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> None:

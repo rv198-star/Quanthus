@@ -25,7 +25,8 @@ CAPACITY_FLAG = "capacity_benchmark_authorized"
 HARNESS_FLAG = "stage_harness_implementation_authorized"
 REFERENCE_FLAG = "stage_reference_pilot_implementation_authorized"
 DEVELOPMENT_SETTLEMENT_FLAG = "development_future_settlement_authorized"
-AUTH_SCOPE = "design_review_capacity_harness_and_development_reference_pilot"
+LEARNING_IMPL_FLAG = "development_learning_implementation_authorized"
+AUTH_SCOPE = "design_review_capacity_harness_reference_and_learning_implementation"
 
 
 def load_plan() -> dict:
@@ -41,16 +42,24 @@ def load_plan() -> dict:
         HARNESS_FLAG,
         REFERENCE_FLAG,
         DEVELOPMENT_SETTLEMENT_FLAG,
+        LEARNING_IMPL_FLAG,
         "scope",
     }
     if set(auth) != expected_auth_fields or auth["scope"] != AUTH_SCOPE:
         raise ValueError("unexpected authorization scope")
     if any(
         auth[key] is not True
-        for key in (CAPACITY_FLAG, HARNESS_FLAG, REFERENCE_FLAG, DEVELOPMENT_SETTLEMENT_FLAG)
+        for key in (
+            CAPACITY_FLAG,
+            HARNESS_FLAG,
+            REFERENCE_FLAG,
+            DEVELOPMENT_SETTLEMENT_FLAG,
+            LEARNING_IMPL_FLAG,
+        )
     ):
         raise ValueError(
-            "capacity, harness and development-reference authorizations must be explicit"
+            "capacity, harness, reference and learning-implementation "
+            "authorizations must be explicit"
         )
     if any(auth[key] is not False for key in DENIED_AUTH_FLAGS):
         raise ValueError(
@@ -133,8 +142,9 @@ def body(item: dict, plan: dict, mapping: dict) -> str:
         evidence = "未执行，尚无任务验收证据"
     authority = (
         "## 权限边界\n"
-        "本次允许P3-STAGE-001-D的development-only T-only reference pack和future settlement pilot；"
-        "不授权市场分类器训练、2022-2025开发读取、正式LabelCard/qualification发布、"
+        "本次允许P3-STAGE-001-D的development-only T-only reference pack和future settlement pilot，"
+        "以及P3-STAGE-001-E的fail-closed学习器实现；不授权真实市场分类器训练、"
+        "2022-2025开发读取、正式LabelCard/qualification发布、"
         "每日调度、云GPU采购或交易。"
     )
     sections = [

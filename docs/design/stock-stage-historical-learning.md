@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A/B/C已关闭；D的development-only T-only reference pack与独立future settlement pilot已获实施授权。分类器训练、2022+读取、资格发布、每日调度、云GPU和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A/B/C已关闭；D的development-only reference/settlement工程pilot已通过但独立语义评审未完成；E的fail-closed学习器实现已授权。真实语义训练、2022+读取、资格发布、每日调度、云GPU和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 

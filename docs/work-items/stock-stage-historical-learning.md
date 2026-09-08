@@ -20,8 +20,8 @@
 | A | P3-STAGE-001-A | closed / #238 | `config/stage-learning/experiment.v1.json`、3/4语义与反例、有限参数空间、120例试标预算、物理镜像claim ceiling | `docs/acceptance/stock-stage-learning-a-freeze-20260908.md`；不打开分类器训练或结果分区 |
 | B | P3-STAGE-001-B | closed / #239 | RX6800独立CPU环境和100k/500k/1m容量基准、实际2020-2021 DWD I/O、设备选择 | 8线程/32GiB预算通过；CPU-first accepted；见 `../acceptance/stock-stage-learning-b-capacity-20260908.md` |
 | C | P3-STAGE-001-C | closed / #240 | 最小Facts扩展、历史逐日harness、候选/decision、独立oracle | real-DWD governed harness PASS；见 `../acceptance/stock-stage-learning-c-harness-20260908.md`；不训练分类器、不读future target |
-| D | P3-STAGE-001-D | ready / #241 | 120例T-only参考包、分歧保留、development-only future settlement、最终试验冻结补充 | 工程pilot已授权；随机80+边界40、双人+第三方契约与future隔离必须成立；独立参考未完成前D不关闭、E不做语义训练 |
-| E | P3-STAGE-001-E | blocked by D | R0/R1/必要CPU R2、有限试验台账、相邻组校准、锁定候选 | 先硬门槛再稳健选择；保留失败配置；无证据可合并/保留R0/INCONCLUSIVE |
+| D | P3-STAGE-001-D | blocked on independent review / #241 | 120例T-only参考包、分歧保留、development-only future settlement、最终试验冻结补充 | 工程pilot已PASS：32只开发样本、120 contexts（80随机+40边界）、120 settlements、52.2s；见 `../acceptance/stock-stage-learning-d-reference-pilot-20260908.md`。独立双评审/分歧裁决未完成，因此语义参考仍INCONCLUSIVE，D不关闭 |
+| E | P3-STAGE-001-E | implementation ready / execution blocked by D | R0/R1/必要CPU R2、有限试验台账、相邻组校准、锁定候选 | fail-closed学习器已实现：冻结18个R1 trial、R0、reference角色分离、覆盖/歧义审计；见 `../acceptance/stock-stage-learning-e-implementation-readiness-20260908.md`。`training_authorized=false`，D独立reference未完成前不会跑真实语义训练 |
 | F | P3-STAGE-001-F | blocked by E+保留集授权 | 一次外样本、分状态/profile/用途资格包 | 数据权限与冻结门槛全部满足；测试失败保留，不原地调参后再称盲测 |
 | G | P3-STAGE-001-G | blocked by F+日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | 延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
 | H | P3-STAGE-001-H | blocked by F+新增范围授权 | 第二/三组状态及特定消费者对照 | 不凑12个状态；按同协议新增版本；策略用途另做完整P2 |
@@ -46,4 +46,4 @@
 
 ## 5. 本轮验证
 
-计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、当前权限全false、P0分区一致、ready范围不包含训练。首轮文档/计划专项48 passed；这些只证明计划契约，不证明标签质量或训练速度。GitHub只同步P3-STAGE-001和A-H，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。后续训练的成功与本轮规划验证分开。最终准备收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；完整工程门禁1617 passed / 7既有环境skip，Catalog摘要未变。A-H仍未执行，所有训练/结果/密封数据/日更/租机授权保持关闭。
+计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub只同步P3-STAGE-001和A-H，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A/B/C 已关闭，D 的工程pilot已通过但独立语义评审未完成；训练、2022+结果/密封分区、日更与租机权限仍保持关闭。

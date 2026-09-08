@@ -6,11 +6,12 @@
   "review": "docs/reviews/stock-stage-learning-review-20260908.md",
   "work_items": "docs/work-items/stock-stage-historical-learning.md",
   "authorization": {
-    "scope": "design_review_capacity_harness_and_development_reference_pilot",
+    "scope": "design_review_capacity_harness_reference_and_learning_implementation",
     "capacity_benchmark_authorized": true,
     "stage_harness_implementation_authorized": true,
     "stage_reference_pilot_implementation_authorized": true,
     "development_future_settlement_authorized": true,
+    "development_learning_implementation_authorized": true,
     "training_authorized": false,
     "market_result_access_authorized": false,
     "sealed_partition_access_authorized": false,
@@ -67,14 +68,14 @@
       "blocked_on": ["分类器训练、future target、2022-2025开发读取、正式LabelCard发布仍关闭"], "evidence": ["docs/acceptance/stock-stage-learning-c-harness-20260908.md"]
     },
     {
-      "id": "P3-STAGE-001-D", "kind": "task", "status": "ready",
+      "id": "P3-STAGE-001-D", "kind": "task", "status": "blocked",
       "title": "建立独立T-only参考集与未来目标结算",
       "depends_on": ["P3-STAGE-001-C"],
       "scope": "120个episode-context可行性试标与确认性样本隔离；双人独立标注+第三方分歧复核；复用TargetCard/Resolver，不以未来阶段编号给自身判卷。",
       "inputs": ["冻结采样总体/种子/参考规范", "人工或明确标注的辅助评审身份", "准入future target卡"],
       "deliverables": ["definite/coexistence/ambiguous/unjudgeable参考账本", "独立settlement账本", "E前最终冻结的样本量/门槛/参数搜索预算"],
       "acceptance": ["评审第一轮不见算法输出与未来行情", "弱标签和LLM自评不能充当独立真值", "随机/边界样本与episode相关性正确计量", "pending/censored/unavailable不算成功，日K双触不猜先后"],
-      "blocked_on": ["工程pilot已获授权；独立双人参考与第三方分歧复核完成前不得关闭D或启动语义训练"], "evidence": []
+      "blocked_on": ["120个context的两名独立primary reviewer与分歧第三方裁决仍未完成；工程pilot已经通过"], "evidence": ["docs/acceptance/stock-stage-learning-d-reference-pilot-20260908.md"]
     },
     {
       "id": "P3-STAGE-001-E", "kind": "task", "status": "blocked",
@@ -84,7 +85,7 @@
       "inputs": ["最终冻结实验manifest", "共享面板/参考集/时间折", "同信息集连续Facts与R0"],
       "deliverables": ["完整trial ledger含失败/预算", "固定环境模型或参数版本", "每状态及相邻组质量/覆盖/延迟/稳定性报告"],
       "acceptance": ["不把歧义集合全当阳性，不将unknown全当负例", "不同标签confidence不可比时不使用margin", "在不可区分的配置中选更简单稳健者而非孤立最高分", "无充分证据可保留R0/合并状态/INCONCLUSIVE，不强行上复杂模型"],
-      "blocked_on": ["训练执行与预算授权", "D完成"], "evidence": []
+      "blocked_on": ["E实现已完成并fail-closed；真实语义训练仍等待D独立reference完成后再打开training_authorized"], "evidence": ["docs/acceptance/stock-stage-learning-e-implementation-readiness-20260908.md"]
     },
     {
       "id": "P3-STAGE-001-F", "kind": "task", "status": "blocked",

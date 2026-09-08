@@ -132,6 +132,11 @@ def _context_key(episode: EpisodeObservation) -> str:
     )
 
 
+def context_identity(episode: EpisodeObservation) -> str:
+    """Stable T-only identity shared by sampling and downstream learning."""
+    return _context_key(episode)
+
+
 def select_reference_contexts(
     episodes: Sequence[EpisodeObservation],
     activity: Sequence[ActivityObservation],

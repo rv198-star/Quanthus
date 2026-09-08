@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 非运行权威的设计提案；没有批准标签实现、结果跑批、每日调度或交易使用 |
+| Authority | 验证/不确定性设计权威；P3-STAGE-001-F已获唯一窄例外，可按 `../../config/stage-learning/qualification.v1.json` 做一次只读2022-2024 arbitration外样本语义评价；2025、QUALIFIED发布、每日调度和交易仍未授权 |
 | Version | 0.1 |
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
@@ -14,13 +14,13 @@
 
 ## 1. 本次要解决的问题
 
-历史口径学习、有限选参与定稿现在由子设计 `stock-stage-historical-learning.md` 具体化；设备规划见 `stock-stage-training-compute.md`。本文件继续拥有验证与不确定性边界，对外标签资格仅用 SHADOW / QUALIFIED，多维证据不是新增生命周期。方案和工单批准准备不等于训练或数据访问授权。
+历史口径学习、有限选参与定稿现在由子设计 `stock-stage-historical-learning.md` 具体化；设备规划见 `stock-stage-training-compute.md`。本文件继续拥有验证与不确定性边界，对外标签资格仅用 SHADOW / QUALIFIED，多维证据不是新增生命周期。D/E development已关闭；F的单次2022-2024 arbitration访问是精确绑定candidate/config/digest的一次性验证例外，不等于一般训练或密封分区访问授权。
 
 Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；两者之间必须有可执行的判定机制，不能因为定时任务稳定、图表看起来合理或运行了一段时间就升级。
 
 本提案把“12 状态”视为待检验的市场描述体系，而不是已经存在标准答案、只差编程的十三分类任务。既要验证算法是否遵守规则，也要验证规则是否能区分用户关心的情形，进一步验证其市场假设与策略用途。允许结果是保留、合并、改为修饰维度、降为展示或拒绝某个状态，而不是为了凑足十二个编号提高规则复杂度。
 
-本轮只形成设计和工单提案，不注册新的 LabelCard，不读取新的结果样本，不启用日更，也不改变 B6-B11/P6 或历史密封分区权限。
+当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。唯一新增的运行范围是P3-STAGE-001-F：在结果读取前已冻结candidate、640-context采样与硬门槛，允许一次只读2022-2024 arbitration外样本语义评价；2025 permanent-blind保持未触碰，合成参考即使通过也只允许bounded SHADOW external-semantic evidence。
 
 ## 2. 仓库核查与需要纠正的前提
 

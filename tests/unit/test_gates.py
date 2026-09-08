@@ -73,6 +73,26 @@ class GateTests(unittest.TestCase):
             report.unopened_partitions,
             ("2022-2024-arbitration", "2025-permanent-blind"),
         )
+        self.assertEqual(report.bounded_partition_exceptions, ("P3-STAGE-001-F",))
+
+    def test_p3_bounded_partition_exception_cannot_open_2025_or_search(self) -> None:
+        gate_path = find_project_root() / "config" / "p3-gates.v1.json"
+        raw = copy.deepcopy(json.loads(gate_path.read_text(encoding="utf-8")))
+
+        for key, value in (
+            ("partition", "2025-permanent-blind"),
+            ("access_budget_runs", 2),
+            ("parameter_search_authorized", True),
+            ("permanent_blind_access_authorized", True),
+            ("claim_ceiling", "qualified"),
+        ):
+            changed = copy.deepcopy(raw)
+            changed["bounded_partition_exceptions"][0][key] = value
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "p3-gates.json"
+                path.write_text(json.dumps(changed), encoding="utf-8")
+                with self.assertRaisesRegex(ConfigurationError, "bounded partition exception"):
+                    load_p3_gate_report(path)
 
     def test_p4_cannot_open_before_p3_acceptance(self) -> None:
         gate_path = find_project_root() / "config" / "p3-gates.v1.json"

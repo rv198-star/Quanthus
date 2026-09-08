@@ -55,5 +55,19 @@
   "unopened_partitions": [
     "2022-2024-arbitration",
     "2025-permanent-blind"
+  ],
+  "bounded_partition_exceptions": [
+    {
+      "id": "P3-STAGE-001-F",
+      "partition": "2022-2024-arbitration",
+      "config": "config/stage-learning/qualification.v1.json",
+      "qualification_digest": "sha256:e235bd53ff7226358dc19eb6b80a08348cfeacf19455dd3bfa37626df43d15ac",
+      "candidate_digest": "sha256:d492d12686be5f5ac84f87ba278afd873d9999aadc5fa5dc79a6f5f5985f176c",
+      "access_budget_runs": 1,
+      "read_only": true,
+      "parameter_search_authorized": false,
+      "permanent_blind_access_authorized": false,
+      "claim_ceiling": "bounded_shadow_external_semantic_only"
+    }
   ]
 }

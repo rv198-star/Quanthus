@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A/B/C已关闭；D/E synthetic development v1已完整执行但审计结论INCONCLUSIVE，未冻结R1赢家。D允许在同一2012-2021开发权限内执行不重叠的v2分层补样与Panel v2，E仅对通过hard-gated development selection的R1候选给出开发排名。HUMAN_EXPERT_REFERENCE、2022+读取、正式资格发布、每日调度、云GPU和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A-E已关闭；D/E v2 development已冻结 `development-candidate.v1.json`（probe=1.0、hold=2、distance=0、activity=1.0），R2不触发。F仅按 `qualification.v1.json` 获得一次只读2022-2024 arbitration外样本语义评价预算；一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -57,7 +57,9 @@
 
 v2补样仍在同一冻结32-security/2020开发池内，显式排除首轮120个context，并固定为40个started活动阈值识别、30个hold=1/2/3接受边界、20个近锚失效负例、15个reclaim歧义控制和15个mature-held共存控制。它是**result-aware development supplement**，不是confirmatory sample。Panel v2同时修正首轮“只要activity可用就把started判为Stage 3”的过宽语义，把活动强弱纳入两位主评和第三裁决的Stage-3判断。
 
-每个context仍由两个互不可见的合成专家原型主评，分歧由第三原型裁决，机构挑战审只提供反证提醒，量化结构审计员只做PIT/证据闭包否决。未来切换真人专家时沿用同一T-only packet和resolution协议。原始/补样都只用于开发口径可辨识性和选参；最终参考集必须另行抽样并冻结。没有足够独立episode时，不把相邻股票日虚增成独立证据。
+v2已完成并关闭D/E：120个context解析为87 definite、21 ambiguous_set、12 coexistence，14个primary disagreement全部由冻结第三原型裁决，量化审计veto为0。R0在同一参考上的macro F1为0.8520、positive-reference coverage为0.7424；最终R1 development candidate为probe=1.0、hold=2、signed distance=0、activity=1.0，macro F1 0.9255、positive-reference coverage 0.8939，Stage 3从29/39提升到39/39且没有新增明确负例误报或歧义强判。原raw-score更高的hold=1组合因ambiguity over-assertion被hard gate拒绝，hold=3组合因Stage-4精度下界/不退化失败被拒绝；signed distance 0与0.0025当前不可辨识，选择0只是较低复杂度/不改R0的tie break，不声称市场真值。R2因此不触发。权威证据为 `../acceptance/stock-stage-learning-de-v2-development-closeout-20260909.md` 和 `../../config/stage-learning/development-candidate.v1.json`。
+
+每个context仍由两个互不可见的合成专家原型主评，分歧由第三原型裁决，机构挑战审只提供反证提醒，量化结构审计员只做PIT/证据闭包否决。未来切换真人专家时沿用同一T-only packet和resolution协议。原始/补样都只用于开发口径可辨识性和选参；最终外样本参考必须另行抽样并冻结。没有足够独立episode时，不把相邻股票日虚增成独立证据。
 
 ## 4. 双账本：描述学习不偷换成获利筛选
 
@@ -90,16 +92,16 @@ v2补样仍在同一冻结32-security/2020开发池内，显式排除首轮120�
 5. 对同槽候选进行联合消歧；不同维度不做无意义的top1竞争。
 6. 用独立开发校准分片或前向out-of-fold预测校准分数；另留阈值选择分片，不拿最终测试调确认阈值。[R2]
 7. 完成语义、灰度、覆盖、参数邻域、时间稳定和独立未来分布审查，锁定一个候选版本。
-8. 在新授权的保留分区一次性评价；失败保留失败证据，任何因结果修改的版本不能再称该分区未使用。
+8. 在新授权的保留分区一次性评价；F首轮已预登记为 `qualification.v1.json` 的2022-2024 arbitration语义评价，640个context要求one-context-per-episode，仅评冻结candidate与R0，不做R1搜索/R2/future settlement/strategy result；首个result-bearing Run即消耗唯一访问预算。失败保留失败证据，任何因结果修改的版本不能再称该分区未使用。2025 permanent-blind继续未触碰。
 9. 以同一冻结版本做CPU/平台推断兼容、批量vs逐日一致性检查，再申请观察性日更与按用途资格。
 
 每次资源失败先归因，不在仍运行的批次中热改规则；终止/保留本批次证据后新版本重启。跨ARM/x86或不同BLAS训练不要求模型字节相同：固定环境内可复现，跨环境要求事前容差及决策差异账本。冻结发布模型的消费语义仍须一致。
 
 ## 6. 时间分区与泄漏防护
 
-当前权威 `config/p0-policy.v1.json`：2012-2021 development、2022-2024 arbitration、2025 permanent blind。`config/p3-gates.v1.json`明确后两者未开放。
+当前权威 `config/p0-policy.v1.json`：2012-2021 development、2022-2024 arbitration、2025 permanent blind。`config/p3-gates.v1.json`继续把后两者列为一般 `unopened_partitions`；新增的 `bounded_partition_exceptions` 只给 `P3-STAGE-001-F` 一个精确绑定 `qualification.v1.json`、candidate digest、一次访问预算、read-only、no-search、no-2025 的窄例外，不把 arbitration 变成通用开发权限。
 
-默认保留现有分区。本轮不把2019-2024变成训练区，也不读取2025。A提出在development内按市场日划分的滚动训练、校准和选择方案，明确此前2020-2021已被研究，不再称全新盲测。2022-2024和2025各自需要独立授权和访问预算；没有授权时F可以实现密封门禁/演练，但不能获得正式外样本结论。
+默认保留现有分区。本轮不把2019-2024变成训练区，也不读取2025。2020-2021已被development反复研究，不能叫全新盲测。F使用2022-2024作为一次时间外 external-semantic holdout；它运行前必须锁定candidate、采样、门槛、用途和失败动作，首个result-bearing访问即消耗预算。2025 permanent-blind留给更高证据等级/后续真正确认性需求，不因F实现而打开。
 
 2019-2024训练/2025测试是可供负责人以后审批的替代方案，必须先修改分区策略与下游验证用途；训练过的2022-2024不能继续当原项目仲裁证据。仅重命名实验不能清除已知信息。
 

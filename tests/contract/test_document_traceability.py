@@ -1373,7 +1373,25 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "development_learning_implementation_authorized",
             "synthetic_expert_development_reference_authorized",
             "synthetic_expert_development_learning_authorized",
+            "bounded_arbitration_qualification_authorized",
         }
+        self.assertIs(
+            stage_plan["authorization"]["bounded_arbitration_qualification_authorized"], True
+        )
+        self.assertEqual(
+            stage_plan["authorization"]["bounded_arbitration_qualification_config"],
+            "config/stage-learning/qualification.v1.json",
+        )
+        self.assertIs(
+            stage_plan["authorization"]["permanent_blind_qualification_authorized"], False
+        )
+        qualification_path = (
+            root / stage_plan["authorization"]["bounded_arbitration_qualification_config"]
+        )
+        qualification = json.loads(qualification_path.read_text())
+        self.assertEqual(qualification["authority"]["arbitration_access_budget_runs"], 1)
+        self.assertIs(qualification["authority"]["parameter_search_authorized"], False)
+        self.assertIs(qualification["authority"]["permanent_blind_access_authorized"], False)
         for key, value in stage_plan["authorization"].items():
             if key.endswith("_authorized") and key not in positive:
                 self.assertIs(value, False)

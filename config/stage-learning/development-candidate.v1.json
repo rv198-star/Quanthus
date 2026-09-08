@@ -1,0 +1,85 @@
+{
+  "schema_version": "quanthus.stage-development-candidate.v1",
+  "candidate_id": "stock-stage-first-group-3-4-r1-development-v1",
+  "work_item": "P3-STAGE-001-E",
+  "status": "frozen_for_external_evaluation",
+  "evidence_scope": "development_only_not_confirmatory",
+  "reference_evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+  "human_expert_validated": false,
+  "code_revision": "ec93424f36e74fff25aa1519fb198f7389cd1a99",
+  "source_job_id": "stage_f3262f626e98490cb3cd7eec9dea866d",
+  "source_run_id": "stage-synthetic-workflow-20260908T155525Z",
+  "evidence_bindings": {
+    "pilot_manifest_sha256": "sha256:39a37a6d7fcd34401668df67f08e1d3ec8d7f872b73436b20ba4446d1cab5cb2",
+    "synthetic_review_manifest_sha256": "sha256:270fe98bb6fc45924a6a6da6daf287e835c1a4b88484cc00b57c09e2cea2aa5f",
+    "resolution_manifest_sha256": "sha256:ae6dc75377a5b461f795cdf02b520e04c294fb2cd59851d093b23676e3edf1e5",
+    "learning_manifest_sha256": "sha256:bbdf87212d33fdc2010a89662925d1e65147d1fef7dc14de06afa4ca337bb8ff",
+    "development_selection_policy_digest": "sha256:f5a3c657eea3a4937b6ac4daa25f24df984ec7bc0d2238f8f0182d7e8e4f3544"
+  },
+  "trial": {
+    "trial_id": "sha256:c21032608ab96d6abae81ba5709bf3e2c3f9eebb29ccdcdccf715dc2c4325bfc",
+    "parameters": {
+      "probe_volume_ratio20_min": "1.0",
+      "acceptance_hold_sessions": 2,
+      "acceptance_signed_distance_min": "0.0",
+      "acceptance_window_volume_ratio20_min": "1.0"
+    }
+  },
+  "development_result": {
+    "reference_count": 120,
+    "definite_count": 87,
+    "definite_positive_count": 66,
+    "definite_negative_count": 21,
+    "ambiguous_count": 21,
+    "macro_f1": 0.925531914893617,
+    "positive_reference_coverage": 0.8939393939393939,
+    "definite_negative_false_positive_rate": 0.0,
+    "ambiguous_unique_assertion_rate": 0.0,
+    "stage_3": {
+      "truth_count": 39,
+      "tp": 39,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "precision_wilson_one_sided_95_lower": 0.9351274859402477,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "stage_4": {
+      "truth_count": 27,
+      "tp": 20,
+      "fp": 0,
+      "fn": 7,
+      "precision": 1.0,
+      "precision_wilson_one_sided_95_lower": 0.8808421626390356,
+      "recall": 0.7407407407407407,
+      "f1": 0.851063829787234
+    }
+  },
+  "r0_comparison": {
+    "trial_id": "sha256:bb855695aef3520050a86b2fab2d369911cb17b6ea39c5ffa0fb19eebd8c8b97",
+    "macro_f1": 0.8520025031289111,
+    "positive_reference_coverage": 0.7424242424242424,
+    "stage_3_recall": 0.7435897435897436,
+    "stage_4_recall": 0.7407407407407407,
+    "definite_negative_false_positive_rate": 0.0,
+    "ambiguous_unique_assertion_rate": 0.0
+  },
+  "selection_rationale": {
+    "probe_volume_ratio20_min": "1.0 recovered all 10 Stage-3 false negatives observed under R0 on the same development reference without adding definite-negative false positives or ambiguous unique assertions",
+    "acceptance_hold_sessions": "2 is retained because hold=1 produced higher diagnostic scores only by exceeding the frozen ambiguity-overassertion gate, while hold=3 failed Stage-4 precision-lower-bound and noninferiority gates",
+    "acceptance_signed_distance_min": "0.0 and 0.0025 were observationally indistinguishable on this development reference; 0.0 is retained as the lower-complexity no-change tie break and is not claimed as market truth",
+    "acceptance_window_volume_ratio20_min": "1.0 was not varied in the frozen R1 search space and remains unchanged from R0"
+  },
+  "r2_disposition": "not_executed_no_attributable_r1_expression_shortfall",
+  "authority_limits": {
+    "qualified_label_version": false,
+    "shadow_authorized_by_this_candidate": false,
+    "arbitration_read_authorized_by_this_candidate": false,
+    "permanent_blind_read_authorized": false,
+    "strategy_consumption_authorized": false,
+    "daily_schedule_authorized": false,
+    "trading_authorized": false
+  },
+  "next_gate": "P3-STAGE-001-F one-time held-out external semantic evaluation under a separately frozen qualification contract"
+}

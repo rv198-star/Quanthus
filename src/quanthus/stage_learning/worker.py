@@ -30,6 +30,9 @@ JOB_SCHEMA = "quanthus.stage-worker-job.v1"
 STATUS_SCHEMA = "quanthus.stage-worker-status.v1"
 STAGE_HARNESS_JOB = "quanthus.stage-harness.v1"
 STAGE_REFERENCE_PILOT_JOB = "quanthus.stage-reference-pilot.v1"
+STAGE_QUALIFICATION_JOB = "quanthus.stage-qualification.v1"
+STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
+QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
 MAIN_REF = "refs/remotes/stage-control/main"
@@ -47,6 +50,12 @@ _JOB_SPECS: dict[str, dict[str, str]] = {
         "module": "quanthus.stage_learning.reference_pilot",
         "artifact_glob": "stage-reference-pilot-*",
         "process_error": "stage_reference_pilot_process_failed",
+    },
+    STAGE_QUALIFICATION_JOB: {
+        "config": "config/stage-learning/qualification.v1.json",
+        "module": "quanthus.stage_learning.qualification",
+        "artifact_glob": "stage-qualification-*",
+        "process_error": "stage_qualification_process_failed",
     },
 }
 
@@ -91,6 +100,20 @@ def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(temporary, path)
+
+
+def _exclusive_json(path: Path, value: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
+    try:
+        with path.open("x", encoding="utf-8") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError as exc:
+        raise StageWorkerError(
+            "qualification access budget is already reserved or consumed"
+        ) from exc
 
 
 @dataclass(frozen=True)
@@ -180,6 +203,10 @@ class StageWorkerPaths:
         return self.control_root / "worker-runtime.json"
 
     @property
+    def qualification_budget(self) -> Path:
+        return self.control_root / "qualification-budget.json"
+
+    @property
     def logs(self) -> Path:
         return self.training_root / "logs" / "stage-worker"
 
@@ -202,6 +229,91 @@ class StageWorkerPaths:
             self.runs,
         ):
             path.mkdir(parents=True, exist_ok=True)
+
+
+def _qualification_budget_value(job: StageJob, *, state: str, reserved_at: str) -> dict[str, Any]:
+    if state not in {"reserved", "consumed"}:
+        raise StageWorkerError("qualification access budget state is invalid")
+    return {
+        "schema_version": QUALIFICATION_BUDGET_SCHEMA,
+        "qualification_id": STAGE_QUALIFICATION_ID,
+        "job_id": job.job_id,
+        "kind": job.kind,
+        "code_revision": job.code_revision,
+        "config": job.config,
+        "state": state,
+        "reserved_at": reserved_at,
+        "consumed_at": _utc_now() if state == "consumed" else None,
+    }
+
+
+def _qualification_budget(paths: StageWorkerPaths) -> dict[str, Any]:
+    value = _object(paths.qualification_budget, "qualification access budget")
+    expected = {
+        "schema_version",
+        "qualification_id",
+        "job_id",
+        "kind",
+        "code_revision",
+        "config",
+        "state",
+        "reserved_at",
+        "consumed_at",
+    }
+    if (
+        set(value) != expected
+        or value.get("schema_version") != QUALIFICATION_BUDGET_SCHEMA
+        or value.get("qualification_id") != STAGE_QUALIFICATION_ID
+        or value.get("kind") != STAGE_QUALIFICATION_JOB
+        or value.get("state") not in {"reserved", "consumed"}
+    ):
+        raise StageWorkerError("qualification access budget marker differs")
+    return value
+
+
+def _reserve_qualification_budget(paths: StageWorkerPaths, job: StageJob) -> None:
+    if job.kind != STAGE_QUALIFICATION_JOB:
+        return
+    reserved_at = _utc_now()
+    _exclusive_json(
+        paths.qualification_budget,
+        _qualification_budget_value(job, state="reserved", reserved_at=reserved_at),
+    )
+
+
+def _consume_qualification_budget(paths: StageWorkerPaths, job: StageJob) -> None:
+    if job.kind != STAGE_QUALIFICATION_JOB:
+        return
+    value = _qualification_budget(paths)
+    if any(
+        value.get(key) != expected
+        for key, expected in (
+            ("job_id", job.job_id),
+            ("code_revision", job.code_revision),
+            ("config", job.config),
+        )
+    ):
+        raise StageWorkerError("qualification access budget identity differs")
+    if value.get("state") != "reserved" or value.get("consumed_at") is not None:
+        raise StageWorkerError("qualification access budget is already consumed")
+    _atomic_json(
+        paths.qualification_budget,
+        _qualification_budget_value(
+            job,
+            state="consumed",
+            reserved_at=str(value["reserved_at"]),
+        ),
+    )
+
+
+def _release_qualification_reservation(paths: StageWorkerPaths, job: StageJob) -> None:
+    if job.kind != STAGE_QUALIFICATION_JOB or not paths.qualification_budget.exists():
+        return
+    value = _qualification_budget(paths)
+    if value.get("job_id") != job.job_id:
+        raise StageWorkerError("qualification access budget identity differs")
+    if value.get("state") == "reserved" and value.get("consumed_at") is None:
+        paths.qualification_budget.unlink()
 
 
 class StageWorker:
@@ -437,8 +549,21 @@ class StageWorker:
         run_root = self.paths.runs / job.job_id
         run_root.mkdir(parents=True, exist_ok=False)
         cancel_path = self.paths.cancel / job.job_id
+        qualification_access_started = False
         try:
             worktree = self._prepare_worktree(job)
+            if cancel_path.exists() or self.stopping:
+                return self._write_status(
+                    job,
+                    state="canceled",
+                    stage="terminal",
+                    started_at=started_at,
+                    completed_at=_utc_now(),
+                    error="cancel_requested_before_execution",
+                )
+            if job.kind == STAGE_QUALIFICATION_JOB:
+                _consume_qualification_budget(self.paths, job)
+                qualification_access_started = True
             self._write_status(job, state="running", stage="executing", started_at=started_at)
             env = dict(os.environ)
             env.update(
@@ -541,6 +666,9 @@ class StageWorker:
             )
         finally:
             cancel_path.unlink(missing_ok=True)
+            if job.kind == STAGE_QUALIFICATION_JOB and not qualification_access_started:
+                with suppress(StageWorkerError):
+                    _release_qualification_reservation(self.paths, job)
             if worktree is not None:
                 self._remove_worktree(worktree)
 
@@ -607,6 +735,9 @@ def submit_job(
         submitted_at=_utc_now(),
     )
     path = paths.queue / f"{job.job_id}.json"
+    qualification_reserved = job.kind == STAGE_QUALIFICATION_JOB
+    if qualification_reserved:
+        _reserve_qualification_budget(paths, job)
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -614,7 +745,15 @@ def submit_job(
             stream.flush()
             os.fsync(stream.fileno())
     except FileExistsError as exc:
+        if qualification_reserved:
+            with suppress(StageWorkerError):
+                _release_qualification_reservation(paths, job)
         raise StageWorkerError("generated duplicate stage job id") from exc
+    except Exception:
+        if qualification_reserved:
+            with suppress(StageWorkerError):
+                _release_qualification_reservation(paths, job)
+        raise
     return {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
 
 
@@ -652,6 +791,7 @@ def cancel_job(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
         queued = paths.queue / f"{job_id}.json"
         if queued.exists():
             job = StageJob.from_dict(_object(queued, "queued stage job"))
+            _release_qualification_reservation(paths, job)
             queued.unlink()
             worker = StageWorker(paths)
             worker._write_status(

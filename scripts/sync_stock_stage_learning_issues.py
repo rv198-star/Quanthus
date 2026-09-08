@@ -28,7 +28,10 @@ DEVELOPMENT_SETTLEMENT_FLAG = "development_future_settlement_authorized"
 LEARNING_IMPL_FLAG = "development_learning_implementation_authorized"
 SYNTHETIC_REFERENCE_FLAG = "synthetic_expert_development_reference_authorized"
 SYNTHETIC_LEARNING_FLAG = "synthetic_expert_development_learning_authorized"
-AUTH_SCOPE = "design_review_capacity_harness_reference_synthetic_panel_and_learning_implementation"
+BOUNDED_ARBITRATION_FLAG = "bounded_arbitration_qualification_authorized"
+BOUNDED_ARBITRATION_CONFIG = "bounded_arbitration_qualification_config"
+PERMANENT_BLIND_QUALIFICATION_FLAG = "permanent_blind_qualification_authorized"
+AUTH_SCOPE = "development_closed_and_one_time_arbitration_semantic_qualification_ready"
 
 
 def load_plan() -> dict:
@@ -47,6 +50,9 @@ def load_plan() -> dict:
         LEARNING_IMPL_FLAG,
         SYNTHETIC_REFERENCE_FLAG,
         SYNTHETIC_LEARNING_FLAG,
+        BOUNDED_ARBITRATION_FLAG,
+        BOUNDED_ARBITRATION_CONFIG,
+        PERMANENT_BLIND_QUALIFICATION_FLAG,
         "scope",
     }
     if set(auth) != expected_auth_fields or auth["scope"] != AUTH_SCOPE:
@@ -61,12 +67,35 @@ def load_plan() -> dict:
             LEARNING_IMPL_FLAG,
             SYNTHETIC_REFERENCE_FLAG,
             SYNTHETIC_LEARNING_FLAG,
+            BOUNDED_ARBITRATION_FLAG,
         )
     ):
         raise ValueError(
-            "capacity, harness, reference, synthetic-panel and learning-implementation "
+            "capacity, harness, reference, synthetic-panel, learning and bounded-arbitration "
             "authorizations must be explicit"
         )
+    if auth[PERMANENT_BLIND_QUALIFICATION_FLAG] is not False:
+        raise ValueError("permanent-blind qualification cannot be opened by planning sync")
+    qualification_config = auth.get(BOUNDED_ARBITRATION_CONFIG)
+    if qualification_config != "config/stage-learning/qualification.v1.json":
+        raise ValueError("bounded arbitration qualification config differs")
+    qualification_path = (ROOT / qualification_config).resolve()
+    if ROOT.resolve() not in qualification_path.parents or not qualification_path.is_file():
+        raise ValueError("bounded arbitration qualification config is missing or unsafe")
+    qualification = json.loads(qualification_path.read_text(encoding="utf-8"))
+    qualification_authority = qualification.get("authority", {})
+    if (
+        qualification.get("work_item") != f"{PARENT}-F"
+        or qualification_authority.get(
+            "one_time_arbitration_semantic_evaluation_authorized"
+        )
+        is not True
+        or qualification_authority.get("arbitration_access_budget_runs") != 1
+        or qualification_authority.get("permanent_blind_access_authorized") is not False
+        or qualification_authority.get("parameter_search_authorized") is not False
+        or qualification_authority.get("qualified_label_publication_authorized") is not False
+    ):
+        raise ValueError("bounded arbitration qualification authority differs")
     if any(auth[key] is not False for key in DENIED_AUTH_FLAGS):
         raise ValueError(
             "planning synchronization cannot grant training, result, schedule or purchase access"
@@ -103,14 +132,14 @@ def load_plan() -> dict:
         ):
             if not item.get(key):
                 raise ValueError(f"empty work-item contract: {key}")
-        if item["status"] == "ready" and item["id"] != f"{PARENT}-D":
-            raise ValueError("only the reference-pilot task may be ready after C closes")
+        if item["status"] == "ready" and item["id"] != f"{PARENT}-F":
+            raise ValueError("only the one-time held-out qualification task may be ready")
         if (
-            item["id"] == f"{PARENT}-D"
+            item["id"] == f"{PARENT}-F"
             and item["status"] == "ready"
-            and by_id[f"{PARENT}-C"]["status"] != "closed"
+            and any(by_id[key]["status"] != "closed" for key in (f"{PARENT}-D", f"{PARENT}-E"))
         ):
-            raise ValueError("reference-pilot task cannot be ready before C closes")
+            raise ValueError("held-out qualification cannot be ready before D/E close")
         for evidence in item["evidence"]:
             path = (ROOT / evidence).resolve()
             if ROOT.resolve() not in path.parents or not path.is_file():
@@ -148,12 +177,13 @@ def body(item: dict, plan: dict, mapping: dict) -> str:
         evidence = "未执行，尚无任务验收证据"
     authority = (
         "## 权限边界\n"
-        "本次允许P3-STAGE-001-D的development-only T-only reference pack、future settlement pilot和"
-        "SYNTHETIC_EXPERT_CONSENSUS评审，以及P3-STAGE-001-E针对该合成参考的"
-        "development-only R0/R1学习；"
-        "合成专家原型不冒充任何真人，也不等于HUMAN_EXPERT_REFERENCE；不授权正式市场分类器资格、"
-        "2022-2025开发读取、正式LabelCard/qualification发布、"
-        "每日调度、云GPU采购或交易。"
+        "P3-STAGE-001-D/E development selection 已关闭并冻结候选；"
+        "仅P3-STAGE-001-F可按 `config/stage-learning/qualification.v1.json` "
+        "执行一次只读2022-2024 arbitration外样本语义评价。"
+        "该窄授权不构成一般sealed-partition开放，不允许参数搜索、结果后改候选，"
+        "也不读取2025 permanent-blind；SYNTHETIC_EXPERT_CONSENSUS通过最多形成"
+        "bounded SHADOW external-semantic evidence，不冒充HUMAN_EXPERT_REFERENCE，"
+        "不发布QUALIFIED LabelCard，也不授权日更、策略消费、云GPU或交易。"
     )
     sections = [
         f"<!-- quanthus-planning:v2 id={item['id']} kind={item['kind']} -->",

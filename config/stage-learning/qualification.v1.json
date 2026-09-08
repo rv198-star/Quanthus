@@ -1,0 +1,117 @@
+{
+  "schema_version": "quanthus.stage-qualification.v1",
+  "qualification_id": "stock-stage-first-group-3-4-arbitration-shadow-v1",
+  "work_item": "P3-STAGE-001-F",
+  "candidate_config": "config/stage-learning/development-candidate.v1.json",
+  "candidate_digest": "sha256:d492d12686be5f5ac84f87ba278afd873d9999aadc5fa5dc79a6f5f5985f176c",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "experiment_config": "config/stage-learning/experiment.v1.json",
+  "synthetic_panel_config": "config/stage-learning/synthetic-expert-panel.v2.json",
+  "authority": {
+    "implementation_authorized": true,
+    "one_time_arbitration_semantic_evaluation_authorized": true,
+    "arbitration_access_budget_runs": 1,
+    "parameter_search_authorized": false,
+    "candidate_mutation_after_result_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "future_settlement_access_authorized": false,
+    "human_expert_qualification_claim_authorized": false,
+    "bounded_shadow_disposition_authorized": true,
+    "qualified_label_publication_authorized": false,
+    "strategy_consumption_authorized": false,
+    "daily_schedule_authorized": false,
+    "trading_authorized": false
+  },
+  "partition": {
+    "name": "2022-2024-arbitration",
+    "evaluation_start": "2022-01-04",
+    "evaluation_end": "2024-12-31",
+    "warmup_start": "2021-07-01",
+    "cohort_date": "2021-12-31",
+    "knowledge_view": "retrospective_dwd_record_view",
+    "physical_blind_claim": false,
+    "access_semantics": "single_result_bearing_external_semantic_evaluation",
+    "permanent_blind_2025_untouched": true
+  },
+  "population": {
+    "cohort_size": 64,
+    "minimum_pre_cohort_observations": 100,
+    "cohort_seed": "sha256:37f3162a8906df72cf25da6c153976e0826413e86445a05e2f0614d01b7b9ad5",
+    "cohort_selection_uses_only_pre_arbitration_evidence": true,
+    "security_overlap_with_development_is_not_forbidden": true,
+    "qualification_population_claim": "deterministic 64-security SSE/SZSE cohort with >=100 pre-2022 admitted observations; temporal holdout is the independence boundary"
+  },
+  "sampling": {
+    "selection_mode": "stratified_external_semantic_v1",
+    "sampling_seed": "sha256:1e0c25e70728519cdf00c14d3755bd27b1926c39afc9df96a37e5232da18636a",
+    "total_contexts": 640,
+    "one_context_per_episode": true,
+    "selection_order": [
+      "started_activity",
+      "early_held",
+      "near_anchor_loss_negative",
+      "reclaimed_ambiguity",
+      "mature_held"
+    ],
+    "strata": {
+      "started_activity": 200,
+      "early_held": 180,
+      "near_anchor_loss_negative": 100,
+      "reclaimed_ambiguity": 80,
+      "mature_held": 80
+    },
+    "started_activity_buckets": {
+      "missing_or_lt_1": 25,
+      "1_to_1_25": 60,
+      "1_25_to_1_5": 60,
+      "gte_1_5": 55
+    },
+    "early_held_per_hold_count": {
+      "1": 60,
+      "2": 60,
+      "3": 60
+    },
+    "review_history_sessions": 60,
+    "selection_must_not_use_candidate_predictions": true,
+    "selection_must_not_use_future_settlements": true,
+    "no_result_dependent_resampling": true
+  },
+  "evaluation": {
+    "candidate_trial_id": "sha256:c21032608ab96d6abae81ba5709bf3e2c3f9eebb29ccdcdccf715dc2c4325bfc",
+    "r0_trial_id": "sha256:bb855695aef3520050a86b2fab2d369911cb17b6ea39c5ffa0fb19eebd8c8b97",
+    "evaluate_candidate_and_r0_only": true,
+    "r1_search_trial_count": 0,
+    "r2_executed": false,
+    "reference_evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+    "future_settlement_read": false,
+    "strategy_result_read": false
+  },
+  "hard_gates": {
+    "minimum_definite_references_per_stage": 100,
+    "minimum_ambiguous_references_for_overassertion_audit": 50,
+    "maximum_unjudgeable_reference_rate": 0.10,
+    "minimum_positive_reference_coverage": 0.60,
+    "maximum_ambiguous_unique_assertion_rate": 0.10,
+    "maximum_definite_negative_false_positive_rate": 0.0,
+    "minimum_stage_precision_one_sided_95_lower": 0.80,
+    "macro_f1_noninferiority_tolerance_vs_r0": 0.03,
+    "require_zero_quantitative_audit_vetoes": true,
+    "require_unique_episode_per_sampled_context": true
+  },
+  "decision": {
+    "when_all_hard_gates_pass": "SHADOW_EXTERNAL_SEMANTIC_ACCEPTED",
+    "when_any_hard_gate_fails": "INCONCLUSIVE_OR_REJECTED_RETAIN_RESULT",
+    "qualified_label_version_allowed": false,
+    "reason": "synthetic role-isolated reference evidence may support bounded external semantic Shadow evidence but cannot substitute for HUMAN_EXPERT_REFERENCE or as-known daily qualification",
+    "no_parameter_change_after_result_access": true,
+    "failure_consumes_the_single_arbitration_access_budget": true
+  },
+  "artifact": {
+    "output_relative_root": "runs/stage-qualification",
+    "publish_review_packets": true,
+    "publish_resolved_references": true,
+    "publish_candidate_and_r0_scores": true,
+    "publish_access_ledger": true,
+    "market_data_committed_to_git": false
+  }
+}

@@ -127,12 +127,15 @@ nodes.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,
   with device assessment in `design/stock-stage-training-compute.md`, three-perspective review in
   `reviews/stock-stage-learning-review-20260908.md`, and issue-managed steps in
-  `work-items/stock-stage-historical-learning.md` (P3-STAGE-001 A-H). A/B/C are closed. D/E synthetic
-  development iteration v1 completed end to end but is retained as INCONCLUSIVE: only three definite
-  Stage-3 references were present and the diagnostic rank #1 increased ambiguous over-assertion. D is
-  ready for a non-overlapping stratified v2 supplement and Panel v2; E will rank only trials that pass
-  the versioned development hard gates. HUMAN_EXPERT_REFERENCE, 2022+ reads, qualification publication,
-  daily scheduling and cloud-GPU purchase remain closed.
+  `work-items/stock-stage-historical-learning.md` (P3-STAGE-001 A-H). A-E are closed. D/E v2 completed
+  the non-overlapping 120-context supplement and hard-gated 18-trial R1 development selection;
+  `development-candidate.v1.json` freezes probe=1.0 / hold=2 / signed-distance=0 / activity=1.0 and
+  explicitly retains the signed-distance non-identifiability claim ceiling. F is ready under
+  `qualification.v1.json` for exactly one read-only 2022-2024 arbitration external-semantic Run using
+  640 unique-episode contexts and the frozen candidate plus R0 only. The general arbitration gate and
+  2025 permanent-blind remain unopened; synthetic-reference success can at most produce bounded SHADOW
+  external-semantic evidence, not HUMAN_EXPERT_REFERENCE or a QUALIFIED LabelCard. Daily scheduling,
+  strategy consumption and cloud-GPU purchase remain closed.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

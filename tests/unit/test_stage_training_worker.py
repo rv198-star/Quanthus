@@ -9,11 +9,13 @@ from quanthus.policy import find_project_root
 from quanthus.stage_learning.worker import (
     JOB_KIND,
     JOB_SCHEMA,
+    STAGE_QUALIFICATION_JOB,
     STAGE_REFERENCE_PILOT_JOB,
     StageJob,
     StageWorker,
     StageWorkerError,
     StageWorkerPaths,
+    _consume_qualification_budget,
     cancel_job,
     doctor,
     read_status,
@@ -106,7 +108,11 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     result = doctor(worker_paths)
     assert result["ready"] is True
     assert result["concurrency"] == 1
-    assert set(result["job_kinds"]) == {JOB_KIND, STAGE_REFERENCE_PILOT_JOB}
+    assert set(result["job_kinds"]) == {
+        JOB_KIND,
+        STAGE_REFERENCE_PILOT_JOB,
+        STAGE_QUALIFICATION_JOB,
+    }
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
 
 
@@ -164,7 +170,11 @@ def test_worker_publishes_runtime_identity_receipt(
     assert receipt["schema_version"] == "quanthus.stage-worker-runtime.v1"
     assert receipt["code_revision"] == REVISION
     assert receipt["pid"] > 0
-    assert set(receipt["job_kinds"]) == {JOB_KIND, STAGE_REFERENCE_PILOT_JOB}
+    assert set(receipt["job_kinds"]) == {
+        JOB_KIND,
+        STAGE_REFERENCE_PILOT_JOB,
+        STAGE_QUALIFICATION_JOB,
+    }
     assert receipt["concurrency"] == 1
 
 def test_reference_pilot_kind_gets_its_frozen_config(tmp_path: Path) -> None:
@@ -176,6 +186,91 @@ def test_reference_pilot_kind_gets_its_frozen_config(tmp_path: Path) -> None:
     )
     assert submitted["kind"] == STAGE_REFERENCE_PILOT_JOB
     assert submitted["config"] == "config/stage-learning/reference-pilot.v1.json"
+
+
+def test_qualification_kind_gets_its_frozen_config(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_QUALIFICATION_JOB,
+    )
+    assert submitted["kind"] == STAGE_QUALIFICATION_JOB
+    assert submitted["config"] == "config/stage-learning/qualification.v1.json"
+
+
+def test_qualification_submit_atomically_reserves_single_access_budget(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    first = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_QUALIFICATION_JOB,
+    )
+    marker = json.loads(worker_paths.qualification_budget.read_text(encoding="utf-8"))
+    assert marker["state"] == "reserved"
+    assert marker["job_id"] == first["job_id"]
+    assert marker["consumed_at"] is None
+
+    with pytest.raises(StageWorkerError, match="already reserved or consumed"):
+        submit_job(worker_paths, code_revision=REVISION, kind=STAGE_QUALIFICATION_JOB)
+
+    canceled = cancel_job(worker_paths, first["job_id"])
+    assert canceled["state"] == "canceled"
+    assert not worker_paths.qualification_budget.exists()
+
+    second = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_QUALIFICATION_JOB,
+    )
+    assert second["job_id"] != first["job_id"]
+    assert worker_paths.qualification_budget.is_file()
+
+
+def test_qualification_budget_is_irreversible_after_execution_access_starts(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_QUALIFICATION_JOB,
+    )
+    job = StageJob.from_dict(
+        json.loads(
+            (worker_paths.queue / f"{submitted['job_id']}.json").read_text(encoding="utf-8")
+        )
+    )
+    _consume_qualification_budget(worker_paths, job)
+    marker = json.loads(worker_paths.qualification_budget.read_text(encoding="utf-8"))
+    assert marker["state"] == "consumed"
+    assert marker["consumed_at"] is not None
+
+    with pytest.raises(StageWorkerError, match="already reserved or consumed"):
+        submit_job(worker_paths, code_revision=REVISION, kind=STAGE_QUALIFICATION_JOB)
+
+
+def test_qualification_pre_access_worker_failure_releases_reservation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_QUALIFICATION_JOB,
+    )
+    worker = StageWorker(worker_paths)
+
+    def fail_before_access(_job: StageJob) -> Path:
+        raise StageWorkerError("synthetic pre-access failure")
+
+    monkeypatch.setattr(worker, "_prepare_worktree", fail_before_access)
+    result = worker.run_once()
+    assert result is not None
+    assert result["job_id"] == submitted["job_id"]
+    assert result["state"] == "failed"
+    assert "pre-access failure" in result["error"]
+    assert not worker_paths.qualification_budget.exists()
 
 
 def test_queue_job_file_has_exact_schema(tmp_path: Path) -> None:

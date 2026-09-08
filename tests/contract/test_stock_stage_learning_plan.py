@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from quanthus.policy import find_project_root
+from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 SCRIPTS = ROOT / "scripts"
@@ -20,12 +21,14 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     plan = sync.load_plan()
     assert len(plan["items"]) == 9
     ready = {item["id"] for item in plan["items"] if item["status"] == "ready"}
-    assert ready == {"P3-STAGE-001-D"}
+    assert ready == {"P3-STAGE-001-F"}
     by_id = {item["id"]: item for item in plan["items"]}
     assert by_id["P3-STAGE-001-A"]["status"] == "closed"
     assert by_id["P3-STAGE-001-B"]["status"] == "closed"
     assert by_id["P3-STAGE-001-C"]["status"] == "closed"
-    assert by_id["P3-STAGE-001-D"]["status"] == "ready"
+    assert by_id["P3-STAGE-001-D"]["status"] == "closed"
+    assert by_id["P3-STAGE-001-E"]["status"] == "closed"
+    assert by_id["P3-STAGE-001-F"]["status"] == "ready"
     assert plan["data_policy"]["development_years"] == [2012, 2021]
     assert plan["data_policy"]["arbitration_years"] == [2022, 2024]
     assert plan["data_policy"]["permanent_blind_years"] == [2025, 2025]
@@ -36,6 +39,11 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert plan["authorization"][sync.LEARNING_IMPL_FLAG] is True
     assert plan["authorization"][sync.SYNTHETIC_REFERENCE_FLAG] is True
     assert plan["authorization"][sync.SYNTHETIC_LEARNING_FLAG] is True
+    assert plan["authorization"][sync.BOUNDED_ARBITRATION_FLAG] is True
+    assert plan["authorization"][sync.BOUNDED_ARBITRATION_CONFIG] == (
+        "config/stage-learning/qualification.v1.json"
+    )
+    assert plan["authorization"][sync.PERMANENT_BLIND_QUALIFICATION_FLAG] is False
     assert all(plan["authorization"][key] is False for key in sync.DENIED_AUTH_FLAGS)
 
 
@@ -81,6 +89,7 @@ def test_issue_sync_cannot_enable_execution(copied_plan, flag: str) -> None:
         sync.LEARNING_IMPL_FLAG,
         sync.SYNTHETIC_REFERENCE_FLAG,
         sync.SYNTHETIC_LEARNING_FLAG,
+        sync.BOUNDED_ARBITRATION_FLAG,
     ],
 )
 def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> None:
@@ -191,6 +200,30 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert selection["hard_gates"]["minimum_positive_reference_coverage"] == 0.60
     assert reference["authority"]["arbitration_access_authorized"] is False
     assert reference["authority"]["permanent_blind_access_authorized"] is False
+    candidate = json.loads(
+        (ROOT / "config/stage-learning/development-candidate.v1.json").read_text()
+    )
+    assert candidate["status"] == "frozen_for_external_evaluation"
+    assert candidate["trial"]["parameters"]["probe_volume_ratio20_min"] == "1.0"
+    assert candidate["trial"]["parameters"]["acceptance_hold_sessions"] == 2
+    qualification = json.loads(
+        (ROOT / "config/stage-learning/qualification.v1.json").read_text()
+    )
+    assert qualification["authority"]["arbitration_access_budget_runs"] == 1
+    assert qualification["authority"]["parameter_search_authorized"] is False
+    assert qualification["authority"]["permanent_blind_access_authorized"] is False
+    assert qualification["partition"]["name"] == "2022-2024-arbitration"
+    assert qualification["partition"]["permanent_blind_2025_untouched"] is True
+    assert qualification["decision"]["qualified_label_version_allowed"] is False
+    p3_gate = json.loads((ROOT / "config/p3-gates.v1.json").read_text())
+    bounded = p3_gate["bounded_partition_exceptions"]
+    assert len(bounded) == 1
+    assert bounded[0]["id"] == "P3-STAGE-001-F"
+    assert bounded[0]["qualification_digest"] == digest(qualification)
+    assert bounded[0]["candidate_digest"] == digest(candidate)
+    assert bounded[0]["access_budget_runs"] == 1
+    assert bounded[0]["parameter_search_authorized"] is False
+    assert bounded[0]["permanent_blind_access_authorized"] is False
     reference = json.loads((ROOT / "config/stage-learning/reference-pilot.v1.json").read_text())
     assert reference["sampling"]["total_episode_contexts"] == 120
     assert reference["authority"]["development_future_settlement_authorized"] is True

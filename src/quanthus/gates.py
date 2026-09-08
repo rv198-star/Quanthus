@@ -337,6 +337,49 @@ def validate_p3_gates(raw: Mapping[str, Any]) -> None:
     if any(not isinstance(value, str) or not value.strip() for value in unopened):
         raise ConfigurationError("unopened partition ids must be non-empty strings")
 
+    exceptions = raw.get("bounded_partition_exceptions")
+    if not isinstance(exceptions, list) or len(exceptions) != 1:
+        raise ConfigurationError("P3 gate requires the exact bounded partition exception set")
+    exception = exceptions[0]
+    if not isinstance(exception, Mapping):
+        raise ConfigurationError("bounded partition exception must be an object")
+    expected_exception_fields = {
+        "id",
+        "partition",
+        "config",
+        "qualification_digest",
+        "candidate_digest",
+        "access_budget_runs",
+        "read_only",
+        "parameter_search_authorized",
+        "permanent_blind_access_authorized",
+        "claim_ceiling",
+    }
+    if set(exception) != expected_exception_fields:
+        raise ConfigurationError("bounded partition exception fields differ")
+    qualification_digest = exception.get("qualification_digest")
+    candidate_digest = exception.get("candidate_digest")
+    if (
+        exception.get("id") != "P3-STAGE-001-F"
+        or exception.get("partition") != "2022-2024-arbitration"
+        or exception.get("partition") not in unopened
+        or exception.get("config") != "config/stage-learning/qualification.v1.json"
+        or qualification_digest
+        != "sha256:e235bd53ff7226358dc19eb6b80a08348cfeacf19455dd3bfa37626df43d15ac"
+        or not isinstance(candidate_digest, str)
+        or len(candidate_digest) != 71
+        or not candidate_digest.startswith("sha256:")
+        or any(character not in "0123456789abcdef" for character in candidate_digest[7:])
+        or exception.get("access_budget_runs") != 1
+        or exception.get("read_only") is not True
+        or exception.get("parameter_search_authorized") is not False
+        or exception.get("permanent_blind_access_authorized") is not False
+        or exception.get("claim_ceiling") != "bounded_shadow_external_semantic_only"
+    ):
+        raise ConfigurationError("bounded partition exception exceeds P3-STAGE-001-F authority")
+    if "2025-permanent-blind" not in unopened:
+        raise ConfigurationError("permanent-blind partition must remain unopened")
+
 
 @dataclass(frozen=True)
 class P3GateReport:
@@ -349,6 +392,7 @@ class P3GateReport:
     capability_fixture_id: str
     deferred_work_items: tuple[str, ...]
     unopened_partitions: tuple[str, ...]
+    bounded_partition_exceptions: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -360,6 +404,7 @@ class P3GateReport:
             "capability_fixture_id": self.capability_fixture_id,
             "deferred_work_items": list(self.deferred_work_items),
             "unopened_partitions": list(self.unopened_partitions),
+            "bounded_partition_exceptions": list(self.bounded_partition_exceptions),
         }
 
 
@@ -382,4 +427,7 @@ def load_p3_gate_report(path: Path | None = None) -> P3GateReport:
         capability_fixture_id=f"{fixture['strategy_id']}@{fixture['strategy_version']}",
         deferred_work_items=deferred,
         unopened_partitions=tuple(str(value) for value in raw["unopened_partitions"]),
+        bounded_partition_exceptions=tuple(
+            str(item["id"]) for item in raw["bounded_partition_exceptions"]
+        ),
     )

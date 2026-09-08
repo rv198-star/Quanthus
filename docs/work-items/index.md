@@ -235,7 +235,7 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-DICT-003-D | Audit, gate and release Catalog Lineage V2 | P3-DICT-003-C | closed; #236; full gate 1602 passed / 7 existing skips; Web navigation refinement on `c25638a`, API remains `3aa4837`; `docs/acceptance/catalog-lineage-v2-inplace-navigation-production-closeout-20260907.md` |
 | P3-STAGE-001 | Learn and qualify stock-stage definitions from history | P3-STRUCT-004, P3-DICT-003 | blocked; planning only; `stock-stage-historical-learning.md`; no execution/data access granted |
 | P3-STAGE-001-A | Freeze first-group semantics, scope and experiment budget | P3-STRUCT-004, P3-DICT-003 | closed; #238; `docs/acceptance/stock-stage-learning-a-freeze-20260908.md`; 3/4 semantics/search/data claim ceiling frozen |
-| P3-STAGE-001-B | Benchmark CPU capacity and qualify the training device | P3-STAGE-001-A | ready; #239; CPU-first capacity benchmark explicitly authorized; classifier training remains blocked |
+| P3-STAGE-001-B | Benchmark CPU capacity and qualify the training device | P3-STAGE-001-A | closed; #239; RX6800 WSL CPU-first accepted; `docs/acceptance/stock-stage-learning-b-capacity-20260908.md` |
 | P3-STAGE-001-C | Implement minimal Facts inputs and historical harness | P3-STAGE-001-A, P3-STAGE-001-B | blocked; depends on A/B and implementation authorization |
 | P3-STAGE-001-D | Build independent T-only references and target settlements | P3-STAGE-001-C | blocked; reference and sample-access authorization required |
 | P3-STAGE-001-E | Learn constrained rules and calibrate adjacent stages | P3-STAGE-001-D | blocked; training execution authorization required |

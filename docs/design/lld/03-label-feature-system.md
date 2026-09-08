@@ -294,7 +294,7 @@ authority.
 | P3-DICT-003-D | Audit and release Catalog Lineage V2 | P3-DICT-003-C | #236; closed; full gate 1602 passed / 7 existing skips; latest Web navigation refinement `c25638a`, API `3aa4837` |
 | P3-STAGE-001 | Learn and qualify stock-stage definitions from history | P3-STRUCT-004, P3-DICT-003 | Planning only; `docs/design/stock-stage-historical-learning.md`; `config/stock-stage-learning-delivery.v1.json`; no training/data-access authority |
 | P3-STAGE-001-A | Freeze first-group semantics, scope and experiment budget | P3-STRUCT-004, P3-DICT-003 | #238 closed; `config/stage-learning/experiment.v1.json`; 3/4 semantic/search/reference/data boundaries frozen; RX6800 full-base mirror claim ceiling recorded |
-| P3-STAGE-001-B | Benchmark CPU capacity and qualify the training device | P3-STAGE-001-A | #239 ready; CPU-first benchmark only; `config/stage-learning/training-node.v1.json`; no classifier training or Worker promotion |
+| P3-STAGE-001-B | Benchmark CPU capacity and qualify the training device | P3-STAGE-001-A | #239 closed; RX6800 WSL CPU-first accepted; `docs/acceptance/stock-stage-learning-b-capacity-20260908.md` |
 | P3-STAGE-001-C | Implement minimal Facts inputs and historical harness | P3-STAGE-001-A, P3-STAGE-001-B | Additive candidate/decision schema, source/time isolation, independent oracle and incremental parity |
 | P3-STAGE-001-D | Build independent T-only references and target settlements | P3-STAGE-001-C | Pilot/test isolation, preserved ambiguity and independent outcome ledger |
 | P3-STAGE-001-E | Learn constrained rules and calibrate adjacent stages | P3-STAGE-001-D | Frozen-budget R0/R1/CPU R2 comparisons, complete trial ledger and within-fold fitting |

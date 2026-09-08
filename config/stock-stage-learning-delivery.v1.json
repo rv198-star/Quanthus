@@ -44,14 +44,14 @@
       "blocked_on": ["分类器训练、未来目标、2022-2025结果读取和C阶段业务实现仍须独立授权"], "evidence": ["docs/acceptance/stock-stage-learning-a-freeze-20260908.md", "config/stage-learning/experiment.v1.json"]
     },
     {
-      "id": "P3-STAGE-001-B", "kind": "task", "status": "ready",
+      "id": "P3-STAGE-001-B", "kind": "task", "status": "closed",
       "title": "完成CPU优先容量基准与训练设备准入",
       "depends_on": ["P3-STAGE-001-A"],
       "scope": "在独立RX6800 WSL训练节点执行CPU-first环境初始化和容量benchmark；合成数据后只读2020-2021 DWD日线，分阶段测I/O/特征/拟合/评价，不训练市场分类器。",
       "inputs": ["config/stage-learning/experiment.v1.json", "config/stage-learning/training-node.v1.json", "已核验只读DWD Base v2.1 + correction训练源"],
       "deliverables": ["独立stage-training虚拟环境", "两至三个规模点的time/RSS/scratch报告", "CPU/RX6800/云节点设备准入结论"],
       "acceptance": ["单并发、8线程、32GiB内存/32GiB scratch预算与主机余量通过preflight", "真实DWD只读2020-2021且报告不包含市场结果", "first process pass不冒充cold OS cache", "没跑完整训练就不承诺训练耗时；GPU仍是可选后续基准"],
-      "blocked_on": ["capacity benchmark已获负责人授权；分类器训练、GPU云和生产Worker迁移仍关闭"], "evidence": []
+      "blocked_on": ["分类器训练、GPU云和生产Worker迁移仍关闭"], "evidence": ["docs/acceptance/stock-stage-learning-b-capacity-20260908.md"]
     },
     {
       "id": "P3-STAGE-001-C", "kind": "task", "status": "blocked",

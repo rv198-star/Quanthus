@@ -3,11 +3,11 @@
 | 字段 | 值 |
 | --- | --- |
 | Design status | draft |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Parent | `stock-stage-historical-learning.md` |
 | Work item | `P3-STAGE-001-B` |
-| Evidence | OCI只读快照；RX6800节点已通过专用SSH独立实测CPU/RAM/WSL/ext4/GPU可见性，并完成DWD Base v2.1+correction只读训练源核验 |
-| Authority | P3-STAGE-001-B CPU-first容量benchmark已获负责人授权；不批准市场分类器训练、2022+开发读取、云GPU采购或生产Worker迁移 |
+| Evidence | `../acceptance/stock-stage-learning-b-capacity-20260908.md`; capacity report `sha256:745b51dedad47296e3206bd8d0877cfd85ce2a37a4e8aebbaf34426f3f4f6a98` |
+| Authority | P3-STAGE-001-B CPU-first容量资格已接受；不批准市场分类器训练、2022+开发读取、云GPU采购或生产Worker迁移 |
 
 ## 1. 结论
 

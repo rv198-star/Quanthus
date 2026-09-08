@@ -18,7 +18,7 @@
 | 步骤 | 稳定ID | 状态 | 主要产物 | 通过条件与失败动作 |
 | --- | --- | --- | --- | --- |
 | A | P3-STAGE-001-A | closed / #238 | `config/stage-learning/experiment.v1.json`、3/4语义与反例、有限参数空间、120例试标预算、物理镜像claim ceiling | `docs/acceptance/stock-stage-learning-a-freeze-20260908.md`；不打开分类器训练或结果分区 |
-| B | P3-STAGE-001-B | ready / #239 | RX6800独立CPU环境和100k/500k/1m容量基准、实际2020-2021 DWD I/O、设备选择 | 8线程/32GiB预算及只读数据preflight；报告只含资源/耗时，不含市场或标签结果 |
+| B | P3-STAGE-001-B | closed / #239 | RX6800独立CPU环境和100k/500k/1m容量基准、实际2020-2021 DWD I/O、设备选择 | 8线程/32GiB预算通过；CPU-first accepted；见 `../acceptance/stock-stage-learning-b-capacity-20260908.md` |
 | C | P3-STAGE-001-C | blocked by A/B | 最小Facts扩展、历史逐日harness、候选/decision、独立oracle | PIT/身份/坐标/歧义/权限反例通过；批量与增量一致；不扫描未准分区 |
 | D | P3-STAGE-001-D | blocked by C | T-only独立参考、分歧保留、未来resolver、最终试验冻结补充 | 试标不复用为测试；参考和未来账本隔离；没有独立参考不授语义资格 |
 | E | P3-STAGE-001-E | blocked by D | R0/R1/必要CPU R2、有限试验台账、相邻组校准、锁定候选 | 先硬门槛再稳健选择；保留失败配置；无证据可合并/保留R0/INCONCLUSIVE |

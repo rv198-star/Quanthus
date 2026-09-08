@@ -7,6 +7,8 @@
     "implementation_authorized": true,
     "development_reference_pack_authorized": true,
     "development_future_settlement_authorized": true,
+    "synthetic_expert_development_reference_authorized": true,
+    "synthetic_expert_development_learning_authorized": true,
     "classifier_training_authorized": false,
     "arbitration_access_authorized": false,
     "permanent_blind_access_authorized": false,
@@ -41,6 +43,15 @@
     "future_settlement_visible_to_primary_reviewers": false,
     "unresolved_reference_disposition": "INCONCLUSIVE",
     "llm_or_rule_weak_labels_are_not_independent_truth": true
+  },
+  "synthetic_workflow": {
+    "enabled": true,
+    "panel_config": "config/stage-learning/synthetic-expert-panel.v1.json",
+    "evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+    "review_engine": "versioned_persona_policy_v1",
+    "run_development_r0_r1_after_resolution": true,
+    "formal_qualification_authorized": false,
+    "human_expert_validated": false
   },
   "future_target": {
     "target_id": "stage-first-group-development-first-passage-v1",

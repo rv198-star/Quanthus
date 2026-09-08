@@ -75,6 +75,7 @@ def load_reference_pilot_config(path: Path) -> dict[str, Any]:
         "population",
         "sampling",
         "review",
+        "synthetic_workflow",
         "future_target",
         "artifact",
     }
@@ -89,6 +90,8 @@ def load_reference_pilot_config(path: Path) -> dict[str, Any]:
         "implementation_authorized",
         "development_reference_pack_authorized",
         "development_future_settlement_authorized",
+        "synthetic_expert_development_reference_authorized",
+        "synthetic_expert_development_learning_authorized",
     }
     required_false = {
         "classifier_training_authorized",
@@ -101,6 +104,21 @@ def load_reference_pilot_config(path: Path) -> dict[str, Any]:
         authority.get(key) is not False for key in required_false
     ):
         raise ReferencePilotRunError("stage reference pilot authority differs")
+    workflow = raw.get("synthetic_workflow")
+    if not isinstance(workflow, Mapping):
+        raise ReferencePilotRunError("synthetic workflow contract is missing")
+    if (
+        workflow.get("enabled") is not True
+        or workflow.get("evidence_tier") != "SYNTHETIC_EXPERT_CONSENSUS"
+        or workflow.get("review_engine") != "versioned_persona_policy_v1"
+        or workflow.get("run_development_r0_r1_after_resolution") is not True
+        or workflow.get("formal_qualification_authorized") is not False
+        or workflow.get("human_expert_validated") is not False
+    ):
+        raise ReferencePilotRunError("synthetic workflow authority differs")
+    panel_config = workflow.get("panel_config")
+    if not isinstance(panel_config, str) or not panel_config:
+        raise ReferencePilotRunError("synthetic workflow panel config is invalid")
     return raw
 
 
@@ -340,13 +358,53 @@ def run_reference_pilot(
     }
     manifest_bytes = canonical(manifest)
     (run_root / "manifest.json").write_bytes(manifest_bytes)
-    (run_root / "READY").write_text(_sha256_bytes(manifest_bytes) + "\n", encoding="ascii")
-    return {
+    pilot_manifest_sha256 = _sha256_bytes(manifest_bytes)
+    (run_root / "READY").write_text(pilot_manifest_sha256 + "\n", encoding="ascii")
+    result: dict[str, Any] = {
         **summary,
         "run_id": run_id,
         "run_root": str(run_root),
-        "manifest_sha256": _sha256_bytes(manifest_bytes),
+        "manifest_sha256": pilot_manifest_sha256,
     }
+    workflow = config["synthetic_workflow"]
+    if isinstance(workflow, Mapping) and workflow.get("enabled") is True:
+        _progress(started, "synthetic-workflow-started")
+        from quanthus.stage_learning.synthetic_workflow import (
+            run_synthetic_workflow,
+            verify_synthetic_workflow_artifact,
+        )
+
+        panel_path = root / str(workflow["panel_config"])
+        workflow_result = run_synthetic_workflow(
+            pilot_artifact=run_root,
+            panel_config=panel_path,
+            training_root=training_root,
+            output_root=output_root / "synthetic-workflow",
+            code_revision=code_revision,
+        )
+        verified_workflow = verify_synthetic_workflow_artifact(
+            Path(str(workflow_result["artifact_root"]))
+        )
+        if verified_workflow.get("verified") is not True:
+            raise ReferencePilotRunError("synthetic development workflow verification failed")
+        result["synthetic_workflow"] = {
+            "artifact_root": workflow_result["artifact_root"],
+            "manifest_sha256": verified_workflow["manifest_sha256"],
+            "development_rank_1_trial_id": verified_workflow[
+                "development_rank_1_trial_id"
+            ],
+            "human_expert_validated": False,
+            "formal_qualification_authorized": False,
+        }
+        _progress(
+            started,
+            "synthetic-workflow-ready",
+            workflow_manifest_sha256=verified_workflow["manifest_sha256"],
+            development_rank_1_trial_id=verified_workflow[
+                "development_rank_1_trial_id"
+            ],
+        )
+    return result
 
 
 def verify_reference_pilot_artifact(

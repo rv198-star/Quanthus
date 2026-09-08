@@ -160,6 +160,10 @@ class StageWorkerPaths:
         return self.control_root / "worktrees"
 
     @property
+    def runtime_identity(self) -> Path:
+        return self.control_root / "worker-runtime.json"
+
+    @property
     def logs(self) -> Path:
         return self.training_root / "logs" / "stage-worker"
 
@@ -531,6 +535,20 @@ class StageWorker:
             claimed_path.unlink(missing_ok=True)
 
     def serve(self) -> None:
+        revision = os.environ.get("QUANTHUS_STAGE_WORKER_CODE_REVISION", "")
+        if not _REVISION.fullmatch(revision):
+            raise StageWorkerError("worker runtime revision is missing or invalid")
+        _atomic_json(
+            self.paths.runtime_identity,
+            {
+                "schema_version": "quanthus.stage-worker-runtime.v1",
+                "code_revision": revision,
+                "pid": os.getpid(),
+                "started_at": _utc_now(),
+                "job_kind": JOB_KIND,
+                "concurrency": 1,
+            },
+        )
         while not self.stopping:
             try:
                 result = self.run_once()

@@ -122,8 +122,8 @@ def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() ->
         "bootstrap-stage-training-node",
         "systemctl --user enable quanthus-stage-worker.service",
         "systemctl --user restart quanthus-stage-worker.service",
-        "QUANTHUS_STAGE_WORKER_CODE_REVISION",
-        "stage worker process revision differs",
+        "worker-runtime.json",
+        "stage worker runtime identity differs",
         "submit --code-revision",
         "bootstrap_state=${bootstrap_state}",
         "git@github.com:rv198-star/Quanthus.git",
@@ -132,6 +132,7 @@ def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() ->
 
     assert "quanthus.stage_learning.worker" in wrapper
     assert "QUANTHUS_STAGE_WORKER_CODE_REVISION" in wrapper
+    assert "/proc/" not in installer
     assert "MemoryMax=34G" in unit
     assert "CPUQuota=800%" in unit
     assert "Restart=always" in unit
@@ -140,6 +141,22 @@ def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() ->
     assert "POSTGRES" not in unit.upper()
     assert "DATABASE" not in unit.upper()
 
+
+
+def test_worker_publishes_runtime_identity_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker = StageWorker(worker_paths)
+    monkeypatch.setenv("QUANTHUS_STAGE_WORKER_CODE_REVISION", REVISION)
+    monkeypatch.setattr(worker, "run_once", lambda: setattr(worker, "stopping", True))
+    worker.serve()
+    receipt = json.loads(worker_paths.runtime_identity.read_text(encoding="utf-8"))
+    assert receipt["schema_version"] == "quanthus.stage-worker-runtime.v1"
+    assert receipt["code_revision"] == REVISION
+    assert receipt["pid"] > 0
+    assert receipt["job_kind"] == JOB_KIND
+    assert receipt["concurrency"] == 1
 
 def test_queue_job_file_has_exact_schema(tmp_path: Path) -> None:
     worker_paths = paths(tmp_path)

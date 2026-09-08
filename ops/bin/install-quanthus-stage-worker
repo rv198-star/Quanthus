@@ -103,12 +103,21 @@ systemctl --user is-active --quiet quanthus-stage-worker.service || \
   fail "stage worker service did not become active"
 service_pid="$(systemctl --user show quanthus-stage-worker.service -p MainPID --value)"
 [[ "${service_pid}" =~ ^[1-9][0-9]*$ ]] || fail "stage worker service has no live MainPID"
-service_revision="$(
-  tr '\0' '\n' < "/proc/${service_pid}/environ" | \
-    awk -F= '$1=="QUANTHUS_STAGE_WORKER_CODE_REVISION" {print $2}'
-)"
-[[ "${service_revision}" == "${revision}" ]] || \
-  fail "stage worker process revision differs: expected ${revision}, observed ${service_revision:-missing}"
+runtime_identity="${training_root}/control/stage-worker/worker-runtime.json"
+service_identity=""
+for _ in $(seq 1 20); do
+  if [[ -f "${runtime_identity}" ]]; then
+    service_identity="$(
+      "${repo_root}/.venv-stage-training/bin/python" -c \
+        'import json,sys; p=json.load(open(sys.argv[1])); print(f"{p.get("pid","")} {p.get("code_revision","")}")' \
+        "${runtime_identity}" 2>/dev/null || true
+    )"
+    [[ "${service_identity}" == "${service_pid} ${revision}" ]] && break
+  fi
+  sleep 1
+done
+[[ "${service_identity}" == "${service_pid} ${revision}" ]] || \
+  fail "stage worker runtime identity differs: expected ${service_pid} ${revision}, observed ${service_identity:-missing}"
 
 worker_doctor="$(bash "${repo_root}/ops/bin/quanthus-stage-worker" doctor)"
 printf '%s\n' "${worker_doctor}"

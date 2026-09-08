@@ -125,6 +125,12 @@ def test_stage_training_bootstrap_fails_closed_without_ensurepip() -> None:
     assert "training virtualenv has no usable pip" in bootstrap
 
 
+def test_stage_training_dependency_group_includes_timezone_support_for_duckdb() -> None:
+    project = (ROOT / "pyproject.toml").read_text()
+    group = project.split("stage-training = [", 1)[1].split("]", 1)[0]
+    assert '"pytz>=2024.1"' in group
+
+
 def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     plan = sync.load_plan()
     manifest = json.loads((ROOT / "config/data-indicator-catalog-sources.v1.json").read_text())

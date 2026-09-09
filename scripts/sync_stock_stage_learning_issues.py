@@ -31,7 +31,7 @@ SYNTHETIC_LEARNING_FLAG = "synthetic_expert_development_learning_authorized"
 BOUNDED_ARBITRATION_FLAG = "bounded_arbitration_qualification_authorized"
 BOUNDED_ARBITRATION_CONFIG = "bounded_arbitration_qualification_config"
 PERMANENT_BLIND_QUALIFICATION_FLAG = "permanent_blind_qualification_authorized"
-AUTH_SCOPE = "development_closed_and_one_time_arbitration_semantic_qualification_ready"
+AUTH_SCOPE = "development_closed_arbitration_consumed_inconclusive_no_holdout_authority"
 
 
 def load_plan() -> dict:
@@ -67,13 +67,14 @@ def load_plan() -> dict:
             LEARNING_IMPL_FLAG,
             SYNTHETIC_REFERENCE_FLAG,
             SYNTHETIC_LEARNING_FLAG,
-            BOUNDED_ARBITRATION_FLAG,
         )
     ):
         raise ValueError(
-            "capacity, harness, reference, synthetic-panel, learning and bounded-arbitration "
-            "authorizations must be explicit"
+            "capacity, harness, reference, synthetic-panel and learning authorizations "
+            "must be explicit"
         )
+    if auth[BOUNDED_ARBITRATION_FLAG] is not False:
+        raise ValueError("consumed arbitration qualification cannot remain authorized")
     if auth[PERMANENT_BLIND_QUALIFICATION_FLAG] is not False:
         raise ValueError("permanent-blind qualification cannot be opened by planning sync")
     qualification_config = auth.get(BOUNDED_ARBITRATION_CONFIG)
@@ -96,6 +97,18 @@ def load_plan() -> dict:
         or qualification_authority.get("qualified_label_publication_authorized") is not False
     ):
         raise ValueError("bounded arbitration qualification authority differs")
+    p3_gate = json.loads((ROOT / "config/p3-gates.v1.json").read_text(encoding="utf-8"))
+    bounded = p3_gate.get("bounded_partition_exceptions", [])
+    if (
+        not isinstance(bounded, list)
+        or len(bounded) != 1
+        or bounded[0].get("id") != f"{PARENT}-F"
+        or bounded[0].get("state") != "consumed_inconclusive"
+        or bounded[0].get("remaining_access_budget_runs") != 0
+        or bounded[0].get("consumed_job_id")
+        != "stage_cf5b89c16c5b4fce8b3c5cdc00a156f7"
+    ):
+        raise ValueError("consumed arbitration qualification evidence differs")
     if any(auth[key] is not False for key in DENIED_AUTH_FLAGS):
         raise ValueError(
             "planning synchronization cannot grant training, result, schedule or purchase access"
@@ -178,12 +191,11 @@ def body(item: dict, plan: dict, mapping: dict) -> str:
     authority = (
         "## 权限边界\n"
         "P3-STAGE-001-D/E development selection 已关闭并冻结候选；"
-        "仅P3-STAGE-001-F可按 `config/stage-learning/qualification.v1.json` "
-        "执行一次只读2022-2024 arbitration外样本语义评价。"
-        "该窄授权不构成一般sealed-partition开放，不允许参数搜索、结果后改候选，"
-        "也不读取2025 permanent-blind；SYNTHETIC_EXPERT_CONSENSUS通过最多形成"
-        "bounded SHADOW external-semantic evidence，不冒充HUMAN_EXPERT_REFERENCE，"
-        "不发布QUALIFIED LabelCard，也不授权日更、策略消费、云GPU或交易。"
+        "P3-STAGE-001-F 的唯一2022-2024 arbitration访问预算已由"
+        " `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility "
+        "INCONCLUSIVE关闭。不得重跑该分区并称fresh holdout。"
+        "2025 permanent-blind仍未开放；当前不授权新的sealed-partition读取、参数搜索、"
+        "结果后改候选、QUALIFIED LabelCard、日更、策略消费、云GPU或交易。"
     )
     sections = [
         f"<!-- quanthus-planning:v2 id={item['id']} kind={item['kind']} -->",

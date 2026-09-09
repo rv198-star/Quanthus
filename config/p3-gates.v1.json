@@ -64,10 +64,13 @@
       "qualification_digest": "sha256:e235bd53ff7226358dc19eb6b80a08348cfeacf19455dd3bfa37626df43d15ac",
       "candidate_digest": "sha256:d492d12686be5f5ac84f87ba278afd873d9999aadc5fa5dc79a6f5f5985f176c",
       "access_budget_runs": 1,
+      "remaining_access_budget_runs": 0,
+      "state": "consumed_inconclusive",
+      "consumed_job_id": "stage_cf5b89c16c5b4fce8b3c5cdc00a156f7",
       "read_only": true,
       "parameter_search_authorized": false,
       "permanent_blind_access_authorized": false,
-      "claim_ceiling": "bounded_shadow_external_semantic_only"
+      "claim_ceiling": "sample_feasibility_inconclusive_no_shadow_or_qualified_claim"
     }
   ]
 }

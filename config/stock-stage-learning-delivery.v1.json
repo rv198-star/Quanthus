@@ -6,7 +6,7 @@
   "review": "docs/reviews/stock-stage-learning-review-20260908.md",
   "work_items": "docs/work-items/stock-stage-historical-learning.md",
   "authorization": {
-    "scope": "development_closed_and_one_time_arbitration_semantic_qualification_ready",
+    "scope": "development_closed_arbitration_consumed_inconclusive_no_holdout_authority",
     "capacity_benchmark_authorized": true,
     "stage_harness_implementation_authorized": true,
     "stage_reference_pilot_implementation_authorized": true,
@@ -14,7 +14,7 @@
     "development_learning_implementation_authorized": true,
     "synthetic_expert_development_reference_authorized": true,
     "synthetic_expert_development_learning_authorized": true,
-    "bounded_arbitration_qualification_authorized": true,
+    "bounded_arbitration_qualification_authorized": false,
     "bounded_arbitration_qualification_config": "config/stage-learning/qualification.v1.json",
     "permanent_blind_qualification_authorized": false,
     "training_authorized": false,
@@ -40,7 +40,7 @@
       "inputs": ["stock-stage-qualification.md", "stock-stage-data-dependencies.md", "冻结数据分区和既有连续Facts对照"],
       "deliverables": ["版本化标签定义/学习结果/证据包", "设备准入报告", "每状态或分组的保留/合并/拒绝结论"],
       "acceptance": ["子项按依赖完成且未授权权限不打开", "无训练/测试泄漏或规则自证真值", "标签资格与具体交易消费权限分离"],
-      "blocked_on": ["当前只授权设计和工单", "新研究实施和训练需范围/预算授权"], "evidence": []
+      "blocked_on": ["F已以sample-feasibility INCONCLUSIVE关闭且未产生可消费标签资格", "2022-2024 fresh holdout已消耗；任何后续外样本、2025 permanent-blind、日更或新状态波次都需新的预登记协议与独立授权"], "evidence": []
     },
     {
       "id": "P3-STAGE-001-A", "kind": "task", "status": "closed",
@@ -93,14 +93,14 @@
       "blocked_on": ["development candidate已冻结；R2因无可归因R1表达不足保持关闭；正式QUALIFIED、人类专家验证和日更仍不打开"], "evidence": ["docs/acceptance/stock-stage-learning-e-implementation-readiness-20260908.md", "docs/acceptance/stock-stage-learning-de-v1-development-audit-20260908.md", "docs/acceptance/stock-stage-learning-de-v2-development-closeout-20260909.md", "config/stage-learning/development-candidate.v1.json"]
     },
     {
-      "id": "P3-STAGE-001-F", "kind": "task", "status": "ready",
+      "id": "P3-STAGE-001-F", "kind": "task", "status": "closed",
       "title": "独立保留集检验并冻结标签资格",
       "depends_on": ["P3-STAGE-001-E"],
       "scope": "锁定所有参数/校准/阈值后按获准保留集执行一次评价；出按state/profile/view/population/use的资格包，保留失败与限制。",
       "inputs": ["config/stage-learning/development-candidate.v1.json及冻结digest", "config/stage-learning/qualification.v1.json的一次2022-2024 arbitration访问预算", "预登记资格判据"],
-      "deliverables": ["不可改的外样本报告/访问账本", "bounded SHADOW external-semantic或INCONCLUSIVE/REJECTED决定及用途", "CPU消费与数值回归报告"],
+      "deliverables": ["不可改的外样本失败报告/访问账本", "INCONCLUSIVE / sample-feasibility决定及claim ceiling", "失败阶段与未执行评分路径审计"],
       "acceptance": ["Worker必须原子保留并在F进程启动前消费唯一arbitration访问预算；启动前取消/基础设施失败可释放，启动后成功/失败/超时均不得重用", "2025 permanent-blind不得读取，且一般sealed-partition权限仍关闭", "资格分不能平均掉硬错误/低覆盖/样本不足", "看结果后改口径须新版本且声明原测试已消耗", "描述资格不自动声称盈利、HUMAN_EXPERT_REFERENCE、QUALIFIED发布或交易权"],
-      "blocked_on": ["仅允许qualification.v1绑定的一次2022-2024 arbitration语义评价；2025 permanent-blind仍关闭", "合成专家证据通过最多形成bounded SHADOW external-semantic evidence，不发布QUALIFIED LabelCard"], "evidence": ["config/stage-learning/development-candidate.v1.json", "config/stage-learning/qualification.v1.json", "docs/acceptance/stock-stage-learning-de-v2-development-closeout-20260909.md", "docs/acceptance/stock-stage-learning-f-pre-result-freeze-20260909.md"]
+      "blocked_on": ["一次2022-2024 arbitration预算已由stage_cf5b89c16c5b4fce8b3c5cdc00a156f7消耗，不得重跑并称新盲测", "F在qualification_mature_held精确80例要求处因仅58个额外unique episodes而INCONCLUSIVE；2025 permanent-blind仍关闭"], "evidence": ["config/stage-learning/development-candidate.v1.json", "config/stage-learning/qualification.v1.json", "docs/acceptance/stock-stage-learning-de-v2-development-closeout-20260909.md", "docs/acceptance/stock-stage-learning-f-pre-result-freeze-20260909.md", "docs/acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md"]
     },
     {
       "id": "P3-STAGE-001-G", "kind": "task", "status": "blocked",
@@ -110,7 +110,7 @@
       "inputs": ["批准的标签版本及允许用途", "逐来源可用时间/水位证据", "日更调度与资源授权"],
       "deliverables": ["daily builder/ADM policy", "缺失/延迟/修正重放/批量一致性证据", "漂移报警和人工批准再训练流程"],
       "acceptance": ["不把retrospective资格当as-known资格", "工作日钟点不替代DWD READY", "缺数据冻结而非看空；consumed_at留在审计日志", "不启用P6策略Shadow、交易通知或真实下单"],
-      "blocked_on": ["日更独立授权和as-known证明", "F完成"], "evidence": []
+      "blocked_on": ["日更独立授权和as-known证明", "F已关闭但结论为sample-feasibility INCONCLUSIVE，未产生可供G消费的bounded-SHADOW或QUALIFIED标签版本"], "evidence": []
     },
     {
       "id": "P3-STAGE-001-H", "kind": "task", "status": "blocked",
@@ -120,7 +120,7 @@
       "inputs": ["首组方法与失败经验", "各组最小Facts缺口", "新增分组/消费者范围与预算批准"],
       "deliverables": ["分组后续实施卡和参数预算", "标签保留/合并/改维度决定", "特定专家/策略消费验收或拒绝"],
       "acceptance": ["不能用已消耗保留集反复迭代却称新盲测", "不为凑足12状态无限扩特征", "删除未合格候选不得制造虚假单值确定", "消费者经济价值独立于标签描述资格"],
-      "blocked_on": ["新波次及消费者单独授权", "F完成"], "evidence": []
+      "blocked_on": ["新波次及消费者单独授权", "F已关闭但未形成合格首组标签版本；不得把已消耗2022-2024作为新波次fresh holdout"], "evidence": []
     }
   ]
 }

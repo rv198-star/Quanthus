@@ -10,8 +10,8 @@
 | Compute | `../design/stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Machine plan | `../../config/stock-stage-learning-delivery.v1.json` |
-| GitHub | 父工单 #246；A #238、B #239、C #240、D #241、E #242、F #243、G #244、H #245；已创建并回读，均open |
-| Current scope | A-E development已关闭；R1 development candidate已冻结；F按预登记合约准备一次只读2022-2024 arbitration外样本语义评价，2025 permanent-blind/正式QUALIFIED/日更/策略权限仍关闭 |
+| GitHub | 父工单 #246；A #238、B #239、C #240、D #241、E #242、F #243、G #244、H #245；A-F关闭，G/H及父工单保持open/blocked |
+| Current scope | A-E development已关闭；F唯一2022-2024 arbitration外样本Run已消耗预算并因`qualification_mature_held`仅58/80额外unique episodes而sample-feasibility INCONCLUSIVE；2025 permanent-blind、正式QUALIFIED、日更和策略权限仍关闭 |
 
 ## 1. 逐步执行路线
 
@@ -22,11 +22,11 @@
 | C | P3-STAGE-001-C | closed / #240 | 最小Facts扩展、历史逐日harness、候选/decision、独立oracle | real-DWD governed harness PASS；见 `../acceptance/stock-stage-learning-c-harness-20260908.md`；不训练分类器、不读future target |
 | D | P3-STAGE-001-D | closed / #241 | T-only参考、development-only future settlement、Synthetic Expert Panel开发参考 | v2非重叠120例分层补样完成：87 definite / 21 ambiguous / 12 coexistence，14个分歧按冻结第三裁决，audit veto=0；见 `../acceptance/stock-stage-learning-de-v2-development-closeout-20260909.md`；证据仍为SYNTHETIC_EXPERT_CONSENSUS |
 | E | P3-STAGE-001-E | closed / #242 | R0/R1有限试验台账、hard-gated开发选择、冻结候选 | 18个R1全部留痕，4个过硬门槛；冻结 `development-candidate.v1.json`：probe 1.0 / hold 2 / distance 0 / activity 1.0。hold=1因歧义过断言被拒，hold=3不退化门槛失败；0与0.0025 distance不可辨识，按最小变更选0；R2不触发 |
-| F | P3-STAGE-001-F | ready / #243 | 一次外样本、分状态/profile/用途资格包 | `qualification.v1.json`已在结果读取前冻结：仅一次只读2022-2024 arbitration、640个unique-episode contexts、候选+R0、无搜索/无future/无2025；合成参考通过最多形成bounded SHADOW external-semantic evidence，不发布QUALIFIED |
-| G | P3-STAGE-001-G | blocked by F+日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | 延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
-| H | P3-STAGE-001-H | blocked by F+新增范围授权 | 第二/三组状态及特定消费者对照 | 不凑12个状态；按同协议新增版本；策略用途另做完整P2 |
+| F | P3-STAGE-001-F | closed / INCONCLUSIVE / #243 | 一次外样本、分状态/profile/用途资格包 | Job `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7`进入真实执行后在panel/预测/评分前因`qualification_mature_held`只有58个额外unique episodes、低于冻结80例要求而fail-closed；无qualification artifact/SHADOW/QUALIFIED结果；见 `../acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md` |
+| G | P3-STAGE-001-G | blocked after F inconclusive + 日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | F未产生可消费标签版本；延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
+| H | P3-STAGE-001-H | blocked after F inconclusive + 新增范围授权 | 第二/三组状态及特定消费者对照 | F未形成合格首组标签；不凑12个状态；策略用途另做完整P2 |
 
-每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A-E已关闭；D/E的result-aware development证据不能再被重新包装成confirmatory sample。F只消费冻结的 `development-candidate.v1.json` 与 `qualification.v1.json`，其一次2022-2024 arbitration访问预算在首个result-bearing Run即视为消耗；看结果后修改参数必须形成新版本且原holdout不再称未使用。2025 permanent-blind保持未触碰。
+每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A-F已关闭，其中F是**sample-feasibility INCONCLUSIVE**而不是模型REJECT：2022-2024 arbitration的一次预算已经消耗，不能修sample后重跑并称fresh holdout。该Run没有进入synthetic panel、candidate/R0 prediction或hard-gate scoring。2025 permanent-blind保持未触碰。任何后续外样本协议都必须先冻结新的sampling contract和最低semantic hard gates，再单独申请未消费分区授权。
 
 ## 2. 谁负责什么
 

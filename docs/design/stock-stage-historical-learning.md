@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-E已关闭；D/E v2 development已冻结 `development-candidate.v1.json`（probe=1.0、hold=2、distance=0、activity=1.0），R2不触发。F仅按 `qualification.v1.json` 获得一次只读2022-2024 arbitration外样本语义评价预算；一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A-F已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已由 `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility INCONCLUSIVE关闭；当前不再授权任何arbitration重跑。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -92,16 +92,16 @@ v2已完成并关闭D/E：120个context解析为87 definite、21 ambiguous_set�
 5. 对同槽候选进行联合消歧；不同维度不做无意义的top1竞争。
 6. 用独立开发校准分片或前向out-of-fold预测校准分数；另留阈值选择分片，不拿最终测试调确认阈值。[R2]
 7. 完成语义、灰度、覆盖、参数邻域、时间稳定和独立未来分布审查，锁定一个候选版本。
-8. 在新授权的保留分区一次性评价；F首轮已预登记为 `qualification.v1.json` 的2022-2024 arbitration语义评价，640个context要求one-context-per-episode，仅评冻结candidate与R0，不做R1搜索/R2/future settlement/strategy result；首个result-bearing Run即消耗唯一访问预算。失败保留失败证据，任何因结果修改的版本不能再称该分区未使用。2025 permanent-blind继续未触碰。
+8. 在新授权的保留分区一次性评价；F首轮已按 `qualification.v1.json` 消耗2022-2024 arbitration预算，但在panel/预测/评分前因最终`qualification_mature_held`分层仅58个额外unique episodes、低于冻结80例而INCONCLUSIVE。该分区不能修采样后重跑并称fresh holdout。任何后续未消费holdout必须在访问前冻结新的协议：稀有stratum使用deterministic target-cap而非“必须精确凑满”的退出条件，最终可声明性由预登记的per-stage/ambiguity/coverage/precision/effective-episode hard gates裁决；不足仍INCONCLUSIVE，不事后跨层补样。2025 permanent-blind继续未触碰。
 9. 以同一冻结版本做CPU/平台推断兼容、批量vs逐日一致性检查，再申请观察性日更与按用途资格。
 
 每次资源失败先归因，不在仍运行的批次中热改规则；终止/保留本批次证据后新版本重启。跨ARM/x86或不同BLAS训练不要求模型字节相同：固定环境内可复现，跨环境要求事前容差及决策差异账本。冻结发布模型的消费语义仍须一致。
 
 ## 6. 时间分区与泄漏防护
 
-当前权威 `config/p0-policy.v1.json`：2012-2021 development、2022-2024 arbitration、2025 permanent blind。`config/p3-gates.v1.json`继续把后两者列为一般 `unopened_partitions`；新增的 `bounded_partition_exceptions` 只给 `P3-STAGE-001-F` 一个精确绑定 `qualification.v1.json`、candidate digest、一次访问预算、read-only、no-search、no-2025 的窄例外，不把 arbitration 变成通用开发权限。
+当前权威 `config/p0-policy.v1.json`：2012-2021 development、2022-2024 arbitration、2025 permanent blind。`config/p3-gates.v1.json`继续把后两者列为一般 `unopened_partitions`；`bounded_partition_exceptions` 保留F的历史窄例外，但其状态现为 `consumed_inconclusive`、remaining budget为0，并绑定唯一Job。它不再提供任何可执行arbitration权限。
 
-默认保留现有分区。本轮不把2019-2024变成训练区，也不读取2025。2020-2021已被development反复研究，不能叫全新盲测。F使用2022-2024作为一次时间外 external-semantic holdout；它运行前必须锁定candidate、采样、门槛、用途和失败动作，首个result-bearing访问即消耗预算。2025 permanent-blind留给更高证据等级/后续真正确认性需求，不因F实现而打开。
+默认保留现有分区。本轮不把2019-2024变成训练区，也不读取2025。2020-2021已被development反复研究；2022-2024已被F访问并暴露至少sample-population信息，因此也不能再次称未使用的confirmatory holdout。2025 permanent-blind继续留给更高证据等级/后续真正确认性需求，只有新的预登记协议与独立授权才能打开。
 
 2019-2024训练/2025测试是可供负责人以后审批的替代方案，必须先修改分区策略与下游验证用途；训练过的2022-2024不能继续当原项目仲裁证据。仅重命名实验不能清除已知信息。
 

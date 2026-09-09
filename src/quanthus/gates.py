@@ -350,6 +350,9 @@ def validate_p3_gates(raw: Mapping[str, Any]) -> None:
         "qualification_digest",
         "candidate_digest",
         "access_budget_runs",
+        "remaining_access_budget_runs",
+        "state",
+        "consumed_job_id",
         "read_only",
         "parameter_search_authorized",
         "permanent_blind_access_authorized",
@@ -371,10 +374,14 @@ def validate_p3_gates(raw: Mapping[str, Any]) -> None:
         or not candidate_digest.startswith("sha256:")
         or any(character not in "0123456789abcdef" for character in candidate_digest[7:])
         or exception.get("access_budget_runs") != 1
+        or exception.get("remaining_access_budget_runs") != 0
+        or exception.get("state") != "consumed_inconclusive"
+        or exception.get("consumed_job_id") != "stage_cf5b89c16c5b4fce8b3c5cdc00a156f7"
         or exception.get("read_only") is not True
         or exception.get("parameter_search_authorized") is not False
         or exception.get("permanent_blind_access_authorized") is not False
-        or exception.get("claim_ceiling") != "bounded_shadow_external_semantic_only"
+        or exception.get("claim_ceiling")
+        != "sample_feasibility_inconclusive_no_shadow_or_qualified_claim"
     ):
         raise ConfigurationError("bounded partition exception exceeds P3-STAGE-001-F authority")
     if "2025-permanent-blind" not in unopened:

@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；P3-STAGE-001-F已获唯一窄例外，可按 `../../config/stage-learning/qualification.v1.json` 做一次只读2022-2024 arbitration外样本语义评价；2025、QUALIFIED发布、每日调度和交易仍未授权 |
+| Authority | 验证/不确定性设计权威；P3-STAGE-001-F唯一2022-2024 arbitration窄例外已由Job `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility INCONCLUSIVE关闭，remaining budget=0；2025、QUALIFIED发布、每日调度和交易仍未授权 |
 | Version | 0.1 |
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
@@ -14,13 +14,13 @@
 
 ## 1. 本次要解决的问题
 
-历史口径学习、有限选参与定稿现在由子设计 `stock-stage-historical-learning.md` 具体化；设备规划见 `stock-stage-training-compute.md`。本文件继续拥有验证与不确定性边界，对外标签资格仅用 SHADOW / QUALIFIED，多维证据不是新增生命周期。D/E development已关闭；F的单次2022-2024 arbitration访问是精确绑定candidate/config/digest的一次性验证例外，不等于一般训练或密封分区访问授权。
+历史口径学习、有限选参与定稿现在由子设计 `stock-stage-historical-learning.md` 具体化；设备规划见 `stock-stage-training-compute.md`。本文件继续拥有验证与不确定性边界，对外标签资格仅用 SHADOW / QUALIFIED，多维证据不是新增生命周期。D/E development已关闭；F的单次2022-2024 arbitration访问已经消费且不能重跑。它在panel/预测/评分前因冻结mature-held 80例要求只有58个额外unique episodes而INCONCLUSIVE，因此没有形成SHADOW或QUALIFIED证据。
 
 Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；两者之间必须有可执行的判定机制，不能因为定时任务稳定、图表看起来合理或运行了一段时间就升级。
 
 本提案把“12 状态”视为待检验的市场描述体系，而不是已经存在标准答案、只差编程的十三分类任务。既要验证算法是否遵守规则，也要验证规则是否能区分用户关心的情形，进一步验证其市场假设与策略用途。允许结果是保留、合并、改为修饰维度、降为展示或拒绝某个状态，而不是为了凑足十二个编号提高规则复杂度。
 
-当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。唯一新增的运行范围是P3-STAGE-001-F：在结果读取前已冻结candidate、640-context采样与硬门槛，允许一次只读2022-2024 arbitration外样本语义评价；2025 permanent-blind保持未触碰，合成参考即使通过也只允许bounded SHADOW external-semantic evidence。
+当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。P3-STAGE-001-F的历史窄例外仅保留为consumed evidence；2022-2024不能在修采样后再称fresh holdout。2025 permanent-blind保持未触碰。任何后续外样本协议必须在新holdout访问前冻结sampling target-cap与minimum semantic hard gates，并单独获得访问授权。
 
 ## 2. 仓库核查与需要纠正的前提
 
@@ -172,7 +172,7 @@ Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；
 
 按市场日切分整个股票面板，不把不同股票的同一交易日随机分到训练和测试。前向窗口交叠需按真实目标起止时间排除跨边界训练样本；同一个 episode 和共同市场冲击要用事件/时间块或聚类不确定性处理。单纯设置 gap 不能替代面板和目标重叠审计。[R3]
 
-既有已查看的2020-2021实验区间不能叫新的盲测。只能在获准 development 范围内预登记新的切分及访问记录；不得以验证标签为由打开 arbitration/permanent-blind 分区。参数、状态数量、采样、目标和评分变更都记入试验账本，多次试验风险不能靠最后保留一次漂亮回测掩盖。[R4]
+既有已查看的2020-2021实验区间不能叫新的盲测；2022-2024也已被F消费并暴露sample-population信息，不能再作为fresh confirmatory holdout。新的时间外评价只能使用尚未消费且另行授权的分区，并在访问前冻结切分、sampling caps、最低有效样本/episode门槛、目标和评分。参数、状态数量、采样、目标和评分变更都记入试验账本，多次试验风险不能靠最后保留一次漂亮回测掩盖。[R4]
 
 至少比较：无阶段的基线、简单趋势/区间分类、同输入闭包的连续 Facts、十二状态候选/消歧结果。标签是同一 Facts 的确定性变换时，不会凭空增加原始信息；它可能改善有限能力消费者的决策组织或解释，也可能损失信息，因此要做实际比较，而不是假设更多状态更好。
 

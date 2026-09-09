@@ -82,6 +82,9 @@ class GateTests(unittest.TestCase):
         for key, value in (
             ("partition", "2025-permanent-blind"),
             ("access_budget_runs", 2),
+            ("remaining_access_budget_runs", 1),
+            ("state", "ready"),
+            ("consumed_job_id", "stage_" + "0" * 32),
             ("parameter_search_authorized", True),
             ("permanent_blind_access_authorized", True),
             ("claim_ceiling", "qualified"),

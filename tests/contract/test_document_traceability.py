@@ -1373,10 +1373,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "development_learning_implementation_authorized",
             "synthetic_expert_development_reference_authorized",
             "synthetic_expert_development_learning_authorized",
-            "bounded_arbitration_qualification_authorized",
         }
         self.assertIs(
-            stage_plan["authorization"]["bounded_arbitration_qualification_authorized"], True
+            stage_plan["authorization"]["bounded_arbitration_qualification_authorized"], False
         )
         self.assertEqual(
             stage_plan["authorization"]["bounded_arbitration_qualification_config"],
@@ -1392,6 +1391,14 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertEqual(qualification["authority"]["arbitration_access_budget_runs"], 1)
         self.assertIs(qualification["authority"]["parameter_search_authorized"], False)
         self.assertIs(qualification["authority"]["permanent_blind_access_authorized"], False)
+        p3_gate = json.loads((root / "config/p3-gates.v1.json").read_text())
+        bounded = p3_gate["bounded_partition_exceptions"][0]
+        self.assertEqual(bounded["state"], "consumed_inconclusive")
+        self.assertEqual(bounded["remaining_access_budget_runs"], 0)
+        self.assertEqual(
+            bounded["consumed_job_id"],
+            "stage_cf5b89c16c5b4fce8b3c5cdc00a156f7",
+        )
         for key, value in stage_plan["authorization"].items():
             if key.endswith("_authorized") and key not in positive:
                 self.assertIs(value, False)

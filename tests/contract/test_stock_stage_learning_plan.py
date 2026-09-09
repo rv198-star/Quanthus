@@ -255,6 +255,15 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert repair["authority"]["permanent_blind_access_authorized"] is False
     assert repair["state_identity_contract"]["stage_5_6_merge_authorized"] is False
     assert repair["state_identity_contract"]["stage_10_11_merge_authorized"] is False
+    repair_experiment = json.loads(
+        (ROOT / "config/stage-learning/second-group-repair-experiment.v1.json").read_text()
+    )
+    assert repair_experiment["sequential_learning_order"] == [10, 7, 11]
+    assert repair_experiment["stage_identity"]["merge_authorized"] is False
+    assert repair_experiment["stage_10"]["support_role"] == "initial_low_support_candidate"
+    assert repair_experiment["authority"]["runtime_search_authorized"] is False
+    assert repair_experiment["authority"]["arbitration_access_authorized"] is False
+    assert repair_experiment["authority"]["permanent_blind_access_authorized"] is False
     p3_gate = json.loads((ROOT / "config/p3-gates.v1.json").read_text())
     bounded = p3_gate["bounded_partition_exceptions"]
     assert len(bounded) == 1

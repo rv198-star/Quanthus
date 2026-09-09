@@ -90,6 +90,33 @@ def _candidate(day: date) -> StageCandidateObservation:
     )
 
 
+def test_repair_experiment_freezes_sequential_10_7_11_search_without_merging() -> None:
+    raw = json.loads(
+        (ROOT / "config/stage-learning/second-group-repair-experiment.v1.json").read_text()
+    )
+    assert raw["schema_version"] == "quanthus.stage-second-group-repair-experiment.v1"
+    assert raw["work_item"] == "P3-STAGE-001-H"
+    assert raw["stage_identity"]["preserve_distinct_stage_codes"] == [5, 6, 7, 10, 11]
+    assert raw["stage_identity"]["merge_authorized"] is False
+    assert raw["sequential_learning_order"] == [10, 7, 11]
+    assert raw["stage_10"]["support_role"] == "initial_low_support_candidate"
+    assert raw["stage_10"]["r1_search_space"]["unreclaimed_persistence_sessions"] == [3, 5, 8]
+    assert raw["stage_10"]["r1_search_space"]["failure_depth_abs_min"] == [
+        "0.02",
+        "0.04",
+        "0.06",
+    ]
+    assert raw["stage_7"]["repair_fraction_min_candidates"] == ["0.25", "0.40", "0.50"]
+    assert raw["stage_11"]["rebound_from_post_break_low_min_candidates"] == [
+        "0.03",
+        "0.05",
+        "0.08",
+    ]
+    assert raw["authority"]["runtime_search_authorized"] is False
+    assert raw["authority"]["arbitration_access_authorized"] is False
+    assert raw["authority"]["permanent_blind_access_authorized"] is False
+
+
 def test_repair_profile_preserves_all_second_group_stage_identities() -> None:
     raw = load_second_group_repair_profile_config(
         ROOT / "config/stage-learning/second-group-repair-profile.v1.json"

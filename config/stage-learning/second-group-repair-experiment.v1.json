@@ -1,0 +1,122 @@
+{
+  "schema_version": "quanthus.stage-second-group-repair-experiment.v1",
+  "experiment_id": "stock-stage-second-group-7-10-11-development-v1",
+  "work_item": "P3-STAGE-001-H",
+  "status": "frozen_for_sequential_development_reference_and_limited_search",
+  "source_profile": {
+    "config": "config/stage-learning/second-group-repair-profile.v1.json",
+    "job_id": "stage_2aba1a0744a94fe4aaa1be64b82a32cb",
+    "run_id": "stage-second-group-repair-profile-20260909T134119Z",
+    "manifest_sha256": "sha256:da98655c905cdbc63208c806fda8f91bb08ecd6edb6d01ddadd0ac1aa5cca113"
+  },
+  "authority": {
+    "development_only": true,
+    "development_reference_design_authorized": true,
+    "limited_parameter_search_design_authorized": true,
+    "runtime_search_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "official_label_publication_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "partition_policy": {
+    "development": {"start": "2012-01-01", "end": "2021-12-31"},
+    "profile_window": {"start": "2020-01-02", "end": "2021-12-31"},
+    "fresh_arbitration_reuse_authorized": false,
+    "permanent_blind_2025_state": "unopened_unselected"
+  },
+  "stage_identity": {
+    "preserve_distinct_stage_codes": [5, 6, 7, 10, 11],
+    "merge_authorized": false,
+    "stage_7_name": "修复重建",
+    "stage_10_name": "结构失效",
+    "stage_11_name": "反抽"
+  },
+  "sequential_learning_order": [10, 7, 11],
+  "stage_10": {
+    "support_role": "initial_low_support_candidate",
+    "support_role_status": "frozen_primary_candidate_for_development_search_not_proven_market_truth",
+    "acceptance_anchor_role": "local_breakout_acceptance_boundary_not_sufficient_alone_for_stage_10",
+    "observable_claim": "the deeper preregistered support candidate has been crossed and remains unreclaimed for the required persistence while the close is materially below that same support",
+    "r0_baseline": {
+      "unreclaimed_persistence_sessions": 5,
+      "failure_depth_abs_min": "0.04"
+    },
+    "r1_search_space": {
+      "unreclaimed_persistence_sessions": [3, 5, 8],
+      "failure_depth_abs_min": ["0.02", "0.04", "0.06"],
+      "candidate_count": 9,
+      "same_support_reclaim_terminates_current_stage_10": true,
+      "single_crossing_is_never_sufficient": true
+    },
+    "profile_evidence": {
+      "acceptance_anchor_break_rate": {"20": 0.7720483943916789, "60": 0.7397034596375618},
+      "initial_low_support_break_rate": {"20": 0.28629669832654907, "60": 0.12932454695222405},
+      "median_sessions_to_break_acceptance_anchor": {"20": 6, "60": 5},
+      "median_sessions_to_break_initial_low_support": {"20": 26, "60": 28},
+      "initial_low_reclaim_rate_among_breaks": {"20": 0.7962085308056872, "60": 0.7707006369426752}
+    },
+    "non_claims": [
+      "initial_low_support_candidate is not yet a universally proven key-support definition",
+      "a later reclaim does not rewrite an earlier valid Stage-10 observation",
+      "missing or censored data cannot create Stage 10"
+    ]
+  },
+  "stage_7": {
+    "observable_claim": "a causal deep-damage episode has occurred and the current T-only price has repaired a material fraction of that damage; depth alone is insufficient",
+    "deep_damage_drawdown_abs_min_candidates": ["0.12", "0.16", "0.20"],
+    "repair_fraction_min_candidates": ["0.25", "0.40", "0.50"],
+    "candidate_count": 9,
+    "repair_fraction_formula": "(current_close - causal_damage_trough) / (causal_pre_damage_peak - causal_damage_trough)",
+    "full_repair_required": false,
+    "same_slot_with_stage_10": true,
+    "current_stage_10_unreclaimed_failure_blocks_stage_7": true,
+    "reclaimed_prior_stage_10_may_transition_to_stage_7": true,
+    "profile_evidence": {
+      "repair_fraction_p75_range": ["0.264", "0.326"],
+      "repair_fraction_p90_range": ["0.481", "0.574"],
+      "fully_repaired_cycle_rate_range": [0.13031550068587106, 0.33826794966691337],
+      "full_repair_median_sessions_range": [9, 14]
+    },
+    "non_claims": [
+      "a 12/16/20 percent drawdown alone is not Stage 7",
+      "future full recovery is not known at T",
+      "repair fraction is a development candidate measure, not a calibrated probability"
+    ]
+  },
+  "stage_11": {
+    "observable_claim": "after a frozen Stage-10-grade failure on the same support, price has rebounded materially from the post-break running low while that failed support remains unreclaimed",
+    "prior_stage_10_reference_required": true,
+    "same_support_must_remain_unreclaimed": true,
+    "reclaim_terminates_stage_11": true,
+    "rebound_from_post_break_low_min_candidates": ["0.03", "0.05", "0.08"],
+    "candidate_count_after_stage_10_freeze": 3,
+    "profile_evidence": {
+      "initial_low_rebound_p50_at_8_sessions": {"20": "0.0263", "60": "0.0324"},
+      "initial_low_rebound_p75_at_8_sessions": {"20": "0.0520", "60": "0.0501"},
+      "initial_low_rebound_p90_at_8_sessions": {"20": "0.0824", "60": "0.0735"}
+    },
+    "non_claims": [
+      "a rebound without a prior Stage-10-grade failure is not Stage 11",
+      "rebound amplitude alone cannot define Stage 11",
+      "reclaim of the failed support ends the unreclaimed-rebound thesis"
+    ]
+  },
+  "reference_plan": {
+    "reference_evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+    "human_expert_validated": false,
+    "reference_kinds": ["definite", "coexistence", "ambiguous_set", "unjudgeable"],
+    "reviewers_must_not_see_algorithm_candidate_or_future_outcome": true,
+    "stage_10_is_calibrated_before_stage_7_and_stage_11": true,
+    "stage_11_uses_only_the_frozen_stage_10_candidate": true
+  },
+  "claim_limits": [
+    "This contract freezes only development search spaces and does not authorize runtime search.",
+    "Stage 5/6/7/10/11 remain distinct stage codes; no merge is authorized.",
+    "The search grids are result-aware development design derived from already-consumed development evidence and are not confirmatory evidence.",
+    "2022-2024 cannot be reused as a fresh holdout and 2025 remains unopened/unselected.",
+    "No official LabelCard, daily schedule, strategy consumption or trading authority is created."
+  ]
+}

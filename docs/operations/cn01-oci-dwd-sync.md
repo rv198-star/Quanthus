@@ -3,8 +3,10 @@
 CN01 publishes one immutable package under
 `/srv/quanthus/dwd-dws-v2/daily/packages/<market-date>/`. OCI pulls only the package named by
 CN01's `daily/CURRENT.json`; it never reads ODS, rewrites a package, or copies the historical
-daily tree. The OCI timer starts at `20:30 Asia/Shanghai` and waits up to 90 minutes for CN01's
-same-date READY-gated DWD pointer. The wall clock is not proof that DWD is complete.
+daily tree. The OCI timer starts at `20:30 Asia/Shanghai` and waits up to 12 hours for CN01's
+same-date READY-gated DWD pointer. The target market date is persisted under the OCI DWD root, so
+cross-midnight recovery continues the original trading date instead of following the wall clock.
+The wall clock is not proof that DWD is complete.
 
 ## CN01 read-only export
 
@@ -22,8 +24,12 @@ normalization once during deployment.
 
 ## OCI sync
 
-The units reuse the protected Resend key in `/etc/quanthus/t-close-plus-5h.env`; an optional
-`/etc/quanthus/oci-dwd-sync.env` may override non-sensitive settings. Install and enable:
+The warehouse units run from the dedicated immutable runtime symlink
+`/opt/quanthus/warehouse-current`, independent of the shared `/opt/quanthus/current` runtime used
+by other OCI jobs. This allows warehouse recovery fixes to deploy without advancing unrelated
+production services. The units reuse the protected Resend key in
+`/etc/quanthus/t-close-plus-5h.env`; an optional `/etc/quanthus/oci-dwd-sync.env` may override
+non-sensitive settings. Install and enable:
 
 ```text
 oci-dwd-daily-sync.timer
@@ -37,9 +43,11 @@ content checks as CN01, and atomically installs the package and OCI `CURRENT.jso
 packages are immutable: a same-date digest mismatch fails closed. A receipt is written under
 `$QUANTHUS_OCI_DWD_LOCAL_ROOT/receipts/<market-date>/`.
 
-When no `--market-date` is supplied, the sync requires CN01 `CURRENT.json` to be today's
-`Asia/Shanghai` date. A stale prior-day pointer is retried within the bounded wait and fails after
-the deadline rather than silently reusing yesterday's package. Source-date failures are marked
+When no `--market-date` is supplied, the sync creates or resumes the persisted pending market-date
+target. The first invocation binds that target to the current `Asia/Shanghai` date; subsequent
+recovery invocations reuse it across midnight until the exact package is synchronized successfully.
+A stale prior-day pointer is retried within the bounded wait and fails after the deadline rather
+than silently reusing yesterday's package. Source-date failures are marked
 with `cn01_source_failure=true`; transport, local disk, and local immutability failures remain
 separately classified.
 

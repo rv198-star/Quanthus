@@ -14,8 +14,8 @@ Environment=QUANTHUS_DWD_FAILURE_RECEIPT=/home/ubuntu/data/quanthus/dwd-daily/fa
 Environment=QUANTHUS_NOTIFICATION_STATE_ROOT=/home/ubuntu/data/quanthus/notifications
 Environment=QUANTHUS_NODE=OCI
 Environment=QUANTHUS_SYSTEMD_UNIT=oci-dwd-daily-sync.service
-WorkingDirectory=/opt/quanthus/current
-ExecStart=/opt/quanthus/current/.venv/bin/python /opt/quanthus/current/ops/bin/notify-dwd-failure
+WorkingDirectory=/opt/quanthus/warehouse-current
+ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python /opt/quanthus/warehouse-current/ops/bin/notify-dwd-failure
 TimeoutStartSec=2min
 NoNewPrivileges=true
 UMask=0027

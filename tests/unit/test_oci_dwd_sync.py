@@ -618,7 +618,12 @@ def test_oci_sync_units_define_2030_pull_and_success_and_failure_notifications()
         root / "ops/systemd/oci-dwd-sync-failure-notification.service"
     ).read_text(encoding="ascii")
     assert "sync-cn01-dwd-daily" in service
-    assert "/opt/quanthus/current/.venv/bin/python" in service
+    assert "/opt/quanthus/warehouse-current/.venv/bin/python" in service
+    assert "WorkingDirectory=/opt/quanthus/warehouse-current" in service
+    assert "/opt/quanthus/warehouse-current/.venv/bin/python" in oci_notification
+    assert "WorkingDirectory=/opt/quanthus/warehouse-current" in oci_notification
+    assert "/opt/quanthus/warehouse-current/.venv/bin/python" in failure_notification
+    assert "WorkingDirectory=/opt/quanthus/warehouse-current" in failure_notification
     assert "EnvironmentFile=/etc/quanthus/t-close-plus-5h.env" in service
     assert "OnSuccess=oci-dwd-sync-notification.service" in service
     assert "oci-dwd-cn01-notification.service" not in service

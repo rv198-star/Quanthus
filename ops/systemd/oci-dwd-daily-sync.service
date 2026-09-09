@@ -24,8 +24,8 @@ Environment=QUANTHUS_NOTIFICATION_STATE_ROOT=/home/ubuntu/data/quanthus/notifica
 Environment=QUANTHUS_DWD_FAILURE_RECEIPT=/home/ubuntu/data/quanthus/dwd-daily/failures/LATEST.json
 Environment=QUANTHUS_NODE=OCI
 Environment=QUANTHUS_SYSTEMD_UNIT=oci-dwd-daily-sync.service
-WorkingDirectory=/opt/quanthus/current
-ExecStart=/opt/quanthus/current/.venv/bin/python /opt/quanthus/current/ops/bin/sync-cn01-dwd-daily --wait-seconds 43200 --poll-seconds 60 --max-attempts 3
+WorkingDirectory=/opt/quanthus/warehouse-current
+ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python /opt/quanthus/warehouse-current/ops/bin/sync-cn01-dwd-daily --wait-seconds 43200 --poll-seconds 60 --max-attempts 3
 TimeoutStartSec=13h
 Nice=5
 IOSchedulingClass=best-effort

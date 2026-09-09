@@ -12,10 +12,12 @@ import json
 import socket
 import sys
 import time
-from collections.abc import Sequence
-from datetime import datetime, timezone
+from collections.abc import Callable, Sequence
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 PAGE_SIZE = 800
 FREQUENCIES = {"1m": 8, "5m": 0}
@@ -31,6 +33,8 @@ TDX_SERVERS = (
     ("123.60.73.44", 7709),
     ("121.36.225.169", 7709),
 )
+EASTMONEY_TRENDS_URL = "https://push2delay.eastmoney.com/api/qt/stock/trends2/get"
+EASTMONEY_TOKEN = "bd1d9ddb04089700cf9c27f6f7426281"
 
 
 def _now_iso() -> str:
@@ -77,6 +81,138 @@ def tdx_client() -> tuple[Any, str]:
         except Exception:  # noqa: BLE001 - provider failover must try the next endpoint
             continue
     raise RuntimeError("no TDX endpoint returned a valid bars probe")
+
+
+def _eastmoney_secid(symbol: str) -> str:
+    market = "1" if symbol.startswith(("5", "6", "9")) else "0"
+    return f"{market}.{symbol}"
+
+
+def _eastmoney_payload(
+    symbol: str,
+    *,
+    timeout: float = 10.0,
+    opener: Callable[..., Any] = urlopen,
+) -> dict[str, Any]:
+    query = urlencode(
+        {
+            "secid": _eastmoney_secid(symbol),
+            "fields1": "f1,f2,f3,f4,f5,f6,f7,f8",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
+            "ndays": "1",
+            "iscr": "0",
+            "iscca": "0",
+            "ut": EASTMONEY_TOKEN,
+        }
+    )
+    request = Request(
+        f"{EASTMONEY_TRENDS_URL}?{query}",
+        headers={"User-Agent": "Mozilla/5.0 Quanthus/1.0"},
+    )
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            with opener(request, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            data = payload.get("data") or {}
+            if str(data.get("code") or "").zfill(6) != symbol:
+                raise RuntimeError("Eastmoney returned a mismatched security")
+            return data
+        except Exception as exc:  # noqa: BLE001 - bounded provider retry
+            last_error = exc
+            if attempt < 2:
+                time.sleep(0.25 * (attempt + 1))
+    raise RuntimeError(f"Eastmoney trends request failed: {last_error}")
+
+
+def _eastmoney_one_minute_frame(data: dict[str, Any], symbol: str) -> Any:
+    import pandas as pd
+
+    rows: list[dict[str, Any]] = []
+    for raw in data.get("trends") or []:
+        fields = str(raw).split(",")
+        if len(fields) < 7:
+            raise RuntimeError("Eastmoney trends row has fewer than 7 fields")
+        ts = pd.Timestamp(fields[0])
+        rows.append(
+            {
+                "stock_code": symbol,
+                "ts": ts,
+                "open": float(fields[1]),
+                "close": float(fields[2]),
+                "high": float(fields[3]),
+                "low": float(fields[4]),
+                "volume": float(fields[5]) * 100.0,
+                "amount": float(fields[6]),
+            }
+        )
+    if not rows:
+        return pd.DataFrame(
+            columns=("stock_code", "ts", "open", "high", "low", "close", "volume", "amount")
+        )
+    return pd.DataFrame(rows).sort_values("ts").reset_index(drop=True)
+
+
+def _five_minute_label(ts: Any) -> Any:
+    minute = int(ts.minute)
+    if ts.hour == 9 and minute == 30:
+        return ts.replace(minute=35)
+    base = ts.replace(second=0, microsecond=0)
+    rounded = ((minute + 4) // 5) * 5
+    if rounded == 60:
+        return base.replace(minute=0) + timedelta(hours=1)
+    return base.replace(minute=rounded)
+
+
+def _eastmoney_bars(symbol: str, frequency: str) -> tuple[Any, dict[str, Any]]:
+    started = time.monotonic()
+    minute = _eastmoney_one_minute_frame(_eastmoney_payload(symbol), symbol)
+    if minute.empty:
+        return minute, {
+            "ok": True,
+            "provider": "eastmoney-push2delay-trends2",
+            "pages": 1,
+            "rows": 0,
+            "elapsed_seconds": round(time.monotonic() - started, 3),
+            "earliest": None,
+            "latest": None,
+        }
+    if frequency == "1m":
+        frame = minute.loc[minute["ts"].dt.strftime("%H:%M") != "09:30"].copy()
+    elif frequency == "5m":
+        grouped = minute.assign(_bucket=minute["ts"].map(_five_minute_label))
+        frame = (
+            grouped.groupby("_bucket", sort=True, as_index=False)
+            .agg(
+                stock_code=("stock_code", "first"),
+                open=("open", "first"),
+                high=("high", "max"),
+                low=("low", "min"),
+                close=("close", "last"),
+                volume=("volume", "sum"),
+                amount=("amount", "sum"),
+            )
+            .rename(columns={"_bucket": "ts"})
+        )
+        frame = frame[
+            ["stock_code", "ts", "open", "high", "low", "close", "volume", "amount"]
+        ]
+    else:
+        raise RuntimeError(f"unsupported Eastmoney fallback frequency: {frequency}")
+    frame = (
+        frame.drop_duplicates(subset=["stock_code", "ts"])
+        .sort_values("ts")
+        .reset_index(drop=True)
+    )
+    return frame, {
+        "ok": True,
+        "provider": "eastmoney-push2delay-trends2",
+        "pages": 1,
+        "rows": len(frame),
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "earliest": str(frame["ts"].iloc[0]) if len(frame) else None,
+        "latest": str(frame["ts"].iloc[-1]) if len(frame) else None,
+    }
 
 
 def _row_timestamp(row: Any) -> Any:
@@ -203,7 +339,16 @@ def collect(
     home.mkdir(parents=True, exist_ok=True)
     status_path = home / "status.json"
     checkpoint_path = home / "checkpoint.json"
-    client, server = tdx_client()
+    client: Any | None
+    fallback = False
+    try:
+        client, server = tdx_client()
+    except RuntimeError:
+        if mode != "incr":
+            raise
+        client = None
+        server = "eastmoney-push2delay-trends2"
+        fallback = True
     started = time.monotonic()
     results: dict[str, dict[str, Any]] = {}
     errors = 0
@@ -231,15 +376,18 @@ def collect(
     record("running")
     for index, symbol in enumerate(symbols, 1):
         try:
-            frame, meta = page_bars(
-                client,
-                symbol,
-                FREQUENCIES[frequency],
-                max_pages,
-                mode,
-            )
+            if fallback:
+                frame, meta = _eastmoney_bars(symbol, frequency)
+            else:
+                frame, meta = page_bars(
+                    client,
+                    symbol,
+                    FREQUENCIES[frequency],
+                    max_pages,
+                    mode,
+                )
             if not meta.get("ok"):
-                raise RuntimeError(str(meta.get("error") or "TDX bars request failed"))
+                raise RuntimeError(str(meta.get("error") or "minute bars request failed"))
             rows, path = _merge_write(home, symbol, frequency, frame)
             results[symbol] = {
                 "status": "done",
@@ -254,8 +402,9 @@ def collect(
                 "status": "error",
                 "error": f"{type(exc).__name__}: {exc}",
             }
-            with contextlib.suppress(Exception):
-                client, server = tdx_client()
+            if not fallback:
+                with contextlib.suppress(Exception):
+                    client, server = tdx_client()
         if index % 5 == 0 or index == len(symbols):
             _atomic_json(
                 checkpoint_path,

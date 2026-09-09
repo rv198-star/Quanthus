@@ -16,6 +16,7 @@ from quanthus.providers import (
     after_hours_tdx,
     common,
     fundamentals,
+    minute_tdx,
     ods_snapshot,
     trading_calendar,
     valuation_history,
@@ -622,6 +623,104 @@ def test_checkpoint_receipt_identity_multiset_rejects_substitution(tmp_path: Pat
                 ["raw_f10", "000001", "request-a"],
                 ["raw_f10", "600519", "request-b"],
             ],
+        )
+
+
+def test_eastmoney_minute_fallback_preserves_exact_amount_and_aggregates_5m(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "code": "000001",
+        "trends": [
+            "2026-09-09 09:30,11.76,11.76,11.76,11.76,1860,2187360.00,11.760",
+            "2026-09-09 09:31,11.75,11.76,11.77,11.74,6856,8055706.00,11.752",
+            "2026-09-09 09:32,11.76,11.75,11.76,11.73,4848,5693941.00,11.750",
+            "2026-09-09 09:33,11.74,11.76,11.76,11.73,8724,10245170.00,11.747",
+            "2026-09-09 09:34,11.76,11.74,11.76,11.73,5087,5974879.00,11.747",
+            "2026-09-09 09:35,11.73,11.73,11.74,11.73,3584,4205736.00,11.746",
+        ],
+    }
+    monkeypatch.setattr(minute_tdx, "_eastmoney_payload", lambda _symbol: payload)
+
+    one, one_meta = minute_tdx._eastmoney_bars("000001", "1m")
+    assert one_meta["provider"] == "eastmoney-push2delay-trends2"
+    assert one["ts"].dt.strftime("%H:%M").tolist() == ["09:31", "09:32", "09:33", "09:34", "09:35"]
+    assert one["volume"].sum() == pytest.approx((6856 + 4848 + 8724 + 5087 + 3584) * 100)
+    assert one["amount"].sum() == pytest.approx(8055706 + 5693941 + 10245170 + 5974879 + 4205736)
+
+    five, five_meta = minute_tdx._eastmoney_bars("000001", "5m")
+    assert five_meta["provider"] == "eastmoney-push2delay-trends2"
+    assert five["ts"].dt.strftime("%H:%M").tolist() == ["09:35"]
+    row = five.iloc[0]
+    assert row["open"] == pytest.approx(11.76)
+    assert row["close"] == pytest.approx(11.73)
+    assert row["high"] == pytest.approx(11.77)
+    assert row["low"] == pytest.approx(11.73)
+    assert row["volume"] == pytest.approx((1860 + 6856 + 4848 + 8724 + 5087 + 3584) * 100)
+    assert row["amount"] == pytest.approx(
+        2187360 + 8055706 + 5693941 + 10245170 + 5974879 + 4205736
+    )
+
+
+def test_minute_collect_uses_eastmoney_only_for_incremental_tdx_outage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pandas as pd
+
+    monkeypatch.setattr(
+        minute_tdx,
+        "tdx_client",
+        lambda: (_ for _ in ()).throw(RuntimeError("TDX unavailable")),
+    )
+    frame = pd.DataFrame(
+        [
+            {
+                "stock_code": "000001",
+                "ts": pd.Timestamp("2026-09-09 15:00:00"),
+                "open": 11.72,
+                "high": 11.72,
+                "low": 11.70,
+                "close": 11.70,
+                "volume": 517700.0,
+                "amount": 6057558.0,
+            }
+        ]
+    )
+    monkeypatch.setattr(
+        minute_tdx,
+        "_eastmoney_bars",
+        lambda _symbol, _frequency: (
+            frame,
+            {"ok": True, "provider": "eastmoney-push2delay-trends2", "rows": 1},
+        ),
+    )
+
+    output = tmp_path / "minute"
+    assert (
+        minute_tdx.collect(
+            home=output,
+            layer="research",
+            frequency="1m",
+            mode="incr",
+            symbols=["000001"],
+            max_pages=1,
+            sleep_seconds=0,
+        )
+        == 0
+    )
+    status = json.loads((output / "status.json").read_text())
+    assert status["server"] == "eastmoney-push2delay-trends2"
+    assert pq.read_table(output / "000001_1m.parquet").num_rows == 1
+
+    with pytest.raises(RuntimeError, match="TDX unavailable"):
+        minute_tdx.collect(
+            home=tmp_path / "backfill",
+            layer="research",
+            frequency="1m",
+            mode="backfill",
+            symbols=["000001"],
+            max_pages=1,
+            sleep_seconds=0,
         )
 
 

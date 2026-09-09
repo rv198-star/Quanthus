@@ -1,0 +1,28 @@
+{
+  "schema_version": "quanthus.structure-f9-run.v1",
+  "provider_config": "config/replay-data-provider.structure-v2.development.v1.json",
+  "scan_start": "2019-10-08",
+  "report_start": "2020-01-02",
+  "report_end": "2020-03-31",
+  "security_codes": ["000001", "300750", "600519"],
+  "lookbacks": [20, 60],
+  "support_horizon_sessions": 60,
+  "support_role": "breakout-start-rolling-low-candidate",
+  "knowledge_view": "retrospective",
+  "coordinate_policy": "raw-cny-action-epoch-reset-v1",
+  "projection": {
+    "stage_10_persistence_sessions": 5,
+    "stage_10_failure_depth_abs_min": "0.02",
+    "stage_11_rebound_min": "0.05",
+    "official_label": false,
+    "strategy_consumption_authorized": false
+  },
+  "review_sample_limit": 12,
+  "maximum_wall_seconds": 1200,
+  "cold_result_job_budget": 2,
+  "research_only": true,
+  "execution_authorized": false,
+  "economic_claim": false,
+  "sealed_partition_access_authorized": false,
+  "permanent_blind_access_authorized": false
+}

@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STRUCT-005",
+  "design": "docs/design/structure-support-facts.md",
+  "runtime_request": "config/structure-f9-run.development.v1.json",
+  "runtime_accepted": false,
+  "runtime_qualification": null,
+  "items": [
+    {
+      "id": "P3-STRUCT-005",
+      "title": "Formalize F9 same-support failure/reclaim/rebound facts",
+      "kind": "epic",
+      "status": "blocked",
+      "depends_on": ["P3-STRUCT-004", "P3-STAGE-001-H"],
+      "scope": "Promote the continuous support-failure evidence behind Stage 10/11 into a narrow Structure B3/B4/B5 extension; keep Stage labels as research-only projections and do not open B6/B7.",
+      "acceptance": [
+        "All child issues closed with exact repository and runtime evidence",
+        "Two same-revision independent cold real-DWD Jobs reproduce F9 semantic identities",
+        "Stage 11 consumes prior immutable Stage-10 confirmation ref rather than current-depth recomputation",
+        "No official label, economic, B6/B7, sealed-partition or trading authority opens"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STRUCT-005-A",
+      "title": "Freeze F9 support-role and projection semantics",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STRUCT-004", "P3-STAGE-001-H"],
+      "scope": "Freeze exact rolling-low support binding, break/reclaim equality, persistence age, post-break rebound and prior-10-ref projection boundary.",
+      "acceptance": [
+        "Support role is a candidate role, not a proven universal support claim",
+        "Fact identity excludes Stage thresholds and usage clocks",
+        "Missing/coordinate/calendar discontinuity censors rather than fabricates failure",
+        "Stage 10/11 projection thresholds remain outside Fact identity"
+      ],
+      "evidence": ["docs/design/structure-support-facts.md"]
+    },
+    {
+      "id": "P3-STRUCT-005-B",
+      "title": "Implement formal F9 facts, deep verifier and governed runner",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STRUCT-005-A"],
+      "scope": "Implement support binding, distance, same-support break/reclaim, unreclaimed age, post-break rebound, research projection, exact artifacts and Event Worker governed dispatch.",
+      "acceptance": [
+        "Synthetic same-target, prefix-replay, censoring and reclaim counterexamples pass",
+        "Stage 11 remains valid after prior Stage 10 when current depth recovers inside 2% but support is unreclaimed",
+        "Deep verifier reconstructs B2 admission, B3-B5 base Structure, F9 Facts and projection",
+        "Event Worker accepts only the fixed repository run config"
+      ],
+      "evidence": ["docs/acceptance/structure-f9-release-ready-20260910.md"]
+    },
+    {
+      "id": "P3-STRUCT-005-C",
+      "title": "Qualify F9 facts with two independent cold real-DWD Jobs",
+      "kind": "task",
+      "status": "ready",
+      "depends_on": ["P3-STRUCT-005-B"],
+      "scope": "Run exactly two same-revision cold Jobs on the frozen three-security 2020Q1 development slice and compare semantic identities and deterministic review sample.",
+      "acceptance": [
+        "Both Jobs independently build the provider and report zero cross-Job cache hits",
+        "Input-readiness, base Structure, F9 support facts and research projection digests match",
+        "Deep verifier passes both immutable artifacts",
+        "Preregistered outcome-blind review finds no obvious semantic contradiction"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STRUCT-005-D",
+      "title": "Freeze F9 runtime bindings and route Stage 10/11 to projections",
+      "kind": "task",
+      "status": "blocked",
+      "depends_on": ["P3-STRUCT-005-C"],
+      "scope": "After C passes, record accepted runtime concept bindings and close the Route-A milestone without activating official Stage labels or consumers.",
+      "acceptance": [
+        "Blueprint records only the accepted F9 scope and preserves B1-B5 acceptance",
+        "Stage 10/11 remain separately versioned research projections over continuous Facts",
+        "Stage 5/6/7 remain INCONCLUSIVE_PARKED",
+        "No B6/B7/economic/daily/strategy/trading authority is opened"
+      ],
+      "evidence": []
+    }
+  ]
+}

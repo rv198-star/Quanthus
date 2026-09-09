@@ -23,7 +23,7 @@ def catalog():
 
 
 def test_every_existing_entry_has_reviewed_chinese_reading(catalog):
-    assert len(catalog.snapshot["entries"]) == 748
+    assert len(catalog.snapshot["entries"]) == 750
     for entry in catalog.snapshot["entries"]:
         assert ZH.search(entry["display_name"]), entry["entry_id"]
         assert ZH.search(entry["description"]), entry["entry_id"]
@@ -282,7 +282,7 @@ def test_packaging_contains_presentation_and_lineage_closure():
 def test_source_inventory_and_semantic_ids_stay_exact(catalog):
     built = build_catalog()
     assert built["snapshot_digest"] == catalog.snapshot["snapshot_digest"]
-    assert built["summary"]["entry_count"] == 748
+    assert built["summary"]["entry_count"] == 750
     assert built["summary"]["counts_by_kind"]["adm_dataset"] == 4
     assert built["summary"]["counts_by_kind"]["adm_field"] == 76
     assert built["summary"]["counts_by_kind"]["dwd_field"] == 524

@@ -23,6 +23,7 @@ from typing import Any
 from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB, DurableJobQueue
 from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
 from quanthus.policy import find_project_root
+from quanthus.structure_f9_artifact import verify_structure_f9_artifact
 from quanthus.structure_v2_artifact import verify_structure_v2_artifact
 
 EVENT_QUEUE = "event"
@@ -35,12 +36,14 @@ _STRUCTURE_MVP_RUN_CONFIG = "config/structure-mvp-run.development.v1.json"
 _STRUCTURE_ECONOMIC_RUN_CONFIG = "config/structure-economic-run.development.v1.json"
 _STRUCTURE_FACTS_RUN_CONFIG = "config/structure-facts-run.development.v1.json"
 _STRUCTURE_V2_RUN_CONFIG = "config/structure-facts-v2-run.development.v1.json"
+_STRUCTURE_F9_RUN_CONFIG = "config/structure-f9-run.development.v1.json"
 _STRUCTURE_RUN_CONFIGS = frozenset(
     {
         _STRUCTURE_MVP_RUN_CONFIG,
         _STRUCTURE_ECONOMIC_RUN_CONFIG,
         _STRUCTURE_FACTS_RUN_CONFIG,
         _STRUCTURE_V2_RUN_CONFIG,
+        _STRUCTURE_F9_RUN_CONFIG,
     }
 )
 # Backward-compatible name retained for the technical-MVP qualification seeder/tests.
@@ -393,6 +396,7 @@ def _structure_request_digest(run_config: str) -> str:
         _STRUCTURE_ECONOMIC_RUN_CONFIG: "quanthus.structure-economic-run.v1",
         _STRUCTURE_FACTS_RUN_CONFIG: "quanthus.structure-facts-run.v1",
         _STRUCTURE_V2_RUN_CONFIG: "quanthus.structure-facts-v2-run.v1",
+        _STRUCTURE_F9_RUN_CONFIG: "quanthus.structure-f9-run.v1",
     }[run_config]
     if not isinstance(raw, dict) or raw.get("schema_version") != expected_schema:
         raise RuntimeError("structure_mvp_run_config_invalid")
@@ -1277,6 +1281,13 @@ class EventWorker:
             running_stage = "running-structure-v2"
             validating_stage = "validating-structure-v2-run"
             recovering_stage = "recovering-sealed-structure-v2-run"
+        elif run_config == _STRUCTURE_F9_RUN_CONFIG:
+            verifier = verify_structure_f9_artifact
+            module = "quanthus.structure_f9_run"
+            artifact_name = "structure-f9"
+            running_stage = "running-structure-f9"
+            validating_stage = "validating-structure-f9-run"
+            recovering_stage = "recovering-sealed-structure-f9-run"
         elif economic:
             verifier = _verify_structure_economic_artifact
             module = "quanthus.structure_economic_experiment"

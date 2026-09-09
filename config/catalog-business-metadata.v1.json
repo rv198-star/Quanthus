@@ -321,6 +321,8 @@
     "structure.episode.below-anchor": ["参照失守过程"],
     "structure.episode.breakout": ["价格突破过程"],
     "structure.episode.reclaim-sequence": ["失守与收复过程"],
+    "structure.episode.support-failure-sequence": ["同一支撑失效过程", "绑定事前冻结的同一支撑候选，记录失守、持续未收复、收复或中断；不代表卖出信号或支撑强度已被证明。"],
+    "structure.geometry.post-break-rebound": ["失守后未收复反弹幅度", "在同一支撑失守且尚未收复期间，计算当前收盘相对破位后因果运行低点的反弹比例；收复当日不计入该度量。"],
     "structure.geometry.range-width": ["价格区间宽度"],
     "structure.geometry.signed-distance": ["价格相对参照距离"],
     "structure.geometry.width-change": ["价格宽度变化"],

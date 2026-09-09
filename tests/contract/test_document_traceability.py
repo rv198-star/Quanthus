@@ -1345,6 +1345,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         stage_ids = {item["id"] for item in stage_plan["items"]}
         self.assertEqual(stage_ids, {"P3-STAGE-001", *[f"P3-STAGE-001-{c}" for c in "ABCDEFGHIJ"]})
+        f9_plan = json.loads(
+            (root / "config/structure-f9-delivery.v1.json").read_text()
+        )["items"]
+        f9_ids = {item["id"] for item in f9_plan}
+        self.assertEqual(f9_ids, {"P3-STRUCT-005", *[f"P3-STRUCT-005-{c}" for c in "ABCD"]})
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True
@@ -1413,10 +1418,10 @@ class DocumentTraceabilityTests(unittest.TestCase):
         for key, value in stage_plan["authorization"].items():
             if key.endswith("_authorized") and key not in positive:
                 self.assertIs(value, False)
-        for declared in [*catalog_plan, *lineage_plan, *stage_plan["items"]]:
+        for declared in [*catalog_plan, *lineage_plan, *stage_plan["items"], *f9_plan]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
-        catalog_owned_ids = catalog_ids | lineage_ids | stage_ids
+        catalog_owned_ids = catalog_ids | lineage_ids | stage_ids | f9_ids
         p3_items = [item for item in items
                     if item.phase == "P3" and item.stable_id not in catalog_owned_ids]
         p4_items = [item for item in items if item.phase == "P4"]

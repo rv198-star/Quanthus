@@ -173,6 +173,17 @@ def _package_from_current(
     return pointer, result
 
 
+def _market_date_from_current(*, daily_root: Path) -> date:
+    pointer = _object(daily_root / "CURRENT.json")
+    raw_date = pointer.get("market_date")
+    if not isinstance(raw_date, str):
+        raise WarehouseNotificationError("DWD CURRENT market_date is invalid")
+    try:
+        return date.fromisoformat(raw_date)
+    except ValueError as exc:
+        raise WarehouseNotificationError("DWD CURRENT market_date is invalid") from exc
+
+
 def _recipients() -> tuple[str, ...]:
     raw = os.environ.get("QUANTHUS_RESEND_TO", "61718@qq.com")
     values = tuple(item.strip() for item in raw.split(",") if item.strip())
@@ -391,7 +402,7 @@ def send_daily_event(
         )
     else:
         if market_date is None:
-            market_date = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+            market_date = _market_date_from_current(daily_root=daily_root)
         pointer, result = _package_from_current(daily_root=daily_root, market_date=market_date)
         failure_error = None
         key_material = (

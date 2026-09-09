@@ -120,6 +120,30 @@ def test_notification_is_idempotent_after_success(tmp_path: Path, monkeypatch) -
     assert calls == ["cn01_dwd_completed"]
 
 
+def test_success_notification_without_explicit_date_uses_current_pointer(
+    tmp_path: Path, monkeypatch
+) -> None:
+    daily_root = tmp_path / "daily"
+    _write_package(daily_root, market_date="2026-09-09")
+    calls: list[dict[str, object]] = []
+
+    def fake_send(**kwargs):
+        calls.append(kwargs)
+        return {"provider": "test", "status": "sent", "attempts": 1}
+
+    monkeypatch.setattr(warehouse_notifications, "_send_resend", fake_send)
+    result = warehouse_notifications.send_daily_event(
+        event="cn01_dwd_completed",
+        daily_root=daily_root,
+        market_date=None,
+        state_root=tmp_path / "notifications",
+    )
+
+    assert result["status"] == "sent"
+    assert result["market_date"] == "2026-09-09"
+    assert calls[0]["market_date"] == date(2026, 9, 9)
+
+
 def test_failure_event_does_not_require_a_dwd_package(tmp_path: Path, monkeypatch) -> None:
     receipt = tmp_path / "failure.json"
     receipt.write_bytes(

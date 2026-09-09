@@ -120,10 +120,7 @@ nodes.
   Expert/economic gate, thirteen-state/ML work, or Shadow/paper/live execution. Catalog work #215
   is a later independent read-only discovery surface and does not retroactively expand this scope.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
-- `P3-STRUCT-005` is accepted and closed for the owner-approved Route-A F9 follow-up. It does **not**
-  reopen Stage tuning. It formalizes the continuous F9 chain as a narrow B3/B4/B5 extension:
-  breakout-start rolling-low support binding, same-support break/reclaim, unreclaimed session age,
-  signed distance and post-break rebound. Stage 10/11 remain research-only projections, with Stage
+- `P3-STRUCT-005` is accepted and closed for the owner-approved Route-A **演化支撑事实族 / Support Evolution Fact Family** follow-up (`F9` is retained only as the historical planning code). It does **not** reopen Stage tuning. The fact family is a narrow B3/B4/B5 extension: support identity/binding, same-support break/reclaim events, unreclaimed process state, signed support distance and post-break rebound are different dimensions inside one family rather than peer labels. Stage 10/11 remain research-only projections, with Stage
   11 consuming an immutable prior Stage-10 confirmation rather than recomputing current Stage-10
   depth. Revision `44571610` completed two independent cold real-DWD Jobs with exact semantic
   reproduction: 174/174 admitted rows, 6 support bindings, 3 breaks, 3 reclaims, 25 unreclaimed

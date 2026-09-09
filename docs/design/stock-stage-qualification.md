@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H第二组development已mixed closeout：Stage 10/11冻结development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED；三视角评审为`PASS_WITH_SCOPE_REDUCTION`。Route A `P3-STRUCT-005` 已接受10/11所需F9 continuous Facts的bounded retrospective双冷跑资格，但不提升Stage标签证据等级。当前版本development search已关闭；正式标签、2025、QUALIFIED、日更、消费者和交易仍未授权 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H第二组development已mixed closeout：Stage 10/11冻结development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED；三视角评审为`PASS_WITH_SCOPE_REDUCTION`。Route A `P3-STRUCT-005` 已接受10/11所需**演化支撑事实族 / Support Evolution Fact Family（历史编号 F9）**的bounded retrospective双冷跑资格，但不提升Stage标签证据等级。当前版本development search已关闭；正式标签、2025、QUALIFIED、日更、消费者和交易仍未授权 |
 | Version | 0.1 |
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |

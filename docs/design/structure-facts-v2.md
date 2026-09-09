@@ -5,7 +5,7 @@
 | Design status | approved |
 | Delivery gate | accepted |
 | Governing work item | `P3-STRUCT-004` |
-| Current delivery | B1-B5 bounded retrospective vertical accepted; B6-B11 remain separately gated |
+| Current delivery | B1-B5 bounded retrospective vertical accepted; additive `B5-F9` **演化支撑事实族 / Support Evolution Fact Family** Route-A extension accepted; B6-B11 remain separately gated |
 | Runtime v2 acceptance | ACCEPTED for the fixed development retrospective slice only |
 | Runtime acceptance | `../acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md` |
 | Retained pre-result repair | `../acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md`; resolved by independent A/B |
@@ -344,6 +344,7 @@ next gate and evidence. A planned row is not implemented; a contract test is not
 | B3 | Small multi-scale reference set | Freeze parameters before result access; no global optimum claim |
 | B4 | Same-anchor close crossings and reclaim | Standalone traceable interactions, no inferred intrabar order |
 | B5 | Minimal loss/reclaim process and one consumer | First v2 vertical qualification boundary, not all possible repair geometry |
+| B5-F9 | **演化支撑事实族 / Support Evolution Fact Family** (`F9` historical capability code) | Accepted additive Route-A B3/B4/B5 extension: support binding, same-support break/reclaim events, unreclaimed process state and continuous support-distance/post-break-rebound measurements; Stage 10/11 remain separate projections |
 | B6 | Geometry/width/compression extensions | Planned; demand and counterexample driven |
 | B7 | Episode activity relations | Planned; shared primitives, independent volume availability |
 | B8 | Shared indicators and Data & Indicator Catalog | P3-DICT-001 accepted as an independent read-only catalog; no dependency of B1-B5 and no claim that every reserved indicator has an executable spec |

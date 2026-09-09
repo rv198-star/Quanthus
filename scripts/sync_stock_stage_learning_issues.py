@@ -34,9 +34,7 @@ SECOND_GROUP_SEARCH_FLAG = "second_group_development_search_authorized"
 BOUNDED_ARBITRATION_FLAG = "bounded_arbitration_qualification_authorized"
 BOUNDED_ARBITRATION_CONFIG = "bounded_arbitration_qualification_config"
 PERMANENT_BLIND_QUALIFICATION_FLAG = "permanent_blind_qualification_authorized"
-AUTH_SCOPE = (
-    "development_second_group_search_authorized_arbitration_consumed_no_holdout_authority"
-)
+AUTH_SCOPE = "second_group_mixed_closeout_no_active_search_no_holdout_authority"
 
 
 def load_plan() -> dict:
@@ -77,13 +75,14 @@ def load_plan() -> dict:
             SYNTHETIC_LEARNING_FLAG,
             CAPACITY_CENSUS_FLAG,
             SECOND_GROUP_PROFILE_FLAG,
-            SECOND_GROUP_SEARCH_FLAG,
         )
     ):
         raise ValueError(
             "capacity, harness, reference, synthetic-panel, learning, development-census and "
-            "second-group profile/search authorizations must be explicit"
+            "second-group profile authorizations must be explicit"
         )
+    if auth[SECOND_GROUP_SEARCH_FLAG] is not False:
+        raise ValueError("second-group development search must be closed after mixed closeout")
     if auth[BOUNDED_ARBITRATION_FLAG] is not False:
         raise ValueError("consumed arbitration qualification cannot remain authorized")
     if auth[PERMANENT_BLIND_QUALIFICATION_FLAG] is not False:
@@ -156,12 +155,10 @@ def load_plan() -> dict:
         ):
             if not item.get(key):
                 raise ValueError(f"empty work-item contract: {key}")
-        if item["status"] == "ready" and item["id"] != f"{PARENT}-H":
-            raise ValueError("only H development profile may be ready without holdout authority")
-        if item["id"] == f"{PARENT}-H" and item["status"] == "ready" and auth.get(
-            SECOND_GROUP_PROFILE_FLAG
-        ) is not True:
-            raise ValueError("H development profile readiness requires explicit authority")
+        if item["status"] == "ready":
+            raise ValueError(
+                "no stock-stage child may remain ready after second-group mixed closeout"
+            )
         if (
             item["id"] == f"{PARENT}-F"
             and item["status"] == "ready"
@@ -210,13 +207,12 @@ def body(item: dict, plan: dict, mapping: dict) -> str:
         " `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility "
         "INCONCLUSIVE关闭。不得重跑该分区并称fresh holdout。"
         "P3-STAGE-001-I 已关闭protocol-only采样修复；J的development容量普查已完成。"
-        "H当前只授权2020-2021 development第二组研究：首轮development已成功执行但"
-        "整体INCONCLUSIVE；Stage 10已冻结，Stage 6/11仅因ambiguous reference数量不足"
-        "进入一次second-group-development-supplement.v1补样。hard gates不变，10不得"
-        "重搜，7保持attributable INCONCLUSIVE且不得扩网格。5/6与10/11保持独立编号，"
-        "不得输出正式阶段标签。2025 permanent-blind仍未开放；当前不授权新的"
-        "sealed-partition读取、development合同外参数搜索、结果后改候选、QUALIFIED "
-        "LabelCard、日更、策略消费、云GPU或交易。"
+        "H第二组development milestone已mixed closeout：Stage 10/11冻结development candidate，"
+        "Stage 5/6/7为INCONCLUSIVE_PARKED，量化/短线/基金三视角评审为"
+        "PASS_WITH_SCOPE_REDUCTION。当前second-group development search已关闭；任何10/11"
+        "产品化、5/6/7新版本、第三组或消费者都需要新scope。2025 permanent-blind仍未开放；"
+        "当前不授权新的sealed-partition读取、参数搜索、QUALIFIED LabelCard、日更、策略消费、"
+        "云GPU或交易。"
     )
     sections = [
         f"<!-- quanthus-planning:v2 id={item['id']} kind={item['kind']} -->",

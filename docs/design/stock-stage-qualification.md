@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H首轮 `second-group-development.v1.json` 已成功执行但整体INCONCLUSIVE：10冻结，6/11因ambiguous reference corpus不足无法通过，7在参考充分下无候选过gate。当前只授权 `second-group-development-supplement.v1.json` 增补6/11 T-only references并重评分原网格；hard gates不变，10不得重搜、7不得扩网格或重跑。5/6与10/11保持独立；正式标签、2025、QUALIFIED、日更、消费者和交易仍未授权 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H第二组development已mixed closeout：Stage 10/11冻结development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED；三视角评审为`PASS_WITH_SCOPE_REDUCTION`。当前版本development search已关闭；正式标签、2025、QUALIFIED、日更、消费者和交易仍未授权 |
 | Version | 0.1 |
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
@@ -20,7 +20,7 @@ Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；
 
 本提案把“12 状态”视为待检验的市场描述体系，而不是已经存在标准答案、只差编程的十三分类任务。既要验证算法是否遵守规则，也要验证规则是否能区分用户关心的情形，进一步验证其市场假设与策略用途。允许结果是保留、合并、改为修饰维度、降为展示或拒绝某个状态，而不是为了凑足十二个编号提高规则复杂度。
 
-当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。P3-STAGE-001-F历史窄例外只保留为consumed evidence；2022-2024不能再称fresh holdout。H首轮development runner已完成：Stage 10成功冻结 `5 sessions + 2%`，Stage 6/11的唯一硬阻塞是ambiguous references分别9/7低于minimum=10，而Stage 7拥有42 positive / 58 negative / 20 ambiguous却仍无候选通过。后继 supplement 因而只解决6/11的reference sufficiency：base sample保留，新增context排除原episode，review policy/hard gates/search grid不变；10直接复用，7不重跑。supplement后无论 complete 还是 INCONCLUSIVE 都停止development追参，随后进入量化、短线、基金专家复审。2025 permanent-blind保持未触碰，任何外样本执行仍须独立授权。
+当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。P3-STAGE-001-F历史窄例外只保留为consumed evidence；2022-2024不能再称fresh holdout。H的首轮development与一次受限supplement均已完成：Stage 6/11 reference sufficiency已修复，但Stage-5/6原网格仍无eligible candidate；Stage 7在充分reference下保持INCONCLUSIVE；Stage 10冻结`5 sessions + 2%`，Stage 11冻结`5% unreclaimed rebound`。当前版本以mixed closeout停止development追参，三视角评审要求只把10/11作为development candidate继续考虑，5/6/7保留连续Facts和编号但不输出离散candidate。2025 permanent-blind保持未触碰，任何产品化、外样本执行或新版本都必须单独授权。
 
 ## 2. 仓库核查与需要纠正的前提
 

@@ -21,7 +21,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     plan = sync.load_plan()
     assert len(plan["items"]) == 11
     ready = {item["id"] for item in plan["items"] if item["status"] == "ready"}
-    assert ready == {"P3-STAGE-001-H"}
+    assert ready == set()
     by_id = {item["id"]: item for item in plan["items"]}
     assert by_id["P3-STAGE-001-A"]["status"] == "closed"
     assert by_id["P3-STAGE-001-B"]["status"] == "closed"
@@ -29,7 +29,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert by_id["P3-STAGE-001-D"]["status"] == "closed"
     assert by_id["P3-STAGE-001-E"]["status"] == "closed"
     assert by_id["P3-STAGE-001-F"]["status"] == "closed"
-    assert by_id["P3-STAGE-001-H"]["status"] == "ready"
+    assert by_id["P3-STAGE-001-H"]["status"] == "blocked"
     assert by_id["P3-STAGE-001-I"]["status"] == "closed"
     assert by_id["P3-STAGE-001-J"]["status"] == "blocked"
     assert plan["data_policy"]["development_years"] == [2012, 2021]
@@ -44,7 +44,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert plan["authorization"][sync.SYNTHETIC_LEARNING_FLAG] is True
     assert plan["authorization"][sync.CAPACITY_CENSUS_FLAG] is True
     assert plan["authorization"][sync.SECOND_GROUP_PROFILE_FLAG] is True
-    assert plan["authorization"][sync.SECOND_GROUP_SEARCH_FLAG] is True
+    assert plan["authorization"][sync.SECOND_GROUP_SEARCH_FLAG] is False
     assert plan["authorization"][sync.BOUNDED_ARBITRATION_FLAG] is False
     assert plan["authorization"][sync.BOUNDED_ARBITRATION_CONFIG] == (
         "config/stage-learning/qualification.v1.json"
@@ -98,7 +98,6 @@ def test_issue_sync_cannot_enable_execution(copied_plan, flag: str) -> None:
         sync.SYNTHETIC_LEARNING_FLAG,
         sync.CAPACITY_CENSUS_FLAG,
         sync.SECOND_GROUP_PROFILE_FLAG,
-        sync.SECOND_GROUP_SEARCH_FLAG,
     ],
 )
 def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> None:
@@ -107,6 +106,36 @@ def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> Non
     path.write_text(json.dumps(plan))
     with pytest.raises(ValueError, match="authorizations must be explicit"):
         sync.load_plan()
+
+
+def test_second_group_search_cannot_be_reopened_after_mixed_closeout(copied_plan) -> None:
+    plan, path = copied_plan
+    plan["authorization"][sync.SECOND_GROUP_SEARCH_FLAG] = True
+    path.write_text(json.dumps(plan))
+    with pytest.raises(ValueError, match="must be closed"):
+        sync.load_plan()
+
+
+def test_second_group_mixed_closeout_freezes_partial_candidates_and_parks_inconclusive() -> None:
+    closeout = json.loads(
+        (ROOT / "config/stage-learning/second-group-development-closeout.v1.json").read_text()
+    )
+    assert closeout["status"] == "development_tuning_closed_mixed_disposition"
+    states = closeout["state_dispositions"]
+    assert states["5"]["status"] == "INCONCLUSIVE_PARKED"
+    assert states["6"]["status"] == "INCONCLUSIVE_PARKED"
+    assert states["7"]["status"] == "INCONCLUSIVE_PARKED"
+    assert states["10"]["status"] == "DEVELOPMENT_CANDIDATE_FROZEN"
+    assert states["10"]["parameters"] == {
+        "support_role": "initial_low_support_candidate",
+        "unreclaimed_persistence_sessions": 5,
+        "failure_depth_abs_min": "0.02",
+    }
+    assert states["11"]["status"] == "DEVELOPMENT_CANDIDATE_FROZEN"
+    assert states["11"]["parameters"]["rebound_from_post_break_low_min"] == "0.05"
+    assert closeout["governance"]["development_tuning_closed"] is True
+    assert closeout["governance"]["development_rerun_authorized"] is False
+    assert closeout["governance"]["permanent_blind_access_authorized"] is False
 
 
 def test_consumed_arbitration_authority_cannot_be_reopened(copied_plan) -> None:

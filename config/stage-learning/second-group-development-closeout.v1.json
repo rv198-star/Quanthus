@@ -1,0 +1,122 @@
+{
+  "schema_version": "quanthus.stage-second-group-development-closeout.v1",
+  "closeout_id": "stock-stage-second-group-development-mixed-closeout-v1",
+  "work_item": "P3-STAGE-001-H",
+  "status": "development_tuning_closed_mixed_disposition",
+  "source_runs": {
+    "base": {
+      "job_id": "stage_45493c2eae724023a1a1a626dd515a95",
+      "run_id": "stage-second-group-development-20260909T155024Z",
+      "manifest_sha256": "sha256:16056a637d4456ed3d9dcab4e4a1f9feb9b7f5e361e76bcc66c16a12acd14cb9",
+      "candidate_artifact_digest": "sha256:8e63c41f42a21396b7fc5eb785e37838ea2a2cb3fd7716f4b1c87b0f7a418d83",
+      "disposition": "INCONCLUSIVE"
+    },
+    "supplement": {
+      "job_id": "stage_5dad4fb7923d44e7b135461e2f60ec75",
+      "run_id": "stage-second-group-development-supplement-20260909T164939Z",
+      "manifest_sha256": "sha256:c3eccde8d704652ab67f9016cfe346d9587ccb7a69d20fd8b8a129c35ad56155",
+      "candidate_artifact_digest": "sha256:6a7b76744f47bc20074cb8646fcdb3ca96e380cb8a0b4f423a37e17f566e348a",
+      "disposition": "INCONCLUSIVE_AFTER_REFERENCE_SUPPLEMENT"
+    }
+  },
+  "state_identity": {
+    "preserve_distinct_stage_codes": [5, 6, 7, 10, 11],
+    "merge_authorized": false
+  },
+  "state_dispositions": {
+    "5": {
+      "status": "INCONCLUSIVE_PARKED",
+      "reason": "joint Stage-5/6 frozen grid produced no hard-gate-eligible candidate after Stage-6 reference sufficiency was repaired",
+      "discrete_candidate_frozen": false,
+      "continuous_facts_retained": true
+    },
+    "6": {
+      "status": "INCONCLUSIVE_PARKED",
+      "reason": "ambiguous reference shortfall was repaired from 9 to 19, but the unchanged joint Stage-5/6 grid still produced no hard-gate-eligible candidate",
+      "merged_reference_counts": {
+        "context_count": 200,
+        "definite_positive_count": 38,
+        "definite_negative_count": 143,
+        "ambiguous_count": 19,
+        "unjudgeable_count": 0
+      },
+      "discrete_candidate_frozen": false,
+      "continuous_facts_retained": true
+    },
+    "7": {
+      "status": "INCONCLUSIVE_PARKED",
+      "reason": "reference corpus was sufficient but all frozen-grid candidates failed at least one preregistered gate; supplement did not rerun or widen Stage 7",
+      "base_reference_counts": {
+        "context_count": 120,
+        "definite_positive_count": 42,
+        "definite_negative_count": 58,
+        "ambiguous_count": 20,
+        "unjudgeable_count": 0
+      },
+      "gate_reason_trial_counts": {
+        "positive_coverage_below_gate": 6,
+        "ambiguous_unique_assertion_rate_above_gate": 4,
+        "f1_inferior_to_r0_beyond_tolerance": 4
+      },
+      "discrete_candidate_frozen": false,
+      "continuous_facts_retained": true
+    },
+    "10": {
+      "status": "DEVELOPMENT_CANDIDATE_FROZEN",
+      "parameters": {
+        "support_role": "initial_low_support_candidate",
+        "unreclaimed_persistence_sessions": 5,
+        "failure_depth_abs_min": "0.02"
+      },
+      "base_reference_counts": {
+        "context_count": 120,
+        "definite_positive_count": 36,
+        "definite_negative_count": 65,
+        "ambiguous_count": 19,
+        "unjudgeable_count": 0
+      },
+      "official_label_authorized": false
+    },
+    "11": {
+      "status": "DEVELOPMENT_CANDIDATE_FROZEN",
+      "parameters": {
+        "prior_stage_10_reference_required": true,
+        "same_support_must_remain_unreclaimed": true,
+        "rebound_from_post_break_low_min": "0.05"
+      },
+      "merged_reference_counts": {
+        "context_count": 200,
+        "definite_positive_count": 52,
+        "definite_negative_count": 137,
+        "ambiguous_count": 11,
+        "unjudgeable_count": 0
+      },
+      "official_label_authorized": false
+    }
+  },
+  "governance": {
+    "development_tuning_closed": true,
+    "additional_reference_supplement_authorized": false,
+    "grid_expansion_authorized": false,
+    "development_rerun_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "official_label_publication_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "review": {
+    "required": true,
+    "path": "docs/reviews/stock-stage-second-group-development-review-20260910.md",
+    "provenance": "single_assistant_three_independent_review_lenses_not_human_expert_signoff"
+  },
+  "claim_limits": [
+    "Stage 10 and Stage 11 are development candidates only, not QUALIFIED labels.",
+    "Stage 5, Stage 6 and Stage 7 remain preserved identifiers but have no frozen discrete candidate in this version.",
+    "Continuous same-information facts remain the required baseline for all five states.",
+    "SYNTHETIC_EXPERT_CONSENSUS is not HUMAN_EXPERT_REFERENCE.",
+    "2022-2024 was not reread and 2025 remains unopened/unselected.",
+    "No consumer, daily, strategy, paper, live or trading authority is created by this closeout."
+  ]
+}

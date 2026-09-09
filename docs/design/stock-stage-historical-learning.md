@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：首轮 `second-group-development.v1.json` 已成功执行但整体INCONCLUSIVE；10在原网格内冻结为5-session+2% depth，6/11因ambiguous reference 9/7低于hard gate=10形成sample-sufficiency blocker，7在参考充分情况下真实INCONCLUSIVE。当前只授权一次 `second-group-development-supplement.v1.json`：仅补6/11 T-only references并重跑原5/6与11网格；hard gates不变，10不得重搜、7不得扩网格或重跑。5/6与10/11保持独立编号；一般sealed-partition、2025、HUMAN_EXPERT_REFERENCE、正式QUALIFIED、日更、云GPU、消费者和策略权限仍关闭 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout并完成三视角评审：Stage 10冻结initial-low support + 5-session unreclaimed + 2% depth，Stage 11冻结prior-10 + same-support unreclaimed + 5% rebound；Stage 5/6/7保留独立编号但标记INCONCLUSIVE_PARKED。当前版本development tuning/search已关闭；任何10/11产品化、5/6/7新版本、第三组或消费者都需新scope。一般sealed-partition、2025、HUMAN_EXPERT_REFERENCE、正式QUALIFIED、日更、云GPU、消费者和策略权限仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -20,7 +20,7 @@
 
 对外标签运行资格只用 SHADOW / QUALIFIED。DRAFT/RETIRED 是定义文档/版本管理状态，不增加四级产品审批。数据、语义、覆盖、稳定性和用途证据是同一个资格包的维度。qualification_score可以做摘要，不是权威加权通行证；消费者和交易权限另行验收。
 
-首组冻结契约为 `config/stage-learning/experiment.v1.json`。H 的两个profile已完成并把第二组搜索空间冻结；首轮 `second-group-development.v1.json` 也已执行完成。它证明 shared Structure/T-only reference/search 链可以执行，并冻结 Stage 10，但同时暴露两类不同 INCONCLUSIVE：6/11 是预登记 reference corpus-sufficiency blocker，7 是样本充分情况下的 semantic/parameter blocker。后继 `second-group-development-supplement.v1.json` 因此不是第二轮调参：它完整保留首轮artifact，只为6/11每个既有T-only bucket追加target-cap contexts且排除原episode；review policy、hard gates、5/6 grid和11 grid保持不变；10绑定首轮冻结candidate，7只审计首轮trial ledger而不重跑。若补样仍不能冻结5/6或11，则development milestone直接INCONCLUSIVE收口。上述中间量仍是Job-local研究投影，不注册为正式Facts/Feature；里程碑后才由量化、短线、基金专家复审7及整体第二组。`prefer_continuous_structure_facts` 仍是强制同信息集基线。
+首组冻结契约为 `config/stage-learning/experiment.v1.json`。H 的两个profile、首轮 development selection 与一次受限 reference supplement 均已完成。Supplement 只修复 Stage-6/11 reference sufficiency，hard gates和网格保持不变：Stage 11最终冻结5%未收复反抽，Stage-5/6联合网格仍无eligible candidate，Stage 7保持原真实INCONCLUSIVE，Stage 10维持5-session+2% candidate。`second-group-development-closeout.v1.json` 因此以mixed disposition关闭当前版本追参：10/11保留development candidate；5/6/7保留编号但INCONCLUSIVE_PARKED。量化、短线操作、基金三视角评审给出`PASS_WITH_SCOPE_REDUCTION`，要求连续Facts继续作为权威基线，且不再为凑齐标签扩参或降gate。上述中间量仍是Job-local研究投影，不注册为正式Facts/Feature；任何后续产品化或新版本均需另开scope。
 
 ## 2. 学习对象：不变的语义骨架与可学习参数
 

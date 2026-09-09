@@ -35,6 +35,9 @@ def test_second_group_experiment_freezes_only_5_6_development_search() -> None:
     assert authority["arbitration_access_authorized"] is False
     assert authority["permanent_blind_access_authorized"] is False
     assert authority["official_label_publication_authorized"] is False
+    assert raw["state_identity_policy"]["preserve_distinct_stage_codes"] == [5, 6, 7, 10, 11]
+    assert raw["state_identity_policy"]["stage_5_6_merge_authorized"] is False
+    assert raw["state_identity_policy"]["stage_10_11_merge_authorized"] is False
     assert raw["dimension_model"]["stage_5"]["coexists_with"] == [6]
     assert raw["dimension_model"]["stage_6"]["coexists_with"] == [5]
     search = raw["r1_search_space"]

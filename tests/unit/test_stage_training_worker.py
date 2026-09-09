@@ -14,6 +14,7 @@ from quanthus.stage_learning.worker import (
     STAGE_QUALIFICATION_JOB,
     STAGE_REFERENCE_PILOT_JOB,
     STAGE_SECOND_GROUP_PROFILE_JOB,
+    STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
     StageJob,
     StageWorker,
     StageWorkerError,
@@ -117,6 +118,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_QUALIFICATION_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_SECOND_GROUP_PROFILE_JOB,
+        STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
     }
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
 
@@ -181,6 +183,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_QUALIFICATION_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_SECOND_GROUP_PROFILE_JOB,
+        STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
     }
     assert receipt["concurrency"] == 1
 
@@ -218,6 +221,19 @@ def test_second_group_profile_kind_gets_its_frozen_config(tmp_path: Path) -> Non
     assert submitted["kind"] == STAGE_SECOND_GROUP_PROFILE_JOB
     assert submitted["config"] == "config/stage-learning/second-group-profile.v1.json"
     assert _JOB_SPECS[STAGE_SECOND_GROUP_PROFILE_JOB]["wall_seconds"] == 1800
+    assert not worker_paths.qualification_budget.exists()
+
+
+def test_second_group_repair_profile_kind_gets_its_frozen_config(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
+    )
+    assert submitted["kind"] == STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB
+    assert submitted["config"] == "config/stage-learning/second-group-repair-profile.v1.json"
+    assert _JOB_SPECS[STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB]["wall_seconds"] == 1800
     assert not worker_paths.qualification_budget.exists()
 
 

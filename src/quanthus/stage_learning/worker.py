@@ -33,6 +33,7 @@ STAGE_REFERENCE_PILOT_JOB = "quanthus.stage-reference-pilot.v1"
 STAGE_QUALIFICATION_JOB = "quanthus.stage-qualification.v1"
 STAGE_CAPACITY_CENSUS_JOB = "quanthus.stage-capacity-census.v1"
 STAGE_SECOND_GROUP_PROFILE_JOB = "quanthus.stage-second-group-profile.v1"
+STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB = "quanthus.stage-second-group-repair-profile.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
@@ -71,6 +72,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.second_group_profile",
         "artifact_glob": "stage-second-group-profile-*",
         "process_error": "stage_second_group_profile_process_failed",
+        "wall_seconds": 1800,
+    },
+    STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB: {
+        "config": "config/stage-learning/second-group-repair-profile.v1.json",
+        "module": "quanthus.stage_learning.second_group_repair_profile",
+        "artifact_glob": "stage-second-group-repair-profile-*",
+        "process_error": "stage_second_group_repair_profile_process_failed",
         "wall_seconds": 1800,
     },
 }
@@ -572,6 +580,18 @@ class StageWorker:
                 "path_observation_count": verified.get("path_observation_count"),
                 "path_stop_counts": verified.get("path_stop_counts"),
                 "scale_profiles": verified.get("scale_profiles"),
+            }
+        if job.kind == STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB:
+            result["second_group_repair_profile"] = {
+                "accepted_stage4_episode_count": verified.get("accepted_stage4_episode_count"),
+                "repair_observation_count": verified.get("repair_observation_count"),
+                "repair_cycle_count": verified.get("repair_cycle_count"),
+                "support_observation_count": verified.get("support_observation_count"),
+                "path_stop_counts": verified.get("path_stop_counts"),
+                "scale_profiles": verified.get("scale_profiles"),
+                "preserved_stage_codes": verified.get("preserved_stage_codes"),
+                "stage_5_6_merged": verified.get("stage_5_6_merged"),
+                "stage_10_11_merged": verified.get("stage_10_11_merged"),
             }
         return result
 

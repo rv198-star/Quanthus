@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H的2020-2021 development第二组连续profile已完成：5/6可进入有限development学习，7与10/11仍缺最小T-only事实；正式5/6/7/10/11标签、2025、QUALIFIED发布、每日调度、消费者和交易仍未授权 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H的v1 development profile已完成并冻结5/6有限搜索；`second-group-repair-profile.v1.json` 现只补7/10/11的T-only repair/persistence/support-role/unreclaimed-rebound证据。5/6与10/11保持独立编号，不做合并；正式5/6/7/10/11标签、2025、QUALIFIED发布、每日调度、消费者和交易仍未授权 |
 | Version | 0.1 |
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
@@ -20,7 +20,7 @@ Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；
 
 本提案把“12 状态”视为待检验的市场描述体系，而不是已经存在标准答案、只差编程的十三分类任务。既要验证算法是否遵守规则，也要验证规则是否能区分用户关心的情形，进一步验证其市场假设与策略用途。允许结果是保留、合并、改为修饰维度、降为展示或拒绝某个状态，而不是为了凑足十二个编号提高规则复杂度。
 
-当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。P3-STAGE-001-F的历史窄例外仅保留为consumed evidence；2022-2024不能在修采样后再称fresh holdout。I已经把后继协议冻结为target-cap + realized-count + unchanged semantic hard gates；J只冻结未来cohort size=512。H则回到development阶段识别本身：先测Stage-4之后的趋势/回撤/支撑失效/反抽连续分布，5是趋势背景假设，6/7与10/11是局部过程假设，暂不强制top-1。2025 permanent-blind保持未触碰，任何后续外样本执行都必须单独获得访问授权。
+当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。P3-STAGE-001-F的历史窄例外仅保留为consumed evidence；2022-2024不能在修采样后再称fresh holdout。I已经把后继协议冻结为target-cap + realized-count + unchanged semantic hard gates；J只冻结未来cohort size=512。H继续在development阶段识别本身：5/6已进入有限搜索，但保持两个独立阶段编号；7改为“深损伤后已有T-only修复证据”，10改为“事前支撑角色持续失效且未快速收复”，11必须绑定Stage-10-grade failure并且同一失败支撑截至T仍未收复。10/11同样保持两个独立阶段编号。后继repair profile只测连续证据，不在Job内选support role或阈值。2025 permanent-blind保持未触碰，任何后续外样本执行都必须单独获得访问授权。
 
 ## 2. 仓库核查与需要纠正的前提
 

@@ -239,6 +239,22 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert second_group["authority"]["arbitration_access_authorized"] is False
     assert second_group["authority"]["permanent_blind_access_authorized"] is False
     assert second_group["population"]["cohort_size"] == 512
+    experiment = json.loads(
+        (ROOT / "config/stage-learning/second-group-experiment.v1.json").read_text()
+    )
+    assert experiment["state_identity_policy"]["preserve_distinct_stage_codes"] == [5, 6, 7, 10, 11]
+    assert experiment["state_identity_policy"]["stage_5_6_merge_authorized"] is False
+    assert experiment["state_identity_policy"]["stage_10_11_merge_authorized"] is False
+    repair = json.loads(
+        (ROOT / "config/stage-learning/second-group-repair-profile.v1.json").read_text()
+    )
+    assert repair["work_item"] == "P3-STAGE-001-H"
+    assert repair["authority"]["development_only"] is True
+    assert repair["authority"]["stage_label_output_authorized"] is False
+    assert repair["authority"]["arbitration_access_authorized"] is False
+    assert repair["authority"]["permanent_blind_access_authorized"] is False
+    assert repair["state_identity_contract"]["stage_5_6_merge_authorized"] is False
+    assert repair["state_identity_contract"]["stage_10_11_merge_authorized"] is False
     p3_gate = json.loads((ROOT / "config/p3-gates.v1.json").read_text())
     bounded = p3_gate["bounded_partition_exceptions"]
     assert len(bounded) == 1

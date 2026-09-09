@@ -1,0 +1,110 @@
+{
+  "schema_version": "quanthus.stage-second-group-repair-profile.v1",
+  "profile_id": "stock-stage-second-group-7-10-11-development-repair-profile-v1",
+  "work_item": "P3-STAGE-001-H",
+  "purpose": "Measure T-only repair, persistent support failure, support-role and unreclaimed rebound morphology for Stage-7/10/11 design without merging stage identities or emitting stage labels.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "candidate_config": "config/stage-learning/development-candidate.v1.json",
+  "candidate_digest": "sha256:d492d12686be5f5ac84f87ba278afd873d9999aadc5fa5dc79a6f5f5985f176c",
+  "second_group_experiment_config": "config/stage-learning/second-group-experiment.v1.json",
+  "authority": {
+    "development_only": true,
+    "runtime_implementation_authorized": true,
+    "development_data_read_authorized": true,
+    "continuous_profile_output_authorized": true,
+    "stage_label_output_authorized": false,
+    "parameter_search_authorized": false,
+    "synthetic_panel_authorized": false,
+    "future_settlement_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "holdout_population_selection_authorized": false,
+    "strategy_result_access_authorized": false,
+    "daily_schedule_authorized": false,
+    "trading_authorized": false
+  },
+  "development_window": {
+    "cohort_scan_start": "2019-01-02",
+    "cohort_date": "2019-12-31",
+    "warmup_start": "2019-07-01",
+    "report_start": "2020-01-02",
+    "report_end": "2021-12-31",
+    "minimum_pre_cohort_observations": 100,
+    "cohort_seed": "sha256:37f3162a8906df72cf25da6c153976e0826413e86445a05e2f0614d01b7b9ad5"
+  },
+  "population": {
+    "cohort_size": 512,
+    "anchor_scales": [20, 60],
+    "one_path_per_breakout_episode_and_scale": true
+  },
+  "entry_contract": {
+    "source": "frozen_first_group_stage_4_candidate",
+    "first_confirmed_stage_4_observation_per_episode": true,
+    "candidate_mutation_authorized": false
+  },
+  "state_identity_contract": {
+    "preserve_distinct_stage_codes": [5, 6, 7, 10, 11],
+    "stage_5_6_merge_authorized": false,
+    "stage_10_11_merge_authorized": false,
+    "stage_7_meaning": "deep structural damage followed by observable T-only repair evidence; damage depth alone is insufficient",
+    "stage_10_meaning": "persistent failure of a predeclared support role with no prompt reclaim; one support crossing is insufficient",
+    "stage_11_meaning": "rebound after Stage-10-grade failure while the same failed support remains unreclaimed",
+    "later_repair_does_not_retroactively_delete_an_earlier_valid_failure": true
+  },
+  "path_contract": {
+    "maximum_path_sessions_including_first_stage_4": 60,
+    "stop_on_nonadmitted_row": true,
+    "stop_on_listing_or_coordinate_change": true,
+    "support_roles": {
+      "acceptance_anchor": {
+        "source": "episode.frozen_level",
+        "semantic_role": "local_acceptance_support",
+        "proven_key_support": false
+      },
+      "initial_low_support_candidate": {
+        "source": "episode.frozen_low",
+        "semantic_role": "deeper_structure_support_candidate",
+        "proven_key_support": false
+      }
+    },
+    "support_role_selection_inside_job_authorized": false,
+    "daily_path_rows_are_not_independent_samples": true
+  },
+  "repair_profile": {
+    "damage_measurement": "causal_trough_since_latest_running_peak / latest_running_peak - 1",
+    "repair_fraction_measurement": "(current_close - causal_trough_since_latest_running_peak) / (latest_running_peak - causal_trough_since_latest_running_peak)",
+    "repair_fraction_defined_only_when_peak_exceeds_trough": true,
+    "deep_damage_candidate_abs_thresholds": ["0.12", "0.16", "0.20"],
+    "threshold_source": "config/stage-learning/second-group-experiment.v1.json#r1_search_space.deep_damage_drawdown_abs_min",
+    "no_stage_7_threshold_selected_inside_job": true
+  },
+  "failure_profile": {
+    "reclaim_rule": "previous_close <= support_level < current_close",
+    "unreclaimed_rule": "after first break, support has not yet satisfied the same-role reclaim rule",
+    "persistence_candidate_sessions": [3, 5, 8],
+    "persistence_candidate_source": "development profile v1 reclaim-time distribution; candidates only",
+    "measure_both_support_roles_without_selecting_one": true,
+    "no_stage_10_threshold_selected_inside_job": true
+  },
+  "rebound_profile": {
+    "requires_prior_break_sequence": true,
+    "rebound_measurement": "current_close / causal_post_break_running_low - 1 while same support remains unreclaimed",
+    "reclaim_session_excluded_from_unreclaimed_rebound": true,
+    "no_stage_11_threshold_selected_inside_job": true
+  },
+  "measurements": {
+    "quantiles": [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95],
+    "quantile_method": "nearest_rank",
+    "report_repair_fraction_by_deep_damage_candidate": true,
+    "report_reclaim_rates_by_support_role_and_persistence_candidate": true,
+    "report_unreclaimed_rebound_by_support_role_and_persistence_candidate": true,
+    "no_stage_threshold_is_derived_inside_this_job": true
+  },
+  "artifact": {
+    "summary_only": true,
+    "security_codes_published": false,
+    "market_prices_published": false,
+    "episode_rows_published": false,
+    "official_stage_labels_published": false
+  }
+}

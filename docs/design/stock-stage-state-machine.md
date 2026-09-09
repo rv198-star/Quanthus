@@ -68,7 +68,7 @@ silently replaced by synthetic bars.
 | `4` | 突破接受 (breakout acceptance) | Price holds above the key level, pullback does not break it, and turnover confirms acceptance. |
 | `5` | 上升推进 (advancing trend) | Trend expands with supporting price/volume behavior. |
 | `6` | 回踩测试 (pullback test) | Contracting-volume retracement toward support without a broken trend. |
-| `7` | 修复重建 (structural rebuild) | A deeper pullback is rebuilding structure and awaits a second confirmation. |
+| `7` | 修复重建 (structural rebuild) | After deeper structural damage, observable T-only recovery/rebuild evidence is present; damage depth alone is not enough. |
 
 ### Topping and decline
 
@@ -76,8 +76,8 @@ silently replaced by synthetic bars.
 | --- | --- | --- |
 | `8` | 加速赶顶 (accelerating top) | Volume and price accelerate, extension expands, and sentiment is exhausted; pointed-top path. |
 | `9` | 高位分歧/派发 (high-level divergence/distribution) | High-volume stalling and gradual turnover; rounded-top path. |
-| `10` | 结构失效 (structural failure) | A key support breaks and reversal is confirmed. |
-| `11` | 反抽 (post-break rebound) | Technical rebound after failure, with insufficient volume or failure to reclaim the key level. |
+| `10` | 结构失效 (structural failure) | A predeclared support role has failed persistently without prompt reclaim; one support crossing is not sufficient. |
+| `11` | 反抽 (post-break rebound) | Rebound after confirmed Stage-10-grade failure while the same failed support remains unreclaimed. |
 | `12` | 下行推进 (declining trend) | Continuing decline or panic acceleration. |
 
 ## 3. Candidate transition graph
@@ -100,7 +100,7 @@ flowchart TD
 
     S5 -->|contracting-volume pullback| S6["6 回踩测试"]
     S6 -->|pullback succeeds| S5
-    S6 -->|deeper pullback| S7["7 修复重建"]
+    S6 -->|deeper damage + repair evidence| S7["7 修复重建"]
     S7 -->|rebuild succeeds| S5
     S7 -->|secondary stalling| S9["9 高位分歧/派发"]
     S7 -->|rebuild fails| S10
@@ -111,8 +111,10 @@ flowchart TD
     S8 -->|pointed-top reversal| S10
     S9 -->|support breaks| S10
 
-    S10 -->|technical rebound| S11["11 反抽"]
+    S10 -->|rebound while failed support unreclaimed| S11["11 反抽"]
+    S10 -->|failed support reclaimed + repair evidence| S7
     S10 -->|direct decline| S12["12 下行推进"]
+    S11 -->|failed support reclaimed + repair evidence| S7
     S11 -->|rebound ends| S12
     S11 -->|rare direct bottom| S1
     S1 -.->|stabilization thesis fails| S12
@@ -132,13 +134,14 @@ specified; the diagram intentionally does not draw fourteen bidirectional edges 
 - `4 -> 5`: breakout acceptance develops into an advancing trend.
 - `3`, `4`, or `5 -> 2`: the bullish path retreats or degrades, but its key structure remains
   intact; return to accumulation/consolidation rather than declaring failure.
-- `3`, `4`, or `5 -> 10`: the relevant key support breaks and structural reversal is confirmed.
+- `3`, `4`, or `5 -> 10`: a predeclared support role shows persistent failure and is not promptly reclaimed; a single crossing is insufficient.
 - `5 -> 6 -> 5`: a normal pullback test followed by successful trend resumption.
-- `6 -> 7`: the pullback is deeper and enters structural rebuilding.
+- `6 -> 7`: deeper damage is present **and** T-only recovery/rebuild evidence has appeared; depth alone does not create Stage 7.
 - `7 -> 5`: rebuilding succeeds.
-- `7 -> 9` or `7 -> 10`: rebuilding fails into distribution or structural failure.
+- `7 -> 9` or `7 -> 10`: rebuilding fails into distribution or persistent structural failure.
 - `5 -> 8 -> 9/10` and `5 -> 9 -> 10`: pointed-top and rounded-top paths remain distinct.
-- `10 -> 11 -> 12` or `10 -> 12`: post-failure rebound or direct decline.
+- `10 -> 11 -> 12` or `10 -> 12`: Stage 11 requires an already confirmed Stage-10-grade failure and a rebound while the same support remains unreclaimed.
+- `10/11 -> 7`: if that failed support is later reclaimed and independent repair evidence appears, a new Stage-7 observation may begin; the earlier valid Stage-10/11 observation is not rewritten.
 - `11 -> 1`: rare direct bottoming transition.
 - `1 -> 12`: stabilization fails and the declining trend resumes.
 - `12 -> 1`: declining momentum exhausts, closing the directional cycle.
@@ -146,9 +149,14 @@ specified; the diagram intentionally does not draw fourteen bidirectional edges 
 
 The shared `3/4/5 -> 2/10` exits make structural integrity the branch condition. A failed
 breakout from `3` remains a transition to `2`, not a separate state; loss of acceptance from `4`
-and trend degradation from `5` follow the same high-level distinction. State `0` is reserved for
-directionless price action and is no longer a classifier-uncertainty or structured
-breakout-failure target.
+and trend degradation from `5` follow the same high-level distinction. Stage 10 additionally needs
+persistent same-role failure rather than a one-day cross. State `0` is reserved for directionless
+price action and is no longer a classifier-uncertainty or structured breakout-failure target.
+
+Stage codes remain distinct even when their roles are related. In particular, `5` is not merged
+with `6`, and `10` is not merged with `11`; background/process relationships are modeling links,
+not permission to collapse stage identities. Likewise, a later reclaim/repair transition never
+retroactively deletes a valid earlier failure observation.
 
 The `1 -> 12` and `9 -> 5` edges are candidate falsification escapes, not a demand to complete a
 mathematically symmetric graph. They prevent bottoming and distribution labels from becoming

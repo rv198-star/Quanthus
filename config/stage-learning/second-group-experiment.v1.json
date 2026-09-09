@@ -27,6 +27,13 @@
     "fresh_arbitration_reuse_authorized": false,
     "permanent_blind_2025_state": "unopened_unselected"
   },
+  "state_identity_policy": {
+    "preserve_distinct_stage_codes": [5, 6, 7, 10, 11],
+    "stage_5_6_merge_authorized": false,
+    "stage_10_11_merge_authorized": false,
+    "dimension_relation_does_not_imply_merge": true,
+    "later_transition_does_not_rewrite_an_earlier_valid_stage_observation": true
+  },
   "dimension_model": {
     "stage_5": {
       "name": "上升推进",
@@ -92,9 +99,9 @@
     "reviewers_must_not_see_algorithm_candidate_or_future_outcome": true
   },
   "blocked_states": {
-    "7": "requires a T-only recovery/rebuild measurement after deeper drawdown; depth alone is not repair",
-    "10": "requires persistent same-support failure / failed reclaim and explicit support-role evidence",
-    "11": "requires prior Stage-10-grade failure plus a rebound that remains below the same failed support",
+    "7": "preserved as a distinct stage code; requires a T-only recovery/rebuild measurement after deeper damage because depth alone is not repair",
+    "10": "preserved as a distinct stage code; requires persistent same-support failure / failed reclaim and explicit support-role evidence rather than one crossing",
+    "11": "preserved as a distinct stage code; requires prior Stage-10-grade failure plus a rebound while the same failed support remains unreclaimed",
     "third_group": "0/1/2/8/9/12 not authorized by this experiment"
   },
   "claim_limits": [

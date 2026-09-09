@@ -142,14 +142,17 @@ nodes.
   H is now the only ready stock-stage task and has returned to stage identification itself. The
   512-security `second-group-profile.v1.json` completed successfully on 2020-2021 development with
   3,425 accepted Stage-4 episode starts and 186,221 path observations. It supports a bounded 5/6
-  development search frozen by `second-group-experiment.v1.json`, while 7 still lacks a T-only
-  rebuild/recovery measurement and 10/11 still lack persistent-failure/unreclaimed-support role
-  evidence. No official second-group label is emitted. 2025 permanent-blind remains unopened/
+  development search frozen by `second-group-experiment.v1.json`. That contract now explicitly keeps
+  5/6/7/10/11 as distinct stage identities. The next frozen `second-group-repair-profile.v1.json`
+  measures 7 damage→repair, two support roles plus 3/5/8-session unreclaimed persistence for 10,
+  and post-failure rebound only while the same support remains unreclaimed for 11. It selects no
+  support role or threshold and emits no official second-group label. 2025 remains unopened/
   unselected; daily scheduling, consumers, strategy use and cloud-GPU purchase remain closed.
   Evidence: `acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md`,
   `acceptance/stock-stage-learning-i-protocol-repair-20260909.md`,
-  `acceptance/stock-stage-learning-h-second-group-profile-freeze-20260909.md`, and
-  `acceptance/stock-stage-learning-h-second-group-profile-result-20260909.md`.
+  `acceptance/stock-stage-learning-h-second-group-profile-freeze-20260909.md`,
+  `acceptance/stock-stage-learning-h-second-group-profile-result-20260909.md`, and
+  `acceptance/stock-stage-learning-h-7-10-11-repair-profile-freeze-20260909.md`.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

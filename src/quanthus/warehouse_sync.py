@@ -31,6 +31,10 @@ class WarehouseSyncError(RuntimeError):
         self.code = code
 
 
+_PENDING_TARGET_KIND = "oci_cn01_dwd_daily_sync_target"
+_WAITABLE_ERROR_CODES = frozenset({"source_market_date_stale", "transfer_failed"})
+
+
 @dataclass(frozen=True)
 class WarehouseSyncResult:
     market_date: date
@@ -350,6 +354,75 @@ def _parse_market_date(value: str | None) -> date | None:
         raise WarehouseSyncError("market date must use YYYY-MM-DD") from exc
 
 
+def _pending_target_path(local_root: Path) -> Path:
+    return local_root / "pending" / "TARGET.json"
+
+
+def _read_pending_target(local_root: Path) -> date | None:
+    path = _pending_target_path(local_root)
+    if not path.exists():
+        return None
+    value = _object(path)
+    if value.get("kind") != _PENDING_TARGET_KIND:
+        raise WarehouseSyncError("pending sync target kind is invalid", code="target_invalid")
+    raw_date = value.get("market_date")
+    if not isinstance(raw_date, str):
+        raise WarehouseSyncError(
+            "pending sync target market_date is invalid", code="target_invalid"
+        )
+    try:
+        return date.fromisoformat(raw_date)
+    except ValueError as exc:
+        raise WarehouseSyncError(
+            "pending sync target market_date is invalid", code="target_invalid"
+        ) from exc
+
+
+def _resolve_pending_target(
+    *, local_root: Path, requested_date: date | None
+) -> date:
+    pending = _read_pending_target(local_root)
+    if pending is not None:
+        if requested_date is not None and requested_date != pending:
+            raise WarehouseSyncError(
+                "explicit market date conflicts with unresolved pending sync target "
+                f"{pending.isoformat()}",
+                code="target_conflict",
+            )
+        return pending
+    target = requested_date or datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    payload = {
+        "schema_version": 1,
+        "kind": _PENDING_TARGET_KIND,
+        "market_date": target.isoformat(),
+        "created_at": datetime.now(ZoneInfo("UTC")).isoformat(),
+    }
+    try:
+        _atomic_bytes(
+            _pending_target_path(local_root),
+            json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode(
+                "ascii"
+            )
+            + b"\n",
+        )
+    except OSError as exc:
+        raise WarehouseSyncError(
+            f"could not persist pending sync target: {exc}", code="target_write_failed"
+        ) from exc
+    return target
+
+
+def _clear_pending_target(*, local_root: Path, market_date: date) -> None:
+    pending = _read_pending_target(local_root)
+    if pending is None:
+        return
+    if pending != market_date:
+        raise WarehouseSyncError(
+            "refusing to clear a different pending sync target", code="target_conflict"
+        )
+    _pending_target_path(local_root).unlink(missing_ok=True)
+
+
 def _write_failure_receipt(
     *, local_root: Path, market_date: date, error: WarehouseSyncError
 ) -> None:
@@ -389,12 +462,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             "wait seconds must be nonnegative; poll seconds and max attempts must be positive"
         )
     local_root = args.local_root.resolve()
+    local_root.mkdir(parents=True, exist_ok=True)
     try:
         requested_date = _parse_market_date(args.market_date)
+        expected_date = _resolve_pending_target(
+            local_root=local_root, requested_date=requested_date
+        )
     except WarehouseSyncError as exc:
         print(f"CN01 DWD sync failed: {exc}", file=sys.stderr)
         return 2
-    expected_date = requested_date or datetime.now(ZoneInfo("Asia/Shanghai")).date()
     deadline = time.monotonic() + args.wait_seconds
     failure: WarehouseSyncError | None = None
     result: WarehouseSyncResult | None = None
@@ -407,11 +483,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         except WarehouseSyncError as exc:
             # The OCI wall clock is only a start time. A stale prior-day pointer is an
             # expected wait condition until CN01 publishes today's READY-gated DWD package.
-            stale_can_wait = (
-                exc.code == "source_market_date_stale" and time.monotonic() < deadline
+            waitable_can_wait = (
+                exc.code in _WAITABLE_ERROR_CODES and time.monotonic() < deadline
             )
             transient_can_retry = attempts < args.max_attempts
-            if not stale_can_wait and not transient_can_retry:
+            if not waitable_can_wait and not transient_can_retry:
                 failure = exc
                 break
             time.sleep(min(args.poll_seconds, max(1, int(deadline - time.monotonic()))))
@@ -428,8 +504,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     if result is None:
         raise AssertionError("sync loop reached no terminal result")
-    # A successful sync supersedes the mutable latest-failure marker. Keep the
-    # date-scoped receipt as audit history, but do not let OnFailure reuse stale state.
+    # A successful sync closes the frozen recovery target and supersedes the mutable
+    # latest-failure marker. Keep date-scoped receipts as audit history.
+    try:
+        _clear_pending_target(local_root=local_root, market_date=result.market_date)
+    except (OSError, WarehouseSyncError) as exc:
+        print(f"CN01 DWD sync failed to clear pending target: {exc}", file=sys.stderr)
+        return 2
     (local_root / "failures" / "LATEST.json").unlink(missing_ok=True)
     print(json.dumps(result.__dict__, default=str, ensure_ascii=False, sort_keys=True))
     return 0

@@ -395,6 +395,115 @@ def test_sync_main_persists_failure_receipt_for_operator_notification(
     saved = json.loads((local / "failures/LATEST.json").read_text(encoding="ascii"))
     assert saved["error_code"] == "transfer_failed"
     assert saved["cn01_source_failure"] is False
+    pending = json.loads((local / "pending/TARGET.json").read_text(encoding="ascii"))
+    assert pending["kind"] == "oci_cn01_dwd_daily_sync_target"
+    assert pending["market_date"] == "2026-08-04"
+
+
+def test_sync_main_recovers_the_frozen_target_without_wall_clock_rebinding(
+    tmp_path: Path, monkeypatch
+) -> None:
+    local = tmp_path / "local"
+    pending = local / "pending" / "TARGET.json"
+    pending.parent.mkdir(parents=True)
+    pending.write_bytes(
+        _canonical(
+            {
+                "schema_version": 1,
+                "kind": "oci_cn01_dwd_daily_sync_target",
+                "market_date": "2026-08-04",
+                "created_at": "2026-08-04T12:30:00+00:00",
+            }
+        )
+        + b"\n"
+    )
+    observed: list[date] = []
+
+    def fake_sync_latest(*, local_root: Path, market_date: date):
+        observed.append(market_date)
+        return warehouse_sync.WarehouseSyncResult(
+            market_date=market_date,
+            package_id="dwd-daily-20260804-test",
+            manifest_sha256="sha256:" + "1" * 64,
+            content_digest="sha256:" + "2" * 64,
+            payload_bytes=10,
+            changed=True,
+            local_package=local_root / "package",
+        )
+
+    monkeypatch.setattr(warehouse_sync, "sync_latest", fake_sync_latest)
+    assert warehouse_sync.main(["--local-root", str(local)]) == 0
+    assert observed == [date(2026, 8, 4)]
+    assert not pending.exists()
+
+
+def test_sync_main_rejects_conflicting_explicit_target(tmp_path: Path, monkeypatch) -> None:
+    local = tmp_path / "local"
+    pending = local / "pending" / "TARGET.json"
+    pending.parent.mkdir(parents=True)
+    pending.write_bytes(
+        _canonical(
+            {
+                "schema_version": 1,
+                "kind": "oci_cn01_dwd_daily_sync_target",
+                "market_date": "2026-08-04",
+                "created_at": "2026-08-04T12:30:00+00:00",
+            }
+        )
+        + b"\n"
+    )
+    monkeypatch.setattr(
+        warehouse_sync,
+        "sync_latest",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError(kwargs)),
+    )
+    assert warehouse_sync.main(
+        ["--local-root", str(local), "--market-date", "2026-08-05"]
+    ) == 2
+    assert pending.exists()
+
+
+def test_sync_main_waits_for_transfer_recovery_until_deadline(
+    tmp_path: Path, monkeypatch
+) -> None:
+    attempts = 0
+    ticks = iter([0.0, 1.0, 2.0, 3.0, 4.0])
+
+    def fake_sync_latest(*, local_root: Path, market_date: date):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise warehouse_sync.WarehouseSyncError(
+                "temporary rsync outage", code="transfer_failed"
+            )
+        return warehouse_sync.WarehouseSyncResult(
+            market_date=market_date,
+            package_id="dwd-daily-20260804-test",
+            manifest_sha256="sha256:" + "1" * 64,
+            content_digest="sha256:" + "2" * 64,
+            payload_bytes=10,
+            changed=True,
+            local_package=local_root / "package",
+        )
+
+    monkeypatch.setattr(warehouse_sync, "sync_latest", fake_sync_latest)
+    monkeypatch.setattr(warehouse_sync.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(warehouse_sync.time, "sleep", lambda seconds: None)
+    assert warehouse_sync.main(
+        [
+            "--local-root",
+            str(tmp_path / "local"),
+            "--market-date",
+            "2026-08-04",
+            "--wait-seconds",
+            "10",
+            "--poll-seconds",
+            "1",
+            "--max-attempts",
+            "1",
+        ]
+    ) == 0
+    assert attempts == 3
 
 
 def test_sync_main_waits_for_the_ready_gated_cn01_pointer(
@@ -464,6 +573,7 @@ def test_sync_success_clears_mutable_latest_failure_receipt(
         ["--local-root", str(local), "--market-date", "2026-08-04"]
     ) == 0
     assert not latest.exists()
+    assert not (local / "pending/TARGET.json").exists()
 
 
 def test_failure_notification_skips_stale_timed_receipt(tmp_path: Path, monkeypatch) -> None:
@@ -513,7 +623,8 @@ def test_oci_sync_units_define_2030_pull_and_success_and_failure_notifications()
     assert "OnSuccess=oci-dwd-sync-notification.service" in service
     assert "oci-dwd-cn01-notification.service" not in service
     assert "OnFailure=oci-dwd-sync-failure-notification.service" in service
-    assert "--wait-seconds 5400 --poll-seconds 60 --max-attempts 3" in service
+    assert "--wait-seconds 43200 --poll-seconds 60 --max-attempts 3" in service
+    assert "TimeoutStartSec=13h" in service
     assert "StartLimitBurst=2" in service
     assert "Restart=" not in service
     assert "RestartSec=" not in service

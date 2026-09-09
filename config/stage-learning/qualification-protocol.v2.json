@@ -1,0 +1,106 @@
+{
+  "schema_version": "quanthus.stage-qualification-protocol.v2",
+  "protocol_id": "stock-stage-first-group-external-semantic-v2",
+  "work_item": "P3-STAGE-001-I",
+  "status": "preregistered_protocol_only_no_partition_authority",
+  "supersedes_sampling_contract": "config/stage-learning/qualification.v1.json#sampling",
+  "failure_evidence": "docs/acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md",
+  "frozen_candidate": {
+    "config": "config/stage-learning/development-candidate.v1.json",
+    "digest": "sha256:d492d12686be5f5ac84f87ba278afd873d9999aadc5fa5dc79a6f5f5985f176c",
+    "mutation_authorized": false
+  },
+  "authority": {
+    "protocol_design_authorized": true,
+    "runtime_implementation_authorized": false,
+    "holdout_access_authorized": false,
+    "arbitration_fresh_reuse_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "submit_authorized": false,
+    "parameter_search_authorized": false,
+    "future_settlement_access_authorized": false,
+    "strategy_result_access_authorized": false,
+    "qualified_label_publication_authorized": false,
+    "daily_schedule_authorized": false,
+    "trading_authorized": false
+  },
+  "partition_policy": {
+    "consumed_partitions": [
+      "2022-2024-arbitration"
+    ],
+    "fresh_confirmatory_reuse_forbidden": [
+      "2022-2024-arbitration"
+    ],
+    "permanent_blind_2025_state": "unopened_unselected",
+    "next_holdout_partition": null,
+    "partition_selection_requires_explicit_authorization": true,
+    "physical_blind_claim_required": false
+  },
+  "sampling": {
+    "selection_mode": "deterministic_target_cap_external_semantic_v2",
+    "one_context_per_episode": true,
+    "selection_order": [
+      "started_activity",
+      "early_held",
+      "near_anchor_loss_negative",
+      "reclaimed_ambiguity",
+      "mature_held"
+    ],
+    "target_caps": {
+      "started_activity": 200,
+      "early_held": 180,
+      "near_anchor_loss_negative": 100,
+      "reclaimed_ambiguity": 80,
+      "mature_held": 80
+    },
+    "started_activity_target_caps": {
+      "missing_or_lt_1": 25,
+      "1_to_1_25": 60,
+      "1_25_to_1_5": 60,
+      "gte_1_5": 55
+    },
+    "early_held_target_caps": {
+      "1": 60,
+      "2": 60,
+      "3": 60
+    },
+    "exact_stratum_quota_required": false,
+    "scarcity_behavior": "take_all_available_up_to_cap_continue_to_semantic_hard_gates",
+    "cross_stratum_backfill_authorized": false,
+    "result_dependent_resampling_authorized": false,
+    "target_cap_shortfall_is_automatic_process_failure": false,
+    "realized_counts_must_be_published": true,
+    "sampling_shortfall_reason_codes_required": true
+  },
+  "semantic_sufficiency": {
+    "source": "config/stage-learning/qualification.v1.json#hard_gates",
+    "minimum_definite_references_per_stage": 100,
+    "minimum_ambiguous_references_for_overassertion_audit": 50,
+    "maximum_unjudgeable_reference_rate": 0.1,
+    "minimum_positive_reference_coverage": 0.6,
+    "maximum_ambiguous_unique_assertion_rate": 0.1,
+    "maximum_definite_negative_false_positive_rate": 0.0,
+    "minimum_stage_precision_one_sided_95_lower": 0.8,
+    "macro_f1_noninferiority_tolerance_vs_r0": 0.03,
+    "require_zero_quantitative_audit_vetoes": true,
+    "require_unique_episode_per_sampled_context": true,
+    "when_any_gate_fails": "INCONCLUSIVE_OR_REJECTED_RETAIN_RESULT"
+  },
+  "evaluation": {
+    "candidate_and_r0_only": true,
+    "r1_search_trial_count": 0,
+    "r2_executed": false,
+    "future_settlement_read": false,
+    "strategy_result_read": false,
+    "reference_evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+    "synthetic_reference_pass_claim_ceiling": "bounded_shadow_external_semantic_only",
+    "qualified_label_version_allowed": false
+  },
+  "non_claims": [
+    "This protocol does not authorize reading 2025 or any other holdout.",
+    "This protocol does not make 2022-2024 fresh again.",
+    "Keeping target caps unchanged does not imply those caps are minimum qualification sample sizes.",
+    "A target-cap shortfall is retained as sample evidence and cannot trigger result-dependent backfill.",
+    "Semantic hard gates, not exact rare-stratum quotas, own the final sufficiency decision."
+  ]
+}

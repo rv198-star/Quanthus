@@ -11,7 +11,7 @@ from sync_github_planning import GitHub, issue_by_stable_id
 ROOT = Path(__file__).resolve().parents[1]
 REPO = "rv198-star/Quanthus"
 PARENT = "P3-STAGE-001"
-IDS = (PARENT, *(f"{PARENT}-{suffix}" for suffix in "ABCDEFGH"))
+IDS = (PARENT, *(f"{PARENT}-{suffix}" for suffix in "ABCDEFGHIJ"))
 PLAN = "config/stock-stage-learning-delivery.v1.json"
 EXTERNAL = {"P3-STRUCT-004", "P3-DICT-003"}
 DENIED_AUTH_FLAGS = {
@@ -145,8 +145,10 @@ def load_plan() -> dict:
         ):
             if not item.get(key):
                 raise ValueError(f"empty work-item contract: {key}")
-        if item["status"] == "ready" and item["id"] != f"{PARENT}-F":
-            raise ValueError("only the one-time held-out qualification task may be ready")
+        if item["status"] == "ready":
+            raise ValueError(
+                "no stock-stage task may be ready while successor holdout is unauthorized"
+            )
         if (
             item["id"] == f"{PARENT}-F"
             and item["status"] == "ready"
@@ -194,8 +196,10 @@ def body(item: dict, plan: dict, mapping: dict) -> str:
         "P3-STAGE-001-F 的唯一2022-2024 arbitration访问预算已由"
         " `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility "
         "INCONCLUSIVE关闭。不得重跑该分区并称fresh holdout。"
-        "2025 permanent-blind仍未开放；当前不授权新的sealed-partition读取、参数搜索、"
-        "结果后改候选、QUALIFIED LabelCard、日更、策略消费、云GPU或交易。"
+        "P3-STAGE-001-I 已关闭protocol-only采样修复，P3-STAGE-001-J保持blocked，"
+        "尚未选择或授权新的holdout。2025 permanent-blind仍未开放；当前不授权新的"
+        "sealed-partition读取、参数搜索、结果后改候选、QUALIFIED LabelCard、日更、"
+        "策略消费、云GPU或交易。"
     )
     sections = [
         f"<!-- quanthus-planning:v2 id={item['id']} kind={item['kind']} -->",

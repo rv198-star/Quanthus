@@ -121,6 +121,28 @@
       "deliverables": ["分组后续实施卡和参数预算", "标签保留/合并/改维度决定", "特定专家/策略消费验收或拒绝"],
       "acceptance": ["不能用已消耗保留集反复迭代却称新盲测", "不为凑足12状态无限扩特征", "删除未合格候选不得制造虚假单值确定", "消费者经济价值独立于标签描述资格"],
       "blocked_on": ["新波次及消费者单独授权", "F已关闭但未形成合格首组标签版本；不得把已消耗2022-2024作为新波次fresh holdout"], "evidence": []
+    },
+    {
+      "id": "P3-STAGE-001-I", "kind": "task", "status": "closed",
+      "title": "修复外样本采样协议并冻结后继验证合同",
+      "depends_on": ["P3-STAGE-001-F"],
+      "scope": "仅根据F暴露的sample-feasibility缺陷修复未来holdout采样控制语义：稀有stratum保留原target cap但不再要求精确凑满；不得读取任何新市场分区或改变candidate/semantic hard gates。",
+      "inputs": ["F INCONCLUSIVE失败证据", "冻结qualification.v1 sampling/hard gates", "冻结development candidate"],
+      "deliverables": ["config/stage-learning/qualification-protocol.v2.json", "target-cap与semantic sufficiency分离合同", "未来holdout不得回填/重采样/复用2022-2024的claim ceiling"],
+      "acceptance": ["mature-held target仍为80而非改成已观察的58", "exact quota shortfall不再作为process crash条件，realized count必须发布", "不允许跨stratum result-dependent backfill", "semantic hard gates保持F v1数值不变", "2022-2024 fresh reuse与2025读取均未授权"],
+      "blocked_on": ["本项仅protocol design，无runtime submit或holdout读取权限"],
+      "evidence": ["config/stage-learning/qualification-protocol.v2.json", "docs/acceptance/stock-stage-learning-i-protocol-repair-20260909.md"]
+    },
+    {
+      "id": "P3-STAGE-001-J", "kind": "task", "status": "blocked",
+      "title": "在未消费holdout上执行后继外样本验证",
+      "depends_on": ["P3-STAGE-001-I"],
+      "scope": "基于protocol v2和冻结candidate，在未来明确选定且未消费的holdout/forward evidence上执行一次新的外样本语义评价；不得默认选择或读取2025。",
+      "inputs": ["qualification-protocol.v2.json", "冻结candidate digest", "明确选定的未消费分区/证据源、证据等级和一次访问预算"],
+      "deliverables": ["精确绑定的新qualification config", "一次性访问/运行证据", "bounded SHADOW / INCONCLUSIVE / REJECTED disposition"],
+      "acceptance": ["2022-2024不得再称fresh holdout", "未获独立授权不得读取2025 permanent-blind", "执行前冻结target partition、sampling seed/caps、hard gates、evidence tier和失败动作", "synthetic evidence通过仍不自动成为QUALIFIED或交易权限"],
+      "blocked_on": ["尚未选择或授权新的未消费holdout；2025保持unopened_unselected", "runtime implementation/submit authority保持关闭"],
+      "evidence": []
     }
   ]
 }

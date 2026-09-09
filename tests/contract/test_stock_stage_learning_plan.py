@@ -19,7 +19,7 @@ import sync_stock_stage_learning_issues as sync  # noqa: E402
 
 def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     plan = sync.load_plan()
-    assert len(plan["items"]) == 9
+    assert len(plan["items"]) == 11
     ready = {item["id"] for item in plan["items"] if item["status"] == "ready"}
     assert ready == set()
     by_id = {item["id"]: item for item in plan["items"]}
@@ -29,6 +29,8 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert by_id["P3-STAGE-001-D"]["status"] == "closed"
     assert by_id["P3-STAGE-001-E"]["status"] == "closed"
     assert by_id["P3-STAGE-001-F"]["status"] == "closed"
+    assert by_id["P3-STAGE-001-I"]["status"] == "closed"
+    assert by_id["P3-STAGE-001-J"]["status"] == "blocked"
     assert plan["data_policy"]["development_years"] == [2012, 2021]
     assert plan["data_policy"]["arbitration_years"] == [2022, 2024]
     assert plan["data_policy"]["permanent_blind_years"] == [2025, 2025]

@@ -1344,7 +1344,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             (root / "config/stock-stage-learning-delivery.v1.json").read_text()
         )
         stage_ids = {item["id"] for item in stage_plan["items"]}
-        self.assertEqual(stage_ids, {"P3-STAGE-001", *[f"P3-STAGE-001-{c}" for c in "ABCDEFGH"]})
+        self.assertEqual(stage_ids, {"P3-STAGE-001", *[f"P3-STAGE-001-{c}" for c in "ABCDEFGHIJ"]})
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True

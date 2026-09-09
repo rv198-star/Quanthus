@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已由 `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility INCONCLUSIVE关闭；当前不再授权任何arbitration重跑。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已由 `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility INCONCLUSIVE关闭；I仅冻结 `qualification-protocol.v2.json`，J保持blocked且没有选定任何新holdout。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -92,7 +92,7 @@ v2已完成并关闭D/E：120个context解析为87 definite、21 ambiguous_set�
 5. 对同槽候选进行联合消歧；不同维度不做无意义的top1竞争。
 6. 用独立开发校准分片或前向out-of-fold预测校准分数；另留阈值选择分片，不拿最终测试调确认阈值。[R2]
 7. 完成语义、灰度、覆盖、参数邻域、时间稳定和独立未来分布审查，锁定一个候选版本。
-8. 在新授权的保留分区一次性评价；F首轮已按 `qualification.v1.json` 消耗2022-2024 arbitration预算，但在panel/预测/评分前因最终`qualification_mature_held`分层仅58个额外unique episodes、低于冻结80例而INCONCLUSIVE。该分区不能修采样后重跑并称fresh holdout。任何后续未消费holdout必须在访问前冻结新的协议：稀有stratum使用deterministic target-cap而非“必须精确凑满”的退出条件，最终可声明性由预登记的per-stage/ambiguity/coverage/precision/effective-episode hard gates裁决；不足仍INCONCLUSIVE，不事后跨层补样。2025 permanent-blind继续未触碰。
+8. 在新授权的保留分区一次性评价；F首轮已按 `qualification.v1.json` 消耗2022-2024 arbitration预算，但在panel/预测/评分前因最终`qualification_mature_held`分层仅58个额外unique episodes、低于冻结80例而INCONCLUSIVE。该分区不能修采样后重跑并称fresh holdout。I随后冻结 `qualification-protocol.v2.json`：原五层target cap和hard gates数值不变，但稀有stratum不足时保留实际样本、发布shortfall并继续到semantic gates，不做结果依赖跨层补样。J只有在未来未消费holdout被独立选择/授权后才能实现/执行；2025 permanent-blind继续未触碰。
 9. 以同一冻结版本做CPU/平台推断兼容、批量vs逐日一致性检查，再申请观察性日更与按用途资格。
 
 每次资源失败先归因，不在仍运行的批次中热改规则；终止/保留本批次证据后新版本重启。跨ARM/x86或不同BLAS训练不要求模型字节相同：固定环境内可复现，跨环境要求事前容差及决策差异账本。冻结发布模型的消费语义仍须一致。

@@ -292,7 +292,7 @@ authority.
 | P3-DICT-003-B | Implement full registered asset/field closure | P3-DICT-003-A | #234; closed in Lineage V2 implementation audit |
 | P3-DICT-003-C | Separate Definition and Usage dependency graphs | P3-DICT-003-B | #235; closed in Lineage V2 implementation audit |
 | P3-DICT-003-D | Audit and release Catalog Lineage V2 | P3-DICT-003-C | #236; closed; full gate 1602 passed / 7 existing skips; latest Web navigation refinement `c25638a`, API `3aa4837` |
-| P3-STAGE-001 | Learn and qualify stock-stage definitions from history | P3-STRUCT-004, P3-DICT-003 | blocked parent; A-F closed, but F is sample-feasibility INCONCLUSIVE after consuming the single 2022-2024 arbitration budget; no SHADOW/QUALIFIED label version exists; 2025/daily/strategy remain closed |
+| P3-STAGE-001 | Learn and qualify stock-stage definitions from history | P3-STRUCT-004, P3-DICT-003 | blocked parent; A-F and I closed, F is sample-feasibility INCONCLUSIVE after consuming the single 2022-2024 arbitration budget; I freezes protocol v2 only; J/G/H remain blocked and 2025/daily/strategy remain closed |
 | P3-STAGE-001-A | Freeze first-group semantics, scope and experiment budget | P3-STRUCT-004, P3-DICT-003 | #238 closed; `config/stage-learning/experiment.v1.json`; 3/4 semantic/search/reference/data boundaries frozen; RX6800 full-base mirror claim ceiling recorded |
 | P3-STAGE-001-B | Benchmark CPU capacity and qualify the training device | P3-STAGE-001-A | #239 closed; RX6800 WSL CPU-first accepted; `docs/acceptance/stock-stage-learning-b-capacity-20260908.md` |
 | P3-STAGE-001-C | Implement minimal Facts inputs and historical harness | P3-STAGE-001-A, P3-STAGE-001-B | #240 closed; real-DWD governed harness accepted; `docs/acceptance/stock-stage-learning-c-harness-20260908.md`; no classifier training |
@@ -301,6 +301,8 @@ authority.
 | P3-STAGE-001-F | Evaluate held-out evidence and freeze label qualification | P3-STAGE-001-E | closed / INCONCLUSIVE; #243; Job `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` consumed the only arbitration budget and failed before panel/prediction/scoring because `qualification_mature_held` supplied 58/80 additional unique episodes; no result artifact/SHADOW/QUALIFIED publication |
 | P3-STAGE-001-G | Publish observational post-DWD daily labels | P3-STAGE-001-F | Separately qualified as-known inputs and scheduling; no P6/strategy activation |
 | P3-STAGE-001-H | Expand stage groups and evaluate specific consumers | P3-STAGE-001-F | Separately authorized waves, same-facts comparison and optional complete-P2 consumer test |
+| P3-STAGE-001-I | Repair held-out sampling protocol after consumed F | P3-STAGE-001-F | closed; `qualification-protocol.v2.json` keeps original target caps, removes exact-quota process failure, forbids result-dependent backfill, leaves semantic hard gates unchanged, and opens no holdout access |
+| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked; no partition selected, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected, runtime/submit authority closed |
 
 ## 7. Acceptance
 

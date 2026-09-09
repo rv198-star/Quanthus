@@ -36,6 +36,17 @@
     "partition_selection_requires_explicit_authorization": true,
     "physical_blind_claim_required": false
   },
+  "population_sizing": {
+    "evidence": "development_capacity_census_2020_2021",
+    "eligible_development_population": 3659,
+    "tested_nested_population_sizes": [64, 128, 256, 512],
+    "first_population_meeting_all_target_caps": 128,
+    "successor_cohort_size": 512,
+    "successor_cohort_size_reason": "use measured compute headroom to retain substantial rare-stratum reserve while keeping semantic sample capped at 640 contexts",
+    "specific_security_selection_frozen": false,
+    "specific_security_selection_requires_pre_holdout_freeze": true,
+    "holdout_partition_selected": false
+  },
   "sampling": {
     "selection_mode": "deterministic_target_cap_external_semantic_v2",
     "one_context_per_episode": true,

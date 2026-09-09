@@ -302,7 +302,7 @@ authority.
 | P3-STAGE-001-G | Publish observational post-DWD daily labels | P3-STAGE-001-F | Separately qualified as-known inputs and scheduling; no P6/strategy activation |
 | P3-STAGE-001-H | Expand stage groups and evaluate specific consumers | P3-STAGE-001-F | Separately authorized waves, same-facts comparison and optional complete-P2 consumer test |
 | P3-STAGE-001-I | Repair held-out sampling protocol after consumed F | P3-STAGE-001-F | closed; #247; `qualification-protocol.v2.json` keeps original target caps, removes exact-quota process failure, forbids result-dependent backfill, leaves semantic hard gates unchanged, and opens no holdout access |
-| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked for holdout; #248; development-only 2020-2021 sample-capacity census is authorized to reverse-infer a cohort size from nested 64/128/256/512 structural capacity; no holdout selected, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected |
+| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked for holdout; #248; development census shows 128 first meets all target caps and freezes successor cohort size=512 using measured compute headroom; specific securities/seed/holdout remain unfrozen, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected |
 
 ## 7. Acceptance
 

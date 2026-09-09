@@ -31,6 +31,18 @@ def test_successor_protocol_has_no_runtime_or_holdout_authority() -> None:
     assert partitions["partition_selection_requires_explicit_authorization"] is True
 
 
+def test_population_sizing_freezes_512_without_selecting_holdout() -> None:
+    raw = _protocol()
+    sizing = raw["population_sizing"]
+    assert sizing["eligible_development_population"] == 3659
+    assert sizing["tested_nested_population_sizes"] == [64, 128, 256, 512]
+    assert sizing["first_population_meeting_all_target_caps"] == 128
+    assert sizing["successor_cohort_size"] == 512
+    assert sizing["specific_security_selection_frozen"] is False
+    assert sizing["specific_security_selection_requires_pre_holdout_freeze"] is True
+    assert sizing["holdout_partition_selected"] is False
+
+
 def test_sampling_keeps_original_targets_but_does_not_require_exact_quota() -> None:
     raw = _protocol()
     sampling = raw["sampling"]

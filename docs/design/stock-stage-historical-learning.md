@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已由 `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility INCONCLUSIVE关闭；I冻结 `qualification-protocol.v2.json`。J仍未获得任何holdout权限，但已获准运行 `sample-capacity-census.v1.json`，仅用2020-2021 development按64/128/256/512嵌套总体反推未来合理股票数。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已由 `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility INCONCLUSIVE关闭；I冻结 `qualification-protocol.v2.json`。J的2020-2021 development容量普查已完成：128只首次满足全部target caps，基于512只实测算力余量冻结未来cohort size=512；但具体证券、seed和holdout均未选择/授权。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 

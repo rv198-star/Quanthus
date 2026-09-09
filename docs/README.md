@@ -138,7 +138,7 @@ nodes.
   rerun as a fresh holdout. I freezes `qualification-protocol.v2.json`: the original targets remain
   target caps, realized scarcity is retained without cross-stratum backfill, and unchanged semantic
   hard gates own sufficiency. J is still blocked for real holdout execution, but its development-only
-  `sample-capacity-census.v1.json` is authorized to measure nested 64/128/256/512 structural capacity
+  `sample-capacity-census.v1.json` measured nested 64/128/256/512 development structural capacity; 128 was the first size meeting every target cap, and successor cohort size is frozen at 512 using measured compute headroom
   on 2020-2021 and reverse-infer a future cohort size before any new partition is selected. 2025
   permanent-blind remains unopened/unselected. Daily scheduling,
   strategy consumption and cloud-GPU purchase remain closed. Evidence:

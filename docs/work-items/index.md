@@ -243,7 +243,7 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-001-G | Publish observational post-DWD daily labels | P3-STAGE-001-F | blocked; as-known input and schedule qualification required |
 | P3-STAGE-001-H | Expand stage groups and evaluate specific consumers | P3-STAGE-001-F | blocked; new-group and consumer authorization required |
 | P3-STAGE-001-I | Repair successor held-out sampling protocol | P3-STAGE-001-F | closed; #247; protocol-only; original target caps retained, exact-quota process failure removed, semantic hard gates unchanged, no new holdout access; `docs/acceptance/stock-stage-learning-i-protocol-repair-20260909.md` |
-| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked for holdout; #248; development-only `sample-capacity-census.v1.json` is authorized to measure 64/128/256/512 structural capacity on 2020-2021 and reverse-infer cohort size; no next partition selected, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected |
+| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked for holdout; #248; 2020-2021 development census found 128 as the first size meeting all caps and freezes successor cohort size=512 using measured compute headroom; no specific securities or next partition selected, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

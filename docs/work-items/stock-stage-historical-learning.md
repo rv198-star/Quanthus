@@ -11,7 +11,7 @@
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Machine plan | `../../config/stock-stage-learning-delivery.v1.json` |
 | GitHub | 父工单 #246；A #238、B #239、C #240、D #241、E #242、F #243、G #244、H #245、I #247、J #248；A-F/I closed，G/H/J及父工单open/blocked |
-| Current scope | A-F已关闭，F为sample-feasibility INCONCLUSIVE；I已关闭为protocol-only修复；J当前只授权2020-2021 development样本容量普查，用64/128/256/512嵌套总体反推未来合理股票数，真实holdout仍未选择/授权；2025 permanent-blind、正式QUALIFIED、日更和策略权限仍关闭 |
+| Current scope | A-F已关闭，F为sample-feasibility INCONCLUSIVE；I已关闭为protocol-only修复；J的2020-2021 development样本容量普查已完成，128只首次满足全部target caps，结合实测算力余量冻结未来cohort size=512；具体证券和真实holdout仍未选择/授权；2025 permanent-blind、正式QUALIFIED、日更和策略权限仍关闭 |
 
 ## 1. 逐步执行路线
 
@@ -26,7 +26,7 @@
 | G | P3-STAGE-001-G | blocked after F inconclusive + 日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | F未产生可消费标签版本；延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
 | H | P3-STAGE-001-H | blocked after F inconclusive + 新增范围授权 | 第二/三组状态及特定消费者对照 | F未形成合格首组标签；不凑12个状态；策略用途另做完整P2 |
 | I | P3-STAGE-001-I | closed / #247 / protocol repair | 后继外样本采样控制协议 | `qualification-protocol.v2.json`保留F原target caps（mature-held仍80），但exact quota不足不再process crash；实际样本量进入冻结semantic hard gates，无跨层结果依赖回填；不读任何新holdout |
-| J | P3-STAGE-001-J | blocked / #248 / successor holdout | 先用development容量普查反推总体规模，再在未来未消费holdout上执行一次后继评价 | 当前可执行 `sample-capacity-census.v1.json`：仅2020-2021、64/128/256/512嵌套总体、无panel/预测/holdout；release-ready见 `../acceptance/stock-stage-learning-j-development-capacity-census-release-ready-20260909.md`。真实评价只有明确选择并授权新的partition/evidence source、一次预算和evidence tier后才可执行。2022-2024禁止fresh reuse，2025当前`unopened_unselected` |
+| J | P3-STAGE-001-J | blocked / #248 / successor holdout | development容量普查已反推并冻结未来cohort size=512；后续在未消费holdout上执行一次评价 | 2020-2021 census：64不够、128首次满足、256/512均满足；选择512是基于实测算力余量增加稀有样本储备，640个semantic contexts上限不变。结果见 `../acceptance/stock-stage-learning-j-development-capacity-census-result-20260909.md`。真实评价仍需预先冻结具体证券/seed/partition并独立授权；2022-2024禁止fresh reuse，2025仍`unopened_unselected` |
 
 每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A-F已关闭，其中F是**sample-feasibility INCONCLUSIVE**而不是模型REJECT：2022-2024 arbitration的一次预算已经消耗，不能修sample后重跑并称fresh holdout。I只修复未来协议，不改candidate、hard gates或本次结果；J保持blocked。2025 permanent-blind保持未触碰。
 

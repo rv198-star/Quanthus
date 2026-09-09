@@ -21,7 +21,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     plan = sync.load_plan()
     assert len(plan["items"]) == 11
     ready = {item["id"] for item in plan["items"] if item["status"] == "ready"}
-    assert ready == set()
+    assert ready == {"P3-STAGE-001-H"}
     by_id = {item["id"]: item for item in plan["items"]}
     assert by_id["P3-STAGE-001-A"]["status"] == "closed"
     assert by_id["P3-STAGE-001-B"]["status"] == "closed"
@@ -29,6 +29,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert by_id["P3-STAGE-001-D"]["status"] == "closed"
     assert by_id["P3-STAGE-001-E"]["status"] == "closed"
     assert by_id["P3-STAGE-001-F"]["status"] == "closed"
+    assert by_id["P3-STAGE-001-H"]["status"] == "ready"
     assert by_id["P3-STAGE-001-I"]["status"] == "closed"
     assert by_id["P3-STAGE-001-J"]["status"] == "blocked"
     assert plan["data_policy"]["development_years"] == [2012, 2021]
@@ -42,6 +43,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert plan["authorization"][sync.SYNTHETIC_REFERENCE_FLAG] is True
     assert plan["authorization"][sync.SYNTHETIC_LEARNING_FLAG] is True
     assert plan["authorization"][sync.CAPACITY_CENSUS_FLAG] is True
+    assert plan["authorization"][sync.SECOND_GROUP_PROFILE_FLAG] is True
     assert plan["authorization"][sync.BOUNDED_ARBITRATION_FLAG] is False
     assert plan["authorization"][sync.BOUNDED_ARBITRATION_CONFIG] == (
         "config/stage-learning/qualification.v1.json"
@@ -94,6 +96,7 @@ def test_issue_sync_cannot_enable_execution(copied_plan, flag: str) -> None:
         sync.SYNTHETIC_REFERENCE_FLAG,
         sync.SYNTHETIC_LEARNING_FLAG,
         sync.CAPACITY_CENSUS_FLAG,
+        sync.SECOND_GROUP_PROFILE_FLAG,
     ],
 )
 def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> None:
@@ -227,6 +230,15 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert qualification["partition"]["name"] == "2022-2024-arbitration"
     assert qualification["partition"]["permanent_blind_2025_untouched"] is True
     assert qualification["decision"]["qualified_label_version_allowed"] is False
+    second_group = json.loads(
+        (ROOT / "config/stage-learning/second-group-profile.v1.json").read_text()
+    )
+    assert second_group["work_item"] == "P3-STAGE-001-H"
+    assert second_group["authority"]["development_only"] is True
+    assert second_group["authority"]["stage_label_output_authorized"] is False
+    assert second_group["authority"]["arbitration_access_authorized"] is False
+    assert second_group["authority"]["permanent_blind_access_authorized"] is False
+    assert second_group["population"]["cohort_size"] == 512
     p3_gate = json.loads((ROOT / "config/p3-gates.v1.json").read_text())
     bounded = p3_gate["bounded_partition_exceptions"]
     assert len(bounded) == 1

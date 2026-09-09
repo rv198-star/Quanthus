@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已由 `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility INCONCLUSIVE关闭；I冻结 `qualification-protocol.v2.json`。J的2020-2021 development容量普查已完成：128只首次满足全部target caps，基于512只实测算力余量冻结未来cohort size=512；但具体证券、seed和holdout均未选择/授权。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：允许 `second-group-profile.v1.json` 只读2020-2021 development，对5/6/7/10/11做连续结构profile，不输出正式阶段标签、不选阈值。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU、消费者和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -20,7 +20,7 @@
 
 对外标签运行资格只用 SHADOW / QUALIFIED。DRAFT/RETIRED 是定义文档/版本管理状态，不增加四级产品审批。数据、语义、覆盖、稳定性和用途证据是同一个资格包的维度。qualification_score可以做摘要，不是权威加权通行证；消费者和交易权限另行验收。
 
-首组冻结契约为 `config/stage-learning/experiment.v1.json`；当前新增的 `stage_training_capacity.py` 仅是B阶段容量工具，不是市场分类器实现。此前受限实验的 `prefer_continuous_structure_facts` 仍成立，因此同信息集连续Facts是强制对照，不承诺离散标签必然增加信息或收益。
+首组冻结契约为 `config/stage-learning/experiment.v1.json`；当前H新增 `config/stage-learning/second-group-profile.v1.json` 只负责development连续形态剖面，不是5/6/7/10/11分类器。其回撤、支撑距离、反抽等中间量属于Job-local研究投影，不注册为正式Facts/Feature；只有profile证明某项能力值得复用后，才按Structure B6/B7/F9边界决定是否泛化。此前受限实验的 `prefer_continuous_structure_facts` 仍成立，因此同信息集连续Facts是强制对照，不承诺离散标签必然增加信息或收益。
 
 ## 2. 学习对象：不变的语义骨架与可学习参数
 

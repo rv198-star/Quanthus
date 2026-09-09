@@ -137,13 +137,16 @@ nodes.
   frozen requirement of 80. No SHADOW/QUALIFIED artifact was published and that partition cannot be
   rerun as a fresh holdout. I freezes `qualification-protocol.v2.json`: the original targets remain
   target caps, realized scarcity is retained without cross-stratum backfill, and unchanged semantic
-  hard gates own sufficiency. J is still blocked for real holdout execution, but its development-only
-  `sample-capacity-census.v1.json` measured nested 64/128/256/512 development structural capacity; 128 was the first size meeting every target cap, and successor cohort size is frozen at 512 using measured compute headroom
-  on 2020-2021 and reverse-infer a future cohort size before any new partition is selected. 2025
-  permanent-blind remains unopened/unselected. Daily scheduling,
-  strategy consumption and cloud-GPU purchase remain closed. Evidence:
-  `acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md` and
-  `acceptance/stock-stage-learning-i-protocol-repair-20260909.md`.
+  hard gates own sufficiency. J is still blocked for real holdout execution; its development-only
+  capacity census found 128 as the first size meeting all target caps and froze future cohort size=512.
+  H is now the only ready stock-stage task and returns to stage identification itself: the fixed
+  `second-group-profile.v1.json` measures 2020-2021 development-only post-Stage-4 trend, drawdown,
+  support-candidate failure and rebound morphology for the 5/6/7/10/11 group. It emits no stage
+  labels and selects no thresholds. 2025 permanent-blind remains unopened/unselected. Daily
+  scheduling, consumers, strategy use and cloud-GPU purchase remain closed. Evidence:
+  `acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md`,
+  `acceptance/stock-stage-learning-i-protocol-repair-20260909.md`, and
+  `acceptance/stock-stage-learning-h-second-group-profile-freeze-20260909.md`.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

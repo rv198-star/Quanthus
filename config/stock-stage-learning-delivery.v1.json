@@ -6,7 +6,7 @@
   "review": "docs/reviews/stock-stage-learning-review-20260908.md",
   "work_items": "docs/work-items/stock-stage-historical-learning.md",
   "authorization": {
-    "scope": "development_closed_arbitration_consumed_inconclusive_capacity_census_authorized_no_holdout_authority",
+    "scope": "development_second_group_profile_authorized_arbitration_consumed_no_holdout_authority",
     "capacity_benchmark_authorized": true,
     "stage_harness_implementation_authorized": true,
     "stage_reference_pilot_implementation_authorized": true,
@@ -15,6 +15,7 @@
     "synthetic_expert_development_reference_authorized": true,
     "synthetic_expert_development_learning_authorized": true,
     "development_capacity_census_authorized": true,
+    "second_group_development_profile_authorized": true,
     "bounded_arbitration_qualification_authorized": false,
     "bounded_arbitration_qualification_config": "config/stage-learning/qualification.v1.json",
     "permanent_blind_qualification_authorized": false,
@@ -41,7 +42,7 @@
       "inputs": ["stock-stage-qualification.md", "stock-stage-data-dependencies.md", "冻结数据分区和既有连续Facts对照"],
       "deliverables": ["版本化标签定义/学习结果/证据包", "设备准入报告", "每状态或分组的保留/合并/拒绝结论"],
       "acceptance": ["子项按依赖完成且未授权权限不打开", "无训练/测试泄漏或规则自证真值", "标签资格与具体交易消费权限分离"],
-      "blocked_on": ["F已以sample-feasibility INCONCLUSIVE关闭且未产生可消费标签资格", "2022-2024 fresh holdout已消耗；任何后续外样本、2025 permanent-blind、日更或新状态波次都需新的预登记协议与独立授权"], "evidence": []
+      "blocked_on": ["F已以sample-feasibility INCONCLUSIVE关闭且未产生可消费标签资格", "H第二组development-only结构剖面已获授权，但任何外样本、2025 permanent-blind、日更、消费者或交易仍需独立授权"], "evidence": []
     },
     {
       "id": "P3-STAGE-001-A", "kind": "task", "status": "closed",
@@ -114,14 +115,14 @@
       "blocked_on": ["日更独立授权和as-known证明", "F已关闭但结论为sample-feasibility INCONCLUSIVE，未产生可供G消费的bounded-SHADOW或QUALIFIED标签版本"], "evidence": []
     },
     {
-      "id": "P3-STAGE-001-H", "kind": "task", "status": "blocked",
+      "id": "P3-STAGE-001-H", "kind": "task", "status": "ready",
       "title": "按波次扩展剩余状态并验证具体消费者",
       "depends_on": ["P3-STAGE-001-F"],
-      "scope": "第二组5/6/7/10/11、第三组0/1/2/8/9/12按同协议研究；业务需要时另做Facts-only与Facts+Stage完整P2对照。",
-      "inputs": ["首组方法与失败经验", "各组最小Facts缺口", "新增分组/消费者范围与预算批准"],
-      "deliverables": ["分组后续实施卡和参数预算", "标签保留/合并/改维度决定", "特定专家/策略消费验收或拒绝"],
-      "acceptance": ["不能用已消耗保留集反复迭代却称新盲测", "不为凑足12状态无限扩特征", "删除未合格候选不得制造虚假单值确定", "消费者经济价值独立于标签描述资格"],
-      "blocked_on": ["新波次及消费者单独授权", "F已关闭但未形成合格首组标签版本；不得把已消耗2022-2024作为新波次fresh holdout"], "evidence": []
+      "scope": "当前只开放第二组5/6/7/10/11的development-only结构剖面：从冻结Stage-4接受点出发测趋势推进、回撤、支撑候选失效与反抽的连续分布；不先强制互斥标签。第三组和消费者仍关闭。",
+      "inputs": ["冻结首组Stage-4 candidate", "config/stage-learning/second-group-profile.v1.json", "2020-2021 development-only 512只固定容量总体", "F4/F5/F6/F7/F9依赖矩阵"],
+      "deliverables": ["第二组连续结构profile artifact", "5背景与6/7、10/11局部过程的维度边界证据", "后续有限参数空间/保留合并决策输入"],
+      "acceptance": ["只读2020-2021 development且2022-2025硬拒绝", "只输出连续剖面不输出5/6/7/10/11正式标签或primary stage", "5趋势背景允许与6/7局部过程共存", "跌回突破位不得自动等同10，10必须绑定预先记录的支撑候选失效", "缺失/坐标变化终止路径而非制造结构失效", "不得在本Job内根据分布直接选阈值"],
+      "blocked_on": ["真实阈值/标签学习必须在profile结果审计后另冻结有限搜索空间", "第三组0/1/2/8/9/12、具体消费者、日更和外样本仍未授权", "2022-2024不得fresh reuse，2025 permanent-blind保持unopened_unselected"], "evidence": ["config/stage-learning/second-group-profile.v1.json", "docs/acceptance/stock-stage-learning-h-second-group-profile-freeze-20260909.md"]
     },
     {
       "id": "P3-STAGE-001-I", "kind": "task", "status": "closed",

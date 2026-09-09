@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；P3-STAGE-001-F唯一2022-2024 arbitration窄例外已消耗并以sample-feasibility INCONCLUSIVE关闭，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`。J的development-only容量普查已完成并冻结未来cohort size=512，但具体证券和holdout仍未选择/授权；2025、QUALIFIED发布、每日调度和交易仍未授权 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H现仅开放2020-2021 development第二组连续profile，不输出正式5/6/7/10/11标签或阈值；2025、QUALIFIED发布、每日调度、消费者和交易仍未授权 |
 | Version | 0.1 |
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
@@ -20,7 +20,7 @@ Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；
 
 本提案把“12 状态”视为待检验的市场描述体系，而不是已经存在标准答案、只差编程的十三分类任务。既要验证算法是否遵守规则，也要验证规则是否能区分用户关心的情形，进一步验证其市场假设与策略用途。允许结果是保留、合并、改为修饰维度、降为展示或拒绝某个状态，而不是为了凑足十二个编号提高规则复杂度。
 
-当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。P3-STAGE-001-F的历史窄例外仅保留为consumed evidence；2022-2024不能在修采样后再称fresh holdout。I已经把后继协议冻结为target-cap + realized-count + unchanged semantic hard gates，并禁止跨层result-dependent backfill；J的2020-2021 development容量普查显示128只首次满足全部target caps，结合512只实测算力余量将未来cohort size冻结为512，但这不构成具体证券或下一分区选择。2025 permanent-blind保持未触碰，任何后续外样本执行都必须单独获得访问授权。
+当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变 B6-B11/P6 权限。P3-STAGE-001-F的历史窄例外仅保留为consumed evidence；2022-2024不能在修采样后再称fresh holdout。I已经把后继协议冻结为target-cap + realized-count + unchanged semantic hard gates；J只冻结未来cohort size=512。H则回到development阶段识别本身：先测Stage-4之后的趋势/回撤/支撑失效/反抽连续分布，5是趋势背景假设，6/7与10/11是局部过程假设，暂不强制top-1。2025 permanent-blind保持未触碰，任何后续外样本执行都必须单独获得访问授权。
 
 ## 2. 仓库核查与需要纠正的前提
 

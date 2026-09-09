@@ -1,0 +1,103 @@
+{
+  "schema_version": "quanthus.stage-second-group-profile.v1",
+  "profile_id": "stock-stage-second-group-5-6-7-10-11-development-profile-v1",
+  "work_item": "P3-STAGE-001-H",
+  "purpose": "Measure development-only causal morphology after a frozen Stage-4 acceptance point so Stage-5/6/7/10/11 boundaries can be learned from observed structure rather than guessed in advance.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "experiment_config": "config/stage-learning/experiment.v1.json",
+  "candidate_config": "config/stage-learning/development-candidate.v1.json",
+  "candidate_digest": "sha256:d492d12686be5f5ac84f87ba278afd873d9999aadc5fa5dc79a6f5f5985f176c",
+  "authority": {
+    "development_only": true,
+    "runtime_implementation_authorized": true,
+    "development_data_read_authorized": true,
+    "continuous_profile_output_authorized": true,
+    "stage_label_output_authorized": false,
+    "parameter_search_authorized": false,
+    "synthetic_panel_authorized": false,
+    "future_settlement_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "holdout_population_selection_authorized": false,
+    "strategy_result_access_authorized": false,
+    "daily_schedule_authorized": false,
+    "trading_authorized": false
+  },
+  "development_window": {
+    "cohort_scan_start": "2019-01-02",
+    "cohort_date": "2019-12-31",
+    "warmup_start": "2019-07-01",
+    "report_start": "2020-01-02",
+    "report_end": "2021-12-31",
+    "minimum_pre_cohort_observations": 100,
+    "cohort_seed": "sha256:37f3162a8906df72cf25da6c153976e0826413e86445a05e2f0614d01b7b9ad5"
+  },
+  "population": {
+    "cohort_size": 512,
+    "anchor_scales": [20, 60],
+    "one_path_per_breakout_episode_and_scale": true
+  },
+  "entry_contract": {
+    "source": "frozen_first_group_stage_4_candidate",
+    "first_confirmed_stage_4_observation_per_episode": true,
+    "require_frozen_candidate_parameters": true,
+    "candidate_mutation_authorized": false
+  },
+  "semantic_axes": {
+    "trend_background": {
+      "candidate_stage_code": 5,
+      "meaning": "advancing-trend background after accepted breakout",
+      "exclusive_with_local_process": false
+    },
+    "pullback_repair_process": {
+      "candidate_stage_codes": [6, 7],
+      "meaning": "local retracement or deeper structural repair inside or after the advancing background",
+      "forced_mutual_exclusion_before_learning": false
+    },
+    "failure_rebound_process": {
+      "candidate_stage_codes": [10, 11],
+      "meaning": "break of a preregistered support candidate followed by post-break rebound morphology",
+      "breakout_anchor_loss_is_not_automatically_stage_10": true
+    },
+    "primary_stage_output": false
+  },
+  "path_contract": {
+    "maximum_path_sessions_including_first_stage_4": 60,
+    "stop_on_nonadmitted_row": true,
+    "stop_on_listing_or_coordinate_change": true,
+    "support_candidate": "pre_T_frozen_low_anchor_captured_at_breakout_start",
+    "support_candidate_is_not_claimed_as_proven_key_support": true,
+    "daily_path_rows_are_not_independent_samples": true
+  },
+  "measurements": {
+    "observation_metrics": [
+      "return_from_stage4_acceptance",
+      "return_5_sessions",
+      "return_10_sessions",
+      "return_20_sessions",
+      "drawdown_from_running_peak",
+      "distance_to_breakout_anchor",
+      "distance_to_initial_low_support_candidate",
+      "volume_ratio20"
+    ],
+    "episode_metrics": [
+      "maximum_extension_from_stage4_acceptance",
+      "maximum_drawdown_from_running_peak",
+      "minimum_distance_to_initial_low_support_candidate",
+      "sessions_to_first_support_candidate_break",
+      "maximum_post_break_rebound_from_running_low",
+      "sessions_to_first_support_candidate_reclaim_after_break",
+      "sessions_observed"
+    ],
+    "quantiles": [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95],
+    "quantile_method": "nearest_rank",
+    "no_stage_threshold_is_derived_inside_this_job": true
+  },
+  "artifact": {
+    "summary_only": true,
+    "security_codes_published": false,
+    "market_prices_published": false,
+    "episode_rows_published": false,
+    "official_stage_labels_published": false
+  }
+}

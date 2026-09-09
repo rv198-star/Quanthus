@@ -124,13 +124,13 @@ DWD 表按其 time profile 保留 `knowledge_from`, `knowledge_to`, `source_reco
 | F6 回撤与修复 | 从因果峰值的回撤、接近支撑程度、恢复幅度、低点抬升 | D1、F1/F3/F4/F5 | B6/过程扩展；若用局部 pivot，必须等右侧确认结束才可用，并记录确认时间，不回填到极值日 |
 | F7 活动与阶段关系 | 当前/突破/回测相对量、价涨量扩/价跌量缩、金额的独立描述 | D2、F2/F3（条件窗口） | `liquidity.volume_ratio20@1.0.0` 已有旧 baseline 公式 `V_t / mean(V_{t-20:t-1})`；V2 B7未集成。改median或换窗口需新规格，不能沿旧ID |
 | F8 日K可观察细节 | 实体、影线、收盘在日内区间位置、跳空 | D1的open/high/low/close及前一close，D4 | DWD有字段；V2 open未映射。`(C-L)/(H-L)`在H=L时不可定义；日线不能还原盘中先后 |
-| F9 关键支撑失效/反抽链 | 预声明支撑角色、首次破坏、持续未收复时长、同角色收复、失效后未收复反抽 | F1/F2/F3/F5/F6 | 第二组 repair profile 已完成：acceptance anchor 因高频早期跌破被降为局部接受边界；更深 initial-low support 被冻结为Stage-10 development主支撑候选。10仍要求持续未收复+足够跌破深度；11必须绑定冻结Stage-10 failure且同支撑仍未收复 |
+| F9 关键支撑失效/反抽链 | 预声明支撑角色、首次破坏、持续未收复时长、同角色收复、失效后未收复反抽 | F1/F2/F3/F5/F6 | `P3-STRUCT-005` 已在 bounded retrospective Route-A scope 正式化连续 Facts：breakout-start rolling-low support binding、same-support break/reclaim、unreclaimed age、signed distance、post-break rebound；10/11阈值仍是独立research projection，不进入Fact identity |
 
 F4 的短长窗口共享输入，不是两个独立证人。F5 拟议的速度可以由固定窗口 log-return 或显式斜率表达，但选择哪种及阈值须在结果访问前冻结，不同时试几十种后只保存最优版本。
 
 F6 的参照最大值必须从截至T的窗口产生，不能用事后已知完整波段最高点。回撤深度相对哪条波段、支撑采用哪个角色，是6/7互斥的必要前提，不是以后随便填的实现细节。
 
-P3-STAGE-001-H 的 v1 与 repair Job-local development profile 均已实跑完成。repair 结果显示 acceptance anchor 在20/60尺度约77%/74%的路径都会被跌破，而更深 initial-low support 仅约29%/13%被跌破且首次跌破中位约26/28个交易日，因此后者被冻结为Stage-10 development主支撑候选；但其跌破仍约80%/77%最终收复，单次穿越继续明确不足。`second-group-repair-experiment.v1.json` 因此冻结顺序搜索10→7→11：10用3/5/8日未收复×2/4/6%跌破深度，7用12/16/20% damage×25/40/50% repair fraction，11在冻结10后只搜3/5/8%未收复反抽。5/6 与10/11均保持独立阶段编号，不做合并。上述 profile/experiment 仍是 development 研究合同，不自动注册为正式F4/F5/F6/F9资产，也不打开Structure B6/B7。
+P3-STAGE-001-H 的 v1 / repair / development 结果最终形成 mixed closeout：10冻结为5日持续未收复+2%深度，11冻结为prior-10-ref+同支撑未收复+5%反抽；5/6/7保持`INCONCLUSIVE_PARKED`。随后 Route A `P3-STRUCT-005` 把这两个阶段背后的连续证据正式化为 F9 bounded retrospective Facts，并用两次独立cold real-DWD Job复现完全一致的F9/projection语义。真实review sample进一步验证：Stage 11可以在当前距支撑仅约-1.44%时继续成立，因为它消费此前immutable Stage-10 confirmation，而不是要求当天重新满足2%深度。F9正式化不打开Structure B6/B7，也不把10/11升级为正式LabelCard。
 
 ## 4. 0-12 状态 -> 必需证据 -> 反证矩阵
 
@@ -148,8 +148,8 @@ D0/D1/D4/D5 是以下所有行的共同准入闭包。D3 用于 profile 适用�
 | 7 修复重建 | 已发生较深结构损伤，且截至T出现可测的恢复/重建；深跌本身不构成7 | F1/F3/F4/F5/F6/F7/F9 | 与6、10区分；需 damage depth + causal trough 后 repair fraction/恢复证据；仅深跌或一次反弹不能确认 | 否：repair profile已完成，已冻结12/16/20% damage × 25/40/50% repair有限development搜索 |
 | 8 加速赶顶 | 当时上行加速、延伸及活动变化；“顶”不是已知事实 | F4/F5/F7，F8可选 | 与5的加速子型区分；未来回落不得作为T的输入 | 否：建议先作为“上行加速/延伸”修饰维度检验 |
 | 9 高位分歧/派发 | 相对因果历史处于高位、活动增加而价格推进减弱 | F4/F5/F7，F8可选 | 与2整理/8加速区分；日线不证明资金意图，重新推进是后续反证 | 否：建议保留“高位量价分歧”可观察含义，派发仅待检验假设 |
-| 10 结构失效 | 事前声明的支撑角色发生破坏，并持续未收复达到可辨识条件；单次穿越不够 | F1/F2/F3/F6/F9；F7按卡片 | 与普通突破失败、7重建区分；必须保留 support_role、break_at、unreclaimed age、reclaim；缺数据/除权不是失效 | 否：initial-low已冻结为development主支撑候选，后续只在3/5/8日持续×2/4/6%跌破深度的9组内学习 |
-| 11 反抽 | 已有 Stage-10-grade failure reference，随后反弹，但同一失败支撑截至T仍未收复 | F1/F2/F3/F5/F7/F9 | 与1、7及普通上涨日区分；reclaim 当日即不再属于“未收复反抽”证据；必须给出 prior failure ref | 否：仅在Stage-10 candidate冻结后顺序学习3/5/8%未收复反抽，避免与10参数并行组合 |
+| 10 结构失效 | 事前声明的支撑角色发生破坏，并持续未收复达到可辨识条件；单次穿越不够 | F1/F2/F3/F6/F9；F7按卡片 | 与普通突破失败、7重建区分；必须保留 support_role、break_at、unreclaimed age、reclaim；缺数据/除权不是失效 | 否：F9 continuous Facts已通过Route-A bounded real-DWD验收，5日+2%仅为development projection candidate；仍无正式LabelCard/外样本资格 |
+| 11 反抽 | 已有 Stage-10-grade failure reference，随后反弹，但同一失败支撑截至T仍未收复 | F1/F2/F3/F5/F7/F9 | 与1、7及普通上涨日区分；reclaim 当日即不再属于“未收复反抽”证据；必须给出 prior failure ref | 否：F9已证明prior immutable Stage-10 ref语义可重建，5% rebound仅为development projection candidate；正式LabelCard/外样本资格仍关闭 |
 | 12 下行推进 | 截至T存在下行方向与持续扩展，活动含义显式给出 | F4/F5/F6/F7/F9 | 与1减速、11反抽区分；不要求必须事先看见10才能首次识别下行 | 否：初始化、下行几何及转移规则未冻结 |
 
 “不完整”不是要求把 F1-F9 全建完才可推进。先选容易形成可证伪命题的突破/保持/回测片段验证3/4/6和其连续背景；若6/7不能稳定区分，应合并或分层，不为维持编号被动增加指标。

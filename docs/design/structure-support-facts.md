@@ -3,13 +3,14 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Governing work item | `P3-STRUCT-005` |
 | Parent baseline | `structure-facts-v2.md`; accepted B1-B5 remains immutable |
 | Trigger | P3-STAGE-001-H mixed closeout and `PASS_WITH_SCOPE_REDUCTION` review |
 | Runtime request | `../../config/structure-f9-run.development.v1.json` |
 | Semantic catalog | `../../config/structure-semantic-catalog.v1.json` |
 | Code | `../../src/quanthus/structure_support_facts.py`; `../../src/quanthus/structure_f9_run.py` |
+| Acceptance | `../acceptance/structure-f9-real-dwd-acceptance-20260910.md` |
 | Claim ceiling | continuous Structure/F9 facts plus research-only Stage-10/11 projection; no official label or trading authority |
 
 ## 1. Decision
@@ -113,9 +114,14 @@ The bounded sample may contain zero Stage-10/11 confirmations; that is not an en
 the formal facts and reconstruction are valid. This slice qualifies fact semantics and reproducible
 construction, not frequency, profitability or external validity.
 
-## 6. Exit criteria
+## 6. Acceptance and exit criteria
 
-P3-STRUCT-005 can close only when:
+P3-STRUCT-005 passed the bounded Route-A real-DWD qualification at revision
+`44571610b1da1792a80bbd45ee7f180d59e8495a`: two independent cold Jobs reproduced the exact
+input-readiness, base Structure, F9 Facts, projection and deterministic review sample identities.
+The accepted evidence is `../acceptance/structure-f9-real-dwd-acceptance-20260910.md`.
+
+The acceptance criteria were:
 
 1. semantic catalog and blueprint expose the new concepts without changing accepted B1-B5 identities;
 2. synthetic counterexamples pass: same-target identity, prefix stability, censoring, reclaim and

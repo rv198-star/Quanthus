@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout并完成三视角评审：Stage 10冻结initial-low support + 5-session unreclaimed + 2% depth，Stage 11冻结prior-10 + same-support unreclaimed + 5% rebound；Stage 5/6/7保留独立编号但标记INCONCLUSIVE_PARKED。当前版本development tuning/search已关闭；任何10/11产品化、5/6/7新版本、第三组或消费者都需新scope。一般sealed-partition、2025、HUMAN_EXPERT_REFERENCE、正式QUALIFIED、日更、云GPU、消费者和策略权限仍关闭 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout并完成三视角评审：Stage 10冻结initial-low support + 5-session unreclaimed + 2% depth，Stage 11冻结prior-10 + same-support unreclaimed + 5% rebound；Stage 5/6/7保留独立编号但标记INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已把10/11背后的F9连续证据正式化并通过bounded real-DWD双冷跑验收；10/11本身仍只是development projection candidate。当前版本development tuning/search已关闭；任何10/11产品化、5/6/7新版本、第三组或消费者都需新scope。一般sealed-partition、2025、HUMAN_EXPERT_REFERENCE、正式QUALIFIED、日更、云GPU、消费者和策略权限仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -20,7 +20,7 @@
 
 对外标签运行资格只用 SHADOW / QUALIFIED。DRAFT/RETIRED 是定义文档/版本管理状态，不增加四级产品审批。数据、语义、覆盖、稳定性和用途证据是同一个资格包的维度。qualification_score可以做摘要，不是权威加权通行证；消费者和交易权限另行验收。
 
-首组冻结契约为 `config/stage-learning/experiment.v1.json`。H 的两个profile、首轮 development selection 与一次受限 reference supplement 均已完成。Supplement 只修复 Stage-6/11 reference sufficiency，hard gates和网格保持不变：Stage 11最终冻结5%未收复反抽，Stage-5/6联合网格仍无eligible candidate，Stage 7保持原真实INCONCLUSIVE，Stage 10维持5-session+2% candidate。`second-group-development-closeout.v1.json` 因此以mixed disposition关闭当前版本追参：10/11保留development candidate；5/6/7保留编号但INCONCLUSIVE_PARKED。量化、短线操作、基金三视角评审给出`PASS_WITH_SCOPE_REDUCTION`，要求连续Facts继续作为权威基线，且不再为凑齐标签扩参或降gate。上述中间量仍是Job-local研究投影，不注册为正式Facts/Feature；任何后续产品化或新版本均需另开scope。
+首组冻结契约为 `config/stage-learning/experiment.v1.json`。H 的两个profile、首轮 development selection 与一次受限 reference supplement 均已完成。Supplement 只修复 Stage-6/11 reference sufficiency，hard gates和网格保持不变：Stage 11最终冻结5%未收复反抽，Stage-5/6联合网格仍无eligible candidate，Stage 7保持原真实INCONCLUSIVE，Stage 10维持5-session+2% candidate。`second-group-development-closeout.v1.json` 因此以mixed disposition关闭当前版本追参：10/11保留development candidate；5/6/7保留编号但INCONCLUSIVE_PARKED。量化、短线操作、基金三视角评审给出`PASS_WITH_SCOPE_REDUCTION`，要求连续Facts继续作为权威基线，且不再为凑齐标签扩参或降gate。随后 Route A `P3-STRUCT-005` 已将same-support break/reclaim、unreclaimed age、signed distance与post-break rebound正式化为bounded retrospective F9 Structure Facts；两次独立cold real-DWD Job语义完全复现。Stage 10/11阈值仍是Facts之上的research projection，不因此获得正式LabelCard或消费权限。
 
 ## 2. 学习对象：不变的语义骨架与可学习参数
 

@@ -120,14 +120,18 @@ nodes.
   Expert/economic gate, thirteen-state/ML work, or Shadow/paper/live execution. Catalog work #215
   is a later independent read-only discovery surface and does not retroactively expand this scope.
   Route: `design/structure-facts-v2.md`; coverage: `config/structure-facts-v2-blueprint.v1.json`.
-- `P3-STRUCT-005` is the owner-approved Route-A follow-up from the Stage-10/11 mixed development
-  closeout. It does **not** reopen Stage tuning. It formalizes the continuous F9 chain as a narrow
-  B3/B4/B5 extension: breakout-start rolling-low support binding, same-support break/reclaim,
-  unreclaimed session age, signed distance and post-break rebound. Stage 10/11 remain research-only
-  projections, with Stage 11 consuming an immutable prior Stage-10 confirmation rather than
-  recomputing current Stage-10 depth. A/B are pre-result complete; C is the only ready step and is
-  frozen to two independent cold real-DWD Jobs on the existing 3-security 2020Q1 development slice.
-  B6/B7, official Stage labels, economic tuning, sealed data and trading stay closed. Route:
+- `P3-STRUCT-005` is accepted and closed for the owner-approved Route-A F9 follow-up. It does **not**
+  reopen Stage tuning. It formalizes the continuous F9 chain as a narrow B3/B4/B5 extension:
+  breakout-start rolling-low support binding, same-support break/reclaim, unreclaimed session age,
+  signed distance and post-break rebound. Stage 10/11 remain research-only projections, with Stage
+  11 consuming an immutable prior Stage-10 confirmation rather than recomputing current Stage-10
+  depth. Revision `44571610` completed two independent cold real-DWD Jobs with exact semantic
+  reproduction: 174/174 admitted rows, 6 support bindings, 3 breaks, 3 reclaims, 25 unreclaimed
+  rebound observations, 2 Stage-10 confirmation refs and 6 Stage-11 active research observations.
+  The preregistered 12-row outcome-blind review found no obvious contradiction, including a real
+  Stage-11 case whose current support distance had recovered inside 2% while its prior Stage-10 ref
+  remained valid. B6/B7, official Stage labels, economic tuning, sealed data and trading stay
+  closed. Acceptance: `acceptance/structure-f9-real-dwd-acceptance-20260910.md`; route:
   `design/structure-support-facts.md`; plan: `config/structure-f9-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

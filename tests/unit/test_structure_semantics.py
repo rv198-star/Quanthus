@@ -195,11 +195,19 @@ def test_blueprint_preserves_gaps_and_has_no_dictionary_dependency_cycle() -> No
     assert rows["B8"]["implementation_status"] == "accepted_catalog_v1"
     assert rows["B8"]["verification_status"] == "production_catalog"
     bindings = {item["concept_id"]: item for item in raw["semantic_runtime_bindings"]}
-    assert len(bindings) == len(raw["semantic_runtime_bindings"]) == 7
+    assert len(bindings) == len(raw["semantic_runtime_bindings"]) == 9
     assert bindings["structure.anchor.rolling-high"]["capability_id"] == "B3"
     assert bindings["structure.geometry.signed-distance"]["capability_id"] == "B3"
     assert bindings["structure.interaction.close-reclaim"]["capability_id"] == "B4"
     assert bindings["structure.episode.reclaim-sequence"]["capability_id"] == "B5"
+    assert bindings["structure.geometry.post-break-rebound"] == {
+        "concept_id": "structure.geometry.post-break-rebound",
+        "capability_id": "B5-F9",
+        "accepted_scope": "bounded_retrospective_f9_support_process",
+    }
+    assert bindings["structure.episode.support-failure-sequence"]["capability_id"] == "B5-F9"
+    assert rows["B5-F9"]["implementation_status"] == "accepted_bounded_v2"
+    assert rows["B5-F9"]["verification_status"] == "real_dwd_ab"
     assert rows["B9"]["implementation_status"] == "outside_structure_scope"
 
     def visit(key: str, ancestors: frozenset[str]) -> None:

@@ -100,19 +100,27 @@ def test_rsi14_retains_existing_formula_and_indicator_concepts_do_not_gain_false
 def test_structure_runtime_bindings_project_only_blueprint_accepted_concepts() -> None:
     catalog = DataIndicatorCatalog()
     accepted = {
-        "structure.anchor.rolling-high": "B3",
-        "structure.anchor.rolling-low": "B3",
-        "structure.geometry.signed-distance": "B3",
-        "structure.interaction.close-cross-above": "B4",
-        "structure.interaction.close-cross-below": "B4",
-        "structure.interaction.close-reclaim": "B4",
-        "structure.episode.reclaim-sequence": "B5",
+        "structure.anchor.rolling-high": ("B3", "bounded_retrospective_b1_b5"),
+        "structure.anchor.rolling-low": ("B3", "bounded_retrospective_b1_b5"),
+        "structure.geometry.signed-distance": ("B3", "bounded_retrospective_b1_b5"),
+        "structure.interaction.close-cross-above": ("B4", "bounded_retrospective_b1_b5"),
+        "structure.interaction.close-cross-below": ("B4", "bounded_retrospective_b1_b5"),
+        "structure.interaction.close-reclaim": ("B4", "bounded_retrospective_b1_b5"),
+        "structure.episode.reclaim-sequence": ("B5", "bounded_retrospective_b1_b5"),
+        "structure.geometry.post-break-rebound": (
+            "B5-F9",
+            "bounded_retrospective_f9_support_process",
+        ),
+        "structure.episode.support-failure-sequence": (
+            "B5-F9",
+            "bounded_retrospective_f9_support_process",
+        ),
     }
-    for concept_id, capability_id in accepted.items():
+    for concept_id, (capability_id, accepted_scope) in accepted.items():
         item = catalog.item(f"semantic_concept:{concept_id}")
         assert item["implementation_status"] == "implemented"
         assert item["verification_status"] == "accepted"
-        assert item["accepted_scope"] == "bounded_retrospective_b1_b5"
+        assert item["accepted_scope"] == accepted_scope
         assert item["details"]["runtime_binding"]["capability_id"] == capability_id
     planned = catalog.item("semantic_concept:structure.anchor.confirmed-pivot")
     assert planned["implementation_status"] == "declared_only"
@@ -131,7 +139,8 @@ def test_turnover_field_is_not_silently_promoted_to_turnover_rate() -> None:
         "dwd_field:dwd_index_bar.turnover",
         "adm_field:p4-event-research-adm.candidate_daily.turnover",
     }
-    assert "成交金额" in catalog.item("adm_field:p4-event-research-adm.candidate_daily.turnover")["description"]
+    turnover = catalog.item("adm_field:p4-event-research-adm.candidate_daily.turnover")
+    assert "成交金额" in turnover["description"]
 
 
 def test_relations_return_outgoing_and_incoming_without_dangling_targets() -> None:

@@ -5,7 +5,7 @@
 | Phase | P3 |
 | Design status | approved |
 | Delivery gate | accepted |
-| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; `P3-STRUCT-005` Route-A F9 extension implemented pre-result with cold real-DWD qualification ready; broader v2 capabilities separately gated; `P3-DICT-001/002/003` accepted in production; Lineage V2 checkout/Web `c25638a`, API `3aa4837` |
+| Implementation status | `P3-FEAT-001` accepted; `P3-FEAT-002` accepted; `P3-LABEL-001` accepted; `P3-LABEL-003` accepted; frozen fixture vocabulary accepted; `P3-LABEL-004` deferred pending a formal label proposal; `P3-STRUCT-001/002/003` accepted within their bounded scopes; `P3-STRUCT-004` bounded B1-B5 retrospective vertical accepted; `P3-STRUCT-005` Route-A F9 bounded retrospective extension accepted on two cold real-DWD Jobs; broader v2 capabilities separately gated; `P3-DICT-001/002/003` accepted in production; Lineage V2 checkout/Web `c25638a`, API `3aa4837` |
 | Gate source | `config/p3-gates.v1.json` |
 | Governing requirements | FR-RULE-001, FR-EVENT-001, NFR-003/004 |
 
@@ -278,11 +278,11 @@ authority.
 | P3-STRUCT-004-B3 | Build prior-20/60 references with qualified target identity | P3-STRUCT-004-B2 | Excluded-T references, target grain, revision and prefix identity tests; #220 |
 | P3-STRUCT-004-B4 | Record same-anchor close crossings, loss and reclaim | P3-STRUCT-004-B3 | Equality, frozen target, no fabricated reclaim, gap/action censoring; #221 |
 | P3-STRUCT-004-B5 | Qualify minimal episodes, audited consumer and P2 through cold A/B | P3-STRUCT-004-B4 | Exact semantic A/B, persisted audit receipts, P2 compatibility and blinded review; #222 |
-| P3-STRUCT-005 | Formalize F9 same-support failure/reclaim/rebound Facts | P3-STRUCT-004, P3-STAGE-001-H | Route-A narrow B3/B4/B5 extension; A/B pre-result closed, C ready for two cold real-DWD Jobs, D blocked; no B6/B7 or official Stage labels |
-| P3-STRUCT-005-A | Freeze F9 support-role and prior-10 projection semantics | P3-STRUCT-004, P3-STAGE-001-H | `docs/design/structure-support-facts.md`; support role remains a candidate, thresholds stay outside Fact identity |
-| P3-STRUCT-005-B | Implement F9 Facts, deep verifier and governed Event Worker route | P3-STRUCT-005-A | focused counterexamples and release-ready evidence `docs/acceptance/structure-f9-release-ready-20260910.md` |
-| P3-STRUCT-005-C | Qualify F9 with two independent cold real-DWD Jobs | P3-STRUCT-005-B | fixed 3-security 2020Q1 development slice; exact A/B semantic reproduction and outcome-blind sample required |
-| P3-STRUCT-005-D | Freeze accepted F9 runtime bindings and projection boundary | P3-STRUCT-005-C | blocked until C; Stage 5/6/7 remain parked, no labels/consumers/trading |
+| P3-STRUCT-005 | Formalize F9 same-support failure/reclaim/rebound Facts | P3-STRUCT-004, P3-STAGE-001-H | closed / #253; bounded Route-A B3/B4/B5 extension accepted; no B6/B7 or official Stage labels |
+| P3-STRUCT-005-A | Freeze F9 support-role and prior-10 projection semantics | P3-STRUCT-004, P3-STAGE-001-H | closed / #249; `docs/design/structure-support-facts.md`; support role remains a candidate, thresholds stay outside Fact identity |
+| P3-STRUCT-005-B | Implement F9 Facts, deep verifier and governed Event Worker route | P3-STRUCT-005-A | closed / #250; focused counterexamples and `docs/acceptance/structure-f9-release-ready-20260910.md` |
+| P3-STRUCT-005-C | Qualify F9 with two independent cold real-DWD Jobs | P3-STRUCT-005-B | closed / #251; exact A/B semantic reproduction and 12/12 outcome-blind review; `docs/acceptance/structure-f9-real-dwd-acceptance-20260910.md` |
+| P3-STRUCT-005-D | Freeze accepted F9 runtime bindings and projection boundary | P3-STRUCT-005-C | closed / #252; B5-F9 runtime bindings accepted bounded; Stage 5/6/7 remain parked, no labels/consumers/trading |
 | P3-DICT-001 | Deliver the Quanthus Data & Indicator Catalog | P3-FEAT-001 | `docs/design/data-indicator-catalog.md`; #215 with children #223-#227; deterministic authority projection, read-only API/UI and drift gates; no dependency of P3-STRUCT-004 |
 | P3-DICT-001-A | Freeze Catalog schema, authority and relation semantics | P3-FEAT-001 | #223; `docs/acceptance/data-indicator-catalog-schema-snapshot-20260907.md` |
 | P3-DICT-001-B | Generate deterministic Catalog snapshot from authoritative sources | P3-DICT-001-A | #224; source adapters, deterministic digest/count manifest and required semantic regressions |

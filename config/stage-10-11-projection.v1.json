@@ -1,0 +1,68 @@
+{
+  "schema_version": "quanthus.stock-stage-projection-contract.v1",
+  "projection_id": "stock-stage.support-evolution-10-11",
+  "version": "1.0.0",
+  "work_item": "P3-STAGE-002",
+  "display_name": "结构失效/反抽阶段投影 / Structural Failure and Rebound Stage Projection",
+  "source_fact_family": {
+    "display_name": "演化支撑事实族 / Support Evolution Fact Family",
+    "historical_planning_code": "F9",
+    "required_concepts": [
+      "structure.episode.support-failure-sequence",
+      "structure.geometry.signed-distance",
+      "structure.geometry.post-break-rebound"
+    ],
+    "accepted_scope": "bounded_retrospective_f9_support_process"
+  },
+  "authority": {
+    "development_projection_contract_authorized": true,
+    "primary_stage_arbitration_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false,
+    "future_outcome_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "permanent_blind_access_authorized": false
+  },
+  "stage_10": {
+    "code": 10,
+    "name": "结构失效 / Structural Failure",
+    "semantic_role": "persistent_structural_failure_context",
+    "confirmation": {
+      "same_support_must_be_unreclaimed": true,
+      "minimum_unreclaimed_sessions": 5,
+      "minimum_failure_depth_abs": "0.02",
+      "first_qualifying_observation_confirms_once": true,
+      "confirmation_reference_is_immutable": true
+    },
+    "active_context": "after_confirmation_while_same_support_remains_unreclaimed"
+  },
+  "stage_11": {
+    "code": 11,
+    "name": "反抽 / Post-break Rebound",
+    "semantic_role": "nested_rebound_condition_within_confirmed_failure_context",
+    "requirements": {
+      "prior_stage_10_confirmation_required": true,
+      "same_support_must_remain_unreclaimed": true,
+      "minimum_post_break_rebound": "0.05",
+      "current_stage_10_depth_reconfirmation_required": false
+    }
+  },
+  "relationship": {
+    "stage_11_is_nested_under_stage_10_context": true,
+    "candidate_set_may_contain_10_and_11_together": true,
+    "candidate_set_is_not_primary_stage": true,
+    "primary_stage_output_must_be_null": true,
+    "reclaim_or_censor_clears_active_candidates_without_rewriting_history": true,
+    "stage_11_current_condition_may_turn_false_without_implying_a_primary_stage_transition": true
+  },
+  "claim_limits": [
+    "This contract formalizes development projection propositions, not an official LabelCard.",
+    "Stage 10 is a persistent structural-failure context; Stage 11 is a nested rebound condition inside that context.",
+    "A {10,11} candidate set is intentional and does not mean two primary stages are simultaneously published.",
+    "Primary-stage compression/arbitration is deferred to a separate milestone.",
+    "Thresholds are projection policy and never enter Support Evolution Fact identity.",
+    "No 2022-2024 reread or 2025 access is authorized by this contract."
+  ]
+}

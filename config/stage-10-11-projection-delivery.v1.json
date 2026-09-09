@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STAGE-002",
+  "design": "docs/design/stage-10-11-projection.md",
+  "review": "docs/reviews/stage-10-11-projection-review-20260910.md",
+  "projection_contract": "config/stage-10-11-projection.v1.json",
+  "qualification_request": "config/stage-10-11-projection-qualification.v1.json",
+  "runtime_accepted": false,
+  "runtime_qualification": null,
+  "authorization": {
+    "scope": "formal_projection_contract_immutable_f9_qualification_only",
+    "projection_contract_implementation_authorized": true,
+    "immutable_f9_artifact_qualification_authorized": true,
+    "market_data_read_authorized": false,
+    "dwd_provider_open_authorized": false,
+    "future_outcome_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "primary_stage_arbitration_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "items": [
+    {
+      "id": "P3-STAGE-002",
+      "title": "Formalize Stage 10/11 projection contract over Support Evolution Facts",
+      "kind": "epic",
+      "status": "ready",
+      "depends_on": ["P3-STRUCT-005", "P3-STAGE-001-H"],
+      "scope": "Formalize Stage 10 structural-failure context and Stage 11 nested rebound proposition over the accepted Support Evolution Fact Family without publishing a primary stage or LabelCard.",
+      "acceptance": [
+        "All child gates close with exact repository/runtime evidence",
+        "Formal projection reproduces retained Stage-10/11 predicates on both accepted F9 cold artifacts",
+        "Candidate set may contain 10 and 11 while primary_stage remains null",
+        "No DWD, sealed partition, future outcome, official label, daily, strategy or trading authority opens"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-002-A",
+      "title": "Freeze nested Stage 10/11 projection semantics",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STRUCT-005", "P3-STAGE-001-H"],
+      "scope": "Freeze Stage 10 as persistent structural-failure context, Stage 11 as nested rebound condition, intentional candidate overlap and deferred primary-stage arbitration.",
+      "acceptance": [
+        "Stage 10 first qualifying confirmation is immutable and exact-fact-revision bound",
+        "Stage 11 consumes prior Stage-10 confirmation and does not re-prove current depth",
+        "Candidate set overlap is explicitly not primary-stage output",
+        "Reclaim/censor clears current propositions without rewriting history"
+      ],
+      "evidence": [
+        "docs/design/stage-10-11-projection.md",
+        "docs/reviews/stage-10-11-projection-review-20260910.md"
+      ]
+    },
+    {
+      "id": "P3-STAGE-002-B",
+      "title": "Implement formal projection, deep verifier and governed qualification route",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STAGE-002-A"],
+      "scope": "Implement versioned projection observations, immutable-F9 qualification, byte-level deep reconstruction and fixed Event Worker dispatch.",
+      "acceptance": [
+        "Focused semantic and qualification tests pass",
+        "New/legacy Stage-10 and Stage-11 predicates match observation-by-observation",
+        "Projection threshold changes do not change Support Evolution Fact identity",
+        "Worker accepts only the fixed governed qualification config"
+      ],
+      "evidence": [
+        "docs/acceptance/stage-10-11-projection-release-ready-20260910.md"
+      ]
+    },
+    {
+      "id": "P3-STAGE-002-C",
+      "title": "Qualify projection against two immutable accepted F9 artifacts",
+      "kind": "task",
+      "status": "ready",
+      "depends_on": ["P3-STAGE-002-B"],
+      "scope": "Execute one governed Job that reads only the two accepted F9 artifact roots, reconstructs formal projection output and proves predicate compatibility/reproducibility without opening market data.",
+      "acceptance": [
+        "Both accepted F9 source artifacts pass original deep verification",
+        "Formal projection bytes/digest match across source runs",
+        "Legacy Stage-10/11 predicate mismatch counts are zero",
+        "Counts remain 241 observations / 2 confirmations / 10 Stage-10 contexts / 6 Stage-11 conditions",
+        "Every primary_stage is null and market-data/provider access counters are zero"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-002-D",
+      "title": "Freeze formal Projection Contract and successor boundary",
+      "kind": "task",
+      "status": "blocked",
+      "depends_on": ["P3-STAGE-002-C"],
+      "scope": "After immutable-artifact qualification passes, close the formal development Projection Contract and explicitly defer primary-stage compression, external validation and LabelCard activation.",
+      "acceptance": [
+        "Runtime qualification identity is frozen in the delivery plan",
+        "Stage 10/11 may be called formal development Projection Contract propositions",
+        "Primary-stage arbitration and official LabelCard remain separate future milestones",
+        "Stage 5/6/7 remain INCONCLUSIVE_PARKED"
+      ],
+      "evidence": []
+    }
+  ]
+}

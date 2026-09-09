@@ -155,8 +155,13 @@ price action and is no longer a classifier-uncertainty or structured breakout-fa
 
 Stage codes remain distinct even when their roles are related. In particular, `5` is not merged
 with `6`, and `10` is not merged with `11`; background/process relationships are modeling links,
-not permission to collapse stage identities. Likewise, a later reclaim/repair transition never
-retroactively deletes a valid earlier failure observation.
+not permission to collapse stage identities. `P3-STAGE-002` now makes one additional projection-layer
+distinction explicit: Stage 10 may persist as a structural-failure **context proposition** while
+Stage 11 is simultaneously true as a nested rebound **condition proposition**. A `{10,11}` candidate
+set is therefore allowed at the evidence/projection layer, but this is not yet a published
+`primary_stage`. How related propositions compress to one displayed stage remains a separately gated
+arbitration problem. Likewise, a later reclaim/repair transition never retroactively deletes a valid
+earlier failure observation.
 
 The `1 -> 12` and `9 -> 5` edges are candidate falsification escapes, not a demand to complete a
 mathematically symmetric graph. They prevent bottoming and distribution labels from becoming

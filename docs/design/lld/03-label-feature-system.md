@@ -307,6 +307,11 @@ authority.
 | P3-STAGE-001-H | Expand stage groups and evaluate specific consumers | P3-STAGE-001-F | blocked; #245; 第二组development mixed closeout：Stage 10/11冻结development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED；量化/短线/基金三视角review=`PASS_WITH_SCOPE_REDUCTION`，当前development search authority关闭；5/6/7/10/11身份不合并，无final labels、consumers或holdout |
 | P3-STAGE-001-I | Repair held-out sampling protocol after consumed F | P3-STAGE-001-F | closed; #247; `qualification-protocol.v2.json` keeps original target caps, removes exact-quota process failure, forbids result-dependent backfill, leaves semantic hard gates unchanged, and opens no holdout access |
 | P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked for holdout; #248; development census shows 128 first meets all target caps and freezes successor cohort size=512 using measured compute headroom; specific securities/seed/holdout remain unfrozen, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected |
+| P3-STAGE-002 | Formalize Stage 10/11 Projection Contract over Support Evolution Facts | P3-STRUCT-005, P3-STAGE-001-H | ready; Stage 10 is persistent failure context, Stage 11 is nested rebound proposition; `{10,11}` candidate overlap is allowed while `primary_stage=null` |
+| P3-STAGE-002-A | Freeze nested Stage 10/11 projection semantics | P3-STRUCT-005, P3-STAGE-001-H | closed; `docs/design/stage-10-11-projection.md`; prior Stage-10 confirmation is immutable and Stage 11 does not re-prove current depth |
+| P3-STAGE-002-B | Implement formal projection, deep verifier and governed qualification route | P3-STAGE-002-A | closed; focused tests and fixed Worker dispatch accepted for pre-run readiness; `docs/acceptance/stage-10-11-projection-release-ready-20260910.md` |
+| P3-STAGE-002-C | Qualify projection against two immutable accepted F9 artifacts | P3-STAGE-002-B | ready; one Job reads only accepted F9 artifacts, reproduces formal projection and checks exact legacy predicate compatibility with zero DWD/provider reads |
+| P3-STAGE-002-D | Freeze formal Projection Contract and successor boundary | P3-STAGE-002-C | blocked pending C; primary-stage arbitration, external validation, LabelCard/daily/strategy/trading stay separate |
 
 ## 7. Acceptance
 

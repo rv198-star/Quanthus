@@ -1350,6 +1350,33 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )["items"]
         f9_ids = {item["id"] for item in f9_plan}
         self.assertEqual(f9_ids, {"P3-STRUCT-005", *[f"P3-STRUCT-005-{c}" for c in "ABCD"]})
+        projection_plan_raw = json.loads(
+            (root / "config/stage-10-11-projection-delivery.v1.json").read_text()
+        )
+        projection_plan = projection_plan_raw["items"]
+        projection_ids = {item["id"] for item in projection_plan}
+        self.assertEqual(
+            projection_ids,
+            {"P3-STAGE-002", *[f"P3-STAGE-002-{c}" for c in "ABCD"]},
+        )
+        self.assertIs(
+            projection_plan_raw["authorization"][
+                "projection_contract_implementation_authorized"
+            ],
+            True,
+        )
+        self.assertIs(
+            projection_plan_raw["authorization"][
+                "immutable_f9_artifact_qualification_authorized"
+            ],
+            True,
+        )
+        for key, value in projection_plan_raw["authorization"].items():
+            if key.endswith("_authorized") and key not in {
+                "projection_contract_implementation_authorized",
+                "immutable_f9_artifact_qualification_authorized",
+            }:
+                self.assertIs(value, False)
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True
@@ -1418,10 +1445,16 @@ class DocumentTraceabilityTests(unittest.TestCase):
         for key, value in stage_plan["authorization"].items():
             if key.endswith("_authorized") and key not in positive:
                 self.assertIs(value, False)
-        for declared in [*catalog_plan, *lineage_plan, *stage_plan["items"], *f9_plan]:
+        for declared in [
+            *catalog_plan,
+            *lineage_plan,
+            *stage_plan["items"],
+            *f9_plan,
+            *projection_plan,
+        ]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
-        catalog_owned_ids = catalog_ids | lineage_ids | stage_ids | f9_ids
+        catalog_owned_ids = catalog_ids | lineage_ids | stage_ids | f9_ids | projection_ids
         p3_items = [item for item in items
                     if item.phase == "P3" and item.stable_id not in catalog_owned_ids]
         p4_items = [item for item in items if item.phase == "P4"]

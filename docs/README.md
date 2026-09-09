@@ -130,6 +130,17 @@ nodes.
   remained valid. B6/B7, official Stage labels, economic tuning, sealed data and trading stay
   closed. Acceptance: `acceptance/structure-f9-real-dwd-acceptance-20260910.md`; route:
   `design/structure-support-facts.md`; plan: `config/structure-f9-delivery.v1.json`.
+- `P3-STAGE-002` is the next Route-A milestone and is currently ready for one immutable-artifact
+  qualification. It formalizes Stage 10 as a persistent structural-failure context proposition and
+  Stage 11 as a nested rebound proposition over the accepted **演化支撑事实族 / Support Evolution
+  Fact Family**. A projection observation may intentionally carry candidate set `{10,11}` while
+  `primary_stage` remains null; this preserves the causal Stage-10 failure context without inventing
+  an unapproved primary-stage arbitration rule. A/B implementation gates are complete. C will read
+  only the two already accepted F9 cold artifacts, reconstruct the formal projection, require exact
+  compatibility with retained `stage_10_active` / `stage_11_active`, and prove zero DWD/provider
+  access. No official LabelCard, daily schedule, external validation, strategy or trading authority
+  is opened. Route: `design/stage-10-11-projection.md`; plan:
+  `config/stage-10-11-projection-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

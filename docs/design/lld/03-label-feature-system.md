@@ -301,8 +301,8 @@ authority.
 | P3-STAGE-001-F | Evaluate held-out evidence and freeze label qualification | P3-STAGE-001-E | closed / INCONCLUSIVE; #243; Job `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` consumed the only arbitration budget and failed before panel/prediction/scoring because `qualification_mature_held` supplied 58/80 additional unique episodes; no result artifact/SHADOW/QUALIFIED publication |
 | P3-STAGE-001-G | Publish observational post-DWD daily labels | P3-STAGE-001-F | Separately qualified as-known inputs and scheduling; no P6/strategy activation |
 | P3-STAGE-001-H | Expand stage groups and evaluate specific consumers | P3-STAGE-001-F | Separately authorized waves, same-facts comparison and optional complete-P2 consumer test |
-| P3-STAGE-001-I | Repair held-out sampling protocol after consumed F | P3-STAGE-001-F | closed; `qualification-protocol.v2.json` keeps original target caps, removes exact-quota process failure, forbids result-dependent backfill, leaves semantic hard gates unchanged, and opens no holdout access |
-| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked; no partition selected, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected, runtime/submit authority closed |
+| P3-STAGE-001-I | Repair held-out sampling protocol after consumed F | P3-STAGE-001-F | closed; #247; `qualification-protocol.v2.json` keeps original target caps, removes exact-quota process failure, forbids result-dependent backfill, leaves semantic hard gates unchanged, and opens no holdout access |
+| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked; #248; no partition selected, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected, runtime/submit authority closed |
 
 ## 7. Acceptance
 

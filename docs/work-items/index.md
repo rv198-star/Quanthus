@@ -242,8 +242,8 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-001-F | Evaluate held-out evidence and freeze label qualification | P3-STAGE-001-E | closed / INCONCLUSIVE; #243; Job `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` failed before panel/prediction/scoring because final mature-held stratum had 58/80 additional unique episodes; single arbitration budget consumed, no result artifact, 2025 untouched |
 | P3-STAGE-001-G | Publish observational post-DWD daily labels | P3-STAGE-001-F | blocked; as-known input and schedule qualification required |
 | P3-STAGE-001-H | Expand stage groups and evaluate specific consumers | P3-STAGE-001-F | blocked; new-group and consumer authorization required |
-| P3-STAGE-001-I | Repair successor held-out sampling protocol | P3-STAGE-001-F | closed; protocol-only; original target caps retained, exact-quota process failure removed, semantic hard gates unchanged, no new holdout access; `docs/acceptance/stock-stage-learning-i-protocol-repair-20260909.md` |
-| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked; no next partition selected, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected, runtime/submit authority closed |
+| P3-STAGE-001-I | Repair successor held-out sampling protocol | P3-STAGE-001-F | closed; #247; protocol-only; original target caps retained, exact-quota process failure removed, semantic hard gates unchanged, no new holdout access; `docs/acceptance/stock-stage-learning-i-protocol-repair-20260909.md` |
+| P3-STAGE-001-J | Execute successor external-semantic validation on an untouched holdout | P3-STAGE-001-I | blocked; #248; no next partition selected, 2022-2024 fresh reuse forbidden, 2025 unopened/unselected, runtime/submit authority closed |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

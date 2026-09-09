@@ -3,14 +3,15 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Work item | `P3-STAGE-002` |
 | Upstream | `P3-STRUCT-005`; `P3-STAGE-001-H` mixed closeout |
 | Source Facts | **演化支撑事实族 / Support Evolution Fact Family** (historical `F9`) |
 | Contract | `../../config/stage-10-11-projection.v1.json` |
 | Qualification | `../../config/stage-10-11-projection-qualification.v1.json` |
 | Runtime code | `../../src/quanthus/stage_projection.py`; `../../src/quanthus/stage_projection_qualification.py` |
-| Claim ceiling | formal development Projection Contract; no primary stage, official LabelCard, daily, strategy or trading authority |
+| Qualification | `../acceptance/stage-10-11-projection-qualification-20260910.md` |
+| Claim ceiling | accepted formal development Projection Contract; no primary stage, official LabelCard, daily, strategy or trading authority |
 
 ## 1. Decision
 
@@ -120,7 +121,14 @@ read by this qualification.
 
 ## 5. What this milestone proves and does not prove
 
-A PASS proves that Stage 10/11 have a stable, versioned, reproducible projection contract over the
+The immutable-artifact qualification passed at revision
+`1cccd0ac230bcb39d89b4514fd08c8dfed639215` in Job
+`job_5e2d82adb2a8492488725fcda379424f`. Both accepted F9 source artifacts produced the same formal
+projection digest, all retained Stage-10/11 predicates matched, and `primary_stage` was null for all
+241 observations. The deep verifier enforced zero market-data reads and zero DWD-provider opens.
+Evidence is `../acceptance/stage-10-11-projection-qualification-20260910.md`.
+
+This PASS proves that Stage 10/11 have a stable, versioned, reproducible projection contract over the
 accepted Support Evolution Fact Family, and that formalization does not change the predicates already
 observed in the accepted F9 run.
 

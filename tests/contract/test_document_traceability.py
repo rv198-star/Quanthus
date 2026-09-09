@@ -1359,23 +1359,17 @@ class DocumentTraceabilityTests(unittest.TestCase):
             projection_ids,
             {"P3-STAGE-002", *[f"P3-STAGE-002-{c}" for c in "ABCD"]},
         )
-        self.assertIs(
-            projection_plan_raw["authorization"][
-                "projection_contract_implementation_authorized"
-            ],
-            True,
+        self.assertIs(projection_plan_raw["runtime_accepted"], True)
+        self.assertEqual(
+            projection_plan_raw["runtime_qualification"]["decision"],
+            "PASS_FORMAL_PROJECTION_CONTRACT",
         )
-        self.assertIs(
-            projection_plan_raw["authorization"][
-                "immutable_f9_artifact_qualification_authorized"
-            ],
-            True,
+        self.assertEqual(
+            projection_plan_raw["authorization"]["scope"],
+            "formal_projection_contract_closed_no_active_qualification",
         )
         for key, value in projection_plan_raw["authorization"].items():
-            if key.endswith("_authorized") and key not in {
-                "projection_contract_implementation_authorized",
-                "immutable_f9_artifact_qualification_authorized",
-            }:
+            if key.endswith("_authorized"):
                 self.assertIs(value, False)
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(

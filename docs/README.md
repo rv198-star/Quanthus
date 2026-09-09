@@ -130,17 +130,18 @@ nodes.
   remained valid. B6/B7, official Stage labels, economic tuning, sealed data and trading stay
   closed. Acceptance: `acceptance/structure-f9-real-dwd-acceptance-20260910.md`; route:
   `design/structure-support-facts.md`; plan: `config/structure-f9-delivery.v1.json`.
-- `P3-STAGE-002` is the next Route-A milestone and is currently ready for one immutable-artifact
-  qualification. It formalizes Stage 10 as a persistent structural-failure context proposition and
-  Stage 11 as a nested rebound proposition over the accepted **演化支撑事实族 / Support Evolution
-  Fact Family**. A projection observation may intentionally carry candidate set `{10,11}` while
-  `primary_stage` remains null; this preserves the causal Stage-10 failure context without inventing
-  an unapproved primary-stage arbitration rule. A/B implementation gates are complete. C will read
-  only the two already accepted F9 cold artifacts, reconstruct the formal projection, require exact
-  compatibility with retained `stage_10_active` / `stage_11_active`, and prove zero DWD/provider
-  access. No official LabelCard, daily schedule, external validation, strategy or trading authority
-  is opened. Route: `design/stage-10-11-projection.md`; plan:
-  `config/stage-10-11-projection-delivery.v1.json`.
+- `P3-STAGE-002` is accepted and closed as the formal development Stage-10/11 Projection Contract
+  over the accepted **演化支撑事实族 / Support Evolution Fact Family**. Stage 10 is a persistent
+  structural-failure context proposition and Stage 11 is a nested rebound proposition. Candidate set
+  `{10,11}` is intentionally legal at the projection/evidence layer while `primary_stage` remains
+  null. The one qualification Job `job_5e2d82adb2a8492488725fcda379424f` reread no market data: it
+  consumed only the two accepted immutable F9 cold artifacts, reproduced 241 projection observations,
+  2 Stage-10 confirmations, 10 Stage-10 contexts and 6 Stage-11 conditions, matched every retained
+  research predicate and produced byte-identical A/B formal projection files. Active implementation
+  and qualification authority is now closed. Primary-stage arbitration, external validation, official
+  LabelCard, daily schedule, strategy and trading remain separate future scope. Acceptance:
+  `acceptance/stage-10-11-projection-qualification-20260910.md`; route:
+  `design/stage-10-11-projection.md`; plan: `config/stage-10-11-projection-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

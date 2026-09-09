@@ -28,10 +28,7 @@ def load_plan() -> dict:
             raise ValueError(f"Stage projection plan path missing: {key}")
 
     authority = raw.get("authorization")
-    expected_authority = {
-        "scope": "formal_projection_contract_immutable_f9_qualification_only",
-        "projection_contract_implementation_authorized": True,
-        "immutable_f9_artifact_qualification_authorized": True,
+    denied = {
         "market_data_read_authorized": False,
         "dwd_provider_open_authorized": False,
         "future_outcome_access_authorized": False,
@@ -43,6 +40,20 @@ def load_plan() -> dict:
         "strategy_consumption_authorized": False,
         "trading_authorized": False,
     }
+    if raw["runtime_accepted"] is False:
+        expected_authority = {
+            "scope": "formal_projection_contract_immutable_f9_qualification_only",
+            "projection_contract_implementation_authorized": True,
+            "immutable_f9_artifact_qualification_authorized": True,
+            **denied,
+        }
+    else:
+        expected_authority = {
+            "scope": "formal_projection_contract_closed_no_active_qualification",
+            "projection_contract_implementation_authorized": False,
+            "immutable_f9_artifact_qualification_authorized": False,
+            **denied,
+        }
     if authority != expected_authority:
         raise ValueError("Stage projection plan authority differs")
 
@@ -85,10 +96,45 @@ def load_plan() -> dict:
             raise ValueError("pre-qualification Stage projection status differs")
     else:
         qualification = raw.get("runtime_qualification")
-        if not isinstance(qualification, dict) or qualification.get("decision") != (
-            "PASS_FORMAL_PROJECTION_CONTRACT"
-        ):
-            raise ValueError("accepted Stage projection runtime lacks PASS qualification")
+        required_qualification = {
+            "decision": "PASS_FORMAL_PROJECTION_CONTRACT",
+            "code_revision": "1cccd0ac230bcb39d89b4514fd08c8dfed639215",
+            "job_id": "job_5e2d82adb2a8492488725fcda379424f",
+            "run_id": "run_5e2d82adb2a8492488725fcda379424f",
+            "input_digest": (
+                "sha256:fe32ef536d4494f269b6e829b2dbaead797528181f61b275639c2c2f39ce2db3"
+            ),
+            "manifest_sha256": (
+                "sha256:ce9418eed4861bcdf17d38eea9dcee297a4921ac33fd34e0714b40c3a6d85b94"
+            ),
+            "projection_contract_digest": (
+                "sha256:4452283774f1c0a30faa6f95b03076f3191b5fd0036835f71046ba047490876d"
+            ),
+            "formal_projection_digest": (
+                "sha256:47797766b987d7886de2be86587c7cbd4d7af8d9551d4dc38cd96eb3c6f8a221"
+            ),
+            "source_support_facts_digest": (
+                "sha256:6abbd976591739ede4451fd15ad2a11e8dd98519cc8039c2374f575c0035aff8"
+            ),
+            "result_digest": (
+                "sha256:2e1ae9ffceb500948dc08401d3b8672c0f267b659ea2e71f2837e43138f22dea"
+            ),
+            "row_count": 241,
+            "source_run_count": 2,
+            "stage_10_confirmation_count": 2,
+            "stage_10_context_count": 10,
+            "stage_11_rebound_condition_count": 6,
+            "nested_10_11_candidate_count": 6,
+            "primary_stage_non_null_count": 0,
+            "legacy_predicate_compatibility": True,
+            "market_data_reads": 0,
+            "dwd_provider_opens": 0,
+            "evidence": "docs/acceptance/stage-10-11-projection-qualification-20260910.md",
+        }
+        if qualification != required_qualification:
+            raise ValueError("accepted Stage projection runtime qualification differs")
+        if not (ROOT / qualification["evidence"]).is_file():
+            raise ValueError("accepted Stage projection runtime evidence is missing")
         if any(by_id[key]["status"] != "closed" for key in IDS):
             raise ValueError("accepted Stage projection milestone must be fully closed")
         if not parent["evidence"] or any(
@@ -107,6 +153,19 @@ def issue_body(item: dict, raw: dict, mapping: dict) -> str:
         if item["evidence"]
         else "Pending exact runtime acceptance evidence."
     )
+    authority_text = (
+        "The formal development Projection Contract is accepted and no active implementation or "
+        "qualification authority remains. No market-data/DWD read, sealed partition, future "
+        "outcome, primary-stage arbitration, official LabelCard, daily schedule, strategy or "
+        "trading authority."
+        if raw["runtime_accepted"] is True
+        else (
+            "Only the formal development Projection Contract and immutable accepted-F9 artifact "
+            "qualification are authorized. No market-data/DWD read, sealed partition, future "
+            "outcome, primary-stage arbitration, official LabelCard, daily schedule, strategy or "
+            "trading authority."
+        )
+    )
     body = [
         f"<!-- quanthus-planning:v2 id={item['id']} kind={item['kind']} -->",
         f"## Scope\n{item['scope']}",
@@ -119,11 +178,7 @@ def issue_body(item: dict, raw: dict, mapping: dict) -> str:
         "## Acceptance\n" + "\n".join(f"- {value}" for value in item["acceptance"]),
         f"## Status\n{item['status']}",
         "## Evidence\n" + evidence,
-        "## Authority boundary\n"
-        "Only the formal development Projection Contract and immutable accepted-F9 artifact "
-        "qualification are authorized. No market-data/DWD read, sealed partition, future outcome, "
-        "primary-stage arbitration, official LabelCard, daily schedule, strategy or "
-        "trading authority.",
+        "## Authority boundary\n" + authority_text,
     ]
     if item["id"] == PARENT:
         body.append("## Children\n" + "\n".join(link(key) for key in IDS[1:]))

@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
 import sync_stage_10_11_projection_issues as sync  # noqa: E402
 
 
-def test_projection_plan_opens_only_immutable_f9_qualification_scope():
+def test_projection_plan_closes_after_immutable_f9_qualification_pass():
     raw = sync.load_plan()
     assert [item["id"] for item in raw["items"]] == [
         "P3-STAGE-002",
@@ -23,17 +23,23 @@ def test_projection_plan_opens_only_immutable_f9_qualification_scope():
         "P3-STAGE-002-C",
         "P3-STAGE-002-D",
     ]
-    by_id = {item["id"]: item for item in raw["items"]}
-    assert by_id["P3-STAGE-002"]["status"] == "ready"
-    assert by_id["P3-STAGE-002-A"]["status"] == "closed"
-    assert by_id["P3-STAGE-002-B"]["status"] == "closed"
-    assert by_id["P3-STAGE-002-C"]["status"] == "ready"
-    assert by_id["P3-STAGE-002-D"]["status"] == "blocked"
-    assert raw["runtime_accepted"] is False
-    assert raw["runtime_qualification"] is None
+    assert all(item["status"] == "closed" for item in raw["items"])
+    assert raw["runtime_accepted"] is True
+    qualified = raw["runtime_qualification"]
+    assert qualified["decision"] == "PASS_FORMAL_PROJECTION_CONTRACT"
+    assert qualified["job_id"] == "job_5e2d82adb2a8492488725fcda379424f"
+    assert qualified["row_count"] == 241
+    assert qualified["stage_10_confirmation_count"] == 2
+    assert qualified["stage_10_context_count"] == 10
+    assert qualified["stage_11_rebound_condition_count"] == 6
+    assert qualified["nested_10_11_candidate_count"] == 6
+    assert qualified["primary_stage_non_null_count"] == 0
+    assert qualified["legacy_predicate_compatibility"] is True
+    assert qualified["market_data_reads"] == qualified["dwd_provider_opens"] == 0
     authority = raw["authorization"]
-    assert authority["projection_contract_implementation_authorized"] is True
-    assert authority["immutable_f9_artifact_qualification_authorized"] is True
+    assert authority["scope"] == "formal_projection_contract_closed_no_active_qualification"
+    assert authority["projection_contract_implementation_authorized"] is False
+    assert authority["immutable_f9_artifact_qualification_authorized"] is False
     for key in (
         "market_data_read_authorized",
         "dwd_provider_open_authorized",
@@ -49,7 +55,9 @@ def test_projection_plan_opens_only_immutable_f9_qualification_scope():
         assert authority[key] is False
 
 
-def test_projection_plan_fails_closed_if_market_or_label_authority_is_opened(tmp_path, monkeypatch):
+def test_projection_plan_fails_closed_if_any_execution_authority_is_reopened(
+    tmp_path, monkeypatch
+):
     raw = sync.load_plan()
     paths = [
         sync.PLAN,

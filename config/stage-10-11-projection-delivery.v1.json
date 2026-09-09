@@ -5,12 +5,34 @@
   "review": "docs/reviews/stage-10-11-projection-review-20260910.md",
   "projection_contract": "config/stage-10-11-projection.v1.json",
   "qualification_request": "config/stage-10-11-projection-qualification.v1.json",
-  "runtime_accepted": false,
-  "runtime_qualification": null,
+  "runtime_accepted": true,
+  "runtime_qualification": {
+    "decision": "PASS_FORMAL_PROJECTION_CONTRACT",
+    "code_revision": "1cccd0ac230bcb39d89b4514fd08c8dfed639215",
+    "job_id": "job_5e2d82adb2a8492488725fcda379424f",
+    "run_id": "run_5e2d82adb2a8492488725fcda379424f",
+    "input_digest": "sha256:fe32ef536d4494f269b6e829b2dbaead797528181f61b275639c2c2f39ce2db3",
+    "manifest_sha256": "sha256:ce9418eed4861bcdf17d38eea9dcee297a4921ac33fd34e0714b40c3a6d85b94",
+    "projection_contract_digest": "sha256:4452283774f1c0a30faa6f95b03076f3191b5fd0036835f71046ba047490876d",
+    "formal_projection_digest": "sha256:47797766b987d7886de2be86587c7cbd4d7af8d9551d4dc38cd96eb3c6f8a221",
+    "source_support_facts_digest": "sha256:6abbd976591739ede4451fd15ad2a11e8dd98519cc8039c2374f575c0035aff8",
+    "result_digest": "sha256:2e1ae9ffceb500948dc08401d3b8672c0f267b659ea2e71f2837e43138f22dea",
+    "row_count": 241,
+    "source_run_count": 2,
+    "stage_10_confirmation_count": 2,
+    "stage_10_context_count": 10,
+    "stage_11_rebound_condition_count": 6,
+    "nested_10_11_candidate_count": 6,
+    "primary_stage_non_null_count": 0,
+    "legacy_predicate_compatibility": true,
+    "market_data_reads": 0,
+    "dwd_provider_opens": 0,
+    "evidence": "docs/acceptance/stage-10-11-projection-qualification-20260910.md"
+  },
   "authorization": {
-    "scope": "formal_projection_contract_immutable_f9_qualification_only",
-    "projection_contract_implementation_authorized": true,
-    "immutable_f9_artifact_qualification_authorized": true,
+    "scope": "formal_projection_contract_closed_no_active_qualification",
+    "projection_contract_implementation_authorized": false,
+    "immutable_f9_artifact_qualification_authorized": false,
     "market_data_read_authorized": false,
     "dwd_provider_open_authorized": false,
     "future_outcome_access_authorized": false,
@@ -27,7 +49,7 @@
       "id": "P3-STAGE-002",
       "title": "Formalize Stage 10/11 projection contract over Support Evolution Facts",
       "kind": "epic",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STRUCT-005", "P3-STAGE-001-H"],
       "scope": "Formalize Stage 10 structural-failure context and Stage 11 nested rebound proposition over the accepted Support Evolution Fact Family without publishing a primary stage or LabelCard.",
       "acceptance": [
@@ -36,7 +58,9 @@
         "Candidate set may contain 10 and 11 while primary_stage remains null",
         "No DWD, sealed partition, future outcome, official label, daily, strategy or trading authority opens"
       ],
-      "evidence": []
+      "evidence": [
+        "docs/acceptance/stage-10-11-projection-qualification-20260910.md"
+      ]
     },
     {
       "id": "P3-STAGE-002-A",
@@ -77,7 +101,7 @@
       "id": "P3-STAGE-002-C",
       "title": "Qualify projection against two immutable accepted F9 artifacts",
       "kind": "task",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STAGE-002-B"],
       "scope": "Execute one governed Job that reads only the two accepted F9 artifact roots, reconstructs formal projection output and proves predicate compatibility/reproducibility without opening market data.",
       "acceptance": [
@@ -87,13 +111,15 @@
         "Counts remain 241 observations / 2 confirmations / 10 Stage-10 contexts / 6 Stage-11 conditions",
         "Every primary_stage is null and market-data/provider access counters are zero"
       ],
-      "evidence": []
+      "evidence": [
+        "docs/acceptance/stage-10-11-projection-qualification-20260910.md"
+      ]
     },
     {
       "id": "P3-STAGE-002-D",
       "title": "Freeze formal Projection Contract and successor boundary",
       "kind": "task",
-      "status": "blocked",
+      "status": "closed",
       "depends_on": ["P3-STAGE-002-C"],
       "scope": "After immutable-artifact qualification passes, close the formal development Projection Contract and explicitly defer primary-stage compression, external validation and LabelCard activation.",
       "acceptance": [
@@ -102,7 +128,9 @@
         "Primary-stage arbitration and official LabelCard remain separate future milestones",
         "Stage 5/6/7 remain INCONCLUSIVE_PARKED"
       ],
-      "evidence": []
+      "evidence": [
+        "docs/acceptance/stage-10-11-projection-qualification-20260910.md"
+      ]
     }
   ]
 }

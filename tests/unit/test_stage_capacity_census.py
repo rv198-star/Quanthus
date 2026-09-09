@@ -8,6 +8,7 @@ from quanthus.policy import find_project_root
 from quanthus.stage_learning.capacity_census import (
     _capacity_for_population,
     load_capacity_census_config,
+    main,
 )
 from quanthus.stage_learning.core import ActivityObservation
 from quanthus.structure_v2 import EpisodeObservation
@@ -162,6 +163,23 @@ def test_capacity_protocol_meets_caps_when_distinct_episode_exists() -> None:
     assert result["sub_stratum_shortfalls"] == {}
     assert result["all_target_caps_met"] is True
     assert result["selected_unique_episode_count"] == 10
+
+
+def test_capacity_cli_serializes_date_values(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        "quanthus.stage_learning.capacity_census.run_capacity_census",
+        lambda **_kwargs: {"development_window": {"cohort_date": date(2019, 12, 31)}},
+    )
+    assert main([
+        "run",
+        "--training-root",
+        "/tmp/training",
+        "--output-root",
+        "/tmp/output",
+        "--code-revision",
+        "a" * 40,
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["development_window"]["cohort_date"] == "2019-12-31"
 
 
 def test_capacity_config_is_not_holdout_authority() -> None:

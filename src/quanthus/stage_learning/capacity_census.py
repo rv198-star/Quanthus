@@ -580,7 +580,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     else:
         result = verify_capacity_census_artifact(args.artifact, code_revision=args.code_revision)
-    print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+    print(canonical(result).decode("ascii"))
     return 0
 
 

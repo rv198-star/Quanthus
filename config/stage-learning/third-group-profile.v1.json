@@ -1,0 +1,111 @@
+{
+  "schema_version": "quanthus.stage-third-group-profile.v1",
+  "profile_id": "stock-stage-third-group-0-1-2-8-9-12-development-profile-v1",
+  "work_item": "P3-STAGE-003-B",
+  "purpose": "Measure development-only T-only continuous morphology for Stage 0/1/2/8/9/12 before any third-group threshold search, while testing whether 8/9 behave more like modifiers than peer primary stages.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "authority": {
+    "development_only": true,
+    "runtime_implementation_authorized": true,
+    "development_data_read_authorized": true,
+    "continuous_profile_output_authorized": true,
+    "stage_label_output_authorized": false,
+    "parameter_search_authorized": false,
+    "synthetic_panel_authorized": false,
+    "future_settlement_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "holdout_population_selection_authorized": false,
+    "formal_structure_fact_registration_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_result_access_authorized": false,
+    "trading_authorized": false
+  },
+  "development_window": {
+    "cohort_scan_start": "2019-01-02",
+    "cohort_date": "2019-12-31",
+    "warmup_start": "2019-07-01",
+    "report_start": "2020-01-02",
+    "report_end": "2021-12-31",
+    "minimum_pre_cohort_observations": 100,
+    "cohort_seed": "sha256:37f3162a8906df72cf25da6c153976e0826413e86445a05e2f0614d01b7b9ad5"
+  },
+  "population": {
+    "cohort_size": 512,
+    "minimum_contiguous_history_sessions": 61,
+    "one_observation_per_security_session": true
+  },
+  "semantic_subgroups": {
+    "order_consolidation": {
+      "candidate_stage_codes": [0, 2],
+      "question": "Can directionless disorder be separated from orderly consolidation using T-only efficiency, width contraction and center stability rather than residual classification?",
+      "primary_stage_forced": false
+    },
+    "downside_lifecycle": {
+      "candidate_stage_codes": [1, 12],
+      "question": "Can continuing decline be separated from observable downside deceleration/stabilization without using future lows?",
+      "primary_stage_forced": false
+    },
+    "high_side_modifiers": {
+      "candidate_stage_codes": [8, 9],
+      "question": "Do upside acceleration/extension and high-level price-volume divergence behave as modifiers over an advancing context rather than peer primary stages?",
+      "modifier_hypothesis_explicit": true,
+      "fund_intent_claim_forbidden": true,
+      "future_top_claim_forbidden": true
+    }
+  },
+  "observation_contract": {
+    "T_included_in_current_window": true,
+    "returns_use_exact_prior_admitted_session": true,
+    "stop_and_rewarm_on_nonadmitted_row": true,
+    "stop_and_rewarm_on_listing_or_coordinate_change": true,
+    "stop_and_rewarm_on_hidden_session_gap": true,
+    "volume_missing_suppresses_only_volume_metrics": true,
+    "daily_rows_are_correlated_observations_not_independent_semantic_samples": true
+  },
+  "measurements": {
+    "metrics": [
+      "return_5_sessions",
+      "return_10_sessions",
+      "return_20_sessions",
+      "return_60_sessions",
+      "signed_directional_efficiency_5",
+      "signed_directional_efficiency_20",
+      "range_width_10",
+      "range_width_20",
+      "range_width_60",
+      "range_width_change_10_vs_prior10",
+      "range_width_change_20_vs_prior20",
+      "center_shift_10_vs_prior10",
+      "center_shift_20_vs_prior20",
+      "position_in_range_20",
+      "position_in_range_60",
+      "drawdown_from_high_20",
+      "drawdown_from_high_60",
+      "rebound_from_low_20",
+      "rebound_from_low_60",
+      "return_velocity_5_per_session",
+      "return_velocity_20_per_session",
+      "velocity_delta_5_vs_20",
+      "volume_ratio_20",
+      "recent_volume_ratio_5_to_prior20"
+    ],
+    "quantiles": [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99],
+    "quantile_method": "nearest_rank",
+    "fixed_diagnostic_bands": {
+      "position_lower_third_max": "0.3333333333333333333333333333",
+      "position_upper_third_min": "0.6666666666666666666666666667",
+      "efficiency_low_abs_max": "0.3333333333333333333333333333",
+      "efficiency_high_abs_min": "0.6666666666666666666666666667"
+    },
+    "no_stage_threshold_is_derived_inside_this_job": true,
+    "no_state_or_modifier_is_selected_inside_this_job": true
+  },
+  "artifact": {
+    "summary_only": true,
+    "security_codes_published": false,
+    "market_prices_published": false,
+    "observation_rows_published": false,
+    "official_stage_labels_published": false
+  }
+}

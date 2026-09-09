@@ -38,6 +38,7 @@ STAGE_SECOND_GROUP_DEVELOPMENT_JOB = "quanthus.stage-second-group-development.v1
 STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB = (
     "quanthus.stage-second-group-development-supplement.v1"
 )
+STAGE_THIRD_GROUP_PROFILE_JOB = "quanthus.stage-third-group-profile.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
@@ -98,6 +99,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-second-group-development-supplement-*",
         "process_error": "stage_second_group_development_supplement_process_failed",
         "wall_seconds": 2700,
+    },
+    STAGE_THIRD_GROUP_PROFILE_JOB: {
+        "config": "config/stage-learning/third-group-profile.v1.json",
+        "module": "quanthus.stage_learning.third_group_profile",
+        "artifact_glob": "stage-third-group-profile-*",
+        "process_error": "stage_third_group_profile_process_failed",
+        "wall_seconds": 1800,
     },
 }
 
@@ -626,6 +634,14 @@ class StageWorker:
                 "reference_summary": verified.get("reference_summary"),
                 "stage_7_gate_reason_counts": verified.get("stage_7_gate_reason_counts"),
                 "candidate_artifact_digest": verified.get("candidate_artifact_digest"),
+            }
+        if job.kind == STAGE_THIRD_GROUP_PROFILE_JOB:
+            result["third_group_profile"] = {
+                "profile_observation_count": verified.get("profile_observation_count"),
+                "reset_counts": verified.get("reset_counts"),
+                "metric_profiles": verified.get("metric_profiles"),
+                "joint_diagnostic_counts": verified.get("joint_diagnostic_counts"),
+                "diagnostic_slice_counts": verified.get("diagnostic_slice_counts"),
             }
         return result
 

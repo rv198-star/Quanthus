@@ -1371,6 +1371,39 @@ class DocumentTraceabilityTests(unittest.TestCase):
         for key, value in projection_plan_raw["authorization"].items():
             if key.endswith("_authorized"):
                 self.assertIs(value, False)
+        third_group_raw = json.loads(
+            (root / "config/stage-third-group-delivery.v1.json").read_text()
+        )
+        third_group_ids = {item["id"] for item in third_group_raw["items"]}
+        self.assertEqual(
+            third_group_ids,
+            {"P3-STAGE-003", *[f"P3-STAGE-003-{c}" for c in "ABCD"]},
+        )
+        third_by_id = {item["id"]: item for item in third_group_raw["items"]}
+        self.assertEqual(third_by_id["P3-STAGE-003-C"]["status"], "ready")
+        self.assertEqual(third_by_id["P3-STAGE-003-D"]["status"], "blocked")
+        third_auth = third_group_raw["authorization"]
+        self.assertEqual(
+            third_auth["scope"],
+            "third_group_development_profile_only_no_labels_no_search",
+        )
+        self.assertIs(third_auth["third_group_development_profile_run_authorized"], True)
+        self.assertIs(third_auth["development_data_read_authorized"], True)
+        self.assertIs(third_auth["continuous_profile_output_authorized"], True)
+        for key in (
+            "parameter_search_authorized",
+            "stage_label_output_authorized",
+            "formal_structure_fact_registration_authorized",
+            "future_outcome_access_authorized",
+            "arbitration_access_authorized",
+            "permanent_blind_access_authorized",
+            "holdout_population_selection_authorized",
+            "primary_stage_arbitration_authorized",
+            "daily_schedule_authorized",
+            "strategy_consumption_authorized",
+            "trading_authorized",
+        ):
+            self.assertIs(third_auth[key], False)
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True
@@ -1445,10 +1478,13 @@ class DocumentTraceabilityTests(unittest.TestCase):
             *stage_plan["items"],
             *f9_plan,
             *projection_plan,
+            *third_group_raw["items"],
         ]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
-        catalog_owned_ids = catalog_ids | lineage_ids | stage_ids | f9_ids | projection_ids
+        catalog_owned_ids = (
+            catalog_ids | lineage_ids | stage_ids | f9_ids | projection_ids | third_group_ids
+        )
         p3_items = [item for item in items
                     if item.phase == "P3" and item.stable_id not in catalog_owned_ids]
         p4_items = [item for item in items if item.phase == "P4"]

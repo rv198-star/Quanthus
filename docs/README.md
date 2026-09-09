@@ -142,6 +142,14 @@ nodes.
   LabelCard, daily schedule, strategy and trading remain separate future scope. Acceptance:
   `acceptance/stage-10-11-projection-qualification-20260910.md`; route:
   `design/stage-10-11-projection.md`; plan: `config/stage-10-11-projection-delivery.v1.json`.
+- `P3-STAGE-003` is the next active stock-stage milestone. It does not begin with six label searches.
+  The frozen third-group profile splits `0/2` order-vs-consolidation, `1/12` downside lifecycle, and
+  `8/9` high-side acceleration/divergence, with an explicit hypothesis that 8/9 may be modifiers
+  rather than peer primary stages. `P3-STAGE-003-A/B` freeze semantics and the aggregate-only 512-
+  security development profile; `P3-STAGE-003-C` is the only ready result-bearing step. The profile
+  emits no Stage labels, performs no parameter search, registers no B6/B7 Facts, and does not touch
+  2022-2024 arbitration or 2025. Route: `design/stock-stage-third-group-profile.md`; plan:
+  `config/stage-third-group-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate
@@ -161,8 +169,9 @@ nodes.
   target caps, realized scarcity is retained without cross-stratum backfill, and unchanged semantic
   hard gates own sufficiency. J is still blocked for real holdout execution; its development-only
   capacity census found 128 as the first size meeting all target caps and froze future cohort size=512.
-  H is now the only ready stock-stage task and has returned to stage identification itself. The
-  512-security `second-group-profile.v1.json` completed successfully on 2020-2021 development with
+  P3-STAGE-001 itself now has no ready child: H is mixed-closeout/blocked, G/J remain blocked. The
+  active development result step has moved to `P3-STAGE-003-C`. The historical 512-security
+  `second-group-profile.v1.json` completed successfully on 2020-2021 development with
   3,425 accepted Stage-4 episode starts and 186,221 path observations. It supports a bounded 5/6
   development search frozen by `second-group-experiment.v1.json`. That contract now explicitly keeps
   5/6/7/10/11 as distinct stage identities. `second-group-repair-profile.v1.json` then completed

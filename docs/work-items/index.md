@@ -254,6 +254,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-002-B | Implement formal projection, deep verifier and governed qualification route | P3-STAGE-002-A | closed; #255; `docs/acceptance/stage-10-11-projection-release-ready-20260910.md` |
 | P3-STAGE-002-C | Qualify projection against two immutable accepted F9 artifacts | P3-STAGE-002-B | closed; #256; Job `job_5e2d82adb2a8492488725fcda379424f` PASS; 241/2/10/6 counts, zero predicate mismatch and zero DWD/provider access |
 | P3-STAGE-002-D | Freeze formal Projection Contract and successor boundary | P3-STAGE-002-C | closed; #257; `docs/acceptance/stage-10-11-projection-qualification-20260910.md`; primary-stage compression/external validation/LabelCard remain separate |
+| P3-STAGE-003 | Profile third-group morphology and decide state-vs-modifier structure | P3-STAGE-002, P3-STRUCT-005 | blocked parent; A/B closed, C ready, D blocked; one 512-security 2020-2021 development profile only; no Stage labels/search/B6-B7 formalization/holdout |
+| P3-STAGE-003-A | Freeze third-group semantic decomposition and morphology axes | P3-STAGE-002, P3-STRUCT-005 | closed; `docs/design/stock-stage-third-group-profile.md`; 0/2 order-consolidation, 1/12 downside-lifecycle, 8/9 high-side-modifier hypotheses frozen |
+| P3-STAGE-003-B | Implement governed 512-security third-group morphology profile | P3-STAGE-003-A | closed; `docs/acceptance/stock-stage-third-group-profile-release-ready-20260910.md`; aggregate-only profile and fixed RX Stage Worker kind |
+| P3-STAGE-003-C | Execute frozen third-group morphology profile on RX6800 | P3-STAGE-003-B | ready; exact `quanthus.stage-third-group-profile.v1` run; no label/threshold/modifier selection in Job |
+| P3-STAGE-003-D | Review third-group profile and freeze next facts/search route | P3-STAGE-003-C | blocked; must review all three subgroups before any threshold grid or narrow B6/B7 follow-up |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

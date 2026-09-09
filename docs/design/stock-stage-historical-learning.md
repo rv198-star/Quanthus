@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout并完成三视角评审：Stage 10冻结initial-low support + 5-session unreclaimed + 2% depth，Stage 11冻结prior-10 + same-support unreclaimed + 5% rebound；Stage 5/6/7保留独立编号但标记INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已把10/11背后的**演化支撑事实族 / Support Evolution Fact Family（历史编号 F9）**正式化并通过bounded real-DWD双冷跑验收。`P3-STAGE-002` 也已完成 immutable-F9 artifact qualification 并关闭：Stage 10正式化为持续失效背景命题，Stage 11正式化为嵌套反抽命题，允许候选集 `{10,11}`，但 `primary_stage` 始终为空。当前 active implementation/qualification authority 已关闭；正式LabelCard、市场数据重读、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout并完成三视角评审：Stage 10/11保留development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已把10/11背后的**演化支撑事实族 / Support Evolution Fact Family（历史编号 F9）**正式化，`P3-STAGE-002` 已把10/11正式化为可重叠但不压`primary_stage`的Projection Contract并关闭。当前新开的唯一结果访问是`P3-STAGE-003-C`：一次512只、2020-2021 development-only第三组连续morphology profile；0/2、1/12、8/9先分三组观察，不输出标签、不搜索阈值、不注册B6/B7 Facts。正式LabelCard、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
 
 ## 1. 决策摘要与继承关系
 
@@ -143,9 +143,9 @@ A须把数字、分母、区间算法、bootstrap块长/聚类、损失优先次
 
 ## 9. 实施顺序与扩展
 
-第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12，处理低频、方向衰竭和命名重叠。
+第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12，当前已进入`P3-STAGE-003`，先按0/2秩序整理、1/12下行生命周期、8/9高位修饰三个语义子组做连续profile，再决定是否需要新的Facts或有限搜索。
 
-每组都走相同的局部学习+全体系冲突审计；不得独立优化12个标签后直接拼接。每组输出保留/合并/改维度/拒绝决定。8/9或其他状态难以辨识时停在观察性描述，不能迫使B6/B7无限扩张。
+每组都走相同的局部学习+全体系冲突审计；不得独立优化12个标签后直接拼接。每组输出保留/合并/改维度/拒绝决定。第三组尤其禁止把`0`做成“其他都不满足”的剩余类，禁止把`8/9`的“赶顶/派发”当可观测事实；若难以辨识则停在观察性描述/修饰命题，不能迫使B6/B7无限扩张。
 
 复用生产模块：`structure_v2.py`及其输入/时间契约、`feature_registry.py`、`label_registry.py`、`label_audit.py`、`expert_evaluation/target_cards.py`、`resolver.py`、`scoring.py`与现有P2。未来新增代码计划归`src/quanthus/stage_learning/`，拟合依赖为独立可选环境，不引入lean API或运行中的Event Worker。
 

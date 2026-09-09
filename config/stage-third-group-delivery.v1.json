@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STAGE-003",
+  "design": "docs/design/stock-stage-third-group-profile.md",
+  "review": "docs/reviews/stock-stage-third-group-profile-review-20260910.md",
+  "runtime_config": "config/stage-learning/third-group-profile.v1.json",
+  "authorization": {
+    "scope": "third_group_development_profile_only_no_labels_no_search",
+    "third_group_profile_implementation_authorized": true,
+    "third_group_development_profile_run_authorized": true,
+    "development_data_read_authorized": true,
+    "continuous_profile_output_authorized": true,
+    "parameter_search_authorized": false,
+    "stage_label_output_authorized": false,
+    "formal_structure_fact_registration_authorized": false,
+    "future_outcome_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "holdout_population_selection_authorized": false,
+    "primary_stage_arbitration_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "items": [
+    {
+      "id": "P3-STAGE-003",
+      "title": "Profile third-group morphology and decide state-vs-modifier structure",
+      "kind": "epic",
+      "status": "blocked",
+      "depends_on": ["P3-STAGE-002", "P3-STRUCT-005"],
+      "scope": "Profile Stage 0/1/2/8/9/12 as three continuous semantic subgroups before any threshold search or primary-stage compression.",
+      "acceptance": [
+        "A/B freeze semantics and implementation before first result-bearing profile Run",
+        "C completes one frozen 512-security 2020-2021 development-only profile",
+        "D reviews the complete profile once and freezes retain/rename/modifier/fact-follow-up decisions",
+        "No Stage label, parameter search, B6/B7 formalization, holdout, daily, strategy or trading authority opens"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-003-A",
+      "title": "Freeze third-group semantic decomposition and morphology axes",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STAGE-002", "P3-STRUCT-005"],
+      "scope": "Freeze 0/2 order-consolidation, 1/12 downside-lifecycle and 8/9 high-side-modifier hypotheses plus T-only measurement definitions and claim ceilings.",
+      "acceptance": [
+        "Stage 0 is positive disorder evidence, not residual fallback",
+        "Stage 2 cannot imply hidden accumulation intent",
+        "Stage 1 cannot use a future low and Stage 12 remains current directional decline",
+        "Stage 8/9 observable names remove future-top/fund-intent claims",
+        "No primary-stage relation or threshold is selected"
+      ],
+      "evidence": [
+        "docs/design/stock-stage-third-group-profile.md",
+        "docs/reviews/stock-stage-third-group-profile-review-20260910.md"
+      ]
+    },
+    {
+      "id": "P3-STAGE-003-B",
+      "title": "Implement governed 512-security third-group morphology profile",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STAGE-003-A"],
+      "scope": "Implement a single-pass development profile, aggregate-only artifact, deep contract verification and RX Stage Worker kind without Stage labels or parameter search.",
+      "acceptance": [
+        "Focused metric/reset/authority tests pass",
+        "Nonadmitted/listing/coordinate/session gaps reset and rewarm rather than concatenate",
+        "Missing volume suppresses only volume metrics",
+        "Artifact publishes aggregates only and verifies exact authority flags",
+        "Worker admits only the fixed third-group profile config"
+      ],
+      "evidence": ["docs/acceptance/stock-stage-third-group-profile-release-ready-20260910.md"]
+    },
+    {
+      "id": "P3-STAGE-003-C",
+      "title": "Execute frozen third-group morphology profile on RX6800",
+      "kind": "task",
+      "status": "ready",
+      "depends_on": ["P3-STAGE-003-B"],
+      "scope": "Run the exact profile once on the frozen 512-security 2020-2021 development cohort and publish aggregate distributions/joint diagnostics only.",
+      "acceptance": [
+        "Exact code/config/input identity is recorded",
+        "Job stays inside 2020-2021 development and reports arbitration/permanent-blind reads false",
+        "No stage labels, state/modifier selection or parameter search are emitted",
+        "Profile observation/reset counts and all metric distributions are durably bound"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-003-D",
+      "title": "Review third-group profile and freeze next facts/search route",
+      "kind": "task",
+      "status": "blocked",
+      "depends_on": ["P3-STAGE-003-C"],
+      "scope": "Perform one post-profile semantic review and decide which codes remain stages, which become modifiers/renamed propositions, and which job-local metrics justify a narrow formal Facts follow-up.",
+      "acceptance": [
+        "Review covers all three semantic subgroups before any implementation change",
+        "Valid decisions include retain/merge/rename/modifier/INCONCLUSIVE/continuous-facts-only",
+        "Any later threshold grid or B6/B7 subset is frozen in a new version before result access",
+        "No attempt is made to force six passing labels"
+      ],
+      "evidence": []
+    }
+  ]
+}

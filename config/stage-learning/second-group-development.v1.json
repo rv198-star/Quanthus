@@ -1,0 +1,106 @@
+{
+  "schema_version": "quanthus.stage-second-group-development.v1",
+  "development_id": "stock-stage-second-group-5-6-7-10-11-development-v1",
+  "work_item": "P3-STAGE-001-H",
+  "purpose": "Build one shared 512-security development panel, create T-only synthetic-consensus references, and execute the preregistered bounded searches for distinct Stage 5/6, then Stage 10, Stage 7, and Stage 11 without reading any holdout or future outcome.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "first_group_candidate_config": "config/stage-learning/development-candidate.v1.json",
+  "stage_5_6_experiment_config": "config/stage-learning/second-group-experiment.v1.json",
+  "stage_7_10_11_experiment_config": "config/stage-learning/second-group-repair-experiment.v1.json",
+  "synthetic_panel_config": "config/stage-learning/second-group-synthetic-panel.v1.json",
+  "authority": {
+    "development_only": true,
+    "runtime_implementation_authorized": true,
+    "development_data_read_authorized": true,
+    "synthetic_reference_runtime_authorized": true,
+    "limited_parameter_search_runtime_authorized": true,
+    "development_candidate_artifact_authorized": true,
+    "future_outcome_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "official_label_publication_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "development_window": {
+    "cohort_scan_start": "2019-01-02",
+    "cohort_date": "2019-12-31",
+    "warmup_start": "2019-07-01",
+    "report_start": "2020-01-02",
+    "report_end": "2021-12-31",
+    "minimum_pre_cohort_observations": 100,
+    "cohort_seed": "sha256:37f3162a8906df72cf25da6c153976e0826413e86445a05e2f0614d01b7b9ad5"
+  },
+  "population": {
+    "cohort_size": 512,
+    "anchor_scales": [20, 60],
+    "maximum_path_sessions_including_first_stage_4": 60,
+    "shared_structure_build_required": true,
+    "shared_activity_build_required": true
+  },
+  "state_identity": {
+    "preserve_distinct_stage_codes": [5, 6, 7, 10, 11],
+    "stage_5_6_merge_authorized": false,
+    "stage_10_11_merge_authorized": false,
+    "coexistence_does_not_imply_merge": true,
+    "later_transition_does_not_rewrite_prior_valid_observation": true
+  },
+  "execution_order": ["stage_5_6", "stage_10", "stage_7", "stage_11"],
+  "dependency_rules": {
+    "stage_5_6_are_jointly_scored_but_remain_distinct": true,
+    "stage_10_candidate_must_freeze_before_stage_7_and_stage_11": true,
+    "stage_7_uses_frozen_stage_10_only_as_current_unreclaimed_failure_blocker": true,
+    "stage_11_requires_frozen_stage_10_prediction_on_same_support": true,
+    "full_cartesian_cross_stage_search_forbidden": true
+  },
+  "reference_sampling": {
+    "seed": "sha256:99e9b747ce71a03cc6e5b2af0c1ae8f1f5077d512b73f6ebdf8b7a10b21aa31c",
+    "target_contexts_per_stage": 120,
+    "target_contexts_per_bucket": 30,
+    "exact_bucket_quota_required": false,
+    "minimum_realized_contexts_per_stage": 80,
+    "one_context_per_episode_per_stage": true,
+    "reviewers_receive_t_only_features_only": true,
+    "algorithm_predictions_hidden_from_reviewers": true,
+    "future_outcomes_hidden_from_reviewers": true
+  },
+  "hard_gates": {
+    "minimum_definite_positive_references": 20,
+    "minimum_definite_negative_references": 20,
+    "minimum_ambiguous_references": 10,
+    "maximum_unjudgeable_reference_rate": 0.15,
+    "minimum_positive_reference_coverage": 0.55,
+    "maximum_definite_negative_false_positive_rate": 0.10,
+    "maximum_ambiguous_unique_assertion_rate": 0.20,
+    "minimum_precision_one_sided_95_lower": 0.65,
+    "f1_noninferiority_tolerance_vs_r0": 0.05,
+    "require_zero_t_only_audit_vetoes": true
+  },
+  "selection": {
+    "reject_hard_gate_failures_before_ranking": true,
+    "rank_order": [
+      "higher_macro_or_stage_f1",
+      "higher_precision_lower_bound",
+      "higher_positive_reference_coverage",
+      "smaller_parameter_distance_from_r0",
+      "lexicographic_parameter_order"
+    ],
+    "when_no_candidate_passes": "INCONCLUSIVE_RETAIN_ALL_TRIALS",
+    "selected_parameters_are_development_candidates_not_market_truth": true
+  },
+  "artifact": {
+    "output_relative_root": "runs/stage-second-group-development",
+    "summary_only": true,
+    "security_codes_published": false,
+    "market_prices_published": false,
+    "future_outcomes_published": false,
+    "official_stage_labels_published": false
+  },
+  "claim_limits": [
+    "This is result-aware development selection, not confirmatory or external validation.",
+    "SYNTHETIC_EXPERT_CONSENSUS is not HUMAN_EXPERT_REFERENCE.",
+    "2022-2024 is not reread and 2025 remains unopened/unselected.",
+    "A frozen development candidate does not authorize daily publication, strategy consumption or trading."
+  ]
+}

@@ -11,7 +11,7 @@
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Machine plan | `../../config/stock-stage-learning-delivery.v1.json` |
 | GitHub | 父工单 #246；A #238、B #239、C #240、D #241、E #242、F #243、G #244、H #245、I #247、J #248；A-F/I closed，G/H/J及父工单open/blocked |
-| Current scope | A-F已关闭，F为sample-feasibility INCONCLUSIVE；I已关闭；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：v1 profile已完成并冻结5/6有限搜索；下一步 `second-group-repair-profile.v1.json` 只读2020-2021 development补7/10/11连续证据。5/6与10/11保持独立编号，不做合并；2025 permanent-blind、正式QUALIFIED、日更、消费者和策略权限仍关闭 |
+| Current scope | A-F已关闭，F为sample-feasibility INCONCLUSIVE；I已关闭；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：v1与repair profile均已完成，5/6及10→7→11有限搜索空间已冻结；`second-group-development.v1.json` 现只授权一次2020-2021 development runtime，共享512只前置并形成第二组development candidate。5/6与10/11保持独立编号，不做合并；2025 permanent-blind、正式QUALIFIED、日更、消费者和策略权限仍关闭 |
 
 ## 1. 逐步执行路线
 
@@ -24,11 +24,11 @@
 | E | P3-STAGE-001-E | closed / #242 | R0/R1有限试验台账、hard-gated开发选择、冻结候选 | 18个R1全部留痕，4个过硬门槛；冻结 `development-candidate.v1.json`：probe 1.0 / hold 2 / distance 0 / activity 1.0。hold=1因歧义过断言被拒，hold=3不退化门槛失败；0与0.0025 distance不可辨识，按最小变更选0；R2不触发 |
 | F | P3-STAGE-001-F | closed / INCONCLUSIVE / #243 | 一次外样本、分状态/profile/用途资格包 | Job `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7`进入真实执行后在panel/预测/评分前因`qualification_mature_held`只有58个额外unique episodes、低于冻结80例要求而fail-closed；无qualification artifact/SHADOW/QUALIFIED结果；见 `../acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md` |
 | G | P3-STAGE-001-G | blocked after F inconclusive + 日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | F未产生可消费标签版本；延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
-| H | P3-STAGE-001-H | ready / #245 / second-group development | v1与repair profile均已成功；5/6保持独立并冻结27组有限搜索；repair结果把10的主支撑候选收敛到更深`initial_low_support_candidate`，冻结10的3/5/8日×2/4/6%失效搜索，7的12/16/20% damage×25/40/50% repair搜索，以及冻结10后11的3/5/8%未收复反抽搜索 | 7/10/11按10→7→11顺序development学习，避免全组合爆炸；结果见 `../acceptance/stock-stage-learning-h-7-10-11-repair-profile-result-20260909.md`；仍不输出正式stage label/primary；第三组/消费者/外样本继续blocked |
+| H | P3-STAGE-001-H | ready / #245 / second-group development | v1与repair profile均已成功；5/6保持独立并冻结27组有限搜索；repair结果冻结10的9组、7的9组、11的3组顺序搜索。`second-group-development.v1.json` 将共享一次512只Structure/Activity，建立每stage target-cap T-only synthetic-consensus reference，先5/6、再10、后7/11并产出development candidate | 任一步无候选通过hard gates则保留INCONCLUSIVE，不边跑边修；仍不输出正式stage label/primary；第三组/消费者/外样本继续blocked |
 | I | P3-STAGE-001-I | closed / #247 / protocol repair | 后继外样本采样控制协议 | `qualification-protocol.v2.json`保留F原target caps（mature-held仍80），但exact quota不足不再process crash；实际样本量进入冻结semantic hard gates，无跨层结果依赖回填；不读任何新holdout |
 | J | P3-STAGE-001-J | blocked / #248 / successor holdout | development容量普查已反推并冻结未来cohort size=512；后续在未消费holdout上执行一次评价 | 2020-2021 census：64不够、128首次满足、256/512均满足；选择512是基于实测算力余量增加稀有样本储备，640个semantic contexts上限不变。结果见 `../acceptance/stock-stage-learning-j-development-capacity-census-result-20260909.md`。真实评价仍需预先冻结具体证券/seed/partition并独立授权；2022-2024禁止fresh reuse，2025仍`unopened_unselected` |
 
-每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A-F已关闭，其中F是**sample-feasibility INCONCLUSIVE**而不是模型REJECT：2022-2024 arbitration的一次预算已经消耗，不能修sample后重跑并称fresh holdout。I只修复未来协议；J保持holdout blocked。H当前只开放development-only第二组连续剖面，profile结果之后才允许另冻有限参数空间。2025 permanent-blind保持未触碰。
+每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A-F已关闭，其中F是**sample-feasibility INCONCLUSIVE**而不是模型REJECT：2022-2024 arbitration的一次预算已经消耗，不能修sample后重跑并称fresh holdout。I只修复未来协议；J保持holdout blocked。H当前已从连续剖面推进到一次development-only有界搜索runtime；它不读取future outcome、不打开holdout，也不能在运行中扩大参数空间。2025 permanent-blind保持未触碰。
 
 ## 2. 谁负责什么
 
@@ -40,7 +40,7 @@
 
 当前不消耗新的holdout。H的两个development profile均已完成。repair profile进一步证明：acceptance anchor在20/60尺度约77%/74%的路径会被跌破，更像局部突破接受边界；更深的initial-low support仅约29%/13%被跌破，且首次跌破中位在26/28个交易日，更适合作为Stage-10主支撑候选。即便如此其跌破仍约80%/77%最终收回，因此10必须同时要求持续未收复和足够跌破深度。7则用damage与T-only repair fraction分离“深跌”与“正在修复”；11只能在冻结10之后、同一失败支撑仍未收复时评估反抽。
 
-v1 profile审计后已经决定：5/6以及10/11暂时都保持独立编号，不做合并。接下来先运行repair profile，再决定7是否能用“深损伤+修复比例”形成稳定定义、10应采用哪一类支撑角色及何种持续未收复条件、11在已确认失效且同支撑未收复前提下需要怎样的反抽证据。J真实holdout、G日更、第三组和消费者继续blocked；2025不动。
+v1与repair profile审计后已经决定：5/6以及10/11暂时都保持独立编号，不做合并；10的development主支撑候选采用更深initial-low，且所有搜索空间都已经在结果访问前冻结。接下来唯一执行项是 `second-group-development.v1.json`：同一Job先完成5/6，再冻结10，随后校准7与11；成功则形成完整第二组development candidate，失败则保留INCONCLUSIVE。J真实holdout、G日更、第三组和消费者继续blocked；2025不动。
 
 ## 4. 原提案迁移
 
@@ -48,4 +48,4 @@ v1 profile审计后已经决定：5/6以及10/11暂时都保持独立编号，�
 
 ## 5. 本轮验证
 
-计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub同步P3-STAGE-001和A-J，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A-F与I关闭，G/H/J blocked。开发候选继续冻结，2022-2024 fresh holdout已消耗，2025/其他新holdout、正式QUALIFIED、日更与策略消费权限仍保持关闭。
+计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub同步P3-STAGE-001和A-J，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A-F与I关闭，H为唯一ready development任务，G/J blocked。首组开发候选继续冻结，第二组仅开放当前一次有界development search；2022-2024 fresh holdout已消耗，2025/其他新holdout、正式QUALIFIED、日更与策略消费权限仍保持关闭。

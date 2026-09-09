@@ -44,6 +44,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert plan["authorization"][sync.SYNTHETIC_LEARNING_FLAG] is True
     assert plan["authorization"][sync.CAPACITY_CENSUS_FLAG] is True
     assert plan["authorization"][sync.SECOND_GROUP_PROFILE_FLAG] is True
+    assert plan["authorization"][sync.SECOND_GROUP_SEARCH_FLAG] is True
     assert plan["authorization"][sync.BOUNDED_ARBITRATION_FLAG] is False
     assert plan["authorization"][sync.BOUNDED_ARBITRATION_CONFIG] == (
         "config/stage-learning/qualification.v1.json"
@@ -97,6 +98,7 @@ def test_issue_sync_cannot_enable_execution(copied_plan, flag: str) -> None:
         sync.SYNTHETIC_LEARNING_FLAG,
         sync.CAPACITY_CENSUS_FLAG,
         sync.SECOND_GROUP_PROFILE_FLAG,
+        sync.SECOND_GROUP_SEARCH_FLAG,
     ],
 )
 def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> None:
@@ -264,6 +266,14 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert repair_experiment["authority"]["runtime_search_authorized"] is False
     assert repair_experiment["authority"]["arbitration_access_authorized"] is False
     assert repair_experiment["authority"]["permanent_blind_access_authorized"] is False
+    development = json.loads(
+        (ROOT / "config/stage-learning/second-group-development.v1.json").read_text()
+    )
+    assert development["execution_order"] == ["stage_5_6", "stage_10", "stage_7", "stage_11"]
+    assert development["state_identity"]["preserve_distinct_stage_codes"] == [5, 6, 7, 10, 11]
+    assert development["authority"]["limited_parameter_search_runtime_authorized"] is True
+    assert development["authority"]["arbitration_access_authorized"] is False
+    assert development["authority"]["permanent_blind_access_authorized"] is False
     p3_gate = json.loads((ROOT / "config/p3-gates.v1.json").read_text())
     bounded = p3_gate["bounded_partition_exceptions"]
     assert len(bounded) == 1

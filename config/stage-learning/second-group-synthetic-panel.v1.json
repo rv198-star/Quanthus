@@ -1,0 +1,75 @@
+{
+  "schema_version": "quanthus.stage-second-group-synthetic-panel.v1",
+  "panel_id": "stock-stage-second-group-development-panel-v1",
+  "work_item": "P3-STAGE-001-H",
+  "evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+  "human_expert_validated": false,
+  "authority": {
+    "development_only": true,
+    "semantic_reference_authorized": true,
+    "future_outcome_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "formal_qualification_authorized": false,
+    "strategy_result_access_authorized": false
+  },
+  "assignment": {
+    "primary_a": "short-tactical-structure-v1",
+    "primary_b": "capacity-structure-v1",
+    "adjudicator": "balanced-structure-v1",
+    "primary_reviews_are_mutually_hidden": true
+  },
+  "policies": {
+    "short-tactical-structure-v1": {
+      "stage_5_extension_positive_min": "0.08",
+      "stage_5_drawdown_max": "0.18",
+      "stage_6_extension_min": "0.06",
+      "stage_6_drawdown_min": "0.05",
+      "stage_6_deep_damage_min": "0.18",
+      "stage_10_persistence_min": 3,
+      "stage_10_depth_min": "0.03",
+      "stage_7_damage_min": "0.12",
+      "stage_7_repair_min": "0.25",
+      "stage_11_rebound_min": "0.03"
+    },
+    "capacity-structure-v1": {
+      "stage_5_extension_positive_min": "0.12",
+      "stage_5_drawdown_max": "0.15",
+      "stage_6_extension_min": "0.10",
+      "stage_6_drawdown_min": "0.07",
+      "stage_6_deep_damage_min": "0.16",
+      "stage_10_persistence_min": 5,
+      "stage_10_depth_min": "0.04",
+      "stage_7_damage_min": "0.16",
+      "stage_7_repair_min": "0.40",
+      "stage_11_rebound_min": "0.05"
+    },
+    "balanced-structure-v1": {
+      "stage_5_extension_positive_min": "0.10",
+      "stage_5_drawdown_max": "0.16",
+      "stage_6_extension_min": "0.08",
+      "stage_6_drawdown_min": "0.06",
+      "stage_6_deep_damage_min": "0.18",
+      "stage_10_persistence_min": 5,
+      "stage_10_depth_min": "0.03",
+      "stage_7_damage_min": "0.14",
+      "stage_7_repair_min": "0.30",
+      "stage_11_rebound_min": "0.04"
+    }
+  },
+  "reference_semantics": {
+    "stage_5_6_coexistence_allowed": true,
+    "stage_5_6_merge_authorized": false,
+    "stage_10_11_merge_authorized": false,
+    "stage_10_support_role": "initial_low_support_candidate",
+    "stage_7_requires_damage_and_repair": true,
+    "stage_11_requires_failure_and_unreclaimed_support": true,
+    "reviewers_never_receive_candidate_parameters": true,
+    "reviewers_never_receive_future_outcomes": true
+  },
+  "non_claims": [
+    "This panel is not HUMAN_EXPERT_REFERENCE.",
+    "The three deterministic reviewer policies are development-only semantic archetypes, not statistically independent human experts.",
+    "Panel agreement does not authorize a QUALIFIED label, daily publication, strategy use or trading."
+  ]
+}

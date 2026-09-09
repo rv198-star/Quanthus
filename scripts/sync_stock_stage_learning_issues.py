@@ -30,11 +30,12 @@ SYNTHETIC_REFERENCE_FLAG = "synthetic_expert_development_reference_authorized"
 SYNTHETIC_LEARNING_FLAG = "synthetic_expert_development_learning_authorized"
 CAPACITY_CENSUS_FLAG = "development_capacity_census_authorized"
 SECOND_GROUP_PROFILE_FLAG = "second_group_development_profile_authorized"
+SECOND_GROUP_SEARCH_FLAG = "second_group_development_search_authorized"
 BOUNDED_ARBITRATION_FLAG = "bounded_arbitration_qualification_authorized"
 BOUNDED_ARBITRATION_CONFIG = "bounded_arbitration_qualification_config"
 PERMANENT_BLIND_QUALIFICATION_FLAG = "permanent_blind_qualification_authorized"
 AUTH_SCOPE = (
-    "development_second_group_profile_authorized_arbitration_consumed_no_holdout_authority"
+    "development_second_group_search_authorized_arbitration_consumed_no_holdout_authority"
 )
 
 
@@ -56,6 +57,7 @@ def load_plan() -> dict:
         SYNTHETIC_LEARNING_FLAG,
         CAPACITY_CENSUS_FLAG,
         SECOND_GROUP_PROFILE_FLAG,
+        SECOND_GROUP_SEARCH_FLAG,
         BOUNDED_ARBITRATION_FLAG,
         BOUNDED_ARBITRATION_CONFIG,
         PERMANENT_BLIND_QUALIFICATION_FLAG,
@@ -75,11 +77,12 @@ def load_plan() -> dict:
             SYNTHETIC_LEARNING_FLAG,
             CAPACITY_CENSUS_FLAG,
             SECOND_GROUP_PROFILE_FLAG,
+            SECOND_GROUP_SEARCH_FLAG,
         )
     ):
         raise ValueError(
             "capacity, harness, reference, synthetic-panel, learning, development-census and "
-            "second-group profile authorizations must be explicit"
+            "second-group profile/search authorizations must be explicit"
         )
     if auth[BOUNDED_ARBITRATION_FLAG] is not False:
         raise ValueError("consumed arbitration qualification cannot remain authorized")
@@ -207,12 +210,12 @@ def body(item: dict, plan: dict, mapping: dict) -> str:
         " `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility "
         "INCONCLUSIVE关闭。不得重跑该分区并称fresh holdout。"
         "P3-STAGE-001-I 已关闭protocol-only采样修复；J的development容量普查已完成。"
-        "H当前只授权2020-2021 development第二组研究：v1 profile已完成，5/6有限搜索"
-        "已冻结；repair profile只补7 repair、10 persistent failure/support role、11同支撑"
-        "未收复反抽。5/6与10/11保持独立编号，不得输出正式阶段标签。"
-        "2025 permanent-blind仍未开放；当前不授权新的"
-        "sealed-partition读取、参数搜索、结果后改候选、QUALIFIED LabelCard、日更、"
-        "策略消费、云GPU或交易。"
+        "H当前只授权2020-2021 development第二组研究：v1与repair profile已完成，"
+        "second-group-development.v1现仅允许一次共享512只前置的5/6→10→7→11"
+        "有界参数搜索与T-only synthetic-consensus reference。5/6与10/11保持独立编号，"
+        "不得输出正式阶段标签。2025 permanent-blind仍未开放；当前不授权新的"
+        "sealed-partition读取、development合同外参数搜索、结果后改候选、QUALIFIED "
+        "LabelCard、日更、策略消费、云GPU或交易。"
     )
     sections = [
         f"<!-- quanthus-planning:v2 id={item['id']} kind={item['kind']} -->",

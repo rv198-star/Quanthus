@@ -1371,6 +1371,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIs(
             stage_plan["authorization"]["second_group_development_profile_authorized"], True
         )
+        self.assertIs(
+            stage_plan["authorization"]["second_group_development_search_authorized"], True
+        )
         positive = {
             "capacity_benchmark_authorized",
             "stage_harness_implementation_authorized",
@@ -1381,6 +1384,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             "synthetic_expert_development_learning_authorized",
             "development_capacity_census_authorized",
             "second_group_development_profile_authorized",
+            "second_group_development_search_authorized",
         }
         self.assertIs(
             stage_plan["authorization"]["bounded_arbitration_qualification_authorized"], False

@@ -150,15 +150,19 @@ nodes.
   contract `second-group-repair-experiment.v1.json` freezes sequential development learning 10→7→11:
   Stage 10 uses 3/5/8-session persistence × 2/4/6% depth, Stage 7 uses 12/16/20% damage × 25/40/50%
   T-only repair fraction, and Stage 11 later uses 3/5/8% unreclaimed rebound after one Stage-10
-  candidate is frozen. Runtime search remains unauthorized and no official second-group label is
-  emitted. 2025 remains unopened/unselected; daily scheduling, consumers, strategy use and cloud-GPU
-  purchase remain closed.
+  candidate is frozen. `second-group-development.v1.json` now authorizes one development-only
+  runtime that reuses a single 512-security Structure/Activity build, creates deterministic T-only
+  `SYNTHETIC_EXPERT_CONSENSUS` references, scores 5/6 jointly without merging them, then freezes
+  Stage 10 before evaluating Stage 7 and Stage 11. It still emits no official label and opens no
+  holdout/future-result authority. 2025 remains unopened/unselected; daily scheduling, consumers,
+  strategy use and cloud-GPU purchase remain closed.
   Evidence: `acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md`,
   `acceptance/stock-stage-learning-i-protocol-repair-20260909.md`,
   `acceptance/stock-stage-learning-h-second-group-profile-freeze-20260909.md`,
   `acceptance/stock-stage-learning-h-second-group-profile-result-20260909.md`, and
-  `acceptance/stock-stage-learning-h-7-10-11-repair-profile-freeze-20260909.md`, and
-  `acceptance/stock-stage-learning-h-7-10-11-repair-profile-result-20260909.md`.
+  `acceptance/stock-stage-learning-h-7-10-11-repair-profile-freeze-20260909.md`,
+  `acceptance/stock-stage-learning-h-7-10-11-repair-profile-result-20260909.md`, and
+  `acceptance/stock-stage-learning-h-second-group-development-release-ready-20260909.md`.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

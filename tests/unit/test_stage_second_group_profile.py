@@ -23,6 +23,28 @@ SHA = "sha256:" + "a" * 64
 TZ = timezone(timedelta(hours=8))
 
 
+def test_second_group_experiment_freezes_only_5_6_development_search() -> None:
+    raw = json.loads(
+        (ROOT / "config/stage-learning/second-group-experiment.v1.json").read_text()
+    )
+    assert raw["schema_version"] == "quanthus.stage-second-group-experiment.v1"
+    assert raw["work_item"] == "P3-STAGE-001-H"
+    authority = raw["authority"]
+    assert authority["development_only"] is True
+    assert authority["runtime_search_authorized"] is False
+    assert authority["arbitration_access_authorized"] is False
+    assert authority["permanent_blind_access_authorized"] is False
+    assert authority["official_label_publication_authorized"] is False
+    assert raw["dimension_model"]["stage_5"]["coexists_with"] == [6]
+    assert raw["dimension_model"]["stage_6"]["coexists_with"] == [5]
+    search = raw["r1_search_space"]
+    assert search["advance_extension_min"] == ["0.05", "0.10", "0.15"]
+    assert search["pullback_drawdown_abs_min"] == ["0.05", "0.08", "0.10"]
+    assert search["deep_damage_drawdown_abs_min"] == ["0.12", "0.16", "0.20"]
+    assert search["candidate_count"] == 27
+    assert set(raw["blocked_states"]) == {"7", "10", "11", "third_group"}
+
+
 def _admission(
     offset: int,
     close: str,

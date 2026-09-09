@@ -119,10 +119,10 @@
       "title": "按波次扩展剩余状态并验证具体消费者",
       "depends_on": ["P3-STAGE-001-F"],
       "scope": "当前只开放第二组5/6/7/10/11的development-only结构剖面：从冻结Stage-4接受点出发测趋势推进、回撤、支撑候选失效与反抽的连续分布；不先强制互斥标签。第三组和消费者仍关闭。",
-      "inputs": ["冻结首组Stage-4 candidate", "config/stage-learning/second-group-profile.v1.json", "2020-2021 development-only 512只固定容量总体", "F4/F5/F6/F7/F9依赖矩阵"],
-      "deliverables": ["第二组连续结构profile artifact", "5背景与6/7、10/11局部过程的维度边界证据", "后续有限参数空间/保留合并决策输入"],
+      "inputs": ["冻结首组Stage-4 candidate", "config/stage-learning/second-group-profile.v1.json", "config/stage-learning/second-group-experiment.v1.json", "2020-2021 development-only 512只固定容量总体", "F4/F5/F6/F7/F9依赖矩阵"],
+      "deliverables": ["第二组连续结构profile artifact", "5背景与6/7、10/11局部过程的维度边界证据", "冻结5/6有限development搜索空间", "7/10/11最小事实缺口与后续保留合并决策输入"],
       "acceptance": ["只读2020-2021 development且2022-2025硬拒绝", "只输出连续剖面不输出5/6/7/10/11正式标签或primary stage", "5趋势背景允许与6/7局部过程共存", "跌回突破位不得自动等同10，10必须绑定预先记录的支撑候选失效", "缺失/坐标变化终止路径而非制造结构失效", "不得在本Job内根据分布直接选阈值"],
-      "blocked_on": ["真实阈值/标签学习必须在profile结果审计后另冻结有限搜索空间", "第三组0/1/2/8/9/12、具体消费者、日更和外样本仍未授权", "2022-2024不得fresh reuse，2025 permanent-blind保持unopened_unselected"], "evidence": ["config/stage-learning/second-group-profile.v1.json", "docs/acceptance/stock-stage-learning-h-second-group-profile-freeze-20260909.md"]
+      "blocked_on": ["5/6可进入有限development学习，但参数空间必须在下一次结果访问前冻结", "7还缺T-only深跌后修复量；10/11还缺持续失效/未收复及支持角色F9证据", "第三组0/1/2/8/9/12、具体消费者、日更和外样本仍未授权", "2022-2024不得fresh reuse，2025 permanent-blind保持unopened_unselected"], "evidence": ["config/stage-learning/second-group-profile.v1.json", "docs/acceptance/stock-stage-learning-h-second-group-profile-freeze-20260909.md", "docs/acceptance/stock-stage-learning-h-second-group-profile-result-20260909.md"]
     },
     {
       "id": "P3-STAGE-001-I", "kind": "task", "status": "closed",

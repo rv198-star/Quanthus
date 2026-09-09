@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H现仅开放2020-2021 development第二组连续profile，不输出正式5/6/7/10/11标签或阈值；2025、QUALIFIED发布、每日调度、消费者和交易仍未授权 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。H的2020-2021 development第二组连续profile已完成：5/6可进入有限development学习，7与10/11仍缺最小T-only事实；正式5/6/7/10/11标签、2025、QUALIFIED发布、每日调度、消费者和交易仍未授权 |
 | Version | 0.1 |
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |

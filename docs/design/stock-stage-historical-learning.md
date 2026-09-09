@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：允许 `second-group-profile.v1.json` 只读2020-2021 development，对5/6/7/10/11做连续结构profile，不输出正式阶段标签、不选阈值。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU、消费者和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：`second-group-profile.v1.json` 已只读2020-2021 development成功完成，5/6可进入有限development学习；7仍缺T-only修复量，10/11仍缺持续失效/未收复及支持角色F9证据。一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU、消费者和策略消费仍关闭 |
 
 ## 1. 决策摘要与继承关系
 

@@ -24,7 +24,7 @@
 | E | P3-STAGE-001-E | closed / #242 | R0/R1有限试验台账、hard-gated开发选择、冻结候选 | 18个R1全部留痕，4个过硬门槛；冻结 `development-candidate.v1.json`：probe 1.0 / hold 2 / distance 0 / activity 1.0。hold=1因歧义过断言被拒，hold=3不退化门槛失败；0与0.0025 distance不可辨识，按最小变更选0；R2不触发 |
 | F | P3-STAGE-001-F | closed / INCONCLUSIVE / #243 | 一次外样本、分状态/profile/用途资格包 | Job `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7`进入真实执行后在panel/预测/评分前因`qualification_mature_held`只有58个额外unique episodes、低于冻结80例要求而fail-closed；无qualification artifact/SHADOW/QUALIFIED结果；见 `../acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md` |
 | G | P3-STAGE-001-G | blocked after F inconclusive + 日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | F未产生可消费标签版本；延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
-| H | P3-STAGE-001-H | ready / #245 / second-group development profile | 当前仅从冻结Stage-4接受点出发，对5趋势背景、6/7回撤修复、10/11失效反抽测连续分布 | `second-group-profile.v1.json`；512只、2020-2021；不输出stage label/primary，不在本Job选阈值；第三组/消费者/外样本仍blocked |
+| H | P3-STAGE-001-H | ready / #245 / second-group development | 512只profile已成功：3,425个Stage-4起点、186,221条路径观察；已冻结 `second-group-experiment.v1.json` 的5/6有限27组development搜索空间；7仍缺深跌后修复量，10/11仍缺持续失效/未收复及支持角色证据 | profile结果见 `../acceptance/stock-stage-learning-h-second-group-profile-result-20260909.md`；5/6允许共存，不输出正式stage label/primary；第三组/消费者/外样本仍blocked |
 | I | P3-STAGE-001-I | closed / #247 / protocol repair | 后继外样本采样控制协议 | `qualification-protocol.v2.json`保留F原target caps（mature-held仍80），但exact quota不足不再process crash；实际样本量进入冻结semantic hard gates，无跨层结果依赖回填；不读任何新holdout |
 | J | P3-STAGE-001-J | blocked / #248 / successor holdout | development容量普查已反推并冻结未来cohort size=512；后续在未消费holdout上执行一次评价 | 2020-2021 census：64不够、128首次满足、256/512均满足；选择512是基于实测算力余量增加稀有样本储备，640个semantic contexts上限不变。结果见 `../acceptance/stock-stage-learning-j-development-capacity-census-result-20260909.md`。真实评价仍需预先冻结具体证券/seed/partition并独立授权；2022-2024禁止fresh reuse，2025仍`unopened_unselected` |
 
@@ -38,7 +38,7 @@
 
 ## 3. 当前下一步
 
-当前不消耗新的holdout。H已经获准先回到阶段识别本身：用 `second-group-profile.v1.json` 在2020-2021 development、512只总体上，从冻结Stage-4接受点追踪最多60个有效交易日，测趋势延伸、回撤、支撑候选距离/失效、反抽与量能分布。这个Job只形成连续profile，不能直接输出5/6/7/10/11或选择阈值。
+当前不消耗新的holdout。H的 `second-group-profile.v1.json` 已在2020-2021 development、512只总体上成功完成：从冻结Stage-4接受点追踪最多60个有效交易日，得到3,425个起点与186,221条路径观察。结果显示两个尺度的当前回撤分布高度一致，5趋势背景与6局部回踩可以进入下一轮有限development学习；但首次支撑候选跌破后20/60尺度分别有约79.6%/77.1%最终收回，且收回中位仅3个交易日，因此一次跌破明确不足以定义10。7需新增T-only修复/恢复量，10/11需新增持续失效、未收复与支持角色F9证据。
 
 profile审计后，再决定5是否保留为趋势背景、6/7是否能稳定分层、10/11是否有足够可辨识的支撑失效—反抽过程，并据此冻结小规模参数空间。J真实holdout、G日更、第三组和消费者继续blocked；2025不动。
 

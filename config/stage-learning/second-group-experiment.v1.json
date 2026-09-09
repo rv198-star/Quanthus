@@ -1,0 +1,106 @@
+{
+  "schema_version": "quanthus.stage-second-group-experiment.v1",
+  "experiment_id": "stock-stage-second-group-5-6-development-v1",
+  "work_item": "P3-STAGE-001-H",
+  "status": "frozen_for_development_reference_and_limited_search",
+  "source_profile": {
+    "config": "config/stage-learning/second-group-profile.v1.json",
+    "job_id": "stage_58983238b6364013b6d531ce9c6b0b70",
+    "run_id": "stage-second-group-profile-20260909T115619Z",
+    "manifest_sha256": "sha256:bbf557378e1b18078fd3cb28584e292a1eb7a36c57fcd9a1f7bbacc90eefa4e5"
+  },
+  "authority": {
+    "development_only": true,
+    "development_reference_design_authorized": true,
+    "limited_parameter_search_design_authorized": true,
+    "runtime_search_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "official_label_publication_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "partition_policy": {
+    "development": {"start": "2012-01-01", "end": "2021-12-31"},
+    "profile_window": {"start": "2020-01-02", "end": "2021-12-31"},
+    "fresh_arbitration_reuse_authorized": false,
+    "permanent_blind_2025_state": "unopened_unselected"
+  },
+  "dimension_model": {
+    "stage_5": {
+      "name": "上升推进",
+      "slot": "trend_background",
+      "observable_claim": "after frozen Stage-4 acceptance, the path has established a material positive extension while the provisional structural support candidate has not been broken",
+      "coexists_with": [6],
+      "non_claims": [
+        "Stage 5 is not a top-1 replacement for a local pullback state",
+        "future profitability is not known",
+        "maximum future extension is not an input at T"
+      ]
+    },
+    "stage_6": {
+      "name": "回踩测试",
+      "slot": "local_pullback_process",
+      "observable_claim": "an established advancing background is undergoing a bounded current drawdown from its causal running peak while the provisional structural support candidate remains intact",
+      "coexists_with": [5],
+      "same_slot_competitors": [7],
+      "non_claims": [
+        "a pullback is not structural failure",
+        "future rebound success is not known",
+        "support integrity cannot be inferred from missing data"
+      ]
+    }
+  },
+  "frozen_measurements": {
+    "advance_extension": "causal running maximum close / Stage-4 acceptance close - 1",
+    "current_drawdown": "current close / causal running maximum close - 1",
+    "provisional_support_integrity": "current close has not crossed below the episode initial pre-T low support candidate",
+    "coordinate_policy": "unadjusted_with_explicit_action_epoch",
+    "observation_grain": "one finalized daily bar",
+    "decision_cutoff": "after_T_close"
+  },
+  "r0_baseline": {
+    "advance_extension_min": "0.10",
+    "pullback_drawdown_abs_min": "0.08",
+    "deep_damage_drawdown_abs_min": "0.16",
+    "provisional_support_must_remain_intact": true
+  },
+  "r1_search_space": {
+    "advance_extension_min": ["0.05", "0.10", "0.15"],
+    "pullback_drawdown_abs_min": ["0.05", "0.08", "0.10"],
+    "deep_damage_drawdown_abs_min": ["0.12", "0.16", "0.20"],
+    "provisional_support_must_remain_intact": [true],
+    "candidate_count": 27,
+    "constraints": [
+      "deep_damage_drawdown_abs_min > pullback_drawdown_abs_min",
+      "Stage-5 background may remain true while Stage-6 local pullback is true",
+      "Stage-7 is not emitted by this experiment"
+    ],
+    "thresholds_are_development_candidates_not_market_truth": true,
+    "parameter_neighborhood_stability_required": true
+  },
+  "reference_plan": {
+    "reference_evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+    "human_expert_validated": false,
+    "primary_questions": [
+      "is an advancing background established at T",
+      "is there a bounded pullback at T while the same background remains valid"
+    ],
+    "reference_kinds": ["definite", "coexistence", "ambiguous_set", "unjudgeable"],
+    "must_preserve_stage5_stage6_coexistence": true,
+    "reviewers_must_not_see_algorithm_candidate_or_future_outcome": true
+  },
+  "blocked_states": {
+    "7": "requires a T-only recovery/rebuild measurement after deeper drawdown; depth alone is not repair",
+    "10": "requires persistent same-support failure / failed reclaim and explicit support-role evidence",
+    "11": "requires prior Stage-10-grade failure plus a rebound that remains below the same failed support",
+    "third_group": "0/1/2/8/9/12 not authorized by this experiment"
+  },
+  "claim_limits": [
+    "This experiment does not produce a qualified or official Stage-5/6 label.",
+    "The 27-value grid is result-aware development design derived from the consumed development profile and cannot be called confirmatory evidence.",
+    "2022-2024 cannot be reused as a fresh holdout and 2025 remains unopened/unselected.",
+    "Continuous Facts remain a mandatory same-information baseline for any later discrete-stage comparison."
+  ]
+}

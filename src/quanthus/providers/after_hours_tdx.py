@@ -11,6 +11,8 @@ from collections.abc import Callable, Sequence
 from datetime import date
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from quanthus.providers.common import (
     atomic_json,
@@ -27,6 +29,10 @@ PROVIDER_REVISION = "after-hours-fixed-price-trades-v1"
 PAGE_SIZE = 800
 MATCHING_START = "15:05:00"
 MATCHING_END = "15:30:00"
+EASTMONEY_DETAILS_URL = "https://push2delay.eastmoney.com/api/qt/stock/details/get"
+EASTMONEY_TRENDS_URL = "https://push2delay.eastmoney.com/api/qt/stock/trends2/get"
+EASTMONEY_TOKEN = "fa5fd1943c7b386f172d6893dbbd1d0c"
+EASTMONEY_WINDOWS = (100, 200, 400, 800, 1600)
 
 
 def trades_schema() -> Any:
@@ -82,6 +88,184 @@ def _frame_records(frame: Any) -> list[dict[str, Any]]:
     if isinstance(frame, Sequence):
         return [dict(row) for row in frame]
     raise TypeError(f"unsupported transaction response {type(frame).__name__}")
+
+
+def _eastmoney_secid(code: str) -> str:
+    market = "1" if code.startswith(("5", "6", "9")) else "0"
+    return f"{market}.{code}"
+
+
+def _eastmoney_json(
+    url: str,
+    params: dict[str, str],
+    *,
+    timeout: float = 12.0,
+    opener: Callable[..., Any] = urlopen,
+) -> dict[str, Any]:
+    request = Request(
+        f"{url}?{urlencode(params)}",
+        headers={
+            "Referer": "https://quote.eastmoney.com/",
+            "User-Agent": "Mozilla/5.0 Quanthus/1.0",
+        },
+    )
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            with opener(request, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            if int(payload.get("rc", -1)) != 0:
+                raise RuntimeError(f"Eastmoney rc={payload.get('rc')}")
+            return payload
+        except Exception as exc:  # noqa: BLE001 - bounded provider retry
+            last_error = exc
+            if attempt < 2:
+                time.sleep(0.25 * (attempt + 1))
+    raise RuntimeError(f"Eastmoney request failed: {last_error}")
+
+
+def _eastmoney_latest_market_date(
+    *, opener: Callable[..., Any] = urlopen
+) -> str:
+    payload = _eastmoney_json(
+        EASTMONEY_TRENDS_URL,
+        {
+            "secid": "0.000001",
+            "fields1": "f1,f2,f3,f4,f5,f6,f7,f8",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
+            "ndays": "1",
+            "iscr": "0",
+            "iscca": "0",
+            "ut": EASTMONEY_TOKEN,
+        },
+        opener=opener,
+    )
+    data = payload.get("data") or {}
+    trends = data.get("trends") or []
+    if not trends:
+        raise RuntimeError("Eastmoney market-date anchor returned no trends")
+    latest = str(trends[-1]).split(",", 1)[0][:10]
+    if len(latest) != 10:
+        raise RuntimeError("Eastmoney market-date anchor is malformed")
+    return latest
+
+
+def _eastmoney_detail_rows(
+    code: str,
+    limit: int,
+    *,
+    opener: Callable[..., Any] = urlopen,
+) -> list[str]:
+    payload = _eastmoney_json(
+        EASTMONEY_DETAILS_URL,
+        {
+            "secid": _eastmoney_secid(code),
+            "fields1": "f1",
+            "fields2": "f51,f52,f53,f54,f55",
+            "pos": f"-{limit}",
+            "lmt": str(limit),
+            "ut": EASTMONEY_TOKEN,
+        },
+        opener=opener,
+    )
+    data = payload.get("data") or {}
+    returned = str(data.get("code") or "").zfill(6)
+    if returned != code:
+        raise RuntimeError(
+            f"Eastmoney returned mismatched security {returned!r} for {code}"
+        )
+    return [str(row) for row in data.get("details") or []]
+
+
+def collect_symbol_eastmoney(
+    *,
+    code: str,
+    security_type: str,
+    market_date: date,
+    opener: Callable[..., Any] = urlopen,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    details: list[str] = []
+    requested_limit = 0
+    requests = 0
+    boundary_proved = False
+    for requested_limit in EASTMONEY_WINDOWS:
+        details = _eastmoney_detail_rows(code, requested_limit, opener=opener)
+        requests += 1
+        if not details:
+            boundary_proved = True
+            break
+        clocks = [_clock(row.split(",", 1)[0]) for row in details]
+        if min(clocks) < MATCHING_START:
+            boundary_proved = True
+            break
+    if not boundary_proved:
+        raise RuntimeError(
+            f"Eastmoney detail window did not cross {MATCHING_START}; "
+            f"limit={requested_limit} rows={len(details)}"
+        )
+
+    acquired_at = now_shanghai_iso()
+    output: list[dict[str, Any]] = []
+    for index, raw in enumerate(details):
+        fields = raw.split(",")
+        if len(fields) < 5:
+            raise RuntimeError("Eastmoney detail row has fewer than 5 fields")
+        clock = _clock(fields[0])
+        if not (MATCHING_START <= clock <= MATCHING_END):
+            continue
+        price = float(fields[1])
+        lots = float(fields[2])
+        quantity = lots * 100.0
+        side = int(fields[4] or 0)
+        raw_identity = json.dumps(
+            {
+                "source": "eastmoney.push2delay.details",
+                "code": code,
+                "date": market_date.isoformat(),
+                "limit": requested_limit,
+                "index": index,
+                "time": clock,
+                "price": price,
+                "vol": lots,
+                "buyorsell": side,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        ).encode("utf-8")
+        output.append(
+            {
+                "event_id": sha256_bytes(raw_identity),
+                "security_id": code,
+                "stock_code": code,
+                "security_type": security_type,
+                "market_date": market_date.isoformat(),
+                "match_time": f"{market_date.isoformat()}T{clock}+08:00",
+                "price": price,
+                "raw_volume_lots": lots,
+                "quantity_units": quantity,
+                "amount": price * quantity,
+                "buy_or_sell_code": side,
+                "provider_offset": -requested_limit,
+                "provider_index": index,
+                "source": "eastmoney.push2delay.details",
+                "source_revision": PROVIDER_REVISION,
+                "acquired_at": acquired_at,
+            }
+        )
+    output.sort(
+        key=lambda row: (
+            str(row["match_time"]),
+            int(row["provider_offset"]),
+            int(row["provider_index"]),
+        )
+    )
+    return output, {
+        "pages": requests,
+        "provider_rows": len(details),
+        "after_hours_rows": len(output),
+        "requested_limit": requested_limit,
+        "acquired_at": acquired_at,
+    }
 
 
 def collect_symbol(
@@ -240,6 +424,7 @@ def collect_after_hours(
     max_pages: int = 10,
     sleep_seconds: float = 0.0,
     client_factory: Callable[[], tuple[Any, str]] = tdx_client,
+    eastmoney_opener: Callable[..., Any] = urlopen,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     typed_universe = [
         *((code, "equity") for code in sorted(set(equities))),
@@ -247,7 +432,20 @@ def collect_after_hours(
     ]
     rows: list[dict[str, Any]] = []
     receipts: list[dict[str, Any]] = []
-    client, server = client_factory()
+    client: Any | None = None
+    fallback = False
+    try:
+        client, server = client_factory()
+    except RuntimeError:
+        latest_market_date = _eastmoney_latest_market_date(opener=eastmoney_opener)
+        if latest_market_date != market_date.isoformat():
+            raise RuntimeError(
+                "Eastmoney after-hours fallback latest market date "
+                f"{latest_market_date} does not match requested {market_date.isoformat()}"
+            ) from None
+        fallback = True
+        server = "push2delay.eastmoney.com"
+
     try:
         for code, security_type in typed_universe:
             started = time.monotonic()
@@ -255,22 +453,35 @@ def collect_after_hours(
             error: Exception | None = None
             selected: list[dict[str, Any]] = []
             meta: dict[str, Any] = {}
-            for attempts in (1, 2):
+            if fallback:
+                attempts = 1
                 try:
-                    selected, meta = collect_symbol(
-                        client,
+                    selected, meta = collect_symbol_eastmoney(
                         code=code,
                         security_type=security_type,
                         market_date=market_date,
-                        max_pages=max_pages,
+                        opener=eastmoney_opener,
                     )
-                    error = None
-                    break
-                except Exception as exc:  # noqa: BLE001 - one bounded provider retry
+                except Exception as exc:  # noqa: BLE001 - request retry is bounded in helper
                     error = exc
-                    _disconnect(client)
-                    if attempts == 1:
-                        client, server = client_factory()
+            else:
+                assert client is not None
+                for attempts in (1, 2):
+                    try:
+                        selected, meta = collect_symbol(
+                            client,
+                            code=code,
+                            security_type=security_type,
+                            market_date=market_date,
+                            max_pages=max_pages,
+                        )
+                        error = None
+                        break
+                    except Exception as exc:  # noqa: BLE001 - one bounded provider retry
+                        error = exc
+                        _disconnect(client)
+                        if attempts == 1:
+                            client, server = client_factory()
             acquired_at = now_shanghai_iso()
             if error is not None:
                 status = "failed"
@@ -284,8 +495,9 @@ def collect_after_hours(
             else:
                 status = "justified_empty"
                 reason = "successful_query_no_after_hours_matches"
+                provider_name = "Eastmoney" if fallback else "TDX"
                 detail = (
-                    "TDX transaction request completed and returned no matches "
+                    f"{provider_name} transaction request completed and returned no matches "
                     "inside 15:05-15:30"
                 )
             receipts.append(
@@ -293,14 +505,21 @@ def collect_after_hours(
                     "dataset": "after_hours_fixed_price_trades",
                     "security_id": code,
                     "security_type": security_type,
-                    "provider": f"tdx:{server}",
+                    "provider": (
+                        f"eastmoney:{server}" if fallback else f"tdx:{server}"
+                    ),
                     "request_json": json.dumps(
                         {
-                            "operation": "transactions",
+                            "operation": "details" if fallback else "transactions",
                             "symbol": code,
                             "date": market_date.strftime("%Y%m%d"),
                             "matching_start": MATCHING_START,
                             "matching_end": MATCHING_END,
+                            "boundary_policy": (
+                                "expand_latest_window_until_before_1505"
+                                if fallback
+                                else "page_until_before_1505"
+                            ),
                         },
                         sort_keys=True,
                     ),
@@ -319,7 +538,8 @@ def collect_after_hours(
             if sleep_seconds > 0:
                 time.sleep(sleep_seconds)
     finally:
-        _disconnect(client)
+        if client is not None:
+            _disconnect(client)
     rows.sort(
         key=lambda row: (
             str(row["security_id"]),
@@ -329,7 +549,7 @@ def collect_after_hours(
         )
     )
     return rows, receipts, {
-        "provider": "tdx",
+        "provider": "eastmoney" if fallback else "tdx",
         "server": server,
         "equity_count": len(set(equities)),
         "etf_count": len(set(etfs) - set(equities)),

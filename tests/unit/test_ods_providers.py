@@ -6,6 +6,7 @@ import json
 import subprocess
 from datetime import date
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -394,6 +395,110 @@ def test_after_hours_collector_preserves_sparse_matches() -> None:
     assert rows[0]["quantity_units"] == 200.0
     assert rows[0]["buy_or_sell_code"] == 5
     assert metadata["provider_rows"] == 2
+
+
+def test_after_hours_eastmoney_fallback_expands_window_and_binds_date() -> None:
+    calls: list[tuple[str, str]] = []
+
+    class Response:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(self.payload).encode("utf-8")
+
+    def opener(request, *, timeout: float):
+        assert timeout == 12.0
+        parsed = urlparse(request.full_url)
+        query = parse_qs(parsed.query)
+        if parsed.path.endswith("/trends2/get"):
+            return Response(
+                {
+                    "rc": 0,
+                    "data": {
+                        "code": "000001",
+                        "trends": [
+                            "2026-07-31 09:30,10,10,10,10,1,100,10",
+                            "2026-07-31 15:00,10,10,10,10,1,100,10",
+                        ],
+                    },
+                }
+            )
+        limit = query["pos"][0]
+        calls.append((query["secid"][0], limit))
+        details = (
+            [
+                "15:10:00,10.00,2,1,1",
+                "15:29:00,10.00,3,1,2",
+            ]
+            if limit == "-100"
+            else [
+                "15:04:59,9.99,1,1,1",
+                "15:10:00,10.00,2,1,1",
+                "15:29:00,10.00,3,1,2",
+            ]
+        )
+        return Response({"rc": 0, "data": {"code": "300750", "details": details}})
+
+    def failed_tdx():
+        raise RuntimeError("no TDX endpoint returned a valid bars probe")
+
+    rows, receipts, metadata = after_hours_tdx.collect_after_hours(
+        ["300750"],
+        [],
+        date(2026, 7, 31),
+        client_factory=failed_tdx,
+        eastmoney_opener=opener,
+    )
+
+    assert calls == [("0.300750", "-100"), ("0.300750", "-200")]
+    assert metadata["provider"] == "eastmoney"
+    assert metadata["server"] == "push2delay.eastmoney.com"
+    assert len(rows) == 2
+    assert rows[0]["source"] == "eastmoney.push2delay.details"
+    assert rows[0]["quantity_units"] == 200.0
+    assert rows[1]["amount"] == 3000.0
+    assert receipts[0]["status"] == "success_nonempty"
+    assert receipts[0]["provider_requested_limit"] == 200
+    assert receipts[0]["provider_provider_rows"] == 3
+
+
+def test_after_hours_eastmoney_fallback_rejects_wrong_market_date() -> None:
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "rc": 0,
+                    "data": {
+                        "code": "000001",
+                        "trends": ["2026-08-03 15:00,10,10,10,10,1,100,10"],
+                    },
+                }
+            ).encode("utf-8")
+
+    def failed_tdx():
+        raise RuntimeError("no TDX endpoint returned a valid bars probe")
+
+    with pytest.raises(RuntimeError, match="does not match requested 2026-07-31"):
+        after_hours_tdx.collect_after_hours(
+            ["300750"],
+            [],
+            date(2026, 7, 31),
+            client_factory=failed_tdx,
+            eastmoney_opener=lambda *_args, **_kwargs: Response(),
+        )
 
 
 def test_after_hours_etf_universe_retries_transient_login_failure() -> None:

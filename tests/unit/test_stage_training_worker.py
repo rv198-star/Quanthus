@@ -14,6 +14,7 @@ from quanthus.stage_learning.worker import (
     STAGE_QUALIFICATION_JOB,
     STAGE_REFERENCE_PILOT_JOB,
     STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
+    STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB,
     STAGE_SECOND_GROUP_PROFILE_JOB,
     STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
     StageJob,
@@ -121,6 +122,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_SECOND_GROUP_PROFILE_JOB,
         STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
         STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
+        STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB,
     }
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
 
@@ -187,6 +189,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_SECOND_GROUP_PROFILE_JOB,
         STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
         STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
+        STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB,
     }
     assert receipt["concurrency"] == 1
 
@@ -250,6 +253,23 @@ def test_second_group_development_kind_gets_its_frozen_config(tmp_path: Path) ->
     assert submitted["kind"] == STAGE_SECOND_GROUP_DEVELOPMENT_JOB
     assert submitted["config"] == "config/stage-learning/second-group-development.v1.json"
     assert _JOB_SPECS[STAGE_SECOND_GROUP_DEVELOPMENT_JOB]["wall_seconds"] == 2700
+    assert not worker_paths.qualification_budget.exists()
+
+
+def test_second_group_development_supplement_kind_gets_its_frozen_config(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB,
+    )
+    assert submitted["kind"] == STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/second-group-development-supplement.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB]["wall_seconds"] == 2700
     assert not worker_paths.qualification_budget.exists()
 
 

@@ -150,19 +150,24 @@ nodes.
   contract `second-group-repair-experiment.v1.json` freezes sequential development learning 10→7→11:
   Stage 10 uses 3/5/8-session persistence × 2/4/6% depth, Stage 7 uses 12/16/20% damage × 25/40/50%
   T-only repair fraction, and Stage 11 later uses 3/5/8% unreclaimed rebound after one Stage-10
-  candidate is frozen. `second-group-development.v1.json` now authorizes one development-only
-  runtime that reuses a single 512-security Structure/Activity build, creates deterministic T-only
-  `SYNTHETIC_EXPERT_CONSENSUS` references, scores 5/6 jointly without merging them, then freezes
-  Stage 10 before evaluating Stage 7 and Stage 11. It still emits no official label and opens no
-  holdout/future-result authority. 2025 remains unopened/unselected; daily scheduling, consumers,
-  strategy use and cloud-GPU purchase remain closed.
+  candidate is frozen. The first `second-group-development.v1.json` Run completed successfully at
+  the infrastructure level but returned `INCONCLUSIVE`: Stage 10 froze at 5 unreclaimed sessions +
+  2% depth, Stage 6/11 had only 9/7 ambiguous references versus the unchanged minimum of 10, and
+  Stage 7 had sufficient reference counts but no candidate passed. The only follow-up authority is
+  `second-group-development-supplement.v1.json`: preserve the base sample, add disjoint T-only
+  references only for 6/11, keep all hard gates and grids unchanged, reuse Stage 10, and retain
+  Stage 7 as attributable INCONCLUSIVE without rerun. After that supplement, development tuning
+  stops and the milestone goes to quantitative, short-term-trading, and fund-expert review. No
+  official label or holdout/future-result authority is opened; 2025 remains unopened/unselected.
   Evidence: `acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md`,
   `acceptance/stock-stage-learning-i-protocol-repair-20260909.md`,
   `acceptance/stock-stage-learning-h-second-group-profile-freeze-20260909.md`,
   `acceptance/stock-stage-learning-h-second-group-profile-result-20260909.md`, and
   `acceptance/stock-stage-learning-h-7-10-11-repair-profile-freeze-20260909.md`,
   `acceptance/stock-stage-learning-h-7-10-11-repair-profile-result-20260909.md`, and
-  `acceptance/stock-stage-learning-h-second-group-development-release-ready-20260909.md`.
+  `acceptance/stock-stage-learning-h-second-group-development-release-ready-20260909.md`,
+  `acceptance/stock-stage-learning-h-second-group-development-result-20260909.md`, and
+  `acceptance/stock-stage-learning-h-second-group-development-supplement-release-ready-20260909.md`.
 - `P3-DICT-001` is accepted and closed as the Quanthus Data & Indicator Catalog. Children #223-#227
   close the authority/schema, deterministic snapshot, GET-only Platform API, first-class `/catalog`
   Web surface and drift/maintenance gates. Its original audited production used checkout `d47abf8`,

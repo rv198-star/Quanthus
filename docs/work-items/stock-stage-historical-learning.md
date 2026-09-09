@@ -11,7 +11,7 @@
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Machine plan | `../../config/stock-stage-learning-delivery.v1.json` |
 | GitHub | 父工单 #246；A #238、B #239、C #240、D #241、E #242、F #243、G #244、H #245、I #247、J #248；A-F/I closed，G/H/J及父工单open/blocked |
-| Current scope | A-F已关闭，F为sample-feasibility INCONCLUSIVE；I已关闭；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：v1与repair profile均已完成，5/6及10→7→11有限搜索空间已冻结；`second-group-development.v1.json` 现只授权一次2020-2021 development runtime，共享512只前置并形成第二组development candidate。5/6与10/11保持独立编号，不做合并；2025 permanent-blind、正式QUALIFIED、日更、消费者和策略权限仍关闭 |
+| Current scope | A-F已关闭，F为sample-feasibility INCONCLUSIVE；I已关闭；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：首轮 `second-group-development.v1.json` 已成功执行但整体INCONCLUSIVE；Stage 10冻结5-session+2% candidate，Stage 6/11因ambiguous reference 9/7低于hard gate=10无法通过，Stage 7在参考充分下真实INCONCLUSIVE。当前只授权 `second-group-development-supplement.v1.json` 增补6/11 references并重跑原网格；10不得重搜、7不得扩网格。5/6与10/11保持独立编号；2025、正式QUALIFIED、日更、消费者和策略权限仍关闭 |
 
 ## 1. 逐步执行路线
 
@@ -24,7 +24,7 @@
 | E | P3-STAGE-001-E | closed / #242 | R0/R1有限试验台账、hard-gated开发选择、冻结候选 | 18个R1全部留痕，4个过硬门槛；冻结 `development-candidate.v1.json`：probe 1.0 / hold 2 / distance 0 / activity 1.0。hold=1因歧义过断言被拒，hold=3不退化门槛失败；0与0.0025 distance不可辨识，按最小变更选0；R2不触发 |
 | F | P3-STAGE-001-F | closed / INCONCLUSIVE / #243 | 一次外样本、分状态/profile/用途资格包 | Job `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7`进入真实执行后在panel/预测/评分前因`qualification_mature_held`只有58个额外unique episodes、低于冻结80例要求而fail-closed；无qualification artifact/SHADOW/QUALIFIED结果；见 `../acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md` |
 | G | P3-STAGE-001-G | blocked after F inconclusive + 日更授权 | 新as-known profile、DWD READY后固定模型推断、ADM发布 | F未产生可消费标签版本；延迟/缺失/修正/漂移受控；不自动开启P6或下单 |
-| H | P3-STAGE-001-H | ready / #245 / second-group development | v1与repair profile均已成功；5/6保持独立并冻结27组有限搜索；repair结果冻结10的9组、7的9组、11的3组顺序搜索。`second-group-development.v1.json` 将共享一次512只Structure/Activity，建立每stage target-cap T-only synthetic-consensus reference，先5/6、再10、后7/11并产出development candidate | 任一步无候选通过hard gates则保留INCONCLUSIVE，不边跑边修；仍不输出正式stage label/primary；第三组/消费者/外样本继续blocked |
+| H | P3-STAGE-001-H | ready / #245 / second-group development supplement | 首轮共享512只 development Job 已成功执行：10冻结5-session+2%，6/11被reference-sufficiency gate阻塞，7为真实INCONCLUSIVE。当前 supplement 保留原120 contexts并只为6/11每bucket追加target cap=20、排除原episode；hard gates与网格不变，只重跑必要5/6和11。10直接复用，7只做immutable trial audit不重跑 | supplement后无论冻结成功还是继续INCONCLUSIVE都停止追参并形成milestone disposition；随后按用户要求进入量化/短线/基金专家评审；无正式stage label/消费者/holdout |
 | I | P3-STAGE-001-I | closed / #247 / protocol repair | 后继外样本采样控制协议 | `qualification-protocol.v2.json`保留F原target caps（mature-held仍80），但exact quota不足不再process crash；实际样本量进入冻结semantic hard gates，无跨层结果依赖回填；不读任何新holdout |
 | J | P3-STAGE-001-J | blocked / #248 / successor holdout | development容量普查已反推并冻结未来cohort size=512；后续在未消费holdout上执行一次评价 | 2020-2021 census：64不够、128首次满足、256/512均满足；选择512是基于实测算力余量增加稀有样本储备，640个semantic contexts上限不变。结果见 `../acceptance/stock-stage-learning-j-development-capacity-census-result-20260909.md`。真实评价仍需预先冻结具体证券/seed/partition并独立授权；2022-2024禁止fresh reuse，2025仍`unopened_unselected` |
 
@@ -40,7 +40,7 @@
 
 当前不消耗新的holdout。H的两个development profile均已完成。repair profile进一步证明：acceptance anchor在20/60尺度约77%/74%的路径会被跌破，更像局部突破接受边界；更深的initial-low support仅约29%/13%被跌破，且首次跌破中位在26/28个交易日，更适合作为Stage-10主支撑候选。即便如此其跌破仍约80%/77%最终收回，因此10必须同时要求持续未收复和足够跌破深度。7则用damage与T-only repair fraction分离“深跌”与“正在修复”；11只能在冻结10之后、同一失败支撑仍未收复时评估反抽。
 
-v1与repair profile审计后已经决定：5/6以及10/11暂时都保持独立编号，不做合并；10的development主支撑候选采用更深initial-low，且所有搜索空间都已经在结果访问前冻结。接下来唯一执行项是 `second-group-development.v1.json`：同一Job先完成5/6，再冻结10，随后校准7与11；成功则形成完整第二组development candidate，失败则保留INCONCLUSIVE。J真实holdout、G日更、第三组和消费者继续blocked；2025不动。
+首轮 `second-group-development.v1.json` 已经执行完毕：Job成功但 disposition=INCONCLUSIVE。10在原网格内冻结为5-session+2% depth；6与11分别只有9/7个ambiguous references，低于预登记minimum=10，因此是corpus-sufficiency blocker；7有42 positive / 58 negative / 20 ambiguous却仍无候选过gate，定性为真实INCONCLUSIVE。当前唯一执行项改为 `second-group-development-supplement.v1.json`：只补6/11 reference，不改hard gates，不重搜10，不扩或重跑7。supplement后即停止development追参并进入量化、短线操作、基金专家评审。J真实holdout、G日更、第三组和消费者继续blocked；2025不动。
 
 ## 4. 原提案迁移
 

@@ -1,0 +1,111 @@
+{
+  "schema_version": "quanthus.stage-second-group-development-supplement.v1",
+  "supplement_id": "stock-stage-second-group-development-reference-supplement-v1",
+  "work_item": "P3-STAGE-001-H",
+  "purpose": "Repair only the development reference-sufficiency shortfall exposed by the first second-group development Run. Preserve the frozen Stage-10 candidate, preserve Stage-7 INCONCLUSIVE without widening its grid, supplement only Stage-6 and Stage-11 T-only references, then rerun only the necessary bounded Stage-5/6 and Stage-11 searches.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "base_development_config": "config/stage-learning/second-group-development.v1.json",
+  "stage_5_6_experiment_config": "config/stage-learning/second-group-experiment.v1.json",
+  "stage_7_10_11_experiment_config": "config/stage-learning/second-group-repair-experiment.v1.json",
+  "synthetic_panel_config": "config/stage-learning/second-group-synthetic-panel.v1.json",
+  "prior_run": {
+    "job_id": "stage_45493c2eae724023a1a1a626dd515a95",
+    "run_id": "stage-second-group-development-20260909T155024Z",
+    "manifest_sha256": "sha256:16056a637d4456ed3d9dcab4e4a1f9feb9b7f5e361e76bcc66c16a12acd14cb9",
+    "candidate_artifact_digest": "sha256:8e63c41f42a21396b7fc5eb785e37838ea2a2cb3fd7716f4b1c87b0f7a418d83",
+    "required_disposition": "INCONCLUSIVE",
+    "frozen_stage_10": {
+      "unreclaimed_persistence_sessions": 5,
+      "failure_depth_abs_min": "0.02"
+    },
+    "stage_7_required_state": "INCONCLUSIVE",
+    "observed_reference_shortfalls": {
+      "stage_6_ambiguous_references": 9,
+      "stage_11_ambiguous_references": 7,
+      "hard_gate_minimum_ambiguous_references": 10
+    }
+  },
+  "authority": {
+    "development_only": true,
+    "runtime_implementation_authorized": true,
+    "development_data_read_authorized": true,
+    "prior_development_artifact_read_authorized": true,
+    "synthetic_reference_supplement_authorized": true,
+    "limited_parameter_search_runtime_authorized": true,
+    "development_candidate_artifact_authorized": true,
+    "stage_10_research_authorized": false,
+    "stage_7_grid_expansion_authorized": false,
+    "future_outcome_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "official_label_publication_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "development_window": {
+    "cohort_scan_start": "2019-01-02",
+    "cohort_date": "2019-12-31",
+    "warmup_start": "2019-07-01",
+    "report_start": "2020-01-02",
+    "report_end": "2021-12-31",
+    "minimum_pre_cohort_observations": 100,
+    "cohort_seed": "sha256:37f3162a8906df72cf25da6c153976e0826413e86445a05e2f0614d01b7b9ad5"
+  },
+  "population": {
+    "cohort_size": 512,
+    "anchor_scales": [20, 60],
+    "maximum_path_sessions_including_first_stage_4": 60,
+    "shared_structure_build_required": true
+  },
+  "state_identity": {
+    "preserve_distinct_stage_codes": [5, 6, 7, 10, 11],
+    "stage_5_6_merge_authorized": false,
+    "stage_10_11_merge_authorized": false,
+    "later_transition_does_not_rewrite_prior_valid_observation": true
+  },
+  "supplement_sampling": {
+    "base_sampling_seed_source": "config/stage-learning/second-group-development.v1.json#reference_sampling.seed",
+    "supplement_seed": "sha256:4af84e4efb2bcd7950d38449757e3761693abfd75d54d13a30389003b43973b3",
+    "supplement_stages": [6, 11],
+    "additional_target_contexts_per_bucket": 20,
+    "exact_additional_bucket_quota_required": false,
+    "exclude_base_sample_episode_ids": true,
+    "one_context_per_episode_per_stage": true,
+    "minimum_merged_ambiguous_references_per_stage": 10,
+    "reviewers_receive_t_only_features_only": true,
+    "algorithm_predictions_hidden_from_reviewers": true,
+    "future_outcomes_hidden_from_reviewers": true
+  },
+  "search_contract": {
+    "stage_5_6": "rerun_original_frozen_grid_against_base_stage5_plus_supplemented_stage6_references",
+    "stage_10": "reuse_prior_frozen_candidate_without_research",
+    "stage_7": "retain_prior_inconclusive_without_grid_expansion_or_rerun",
+    "stage_11": "rerun_original_frozen_three_value_grid_against_supplemented_stage11_references_using_prior_frozen_stage10",
+    "hard_gates_source": "config/stage-learning/second-group-development.v1.json#hard_gates",
+    "hard_gate_values_must_not_change": true,
+    "full_cartesian_cross_stage_search_forbidden": true
+  },
+  "milestone_decision": {
+    "complete_when_stage_5_6_and_stage_11_freeze_and_stage_7_remains_attributably_inconclusive": true,
+    "complete_disposition": "DEVELOPMENT_MILESTONE_COMPLETE_WITH_STAGE_7_INCONCLUSIVE",
+    "otherwise_disposition": "INCONCLUSIVE_AFTER_REFERENCE_SUPPLEMENT",
+    "stage_7_inconclusive_is_not_a_failure_to_execute": true,
+    "expert_review_required_after_complete_disposition": true
+  },
+  "artifact": {
+    "summary_only": true,
+    "security_codes_published": false,
+    "market_prices_published": false,
+    "future_outcomes_published": false,
+    "official_stage_labels_published": false
+  },
+  "claim_limits": [
+    "This supplement is result-aware development repair, not confirmatory evidence.",
+    "Only Stage 6 and Stage 11 reference sufficiency may be supplemented; hard gates are unchanged.",
+    "Stage 10 is immutable from the prior Run and Stage 7 remains INCONCLUSIVE unless a later separately reviewed version is authorized.",
+    "SYNTHETIC_EXPERT_CONSENSUS is not HUMAN_EXPERT_REFERENCE.",
+    "2022-2024 is not reread and 2025 remains unopened/unselected.",
+    "Milestone completion does not authorize official labels, daily publication, strategy consumption or trading."
+  ]
+}

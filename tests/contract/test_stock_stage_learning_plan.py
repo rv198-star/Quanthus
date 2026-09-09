@@ -274,6 +274,21 @@ def test_planning_routes_exist_without_runtime_feature_registration() -> None:
     assert development["authority"]["limited_parameter_search_runtime_authorized"] is True
     assert development["authority"]["arbitration_access_authorized"] is False
     assert development["authority"]["permanent_blind_access_authorized"] is False
+    supplement = json.loads(
+        (ROOT / "config/stage-learning/second-group-development-supplement.v1.json").read_text()
+    )
+    assert supplement["supplement_sampling"]["supplement_stages"] == [6, 11]
+    assert supplement["search_contract"]["hard_gate_values_must_not_change"] is True
+    assert supplement["search_contract"]["stage_10"] == (
+        "reuse_prior_frozen_candidate_without_research"
+    )
+    assert supplement["search_contract"]["stage_7"] == (
+        "retain_prior_inconclusive_without_grid_expansion_or_rerun"
+    )
+    assert supplement["authority"]["stage_10_research_authorized"] is False
+    assert supplement["authority"]["stage_7_grid_expansion_authorized"] is False
+    assert supplement["authority"]["arbitration_access_authorized"] is False
+    assert supplement["authority"]["permanent_blind_access_authorized"] is False
     p3_gate = json.loads((ROOT / "config/p3-gates.v1.json").read_text())
     bounded = p3_gate["bounded_partition_exceptions"]
     assert len(bounded) == 1

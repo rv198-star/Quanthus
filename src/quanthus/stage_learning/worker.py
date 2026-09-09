@@ -35,6 +35,9 @@ STAGE_CAPACITY_CENSUS_JOB = "quanthus.stage-capacity-census.v1"
 STAGE_SECOND_GROUP_PROFILE_JOB = "quanthus.stage-second-group-profile.v1"
 STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB = "quanthus.stage-second-group-repair-profile.v1"
 STAGE_SECOND_GROUP_DEVELOPMENT_JOB = "quanthus.stage-second-group-development.v1"
+STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB = (
+    "quanthus.stage-second-group-development-supplement.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
@@ -87,6 +90,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.second_group_development",
         "artifact_glob": "stage-second-group-development-*",
         "process_error": "stage_second_group_development_process_failed",
+        "wall_seconds": 2700,
+    },
+    STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB: {
+        "config": "config/stage-learning/second-group-development-supplement.v1.json",
+        "module": "quanthus.stage_learning.second_group_development_supplement",
+        "artifact_glob": "stage-second-group-development-supplement-*",
+        "process_error": "stage_second_group_development_supplement_process_failed",
         "wall_seconds": 2700,
     },
 }
@@ -606,6 +616,15 @@ class StageWorker:
                 "disposition": verified.get("disposition"),
                 "selected_parameters": verified.get("selected_parameters"),
                 "reference_summary": verified.get("reference_summary"),
+                "candidate_artifact_digest": verified.get("candidate_artifact_digest"),
+            }
+        if job.kind == STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB:
+            result["second_group_development_supplement"] = {
+                "disposition": verified.get("disposition"),
+                "milestone_complete": verified.get("milestone_complete"),
+                "selected_parameters": verified.get("selected_parameters"),
+                "reference_summary": verified.get("reference_summary"),
+                "stage_7_gate_reason_counts": verified.get("stage_7_gate_reason_counts"),
                 "candidate_artifact_digest": verified.get("candidate_artifact_digest"),
             }
         return result

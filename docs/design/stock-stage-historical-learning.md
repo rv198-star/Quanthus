@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：v1与repair profile均已完成；5/6保持独立并已有27组有限development搜索，`second-group-repair-experiment.v1.json` 进一步冻结7/10/11顺序development搜索（10→7→11）。`second-group-development.v1.json` 现只授权一次2020-2021 development runtime：共享512只Structure/Activity前置、建立T-only synthetic-consensus reference、按5/6→10→7→11顺序执行有限搜索并产出development candidate。5/6与10/11均保持独立阶段编号，不做合并；一般sealed-partition权限、2025 permanent-blind、HUMAN_EXPERT_REFERENCE、正式QUALIFIED发布、每日调度、云GPU、消费者和策略消费仍关闭 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；D/E v2 development候选保持冻结。F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J仅冻结未来cohort size=512且真实holdout继续blocked。H现唯一ready：首轮 `second-group-development.v1.json` 已成功执行但整体INCONCLUSIVE；10在原网格内冻结为5-session+2% depth，6/11因ambiguous reference 9/7低于hard gate=10形成sample-sufficiency blocker，7在参考充分情况下真实INCONCLUSIVE。当前只授权一次 `second-group-development-supplement.v1.json`：仅补6/11 T-only references并重跑原5/6与11网格；hard gates不变，10不得重搜、7不得扩网格或重跑。5/6与10/11保持独立编号；一般sealed-partition、2025、HUMAN_EXPERT_REFERENCE、正式QUALIFIED、日更、云GPU、消费者和策略权限仍关闭 |
 
 ## 1. 决策摘要与继承关系
 
@@ -20,7 +20,7 @@
 
 对外标签运行资格只用 SHADOW / QUALIFIED。DRAFT/RETIRED 是定义文档/版本管理状态，不增加四级产品审批。数据、语义、覆盖、稳定性和用途证据是同一个资格包的维度。qualification_score可以做摘要，不是权威加权通行证；消费者和交易权限另行验收。
 
-首组冻结契约为 `config/stage-learning/experiment.v1.json`。H 的 `second-group-profile.v1.json` 与 `second-group-repair-profile.v1.json` 均已完成并只作为development连续剖面；`second-group-experiment.v1.json` 明确保持5/6/7/10/11五个编号独立并冻结5/6的27组有限搜索，`second-group-repair-experiment.v1.json` 则把repair结果转为顺序有限搜索：先冻结10，再以其冲突语义校准7，最后让11只消费冻结10。`second-group-development.v1.json` 是唯一runtime授权：一次构建共享Structure/Activity和T-only observation panel，按stage分别抽120个target-cap context、双主评+第三裁决形成development reference，再严格按5/6→10→7→11顺序搜索；跨阶段全笛卡尔积被禁止。acceptance anchor被保留为局部突破接受边界，不再单独承载Stage-10关键结构失效；更深initial-low只被提升为Stage-10 development主支撑候选，仍不声称普适市场真值。上述中间量都是Job-local研究投影，不注册为正式Facts/Feature；只有后续学习证明能力值得复用后，才按Structure B6/B7/F9边界决定是否泛化。此前受限实验的 `prefer_continuous_structure_facts` 仍成立，因此同信息集连续Facts是强制对照，不承诺离散标签必然增加信息或收益。
+首组冻结契约为 `config/stage-learning/experiment.v1.json`。H 的两个profile已完成并把第二组搜索空间冻结；首轮 `second-group-development.v1.json` 也已执行完成。它证明 shared Structure/T-only reference/search 链可以执行，并冻结 Stage 10，但同时暴露两类不同 INCONCLUSIVE：6/11 是预登记 reference corpus-sufficiency blocker，7 是样本充分情况下的 semantic/parameter blocker。后继 `second-group-development-supplement.v1.json` 因此不是第二轮调参：它完整保留首轮artifact，只为6/11每个既有T-only bucket追加target-cap contexts且排除原episode；review policy、hard gates、5/6 grid和11 grid保持不变；10绑定首轮冻结candidate，7只审计首轮trial ledger而不重跑。若补样仍不能冻结5/6或11，则development milestone直接INCONCLUSIVE收口。上述中间量仍是Job-local研究投影，不注册为正式Facts/Feature；里程碑后才由量化、短线、基金专家复审7及整体第二组。`prefer_continuous_structure_facts` 仍是强制同信息集基线。
 
 ## 2. 学习对象：不变的语义骨架与可学习参数
 

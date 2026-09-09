@@ -169,22 +169,17 @@ def _normal_sha(value: object) -> str:
     return text
 
 
-def discover_development_security_codes(
+def discover_development_security_population(
     *,
     training_root: Path,
     node_config: Mapping[str, Any],
     scan_start: date,
     cohort_date: date,
     minimum_observations: int,
-    cohort_size: int,
     seed: str,
 ) -> tuple[str, ...]:
-    """Freeze one historical cohort using only evidence available through ``cohort_date``.
-
-    The cohort is for the development feasibility pilot, not a qualification population.  It is
-    deliberately selected before the report window and never consults later survival or outcomes.
-    """
-    if minimum_observations < 1 or cohort_size < 1 or not seed:
+    """Rank all eligible development securities using only evidence through ``cohort_date``."""
+    if minimum_observations < 1 or not seed:
         raise StageDevelopmentSourceError("development cohort parameters are invalid")
     scope = DevelopmentReadScope(scan_start, cohort_date, cohort_date)
     base, correction, _source_binding = _source_roots(training_root, node_config)
@@ -267,14 +262,43 @@ def discover_development_security_codes(
     finally:
         connection.close()
     eligible = tuple(str(row[0]) for row in rows if _CODE.fullmatch(str(row[0])))
-    if len(eligible) < cohort_size:
-        raise StageDevelopmentSourceError(
-            f"development cohort has only {len(eligible)} eligible codes; need {cohort_size}"
+    return tuple(
+        sorted(
+            eligible,
+            key=lambda code: hashlib.sha256(f"{seed}|{code}".encode()).hexdigest(),
         )
-    ranked = sorted(
-        eligible,
-        key=lambda code: hashlib.sha256(f"{seed}|{code}".encode()).hexdigest(),
     )
+
+
+def discover_development_security_codes(
+    *,
+    training_root: Path,
+    node_config: Mapping[str, Any],
+    scan_start: date,
+    cohort_date: date,
+    minimum_observations: int,
+    cohort_size: int,
+    seed: str,
+) -> tuple[str, ...]:
+    """Freeze one historical cohort using only evidence available through ``cohort_date``.
+
+    The cohort is for the development feasibility pilot, not a qualification population.  It is
+    deliberately selected before the report window and never consults later survival or outcomes.
+    """
+    if cohort_size < 1:
+        raise StageDevelopmentSourceError("development cohort parameters are invalid")
+    ranked = discover_development_security_population(
+        training_root=training_root,
+        node_config=node_config,
+        scan_start=scan_start,
+        cohort_date=cohort_date,
+        minimum_observations=minimum_observations,
+        seed=seed,
+    )
+    if len(ranked) < cohort_size:
+        raise StageDevelopmentSourceError(
+            f"development cohort has only {len(ranked)} eligible codes; need {cohort_size}"
+        )
     return tuple(sorted(ranked[:cohort_size]))
 
 

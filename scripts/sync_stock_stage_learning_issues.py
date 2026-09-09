@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate/synchronize only the stock-stage learning epic and eight bounded tasks."""
+"""Validate/synchronize only the stock-stage learning epic and bounded A-J tasks."""
 from __future__ import annotations
 
 import argparse
@@ -28,10 +28,14 @@ DEVELOPMENT_SETTLEMENT_FLAG = "development_future_settlement_authorized"
 LEARNING_IMPL_FLAG = "development_learning_implementation_authorized"
 SYNTHETIC_REFERENCE_FLAG = "synthetic_expert_development_reference_authorized"
 SYNTHETIC_LEARNING_FLAG = "synthetic_expert_development_learning_authorized"
+CAPACITY_CENSUS_FLAG = "development_capacity_census_authorized"
 BOUNDED_ARBITRATION_FLAG = "bounded_arbitration_qualification_authorized"
 BOUNDED_ARBITRATION_CONFIG = "bounded_arbitration_qualification_config"
 PERMANENT_BLIND_QUALIFICATION_FLAG = "permanent_blind_qualification_authorized"
-AUTH_SCOPE = "development_closed_arbitration_consumed_inconclusive_no_holdout_authority"
+AUTH_SCOPE = (
+    "development_closed_arbitration_consumed_inconclusive_capacity_census_authorized_"
+    "no_holdout_authority"
+)
 
 
 def load_plan() -> dict:
@@ -50,6 +54,7 @@ def load_plan() -> dict:
         LEARNING_IMPL_FLAG,
         SYNTHETIC_REFERENCE_FLAG,
         SYNTHETIC_LEARNING_FLAG,
+        CAPACITY_CENSUS_FLAG,
         BOUNDED_ARBITRATION_FLAG,
         BOUNDED_ARBITRATION_CONFIG,
         PERMANENT_BLIND_QUALIFICATION_FLAG,
@@ -67,11 +72,12 @@ def load_plan() -> dict:
             LEARNING_IMPL_FLAG,
             SYNTHETIC_REFERENCE_FLAG,
             SYNTHETIC_LEARNING_FLAG,
+            CAPACITY_CENSUS_FLAG,
         )
     ):
         raise ValueError(
-            "capacity, harness, reference, synthetic-panel and learning authorizations "
-            "must be explicit"
+            "capacity, harness, reference, synthetic-panel, learning and development-census "
+            "authorizations must be explicit"
         )
     if auth[BOUNDED_ARBITRATION_FLAG] is not False:
         raise ValueError("consumed arbitration qualification cannot remain authorized")
@@ -196,8 +202,9 @@ def body(item: dict, plan: dict, mapping: dict) -> str:
         "P3-STAGE-001-F 的唯一2022-2024 arbitration访问预算已由"
         " `stage_cf5b89c16c5b4fce8b3c5cdc00a156f7` 消耗并以sample-feasibility "
         "INCONCLUSIVE关闭。不得重跑该分区并称fresh holdout。"
-        "P3-STAGE-001-I 已关闭protocol-only采样修复，P3-STAGE-001-J保持blocked，"
-        "尚未选择或授权新的holdout。2025 permanent-blind仍未开放；当前不授权新的"
+        "P3-STAGE-001-I 已关闭protocol-only采样修复；P3-STAGE-001-J当前仅授权"
+        "2020-2021 development样本容量普查，用于反推未来总体规模，不得选择holdout。"
+        "2025 permanent-blind仍未开放；当前不授权新的"
         "sealed-partition读取、参数搜索、结果后改候选、QUALIFIED LabelCard、日更、"
         "策略消费、云GPU或交易。"
     )
@@ -227,7 +234,7 @@ def main() -> int:
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="synchronize only the exact nine planning issues",
+        help="synchronize only the exact stock-stage planning issue set",
     )
     args = parser.parse_args()
     plan = load_plan()

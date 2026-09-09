@@ -1,0 +1,52 @@
+{
+  "schema_version": "quanthus.stage-sample-capacity-census.v1",
+  "census_id": "stock-stage-first-group-development-capacity-2020-2021-v1",
+  "work_item": "P3-STAGE-001-J",
+  "purpose": "Use only already-consumed development data to measure structural sample density and reverse-infer a reasonable security population for a future untouched holdout protocol.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "experiment_config": "config/stage-learning/experiment.v1.json",
+  "qualification_protocol": "config/stage-learning/qualification-protocol.v2.json",
+  "authority": {
+    "development_only": true,
+    "runtime_implementation_authorized": true,
+    "development_data_read_authorized": true,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "candidate_prediction_authorized": false,
+    "semantic_panel_authorized": false,
+    "future_settlement_access_authorized": false,
+    "strategy_result_access_authorized": false,
+    "parameter_search_authorized": false,
+    "holdout_population_selection_authorized": false,
+    "holdout_submit_authorized": false
+  },
+  "development_window": {
+    "cohort_scan_start": "2019-01-02",
+    "cohort_date": "2019-12-31",
+    "warmup_start": "2019-07-01",
+    "report_start": "2020-01-02",
+    "report_end": "2021-12-31",
+    "minimum_pre_cohort_observations": 100,
+    "cohort_seed": "sha256:37f3162a8906df72cf25da6c153976e0826413e86445a05e2f0614d01b7b9ad5"
+  },
+  "nested_population_sizes": [64, 128, 256, 512],
+  "maximum_runtime_population": 512,
+  "analysis": {
+    "reuse_single_max_population_structure_build": true,
+    "nested_cohorts_share_one_deterministic_rank_order": true,
+    "respect_protocol_selection_order": true,
+    "respect_one_context_per_episode": true,
+    "report_raw_unique_episode_pool_before_cross_stratum_consumption": true,
+    "report_realized_target_cap_counts_after_cross_stratum_consumption": true,
+    "report_first_population_meeting_all_target_caps": true,
+    "if_maximum_population_is_insufficient": "retain_result_and_require_larger_development_census",
+    "do_not_extrapolate_as_qualification_evidence": true
+  },
+  "artifact": {
+    "output_relative_root": "runs/stage-capacity-census",
+    "market_values_published": false,
+    "security_codes_published": false,
+    "episode_rows_published": false,
+    "summary_only": true
+  }
+}

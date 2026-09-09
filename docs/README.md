@@ -137,8 +137,10 @@ nodes.
   frozen requirement of 80. No SHADOW/QUALIFIED artifact was published and that partition cannot be
   rerun as a fresh holdout. I freezes `qualification-protocol.v2.json`: the original targets remain
   target caps, realized scarcity is retained without cross-stratum backfill, and unchanged semantic
-  hard gates own sufficiency. J is blocked until a new untouched holdout/evidence source is explicitly
-  selected and authorized; 2025 permanent-blind remains unopened/unselected. Daily scheduling,
+  hard gates own sufficiency. J is still blocked for real holdout execution, but its development-only
+  `sample-capacity-census.v1.json` is authorized to measure nested 64/128/256/512 structural capacity
+  on 2020-2021 and reverse-infer a future cohort size before any new partition is selected. 2025
+  permanent-blind remains unopened/unselected. Daily scheduling,
   strategy consumption and cloud-GPU purchase remain closed. Evidence:
   `acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md` and
   `acceptance/stock-stage-learning-i-protocol-repair-20260909.md`.

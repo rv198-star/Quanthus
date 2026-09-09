@@ -31,6 +31,7 @@ STATUS_SCHEMA = "quanthus.stage-worker-status.v1"
 STAGE_HARNESS_JOB = "quanthus.stage-harness.v1"
 STAGE_REFERENCE_PILOT_JOB = "quanthus.stage-reference-pilot.v1"
 STAGE_QUALIFICATION_JOB = "quanthus.stage-qualification.v1"
+STAGE_CAPACITY_CENSUS_JOB = "quanthus.stage-capacity-census.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
@@ -38,7 +39,7 @@ GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
 MAIN_REF = "refs/remotes/stage-control/main"
 _JOB_ID = re.compile(r"^stage_[0-9a-f]{32}$")
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
-_JOB_SPECS: dict[str, dict[str, str]] = {
+_JOB_SPECS: dict[str, dict[str, Any]] = {
     STAGE_HARNESS_JOB: {
         "config": "config/stage-learning/harness.v1.json",
         "module": "quanthus.stage_learning.harness",
@@ -56,6 +57,13 @@ _JOB_SPECS: dict[str, dict[str, str]] = {
         "module": "quanthus.stage_learning.qualification",
         "artifact_glob": "stage-qualification-*",
         "process_error": "stage_qualification_process_failed",
+    },
+    STAGE_CAPACITY_CENSUS_JOB: {
+        "config": "config/stage-learning/sample-capacity-census.v1.json",
+        "module": "quanthus.stage_learning.capacity_census",
+        "artifact_glob": "stage-capacity-census-*",
+        "process_error": "stage_capacity_census_process_failed",
+        "wall_seconds": 1800,
     },
 }
 
@@ -534,12 +542,23 @@ class StageWorker:
             raise StageWorkerError("stage job verification output is invalid") from exc
         if not isinstance(verified, dict) or verified.get("verified") is not True:
             raise StageWorkerError("stage job artifact verification did not pass")
-        return {
+        result = {
             "artifact_root": str(artifacts[0]),
             "run_id": verified.get("run_id"),
             "manifest_sha256": verified.get("manifest_sha256"),
             "file_count": verified.get("file_count"),
         }
+        if job.kind == STAGE_CAPACITY_CENSUS_JOB:
+            result["capacity_census"] = {
+                "eligible_population_count": verified.get("eligible_population_count"),
+                "runtime_population_size": verified.get("runtime_population_size"),
+                "capacity_curve": verified.get("capacity_curve"),
+                "first_population_meeting_all_target_caps": verified.get(
+                    "first_population_meeting_all_target_caps"
+                ),
+                "requires_larger_census": verified.get("requires_larger_census"),
+            }
+        return result
 
     def execute(self, job: StageJob) -> dict[str, Any]:
         started_at = _utc_now()
@@ -599,7 +618,8 @@ class StageWorker:
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
                 )
-                deadline = time.monotonic() + self.wall_seconds
+                job_wall_seconds = int(spec.get("wall_seconds", self.wall_seconds))
+                deadline = time.monotonic() + job_wall_seconds
                 canceled = False
                 timed_out = False
                 while process.poll() is None:

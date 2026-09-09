@@ -6,7 +6,7 @@
   "review": "docs/reviews/stock-stage-learning-review-20260908.md",
   "work_items": "docs/work-items/stock-stage-historical-learning.md",
   "authorization": {
-    "scope": "development_closed_arbitration_consumed_inconclusive_no_holdout_authority",
+    "scope": "development_closed_arbitration_consumed_inconclusive_capacity_census_authorized_no_holdout_authority",
     "capacity_benchmark_authorized": true,
     "stage_harness_implementation_authorized": true,
     "stage_reference_pilot_implementation_authorized": true,
@@ -14,6 +14,7 @@
     "development_learning_implementation_authorized": true,
     "synthetic_expert_development_reference_authorized": true,
     "synthetic_expert_development_learning_authorized": true,
+    "development_capacity_census_authorized": true,
     "bounded_arbitration_qualification_authorized": false,
     "bounded_arbitration_qualification_config": "config/stage-learning/qualification.v1.json",
     "permanent_blind_qualification_authorized": false,
@@ -138,11 +139,11 @@
       "title": "在未消费holdout上执行后继外样本验证",
       "depends_on": ["P3-STAGE-001-I"],
       "scope": "基于protocol v2和冻结candidate，在未来明确选定且未消费的holdout/forward evidence上执行一次新的外样本语义评价；不得默认选择或读取2025。",
-      "inputs": ["qualification-protocol.v2.json", "冻结candidate digest", "明确选定的未消费分区/证据源、证据等级和一次访问预算"],
-      "deliverables": ["精确绑定的新qualification config", "一次性访问/运行证据", "bounded SHADOW / INCONCLUSIVE / REJECTED disposition"],
+      "inputs": ["qualification-protocol.v2.json", "config/stage-learning/sample-capacity-census.v1.json及development-only容量曲线", "冻结candidate digest", "明确选定的未消费分区/证据源、证据等级和一次访问预算"],
+      "deliverables": ["development-only样本容量反推与建议总体规模", "精确绑定的新qualification config", "一次性访问/运行证据", "bounded SHADOW / INCONCLUSIVE / REJECTED disposition"],
       "acceptance": ["2022-2024不得再称fresh holdout", "未获独立授权不得读取2025 permanent-blind", "执行前冻结target partition、sampling seed/caps、hard gates、evidence tier和失败动作", "synthetic evidence通过仍不自动成为QUALIFIED或交易权限"],
-      "blocked_on": ["尚未选择或授权新的未消费holdout；2025保持unopened_unselected", "runtime implementation/submit authority保持关闭"],
-      "evidence": []
+      "blocked_on": ["先完成仅使用2020-2021 development的样本容量普查，反推后继总体规模；该普查不得选择holdout", "尚未选择或授权新的未消费holdout；2025保持unopened_unselected", "successor qualification runtime/submit authority保持关闭"],
+      "evidence": ["config/stage-learning/sample-capacity-census.v1.json", "docs/acceptance/stock-stage-learning-j-development-capacity-census-release-ready-20260909.md"]
     }
   ]
 }

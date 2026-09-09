@@ -7,8 +7,10 @@ import pytest
 
 from quanthus.policy import find_project_root
 from quanthus.stage_learning.worker import (
+    _JOB_SPECS,
     JOB_KIND,
     JOB_SCHEMA,
+    STAGE_CAPACITY_CENSUS_JOB,
     STAGE_QUALIFICATION_JOB,
     STAGE_REFERENCE_PILOT_JOB,
     StageJob,
@@ -112,6 +114,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
+        STAGE_CAPACITY_CENSUS_JOB,
     }
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
 
@@ -174,6 +177,7 @@ def test_worker_publishes_runtime_identity_receipt(
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
+        STAGE_CAPACITY_CENSUS_JOB,
     }
     assert receipt["concurrency"] == 1
 
@@ -186,6 +190,19 @@ def test_reference_pilot_kind_gets_its_frozen_config(tmp_path: Path) -> None:
     )
     assert submitted["kind"] == STAGE_REFERENCE_PILOT_JOB
     assert submitted["config"] == "config/stage-learning/reference-pilot.v1.json"
+
+
+def test_capacity_census_kind_gets_its_frozen_config(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_CAPACITY_CENSUS_JOB,
+    )
+    assert submitted["kind"] == STAGE_CAPACITY_CENSUS_JOB
+    assert submitted["config"] == "config/stage-learning/sample-capacity-census.v1.json"
+    assert _JOB_SPECS[STAGE_CAPACITY_CENSUS_JOB]["wall_seconds"] == 1800
+    assert not worker_paths.qualification_budget.exists()
 
 
 def test_qualification_kind_gets_its_frozen_config(tmp_path: Path) -> None:

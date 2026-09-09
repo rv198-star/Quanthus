@@ -41,6 +41,7 @@ def test_exact_plan_keeps_training_and_sealed_data_unopened() -> None:
     assert plan["authorization"][sync.LEARNING_IMPL_FLAG] is True
     assert plan["authorization"][sync.SYNTHETIC_REFERENCE_FLAG] is True
     assert plan["authorization"][sync.SYNTHETIC_LEARNING_FLAG] is True
+    assert plan["authorization"][sync.CAPACITY_CENSUS_FLAG] is True
     assert plan["authorization"][sync.BOUNDED_ARBITRATION_FLAG] is False
     assert plan["authorization"][sync.BOUNDED_ARBITRATION_CONFIG] == (
         "config/stage-learning/qualification.v1.json"
@@ -92,6 +93,7 @@ def test_issue_sync_cannot_enable_execution(copied_plan, flag: str) -> None:
         sync.LEARNING_IMPL_FLAG,
         sync.SYNTHETIC_REFERENCE_FLAG,
         sync.SYNTHETIC_LEARNING_FLAG,
+        sync.CAPACITY_CENSUS_FLAG,
     ],
 )
 def test_positive_authorizations_must_be_explicit(copied_plan, flag: str) -> None:

@@ -33,6 +33,7 @@ EASTMONEY_DETAILS_URL = "https://push2delay.eastmoney.com/api/qt/stock/details/g
 EASTMONEY_TRENDS_URL = "https://push2delay.eastmoney.com/api/qt/stock/trends2/get"
 EASTMONEY_TOKEN = "fa5fd1943c7b386f172d6893dbbd1d0c"
 EASTMONEY_WINDOWS = (100, 200, 400, 800, 1600)
+TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={symbol}"
 
 
 def trades_schema() -> Any:
@@ -175,6 +176,66 @@ def _eastmoney_detail_rows(
             f"Eastmoney returned mismatched security {returned!r} for {code}"
         )
     return [str(row) for row in data.get("details") or []]
+
+
+def _tencent_symbol(code: str) -> str:
+    market = "sh" if code.startswith(("5", "6", "9")) else "sz"
+    return f"{market}{code}"
+
+
+def _tencent_zero_activity_evidence(
+    code: str,
+    market_date: date,
+    *,
+    opener: Callable[..., Any] = urlopen,
+    timeout: float = 12.0,
+) -> dict[str, Any]:
+    symbol = _tencent_symbol(code)
+    request = Request(
+        TENCENT_QUOTE_URL.format(symbol=symbol),
+        headers={"User-Agent": "Mozilla/5.0 Quanthus/1.0"},
+    )
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            with opener(request, timeout=timeout) as response:
+                text = response.read().decode("gb18030", errors="replace")
+            marker = f'v_{symbol}="'
+            start = text.find(marker)
+            if start < 0:
+                raise RuntimeError("Tencent quote response marker is missing")
+            payload = text[start + len(marker) :].split('";', 1)[0]
+            fields = payload.split("~")
+            if len(fields) <= 30:
+                raise RuntimeError("Tencent quote response has too few fields")
+            returned = str(fields[2]).strip().zfill(6)
+            if returned != code:
+                raise RuntimeError(
+                    f"Tencent returned mismatched security {returned!r} for {code}"
+                )
+            quote_timestamp = str(fields[30]).strip()
+            expected_date = market_date.strftime("%Y%m%d")
+            if quote_timestamp[:8] != expected_date:
+                raise RuntimeError(
+                    "Tencent quote market date "
+                    f"{quote_timestamp[:8]!r} does not match requested {expected_date!r}"
+                )
+            total_volume = float(fields[6] or 0.0)
+            if total_volume != 0.0:
+                raise RuntimeError(
+                    f"Tencent quote reports nonzero total volume {total_volume} for {code}"
+                )
+            return {
+                "provider": "tencent-quote-zero-activity",
+                "quote_market_date": market_date.isoformat(),
+                "quote_timestamp": quote_timestamp,
+                "daily_volume": total_volume,
+            }
+        except Exception as exc:  # noqa: BLE001 - bounded quote retry
+            last_error = exc
+            if attempt < 2:
+                time.sleep(0.25 * (attempt + 1))
+    raise RuntimeError(f"Tencent zero-activity quote failed: {last_error}")
 
 
 def collect_symbol_eastmoney(
@@ -425,6 +486,7 @@ def collect_after_hours(
     sleep_seconds: float = 0.0,
     client_factory: Callable[[], tuple[Any, str]] = tdx_client,
     eastmoney_opener: Callable[..., Any] = urlopen,
+    quote_opener: Callable[..., Any] = urlopen,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     typed_universe = [
         *((code, "equity") for code in sorted(set(equities))),
@@ -464,6 +526,20 @@ def collect_after_hours(
                     )
                 except Exception as exc:  # noqa: BLE001 - request retry is bounded in helper
                     error = exc
+                    if security_type == "etf":
+                        try:
+                            meta = _tencent_zero_activity_evidence(
+                                code,
+                                market_date,
+                                opener=quote_opener,
+                            )
+                            selected = []
+                            error = None
+                            attempts = 2
+                        except Exception as quote_exc:  # noqa: BLE001 - fail closed on both sources
+                            error = RuntimeError(
+                                f"{exc}; zero-activity fallback failed: {quote_exc}"
+                            )
             else:
                 assert client is not None
                 for attempts in (1, 2):
@@ -494,31 +570,49 @@ def collect_after_hours(
                 rows.extend(selected)
             else:
                 status = "justified_empty"
-                reason = "successful_query_no_after_hours_matches"
-                provider_name = "Eastmoney" if fallback else "TDX"
-                detail = (
-                    f"{provider_name} transaction request completed and returned no matches "
-                    "inside 15:05-15:30"
-                )
+                if meta.get("provider") == "tencent-quote-zero-activity":
+                    reason = "same_day_zero_volume_proves_no_after_hours_matches"
+                    detail = (
+                        "Tencent same-day quote reported zero total trading volume; "
+                        "after-hours fixed-price matches are therefore impossible"
+                    )
+                else:
+                    reason = "successful_query_no_after_hours_matches"
+                    provider_name = "Eastmoney" if fallback else "TDX"
+                    detail = (
+                        f"{provider_name} transaction request completed and returned no matches "
+                        "inside 15:05-15:30"
+                    )
+            receipt_uses_tencent = meta.get("provider") == "tencent-quote-zero-activity"
             receipts.append(
                 {
                     "dataset": "after_hours_fixed_price_trades",
                     "security_id": code,
                     "security_type": security_type,
                     "provider": (
-                        f"eastmoney:{server}" if fallback else f"tdx:{server}"
+                        "tencent:qt.gtimg.cn"
+                        if receipt_uses_tencent
+                        else (f"eastmoney:{server}" if fallback else f"tdx:{server}")
                     ),
                     "request_json": json.dumps(
                         {
-                            "operation": "details" if fallback else "transactions",
+                            "operation": (
+                                "quote_zero_activity"
+                                if receipt_uses_tencent
+                                else ("details" if fallback else "transactions")
+                            ),
                             "symbol": code,
                             "date": market_date.strftime("%Y%m%d"),
                             "matching_start": MATCHING_START,
                             "matching_end": MATCHING_END,
                             "boundary_policy": (
-                                "expand_latest_window_until_before_1505"
-                                if fallback
-                                else "page_until_before_1505"
+                                "same_day_zero_volume_proves_no_after_hours"
+                                if receipt_uses_tencent
+                                else (
+                                    "expand_latest_window_until_before_1505"
+                                    if fallback
+                                    else "page_until_before_1505"
+                                )
                             ),
                         },
                         sort_keys=True,

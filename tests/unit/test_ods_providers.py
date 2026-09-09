@@ -469,6 +469,93 @@ def test_after_hours_eastmoney_fallback_expands_window_and_binds_date() -> None:
     assert receipts[0]["provider_provider_rows"] == 3
 
 
+def test_after_hours_zero_activity_etf_uses_same_day_quote_evidence() -> None:
+    class JsonResponse:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(self.payload).encode("utf-8")
+
+    def eastmoney_opener(request, *, timeout: float):
+        assert timeout == 12.0
+        parsed = urlparse(request.full_url)
+        if parsed.path.endswith("/trends2/get"):
+            return JsonResponse(
+                {
+                    "rc": 0,
+                    "data": {
+                        "code": "000001",
+                        "trends": ["2026-07-31 15:00,10,10,10,10,1,100,10"],
+                    },
+                }
+            )
+        return JsonResponse({"rc": 100, "data": None})
+
+    class QuoteResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            fields = [""] * 31
+            fields[2] = "560000"
+            fields[6] = "0"
+            fields[30] = "20260731160000"
+            return f'v_sh560000="{"~".join(fields)}";'.encode("gb18030")
+
+    def failed_tdx():
+        raise RuntimeError("no TDX endpoint returned a valid bars probe")
+
+    rows, receipts, metadata = after_hours_tdx.collect_after_hours(
+        [],
+        ["560000"],
+        date(2026, 7, 31),
+        client_factory=failed_tdx,
+        eastmoney_opener=eastmoney_opener,
+        quote_opener=lambda *_args, **_kwargs: QuoteResponse(),
+    )
+
+    assert rows == []
+    assert metadata["provider"] == "eastmoney"
+    assert receipts[0]["status"] == "justified_empty"
+    assert receipts[0]["provider"] == "tencent:qt.gtimg.cn"
+    assert receipts[0]["reason_code"] == "same_day_zero_volume_proves_no_after_hours_matches"
+    assert receipts[0]["provider_daily_volume"] == 0.0
+    assert receipts[0]["provider_quote_market_date"] == "2026-07-31"
+
+
+def test_after_hours_zero_activity_quote_rejects_nonzero_volume() -> None:
+    class QuoteResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            fields = [""] * 31
+            fields[2] = "159915"
+            fields[6] = "10980443"
+            fields[30] = "20260731161403"
+            return f'v_sz159915="{"~".join(fields)}";'.encode("gb18030")
+
+    with pytest.raises(RuntimeError, match="nonzero total volume"):
+        after_hours_tdx._tencent_zero_activity_evidence(
+            "159915",
+            date(2026, 7, 31),
+            opener=lambda *_args, **_kwargs: QuoteResponse(),
+        )
+
+
 def test_after_hours_eastmoney_fallback_rejects_wrong_market_date() -> None:
     class Response:
         def __enter__(self):

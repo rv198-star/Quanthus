@@ -3,7 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
+| Accepted scope | twelve-case real-input collection feasibility; limited descriptive coverage, not independent semantic qualification |
 | Owner decision | 用户要求沿评审结论继续，直到当前里程碑完成；本站落实真实参考可行性，不重做已关闭工程里程碑 |
 | Parent | [参考协议](stage-order-reference-protocol.md); [LLD03](lld/03-label-feature-system.md) |
 | Work item | P3-STAGE-006 |
@@ -75,3 +76,16 @@ review视图通过受限Job结果返回。resolve保留完整P3-STAGE-005 bundle
 
 采用最小部署范围：只部署所需Event Worker，保留API、Web、replay-worker和数据卷。
 该部署只为读取已有artifact并执行参考封存，不进行数据库迁移或数据清洗。
+
+## 5. 已完成的范围
+
+固定prepare与resolve均以执行版本 `bf5d8b11c3869bdb7c1205943779ce3f5619cbe4` 一次成功：
+Job `job_fec6e60e382f47bc8dcc796919470748` 与
+`job_2a380e24cb5b4f8e8816558b6fbabb5d`。357条保留输入生成12例、24份同源模拟意见；
+解析为0=4、2=1、两者皆非=3、模糊=4，另有1项近期意见分歧。输入不可用与规则冲突均0。
+采集闭环为PASS_REAL_INPUT_REFERENCE_COLLECTION，有限覆盖为
+DESCRIPTIVE_REFERENCE_COVERAGE_OBSERVED，全部原意见和证据均保留并通过同版本冷重建。
+
+该覆盖不是原统计资格门槛，也不等于独立模型、人类专家或盲测认可；primary_stage仍null。
+全部执行授权在交付计划内关闭，无第三次Job或隐含后继搜索。固定配置与产物保持不变，
+完整回执和量化/数仓符合性审查见[验收记录](../acceptance/stage-order-reference-feasibility-20260911.md)。

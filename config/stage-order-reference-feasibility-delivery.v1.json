@@ -5,12 +5,59 @@
   "runtime_config": "config/stage-learning/order-reference-feasibility.v1.json",
   "implementation": "src/quanthus/stage_learning/order_reference_feasibility.py",
   "evidence": "docs/acceptance/stage-order-reference-feasibility-20260911.md",
-  "runtime_completed": false,
-  "runtime_receipts": null,
+  "runtime_completed": true,
+  "runtime_receipts": {
+    "code_revision": "bf5d8b11c3869bdb7c1205943779ce3f5619cbe4",
+    "config_digest": "sha256:f161f1931c724df05b6dff0851185fe9e8571286841b3fd06e013a3821fdaf22",
+    "prepare": {
+      "job_id": "job_fec6e60e382f47bc8dcc796919470748",
+      "run_id": "run_fec6e60e382f47bc8dcc796919470748",
+      "phase": "prepare", "state": "succeeded", "attempt": 1, "error_reason": null,
+      "input_digest": "sha256:98505c36c78f5e28c89acc216bde024fc398743e6aecb71260c14ea95b350ab1",
+      "manifest_sha256": "sha256:fdb7cc8b3c34566fee18ea5ee00589ad12e1da6dbe74e2f624bb030d10acf5ec",
+      "evidence_digest": "sha256:5af53e4c1b852c48ce0d5b04d2b02ef3623badf7949b87424ab7ddb941839a94",
+      "source_inputs_digest": "sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac",
+      "source_row_count": 357, "case_count": 12,
+      "created_at": "2026-09-10T16:55:50.829529+00:00",
+      "started_at": "2026-09-10T16:55:52.634635+00:00",
+      "completed_at": "2026-09-10T16:55:57.941410+00:00",
+      "worker_elapsed_seconds": 5.306775, "runner_elapsed_seconds": 3.3753497898578644
+    },
+    "resolve": {
+      "job_id": "job_2a380e24cb5b4f8e8816558b6fbabb5d",
+      "run_id": "run_2a380e24cb5b4f8e8816558b6fbabb5d",
+      "phase": "resolve", "state": "succeeded", "attempt": 1, "error_reason": null,
+      "input_digest": "sha256:98f9fd853236d04b724e350006cc703cbb8b6823fcda8805e35a2d5cf884949b",
+      "manifest_sha256": "sha256:ed8252670525962f224dee6f0bfb6c2e622b8c9f0ebc729df529a7bfe4ecfed9",
+      "bundle_manifest_sha256": "sha256:79f8ecc5470ef2eaca85e6e7e798a50624b5b47745ca80ddf26fa831ce343eda",
+      "evidence_digest": "sha256:5af53e4c1b852c48ce0d5b04d2b02ef3623badf7949b87424ab7ddb941839a94",
+      "opinion_digest": "sha256:d281a2b37e522c44413f6738d045deac642e9b021e1c6fc3d93f789db87a488c",
+      "resolved_digest": "sha256:ab8b8319af9bf5b75091fbbb66e59ec20c192968a8296519359319f00161772d",
+      "parent_manifest_sha256": "sha256:fdb7cc8b3c34566fee18ea5ee00589ad12e1da6dbe74e2f624bb030d10acf5ec",
+      "created_at": "2026-09-10T17:05:27.283202+00:00",
+      "started_at": "2026-09-10T17:05:27.812903+00:00",
+      "completed_at": "2026-09-10T17:05:32.078062+00:00",
+      "worker_elapsed_seconds": 4.265159, "runner_elapsed_seconds": 1.08252811152488
+    },
+    "summary": {
+      "collection_disposition": "PASS_REAL_INPUT_REFERENCE_COLLECTION",
+      "coverage_disposition": "DESCRIPTIVE_REFERENCE_COVERAGE_OBSERVED",
+      "case_count": 12, "opinion_count": 24, "security_count": 3, "date_count": 4,
+      "primary_reference_counts": {"AMBIGUOUS": 4, "NEITHER": 3, "STAGE_0": 4, "STAGE_2": 1},
+      "recent_disagreement_count": 1,
+      "distinct_origin_count": 1, "review_source_kinds": ["self_simulated"],
+      "source_kind": "retrospective_development", "dwd_provider_opens": 0,
+      "human_expert_validated": false, "independent_validation": false,
+      "full_context_blinding_claimed": false, "market_reference_validated": false,
+      "market_representativeness": false, "new_parameter_candidate_accepted": false,
+      "parameter_search_authorized": false, "official_label_authorized": false,
+      "primary_stage": null
+    }
+  },
   "authorization": {
-    "scope": "bounded_12_case_retained_f9_reference_feasibility",
-    "prepare_job": true,
-    "resolve_job": true,
+    "scope": "reference_feasibility_completed_no_additional_jobs_or_search",
+    "prepare_job": false,
+    "resolve_job": false,
     "maximum_jobs": 2,
     "maximum_cases": 12,
     "maximum_opinions": 24,
@@ -23,10 +70,10 @@
     "trading": false
   },
   "items": [
-    {"id": "P3-STAGE-006", "kind": "epic", "title": "Complete real-input scale-explicit reference feasibility", "status": "ready", "depends_on": ["P3-STAGE-005"], "scope": "Exactly one 12-case prepare and one 24-opinion resolution from two accepted F9 artifacts; no DWD/search/holdout access.", "acceptance": ["Real source identity, immutable packets, raw opinions and independent reconstruction are bound", "Coverage and collection feasibility are distinct from independent semantic qualification"], "evidence": []},
+    {"id": "P3-STAGE-006", "kind": "epic", "title": "Complete real-input scale-explicit reference feasibility", "status": "closed", "depends_on": ["P3-STAGE-005"], "scope": "Exactly one 12-case prepare and one 24-opinion resolution from two accepted F9 artifacts; no DWD/search/holdout access.", "acceptance": ["Real source identity, immutable packets, raw opinions and independent reconstruction are bound", "Coverage and collection feasibility are distinct from independent semantic qualification"], "evidence": ["docs/acceptance/stage-order-reference-feasibility-20260911.md"]},
     {"id": "P3-STAGE-006-A", "kind": "task", "title": "Freeze source, selection, review provenance and stop rules", "status": "closed", "depends_on": ["P3-STAGE-005"], "scope": "Freeze date-only 4-per-security selection and same-origin simulated roles before new case review.", "acceptance": ["Twelve cases, twenty-four opinions, no replacements or result-dependent selection"], "evidence": ["docs/design/stage-order-reference-feasibility.md"]},
     {"id": "P3-STAGE-006-B", "kind": "task", "title": "Implement and release the bounded two-phase Worker route", "status": "closed", "depends_on": ["P3-STAGE-006-A"], "scope": "Reuse reference protocol, bind retained source membership and dynamic opinion input, test recovery and tampering.", "acceptance": ["Full checks and focused gates pass before runtime"], "evidence": ["docs/acceptance/stage-order-reference-feasibility-20260911.md"]},
-    {"id": "P3-STAGE-006-C", "kind": "task", "title": "Execute fixed real-input reference collection and resolution", "status": "ready", "depends_on": ["P3-STAGE-006-B"], "scope": "Prepare exact packets, perform actual self-simulated case reviews, seal raw opinions once.", "acceptance": ["Two exact terminal receipts and complete immutable evidence; no automated reviewer judgements"], "evidence": []},
-    {"id": "P3-STAGE-006-D", "kind": "task", "title": "Review collection feasibility and close without candidate promotion", "status": "blocked", "depends_on": ["P3-STAGE-006-C"], "scope": "Separate collection, finite descriptive coverage and absent independent semantic validation.", "acceptance": ["Retain all disagreements and insufficiency, forbid automatic supplement or search"], "evidence": []}
+    {"id": "P3-STAGE-006-C", "kind": "task", "title": "Execute fixed real-input reference collection and resolution", "status": "closed", "depends_on": ["P3-STAGE-006-B"], "scope": "Prepare exact packets, perform actual self-simulated case reviews, seal raw opinions once.", "acceptance": ["Two exact terminal receipts and complete immutable evidence; no automated reviewer judgements"], "evidence": ["docs/acceptance/stage-order-reference-feasibility-20260911.md"]},
+    {"id": "P3-STAGE-006-D", "kind": "task", "title": "Review collection feasibility and close without candidate promotion", "status": "closed", "depends_on": ["P3-STAGE-006-C"], "scope": "Separate collection, finite descriptive coverage and absent independent semantic validation.", "acceptance": ["Retain all disagreements and insufficiency, forbid automatic supplement or search"], "evidence": ["docs/acceptance/stage-order-reference-feasibility-20260911.md"]}
   ]
 }

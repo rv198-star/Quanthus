@@ -202,9 +202,13 @@ nodes.
   [scale-explicit reference protocol](design/stage-order-reference-protocol.md); plan:
   `config/stage-order-reference-delivery.v1.json`; engineering evidence:
   [reference mechanism acceptance](acceptance/stage-order-reference-engineering-20260910.md).
-- `P3-STAGE-006` opens the bounded real-input reference-feasibility successor, not a new candidate
-  search. It reuses only two accepted immutable F9 source artifacts, with twelve date-selected cases
-  and twenty-four same-origin simulated opinions. No DWD, sealed partition, daily or trading access.
+- `P3-STAGE-006` is accepted and closed for real-input reference collection feasibility. Two exact
+  Jobs on revision `bf5d8b1` reused the accepted immutable F9 sources: 357 retained input rows,
+  twelve date-selected cases and twenty-four same-origin simulated opinions. Cold readback binds
+  the original source, case selection and raw opinions. References resolve to Stage 0=4, Stage 2=1,
+  neither=3 and ambiguous=4, with one separate recent-condition disagreement. Collection passes
+  and finite descriptive coverage is observed; independent semantic qualification remains absent.
+  No candidate, third Job, search, DWD, sealed partition, daily or trading authority opens.
   Route: [reference feasibility](design/stage-order-reference-feasibility.md); machine plan:
   `config/stage-order-reference-feasibility-delivery.v1.json`; evidence:
   `acceptance/stage-order-reference-feasibility-20260911.md`.

@@ -142,13 +142,16 @@ nodes.
   LabelCard, daily schedule, strategy and trading remain separate future scope. Acceptance:
   `acceptance/stage-10-11-projection-qualification-20260910.md`; route:
   `design/stage-10-11-projection.md`; plan: `config/stage-10-11-projection-delivery.v1.json`.
-- `P3-STAGE-003` is the next active stock-stage milestone. It does not begin with six label searches.
-  The frozen third-group profile splits `0/2` order-vs-consolidation, `1/12` downside lifecycle, and
-  `8/9` high-side acceleration/divergence, with an explicit hypothesis that 8/9 may be modifiers
-  rather than peer primary stages. `P3-STAGE-003-A/B` freeze semantics and the aggregate-only 512-
-  security development profile; `P3-STAGE-003-C` is the only ready result-bearing step. The profile
-  emits no Stage labels, performs no parameter search, registers no B6/B7 Facts, and does not touch
-  2022-2024 arbitration or 2025. Route: `design/stock-stage-third-group-profile.md`; plan:
+- `P3-STAGE-003` is accepted and closed after one frozen 512-security 2020-2021 development-only
+  morphology profile (`stage_313d48cfc06948e0a7fc7a3bd77b2657`, 225,246 profiled observations).
+  The post-run review returns `PASS_WITH_DIMENSIONAL_RECLASSIFICATION`: `0/2` remain candidate
+  vocabulary but require a Structure Order Fact Family before any search; `1/12` are retained as a
+  layered downside context + deceleration/stabilization condition and prioritize a Trend Evolution
+  Fact Family; `8/9` remain traceable codes but are reclassified as high-side modifier hypotheses,
+  with observable meanings `upside acceleration / extension` and `high-level price-volume divergence`.
+  No active third-group profile/search/fact authority remains. Route:
+  `design/stock-stage-third-group-profile.md`; result:
+  `acceptance/stock-stage-third-group-profile-result-20260910.md`; plan:
   `config/stage-third-group-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
@@ -170,7 +173,8 @@ nodes.
   hard gates own sufficiency. J is still blocked for real holdout execution; its development-only
   capacity census found 128 as the first size meeting all target caps and froze future cohort size=512.
   P3-STAGE-001 itself now has no ready child: H is mixed-closeout/blocked, G/J remain blocked. The
-  active development result step has moved to `P3-STAGE-003-C`. The historical 512-security
+  third-group result step has now closed under `P3-STAGE-003`; no active Stage result/search authority
+  remains. The historical 512-security
   `second-group-profile.v1.json` completed successfully on 2020-2021 development with
   3,425 accepted Stage-4 episode starts and 186,221 path observations. It supports a bounded 5/6
   development search frozen by `second-group-experiment.v1.json`. That contract now explicitly keeps

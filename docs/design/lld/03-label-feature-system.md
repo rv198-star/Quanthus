@@ -312,11 +312,11 @@ authority.
 | P3-STAGE-002-B | Implement formal projection, deep verifier and governed qualification route | P3-STAGE-002-A | closed / #255; fixed Worker dispatch and deep verifier accepted; `docs/acceptance/stage-10-11-projection-release-ready-20260910.md` |
 | P3-STAGE-002-C | Qualify projection against two immutable accepted F9 artifacts | P3-STAGE-002-B | closed / #256; Job `job_5e2d82adb2a8492488725fcda379424f` PASS with 241 observations / 2 confirmations / 10 contexts / 6 nested rebound conditions, zero predicate mismatch and zero DWD/provider access |
 | P3-STAGE-002-D | Freeze formal Projection Contract and successor boundary | P3-STAGE-002-C | closed / #257; `docs/acceptance/stage-10-11-projection-qualification-20260910.md`; primary-stage arbitration, external validation, LabelCard/daily/strategy/trading stay separate |
-| P3-STAGE-003 | Profile third-group morphology and decide state-vs-modifier structure | P3-STAGE-002, P3-STRUCT-005 | blocked parent; A/B closed, C ready, D blocked; one 512-security 2020-2021 development-only morphology profile; no label/search/B6-B7 formalization |
-| P3-STAGE-003-A | Freeze third-group semantic decomposition and morphology axes | P3-STAGE-002, P3-STRUCT-005 | closed; `docs/design/stock-stage-third-group-profile.md`; 0/2, 1/12 and 8/9 subgroups frozen before result access |
-| P3-STAGE-003-B | Implement governed 512-security third-group morphology profile | P3-STAGE-003-A | closed; fixed RX Stage Worker route and aggregate-only artifact; `docs/acceptance/stock-stage-third-group-profile-release-ready-20260910.md` |
-| P3-STAGE-003-C | Execute frozen third-group morphology profile on RX6800 | P3-STAGE-003-B | ready; no Stage labels, threshold ranking, modifier selection or holdout access |
-| P3-STAGE-003-D | Review third-group profile and freeze next facts/search route | P3-STAGE-003-C | blocked; any later narrow B6/B7 Facts or parameter grid requires a new preregistered contract |
+| P3-STAGE-003 | Profile third-group morphology and decide state-vs-modifier structure | P3-STAGE-002, P3-STRUCT-005 | closed / #263; 225,246-observation development profile accepted with dimensional reclassification; no active label/search/fact authority |
+| P3-STAGE-003-A | Freeze third-group semantic decomposition and morphology axes | P3-STAGE-002, P3-STRUCT-005 | closed / #259; `docs/design/stock-stage-third-group-profile.md`; 0/2, 1/12 and 8/9 subgroups frozen before result access |
+| P3-STAGE-003-B | Implement governed 512-security third-group morphology profile | P3-STAGE-003-A | closed / #260; fixed RX Stage Worker route and aggregate-only artifact; `docs/acceptance/stock-stage-third-group-profile-release-ready-20260910.md` |
+| P3-STAGE-003-C | Execute frozen third-group morphology profile on RX6800 | P3-STAGE-003-B | closed / #261; Job `stage_313d48cfc06948e0a7fc7a3bd77b2657` PASS; no Stage labels/search/holdout access |
+| P3-STAGE-003-D | Review third-group profile and freeze next facts/search route | P3-STAGE-003-C | closed / #262; 1/12 -> Trend Evolution Facts, 0/2 -> Structure Order Facts, 8/9 -> modifier hypotheses; later work needs new contracts |
 
 ## 7. Acceptance
 

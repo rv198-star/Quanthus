@@ -3,13 +3,41 @@
   "parent_id": "P3-STAGE-003",
   "design": "docs/design/stock-stage-third-group-profile.md",
   "review": "docs/reviews/stock-stage-third-group-profile-review-20260910.md",
+  "post_run_review": "docs/reviews/stock-stage-third-group-profile-result-review-20260910.md",
   "runtime_config": "config/stage-learning/third-group-profile.v1.json",
+  "runtime_accepted": true,
+  "runtime_qualification": {
+    "decision": "PASS_PROFILE_WITH_DIMENSIONAL_RECLASSIFICATION",
+    "code_revision": "0a15ccc48ad00ab3f170f903e2ee0d27a385c26d",
+    "job_id": "stage_313d48cfc06948e0a7fc7a3bd77b2657",
+    "run_id": "stage-third-group-profile-20260910T031429Z",
+    "manifest_sha256": "sha256:351f749db94742e847cb873796105c2d855bdc402ed664400e04678ac9a121c7",
+    "input_digest": "sha256:3a362fb1cb1664e4eeb894c49cd3b75e7b556f67eac3914320ace76da638e340",
+    "profile_observation_count": 225246,
+    "reset_counts": {
+      "profiled_rows": 225246,
+      "nonadmitted": 8,
+      "listing_or_coordinate_change": 469,
+      "hidden_session_gap": 0
+    },
+    "subgroup_disposition": {
+      "0_2": "retain_candidates_require_structure_order_fact_family_before_search",
+      "1_12": "retain_layered_context_condition_prioritize_trend_evolution_fact_family",
+      "8_9": "preserve_codes_reclassify_as_modifier_hypotheses"
+    },
+    "successor_order": [
+      "trend_evolution_fact_family",
+      "structure_order_fact_family",
+      "high_side_activity_relation_if_still_required"
+    ],
+    "evidence": "docs/acceptance/stock-stage-third-group-profile-result-20260910.md"
+  },
   "authorization": {
-    "scope": "third_group_development_profile_only_no_labels_no_search",
-    "third_group_profile_implementation_authorized": true,
-    "third_group_development_profile_run_authorized": true,
-    "development_data_read_authorized": true,
-    "continuous_profile_output_authorized": true,
+    "scope": "third_group_profile_closed_no_active_search_or_fact_authority",
+    "third_group_profile_implementation_authorized": false,
+    "third_group_development_profile_run_authorized": false,
+    "development_data_read_authorized": false,
+    "continuous_profile_output_authorized": false,
     "parameter_search_authorized": false,
     "stage_label_output_authorized": false,
     "formal_structure_fact_registration_authorized": false,
@@ -27,7 +55,7 @@
       "id": "P3-STAGE-003",
       "title": "Profile third-group morphology and decide state-vs-modifier structure",
       "kind": "epic",
-      "status": "blocked",
+      "status": "closed",
       "depends_on": ["P3-STAGE-002", "P3-STRUCT-005"],
       "scope": "Profile Stage 0/1/2/8/9/12 as three continuous semantic subgroups before any threshold search or primary-stage compression.",
       "acceptance": [
@@ -36,7 +64,7 @@
         "D reviews the complete profile once and freezes retain/rename/modifier/fact-follow-up decisions",
         "No Stage label, parameter search, B6/B7 formalization, holdout, daily, strategy or trading authority opens"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/stock-stage-third-group-profile-result-20260910.md"]
     },
     {
       "id": "P3-STAGE-003-A",
@@ -77,7 +105,7 @@
       "id": "P3-STAGE-003-C",
       "title": "Execute frozen third-group morphology profile on RX6800",
       "kind": "task",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STAGE-003-B"],
       "scope": "Run the exact profile once on the frozen 512-security 2020-2021 development cohort and publish aggregate distributions/joint diagnostics only.",
       "acceptance": [
@@ -86,13 +114,13 @@
         "No stage labels, state/modifier selection or parameter search are emitted",
         "Profile observation/reset counts and all metric distributions are durably bound"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/stock-stage-third-group-profile-result-20260910.md"]
     },
     {
       "id": "P3-STAGE-003-D",
       "title": "Review third-group profile and freeze next facts/search route",
       "kind": "task",
-      "status": "blocked",
+      "status": "closed",
       "depends_on": ["P3-STAGE-003-C"],
       "scope": "Perform one post-profile semantic review and decide which codes remain stages, which become modifiers/renamed propositions, and which job-local metrics justify a narrow formal Facts follow-up.",
       "acceptance": [
@@ -101,7 +129,10 @@
         "Any later threshold grid or B6/B7 subset is frozen in a new version before result access",
         "No attempt is made to force six passing labels"
       ],
-      "evidence": []
+      "evidence": [
+        "docs/acceptance/stock-stage-third-group-profile-result-20260910.md",
+        "docs/reviews/stock-stage-third-group-profile-result-review-20260910.md"
+      ]
     }
   ]
 }

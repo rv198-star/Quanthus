@@ -15,7 +15,7 @@ if str(SCRIPTS) not in sys.path:
 import sync_stage_third_group_issues as sync  # noqa: E402
 
 
-def test_third_group_plan_opens_only_one_profile_run():
+def test_third_group_plan_closes_after_one_profile_and_freezes_successor_route():
     raw = sync.load_plan()
     by_id = {item["id"]: item for item in raw["items"]}
     assert [item["id"] for item in raw["items"]] == [
@@ -25,27 +25,25 @@ def test_third_group_plan_opens_only_one_profile_run():
         "P3-STAGE-003-C",
         "P3-STAGE-003-D",
     ]
-    assert by_id["P3-STAGE-003-A"]["status"] == "closed"
-    assert by_id["P3-STAGE-003-B"]["status"] == "closed"
-    assert by_id["P3-STAGE-003-C"]["status"] == "ready"
-    assert by_id["P3-STAGE-003-D"]["status"] == "blocked"
+    assert all(by_id[key]["status"] == "closed" for key in by_id)
+    assert raw["runtime_accepted"] is True
+    qualified = raw["runtime_qualification"]
+    assert qualified["decision"] == "PASS_PROFILE_WITH_DIMENSIONAL_RECLASSIFICATION"
+    assert qualified["job_id"] == "stage_313d48cfc06948e0a7fc7a3bd77b2657"
+    assert qualified["profile_observation_count"] == 225246
+    assert qualified["successor_order"] == [
+        "trend_evolution_fact_family",
+        "structure_order_fact_family",
+        "high_side_activity_relation_if_still_required",
+    ]
+    assert qualified["subgroup_disposition"]["8_9"] == (
+        "preserve_codes_reclassify_as_modifier_hypotheses"
+    )
     auth = raw["authorization"]
-    assert auth["third_group_development_profile_run_authorized"] is True
-    assert auth["development_data_read_authorized"] is True
-    for key in (
-        "parameter_search_authorized",
-        "stage_label_output_authorized",
-        "formal_structure_fact_registration_authorized",
-        "future_outcome_access_authorized",
-        "arbitration_access_authorized",
-        "permanent_blind_access_authorized",
-        "holdout_population_selection_authorized",
-        "primary_stage_arbitration_authorized",
-        "daily_schedule_authorized",
-        "strategy_consumption_authorized",
-        "trading_authorized",
-    ):
-        assert auth[key] is False
+    assert auth["scope"] == "third_group_profile_closed_no_active_search_or_fact_authority"
+    for key, value in auth.items():
+        if key.endswith("_authorized"):
+            assert value is False
 
 
 def test_third_group_runtime_config_stays_development_only_and_aggregate_only():
@@ -66,7 +64,14 @@ def test_third_group_runtime_config_stays_development_only_and_aggregate_only():
 
 def test_third_group_plan_fails_closed_if_search_is_opened(tmp_path: Path, monkeypatch):
     raw = sync.load_plan()
-    required = [sync.PLAN, raw["design"], raw["review"], raw["runtime_config"]]
+    required = [
+        sync.PLAN,
+        raw["design"],
+        raw["review"],
+        raw["post_run_review"],
+        raw["runtime_config"],
+        raw["runtime_qualification"]["evidence"],
+    ]
     required.extend(path for item in raw["items"] for path in item["evidence"])
     for relative in required:
         target = tmp_path / relative

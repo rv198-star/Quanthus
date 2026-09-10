@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout并完成三视角评审：Stage 10/11保留development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已把10/11背后的**演化支撑事实族 / Support Evolution Fact Family（历史编号 F9）**正式化，`P3-STAGE-002` 已把10/11正式化为可重叠但不压`primary_stage`的Projection Contract并关闭。当前新开的唯一结果访问是`P3-STAGE-003-C`：一次512只、2020-2021 development-only第三组连续morphology profile；0/2、1/12、8/9先分三组观察，不输出标签、不搜索阈值、不注册B6/B7 Facts。正式LabelCard、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout，Stage 10/11保留development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已正式化**演化支撑事实族 / Support Evolution Fact Family**，`P3-STAGE-002` 已正式化10/11可重叠Projection Contract并关闭。第三组 `P3-STAGE-003` 也已完成一次512只、2020-2021 development-only morphology profile并关闭：0/2保留候选但需结构秩序事实族；1/12保留为下行背景+减速/企稳条件并优先趋势演化事实族；8/9降为高位modifier假设。当前无active Stage profile/search/fact-registration权限；正式LabelCard、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
 
 ## 1. 决策摘要与继承关系
 
@@ -143,7 +143,7 @@ A须把数字、分母、区间算法、bootstrap块长/聚类、损失优先次
 
 ## 9. 实施顺序与扩展
 
-第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12，当前已进入`P3-STAGE-003`，先按0/2秩序整理、1/12下行生命周期、8/9高位修饰三个语义子组做连续profile，再决定是否需要新的Facts或有限搜索。
+第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12 已完成`P3-STAGE-003`连续profile：0/2需要结构秩序事实族后再判断；1/12显示出下行背景+减速条件的层次关系；8/9更适合作为高位修饰命题。后续优先正式化趋势演化事实族，再处理结构秩序事实族，必要时补高位活动关系。
 
 每组都走相同的局部学习+全体系冲突审计；不得独立优化12个标签后直接拼接。每组输出保留/合并/改维度/拒绝决定。第三组尤其禁止把`0`做成“其他都不满足”的剩余类，禁止把`8/9`的“赶顶/派发”当可观测事实；若难以辨识则停在观察性描述/修饰命题，不能迫使B6/B7无限扩张。
 

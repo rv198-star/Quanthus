@@ -3,12 +3,13 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Work item | `P3-STAGE-003` |
 | Parent context | `stock-stage-historical-learning.md`; accepted `P3-STAGE-002` |
 | Runtime config | `../../config/stage-learning/third-group-profile.v1.json` |
 | Runtime module | `../../src/quanthus/stage_learning/third_group_profile.py` |
-| Scope | development-only 512-security T-only continuous profile; no Stage labels or parameter search |
+| Scope | accepted development-only 512-security T-only continuous profile; no Stage labels or parameter search |
+| Result | `../acceptance/stock-stage-third-group-profile-result-20260910.md`; `../reviews/stock-stage-third-group-profile-result-review-20260910.md` |
 
 ## 1. Decision
 
@@ -126,3 +127,28 @@ Gate D must answer before any third-group search:
 
 Valid outcomes include retain, merge, rename to observable semantics, demote to modifier, park as
 INCONCLUSIVE, or keep only continuous Facts. The milestone must not force six passing labels.
+
+## 7. Accepted result and successor route
+
+The frozen Job `stage_313d48cfc06948e0a7fc7a3bd77b2657` completed successfully at revision
+`0a15ccc48ad00ab3f170f903e2ee0d27a385c26d` with 225,246 profiled observations. The post-run review
+returns `PASS_WITH_DIMENSIONAL_RECLASSIFICATION`.
+
+The accepted interpretation is:
+
+- **0 / 2 remain candidate vocabulary**, but low directional efficiency is too common to separate
+  disorder from consolidation. Their next prerequisite is a **Structure Order Fact Family / 结构秩序事实族**
+  combining directional efficiency, range-width evolution and center stability. No Stage-0/2
+  threshold search is opened.
+- **12 / 1 are retained as a layered downside lifecycle**: Stage 12 is a downside context proposition;
+  Stage 1 is a nested deceleration/stabilization condition that may coexist with the downside context.
+  Their next prerequisite is a **Trend Evolution Fact Family / 趋势演化事实族**.
+- **8 / 9 are reclassified as modifier hypotheses**, not peer primary stages. Their observable working
+  meanings are `upside acceleration / extension` and `high-level price-volume divergence`. `赶顶` and
+  `派发` remain historical wording only, not admitted Facts. Stage 9 still lacks the necessary joint
+  high-position × slowing-price × elevated-activity evidence.
+
+Successor order is frozen as: Trend Evolution Fact Family first; Structure Order Fact Family second;
+a narrow high-side activity relation only afterward if Stage 9 still requires it. This acceptance
+opens none of those successor implementations by itself and does not authorize Stage labels,
+primary-stage compression, holdout use, daily inference, strategy consumption or trading.

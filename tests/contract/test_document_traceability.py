@@ -1380,30 +1380,30 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {"P3-STAGE-003", *[f"P3-STAGE-003-{c}" for c in "ABCD"]},
         )
         third_by_id = {item["id"]: item for item in third_group_raw["items"]}
-        self.assertEqual(third_by_id["P3-STAGE-003-C"]["status"], "ready")
-        self.assertEqual(third_by_id["P3-STAGE-003-D"]["status"], "blocked")
+        self.assertTrue(all(third_by_id[key]["status"] == "closed" for key in third_by_id))
+        self.assertIs(third_group_raw["runtime_accepted"], True)
+        third_qualified = third_group_raw["runtime_qualification"]
+        self.assertEqual(
+            third_qualified["decision"],
+            "PASS_PROFILE_WITH_DIMENSIONAL_RECLASSIFICATION",
+        )
+        self.assertEqual(third_qualified["profile_observation_count"], 225246)
+        self.assertEqual(
+            third_qualified["successor_order"],
+            [
+                "trend_evolution_fact_family",
+                "structure_order_fact_family",
+                "high_side_activity_relation_if_still_required",
+            ],
+        )
         third_auth = third_group_raw["authorization"]
         self.assertEqual(
             third_auth["scope"],
-            "third_group_development_profile_only_no_labels_no_search",
+            "third_group_profile_closed_no_active_search_or_fact_authority",
         )
-        self.assertIs(third_auth["third_group_development_profile_run_authorized"], True)
-        self.assertIs(third_auth["development_data_read_authorized"], True)
-        self.assertIs(third_auth["continuous_profile_output_authorized"], True)
-        for key in (
-            "parameter_search_authorized",
-            "stage_label_output_authorized",
-            "formal_structure_fact_registration_authorized",
-            "future_outcome_access_authorized",
-            "arbitration_access_authorized",
-            "permanent_blind_access_authorized",
-            "holdout_population_selection_authorized",
-            "primary_stage_arbitration_authorized",
-            "daily_schedule_authorized",
-            "strategy_consumption_authorized",
-            "trading_authorized",
-        ):
-            self.assertIs(third_auth[key], False)
+        for key, value in third_auth.items():
+            if key.endswith("_authorized"):
+                self.assertIs(value, False)
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True

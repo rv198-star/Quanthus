@@ -183,7 +183,13 @@ nodes.
   Facts, resolves T-only synthetic references before search, tests 81 Stage-2 and 27 Stage-0 finite
   candidates, and requires zero selected-pair overlap. Both propositions may be false; no
   `primary_stage` or official LabelCard is emitted. Route: `design/stage-0-2-order-proposition.md`;
-  plan: `config/stage-order-proposition-delivery.v1.json`.
+  plan: `config/stage-order-proposition-delivery.v1.json`. The first C Job
+  `stage_64da9bea52984726ab32c10bfdd36d4c` failed at the 2700-second runtime limit, not a semantic
+  INCONCLUSIVE result. Object-local input-digest reuse and observational progress logging are the
+  bounded runtime repair. Check for a recoverable sealed original artifact before the one permitted
+  technical retry; no new reference rules, thresholds or larger time budget. C/D remain unaccepted.
+  Execution history, pending result review and runtime-cost evidence:
+  `reviews/stage-0-2-order-proposition-result-review-20260910.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

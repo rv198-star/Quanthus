@@ -8,7 +8,7 @@
     "panel": {"path":"src/quanthus/backtest/baseline_research.py","sha256":"sha256:3a3a31010dba64a1fe10fd8500fc4ae96fa6286a421752efc54cbd79b210bff1","locator":"_feature_panel_query"},
     "structure": {"path":"src/quanthus/structure_v2.py","sha256":"sha256:29693a9cf81545e8e7e34db7e5f5403f5e7f782c4d845b8cc64f700390121158","locator":"build_structure_v2"},
     "admission": {"path":"src/quanthus/structure_v2_run.py","sha256":"sha256:ce4d9ea947e5009e362422073503602ef7bef8b30a9970f72eca2b919cda7734","locator":"extract_admissions"},
-    "inputs": {"path":"src/quanthus/structure_v2_inputs.py","sha256":"sha256:e895443dc062244c0c36bad92ab9782b21c0739ef72b07c6c2043befaa2cf50d","locator":"admit_daily"},
+    "inputs": {"path":"src/quanthus/structure_v2_inputs.py","sha256":"sha256:b336e3ee48889ca7ccb9903c0d2ddf55e84e9b9fe56472cc34b7e640339e2275","locator":"admit_daily"},
     "consumer": {"path":"src/quanthus/structure_v2_consumer.py","sha256":"sha256:6870f9d1d4d2cbc6e27706b4e85998c961cb16458cc1b5d9ef7c0fb770fe4bb2","locator":"StructureV2CompatibilityExpert"},
     "factor_materialization": {"path":"src/quanthus/pipelines/securities_warehouse/disclosure_event.py","sha256":"sha256:99d456309d352527ab4ca78a0e95d809a087f3743af96f9464bf2471f52ec53f","locator":"materialize_adjustment_factor_rows"},
     "factor_interval": {"path":"src/quanthus/pipelines/securities_warehouse/disclosure_event.py","sha256":"sha256:99d456309d352527ab4ca78a0e95d809a087f3743af96f9464bf2471f52ec53f","locator":"close_adjustment_factor_intervals"},

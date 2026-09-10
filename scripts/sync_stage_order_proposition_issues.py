@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -71,6 +72,36 @@ def load_plan() -> dict:
             raise ValueError("unaccepted Stage-0/2 plan cannot have runtime qualification")
     if raw.get("authorization") != expected_authority:
         raise ValueError("Stage-0/2 plan authority differs")
+    retry = raw.get("technical_retry")
+    if retry is not None:
+        attempts = raw.get("execution_attempts", [])
+        if (
+            not attempts
+            or attempts[0].get("state") != "failed"
+            or attempts[0].get("error") != "stage_worker_wall_budget_exceeded"
+            or attempts[0].get("result_ref") is not None
+            or retry.get("scope") != "runtime_only_same_frozen_experiment"
+            or retry.get("maximum_additional_attempts") != 1
+            or retry.get("requires_prior_terminal_failure") is not True
+            or retry.get("recover_existing_sealed_artifact_first") is not True
+            or retry.get("semantic_changes_authorized") is not False
+            or retry.get("wall_seconds") != 2700
+            or not (ROOT / retry["evidence"]).is_file()
+            or (
+                retry.get("authorized") is True
+                and (raw.get("runtime_accepted") is True or retry.get("job_id") is not None)
+            )
+        ):
+            raise ValueError("Stage-0/2 technical retry authority differs")
+        for digest_key, path_key in (
+            ("development_config_digest", "runtime_config"),
+            ("panel_config_digest", "panel_config"),
+        ):
+            payload = json.loads((ROOT / raw[path_key]).read_text(encoding="utf-8"))
+            encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                                 ensure_ascii=True, allow_nan=False).encode()
+            if retry.get(digest_key) != "sha256:" + hashlib.sha256(encoded).hexdigest():
+                raise ValueError("Stage-0/2 retry changes a frozen semantic contract")
     by_id = {item["id"]: item for item in raw["items"]}
     if {key: by_id[key]["status"] for key in IDS} != expected_status:
         raise ValueError("Stage-0/2 plan status differs")
@@ -132,6 +163,18 @@ def issue_body(item: dict, raw: dict, mapping: dict) -> str:
         "## Evidence\n" + evidence,
         "## Authority boundary\n" + authority,
     ]
+    retry = raw.get("technical_retry")
+    if retry is not None and item["id"] in {PARENT, f"{PARENT}-C", f"{PARENT}-D"}:
+        previous = raw["execution_attempts"][0]
+        body.append(
+            "## Execution checkpoint\n"
+            f"Original Job `{previous['job_id']}` failed technically: `{previous['error']}`. "
+            "This is not a semantic INCONCLUSIVE result. The retry preserves all frozen "
+            "reference/search/Fact contracts and the 2700-second limit. "
+            f"Additional-attempt cap: {retry['maximum_additional_attempts']}; "
+            f"retry authorized: {retry['authorized']}; retry Job: {retry['job_id']}. "
+            f"Evidence: `{retry['evidence']}`."
+        )
     if item["id"] == PARENT:
         body.append("## Children\n" + "\n".join(link(key) for key in IDS[1:]))
     else:

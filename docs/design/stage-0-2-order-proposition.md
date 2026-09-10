@@ -82,3 +82,32 @@ The experiment may read only 2020-2021 development data after 2019 warm-up for t
 It may produce a development proposition candidate, but not an official label. It does not reread the
 consumed 2022-2024 arbitration partition and does not touch 2025. No daily schedule, consumer,
 strategy, trading or primary-stage authority opens.
+
+## 7. Runtime-only retry after the first attempt timed out
+
+The first attempt `stage_64da9bea52984726ab32c10bfdd36d4c`, running revision
+`35439da64e81f60aa50bfeb26e4a5d0531d6eb78`, reached terminal `failed` with
+`stage_worker_wall_budget_exceeded` at `2026-09-10T06:39:21.724431+00:00`. No result reference was
+published to its terminal status. This is a technical execution failure, not the semantic
+`INCONCLUSIVE` exit in section 5; no completed reference/search results have been reviewed.
+
+Under the owner's instruction to continue to this milestone's completion, one bounded technical
+retry is permitted after a runtime-only repair. This is not an additional tuning round. It must
+retain the exact development/panel/Fact contracts, 512-security cohort construction, source scope,
+81+27 grids, hard gates, selection order and 2700-second Worker limit. Before a retry, inspect the
+first Job for a sealed READY/manifest artifact: a recoverable result must be verified rather than
+recomputed. The first failed Job and its logs remain intact. A second technical failure must be
+reported rather than automatically starting further attempts.
+
+The repair reuses `DailyInput.member_digest` only for the lifetime of each immutable input object.
+Its calculation and exclusion of caller-only `session_index`/`cutoff` are unchanged. Cache storage
+is not a dataclass field, a persisted cache, an ADM, or a new semantic identity component. Source
+revisions, coordinate/listing changes and replacement objects must obtain their own exact digest.
+Counterexample tests must compare complete assembled observation bytes with the original uncached
+formula, not only compare observation counts.
+
+A progress callback may report completed-security and observation counts every 16 securities and
+at completion. The callback is observational: it cannot enter reference inputs, candidate scoring,
+Fact identities or published semantic counts. Deployment and submission must use the new exact
+Git revision through the approved node deployment route. Successful local tests are release
+readiness only; C/D cannot close until the actual retry's terminal evidence is reviewed.

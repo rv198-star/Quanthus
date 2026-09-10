@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from datetime import date, datetime, time, timezone
 from decimal import Context, Decimal, localcontext
 from enum import Enum
+from functools import cached_property
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -123,8 +124,10 @@ class DailyInput:
     calendar_member_digest: str = ""
     action_member_digest: str = ""
 
-    @property
+    @cached_property
     def member_digest(self) -> str:
+        # DailyInput is immutable: reuse its exact digest only for this object's lifetime.
+        # The cache is not a dataclass field and does not enter serialized evidence or Fact IDs.
         # Exact causal member/version identity; no provider materialization or Run inventory hash.
         return digest({key: value for key, value in asdict(self).items()
                        if key not in {"session_index", "cutoff"}})

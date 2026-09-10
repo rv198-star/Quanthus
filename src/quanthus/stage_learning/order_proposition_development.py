@@ -15,7 +15,7 @@ import math
 import re
 import time
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -335,6 +335,7 @@ def build_order_observations(
     *,
     report_start: date,
     report_end: date,
+    progress: Callable[[int, int, int], None] | None = None,
 ) -> tuple[tuple[OrderObservation, ...], dict[str, int]]:
     by_security: dict[str, list[Admission]] = defaultdict(list)
     for item in admissions:
@@ -389,6 +390,8 @@ def build_order_observations(
                 )
             )
             counts["fact_intersection"] += 1
+        if progress is not None:
+            progress(counts["securities"], len(by_security), counts["fact_intersection"])
     ordered = tuple(
         sorted(observations, key=lambda item: (item.security_code, item.market_date))
     )
@@ -866,8 +869,22 @@ def run_order_proposition_development(
         spec_digest=spec_digest,
     )
     _progress(started, "source-ready", admissions=len(admissions))
+
+    def report_fact_progress(completed: int, total: int, count: int) -> None:
+        if completed % 16 == 0 or completed == total:
+            _progress(
+                started,
+                "formal-facts-progress",
+                securities_processed=completed,
+                securities_total=total,
+                observations=count,
+            )
+
     observations, build_counts = build_order_observations(
-        admissions, report_start=report_start, report_end=report_end
+        admissions,
+        report_start=report_start,
+        report_end=report_end,
+        progress=report_fact_progress,
     )
     _progress(started, "formal-facts-ready", observations=len(observations), **build_counts)
     sampling = config["reference_sampling"]

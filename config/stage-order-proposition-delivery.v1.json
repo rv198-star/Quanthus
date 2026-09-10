@@ -7,6 +7,30 @@
   "panel_config": "config/stage-learning/order-proposition-synthetic-panel.v1.json",
   "runtime_accepted": false,
   "runtime_qualification": null,
+  "execution_attempts": [
+    {
+      "job_id": "stage_64da9bea52984726ab32c10bfdd36d4c",
+      "code_revision": "35439da64e81f60aa50bfeb26e4a5d0531d6eb78",
+      "input_digest": "sha256:cd4d4511424b0c93097972b7c4c720e6755b04188a9d0df560f7ec3a474b3545",
+      "state": "failed",
+      "error": "stage_worker_wall_budget_exceeded",
+      "completed_at": "2026-09-10T06:39:21.724431+00:00",
+      "result_ref": null
+    }
+  ],
+  "technical_retry": {
+    "authorized": true,
+    "maximum_additional_attempts": 1,
+    "job_id": null,
+    "scope": "runtime_only_same_frozen_experiment",
+    "development_config_digest": "sha256:894a38df99419cadcc24d1ef3fd775ffd6189609f593dc8d4487c5f4f08bdb80",
+    "panel_config_digest": "sha256:cd8724da8d7aad47d501a8cc848ae6210fba36cec5de0a1c568db2877b453912",
+    "requires_prior_terminal_failure": true,
+    "recover_existing_sealed_artifact_first": true,
+    "semantic_changes_authorized": false,
+    "wall_seconds": 2700,
+    "evidence": "docs/reviews/stage-0-2-order-proposition-result-review-20260910.md"
+  },
   "authorization": {
     "scope": "stage_0_2_bounded_development_proposition_experiment_only",
     "order_proposition_implementation_authorized": true,
@@ -89,7 +113,7 @@
         "No future outcome, arbitration, permanent-blind, official Stage or primary-stage output occurs",
         "If candidates freeze, selected pair overlap is exactly zero"
       ],
-      "evidence": []
+      "evidence": ["docs/reviews/stage-0-2-order-proposition-result-review-20260910.md"]
     },
     {
       "id": "P3-STAGE-004-D",

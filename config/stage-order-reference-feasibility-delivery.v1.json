@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STAGE-006",
+  "design": "docs/design/stage-order-reference-feasibility.md",
+  "runtime_config": "config/stage-learning/order-reference-feasibility.v1.json",
+  "implementation": "src/quanthus/stage_learning/order_reference_feasibility.py",
+  "evidence": "docs/acceptance/stage-order-reference-feasibility-20260911.md",
+  "runtime_completed": false,
+  "runtime_receipts": null,
+  "authorization": {
+    "scope": "bounded_12_case_retained_f9_reference_feasibility",
+    "prepare_job": true,
+    "resolve_job": true,
+    "maximum_jobs": 2,
+    "maximum_cases": 12,
+    "maximum_opinions": 24,
+    "new_dwd_read": false,
+    "parameter_search": false,
+    "arbitration": false,
+    "permanent_blind": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "items": [
+    {"id": "P3-STAGE-006", "kind": "epic", "title": "Complete real-input scale-explicit reference feasibility", "status": "ready", "depends_on": ["P3-STAGE-005"], "scope": "Exactly one 12-case prepare and one 24-opinion resolution from two accepted F9 artifacts; no DWD/search/holdout access.", "acceptance": ["Real source identity, immutable packets, raw opinions and independent reconstruction are bound", "Coverage and collection feasibility are distinct from independent semantic qualification"], "evidence": []},
+    {"id": "P3-STAGE-006-A", "kind": "task", "title": "Freeze source, selection, review provenance and stop rules", "status": "closed", "depends_on": ["P3-STAGE-005"], "scope": "Freeze date-only 4-per-security selection and same-origin simulated roles before new case review.", "acceptance": ["Twelve cases, twenty-four opinions, no replacements or result-dependent selection"], "evidence": ["docs/design/stage-order-reference-feasibility.md"]},
+    {"id": "P3-STAGE-006-B", "kind": "task", "title": "Implement and release the bounded two-phase Worker route", "status": "closed", "depends_on": ["P3-STAGE-006-A"], "scope": "Reuse reference protocol, bind retained source membership and dynamic opinion input, test recovery and tampering.", "acceptance": ["Full checks and focused gates pass before runtime"], "evidence": ["docs/acceptance/stage-order-reference-feasibility-20260911.md"]},
+    {"id": "P3-STAGE-006-C", "kind": "task", "title": "Execute fixed real-input reference collection and resolution", "status": "ready", "depends_on": ["P3-STAGE-006-B"], "scope": "Prepare exact packets, perform actual self-simulated case reviews, seal raw opinions once.", "acceptance": ["Two exact terminal receipts and complete immutable evidence; no automated reviewer judgements"], "evidence": []},
+    {"id": "P3-STAGE-006-D", "kind": "task", "title": "Review collection feasibility and close without candidate promotion", "status": "blocked", "depends_on": ["P3-STAGE-006-C"], "scope": "Separate collection, finite descriptive coverage and absent independent semantic validation.", "acceptance": ["Retain all disagreements and insufficiency, forbid automatic supplement or search"], "evidence": []}
+  ]
+}

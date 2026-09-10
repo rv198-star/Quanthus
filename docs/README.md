@@ -202,6 +202,12 @@ nodes.
   [scale-explicit reference protocol](design/stage-order-reference-protocol.md); plan:
   `config/stage-order-reference-delivery.v1.json`; engineering evidence:
   [reference mechanism acceptance](acceptance/stage-order-reference-engineering-20260910.md).
+- `P3-STAGE-006` opens the bounded real-input reference-feasibility successor, not a new candidate
+  search. It reuses only two accepted immutable F9 source artifacts, with twelve date-selected cases
+  and twenty-four same-origin simulated opinions. No DWD, sealed partition, daily or trading access.
+  Route: [reference feasibility](design/stage-order-reference-feasibility.md); machine plan:
+  `config/stage-order-reference-feasibility-delivery.v1.json`; evidence:
+  `acceptance/stage-order-reference-feasibility-20260911.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

@@ -17,12 +17,22 @@ import time
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB, DurableJobQueue
 from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
 from quanthus.policy import find_project_root
+from quanthus.stage_learning.order_reference_feasibility import (
+    CONFIG as _REFERENCE_FEASIBILITY_CONFIG,
+)
+from quanthus.stage_learning.order_reference_feasibility import (
+    normalize_input as normalize_reference_feasibility_input,
+)
+from quanthus.stage_learning.order_reference_feasibility import (
+    verify_feasibility_artifact,
+)
 from quanthus.stage_projection_artifact import verify_stage_projection_artifact
 from quanthus.structure_f9_artifact import verify_structure_f9_artifact
 from quanthus.structure_order_artifact import verify_structure_order_artifact
@@ -53,6 +63,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _STRUCTURE_F9_RUN_CONFIG,
         _TREND_EVOLUTION_RUN_CONFIG,
         _STRUCTURE_ORDER_RUN_CONFIG,
+        _REFERENCE_FEASIBILITY_CONFIG,
     }
 )
 # Backward-compatible name retained for the technical-MVP qualification seeder/tests.
@@ -173,7 +184,9 @@ def _event_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
     return normalized
 
 
-def _structure_input(input_ref: Mapping[str, Any]) -> dict[str, str]:
+def _structure_input(input_ref: Mapping[str, Any]) -> dict[str, Any]:
+    if input_ref.get("run_config") == _REFERENCE_FEASIBILITY_CONFIG:
+        return normalize_reference_feasibility_input(input_ref)
     expected_keys = {"code_revision", "run_config"}
     if set(input_ref) != expected_keys:
         raise RuntimeError("structure_mvp_input_contract_mismatch")
@@ -409,6 +422,7 @@ def _structure_request_digest(run_config: str) -> str:
         _STRUCTURE_F9_RUN_CONFIG: "quanthus.structure-f9-run.v1",
         _TREND_EVOLUTION_RUN_CONFIG: "quanthus.trend-evolution-qualification.v1",
         _STRUCTURE_ORDER_RUN_CONFIG: "quanthus.structure-order-qualification.v1",
+        _REFERENCE_FEASIBILITY_CONFIG: "quanthus.stage-order-reference-feasibility.v1",
     }[run_config]
     if not isinstance(raw, dict) or raw.get("schema_version") != expected_schema:
         raise RuntimeError("structure_mvp_run_config_invalid")
@@ -1286,7 +1300,14 @@ class EventWorker:
         run_config = governed["run_config"]
         economic = run_config == _STRUCTURE_ECONOMIC_RUN_CONFIG
         facts = run_config == _STRUCTURE_FACTS_RUN_CONFIG
-        if run_config == _STRUCTURE_ORDER_RUN_CONFIG:
+        if run_config == _REFERENCE_FEASIBILITY_CONFIG:
+            verifier = partial(verify_feasibility_artifact, job_input=governed)
+            module = "quanthus.stage_learning.order_reference_feasibility"
+            artifact_name = "order-reference-feasibility"
+            running_stage = "running-order-reference-" + governed["phase"]
+            validating_stage = "validating-order-reference-" + governed["phase"]
+            recovering_stage = "recovering-order-reference-" + governed["phase"]
+        elif run_config == _STRUCTURE_ORDER_RUN_CONFIG:
             verifier = verify_structure_order_artifact
             module = "quanthus.structure_order_qualification"
             artifact_name = "structure-order"
@@ -1396,6 +1417,8 @@ class EventWorker:
             "--code-revision",
             governed["code_revision"],
         )
+        if run_config == _REFERENCE_FEASIBILITY_CONFIG:
+            command += ("--job-input", json.dumps(governed, sort_keys=True, separators=(",", ":")))
         self.store.update_claimed_job(
             job_id,
             generation,

@@ -1,0 +1,50 @@
+{
+  "schema_version": "quanthus.stage-order-reference-feasibility.v1",
+  "work_item": "P3-STAGE-006",
+  "protocol_digest": "sha256:927edd8451c9db9adb0ac06e24dcbc55d11e1ac82aac87123a4d9627557eaf1e",
+  "source_contract": "config/structure-order-qualification.v1.json",
+  "source_inputs_digest": "sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac",
+  "selection": {
+    "security_codes": ["000001", "300750", "600519"],
+    "report_start": "2020-01-02",
+    "report_end": "2020-03-31",
+    "per_security": 4,
+    "method": "sorted_report_session_indices_floor_j_times_n_minus_1_over_3",
+    "expected_cases": 12,
+    "sampling_stratum": "unspecified",
+    "feature_or_label_dependent_selection": false,
+    "replacement_or_supplement": false
+  },
+  "review": {
+    "roles": ["short_term", "fund"],
+    "kind": "self_simulated",
+    "origin_id": "chatgpt-owner-session-stage006",
+    "session_id": "stage006-reference-feasibility-v1",
+    "full_context_blinding_claimed": false,
+    "purpose": "real-input reference collection feasibility, not independent semantic qualification"
+  },
+  "bounds": {"max_jobs": 2, "max_cases": 12, "max_opinions": 24, "max_input_bytes": 60000, "max_artifact_bytes": 33554432},
+  "authority": {
+    "immutable_f9_inputs_read": true,
+    "reference_packet_construction": true,
+    "self_simulated_case_review": true,
+    "dwd_provider_open": false,
+    "new_market_data_acquisition": false,
+    "old_160_case_reconstruction": false,
+    "parameter_search": false,
+    "future_outcome_access": false,
+    "arbitration_access": false,
+    "permanent_blind_access": false,
+    "official_labels": false,
+    "daily_schedule": false,
+    "strategy_consumption": false,
+    "trading": false
+  },
+  "disposition": {
+    "collection_complete": "all 12 cases, 24 evidence-bound opinions and independent artifact reconstruction",
+    "coverage_demonstrated": "at least one agreed Stage 0 and Stage 2, and no RULE_CONFLICT; descriptive only",
+    "coverage_insufficient": "INCONCLUSIVE_REFERENCE_COVERAGE_NO_SUPPLEMENT",
+    "independent_semantic_validation": false,
+    "automatic_search_promotion": false
+  }
+}

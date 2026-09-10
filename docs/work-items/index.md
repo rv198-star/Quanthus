@@ -278,6 +278,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-005-A | Freeze scale-explicit business and reference contract | P3-STAGE-004 | closed; #279; `docs/design/stage-order-reference-protocol.md` |
 | P3-STAGE-005-B | Implement T-only packets and traceable reviewer ledgers | P3-STAGE-005-A | closed; #280; strict source/opinion binding, retained disagreement and cold readback |
 | P3-STAGE-005-C | Accept synthetic engineering closure | P3-STAGE-005-B | closed; #281; `docs/acceptance/stage-order-reference-engineering-20260910.md`; synthetic engineering only, not a market run |
+| P3-STAGE-006 | Real-input reference collection feasibility | P3-STAGE-005 | ready; fixed retained F9 inputs, 12 cases, no DWD/search |
+| P3-STAGE-006-A | Freeze source/selection/review/stop | P3-STAGE-005 | closed; docs/design/stage-order-reference-feasibility.md |
+| P3-STAGE-006-B | Release bounded two-phase Worker route | P3-STAGE-006-A | closed; #284; 1932 tests passed |
+| P3-STAGE-006-C | Execute twelve-case reference collection | P3-STAGE-006-B | ready; #285 |
+| P3-STAGE-006-D | Freeze feasibility disposition | P3-STAGE-006-C | blocked |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

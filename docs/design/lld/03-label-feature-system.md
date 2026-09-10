@@ -351,6 +351,23 @@ inputs do not become Stage 0; no candidate, official stage, new market run or tr
 Delivery: `../../config/stage-order-reference-delivery.v1.json`; engineering evidence:
 `../../acceptance/stage-order-reference-engineering-20260910.md`.
 
+### Retained-input reference feasibility
+
+`P3-STAGE-006` is the owner-approved successor to the accepted reference mechanism. It uses
+only the two immutable accepted F9 input artifacts, selects twelve dates without inspecting labels,
+and binds actual same-origin simulated opinions through a two-phase Worker route. It does not
+open DWD, parameter search, holdout, official labels, daily operation or strategy consumption.
+Design: [reference feasibility](../stage-order-reference-feasibility.md); plan:
+`config/stage-order-reference-feasibility-delivery.v1.json`.
+
+| ID | Work | Dependency | Acceptance evidence |
+| --- | --- | --- | --- |
+| P3-STAGE-006 | Real-input reference collection feasibility | P3-STAGE-005 | ready |
+| P3-STAGE-006-A | Freeze source/selection/review/stop | P3-STAGE-005 | closed |
+| P3-STAGE-006-B | Release bounded two-phase Worker route | P3-STAGE-006-A | closed; #284; 1932 tests passed |
+| P3-STAGE-006-C | Execute twelve-case reference collection | P3-STAGE-006-B | ready; #285 |
+| P3-STAGE-006-D | Freeze feasibility disposition | P3-STAGE-006-C | blocked |
+
 ## 7. Acceptance
 
 Active cards have no subjective conditions, a repeat run is identical, invalid combinations

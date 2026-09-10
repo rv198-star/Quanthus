@@ -1,0 +1,48 @@
+{
+  "schema_version": "quanthus.structure-order-fact-family.v1",
+  "fact_family_id": "structure-order-v1",
+  "display_name_zh": "结构秩序事实族",
+  "display_name_en": "Structure Order Fact Family",
+  "work_item": "P3-STRUCT-007-A",
+  "purpose": "Formalize only the threshold-free rolling range-width, nonoverlap width-change and range-center-shift facts required to distinguish Stage 0/2 structure order, while reusing rather than duplicating accepted directional-efficiency facts.",
+  "source_profile": "config/stage-learning/third-group-profile.v1.json",
+  "reused_fact_family": "config/structure-trend-evolution.v1.json",
+  "concepts": {
+    "structure.geometry.range-width": {"windows": [10, 20, 60]},
+    "structure.geometry.width-change": {"windows": [10, 20], "comparison": "immediately_prior_equal_nonoverlap_window"},
+    "structure.geometry.range-center-shift": {"windows": [10, 20], "comparison": "immediately_prior_equal_nonoverlap_window"}
+  },
+  "semantics": {
+    "current_windows_include_t": true,
+    "same_listing_coordinate_required": true,
+    "hidden_session_gap_resets_history": true,
+    "nonadmitted_row_resets_history": true,
+    "range_width_uses_midpoint_normalization": true,
+    "width_change_prior_zero_width_is_unavailable": true,
+    "center_shift_remains_available_when_prior_width_is_zero": true,
+    "directional_efficiency_is_reused_not_redefined": true,
+    "order_or_disorder_label_forbidden": true,
+    "stage_thresholds_in_fact_identity": false
+  },
+  "authority": {
+    "formal_structure_fact_implementation_authorized": true,
+    "immutable_accepted_source_artifact_qualification_authorized": true,
+    "market_data_read_authorized": false,
+    "dwd_provider_open_authorized": false,
+    "stage_projection_authorized": false,
+    "parameter_search_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "future_outcome_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "claim_limits": [
+    "Structure Order Facts describe geometry only; they do not classify orderly consolidation or disorder.",
+    "Directional efficiency remains owned by the accepted Trend Evolution Fact Family and is not duplicated here.",
+    "Range contraction does not imply accumulation and range expansion does not imply distribution.",
+    "No economic, actor-intent, portfolio or trading meaning is implied."
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STRUCT-007",
+  "design": "docs/design/structure-order-facts.md",
+  "fact_contract": "config/structure-order-facts.v1.json",
+  "qualification_request": "config/structure-order-qualification.v1.json",
+  "runtime_accepted": false,
+  "runtime_qualification": null,
+  "authorization": {
+    "scope": "structure_order_fact_implementation_and_immutable_source_qualification_only",
+    "formal_structure_fact_implementation_authorized": true,
+    "immutable_accepted_source_artifact_qualification_authorized": true,
+    "market_data_read_authorized": false,
+    "dwd_provider_open_authorized": false,
+    "stage_projection_authorized": false,
+    "parameter_search_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "future_outcome_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "primary_stage_arbitration_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "items": [
+    {
+      "id": "P3-STRUCT-007",
+      "title": "Formalize Structure Order Fact Family",
+      "kind": "epic",
+      "status": "ready",
+      "depends_on": ["P3-STRUCT-006", "P3-STAGE-003"],
+      "scope": "Formalize threshold-free rolling range width, width evolution and center movement required by Stage 0/2 research while reusing accepted directional-efficiency facts.",
+      "acceptance": [
+        "A/B freeze semantics and implementation before qualification",
+        "C reproduces the fact family from two accepted immutable cold-source artifacts with no DWD/provider access",
+        "D binds only accepted runtime concepts and closes all implementation/qualification authority",
+        "No Stage 0/2 projection/search, LabelCard, holdout, daily, strategy or trading authority opens"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STRUCT-007-A",
+      "title": "Freeze Structure Order Fact Family semantics",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STRUCT-006", "P3-STAGE-003"],
+      "scope": "Freeze midpoint-normalized range width, nonoverlap width-change, range-center-shift and explicit reuse of Trend Evolution directional efficiency.",
+      "acceptance": [
+        "Existing range-width/width-change concepts are reused rather than duplicated",
+        "Only missing range-center-shift concept is added",
+        "Contraction/center stability do not imply accumulation or Stage 2",
+        "Directional efficiency remains owned by Trend Evolution",
+        "Stage thresholds and usage clocks stay outside Fact identity"
+      ],
+      "evidence": ["docs/design/structure-order-facts.md"]
+    },
+    {
+      "id": "P3-STRUCT-007-B",
+      "title": "Implement Structure Order Facts, deep verifier and fixed Worker route",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STRUCT-007-A"],
+      "scope": "Implement typed range organization observations, partial availability/reset semantics, immutable-source A/B qualification and fixed Event Worker dispatch.",
+      "acceptance": [
+        "Formal calculations exactly match frozen third-group range geometry",
+        "Prior-zero-width, reset, prefix-replay and no-Stage counterexamples pass",
+        "Deep verifier first validates each original F9 source artifact",
+        "Worker admits only the fixed Structure Order qualification config",
+        "Qualification code has no market-data/provider opening path"
+      ],
+      "evidence": ["docs/acceptance/structure-order-release-ready-20260910.md"]
+    },
+    {
+      "id": "P3-STRUCT-007-C",
+      "title": "Qualify Structure Order Facts from two immutable cold-source artifacts",
+      "kind": "task",
+      "status": "ready",
+      "depends_on": ["P3-STRUCT-007-B"],
+      "scope": "Execute one governed qualification Job that replays only the two accepted F9 source artifacts and requires byte-identical Structure Order facts and deterministic review samples.",
+      "acceptance": [
+        "Both source F9 artifacts pass original deep verification",
+        "Source-input payloads and reconstructed Structure Order payloads match exactly across A/B",
+        "Fact counts and deterministic review sample are durably bound",
+        "Market-data read and DWD-provider-open counters remain zero",
+        "No Stage 0/2 projection/search output is emitted"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STRUCT-007-D",
+      "title": "Freeze accepted Structure Order runtime bindings",
+      "kind": "task",
+      "status": "blocked",
+      "depends_on": ["P3-STRUCT-007-C"],
+      "scope": "After C passes, bind only the qualified Structure Order concepts in the Structure blueprint/Catalog and close the milestone without opening Stage 0/2 threshold search.",
+      "acceptance": [
+        "Blueprint binds only range-width, width-change and range-center-shift under the qualified subset",
+        "Accepted B1-B5, Support Evolution and Trend Evolution identities remain unchanged",
+        "Stage 0/2 proposition research remains separately gated",
+        "High-side activity relation remains a later optional question",
+        "All implementation/qualification authority closes after acceptance"
+      ],
+      "evidence": []
+    }
+  ]
+}

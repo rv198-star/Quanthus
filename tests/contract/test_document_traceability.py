@@ -1432,6 +1432,27 @@ class DocumentTraceabilityTests(unittest.TestCase):
         for key, value in trend_auth.items():
             if key.endswith("_authorized"):
                 self.assertIs(value, False)
+        order_raw = json.loads(
+            (root / "config/structure-order-delivery.v1.json").read_text()
+        )
+        order_ids = {item["id"] for item in order_raw["items"]}
+        self.assertEqual(
+            order_ids,
+            {"P3-STRUCT-007", *[f"P3-STRUCT-007-{c}" for c in "ABCD"]},
+        )
+        order_by_id = {item["id"]: item for item in order_raw["items"]}
+        self.assertEqual(order_by_id["P3-STRUCT-007-C"]["status"], "ready")
+        self.assertEqual(order_by_id["P3-STRUCT-007-D"]["status"], "blocked")
+        self.assertFalse(order_raw["runtime_accepted"])
+        order_auth = order_raw["authorization"]
+        self.assertEqual(
+            order_auth["scope"],
+            "structure_order_fact_implementation_and_immutable_source_qualification_only",
+        )
+        self.assertTrue(order_auth["formal_structure_fact_implementation_authorized"])
+        self.assertTrue(order_auth["immutable_accepted_source_artifact_qualification_authorized"])
+        self.assertFalse(order_auth["market_data_read_authorized"])
+        self.assertFalse(order_auth["stage_projection_authorized"])
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True
@@ -1508,6 +1529,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             *projection_plan,
             *third_group_raw["items"],
             *trend_raw["items"],
+            *order_raw["items"],
         ]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
@@ -1519,6 +1541,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             | projection_ids
             | third_group_ids
             | trend_ids
+            | order_ids
         )
         p3_items = [item for item in items
                     if item.phase == "P3" and item.stable_id not in catalog_owned_ids]

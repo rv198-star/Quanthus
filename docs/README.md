@@ -165,6 +165,13 @@ nodes.
   `acceptance/structure-trend-evolution-result-20260910.md`; route:
   `design/structure-trend-evolution-facts.md`; plan:
   `config/structure-trend-evolution-delivery.v1.json`.
+- `P3-STRUCT-007` is the next ready Structure milestone: **结构秩序事实族 / Structure Order Fact
+  Family**. It reuses accepted directional efficiency and formalizes only midpoint-normalized
+  10/20/60 range width, immediately prior non-overlapping width change, and range-center shift.
+  Range contraction or center stability is not itself Stage 2 or accumulation. Qualification reuses
+  the same two accepted immutable F9 source artifacts with zero new DWD/provider access and no
+  Stage-0/2 search. Route: `design/structure-order-facts.md`; plan:
+  `config/structure-order-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

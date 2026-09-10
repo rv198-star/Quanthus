@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout，Stage 10/11保留development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已正式化**演化支撑事实族 / Support Evolution Fact Family**，`P3-STAGE-002` 已正式化10/11可重叠Projection Contract并关闭。第三组 `P3-STAGE-003` 已完成512只 morphology profile；后继 `P3-STRUCT-006` 也已把5/20/60收益、方向效率、收益速度/速度差及60日区间位置/高低点距离正式化为**趋势演化事实族 / Trend Evolution Fact Family**，资格仅重放两份immutable F9 source artifacts，DWD/provider新读取均为0。0/2仍需结构秩序事实族；1/12与8/9尚未打开阈值/Projection。当前无active Stage search，正式LabelCard、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout，Stage 10/11保留development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已正式化**演化支撑事实族 / Support Evolution Fact Family**，`P3-STAGE-002` 已正式化10/11可重叠Projection Contract并关闭。第三组 `P3-STAGE-003` 已完成512只 morphology profile；`P3-STRUCT-006` 已正式化**趋势演化事实族 / Trend Evolution Fact Family**。当前唯一新开的结构事实资格为`P3-STRUCT-007-C`：**结构秩序事实族 / Structure Order Fact Family**只复用两份immutable F9 source artifacts，正式化range-width、width-change、range-center-shift，DWD/provider新读取为0，Stage 0/2 search仍关闭。1/12、0/2、8/9均未打开阈值/Projection；正式LabelCard、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
 
 ## 1. 决策摘要与继承关系
 
@@ -143,7 +143,7 @@ A须把数字、分母、区间算法、bootstrap块长/聚类、损失优先次
 
 ## 9. 实施顺序与扩展
 
-第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12 已完成`P3-STAGE-003`连续profile；后继趋势演化事实族也已由`P3-STRUCT-006`正式化并接受。当前下一步是结构秩序事实族，为0/2补方向效率之外的区间宽度演化与中心稳定；必要时其后再补高位活动关系。1/12和8/9的Projection/阈值仍不提前开启。
+第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12 已完成`P3-STAGE-003`连续profile；趋势演化事实族已由`P3-STRUCT-006`正式化并接受。`P3-STRUCT-007`现只补0/2需要的结构秩序几何：区间宽度、宽度演化和中心移动，并复用既有方向效率。通过后再决定是否进入0/2命题实验；必要时其后才补高位活动关系。1/12和8/9的Projection/阈值仍不提前开启。
 
 每组都走相同的局部学习+全体系冲突审计；不得独立优化12个标签后直接拼接。每组输出保留/合并/改维度/拒绝决定。第三组尤其禁止把`0`做成“其他都不满足”的剩余类，禁止把`8/9`的“赶顶/派发”当可观测事实；若难以辨识则停在观察性描述/修饰命题，不能迫使B6/B7无限扩张。
 

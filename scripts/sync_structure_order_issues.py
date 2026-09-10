@@ -63,6 +63,43 @@ def load_plan() -> dict:
         qualification = raw.get("runtime_qualification")
         if not isinstance(qualification, dict):
             raise ValueError("accepted Structure Order plan requires qualification")
+        required_qualification = {
+            "decision": "PASS_BOUNDED_STRUCTURE_ORDER_FACT_FAMILY",
+            "code_revision": "fc5a08ee34015cd29132dc4eb379edfcfaf3e4c6",
+            "job_id": "job_87fe531cec73477fbcc92df65a43a137",
+            "run_id": "run_87fe531cec73477fbcc92df65a43a137",
+            "job_input_digest": (
+                "sha256:708265f0e95970689c461efe044539a2df7b1421427f10146b0983d86cc54057"
+            ),
+            "qualification_request_digest": (
+                "sha256:bbb00fb0098cb39171a82d65211459f72377d64d0fd5f5af55cc117e6866e5eb"
+            ),
+            "manifest_sha256": (
+                "sha256:5deff11a24aeb0310315b96f5d9834f9936743ac60b1497d5534ea0ec4e392ee"
+            ),
+            "fact_contract_digest": (
+                "sha256:57e5f60e000c4f238f83b4128d2df3acb1c7766fc01bc42829aeb085bbb8491d"
+            ),
+            "structure_order_digest": (
+                "sha256:1734db33f00195a3bcea2eec222773f13c437055b4539d7d255b9a12a2ad7450"
+            ),
+            "source_inputs_digest": (
+                "sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac"
+            ),
+            "result_digest": (
+                "sha256:9272ac067812e2d04c06e953510860f73ac73dbde4f837e0e63ab9d06b96bdc9"
+            ),
+            "source_run_count": 2,
+            "available_observation_count": 174,
+            "measurement_count": 1218,
+            "market_data_reads": 0,
+            "dwd_provider_opens": 0,
+            "evidence": "docs/acceptance/structure-order-result-20260910.md",
+        }
+        if qualification != required_qualification:
+            raise ValueError("accepted Structure Order qualification differs")
+        if not (ROOT / qualification["evidence"]).is_file():
+            raise ValueError("accepted Structure Order qualification evidence is missing")
         expected_status = {key: "closed" for key in IDS}
     else:
         if raw.get("runtime_qualification") is not None:

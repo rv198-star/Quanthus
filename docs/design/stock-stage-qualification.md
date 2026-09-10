@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组已mixed closeout，Route A `P3-STRUCT-005` 与 `P3-STAGE-002` 已分别正式化演化支撑事实族和10/11 Projection Contract。第三组 `P3-STAGE-003` 已完成512只 morphology profile；`P3-STRUCT-006` 已接受**趋势演化事实族 / Trend Evolution Fact Family**。当前唯一新事实资格为`P3-STRUCT-007-C`的**结构秩序事实族 / Structure Order Fact Family**：只重放两份immutable F9 source artifacts，正式化range-width、width-change、range-center-shift并复用方向效率，DWD/provider新读取为0，Stage 0/2 search仍关闭。2022-2024不重读，2025、QUALIFIED、日更、消费者或交易仍未开放 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组已mixed closeout，Route A `P3-STRUCT-005` 与 `P3-STAGE-002` 已分别正式化演化支撑事实族和10/11 Projection Contract。第三组 `P3-STAGE-003` 已完成512只 morphology profile；`P3-STRUCT-006/007` 已分别接受**趋势演化事实族 / Trend Evolution Fact Family**和**结构秩序事实族 / Structure Order Fact Family**。后者174个bounded观察生成1,218个typed measurements，A/B immutable-source事实完全一致且DWD/provider新读取为0。0/2现具备足够价格结构Facts进入单独命题实验，但Stage search尚未开放；2022-2024不重读，2025、QUALIFIED、日更、消费者或交易仍未开放 |
 | Version | 0.1 |
 | Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
@@ -20,7 +20,7 @@ Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；
 
 本提案把“12 状态”视为待检验的市场描述体系，而不是已经存在标准答案、只差编程的十三分类任务。既要验证算法是否遵守规则，也要验证规则是否能区分用户关心的情形，进一步验证其市场假设与策略用途。允许结果是保留、合并、改为修饰维度、降为展示或拒绝某个状态，而不是为了凑足十二个编号提高规则复杂度。
 
-当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变正式B6-B11/P6权限。第二组和10/11 Projection Contract均已关闭，primary-stage仲裁继续延后。第三组 `P3-STAGE-003` 的225,246观察profile已经关闭；趋势演化事实族已由`P3-STRUCT-006`正式接受。当前`P3-STRUCT-007`只补0/2真正缺的结构组织几何：10/20/60区间宽度、10/20相对前一等长非重叠窗口的宽度变化与中心移动，并明确复用已接受方向效率，不把收缩直接叫蓄势、不把稳定直接叫Stage 2。资格仍只消费两份既有immutable F9 artifacts，无DWD/provider新读取。0/2阈值/Projection、1/12和8/9阈值/Projection继续关闭。阈值外样本、HUMAN_EXPERT_REFERENCE、primary-stage仲裁和产品资格仍未验证；2022-2024不重读，2025 permanent-blind保持未触碰。
+当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变正式B6-B11/P6权限。第二组和10/11 Projection Contract均已关闭，primary-stage仲裁继续延后。第三组 `P3-STAGE-003` 的225,246观察profile已经关闭；趋势演化与结构秩序事实族已由`P3-STRUCT-006/007`正式接受。结构秩序Facts正式包含10/20/60区间宽度、10/20相对前一等长非重叠窗口的宽度变化与中心移动，并复用既有方向效率；收缩不自动叫蓄势，中心稳定也不自动叫Stage 2。资格只消费两份既有immutable F9 artifacts，无DWD/provider新读取。0/2现在可以另开有限命题实验，但阈值/Projection仍须新scope；1/12和8/9也继续关闭。阈值外样本、HUMAN_EXPERT_REFERENCE、primary-stage仲裁和产品资格仍未验证；2022-2024不重读，2025 permanent-blind保持未触碰。
 
 ## 2. 仓库核查与需要纠正的前提
 

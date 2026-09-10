@@ -195,7 +195,7 @@ def test_blueprint_preserves_gaps_and_has_no_dictionary_dependency_cycle() -> No
     assert rows["B8"]["implementation_status"] == "accepted_catalog_v1"
     assert rows["B8"]["verification_status"] == "production_catalog"
     bindings = {item["concept_id"]: item for item in raw["semantic_runtime_bindings"]}
-    assert len(bindings) == len(raw["semantic_runtime_bindings"]) == 16
+    assert len(bindings) == len(raw["semantic_runtime_bindings"]) == 19
     assert bindings["structure.anchor.rolling-high"]["capability_id"] == "B3"
     assert bindings["structure.geometry.signed-distance"]["capability_id"] == "B3"
     assert bindings["structure.interaction.close-reclaim"]["capability_id"] == "B4"
@@ -223,6 +223,17 @@ def test_blueprint_preserves_gaps_and_has_no_dictionary_dependency_cycle() -> No
     }
     assert rows["B6-TREND"]["implementation_status"] == "accepted_bounded_v2"
     assert rows["B6-TREND"]["verification_status"] == "immutable_source_ab"
+    order = {
+        "structure.geometry.range-width",
+        "structure.geometry.width-change",
+        "structure.geometry.range-center-shift",
+    }
+    assert {bindings[key]["capability_id"] for key in order} == {"B6-ORDER"}
+    assert {bindings[key]["accepted_scope"] for key in order} == {
+        "bounded_retrospective_structure_order"
+    }
+    assert rows["B6-ORDER"]["implementation_status"] == "accepted_bounded_v2"
+    assert rows["B6-ORDER"]["verification_status"] == "immutable_source_ab"
     assert rows["B6"]["implementation_status"] == "not_started"
     assert rows["B9"]["implementation_status"] == "outside_structure_scope"
 

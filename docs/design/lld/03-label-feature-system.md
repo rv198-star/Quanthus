@@ -285,11 +285,11 @@ authority.
 | P3-STRUCT-006-B | Implement Trend Evolution Facts, deep verifier and fixed Worker route | P3-STRUCT-006-A | closed / #265; immutable-source qualification only; `docs/acceptance/structure-trend-evolution-release-ready-20260910.md` |
 | P3-STRUCT-006-C | Qualify Trend Evolution Facts from two immutable cold-source artifacts | P3-STRUCT-006-B | closed / #266; 174 observations / 1,914 measurements, exact A/B fact payloads, market-data/DWD provider access 0 |
 | P3-STRUCT-006-D | Freeze accepted Trend Evolution runtime bindings | P3-STRUCT-006-C | closed / #267; seven concepts accepted as `B6-TREND`; Stage 1/12 and 8/9 research remains separately gated |
-| P3-STRUCT-007 | Formalize Structure Order Fact Family / 结构秩序事实族 | P3-STRUCT-006, P3-STAGE-003 | ready; A/B closed, C ready, D blocked; immutable-source qualification only, no Stage-0/2 search |
-| P3-STRUCT-007-A | Freeze Structure Order Fact Family semantics | P3-STRUCT-006, P3-STAGE-003 | closed; reuse existing range-width/width-change and add only range-center-shift |
-| P3-STRUCT-007-B | Implement Structure Order Facts, deep verifier and fixed Worker route | P3-STRUCT-007-A | closed; `docs/acceptance/structure-order-release-ready-20260910.md`; zero new market-data path |
-| P3-STRUCT-007-C | Qualify Structure Order Facts from two immutable cold-source artifacts | P3-STRUCT-007-B | ready; exact A/B fact payload/sample equality required |
-| P3-STRUCT-007-D | Freeze accepted Structure Order runtime bindings | P3-STRUCT-007-C | blocked; Stage 0/2 proposition thresholds remain separately gated |
+| P3-STRUCT-007 | Formalize Structure Order Fact Family / 结构秩序事实族 | P3-STRUCT-006, P3-STAGE-003 | closed / #273; bounded Structure Order Facts accepted from two immutable cold-source artifacts with zero new DWD/provider access |
+| P3-STRUCT-007-A | Freeze Structure Order Fact Family semantics | P3-STRUCT-006, P3-STAGE-003 | closed / #269; reuse existing range-width/width-change and add only range-center-shift |
+| P3-STRUCT-007-B | Implement Structure Order Facts, deep verifier and fixed Worker route | P3-STRUCT-007-A | closed / #270; `docs/acceptance/structure-order-release-ready-20260910.md`; zero new market-data path |
+| P3-STRUCT-007-C | Qualify Structure Order Facts from two immutable cold-source artifacts | P3-STRUCT-007-B | closed / #271; 174 observations / 1,218 measurements, exact A/B payloads, market-data/DWD provider access 0 |
+| P3-STRUCT-007-D | Freeze accepted Structure Order runtime bindings | P3-STRUCT-007-C | closed / #272; three concepts accepted as `B6-ORDER`; Stage 0/2 proposition thresholds remain separately gated |
 | P3-DICT-001 | Deliver the Quanthus Data & Indicator Catalog | P3-FEAT-001 | `docs/design/data-indicator-catalog.md`; #215 with children #223-#227; deterministic authority projection, read-only API/UI and drift gates; no dependency of P3-STRUCT-004 |
 | P3-DICT-001-A | Freeze Catalog schema, authority and relation semantics | P3-FEAT-001 | #223; `docs/acceptance/data-indicator-catalog-schema-snapshot-20260907.md` |
 | P3-DICT-001-B | Generate deterministic Catalog snapshot from authoritative sources | P3-DICT-001-A | #224; source adapters, deterministic digest/count manifest and required semantic regressions |

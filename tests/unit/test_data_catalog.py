@@ -143,6 +143,18 @@ def test_structure_runtime_bindings_project_only_blueprint_accepted_concepts() -
             "B6-TREND",
             "bounded_retrospective_trend_evolution",
         ),
+        "structure.geometry.range-width": (
+            "B6-ORDER",
+            "bounded_retrospective_structure_order",
+        ),
+        "structure.geometry.width-change": (
+            "B6-ORDER",
+            "bounded_retrospective_structure_order",
+        ),
+        "structure.geometry.range-center-shift": (
+            "B6-ORDER",
+            "bounded_retrospective_structure_order",
+        ),
     }
     for concept_id, (capability_id, accepted_scope) in accepted.items():
         item = catalog.item(f"semantic_concept:{concept_id}")

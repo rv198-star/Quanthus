@@ -3,12 +3,13 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Governing work item | `P3-STRUCT-007` |
 | Trigger | accepted `P3-STAGE-003` third-group morphology review and accepted `P3-STRUCT-006` Trend Evolution Facts |
 | Parent baseline | `structure-facts-v2.md`; `structure-trend-evolution-facts.md` |
 | Fact contract | `../../config/structure-order-facts.v1.json` |
 | Qualification | `../../config/structure-order-qualification.v1.json` |
+| Acceptance | `../acceptance/structure-order-result-20260910.md` |
 | Code | `../../src/quanthus/structure_order_facts.py` |
 | Claim ceiling | threshold-free rolling range geometry only; no Stage 0/2 classification or trading authority |
 
@@ -136,7 +137,21 @@ and does not inspect future outcomes.
 7. no Stage 0/2 projection/search, DWD/provider read, LabelCard, holdout, daily, strategy or trading
    authority opens.
 
-A PASS makes this a bounded accepted Structure capability. It does not automatically authorize
-Stage 0/2 parameter selection. After acceptance, the third-group facts substrate is complete enough
-to separately design the minimal Stage 0/2 proposition experiment; high-side Stage 9 activity
-relation remains a different, later question.
+## 8. Accepted result
+
+`P3-STRUCT-007` passed at result-bearing revision
+`fc5a08ee34015cd29132dc4eb379edfcfaf3e4c6` in Job
+`job_87fe531cec73477fbcc92df65a43a137`. Two independently accepted immutable source artifacts
+reconstructed byte-identical Structure Order payloads with digest
+`sha256:1734db33f00195a3bcea2eec222773f13c437055b4539d7d255b9a12a2ad7450`.
+The bounded slice contains 174 complete observations and 1,218 typed measurements; qualification
+recorded `market_data_reads=0` and `dwd_provider_opens=0`.
+
+The deterministic review sample showed both strong contraction and expansion plus positive/negative
+center shifts without requiring a Stage label, supporting the decision that order/disorder must be a
+later multi-fact proposition rather than a synonym for one geometry number.
+
+All active implementation/qualification authority is now closed. This acceptance does not
+automatically authorize Stage 0/2 parameter selection. The third-group price-structure substrate is
+now sufficient to separately design a minimal Stage 0/2 proposition experiment; high-side Stage 9
+activity relation remains a different, later question.

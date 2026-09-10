@@ -4,12 +4,30 @@
   "design": "docs/design/structure-order-facts.md",
   "fact_contract": "config/structure-order-facts.v1.json",
   "qualification_request": "config/structure-order-qualification.v1.json",
-  "runtime_accepted": false,
-  "runtime_qualification": null,
+  "runtime_accepted": true,
+  "runtime_qualification": {
+    "decision": "PASS_BOUNDED_STRUCTURE_ORDER_FACT_FAMILY",
+    "code_revision": "fc5a08ee34015cd29132dc4eb379edfcfaf3e4c6",
+    "job_id": "job_87fe531cec73477fbcc92df65a43a137",
+    "run_id": "run_87fe531cec73477fbcc92df65a43a137",
+    "job_input_digest": "sha256:708265f0e95970689c461efe044539a2df7b1421427f10146b0983d86cc54057",
+    "qualification_request_digest": "sha256:bbb00fb0098cb39171a82d65211459f72377d64d0fd5f5af55cc117e6866e5eb",
+    "manifest_sha256": "sha256:5deff11a24aeb0310315b96f5d9834f9936743ac60b1497d5534ea0ec4e392ee",
+    "fact_contract_digest": "sha256:57e5f60e000c4f238f83b4128d2df3acb1c7766fc01bc42829aeb085bbb8491d",
+    "structure_order_digest": "sha256:1734db33f00195a3bcea2eec222773f13c437055b4539d7d255b9a12a2ad7450",
+    "source_inputs_digest": "sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac",
+    "result_digest": "sha256:9272ac067812e2d04c06e953510860f73ac73dbde4f837e0e63ab9d06b96bdc9",
+    "source_run_count": 2,
+    "available_observation_count": 174,
+    "measurement_count": 1218,
+    "market_data_reads": 0,
+    "dwd_provider_opens": 0,
+    "evidence": "docs/acceptance/structure-order-result-20260910.md"
+  },
   "authorization": {
-    "scope": "structure_order_fact_implementation_and_immutable_source_qualification_only",
-    "formal_structure_fact_implementation_authorized": true,
-    "immutable_accepted_source_artifact_qualification_authorized": true,
+    "scope": "structure_order_fact_family_closed_no_active_qualification",
+    "formal_structure_fact_implementation_authorized": false,
+    "immutable_accepted_source_artifact_qualification_authorized": false,
     "market_data_read_authorized": false,
     "dwd_provider_open_authorized": false,
     "stage_projection_authorized": false,
@@ -28,7 +46,7 @@
       "id": "P3-STRUCT-007",
       "title": "Formalize Structure Order Fact Family",
       "kind": "epic",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STRUCT-006", "P3-STAGE-003"],
       "scope": "Formalize threshold-free rolling range width, width evolution and center movement required by Stage 0/2 research while reusing accepted directional-efficiency facts.",
       "acceptance": [
@@ -37,7 +55,7 @@
         "D binds only accepted runtime concepts and closes all implementation/qualification authority",
         "No Stage 0/2 projection/search, LabelCard, holdout, daily, strategy or trading authority opens"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/structure-order-result-20260910.md"]
     },
     {
       "id": "P3-STRUCT-007-A",
@@ -75,7 +93,7 @@
       "id": "P3-STRUCT-007-C",
       "title": "Qualify Structure Order Facts from two immutable cold-source artifacts",
       "kind": "task",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STRUCT-007-B"],
       "scope": "Execute one governed qualification Job that replays only the two accepted F9 source artifacts and requires byte-identical Structure Order facts and deterministic review samples.",
       "acceptance": [
@@ -85,13 +103,13 @@
         "Market-data read and DWD-provider-open counters remain zero",
         "No Stage 0/2 projection/search output is emitted"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/structure-order-result-20260910.md"]
     },
     {
       "id": "P3-STRUCT-007-D",
       "title": "Freeze accepted Structure Order runtime bindings",
       "kind": "task",
-      "status": "blocked",
+      "status": "closed",
       "depends_on": ["P3-STRUCT-007-C"],
       "scope": "After C passes, bind only the qualified Structure Order concepts in the Structure blueprint/Catalog and close the milestone without opening Stage 0/2 threshold search.",
       "acceptance": [
@@ -101,7 +119,7 @@
         "High-side activity relation remains a later optional question",
         "All implementation/qualification authority closes after acceptance"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/structure-order-result-20260910.md"]
     }
   ]
 }

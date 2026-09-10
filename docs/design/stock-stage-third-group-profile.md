@@ -148,9 +148,12 @@ The accepted interpretation is:
   `派发` remain historical wording only, not admitted Facts. Stage 9 still lacks the necessary joint
   high-position × slowing-price × elevated-activity evidence.
 
-Successor order is frozen as: Trend Evolution Fact Family first; Structure Order Fact Family second;
-a narrow high-side activity relation only afterward if Stage 9 still requires it. The first successor,
-**趋势演化事实族 / Trend Evolution Fact Family**, has now closed under `P3-STRUCT-006` with bounded
-immutable-source A/B qualification and zero new DWD/provider reads. The next separately gated
-successor is therefore **结构秩序事实族 / Structure Order Fact Family**. Neither acceptance authorizes
-Stage labels, primary-stage compression, holdout use, daily inference, strategy consumption or trading.
+Successor order was frozen as: Trend Evolution Fact Family first; Structure Order Fact Family second;
+a narrow high-side activity relation only afterward if Stage 9 still requires it. The first two
+successors have now both closed: `P3-STRUCT-006` accepted **趋势演化事实族 / Trend Evolution Fact
+Family**, and `P3-STRUCT-007` accepted **结构秩序事实族 / Structure Order Fact Family**, each through
+bounded immutable-source A/B qualification with zero new DWD/provider reads. The third-group
+price-structure substrate is therefore sufficient to separately design a minimal Stage-0/2
+proposition experiment. A high-side activity relation remains optional and later, only if Stage 9
+still requires it. None of these acceptances authorize Stage labels, primary-stage compression,
+holdout use, daily inference, strategy consumption or trading.

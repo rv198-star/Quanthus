@@ -4,12 +4,30 @@
   "design": "docs/design/structure-trend-evolution-facts.md",
   "fact_contract": "config/structure-trend-evolution.v1.json",
   "qualification_request": "config/structure-trend-evolution-qualification.v1.json",
-  "runtime_accepted": false,
-  "runtime_qualification": null,
+  "runtime_accepted": true,
+  "runtime_qualification": {
+    "decision": "PASS_BOUNDED_TREND_EVOLUTION_FACT_FAMILY",
+    "code_revision": "fc75f5993d342809c9e01dece3592c039e728b1b",
+    "job_id": "job_bb986ee743994981ab61267e70f6f7f7",
+    "run_id": "run_bb986ee743994981ab61267e70f6f7f7",
+    "job_input_digest": "sha256:535a5e94d10b7a3478e3cce7151e0f8323c50669b10a51aa03dd3b21532cf0a0",
+    "qualification_request_digest": "sha256:4d3ef80711685a2154054fa34791a1d6837a7f70f4269c29b0a19abe238c9a98",
+    "manifest_sha256": "sha256:b8b909db08d2b88aaa0d266ae486a38f77e40b3e347ede54805b95317a9656be",
+    "fact_contract_digest": "sha256:480db6df61901322c107da44eb41687bf4d19d2c6d1297a846a7af68cd224e03",
+    "trend_facts_digest": "sha256:fa9c93f8ddc339d7f1f477d596f4a50485252f8b81aabf20673ab2f3db88b9a8",
+    "source_inputs_digest": "sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac",
+    "result_digest": "sha256:ec32fe6107bf6f8d8f760c48a28875a132809d1b01ff1454b8aa56411ab17ea9",
+    "source_run_count": 2,
+    "available_observation_count": 174,
+    "measurement_count": 1914,
+    "market_data_reads": 0,
+    "dwd_provider_opens": 0,
+    "evidence": "docs/acceptance/structure-trend-evolution-result-20260910.md"
+  },
   "authorization": {
-    "scope": "trend_evolution_fact_implementation_and_immutable_source_qualification_only",
-    "formal_structure_fact_implementation_authorized": true,
-    "immutable_accepted_source_artifact_qualification_authorized": true,
+    "scope": "trend_evolution_fact_family_closed_no_active_qualification",
+    "formal_structure_fact_implementation_authorized": false,
+    "immutable_accepted_source_artifact_qualification_authorized": false,
     "market_data_read_authorized": false,
     "dwd_provider_open_authorized": false,
     "stage_projection_authorized": false,
@@ -28,7 +46,7 @@
       "id": "P3-STRUCT-006",
       "title": "Formalize Trend Evolution Fact Family",
       "kind": "epic",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STAGE-003", "P3-STRUCT-005"],
       "scope": "Formalize the threshold-free direction, efficiency, velocity and rolling-range-position facts justified by the third-group profile without opening Stage propositions or new market-data reads.",
       "acceptance": [
@@ -37,7 +55,7 @@
         "D binds only accepted runtime concepts and closes all implementation/qualification authority",
         "No Stage projection, parameter search, LabelCard, holdout, daily, strategy or trading authority opens"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/structure-trend-evolution-result-20260910.md"]
     },
     {
       "id": "P3-STRUCT-006-A",
@@ -75,7 +93,7 @@
       "id": "P3-STRUCT-006-C",
       "title": "Qualify Trend Evolution Facts from two immutable cold-source artifacts",
       "kind": "task",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STRUCT-006-B"],
       "scope": "Execute one governed qualification Job that replays only the two accepted F9 source artifacts and requires byte-identical Trend Evolution facts and deterministic review samples.",
       "acceptance": [
@@ -85,13 +103,13 @@
         "Market-data read and DWD-provider-open counters remain zero",
         "No Stage projection/search/LabelCard output is emitted"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/structure-trend-evolution-result-20260910.md"]
     },
     {
       "id": "P3-STRUCT-006-D",
       "title": "Freeze accepted Trend Evolution runtime bindings",
       "kind": "task",
-      "status": "blocked",
+      "status": "closed",
       "depends_on": ["P3-STRUCT-006-C"],
       "scope": "After C passes, bind only the accepted Trend Evolution concepts in the Structure blueprint/Catalog and close the milestone without opening Stage 1/12 or 8/9 search.",
       "acceptance": [
@@ -101,7 +119,7 @@
         "Structure Order remains the next separately gated fact-family milestone",
         "All implementation/qualification authority closes after acceptance"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/structure-trend-evolution-result-20260910.md"]
     }
   ]
 }

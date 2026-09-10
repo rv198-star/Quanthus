@@ -153,12 +153,16 @@ nodes.
   `design/stock-stage-third-group-profile.md`; result:
   `acceptance/stock-stage-third-group-profile-result-20260910.md`; plan:
   `config/stage-third-group-delivery.v1.json`.
-- `P3-STRUCT-006` is the next ready Structure milestone: **趋势演化事实族 / Trend Evolution Fact
-  Family**. It formalizes only threshold-free 5/20/60 return, 5/20 directional efficiency and return
-  velocity, 5-vs-20 velocity delta, and 60-session range-position/high-low distance facts justified
-  by P3-STAGE-003. Positive velocity delta is deliberately not named acceleration because its
-  interpretation depends on direction. Qualification reuses the two accepted immutable F9 source
-  artifacts and opens no DWD/provider access, Stage projection/search or LabelCard authority. Route:
+- `P3-STRUCT-006` is accepted and closed as **趋势演化事实族 / Trend Evolution Fact Family**. It
+  formalizes threshold-free 5/20/60 return, 5/20 directional efficiency and return velocity,
+  5-vs-20 velocity delta, plus 60-session range position/high-low distance. Qualification Job
+  `job_bb986ee743994981ab61267e70f6f7f7` reused only the two accepted immutable F9 source artifacts:
+  174 complete observations produced 1,914 typed measurements, A/B fact payloads were identical,
+  and `market_data_reads=0` / `dwd_provider_opens=0`. Positive velocity delta remains a mathematical
+  fact rather than an unconditional acceleration label. All active implementation/qualification
+  authority is closed; Stage 1/12 and 8/9 search remains separate. The next gated Structure route is
+  **结构秩序事实族 / Structure Order Fact Family**. Acceptance:
+  `acceptance/structure-trend-evolution-result-20260910.md`; route:
   `design/structure-trend-evolution-facts.md`; plan:
   `config/structure-trend-evolution-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

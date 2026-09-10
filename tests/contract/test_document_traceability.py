@@ -1413,18 +1413,25 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {"P3-STRUCT-006", *[f"P3-STRUCT-006-{c}" for c in "ABCD"]},
         )
         trend_by_id = {item["id"]: item for item in trend_raw["items"]}
-        self.assertEqual(trend_by_id["P3-STRUCT-006-C"]["status"], "ready")
-        self.assertEqual(trend_by_id["P3-STRUCT-006-D"]["status"], "blocked")
-        self.assertFalse(trend_raw["runtime_accepted"])
+        self.assertTrue(all(trend_by_id[key]["status"] == "closed" for key in trend_by_id))
+        self.assertTrue(trend_raw["runtime_accepted"])
+        trend_qualified = trend_raw["runtime_qualification"]
+        self.assertEqual(
+            trend_qualified["decision"],
+            "PASS_BOUNDED_TREND_EVOLUTION_FACT_FAMILY",
+        )
+        self.assertEqual(trend_qualified["available_observation_count"], 174)
+        self.assertEqual(trend_qualified["measurement_count"], 1914)
+        self.assertEqual(trend_qualified["market_data_reads"], 0)
+        self.assertEqual(trend_qualified["dwd_provider_opens"], 0)
         trend_auth = trend_raw["authorization"]
         self.assertEqual(
             trend_auth["scope"],
-            "trend_evolution_fact_implementation_and_immutable_source_qualification_only",
+            "trend_evolution_fact_family_closed_no_active_qualification",
         )
-        self.assertTrue(trend_auth["formal_structure_fact_implementation_authorized"])
-        self.assertTrue(trend_auth["immutable_accepted_source_artifact_qualification_authorized"])
-        self.assertFalse(trend_auth["market_data_read_authorized"])
-        self.assertFalse(trend_auth["stage_projection_authorized"])
+        for key, value in trend_auth.items():
+            if key.endswith("_authorized"):
+                self.assertIs(value, False)
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True

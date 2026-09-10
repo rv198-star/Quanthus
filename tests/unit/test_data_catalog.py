@@ -115,6 +115,34 @@ def test_structure_runtime_bindings_project_only_blueprint_accepted_concepts() -
             "B5-F9",
             "bounded_retrospective_f9_support_process",
         ),
+        "structure.geometry.window-return": (
+            "B6-TREND",
+            "bounded_retrospective_trend_evolution",
+        ),
+        "structure.geometry.directional-efficiency": (
+            "B6-TREND",
+            "bounded_retrospective_trend_evolution",
+        ),
+        "structure.geometry.return-velocity": (
+            "B6-TREND",
+            "bounded_retrospective_trend_evolution",
+        ),
+        "structure.geometry.velocity-delta": (
+            "B6-TREND",
+            "bounded_retrospective_trend_evolution",
+        ),
+        "structure.geometry.range-position": (
+            "B6-TREND",
+            "bounded_retrospective_trend_evolution",
+        ),
+        "structure.geometry.drawdown-from-window-high": (
+            "B6-TREND",
+            "bounded_retrospective_trend_evolution",
+        ),
+        "structure.geometry.rebound-from-window-low": (
+            "B6-TREND",
+            "bounded_retrospective_trend_evolution",
+        ),
     }
     for concept_id, (capability_id, accepted_scope) in accepted.items():
         item = catalog.item(f"semantic_concept:{concept_id}")

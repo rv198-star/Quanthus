@@ -149,6 +149,8 @@ The accepted interpretation is:
   high-position × slowing-price × elevated-activity evidence.
 
 Successor order is frozen as: Trend Evolution Fact Family first; Structure Order Fact Family second;
-a narrow high-side activity relation only afterward if Stage 9 still requires it. This acceptance
-opens none of those successor implementations by itself and does not authorize Stage labels,
-primary-stage compression, holdout use, daily inference, strategy consumption or trading.
+a narrow high-side activity relation only afterward if Stage 9 still requires it. The first successor,
+**趋势演化事实族 / Trend Evolution Fact Family**, has now closed under `P3-STRUCT-006` with bounded
+immutable-source A/B qualification and zero new DWD/provider reads. The next separately gated
+successor is therefore **结构秩序事实族 / Structure Order Fact Family**. Neither acceptance authorizes
+Stage labels, primary-stage compression, holdout use, daily inference, strategy consumption or trading.

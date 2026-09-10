@@ -60,8 +60,46 @@ def load_plan() -> dict:
 
     by_id = {item["id"]: item for item in raw["items"]}
     if raw.get("runtime_accepted") is True:
-        if raw.get("runtime_qualification") is None:
+        qualification = raw.get("runtime_qualification")
+        if not isinstance(qualification, dict):
             raise ValueError("accepted Trend Evolution plan requires qualification")
+        required_qualification = {
+            "decision": "PASS_BOUNDED_TREND_EVOLUTION_FACT_FAMILY",
+            "code_revision": "fc75f5993d342809c9e01dece3592c039e728b1b",
+            "job_id": "job_bb986ee743994981ab61267e70f6f7f7",
+            "run_id": "run_bb986ee743994981ab61267e70f6f7f7",
+            "job_input_digest": (
+                "sha256:535a5e94d10b7a3478e3cce7151e0f8323c50669b10a51aa03dd3b21532cf0a0"
+            ),
+            "qualification_request_digest": (
+                "sha256:4d3ef80711685a2154054fa34791a1d6837a7f70f4269c29b0a19abe238c9a98"
+            ),
+            "manifest_sha256": (
+                "sha256:b8b909db08d2b88aaa0d266ae486a38f77e40b3e347ede54805b95317a9656be"
+            ),
+            "fact_contract_digest": (
+                "sha256:480db6df61901322c107da44eb41687bf4d19d2c6d1297a846a7af68cd224e03"
+            ),
+            "trend_facts_digest": (
+                "sha256:fa9c93f8ddc339d7f1f477d596f4a50485252f8b81aabf20673ab2f3db88b9a8"
+            ),
+            "source_inputs_digest": (
+                "sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac"
+            ),
+            "result_digest": (
+                "sha256:ec32fe6107bf6f8d8f760c48a28875a132809d1b01ff1454b8aa56411ab17ea9"
+            ),
+            "source_run_count": 2,
+            "available_observation_count": 174,
+            "measurement_count": 1914,
+            "market_data_reads": 0,
+            "dwd_provider_opens": 0,
+            "evidence": "docs/acceptance/structure-trend-evolution-result-20260910.md",
+        }
+        if qualification != required_qualification:
+            raise ValueError("accepted Trend Evolution qualification differs")
+        if not (ROOT / qualification["evidence"]).is_file():
+            raise ValueError("accepted Trend Evolution qualification evidence is missing")
         expected_status = {key: "closed" for key in IDS}
     else:
         if raw.get("runtime_qualification") is not None:

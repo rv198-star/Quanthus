@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
 import sync_structure_trend_evolution_issues as sync  # noqa: E402
 
 
-def test_trend_evolution_plan_opens_only_immutable_source_qualification():
+def test_trend_evolution_plan_closes_after_immutable_source_qualification():
     raw = sync.load_plan()
     by_id = {item["id"]: item for item in raw["items"]}
     assert [item["id"] for item in raw["items"]] == [
@@ -24,19 +24,19 @@ def test_trend_evolution_plan_opens_only_immutable_source_qualification():
         "P3-STRUCT-006-C",
         "P3-STRUCT-006-D",
     ]
-    assert raw["runtime_accepted"] is False
-    assert by_id["P3-STRUCT-006-A"]["status"] == "closed"
-    assert by_id["P3-STRUCT-006-B"]["status"] == "closed"
-    assert by_id["P3-STRUCT-006-C"]["status"] == "ready"
-    assert by_id["P3-STRUCT-006-D"]["status"] == "blocked"
+    assert raw["runtime_accepted"] is True
+    assert all(by_id[key]["status"] == "closed" for key in by_id)
+    qualified = raw["runtime_qualification"]
+    assert qualified["decision"] == "PASS_BOUNDED_TREND_EVOLUTION_FACT_FAMILY"
+    assert qualified["job_id"] == "job_bb986ee743994981ab61267e70f6f7f7"
+    assert qualified["available_observation_count"] == 174
+    assert qualified["measurement_count"] == 1914
+    assert qualified["market_data_reads"] == 0
+    assert qualified["dwd_provider_opens"] == 0
     auth = raw["authorization"]
-    assert auth["formal_structure_fact_implementation_authorized"] is True
-    assert auth["immutable_accepted_source_artifact_qualification_authorized"] is True
+    assert auth["scope"] == "trend_evolution_fact_family_closed_no_active_qualification"
     for key, value in auth.items():
-        if key.endswith("_authorized") and key not in {
-            "formal_structure_fact_implementation_authorized",
-            "immutable_accepted_source_artifact_qualification_authorized",
-        }:
+        if key.endswith("_authorized"):
             assert value is False
 
 
@@ -55,7 +55,7 @@ def test_trend_evolution_plan_fails_closed_if_market_data_is_opened(tmp_path, mo
         sync.load_plan()
 
 
-def test_catalog_declares_trend_concepts_without_runtime_acceptance_yet():
+def test_catalog_binds_only_the_qualified_trend_concepts():
     catalog = json.loads((ROOT / "config/structure-semantic-catalog.v1.json").read_text())
     concepts = {item["concept_id"] for item in catalog["concepts"]}
     expected = {
@@ -69,5 +69,13 @@ def test_catalog_declares_trend_concepts_without_runtime_acceptance_yet():
     }
     assert expected <= concepts
     blueprint = json.loads((ROOT / "config/structure-facts-v2-blueprint.v1.json").read_text())
-    bound = {item["concept_id"] for item in blueprint["semantic_runtime_bindings"]}
-    assert expected.isdisjoint(bound)
+    bound = {
+        item["concept_id"]: item
+        for item in blueprint["semantic_runtime_bindings"]
+        if item["concept_id"] in expected
+    }
+    assert set(bound) == expected
+    assert {item["capability_id"] for item in bound.values()} == {"B6-TREND"}
+    assert {item["accepted_scope"] for item in bound.values()} == {
+        "bounded_retrospective_trend_evolution"
+    }

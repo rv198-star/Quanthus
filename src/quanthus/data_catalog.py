@@ -11,18 +11,15 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from quanthus.catalog_asset_lineage import (
-    build_asset_lineage,
-    focus as focus_asset_lineage,
-    overview as asset_lineage_overview,
-    validate_asset_lineage,
-)
+from quanthus.catalog_asset_lineage import build_asset_lineage, validate_asset_lineage
+from quanthus.catalog_asset_lineage import focus as focus_asset_lineage
+from quanthus.catalog_asset_lineage import overview as asset_lineage_overview
 from quanthus.catalog_dependency import (
     build_definition_dependency,
     build_usage_dependency,
-    focus as focus_dependency,
     validate_dependency_graph,
 )
+from quanthus.catalog_dependency import focus as focus_dependency
 from quanthus.catalog_lineage import build_lineage, focus, overview, validate_lineage
 from quanthus.catalog_presentation import apply_presentation
 from quanthus.policy import find_project_root
@@ -762,9 +759,10 @@ def build_catalog(source_manifest_path: Path | None = None) -> dict[str, Any]:
         capability = capability_map.get(capability_id)
         if item is None or item["domain"] != "structure" or not isinstance(capability, Mapping):
             raise DataCatalogError("structure runtime binding target is invalid")
+        accepted_structure_verification = {"real_dwd_ab", "immutable_source_ab"}
         if (
             capability.get("implementation_status") != "accepted_bounded_v2"
-            or capability.get("verification_status") != "real_dwd_ab"
+            or capability.get("verification_status") not in accepted_structure_verification
         ):
             raise DataCatalogError("structure runtime binding is not backed by accepted runtime evidence")
         item = {

@@ -3,12 +3,13 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Governing work item | `P3-STRUCT-006` |
 | Trigger | accepted `P3-STAGE-003` third-group morphology review |
 | Parent baseline | `structure-facts-v2.md`; `structure-support-facts.md` |
 | Fact contract | `../../config/structure-trend-evolution.v1.json` |
 | Qualification | `../../config/structure-trend-evolution-qualification.v1.json` |
+| Acceptance | `../acceptance/structure-trend-evolution-result-20260910.md` |
 | Code | `../../src/quanthus/structure_trend_evolution.py` |
 | Claim ceiling | threshold-free continuous Structure facts only; no Stage 1/8/9/12 projection or trading authority |
 
@@ -73,7 +74,7 @@ Stage/proposition layers may interpret the same fact only after binding an expli
 
 This milestone emits **no Stage proposition**.
 
-After this fact family is independently accepted, later stage research may test:
+After this fact family is accepted, later separately gated stage research may test:
 
 - Stage 12 as a downside-context proposition using direction, efficiency and persistence;
 - Stage 1 as a nested deceleration/stabilization condition using the same context plus velocity delta,
@@ -125,6 +126,20 @@ external validation or proof that any Stage threshold is correct.
 7. no Stage projection, parameter search, LabelCard, DWD/provider, holdout, daily, strategy or trading
    authority is opened.
 
-A PASS permits the fact family to become an accepted bounded Structure capability. It does not open
-Stage 1/12 or Stage 8/9 search automatically. The next accepted successor remains the Structure Order
-Fact Family unless the owner changes the route.
+## 8. Accepted result
+
+`P3-STRUCT-006` passed at result-bearing revision
+`fc75f5993d342809c9e01dece3592c039e728b1b` in Job
+`job_bb986ee743994981ab61267e70f6f7f7`. The two independently accepted immutable source artifacts
+reconstructed byte-identical Trend Evolution payloads with digest
+`sha256:fa9c93f8ddc339d7f1f477d596f4a50485252f8b81aabf20673ab2f3db88b9a8`.
+The bounded slice contains 174 complete observations and 1,914 typed measurements. Qualification
+recorded `market_data_reads=0` and `dwd_provider_opens=0`.
+
+The deterministic 12-row T-only review found no obvious semantic contradiction. In particular, it
+confirmed that a positive 5-vs-20 velocity delta inside a negative medium-term return can represent
+rebound/deceleration rather than unconditional acceleration, validating the raw-math Fact boundary.
+
+All active implementation/qualification authority is now closed. This acceptance does not open Stage
+1/12 or Stage 8/9 search automatically. The next separately gated successor is the **结构秩序事实族 /
+Structure Order Fact Family** unless the owner changes the route.

@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STRUCT-006",
+  "design": "docs/design/structure-trend-evolution-facts.md",
+  "fact_contract": "config/structure-trend-evolution.v1.json",
+  "qualification_request": "config/structure-trend-evolution-qualification.v1.json",
+  "runtime_accepted": false,
+  "runtime_qualification": null,
+  "authorization": {
+    "scope": "trend_evolution_fact_implementation_and_immutable_source_qualification_only",
+    "formal_structure_fact_implementation_authorized": true,
+    "immutable_accepted_source_artifact_qualification_authorized": true,
+    "market_data_read_authorized": false,
+    "dwd_provider_open_authorized": false,
+    "stage_projection_authorized": false,
+    "parameter_search_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "future_outcome_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "primary_stage_arbitration_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "items": [
+    {
+      "id": "P3-STRUCT-006",
+      "title": "Formalize Trend Evolution Fact Family",
+      "kind": "epic",
+      "status": "ready",
+      "depends_on": ["P3-STAGE-003", "P3-STRUCT-005"],
+      "scope": "Formalize the threshold-free direction, efficiency, velocity and rolling-range-position facts justified by the third-group profile without opening Stage propositions or new market-data reads.",
+      "acceptance": [
+        "A/B freeze semantics and implementation before qualification",
+        "C reproduces the fact family from two accepted immutable cold-source artifacts with no DWD/provider access",
+        "D binds only accepted runtime concepts and closes all implementation/qualification authority",
+        "No Stage projection, parameter search, LabelCard, holdout, daily, strategy or trading authority opens"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STRUCT-006-A",
+      "title": "Freeze Trend Evolution Fact Family semantics",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STAGE-003", "P3-STRUCT-005"],
+      "scope": "Freeze the seven concept meanings/windows, same-coordinate contiguous-history rules and the math-only velocity-delta boundary.",
+      "acceptance": [
+        "Fact family has a stable Chinese/English business name",
+        "Positive velocity delta is not intrinsically called acceleration",
+        "Rolling extrema are not confirmed tops/bottoms",
+        "Range-width/center and activity stay outside this fact family",
+        "Stage thresholds and usage clocks stay outside Fact identity"
+      ],
+      "evidence": ["docs/design/structure-trend-evolution-facts.md"]
+    },
+    {
+      "id": "P3-STRUCT-006-B",
+      "title": "Implement Trend Evolution Facts, deep verifier and fixed Worker route",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STRUCT-006-A"],
+      "scope": "Implement typed Trend Evolution observations, reset/availability semantics, immutable-source A/B qualification and a fixed Event Worker dispatch path.",
+      "acceptance": [
+        "Formal calculations exactly match frozen third-group morphology formulas",
+        "Reset, zero-range, prefix-replay and no-stage counterexamples pass",
+        "Deep verifier first validates each original F9 source artifact",
+        "Worker admits only the fixed Trend Evolution qualification config",
+        "Qualification code has no market-data/provider opening path"
+      ],
+      "evidence": ["docs/acceptance/structure-trend-evolution-release-ready-20260910.md"]
+    },
+    {
+      "id": "P3-STRUCT-006-C",
+      "title": "Qualify Trend Evolution Facts from two immutable cold-source artifacts",
+      "kind": "task",
+      "status": "ready",
+      "depends_on": ["P3-STRUCT-006-B"],
+      "scope": "Execute one governed qualification Job that replays only the two accepted F9 source artifacts and requires byte-identical Trend Evolution facts and deterministic review samples.",
+      "acceptance": [
+        "Both source F9 artifacts pass original deep verification",
+        "Source-input payloads and reconstructed Trend Evolution fact payloads match exactly across A/B",
+        "Fact counts and deterministic review sample are durably bound",
+        "Market-data read and DWD-provider-open counters remain zero",
+        "No Stage projection/search/LabelCard output is emitted"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STRUCT-006-D",
+      "title": "Freeze accepted Trend Evolution runtime bindings",
+      "kind": "task",
+      "status": "blocked",
+      "depends_on": ["P3-STRUCT-006-C"],
+      "scope": "After C passes, bind only the accepted Trend Evolution concepts in the Structure blueprint/Catalog and close the milestone without opening Stage 1/12 or 8/9 search.",
+      "acceptance": [
+        "Blueprint binds only the seven qualified concepts",
+        "Accepted B1-B5 and Support Evolution identities remain unchanged",
+        "Trend Evolution becomes the reusable substrate for later Stage 1/12 and high-side modifier research",
+        "Structure Order remains the next separately gated fact-family milestone",
+        "All implementation/qualification authority closes after acceptance"
+      ],
+      "evidence": []
+    }
+  ]
+}

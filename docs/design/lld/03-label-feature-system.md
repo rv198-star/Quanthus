@@ -280,6 +280,11 @@ authority.
 | P3-STRUCT-005-B | Implement Support Evolution Facts, deep verifier and governed Event Worker route | P3-STRUCT-005-A | closed / #250; historical technical code remains F9; focused counterexamples and `docs/acceptance/structure-f9-release-ready-20260910.md` |
 | P3-STRUCT-005-C | Qualify Support Evolution Facts with two independent cold real-DWD Jobs | P3-STRUCT-005-B | closed / #251; exact A/B semantic reproduction and 12/12 outcome-blind review; `docs/acceptance/structure-f9-real-dwd-acceptance-20260910.md` |
 | P3-STRUCT-005-D | Freeze accepted Support Evolution runtime bindings and projection boundary | P3-STRUCT-005-C | closed / #252; technical capability ID `B5-F9` remains stable; Stage 5/6/7 remain parked, no labels/consumers/trading |
+| P3-STRUCT-006 | Formalize Trend Evolution Fact Family / 趋势演化事实族 | P3-STAGE-003, P3-STRUCT-005 | ready; A/B closed, C ready, D blocked; no Stage projection or new DWD/provider access |
+| P3-STRUCT-006-A | Freeze Trend Evolution Fact Family semantics | P3-STAGE-003, P3-STRUCT-005 | closed; seven threshold-free geometry concepts and direction-aware interpretation boundary frozen |
+| P3-STRUCT-006-B | Implement Trend Evolution Facts, deep verifier and fixed Worker route | P3-STRUCT-006-A | closed; immutable-source qualification only; `docs/acceptance/structure-trend-evolution-release-ready-20260910.md` |
+| P3-STRUCT-006-C | Qualify Trend Evolution Facts from two immutable cold-source artifacts | P3-STRUCT-006-B | ready; exact A/B fact payload/sample equality and zero DWD/provider access required |
+| P3-STRUCT-006-D | Freeze accepted Trend Evolution runtime bindings | P3-STRUCT-006-C | blocked; Stage 1/12 and 8/9 research remains separately gated |
 | P3-DICT-001 | Deliver the Quanthus Data & Indicator Catalog | P3-FEAT-001 | `docs/design/data-indicator-catalog.md`; #215 with children #223-#227; deterministic authority projection, read-only API/UI and drift gates; no dependency of P3-STRUCT-004 |
 | P3-DICT-001-A | Freeze Catalog schema, authority and relation semantics | P3-FEAT-001 | #223; `docs/acceptance/data-indicator-catalog-schema-snapshot-20260907.md` |
 | P3-DICT-001-B | Generate deterministic Catalog snapshot from authoritative sources | P3-DICT-001-A | #224; source adapters, deterministic digest/count manifest and required semantic regressions |

@@ -153,6 +153,14 @@ nodes.
   `design/stock-stage-third-group-profile.md`; result:
   `acceptance/stock-stage-third-group-profile-result-20260910.md`; plan:
   `config/stage-third-group-delivery.v1.json`.
+- `P3-STRUCT-006` is the next ready Structure milestone: **趋势演化事实族 / Trend Evolution Fact
+  Family**. It formalizes only threshold-free 5/20/60 return, 5/20 directional efficiency and return
+  velocity, 5-vs-20 velocity delta, and 60-session range-position/high-low distance facts justified
+  by P3-STAGE-003. Positive velocity delta is deliberately not named acceleration because its
+  interpretation depends on direction. Qualification reuses the two accepted immutable F9 source
+  artifacts and opens no DWD/provider access, Stage projection/search or LabelCard authority. Route:
+  `design/structure-trend-evolution-facts.md`; plan:
+  `config/structure-trend-evolution-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

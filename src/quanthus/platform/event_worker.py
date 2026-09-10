@@ -25,6 +25,7 @@ from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
 from quanthus.policy import find_project_root
 from quanthus.stage_projection_artifact import verify_stage_projection_artifact
 from quanthus.structure_f9_artifact import verify_structure_f9_artifact
+from quanthus.structure_trend_evolution_artifact import verify_trend_evolution_artifact
 from quanthus.structure_v2_artifact import verify_structure_v2_artifact
 
 EVENT_QUEUE = "event"
@@ -39,6 +40,7 @@ _STRUCTURE_FACTS_RUN_CONFIG = "config/structure-facts-run.development.v1.json"
 _STRUCTURE_V2_RUN_CONFIG = "config/structure-facts-v2-run.development.v1.json"
 _STAGE_10_11_PROJECTION_RUN_CONFIG = "config/stage-10-11-projection-qualification.v1.json"
 _STRUCTURE_F9_RUN_CONFIG = "config/structure-f9-run.development.v1.json"
+_TREND_EVOLUTION_RUN_CONFIG = "config/structure-trend-evolution-qualification.v1.json"
 _STRUCTURE_RUN_CONFIGS = frozenset(
     {
         _STRUCTURE_MVP_RUN_CONFIG,
@@ -47,6 +49,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _STRUCTURE_V2_RUN_CONFIG,
         _STAGE_10_11_PROJECTION_RUN_CONFIG,
         _STRUCTURE_F9_RUN_CONFIG,
+        _TREND_EVOLUTION_RUN_CONFIG,
     }
 )
 # Backward-compatible name retained for the technical-MVP qualification seeder/tests.
@@ -401,6 +404,7 @@ def _structure_request_digest(run_config: str) -> str:
         _STRUCTURE_V2_RUN_CONFIG: "quanthus.structure-facts-v2-run.v1",
         _STAGE_10_11_PROJECTION_RUN_CONFIG: "quanthus.stock-stage-projection-qualification.v1",
         _STRUCTURE_F9_RUN_CONFIG: "quanthus.structure-f9-run.v1",
+        _TREND_EVOLUTION_RUN_CONFIG: "quanthus.trend-evolution-qualification.v1",
     }[run_config]
     if not isinstance(raw, dict) or raw.get("schema_version") != expected_schema:
         raise RuntimeError("structure_mvp_run_config_invalid")
@@ -1278,7 +1282,14 @@ class EventWorker:
         run_config = governed["run_config"]
         economic = run_config == _STRUCTURE_ECONOMIC_RUN_CONFIG
         facts = run_config == _STRUCTURE_FACTS_RUN_CONFIG
-        if run_config == _STAGE_10_11_PROJECTION_RUN_CONFIG:
+        if run_config == _TREND_EVOLUTION_RUN_CONFIG:
+            verifier = verify_trend_evolution_artifact
+            module = "quanthus.structure_trend_evolution_qualification"
+            artifact_name = "trend-evolution"
+            running_stage = "running-trend-evolution"
+            validating_stage = "validating-trend-evolution"
+            recovering_stage = "recovering-sealed-trend-evolution"
+        elif run_config == _STAGE_10_11_PROJECTION_RUN_CONFIG:
             verifier = verify_stage_projection_artifact
             module = "quanthus.stage_projection_qualification"
             artifact_name = "stage-10-11-projection"

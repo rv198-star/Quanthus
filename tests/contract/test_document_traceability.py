@@ -1404,6 +1404,27 @@ class DocumentTraceabilityTests(unittest.TestCase):
         for key, value in third_auth.items():
             if key.endswith("_authorized"):
                 self.assertIs(value, False)
+        trend_raw = json.loads(
+            (root / "config/structure-trend-evolution-delivery.v1.json").read_text()
+        )
+        trend_ids = {item["id"] for item in trend_raw["items"]}
+        self.assertEqual(
+            trend_ids,
+            {"P3-STRUCT-006", *[f"P3-STRUCT-006-{c}" for c in "ABCD"]},
+        )
+        trend_by_id = {item["id"]: item for item in trend_raw["items"]}
+        self.assertEqual(trend_by_id["P3-STRUCT-006-C"]["status"], "ready")
+        self.assertEqual(trend_by_id["P3-STRUCT-006-D"]["status"], "blocked")
+        self.assertFalse(trend_raw["runtime_accepted"])
+        trend_auth = trend_raw["authorization"]
+        self.assertEqual(
+            trend_auth["scope"],
+            "trend_evolution_fact_implementation_and_immutable_source_qualification_only",
+        )
+        self.assertTrue(trend_auth["formal_structure_fact_implementation_authorized"])
+        self.assertTrue(trend_auth["immutable_accepted_source_artifact_qualification_authorized"])
+        self.assertFalse(trend_auth["market_data_read_authorized"])
+        self.assertFalse(trend_auth["stage_projection_authorized"])
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True
@@ -1479,11 +1500,18 @@ class DocumentTraceabilityTests(unittest.TestCase):
             *f9_plan,
             *projection_plan,
             *third_group_raw["items"],
+            *trend_raw["items"],
         ]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
         catalog_owned_ids = (
-            catalog_ids | lineage_ids | stage_ids | f9_ids | projection_ids | third_group_ids
+            catalog_ids
+            | lineage_ids
+            | stage_ids
+            | f9_ids
+            | projection_ids
+            | third_group_ids
+            | trend_ids
         )
         p3_items = [item for item in items
                     if item.phase == "P3" and item.stable_id not in catalog_owned_ids]

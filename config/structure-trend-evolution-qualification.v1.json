@@ -1,0 +1,49 @@
+{
+  "schema_version": "quanthus.trend-evolution-qualification.v1",
+  "qualification_id": "trend-evolution-facts-from-accepted-f9-source-artifacts-v1",
+  "work_item": "P3-STRUCT-006-C",
+  "fact_contract": "config/structure-trend-evolution.v1.json",
+  "source_f9": {
+    "code_revision": "44571610b1da1792a80bbd45ee7f180d59e8495a",
+    "request_digest": "sha256:33ae7300f6b4ab61e32d0f84bbf94739c7f78f220bd424bed945c888aaa88849",
+    "source_inputs_digest": "sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac",
+    "run_ids": [
+      "run_237a3e986b49490381f380a7ed5d4d14",
+      "run_f371d3f2cb0440aea2c49ceaad1c237b"
+    ],
+    "manifest_sha256": [
+      "sha256:88a2a1a57d2cef4d3f75b55c36ded41d42b737082644c8232eeecf6497de3c90",
+      "sha256:429d298651e7d6596c4490b0e2a1b3c359c26e5d8081e918392450aafa944373"
+    ]
+  },
+  "scope": {
+    "report_start": "2020-01-02",
+    "report_end": "2020-03-31",
+    "security_codes": ["000001", "300750", "600519"],
+    "minimum_contiguous_history_sessions": 61,
+    "review_sample_limit": 12
+  },
+  "authority": {
+    "immutable_f9_artifact_read_authorized": true,
+    "market_data_read_authorized": false,
+    "dwd_provider_open_authorized": false,
+    "stage_projection_authorized": false,
+    "parameter_search_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "future_outcome_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "acceptance": {
+    "source_artifacts_must_pass_original_f9_deep_verifier": true,
+    "source_input_payloads_must_be_byte_identical": true,
+    "trend_fact_payloads_must_be_byte_identical": true,
+    "trend_fact_digests_must_match": true,
+    "profile_metric_formulas_must_match_frozen_third_group_definitions": true,
+    "no_stage_projection_or_threshold_output": true,
+    "no_market_data_or_provider_access": true
+  }
+}

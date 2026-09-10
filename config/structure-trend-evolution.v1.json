@@ -1,0 +1,50 @@
+{
+  "schema_version": "quanthus.trend-evolution-fact-family.v1",
+  "fact_family_id": "structure-trend-evolution-v1",
+  "display_name_zh": "趋势演化事实族",
+  "display_name_en": "Trend Evolution Fact Family",
+  "work_item": "P3-STRUCT-006-A",
+  "purpose": "Formalize only the threshold-free direction, efficiency, velocity and rolling-range-position facts justified by P3-STAGE-003, without emitting Stage 1/8/9/12 propositions.",
+  "source_profile": "config/stage-learning/third-group-profile.v1.json",
+  "concepts": {
+    "structure.geometry.window-return": {"windows": [5, 20, 60]},
+    "structure.geometry.directional-efficiency": {"windows": [5, 20]},
+    "structure.geometry.return-velocity": {"windows": [5, 20]},
+    "structure.geometry.velocity-delta": {"window": 5, "comparison_window": 20},
+    "structure.geometry.range-position": {"window": 60},
+    "structure.geometry.drawdown-from-window-high": {"window": 60},
+    "structure.geometry.rebound-from-window-low": {"window": 60}
+  },
+  "semantics": {
+    "current_windows_include_t": true,
+    "returns_use_exact_prior_admitted_session": true,
+    "same_listing_coordinate_required": true,
+    "hidden_session_gap_resets_history": true,
+    "nonadmitted_row_resets_history": true,
+    "zero_range_makes_only_range_position_unavailable": true,
+    "velocity_delta_is_math_not_acceleration_label": true,
+    "future_bottom_or_top_claim_forbidden": true,
+    "stage_thresholds_in_fact_identity": false
+  },
+  "authority": {
+    "formal_structure_fact_implementation_authorized": true,
+    "immutable_accepted_source_artifact_qualification_authorized": true,
+    "market_data_read_authorized": false,
+    "dwd_provider_open_authorized": false,
+    "stage_projection_authorized": false,
+    "parameter_search_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "future_outcome_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "claim_limits": [
+    "Trend Evolution Facts are continuous observations, not Stage labels.",
+    "Positive velocity delta is not intrinsically acceleration: interpretation depends on direction context.",
+    "Window high/low are causal rolling extrema, not confirmed swing tops/bottoms.",
+    "No economic, portfolio or trading meaning is implied."
+  ]
+}

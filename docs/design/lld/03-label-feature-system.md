@@ -332,6 +332,24 @@ authority.
 | P3-STAGE-004-B | Implement bounded Stage 0/2 development runner and fixed RX route | P3-STAGE-004-A | closed / #275; runtime-only retry preserves frozen Facts/reference/scoring inputs |
 | P3-STAGE-004-C | Execute frozen Stage 0/2 development experiment on RX6800 | P3-STAGE-004-B | closed / #276; successful retry reports 224,346 observations and 160 references; terminal-summary evidence, not full per-trial re-audit |
 | P3-STAGE-004-D | Review and freeze Stage 0/2 development disposition | P3-STAGE-004-C | closed / #277; Stage-2 references 9 below required 20 block both searches; `docs/acceptance/stage-0-2-order-proposition-result-20260910.md`; no further retry/search |
+| P3-STAGE-005 | Deliver scale-explicit 0/2 reference evidence mechanism | P3-STAGE-004 | closed / #282; synthetic engineering only; `docs/acceptance/stage-order-reference-engineering-20260910.md` |
+| P3-STAGE-005-A | Freeze scale-explicit business and reference contract | P3-STAGE-004 | closed / #279; `docs/design/stage-order-reference-protocol.md` |
+| P3-STAGE-005-B | Implement T-only packets and traceable reviewer ledgers | P3-STAGE-005-A | closed / #280; strict source/opinion binding, retained disagreement and cold readback |
+| P3-STAGE-005-C | Accept synthetic engineering closure | P3-STAGE-005-B | closed / #281; synthetic fixtures, not market semantic qualification |
+
+### Scale-explicit reference mechanism
+
+`P3-STAGE-005` implements the owner-approved successor in
+[stage-order-reference-protocol.md](../stage-order-reference-protocol.md). It is a reference
+mechanism, not a LabelCard or rerun of `P3-STAGE-004`: 20-session primary propositions and
+10-session recent conditions have separate evidence and opinion fields. The batch builds each
+accepted Fact family once; a reviewer sees only the selected case's T-only history. Raw opinions,
+source rows, disagreements and source/stratum denominators are retained in immutable packages.
+Independent readback reconstructs the retained evidence rather than trusting only file hashes.
+No declared role, AI session or human string automatically proves semantic independence. Missing
+inputs do not become Stage 0; no candidate, official stage, new market run or trading gate opens.
+Delivery: `../../config/stage-order-reference-delivery.v1.json`; engineering evidence:
+`../../acceptance/stage-order-reference-engineering-20260910.md`.
 
 ## 7. Acceptance
 

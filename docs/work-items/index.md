@@ -274,6 +274,10 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-004-B | Implement bounded Stage 0/2 development runner and fixed RX route | P3-STAGE-004-A | closed; #275; runtime-only digest reuse and progress repair retained; frozen Fact/reference/search semantics unchanged |
 | P3-STAGE-004-C | Execute frozen Stage 0/2 development experiment on RX6800 | P3-STAGE-004-B | closed; #276; retry `stage_87d166eb3f4a4f7f858f9b4f3e238462` succeeded; 224,346 observations / 160 references; bounded terminal-summary evidence |
 | P3-STAGE-004-D | Review and freeze Stage 0/2 development disposition | P3-STAGE-004-C | closed; #277; Stage-2 references 9/20 block both candidates; `docs/acceptance/stage-0-2-order-proposition-result-20260910.md`; no claim of semantic inseparability or full trial re-audit |
+| P3-STAGE-005 | Deliver scale-explicit 0/2 reference evidence mechanism | P3-STAGE-004 | closed; #282; engineering mechanism accepted, no market qualification |
+| P3-STAGE-005-A | Freeze scale-explicit business and reference contract | P3-STAGE-004 | closed; #279; `docs/design/stage-order-reference-protocol.md` |
+| P3-STAGE-005-B | Implement T-only packets and traceable reviewer ledgers | P3-STAGE-005-A | closed; #280; strict source/opinion binding, retained disagreement and cold readback |
+| P3-STAGE-005-C | Accept synthetic engineering closure | P3-STAGE-005-B | closed; #281; `docs/acceptance/stage-order-reference-engineering-20260910.md`; synthetic engineering only, not a market run |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

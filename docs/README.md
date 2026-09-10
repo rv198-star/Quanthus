@@ -189,6 +189,19 @@ nodes.
   `design/stage-0-2-order-proposition.md`; plan: `config/stage-order-proposition-delivery.v1.json`;
   result: `acceptance/stage-0-2-order-proposition-result-20260910.md`; review and execution history:
   `reviews/stage-0-2-order-proposition-result-review-20260910.md`.
+  The non-governing business-boundary re-audit is
+  [STAGE-004-REAUDIT-20260910](reviews/stage-0-2-business-boundary-reaudit-20260910.md).
+  It records synthetic admitted-path evidence and two rounds of single-assistant four-perspective
+  review. The owner-authorized simulated second round is complete despite the independent-provider
+  401; section 9 records its scoped design recommendation. No experiment or successor run is opened.
+- `P3-STAGE-005` implements the owner-approved successor reference mechanism, not a rerun of 004.
+  It separates 20-session primary propositions from 10-session recent conditions, retains T-only
+  case evidence and raw opinions, and verifies sealed packages by independent reconstruction.
+  Role/source declarations do not confer independent or human validation. No market sampling,
+  search, official labels or data-access authority opens. Route:
+  [scale-explicit reference protocol](design/stage-order-reference-protocol.md); plan:
+  `config/stage-order-reference-delivery.v1.json`; engineering evidence:
+  [reference mechanism acceptance](acceptance/stage-order-reference-engineering-20260910.md).
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

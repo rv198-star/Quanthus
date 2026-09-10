@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STAGE-005",
+  "design": "docs/design/stage-order-reference-protocol.md",
+  "review": "docs/reviews/stage-0-2-business-boundary-reaudit-20260910.md",
+  "protocol": "config/stage-learning/order-reference-protocol.v1.json",
+  "scope": "scale_explicit_reference_mechanism_and_synthetic_engineering_acceptance_only",
+  "engineering_accepted": true,
+  "market_reference_validated": false,
+  "old_experiment_reopened": false,
+  "items": [
+    {
+      "id": "P3-STAGE-005", "kind": "epic", "status": "closed",
+      "title": "Deliver scale-explicit Stage 0/2 reference evidence mechanism",
+      "depends_on": ["P3-STAGE-004"],
+      "scope": "Implement the owner-approved four-perspective review outcome without reopening v1 or new market runs.",
+      "acceptance": ["A/B/C close with preserved v1 identities", "No market semantic, independent-expert, official-label or trading claim"],
+      "evidence": ["docs/acceptance/stage-order-reference-engineering-20260910.md"]
+    },
+    {
+      "id": "P3-STAGE-005-A", "kind": "task", "status": "closed",
+      "title": "Freeze scale-explicit business and reference contract",
+      "depends_on": ["P3-STAGE-004"],
+      "scope": "20-session primary description, 10-session recent conditions, both-false and unknown/conflict separation; actual review provenance and retained per-case evidence.",
+      "acceptance": ["No new market thresholds or silent v1 rewrite", "No forced reference consensus or classifier-derived truth", "Complete history and retrospective view remain explicit"],
+      "evidence": ["docs/design/stage-order-reference-protocol.md", "config/stage-learning/order-reference-protocol.v1.json"]
+    },
+    {
+      "id": "P3-STAGE-005-B", "kind": "task", "status": "closed",
+      "title": "Implement bounded T-only packets and traceable reviewer ledgers",
+      "depends_on": ["P3-STAGE-005-A"],
+      "scope": "Reuse formal Facts once per batch; validate external opinions; retain sources, raw opinions and disagreements in immutable packages with independent readback.",
+      "acceptance": ["T-only reviewer views and strict schema validation", "No role-name-based independence or human certification", "Tampered and incomplete packages fail closed"],
+      "evidence": ["docs/acceptance/stage-order-reference-engineering-20260910.md"]
+    },
+    {
+      "id": "P3-STAGE-005-C", "kind": "task", "status": "closed",
+      "title": "Accept synthetic engineering closure without Stage qualification",
+      "depends_on": ["P3-STAGE-005-B"],
+      "scope": "Exercise fixed admitted synthetic paths, complete packet-review-seal-readback chain, regression checks and four-responsibility conformance review.",
+      "acceptance": ["Old v1 runner/config/result unchanged", "Full make check passes with skips disclosed", "Real reference feasibility remains a separate unexecuted boundary"],
+      "evidence": ["docs/acceptance/stage-order-reference-engineering-20260910.md"]
+    }
+  ]
+}

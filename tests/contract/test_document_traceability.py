@@ -1460,6 +1460,28 @@ class DocumentTraceabilityTests(unittest.TestCase):
         for key, value in order_auth.items():
             if key.endswith("_authorized"):
                 self.assertIs(value, False)
+        order_stage_raw = json.loads(
+            (root / "config/stage-order-proposition-delivery.v1.json").read_text()
+        )
+        order_stage_ids = {item["id"] for item in order_stage_raw["items"]}
+        self.assertEqual(
+            order_stage_ids,
+            {"P3-STAGE-004", *[f"P3-STAGE-004-{c}" for c in "ABCD"]},
+        )
+        order_stage_by_id = {item["id"]: item for item in order_stage_raw["items"]}
+        self.assertEqual(order_stage_by_id["P3-STAGE-004-C"]["status"], "ready")
+        self.assertEqual(order_stage_by_id["P3-STAGE-004-D"]["status"], "blocked")
+        self.assertFalse(order_stage_raw["runtime_accepted"])
+        order_stage_auth = order_stage_raw["authorization"]
+        self.assertEqual(
+            order_stage_auth["scope"],
+            "stage_0_2_bounded_development_proposition_experiment_only",
+        )
+        self.assertTrue(order_stage_auth["development_data_read_authorized"])
+        self.assertTrue(order_stage_auth["limited_parameter_search_authorized"])
+        self.assertFalse(order_stage_auth["permanent_blind_access_authorized"])
+        self.assertFalse(order_stage_auth["official_label_card_publication_authorized"])
+        self.assertFalse(order_stage_auth["primary_stage_arbitration_authorized"])
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True
@@ -1537,6 +1559,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             *third_group_raw["items"],
             *trend_raw["items"],
             *order_raw["items"],
+            *order_stage_raw["items"],
         ]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
@@ -1549,6 +1572,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             | third_group_ids
             | trend_ids
             | order_ids
+            | order_stage_ids
         )
         p3_items = [item for item in items
                     if item.phase == "P3" and item.stable_id not in catalog_owned_ids]

@@ -39,6 +39,7 @@ STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB = (
     "quanthus.stage-second-group-development-supplement.v1"
 )
 STAGE_THIRD_GROUP_PROFILE_JOB = "quanthus.stage-third-group-profile.v1"
+STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB = "quanthus.stage-order-proposition-development.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
@@ -106,6 +107,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-third-group-profile-*",
         "process_error": "stage_third_group_profile_process_failed",
         "wall_seconds": 1800,
+    },
+    STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB: {
+        "config": "config/stage-learning/order-proposition-development.v1.json",
+        "module": "quanthus.stage_learning.order_proposition_development",
+        "artifact_glob": "stage-order-proposition-development-*",
+        "process_error": "stage_order_proposition_development_process_failed",
+        "wall_seconds": 2700,
     },
 }
 
@@ -642,6 +650,15 @@ class StageWorker:
                 "metric_profiles": verified.get("metric_profiles"),
                 "joint_diagnostic_counts": verified.get("joint_diagnostic_counts"),
                 "diagnostic_slice_counts": verified.get("diagnostic_slice_counts"),
+            }
+        if job.kind == STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB:
+            result["order_proposition_development"] = {
+                "disposition": verified.get("disposition"),
+                "selected_parameters": verified.get("selected_parameters"),
+                "selected_pair_overlap_count": verified.get("selected_pair_overlap_count"),
+                "reference_summary": verified.get("reference_summary"),
+                "observation_count": verified.get("observation_count"),
+                "candidate_artifact_digest": verified.get("candidate_artifact_digest"),
             }
         return result
 

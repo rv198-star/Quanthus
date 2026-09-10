@@ -1,0 +1,74 @@
+{
+  "schema_version": "quanthus.stage-order-proposition-synthetic-panel.v1",
+  "work_item": "P3-STAGE-004",
+  "evidence_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+  "human_expert_validated": false,
+  "authority": {
+    "development_only": true,
+    "semantic_reference_authorized": true,
+    "future_outcome_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "formal_qualification_authorized": false
+  },
+  "assignment": {
+    "primary_a": "short-tactical-order-v1",
+    "primary_b": "fund-structure-order-v1",
+    "adjudicator": "balanced-order-v1",
+    "primary_reviews_are_mutually_hidden": true
+  },
+  "reference_semantics": {
+    "stage_0_working_name": "structural_disorder",
+    "stage_2_working_name": "orderly_consolidation",
+    "historical_stage_0_name": "无序震荡",
+    "historical_stage_2_name": "蓄势整理",
+    "stage_0_is_not_residual": true,
+    "stage_2_implies_future_breakout": false,
+    "both_false_allowed": true,
+    "both_true_allowed": false,
+    "reviewers_never_receive_candidate_parameters": true,
+    "reviewers_never_receive_future_outcomes": true,
+    "reviewers_receive_t_only_formal_fact_values_only": true
+  },
+  "policies": {
+    "short-tactical-order-v1": {
+      "stage_2_efficiency20_abs_max": "0.30",
+      "stage_2_range_width20_max": "0.18",
+      "stage_2_width_change10_max": "-0.10",
+      "stage_2_width_change20_max": "-0.10",
+      "stage_2_center_shift10_abs_max": "0.05",
+      "stage_2_center_shift20_abs_max": "0.04",
+      "stage_0_efficiency20_abs_max": "0.45",
+      "stage_0_width_change10_min": "0.25",
+      "stage_0_width_change20_min": "0.20",
+      "stage_0_center_shift10_abs_min": "0.07",
+      "stage_0_center_shift20_abs_min": "0.06"
+    },
+    "fund-structure-order-v1": {
+      "stage_2_efficiency20_abs_max": "0.33",
+      "stage_2_range_width20_max": "0.16",
+      "stage_2_width_change10_max": "-0.05",
+      "stage_2_width_change20_max": "-0.20",
+      "stage_2_center_shift10_abs_max": "0.04",
+      "stage_2_center_shift20_abs_max": "0.03",
+      "stage_0_efficiency20_abs_max": "0.40",
+      "stage_0_width_change10_min": "0.15",
+      "stage_0_width_change20_min": "0.20",
+      "stage_0_center_shift10_abs_min": "0.06",
+      "stage_0_center_shift20_abs_min": "0.06"
+    },
+    "balanced-order-v1": {
+      "stage_2_efficiency20_abs_max": "0.33",
+      "stage_2_range_width20_max": "0.18",
+      "stage_2_width_change10_max": "-0.05",
+      "stage_2_width_change20_max": "-0.15",
+      "stage_2_center_shift10_abs_max": "0.05",
+      "stage_2_center_shift20_abs_max": "0.04",
+      "stage_0_efficiency20_abs_max": "0.45",
+      "stage_0_width_change10_min": "0.20",
+      "stage_0_width_change20_min": "0.20",
+      "stage_0_center_shift10_abs_min": "0.07",
+      "stage_0_center_shift20_abs_min": "0.07"
+    }
+  }
+}

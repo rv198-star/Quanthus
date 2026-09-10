@@ -1,0 +1,136 @@
+{
+  "schema_version": "quanthus.stage-order-proposition-development.v1",
+  "development_id": "stock-stage-0-2-order-proposition-development-v1",
+  "work_item": "P3-STAGE-004",
+  "purpose": "Test whether Stage 0 structural disorder and Stage 2 orderly consolidation can be positively and non-residually distinguished from accepted Trend Evolution and Structure Order facts on development-only data.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "trend_fact_contract": "config/structure-trend-evolution.v1.json",
+  "trend_fact_contract_digest": "sha256:480db6df61901322c107da44eb41687bf4d19d2c6d1297a846a7af68cd224e03",
+  "order_fact_contract": "config/structure-order-facts.v1.json",
+  "order_fact_contract_digest": "sha256:57e5f60e000c4f238f83b4128d2df3acb1c7766fc01bc42829aeb085bbb8491d",
+  "synthetic_panel_config": "config/stage-learning/order-proposition-synthetic-panel.v1.json",
+  "authority": {
+    "development_only": true,
+    "runtime_implementation_authorized": true,
+    "development_data_read_authorized": true,
+    "formal_fact_consumption_authorized": true,
+    "synthetic_reference_runtime_authorized": true,
+    "limited_parameter_search_runtime_authorized": true,
+    "development_proposition_candidate_artifact_authorized": true,
+    "future_outcome_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "holdout_population_selection_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "primary_stage_arbitration_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_result_access_authorized": false,
+    "trading_authorized": false
+  },
+  "development_window": {
+    "cohort_scan_start": "2019-01-02",
+    "cohort_date": "2019-12-31",
+    "warmup_start": "2019-07-01",
+    "report_start": "2020-01-02",
+    "report_end": "2021-12-31",
+    "minimum_pre_cohort_observations": 100,
+    "cohort_seed": "sha256:37f3162a8906df72cf25da6c153976e0826413e86445a05e2f0614d01b7b9ad5"
+  },
+  "population": {
+    "cohort_size": 512,
+    "one_observation_per_security_session": true,
+    "one_reference_context_per_security": true,
+    "trend_and_order_facts_built_per_security_to_bound_memory": true
+  },
+  "proposition_identity": {
+    "stage_0_code": 0,
+    "stage_0_working_name": "structural_disorder",
+    "stage_2_code": 2,
+    "stage_2_working_name": "orderly_consolidation",
+    "stage_0_is_not_residual": true,
+    "stage_2_implies_future_breakout": false,
+    "both_false_allowed": true,
+    "both_true_allowed": false,
+    "primary_stage_output": false
+  },
+  "reference_sampling": {
+    "bucket_order": ["directional_control", "order_like", "disorder_like", "mixed_low_efficiency"],
+    "target_contexts_per_bucket": 40,
+    "minimum_realized_contexts": 120,
+    "one_context_per_security": true,
+    "reviewers_receive_t_only_features_only": true,
+    "algorithm_predictions_hidden_from_reviewers": true,
+    "candidate_parameters_hidden_from_reviewers": true,
+    "future_outcomes_hidden_from_reviewers": true,
+    "sampling_bands": {
+      "low_efficiency20_abs_max": "0.45",
+      "order_range_width20_max": "0.18",
+      "order_width_change20_max": "0",
+      "order_center_shift20_abs_max": "0.04",
+      "disorder_width_change20_min": "0.20",
+      "disorder_center_shift20_abs_min": "0.07"
+    }
+  },
+  "r0": {
+    "stage_2": {
+      "efficiency20_abs_max": "0.33",
+      "range_width20_max": "0.18",
+      "width_change20_max": "-0.20",
+      "center_shift20_abs_max": "0.04"
+    },
+    "stage_0": {
+      "efficiency20_abs_max": "0.40",
+      "width_change20_min": "0.20",
+      "center_shift20_abs_min": "0.07"
+    }
+  },
+  "search_space": {
+    "stage_2": {
+      "efficiency20_abs_max": ["0.25", "0.33", "0.40"],
+      "range_width20_max": ["0.15", "0.18", "0.22"],
+      "width_change20_max": ["-0.10", "-0.20", "-0.30"],
+      "center_shift20_abs_max": ["0.03", "0.04", "0.06"]
+    },
+    "stage_0": {
+      "efficiency20_abs_max": ["0.30", "0.40", "0.50"],
+      "width_change20_min": ["0.10", "0.20", "0.30"],
+      "center_shift20_abs_min": ["0.05", "0.07", "0.09"]
+    }
+  },
+  "execution_order": ["resolve_references", "search_stage_2", "freeze_stage_2_if_eligible", "search_stage_0_with_pair_conflict_gate"],
+  "hard_gates": {
+    "minimum_stage_0_definite_references": 20,
+    "minimum_stage_2_definite_references": 20,
+    "minimum_ambiguous_references": 10,
+    "minimum_neither_references": 10,
+    "minimum_definite_positive_references": 20,
+    "minimum_definite_negative_references": 20,
+    "minimum_positive_reference_coverage": 0.55,
+    "maximum_definite_negative_false_positive_rate": 0.10,
+    "maximum_ambiguous_unique_assertion_rate": 0.20,
+    "minimum_precision_one_sided_95_lower": 0.65,
+    "f1_noninferiority_tolerance_vs_r0": 0.05,
+    "maximum_pair_overlap_count": 0
+  },
+  "selection": {
+    "stage_2_then_stage_0": true,
+    "rank": ["gate_pass", "f1_desc", "precision_desc", "ambiguous_assertion_asc", "distance_from_r0_asc", "trial_id_asc"],
+    "no_eligible_candidate_action": "INCONCLUSIVE_RETAIN_ALL_TRIALS",
+    "no_in_run_hot_fix": true,
+    "no_search_space_expansion_after_results": true
+  },
+  "artifact": {
+    "summary_only_plus_candidate": true,
+    "security_codes_published": false,
+    "market_prices_published": false,
+    "observation_rows_published": false,
+    "official_stage_labels_published": false
+  },
+  "claim_limits": [
+    "synthetic development references are not human-expert validation",
+    "a development proposition candidate is not a QUALIFIED LabelCard",
+    "Stage 0 is positive structural-disorder evidence and never a residual fallback",
+    "Stage 2 orderly consolidation does not imply future breakout or accumulation intent",
+    "2022-2024 arbitration is not reread and 2025 permanent blind remains untouched"
+  ]
+}

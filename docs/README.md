@@ -176,6 +176,14 @@ nodes.
   for a separately gated Stage-0/2 proposition experiment. Acceptance:
   `acceptance/structure-order-result-20260910.md`; route: `design/structure-order-facts.md`; plan:
   `config/structure-order-delivery.v1.json`.
+- `P3-STAGE-004` is the active bounded Stage-0/2 proposition experiment. Stage 0 is treated as
+  positive **结构无序 / structural disorder** evidence rather than a residual class; Stage 2 is
+  **有序整理 / orderly consolidation** and does not imply accumulation or future breakout. The
+  frozen 512-security 2020-2021 development Run consumes accepted Trend Evolution + Structure Order
+  Facts, resolves T-only synthetic references before search, tests 81 Stage-2 and 27 Stage-0 finite
+  candidates, and requires zero selected-pair overlap. Both propositions may be false; no
+  `primary_stage` or official LabelCard is emitted. Route: `design/stage-0-2-order-proposition.md`;
+  plan: `config/stage-order-proposition-delivery.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

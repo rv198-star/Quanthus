@@ -327,6 +327,11 @@ authority.
 | P3-STAGE-003-B | Implement governed 512-security third-group morphology profile | P3-STAGE-003-A | closed / #260; fixed RX Stage Worker route and aggregate-only artifact; `docs/acceptance/stock-stage-third-group-profile-release-ready-20260910.md` |
 | P3-STAGE-003-C | Execute frozen third-group morphology profile on RX6800 | P3-STAGE-003-B | closed / #261; Job `stage_313d48cfc06948e0a7fc7a3bd77b2657` PASS; no Stage labels/search/holdout access |
 | P3-STAGE-003-D | Review third-group profile and freeze next facts/search route | P3-STAGE-003-C | closed / #262; 1/12 -> Trend Evolution Facts, 0/2 -> Structure Order Facts, 8/9 -> modifier hypotheses; later work needs new contracts |
+| P3-STAGE-004 | Test Stage 0/2 structural disorder versus orderly consolidation | P3-STRUCT-006, P3-STRUCT-007, P3-STAGE-003 | ready; A/B closed, C ready, D blocked; bounded development experiment only, no official LabelCard/primary-stage |
+| P3-STAGE-004-A | Freeze Stage 0/2 proposition semantics and finite search | P3-STRUCT-006, P3-STRUCT-007, P3-STAGE-003 | closed; `docs/design/stage-0-2-order-proposition.md`; positive evidence, both-false allowed, never-both-true pair semantics |
+| P3-STAGE-004-B | Implement bounded Stage 0/2 development runner and fixed RX route | P3-STAGE-004-A | closed; `docs/acceptance/stage-0-2-order-proposition-release-ready-20260910.md`; 81+27 finite search with T-only synthetic reference consensus |
+| P3-STAGE-004-C | Execute frozen Stage 0/2 development experiment on RX6800 | P3-STAGE-004-B | ready; one frozen 512-security 2020-2021 Run; no future/holdout/official Stage output |
+| P3-STAGE-004-D | Review and freeze Stage 0/2 development disposition | P3-STAGE-004-C | blocked; freeze candidate or INCONCLUSIVE without result-dependent repair |
 
 ## 7. Acceptance
 

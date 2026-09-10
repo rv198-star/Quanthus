@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0.0",
+  "parent_id": "P3-STAGE-004",
+  "design": "docs/design/stage-0-2-order-proposition.md",
+  "review": "docs/reviews/stage-0-2-order-proposition-review-20260910.md",
+  "runtime_config": "config/stage-learning/order-proposition-development.v1.json",
+  "panel_config": "config/stage-learning/order-proposition-synthetic-panel.v1.json",
+  "runtime_accepted": false,
+  "runtime_qualification": null,
+  "authorization": {
+    "scope": "stage_0_2_bounded_development_proposition_experiment_only",
+    "order_proposition_implementation_authorized": true,
+    "development_data_read_authorized": true,
+    "synthetic_reference_authorized": true,
+    "limited_parameter_search_authorized": true,
+    "development_candidate_artifact_authorized": true,
+    "future_outcome_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "holdout_population_selection_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "primary_stage_arbitration_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "items": [
+    {
+      "id": "P3-STAGE-004",
+      "title": "Test Stage 0/2 structural disorder versus orderly consolidation",
+      "kind": "epic",
+      "status": "ready",
+      "depends_on": ["P3-STRUCT-006", "P3-STRUCT-007", "P3-STAGE-003"],
+      "scope": "Run one bounded development-only proposition experiment over accepted Trend Evolution and Structure Order Facts without official Stage publication or primary-stage compression.",
+      "acceptance": [
+        "A/B freeze observable semantics, synthetic reference protocol, finite search and fixed Worker route before result access",
+        "C executes one frozen 512-security 2020-2021 development Run",
+        "D freezes DEVELOPMENT_PROPOSITION_CANDIDATES_FROZEN or INCONCLUSIVE without result-dependent repair",
+        "No holdout, LabelCard, primary-stage, daily, strategy or trading authority opens"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-004-A",
+      "title": "Freeze Stage 0/2 proposition semantics and finite search",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STRUCT-006", "P3-STRUCT-007", "P3-STAGE-003"],
+      "scope": "Freeze Stage 0 as positive structural-disorder evidence and Stage 2 as orderly-consolidation evidence, plus both-false/never-both-true semantics, reference strata and 81+27 finite search.",
+      "acceptance": [
+        "Stage 0 is never residual fallback",
+        "Stage 2 does not imply accumulation or future breakout",
+        "Synthetic references use T-only formal Facts and hide candidate predictions/parameters",
+        "Candidate rules consume accepted Trend Evolution and Structure Order Facts only",
+        "No primary-stage or official LabelCard semantics are introduced"
+      ],
+      "evidence": [
+        "docs/design/stage-0-2-order-proposition.md",
+        "docs/reviews/stage-0-2-order-proposition-review-20260910.md"
+      ]
+    },
+    {
+      "id": "P3-STAGE-004-B",
+      "title": "Implement bounded Stage 0/2 development runner and fixed RX route",
+      "kind": "task",
+      "status": "closed",
+      "depends_on": ["P3-STAGE-004-A"],
+      "scope": "Implement formal-Fact observation assembly, one-context-per-security reference sampling, deterministic synthetic consensus, hard-gated finite searches and a fixed Stage Worker kind.",
+      "acceptance": [
+        "Focused positive-evidence, abstention, reference, scoring and overlap tests pass",
+        "Formal Trend/Order contract digests are exact runtime inputs",
+        "Stage 2 freezes before Stage 0 and no cross-stage Cartesian search occurs",
+        "Selected pair overlap must be zero across the full development observation set",
+        "Worker admits only the exact order-proposition config"
+      ],
+      "evidence": ["docs/acceptance/stage-0-2-order-proposition-release-ready-20260910.md"]
+    },
+    {
+      "id": "P3-STAGE-004-C",
+      "title": "Execute frozen Stage 0/2 development experiment on RX6800",
+      "kind": "task",
+      "status": "ready",
+      "depends_on": ["P3-STAGE-004-B"],
+      "scope": "Execute exactly one 512-security 2020-2021 development Run and publish aggregate reference/search results plus a development candidate artifact.",
+      "acceptance": [
+        "Exact code/config/panel/fact-contract identities are recorded",
+        "Reference label counts satisfy preregistered sufficiency gates or the Run remains INCONCLUSIVE",
+        "All 81 Stage-2 and 27 Stage-0 trials are retained with hard-gate reasons",
+        "No future outcome, arbitration, permanent-blind, official Stage or primary-stage output occurs",
+        "If candidates freeze, selected pair overlap is exactly zero"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-004-D",
+      "title": "Review and freeze Stage 0/2 development disposition",
+      "kind": "task",
+      "status": "blocked",
+      "depends_on": ["P3-STAGE-004-C"],
+      "scope": "Perform one post-run quantitative/trading/fund review and freeze candidate or INCONCLUSIVE disposition without changing the completed Run.",
+      "acceptance": [
+        "Review distinguishes reference insufficiency from proposition non-identifiability",
+        "No hard gate or search space is changed after seeing C results",
+        "A frozen candidate remains development-only and synthetic-consensus limited",
+        "Any formal Projection Contract or external validation requires a new milestone",
+        "2022-2024 fresh reuse stays forbidden and 2025 remains untouched"
+      ],
+      "evidence": []
+    }
+  ]
+}

@@ -212,6 +212,13 @@ nodes.
   Route: [reference feasibility](design/stage-order-reference-feasibility.md); machine plan:
   `config/stage-order-reference-feasibility-delivery.v1.json`; evidence:
   `acceptance/stage-order-reference-feasibility-20260911.md`.
+- `P3-STAGE-007` is open for one fixed-rule, task-disjoint development screen. The authorized
+  four-role simulated review has frozen the descriptive target and an executable unchanged R0 seed;
+  this is not market acceptance. A is complete, B owns source isolation and the minimal execution
+  adapter, and C/D remain pending actual references, scoring and a business disposition. No new
+  market Job is authorized before B's exact source/runtime/resource bindings and engineering gates.
+  Route: [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
+  `config/stage-order-rule-screen-delivery.v1.json`; rule: `config/stage-learning/order-rule-screen.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

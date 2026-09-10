@@ -1,0 +1,52 @@
+{
+  "schema_version": "quanthus.stage-order-rule-screen.v1",
+  "rule_id": "stage-order-primary20-fixed-r0.v1",
+  "work_item": "P3-STAGE-007",
+  "purpose": "One frozen descriptive candidate; no search, official label or trading decision",
+  "reference_protocol_digest": "sha256:927edd8451c9db9adb0ac06e24dcbc55d11e1ac82aac87123a4d9627557eaf1e",
+  "parameter_origin": {
+    "path": "config/stage-learning/order-proposition-development.v1.json",
+    "pointer": "r0",
+    "revision": "a21d76110af3e72406203f950b23b595bcc00d33",
+    "selection": "inherit_preregistered_seed_not_fit_to_12_case_results"
+  },
+  "profile": {
+    "primary_window_sessions": 20,
+    "recent_window_sessions": 10,
+    "retained_history_sessions": 61,
+    "knowledge_view": "retrospective",
+    "stage_0_name": "low_directional_efficiency_geometric_instability_at_20",
+    "stage_2_name": "contracting_orderly_consolidation_at_20",
+    "recent_conditions_change_primary": false,
+    "fixed_prior_box_survival_claimed": false,
+    "no_match": "NO_ASSERTION"
+  },
+  "rules": {
+    "stage_2": {
+      "efficiency20_abs_max": "0.33",
+      "range_width20_max": "0.18",
+      "width_change20_max": "-0.20",
+      "center_shift20_abs_max": "0.04"
+    },
+    "stage_0": {
+      "efficiency20_abs_max": "0.40",
+      "width_change20_min": "0.20",
+      "center_shift20_abs_min": "0.07"
+    }
+  },
+  "candidate_count": 1,
+  "authority": {
+    "engineering_evaluation_on_supplied_cases": true,
+    "new_data_acquisition": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "future_outcome_access": false,
+    "arbitration_access": false,
+    "permanent_blind_access": false,
+    "official_label_publication": false,
+    "primary_stage_arbitration": false,
+    "daily_schedule": false,
+    "strategy_consumption": false,
+    "trading": false
+  }
+}

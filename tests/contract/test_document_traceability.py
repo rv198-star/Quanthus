@@ -1468,6 +1468,15 @@ class DocumentTraceabilityTests(unittest.TestCase):
             (root / "config/stage-order-reference-feasibility-delivery.v1.json").read_text()
         )
         reference_feasibility_ids = {item["id"] for item in reference_feasibility_raw["items"]}
+        screen_raw = json.loads(
+            (root / "config/stage-order-rule-screen-delivery.v1.json").read_text()
+        )
+        screen_ids = {item["id"] for item in screen_raw["items"]}
+        self.assertEqual(screen_ids, {"P3-STAGE-007", *[f"P3-STAGE-007-{c}" for c in "ABCD"]})
+        self.assertIs(screen_raw["milestone_completed"], False)
+        self.assertIsNone(screen_raw["runtime_receipts"])
+        for key, value in screen_raw["authorization"].items():
+            self.assertIs(value, key == "implementation_and_synthetic_tests")
         self.assertEqual(
             reference_feasibility_ids,
             {"P3-STAGE-006", *[f"P3-STAGE-006-{c}" for c in "ABCD"]},
@@ -1583,6 +1592,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             *order_raw["items"],
             *order_stage_raw["items"],
             *reference_feasibility_raw["items"],
+            *screen_raw["items"],
         ]:
             observed = next(item for item in items if item.stable_id == declared["id"])
             self.assertEqual(observed.status, declared["status"])
@@ -1597,6 +1607,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             | order_ids
             | order_stage_ids
             | reference_feasibility_ids
+            | screen_ids
         )
         p3_items = [item for item in items
                     if item.phase == "P3" and item.stable_id not in catalog_owned_ids]

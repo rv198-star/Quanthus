@@ -1,0 +1,139 @@
+{
+  "schema_version": "quanthus.stage-order-rule-screen-delivery.v1",
+  "parent_id": "P3-STAGE-007",
+  "baseline_revision": "a21d76110af3e72406203f950b23b595bcc00d33",
+  "design": "docs/design/stage-order-rule-screen.md",
+  "rule_contract": "config/stage-learning/order-rule-screen.v1.json",
+  "rule_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0",
+  "implementation": "src/quanthus/stage_learning/order_rule_screen.py",
+  "review_provenance": "owner_authorized_single_assistant_four_role_simulation",
+  "milestone_completed": false,
+  "runtime_contract": null,
+  "runtime_receipts": null,
+  "authorization": {
+    "implementation_and_synthetic_tests": true,
+    "runtime_job_submission": false,
+    "new_market_data_read": false,
+    "parameter_search": false,
+    "arbitration_access": false,
+    "permanent_blind_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "runtime_activation_requirements": [
+    "exact_verified_source_and_correction_manifests",
+    "economic_identity_exclusion_of_entire_old_512_cohort_and_stage006_sources",
+    "fixed_sampling_algorithm_and_seed_before_new_case_review",
+    "frozen_runtime_contract_code_revision_worker_route_and_idempotency_keys",
+    "source_scan_memory_storage_and_review_budget_measured_and_bounded",
+    "shared_fact_materialization_and_retained_raw_evidence",
+    "reference_provenance_and_visibility_recorded_without_false_blinding",
+    "engineering_and_conformance_checks_pass_before_run"
+  ],
+  "validation": {
+    "scope": "task_disjoint_development_screen_not_a_fresh_blind_or_market_qualification",
+    "candidate_count": 1,
+    "data_years_allowed": [2019, 2020, 2021],
+    "report_year": 2021,
+    "excluded_old_cohort_size": 512,
+    "excluded_stage006_codes_to_resolve_to_economic_identities": ["000001", "300750", "600519"],
+    "maximum_new_pool_securities": 512,
+    "maximum_cases": 160,
+    "maximum_cases_per_economic_identity": 1,
+    "sample_seed": "stage007-frozen-screen-20260911-v1",
+    "panels": {
+      "coverage": {"target": 64, "per_quarter": 16, "selection": "identity_then_date_hash_without_morphology"},
+      "challenge": {
+        "target": 96,
+        "bucket_order": ["order_like", "instability_like", "boundary"],
+        "bucket_targets": [48, 32, 16],
+        "selection": "lowest_date_hash_per_identity_then_identity_hash_without_replacement"
+      }
+    },
+    "sampling_bands": {
+      "efficiency_abs_max": "0.45",
+      "order_width_max": "0.18",
+      "order_width_change_max": "0",
+      "order_center_abs_max": "0.04",
+      "instability_width_change_min": "0.20",
+      "instability_center_abs_min": "0.07"
+    },
+    "cross_bucket_backfill": false,
+    "result_dependent_replacement": false,
+    "representativeness_claimed": false,
+    "minimum_complete_cases": 120,
+    "minimum_definite_positives_per_class": 20,
+    "minimum_definite_negatives_per_class": 20,
+    "minimum_definite_predictions_per_class": 20,
+    "minimum_ambiguous_references": 10,
+    "minimum_benchmark_precision": "0.80",
+    "minimum_positive_reference_coverage": "0.55",
+    "maximum_definite_negative_false_positive_rate": "0.10",
+    "maximum_ambiguous_assertion_rate": "0.20",
+    "maximum_same_scale_conflicts": 0,
+    "coverage_panel_veto_min_predictions": 10,
+    "coverage_panel_veto_precision_below": "0.65",
+    "report_panels_and_quarters_separately": true,
+    "formal_population_confidence_claimed": false
+  },
+  "budgets": {
+    "maximum_new_jobs": 2,
+    "maximum_worker_wall_seconds_per_job": 2700,
+    "maximum_raw_opinions": 320,
+    "maximum_successful_external_review_responses": 320,
+    "maximum_failed_transport_retries": 8,
+    "semantic_answer_retries": 0,
+    "automatic_supplement_rounds": 0,
+    "parameter_trials": 1
+  },
+  "dispositions": [
+    "BLOCKED_EVIDENCE",
+    "INCONCLUSIVE_NO_SUPPLEMENT",
+    "REVISE_TARGET_OR_PARK",
+    "PROMISING_EXPLORATORY_ONLY",
+    "READY_FOR_BROADER_VALIDATION"
+  ],
+  "items": [
+    {
+      "id": "P3-STAGE-007", "kind": "epic", "status": "ready",
+      "title": "Decide whether one fixed scale-explicit rule warrants broader validation",
+      "depends_on": ["P3-STAGE-006"],
+      "scope": "One preregistered candidate, task-disjoint development references, immutable scoring and a business disposition; no framework rebuild.",
+      "acceptance": ["C and D return a bounded evidence-backed disposition, not just engineering success", "No threshold tuning, no reused-case qualification, no sealed partitions or trading"],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-007-A", "kind": "task", "status": "closed",
+      "title": "Resolve business boundaries and freeze one executable seed rule",
+      "depends_on": ["P3-STAGE-006"],
+      "scope": "Complete the authorized simulated joint review and freeze the unchanged old R0 numbers under explicit 20-session semantics.",
+      "acceptance": ["NO_ASSERTION differs from NEITHER and INPUT_UNAVAILABLE", "Recent facts do not introduce a hidden primary veto", "Synthetic threshold and admitted-path tests pass"],
+      "evidence": ["docs/design/stage-order-rule-screen.md", "tests/unit/test_stage_order_rule_screen.py"]
+    },
+    {
+      "id": "P3-STAGE-007-B", "kind": "task", "status": "ready",
+      "title": "Bind disjoint sources, fixed sampling and a minimal execution adapter",
+      "depends_on": ["P3-STAGE-007-A"],
+      "scope": "Prove economic-identity exclusion, freeze source/code/resource bindings, reuse reference packets and the controlled Worker; do not open the validation set during rule development.",
+      "acceptance": ["All runtime activation requirements are verified", "Unable to prove source isolation is an explicit blocker", "Existing 004/005/006 contracts and outcomes are untouched"],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-007-C", "kind": "task", "status": "blocked",
+      "title": "Execute one fixed reference and scoring batch without in-run repair",
+      "depends_on": ["P3-STAGE-007-B"],
+      "scope": "At most 160 cases and 320 actual source-declared opinions; seal references before scoring and keep every denominator.",
+      "acceptance": ["Exact runtime receipts and immutable evidence bind selection, references and the frozen rule", "Coverage and challenge panels are reported separately", "Related simulated origins never claim independent validation"],
+      "evidence": []
+    },
+    {
+      "id": "P3-STAGE-007-D", "kind": "task", "status": "blocked",
+      "title": "Attribute failures and close with a substantive business decision",
+      "depends_on": ["P3-STAGE-007-C"],
+      "scope": "Distinguish reference scarcity, target ambiguity, missing representation and rule error; close under the preregistered disposition order.",
+      "acceptance": ["No parent completion from A/B engineering alone", "One fixed experiment ends without automatic supplementation", "Any positive outcome remains bounded research, not a LabelCard or trading permission"],
+      "evidence": []
+    }
+  ]
+}

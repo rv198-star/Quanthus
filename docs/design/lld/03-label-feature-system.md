@@ -353,20 +353,43 @@ Delivery: `../../config/stage-order-reference-delivery.v1.json`; engineering evi
 
 ### Retained-input reference feasibility
 
-`P3-STAGE-006` is the owner-approved successor to the accepted reference mechanism. It uses
-only the two immutable accepted F9 input artifacts, selects twelve dates without inspecting labels,
-and binds actual same-origin simulated opinions through a two-phase Worker route. It does not
-open DWD, parameter search, holdout, official labels, daily operation or strategy consumption.
+`P3-STAGE-006` is accepted and closed for real-input reference collection feasibility. Its two
+successful Jobs reused the immutable accepted F9 inputs and retained twelve cases and twenty-four
+same-origin simulated opinions. Collection feasibility and descriptive coverage are not independent
+semantic qualification. The closed delivery contract opens no further Job, DWD, search, holdout,
+official label, daily operation or strategy consumption.
 Design: [reference feasibility](../stage-order-reference-feasibility.md); plan:
 `config/stage-order-reference-feasibility-delivery.v1.json`.
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P3-STAGE-006 | Real-input reference collection feasibility | P3-STAGE-005 | ready |
-| P3-STAGE-006-A | Freeze source/selection/review/stop | P3-STAGE-005 | closed |
-| P3-STAGE-006-B | Release bounded two-phase Worker route | P3-STAGE-006-A | closed; #284; 1932 tests passed |
-| P3-STAGE-006-C | Execute twelve-case reference collection | P3-STAGE-006-B | ready; #285 |
-| P3-STAGE-006-D | Freeze feasibility disposition | P3-STAGE-006-C | blocked |
+| P3-STAGE-006 | Real-input reference collection feasibility | P3-STAGE-005 | closed; #287; `../../acceptance/stage-order-reference-feasibility-20260911.md` |
+| P3-STAGE-006-A | Freeze source/selection/review/stop | P3-STAGE-005 | closed; #283 |
+| P3-STAGE-006-B | Release bounded two-phase Worker route | P3-STAGE-006-A | closed; #284; 1932 pre-release tests passed |
+| P3-STAGE-006-C | Execute twelve-case reference collection | P3-STAGE-006-B | closed; #285; two succeeded Jobs, no rerun |
+| P3-STAGE-006-D | Freeze feasibility disposition | P3-STAGE-006-C | closed; #286; collection only, no independent semantic qualification |
+
+### Fixed-rule development screen
+
+`P3-STAGE-007` implements the owner-approved next-stage decision in
+[fixed-rule screen](../stage-order-rule-screen.md). It retains the 20-session/10-session separation,
+uses exactly the old preregistered R0 numbers as one new research seed, and distinguishes machine
+NO_ASSERTION from a reference NEITHER. The seed is an executable hypothesis, not a qualified
+classifier. Source isolation, fixed sampling, actual reference collection and an error-based
+business disposition remain necessary; completing A or B cannot close the parent.
+The current increment does not open a Worker Job. B must bind the exact source, historical exposure
+exclusion, runtime and resource contracts before activation. References preserve actual provenance;
+same-origin simulation cannot become independent validation. No old contract, permanent dataset,
+sealed partition, official label or trading boundary changes.
+Machine plan: `../../config/stage-order-rule-screen-delivery.v1.json`.
+
+| ID | Work | Dependency | Acceptance evidence |
+| --- | --- | --- | --- |
+| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | ready; actual C/D business disposition required |
+| P3-STAGE-007-A | Resolve business boundaries and freeze one executable seed | P3-STAGE-006 | closed; `../stage-order-rule-screen.md`; synthetic rule-contract tests |
+| P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | ready; no new market run before exact readiness evidence |
+| P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | blocked; at most 160 cases, 320 opinions, two Jobs |
+| P3-STAGE-007-D | Attribute errors and give the business disposition | P3-STAGE-007-C | blocked; no automatic supplementation or tuning |
 
 ## 7. Acceptance
 

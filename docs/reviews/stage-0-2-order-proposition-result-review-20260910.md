@@ -4,7 +4,7 @@
 | --- | --- |
 | Work item | `P3-STAGE-004-D` |
 | Governing design | `../design/stage-0-2-order-proposition.md` |
-| Review status | TECHNICAL_TIMEOUT; runtime-only retry release verified; experiment result and semantic disposition remain pending |
+| Review status | CLOSED — `INCONCLUSIVE_REFERENCE_SUFFICIENCY`; technical retry succeeded, no Stage candidate accepted |
 | Provenance | One assistant reviewing quantitative, short-term-operation and fund-use perspectives; not independent model reviews or human-expert signoff |
 | Source Job | `stage_64da9bea52984726ab32c10bfdd36d4c` |
 | Execution revision | `35439da64e81f60aa50bfeb26e4a5d0531d6eb78` |
@@ -12,9 +12,9 @@
 | Frozen development config digest | `sha256:894a38df99419cadcc24d1ef3fd775ffd6189609f593dc8d4487c5f4f08bdb80` |
 | Frozen panel config digest | `sha256:cd8724da8d7aad47d501a8cc848ae6210fba36cec5de0a1c568db2877b453912` |
 
-This is an evidence/review record, not a new runtime contract. It preserves the completed first
-attempt and the frozen population, Fact contracts, reference rules, grids and hard gates. The
-explicit runtime-only retry boundary is owned by the governing design and delivery plan.
+This is an evidence/review record, not a new runtime contract. Sections 1-6 preserve the earlier
+execution and repair checkpoints. The final retry result and disposition are recorded in section 7;
+no historical Job, source population, Fact contract, reference rule, grid or hard gate was changed.
 
 ## 1. Evidence interpretation established before terminal result
 
@@ -161,4 +161,68 @@ recheck passed and the rebuilt snapshot matched exactly.
 Final `make check PYTHON=/home/ubuntu/GitHub/Quanthus/repo/.venv/bin/python` passed with
 **1847 passed, 7 skipped** in 240.95 seconds. The skipped cases require production artifacts or an
 explicit PostgreSQL test DSN and are not claimed as executed. These are repair-release checks, not
-acceptance of the pending real-data experiment or independent expert validation of Stage 0/2.
+acceptance of the then-pending real-data experiment or independent expert validation of Stage 0/2.
+
+## 7. Final retry readback and three-perspective closeout
+
+At `2026-09-10T07:43:12.754279+00:00`, the fixed audited read-only status operation returned terminal
+success for `stage_87d166eb3f4a4f7f858f9b4f3e238462`, revision
+`1878c625ad04b23793507d92bf0e3008052a5a85`, Job input digest
+`sha256:3ab41405c2c804fcac6015aefce6717ce3c7c6bb9d5f759d80be94391dc83e33`.
+It ran from `2026-09-10T07:31:34.792374+00:00` to `2026-09-10T07:42:35.518779+00:00`
+(660.726405 seconds), with exit code 0 and no error. Its research disposition is `INCONCLUSIVE`.
+
+The result binds Run `stage-order-proposition-development-20260910T074234Z`, manifest
+`sha256:67a1159eba611ceb8af1f43c246f49acc101786e223730af6b61a9b0a8c237ac`, and candidate
+`sha256:bd38c21ff47d17921efb132cca61e49fd5afd124b4f3b30c35e8c294ac223c41`.
+It reports 224,346 observations and 160 reference contexts, 40 in each preregistered sampling bucket.
+Resolved labels: Stage 0=69, Stage 2=9, ambiguous=65, neither=17; primary policy disagreements=21.
+Both selected parameter objects are null. Selected-pair overlap is null, not an observed zero.
+
+### Quantitative conclusion
+
+The common reference gate requires at least 20 Stage-2 references. Nine is insufficient and blocks
+both searches, regardless of how favorable their other metrics might be. A market-data-free test
+with these exact counts and hypothetical perfect scores confirms this necessary-condition failure
+in the frozen `_gate`. This is not evidence that Stage 0/2 are intrinsically inseparable, nor does
+it prove a Stage-0 precision/coverage failure. No candidate may be selected from diagnostic ranks.
+
+The expected null-candidate payload reconstructed under the unchanged publisher contract hashes
+exactly to the candidate SHA256 reported by the Worker. The read-only adapter still cannot retrieve
+this new job kind's full summary/trial arrays. Thus no actual per-trial F1/precision, complete list
+of failed metric gates, or independent source-membership audit is claimed. The inspected terminal
+aggregate and frozen common gate are sufficient for conservative no-candidate closure, not full
+trial-level acceptance.
+
+### Short-term-operation conclusion
+
+Forty `order_like` sampling contexts are not forty positive Stage-2 references. The sampling surface
+uses broad 20-session geometry while reference policies additionally examine 10-session behavior.
+This could contribute to the positive-reference shortage; without individual reference decisions
+we cannot attribute the nine positives to a particular policy clause. In particular, nine positives
+among the sampled 160 is not the total population frequency of orderly consolidation.
+
+The future question is whether the reference protocol expresses the intended observable orderliness
+and how to obtain independently judged sufficient references. It is not permission to remove the
+10-session conditions, lower the count gate or amend the finished run. There is still no future
+breakout, accumulation or trading implication.
+
+### Fund-use conclusion
+
+Retain the continuous Trend Evolution and Structure Order Fact families as accepted bounded
+research inputs, and retain both 0/2 names without freezing their discrete rules. Do not force every
+observation into a class or merge 0/2 based on this insufficient experiment. No allocation or risk
+action is authorized by the result.
+
+### Joint disposition
+
+Close `P3-STAGE-004` as `INCONCLUSIVE_REFERENCE_SUFFICIENCY`, meaning completed execution and
+inconclusive experiment closeout only. `runtime_accepted=true` in the existing delivery plan denotes
+that completion; `development_candidate_accepted=false` and `reference_sufficient=false` prevent
+confusion with Stage qualification. C/D are closed with this explicit evidence ceiling, not with a
+claim that every individual trial was re-audited. All implementation/read/reference/search and
+technical-retry permissions are now closed. No third execution or reference supplement occurs.
+
+A subsequent sampling/reference-design review is a separate owner decision. It must preserve the
+observed development status of this sample and the 2022-2024/2025 boundaries. Final evidence:
+`../acceptance/stage-0-2-order-proposition-result-20260910.md`.

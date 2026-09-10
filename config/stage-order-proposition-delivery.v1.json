@@ -5,8 +5,34 @@
   "review": "docs/reviews/stage-0-2-order-proposition-review-20260910.md",
   "runtime_config": "config/stage-learning/order-proposition-development.v1.json",
   "panel_config": "config/stage-learning/order-proposition-synthetic-panel.v1.json",
-  "runtime_accepted": false,
-  "runtime_qualification": null,
+  "runtime_accepted": true,
+  "runtime_qualification": {
+    "decision": "INCONCLUSIVE_REFERENCE_SUFFICIENCY",
+    "disposition": "INCONCLUSIVE",
+    "acceptance_scope": "completed_execution_and_inconclusive_closeout_only",
+    "development_candidate_accepted": false,
+    "job_id": "stage_87d166eb3f4a4f7f858f9b4f3e238462",
+    "run_id": "stage-order-proposition-development-20260910T074234Z",
+    "code_revision": "1878c625ad04b23793507d92bf0e3008052a5a85",
+    "input_digest": "sha256:3ab41405c2c804fcac6015aefce6717ce3c7c6bb9d5f759d80be94391dc83e33",
+    "manifest_sha256": "sha256:67a1159eba611ceb8af1f43c246f49acc101786e223730af6b61a9b0a8c237ac",
+    "candidate_artifact_digest": "sha256:bd38c21ff47d17921efb132cca61e49fd5afd124b4f3b30c35e8c294ac223c41",
+    "observation_count": 224346,
+    "reference_summary": {
+      "context_count": 160,
+      "bucket_counts": {"directional_control": 40, "order_like": 40, "disorder_like": 40, "mixed_low_efficiency": 40},
+      "label_counts": {"stage_0": 69, "stage_2": 9, "ambiguous": 65, "neither": 17},
+      "primary_disagreement_count": 21
+    },
+    "decisive_reason_code": "stage_2_reference_count_below_gate",
+    "selected_parameters": {"stage_0": null, "stage_2": null},
+    "selected_pair_overlap_count": null,
+    "reference_sufficient": false,
+    "human_expert_validated": false,
+    "full_trial_detail_readback": false,
+    "evidence_scope": "worker_verified_terminal_summary_and_frozen_gate_proof",
+    "evidence": "docs/acceptance/stage-0-2-order-proposition-result-20260910.md"
+  },
   "execution_attempts": [
     {
       "job_id": "stage_64da9bea52984726ab32c10bfdd36d4c",
@@ -16,12 +42,25 @@
       "error": "stage_worker_wall_budget_exceeded",
       "completed_at": "2026-09-10T06:39:21.724431+00:00",
       "result_ref": null
+    },
+    {
+      "job_id": "stage_87d166eb3f4a4f7f858f9b4f3e238462",
+      "code_revision": "1878c625ad04b23793507d92bf0e3008052a5a85",
+      "input_digest": "sha256:3ab41405c2c804fcac6015aefce6717ce3c7c6bb9d5f759d80be94391dc83e33",
+      "submitted_at": "2026-09-10T07:31:33.966795+00:00",
+      "started_at": "2026-09-10T07:31:34.792374+00:00",
+      "completed_at": "2026-09-10T07:42:35.518779+00:00",
+      "state": "succeeded",
+      "exit_code": 0,
+      "error": null,
+      "disposition": "INCONCLUSIVE",
+      "manifest_sha256": "sha256:67a1159eba611ceb8af1f43c246f49acc101786e223730af6b61a9b0a8c237ac"
     }
   ],
   "technical_retry": {
-    "authorized": true,
+    "authorized": false,
     "maximum_additional_attempts": 1,
-    "job_id": null,
+    "job_id": "stage_87d166eb3f4a4f7f858f9b4f3e238462",
     "scope": "runtime_only_same_frozen_experiment",
     "development_config_digest": "sha256:894a38df99419cadcc24d1ef3fd775ffd6189609f593dc8d4487c5f4f08bdb80",
     "panel_config_digest": "sha256:cd8724da8d7aad47d501a8cc848ae6210fba36cec5de0a1c568db2877b453912",
@@ -32,12 +71,12 @@
     "evidence": "docs/reviews/stage-0-2-order-proposition-result-review-20260910.md"
   },
   "authorization": {
-    "scope": "stage_0_2_bounded_development_proposition_experiment_only",
-    "order_proposition_implementation_authorized": true,
-    "development_data_read_authorized": true,
-    "synthetic_reference_authorized": true,
-    "limited_parameter_search_authorized": true,
-    "development_candidate_artifact_authorized": true,
+    "scope": "stage_0_2_development_experiment_closed_no_active_search",
+    "order_proposition_implementation_authorized": false,
+    "development_data_read_authorized": false,
+    "synthetic_reference_authorized": false,
+    "limited_parameter_search_authorized": false,
+    "development_candidate_artifact_authorized": false,
     "future_outcome_access_authorized": false,
     "arbitration_access_authorized": false,
     "permanent_blind_access_authorized": false,
@@ -53,7 +92,7 @@
       "id": "P3-STAGE-004",
       "title": "Test Stage 0/2 structural disorder versus orderly consolidation",
       "kind": "epic",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STRUCT-006", "P3-STRUCT-007", "P3-STAGE-003"],
       "scope": "Run one bounded development-only proposition experiment over accepted Trend Evolution and Structure Order Facts without official Stage publication or primary-stage compression.",
       "acceptance": [
@@ -62,7 +101,7 @@
         "D freezes DEVELOPMENT_PROPOSITION_CANDIDATES_FROZEN or INCONCLUSIVE without result-dependent repair",
         "No holdout, LabelCard, primary-stage, daily, strategy or trading authority opens"
       ],
-      "evidence": []
+      "evidence": ["docs/acceptance/stage-0-2-order-proposition-result-20260910.md"]
     },
     {
       "id": "P3-STAGE-004-A",
@@ -103,7 +142,7 @@
       "id": "P3-STAGE-004-C",
       "title": "Execute frozen Stage 0/2 development experiment on RX6800",
       "kind": "task",
-      "status": "ready",
+      "status": "closed",
       "depends_on": ["P3-STAGE-004-B"],
       "scope": "Execute exactly one 512-security 2020-2021 development Run and publish aggregate reference/search results plus a development candidate artifact.",
       "acceptance": [
@@ -113,13 +152,13 @@
         "No future outcome, arbitration, permanent-blind, official Stage or primary-stage output occurs",
         "If candidates freeze, selected pair overlap is exactly zero"
       ],
-      "evidence": ["docs/reviews/stage-0-2-order-proposition-result-review-20260910.md"]
+      "evidence": ["docs/acceptance/stage-0-2-order-proposition-result-20260910.md"]
     },
     {
       "id": "P3-STAGE-004-D",
       "title": "Review and freeze Stage 0/2 development disposition",
       "kind": "task",
-      "status": "blocked",
+      "status": "closed",
       "depends_on": ["P3-STAGE-004-C"],
       "scope": "Perform one post-run quantitative/trading/fund review and freeze candidate or INCONCLUSIVE disposition without changing the completed Run.",
       "acceptance": [
@@ -129,7 +168,7 @@
         "Any formal Projection Contract or external validation requires a new milestone",
         "2022-2024 fresh reuse stays forbidden and 2025 remains untouched"
       ],
-      "evidence": []
+      "evidence": ["docs/reviews/stage-0-2-order-proposition-result-review-20260910.md", "docs/acceptance/stage-0-2-order-proposition-result-20260910.md"]
     }
   ]
 }

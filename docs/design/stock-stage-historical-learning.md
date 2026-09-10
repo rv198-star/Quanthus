@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout，Stage 10/11保留development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已正式化**演化支撑事实族 / Support Evolution Fact Family**，`P3-STAGE-002` 已正式化10/11可重叠Projection Contract并关闭。第三组 `P3-STAGE-003` 已完成512只 morphology profile；`P3-STRUCT-006` 与 `P3-STRUCT-007` 已分别接受**趋势演化事实族 / Trend Evolution Fact Family**和**结构秩序事实族 / Structure Order Fact Family**。Structure Order资格只重放两份immutable F9 source artifacts，174个观察生成1,218个typed measurements，DWD/provider新读取均为0。第三组价格结构事实底座现已足够，`P3-STAGE-004` 已冻结并开放一次 512只、2020-2021 development-only 的0/2命题实验：Stage 0工作语义为结构无序且不得作为 residual，Stage 2为有序整理且不得暗示未来突破；只允许81+27有限搜索、T-only synthetic reference、零pair overlap，正式LabelCard、primary-stage、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout，Stage 10/11保留development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已正式化**演化支撑事实族 / Support Evolution Fact Family**，`P3-STAGE-002` 已正式化10/11可重叠Projection Contract并关闭。第三组 `P3-STAGE-003` 已完成512只 morphology profile；`P3-STRUCT-006` 与 `P3-STRUCT-007` 已分别接受**趋势演化事实族 / Trend Evolution Fact Family**和**结构秩序事实族 / Structure Order Fact Family**。Structure Order资格只重放两份immutable F9 source artifacts，174个观察生成1,218个typed measurements，DWD/provider新读取均为0。`P3-STAGE-004` 已以 INCONCLUSIVE_REFERENCE_SUFFICIENCY 关闭：唯一技术重试执行成功，224,346个观察中抽取160个参考，Stage 2明确正例仅9个、低于冻结最低20个，触发两项搜索共用门槛；0/2均未冻结候选，pair overlap为null而非0。完成实验不等于证明0/2不可区分；全量trial细节未单独读回，结论限于终态摘要和冻结必要门槛。当前无active 0/2搜索或重试权限，正式LabelCard、primary-stage、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
 
 ## 1. 决策摘要与继承关系
 
@@ -143,7 +143,7 @@ A须把数字、分母、区间算法、bootstrap块长/聚类、损失优先次
 
 ## 9. 实施顺序与扩展
 
-第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12 已完成`P3-STAGE-003`连续profile；趋势演化与结构秩序事实族已分别由`P3-STRUCT-006/007`正式化并接受。0/2现在进入 `P3-STAGE-004` 单独有限命题实验：只消费已接受的方向效率+区间宽度演化+中心移动Facts，先Stage 2后Stage 0，允许both-false并要求selected pair零重叠；若任一命题不过hard gates，本里程碑直接INCONCLUSIVE，不扩网格。1/12仍保持独立后续，8/9仍作为modifier假设且9的活动关系后置。
+第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12 已完成`P3-STAGE-003`连续profile；趋势演化与结构秩序事实族已分别由`P3-STRUCT-006/007`正式化并接受。0/2的 `P3-STAGE-004` 有限命题实验已关闭为 INCONCLUSIVE_REFERENCE_SUFFICIENCY：Stage 2参考正例9/20，故两项均无候选；不是市场总体仅有9个案例，也未证明语义不可区分。冻结网格、门槛与连续Facts不改，不再补样或重试。执行与证据边界见 `../acceptance/stage-0-2-order-proposition-result-20260910.md`；后续参考协议复审须另立里程碑。1/12仍保持独立后续，8/9仍作为modifier假设且9的活动关系后置。
 
 每组都走相同的局部学习+全体系冲突审计；不得独立优化12个标签后直接拼接。每组输出保留/合并/改维度/拒绝决定。第三组尤其禁止把`0`做成“其他都不满足”的剩余类，禁止把`8/9`的“赶顶/派发”当可观测事实；若难以辨识则停在观察性描述/修饰命题，不能迫使B6/B7无限扩张。
 

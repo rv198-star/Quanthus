@@ -17,6 +17,59 @@ EXTERNAL = {"P3-STRUCT-006", "P3-STRUCT-007", "P3-STAGE-003"}
 PLAN = "config/stage-order-proposition-delivery.v1.json"
 
 
+def _validate_inconclusive_closeout(raw: dict) -> None:
+    """Acceptance here closes the experiment, not a Stage candidate or full trial audit."""
+    result = raw.get("runtime_qualification")
+    if not isinstance(result, dict) or (
+        result.get("decision") != "INCONCLUSIVE_REFERENCE_SUFFICIENCY"
+        or result.get("disposition") != "INCONCLUSIVE"
+        or result.get("acceptance_scope") != "completed_execution_and_inconclusive_closeout_only"
+        or result.get("development_candidate_accepted") is not False
+        or result.get("reference_sufficient") is not False
+        or result.get("human_expert_validated") is not False
+        or result.get("full_trial_detail_readback") is not False
+        or result.get("evidence_scope") != "worker_verified_terminal_summary_and_frozen_gate_proof"
+        or result.get("selected_parameters") != {"stage_0": None, "stage_2": None}
+        or result.get("selected_pair_overlap_count") is not None
+        or result.get("decisive_reason_code") != "stage_2_reference_count_below_gate"
+    ):
+        raise ValueError("Stage-0/2 closeout promotes an inconclusive or uninspected result")
+    reference = result.get("reference_summary", {})
+    counts = reference.get("label_counts", {})
+    if (
+        result.get("observation_count") != 224346
+        or reference.get("context_count") != 160
+        or reference.get("primary_disagreement_count") != 21
+        or counts != {"stage_0": 69, "stage_2": 9, "ambiguous": 65, "neither": 17}
+        or reference.get("bucket_counts") != {
+            "directional_control": 40, "order_like": 40,
+            "disorder_like": 40, "mixed_low_efficiency": 40,
+        }
+        or not (ROOT / result["evidence"]).is_file()
+    ):
+        raise ValueError("Stage-0/2 closeout receipt counts or evidence differ")
+    runtime = json.loads((ROOT / raw["runtime_config"]).read_text(encoding="utf-8"))
+    if counts["stage_2"] >= runtime["hard_gates"]["minimum_stage_2_definite_references"]:
+        raise ValueError("Stage-0/2 closeout has no reference-sufficiency blocker")
+    attempts = raw.get("execution_attempts", [])
+    retry = raw.get("technical_retry", {})
+    if len(attempts) != 2 or retry.get("authorized") is not False:
+        raise ValueError("Stage-0/2 closeout must consume the one technical retry")
+    terminal = attempts[1]
+    if (
+        terminal.get("state") != "succeeded"
+        or terminal.get("exit_code") != 0
+        or terminal.get("error") is not None
+        or terminal.get("disposition") != "INCONCLUSIVE"
+        or terminal.get("job_id") == attempts[0].get("job_id")
+        or retry.get("job_id") != terminal.get("job_id")
+        or any(result.get(key) != terminal.get(key) for key in (
+            "job_id", "code_revision", "input_digest", "manifest_sha256"
+        ))
+    ):
+        raise ValueError("Stage-0/2 closeout retry/result binding differs")
+
+
 def load_plan() -> dict:
     raw = json.loads((ROOT / PLAN).read_text(encoding="utf-8"))
     if raw.get("schema_version") != "1.0.0" or raw.get("parent_id") != PARENT:
@@ -102,6 +155,8 @@ def load_plan() -> dict:
                                  ensure_ascii=True, allow_nan=False).encode()
             if retry.get(digest_key) != "sha256:" + hashlib.sha256(encoded).hexdigest():
                 raise ValueError("Stage-0/2 retry changes a frozen semantic contract")
+    if raw.get("runtime_accepted") is True:
+        _validate_inconclusive_closeout(raw)
     by_id = {item["id"]: item for item in raw["items"]}
     if {key: by_id[key]["status"] for key in IDS} != expected_status:
         raise ValueError("Stage-0/2 plan status differs")
@@ -174,6 +229,20 @@ def issue_body(item: dict, raw: dict, mapping: dict) -> str:
             f"Additional-attempt cap: {retry['maximum_additional_attempts']}; "
             f"retry authorized: {retry['authorized']}; retry Job: {retry['job_id']}. "
             f"Evidence: `{retry['evidence']}`."
+        )
+    qualification = raw.get("runtime_qualification")
+    if qualification is not None:
+        labels = qualification["reference_summary"]["label_counts"]
+        body.append(
+            "## Research disposition\n"
+            f"`{qualification['decision']}`; successful execution is not candidate acceptance. "
+            f"References: Stage 0={labels['stage_0']}, Stage 2={labels['stage_2']}, "
+            f"ambiguous={labels['ambiguous']}, neither={labels['neither']}. "
+            "Stage 2 has 9 references against the frozen minimum 20, a shared gate for both "
+            "searches. Both parameter selections and pair overlap are null. "
+            "No third attempt or semantic retuning. Full trial arrays were not separately read; "
+            "the terminal aggregate and frozen necessary-condition gate support only this "
+            f"no-candidate closeout. Evidence: `{qualification['evidence']}`."
         )
     if item["id"] == PARENT:
         body.append("## Children\n" + "\n".join(link(key) for key in IDS[1:]))

@@ -1469,19 +1469,30 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {"P3-STAGE-004", *[f"P3-STAGE-004-{c}" for c in "ABCD"]},
         )
         order_stage_by_id = {item["id"]: item for item in order_stage_raw["items"]}
-        self.assertEqual(order_stage_by_id["P3-STAGE-004-C"]["status"], "ready")
-        self.assertEqual(order_stage_by_id["P3-STAGE-004-D"]["status"], "blocked")
-        self.assertFalse(order_stage_raw["runtime_accepted"])
+        self.assertTrue(all(item["status"] == "closed" for item in order_stage_by_id.values()))
+        self.assertTrue(order_stage_raw["runtime_accepted"])
+        order_stage_result = order_stage_raw["runtime_qualification"]
+        self.assertEqual(order_stage_result["decision"], "INCONCLUSIVE_REFERENCE_SUFFICIENCY")
+        self.assertEqual(order_stage_result["disposition"], "INCONCLUSIVE")
+        self.assertFalse(order_stage_result["development_candidate_accepted"])
+        self.assertFalse(order_stage_result["reference_sufficient"])
+        self.assertFalse(order_stage_result["full_trial_detail_readback"])
+        self.assertEqual(order_stage_result["observation_count"], 224346)
+        self.assertEqual(order_stage_result["reference_summary"]["label_counts"]["stage_2"], 9)
+        self.assertEqual(
+            order_stage_result["selected_parameters"], {"stage_0": None, "stage_2": None}
+        )
+        self.assertIsNone(order_stage_result["selected_pair_overlap_count"])
+        self.assertFalse(order_stage_raw["technical_retry"]["authorized"])
+        self.assertEqual(order_stage_raw["technical_retry"]["job_id"], order_stage_result["job_id"])
         order_stage_auth = order_stage_raw["authorization"]
         self.assertEqual(
             order_stage_auth["scope"],
-            "stage_0_2_bounded_development_proposition_experiment_only",
+            "stage_0_2_development_experiment_closed_no_active_search",
         )
-        self.assertTrue(order_stage_auth["development_data_read_authorized"])
-        self.assertTrue(order_stage_auth["limited_parameter_search_authorized"])
-        self.assertFalse(order_stage_auth["permanent_blind_access_authorized"])
-        self.assertFalse(order_stage_auth["official_label_card_publication_authorized"])
-        self.assertFalse(order_stage_auth["primary_stage_arbitration_authorized"])
+        for key, value in order_stage_auth.items():
+            if key.endswith("_authorized"):
+                self.assertIs(value, False)
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_harness_implementation_authorized"], True

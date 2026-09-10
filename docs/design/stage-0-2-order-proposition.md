@@ -3,7 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted |
+| Accepted scope | completed experiment and INCONCLUSIVE closeout only; no Stage candidate accepted |
 | Work item | `P3-STAGE-004` |
 | Inputs | accepted `P3-STRUCT-006` Trend Evolution Facts; accepted `P3-STRUCT-007` Structure Order Facts |
 | Runtime config | `../../config/stage-learning/order-proposition-development.v1.json` |
@@ -111,3 +112,32 @@ at completion. The callback is observational: it cannot enter reference inputs, 
 Fact identities or published semantic counts. Deployment and submission must use the new exact
 Git revision through the approved node deployment route. Successful local tests are release
 readiness only; C/D cannot close until the actual retry's terminal evidence is reviewed.
+
+## 8. Completed experiment and current boundary
+
+The permitted retry `stage_87d166eb3f4a4f7f858f9b4f3e238462`, revision
+`1878c625ad04b23793507d92bf0e3008052a5a85`, succeeded in 660.726405 seconds and returned
+`INCONCLUSIVE`. Its 224,346 usable observations supplied 160 sampled references: Stage 0=69,
+Stage 2=9, ambiguous=65 and neither=17. The Stage-2 reference minimum is 20 and is a shared
+prerequisite of both searches. Thus neither proposition can freeze; this does not establish
+semantic inseparability or population-wide scarcity. Both selected parameter objects and the
+selected-pair overlap count remain null.
+
+The existing section-5 stop rule closes this milestone without another run, reference supplement,
+grid change or lower gate. Continuous Trend Evolution and Structure Order Facts and the 0/2
+vocabulary remain unchanged. The machine delivery plan's `runtime_accepted` records completed
+execution/closeout only; it explicitly denies candidate acceptance, reference sufficiency and
+further technical retry/search authority. This is not a new Projection Contract.
+
+Evidence supports the Worker-verified terminal summary, a matching reconstruction of the null
+candidate hash, and the frozen necessary-condition gate. The full remote trial arrays were not
+separately fetched through the installed read adapter; no per-trial accuracy claim or full second
+audit is made. This limitation does not justify selecting a candidate or rerunning the experiment.
+Result and three-perspective disposition:
+`../acceptance/stage-0-2-order-proposition-result-20260910.md` and
+`../reviews/stage-0-2-order-proposition-result-review-20260910.md`.
+
+Any later reference-protocol redesign requires a new owner decision. The current positive-reference
+shortage cannot be addressed by silently loosening the 10/20-session criteria or count gates after
+seeing this result. The 2022-2024 and 2025 boundaries and all official-label/daily/strategy/trading
+gates remain closed.

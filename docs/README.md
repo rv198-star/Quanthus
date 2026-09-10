@@ -176,19 +176,18 @@ nodes.
   for a separately gated Stage-0/2 proposition experiment. Acceptance:
   `acceptance/structure-order-result-20260910.md`; route: `design/structure-order-facts.md`; plan:
   `config/structure-order-delivery.v1.json`.
-- `P3-STAGE-004` is the active bounded Stage-0/2 proposition experiment. Stage 0 is treated as
-  positive **结构无序 / structural disorder** evidence rather than a residual class; Stage 2 is
-  **有序整理 / orderly consolidation** and does not imply accumulation or future breakout. The
-  frozen 512-security 2020-2021 development Run consumes accepted Trend Evolution + Structure Order
-  Facts, resolves T-only synthetic references before search, tests 81 Stage-2 and 27 Stage-0 finite
-  candidates, and requires zero selected-pair overlap. Both propositions may be false; no
-  `primary_stage` or official LabelCard is emitted. Route: `design/stage-0-2-order-proposition.md`;
-  plan: `config/stage-order-proposition-delivery.v1.json`. The first C Job
-  `stage_64da9bea52984726ab32c10bfdd36d4c` failed at the 2700-second runtime limit, not a semantic
-  INCONCLUSIVE result. Object-local input-digest reuse and observational progress logging are the
-  bounded runtime repair. Check for a recoverable sealed original artifact before the one permitted
-  technical retry; no new reference rules, thresholds or larger time budget. C/D remain unaccepted.
-  Execution history, pending result review and runtime-cost evidence:
+- `P3-STAGE-004` is closed as `INCONCLUSIVE_REFERENCE_SUFFICIENCY`, not accepted Stage-0/2
+  candidates. After the original technical timeout, the one runtime-only retry
+  `stage_87d166eb3f4a4f7f858f9b4f3e238462` succeeded in 660.726405 seconds without changing the
+  frozen experiment or its 2700-second limit. Its terminal result reports 224,346 observations and
+  160 reference contexts: Stage 0=69, Stage 2=9, ambiguous=65, neither=17. The frozen minimum of 20
+  Stage-2 references is a shared gate for both searches; both selections and pair overlap are null.
+  This proves reference insufficiency in the selected sample, not population-wide scarcity or
+  inseparability. The full trial arrays were not separately read; no trial-specific accuracy is
+  claimed. Continuous Facts and the 0/2 vocabulary remain unchanged. No further retry, supplement,
+  search, primary-stage, official LabelCard, holdout, daily or strategy authority opens. Route:
+  `design/stage-0-2-order-proposition.md`; plan: `config/stage-order-proposition-delivery.v1.json`;
+  result: `acceptance/stage-0-2-order-proposition-result-20260910.md`; review and execution history:
   `reviews/stage-0-2-order-proposition-result-review-20260910.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

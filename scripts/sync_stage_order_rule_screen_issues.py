@@ -9,6 +9,8 @@ from pathlib import Path
 from sync_github_planning import GitHub, issue_by_stable_id
 
 from quanthus.stage_learning.order_rule_screen import RULE_DIGEST, load_rule
+from quanthus.stage_learning.order_rule_validation import VALIDATION_DIGEST
+from quanthus.structure_v2_inputs import digest
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN = "config/stage-order-rule-screen-delivery.v1.json"
@@ -18,7 +20,7 @@ REPO = "rv198-star/Quanthus"
 
 
 def validate_plan(raw: dict) -> None:
-    """This revision validates design/seed completion, not unexecuted runtime acceptance."""
+    """Validate the frozen screen and evidence-blocked preparation, never invent a runtime PASS."""
     if (raw["schema_version"] != "quanthus.stage-order-rule-screen-delivery.v1"
             or raw["parent_id"] != PARENT
             or tuple(item["id"] for item in raw["items"]) != IDS):
@@ -37,8 +39,26 @@ def validate_plan(raw: dict) -> None:
     expected_auth["implementation_and_synthetic_tests"] = True
     if raw["authorization"] != expected_auth:
         raise ValueError("screen_unauthorized_activation")
-    expected_states = dict(zip(IDS, ("ready", "closed", "ready", "blocked", "blocked"),
-                               strict=True))
+    states = ("ready", "closed", "ready", "blocked", "blocked")
+    checkpoint = raw.get("preparation_checkpoint")
+    if checkpoint is not None:
+        if (checkpoint.get("state") != "BLOCKED_SOURCE_ISOLATION"
+                or checkpoint.get("reason_code") != "RX6800_SSH_KEY_REJECTED_PERMISSIONS"
+                or checkpoint.get("read_attempt_exit_code") != 255
+                or checkpoint.get("source_isolation_verified") is not False
+                or checkpoint.get("source_membership_verified") is not False
+                or checkpoint.get("old_cohort_digest") is not None
+                or type(checkpoint.get("new_market_data_reads")) is not int
+                or checkpoint["new_market_data_reads"] != 0
+                or type(checkpoint.get("new_jobs_submitted")) is not int
+                or checkpoint["new_jobs_submitted"] != 0):
+            raise ValueError("screen_preparation_checkpoint_claim")
+        for key in ("component", "tests", "evidence"):
+            path = (ROOT / checkpoint[key]).resolve()
+            if not path.is_relative_to(ROOT) or not path.is_file():
+                raise ValueError("screen_preparation_evidence_missing")
+        states = ("blocked", "closed", "blocked", "blocked", "blocked")
+    expected_states = dict(zip(IDS, states, strict=True))
     if {item["id"]: item["status"] for item in raw["items"]} != expected_states:
         raise ValueError("screen_status_requires_real_evidence")
     for key in ("design", "rule_contract", "implementation"):
@@ -49,6 +69,8 @@ def validate_plan(raw: dict) -> None:
     if len(requirements) != 8 or len(set(requirements)) != 8:
         raise ValueError("screen_activation_requirements")
     validation = raw["validation"]
+    if digest(validation) != VALIDATION_DIGEST:
+        raise ValueError("screen_frozen_validation_drift")
     if (validation["candidate_count"] != 1 or validation["data_years_allowed"] != [2019, 2020, 2021]
             or validation["report_year"] != 2021 or validation["excluded_old_cohort_size"] != 512
             or validation["maximum_new_pool_securities"] != 512
@@ -139,6 +161,10 @@ def main() -> int:
             ("## Children\n" + ", ".join(map(link, IDS[1:])) if item["id"] == PARENT
              else "## Parent\n" + link(PARENT)),
         ]
+        if raw.get("preparation_checkpoint") is not None:
+            sections.append("## Preparation checkpoint\n" + json.dumps(
+                raw["preparation_checkpoint"], sort_keys=True,
+            ))
         return "\n\n".join(sections) + "\n"
 
     ordered = [*raw["items"][1:], raw["items"][0]]

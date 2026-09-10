@@ -385,9 +385,9 @@ Machine plan: `../../config/stage-order-rule-screen-delivery.v1.json`.
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | ready; actual C/D business disposition required |
+| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | blocked; #292; source isolation unresolved, C/D business disposition required |
 | P3-STAGE-007-A | Resolve business boundaries and freeze one executable seed | P3-STAGE-006 | closed; `../stage-order-rule-screen.md`; synthetic rule-contract tests |
-| P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | ready; no new market run before exact readiness evidence |
+| P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | blocked; #289; selection/scoring components tested; RX SSH source read rejected; `../../acceptance/stage-order-rule-screen-b-checkpoint-20260911.md` |
 | P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | blocked; at most 160 cases, 320 opinions, two Jobs |
 | P3-STAGE-007-D | Attribute errors and give the business disposition | P3-STAGE-007-C | blocked; no automatic supplementation or tuning |
 

@@ -189,4 +189,35 @@ compile、pytest和planning检查：2014 passed、7 skipped，pytest耗时247.83
 另一次附加只读摘要汇总调用被工具安全检查拦截，未获得结果、未重试该调用，也没有
 将其记作验证通过；上述规则和计划绑定由实际运行的测试及正常规划检查提供证据。
 
-本节仅证明A设计与工程种子完成；B来源隔离和执行绑定仍待实现，C/D没有运行回执。
+本节仅证明A设计与工程种子完成；当时B来源隔离和执行绑定待实现，C/D没有运行回执。
+
+## 9. B的选择/评分组件与来源检查点
+
+用户批准沿评审继续后，新增薄组件
+`src/quanthus/stage_learning/order_rule_validation.py`，不改变规则、门槛或005证据协议。
+机器计划的validation子树整体以
+`sha256:1512c0f0fdc46a7c0bcd18e4a7f3c46bae83a4d5e08a885dcb42632481bc9989`绑定。
+
+哈希键固定为canonical对象：seed、purpose、security_id、market_date、bucket。
+purpose分别为pool、coverage_identity、date、challenge_identity；无日期用null、无桶用
+空串，摘要并列时用身份或日期作稳定次序。覆盖面板先按coverage_identity固定至多64个
+身份，排序索引0—15/16—31/32—47/48—63分别分配四季度；每槽选本季度日期哈希最小
+的已提供尝试，缺失不更换身份。已分配覆盖槽的身份即使无目标记录，也不进入挑战桶。
+挑战桶逐桶按date选每身份的一例，再按challenge_identity取配额，保持原无回填规定。
+选中记录保留观察摘要，计分时核对同一经济身份、代码、日期、季度和事实值。
+
+旧cohort校验要求原接受manifest的精确字节摘要、其绑定的summary和512代码的完整
+cohort_digest一致。经济身份集合逻辑排除历史代码复用的所有身份及别名；仅校验传入
+映射不能证明它来自受认证源，故source_membership_verified始终false，运行侧仍须
+保留源成员资格的实际证据，不接收调用者自填true来激活。
+
+计分只读取已封存005参考包，先冷校验并核对外部预绑定的manifest/selection摘要，再
+执行唯一007规则。输出完整混淆表、两面板和季度分母，未知/分歧分开，未断言计入漏报。
+其SCORING_COMPONENT_ONLY输出只报告门槛计算，不能代替来源隔离、评审可见性或整个
+运行结案；独立验证及正式标签授权保持false。组件无需并且不提供数据获取或Job入口。
+
+当前只读RX路由因既有SSH密钥权限被客户端拒绝（exit255），未取得旧运行队列摘要；
+B因此部分实现但仍BLOCKED_SOURCE_ISOLATION，父里程碑未完成。不得以合成测试或
+修订文档替代真实来源绑定。恢复既有读通道后接续元数据校验、最薄受控运行适配与完整
+预算验证，再进入C/D，不重做A/005/006。实际检查及资源测量见
+[B检查点](../acceptance/stage-order-rule-screen-b-checkpoint-20260911.md)。

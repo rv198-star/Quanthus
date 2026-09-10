@@ -27,8 +27,8 @@ def test_review_complete_does_not_mean_milestone_complete():
     assert not raw["milestone_completed"]
     assert raw["runtime_receipts"] is None
     assert [(i["id"], i["status"]) for i in raw["items"]] == [
-        ("P3-STAGE-007", "ready"), ("P3-STAGE-007-A", "closed"),
-        ("P3-STAGE-007-B", "ready"), ("P3-STAGE-007-C", "blocked"),
+        ("P3-STAGE-007", "blocked"), ("P3-STAGE-007-A", "closed"),
+        ("P3-STAGE-007-B", "blocked"), ("P3-STAGE-007-C", "blocked"),
         ("P3-STAGE-007-D", "blocked"),
     ]
     from sync_github_planning import work_items
@@ -81,6 +81,27 @@ def test_no_parent_pass_or_runtime_receipt_from_synthetic_rule_tests():
     raw = script.load_plan()
     raw["milestone_completed"] = True
     with pytest.raises(ValueError, match="unexecuted"):
+        script.validate_plan(raw)
+
+
+@pytest.mark.parametrize("key,value", [
+    ("source_isolation_verified", True), ("source_membership_verified", True),
+    ("old_cohort_digest", "sha256:" + "0" * 64), ("new_market_data_reads", 1),
+    ("new_jobs_submitted", 1), ("read_attempt_exit_code", 0),
+])
+def test_component_tests_cannot_fill_missing_real_source_evidence(key, value):
+    script = module()
+    raw = script.load_plan()
+    raw["preparation_checkpoint"][key] = value
+    with pytest.raises(ValueError, match="checkpoint_claim"):
+        script.validate_plan(raw)
+
+
+def test_sampling_band_drift_is_rejected_before_activation():
+    script = module()
+    raw = script.load_plan()
+    raw["validation"]["sampling_bands"]["efficiency_abs_max"] = "0.9"
+    with pytest.raises(ValueError, match="validation_drift"):
         script.validate_plan(raw)
 
 

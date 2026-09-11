@@ -1475,8 +1475,18 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertEqual(screen_ids, {"P3-STAGE-007", *[f"P3-STAGE-007-{c}" for c in "ABCD"]})
         self.assertIs(screen_raw["milestone_completed"], False)
         self.assertIsNone(screen_raw["runtime_receipts"])
+        screen_positive_authority = {
+            "implementation_and_synthetic_tests",
+            "runtime_job_submission",
+            "new_market_data_read",
+        }
         for key, value in screen_raw["authorization"].items():
-            self.assertIs(value, key == "implementation_and_synthetic_tests")
+            self.assertIs(value, key in screen_positive_authority)
+        screen_runtime = screen_raw["runtime_contract"]
+        self.assertEqual(screen_runtime["phase"], "prepare_only")
+        self.assertEqual(screen_runtime["maximum_jobs"], 1)
+        self.assertIs(screen_runtime["opinion_generation"], False)
+        self.assertIs(screen_runtime["candidate_scoring"], False)
         self.assertEqual(
             reference_feasibility_ids,
             {"P3-STAGE-006", *[f"P3-STAGE-006-{c}" for c in "ABCD"]},

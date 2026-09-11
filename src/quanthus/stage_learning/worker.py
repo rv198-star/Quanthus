@@ -40,8 +40,10 @@ STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB = (
 )
 STAGE_THIRD_GROUP_PROFILE_JOB = "quanthus.stage-third-group-profile.v1"
 STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB = "quanthus.stage-order-proposition-development.v1"
+STAGE_ORDER_RULE_PREPARE_JOB = "quanthus.stage-order-rule-prepare.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
+ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
 MAIN_REF = "refs/remotes/stage-control/main"
@@ -113,6 +115,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.order_proposition_development",
         "artifact_glob": "stage-order-proposition-development-*",
         "process_error": "stage_order_proposition_development_process_failed",
+        "wall_seconds": 2700,
+    },
+    STAGE_ORDER_RULE_PREPARE_JOB: {
+        "config": "config/stage-learning/order-rule-prepare.v1.json",
+        "module": "quanthus.stage_learning.order_rule_prepare",
+        "artifact_glob": "stage-order-rule-prepare-*",
+        "process_error": "stage_order_rule_prepare_process_failed",
         "wall_seconds": 2700,
     },
 }
@@ -265,6 +274,10 @@ class StageWorkerPaths:
         return self.control_root / "qualification-budget.json"
 
     @property
+    def order_rule_prepare_budget(self) -> Path:
+        return self.control_root / "order-rule-prepare-budget.json"
+
+    @property
     def logs(self) -> Path:
         return self.training_root / "logs" / "stage-worker"
 
@@ -287,6 +300,44 @@ class StageWorkerPaths:
             self.runs,
         ):
             path.mkdir(parents=True, exist_ok=True)
+
+
+def _order_rule_prepare_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": ORDER_RULE_PREPARE_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-007-B",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_order_rule_prepare_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.order_rule_prepare_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "order-rule prepare budget")
+    if (
+        marker.get("schema_version") != ORDER_RULE_PREPARE_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-007-B"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("order-rule prepare budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_ORDER_RULE_PREPARE_JOB
+        or marker.get("input_digest") != job.input_digest
+        or job.code_revision != code_revision
+    ):
+        raise StageWorkerError("order-rule prepare is already bound to another immutable input")
+    observed = read_status(paths, job.job_id)
+    return {
+        **job.to_dict(),
+        "input_digest": job.input_digest,
+        "state": observed["state"],
+        "idempotent_reuse": True,
+    }
 
 
 def _qualification_budget_value(job: StageJob, *, state: str, reserved_at: str) -> dict[str, Any]:
@@ -660,6 +711,22 @@ class StageWorker:
                 "observation_count": verified.get("observation_count"),
                 "candidate_artifact_digest": verified.get("candidate_artifact_digest"),
             }
+        if job.kind == STAGE_ORDER_RULE_PREPARE_JOB:
+            result["order_rule_prepare"] = {
+                "source_isolation_verified": verified.get("source_isolation_verified"),
+                "old_cohort_size": verified.get("old_cohort_size"),
+                "excluded_economic_identity_count": verified.get(
+                    "excluded_economic_identity_count"
+                ),
+                "candidate_population_count": verified.get("candidate_population_count"),
+                "pool_size": verified.get("pool_size"),
+                "selected_case_count": verified.get("selected_case_count"),
+                "selection_digest": verified.get("selection_digest"),
+                "selection_shortfalls": verified.get("selection_shortfalls"),
+                "evidence_digest": verified.get("evidence_digest"),
+                "evidence_source_row_count": verified.get("evidence_source_row_count"),
+                "review_ready": verified.get("review_ready"),
+            }
         return result
 
     def execute(self, job: StageJob) -> dict[str, Any]:
@@ -849,6 +916,10 @@ def submit_job(
     spec = _JOB_SPECS.get(kind)
     if spec is None:
         raise StageWorkerError("submit kind is not admitted")
+    if kind == STAGE_ORDER_RULE_PREPARE_JOB:
+        existing = _existing_order_rule_prepare_submission(paths, code_revision=code_revision)
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -858,8 +929,11 @@ def submit_job(
     )
     path = paths.queue / f"{job.job_id}.json"
     qualification_reserved = job.kind == STAGE_QUALIFICATION_JOB
+    prepare_reserved = job.kind == STAGE_ORDER_RULE_PREPARE_JOB
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
+    if prepare_reserved:
+        _exclusive_json(paths.order_rule_prepare_budget, _order_rule_prepare_budget_value(job))
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -870,11 +944,15 @@ def submit_job(
         if qualification_reserved:
             with suppress(StageWorkerError):
                 _release_qualification_reservation(paths, job)
+        if prepare_reserved:
+            paths.order_rule_prepare_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
             with suppress(StageWorkerError):
                 _release_qualification_reservation(paths, job)
+        if prepare_reserved:
+            paths.order_rule_prepare_budget.unlink(missing_ok=True)
         raise
     return {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
 

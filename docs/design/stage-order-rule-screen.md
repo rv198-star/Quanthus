@@ -216,8 +216,33 @@ cohort_digest一致。经济身份集合逻辑排除历史代码复用的所有�
 其SCORING_COMPONENT_ONLY输出只报告门槛计算，不能代替来源隔离、评审可见性或整个
 运行结案；独立验证及正式标签授权保持false。组件无需并且不提供数据获取或Job入口。
 
-当前只读RX路由因既有SSH密钥权限被客户端拒绝（exit255），未取得旧运行队列摘要；
-B因此部分实现但仍BLOCKED_SOURCE_ISOLATION，父里程碑未完成。不得以合成测试或
-修订文档替代真实来源绑定。恢复既有读通道后接续元数据校验、最薄受控运行适配与完整
-预算验证，再进入C/D，不重做A/005/006。实际检查及资源测量见
-[B检查点](../acceptance/stage-order-rule-screen-b-checkpoint-20260911.md)。
+当时只读RX路由因既有SSH密钥权限被客户端拒绝（exit255），未取得旧运行队列摘要；
+因此该检查点保持BLOCKED_SOURCE_ISOLATION历史状态，不以合成测试替代真实来源绑定。
+实际检查及资源测量见
+[B阻断检查点](../acceptance/stage-order-rule-screen-b-checkpoint-20260911.md)。
+
+## 10. B恢复后的prepare-only运行合同
+
+后续排查确认MCP服务以`ubuntu`运行，而旧训练私钥通过ACL跨用户读取导致OpenSSH拒绝；
+同时RX Tailscale节点曾短时离线。服务身份改为读取`ubuntu`独占0600私钥并恢复网络后，
+通过生产MCP Unix socket的既有`stage_worker_status`操作成功读回旧004终态，原Job、
+revision、manifest、160参考计数和INCONCLUSIVE处置全部与历史证据一致。这只证明受控
+通道恢复，不等于旧512已经重建。
+
+B新增`config/stage-learning/order-rule-prepare.v1.json`及
+`src/quanthus/stage_learning/order_rule_prepare.py`。唯一prepare Job按以下顺序执行：
+旧artifact冷校验 -> 旧2019 cohort重建并核对真实cohort digest -> 旧source manifest重建
+-> 2019—2021经济身份全排除 -> 2020-12-31前冻结的新开发池 -> 2021固定选例 -> 每例
+61会话T-only证据封存。身份投影只读取开发期上市/证券元数据；行情读取仍由原development
+reader的2012—2021硬边界控制。2022—2024、2025及未来结果均没有新权限。
+
+Stage Worker新增固定kind `quanthus.stage-order-rule-prepare.v1`和独立单次预算标记。相同
+exact revision重复提交返回原Job，不创建第二个；不同revision或输入不能借重复提交换批。
+本阶段只开放这1个prepare Job。它不生成意见、不评分候选、不搜索参数；C的resolve+score
+仍未开放。真实prepare成功并给出old cohort、经济身份排除、新池、选例与evidence digest
+后，B才可关闭。
+
+恢复后的运行前证据见
+[B pre-run readiness](../acceptance/stage-order-rule-screen-b-prerun-20260911.md)。生产MCP当前
+`stage_worker_submit`执行器仍是旧的qualification专用入口，因此这只是运行合同ready；
+不能把“可由节点本地受控CLI提交”写成“本会话已经提交”。

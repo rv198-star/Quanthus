@@ -1,0 +1,57 @@
+{
+  "schema_version": "quanthus.stage-order-rule-prepare.v1",
+  "work_item": "P3-STAGE-007-B",
+  "purpose": "Reconstruct and verify the exposed Stage-004 cohort, exclude all mapped economic identities plus Stage-006 identities, freeze a task-disjoint 2021 development case set, and publish T-only reference evidence without opinions or scoring.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "old_run": {
+    "job_id": "stage_87d166eb3f4a4f7f858f9b4f3e238462",
+    "code_revision": "1878c625ad04b23793507d92bf0e3008052a5a85",
+    "artifact_relative_path": "runs/stage-worker/stage_87d166eb3f4a4f7f858f9b4f3e238462/stage-order-proposition-development-20260910T074234Z",
+    "manifest_sha256": "sha256:67a1159eba611ceb8af1f43c246f49acc101786e223730af6b61a9b0a8c237ac",
+    "development_config": "config/stage-learning/order-proposition-development.v1.json",
+    "development_config_digest": "sha256:894a38df99419cadcc24d1ef3fd775ffd6189609f593dc8d4487c5f4f08bdb80",
+    "cohort_size": 512
+  },
+  "source_scope": {
+    "identity_start": "2019-01-01",
+    "identity_end": "2021-12-31",
+    "candidate_scan_start": "2020-01-02",
+    "candidate_cohort_date": "2020-12-31",
+    "candidate_minimum_observations": 100,
+    "candidate_seed": "stage007-frozen-screen-20260911-v1|candidate-population",
+    "history_start": "2019-01-01",
+    "report_start": "2021-01-01",
+    "report_end": "2021-12-31"
+  },
+  "bindings": {
+    "reference_protocol_digest": "sha256:927edd8451c9db9adb0ac06e24dcbc55d11e1ac82aac87123a4d9627557eaf1e",
+    "rule_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0",
+    "validation_digest": "sha256:1512c0f0fdc46a7c0bcd18e4a7f3c46bae83a4d5e08a885dcb42632481bc9989"
+  },
+  "limits": {
+    "maximum_candidate_codes": 10000,
+    "maximum_identity_members": 100000,
+    "maximum_pool_securities": 512,
+    "maximum_scan_rows": 187392,
+    "maximum_cases": 160,
+    "maximum_evidence_bytes": 33554432,
+    "worker_wall_seconds": 2700
+  },
+  "authority": {
+    "development_data_read": true,
+    "identity_metadata_read": true,
+    "old_cohort_metadata_reconstruction": true,
+    "fixed_case_selection": true,
+    "reference_evidence_publication": true,
+    "opinion_generation": false,
+    "candidate_scoring": false,
+    "parameter_search": false,
+    "future_outcome_access": false,
+    "arbitration_access": false,
+    "permanent_blind_access": false,
+    "official_labels": false,
+    "primary_stage": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

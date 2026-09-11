@@ -377,17 +377,19 @@ uses exactly the old preregistered R0 numbers as one new research seed, and dist
 NO_ASSERTION from a reference NEITHER. The seed is an executable hypothesis, not a qualified
 classifier. Source isolation, fixed sampling, actual reference collection and an error-based
 business disposition remain necessary; completing A or B cannot close the parent.
-The current increment does not open a Worker Job. B must bind the exact source, historical exposure
-exclusion, runtime and resource contracts before activation. References preserve actual provenance;
-same-origin simulation cannot become independent validation. No old contract, permanent dataset,
-sealed partition, official label or trading boundary changes.
+The current increment now opens exactly one prepare-only Worker Job after the RX control path was
+restored and the source/runtime contract was frozen. That Job may reconstruct the old cohort,
+prove historical economic-identity exclusion and freeze T-only 2021 evidence; it may not generate
+opinions or score the candidate. References preserve actual provenance; same-origin simulation
+cannot become independent validation. No old contract, permanent dataset, sealed partition,
+official label or trading boundary changes.
 Machine plan: `../../config/stage-order-rule-screen-delivery.v1.json`.
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | blocked; #292; source isolation unresolved, C/D business disposition required |
+| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | ready; #292; one prepare Job authorized, C/D business disposition still required |
 | P3-STAGE-007-A | Resolve business boundaries and freeze one executable seed | P3-STAGE-006 | closed; `../stage-order-rule-screen.md`; synthetic rule-contract tests |
-| P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | blocked; #289; selection/scoring components tested; RX SSH source read rejected; `../../acceptance/stage-order-rule-screen-b-checkpoint-20260911.md` |
+| P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | ready; #289; prepare-only route and restored RX control path; `../../acceptance/stage-order-rule-screen-b-prerun-20260911.md` |
 | P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | blocked; at most 160 cases, 320 opinions, two Jobs |
 | P3-STAGE-007-D | Attribute errors and give the business disposition | P3-STAGE-007-C | blocked; no automatic supplementation or tuning |
 

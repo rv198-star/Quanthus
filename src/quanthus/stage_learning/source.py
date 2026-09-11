@@ -270,6 +270,86 @@ def discover_development_security_population(
     )
 
 
+def read_development_identity_members(
+    *,
+    training_root: Path,
+    node_config: Mapping[str, Any],
+    security_codes: tuple[str, ...],
+    start: date,
+    end: date,
+    active_on: date | None = None,
+) -> tuple[dict[str, str], ...]:
+    """Project development-only code-to-economic-identity membership.
+
+    This is metadata-only. It verifies the same immutable base/correction source binding as the
+    normal development reader, does not read prices or future targets, and refuses dates after
+    2021. ``active_on`` narrows the projection to listings active on one development date; when it
+    is omitted, every identity overlapping ``start..end`` is retained so historical code reuse is
+    conservatively excluded.
+    """
+    if (
+        type(security_codes) is not tuple
+        or not security_codes
+        or len(set(security_codes)) != len(security_codes)
+        or any(not _CODE.fullmatch(code) for code in security_codes)
+    ):
+        raise StageDevelopmentSourceError("identity security_codes must be unique six-digit codes")
+    DevelopmentReadScope(start, start, end)
+    if active_on is not None and not start <= active_on <= end:
+        raise StageDevelopmentSourceError("identity active_on is outside the declared scope")
+    base, _correction, _source_binding = _source_roots(training_root, node_config)
+    try:
+        import duckdb
+    except ModuleNotFoundError as exc:
+        raise StageDevelopmentSourceError(
+            "development identity projection requires duckdb"
+        ) from exc
+
+    listing_path = base / "payload/listed_company/dwd_listing.parquet"
+    security_path = base / "payload/listed_company/dwd_security.parquet"
+    codes = ",".join("?" for _ in security_codes)
+    start_text, end_text = start.isoformat(), end.isoformat()
+    if active_on is None:
+        temporal = (
+            f"CAST(listing.effective_from AS DATE) <= DATE '{end_text}' "
+            f"AND (listing.effective_to IS NULL OR "
+            f"CAST(listing.effective_to AS DATE) >= DATE '{start_text}')"
+        )
+    else:
+        day = active_on.isoformat()
+        temporal = (
+            f"CAST(listing.effective_from AS DATE) <= DATE '{day}' "
+            f"AND (listing.effective_to IS NULL OR DATE '{day}' < "
+            f"CAST(listing.effective_to AS DATE))"
+        )
+    connection = duckdb.connect(":memory:")
+    try:
+        rows = connection.execute(
+            f"""
+            SELECT DISTINCT listing.listing_code AS security_code, listing.security_id
+            FROM read_parquet({_sql_literal(str(listing_path))}) listing
+            JOIN read_parquet({_sql_literal(str(security_path))}) security
+              ON security.security_id=listing.security_id
+            WHERE listing.knowledge_to IS NULL AND security.knowledge_to IS NULL
+              AND listing.venue_id IN ('{_SSE}','{_SZSE}')
+              AND listing.listing_code IN ({codes})
+              AND {temporal}
+            ORDER BY security_code, security_id
+            """,
+            list(security_codes),
+        ).fetchall()
+    finally:
+        connection.close()
+    result = tuple(
+        {"security_code": str(code), "security_id": str(security_id)}
+        for code, security_id in rows
+        if _CODE.fullmatch(str(code)) and str(security_id)
+    )
+    if len({(item["security_code"], item["security_id"]) for item in result}) != len(result):
+        raise StageDevelopmentSourceError("identity projection contains duplicate membership")
+    return result
+
+
 def discover_development_security_codes(
     *,
     training_root: Path,

@@ -8,25 +8,33 @@
   "implementation": "src/quanthus/stage_learning/order_rule_screen.py",
   "review_provenance": "owner_authorized_single_assistant_four_role_simulation",
   "milestone_completed": false,
-  "runtime_contract": null,
+  "runtime_contract": {
+    "path": "config/stage-learning/order-rule-prepare.v1.json",
+    "digest": "sha256:b27bbc1d3d54f9e410a8ca7b931af63f62690be9b911d538aeb0cda5666e9bd9",
+    "kind": "quanthus.stage-order-rule-prepare.v1",
+    "phase": "prepare_only",
+    "maximum_jobs": 1,
+    "opinion_generation": false,
+    "candidate_scoring": false
+  },
   "runtime_receipts": null,
   "preparation_checkpoint": {
-    "state": "BLOCKED_SOURCE_ISOLATION",
-    "reason_code": "RX6800_SSH_KEY_REJECTED_PERMISSIONS",
-    "read_attempt_exit_code": 255,
+    "state": "READY_FOR_PREPARE_RUN",
+    "reason_code": "RX6800_CONTROL_PATH_RESTORED_AND_PREPARE_ROUTE_IMPLEMENTED",
+    "read_attempt_exit_code": 0,
     "source_isolation_verified": false,
     "source_membership_verified": false,
     "old_cohort_digest": null,
     "new_market_data_reads": 0,
     "new_jobs_submitted": 0,
-    "component": "src/quanthus/stage_learning/order_rule_validation.py",
-    "tests": "tests/unit/test_stage_order_rule_validation.py",
-    "evidence": "docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md"
+    "component": "src/quanthus/stage_learning/order_rule_prepare.py",
+    "tests": "tests/unit/test_stage_order_rule_prepare.py",
+    "evidence": "docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md"
   },
   "authorization": {
     "implementation_and_synthetic_tests": true,
-    "runtime_job_submission": false,
-    "new_market_data_read": false,
+    "runtime_job_submission": true,
+    "new_market_data_read": true,
     "parameter_search": false,
     "arbitration_access": false,
     "permanent_blind_access": false,
@@ -109,7 +117,7 @@
   ],
   "items": [
     {
-      "id": "P3-STAGE-007", "kind": "epic", "status": "blocked",
+      "id": "P3-STAGE-007", "kind": "epic", "status": "ready",
       "title": "Decide whether one fixed scale-explicit rule warrants broader validation",
       "depends_on": ["P3-STAGE-006"],
       "scope": "One preregistered candidate, task-disjoint development references, immutable scoring and a business disposition; no framework rebuild.",
@@ -125,12 +133,12 @@
       "evidence": ["docs/design/stage-order-rule-screen.md", "tests/unit/test_stage_order_rule_screen.py"]
     },
     {
-      "id": "P3-STAGE-007-B", "kind": "task", "status": "blocked",
+      "id": "P3-STAGE-007-B", "kind": "task", "status": "ready",
       "title": "Bind disjoint sources, fixed sampling and a minimal execution adapter",
       "depends_on": ["P3-STAGE-007-A"],
       "scope": "Prove economic-identity exclusion, freeze source/code/resource bindings, reuse reference packets and the controlled Worker; do not open the validation set during rule development.",
       "acceptance": ["All runtime activation requirements are verified", "Unable to prove source isolation is an explicit blocker", "Existing 004/005/006 contracts and outcomes are untouched"],
-      "evidence": ["docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md"]
+      "evidence": ["docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md"]
     },
     {
       "id": "P3-STAGE-007-C", "kind": "task", "status": "blocked",

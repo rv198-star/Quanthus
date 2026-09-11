@@ -12,6 +12,7 @@ from quanthus.stage_learning.worker import (
     JOB_SCHEMA,
     STAGE_CAPACITY_CENSUS_JOB,
     STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
+    STAGE_ORDER_RULE_PREPARE_JOB,
     STAGE_QUALIFICATION_JOB,
     STAGE_REFERENCE_PILOT_JOB,
     STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
@@ -127,6 +128,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB,
         STAGE_THIRD_GROUP_PROFILE_JOB,
         STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
+        STAGE_ORDER_RULE_PREPARE_JOB,
     }
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
 
@@ -196,6 +198,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB,
         STAGE_THIRD_GROUP_PROFILE_JOB,
         STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
+        STAGE_ORDER_RULE_PREPARE_JOB,
     }
     assert receipt["concurrency"] == 1
 
@@ -303,6 +306,66 @@ def test_order_proposition_development_kind_gets_its_frozen_config(tmp_path: Pat
     assert submitted["config"] == "config/stage-learning/order-proposition-development.v1.json"
     assert _JOB_SPECS[STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB]["wall_seconds"] == 2700
     assert not worker_paths.qualification_budget.exists()
+
+
+def test_order_rule_prepare_kind_gets_its_frozen_config(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+    )
+    assert submitted["kind"] == STAGE_ORDER_RULE_PREPARE_JOB
+    assert submitted["config"] == "config/stage-learning/order-rule-prepare.v1.json"
+    assert _JOB_SPECS[STAGE_ORDER_RULE_PREPARE_JOB]["wall_seconds"] == 2700
+    assert not worker_paths.qualification_budget.exists()
+
+
+def test_order_rule_prepare_submit_is_single_job_idempotent(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    first = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+    )
+    second = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+    )
+    assert second["job_id"] == first["job_id"]
+    assert second["state"] == "queued"
+    assert second["idempotent_reuse"] is True
+    assert len(list(worker_paths.queue.glob("stage_*.json"))) == 1
+    marker = json.loads(worker_paths.order_rule_prepare_budget.read_text(encoding="utf-8"))
+    assert marker["job"]["job_id"] == first["job_id"]
+    assert marker["input_digest"] == first["input_digest"]
+
+    with pytest.raises(StageWorkerError, match="another immutable input"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
+            kind=STAGE_ORDER_RULE_PREPARE_JOB,
+        )
+
+
+def test_order_rule_prepare_cancel_does_not_open_a_second_job(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    first = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+    )
+    canceled = cancel_job(worker_paths, first["job_id"])
+    assert canceled["state"] == "canceled"
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+    )
+    assert repeated["job_id"] == first["job_id"]
+    assert repeated["state"] == "canceled"
+    assert repeated["idempotent_reuse"] is True
 
 
 def test_qualification_kind_gets_its_frozen_config(tmp_path: Path) -> None:

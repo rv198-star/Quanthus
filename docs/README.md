@@ -214,11 +214,13 @@ nodes.
   `acceptance/stage-order-reference-feasibility-20260911.md`.
 - `P3-STAGE-007` is open for one fixed-rule, task-disjoint development screen. The authorized
   four-role simulated review has frozen the descriptive target and an executable unchanged R0 seed;
-  this is not market acceptance. A is complete; B now has tested fixed selection/scoring components
-  but remains source-blocked: the existing RX read channel rejected its SSH key permissions.
-  [B checkpoint](acceptance/stage-order-rule-screen-b-checkpoint-20260911.md) records the exact
-  continuation. C/D still require actual references, scoring and a business disposition. No new
-  market Job is authorized before B's exact source/runtime/resource bindings and engineering gates.
+  this is not market acceptance. A is complete. The earlier RX SSH blocker is retained in the
+  [blocked checkpoint](acceptance/stage-order-rule-screen-b-checkpoint-20260911.md), and the
+  restored control path plus bounded prepare route are recorded in the
+  [pre-run readiness](acceptance/stage-order-rule-screen-b-prerun-20260911.md). Exactly one
+  prepare Job may now reconstruct the old cohort, prove economic-identity exclusion and freeze
+  T-only 2021 cases; opinion generation and scoring remain closed. C/D still require actual
+  references, scoring and a business disposition.
   Route: [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
   `config/stage-order-rule-screen-delivery.v1.json`; rule: `config/stage-learning/order-rule-screen.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

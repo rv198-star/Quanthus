@@ -283,9 +283,9 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-006-B | Release bounded two-phase Worker route | P3-STAGE-006-A | closed; #284; 1932 tests passed |
 | P3-STAGE-006-C | Execute twelve-case reference collection | P3-STAGE-006-B | closed; #285; prepare fec6e60e / resolve 2a380e24 succeeded, no retry |
 | P3-STAGE-006-D | Freeze feasibility disposition | P3-STAGE-006-C | closed; #286; 0=4, 2=1, neither=3, ambiguous=4; docs/acceptance/stage-order-reference-feasibility-20260911.md |
-| P3-STAGE-007 | Fixed-rule development screen with a business disposition | P3-STAGE-006 | blocked; #292; B source isolation pending, no C/D business result |
+| P3-STAGE-007 | Fixed-rule development screen with a business disposition | P3-STAGE-006 | ready; #292; one prepare Job authorized, no C/D business result |
 | P3-STAGE-007-A | Resolve business boundaries and freeze one executable seed | P3-STAGE-006 | closed; docs/design/stage-order-rule-screen.md; synthetic rule tests only |
-| P3-STAGE-007-B | Prove source isolation and bind minimal execution | P3-STAGE-007-A | blocked; #289; selection/scoring components tested, RX source read blocked; docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md |
+| P3-STAGE-007-B | Prove source isolation and bind minimal execution | P3-STAGE-007-A | ready; #289; restored RX control path and one prepare-only Worker route; docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md |
 | P3-STAGE-007-C | Execute one fixed reference and scoring batch | P3-STAGE-007-B | blocked; no new Job before B readiness; at most 160 cases and 320 opinions |
 | P3-STAGE-007-D | Attribute errors and decide continuation or parking | P3-STAGE-007-C | blocked; no parent closure from engineering alone |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |

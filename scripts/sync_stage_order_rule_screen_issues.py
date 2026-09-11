@@ -8,6 +8,7 @@ from pathlib import Path
 
 from sync_github_planning import GitHub, issue_by_stable_id
 
+from quanthus.stage_learning.order_rule_prepare import load_prepare_config
 from quanthus.stage_learning.order_rule_screen import RULE_DIGEST, load_rule
 from quanthus.stage_learning.order_rule_validation import VALIDATION_DIGEST
 from quanthus.structure_v2_inputs import digest
@@ -20,44 +21,63 @@ REPO = "rv198-star/Quanthus"
 
 
 def validate_plan(raw: dict) -> None:
-    """Validate the frozen screen and evidence-blocked preparation, never invent a runtime PASS."""
+    """Validate the frozen screen and one authorized prepare run, never invent a runtime PASS."""
     if (raw["schema_version"] != "quanthus.stage-order-rule-screen-delivery.v1"
             or raw["parent_id"] != PARENT
             or tuple(item["id"] for item in raw["items"]) != IDS):
         raise ValueError("screen_plan_identity")
-    if (raw["milestone_completed"] is not False or raw["runtime_receipts"] is not None
-            or raw["runtime_contract"] is not None):
+    if raw["milestone_completed"] is not False or raw["runtime_receipts"] is not None:
         raise ValueError("screen_unexecuted_runtime_claim")
+    runtime = raw.get("runtime_contract")
+    if not isinstance(runtime, dict) or runtime != {
+        "path": "config/stage-learning/order-rule-prepare.v1.json",
+        "digest": "sha256:b27bbc1d3d54f9e410a8ca7b931af63f62690be9b911d538aeb0cda5666e9bd9",
+        "kind": "quanthus.stage-order-rule-prepare.v1",
+        "phase": "prepare_only",
+        "maximum_jobs": 1,
+        "opinion_generation": False,
+        "candidate_scoring": False,
+    }:
+        raise ValueError("screen_prepare_runtime_contract")
+    runtime_path = (ROOT / runtime["path"]).resolve()
+    if not runtime_path.is_relative_to(ROOT) or not runtime_path.is_file():
+        raise ValueError("screen_prepare_runtime_contract_missing")
+    if digest(load_prepare_config(runtime_path)) != runtime["digest"]:
+        raise ValueError("screen_prepare_runtime_contract_digest")
     if raw["rule_digest"] != RULE_DIGEST:
         raise ValueError("screen_rule_binding")
     load_rule(ROOT)
     expected_auth = {key: False for key in (
-        "runtime_job_submission", "new_market_data_read", "parameter_search",
-        "arbitration_access", "permanent_blind_access", "official_labels",
+        "parameter_search", "arbitration_access", "permanent_blind_access", "official_labels",
         "daily_or_strategy", "trading",
     )}
-    expected_auth["implementation_and_synthetic_tests"] = True
+    expected_auth.update({
+        "implementation_and_synthetic_tests": True,
+        "runtime_job_submission": True,
+        "new_market_data_read": True,
+    })
     if raw["authorization"] != expected_auth:
         raise ValueError("screen_unauthorized_activation")
     states = ("ready", "closed", "ready", "blocked", "blocked")
     checkpoint = raw.get("preparation_checkpoint")
-    if checkpoint is not None:
-        if (checkpoint.get("state") != "BLOCKED_SOURCE_ISOLATION"
-                or checkpoint.get("reason_code") != "RX6800_SSH_KEY_REJECTED_PERMISSIONS"
-                or checkpoint.get("read_attempt_exit_code") != 255
-                or checkpoint.get("source_isolation_verified") is not False
-                or checkpoint.get("source_membership_verified") is not False
-                or checkpoint.get("old_cohort_digest") is not None
-                or type(checkpoint.get("new_market_data_reads")) is not int
-                or checkpoint["new_market_data_reads"] != 0
-                or type(checkpoint.get("new_jobs_submitted")) is not int
-                or checkpoint["new_jobs_submitted"] != 0):
-            raise ValueError("screen_preparation_checkpoint_claim")
-        for key in ("component", "tests", "evidence"):
-            path = (ROOT / checkpoint[key]).resolve()
-            if not path.is_relative_to(ROOT) or not path.is_file():
-                raise ValueError("screen_preparation_evidence_missing")
-        states = ("blocked", "closed", "blocked", "blocked", "blocked")
+    if not isinstance(checkpoint, dict) or (
+        checkpoint.get("state") != "READY_FOR_PREPARE_RUN"
+        or checkpoint.get("reason_code")
+        != "RX6800_CONTROL_PATH_RESTORED_AND_PREPARE_ROUTE_IMPLEMENTED"
+        or checkpoint.get("read_attempt_exit_code") != 0
+        or checkpoint.get("source_isolation_verified") is not False
+        or checkpoint.get("source_membership_verified") is not False
+        or checkpoint.get("old_cohort_digest") is not None
+        or type(checkpoint.get("new_market_data_reads")) is not int
+        or checkpoint["new_market_data_reads"] != 0
+        or type(checkpoint.get("new_jobs_submitted")) is not int
+        or checkpoint["new_jobs_submitted"] != 0
+    ):
+        raise ValueError("screen_preparation_checkpoint_claim")
+    for key in ("component", "tests", "evidence"):
+        path = (ROOT / checkpoint[key]).resolve()
+        if not path.is_relative_to(ROOT) or not path.is_file():
+            raise ValueError("screen_preparation_evidence_missing")
     expected_states = dict(zip(IDS, states, strict=True))
     if {item["id"]: item["status"] for item in raw["items"]} != expected_states:
         raise ValueError("screen_status_requires_real_evidence")

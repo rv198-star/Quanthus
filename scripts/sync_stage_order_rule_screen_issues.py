@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -35,6 +36,7 @@ def validate_plan(raw: dict) -> None:
         "kind": "quanthus.stage-order-rule-prepare.v1",
         "phase": "prepare_only",
         "maximum_jobs": 1,
+        "maximum_technical_retries": 1,
         "opinion_generation": False,
         "candidate_scoring": False,
     }:
@@ -61,23 +63,73 @@ def validate_plan(raw: dict) -> None:
     states = ("ready", "closed", "ready", "blocked", "blocked")
     checkpoint = raw.get("preparation_checkpoint")
     if not isinstance(checkpoint, dict) or (
-        checkpoint.get("state") != "READY_FOR_PREPARE_RUN"
+        checkpoint.get("state") != "TECHNICAL_RETRY_READY"
         or checkpoint.get("reason_code")
-        != "RX6800_CONTROL_PATH_RESTORED_AND_PREPARE_ROUTE_IMPLEMENTED"
+        != "POST_SELECTION_SAMPLING_COORDINATE_CANONICALIZATION"
         or checkpoint.get("read_attempt_exit_code") != 0
         or checkpoint.get("source_isolation_verified") is not False
         or checkpoint.get("source_membership_verified") is not False
         or checkpoint.get("old_cohort_digest") is not None
-        or type(checkpoint.get("new_market_data_reads")) is not int
-        or checkpoint["new_market_data_reads"] != 0
-        or type(checkpoint.get("new_jobs_submitted")) is not int
-        or checkpoint["new_jobs_submitted"] != 0
+        or checkpoint.get("new_market_data_reads") != 1
+        or checkpoint.get("new_jobs_submitted") != 1
+        or checkpoint.get("failed_job_id") != "stage_7ef751fa63664175b49eaa3459c83ca3"
+        or checkpoint.get("failed_job_revision")
+        != "b7042cf0683b817a2ed2b3a59a00d5d6159cf5b6"
+        or checkpoint.get("failed_input_digest")
+        != "sha256:d46f8d3f990890abdf49d0ae0fba12c0b9a5a2629e70faba56a15d15acf5dedb"
+        or checkpoint.get("failed_worker_error") != "stage_order_rule_prepare_process_failed"
     ):
         raise ValueError("screen_preparation_checkpoint_claim")
     for key in ("component", "tests", "evidence"):
         path = (ROOT / checkpoint[key]).resolve()
         if not path.is_relative_to(ROOT) or not path.is_file():
             raise ValueError("screen_preparation_evidence_missing")
+    retry = raw.get("technical_retry")
+    if retry != {
+        "authorization": "config/stage-learning/order-rule-prepare-retry.v1.json",
+        "authorized": True,
+        "maximum_retries": 1,
+        "counts_against_result_bearing_job_budget": False,
+        "semantic_result_exposed_before_failure": False,
+        "opinion_count_before_failure": 0,
+        "candidate_scored_before_failure": False,
+        "parameter_search_before_failure": False,
+        "selection_case_count": 160,
+        "selection_shortfalls": {
+            "coverage": 0, "order_like": 0, "instability_like": 0, "boundary": 0,
+        },
+    }:
+        raise ValueError("screen_technical_retry_claim")
+    retry_path = (ROOT / retry["authorization"]).resolve()
+    if not retry_path.is_relative_to(ROOT) or not retry_path.is_file():
+        raise ValueError("screen_technical_retry_authorization_missing")
+    retry_auth = json.loads(retry_path.read_text(encoding="utf-8"))
+    failure = retry_auth.get("failure")
+    policy = retry_auth.get("authorization")
+    bindings = retry_auth.get("bindings")
+    if (
+        retry_auth.get("schema_version") != "quanthus.stage-order-rule-prepare-retry.v1"
+        or retry_auth.get("work_item") != "P3-STAGE-007-B"
+        or not all(isinstance(value, dict) for value in (failure, policy, bindings))
+        or failure.get("job_id") != checkpoint["failed_job_id"]
+        or failure.get("code_revision") != checkpoint["failed_job_revision"]
+        or failure.get("input_digest") != checkpoint["failed_input_digest"]
+        or failure.get("worker_error") != checkpoint["failed_worker_error"]
+        or failure.get("root_cause") != "post_selection_sampling_coordinate_canonicalization"
+        or failure.get("failed_check") != "selected_observation_differs_from_retained_evidence"
+        or policy.get("maximum_technical_retries") != 1
+        or policy.get("counts_against_result_bearing_job_budget") is not False
+        or bindings.get("prepare_config_digest") != runtime["digest"]
+        or bindings.get("rule_digest") != RULE_DIGEST
+        or bindings.get("validation_digest") != VALIDATION_DIGEST
+    ):
+        raise ValueError("screen_technical_retry_binding")
+    fix_path = (ROOT / str(bindings.get("fix_path") or "")).resolve()
+    if not fix_path.is_relative_to(ROOT) or not fix_path.is_file():
+        raise ValueError("screen_technical_retry_fix_missing")
+    observed_fix = "sha256:" + hashlib.sha256(fix_path.read_bytes()).hexdigest()
+    if observed_fix != bindings.get("fix_file_sha256"):
+        raise ValueError("screen_technical_retry_fix_drift")
     expected_states = dict(zip(IDS, states, strict=True))
     if {item["id"]: item["status"] for item in raw["items"]} != expected_states:
         raise ValueError("screen_status_requires_real_evidence")

@@ -133,6 +133,28 @@ def test_sampling_is_independent_of_ambient_decimal_precision():
         assert api.select_cases(pool, rows) == expected
 
 
+def test_case_reconstruction_uses_same_absolute_sampling_coordinates():
+    case = {
+        "security_id": "i000",
+        "security_code": "s000",
+        "market_date": "2021-01-15",
+        "primary_available": True,
+        "primary": {
+            "directional_efficiency": {"value": "-0.2"},
+            "range_width": {"value": "0.25"},
+            "width_change": {"value": "0.5"},
+            "center_shift": {"value": "-0.1"},
+        },
+    }
+    rebuilt = api.SamplingObservation.from_case(case)
+    expected = api.SamplingObservation(
+        "i000", "s000", date(2021, 1, 15), True,
+        D("0.2"), D("0.25"), D("0.5"), D("0.1"),
+    )
+    assert rebuilt == expected
+    assert digest(rebuilt) == digest(expected)
+
+
 def old_metadata():
     codes = tuple(f"{i:06}" for i in range(512))
     summary = canonical({"code_revision": api.OLD_REVISION, "cohort_size": 512,

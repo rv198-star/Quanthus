@@ -1,0 +1,58 @@
+{
+  "schema_version": "quanthus.stage-order-rule-prepare-retry.v1",
+  "work_item": "P3-STAGE-007-B",
+  "failure": {
+    "job_id": "stage_7ef751fa63664175b49eaa3459c83ca3",
+    "code_revision": "b7042cf0683b817a2ed2b3a59a00d5d6159cf5b6",
+    "input_digest": "sha256:d46f8d3f990890abdf49d0ae0fba12c0b9a5a2629e70faba56a15d15acf5dedb",
+    "terminal_state": "failed",
+    "worker_error": "stage_order_rule_prepare_process_failed",
+    "root_cause": "post_selection_sampling_coordinate_canonicalization",
+    "failed_check": "selected_observation_differs_from_retained_evidence"
+  },
+  "authorization": {
+    "maximum_technical_retries": 1,
+    "counts_against_result_bearing_job_budget": false,
+    "same_prepare_config_required": true,
+    "same_rule_digest_required": true,
+    "same_validation_digest_required": true,
+    "same_source_scope_required": true,
+    "same_sampling_algorithm_required": true,
+    "same_sampling_seed_required": true,
+    "opinion_generation": false,
+    "candidate_scoring": false,
+    "parameter_search": false,
+    "future_outcome_access": false,
+    "arbitration_access": false,
+    "permanent_blind_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "bindings": {
+    "prepare_config_digest": "sha256:b27bbc1d3d54f9e410a8ca7b931af63f62690be9b911d538aeb0cda5666e9bd9",
+    "rule_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0",
+    "validation_digest": "sha256:1512c0f0fdc46a7c0bcd18e4a7f3c46bae83a4d5e08a885dcb42632481bc9989",
+    "fix_path": "src/quanthus/stage_learning/order_rule_validation.py",
+    "fix_file_sha256": "sha256:c86360817fa7d50694b9f6678515f3dfb447f2ec96c6988d95d5d5443df96b14"
+  },
+  "observed_before_failure": {
+    "old_cohort_size": 512,
+    "old_source_attempts": 313344,
+    "candidate_population_count": 3917,
+    "excluded_economic_identity_count": 515,
+    "identity_member_count": 3920,
+    "pool_size": 512,
+    "available_observation_count": 121329,
+    "selected_case_count": 160,
+    "selection_shortfalls": {
+      "coverage": 0,
+      "order_like": 0,
+      "instability_like": 0,
+      "boundary": 0
+    },
+    "evidence_source_row_count": 9760,
+    "opinion_count": 0,
+    "candidate_scored": false
+  }
+}

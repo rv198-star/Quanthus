@@ -49,16 +49,17 @@ def test_prepare_authority_cannot_silently_open_search_or_trading(key):
         script.validate_plan(raw)
 
 
-def test_only_one_prepare_run_is_opened_before_real_source_evidence():
+def test_only_one_prepare_result_job_plus_one_bound_technical_retry_is_opened():
     script = module()
     raw = script.load_plan()
     assert raw["authorization"]["runtime_job_submission"] is True
     assert raw["authorization"]["new_market_data_read"] is True
     assert raw["runtime_contract"]["phase"] == "prepare_only"
     assert raw["runtime_contract"]["maximum_jobs"] == 1
+    assert raw["runtime_contract"]["maximum_technical_retries"] == 1
     assert raw["runtime_contract"]["opinion_generation"] is False
     assert raw["runtime_contract"]["candidate_scoring"] is False
-    changed = {**raw["runtime_contract"], "maximum_jobs": 2}
+    changed = {**raw["runtime_contract"], "maximum_technical_retries": 2}
     raw["runtime_contract"] = changed
     with pytest.raises(ValueError, match="runtime_contract"):
         script.validate_plan(raw)
@@ -101,14 +102,26 @@ def test_no_parent_pass_or_runtime_receipt_from_synthetic_rule_tests():
 
 @pytest.mark.parametrize("key,value", [
     ("source_isolation_verified", True), ("source_membership_verified", True),
-    ("old_cohort_digest", "sha256:" + "0" * 64), ("new_market_data_reads", 1),
-    ("new_jobs_submitted", 1), ("read_attempt_exit_code", 255),
+    ("old_cohort_digest", "sha256:" + "0" * 64), ("new_market_data_reads", 0),
+    ("new_jobs_submitted", 2), ("read_attempt_exit_code", 255),
 ])
-def test_component_tests_cannot_fill_missing_real_source_evidence(key, value):
+def test_failed_prepare_cannot_fill_missing_real_source_evidence(key, value):
     script = module()
     raw = script.load_plan()
     raw["preparation_checkpoint"][key] = value
     with pytest.raises(ValueError, match="checkpoint_claim"):
+        script.validate_plan(raw)
+
+
+def test_technical_retry_cannot_be_expanded_or_reframed_as_semantic_result():
+    script = module()
+    raw = script.load_plan()
+    raw["technical_retry"]["maximum_retries"] = 2
+    with pytest.raises(ValueError, match="technical_retry"):
+        script.validate_plan(raw)
+    raw = script.load_plan()
+    raw["technical_retry"]["semantic_result_exposed_before_failure"] = True
+    with pytest.raises(ValueError, match="technical_retry"):
         script.validate_plan(raw)
 
 

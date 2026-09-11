@@ -244,5 +244,33 @@ exact revision重复提交返回原Job，不创建第二个；不同revision或�
 
 恢复后的运行前证据见
 [B pre-run readiness](../acceptance/stage-order-rule-screen-b-prerun-20260911.md)。生产MCP当前
-`stage_worker_submit`执行器仍是旧的qualification专用入口，因此这只是运行合同ready；
-不能把“可由节点本地受控CLI提交”写成“本会话已经提交”。
+`stage_worker_submit`执行器仍是旧的qualification专用入口，因此首次prepare由RX节点本地
+受控CLI按精确revision提交；这一提交已经发生并保留终态，不能再把本节写成未执行状态。
+
+## 11. 首次prepare技术失败与唯一重试
+
+首个prepare Job `stage_7ef751fa63664175b49eaa3459c83ca3`绑定revision
+`b7042cf0683b817a2ed2b3a59a00d5d6159cf5b6`和input digest
+`sha256:d46f8d3f990890abdf49d0ae0fba12c0b9a5a2629e70faba56a15d15acf5dedb`。
+它在RX本地实际完成旧512 cohort重建、313344次旧source binding、3917候选证券扫描、
+515个经济身份排除、512新池、121329个可用2021观察和固定160例选择；四个目标桶缺额
+均为0。随后005 evidence封装已构建9760条保留源行和160个案例包，但尚未发布 governed
+artifact 就在最后一致性检查失败。
+
+根因不是行情、Facts或选择变化，而是两个表示使用了不同但本应等价的坐标：选择阶段
+消费`efficiency20_abs`与`center_shift20_abs`；reference packet保留正式Fact原始符号；
+`SamplingObservation.from_case()`旧实现没有把后两者恢复到抽样使用的绝对坐标，于是
+负方向/负中心案例产生不同digest。修复只对这两个抽样坐标执行`copy_abs()`，宽度、宽度
+变化、选择seed、桶定义、阈值、rule/validation/source合同均不变。新增负号回归覆盖该错。
+
+由于失败发生在意见生成、候选评分、参数搜索之前，没有语义结果可供事后调参，也没有
+改变160例如何被选择。项目因此授权一次且仅一次technical retry，用于产生本次prepare
+本应发布的sealed artifact。授权由
+`config/stage-learning/order-rule-prepare-retry.v1.json`绑定失败Job、旧revision、旧input
+摘要、未变prepare/rule/validation摘要和修复文件SHA；Worker同时保留原失败marker和
+独立retry marker。相同retry revision重复提交只返回同一Job，第三个prepare尝试被拒绝。
+
+这次technical retry不计入原先为结果阶段预留的两个result-bearing Job预算；它是失败的
+prepare恢复，不是新研究轮次。若该唯一retry再次失败，B停止，不再追加prepare。完整失败
+证据和claim ceiling见
+[B prepare failure](../acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md)。

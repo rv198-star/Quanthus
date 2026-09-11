@@ -14,22 +14,44 @@
     "kind": "quanthus.stage-order-rule-prepare.v1",
     "phase": "prepare_only",
     "maximum_jobs": 1,
+    "maximum_technical_retries": 1,
     "opinion_generation": false,
     "candidate_scoring": false
   },
   "runtime_receipts": null,
   "preparation_checkpoint": {
-    "state": "READY_FOR_PREPARE_RUN",
-    "reason_code": "RX6800_CONTROL_PATH_RESTORED_AND_PREPARE_ROUTE_IMPLEMENTED",
+    "state": "TECHNICAL_RETRY_READY",
+    "reason_code": "POST_SELECTION_SAMPLING_COORDINATE_CANONICALIZATION",
     "read_attempt_exit_code": 0,
     "source_isolation_verified": false,
     "source_membership_verified": false,
     "old_cohort_digest": null,
-    "new_market_data_reads": 0,
-    "new_jobs_submitted": 0,
+    "new_market_data_reads": 1,
+    "new_jobs_submitted": 1,
+    "failed_job_id": "stage_7ef751fa63664175b49eaa3459c83ca3",
+    "failed_job_revision": "b7042cf0683b817a2ed2b3a59a00d5d6159cf5b6",
+    "failed_input_digest": "sha256:d46f8d3f990890abdf49d0ae0fba12c0b9a5a2629e70faba56a15d15acf5dedb",
+    "failed_worker_error": "stage_order_rule_prepare_process_failed",
     "component": "src/quanthus/stage_learning/order_rule_prepare.py",
     "tests": "tests/unit/test_stage_order_rule_prepare.py",
-    "evidence": "docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md"
+    "evidence": "docs/acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md"
+  },
+  "technical_retry": {
+    "authorization": "config/stage-learning/order-rule-prepare-retry.v1.json",
+    "authorized": true,
+    "maximum_retries": 1,
+    "counts_against_result_bearing_job_budget": false,
+    "semantic_result_exposed_before_failure": false,
+    "opinion_count_before_failure": 0,
+    "candidate_scored_before_failure": false,
+    "parameter_search_before_failure": false,
+    "selection_case_count": 160,
+    "selection_shortfalls": {
+      "coverage": 0,
+      "order_like": 0,
+      "instability_like": 0,
+      "boundary": 0
+    }
   },
   "authorization": {
     "implementation_and_synthetic_tests": true,
@@ -138,7 +160,7 @@
       "depends_on": ["P3-STAGE-007-A"],
       "scope": "Prove economic-identity exclusion, freeze source/code/resource bindings, reuse reference packets and the controlled Worker; do not open the validation set during rule development.",
       "acceptance": ["All runtime activation requirements are verified", "Unable to prove source isolation is an explicit blocker", "Existing 004/005/006 contracts and outcomes are untouched"],
-      "evidence": ["docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md"]
+      "evidence": ["docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md"]
     },
     {
       "id": "P3-STAGE-007-C", "kind": "task", "status": "blocked",

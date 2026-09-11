@@ -44,6 +44,8 @@ STAGE_ORDER_RULE_PREPARE_JOB = "quanthus.stage-order-rule-prepare.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
+ORDER_RULE_PREPARE_RETRY_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-retry-budget.v1"
+ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
 MAIN_REF = "refs/remotes/stage-control/main"
@@ -278,6 +280,10 @@ class StageWorkerPaths:
         return self.control_root / "order-rule-prepare-budget.json"
 
     @property
+    def order_rule_prepare_retry_budget(self) -> Path:
+        return self.control_root / "order-rule-prepare-retry-budget.json"
+
+    @property
     def logs(self) -> Path:
         return self.training_root / "logs" / "stage-worker"
 
@@ -311,9 +317,99 @@ def _order_rule_prepare_budget_value(job: StageJob) -> dict[str, Any]:
     }
 
 
-def _existing_order_rule_prepare_submission(
-    paths: StageWorkerPaths, *, code_revision: str,
-) -> dict[str, Any] | None:
+def _order_rule_prepare_retry_budget_value(
+    failed_job: StageJob, retry_job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": ORDER_RULE_PREPARE_RETRY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-007-B",
+        "technical_retry_of": failed_job.job_id,
+        "failed_input_digest": failed_job.input_digest,
+        "job": retry_job.to_dict(),
+        "input_digest": retry_job.input_digest,
+    }
+
+
+def _file_sha256(path: Path) -> str:
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise StageWorkerError("order-rule prepare retry binding unreadable") from exc
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _order_rule_prepare_retry_authorization(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> dict[str, Any]:
+    authorization = _object(
+        paths.control_repo / ORDER_RULE_PREPARE_RETRY_AUTH,
+        "order-rule prepare retry authorization",
+    )
+    if (
+        authorization.get("schema_version") != "quanthus.stage-order-rule-prepare-retry.v1"
+        or authorization.get("work_item") != "P3-STAGE-007-B"
+    ):
+        raise StageWorkerError("order-rule prepare retry authorization differs")
+    failure = authorization.get("failure")
+    policy = authorization.get("authorization")
+    bindings = authorization.get("bindings")
+    if not all(isinstance(value, Mapping) for value in (failure, policy, bindings)):
+        raise StageWorkerError("order-rule prepare retry authorization incomplete")
+    if (
+        failure.get("job_id") != failed_job.job_id
+        or failure.get("code_revision") != failed_job.code_revision
+        or failure.get("input_digest") != failed_job.input_digest
+        or failure.get("terminal_state") != "failed"
+        or failure.get("worker_error") != "stage_order_rule_prepare_process_failed"
+        or failure.get("root_cause") != "post_selection_sampling_coordinate_canonicalization"
+        or failure.get("failed_check") != "selected_observation_differs_from_retained_evidence"
+    ):
+        raise StageWorkerError("order-rule prepare retry failure binding differs")
+    if (
+        policy.get("maximum_technical_retries") != 1
+        or policy.get("counts_against_result_bearing_job_budget") is not False
+    ):
+        raise StageWorkerError("order-rule prepare retry budget differs")
+    for key in (
+        "same_prepare_config_required", "same_rule_digest_required",
+        "same_validation_digest_required", "same_source_scope_required",
+        "same_sampling_algorithm_required", "same_sampling_seed_required",
+    ):
+        if policy.get(key) is not True:
+            raise StageWorkerError("order-rule prepare retry invariant missing")
+    for key in (
+        "opinion_generation", "candidate_scoring", "parameter_search", "future_outcome_access",
+        "arbitration_access", "permanent_blind_access", "official_labels",
+        "daily_or_strategy", "trading",
+    ):
+        if policy.get(key) is not False:
+            raise StageWorkerError("order-rule prepare retry authority expanded")
+    prepare_path = paths.control_repo / "config/stage-learning/order-rule-prepare.v1.json"
+    prepare = _object(prepare_path, "order-rule prepare config")
+    if _digest(prepare) != bindings.get("prepare_config_digest"):
+        raise StageWorkerError("order-rule prepare retry config drift")
+    prepare_bindings = prepare.get("bindings")
+    if not isinstance(prepare_bindings, Mapping):
+        raise StageWorkerError("order-rule prepare retry config bindings missing")
+    if (
+        prepare_bindings.get("rule_digest") != bindings.get("rule_digest")
+        or prepare_bindings.get("validation_digest") != bindings.get("validation_digest")
+    ):
+        raise StageWorkerError("order-rule prepare retry semantic binding drift")
+    fix_relative = bindings.get("fix_path")
+    if not isinstance(fix_relative, str) or not fix_relative:
+        raise StageWorkerError("order-rule prepare retry fix path invalid")
+    fix_path = (paths.control_repo / fix_relative).resolve()
+    try:
+        fix_path.relative_to(paths.control_repo.resolve())
+    except ValueError as exc:
+        raise StageWorkerError("order-rule prepare retry fix outside repository") from exc
+    if _file_sha256(fix_path) != bindings.get("fix_file_sha256"):
+        raise StageWorkerError("order-rule prepare retry fix digest differs")
+    return authorization
+
+
+def _parse_order_rule_prepare_marker(paths: StageWorkerPaths) -> StageJob | None:
     marker_path = paths.order_rule_prepare_budget
     if not marker_path.exists():
         return None
@@ -328,9 +424,36 @@ def _existing_order_rule_prepare_submission(
     if (
         job.kind != STAGE_ORDER_RULE_PREPARE_JOB
         or marker.get("input_digest") != job.input_digest
-        or job.code_revision != code_revision
     ):
-        raise StageWorkerError("order-rule prepare is already bound to another immutable input")
+        raise StageWorkerError("order-rule prepare budget marker differs")
+    return job
+
+
+def _parse_order_rule_prepare_retry_marker(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> StageJob | None:
+    marker_path = paths.order_rule_prepare_retry_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "order-rule prepare retry budget")
+    if (
+        marker.get("schema_version") != ORDER_RULE_PREPARE_RETRY_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-007-B"
+        or marker.get("technical_retry_of") != failed_job.job_id
+        or marker.get("failed_input_digest") != failed_job.input_digest
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("order-rule prepare retry budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_ORDER_RULE_PREPARE_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("order-rule prepare retry budget marker differs")
+    return job
+
+
+def _idempotent_stage_submission(paths: StageWorkerPaths, job: StageJob) -> dict[str, Any]:
     observed = read_status(paths, job.job_id)
     return {
         **job.to_dict(),
@@ -338,6 +461,33 @@ def _existing_order_rule_prepare_submission(
         "state": observed["state"],
         "idempotent_reuse": True,
     }
+
+
+def _existing_order_rule_prepare_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> tuple[dict[str, Any] | None, StageJob | None]:
+    failed_job = _parse_order_rule_prepare_marker(paths)
+    if failed_job is None:
+        return None, None
+    if failed_job.code_revision == code_revision:
+        return _idempotent_stage_submission(paths, failed_job), None
+    retry_job = _parse_order_rule_prepare_retry_marker(paths, failed_job)
+    if retry_job is not None:
+        if retry_job.code_revision == code_revision:
+            result = _idempotent_stage_submission(paths, retry_job)
+            result["technical_retry_of"] = failed_job.job_id
+            return result, None
+        raise StageWorkerError("order-rule prepare technical retry budget is already consumed")
+    observed = read_status(paths, failed_job.job_id)
+    if (
+        observed.get("state") != "failed"
+        or observed.get("error") != "stage_order_rule_prepare_process_failed"
+        or observed.get("input_digest") != failed_job.input_digest
+        or observed.get("code_revision") != failed_job.code_revision
+    ):
+        raise StageWorkerError("order-rule prepare is already bound to another immutable input")
+    _order_rule_prepare_retry_authorization(paths, failed_job)
+    return None, failed_job
 
 
 def _qualification_budget_value(job: StageJob, *, state: str, reserved_at: str) -> dict[str, Any]:
@@ -916,8 +1066,11 @@ def submit_job(
     spec = _JOB_SPECS.get(kind)
     if spec is None:
         raise StageWorkerError("submit kind is not admitted")
+    prepare_retry_of: StageJob | None = None
     if kind == STAGE_ORDER_RULE_PREPARE_JOB:
-        existing = _existing_order_rule_prepare_submission(paths, code_revision=code_revision)
+        existing, prepare_retry_of = _existing_order_rule_prepare_submission(
+            paths, code_revision=code_revision,
+        )
         if existing is not None:
             return existing
     job = StageJob(
@@ -929,11 +1082,19 @@ def submit_job(
     )
     path = paths.queue / f"{job.job_id}.json"
     qualification_reserved = job.kind == STAGE_QUALIFICATION_JOB
-    prepare_reserved = job.kind == STAGE_ORDER_RULE_PREPARE_JOB
+    prepare_reserved = job.kind == STAGE_ORDER_RULE_PREPARE_JOB and prepare_retry_of is None
+    prepare_retry_reserved = (
+        job.kind == STAGE_ORDER_RULE_PREPARE_JOB and prepare_retry_of is not None
+    )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
         _exclusive_json(paths.order_rule_prepare_budget, _order_rule_prepare_budget_value(job))
+    if prepare_retry_reserved:
+        _exclusive_json(
+            paths.order_rule_prepare_retry_budget,
+            _order_rule_prepare_retry_budget_value(prepare_retry_of, job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -946,6 +1107,8 @@ def submit_job(
                 _release_qualification_reservation(paths, job)
         if prepare_reserved:
             paths.order_rule_prepare_budget.unlink(missing_ok=True)
+        if prepare_retry_reserved:
+            paths.order_rule_prepare_retry_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -953,8 +1116,13 @@ def submit_job(
                 _release_qualification_reservation(paths, job)
         if prepare_reserved:
             paths.order_rule_prepare_budget.unlink(missing_ok=True)
+        if prepare_retry_reserved:
+            paths.order_rule_prepare_retry_budget.unlink(missing_ok=True)
         raise
-    return {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
+    result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
+    if prepare_retry_of is not None:
+        result["technical_retry_of"] = prepare_retry_of.job_id
+    return result
 
 
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:

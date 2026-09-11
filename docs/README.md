@@ -217,10 +217,12 @@ nodes.
   this is not market acceptance. A is complete. The earlier RX SSH blocker is retained in the
   [blocked checkpoint](acceptance/stage-order-rule-screen-b-checkpoint-20260911.md), and the
   restored control path plus bounded prepare route are recorded in the
-  [pre-run readiness](acceptance/stage-order-rule-screen-b-prerun-20260911.md). Exactly one
-  prepare Job may now reconstruct the old cohort, prove economic-identity exclusion and freeze
-  T-only 2021 cases; opinion generation and scoring remain closed. C/D still require actual
-  references, scoring and a business disposition.
+  [pre-run readiness](acceptance/stage-order-rule-screen-b-prerun-20260911.md). The first prepare
+  Job reached source isolation, the full 512-security Fact build and a 160-case zero-shortfall
+  selection, then failed only at a post-selection signed-vs-absolute sampling-coordinate check.
+  [Failure evidence](acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md) freezes that
+  terminal Job and authorizes exactly one same-input technical retry; opinion generation and
+  scoring remain closed. C/D still require actual references, scoring and a business disposition.
   Route: [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
   `config/stage-order-rule-screen-delivery.v1.json`; rule: `config/stage-learning/order-rule-screen.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

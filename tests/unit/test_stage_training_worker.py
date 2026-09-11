@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from quanthus.stage_learning.worker import (
     StageWorkerError,
     StageWorkerPaths,
     _consume_qualification_budget,
+    _digest,
     cancel_job,
     doctor,
     read_status,
@@ -345,6 +347,112 @@ def test_order_rule_prepare_submit_is_single_job_idempotent(tmp_path: Path) -> N
         submit_job(
             worker_paths,
             code_revision="c" * 40,
+            kind=STAGE_ORDER_RULE_PREPARE_JOB,
+        )
+
+
+def _write_prepare_retry_authorization(worker_paths: StageWorkerPaths, first: dict) -> None:
+    prepare = {
+        "bindings": {
+            "rule_digest": "sha256:" + "1" * 64,
+            "validation_digest": "sha256:" + "2" * 64,
+        }
+    }
+    prepare_path = worker_paths.control_repo / "config/stage-learning/order-rule-prepare.v1.json"
+    prepare_path.parent.mkdir(parents=True, exist_ok=True)
+    prepare_path.write_text(json.dumps(prepare), encoding="utf-8")
+    fix_path = worker_paths.control_repo / "src/quanthus/stage_learning/order_rule_validation.py"
+    fix_path.parent.mkdir(parents=True, exist_ok=True)
+    fix_path.write_text("technical-fix\n", encoding="utf-8")
+    fix_sha = "sha256:" + hashlib.sha256(fix_path.read_bytes()).hexdigest()
+    authorization = {
+        "schema_version": "quanthus.stage-order-rule-prepare-retry.v1",
+        "work_item": "P3-STAGE-007-B",
+        "failure": {
+            "job_id": first["job_id"],
+            "code_revision": first["code_revision"],
+            "input_digest": first["input_digest"],
+            "terminal_state": "failed",
+            "worker_error": "stage_order_rule_prepare_process_failed",
+            "root_cause": "post_selection_sampling_coordinate_canonicalization",
+            "failed_check": "selected_observation_differs_from_retained_evidence",
+        },
+        "authorization": {
+            "maximum_technical_retries": 1,
+            "counts_against_result_bearing_job_budget": False,
+            "same_prepare_config_required": True,
+            "same_rule_digest_required": True,
+            "same_validation_digest_required": True,
+            "same_source_scope_required": True,
+            "same_sampling_algorithm_required": True,
+            "same_sampling_seed_required": True,
+            "opinion_generation": False,
+            "candidate_scoring": False,
+            "parameter_search": False,
+            "future_outcome_access": False,
+            "arbitration_access": False,
+            "permanent_blind_access": False,
+            "official_labels": False,
+            "daily_or_strategy": False,
+            "trading": False,
+        },
+        "bindings": {
+            "prepare_config_digest": _digest(prepare),
+            "rule_digest": prepare["bindings"]["rule_digest"],
+            "validation_digest": prepare["bindings"]["validation_digest"],
+            "fix_path": "src/quanthus/stage_learning/order_rule_validation.py",
+            "fix_file_sha256": fix_sha,
+        },
+    }
+    retry_path = (
+        worker_paths.control_repo / "config/stage-learning/order-rule-prepare-retry.v1.json"
+    )
+    retry_path.write_text(json.dumps(authorization), encoding="utf-8")
+
+
+def test_order_rule_prepare_allows_exactly_one_bound_technical_retry(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    first = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+    )
+    job = StageJob.from_dict(json.loads(
+        (worker_paths.queue / f"{first['job_id']}.json").read_text(encoding="utf-8")
+    ))
+    (worker_paths.queue / f"{first['job_id']}.json").unlink()
+    StageWorker(worker_paths)._write_status(
+        job,
+        state="failed",
+        stage="terminal",
+        started_at="2026-09-11T05:22:47+00:00",
+        completed_at="2026-09-11T05:28:35+00:00",
+        error="stage_order_rule_prepare_process_failed",
+        exit_code=1,
+    )
+    _write_prepare_retry_authorization(worker_paths, first)
+
+    retry_revision = "c" * 40
+    retry = submit_job(
+        worker_paths,
+        code_revision=retry_revision,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+    )
+    assert retry["job_id"] != first["job_id"]
+    assert retry["technical_retry_of"] == first["job_id"]
+    assert retry["state"] == "queued"
+    repeated = submit_job(
+        worker_paths,
+        code_revision=retry_revision,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+    )
+    assert repeated["job_id"] == retry["job_id"]
+    assert repeated["idempotent_reuse"] is True
+    assert repeated["technical_retry_of"] == first["job_id"]
+    with pytest.raises(StageWorkerError, match="retry budget is already consumed"):
+        submit_job(
+            worker_paths,
+            code_revision="d" * 40,
             kind=STAGE_ORDER_RULE_PREPARE_JOB,
         )
 

@@ -190,9 +190,14 @@ class SamplingObservation:
             values = [case["primary"][key]["value"] for key in (
                 "directional_efficiency", "range_width", "width_change", "center_shift",
             )]
+            normalized = [None if value is None else Decimal(value) for value in values]
+            if normalized[0] is not None:
+                normalized[0] = normalized[0].copy_abs()
+            if normalized[3] is not None:
+                normalized[3] = normalized[3].copy_abs()
             result = cls(case["security_id"], case["security_code"],
                          date.fromisoformat(case["market_date"]), case["primary_available"],
-                         *(None if value is None else Decimal(value) for value in values))
+                         *normalized)
             result.check()
             return result
         except (KeyError, TypeError, ValueError, InvalidOperation) as exc:

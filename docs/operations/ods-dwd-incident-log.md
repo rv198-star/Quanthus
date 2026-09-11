@@ -32,7 +32,7 @@ Each entry must record:
 
 ### Attribution
 
-The first market acquisition attempt reached the fixed `19:46: Asia/Shanghai` completion deadline
+The first market acquisition attempt reached the fixed `19:46:00 Asia/Shanghai` completion deadline
 after returning 1,804 of the required 4,992 securities. Baostock request latency averaged `2.512s`,
 compared with `0.259s` on the prior session. The attempt reported
 `provider_error_count=0`; the immediate failure was insufficient throughput within the governed

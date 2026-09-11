@@ -126,7 +126,13 @@ raise SystemExit(0)
         }
     )
     completed = subprocess.run(
-        [str(ORCHESTRATOR), "--market-date", "2026-08-04"],
+        [
+            str(ORCHESTRATOR),
+            "--market-date",
+            "2026-08-04",
+            "--recovery-window-seconds",
+            "20",
+        ],
         cwd=ROOT,
         env=env,
         capture_output=True,
@@ -136,6 +142,7 @@ raise SystemExit(0)
     assert completed.returncode == 0, completed.stderr + completed.stdout
     state = json.loads(completed.stdout)
     assert state["status"] == "ready"
+    assert state["market_recovery_deadline_at"] is not None
     assert state["lanes"]["market-daily-core"]["status"] == "ready"
     assert state["lanes"]["calendar-daily-events"]["status"] == "ready"
     assert state["lanes"]["intraday-1m"]["status"] == "ready"
@@ -149,6 +156,7 @@ raise SystemExit(0)
     assert (run_roots[0] / "READY").is_file()
     called = calls.read_text(encoding="utf-8")
     assert "--lane market-daily-core" in called
+    assert called.count("--recovery-deadline-at") == 1
     assert "--lane calendar-daily-events" in called
     assert "--stream 1m" in called
     assert called.count("--stream 5m") == 2
@@ -243,6 +251,7 @@ catalog.write_text('{"kind":"daily_ods_input_catalog"}\\n', encoding='ascii')
     lane_calls = calls.read_text(encoding="utf-8").splitlines()
     market_call = next(call for call in lane_calls if "--lane market-daily-core" in call)
     deadline_text = market_call.split("--recovery-deadline-at ", 1)[1].split()[0]
+    assert state["market_recovery_deadline_at"] == deadline_text
     recovery_deadline = datetime.fromisoformat(deadline_text)
     assert recovery_deadline.tzinfo is not None
     assert recovery_deadline > datetime.fromisoformat(state["started_at"].replace("Z", "+00:00"))
@@ -260,7 +269,8 @@ def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     timer = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.timer").read_text(encoding="ascii")
     assert "run-ods-daily-with-retry" in service
     assert "run-cn01-ods-daily" in service
-    assert "TimeoutStartSec=330min" in service
+    assert "QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760" in service
+    assert "TimeoutStartSec=540min" in service
     assert "SuccessExitStatus=0" in service
     assert "OnSuccess=hermes-dwd-success-notification.service" in service
     assert "OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai" in timer
@@ -269,11 +279,14 @@ def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
 
 def test_daily_retry_wrapper_returns_success_after_a_retry(tmp_path: Path) -> None:
     attempts = tmp_path / "attempts"
+    calls = tmp_path / "calls"
     runner = tmp_path / "runner"
     _write_executable(
         runner,
         "#!/usr/bin/env bash\n"
         f"attempts={str(attempts)!r}\n"
+        f"calls={str(calls)!r}\n"
+        "printf '%s\\n' \"$*\" >> \"$calls\"\n"
         "count=0\n"
         "[[ -f $attempts ]] && count=$(<\"$attempts\")\n"
         "count=$((count + 1))\n"
@@ -285,6 +298,7 @@ def test_daily_retry_wrapper_returns_success_after_a_retry(tmp_path: Path) -> No
         {
             "QUANTHUS_ODS_DAILY_MAX_ATTEMPTS": "2",
             "QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS": "0",
+            "QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS": "14760",
         }
     )
 
@@ -299,6 +313,10 @@ def test_daily_retry_wrapper_returns_success_after_a_retry(tmp_path: Path) -> No
 
     assert completed.returncode == 0, completed.stderr
     assert attempts.read_text(encoding="ascii") == "2\n"
+    assert calls.read_text(encoding="ascii").splitlines() == [
+        "",
+        "--recovery-window-seconds 14760",
+    ]
 
 
 def test_daily_retry_wrapper_returns_final_failure_status(tmp_path: Path) -> None:

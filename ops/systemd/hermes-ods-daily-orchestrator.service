@@ -16,8 +16,9 @@ Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/hermes-ods-lane.env
 WorkingDirectory=/root/work/Quanthus
 Environment=QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=2
 Environment=QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS=600
+Environment=QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760
 ExecStart=/root/work/Quanthus/ops/bin/run-ods-daily-with-retry /root/work/Quanthus/ops/bin/run-cn01-ods-daily
-TimeoutStartSec=330min
+TimeoutStartSec=540min
 SuccessExitStatus=0
 Nice=5
 UMask=0027

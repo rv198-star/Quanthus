@@ -254,3 +254,15 @@ STAGE 2 RESEARCH: NOT REOPENED
 
 This verdict means the proposed repair is internally coherent across the four simulated
 responsibilities. It is not independent expert validation and must not be reported as such.
+
+## 9. Post-review implementation activation
+
+On 2026-09-12 the owner explicitly approved only P3-STAGE-008-B after the scope was restated in plain
+language. The implementation therefore consumed the review's bounded next move: two threshold-free
+path Facts plus the primary-first reference contract. It did not open 008-C/D, any runtime Job,
+market-data read, threshold search or Stage-2 change. Engineering evidence is recorded in
+`../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`.
+
+The historical review verdict above remains the design-entry record; this addendum records that its
+implementation blocker was resolved by explicit owner activation and contract tests, not by silently
+reclassifying the original review as runtime acceptance.

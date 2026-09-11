@@ -1,0 +1,54 @@
+{
+  "schema_version": "quanthus.directional-path-geometry-fact-family.v1",
+  "fact_family_id": "directional-path-geometry-v1",
+  "display_name_zh": "方向路径几何事实族",
+  "display_name_en": "Directional Path Geometry Fact Family",
+  "work_item": "P3-STAGE-008-B",
+  "purpose": "Formalize only threshold-free 20-session endpoint traversal and counter-direction excursion needed to distinguish coherent directional relocation from direction-neutral instability without emitting Stage propositions.",
+  "governing_design": "docs/design/stage-directional-boundary-repair.md",
+  "reused_fact_families": [
+    "config/structure-trend-evolution.v1.json",
+    "config/structure-order-facts.v1.json"
+  ],
+  "concepts": {
+    "structure.geometry.range-traversal": {"window_sessions": 20},
+    "structure.geometry.counter-direction-excursion-share": {"window_sessions": 20}
+  },
+  "semantics": {
+    "current_window_includes_t": true,
+    "window_uses_t_minus_20_through_t_closes": true,
+    "required_contiguous_admitted_rows": 21,
+    "same_listing_coordinate_required": true,
+    "hidden_session_gap_resets_history": true,
+    "nonadmitted_row_resets_history": true,
+    "range_traversal_zero_close_range_value": "0",
+    "counter_direction_zero_net_displacement_unavailable": true,
+    "counter_direction_zero_net_reason": "zero_net_direction",
+    "window_return_is_reused_not_redefined": true,
+    "directional_efficiency_is_reused_not_redefined": true,
+    "range_traversal_alone_cannot_assert_directional_relocation": true,
+    "stage_thresholds_in_fact_identity": false,
+    "stage_projection_forbidden": true
+  },
+  "authority": {
+    "formal_structure_fact_implementation_authorized": true,
+    "synthetic_conformance_authorized": true,
+    "market_data_read_authorized": false,
+    "dwd_provider_open_authorized": false,
+    "runtime_job_submission_authorized": false,
+    "parameter_search_authorized": false,
+    "official_label_card_publication_authorized": false,
+    "future_outcome_access_authorized": false,
+    "sealed_partition_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "claim_limits": [
+    "Range traversal describes endpoint displacement relative to the observed close range; it does not prove trend quality or Stage membership.",
+    "Counter-direction excursion describes the largest move against the endpoint direction; it does not infer actor intent, risk or future reversal.",
+    "A directional relocation predicate must later combine multiple independently explainable facts; this family freezes no Stage threshold.",
+    "No economic, portfolio, strategy or trading meaning is implied."
+  ]
+}

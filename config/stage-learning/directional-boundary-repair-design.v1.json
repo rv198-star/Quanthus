@@ -154,6 +154,23 @@
     {"case": "listing_or_coordinate_reset", "expected": "input_unavailable_not_stage0"},
     {"case": "missing_primary_input", "expected": "input_unavailable_not_stage0"}
   ],
+  "implementation_checkpoint": {
+    "work_item": "P3-STAGE-008-B",
+    "state": "ENGINEERING_IMPLEMENTATION_ACCEPTED",
+    "fact_contract": "config/structure-directional-path-geometry.v1.json",
+    "fact_contract_digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c",
+    "fact_implementation": "src/quanthus/structure_directional_path_geometry.py",
+    "reference_protocol": "config/stage-learning/order-reference-protocol.v2.json",
+    "reference_protocol_digest": "sha256:8db37fb3d197668cfe16f9daabaa57c625617460be94ace13a28ccb81e89c88b",
+    "reference_implementation": "src/quanthus/stage_learning/order_reference_protocol_v2.py",
+    "acceptance": "docs/acceptance/stage-directional-boundary-repair-b-implementation-20260912.md",
+    "new_market_data_reads": 0,
+    "runtime_jobs": 0,
+    "parameter_trials": 0,
+    "stage_2_changed": false,
+    "stage_007_threshold_learning": false,
+    "next_work_item_authorized": false
+  },
   "future_validation_boundary": {
     "stage_007_cases_may_be_used_for_threshold_learning": false,
     "stage_007_cases_may_be_used_for_qualification": false,

@@ -1,0 +1,61 @@
+{
+  "schema_version": "quanthus.stage-order-reference-protocol.v2",
+  "protocol_id": "stage-order-primary-first-reference-v2",
+  "work_item": "P3-STAGE-008-B",
+  "purpose": "Commit atomic 20-session primary opinions before exposing explicit 10-session derived modifiers; recent evidence may annotate but cannot mutate primary status.",
+  "governing_design": "docs/design/stage-directional-boundary-repair.md",
+  "primary_scale_sessions": 20,
+  "recent_scale_sessions": 10,
+  "primary_atomic_propositions": [
+    "structural_instability_20",
+    "coherent_directional_relocation_20",
+    "orderly_consolidation_20"
+  ],
+  "truth_values": ["TRUE", "FALSE", "UNKNOWN"],
+  "primary_role_resolution_precedence": [
+    "INPUT_UNAVAILABLE",
+    "AMBIGUOUS_CONFLICT",
+    "STAGE_0",
+    "STAGE_2",
+    "NEITHER_RELOCATION_OR_MIXED",
+    "NEITHER_NO_POSITIVE_PROPOSITION",
+    "AMBIGUOUS_UNKNOWN"
+  ],
+  "recent": {
+    "width_values": ["CONTRACTING", "EXPANDING", "STABLE", "UNKNOWN", "UNAVAILABLE"],
+    "center_values": ["STABLE", "SHIFTING", "UNKNOWN", "UNAVAILABLE"],
+    "relation_values": ["SUPPORTS", "CONTRADICTS", "NEUTRAL", "UNKNOWN"],
+    "may_modify_primary": false
+  },
+  "review_roles": ["short_term", "fund"],
+  "review_sources": ["deterministic_policy", "self_simulated", "external_ai", "human"],
+  "required_fact_contracts": {
+    "trend": {"path": "config/structure-trend-evolution.v1.json", "digest": "sha256:480db6df61901322c107da44eb41687bf4d19d2c6d1297a846a7af68cd224e03"},
+    "order": {"path": "config/structure-order-facts.v1.json", "digest": "sha256:57e5f60e000c4f238f83b4128d2df3acb1c7766fc01bc42829aeb085bbb8491d"},
+    "directional_path": {"path": "config/structure-directional-path-geometry.v1.json", "digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c"}
+  },
+  "enforcement": {
+    "primary_commit_digest_required_before_recent_packet": true,
+    "explicit_recent_derived_facts_absent_from_primary_packet": true,
+    "candidate_output_absent_from_all_review_packets": true,
+    "future_rows_absent_from_all_review_packets": true,
+    "recent_schema_contains_no_primary_fields": true,
+    "primary_resolver_does_not_accept_recent_modifier": true,
+    "cross_role_majority_or_adjudication_forbidden": true,
+    "full_cognitive_blinding_claimed": false
+  },
+  "authority": {
+    "reference_protocol_implementation_authorized": true,
+    "synthetic_conformance_authorized": true,
+    "market_data_acquisition_authorized": false,
+    "runtime_job_submission_authorized": false,
+    "parameter_search_authorized": false,
+    "future_outcome_access_authorized": false,
+    "arbitration_access_authorized": false,
+    "permanent_blind_access_authorized": false,
+    "official_labels_authorized": false,
+    "daily_schedule_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  }
+}

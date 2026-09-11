@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/directional-boundary-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:61922646743cbad3a7981a80db4778c7700a71838eb6266e37c77445ac6a01d8"
+DESIGN_DIGEST = "sha256:30e3ea9d8f5cd165225d7ebc07cc0772598c1d747538930264b8619557586727"
 
 
 def load_design() -> dict:
@@ -108,6 +108,41 @@ def test_recent_packet_cannot_mutate_primary() -> None:
     assert protocol["resolver_uses_recent_to_change_primary_status"] is False
     assert protocol["unknown_primary_reason_may_cite_explicit_recent_fact"] is False
     assert protocol["full_cognitive_blinding_claimed"] is False
+
+
+def test_b_implementation_is_bound_but_opens_no_next_stage_or_runtime() -> None:
+    checkpoint = load_design()["implementation_checkpoint"]
+    assert checkpoint == {
+        "work_item": "P3-STAGE-008-B",
+        "state": "ENGINEERING_IMPLEMENTATION_ACCEPTED",
+        "fact_contract": "config/structure-directional-path-geometry.v1.json",
+        "fact_contract_digest": (
+            "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c"
+        ),
+        "fact_implementation": "src/quanthus/structure_directional_path_geometry.py",
+        "reference_protocol": "config/stage-learning/order-reference-protocol.v2.json",
+        "reference_protocol_digest": (
+            "sha256:8db37fb3d197668cfe16f9daabaa57c625617460be94ace13a28ccb81e89c88b"
+        ),
+        "reference_implementation": "src/quanthus/stage_learning/order_reference_protocol_v2.py",
+        "acceptance": (
+            "docs/acceptance/stage-directional-boundary-repair-b-implementation-20260912.md"
+        ),
+        "new_market_data_reads": 0,
+        "runtime_jobs": 0,
+        "parameter_trials": 0,
+        "stage_2_changed": False,
+        "stage_007_threshold_learning": False,
+        "next_work_item_authorized": False,
+    }
+    for key in (
+        "fact_contract",
+        "fact_implementation",
+        "reference_protocol",
+        "reference_implementation",
+        "acceptance",
+    ):
+        assert (ROOT / checkpoint[key]).is_file()
 
 
 def test_stage007_is_diagnostic_only_and_future_partitions_remain_closed() -> None:

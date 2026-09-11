@@ -8,7 +8,7 @@
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | P3-STAGE-007 / `REVISE_TARGET_OR_PARK` |
 | Machine design | `../../config/stage-learning/directional-boundary-repair-design.v1.json` |
-| Machine design digest | `sha256:61922646743cbad3a7981a80db4778c7700a71838eb6266e37c77445ac6a01d8` |
+| Machine design digest | `sha256:30e3ea9d8f5cd165225d7ebc07cc0772598c1d747538930264b8619557586727` |
 | Four-party review | [review record](../reviews/stage-directional-boundary-repair-review-20260911.md) |
 | Runtime authority | none |
 
@@ -31,7 +31,9 @@ primary vetoes. P3-STAGE-008 therefore repairs two boundaries together but does 
 2. the evidence-governance boundary between the **20-session primary judgement** and the
    **10-session recent modifier**.
 
-This document authorizes neither implementation nor a new experiment.
+The owner explicitly authorized P3-STAGE-008-B on 2026-09-12. The bounded engineering
+implementation is now accepted; this still authorizes no new market experiment, threshold search or
+runtime Job.
 
 ## 2. Primary semantic decomposition
 
@@ -244,12 +246,40 @@ consumed/exposed for their existing purposes and 2025 remains closed.
 
 The four-party review approves the design direction but intentionally leaves delivery blocked:
 
-1. **P3-STAGE-008-A — design and four-party adversarial review:** complete in this change;
-2. **P3-STAGE-008-B — implement threshold-free Facts and two-phase reference contract:** blocked;
+1. **P3-STAGE-008-A — design and four-party adversarial review:** closed;
+2. **P3-STAGE-008-B — implement threshold-free Facts and two-phase reference contract:** closed;
+   engineering acceptance is `../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`;
 3. **P3-STAGE-008-C — conformance/regression using synthetic paths plus already-exposed 007 cases:**
-   blocked; diagnostic only, no threshold learning;
-4. **P3-STAGE-008-D — one fresh task-disjoint development screen:** blocked until B/C pass and a
+   blocked; not executed by the B approval, diagnostic only and no threshold learning;
+4. **P3-STAGE-008-D — one fresh task-disjoint development screen:** blocked until C passes and a
    separate runtime authorization is granted.
 
 No new Job, market-data read, parameter search, official label, strategy use or trading permission is
-created by this approved design.
+created by the B implementation.
+
+## 10. P3-STAGE-008-B implementation result
+
+The approved design is now implemented in two deliberately separate surfaces.
+
+`config/structure-directional-path-geometry.v1.json` and
+`src/quanthus/structure_directional_path_geometry.py` own the two new 20-session threshold-free
+measurements. They require 21 contiguous admitted rows, inherit listing/coordinate/gap reset
+semantics, expose exact source-closure/revision identity, and contain no Stage threshold or provider
+opening path. Zero net displacement makes only counter-direction excursion unavailable; range
+traversal remains defined.
+
+`config/stage-learning/order-reference-protocol.v2.json` and
+`src/quanthus/stage_learning/order_reference_protocol_v2.py` implement the Primary-P then Recent-R
+ledger mechanically. The primary packet has no explicit 10-session derived facts; a content-digested
+primary opinion is required before a recent packet can be built. Recent commits have no primary
+field, and the primary resolver accepts no recent-modifier argument. A combined resolver returns the
+recent relation separately and explicitly states that it cannot modify primary status.
+
+The role-level atomic precedence from section 2 is executable: relocation-positive mixed conditions
+remain outside Stage 0, unknown-dependent combinations remain ambiguous, and cross-role disagreement
+cannot be majority-voted away. Stage 2 code/thresholds are untouched.
+
+The two semantic concepts are registered in the Data & Indicator Catalog as reserved Structure
+concepts with reviewed Chinese descriptions. They are intentionally **not** added to accepted
+Structure runtime bindings because 008-C/D have not happened. Detailed evidence is in
+[008-B engineering acceptance](../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md).

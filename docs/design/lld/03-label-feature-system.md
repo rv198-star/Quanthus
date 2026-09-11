@@ -408,27 +408,31 @@ directional relocation and orderly consolidation. Coherent relocation becomes an
 guard, so directional repricing, correction or trend legs cannot enter Stage 0 by residual logic.
 Stage 2 remains frozen.
 
-The minimum proposed Fact extension adds only 20-session range traversal and counter-direction
-excursion share. Existing window return and directional efficiency remain owned by Trend Evolution.
-Stage-007 is used only as a permanently exposed design diagnostic: it supports the choice of Fact
-shape but cannot select thresholds or qualify the successor. A four-responsibility adversarial review
+The minimum Fact extension contains only 20-session range traversal and counter-direction excursion
+share. Existing window return and directional efficiency remain owned by Trend Evolution. Stage-007
+is used only as a permanently exposed design diagnostic: it supports the choice of Fact shape but
+cannot select thresholds or qualify the successor. A four-responsibility adversarial review
 (short-term, fund, quant and data/evidence governance) found no open design-direction blocker after
 requiring the counter-direction Fact and a primary-first two-phase review ledger. The review is
 same-origin simulation, not independent expert validation.
 
-The reference contract commits atomic 20-session primary opinions before explicit 10-session derived
-facts are revealed; the later recent packet may support or contradict but cannot mutate primary
-status. Delivery remains blocked. No implementation, market read, Job, parameter search, Stage-2
-change, 2022-2025 access, official label, strategy or trading authority is active. Machine design:
-`../../config/stage-learning/directional-boundary-repair-design.v1.json`; review:
+P3-STAGE-008-B has now implemented those two threshold-free Facts plus Reference Protocol v2. The
+Fact builder requires 21 contiguous admitted rows and preserves listing/coordinate/gap resets and
+exact revision/source closure. The reference contract commits atomic 20-session primary opinions
+before explicit 10-session derived facts are revealed; the recent schema contains no primary field
+and the primary resolver accepts no recent input. The concepts are Catalog-registered but remain
+outside accepted runtime bindings. C/D remain blocked: no market read, Job, threshold search,
+Stage-2 change, 2022-2025 access, official label, strategy or trading authority is active. Machine
+design: `../../config/stage-learning/directional-boundary-repair-design.v1.json`; B evidence:
+`../../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`; review:
 `../../reviews/stage-directional-boundary-repair-review-20260911.md`.
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P3-STAGE-008 | Repair Stage-0 direction boundary and primary/recent semantics | P3-STAGE-007 | blocked delivery; design approved; four-party adversarial review complete |
+| P3-STAGE-008 | Repair Stage-0 direction boundary and primary/recent semantics | P3-STAGE-007 | blocked delivery; A/B closed, C/D not authorized |
 | P3-STAGE-008-A | Freeze semantics, path Facts and four-party review | P3-STAGE-007 | closed; `../stage-directional-boundary-repair.md` |
-| P3-STAGE-008-B | Implement threshold-free Facts and primary-first reference schema | P3-STAGE-008-A | blocked; explicit implementation activation required |
-| P3-STAGE-008-C | Synthetic conformance plus exposed-007 regression | P3-STAGE-008-B | blocked; diagnostic only, no threshold learning |
+| P3-STAGE-008-B | Implement threshold-free Facts and primary-first reference schema | P3-STAGE-008-A | closed; `../../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md` |
+| P3-STAGE-008-C | Synthetic conformance plus exposed-007 regression | P3-STAGE-008-B | blocked; not authorized by B approval; diagnostic only, no threshold learning |
 | P3-STAGE-008-D | Fresh disjoint development screen | P3-STAGE-008-C | blocked; separate runtime authority required |
 
 ## 7. Acceptance

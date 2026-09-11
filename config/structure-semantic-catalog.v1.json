@@ -33,6 +33,8 @@
     {"concept_id": "structure.geometry.post-break-rebound", "meaning": "同一支撑失守后、尚未收复期间，当前收盘相对因果运行低点的反弹幅度；收复当日不计入未收复反抽", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.window-return", "meaning": "同一上市身份与价格坐标下，当前收盘相对精确前n个合格交易时段收盘的简单收益；窗口与n属于规格", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.directional-efficiency", "meaning": "指定窗口净收盘变化相对逐期绝对收盘变化路径长度的有符号比例；描述方向效率，不判断趋势质量", "result_kind": "measurement", "registration": "reserved"},
+    {"concept_id": "structure.geometry.range-traversal", "meaning": "窗口起点到终点的绝对收盘位移占同窗实际收盘区间宽度的比例；描述价格重定位程度，不单独证明方向一致性", "result_kind": "measurement", "registration": "reserved"},
+    {"concept_id": "structure.geometry.counter-direction-excursion-share", "meaning": "相对窗口最终净方向的最大反向收盘偏离占同窗实际收盘区间的比例；描述反向折返强度，不推断未来反转", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.return-velocity", "meaning": "指定窗口简单收益除以窗口交易时段数的单位时段变化速度；不等同于未来趋势速度", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.velocity-delta", "meaning": "两个显式窗口单位时段收益速度之差；正负号只表示数学差，不直接命名为加速或减速", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.range-position", "meaning": "当前收盘在指定因果滚动高低区间中的归一化位置；零宽区间不可定义", "result_kind": "measurement", "registration": "reserved"},

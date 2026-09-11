@@ -24,7 +24,7 @@ def test_catalog_build_is_deterministic_and_matches_snapshot_manifest() -> None:
     catalog = DataIndicatorCatalog()
     assert catalog.snapshot["snapshot_digest"] == first["snapshot_digest"]
     assert first["summary"] == {
-        "entry_count": 758,
+        "entry_count": 760,
         "gap_count": 10,
         "counts_by_kind": {
             "adm_dataset": 4,
@@ -34,7 +34,7 @@ def test_catalog_build_is_deterministic_and_matches_snapshot_manifest() -> None:
             "feature_spec": 9,
             "label_card": 4,
             "ods_dataset": 57,
-            "semantic_concept": 31,
+            "semantic_concept": 33,
             "semantic_family": 20,
         },
     }

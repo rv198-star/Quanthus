@@ -229,19 +229,19 @@ nodes.
   [C/D closeout](acceptance/stage-order-rule-screen-cd-closeout-20260911.md). Route:
   [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
   `config/stage-order-rule-screen-delivery.v1.json`; rule: `config/stage-learning/order-rule-screen.v1.json`.
-- `P3-STAGE-008` now owns the approved successor design for the Stage-0 direction boundary and the
-  primary/recent reference protocol. The design decomposes the primary judgement into structural
-  instability, coherent directional relocation and orderly consolidation; relocation is an explicit
-  Stage-0 guard rather than another Stage label. It proposes only two new threshold-free path Facts:
-  20-session range traversal and counter-direction excursion share, while reusing existing window
-  return and directional efficiency. Stage-007 is permanently design-exposed and cannot tune or
-  qualify the successor. The reference workflow commits the 20-session primary opinion before
-  explicit 10-session derived facts are shown, and recent modifiers cannot mutate primary status.
-  Four simulated responsibilities (short-term, fund, quant, data/evidence governance) completed an
-  adversarial review with no open design-direction blocker, but this is not independent expert
-  validation. Delivery remains blocked: no implementation, Job, market-data read, parameter search,
-  Stage-2 change, 2022-2025 access, official label, strategy or trading authority is open. Route:
-  [directional-boundary repair](design/stage-directional-boundary-repair.md); review:
+- `P3-STAGE-008` owns the approved successor for the Stage-0 direction boundary and primary/recent
+  reference protocol. A is closed by four-responsibility adversarial design review. B is now also
+  closed at engineering scope: `structure.geometry.range-traversal` and
+  `structure.geometry.counter-direction-excursion-share` are implemented as threshold-free,
+  21-row contiguous Structure Facts, and Reference Protocol v2 mechanically commits the atomic
+  20-session primary ledger before exposing explicit 10-session modifiers. Recent commits contain
+  no primary field and cannot change the primary resolver outcome. The two concepts are registered
+  in the semantic/Data Catalog as reserved concepts but are not added to accepted runtime bindings.
+  Stage-007 remains permanently design-exposed and cannot tune or qualify the successor; Stage 2 is
+  untouched. C and D remain blocked: no Job, market-data read, parameter search, 2022-2025 access,
+  official label, strategy or trading authority is open. Route:
+  [directional-boundary repair](design/stage-directional-boundary-repair.md); B evidence:
+  `acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`; review:
   `reviews/stage-directional-boundary-repair-review-20260911.md`; machine design:
   `config/stage-learning/directional-boundary-repair-design.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

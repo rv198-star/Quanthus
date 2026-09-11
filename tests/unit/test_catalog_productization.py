@@ -23,7 +23,7 @@ def catalog():
 
 
 def test_every_existing_entry_has_reviewed_chinese_reading(catalog):
-    assert len(catalog.snapshot["entries"]) == 758
+    assert len(catalog.snapshot["entries"]) == 760
     for entry in catalog.snapshot["entries"]:
         assert ZH.search(entry["display_name"]), entry["entry_id"]
         assert ZH.search(entry["description"]), entry["entry_id"]
@@ -70,6 +70,17 @@ def test_business_summary_is_not_a_maintenance_dashboard(catalog):
     macd = catalog.item("semantic_concept:indicator.momentum.macd")
     assert macd["implementation_status"] == "declared_only"
     assert "暂无" in json.dumps(macd["details"]["reading"], ensure_ascii=False)
+
+
+def test_directional_path_geometry_concepts_have_reviewed_chinese_readings(catalog):
+    traversal = catalog.item("semantic_concept:structure.geometry.range-traversal")
+    counter = catalog.item(
+        "semantic_concept:structure.geometry.counter-direction-excursion-share"
+    )
+    assert "区间穿越" in traversal["display_name"]
+    assert "价格重定位" in traversal["description"]
+    assert "反向偏离" in counter["display_name"]
+    assert "未来反转" in counter["description"]
 
 
 def test_price_index_volume_and_time_units_are_not_guessed(catalog):
@@ -282,7 +293,8 @@ def test_packaging_contains_presentation_and_lineage_closure():
 def test_source_inventory_and_semantic_ids_stay_exact(catalog):
     built = build_catalog()
     assert built["snapshot_digest"] == catalog.snapshot["snapshot_digest"]
-    assert built["summary"]["entry_count"] == 758
+    assert built["summary"]["entry_count"] == 760
+    assert built["summary"]["counts_by_kind"]["semantic_concept"] == 33
     assert built["summary"]["counts_by_kind"]["adm_dataset"] == 4
     assert built["summary"]["counts_by_kind"]["adm_field"] == 76
     assert built["summary"]["counts_by_kind"]["dwd_field"] == 524

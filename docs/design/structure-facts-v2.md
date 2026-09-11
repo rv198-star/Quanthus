@@ -5,7 +5,7 @@
 | Design status | approved |
 | Delivery gate | accepted |
 | Governing work item | `P3-STRUCT-004` |
-| Current delivery | B1-B5 bounded retrospective vertical accepted; additive `B5-F9` **演化支撑事实族 / Support Evolution Fact Family**, `B6-TREND` **趋势演化事实族 / Trend Evolution Fact Family**, and `B6-ORDER` **结构秩序事实族 / Structure Order Fact Family** accepted; broad B6/B7-B11 remain separately gated |
+| Current delivery | B1-B5 bounded retrospective vertical accepted; additive `B5-F9` **演化支撑事实族 / Support Evolution Fact Family**, `B6-TREND` **趋势演化事实族 / Trend Evolution Fact Family**, and `B6-ORDER` **结构秩序事实族 / Structure Order Fact Family** accepted; `B6-PATH` **方向路径几何事实族 / Directional Path Geometry Fact Family** is implemented but unqualified under P3-STAGE-008-B; broad B6/B7-B11 remain separately gated |
 | Runtime v2 acceptance | ACCEPTED for the fixed development retrospective slice only |
 | Runtime acceptance | `../acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md` |
 | Retained pre-result repair | `../acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md`; resolved by independent A/B |

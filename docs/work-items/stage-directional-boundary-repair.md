@@ -6,7 +6,7 @@
 | Governing design | `../design/stage-directional-boundary-repair.md` |
 | Review | `../reviews/stage-directional-boundary-repair-review-20260911.md` |
 | Machine design | `../../config/stage-learning/directional-boundary-repair-design.v1.json` |
-| Current state | design approved / delivery blocked |
+| Current state | A/B closed; C/D blocked; no runtime authority |
 
 P3-STAGE-008 is the bounded successor to P3-STAGE-007. It repairs the Stage-0 direction boundary and
 the primary/recent reference protocol without reopening Stage 2, old partitions, or runtime access.
@@ -14,8 +14,8 @@ the primary/recent reference protocol without reopening Stage 2, old partitions,
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-008-A | Freeze semantic decomposition, path Facts and four-party adversarial review | P3-STAGE-007 | closed; design approved; no runtime authority |
-| P3-STAGE-008-B | Implement only threshold-free range-traversal / counter-direction-excursion Facts and primary-first reference schema | P3-STAGE-008-A | blocked; requires explicit implementation activation |
-| P3-STAGE-008-C | Run synthetic conformance plus exposed Stage-007 diagnostic regression | P3-STAGE-008-B | blocked; Stage-007 may not tune thresholds or qualify the repair |
+| P3-STAGE-008-B | Implement only threshold-free range-traversal / counter-direction-excursion Facts and primary-first reference schema | P3-STAGE-008-A | closed; engineering accepted; `../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md` |
+| P3-STAGE-008-C | Run synthetic conformance plus exposed Stage-007 diagnostic regression | P3-STAGE-008-B | blocked; not authorized by B approval; Stage-007 may not tune thresholds or qualify the repair |
 | P3-STAGE-008-D | Execute one fresh task-disjoint development screen | P3-STAGE-008-C | blocked; requires separate runtime authority and new economic identities |
 
 ## Hard boundaries

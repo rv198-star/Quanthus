@@ -37,7 +37,7 @@ def test_viewer_can_read_catalog_summary_and_search(kernel) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert status == 200
-    assert summary["summary"]["entry_count"] == 758
+    assert summary["summary"]["entry_count"] == 760
     assert summary["summary"]["counts_by_kind"]["adm_dataset"] == 4
     assert summary["summary"]["counts_by_kind"]["adm_field"] == 76
     assert summary["summary"]["counts_by_kind"]["dwd_table"] == 33

@@ -234,6 +234,12 @@ def test_blueprint_preserves_gaps_and_has_no_dictionary_dependency_cycle() -> No
     }
     assert rows["B6-ORDER"]["implementation_status"] == "accepted_bounded_v2"
     assert rows["B6-ORDER"]["verification_status"] == "immutable_source_ab"
+    assert rows["B6-PATH"]["implementation_status"] == "implemented_unqualified"
+    assert rows["B6-PATH"]["verification_status"] == "unit_and_contract_only"
+    assert {
+        "structure.geometry.range-traversal",
+        "structure.geometry.counter-direction-excursion-share",
+    }.isdisjoint(bindings)
     assert rows["B6"]["implementation_status"] == "not_started"
     assert rows["B9"]["implementation_status"] == "outside_structure_scope"
 

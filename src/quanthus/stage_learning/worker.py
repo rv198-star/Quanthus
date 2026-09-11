@@ -43,10 +43,12 @@ STAGE_SECOND_GROUP_DEVELOPMENT_SUPPLEMENT_JOB = (
 STAGE_THIRD_GROUP_PROFILE_JOB = "quanthus.stage-third-group-profile.v1"
 STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB = "quanthus.stage-order-proposition-development.v1"
 STAGE_ORDER_RULE_PREPARE_JOB = "quanthus.stage-order-rule-prepare.v1"
+STAGE_ORDER_RULE_RESOLVE_SCORE_JOB = "quanthus.stage-order-rule-resolve-score.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
 ORDER_RULE_PREPARE_RETRY_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-retry-budget.v1"
+ORDER_RULE_RESOLVE_SCORE_BUDGET_SCHEMA = "quanthus.stage-order-rule-resolve-score-budget.v1"
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
@@ -127,6 +129,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-order-rule-prepare-*",
         "process_error": "stage_order_rule_prepare_process_failed",
         "wall_seconds": 2700,
+    },
+    STAGE_ORDER_RULE_RESOLVE_SCORE_JOB: {
+        "config": "config/stage-learning/order-rule-resolve-score.v1.json",
+        "module": "quanthus.stage_learning.order_rule_resolve_score",
+        "artifact_glob": "stage-order-rule-resolve-score-*",
+        "process_error": "stage_order_rule_resolve_score_process_failed",
+        "wall_seconds": 600,
     },
 }
 
@@ -284,6 +293,10 @@ class StageWorkerPaths:
     @property
     def order_rule_prepare_retry_budget(self) -> Path:
         return self.control_root / "order-rule-prepare-retry-budget.json"
+
+    @property
+    def order_rule_resolve_score_budget(self) -> Path:
+        return self.control_root / "order-rule-resolve-score-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -490,6 +503,72 @@ def _existing_order_rule_prepare_submission(
         raise StageWorkerError("order-rule prepare is already bound to another immutable input")
     _order_rule_prepare_retry_authorization(paths, failed_job)
     return None, failed_job
+
+
+def _order_rule_resolve_score_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": ORDER_RULE_RESOLVE_SCORE_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-007-C",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _require_order_rule_resolve_score_parent(paths: StageWorkerPaths) -> None:
+    config = _object(
+        paths.control_repo / "config/stage-learning/order-rule-resolve-score.v1.json",
+        "order-rule resolve-score config",
+    )
+    prepare = config.get("prepare")
+    if not isinstance(prepare, Mapping):
+        raise StageWorkerError("order-rule resolve-score prepare binding missing")
+    job_id = str(prepare.get("job_id") or "")
+    if not _JOB_ID.fullmatch(job_id):
+        raise StageWorkerError("order-rule resolve-score prepare job id differs")
+    status_path = paths.status / f"{job_id}.json"
+    if not status_path.is_file():
+        raise StageWorkerError("order-rule resolve-score prepare status missing")
+    observed = _object(status_path, "order-rule resolve-score prepare status")
+    result_ref = observed.get("result_ref")
+    prepared = result_ref.get("order_rule_prepare") if isinstance(result_ref, Mapping) else None
+    if (
+        observed.get("state") != "succeeded"
+        or not isinstance(prepared, Mapping)
+        or result_ref.get("manifest_sha256") != prepare.get("manifest_sha256")
+        or prepared.get("selection_digest") != prepare.get("selection_digest")
+        or prepared.get("evidence_digest") != prepare.get("evidence_digest")
+        or prepared.get("selected_case_count") != prepare.get("case_count")
+        or prepared.get("source_isolation_verified") is not True
+        or prepared.get("review_ready") is not True
+    ):
+        raise StageWorkerError("order-rule resolve-score prepare receipt differs")
+
+
+def _existing_order_rule_resolve_score_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.order_rule_resolve_score_budget
+    if not marker_path.exists():
+        _require_order_rule_resolve_score_parent(paths)
+        return None
+    marker = _object(marker_path, "order-rule resolve-score budget")
+    if (
+        marker.get("schema_version") != ORDER_RULE_RESOLVE_SCORE_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-007-C"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("order-rule resolve-score budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_ORDER_RULE_RESOLVE_SCORE_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("order-rule resolve-score budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "order-rule resolve-score has no retry or input-replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
 
 
 def _qualification_budget_value(job: StageJob, *, state: str, reserved_at: str) -> dict[str, Any]:
@@ -879,6 +958,21 @@ class StageWorker:
                 "evidence_source_row_count": verified.get("evidence_source_row_count"),
                 "review_ready": verified.get("review_ready"),
             }
+        if job.kind == STAGE_ORDER_RULE_RESOLVE_SCORE_JOB:
+            result["order_rule_resolve_score"] = {
+                "case_count": verified.get("case_count"),
+                "opinion_count": verified.get("opinion_count"),
+                "reference_manifest_sha256": verified.get("reference_manifest_sha256"),
+                "primary_reference_counts": verified.get("primary_reference_counts"),
+                "gate_calculation": verified.get("gate_calculation"),
+                "primary_disagreement_count": verified.get("primary_disagreement_count"),
+                "joint_primary_unknown_count": verified.get("joint_primary_unknown_count"),
+                "recent_disagreement_count": verified.get("recent_disagreement_count"),
+                "independent_validation": verified.get("independent_validation"),
+                "full_context_blinding_claimed": verified.get("full_context_blinding_claimed"),
+                "official_labels_authorized": verified.get("official_labels_authorized"),
+                "runtime_activation_authorized": verified.get("runtime_activation_authorized"),
+            }
         return result
 
     def execute(self, job: StageJob) -> dict[str, Any]:
@@ -1075,6 +1169,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_ORDER_RULE_RESOLVE_SCORE_JOB:
+        existing = _existing_order_rule_resolve_score_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -1088,6 +1188,7 @@ def submit_job(
     prepare_retry_reserved = (
         job.kind == STAGE_ORDER_RULE_PREPARE_JOB and prepare_retry_of is not None
     )
+    resolve_score_reserved = job.kind == STAGE_ORDER_RULE_RESOLVE_SCORE_JOB
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
@@ -1096,6 +1197,11 @@ def submit_job(
         _exclusive_json(
             paths.order_rule_prepare_retry_budget,
             _order_rule_prepare_retry_budget_value(prepare_retry_of, job),
+        )
+    if resolve_score_reserved:
+        _exclusive_json(
+            paths.order_rule_resolve_score_budget,
+            _order_rule_resolve_score_budget_value(job),
         )
     try:
         with path.open("xb") as stream:
@@ -1111,6 +1217,8 @@ def submit_job(
             paths.order_rule_prepare_budget.unlink(missing_ok=True)
         if prepare_retry_reserved:
             paths.order_rule_prepare_retry_budget.unlink(missing_ok=True)
+        if resolve_score_reserved:
+            paths.order_rule_resolve_score_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -1120,6 +1228,8 @@ def submit_job(
             paths.order_rule_prepare_budget.unlink(missing_ok=True)
         if prepare_retry_reserved:
             paths.order_rule_prepare_retry_budget.unlink(missing_ok=True)
+        if resolve_score_reserved:
+            paths.order_rule_resolve_score_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:

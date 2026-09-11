@@ -10,6 +10,12 @@ from pathlib import Path
 from sync_github_planning import GitHub, issue_by_stable_id
 
 from quanthus.stage_learning.order_rule_prepare import load_prepare_config
+from quanthus.stage_learning.order_rule_resolve_score import (
+    CONFIG_DIGEST as RESOLVE_SCORE_DIGEST,
+)
+from quanthus.stage_learning.order_rule_resolve_score import (
+    load_config as load_resolve_score_config,
+)
 from quanthus.stage_learning.order_rule_screen import RULE_DIGEST, load_rule
 from quanthus.stage_learning.order_rule_validation import VALIDATION_DIGEST
 from quanthus.structure_v2_inputs import digest
@@ -65,8 +71,8 @@ def validate_plan(raw: dict) -> None:
         ),
     }:
         raise ValueError("screen_successful_prepare_receipt_drift")
-    runtime = raw.get("runtime_contract")
-    if not isinstance(runtime, dict) or runtime != {
+    prepare_runtime = raw.get("completed_prepare_contract")
+    if not isinstance(prepare_runtime, dict) or prepare_runtime != {
         "path": "config/stage-learning/order-rule-prepare.v1.json",
         "digest": "sha256:b27bbc1d3d54f9e410a8ca7b931af63f62690be9b911d538aeb0cda5666e9bd9",
         "kind": "quanthus.stage-order-rule-prepare.v1",
@@ -76,20 +82,42 @@ def validate_plan(raw: dict) -> None:
         "opinion_generation": False,
         "candidate_scoring": False,
     }:
-        raise ValueError("screen_prepare_runtime_contract")
+        raise ValueError("screen_completed_prepare_runtime_contract")
+    prepare_runtime_path = (ROOT / prepare_runtime["path"]).resolve()
+    if not prepare_runtime_path.is_relative_to(ROOT) or not prepare_runtime_path.is_file():
+        raise ValueError("screen_completed_prepare_contract_missing")
+    if digest(load_prepare_config(prepare_runtime_path)) != prepare_runtime["digest"]:
+        raise ValueError("screen_completed_prepare_contract_digest")
+    runtime = raw.get("runtime_contract")
+    if not isinstance(runtime, dict) or runtime != {
+        "path": "config/stage-learning/order-rule-resolve-score.v1.json",
+        "digest": RESOLVE_SCORE_DIGEST,
+        "kind": "quanthus.stage-order-rule-resolve-score.v1",
+        "phase": "seal_then_score",
+        "maximum_jobs": 1,
+        "maximum_technical_retries": 0,
+        "case_count": 160,
+        "opinion_count": 320,
+        "new_market_data_read": False,
+        "parameter_search": False,
+    }:
+        raise ValueError("screen_resolve_score_runtime_contract")
     runtime_path = (ROOT / runtime["path"]).resolve()
     if not runtime_path.is_relative_to(ROOT) or not runtime_path.is_file():
-        raise ValueError("screen_prepare_runtime_contract_missing")
-    if digest(load_prepare_config(runtime_path)) != runtime["digest"]:
-        raise ValueError("screen_prepare_runtime_contract_digest")
+        raise ValueError("screen_resolve_score_runtime_contract_missing")
+    if digest(load_resolve_score_config(runtime_path)) != runtime["digest"]:
+        raise ValueError("screen_resolve_score_runtime_contract_digest")
     if raw["rule_digest"] != RULE_DIGEST:
         raise ValueError("screen_rule_binding")
     load_rule(ROOT)
     expected_auth = {key: False for key in (
-        "runtime_job_submission", "new_market_data_read", "parameter_search", "arbitration_access",
+        "new_market_data_read", "parameter_search", "arbitration_access",
         "permanent_blind_access", "official_labels", "daily_or_strategy", "trading",
     )}
-    expected_auth["implementation_and_synthetic_tests"] = True
+    expected_auth.update({
+        "implementation_and_synthetic_tests": True,
+        "runtime_job_submission": True,
+    })
     if raw["authorization"] != expected_auth:
         raise ValueError("screen_unauthorized_activation")
     states = ("ready", "closed", "closed", "ready", "blocked")
@@ -157,7 +185,7 @@ def validate_plan(raw: dict) -> None:
         or failure.get("failed_check") != "selected_observation_differs_from_retained_evidence"
         or policy.get("maximum_technical_retries") != 1
         or policy.get("counts_against_result_bearing_job_budget") is not False
-        or bindings.get("prepare_config_digest") != runtime["digest"]
+        or bindings.get("prepare_config_digest") != prepare_runtime["digest"]
         or bindings.get("rule_digest") != RULE_DIGEST
         or bindings.get("validation_digest") != VALIDATION_DIGEST
     ):
@@ -168,6 +196,31 @@ def validate_plan(raw: dict) -> None:
     observed_fix = "sha256:" + hashlib.sha256(fix_path.read_bytes()).hexdigest()
     if observed_fix != bindings.get("fix_file_sha256"):
         raise ValueError("screen_technical_retry_fix_drift")
+    reference = raw.get("reference_checkpoint")
+    if reference != {
+        "state": "REVIEW_LEDGER_FROZEN",
+        "review_decisions": "config/stage-learning/order-rule-review-decisions.v1.tsv",
+        "review_decisions_sha256": (
+            "sha256:493933e614fccd8c84e9066182f29b11ca80570396ea697d014337fda9504fd7"
+        ),
+        "case_count": 160,
+        "opinion_count": 320,
+        "provenance_kind": "self_simulated",
+        "origin_id": "chatgpt-owner-session-stage007",
+        "session_id": "stage007-reference-review-20260911",
+        "candidate_output_seen_during_case_review": False,
+        "cognitive_blinding_claimed": False,
+        "resolved_preview": {
+            "STAGE_0": 30, "STAGE_2": 46, "NEITHER": 36, "AMBIGUOUS": 48,
+        },
+    }:
+        raise ValueError("screen_reference_checkpoint")
+    review_path = (ROOT / reference["review_decisions"]).resolve()
+    if not review_path.is_relative_to(ROOT) or not review_path.is_file():
+        raise ValueError("screen_review_ledger_missing")
+    observed_review = "sha256:" + hashlib.sha256(review_path.read_bytes()).hexdigest()
+    if observed_review != reference["review_decisions_sha256"]:
+        raise ValueError("screen_review_ledger_drift")
     expected_states = dict(zip(IDS, states, strict=True))
     if {item["id"]: item["status"] for item in raw["items"]} != expected_states:
         raise ValueError("screen_status_requires_real_evidence")

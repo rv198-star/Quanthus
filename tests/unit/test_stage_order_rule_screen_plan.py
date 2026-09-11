@@ -49,21 +49,28 @@ def test_prepare_authority_cannot_silently_open_search_or_trading(key):
         script.validate_plan(raw)
 
 
-def test_prepare_is_closed_after_exactly_one_consumed_technical_retry():
+def test_prepare_is_closed_and_only_one_seal_then_score_job_is_open():
     script = module()
     raw = script.load_plan()
-    assert raw["authorization"]["runtime_job_submission"] is False
+    assert raw["authorization"]["runtime_job_submission"] is True
     assert raw["authorization"]["new_market_data_read"] is False
-    assert raw["runtime_contract"]["phase"] == "prepare_only"
+    assert raw["completed_prepare_contract"]["phase"] == "prepare_only"
+    assert raw["completed_prepare_contract"]["maximum_technical_retries"] == 1
+    assert raw["runtime_contract"]["phase"] == "seal_then_score"
     assert raw["runtime_contract"]["maximum_jobs"] == 1
-    assert raw["runtime_contract"]["maximum_technical_retries"] == 1
-    assert raw["runtime_contract"]["opinion_generation"] is False
-    assert raw["runtime_contract"]["candidate_scoring"] is False
+    assert raw["runtime_contract"]["maximum_technical_retries"] == 0
+    assert raw["runtime_contract"]["case_count"] == 160
+    assert raw["runtime_contract"]["opinion_count"] == 320
+    assert raw["runtime_contract"]["new_market_data_read"] is False
+    assert raw["runtime_contract"]["parameter_search"] is False
     assert raw["technical_retry"]["authorized"] is False
     assert raw["technical_retry"]["consumed"] is True
     assert raw["technical_retry"]["actual_retries"] == 1
     assert raw["preparation_checkpoint"]["source_isolation_verified"] is True
-    changed = {**raw["runtime_contract"], "maximum_technical_retries": 2}
+    assert raw["reference_checkpoint"]["state"] == "REVIEW_LEDGER_FROZEN"
+    assert raw["reference_checkpoint"]["case_count"] == 160
+    assert raw["reference_checkpoint"]["opinion_count"] == 320
+    changed = {**raw["runtime_contract"], "maximum_technical_retries": 1}
     raw["runtime_contract"] = changed
     with pytest.raises(ValueError, match="runtime_contract"):
         script.validate_plan(raw)
@@ -126,6 +133,14 @@ def test_technical_retry_cannot_be_expanded_or_reframed_as_semantic_result():
     raw = script.load_plan()
     raw["technical_retry"]["semantic_result_exposed_before_failure"] = True
     with pytest.raises(ValueError, match="technical_retry"):
+        script.validate_plan(raw)
+
+
+def test_frozen_review_ledger_claim_cannot_be_rewritten():
+    script = module()
+    raw = script.load_plan()
+    raw["reference_checkpoint"]["resolved_preview"]["STAGE_2"] = 47
+    with pytest.raises(ValueError, match="reference_checkpoint"):
         script.validate_plan(raw)
 
 

@@ -1478,13 +1478,20 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertEqual(
             screen_raw["runtime_receipts"]["successful_prepare"]["state"], "succeeded"
         )
+        screen_positive_authority = {
+            "implementation_and_synthetic_tests", "runtime_job_submission",
+        }
         for key, value in screen_raw["authorization"].items():
-            self.assertIs(value, key == "implementation_and_synthetic_tests")
+            self.assertIs(value, key in screen_positive_authority)
+        self.assertEqual(screen_raw["completed_prepare_contract"]["phase"], "prepare_only")
         screen_runtime = screen_raw["runtime_contract"]
-        self.assertEqual(screen_runtime["phase"], "prepare_only")
+        self.assertEqual(screen_runtime["phase"], "seal_then_score")
         self.assertEqual(screen_runtime["maximum_jobs"], 1)
-        self.assertIs(screen_runtime["opinion_generation"], False)
-        self.assertIs(screen_runtime["candidate_scoring"], False)
+        self.assertEqual(screen_runtime["maximum_technical_retries"], 0)
+        self.assertEqual(screen_runtime["case_count"], 160)
+        self.assertEqual(screen_runtime["opinion_count"], 320)
+        self.assertIs(screen_runtime["new_market_data_read"], False)
+        self.assertEqual(screen_raw["reference_checkpoint"]["state"], "REVIEW_LEDGER_FROZEN")
         self.assertEqual(
             reference_feasibility_ids,
             {"P3-STAGE-006", *[f"P3-STAGE-006-{c}" for c in "ABCD"]},

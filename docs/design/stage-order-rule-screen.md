@@ -289,7 +289,7 @@ fail-closed，不修改原artifact。
 评审意见仍须在候选评分前独立封存；同一助手看过规则的意见必须如实记为same-origin
 self-simulated，不能因为传输隔离就升级为独立盲测。
 
-## 12. prepare技术重试成功与B关闭
+## 13. prepare技术重试成功与B关闭
 
 唯一technical retry `stage_95f9b48bd96049b184e0cbf856b9a5e8`在revision
 `ae99d4973f605c3a6e7044cb6c5f88fd91f98874`上成功，且明确绑定
@@ -312,3 +312,21 @@ selected=160、四桶shortfall全0、保留source rows=9760、`source_isolation_
 冻结候选评分。第一次失败和第二次成功都计入执行历史；开发源被同一冻结合同读取两次，
 不能把技术重试隐藏成单次成本。成功验收见
 [B prepare success](../acceptance/stage-order-rule-screen-b-prepare-success-20260911.md)。
+
+## 14. C的参考账本冻结与唯一seal-then-score入口
+
+通过第12节的只读T-only传输完成160例逐例评审后，原始判断被冻结在
+`config/stage-learning/order-rule-review-decisions.v1.tsv`。账本包含160个唯一case-id、
+短线/基金两角色判断、近期width/center描述和逐角色理由；文件SHA-256固定为
+`sha256:493933e614fccd8c84e9066182f29b11ca80570396ea697d014337fda9504fd7`。
+来源如实声明为同一ChatGPT会话的`self_simulated`，不声称独立来源或认知盲测；评审时
+没有读取候选输出、候选评分或T后数据，但模型已知此前规则背景，因此
+`cognitive_blinding_claimed=false`。
+
+封存前仅做分母预览，用于确认参考数量足够继续，不用于修改任何判断：Stage0=30、
+Stage2=46、Neither=36、Ambiguous=48。该预览和320份待展开意见一起由
+`config/stage-learning/order-rule-resolve-score.v1.json`绑定。当前唯一可执行Job是
+`quanthus.stage-order-rule-resolve-score.v1`：先把320份原始意见发布为不可变reference
+bundle，成功封存后才调用冻结规则评分。该Job不得重新读取行情、重生成意见、替换样本、
+搜索参数或语义重试；失败也不开放第三次Job。P3-STAGE-007-C在该Job成功并保留完整分母
+前保持ready而非closed。

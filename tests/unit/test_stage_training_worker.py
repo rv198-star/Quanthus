@@ -16,6 +16,7 @@ from quanthus.stage_learning.worker import (
     STAGE_CAPACITY_CENSUS_JOB,
     STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
     STAGE_ORDER_RULE_PREPARE_JOB,
+    STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
     STAGE_QUALIFICATION_JOB,
     STAGE_REFERENCE_PILOT_JOB,
     STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
@@ -52,6 +53,49 @@ def paths(tmp_path: Path) -> StageWorkerPaths:
     key = tmp_path / "github-ro"
     key.write_text("test-only")
     return StageWorkerPaths(training, repo, key)
+
+
+def seed_order_rule_resolve_score_parent(worker_paths: StageWorkerPaths) -> StageJob:
+    config = worker_paths.control_repo / "config/stage-learning/order-rule-resolve-score.v1.json"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    prepare_job = StageJob(
+        job_id="stage_" + "1" * 32,
+        kind=STAGE_ORDER_RULE_PREPARE_JOB,
+        code_revision="b" * 40,
+        config="config/stage-learning/order-rule-prepare.v1.json",
+        submitted_at="2026-09-11T07:59:43+00:00",
+    )
+    manifest = "sha256:" + "1" * 64
+    selection = "sha256:" + "2" * 64
+    evidence = "sha256:" + "3" * 64
+    config.write_text(json.dumps({
+        "prepare": {
+            "job_id": prepare_job.job_id,
+            "manifest_sha256": manifest,
+            "selection_digest": selection,
+            "evidence_digest": evidence,
+            "case_count": 160,
+        }
+    }))
+    StageWorker(worker_paths)._write_status(
+        prepare_job,
+        state="succeeded",
+        stage="terminal",
+        started_at="2026-09-11T08:00:00+00:00",
+        completed_at="2026-09-11T08:05:00+00:00",
+        exit_code=0,
+        result_ref={
+            "manifest_sha256": manifest,
+            "order_rule_prepare": {
+                "selection_digest": selection,
+                "evidence_digest": evidence,
+                "selected_case_count": 160,
+                "source_isolation_verified": True,
+                "review_ready": True,
+            },
+        },
+    )
+    return prepare_job
 
 
 def test_submit_status_and_preclaim_cancel_are_durable(tmp_path: Path) -> None:
@@ -133,6 +177,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_THIRD_GROUP_PROFILE_JOB,
         STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
         STAGE_ORDER_RULE_PREPARE_JOB,
+        STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
     }
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
 
@@ -203,6 +248,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_THIRD_GROUP_PROFILE_JOB,
         STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
         STAGE_ORDER_RULE_PREPARE_JOB,
+        STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
     }
     assert receipt["concurrency"] == 1
 
@@ -563,6 +609,79 @@ def test_successful_prepare_status_exposes_bounded_t_only_review_transport(tmp_p
         "original-price-quantity-epoch", None,
     ]]
     assert "history_refs" not in decoded["cases"][0]
+
+
+def test_order_rule_resolve_score_requires_successful_parent_and_is_single_job(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    with pytest.raises(StageWorkerError, match="config"):
+        submit_job(
+            worker_paths,
+            code_revision=REVISION,
+            kind=STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
+        )
+
+    seed_order_rule_resolve_score_parent(worker_paths)
+    first = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
+    )
+    second = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
+    )
+    assert first["kind"] == STAGE_ORDER_RULE_RESOLVE_SCORE_JOB
+    assert first["config"] == "config/stage-learning/order-rule-resolve-score.v1.json"
+    assert _JOB_SPECS[STAGE_ORDER_RULE_RESOLVE_SCORE_JOB]["wall_seconds"] == 600
+    assert second["job_id"] == first["job_id"]
+    assert second["idempotent_reuse"] is True
+    marker = json.loads(worker_paths.order_rule_resolve_score_budget.read_text(encoding="utf-8"))
+    assert marker["job"]["job_id"] == first["job_id"]
+    assert marker["input_digest"] == first["input_digest"]
+    with pytest.raises(StageWorkerError, match="no retry"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
+            kind=STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
+        )
+
+
+def test_order_rule_resolve_score_terminal_failure_cannot_open_retry(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    seed_order_rule_resolve_score_parent(worker_paths)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
+    )
+    job = StageJob.from_dict(json.loads(
+        (worker_paths.queue / f"{submitted['job_id']}.json").read_text(encoding="utf-8")
+    ))
+    StageWorker(worker_paths)._write_status(
+        job,
+        state="failed",
+        stage="terminal",
+        started_at="2026-09-11T09:00:00+00:00",
+        completed_at="2026-09-11T09:01:00+00:00",
+        error="stage_order_rule_resolve_score_process_failed",
+        exit_code=1,
+    )
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    assert repeated["state"] == "failed"
+    with pytest.raises(StageWorkerError, match="no retry"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
+            kind=STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
+        )
 
 
 def test_qualification_kind_gets_its_frozen_config(tmp_path: Path) -> None:

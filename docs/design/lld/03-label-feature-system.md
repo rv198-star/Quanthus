@@ -383,9 +383,12 @@ at a signed-vs-absolute sampling-coordinate consistency check and produced no op
 score. That terminal failure remains retained; its single same-input technical retry succeeded after
 the canonicalization-only fix. B therefore closes with 512 old securities reconstructed, 515
 economic identities excluded, a 512-security isolated pool, 160 fixed cases and 9,760 retained
-source rows. References still preserve actual provenance; same-origin simulation cannot become
-independent validation. No old contract, permanent dataset, sealed partition, official label or
-trading boundary changes.
+source rows. C has since completed T-only review of all 160 cases and frozen 320 raw opinions from
+one same-origin `self_simulated` ChatGPT session. The pre-score resolution preview is Stage0=30,
+Stage2=46, neither=36 and ambiguous=48; this is not independent validation. Candidate outputs and
+future rows were excluded during review, but cognitive blinding is not claimed because the model
+already knew the rule context. C now has exactly one no-retry `seal_then_score` Job remaining. No
+old contract, permanent dataset, sealed partition, official label or trading boundary changes.
 Machine plan: `../../config/stage-order-rule-screen-delivery.v1.json`.
 
 | ID | Work | Dependency | Acceptance evidence |
@@ -393,7 +396,7 @@ Machine plan: `../../config/stage-order-rule-screen-delivery.v1.json`.
 | P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | ready; #292; A/B closed, C ready, D business disposition still required |
 | P3-STAGE-007-A | Resolve business boundaries and freeze one executable seed | P3-STAGE-006 | closed; `../stage-order-rule-screen.md`; synthetic rule-contract tests |
 | P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | closed; #289; one technical retry consumed, 512 old cohort / 515 identities excluded / 160 fixed cases; `../../acceptance/stage-order-rule-screen-b-prepare-success-20260911.md` |
-| P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | ready; fixed 160-case evidence exists, at most 320 opinions, seal before scoring |
+| P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | ready; 160 cases / 320 same-origin opinions frozen; one no-retry seal-then-score Job remains |
 | P3-STAGE-007-D | Attribute errors and give the business disposition | P3-STAGE-007-C | blocked; no automatic supplementation or tuning |
 
 ## 7. Acceptance

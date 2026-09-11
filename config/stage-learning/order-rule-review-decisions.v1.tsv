@@ -1,0 +1,167 @@
+# schema=quanthus.stage-order-rule-review-decisions.v1
+# work_item=P3-STAGE-007-C
+# provenance=self_simulated|chatgpt-owner-session-stage007|stage007-reference-review-20260911
+# reviewers=chatgpt-short-term-stage007|chatgpt-fund-stage007
+# candidate_output_seen_during_case_review=false
+# cognitive_blinding_claimed=false
+index|case_id|short_primary|fund_primary|recent_width|recent_center|short_reason|fund_reason
+0|sha256:3307a604ebe8c1ec9e0e809517ed063aa1fa1cabbcd58977628bb9903af4555f|S0|N|EXPANDING|SHIFTING|main instability despite decline|directional decline dominates
+1|sha256:9add1fd83a766232266a0a6b983b586a84ae32cf117a4ae89d81283844dd451e|S0|N|CONTRACTING|SHIFTING|broad expanding structure remains unstable|large directional advance weakens disorder claim
+2|sha256:65e14e9fcc5ed917492146fbe65cbfd61dab5b2481343704f873d36dc55964fc|S0|S0|CONTRACTING|SHIFTING|low-direction structure with center migration|low-direction structure with center migration
+3|sha256:f8a430fd766db6f6684fb89cea39691451ae897f6e7ff9102c0bc5038cbdf5b1|N|N|STABLE|UNKNOWN|directional decline, not directionless disorder|directional decline, not directionless disorder
+4|sha256:6731ad47c2dedc1b11561d635bbcabbfff01f75e420302b2f75fdd4581b1330d|S2|S2|CONTRACTING|STABLE|narrow low-direction contraction|narrow low-direction contraction
+5|sha256:ce3c1a2908b158ea039dd1c444da7c2c8dc1d2f5a9a48a0cdff0435180b0c68d|S0|S0|CONTRACTING|UNKNOWN|broad low-direction unstable range|broad low-direction unstable range
+6|sha256:9d63dc1a8a8a0a999b06b66753e04c2548085dfdd89f4926bd4b1d72db2299bc|N|N|CONTRACTING|SHIFTING|strong directional advance dominates|strong directional advance dominates
+7|sha256:e1dc2903f2f00550228aa52d019d398c5f40f59d31993d9798ac059cd73b2d9d|N|N|CONTRACTING|SHIFTING|directional decline with center migration|directional decline with center migration
+8|sha256:76278e16c2d53d89814eba42d069a60f1ccb39fd9cf8da5a7362ef2520facd75|N|N|CONTRACTING|SHIFTING|strong directional decline|strong directional decline
+9|sha256:8d33f55864f97fd0f4540263da53ca9bf1064aafa2c303158f343e2ea0d8ff06|S2|S2|CONTRACTING|UNKNOWN|low-direction narrowing structure|low-direction narrowing structure
+10|sha256:93f330b65bf4d0e6acfac76956e4291ec57c2935c58fa5ae9bbd9c0ae247edfc|S0|S0|CONTRACTING|STABLE|low-direction main-scale expansion|low-direction main-scale expansion
+11|sha256:837d61f188503619f0d17f5852bc6bdbc365880b3361c7217a18c1e85e10f719|S2|S2|CONTRACTING|STABLE|orderly contraction with stable center|orderly contraction with stable center
+12|sha256:5edef339ca0084872bdd0335f81979931503eddf07b05cf1809f31b1ac0ec6f2|N|U2|CONTRACTING|STABLE|center migrated too far for orderly consolidation|main contraction present but center migration creates uncertainty
+13|sha256:f15ef1bdaddef72380276e407081732235a9341b622cac95231b7373b242bb7d|N|N|CONTRACTING|UNKNOWN|declining path dominates|declining path dominates
+14|sha256:2c4d7c4c87887dadcab94a00b823957538206e95497ab7133c1657cad3067b54|S2|S2|STABLE|STABLE|low-direction contraction and stable center|low-direction contraction and stable center
+15|sha256:c9dea337b340cf8000fa990ff797ea2f5d1b3ea627c824ccf65bcb9fc108e9a6|S2|S2|CONTRACTING|STABLE|narrow contracting low-direction structure|narrow contracting low-direction structure
+16|sha256:244c5c15f7bb9d9e8d2e69ad07ad14314fb64c4e31f51a494ff0150f7dc557c2|S2|S2|EXPANDING|STABLE|main-scale contraction remains orderly|main-scale contraction remains orderly
+17|sha256:bf8d4ce85670509f3044965bddc078b90da138c324f36ae290720aa2c8fd9264|N|U2|EXPANDING|SHIFTING|center migration and recent expansion negate consolidation|main contraction exists but large center shift is unresolved
+18|sha256:8ad27c2598fd0875102e0c282b9fd669867ace67adcc15dd3745d7369cba732a|S2|S2|CONTRACTING|STABLE|narrow contraction with stable center|narrow contraction with stable center
+19|sha256:7b41b8e3a4af8bf22e7181ebe1a838757162d539366c25db87b0abb7855eca7d|S0|S0|EXPANDING|UNKNOWN|low-direction main-scale expansion|low-direction main-scale expansion
+20|sha256:8d1e70c86f56f35cc24098363257e550a6e47d57b92a3374e505457b4de1c961|N|S2|EXPANDING|UNKNOWN|recent expansion breaks short-horizon consolidation|main-scale contraction remains valid despite recent disturbance
+21|sha256:21af912d6423e72d685a303b6bb3eaf156ccd3cc63800008fd095ea0753cd9ed|N|N|CONTRACTING|SHIFTING|strong directional advance and center migration|strong directional advance and center migration
+22|sha256:e14c14c5e7f5fff64df8034fe52cc9032b322605b1973531bb17c4db69dd3728|S2|S2|STABLE|STABLE|low-direction contraction; center movement still bounded|low-direction contraction; center movement still bounded
+23|sha256:14f009016f5f2cd02e23ae923ae42c400d52446271c09d26a29f9f0af3ebcc49|N|U2|EXPANDING|STABLE|recent expansion and directional rise weaken consolidation|main contraction is present but center/recent expansion create uncertainty
+24|sha256:42d35f6f0dded2f520f1338bb479aae93bbc84b9b9b7cf2a9c788d11b86aa7b7|S0|S0|EXPANDING|STABLE|low-direction broad main-scale expansion|low-direction broad main-scale expansion
+25|sha256:d95bc6c65fbd4cffeef5eb58e92682564494040910a54613f78e9191c6c1f9a3|S2|S2|CONTRACTING|UNKNOWN|main-scale contraction with stable center|main-scale contraction with stable center
+26|sha256:34100babb6f978cfd5c9b7d012e2ab4331fe545ede26730b4562e6dc11dd999e|S0|N|EXPANDING|SHIFTING|large expansion and center displacement|directional advance dominates broad instability
+27|sha256:7ea9d4eafdc123c5898cfd1033b4a71cefd0c0aac90614f5cc9df3417c93c176|N|N|CONTRACTING|STABLE|stable range without main-scale convergence|stable range without main-scale convergence
+28|sha256:feedcbcd6cc3627c896f30c75e12e72c83c5c6425153f526d23d7a687582d708|S2|S2|STABLE|STABLE|narrow main-scale contraction and stable center|narrow main-scale contraction and stable center
+29|sha256:3ab9428fbd7c12b583920844e1525ea88e396ba9cfd8ce4ce04dffb2b0f3d47d|S0|S0|EXPANDING|SHIFTING|broad low-direction expansion|broad low-direction expansion
+30|sha256:1bb4faa08434891b1245a06bfcb99a930c0f2c0b66024d0251a12a7d32ff42a4|N|U2|CONTRACTING|UNKNOWN|large center migration prevents orderly consolidation|strong contraction exists but center migration is unresolved
+31|sha256:32e87fee97904c5d397e4a1aadd492a4415ac5f757b5f7cffeb5e27d79eefca3|S0|S0|EXPANDING|STABLE|low-direction expansion with center movement|low-direction expansion with center movement
+32|sha256:fc7162eda7ffc5fcc9c1416b2e53a735aaaeedbaa9e778d498e90cfd9c040718|S2|S2|STABLE|UNKNOWN|main-scale contraction with bounded center|main-scale contraction with bounded center
+33|sha256:27e484ddf05ecf80243c6ffb57a2c70efcffccf3fd9031c6f3c15f0ae5e71ab6|S0|N|EXPANDING|UNKNOWN|main and recent expansion indicate instability|directional decline signal weakens directionless-disorder claim
+34|sha256:4dceb8cfe93407faa2fba49feb332081b4a8836108e75f72a1781df5b079f1fc|N|N|CONTRACTING|STABLE|stable range without clear main-scale convergence|stable range without clear main-scale convergence
+35|sha256:e481a2f06eb71af51cf65251f70428aca1c106966cf174e40c2331dee07da2a2|N|S2|EXPANDING|UNKNOWN|recent expansion breaks short-term consolidation|mild main-scale contraction remains interpretable as consolidation
+36|sha256:c45f9ec30af4ef3598d2204f71ace3ed11d9c527c32675eb191314c9442d8b13|S2|S2|CONTRACTING|STABLE|very narrow strong contraction|very narrow strong contraction
+37|sha256:8e10a27897945b83edb342c78c1703679d72130de355d7329f26eee2d7f05030|U2|S2|CONTRACTING|STABLE|contraction is present but range remains relatively broad|main-scale contraction and stable center support consolidation
+38|sha256:3150ddfc077f02f571c85606235b1b7c85ba82b436603e6a89a1cef56da6cc99|U2|S2|CONTRACTING|STABLE|center migration is near the short-term tolerance boundary|narrow contraction remains dominant
+39|sha256:ea13be710e821d4105753537081af36cdb35751571183baf380f46e67ddf9af4|N|N|CONTRACTING|STABLE|narrow but not clearly converging on the main scale|narrow but not clearly converging on the main scale
+40|sha256:1e476d22a49836ac4bdf14b8b35358d5745d97e682df982a358bc731cf439179|N|N|EXPANDING|SHIFTING|strong directional advance dominates|strong directional advance dominates
+41|sha256:3dac0b2e4a661290e9ade4de75c5fc160e5f1c5d9447815a87288552e89c3416|S0|S0|CONTRACTING|STABLE|broad low-direction structure with center drift|broad low-direction structure with center drift
+42|sha256:6023606a9bf75da70da761f6a2806689968fb99ba3a03dcd1ef430b35f6744b6|U2|S2|EXPANDING|UNKNOWN|recent explosive expansion makes consolidation unresolved|main-scale contraction and stable center support consolidation
+43|sha256:897ba04288e3cc0fa8aea53de6cb1f28e43c71a688a6346a01c5a7f5e4c73342|N|N|CONTRACTING|SHIFTING|strong directional decline dominates|strong directional decline dominates
+44|sha256:b82399f142f7d4c21617c87ed18921dfb390446278e5f200ba01c3e2233d027e|S0|S0|EXPANDING|UNKNOWN|broad low-direction range with center displacement|broad low-direction range with center displacement
+45|sha256:32c44edd804904349ecdd3bdcccc10fb3821066a41b57d09da6e6645c9512b6a|S2|S2|CONTRACTING|STABLE|very narrow orderly contraction|very narrow orderly contraction
+46|sha256:0f710ac8206ca5f4b7295b7049298ad9007d9de5210b4bede274d79de7195067|S2|S2|CONTRACTING|STABLE|narrow strong contraction with stable center|narrow strong contraction with stable center
+47|sha256:17c8a62fc970d030e1f4ff1367b93c9ac6b469a65da4eedf001471523ca4bfd6|S2|S2|STABLE|STABLE|main-scale contraction remains orderly|main-scale contraction remains orderly
+48|sha256:88fe7e37e13ba6e83f823b9d967e8935d5e2e5db5fd69a7727d3c271139439c7|S0|N|EXPANDING|STABLE|recent and main-scale expansion support instability|current range remains narrow enough that fund view does not call disorder
+49|sha256:fd41105ba1d532119898efd64f217517f7fd05e848b7da9a25f2218fd3528819|U2|S2|EXPANDING|STABLE|recent expansion makes the short-horizon state unresolved|main-scale narrow contraction remains orderly
+50|sha256:1fb213f859202f5355679e1c987881c18fa82d2015d056b54faee49537761dad|S2|S2|CONTRACTING|STABLE|narrow main-scale contraction with stable center|narrow main-scale contraction with stable center
+51|sha256:552e9fb9a96b3429712aa1d1a2fc85ab80ac3dc1466c652d289dcb0f79df799e|S0|S0|CONTRACTING|STABLE|low-direction main-scale expansion|low-direction main-scale expansion
+52|sha256:52bb7076caf9b03fd8e6eb67e04e869d907e9c773368bdda0caa538646d5fe3c|S2|S2|CONTRACTING|STABLE|very narrow contraction with stable center|very narrow contraction with stable center
+53|sha256:d7c3bec1519cefabf8ff3a81e19cbad5a8cc83a4128d6fceb90e7242fd6938bb|S2|S2|CONTRACTING|UNKNOWN|orderly main-scale contraction|orderly main-scale contraction
+54|sha256:37d22ff4ceac19ca8e0420b6abeb55469b4c44512327faf34be778d5bd904990|N|S2|EXPANDING|STABLE|recent expansion weakens current consolidation|main-scale contraction remains the dominant structure
+55|sha256:cfd97a60338a3f1366124d8c4f045fe3712738eb79d83a5521d16000752459b5|S0|S0|CONTRACTING|UNKNOWN|broad low-direction expansion|broad low-direction expansion
+56|sha256:be67b4b2bbbd051b7addbeda225bb1117bbd71bb14d7b4736d72030cd0a1b1c0|N|N|STABLE|STABLE|stable range without main-scale convergence|stable range without main-scale convergence
+57|sha256:87e06da5dab6b5b75be4ce00ca680cdb503fb2015e396f2723ecabeb8e5ef1b4|N|N|CONTRACTING|SHIFTING|strong directional advance dominates|strong directional advance dominates
+58|sha256:0fd32e5b811613c6be0547747ad461f816dc96d6fbd9460e2335f1e2a88d8c5a|U2|S2|EXPANDING|STABLE|recent expansion makes the short-horizon state unresolved|main-scale contraction remains orderly
+59|sha256:33be535688387ca91d08ad39b9f1231a52377071a475f29dc7ff86c738b95b47|S0|S0|CONTRACTING|SHIFTING|broad low-direction structure with center migration|broad low-direction structure with center migration
+60|sha256:67114bb6bd01e5ab3b647bef42d6fc245e3ec08a13d0d01e314ebc13bb0990e3|S2|S2|STABLE|STABLE|very narrow strong contraction|very narrow strong contraction
+61|sha256:78d52ea1f1c00ca2b7902d86b08949fbbfd675668f007fade31119fc37ea2fba|U2|S2|EXPANDING|STABLE|recent expansion makes current consolidation unresolved|main-scale contraction and stable center support consolidation
+62|sha256:28b69833e58fe4ed6f636238e5c8e35d035c3dcd7c00bcdba9d5752d5e914f26|S2|S2|CONTRACTING|STABLE|narrow main-scale contraction|narrow main-scale contraction
+63|sha256:8c3b8ab36e77008df34f2099e9095f017b37e87f011ca841737401ae43168977|N|N|EXPANDING|SHIFTING|directional advance and major center migration dominate|directional advance and major center migration dominate
+64|sha256:97b65a9cb0ba874084480d68089899fac1213f32b8d5ec3657e0d48830cdbb94|S2|S2|CONTRACTING|UNKNOWN|low-direction main-scale contraction with stable center|low-direction main-scale contraction with stable center
+65|sha256:cd3ee8b322592537d42fb16c6cbc93499ea5035a45cf6b9998b2a2b160bc8954|U2|S2|CONTRACTING|SHIFTING|main contraction is mild and recent center movement is material|main-scale contraction remains interpretable as consolidation
+66|sha256:19244d06334bd6ea68c0a5821e9c41dc22c9f8423cdf923e5ada7b254c64eaad|S2|S2|STABLE|STABLE|very narrow strong contraction|very narrow strong contraction
+67|sha256:ed582f09b92191c3c551a35c519a7b5ea5632f19703a2595d09d5ac40c2143bd|N|N|EXPANDING|STABLE|main scale is not converging and recent expansion is sharp|main scale is not converging and recent expansion is sharp
+68|sha256:90eebcfd255a36a606291fdb6e5c1365363d52ef5e9f1da40ace488968104949|N|N|EXPANDING|SHIFTING|directional advance and extreme center migration dominate|directional advance and extreme center migration dominate
+69|sha256:a3151fbb621e9283d4b2ce3c2c688632be3516a5fea5663a42c4a2d9471aa12e|N|U2|EXPANDING|STABLE|center migration and recent expansion undermine consolidation|strong contraction exists but center migration remains unresolved
+70|sha256:1a61b7c671fd5f90f20c379e9865d74bef40a644c1fe19194f2c48d350ad747a|U2|S2|STABLE|UNKNOWN|contraction is modest and center movement is borderline|main-scale contraction is still orderly enough
+71|sha256:0f810a2070cb87dad62062a40e2a10290b3a7680571e16ca23eef67708fceae4|S2|S2|CONTRACTING|STABLE|narrow strong contraction with stable center|narrow strong contraction with stable center
+72|sha256:6514940415b9604db5a6372db7c1600058093b971c4234ce59bd904a2d91f4d1|S0|S0|STABLE|SHIFTING|broad low-direction expansion|broad low-direction expansion
+73|sha256:905737caca752fefe7875e5077fb1b793a1c8d5aced6a777de061d8d2082659c|S2|S2|CONTRACTING|STABLE|narrow contraction with stable center|narrow contraction with stable center
+74|sha256:c9d826102448d80d322cceb37333c477ae9fc83c05f19f397634350c270e7736|S2|S2|STABLE|STABLE|very narrow contraction with stable center|very narrow contraction with stable center
+75|sha256:875b4d4c7163a859df8e48883b7d243d53e19a15fe982b10b3c571fd1483e4a4|S0|S0|CONTRACTING|UNKNOWN|extreme low-direction expansion and center displacement|extreme low-direction expansion and center displacement
+76|sha256:ea24520b95870cf4649ec29b3e62f8e7281b9591430461954d77b6b774650785|N|U2|EXPANDING|STABLE|recent expansion and center migration weaken consolidation|strong main contraction exists but center migration is unresolved
+77|sha256:ca4569b8ac467edd1171535718a680c0a470cf44068e033952af8069552c3ca6|N|U2|CONTRACTING|UNKNOWN|center migration prevents a clean consolidation call|main contraction exists but center migration remains unresolved
+78|sha256:6efc6ad3488e128b6e5415e67a0ce7faf18b0a691000d94d6ab0908f80a3ced9|S0|S0|EXPANDING|STABLE|low-direction center instability without convergence|low-direction center instability without convergence
+79|sha256:36d252b84e6da12c103ae20d943f2ba60b51a04d985507dd2d391e23f99a67f9|S0|N|CONTRACTING|STABLE|mild main-scale expansion in a low-direction broad range|main-scale instability is not strong enough for a fund disorder call
+80|sha256:92253f3ed4e9bac00115111977793d0fa93f99edabdde9f29b45db1f72c163a6|S2|S2|CONTRACTING|UNKNOWN|main-scale contraction with stable center|main-scale contraction with stable center
+81|sha256:f0bd40b9a388193d69953adac48ed056c71930be20cbdfa4207f2ed600874e55|S0|U2|STABLE|SHIFTING|broad low-direction structure with substantial center migration|main contraction exists but center migration prevents a firm consolidation call
+82|sha256:7f40c5900681eed3ade1caa78d9f76465cadc7f3ec2425f7ecd61cde13143c50|S0|S0|STABLE|UNKNOWN|low-direction expansion with center movement|low-direction expansion with center movement
+83|sha256:99757e25f8226307beb1815b76c53ce4a00fe7ed02e83509009df5665eda7cfc|S2|S2|CONTRACTING|STABLE|strong main-scale contraction with stable center|strong main-scale contraction with stable center
+84|sha256:46ee119e7406278ab1ab27285e752ca80afe130774b2b7809d8bc083c0b7c1f9|N|N|CONTRACTING|UNKNOWN|stable range without clear main-scale convergence|stable range without clear main-scale convergence
+85|sha256:b22bc360c738fc38af190767b20802361b4590d4395614220644d843f268feda|N|N|EXPANDING|STABLE|strong directional decline and large center migration dominate|strong directional decline and large center migration dominate
+86|sha256:860b7dbb9b6c393ad6db487bdf2819391086c1e11a2b0059942e8a1ddf6042a7|N|N|CONTRACTING|UNKNOWN|directional decline with large center migration|directional decline with large center migration
+87|sha256:d50236e10cbc55975dac86246f4d93f578688a36917414c435a9dc09fb2452c2|S0|S0|EXPANDING|SHIFTING|broad low-direction expansion and center displacement|broad low-direction expansion and center displacement
+88|sha256:afb8afdd7348722e94ecca4c7e364eb9fb257b2344356099e18e719ac2ae7056|N|S2|EXPANDING|STABLE|recent expansion and only mild main contraction make short-term consolidation doubtful|very narrow low-direction range with mild main contraction supports consolidation
+89|sha256:f97d1f6028fa0f087c80d05e43427b0244939b0ce6712183226db4d1c7421b30|U2|S2|EXPANDING|UNKNOWN|recent expansion makes current consolidation unresolved|strong main-scale contraction and stable center support consolidation
+90|sha256:27cc1474133fe57545a6e69ecc886dcf2dc798558b9e9260c6f552f69d9e6be4|S0|S0|EXPANDING|UNKNOWN|low-direction structure with large center migration|low-direction structure with large center migration
+91|sha256:965560a4656d58dcf5b1dfb96724248b0b9c6cce7d4f06cf64d8807268d6a98e|U2|S2|EXPANDING|UNKNOWN|recent expansion and center movement make the short-term state unresolved|main range remains narrow with mild contraction
+92|sha256:f8614752ec7322ab7fef8eaa2415b6ae93717b5a924926cc9483bfb21a2f4d7b|N|N|CONTRACTING|STABLE|strong directional advance dominates|strong directional advance dominates
+93|sha256:b9b99c0a916aceb71241b243a4036b247bcb6687f2d8718b98cd30217cac22de|S0|N|EXPANDING|SHIFTING|main and recent expansion with center migration indicate instability|directional decline weakens a directionless-disorder interpretation
+94|sha256:12919d15f5d07335f4848442562bd35a9b03514cd10e4030f2105437df19b02c|N|N|EXPANDING|SHIFTING|directional advance and broad shifting range dominate|directional advance and broad shifting range dominate
+95|sha256:fb0b888a59bf4bf0c050d5292e706c517609e9599e3077f792b34694b30da8e2|U2|S2|EXPANDING|STABLE|recent expansion weakens current consolidation|very narrow main-scale contraction remains orderly
+96|sha256:bf972daba52dd337c67908dbb534c776a35be4abc1d60e95aa5d3f1f5c4a4bbc|N|N|CONTRACTING|UNKNOWN|main-scale contraction is too weak for a clear convergence call|main-scale contraction is too weak for a clear convergence call
+97|sha256:0ceb995023b63f33e9f4a6b4461198fb2254626b39396690a15b71b0ff88d120|S2|S2|CONTRACTING|UNKNOWN|narrow low-direction contraction|narrow low-direction contraction
+98|sha256:2a9d3f611076f193ce119ac562c4f9739cd446625d2d54cf4b33b33566524fd6|U2|S2|EXPANDING|UNKNOWN|recent expansion makes short-term consolidation unresolved|main-scale contraction and stable center support consolidation
+99|sha256:869dd9e6ce4a2bd03118b4d25113880ca7bd39ec8ffe01c1f085bdc1ae8cd7e6|S2|S2|CONTRACTING|STABLE|narrow strong contraction with stable center|narrow strong contraction with stable center
+100|sha256:de1da1a8a9b5cf705b1fd8048e7cd6810e52340590ec3f6d1416b99a7566ec7f|S2|S2|CONTRACTING|STABLE|very narrow contraction with stable center|very narrow contraction with stable center
+101|sha256:28f1dd4a4aa4c79e8673725dbcfc0a31218dbbfc82e1a506367bed30102d49fd|N|N|CONTRACTING|STABLE|stable narrow range without clear main-scale convergence|stable narrow range without clear main-scale convergence
+102|sha256:37fcd47fe6b20ce429bac4607faaed27eeeb8e2a1a07ae5d8587dc2453ebd543|S2|S2|CONTRACTING|STABLE|narrow mild contraction with stable center|narrow mild contraction with stable center
+103|sha256:b533d8733c4df8ed1787d0dc12843fe0028a6754e6cea403418e915b625da454|S2|S2|EXPANDING|STABLE|very narrow strong main-scale contraction|very narrow strong main-scale contraction
+104|sha256:34981bf830e35c52cd5f0dfeeed717960c1274257aae315505514620acff1b90|S2|S2|CONTRACTING|STABLE|narrow contraction with bounded center|narrow contraction with bounded center
+105|sha256:b64e30625c59c1c0ff9c98a445a438512621fc5b47a76421f71d14fec86002c6|N|U2|CONTRACTING|STABLE|large main-scale center migration prevents a clean consolidation call|strong contraction exists but center migration remains unresolved
+106|sha256:8dd4595a897c632fee061e4de0e49c2e0daf3dfd4d26ea01a83b6fa289bf94c2|U2|S2|EXPANDING|STABLE|recent expansion weakens the short-term consolidation state|main-scale contraction and stable center remain orderly
+107|sha256:7d4e640c879f9cb40c01cbcbb50e603df3cd3d3b53c7423653275756ca470e47|N|U2|EXPANDING|UNKNOWN|center migration and recent expansion undermine consolidation|main contraction exists but center movement leaves uncertainty
+108|sha256:fa8e422ce392d66f804b471c473a4bc55c97aaeb6d2c29e82dfebd730f2ae638|U2|S2|EXPANDING|UNKNOWN|recent expansion makes the short-term state unresolved|main-scale contraction remains dominant
+109|sha256:2ee9be75685463b84e5d67ffaee3a2cf556a93dea84455a3721bbb8a1c56d2aa|S0|N|CONTRACTING|UNKNOWN|low-direction structure shows center instability without convergence|main instability is not strong enough for a firm disorder call
+110|sha256:7ccd20a2aee96ccda355cbfd2efec58d33db8aceb2d0920e4ef1941f9fe114cc|S2|S2|CONTRACTING|STABLE|very narrow contraction with stable center|very narrow contraction with stable center
+111|sha256:f40ae2aff0cd561502a157702bc69f952c8035e06ac92067a99f0e990ee305ed|S0|S0|CONTRACTING|STABLE|low-direction main-scale expansion|low-direction main-scale expansion
+112|sha256:462d381822066190b88bc119e9a8d1c0891ba77333c910f8070556b79fdf942f|N|N|STABLE|SHIFTING|strong directional advance and broad expansion dominate|strong directional advance and broad expansion dominate
+113|sha256:7259c843dead37371c190c8e2dcd9a84c567e832c56c411aad5d9653bf8a8d88|U2|S2|EXPANDING|STABLE|center migration and mild recent expansion make the short-term state uncertain|main-scale contraction remains interpretable as consolidation
+114|sha256:06d458a70d9c7a9e7ceab05d3879d83a3f1fe87ed28d46e0dd0ece1e02c1a8a7|S0|S0|EXPANDING|STABLE|low-direction main-scale expansion|low-direction main-scale expansion
+115|sha256:0b2efd938ce277d9543fb945a87e58d37af6e85ea8643f46aaa948017a8f0280|N|N|CONTRACTING|UNKNOWN|directional decline dominates|directional decline dominates
+116|sha256:03dd4b541cebe335c874d98b4061b731c615cf577a6f02f516bcf40d8fab794a|S2|S2|CONTRACTING|STABLE|very narrow contraction with stable center|very narrow contraction with stable center
+117|sha256:9cf2aeb549fb2a2a8cd0e36f5e5dd92538dda214863db4188dfadf952f854b8a|S0|S0|STABLE|STABLE|low-direction main-scale expansion|low-direction main-scale expansion
+118|sha256:22fd5f16bd698f3dc47ac3f35b44de6d8c1f77b49698b5320f9fe90cc9839188|S2|S2|CONTRACTING|STABLE|narrow contraction with bounded center|narrow contraction with bounded center
+119|sha256:5a21b59fe3422c69689e9a5c0dffef4e12ea4b4b86726b5995afb8612e5c78c5|S2|S2|CONTRACTING|STABLE|narrow contraction with stable center|narrow contraction with stable center
+120|sha256:18d8e84a8f41c1004fb59830f2551b45b7a44fa56326709d0ddb034fb2702f27|S2|S2|STABLE|STABLE|narrow strong contraction with stable center|narrow strong contraction with stable center
+121|sha256:7a827be73a21663e54ce780b0a7580c021bd502315efb78603fed7d7bc99555a|U2|S2|EXPANDING|STABLE|recent expansion makes current consolidation unresolved|main-scale contraction remains orderly
+122|sha256:291ed976332eda2e778e0d8653d5080ce44bcd9e672b408f50efec3e15d27dd0|U2|S2|EXPANDING|STABLE|recent expansion makes current consolidation unresolved|main-scale contraction remains orderly
+123|sha256:2a81dbc72d93c20f497ff256c714087950cdbceb9dacee4d83acad9c1c8fff8b|S0|S0|EXPANDING|STABLE|low-direction main-scale expansion|low-direction main-scale expansion
+124|sha256:2a8e088cd5acb58431dc04bcd96dfd3281015d82728080521fdac83ec2d7ef66|S0|N|EXPANDING|STABLE|main-scale expansion indicates instability|directional advance weakens a directionless-disorder interpretation
+125|sha256:2a9ccc43997ead927cfa4fc9557e5c4b3e5e8a5b72495108b5f8dc0bc98475f8|S0|S0|CONTRACTING|STABLE|low-direction main-scale expansion|low-direction main-scale expansion
+126|sha256:f7c864468be403f55bb7128d901e42070af13988496ec7e346709adb328f5a6b|S0|S0|EXPANDING|SHIFTING|low-direction expansion with center migration|low-direction expansion with center migration
+127|sha256:aacf10bc99dff357b9cdbf0809f83de6f2e0525edd4489370e3f2a2412498c1f|S2|S2|STABLE|STABLE|narrow contraction with stable center|narrow contraction with stable center
+128|sha256:15d79447b553d6ce845ab17e8fb925cfa0441a3a7641b7678a015ca7b53932e8|N|N|EXPANDING|STABLE|main scale is not converging and recent expansion is extreme|main scale is not converging and recent expansion is extreme
+129|sha256:c573ce9797761a71df8bb30a62850b5514487db322bfcfe97b6ccd93e81ce34a|S0|S0|CONTRACTING|SHIFTING|low-direction broad main-scale expansion|low-direction broad main-scale expansion
+130|sha256:d6c06318aa83617eca9de4ad8e7efe36f8ed63588503cdcf151edffabcc1c836|S2|S2|CONTRACTING|STABLE|main-scale contraction with stable center|main-scale contraction with stable center
+131|sha256:e8f6966a09bb39a38dec4418e99f7856b500c006a1950fa84cd37dbde18d8e36|S2|S2|CONTRACTING|STABLE|very narrow strong contraction|very narrow strong contraction
+132|sha256:4955faa22c9efecfefa7a3af59a7c7b88f4795030fe50aac526a03b953439b21|S0|N|EXPANDING|UNKNOWN|low-direction center instability and recent expansion|main instability is not strong enough for a firm disorder call
+133|sha256:15961640324cf085d65e796ec919d2c8de15ebb3e31b151fa03fa512193ffe76|N|N|EXPANDING|STABLE|strong directional decline dominates|strong directional decline dominates
+134|sha256:c1cac691e6b76b4c0cc9d6d0f6d03b4cd288c602f2c8ed2b6a28f9e130511cc8|N|N|STABLE|UNKNOWN|stable range without clear convergence or disorder|stable range without clear convergence or disorder
+135|sha256:521669746b8eafa4f0e993d78a1f5702f44736ffa270502d7aaf90be99a563d6|S0|S0|CONTRACTING|UNKNOWN|low-direction large main-scale expansion|low-direction large main-scale expansion
+136|sha256:601bc685f00158a0d84d5d60b45012990b392783d4c123ceff48ea7c35829a10|S2|S2|CONTRACTING|STABLE|main-scale contraction with stable center|main-scale contraction with stable center
+137|sha256:dc6926ce5dbfed5073a58e7d239bb521c7e1dbe3705dc81e9b75c6f01ef86ab4|S0|N|CONTRACTING|UNKNOWN|low-direction broad range with mild main expansion|main instability is too weak for a firm disorder call
+138|sha256:bc413a6055220e115b06dc87928314155f259df82c905edb7ca4b30e24ff2875|N|N|CONTRACTING|UNKNOWN|directional decline dominates|directional decline dominates
+139|sha256:f76634e7d6b5f176765d511eb3c50b2e33adef17f0f5000655b8bb40b6ae72d0|N|U2|EXPANDING|UNKNOWN|large center migration and recent expansion undermine consolidation|main contraction exists but center migration remains unresolved
+140|sha256:a5be22b62ec1ebd330b4f8f0ea0f8a910898313fbfe9c55499eb966bef569774|S0|S0|STABLE|UNKNOWN|low-direction broad main-scale expansion|low-direction broad main-scale expansion
+141|sha256:6372acd6558e94a8b2043f3e56e426ae611aad86fd48f1a56348333d7dd7d207|S0|S0|EXPANDING|STABLE|low-direction center instability with main expansion|low-direction center instability with main expansion
+142|sha256:97a8849286d2df72fe0f71812460187734a07bcd38ea4f3b06cb43bdb85de317|N|N|STABLE|SHIFTING|strong directional decline dominates|strong directional decline dominates
+143|sha256:f5496c51c308c2cb9a0585b2ccb422f657fcff1327d77a4f39c3b8da4181f74b|S2|S2|CONTRACTING|STABLE|very narrow strong contraction|very narrow strong contraction
+144|sha256:029abc8c23c6ce772e60392c267087d4eb73f916b2b1958662ec2f12778f3279|N|N|EXPANDING|SHIFTING|strong directional advance dominates|strong directional advance dominates
+145|sha256:0f5f1b784566e1effddc5e9a76cca5b159902b6d58091f519455ec947ea57794|U2|S2|CONTRACTING|STABLE|center migration is near the short-term tolerance boundary|strong main-scale contraction remains orderly
+146|sha256:a4fbbe1bb8baf3dd48bbd5c3295dc747540c738e907ce01d601336cc8fc2a715|N|N|EXPANDING|UNKNOWN|directional decline and large center migration dominate|directional decline and large center migration dominate
+147|sha256:2881824ab81716d50d6ce78eaf7b4d3815d4ef96a85e3ebaeeace30dc5dffaab|S0|N|STABLE|UNKNOWN|main-scale expansion indicates instability despite the decline|directional decline weakens a directionless-disorder interpretation
+148|sha256:106b2f506f9cb91d48333d52910e5a5af9140f51861f7d75c1b06c40039e33c5|N|N|EXPANDING|UNKNOWN|strong directional decline dominates|strong directional decline dominates
+149|sha256:9d170b2c827e34208317754d83d287e14e42fe43790a7c86a8fa2884afa29925|U2|S2|EXPANDING|UNKNOWN|recent explosive expansion makes the short-term state unresolved|main-scale contraction and stable center support consolidation
+150|sha256:c940b9c304954212984607cf600e6a695284b335cd658dd15d97ae1cea5f1bb7|S2|S2|STABLE|STABLE|main-scale contraction with stable center|main-scale contraction with stable center
+151|sha256:ecbe077069538698576800f20a5f29fca5180dbc9b1647f85a1cf770dcca72c4|N|N|STABLE|STABLE|narrow but not clearly converging on the main scale|narrow but not clearly converging on the main scale
+152|sha256:e60d0ff7e63cf074c18c75d66b426b2e092bf316d58281a6a0c434f82fb6e473|N|N|EXPANDING|UNKNOWN|directional advance and large center migration dominate|directional advance and large center migration dominate
+153|sha256:23d5dace01ad1c8bc2cc34016cb2f99d08f8d09d075801854abf800f7e7dbecc|N|N|STABLE|STABLE|main-scale contraction is too weak for a clear convergence call|main-scale contraction is too weak for a clear convergence call
+154|sha256:e6644832ea291f07bfe8ed60c4350d8c88767a7c44a5722ab456fc7af666f84b|S2|S2|CONTRACTING|STABLE|main-scale contraction with stable center|main-scale contraction with stable center
+155|sha256:733aaf43222b62057e2796047ed8fe373520eee45fb2b7c5c976e1cf977d8852|U2|S2|EXPANDING|STABLE|recent expansion makes the short-term state unresolved|main range remains narrow and only mildly directional
+156|sha256:b6a251aa6a0457a8561cee71be65e8b29af226afa053246d473a4d758353b325|S0|S0|STABLE|STABLE|broad low-direction main-scale expansion|broad low-direction main-scale expansion
+157|sha256:5060d6382fd43ed3262a5c920dc4e0a49376a510096e1644261e1c22c0e25c15|U2|S2|EXPANDING|STABLE|recent expansion weakens current consolidation|very narrow strong main-scale contraction remains orderly
+158|sha256:6e64ef58207ec6224bbc9d8e97c2ca74f4189239a139db0a2094390adef3980c|S0|S0|CONTRACTING|STABLE|low-direction broad range with center instability|low-direction broad range with center instability
+159|sha256:41cb76e2a995326513ac290278e6d2c825c622c0667ebec2b0536a6bf74de7b6|S2|S2|CONTRACTING|STABLE|main-scale contraction with stable center|main-scale contraction with stable center

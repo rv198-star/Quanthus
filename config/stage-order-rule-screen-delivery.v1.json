@@ -8,7 +8,7 @@
   "implementation": "src/quanthus/stage_learning/order_rule_screen.py",
   "review_provenance": "owner_authorized_single_assistant_four_role_simulation",
   "milestone_completed": false,
-  "runtime_contract": {
+  "completed_prepare_contract": {
     "path": "config/stage-learning/order-rule-prepare.v1.json",
     "digest": "sha256:b27bbc1d3d54f9e410a8ca7b931af63f62690be9b911d538aeb0cda5666e9bd9",
     "kind": "quanthus.stage-order-rule-prepare.v1",
@@ -17,6 +17,18 @@
     "maximum_technical_retries": 1,
     "opinion_generation": false,
     "candidate_scoring": false
+  },
+  "runtime_contract": {
+    "path": "config/stage-learning/order-rule-resolve-score.v1.json",
+    "digest": "sha256:2407e10998b7601f35d7cefa18dea26dc448eb471307cd50d2da32b0f91c1781",
+    "kind": "quanthus.stage-order-rule-resolve-score.v1",
+    "phase": "seal_then_score",
+    "maximum_jobs": 1,
+    "maximum_technical_retries": 0,
+    "case_count": 160,
+    "opinion_count": 320,
+    "new_market_data_read": false,
+    "parameter_search": false
   },
   "runtime_receipts": {
     "failed_prepare": {
@@ -86,9 +98,27 @@
       "boundary": 0
     }
   },
+  "reference_checkpoint": {
+    "state": "REVIEW_LEDGER_FROZEN",
+    "review_decisions": "config/stage-learning/order-rule-review-decisions.v1.tsv",
+    "review_decisions_sha256": "sha256:493933e614fccd8c84e9066182f29b11ca80570396ea697d014337fda9504fd7",
+    "case_count": 160,
+    "opinion_count": 320,
+    "provenance_kind": "self_simulated",
+    "origin_id": "chatgpt-owner-session-stage007",
+    "session_id": "stage007-reference-review-20260911",
+    "candidate_output_seen_during_case_review": false,
+    "cognitive_blinding_claimed": false,
+    "resolved_preview": {
+      "STAGE_0": 30,
+      "STAGE_2": 46,
+      "NEITHER": 36,
+      "AMBIGUOUS": 48
+    }
+  },
   "authorization": {
     "implementation_and_synthetic_tests": true,
-    "runtime_job_submission": false,
+    "runtime_job_submission": true,
     "new_market_data_read": false,
     "parameter_search": false,
     "arbitration_access": false,

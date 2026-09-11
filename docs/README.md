@@ -223,7 +223,12 @@ nodes.
   [pre-run readiness](acceptance/stage-order-rule-screen-b-prerun-20260911.md),
   [failed prepare attribution](acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md),
   and [successful prepare acceptance](acceptance/stage-order-rule-screen-b-prepare-success-20260911.md).
-  C is ready for actual reference opinions and frozen scoring; D remains blocked on that result.
+  C has now completed the 160-case T-only semantic review and frozen 320 same-origin
+  `self_simulated` opinions in `config/stage-learning/order-rule-review-decisions.v1.tsv` without
+  candidate outputs or future rows. The pre-score reference preview is Stage0=30, Stage2=46,
+  neither=36 and ambiguous=48. The only remaining C action is one `seal_then_score` Worker Job:
+  seal the immutable reference bundle first, then score the single frozen candidate; no market-data
+  reread, opinion regeneration, parameter search or retry is authorized. D remains blocked on that result.
   Route: [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
   `config/stage-order-rule-screen-delivery.v1.json`; rule: `config/stage-learning/order-rule-screen.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

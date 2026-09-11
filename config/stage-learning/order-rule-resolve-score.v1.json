@@ -1,0 +1,60 @@
+{
+  "schema_version": "quanthus.stage-order-rule-resolve-score.v1",
+  "work_item": "P3-STAGE-007-C",
+  "prepare": {
+    "job_id": "stage_95f9b48bd96049b184e0cbf856b9a5e8",
+    "code_revision": "ae99d4973f605c3a6e7044cb6c5f88fd91f98874",
+    "artifact_relative_path": "runs/stage-worker/stage_95f9b48bd96049b184e0cbf856b9a5e8/stage-order-rule-prepare-20260911T080532Z",
+    "manifest_sha256": "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7",
+    "selection_digest": "sha256:75c5d7c1a0711482abf503d9c17b71f0470ba256d6b66fd15ce9ff4f645d7373",
+    "evidence_digest": "sha256:6a9df1869ff4f532715b212e41b9b6ada34d72835152d7318f4ac662acbf8dcf",
+    "case_count": 160,
+    "source_isolation_verified": true
+  },
+  "review_decisions": {
+    "path": "config/stage-learning/order-rule-review-decisions.v1.tsv",
+    "sha256": "sha256:493933e614fccd8c84e9066182f29b11ca80570396ea697d014337fda9504fd7",
+    "case_count": 160,
+    "opinion_count": 320,
+    "kind": "self_simulated",
+    "origin_id": "chatgpt-owner-session-stage007",
+    "session_id": "stage007-reference-review-20260911",
+    "short_term_reviewer_id": "chatgpt-short-term-stage007",
+    "fund_reviewer_id": "chatgpt-fund-stage007",
+    "candidate_output_seen_during_case_review": false,
+    "cognitive_blinding_claimed": false,
+    "expected_reference_preview": {
+      "STAGE_0": 30,
+      "STAGE_2": 46,
+      "NEITHER": 36,
+      "AMBIGUOUS": 48
+    }
+  },
+  "bindings": {
+    "reference_protocol_digest": "sha256:927edd8451c9db9adb0ac06e24dcbc55d11e1ac82aac87123a4d9627557eaf1e",
+    "rule_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0",
+    "validation_digest": "sha256:1512c0f0fdc46a7c0bcd18e4a7f3c46bae83a4d5e08a885dcb42632481bc9989"
+  },
+  "authority": {
+    "read_prepared_evidence": true,
+    "seal_raw_opinions": true,
+    "score_single_frozen_candidate_after_seal": true,
+    "new_market_data_read": false,
+    "opinion_regeneration": false,
+    "semantic_answer_retry": false,
+    "parameter_search": false,
+    "sample_replacement": false,
+    "arbitration_access": false,
+    "permanent_blind_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "limits": {
+    "maximum_jobs": 1,
+    "maximum_cases": 160,
+    "maximum_opinions": 320,
+    "worker_wall_seconds": 600,
+    "maximum_artifact_bytes": 33554432
+  }
+}

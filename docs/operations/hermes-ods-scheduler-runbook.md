@@ -44,7 +44,7 @@ sudo systemctl daemon-reload
 The rendered directory includes the generic `quanthus-pipeline-failure@.service` handler. Node
 renaming changes unit names, the protected environment-file path, and the market-window metadata,
 but the repository-owned launcher remains `ops/bin/run-hermes-ods-lane` for each individual lane.
-CN01 renders its daily orchestrator at 18:30; Hermes renders it at 19:30. Both use a 160-minute
+CN01 renders its daily orchestrator at 18:30; Hermes renders it at 19:30. Both use a 540-minute
 systemd bound. The controller reuses verified same-date READY releases, starts only
 missing lanes, seals the daily catalog, and builds the node-local DWD increment after all four
 lanes pass. The former four daily lane timers are rendered with

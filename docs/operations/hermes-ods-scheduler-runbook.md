@@ -265,6 +265,13 @@ On weekends, only event-lane output is expected.
 Do not edit a release, reuse its id, update PG directly, or fill missing observations with zeros.
 Keep failed/partial attempts for diagnosis and retry into a new attempt.
 
+The daily service's first attempt always obeys the schedule contract's fixed completion deadline.
+If that attempt fails, `run-ods-daily-with-retry` gives only the second attempt the configured
+`QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS` window. The orchestrator records the resulting
+`market_recovery_deadline_at`, passes it only to `market-daily-core`, and continues to require all
+four READY releases before catalog or DWD construction. This makes a terminal timeout retry useful
+without weakening coverage checks or silently moving the recurring schedule deadline.
+
 If a replacement lane misses data or violates its manifest contract, disable only that new timer,
 re-enable its archived legacy entry, and post `ROLLED_BACK` with exact evidence to #41. Do not
 roll back lanes that are operating correctly. OCI does not advance DWD `CURRENT` from the bad

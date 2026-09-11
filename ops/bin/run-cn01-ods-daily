@@ -281,6 +281,11 @@ def main() -> int:
     parser.add_argument("--dwd-sla-seconds", type=int)
     parser.add_argument("--poll-seconds", type=float)
     parser.add_argument(
+        "--recovery-window-seconds",
+        type=int,
+        help="give a retry an explicit market acquisition window from its start time",
+    )
+    parser.add_argument(
         "--ods-only",
         action="store_true",
         help="seal the ODS lanes and catalog without starting the daily DWD build",
@@ -298,7 +303,12 @@ def main() -> int:
     poll_seconds = args.poll_seconds or float(
         os.environ.get("HERMES_ODS_ORCHESTRATOR_POLL_SECONDS", "15")
     )
-    if sla_seconds <= 0 or dwd_sla_seconds <= 0 or poll_seconds <= 0:
+    if (
+        sla_seconds <= 0
+        or dwd_sla_seconds <= 0
+        or poll_seconds <= 0
+        or (args.recovery_window_seconds is not None and args.recovery_window_seconds <= 0)
+    ):
         parser.error("SLA and poll intervals must be positive")
 
     astock_root = Path(os.environ.get("ASTOCK_ROOT", "/root/work/astock"))
@@ -337,10 +347,13 @@ def main() -> int:
         dwd_python = Path(sys.executable)
 
     started = _now()
+    if args.recovery_window_seconds is not None:
+        sla_seconds = args.recovery_window_seconds
     deadline = time.monotonic() + sla_seconds
     market_recovery_deadline = (
         started + timedelta(seconds=sla_seconds)
-        if args.ods_only and market_date < datetime.now(SHANGHAI).date()
+        if args.recovery_window_seconds is not None
+        or (args.ods_only and market_date < datetime.now(SHANGHAI).date())
         else None
     )
     run_id = started.strftime("%Y%m%dT%H%M%S%fZ")
@@ -380,6 +393,9 @@ def main() -> int:
         "release_root": str(release_root),
         "ods_sla_seconds": sla_seconds,
         "dwd_sla_seconds": dwd_sla_seconds,
+        "market_recovery_deadline_at": (
+            market_recovery_deadline.isoformat() if market_recovery_deadline else None
+        ),
         "started_at": _iso(started),
     }
     state: dict[str, Any] = {

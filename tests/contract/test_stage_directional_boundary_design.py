@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/directional-boundary-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:e347e44104d79e06e354f0eaeb049d9f9fbfa19b2d54aeec48002e6387a3d6d1"
+DESIGN_DIGEST = "sha256:cf23f83530925ac78653ab43b9b20be2df30d03d84f1153866f1a6c86204c828"
 
 
 def load_design() -> dict:
@@ -187,6 +187,21 @@ def test_c_conformance_is_bound_without_opening_d_data_or_threshold_search() -> 
     assert checkpoint["next_work_item_preregistration_authorized"] is True
     assert checkpoint["next_work_item_data_access_authorized"] is False
     for key in ("contract", "runner", "acceptance"):
+        assert (ROOT / checkpoint[key]).is_file()
+
+
+def test_d2_candidate_is_frozen_before_evaluation_read() -> None:
+    checkpoint = load_design()["candidate_freeze_checkpoint"]
+    assert checkpoint["state"] == "CANDIDATE_FROZEN_FOR_EVALUATION"
+    assert checkpoint["candidate_trial_count"] == 27
+    assert checkpoint["eligible_candidate_count"] == 1
+    assert checkpoint["evaluation_data_read_before_freeze"] is False
+    assert checkpoint["d3_evaluation_data_read_authorized"] is True
+    assert checkpoint["candidate_replacement_after_evaluation_read"] is False
+    assert checkpoint["frozen_candidate_id"] == (
+        "sha256:d11c368d4111ebf991315a6c61b800a6737d56e5f81792cf153dabcda7cb52fd"
+    )
+    for key in ("candidate_contract", "calibration_review", "acceptance"):
         assert (ROOT / checkpoint[key]).is_file()
 
 

@@ -1,0 +1,93 @@
+{
+  "schema_version": "quanthus.stage-directional-boundary-candidate.v1",
+  "work_item": "P3-STAGE-008-D",
+  "phase": "D2_FREEZE_ONE_CALIBRATION_CANDIDATE_BEFORE_EVALUATION_READ",
+  "governing_screen": {
+    "path": "config/stage-learning/directional-boundary-development-screen.v1.json",
+    "digest": "sha256:fff38395c6466db0305287125d66bc5ba2f5a4ea18d6eb7ee97dd13f0047f963"
+  },
+  "d1_prepare": {
+    "job_id": "stage_7ffc681cd5254aa0ab3e0d98026c42d7",
+    "code_revision": "071cdbf5cbe8fd1fa71bb042aca48a372193eea6",
+    "manifest_sha256": "sha256:2ddc4f90376e2061932862c2ef1a8cfd27f8774d1df9bdb59de8bf4e3bf1f9a3",
+    "calibration_evidence_digest": "sha256:86091171863673e1fad9c41083719e8f48d9e6bc2ba86d4c7eb58b5fb6db0982",
+    "calibration_selection_digest": "sha256:8ab132e78ec408980453b6ad9e3f539b1c54f262acdf411171f83f4c94a3a699",
+    "evaluation_plan_digest": "sha256:bdb24aeb137cbe59148b765b31d7907bd5cb14a467ceec182cb6f2b996d6a743",
+    "evaluation_identity_digest": "sha256:ae50b174133291a82d726379327c93ff52d04ca28a0d2c8b4b312cef2dc8647b",
+    "evaluation_planned_identity_count": 96,
+    "evaluation_data_read_at_candidate_freeze": false
+  },
+  "calibration_review": {
+    "path": "config/stage-learning/directional-boundary-calibration-review.v1.tsv",
+    "sha256": "sha256:f147090c7d6f814e89b652570a89d9aa805b9a0ff34913ab258135ce9356c070",
+    "case_count": 64,
+    "opinion_count": 128,
+    "primary_reference_counts": {
+      "AMBIGUOUS": 5,
+      "NEITHER": 15,
+      "STAGE_0": 28,
+      "STAGE_2": 16
+    },
+    "primary_disagreement_count": 5,
+    "provenance": "same-origin self_simulated primary-only review",
+    "candidate_output_seen_during_review": false,
+    "explicit_recent_derived_facts_seen": false,
+    "independent_validation": false
+  },
+  "calibration_search": {
+    "candidate_count": 27,
+    "eligible_count": 1,
+    "trials_digest": "sha256:b47919aec512ce39aa49989188e1d54bd1963182eb72c042670137fb458ca6bf",
+    "grid_expanded_after_result": false,
+    "supplementation_after_result": false,
+    "stage_007_threshold_learning": false,
+    "old_r0_stage0": {
+      "definite_positive_references": 28,
+      "definite_negative_references": 31,
+      "ambiguous_references": 5,
+      "true_positive": 28,
+      "false_positive": 8,
+      "false_negative": 0,
+      "stage_0_predictions": 36,
+      "precision": "0.7777777777777777777777777778",
+      "positive_reference_coverage": "1",
+      "definite_negative_false_positive_rate": "0.2580645161290322580645161290"
+    }
+  },
+  "frozen_candidate": {
+    "candidate_id": "sha256:d11c368d4111ebf991315a6c61b800a6737d56e5f81792cf153dabcda7cb52fd",
+    "absolute_window_return20_min": "0.10",
+    "range_traversal20_min": "0.50",
+    "counter_direction_excursion_share20_max": "0.60",
+    "calibration_metrics": {
+      "definite_positive_references": 28,
+      "definite_negative_references": 31,
+      "ambiguous_references": 5,
+      "true_positive": 28,
+      "false_positive": 3,
+      "false_negative": 0,
+      "stage_0_predictions": 31,
+      "precision": "0.9032258064516129032258064516",
+      "positive_reference_coverage": "1",
+      "definite_negative_false_positive_rate": "0.09677419354838709677419354839"
+    }
+  },
+  "stage_2": {
+    "rule_changed": false,
+    "threshold_search_authorized": false,
+    "evaluation_must_reproduce_unchanged_predictions": true
+  },
+  "evaluation_authority": {
+    "d3_read_exact_frozen_2021_evaluation_identities": true,
+    "evaluation_selection_may_use_morphology": false,
+    "evaluation_opinions_must_be_sealed_before_scoring": true,
+    "evaluation_parameter_search": false,
+    "candidate_replacement_after_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "future_outcome_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

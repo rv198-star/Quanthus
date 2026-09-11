@@ -8,7 +8,7 @@
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | P3-STAGE-007 / `REVISE_TARGET_OR_PARK` |
 | Machine design | `../../config/stage-learning/directional-boundary-repair-design.v1.json` |
-| Machine design digest | `sha256:e347e44104d79e06e354f0eaeb049d9f9fbfa19b2d54aeec48002e6387a3d6d1` |
+| Machine design digest | `sha256:cf23f83530925ac78653ab43b9b20be2df30d03d84f1153866f1a6c86204c828` |
 | Four-party review | [review record](../reviews/stage-directional-boundary-repair-review-20260911.md) |
 | Runtime authority | none |
 

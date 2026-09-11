@@ -21,15 +21,18 @@ def module():
     return result
 
 
-def test_review_complete_does_not_mean_milestone_complete():
+def test_terminal_screen_closes_with_revise_not_candidate_pass():
     script = module()
     raw = script.load_plan()
-    assert not raw["milestone_completed"]
+    assert raw["milestone_completed"]
     assert raw["runtime_receipts"]["successful_prepare"]["state"] == "succeeded"
+    assert raw["runtime_receipts"]["resolve_score"]["state"] == "succeeded"
+    assert raw["final_disposition"]["decision"] == "REVISE_TARGET_OR_PARK"
+    assert raw["final_disposition"]["combined_candidate_broader_validation_authorized"] is False
     assert [(i["id"], i["status"]) for i in raw["items"]] == [
-        ("P3-STAGE-007", "ready"), ("P3-STAGE-007-A", "closed"),
-        ("P3-STAGE-007-B", "closed"), ("P3-STAGE-007-C", "ready"),
-        ("P3-STAGE-007-D", "blocked"),
+        ("P3-STAGE-007", "closed"), ("P3-STAGE-007-A", "closed"),
+        ("P3-STAGE-007-B", "closed"), ("P3-STAGE-007-C", "closed"),
+        ("P3-STAGE-007-D", "closed"),
     ]
     from sync_github_planning import work_items
 
@@ -49,20 +52,21 @@ def test_prepare_authority_cannot_silently_open_search_or_trading(key):
         script.validate_plan(raw)
 
 
-def test_prepare_is_closed_and_only_one_seal_then_score_job_is_open():
+def test_prepare_and_seal_score_contracts_are_consumed_and_runtime_is_closed():
     script = module()
     raw = script.load_plan()
-    assert raw["authorization"]["runtime_job_submission"] is True
+    assert raw["authorization"]["runtime_job_submission"] is False
     assert raw["authorization"]["new_market_data_read"] is False
     assert raw["completed_prepare_contract"]["phase"] == "prepare_only"
     assert raw["completed_prepare_contract"]["maximum_technical_retries"] == 1
-    assert raw["runtime_contract"]["phase"] == "seal_then_score"
-    assert raw["runtime_contract"]["maximum_jobs"] == 1
-    assert raw["runtime_contract"]["maximum_technical_retries"] == 0
-    assert raw["runtime_contract"]["case_count"] == 160
-    assert raw["runtime_contract"]["opinion_count"] == 320
-    assert raw["runtime_contract"]["new_market_data_read"] is False
-    assert raw["runtime_contract"]["parameter_search"] is False
+    assert raw["completed_resolve_score_contract"]["phase"] == "seal_then_score"
+    assert raw["completed_resolve_score_contract"]["maximum_jobs"] == 1
+    assert raw["completed_resolve_score_contract"]["maximum_technical_retries"] == 0
+    assert raw["completed_resolve_score_contract"]["case_count"] == 160
+    assert raw["completed_resolve_score_contract"]["opinion_count"] == 320
+    assert raw["completed_resolve_score_contract"]["new_market_data_read"] is False
+    assert raw["completed_resolve_score_contract"]["parameter_search"] is False
+    assert raw["runtime_contract"] is None
     assert raw["technical_retry"]["authorized"] is False
     assert raw["technical_retry"]["consumed"] is True
     assert raw["technical_retry"]["actual_retries"] == 1
@@ -70,9 +74,8 @@ def test_prepare_is_closed_and_only_one_seal_then_score_job_is_open():
     assert raw["reference_checkpoint"]["state"] == "REVIEW_LEDGER_FROZEN"
     assert raw["reference_checkpoint"]["case_count"] == 160
     assert raw["reference_checkpoint"]["opinion_count"] == 320
-    changed = {**raw["runtime_contract"], "maximum_technical_retries": 1}
-    raw["runtime_contract"] = changed
-    with pytest.raises(ValueError, match="runtime_contract"):
+    raw["runtime_contract"] = dict(raw["completed_resolve_score_contract"])
+    with pytest.raises(ValueError, match="terminal_runtime_contract"):
         script.validate_plan(raw)
 
 
@@ -103,11 +106,11 @@ def test_resources_are_bounded_before_result_access(key, value):
         script.validate_plan(raw)
 
 
-def test_no_parent_pass_from_prepare_completion():
+def test_terminal_completion_cannot_be_reframed_as_candidate_acceptance():
     script = module()
     raw = script.load_plan()
-    raw["milestone_completed"] = True
-    with pytest.raises(ValueError, match="parent_not_complete"):
+    raw["final_disposition"]["combined_candidate_broader_validation_authorized"] = True
+    with pytest.raises(ValueError, match="final_disposition"):
         script.validate_plan(raw)
 
 

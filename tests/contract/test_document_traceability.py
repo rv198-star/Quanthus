@@ -1473,25 +1473,29 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         screen_ids = {item["id"] for item in screen_raw["items"]}
         self.assertEqual(screen_ids, {"P3-STAGE-007", *[f"P3-STAGE-007-{c}" for c in "ABCD"]})
-        self.assertIs(screen_raw["milestone_completed"], False)
+        self.assertIs(screen_raw["milestone_completed"], True)
         self.assertEqual(screen_raw["runtime_receipts"]["failed_prepare"]["state"], "failed")
         self.assertEqual(
             screen_raw["runtime_receipts"]["successful_prepare"]["state"], "succeeded"
         )
-        screen_positive_authority = {
-            "implementation_and_synthetic_tests", "runtime_job_submission",
-        }
+        screen_positive_authority = {"implementation_and_synthetic_tests"}
         for key, value in screen_raw["authorization"].items():
             self.assertIs(value, key in screen_positive_authority)
         self.assertEqual(screen_raw["completed_prepare_contract"]["phase"], "prepare_only")
-        screen_runtime = screen_raw["runtime_contract"]
+        screen_runtime = screen_raw["completed_resolve_score_contract"]
         self.assertEqual(screen_runtime["phase"], "seal_then_score")
         self.assertEqual(screen_runtime["maximum_jobs"], 1)
         self.assertEqual(screen_runtime["maximum_technical_retries"], 0)
         self.assertEqual(screen_runtime["case_count"], 160)
         self.assertEqual(screen_runtime["opinion_count"], 320)
         self.assertIs(screen_runtime["new_market_data_read"], False)
+        self.assertIsNone(screen_raw["runtime_contract"])
         self.assertEqual(screen_raw["reference_checkpoint"]["state"], "REVIEW_LEDGER_FROZEN")
+        self.assertEqual(screen_raw["runtime_receipts"]["resolve_score"]["state"], "succeeded")
+        self.assertEqual(screen_raw["final_disposition"]["decision"], "REVISE_TARGET_OR_PARK")
+        self.assertFalse(
+            screen_raw["final_disposition"]["combined_candidate_broader_validation_authorized"]
+        )
         self.assertEqual(
             reference_feasibility_ids,
             {"P3-STAGE-006", *[f"P3-STAGE-006-{c}" for c in "ABCD"]},

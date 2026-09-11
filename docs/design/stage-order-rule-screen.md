@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | closed / REVISE_TARGET_OR_PARK |
 | Work item | P3-STAGE-007 |
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Owner decision | 用户批准业务/量化/数仓/技术联合评审，并形成可执行的下一阶段任务 |
@@ -325,8 +325,37 @@ selected=160、四桶shortfall全0、保留source rows=9760、`source_isolation_
 
 封存前仅做分母预览，用于确认参考数量足够继续，不用于修改任何判断：Stage0=30、
 Stage2=46、Neither=36、Ambiguous=48。该预览和320份待展开意见一起由
-`config/stage-learning/order-rule-resolve-score.v1.json`绑定。当前唯一可执行Job是
-`quanthus.stage-order-rule-resolve-score.v1`：先把320份原始意见发布为不可变reference
-bundle，成功封存后才调用冻结规则评分。该Job不得重新读取行情、重生成意见、替换样本、
-搜索参数或语义重试；失败也不开放第三次Job。P3-STAGE-007-C在该Job成功并保留完整分母
-前保持ready而非closed。
+`config/stage-learning/order-rule-resolve-score.v1.json`绑定。唯一C Job必须先把320份原始
+意见发布为不可变reference bundle，再调用冻结规则评分；不得重新读取行情、重生成意见、
+替换样本、搜索参数或语义重试。该合同已由第15节的成功Job消费完毕，当前不再存在可执行
+的Stage-007 runtime contract。
+
+## 15. C/D最终结果与关闭
+
+唯一C Job `stage_e8d174dd13db412e94c8f4bdbf70c7f5`在revision
+`38b965aea678d180a12299b53db3f4db4a1ce256`上成功，exit 0。它先封存320份意见，再评分
+唯一冻结候选；未重读行情、未重建Facts、未生成新意见、未调参。正式gate disposition为
+`REVISE_TARGET_OR_PARK`。
+
+明确参考上的Stage 0结果为：30个正例、82个负例、28 TP、12 FP、2 FN，precision=0.70、
+positive-reference coverage约0.933、definite-negative FPR约0.146。12个FP全部是两角色一致
+的`NEITHER`，且理由一致指向“方向推进/下跌/修正主导”，说明旧R0把中心迁移或宽度变化
+机械解释为失稳，却无法区分**coherent directional relocation**与真正的低方向结构失稳。
+这不是随机噪声，也不应通过同批阈值微调修补。
+
+Stage 2则保留为强探索性子结果：46个明确正例、33 TP、0 FP、13 FN，precision=1.00、
+positive-reference coverage约0.717、definite-negative FPR=0。它不因Stage 0失败而被抹掉，
+但同源参考和当前批次的参考质量缺陷意味着它仍不能升级为独立语义验证、正式LabelCard或
+市场资格。
+
+D还发现参考过程自身存在语义偏离：A阶段冻结了“10日近期事实不能成为20日主尺度隐藏
+veto”，但48个Ambiguous中至少21个意见明确用近期扩张/移动把主尺度Stage 2降为UNKNOWN
+或NEITHER。因此observed ambiguous assertion rate=32/48约0.667不能作为干净的纯规则质量
+证据。原始意见保持不可改，不在看到分数后重写。该缺陷也不能挽救组合候选，因为Stage 0
+的precision/FPR失败只使用明确参考，独立成立。
+
+最终关闭原则：不重跑这160例，不在同批调阈值，不自动补样，不消费2025。Stage 0下一步
+应先增加一个同T、主尺度的连续路径形态事实，显式区分“方向一致的重定位”和“双向/振荡式
+失稳”；参考协议同时增加近期窗口不得改变主尺度判断的语义审计。当前Stage 2规则保持原样，
+等待语义修复后再决定新的独立验证来源。完整验收见
+[C/D closeout](../acceptance/stage-order-rule-screen-cd-closeout-20260911.md)。

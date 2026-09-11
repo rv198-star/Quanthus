@@ -28,16 +28,18 @@ REPO = "rv198-star/Quanthus"
 
 
 def validate_plan(raw: dict) -> None:
-    """Validate the frozen screen and one authorized prepare run, never invent a runtime PASS."""
+    """Validate the frozen screen and its evidence-backed terminal disposition."""
     if (raw["schema_version"] != "quanthus.stage-order-rule-screen-delivery.v1"
             or raw["parent_id"] != PARENT
             or tuple(item["id"] for item in raw["items"]) != IDS):
         raise ValueError("screen_plan_identity")
-    if raw["milestone_completed"] is not False:
-        raise ValueError("screen_parent_not_complete_before_c_d")
+    if raw["milestone_completed"] is not True:
+        raise ValueError("screen_terminal_closeout_missing")
     receipts = raw.get("runtime_receipts")
-    if not isinstance(receipts, dict) or set(receipts) != {"failed_prepare", "successful_prepare"}:
-        raise ValueError("screen_prepare_receipts_missing")
+    if not isinstance(receipts, dict) or set(receipts) != {
+        "failed_prepare", "successful_prepare", "resolve_score",
+    }:
+        raise ValueError("screen_runtime_receipts_missing")
     failed_receipt = receipts["failed_prepare"]
     success_receipt = receipts["successful_prepare"]
     if failed_receipt != {
@@ -71,6 +73,35 @@ def validate_plan(raw: dict) -> None:
         ),
     }:
         raise ValueError("screen_successful_prepare_receipt_drift")
+    resolve_receipt = receipts["resolve_score"]
+    if resolve_receipt != {
+        "job_id": "stage_e8d174dd13db412e94c8f4bdbf70c7f5",
+        "code_revision": "38b965aea678d180a12299b53db3f4db4a1ce256",
+        "input_digest": "sha256:d169d5673430e3ca4fd5962d8f2e834e4ccb5676c0db51f54ce0cfd0491a7cc3",
+        "state": "succeeded",
+        "exit_code": 0,
+        "started_at": "2026-09-11T13:45:17.270315+00:00",
+        "completed_at": "2026-09-11T13:45:36.734284+00:00",
+        "run_id": "stage-order-rule-resolve-score-20260911T134519Z",
+        "manifest_sha256": (
+            "sha256:a7dbf622fce034b7b5d88d1bf3cee46b5e6e52786ea786a56e97bd0069e1a931"
+        ),
+        "reference_manifest_sha256": (
+            "sha256:d87572762af7c6397290cf7ca731f213f9ce5674e4034aa2cb17427c07fbce40"
+        ),
+        "case_count": 160,
+        "opinion_count": 320,
+        "primary_reference_counts": {
+            "STAGE_0": 30, "STAGE_2": 46, "NEITHER": 36, "AMBIGUOUS": 48,
+        },
+        "gate_disposition": "REVISE_TARGET_OR_PARK",
+        "gate_reasons": [
+            "STAGE_0:precision_fails",
+            "STAGE_0:definite_negative_false_positive_rate_fails",
+            "ambiguous_assertion_rate_fails",
+        ],
+    }:
+        raise ValueError("screen_resolve_score_receipt_drift")
     prepare_runtime = raw.get("completed_prepare_contract")
     if not isinstance(prepare_runtime, dict) or prepare_runtime != {
         "path": "config/stage-learning/order-rule-prepare.v1.json",
@@ -88,7 +119,7 @@ def validate_plan(raw: dict) -> None:
         raise ValueError("screen_completed_prepare_contract_missing")
     if digest(load_prepare_config(prepare_runtime_path)) != prepare_runtime["digest"]:
         raise ValueError("screen_completed_prepare_contract_digest")
-    runtime = raw.get("runtime_contract")
+    runtime = raw.get("completed_resolve_score_contract")
     if not isinstance(runtime, dict) or runtime != {
         "path": "config/stage-learning/order-rule-resolve-score.v1.json",
         "digest": RESOLVE_SCORE_DIGEST,
@@ -107,20 +138,19 @@ def validate_plan(raw: dict) -> None:
         raise ValueError("screen_resolve_score_runtime_contract_missing")
     if digest(load_resolve_score_config(runtime_path)) != runtime["digest"]:
         raise ValueError("screen_resolve_score_runtime_contract_digest")
+    if raw.get("runtime_contract") is not None:
+        raise ValueError("screen_terminal_runtime_contract_must_be_closed")
     if raw["rule_digest"] != RULE_DIGEST:
         raise ValueError("screen_rule_binding")
     load_rule(ROOT)
     expected_auth = {key: False for key in (
-        "new_market_data_read", "parameter_search", "arbitration_access",
+        "runtime_job_submission", "new_market_data_read", "parameter_search", "arbitration_access",
         "permanent_blind_access", "official_labels", "daily_or_strategy", "trading",
     )}
-    expected_auth.update({
-        "implementation_and_synthetic_tests": True,
-        "runtime_job_submission": True,
-    })
+    expected_auth["implementation_and_synthetic_tests"] = True
     if raw["authorization"] != expected_auth:
         raise ValueError("screen_unauthorized_activation")
-    states = ("ready", "closed", "closed", "ready", "blocked")
+    states = ("closed", "closed", "closed", "closed", "closed")
     checkpoint = raw.get("preparation_checkpoint")
     if not isinstance(checkpoint, dict) or checkpoint != {
         "state": "PREPARE_ACCEPTED",
@@ -221,6 +251,36 @@ def validate_plan(raw: dict) -> None:
     observed_review = "sha256:" + hashlib.sha256(review_path.read_bytes()).hexdigest()
     if observed_review != reference["review_decisions_sha256"]:
         raise ValueError("screen_review_ledger_drift")
+    final = raw.get("final_disposition")
+    if not isinstance(final, dict) or (
+        final.get("state") != "CLOSED"
+        or final.get("decision") != "REVISE_TARGET_OR_PARK"
+        or final.get("combined_candidate_broader_validation_authorized") is not False
+        or final.get("stage_0", {}).get("decision") != "REVISE_TARGET"
+        or final.get("stage_0", {}).get("precision") != "0.70"
+        or final.get("stage_0", {}).get("definite_negative_false_positive_rate")
+        != "0.1463414634146341463414634146"
+        or final.get("stage_0", {}).get("false_positive") != 12
+        or final.get("stage_2", {}).get("decision")
+        != "PROMISING_EXPLORATORY_SUBRESULT_ONLY"
+        or final.get("stage_2", {}).get("precision") != "1"
+        or final.get("stage_2", {}).get("false_positive") != 0
+        or final.get("stage_2", {}).get("broader_validation_authorized") is not False
+        or final.get("reference_quality", {}).get("clear_recent_window_primary_veto_deviations")
+        != 21
+        or final.get("reference_quality", {}).get("ambiguity_metric_clean_rule_quality_evidence")
+        is not False
+        or final.get("reference_quality", {}).get(
+            "definite_stage_0_failure_independent_of_ambiguity_defect"
+        ) is not True
+        or final.get("successor_direction", {}).get("rerun_same_batch") is not False
+        or final.get("successor_direction", {}).get("threshold_tuning_on_same_batch") is not False
+        or final.get("successor_direction", {}).get("consume_2025_now") is not False
+    ):
+        raise ValueError("screen_final_disposition_drift")
+    final_evidence = (ROOT / str(final.get("evidence") or "")).resolve()
+    if not final_evidence.is_relative_to(ROOT) or not final_evidence.is_file():
+        raise ValueError("screen_final_disposition_evidence_missing")
     expected_states = dict(zip(IDS, states, strict=True))
     if {item["id"]: item["status"] for item in raw["items"]} != expected_states:
         raise ValueError("screen_status_requires_real_evidence")
@@ -314,9 +374,10 @@ def main() -> int:
             "## Acceptance\n" + "\n".join("- " + text for text in item["acceptance"]),
             "## Evidence\n" + ("\n".join("- `" + p + "`" for p in item["evidence"])
                                or "Pending actual delivery evidence; no runtime PASS."),
-            "## Boundary\nOne candidate; no 004/005/006 rerun. New source isolation and a frozen "
-            "runtime contract must precede any Job. Same-origin simulation is exploratory only. "
-            "2022-2024 and 2025 stay closed; no official label, daily, strategy or trading.",
+            "## Boundary\nOne candidate; no 004/005/006 rerun. The bounded runtime contracts are "
+            "consumed and no further Stage-007 Job is authorized. Same-origin simulation remains "
+            "exploratory only. 2022-2024 and 2025 stay closed; no official label, daily, strategy "
+            "or trading.",
             "## Budgets\n" + json.dumps(raw["budgets"], sort_keys=True),
             "## Runtime activation prerequisites\n" + "\n".join(
                 "- " + text for text in raw["runtime_activation_requirements"]
@@ -327,6 +388,10 @@ def main() -> int:
         if raw.get("preparation_checkpoint") is not None:
             sections.append("## Preparation checkpoint\n" + json.dumps(
                 raw["preparation_checkpoint"], sort_keys=True,
+            ))
+        if raw.get("final_disposition") is not None:
+            sections.append("## Final disposition\n" + json.dumps(
+                raw["final_disposition"], sort_keys=True,
             ))
         return "\n\n".join(sections) + "\n"
 

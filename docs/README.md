@@ -212,24 +212,22 @@ nodes.
   Route: [reference feasibility](design/stage-order-reference-feasibility.md); machine plan:
   `config/stage-order-reference-feasibility-delivery.v1.json`; evidence:
   `acceptance/stage-order-reference-feasibility-20260911.md`.
-- `P3-STAGE-007` is open for one fixed-rule, task-disjoint development screen. The authorized
-  four-role simulated review froze the descriptive target and an unchanged R0 seed; this is not
-  market acceptance. A and B are complete. The first prepare failed only at the post-selection
-  signed-vs-absolute sampling-coordinate check; its one bound technical retry then succeeded.
-  B verified the old 512 cohort, excluded 515 economic identities, froze a 512-security isolated
-  pool and exactly 160 T-only 2021 cases with zero panel shortfall; the evidence closure contains
-  9,760 rows and reports `source_isolation_verified=true`. Historical evidence remains in the
-  [blocked checkpoint](acceptance/stage-order-rule-screen-b-checkpoint-20260911.md),
-  [pre-run readiness](acceptance/stage-order-rule-screen-b-prerun-20260911.md),
-  [failed prepare attribution](acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md),
-  and [successful prepare acceptance](acceptance/stage-order-rule-screen-b-prepare-success-20260911.md).
-  C has now completed the 160-case T-only semantic review and frozen 320 same-origin
-  `self_simulated` opinions in `config/stage-learning/order-rule-review-decisions.v1.tsv` without
-  candidate outputs or future rows. The pre-score reference preview is Stage0=30, Stage2=46,
-  neither=36 and ambiguous=48. The only remaining C action is one `seal_then_score` Worker Job:
-  seal the immutable reference bundle first, then score the single frozen candidate; no market-data
-  reread, opinion regeneration, parameter search or retry is authorized. D remains blocked on that result.
-  Route: [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
+- `P3-STAGE-007` is closed as a bounded decision experiment with final disposition
+  `REVISE_TARGET_OR_PARK`; this is not market acceptance. B verified the old 512 cohort, excluded
+  515 economic identities, froze a 512-security isolated pool and exactly 160 T-only 2021 cases.
+  C sealed 320 same-origin `self_simulated` opinions before scoring the one frozen candidate. The
+  single score Job `stage_e8d174dd13db412e94c8f4bdbf70c7f5` succeeded with no reread, retry,
+  replacement or parameter search. Stage 0 failed on definite references: precision 0.70 and
+  definite-negative FPR about 0.146 despite 0.933 positive coverage; all 12 false positives are
+  directionally dominated `NEITHER` cases. Stage 2 remains a strong exploratory sub-result:
+  precision 1.00, positive-reference coverage about 0.717 and zero definite-negative false positives.
+  D also found a reference-quality defect: at least 21 ambiguous opinions used recent-window behavior
+  as a hidden primary veto despite the frozen 20-session semantics, so the observed 0.667 ambiguity
+  assertion rate is not clean standalone rule-quality evidence. This defect does not rescue Stage 0
+  because its definite-reference failures are independent. No current runtime Job remains authorized;
+  no official label, daily/strategy use, 2025 access or trading opens. Evidence:
+  [C/D closeout](acceptance/stage-order-rule-screen-cd-closeout-20260911.md). Route:
+  [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
   `config/stage-order-rule-screen-delivery.v1.json`; rule: `config/stage-learning/order-rule-screen.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

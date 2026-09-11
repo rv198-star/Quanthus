@@ -371,33 +371,33 @@ Design: [reference feasibility](../stage-order-reference-feasibility.md); plan:
 
 ### Fixed-rule development screen
 
-`P3-STAGE-007` implements the owner-approved next-stage decision in
-[fixed-rule screen](../stage-order-rule-screen.md). It retains the 20-session/10-session separation,
-uses exactly the old preregistered R0 numbers as one new research seed, and distinguishes machine
-NO_ASSERTION from a reference NEITHER. The seed is an executable hypothesis, not a qualified
-classifier. Source isolation, fixed sampling, actual reference collection and an error-based
-business disposition remain necessary; completing A or B cannot close the parent.
-The prepare route reconstructed the old cohort, completed historical economic-identity exclusion
-and fixed 160 T-only 2021 cases with zero bucket shortfall. The first Job failed before publication
-at a signed-vs-absolute sampling-coordinate consistency check and produced no opinion or candidate
-score. That terminal failure remains retained; its single same-input technical retry succeeded after
-the canonicalization-only fix. B therefore closes with 512 old securities reconstructed, 515
-economic identities excluded, a 512-security isolated pool, 160 fixed cases and 9,760 retained
-source rows. C has since completed T-only review of all 160 cases and frozen 320 raw opinions from
-one same-origin `self_simulated` ChatGPT session. The pre-score resolution preview is Stage0=30,
-Stage2=46, neither=36 and ambiguous=48; this is not independent validation. Candidate outputs and
-future rows were excluded during review, but cognitive blinding is not claimed because the model
-already knew the rule context. C now has exactly one no-retry `seal_then_score` Job remaining. No
-old contract, permanent dataset, sealed partition, official label or trading boundary changes.
-Machine plan: `../../config/stage-order-rule-screen-delivery.v1.json`.
+`P3-STAGE-007` is now closed as the owner-approved fixed-rule decision experiment in
+[fixed-rule screen](../stage-order-rule-screen.md). The prepare route reconstructed the old cohort,
+excluded historical economic identities and fixed 160 T-only 2021 cases. The first prepare failed
+only at a post-selection canonicalization check; its single bound technical retry succeeded. C then
+froze 320 same-origin `self_simulated` opinions and sealed them before the single frozen score Job.
+The score Job succeeded technically and returned `REVISE_TARGET_OR_PARK`.
+
+Stage 0 is the substantive blocker: definite precision is 0.70, positive-reference coverage about
+0.933 and definite-negative FPR about 0.146. All 12 definite false positives are directionally
+dominated `NEITHER` references, showing the four summary Facts cannot reliably distinguish coherent
+directional relocation from low-direction structural instability. Stage 2 remains a strong exploratory
+sub-result with definite precision 1.00, positive-reference coverage about 0.717 and zero definite
+false positives. D also found a reference-quality defect: at least 21 ambiguous opinions used recent
+10-session behavior as a primary-scale veto despite the frozen semantics. The observed ambiguity
+assertion rate is therefore not clean standalone rule-quality evidence, but this does not rescue Stage 0
+because its definite-reference failures are independent. No rerun, same-batch threshold tuning, 2025
+access, official label, daily/strategy or trading authority opens. Machine plan:
+`../../config/stage-order-rule-screen-delivery.v1.json`; closeout:
+`../../acceptance/stage-order-rule-screen-cd-closeout-20260911.md`.
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | ready; #292; A/B closed, C ready, D business disposition still required |
+| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | closed; #292; REVISE_TARGET_OR_PARK; `../../acceptance/stage-order-rule-screen-cd-closeout-20260911.md` |
 | P3-STAGE-007-A | Resolve business boundaries and freeze one executable seed | P3-STAGE-006 | closed; `../stage-order-rule-screen.md`; synthetic rule-contract tests |
 | P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | closed; #289; one technical retry consumed, 512 old cohort / 515 identities excluded / 160 fixed cases; `../../acceptance/stage-order-rule-screen-b-prepare-success-20260911.md` |
-| P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | ready; 160 cases / 320 same-origin opinions frozen; one no-retry seal-then-score Job remains |
-| P3-STAGE-007-D | Attribute errors and give the business disposition | P3-STAGE-007-C | blocked; no automatic supplementation or tuning |
+| P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | closed; #290; 160 cases / 320 opinions sealed, one no-retry score Job succeeded |
+| P3-STAGE-007-D | Attribute errors and give the business disposition | P3-STAGE-007-C | closed; #291; Stage0 target/representation revision required; Stage2 preserved as exploratory only |
 
 ## 7. Acceptance
 

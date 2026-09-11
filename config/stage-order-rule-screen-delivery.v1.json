@@ -7,7 +7,7 @@
   "rule_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0",
   "implementation": "src/quanthus/stage_learning/order_rule_screen.py",
   "review_provenance": "owner_authorized_single_assistant_four_role_simulation",
-  "milestone_completed": false,
+  "milestone_completed": true,
   "completed_prepare_contract": {
     "path": "config/stage-learning/order-rule-prepare.v1.json",
     "digest": "sha256:b27bbc1d3d54f9e410a8ca7b931af63f62690be9b911d538aeb0cda5666e9bd9",
@@ -18,7 +18,7 @@
     "opinion_generation": false,
     "candidate_scoring": false
   },
-  "runtime_contract": {
+  "completed_resolve_score_contract": {
     "path": "config/stage-learning/order-rule-resolve-score.v1.json",
     "digest": "sha256:2407e10998b7601f35d7cefa18dea26dc448eb471307cd50d2da32b0f91c1781",
     "kind": "quanthus.stage-order-rule-resolve-score.v1",
@@ -30,6 +30,7 @@
     "new_market_data_read": false,
     "parameter_search": false
   },
+  "runtime_contract": null,
   "runtime_receipts": {
     "failed_prepare": {
       "job_id": "stage_7ef751fa63664175b49eaa3459c83ca3",
@@ -53,6 +54,32 @@
       "manifest_sha256": "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7",
       "selection_digest": "sha256:75c5d7c1a0711482abf503d9c17b71f0470ba256d6b66fd15ce9ff4f645d7373",
       "evidence_digest": "sha256:6a9df1869ff4f532715b212e41b9b6ada34d72835152d7318f4ac662acbf8dcf"
+    },
+    "resolve_score": {
+      "job_id": "stage_e8d174dd13db412e94c8f4bdbf70c7f5",
+      "code_revision": "38b965aea678d180a12299b53db3f4db4a1ce256",
+      "input_digest": "sha256:d169d5673430e3ca4fd5962d8f2e834e4ccb5676c0db51f54ce0cfd0491a7cc3",
+      "state": "succeeded",
+      "exit_code": 0,
+      "started_at": "2026-09-11T13:45:17.270315+00:00",
+      "completed_at": "2026-09-11T13:45:36.734284+00:00",
+      "run_id": "stage-order-rule-resolve-score-20260911T134519Z",
+      "manifest_sha256": "sha256:a7dbf622fce034b7b5d88d1bf3cee46b5e6e52786ea786a56e97bd0069e1a931",
+      "reference_manifest_sha256": "sha256:d87572762af7c6397290cf7ca731f213f9ce5674e4034aa2cb17427c07fbce40",
+      "case_count": 160,
+      "opinion_count": 320,
+      "primary_reference_counts": {
+        "STAGE_0": 30,
+        "STAGE_2": 46,
+        "NEITHER": 36,
+        "AMBIGUOUS": 48
+      },
+      "gate_disposition": "REVISE_TARGET_OR_PARK",
+      "gate_reasons": [
+        "STAGE_0:precision_fails",
+        "STAGE_0:definite_negative_false_positive_rate_fails",
+        "ambiguous_assertion_rate_fails"
+      ]
     }
   },
   "preparation_checkpoint": {
@@ -116,9 +143,50 @@
       "AMBIGUOUS": 48
     }
   },
+  "final_disposition": {
+    "state": "CLOSED",
+    "decision": "REVISE_TARGET_OR_PARK",
+    "combined_candidate_broader_validation_authorized": false,
+    "stage_0": {
+      "decision": "REVISE_TARGET",
+      "precision": "0.70",
+      "positive_reference_coverage": "0.9333333333333333333333333333",
+      "definite_negative_false_positive_rate": "0.1463414634146341463414634146",
+      "true_positive": 28,
+      "false_positive": 12,
+      "false_negative": 2,
+      "root_cause": "directional_relocation_not_distinguished_from_structural_instability"
+    },
+    "stage_2": {
+      "decision": "PROMISING_EXPLORATORY_SUBRESULT_ONLY",
+      "precision": "1",
+      "positive_reference_coverage": "0.7173913043478260869565217391",
+      "definite_negative_false_positive_rate": "0",
+      "true_positive": 33,
+      "false_positive": 0,
+      "false_negative": 13,
+      "broader_validation_authorized": false
+    },
+    "reference_quality": {
+      "ambiguous_reference_count": 48,
+      "ambiguous_assertion_rate_observed": "0.6666666666666666666666666667",
+      "clear_recent_window_primary_veto_deviations": 21,
+      "ambiguity_metric_clean_rule_quality_evidence": false,
+      "definite_stage_0_failure_independent_of_ambiguity_defect": true
+    },
+    "successor_direction": {
+      "rerun_same_batch": false,
+      "threshold_tuning_on_same_batch": false,
+      "stage_0_new_primary_scale_path_shape_fact_required": true,
+      "reference_recent_window_semantic_guard_required": true,
+      "preserve_stage_2_rule_unchanged": true,
+      "consume_2025_now": false
+    },
+    "evidence": "docs/acceptance/stage-order-rule-screen-cd-closeout-20260911.md"
+  },
   "authorization": {
     "implementation_and_synthetic_tests": true,
-    "runtime_job_submission": true,
+    "runtime_job_submission": false,
     "new_market_data_read": false,
     "parameter_search": false,
     "arbitration_access": false,
@@ -202,12 +270,12 @@
   ],
   "items": [
     {
-      "id": "P3-STAGE-007", "kind": "epic", "status": "ready",
+      "id": "P3-STAGE-007", "kind": "epic", "status": "closed",
       "title": "Decide whether one fixed scale-explicit rule warrants broader validation",
       "depends_on": ["P3-STAGE-006"],
       "scope": "One preregistered candidate, task-disjoint development references, immutable scoring and a business disposition; no framework rebuild.",
       "acceptance": ["C and D return a bounded evidence-backed disposition, not just engineering success", "No threshold tuning, no reused-case qualification, no sealed partitions or trading"],
-      "evidence": []
+      "evidence": ["docs/acceptance/stage-order-rule-screen-cd-closeout-20260911.md"]
     },
     {
       "id": "P3-STAGE-007-A", "kind": "task", "status": "closed",
@@ -226,20 +294,20 @@
       "evidence": ["docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prepare-success-20260911.md"]
     },
     {
-      "id": "P3-STAGE-007-C", "kind": "task", "status": "ready",
+      "id": "P3-STAGE-007-C", "kind": "task", "status": "closed",
       "title": "Execute one fixed reference and scoring batch without in-run repair",
       "depends_on": ["P3-STAGE-007-B"],
       "scope": "At most 160 cases and 320 actual source-declared opinions; seal references before scoring and keep every denominator.",
       "acceptance": ["Exact runtime receipts and immutable evidence bind selection, references and the frozen rule", "Coverage and challenge panels are reported separately", "Related simulated origins never claim independent validation"],
-      "evidence": []
+      "evidence": ["docs/acceptance/stage-order-rule-screen-cd-closeout-20260911.md"]
     },
     {
-      "id": "P3-STAGE-007-D", "kind": "task", "status": "blocked",
+      "id": "P3-STAGE-007-D", "kind": "task", "status": "closed",
       "title": "Attribute failures and close with a substantive business decision",
       "depends_on": ["P3-STAGE-007-C"],
       "scope": "Distinguish reference scarcity, target ambiguity, missing representation and rule error; close under the preregistered disposition order.",
       "acceptance": ["No parent completion from A/B engineering alone", "One fixed experiment ends without automatic supplementation", "Any positive outcome remains bounded research, not a LabelCard or trading permission"],
-      "evidence": []
+      "evidence": ["docs/acceptance/stage-order-rule-screen-cd-closeout-20260911.md"]
     }
   ]
 }

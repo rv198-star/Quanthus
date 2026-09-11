@@ -1643,6 +1643,10 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {
                 "P3-LABEL-004",
                 "P3-DASH-001",
+                "P3-STAGE-008",
+                "P3-STAGE-008-B",
+                "P3-STAGE-008-C",
+                "P3-STAGE-008-D",
             },
         )
         self.assertEqual(

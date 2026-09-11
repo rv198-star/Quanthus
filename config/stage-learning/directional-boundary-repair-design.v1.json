@@ -1,0 +1,177 @@
+{
+  "schema_version": "quanthus.stage-directional-boundary-repair-design.v1",
+  "work_item": "P3-STAGE-008",
+  "design_status": "approved",
+  "delivery_gate": "blocked",
+  "predecessor": {
+    "work_item": "P3-STAGE-007",
+    "closeout": "docs/acceptance/stage-order-rule-screen-cd-closeout-20260911.md",
+    "disposition": "REVISE_TARGET_OR_PARK",
+    "closeout_commit": "c6b2d8c8e4a4105b666ad07a1b87d0538693915e"
+  },
+  "problem_statement": {
+    "stage_0_target": "direction-neutral structural instability at the 20-session primary scale",
+    "stage_2_target": "orderly consolidation at the 20-session primary scale",
+    "observed_stage_0_false_positives": 12,
+    "observed_stage_0_false_positive_pattern": "coherent directional repricing or correction was mistaken for direction-neutral instability",
+    "reference_protocol_defect": "explicit 10-session recent conditions were allowed to influence the 20-session primary judgement in at least 21 ambiguous cases"
+  },
+  "semantic_decomposition": {
+    "primary_scale_sessions": 20,
+    "recent_scale_sessions": 10,
+    "atomic_primary_propositions": [
+      "structural_instability_20",
+      "coherent_directional_relocation_20",
+      "orderly_consolidation_20"
+    ],
+    "truth_values": ["TRUE", "FALSE", "UNKNOWN"],
+    "stage_0_requires": {
+      "structural_instability_20": "TRUE",
+      "coherent_directional_relocation_20": "FALSE",
+      "orderly_consolidation_20": "FALSE"
+    },
+    "stage_2_requires": {
+      "structural_instability_20": "FALSE",
+      "coherent_directional_relocation_20": "FALSE",
+      "orderly_consolidation_20": "TRUE"
+    },
+    "directional_relocation_is_a_stage_0_guard": true,
+    "directional_relocation_is_not_stage_0": true,
+    "directional_relocation_is_not_automatically_stage_12": true,
+    "positive_instability_plus_positive_relocation": "outside_stage_0_2_scope_with_mixed_directional_instability_reason",
+    "unknown_relocation_with_positive_instability": "AMBIGUOUS",
+    "role_level_resolution_precedence": [
+      "INPUT_UNAVAILABLE if primary evidence is unavailable",
+      "AMBIGUOUS_CONFLICT if orderly_consolidation_20 is TRUE together with structural_instability_20 TRUE or coherent_directional_relocation_20 TRUE",
+      "STAGE_0 only for instability TRUE, relocation FALSE, order FALSE",
+      "STAGE_2 only for instability FALSE, relocation FALSE, order TRUE",
+      "NEITHER when coherent_directional_relocation_20 is TRUE and orderly_consolidation_20 is FALSE; retain mixed_directional_instability when instability is also TRUE",
+      "NEITHER when structural_instability_20 is FALSE and orderly_consolidation_20 is FALSE",
+      "AMBIGUOUS for all remaining UNKNOWN-dependent combinations"
+    ],
+    "cross_role_resolution": "if the two semantic roles do not produce the same primary status, retain AMBIGUOUS and preserve both atomic ledgers; no majority or adjudication",
+    "residual_stage_0_forbidden": true,
+    "top_1_force_forbidden": true
+  },
+  "fact_design": {
+    "reuse_without_duplication": [
+      "structure.geometry.window-return@20",
+      "structure.geometry.directional-efficiency@20",
+      "structure.geometry.range-width@20",
+      "structure.geometry.width-change@20_vs_prior20",
+      "structure.geometry.range-center-shift@20_vs_prior20"
+    ],
+    "proposed_threshold_free_facts": {
+      "structure.geometry.range-traversal": {
+        "window_sessions": 20,
+        "formula": "abs(close_t-close_t_minus_20)/(max_close_t_minus_20_through_t-min_close_t_minus_20_through_t)",
+        "bounds": ["0", "1"],
+        "zero_close_range_value": "0",
+        "meaning": "how much of the observed close range is traversed from the window start to the window end; high values support one-way relocation but do not by themselves prove coherent direction"
+      },
+      "structure.geometry.counter-direction-excursion-share": {
+        "window_sessions": 20,
+        "up_net_formula": "max(running_max_close_to_s-close_s)/(max_close-min_close)",
+        "down_net_formula": "max(close_s-running_min_close_to_s)/(max_close-min_close)",
+        "bounds": ["0", "1"],
+        "zero_net_displacement": "unavailable:zero_net_direction",
+        "meaning": "largest excursion against the endpoint direction as a share of the observed close range; low values support coherent relocation and high values expose substantial path reversal"
+      }
+    },
+    "not_promoted_in_v1": {
+      "daily_sign_reversal_rate": "Stage-007 diagnostic showed little separation between true Stage 0 and the directional false positives",
+      "daily_direction_agreement_share": "incremental value was limited and it is partially redundant with directional efficiency",
+      "linear_trend_r_squared": "diagnostically useful but less interpretable and more model-like than the minimum required path geometry"
+    },
+    "stage_thresholds_in_fact_identity": false,
+    "facts_emit_stage_labels": false
+  },
+  "projection_design": {
+    "instability_and_relocation_must_be_separate_predicates": true,
+    "center_shift_alone_cannot_assert_stage_0": true,
+    "center_shift_aligned_with_coherent_relocation_must_not_be_treated_as_directionless_disorder": true,
+    "range_traversal_alone_cannot_assert_relocation": true,
+    "counter_direction_excursion_must_be_considered_before_a_relocation_guard_can_be_frozen": true,
+    "no_stage_0_thresholds_are_frozen_by_this_design": true,
+    "stage_2_rule_changes_authorized": false
+  },
+  "reference_protocol_v2": {
+    "primary_then_recent_two_phase": true,
+    "primary_packet": {
+      "explicit_10_session_derived_facts_visible": false,
+      "candidate_output_visible": false,
+      "future_rows_visible": false,
+      "atomic_primary_opinions_required": true
+    },
+    "primary_commit_required_before_recent_packet": true,
+    "primary_commit_digest_required": true,
+    "recent_packet": {
+      "may_record_width_condition": true,
+      "may_record_center_condition": true,
+      "may_record_relation_to_primary": ["SUPPORTS", "CONTRADICTS", "NEUTRAL", "UNKNOWN"],
+      "may_modify_primary_opinion": false
+    },
+    "resolver_uses_recent_to_change_primary_status": false,
+    "unknown_primary_reason_may_cite_explicit_recent_fact": false,
+    "raw_20_session_path_still_contains_its_last_10_sessions": true,
+    "full_cognitive_blinding_claimed": false
+  },
+  "stage_007_design_diagnostic": {
+    "purpose": "reject weak fact designs only; this exposed cohort cannot qualify P3-STAGE-008 or tune thresholds",
+    "cohort_status": "permanently_design_exposed",
+    "old_stage_0_true_positive_count": 28,
+    "old_stage_0_false_positive_neither_count": 12,
+    "absolute_window_return_20": {
+      "true_stage_0_median": "0.0444",
+      "directional_false_positive_median": "0.2526"
+    },
+    "range_traversal_20": {
+      "true_stage_0_median": "0.3261",
+      "directional_false_positive_median": "0.7695"
+    },
+    "counter_direction_excursion_share_20": {
+      "true_stage_0_median": "0.6286",
+      "directional_false_positive_median": "0.3272"
+    },
+    "daily_sign_reversal_rate_20": {
+      "true_stage_0_median": "0.4721",
+      "directional_false_positive_median": "0.5000",
+      "decision": "do_not_promote_as_primary_fact"
+    },
+    "threshold_search_performed": false
+  },
+  "synthetic_direction_guard_cases": [
+    {"case": "monotonic_up", "expected": "relocation_positive_stage0_false"},
+    {"case": "monotonic_down", "expected": "relocation_positive_stage0_false"},
+    {"case": "stair_step_direction_with_small_pullbacks", "expected": "relocation_supported_or_ambiguous_never_stage0_by_residual"},
+    {"case": "large_up_down_up_path_ending_at_range_edge", "expected": "range_traversal_alone_insufficient_counter_excursion_exposes_reversal"},
+    {"case": "symmetric_broad_oscillation_ending_near_start", "expected": "relocation_negative_instability_can_be_positive"},
+    {"case": "one_step_repricing_then_flat", "expected": "relocation_positive_stage0_false"},
+    {"case": "narrow_contracting_box", "expected": "stage2_can_be_positive"},
+    {"case": "narrow_contracting_box_with_recent_10d_expansion", "expected": "primary_stage2_unchanged_recent_modifier_contradicts"},
+    {"case": "large_center_shift_aligned_with_one_way_repricing", "expected": "center_shift_not_stage0_by_itself"},
+    {"case": "large_center_shift_low_traversal_high_counter_excursion", "expected": "instability_supported_relocation_not_supported"},
+    {"case": "listing_or_coordinate_reset", "expected": "input_unavailable_not_stage0"},
+    {"case": "missing_primary_input", "expected": "input_unavailable_not_stage0"}
+  ],
+  "future_validation_boundary": {
+    "stage_007_cases_may_be_used_for_threshold_learning": false,
+    "stage_007_cases_may_be_used_for_qualification": false,
+    "new_market_data_read_authorized": false,
+    "2022_2024_access_authorized": false,
+    "2025_access_authorized": false,
+    "fresh_development_screen_requires_new_economic_identities": true,
+    "stage_2_threshold_research_authorized": false
+  },
+  "authority": {
+    "design_and_review": true,
+    "production_fact_implementation": false,
+    "reference_protocol_implementation": false,
+    "runtime_job_submission": false,
+    "market_data_read": false,
+    "parameter_search": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

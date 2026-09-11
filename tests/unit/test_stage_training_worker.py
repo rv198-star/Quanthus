@@ -532,14 +532,27 @@ def test_successful_prepare_status_exposes_bounded_t_only_review_transport(tmp_p
         "submitted_at": "2026-09-11T00:00:00+00:00",
         "started_at": "2026-09-11T00:00:01+00:00",
         "completed_at": "2026-09-11T00:00:02+00:00",
-        "result_ref": {"artifact_root": str(artifact), "manifest_sha256": manifest_sha},
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "order_rule_prepare": {"selected_case_count": 1},
+        },
         "error": None,
         "exit_code": 0,
         "updated_at": "2026-09-11T00:00:02+00:00",
     }
     (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
     observed = read_status(worker_paths, job_id)
-    envelope = observed["review_transport"]
+    index = observed["review_transport_index"]
+    assert index["case_count"] == 1
+    assert index["page_count"] == 1
+    assert index["candidate_output_included"] is False
+    assert index["future_rows_included"] is False
+    alias = index["pages"][0]["job_id"]
+    page_status = read_status(worker_paths, alias)
+    assert page_status["parent_job_id"] == job_id
+    assert page_status["stage"] == "virtual_read_only"
+    envelope = page_status["review_transport"]
     raw = gzip.decompress(base64.b64decode(envelope["payload"]))
     decoded = json.loads(raw)
     assert decoded["case_count"] == 1

@@ -1131,16 +1131,15 @@ def _bytes_sha256(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def _order_rule_review_transport(
+ORDER_RULE_REVIEW_PAGE_SIZE = 8
+
+
+def _order_rule_review_evidence(
     paths: StageWorkerPaths, observed: Mapping[str, Any],
-) -> dict[str, Any] | None:
-    if (
-        observed.get("kind") != STAGE_ORDER_RULE_PREPARE_JOB
-        or observed.get("state") != "succeeded"
-        or not isinstance(observed.get("result_ref"), Mapping)
-    ):
-        return None
-    result_ref = observed["result_ref"]
+) -> tuple[str, str, dict[str, Any]]:
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("order-rule review result reference missing")
     artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
     job_root = (paths.runs / str(observed["job_id"])).resolve()
     try:
@@ -1154,20 +1153,73 @@ def _order_rule_review_transport(
         raise StageWorkerError("order-rule review manifest binding differs")
     manifest = json.loads(manifest_raw)
     evidence_raw = (artifact_root / "evidence.json").read_bytes()
-    if manifest.get("files", {}).get("evidence.json") != _bytes_sha256(evidence_raw):
+    evidence_sha = _bytes_sha256(evidence_raw)
+    if manifest.get("files", {}).get("evidence.json") != evidence_sha:
         raise StageWorkerError("order-rule review evidence binding differs")
     evidence = json.loads(evidence_raw)
-    source_rows = evidence.get("source_rows")
-    cases = evidence.get("cases")
-    profile = evidence.get("protocol", {}).get("profile")
     if (
-        not isinstance(source_rows, dict)
-        or not isinstance(cases, list)
-        or not isinstance(profile, dict)
+        not isinstance(evidence.get("source_rows"), dict)
+        or not isinstance(evidence.get("cases"), list)
+        or not isinstance(evidence.get("protocol", {}).get("profile"), dict)
     ):
         raise StageWorkerError("order-rule review evidence shape differs")
+    return manifest_sha, evidence_sha, evidence
+
+
+def _order_rule_review_alias(parent_job_id: str, page: int) -> str:
+    suffix = hashlib.sha256(f"{parent_job_id}|review-page|{page}".encode()).hexdigest()[:32]
+    return "stage_" + suffix
+
+
+def _order_rule_review_index(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_ORDER_RULE_PREPARE_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    manifest_sha, evidence_sha, evidence = _order_rule_review_evidence(paths, observed)
+    case_count = len(evidence["cases"])
+    pages = (case_count + ORDER_RULE_REVIEW_PAGE_SIZE - 1) // ORDER_RULE_REVIEW_PAGE_SIZE
+    return {
+        "schema_version": "quanthus.stage-order-review-index.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "evidence_file_sha256": evidence_sha,
+        "case_count": case_count,
+        "page_size": ORDER_RULE_REVIEW_PAGE_SIZE,
+        "page_count": pages,
+        "pages": [
+            {
+                "page": page,
+                "job_id": _order_rule_review_alias(str(observed["job_id"]), page),
+                "start": page * ORDER_RULE_REVIEW_PAGE_SIZE,
+                "count": min(
+                    ORDER_RULE_REVIEW_PAGE_SIZE,
+                    case_count - page * ORDER_RULE_REVIEW_PAGE_SIZE,
+                ),
+            }
+            for page in range(pages)
+        ],
+        "candidate_output_included": False,
+        "future_rows_included": False,
+    }
+
+
+def _order_rule_review_page(
+    paths: StageWorkerPaths, observed: Mapping[str, Any], page: int,
+) -> dict[str, Any]:
+    manifest_sha, evidence_sha, evidence = _order_rule_review_evidence(paths, observed)
+    source_rows = evidence["source_rows"]
+    cases = evidence["cases"]
+    profile = evidence["protocol"]["profile"]
+    start = page * ORDER_RULE_REVIEW_PAGE_SIZE
+    selected = cases[start:start + ORDER_RULE_REVIEW_PAGE_SIZE]
+    if not selected:
+        raise StageWorkerError("order-rule review page outside denominator")
     compact_cases = []
-    for case in cases:
+    for case in selected:
         if not isinstance(case, dict):
             raise StageWorkerError("order-rule review case shape differs")
         case_id = str(case.get("case_id") or "")
@@ -1206,11 +1258,13 @@ def _order_rule_review_transport(
         })
     transport = {
         "schema_version": "quanthus.stage-order-review-transport.v1",
-        "job_id": observed["job_id"],
+        "parent_job_id": observed["job_id"],
+        "page": page,
+        "page_size": ORDER_RULE_REVIEW_PAGE_SIZE,
         "manifest_sha256": manifest_sha,
-        "evidence_file_sha256": _bytes_sha256(evidence_raw),
+        "evidence_file_sha256": evidence_sha,
         "profile": profile,
-        "case_count": len(compact_cases),
+        "case_count": len(cases),
         "cases": compact_cases,
         "candidate_output_included": False,
         "future_rows_included": False,
@@ -1220,8 +1274,8 @@ def _order_rule_review_transport(
     ).encode("utf-8")
     compressed = gzip.compress(raw, compresslevel=9, mtime=0)
     encoded = base64.b64encode(compressed).decode("ascii")
-    if len(encoded) > 220 * 1024:
-        raise StageWorkerError("order-rule review transport exceeds status budget")
+    if len(encoded) > 180 * 1024:
+        raise StageWorkerError("order-rule review page exceeds status budget")
     return {
         "schema_version": "quanthus.stage-order-review-transport-envelope.v1",
         "encoding": "gzip+base64",
@@ -1233,17 +1287,57 @@ def _order_rule_review_transport(
     }
 
 
+def _order_rule_virtual_review_status(
+    paths: StageWorkerPaths, requested_job_id: str,
+) -> dict[str, Any] | None:
+    for status_path in sorted(paths.status.glob("stage_*.json")):
+        observed = _object(status_path, "stage job status")
+        if (
+            observed.get("kind") != STAGE_ORDER_RULE_PREPARE_JOB
+            or observed.get("state") != "succeeded"
+            or not isinstance(observed.get("result_ref"), Mapping)
+        ):
+            continue
+        result = observed["result_ref"].get("order_rule_prepare")
+        if not isinstance(result, Mapping):
+            continue
+        case_count = int(result.get("selected_case_count") or 0)
+        pages = (case_count + ORDER_RULE_REVIEW_PAGE_SIZE - 1) // ORDER_RULE_REVIEW_PAGE_SIZE
+        for page in range(pages):
+            if _order_rule_review_alias(str(observed["job_id"]), page) != requested_job_id:
+                continue
+            return {
+                "schema_version": STATUS_SCHEMA,
+                "job_id": requested_job_id,
+                "kind": "quanthus.stage-order-review-page.v1",
+                "code_revision": observed.get("code_revision"),
+                "input_digest": observed.get("input_digest"),
+                "state": "succeeded",
+                "stage": "virtual_read_only",
+                "submitted_at": observed.get("submitted_at"),
+                "started_at": observed.get("started_at"),
+                "completed_at": observed.get("completed_at"),
+                "parent_job_id": observed["job_id"],
+                "page": page,
+                "review_transport": _order_rule_review_page(paths, observed, page),
+                "error": None,
+                "exit_code": 0,
+                "updated_at": observed.get("updated_at"),
+            }
+    return None
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
     status = paths.status / f"{job_id}.json"
     if status.is_file():
         observed = _object(status, "stage job status")
-        review_transport = _order_rule_review_transport(paths, observed)
+        review_index = _order_rule_review_index(paths, observed)
         return (
             observed
-            if review_transport is None
-            else {**observed, "review_transport": review_transport}
+            if review_index is None
+            else {**observed, "review_transport_index": review_index}
         )
     for root, state in ((paths.queue, "queued"), (paths.claimed, "claimed")):
         candidate = root / f"{job_id}.json"
@@ -1259,6 +1353,9 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
                 "stage": state,
                 "submitted_at": job.submitted_at,
             }
+    virtual = _order_rule_virtual_review_status(paths, job_id)
+    if virtual is not None:
+        return virtual
     raise StageWorkerError("stage job is not known on this node")
 
 

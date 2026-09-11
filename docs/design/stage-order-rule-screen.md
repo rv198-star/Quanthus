@@ -274,3 +274,27 @@ artifact 就在最后一致性检查失败。
 prepare恢复，不是新研究轮次。若该唯一retry再次失败，B停止，不再追加prepare。完整失败
 证据和claim ceiling见
 [B prepare failure](../acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md)。
+
+## 12. prepare技术重试成功与B关闭
+
+唯一technical retry `stage_95f9b48bd96049b184e0cbf856b9a5e8`在revision
+`ae99d4973f605c3a6e7044cb6c5f88fd91f98874`上成功，且明确绑定
+`technical_retry_of=stage_7ef751fa63664175b49eaa3459c83ca3`。它没有改变prepare配置、
+规则、validation、sample seed、面板配额或来源范围，只消费第11节允许的canonicalization
+修复。运行从2026-09-11T07:59:45.393801+00:00至08:05:35.136275+00:00，exit 0。
+
+成功产物manifest为
+`sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7`；
+selection digest为
+`sha256:75c5d7c1a0711482abf503d9c17b71f0470ba256d6b66fd15ce9ff4f645d7373`；
+evidence digest为
+`sha256:6a9df1869ff4f532715b212e41b9b6ada34d72835152d7318f4ac662acbf8dcf`。
+Worker冷验证确认：旧cohort=512、排除经济身份=515、候选人口=3917、隔离池=512、
+selected=160、四桶shortfall全0、保留source rows=9760、`source_isolation_verified=true`、
+`review_ready=true`。
+
+因此P3-STAGE-007-B关闭。prepare权限和其technical retry均耗尽，后续不得重建或重抽样
+这160例；C只能读取这份封存T-only evidence生成原始参考意见，再在意见封存后执行唯一
+冻结候选评分。第一次失败和第二次成功都计入执行历史；开发源被同一冻结合同读取两次，
+不能把技术重试隐藏成单次成本。成功验收见
+[B prepare success](../acceptance/stage-order-rule-screen-b-prepare-success-20260911.md)。

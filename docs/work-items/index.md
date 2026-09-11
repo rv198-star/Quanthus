@@ -285,8 +285,8 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-006-D | Freeze feasibility disposition | P3-STAGE-006-C | closed; #286; 0=4, 2=1, neither=3, ambiguous=4; docs/acceptance/stage-order-reference-feasibility-20260911.md |
 | P3-STAGE-007 | Fixed-rule development screen with a business disposition | P3-STAGE-006 | ready; #292; first prepare failed after fixed selection, one bounded technical retry authorized; no C/D business result |
 | P3-STAGE-007-A | Resolve business boundaries and freeze one executable seed | P3-STAGE-006 | closed; docs/design/stage-order-rule-screen.md; synthetic rule tests only |
-| P3-STAGE-007-B | Prove source isolation and bind minimal execution | P3-STAGE-007-A | ready; #289; failed prepare retained, canonicalization fix plus exactly one technical retry; docs/acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md |
-| P3-STAGE-007-C | Execute one fixed reference and scoring batch | P3-STAGE-007-B | blocked; no new Job before B readiness; at most 160 cases and 320 opinions |
+| P3-STAGE-007-B | Prove source isolation and bind minimal execution | P3-STAGE-007-A | closed; #289; one technical retry consumed, 512 old cohort / 515 identities excluded / 160 fixed cases; docs/acceptance/stage-order-rule-screen-b-prepare-success-20260911.md |
+| P3-STAGE-007-C | Execute one fixed reference and scoring batch | P3-STAGE-007-B | ready; fixed 160-case evidence exists; at most 320 opinions, seal before scoring |
 | P3-STAGE-007-D | Attribute errors and decide continuation or parking | P3-STAGE-007-C | blocked; no parent closure from engineering alone |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |

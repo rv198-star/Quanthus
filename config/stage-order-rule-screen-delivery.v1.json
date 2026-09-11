@@ -18,28 +18,61 @@
     "opinion_generation": false,
     "candidate_scoring": false
   },
-  "runtime_receipts": null,
+  "runtime_receipts": {
+    "failed_prepare": {
+      "job_id": "stage_7ef751fa63664175b49eaa3459c83ca3",
+      "code_revision": "b7042cf0683b817a2ed2b3a59a00d5d6159cf5b6",
+      "input_digest": "sha256:d46f8d3f990890abdf49d0ae0fba12c0b9a5a2629e70faba56a15d15acf5dedb",
+      "state": "failed",
+      "error": "stage_order_rule_prepare_process_failed",
+      "exit_code": 1,
+      "completed_at": "2026-09-11T05:28:35.396338+00:00"
+    },
+    "successful_prepare": {
+      "job_id": "stage_95f9b48bd96049b184e0cbf856b9a5e8",
+      "technical_retry_of": "stage_7ef751fa63664175b49eaa3459c83ca3",
+      "code_revision": "ae99d4973f605c3a6e7044cb6c5f88fd91f98874",
+      "input_digest": "sha256:4dbe116bc5221eb178414f66ada5f589e8f08849a9d440569cd468a3ae20e4cd",
+      "state": "succeeded",
+      "exit_code": 0,
+      "started_at": "2026-09-11T07:59:45.393801+00:00",
+      "completed_at": "2026-09-11T08:05:35.136275+00:00",
+      "run_id": "stage-order-rule-prepare-20260911T080532Z",
+      "manifest_sha256": "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7",
+      "selection_digest": "sha256:75c5d7c1a0711482abf503d9c17b71f0470ba256d6b66fd15ce9ff4f645d7373",
+      "evidence_digest": "sha256:6a9df1869ff4f532715b212e41b9b6ada34d72835152d7318f4ac662acbf8dcf"
+    }
+  },
   "preparation_checkpoint": {
-    "state": "TECHNICAL_RETRY_READY",
-    "reason_code": "POST_SELECTION_SAMPLING_COORDINATE_CANONICALIZATION",
+    "state": "PREPARE_ACCEPTED",
+    "reason_code": "SOURCE_ISOLATION_AND_FIXED_SELECTION_VERIFIED",
     "read_attempt_exit_code": 0,
-    "source_isolation_verified": false,
-    "source_membership_verified": false,
-    "old_cohort_digest": null,
-    "new_market_data_reads": 1,
-    "new_jobs_submitted": 1,
-    "failed_job_id": "stage_7ef751fa63664175b49eaa3459c83ca3",
-    "failed_job_revision": "b7042cf0683b817a2ed2b3a59a00d5d6159cf5b6",
-    "failed_input_digest": "sha256:d46f8d3f990890abdf49d0ae0fba12c0b9a5a2629e70faba56a15d15acf5dedb",
-    "failed_worker_error": "stage_order_rule_prepare_process_failed",
+    "source_isolation_verified": true,
+    "source_membership_verified": true,
+    "old_cohort_size": 512,
+    "excluded_economic_identity_count": 515,
+    "candidate_population_count": 3917,
+    "pool_size": 512,
+    "selected_case_count": 160,
+    "selection_shortfalls": {
+      "coverage": 0,
+      "order_like": 0,
+      "instability_like": 0,
+      "boundary": 0
+    },
+    "evidence_source_row_count": 9760,
+    "prepare_attempts_with_development_source_read": 2,
+    "result_bearing_prepare_successes": 1,
     "component": "src/quanthus/stage_learning/order_rule_prepare.py",
     "tests": "tests/unit/test_stage_order_rule_prepare.py",
-    "evidence": "docs/acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md"
+    "evidence": "docs/acceptance/stage-order-rule-screen-b-prepare-success-20260911.md"
   },
   "technical_retry": {
     "authorization": "config/stage-learning/order-rule-prepare-retry.v1.json",
-    "authorized": true,
+    "authorized": false,
+    "consumed": true,
     "maximum_retries": 1,
+    "actual_retries": 1,
     "counts_against_result_bearing_job_budget": false,
     "semantic_result_exposed_before_failure": false,
     "opinion_count_before_failure": 0,
@@ -55,8 +88,8 @@
   },
   "authorization": {
     "implementation_and_synthetic_tests": true,
-    "runtime_job_submission": true,
-    "new_market_data_read": true,
+    "runtime_job_submission": false,
+    "new_market_data_read": false,
     "parameter_search": false,
     "arbitration_access": false,
     "permanent_blind_access": false,
@@ -155,15 +188,15 @@
       "evidence": ["docs/design/stage-order-rule-screen.md", "tests/unit/test_stage_order_rule_screen.py"]
     },
     {
-      "id": "P3-STAGE-007-B", "kind": "task", "status": "ready",
+      "id": "P3-STAGE-007-B", "kind": "task", "status": "closed",
       "title": "Bind disjoint sources, fixed sampling and a minimal execution adapter",
       "depends_on": ["P3-STAGE-007-A"],
       "scope": "Prove economic-identity exclusion, freeze source/code/resource bindings, reuse reference packets and the controlled Worker; do not open the validation set during rule development.",
       "acceptance": ["All runtime activation requirements are verified", "Unable to prove source isolation is an explicit blocker", "Existing 004/005/006 contracts and outcomes are untouched"],
-      "evidence": ["docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md"]
+      "evidence": ["docs/acceptance/stage-order-rule-screen-b-checkpoint-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prerun-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md", "docs/acceptance/stage-order-rule-screen-b-prepare-success-20260911.md"]
     },
     {
-      "id": "P3-STAGE-007-C", "kind": "task", "status": "blocked",
+      "id": "P3-STAGE-007-C", "kind": "task", "status": "ready",
       "title": "Execute one fixed reference and scoring batch without in-run repair",
       "depends_on": ["P3-STAGE-007-B"],
       "scope": "At most 160 cases and 320 actual source-declared opinions; seal references before scoring and keep every denominator.",

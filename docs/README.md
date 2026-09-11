@@ -213,16 +213,17 @@ nodes.
   `config/stage-order-reference-feasibility-delivery.v1.json`; evidence:
   `acceptance/stage-order-reference-feasibility-20260911.md`.
 - `P3-STAGE-007` is open for one fixed-rule, task-disjoint development screen. The authorized
-  four-role simulated review has frozen the descriptive target and an executable unchanged R0 seed;
-  this is not market acceptance. A is complete. The earlier RX SSH blocker is retained in the
-  [blocked checkpoint](acceptance/stage-order-rule-screen-b-checkpoint-20260911.md), and the
-  restored control path plus bounded prepare route are recorded in the
-  [pre-run readiness](acceptance/stage-order-rule-screen-b-prerun-20260911.md). The first prepare
-  Job reached source isolation, the full 512-security Fact build and a 160-case zero-shortfall
-  selection, then failed only at a post-selection signed-vs-absolute sampling-coordinate check.
-  [Failure evidence](acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md) freezes that
-  terminal Job and authorizes exactly one same-input technical retry; opinion generation and
-  scoring remain closed. C/D still require actual references, scoring and a business disposition.
+  four-role simulated review froze the descriptive target and an unchanged R0 seed; this is not
+  market acceptance. A and B are complete. The first prepare failed only at the post-selection
+  signed-vs-absolute sampling-coordinate check; its one bound technical retry then succeeded.
+  B verified the old 512 cohort, excluded 515 economic identities, froze a 512-security isolated
+  pool and exactly 160 T-only 2021 cases with zero panel shortfall; the evidence closure contains
+  9,760 rows and reports `source_isolation_verified=true`. Historical evidence remains in the
+  [blocked checkpoint](acceptance/stage-order-rule-screen-b-checkpoint-20260911.md),
+  [pre-run readiness](acceptance/stage-order-rule-screen-b-prerun-20260911.md),
+  [failed prepare attribution](acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md),
+  and [successful prepare acceptance](acceptance/stage-order-rule-screen-b-prepare-success-20260911.md).
+  C is ready for actual reference opinions and frozen scoring; D remains blocked on that result.
   Route: [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
   `config/stage-order-rule-screen-delivery.v1.json`; rule: `config/stage-learning/order-rule-screen.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

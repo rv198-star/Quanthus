@@ -25,10 +25,10 @@ def test_review_complete_does_not_mean_milestone_complete():
     script = module()
     raw = script.load_plan()
     assert not raw["milestone_completed"]
-    assert raw["runtime_receipts"] is None
+    assert raw["runtime_receipts"]["successful_prepare"]["state"] == "succeeded"
     assert [(i["id"], i["status"]) for i in raw["items"]] == [
         ("P3-STAGE-007", "ready"), ("P3-STAGE-007-A", "closed"),
-        ("P3-STAGE-007-B", "ready"), ("P3-STAGE-007-C", "blocked"),
+        ("P3-STAGE-007-B", "closed"), ("P3-STAGE-007-C", "ready"),
         ("P3-STAGE-007-D", "blocked"),
     ]
     from sync_github_planning import work_items
@@ -49,16 +49,20 @@ def test_prepare_authority_cannot_silently_open_search_or_trading(key):
         script.validate_plan(raw)
 
 
-def test_only_one_prepare_result_job_plus_one_bound_technical_retry_is_opened():
+def test_prepare_is_closed_after_exactly_one_consumed_technical_retry():
     script = module()
     raw = script.load_plan()
-    assert raw["authorization"]["runtime_job_submission"] is True
-    assert raw["authorization"]["new_market_data_read"] is True
+    assert raw["authorization"]["runtime_job_submission"] is False
+    assert raw["authorization"]["new_market_data_read"] is False
     assert raw["runtime_contract"]["phase"] == "prepare_only"
     assert raw["runtime_contract"]["maximum_jobs"] == 1
     assert raw["runtime_contract"]["maximum_technical_retries"] == 1
     assert raw["runtime_contract"]["opinion_generation"] is False
     assert raw["runtime_contract"]["candidate_scoring"] is False
+    assert raw["technical_retry"]["authorized"] is False
+    assert raw["technical_retry"]["consumed"] is True
+    assert raw["technical_retry"]["actual_retries"] == 1
+    assert raw["preparation_checkpoint"]["source_isolation_verified"] is True
     changed = {**raw["runtime_contract"], "maximum_technical_retries": 2}
     raw["runtime_contract"] = changed
     with pytest.raises(ValueError, match="runtime_contract"):
@@ -92,20 +96,20 @@ def test_resources_are_bounded_before_result_access(key, value):
         script.validate_plan(raw)
 
 
-def test_no_parent_pass_or_runtime_receipt_from_synthetic_rule_tests():
+def test_no_parent_pass_from_prepare_completion():
     script = module()
     raw = script.load_plan()
     raw["milestone_completed"] = True
-    with pytest.raises(ValueError, match="unexecuted"):
+    with pytest.raises(ValueError, match="parent_not_complete"):
         script.validate_plan(raw)
 
 
 @pytest.mark.parametrize("key,value", [
-    ("source_isolation_verified", True), ("source_membership_verified", True),
-    ("old_cohort_digest", "sha256:" + "0" * 64), ("new_market_data_reads", 0),
-    ("new_jobs_submitted", 2), ("read_attempt_exit_code", 255),
+    ("source_isolation_verified", False), ("source_membership_verified", False),
+    ("old_cohort_size", 511), ("selected_case_count", 159),
+    ("evidence_source_row_count", 9759), ("read_attempt_exit_code", 255),
 ])
-def test_failed_prepare_cannot_fill_missing_real_source_evidence(key, value):
+def test_accepted_prepare_evidence_cannot_be_rewritten(key, value):
     script = module()
     raw = script.load_plan()
     raw["preparation_checkpoint"][key] = value

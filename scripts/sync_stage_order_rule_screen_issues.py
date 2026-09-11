@@ -27,8 +27,44 @@ def validate_plan(raw: dict) -> None:
             or raw["parent_id"] != PARENT
             or tuple(item["id"] for item in raw["items"]) != IDS):
         raise ValueError("screen_plan_identity")
-    if raw["milestone_completed"] is not False or raw["runtime_receipts"] is not None:
-        raise ValueError("screen_unexecuted_runtime_claim")
+    if raw["milestone_completed"] is not False:
+        raise ValueError("screen_parent_not_complete_before_c_d")
+    receipts = raw.get("runtime_receipts")
+    if not isinstance(receipts, dict) or set(receipts) != {"failed_prepare", "successful_prepare"}:
+        raise ValueError("screen_prepare_receipts_missing")
+    failed_receipt = receipts["failed_prepare"]
+    success_receipt = receipts["successful_prepare"]
+    if failed_receipt != {
+        "job_id": "stage_7ef751fa63664175b49eaa3459c83ca3",
+        "code_revision": "b7042cf0683b817a2ed2b3a59a00d5d6159cf5b6",
+        "input_digest": "sha256:d46f8d3f990890abdf49d0ae0fba12c0b9a5a2629e70faba56a15d15acf5dedb",
+        "state": "failed",
+        "error": "stage_order_rule_prepare_process_failed",
+        "exit_code": 1,
+        "completed_at": "2026-09-11T05:28:35.396338+00:00",
+    }:
+        raise ValueError("screen_failed_prepare_receipt_drift")
+    if success_receipt != {
+        "job_id": "stage_95f9b48bd96049b184e0cbf856b9a5e8",
+        "technical_retry_of": "stage_7ef751fa63664175b49eaa3459c83ca3",
+        "code_revision": "ae99d4973f605c3a6e7044cb6c5f88fd91f98874",
+        "input_digest": "sha256:4dbe116bc5221eb178414f66ada5f589e8f08849a9d440569cd468a3ae20e4cd",
+        "state": "succeeded",
+        "exit_code": 0,
+        "started_at": "2026-09-11T07:59:45.393801+00:00",
+        "completed_at": "2026-09-11T08:05:35.136275+00:00",
+        "run_id": "stage-order-rule-prepare-20260911T080532Z",
+        "manifest_sha256": (
+            "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7"
+        ),
+        "selection_digest": (
+            "sha256:75c5d7c1a0711482abf503d9c17b71f0470ba256d6b66fd15ce9ff4f645d7373"
+        ),
+        "evidence_digest": (
+            "sha256:6a9df1869ff4f532715b212e41b9b6ada34d72835152d7318f4ac662acbf8dcf"
+        ),
+    }:
+        raise ValueError("screen_successful_prepare_receipt_drift")
     runtime = raw.get("runtime_contract")
     if not isinstance(runtime, dict) or runtime != {
         "path": "config/stage-learning/order-rule-prepare.v1.json",
@@ -50,35 +86,35 @@ def validate_plan(raw: dict) -> None:
         raise ValueError("screen_rule_binding")
     load_rule(ROOT)
     expected_auth = {key: False for key in (
-        "parameter_search", "arbitration_access", "permanent_blind_access", "official_labels",
-        "daily_or_strategy", "trading",
+        "runtime_job_submission", "new_market_data_read", "parameter_search", "arbitration_access",
+        "permanent_blind_access", "official_labels", "daily_or_strategy", "trading",
     )}
-    expected_auth.update({
-        "implementation_and_synthetic_tests": True,
-        "runtime_job_submission": True,
-        "new_market_data_read": True,
-    })
+    expected_auth["implementation_and_synthetic_tests"] = True
     if raw["authorization"] != expected_auth:
         raise ValueError("screen_unauthorized_activation")
-    states = ("ready", "closed", "ready", "blocked", "blocked")
+    states = ("ready", "closed", "closed", "ready", "blocked")
     checkpoint = raw.get("preparation_checkpoint")
-    if not isinstance(checkpoint, dict) or (
-        checkpoint.get("state") != "TECHNICAL_RETRY_READY"
-        or checkpoint.get("reason_code")
-        != "POST_SELECTION_SAMPLING_COORDINATE_CANONICALIZATION"
-        or checkpoint.get("read_attempt_exit_code") != 0
-        or checkpoint.get("source_isolation_verified") is not False
-        or checkpoint.get("source_membership_verified") is not False
-        or checkpoint.get("old_cohort_digest") is not None
-        or checkpoint.get("new_market_data_reads") != 1
-        or checkpoint.get("new_jobs_submitted") != 1
-        or checkpoint.get("failed_job_id") != "stage_7ef751fa63664175b49eaa3459c83ca3"
-        or checkpoint.get("failed_job_revision")
-        != "b7042cf0683b817a2ed2b3a59a00d5d6159cf5b6"
-        or checkpoint.get("failed_input_digest")
-        != "sha256:d46f8d3f990890abdf49d0ae0fba12c0b9a5a2629e70faba56a15d15acf5dedb"
-        or checkpoint.get("failed_worker_error") != "stage_order_rule_prepare_process_failed"
-    ):
+    if not isinstance(checkpoint, dict) or checkpoint != {
+        "state": "PREPARE_ACCEPTED",
+        "reason_code": "SOURCE_ISOLATION_AND_FIXED_SELECTION_VERIFIED",
+        "read_attempt_exit_code": 0,
+        "source_isolation_verified": True,
+        "source_membership_verified": True,
+        "old_cohort_size": 512,
+        "excluded_economic_identity_count": 515,
+        "candidate_population_count": 3917,
+        "pool_size": 512,
+        "selected_case_count": 160,
+        "selection_shortfalls": {
+            "coverage": 0, "order_like": 0, "instability_like": 0, "boundary": 0,
+        },
+        "evidence_source_row_count": 9760,
+        "prepare_attempts_with_development_source_read": 2,
+        "result_bearing_prepare_successes": 1,
+        "component": "src/quanthus/stage_learning/order_rule_prepare.py",
+        "tests": "tests/unit/test_stage_order_rule_prepare.py",
+        "evidence": "docs/acceptance/stage-order-rule-screen-b-prepare-success-20260911.md",
+    }:
         raise ValueError("screen_preparation_checkpoint_claim")
     for key in ("component", "tests", "evidence"):
         path = (ROOT / checkpoint[key]).resolve()
@@ -87,8 +123,10 @@ def validate_plan(raw: dict) -> None:
     retry = raw.get("technical_retry")
     if retry != {
         "authorization": "config/stage-learning/order-rule-prepare-retry.v1.json",
-        "authorized": True,
+        "authorized": False,
+        "consumed": True,
         "maximum_retries": 1,
+        "actual_retries": 1,
         "counts_against_result_bearing_job_budget": False,
         "semantic_result_exposed_before_failure": False,
         "opinion_count_before_failure": 0,
@@ -111,10 +149,10 @@ def validate_plan(raw: dict) -> None:
         retry_auth.get("schema_version") != "quanthus.stage-order-rule-prepare-retry.v1"
         or retry_auth.get("work_item") != "P3-STAGE-007-B"
         or not all(isinstance(value, dict) for value in (failure, policy, bindings))
-        or failure.get("job_id") != checkpoint["failed_job_id"]
-        or failure.get("code_revision") != checkpoint["failed_job_revision"]
-        or failure.get("input_digest") != checkpoint["failed_input_digest"]
-        or failure.get("worker_error") != checkpoint["failed_worker_error"]
+        or failure.get("job_id") != failed_receipt["job_id"]
+        or failure.get("code_revision") != failed_receipt["code_revision"]
+        or failure.get("input_digest") != failed_receipt["input_digest"]
+        or failure.get("worker_error") != failed_receipt["error"]
         or failure.get("root_cause") != "post_selection_sampling_coordinate_canonicalization"
         or failure.get("failed_check") != "selected_observation_differs_from_retained_evidence"
         or policy.get("maximum_technical_retries") != 1

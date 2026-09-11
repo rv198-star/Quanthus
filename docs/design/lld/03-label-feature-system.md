@@ -377,22 +377,23 @@ uses exactly the old preregistered R0 numbers as one new research seed, and dist
 NO_ASSERTION from a reference NEITHER. The seed is an executable hypothesis, not a qualified
 classifier. Source isolation, fixed sampling, actual reference collection and an error-based
 business disposition remain necessary; completing A or B cannot close the parent.
-The current increment opened one prepare-only Worker Job after the RX control path was restored and
-the source/runtime contract was frozen. That Job reconstructed the old cohort, completed the
-historical economic-identity exclusion path and fixed 160 T-only 2021 cases with zero bucket
-shortfall, but failed before publication at a signed-vs-absolute sampling-coordinate consistency
-check. No opinion or candidate score was produced. The failed Job is retained, and exactly one
-same-input technical retry is authorized after a canonicalization-only fix. References preserve
-actual provenance; same-origin simulation cannot become independent validation. No old contract,
-permanent dataset, sealed partition, official label or trading boundary changes.
+The prepare route reconstructed the old cohort, completed historical economic-identity exclusion
+and fixed 160 T-only 2021 cases with zero bucket shortfall. The first Job failed before publication
+at a signed-vs-absolute sampling-coordinate consistency check and produced no opinion or candidate
+score. That terminal failure remains retained; its single same-input technical retry succeeded after
+the canonicalization-only fix. B therefore closes with 512 old securities reconstructed, 515
+economic identities excluded, a 512-security isolated pool, 160 fixed cases and 9,760 retained
+source rows. References still preserve actual provenance; same-origin simulation cannot become
+independent validation. No old contract, permanent dataset, sealed partition, official label or
+trading boundary changes.
 Machine plan: `../../config/stage-order-rule-screen-delivery.v1.json`.
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | ready; #292; first prepare failed technically, one bounded retry authorized; C/D business disposition still required |
+| P3-STAGE-007 | Decide whether one fixed rule warrants broader validation | P3-STAGE-006 | ready; #292; A/B closed, C ready, D business disposition still required |
 | P3-STAGE-007-A | Resolve business boundaries and freeze one executable seed | P3-STAGE-006 | closed; `../stage-order-rule-screen.md`; synthetic rule-contract tests |
-| P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | ready; #289; failed prepare retained, canonicalization fix and one technical retry; `../../acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md` |
-| P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | blocked; at most 160 cases, 320 opinions, two Jobs |
+| P3-STAGE-007-B | Bind disjoint sources, fixed sampling and execution | P3-STAGE-007-A | closed; #289; one technical retry consumed, 512 old cohort / 515 identities excluded / 160 fixed cases; `../../acceptance/stage-order-rule-screen-b-prepare-success-20260911.md` |
+| P3-STAGE-007-C | Execute fixed references and score once | P3-STAGE-007-B | ready; fixed 160-case evidence exists, at most 320 opinions, seal before scoring |
 | P3-STAGE-007-D | Attribute errors and give the business disposition | P3-STAGE-007-C | blocked; no automatic supplementation or tuning |
 
 ## 7. Acceptance

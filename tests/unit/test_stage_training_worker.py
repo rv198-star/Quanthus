@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -474,6 +476,80 @@ def test_order_rule_prepare_cancel_does_not_open_a_second_job(tmp_path: Path) ->
     assert repeated["job_id"] == first["job_id"]
     assert repeated["state"] == "canceled"
     assert repeated["idempotent_reuse"] is True
+
+
+def test_successful_prepare_status_exposes_bounded_t_only_review_transport(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "9" * 32
+    row = {
+        "market_date": "2021-03-31",
+        "high": "101",
+        "low": "99",
+        "close": "100",
+        "coordinate_epoch": "original-price-quantity-epoch",
+        "reset_reason": None,
+    }
+    row_ref = _digest(row)
+    case_body = {
+        "security_code": "000001",
+        "security_id": "security-A",
+        "market_date": "2021-03-31",
+        "sampling_stratum": "representative",
+        "coordinate_ref": _digest({"coordinate": "A"}),
+        "primary_available": True,
+        "recent_available": True,
+        "input_reason": "admitted",
+        "availability_reasons": {"trend": "available", "order": "available"},
+        "primary": {"directional_efficiency": {"value": "-0.2"}},
+        "recent": {"width_change": {"value": "-0.1"}},
+        "history_refs": [row_ref],
+    }
+    case = {"case_id": _digest(case_body), **case_body}
+    evidence = {
+        "protocol": {"profile": {"primary_window_sessions": 20, "recent_window_sessions": 10}},
+        "source_rows": {row_ref: row},
+        "cases": [case],
+    }
+    evidence_raw = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
+    evidence_sha = "sha256:" + hashlib.sha256(evidence_raw).hexdigest()
+    artifact = worker_paths.runs / job_id / "stage-order-rule-prepare-test"
+    artifact.mkdir(parents=True)
+    (artifact / "evidence.json").write_bytes(evidence_raw)
+    manifest = {"files": {"evidence.json": evidence_sha}}
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_ORDER_RULE_PREPARE_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-11T00:00:00+00:00",
+        "started_at": "2026-09-11T00:00:01+00:00",
+        "completed_at": "2026-09-11T00:00:02+00:00",
+        "result_ref": {"artifact_root": str(artifact), "manifest_sha256": manifest_sha},
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-11T00:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+    observed = read_status(worker_paths, job_id)
+    envelope = observed["review_transport"]
+    raw = gzip.decompress(base64.b64decode(envelope["payload"]))
+    decoded = json.loads(raw)
+    assert decoded["case_count"] == 1
+    assert decoded["candidate_output_included"] is False
+    assert decoded["future_rows_included"] is False
+    assert decoded["cases"][0]["history"] == [[
+        row_ref, "2021-03-31", "101", "99", "100",
+        "original-price-quantity-epoch", None,
+    ]]
+    assert "history_refs" not in decoded["cases"][0]
 
 
 def test_qualification_kind_gets_its_frozen_config(tmp_path: Path) -> None:

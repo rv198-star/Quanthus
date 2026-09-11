@@ -275,6 +275,20 @@ prepare恢复，不是新研究轮次。若该唯一retry再次失败，B停止�
 证据和claim ceiling见
 [B prepare failure](../acceptance/stage-order-rule-screen-b-prepare-failure-20260911.md)。
 
+## 12. C的只读评审视图传输
+
+B关闭后，C不要求操作者手工打包或复制`evidence.json`。Stage Worker的`status`仅对已
+`succeeded`的`quanthus.stage-order-rule-prepare.v1` Job附加一个确定性的只读评审传输包：
+先重新核对Job目录、READY/manifest和evidence文件摘要，再从封存evidence展开每例截至T
+的61会话价格路径。传输只保留case identity、主/近期Facts、可用性、coordinate引用和
+每行source ref + 日期/OHLC/coordinate epoch/reset reason；不包含候选输出、规则阈值、
+T后行、未来收益或评分。整包以gzip+base64压缩并带原始payload SHA，超出status预算则
+fail-closed，不修改原artifact。
+
+该transport是读取界面，不是新证据、不是第三个Job，也不改变160例选择或参考任务。
+评审意见仍须在候选评分前独立封存；同一助手看过规则的意见必须如实记为same-origin
+self-simulated，不能因为传输隔离就升级为独立盲测。
+
 ## 12. prepare技术重试成功与B关闭
 
 唯一technical retry `stage_95f9b48bd96049b184e0cbf856b9a5e8`在revision

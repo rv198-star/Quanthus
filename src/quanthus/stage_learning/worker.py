@@ -9,6 +9,8 @@ control checkout remains unchanged.
 from __future__ import annotations
 
 import argparse
+import base64
+import gzip
 import hashlib
 import json
 import os
@@ -1125,12 +1127,124 @@ def submit_job(
     return result
 
 
+def _bytes_sha256(raw: bytes) -> str:
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _order_rule_review_transport(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_ORDER_RULE_PREPARE_JOB
+        or observed.get("state") != "succeeded"
+        or not isinstance(observed.get("result_ref"), Mapping)
+    ):
+        return None
+    result_ref = observed["result_ref"]
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError("order-rule review artifact outside job root") from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("order-rule review manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    evidence_raw = (artifact_root / "evidence.json").read_bytes()
+    if manifest.get("files", {}).get("evidence.json") != _bytes_sha256(evidence_raw):
+        raise StageWorkerError("order-rule review evidence binding differs")
+    evidence = json.loads(evidence_raw)
+    source_rows = evidence.get("source_rows")
+    cases = evidence.get("cases")
+    profile = evidence.get("protocol", {}).get("profile")
+    if (
+        not isinstance(source_rows, dict)
+        or not isinstance(cases, list)
+        or not isinstance(profile, dict)
+    ):
+        raise StageWorkerError("order-rule review evidence shape differs")
+    compact_cases = []
+    for case in cases:
+        if not isinstance(case, dict):
+            raise StageWorkerError("order-rule review case shape differs")
+        case_id = str(case.get("case_id") or "")
+        if _digest({key: value for key, value in case.items() if key != "case_id"}) != case_id:
+            raise StageWorkerError("order-rule review case digest differs")
+        history = []
+        for ref in case.get("history_refs", []):
+            row = source_rows.get(ref)
+            if not isinstance(row, dict) or _digest(row) != ref:
+                raise StageWorkerError("order-rule review history binding differs")
+            if row.get("market_date") > case.get("market_date"):
+                raise StageWorkerError("order-rule review future row")
+            history.append([
+                ref,
+                row.get("market_date"),
+                row.get("high"),
+                row.get("low"),
+                row.get("close"),
+                row.get("coordinate_epoch"),
+                row.get("reset_reason"),
+            ])
+        compact_cases.append({
+            "case_id": case_id,
+            "security_code": case.get("security_code"),
+            "security_id": case.get("security_id"),
+            "market_date": case.get("market_date"),
+            "sampling_stratum": case.get("sampling_stratum"),
+            "coordinate_ref": case.get("coordinate_ref"),
+            "primary_available": case.get("primary_available"),
+            "recent_available": case.get("recent_available"),
+            "input_reason": case.get("input_reason"),
+            "availability_reasons": case.get("availability_reasons"),
+            "primary": case.get("primary"),
+            "recent": case.get("recent"),
+            "history": history,
+        })
+    transport = {
+        "schema_version": "quanthus.stage-order-review-transport.v1",
+        "job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "evidence_file_sha256": _bytes_sha256(evidence_raw),
+        "profile": profile,
+        "case_count": len(compact_cases),
+        "cases": compact_cases,
+        "candidate_output_included": False,
+        "future_rows_included": False,
+    }
+    raw = json.dumps(
+        transport, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    compressed = gzip.compress(raw, compresslevel=9, mtime=0)
+    encoded = base64.b64encode(compressed).decode("ascii")
+    if len(encoded) > 220 * 1024:
+        raise StageWorkerError("order-rule review transport exceeds status budget")
+    return {
+        "schema_version": "quanthus.stage-order-review-transport-envelope.v1",
+        "encoding": "gzip+base64",
+        "raw_sha256": _bytes_sha256(raw),
+        "raw_bytes": len(raw),
+        "compressed_bytes": len(compressed),
+        "encoded_bytes": len(encoded),
+        "payload": encoded,
+    }
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
     status = paths.status / f"{job_id}.json"
     if status.is_file():
-        return _object(status, "stage job status")
+        observed = _object(status, "stage job status")
+        review_transport = _order_rule_review_transport(paths, observed)
+        return (
+            observed
+            if review_transport is None
+            else {**observed, "review_transport": review_transport}
+        )
     for root, state in ((paths.queue, "queued"), (paths.claimed, "claimed")):
         candidate = root / f"{job_id}.json"
         if candidate.is_file():

@@ -482,7 +482,7 @@ gate is a conformance defect rather than an alternate project state.
 | P2 backtest implementation | root `AGENTS.md`, this map, `design/hld.md`, `design/execution-notification-profiles.md`, `design/lld/README.md`, `design/lld/02-backtest-engine.md` | LLD 01 for inputs, LLD 10 for logs, LLD 05 for boundary checks |
 | P1/P2 data input | this map, HLD, LLD 01 | Linked architecture topic, ADR 0002/0003/0004/0005, relevant acceptance file |
 | Product-bounded DWD modeling or coverage | this map, HLD, ADR 0006/0007, LLD 01, `design/lld/01-data-foundation/dwd-domain-model.md`, `design/lld/01-data-foundation/ods-dwd-data-dictionary.md`, and `design/lld/01-data-foundation/ods-to-dwd-lineage.md` | `config/releases/v2-build202607.json`, exact Base manifest, machine model contract, and focused tests |
-| ODS or daily operations | this map, architecture index, ADR 0003/0004/0007, selected runbook | Exact config, service, and contract tests |
+| ODS or daily operations | this map, architecture index, ADR 0003/0004/0007, selected runbook, `operations/ods-dwd-incident-log.md` | Exact config, service, and contract tests |
 | Historical dual-lane or ADS evidence | root `AGENTS.md`, this map, ADR 0005 and the exact acceptance record | Treat packages as retained historical evidence, not current operating authority |
 | Product or phase decision | PRD, HLD, LLD 09, work-item index | Governing gate, ADR, or acceptance evidence |
 | Platform Kernel extraction or restoration | root `AGENTS.md`, this map, HLD, ADR 0010, LLD 11, `config/platform-kernel-gates.v1.json` | QuantDinger audit record, exact upstream source path, selected Web ownership/source evidence, and adapter contract |

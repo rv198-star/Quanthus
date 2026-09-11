@@ -265,6 +265,13 @@ On weekends, only event-lane output is expected.
 Do not edit a release, reuse its id, update PG directly, or fill missing observations with zeros.
 Keep failed/partial attempts for diagnosis and retry into a new attempt.
 
+Every failed scheduled or recovery run must be entered on the same Shanghai calendar day in
+`docs/operations/ods-dwd-incident-log.md`. Open unresolved cases as `pending_attribution` rather
+than guessing a cause. Preserve the failed attempt and orchestrator paths, distinguish trigger from
+software root cause, state which downstream stages were blocked, and append recovery and permanent
+corrective evidence when confirmed. A systemd journal entry or notification alone is not the
+operations incident record.
+
 The daily service's first attempt always obeys the schedule contract's fixed completion deadline.
 If that attempt fails, `run-ods-daily-with-retry` gives only the second attempt the configured
 `QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS` window. The orchestrator records the resulting

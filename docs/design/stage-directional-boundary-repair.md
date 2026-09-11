@@ -8,7 +8,7 @@
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | P3-STAGE-007 / `REVISE_TARGET_OR_PARK` |
 | Machine design | `../../config/stage-learning/directional-boundary-repair-design.v1.json` |
-| Machine design digest | `sha256:30e3ea9d8f5cd165225d7ebc07cc0772598c1d747538930264b8619557586727` |
+| Machine design digest | `sha256:c43b3e79489a1104bdecd975a025969c0ea2f9e8a87b9c8d1012475618e4408a` |
 | Four-party review | [review record](../reviews/stage-directional-boundary-repair-review-20260911.md) |
 | Runtime authority | none |
 
@@ -250,12 +250,12 @@ The four-party review approves the design direction but intentionally leaves del
 2. **P3-STAGE-008-B — implement threshold-free Facts and two-phase reference contract:** closed;
    engineering acceptance is `../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`;
 3. **P3-STAGE-008-C — conformance/regression using synthetic paths plus already-exposed 007 cases:**
-   blocked; not executed by the B approval, diagnostic only and no threshold learning;
-4. **P3-STAGE-008-D — one fresh task-disjoint development screen:** blocked until C passes and a
-   separate runtime authorization is granted.
+   closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`; no threshold learning or qualification claim;
+4. **P3-STAGE-008-D — one fresh task-disjoint development screen:** preregistration is now allowed,
+   but fresh data access remains closed until its own contract is frozen.
 
-No new Job, market-data read, parameter search, official label, strategy use or trading permission is
-created by the B implementation.
+C created no Job, market-data read, parameter search, official label, strategy use or trading
+permission. Its acceptance only permits D preregistration.
 
 ## 10. P3-STAGE-008-B implementation result
 
@@ -281,5 +281,22 @@ cannot be majority-voted away. Stage 2 code/thresholds are untouched.
 
 The two semantic concepts are registered in the Data & Indicator Catalog as reserved Structure
 concepts with reviewed Chinese descriptions. They are intentionally **not** added to accepted
-Structure runtime bindings because 008-C/D have not happened. Detailed evidence is in
+Structure runtime bindings because 008-D has not qualified them. Detailed B evidence is in
 [008-B engineering acceptance](../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md).
+
+## 11. P3-STAGE-008-C conformance result
+
+C executed the frozen conformance contract without opening new data. The existing Stage-007 prepare
+was read through the bounded review-transport index plus twenty pages, for 21 read-only status calls.
+All 160 exposed cases were read; the transport contained neither candidate output nor future rows.
+
+The old frozen Stage-0 rule plus the frozen Stage-007 semantic ledger reproduced exactly the A-design
+regression groups: 28 old Stage-0 true positives and 12 old Stage-0 false positives with definite
+`NEITHER` references. The B implementation then reproduced all A-frozen diagnostic medians exactly
+to four decimals: TP vs directional-FP absolute 20-session return `0.0444 / 0.2526`, range traversal
+`0.3261 / 0.7695`, and counter-direction excursion share `0.6286 / 0.3272`.
+
+These are regression checks on already exposed evidence, not learned cutoffs. C performed zero
+threshold searches, zero parameter trials, zero new market-data reads and zero runtime Jobs. The
+result is `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`, with evidence in
+[008-C conformance acceptance](../acceptance/stage-directional-boundary-repair-c-conformance-20260912.md).

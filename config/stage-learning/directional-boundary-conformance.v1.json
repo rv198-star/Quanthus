@@ -1,0 +1,74 @@
+{
+  "schema_version": "quanthus.stage-directional-boundary-conformance.v1",
+  "work_item": "P3-STAGE-008-C",
+  "purpose": "Verify the implemented Directional Path Geometry facts and primary-first reference protocol against frozen synthetic adversarial cases and the permanently exposed P3-STAGE-007 diagnostic cohort without learning thresholds or qualifying Stage 0.",
+  "bindings": {
+    "design": {"path": "config/stage-learning/directional-boundary-repair-design.v1.json", "digest": "sha256:30e3ea9d8f5cd165225d7ebc07cc0772598c1d747538930264b8619557586727"},
+    "fact_contract": {"path": "config/structure-directional-path-geometry.v1.json", "digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c"},
+    "reference_protocol": {"path": "config/stage-learning/order-reference-protocol.v2.json", "digest": "sha256:8db37fb3d197668cfe16f9daabaa57c625617460be94ace13a28ccb81e89c88b"},
+    "stage_007_review_ledger": {"path": "config/stage-learning/order-rule-review-decisions.v1.tsv", "sha256": "sha256:493933e614fccd8c84e9066182f29b11ca80570396ea697d014337fda9504fd7"},
+    "stage_007_prepare": {
+      "job_id": "stage_95f9b48bd96049b184e0cbf856b9a5e8",
+      "manifest_sha256": "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7",
+      "evidence_sha256": "sha256:6a9df1869ff4f532715b212e41b9b6ada34d72835152d7318f4ac662acbf8dcf",
+      "case_count": 160,
+      "page_count": 20,
+      "candidate_output_included": false,
+      "future_rows_included": false
+    },
+    "stage_007_rule_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0"
+  },
+  "frozen_group_definition": {
+    "old_stage_0_true_positive": "old frozen rule predicts STAGE_0 and both Stage-007 semantic roles resolve STAGE_0",
+    "old_stage_0_false_positive_neither": "old frozen rule predicts STAGE_0 and both Stage-007 semantic roles resolve NEITHER",
+    "expected_counts": {"old_stage_0_true_positive": 28, "old_stage_0_false_positive_neither": 12}
+  },
+  "frozen_design_regression": {
+    "rounding_places": 4,
+    "absolute_window_return_20_median": {"old_stage_0_true_positive": "0.0444", "old_stage_0_false_positive_neither": "0.2526"},
+    "range_traversal_20_median": {"old_stage_0_true_positive": "0.3261", "old_stage_0_false_positive_neither": "0.7695"},
+    "counter_direction_excursion_share_20_median": {"old_stage_0_true_positive": "0.6286", "old_stage_0_false_positive_neither": "0.3272"},
+    "interpretation": "Regression-only reproduction of values already exposed and frozen by P3-STAGE-008-A; no cutoff is selected or implied."
+  },
+  "synthetic_conformance": {
+    "required_cases": [
+      "monotonic_up",
+      "monotonic_down",
+      "large_up_down_up_path_ending_at_range_edge",
+      "symmetric_broad_oscillation_ending_near_start",
+      "one_step_repricing_then_flat",
+      "narrow_contracting_box_with_recent_10d_expansion",
+      "listing_or_coordinate_reset",
+      "missing_primary_input"
+    ],
+    "stage_2_rule_change_authorized": false
+  },
+  "pass_conditions": {
+    "all_160_exposed_cases_read": true,
+    "transport_contains_candidate_output": false,
+    "transport_contains_future_rows": false,
+    "group_counts_match_frozen_design": true,
+    "frozen_design_regression_values_match": true,
+    "synthetic_contract_tests_pass": true,
+    "threshold_search_count": 0,
+    "parameter_trials": 0,
+    "new_market_data_reads": 0,
+    "runtime_jobs": 0
+  },
+  "authority": {
+    "synthetic_conformance": true,
+    "read_existing_stage_007_sealed_evidence": true,
+    "write_new_market_data": false,
+    "market_data_acquisition": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "stage_007_threshold_learning": false,
+    "stage_007_qualification": false,
+    "stage_2_change": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

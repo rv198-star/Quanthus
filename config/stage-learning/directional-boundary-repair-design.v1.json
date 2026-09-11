@@ -171,6 +171,30 @@
     "stage_007_threshold_learning": false,
     "next_work_item_authorized": false
   },
+  "conformance_checkpoint": {
+    "work_item": "P3-STAGE-008-C",
+    "state": "PASS_DIAGNOSTIC_CONFORMANCE_ONLY",
+    "contract": "config/stage-learning/directional-boundary-conformance.v1.json",
+    "contract_digest": "sha256:defec6a0ec09f209e5608274febdf3a8c76f7907db4bc44c8c2a9061dff022bb",
+    "runner": "scripts/run_stage_directional_boundary_conformance.py",
+    "acceptance": "docs/acceptance/stage-directional-boundary-repair-c-conformance-20260912.md",
+    "case_count": 160,
+    "old_stage_0_true_positive_count": 28,
+    "old_stage_0_false_positive_neither_count": 12,
+    "diagnostic_medians": {
+      "old_stage_0_true_positive": {"absolute_window_return_20": "0.0444", "range_traversal_20": "0.3261", "counter_direction_excursion_share_20": "0.6286"},
+      "old_stage_0_false_positive_neither": {"absolute_window_return_20": "0.2526", "range_traversal_20": "0.7695", "counter_direction_excursion_share_20": "0.3272"}
+    },
+    "read_only_stage_status_calls": 21,
+    "new_market_data_reads": 0,
+    "runtime_jobs": 0,
+    "threshold_search_count": 0,
+    "parameter_trials": 0,
+    "stage_007_threshold_learning": false,
+    "stage_007_qualification": false,
+    "next_work_item_preregistration_authorized": true,
+    "next_work_item_data_access_authorized": false
+  },
   "future_validation_boundary": {
     "stage_007_cases_may_be_used_for_threshold_learning": false,
     "stage_007_cases_may_be_used_for_qualification": false,

@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/directional-boundary-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:30e3ea9d8f5cd165225d7ebc07cc0772598c1d747538930264b8619557586727"
+DESIGN_DIGEST = "sha256:c43b3e79489a1104bdecd975a025969c0ea2f9e8a87b9c8d1012475618e4408a"
 
 
 def load_design() -> dict:
@@ -142,6 +142,41 @@ def test_b_implementation_is_bound_but_opens_no_next_stage_or_runtime() -> None:
         "reference_implementation",
         "acceptance",
     ):
+        assert (ROOT / checkpoint[key]).is_file()
+
+
+def test_c_conformance_is_bound_without_opening_d_data_or_threshold_search() -> None:
+    checkpoint = load_design()["conformance_checkpoint"]
+    assert checkpoint["work_item"] == "P3-STAGE-008-C"
+    assert checkpoint["state"] == "PASS_DIAGNOSTIC_CONFORMANCE_ONLY"
+    assert checkpoint["contract_digest"] == (
+        "sha256:defec6a0ec09f209e5608274febdf3a8c76f7907db4bc44c8c2a9061dff022bb"
+    )
+    assert checkpoint["case_count"] == 160
+    assert checkpoint["old_stage_0_true_positive_count"] == 28
+    assert checkpoint["old_stage_0_false_positive_neither_count"] == 12
+    assert checkpoint["diagnostic_medians"] == {
+        "old_stage_0_true_positive": {
+            "absolute_window_return_20": "0.0444",
+            "range_traversal_20": "0.3261",
+            "counter_direction_excursion_share_20": "0.6286",
+        },
+        "old_stage_0_false_positive_neither": {
+            "absolute_window_return_20": "0.2526",
+            "range_traversal_20": "0.7695",
+            "counter_direction_excursion_share_20": "0.3272",
+        },
+    }
+    assert checkpoint["read_only_stage_status_calls"] == 21
+    assert checkpoint["new_market_data_reads"] == 0
+    assert checkpoint["runtime_jobs"] == 0
+    assert checkpoint["threshold_search_count"] == 0
+    assert checkpoint["parameter_trials"] == 0
+    assert checkpoint["stage_007_threshold_learning"] is False
+    assert checkpoint["stage_007_qualification"] is False
+    assert checkpoint["next_work_item_preregistration_authorized"] is True
+    assert checkpoint["next_work_item_data_access_authorized"] is False
+    for key in ("contract", "runner", "acceptance"):
         assert (ROOT / checkpoint[key]).is_file()
 
 

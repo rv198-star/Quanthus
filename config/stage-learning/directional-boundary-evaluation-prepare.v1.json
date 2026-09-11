@@ -1,0 +1,61 @@
+{
+  "schema_version": "quanthus.stage-directional-boundary-evaluation-prepare.v1",
+  "work_item": "P3-STAGE-008-D",
+  "phase": "D3_PREPARE_EVALUATION_AFTER_CANDIDATE_FREEZE",
+  "purpose": "Read only the 96 evaluation economic identities and quarter assignments frozen by D1 after D2 candidate freeze, select one morphology-blind 2021 date per identity without backfill, and publish Primary-only T-time evidence for semantic review before scoring.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "development_screen": {
+    "path": "config/stage-learning/directional-boundary-development-screen.v1.json",
+    "digest": "sha256:fff38395c6466db0305287125d66bc5ba2f5a4ea18d6eb7ee97dd13f0047f963"
+  },
+  "frozen_candidate": {
+    "path": "config/stage-learning/directional-boundary-candidate.v1.json",
+    "digest": "sha256:c815077233ff837e7a8d0ebd884b12dcfb3d6d5c31abfe302cefe97e6997b3ff",
+    "candidate_id": "sha256:d11c368d4111ebf991315a6c61b800a6737d56e5f81792cf153dabcda7cb52fd"
+  },
+  "d1_prepare": {
+    "job_id": "stage_7ffc681cd5254aa0ab3e0d98026c42d7",
+    "code_revision": "071cdbf5cbe8fd1fa71bb042aca48a372193eea6",
+    "artifact_relative_path": "runs/stage-worker/stage_7ffc681cd5254aa0ab3e0d98026c42d7/stage-directional-boundary-d1-20260911T204403Z",
+    "manifest_sha256": "sha256:2ddc4f90376e2061932862c2ef1a8cfd27f8774d1df9bdb59de8bf4e3bf1f9a3",
+    "evaluation_plan_digest": "sha256:bdb24aeb137cbe59148b765b31d7907bd5cb14a467ceec182cb6f2b996d6a743",
+    "evaluation_identity_digest": "sha256:ae50b174133291a82d726379327c93ff52d04ca28a0d2c8b4b312cef2dc8647b",
+    "evaluation_identity_count": 96
+  },
+  "selection": {
+    "year": 2021,
+    "selection_uses_morphology": false,
+    "date_selection": "lowest_hash_primary_available_date_within_assigned_quarter",
+    "sampling_seed": "stage008-d-fresh-development-20260912-v1|evaluation",
+    "cross_quarter_backfill": false,
+    "identity_backfill": false,
+    "result_dependent_replacement": false
+  },
+  "source_scope": {
+    "history_start": "2019-01-01",
+    "report_start": "2021-01-01",
+    "report_end": "2021-12-31"
+  },
+  "limits": {
+    "maximum_evaluation_identities": 96,
+    "maximum_evaluation_cases": 96,
+    "maximum_evidence_bytes": 33554432,
+    "worker_wall_seconds": 2700
+  },
+  "authority": {
+    "exact_frozen_evaluation_identity_read": true,
+    "evaluation_market_data_read_2019_2021": true,
+    "fixed_morphology_blind_date_selection": true,
+    "evaluation_evidence_publication": true,
+    "opinion_generation": false,
+    "candidate_scoring": false,
+    "parameter_search": false,
+    "candidate_replacement": false,
+    "future_outcome_access": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

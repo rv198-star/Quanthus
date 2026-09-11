@@ -15,6 +15,7 @@ from quanthus.stage_learning.worker import (
     JOB_SCHEMA,
     STAGE_CAPACITY_CENSUS_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
+    STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
     STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
     STAGE_ORDER_RULE_PREPARE_JOB,
     STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
@@ -172,6 +173,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_QUALIFICATION_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
+        STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
         STAGE_SECOND_GROUP_PROFILE_JOB,
         STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
         STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
@@ -244,6 +246,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_QUALIFICATION_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
+        STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
         STAGE_SECOND_GROUP_PROFILE_JOB,
         STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
         STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
@@ -730,6 +733,145 @@ def test_directional_boundary_d1_status_exposes_primary_only_review_transport(
         "error": None,
         "exit_code": 0,
         "updated_at": "2026-09-12T00:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+    observed = read_status(worker_paths, job_id)
+    index = observed["review_transport_index"]
+    assert index["case_count"] == 1
+    assert index["explicit_recent_derived_facts_included"] is False
+    assert index["candidate_output_included"] is False
+    assert index["future_rows_included"] is False
+    page_status = read_status(worker_paths, index["pages"][0]["job_id"])
+    envelope = page_status["review_transport"]
+    decoded = json.loads(gzip.decompress(base64.b64decode(envelope["payload"])))
+    review_case = decoded["cases"][0]
+    assert len(review_case["history"]) == 21
+    assert review_case["primary"] == primary
+    assert len(review_case["directional_path_facts"]) == 2
+    assert "recent" not in review_case
+    assert "recent_available" not in review_case
+    assert decoded["explicit_recent_derived_facts_included"] is False
+
+
+def test_directional_boundary_d3_is_single_job_with_no_retry(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    first = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
+    )
+    second = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
+    )
+    assert first["kind"] == STAGE_DIRECTIONAL_BOUNDARY_D3_JOB
+    assert first["config"] == (
+        "config/stage-learning/directional-boundary-evaluation-prepare.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_DIRECTIONAL_BOUNDARY_D3_JOB]["wall_seconds"] == 2700
+    assert second["job_id"] == first["job_id"]
+    assert second["idempotent_reuse"] is True
+    marker = json.loads(worker_paths.directional_boundary_d3_budget.read_text(encoding="utf-8"))
+    assert marker["job"]["job_id"] == first["job_id"]
+    assert marker["input_digest"] == first["input_digest"]
+    with pytest.raises(StageWorkerError, match="no retry"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
+            kind=STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
+        )
+
+
+def test_directional_boundary_d3_status_exposes_primary_only_review_transport(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "7" * 32
+    source_rows = {}
+    history_refs = []
+    for index in range(21):
+        row = {
+            "market_date": f"2021-03-{index + 1:02d}",
+            "high": str(201 + index),
+            "low": str(199 + index),
+            "close": str(200 + index),
+            "coordinate_epoch": "original-price-quantity-epoch",
+            "reset_reason": None,
+        }
+        ref = _digest(row)
+        source_rows[ref] = row
+        history_refs.append(ref)
+    primary = {
+        "directional_efficiency": {"value": "0.20", "reason": "available"},
+        "range_width": {"value": "0.25", "reason": "available"},
+        "width_change": {"value": "0.30", "reason": "available"},
+        "center_shift": {"value": "0.08", "reason": "available"},
+    }
+    case_body = {
+        "security_code": "600001",
+        "security_id": "security-eval-A",
+        "market_date": "2021-03-21",
+        "sampling_stratum": "representative",
+        "coordinate_ref": _digest({"coordinate": "eval-A"}),
+        "primary_available": True,
+        "recent_available": True,
+        "input_reason": "admitted",
+        "availability_reasons": {"trend": "available", "order": "available"},
+        "primary": primary,
+        "recent": {"width_change": {"value": "0.2"}, "center_shift": {"value": "0.1"}},
+        "history_refs": history_refs,
+    }
+    case = {"case_id": _digest(case_body), **case_body}
+    evidence = {"source_rows": source_rows, "cases": [case]}
+    evidence_raw = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
+    evidence_sha = "sha256:" + hashlib.sha256(evidence_raw).hexdigest()
+    path_facts = {
+        "cases": {
+            case["case_id"]: {
+                "structure.geometry.range-traversal": {
+                    "value": "0.8", "reason": "available", "revision_id": _digest({"e": 1}),
+                },
+                "structure.geometry.counter-direction-excursion-share": {
+                    "value": "0.2", "reason": "available", "revision_id": _digest({"e": 2}),
+                },
+            }
+        }
+    }
+    path_raw = json.dumps(path_facts, sort_keys=True, separators=(",", ":")).encode()
+    path_sha = "sha256:" + hashlib.sha256(path_raw).hexdigest()
+    artifact = worker_paths.runs / job_id / "stage-directional-boundary-d3-test"
+    artifact.mkdir(parents=True)
+    (artifact / "evidence.json").write_bytes(evidence_raw)
+    (artifact / "path-facts.json").write_bytes(path_raw)
+    manifest = {"files": {"evidence.json": evidence_sha, "path-facts.json": path_sha}}
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-12T01:00:00+00:00",
+        "started_at": "2026-09-12T01:00:01+00:00",
+        "completed_at": "2026-09-12T01:00:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "directional_boundary_d3": {
+                "evaluation_selected_case_count": 1,
+                "review_ready": True,
+            },
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-12T01:00:02+00:00",
     }
     (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
     observed = read_status(worker_paths, job_id)

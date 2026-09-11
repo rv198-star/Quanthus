@@ -44,11 +44,13 @@ STAGE_THIRD_GROUP_PROFILE_JOB = "quanthus.stage-third-group-profile.v1"
 STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB = "quanthus.stage-order-proposition-development.v1"
 STAGE_ORDER_RULE_PREPARE_JOB = "quanthus.stage-order-rule-prepare.v1"
 STAGE_ORDER_RULE_RESOLVE_SCORE_JOB = "quanthus.stage-order-rule-resolve-score.v1"
+STAGE_DIRECTIONAL_BOUNDARY_D1_JOB = "quanthus.stage-directional-boundary-d1-prepare.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
 ORDER_RULE_PREPARE_RETRY_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-retry-budget.v1"
 ORDER_RULE_RESOLVE_SCORE_BUDGET_SCHEMA = "quanthus.stage-order-rule-resolve-score-budget.v1"
+DIRECTIONAL_BOUNDARY_D1_BUDGET_SCHEMA = "quanthus.stage-directional-boundary-d1-budget.v1"
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
@@ -136,6 +138,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-order-rule-resolve-score-*",
         "process_error": "stage_order_rule_resolve_score_process_failed",
         "wall_seconds": 600,
+    },
+    STAGE_DIRECTIONAL_BOUNDARY_D1_JOB: {
+        "config": "config/stage-learning/directional-boundary-development-screen.v1.json",
+        "module": "quanthus.stage_learning.directional_boundary_calibration_prepare",
+        "artifact_glob": "stage-directional-boundary-d1-*",
+        "process_error": "stage_directional_boundary_d1_process_failed",
+        "wall_seconds": 2700,
     },
 }
 
@@ -297,6 +306,10 @@ class StageWorkerPaths:
     @property
     def order_rule_resolve_score_budget(self) -> Path:
         return self.control_root / "order-rule-resolve-score-budget.json"
+
+    @property
+    def directional_boundary_d1_budget(self) -> Path:
+        return self.control_root / "directional-boundary-d1-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -568,6 +581,41 @@ def _existing_order_rule_resolve_score_submission(
         raise StageWorkerError(
             "order-rule resolve-score has no retry or input-replacement authority"
         )
+    return _idempotent_stage_submission(paths, job)
+
+
+def _directional_boundary_d1_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": DIRECTIONAL_BOUNDARY_D1_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-008-D",
+        "phase": "D1_PREPARE_CALIBRATION_AND_FREEZE_EVALUATION_IDENTITY_PLAN",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_directional_boundary_d1_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.directional_boundary_d1_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "directional boundary D1 budget")
+    if (
+        marker.get("schema_version") != DIRECTIONAL_BOUNDARY_D1_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-008-D"
+        or marker.get("phase") != "D1_PREPARE_CALIBRATION_AND_FREEZE_EVALUATION_IDENTITY_PLAN"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("directional boundary D1 budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_DIRECTIONAL_BOUNDARY_D1_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("directional boundary D1 budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError("directional boundary D1 has no retry or replacement authority")
     return _idempotent_stage_submission(paths, job)
 
 
@@ -973,6 +1021,30 @@ class StageWorker:
                 "official_labels_authorized": verified.get("official_labels_authorized"),
                 "runtime_activation_authorized": verified.get("runtime_activation_authorized"),
             }
+        if job.kind == STAGE_DIRECTIONAL_BOUNDARY_D1_JOB:
+            result["directional_boundary_d1"] = {
+                "fresh_pool_size": verified.get("fresh_pool_size"),
+                "calibration_identity_capacity": verified.get("calibration_identity_capacity"),
+                "evaluation_identity_capacity": verified.get("evaluation_identity_capacity"),
+                "calibration_case_count": verified.get("calibration_case_count"),
+                "calibration_selection_counts": verified.get("calibration_selection_counts"),
+                "calibration_selection_shortfalls": verified.get(
+                    "calibration_selection_shortfalls"
+                ),
+                "calibration_selection_digest": verified.get("calibration_selection_digest"),
+                "calibration_evidence_digest": verified.get("calibration_evidence_digest"),
+                "path_facts_digest": verified.get("path_facts_digest"),
+                "evaluation_planned_identity_count": verified.get(
+                    "evaluation_planned_identity_count"
+                ),
+                "evaluation_identity_digest": verified.get("evaluation_identity_digest"),
+                "evaluation_plan_digest": verified.get("evaluation_plan_digest"),
+                "evaluation_data_read": verified.get("evaluation_data_read"),
+                "parameter_search": verified.get("parameter_search"),
+                "opinion_count": verified.get("opinion_count"),
+                "candidate_frozen": verified.get("candidate_frozen"),
+                "review_ready": verified.get("review_ready"),
+            }
         return result
 
     def execute(self, job: StageJob) -> dict[str, Any]:
@@ -1175,6 +1247,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_DIRECTIONAL_BOUNDARY_D1_JOB:
+        existing = _existing_directional_boundary_d1_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -1189,6 +1267,7 @@ def submit_job(
         job.kind == STAGE_ORDER_RULE_PREPARE_JOB and prepare_retry_of is not None
     )
     resolve_score_reserved = job.kind == STAGE_ORDER_RULE_RESOLVE_SCORE_JOB
+    directional_d1_reserved = job.kind == STAGE_DIRECTIONAL_BOUNDARY_D1_JOB
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
@@ -1202,6 +1281,11 @@ def submit_job(
         _exclusive_json(
             paths.order_rule_resolve_score_budget,
             _order_rule_resolve_score_budget_value(job),
+        )
+    if directional_d1_reserved:
+        _exclusive_json(
+            paths.directional_boundary_d1_budget,
+            _directional_boundary_d1_budget_value(job),
         )
     try:
         with path.open("xb") as stream:
@@ -1219,6 +1303,8 @@ def submit_job(
             paths.order_rule_prepare_retry_budget.unlink(missing_ok=True)
         if resolve_score_reserved:
             paths.order_rule_resolve_score_budget.unlink(missing_ok=True)
+        if directional_d1_reserved:
+            paths.directional_boundary_d1_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -1230,6 +1316,8 @@ def submit_job(
             paths.order_rule_prepare_retry_budget.unlink(missing_ok=True)
         if resolve_score_reserved:
             paths.order_rule_resolve_score_budget.unlink(missing_ok=True)
+        if directional_d1_reserved:
+            paths.directional_boundary_d1_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -1437,6 +1525,233 @@ def _order_rule_virtual_review_status(
     return None
 
 
+DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE = 8
+
+
+def _directional_boundary_d1_review_evidence(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> tuple[str, str, str, dict[str, Any], dict[str, Any]]:
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("directional boundary D1 result reference missing")
+    detail = result_ref.get("directional_boundary_d1")
+    if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
+        raise StageWorkerError("directional boundary D1 review is not ready")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError("directional boundary D1 artifact outside job root") from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("directional boundary D1 manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    evidence_raw = (artifact_root / "evidence.json").read_bytes()
+    path_facts_raw = (artifact_root / "path-facts.json").read_bytes()
+    evidence_sha = _bytes_sha256(evidence_raw)
+    path_facts_sha = _bytes_sha256(path_facts_raw)
+    files = manifest.get("files", {})
+    if (
+        files.get("evidence.json") != evidence_sha
+        or files.get("path-facts.json") != path_facts_sha
+    ):
+        raise StageWorkerError("directional boundary D1 review file binding differs")
+    evidence = json.loads(evidence_raw)
+    path_facts = json.loads(path_facts_raw)
+    if (
+        not isinstance(evidence.get("source_rows"), dict)
+        or not isinstance(evidence.get("cases"), list)
+        or not isinstance(path_facts.get("cases"), dict)
+    ):
+        raise StageWorkerError("directional boundary D1 review evidence shape differs")
+    if len(evidence["cases"]) != detail.get("calibration_case_count"):
+        raise StageWorkerError("directional boundary D1 review denominator differs")
+    return manifest_sha, evidence_sha, path_facts_sha, evidence, path_facts
+
+
+def _directional_boundary_d1_review_alias(parent_job_id: str, page: int) -> str:
+    raw = f"{parent_job_id}|directional-boundary-d1-primary-page|{page}".encode()
+    return "stage_" + hashlib.sha256(raw).hexdigest()[:32]
+
+
+def _directional_boundary_d1_review_index(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_DIRECTIONAL_BOUNDARY_D1_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    manifest_sha, evidence_sha, path_facts_sha, evidence, _path_facts = (
+        _directional_boundary_d1_review_evidence(paths, observed)
+    )
+    case_count = len(evidence["cases"])
+    pages = (
+        case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
+    ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+    return {
+        "schema_version": "quanthus.stage-directional-boundary-primary-review-index.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "evidence_file_sha256": evidence_sha,
+        "path_facts_file_sha256": path_facts_sha,
+        "case_count": case_count,
+        "page_size": DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+        "page_count": pages,
+        "pages": [
+            {
+                "page": page,
+                "job_id": _directional_boundary_d1_review_alias(str(observed["job_id"]), page),
+                "start": page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                "count": min(
+                    DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                    case_count - page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                ),
+            }
+            for page in range(pages)
+        ],
+        "explicit_recent_derived_facts_included": False,
+        "candidate_output_included": False,
+        "future_rows_included": False,
+    }
+
+
+def _directional_boundary_d1_review_page(
+    paths: StageWorkerPaths, observed: Mapping[str, Any], page: int,
+) -> dict[str, Any]:
+    manifest_sha, evidence_sha, path_facts_sha, evidence, path_facts = (
+        _directional_boundary_d1_review_evidence(paths, observed)
+    )
+    cases = evidence["cases"]
+    source_rows = evidence["source_rows"]
+    path_by_case = path_facts["cases"]
+    start = page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+    selected = cases[start:start + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE]
+    if not selected:
+        raise StageWorkerError("directional boundary D1 review page outside denominator")
+    compact_cases = []
+    for case in selected:
+        if not isinstance(case, dict):
+            raise StageWorkerError("directional boundary D1 review case shape differs")
+        case_id = str(case.get("case_id") or "")
+        if _digest({key: value for key, value in case.items() if key != "case_id"}) != case_id:
+            raise StageWorkerError("directional boundary D1 review case digest differs")
+        directional = path_by_case.get(case_id)
+        if not isinstance(directional, dict) or len(directional) != 2:
+            raise StageWorkerError("directional boundary D1 path facts missing")
+        refs = case.get("history_refs")
+        if not isinstance(refs, list) or len(refs) < 21:
+            raise StageWorkerError("directional boundary D1 primary history too short")
+        history = []
+        for ref in refs[-21:]:
+            row = source_rows.get(ref)
+            if not isinstance(row, dict) or _digest(row) != ref:
+                raise StageWorkerError("directional boundary D1 history binding differs")
+            if row.get("market_date") > case.get("market_date"):
+                raise StageWorkerError("directional boundary D1 future row")
+            history.append([
+                ref,
+                row.get("market_date"),
+                row.get("high"),
+                row.get("low"),
+                row.get("close"),
+                row.get("coordinate_epoch"),
+                row.get("reset_reason"),
+            ])
+        compact_cases.append({
+            "case_id": case_id,
+            "security_code": case.get("security_code"),
+            "security_id": case.get("security_id"),
+            "market_date": case.get("market_date"),
+            "sampling_stratum": case.get("sampling_stratum"),
+            "coordinate_ref": case.get("coordinate_ref"),
+            "primary_available": case.get("primary_available"),
+            "input_reason": case.get("input_reason"),
+            "availability_reasons": case.get("availability_reasons"),
+            "primary": case.get("primary"),
+            "directional_path_facts": directional,
+            "history": history,
+        })
+    transport = {
+        "schema_version": "quanthus.stage-directional-boundary-primary-review-transport.v1",
+        "parent_job_id": observed["job_id"],
+        "page": page,
+        "page_size": DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+        "manifest_sha256": manifest_sha,
+        "evidence_file_sha256": evidence_sha,
+        "path_facts_file_sha256": path_facts_sha,
+        "case_count": len(cases),
+        "cases": compact_cases,
+        "explicit_recent_derived_facts_included": False,
+        "candidate_output_included": False,
+        "future_rows_included": False,
+    }
+    raw = json.dumps(
+        transport, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    compressed = gzip.compress(raw, compresslevel=9, mtime=0)
+    encoded = base64.b64encode(compressed).decode("ascii")
+    if len(encoded) > 180 * 1024:
+        raise StageWorkerError("directional boundary D1 review page exceeds status budget")
+    return {
+        "schema_version": "quanthus.stage-directional-boundary-primary-review-envelope.v1",
+        "encoding": "gzip+base64",
+        "raw_sha256": _bytes_sha256(raw),
+        "raw_bytes": len(raw),
+        "compressed_bytes": len(compressed),
+        "encoded_bytes": len(encoded),
+        "payload": encoded,
+    }
+
+
+def _directional_boundary_d1_virtual_review_status(
+    paths: StageWorkerPaths, requested_job_id: str,
+) -> dict[str, Any] | None:
+    for status_path in sorted(paths.status.glob("stage_*.json")):
+        observed = _object(status_path, "stage job status")
+        if (
+            observed.get("kind") != STAGE_DIRECTIONAL_BOUNDARY_D1_JOB
+            or observed.get("state") != "succeeded"
+        ):
+            continue
+        result_ref = observed.get("result_ref")
+        detail = result_ref.get("directional_boundary_d1") if isinstance(
+            result_ref, Mapping
+        ) else None
+        if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
+            continue
+        case_count = int(detail.get("calibration_case_count") or 0)
+        pages = (
+            case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
+        ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+        for page in range(pages):
+            alias = _directional_boundary_d1_review_alias(str(observed["job_id"]), page)
+            if alias != requested_job_id:
+                continue
+            return {
+                "schema_version": STATUS_SCHEMA,
+                "job_id": requested_job_id,
+                "kind": "quanthus.stage-directional-boundary-primary-review-page.v1",
+                "code_revision": observed.get("code_revision"),
+                "input_digest": observed.get("input_digest"),
+                "state": "succeeded",
+                "stage": "virtual_read_only",
+                "submitted_at": observed.get("submitted_at"),
+                "started_at": observed.get("started_at"),
+                "completed_at": observed.get("completed_at"),
+                "parent_job_id": observed["job_id"],
+                "page": page,
+                "review_transport": _directional_boundary_d1_review_page(paths, observed, page),
+                "error": None,
+                "exit_code": 0,
+                "updated_at": observed.get("updated_at"),
+            }
+    return None
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -1444,6 +1759,8 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if status.is_file():
         observed = _object(status, "stage job status")
         review_index = _order_rule_review_index(paths, observed)
+        if review_index is None:
+            review_index = _directional_boundary_d1_review_index(paths, observed)
         return (
             observed
             if review_index is None
@@ -1464,6 +1781,9 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
                 "submitted_at": job.submitted_at,
             }
     virtual = _order_rule_virtual_review_status(paths, job_id)
+    if virtual is not None:
+        return virtual
+    virtual = _directional_boundary_d1_virtual_review_status(paths, job_id)
     if virtual is not None:
         return virtual
     raise StageWorkerError("stage job is not known on this node")

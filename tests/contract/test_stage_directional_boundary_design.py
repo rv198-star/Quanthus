@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/directional-boundary-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:c43b3e79489a1104bdecd975a025969c0ea2f9e8a87b9c8d1012475618e4408a"
+DESIGN_DIGEST = "sha256:e347e44104d79e06e354f0eaeb049d9f9fbfa19b2d54aeec48002e6387a3d6d1"
 
 
 def load_design() -> dict:
@@ -16,21 +16,31 @@ def load_design() -> dict:
     return value
 
 
-def test_design_is_approved_but_runtime_stays_blocked() -> None:
+def test_design_is_approved_and_only_preregistered_d_runtime_is_open() -> None:
     design = load_design()
     assert design["design_status"] == "approved"
-    assert design["delivery_gate"] == "blocked"
+    assert design["delivery_gate"] == "open"
     assert design["authority"] == {
         "design_and_review": True,
         "production_fact_implementation": False,
         "reference_protocol_implementation": False,
-        "runtime_job_submission": False,
-        "market_data_read": False,
-        "parameter_search": False,
+        "runtime_job_submission": True,
+        "market_data_read": True,
+        "parameter_search": True,
         "official_labels": False,
         "daily_or_strategy": False,
         "trading": False,
     }
+    activation = design["development_screen_activation"]
+    assert activation["state"] == "PREREGISTERED_AND_AUTHORIZED"
+    assert activation["maximum_result_bearing_jobs"] == 4
+    assert activation["maximum_parameter_trials"] == 27
+    assert activation["development_data_years"] == [2019, 2020, 2021]
+    assert activation["evaluation_market_data_before_candidate_freeze"] is False
+    assert activation["2022_2024_access"] is False
+    assert activation["2025_access"] is False
+    assert activation["stage_2_threshold_research"] is False
+    assert (ROOT / activation["contract"]).is_file()
 
 
 def test_stage0_is_not_residual_and_directional_relocation_is_a_guard() -> None:
@@ -189,7 +199,8 @@ def test_stage007_is_diagnostic_only_and_future_partitions_remain_closed() -> No
     future = design["future_validation_boundary"]
     assert future["stage_007_cases_may_be_used_for_threshold_learning"] is False
     assert future["stage_007_cases_may_be_used_for_qualification"] is False
-    assert future["new_market_data_read_authorized"] is False
+    assert future["new_market_data_read_authorized"] is True
+    assert design["development_screen_activation"]["development_data_years"] == [2019, 2020, 2021]
     assert future["2022_2024_access_authorized"] is False
     assert future["2025_access_authorized"] is False
     assert future["stage_2_threshold_research_authorized"] is False

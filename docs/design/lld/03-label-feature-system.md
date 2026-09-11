@@ -429,11 +429,11 @@ design: `../../config/stage-learning/directional-boundary-repair-design.v1.json`
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P3-STAGE-008 | Repair Stage-0 direction boundary and primary/recent semantics | P3-STAGE-007 | blocked delivery; A/B/C closed, D data/runtime still gated |
+| P3-STAGE-008 | Repair Stage-0 direction boundary and primary/recent semantics | P3-STAGE-007 | ready; A/B/C closed, D active at D1 |
 | P3-STAGE-008-A | Freeze semantics, path Facts and four-party review | P3-STAGE-007 | closed; `../stage-directional-boundary-repair.md` |
 | P3-STAGE-008-B | Implement threshold-free Facts and primary-first reference schema | P3-STAGE-008-A | closed; `../../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md` |
 | P3-STAGE-008-C | Synthetic conformance plus exposed-007 regression | P3-STAGE-008-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; `../../acceptance/stage-directional-boundary-repair-c-conformance-20260912.md` |
-| P3-STAGE-008-D | Fresh disjoint development screen | P3-STAGE-008-C | blocked for data/runtime; preregistration permitted |
+| P3-STAGE-008-D | Fresh disjoint development screen | P3-STAGE-008-C | ready at D1; evaluation data sealed until D2 candidate freeze |
 
 ## 7. Acceptance
 

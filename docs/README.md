@@ -240,11 +240,13 @@ nodes.
   Stage-007 remains permanently design-exposed and cannot tune or qualify the successor; Stage 2 is
   untouched. C is now closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`: all 160 exposed cases reproduced
   the frozen 28/12 groups and all A-frozen diagnostic medians exactly, with zero threshold search,
-  parameter trials, new market reads or Jobs. D preregistration is permitted but D data/runtime
-  remains closed until its own fresh-development contract is frozen. Route:
+  parameter trials, new market reads or Jobs. D is now separately preregistered and active at D1:
+  only 2019-2020 calibration data may be read next, while 2021 evaluation identities/quarters are
+  frozen without reading their market data until D2 freezes one candidate. Route:
   [directional-boundary repair](design/stage-directional-boundary-repair.md); B/C evidence:
   `acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`,
-  `acceptance/stage-directional-boundary-repair-c-conformance-20260912.md`; review:
+  `acceptance/stage-directional-boundary-repair-c-conformance-20260912.md`,
+  `acceptance/stage-directional-boundary-repair-d-preregistration-20260912.md`; review:
   `reviews/stage-directional-boundary-repair-review-20260911.md`; machine design:
   `config/stage-learning/directional-boundary-repair-design.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

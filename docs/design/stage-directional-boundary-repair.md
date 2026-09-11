@@ -3,12 +3,12 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | blocked |
+| Delivery gate | open |
 | Work item | P3-STAGE-008 |
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | P3-STAGE-007 / `REVISE_TARGET_OR_PARK` |
 | Machine design | `../../config/stage-learning/directional-boundary-repair-design.v1.json` |
-| Machine design digest | `sha256:c43b3e79489a1104bdecd975a025969c0ea2f9e8a87b9c8d1012475618e4408a` |
+| Machine design digest | `sha256:e347e44104d79e06e354f0eaeb049d9f9fbfa19b2d54aeec48002e6387a3d6d1` |
 | Four-party review | [review record](../reviews/stage-directional-boundary-repair-review-20260911.md) |
 | Runtime authority | none |
 
@@ -251,11 +251,12 @@ The four-party review approves the design direction but intentionally leaves del
    engineering acceptance is `../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`;
 3. **P3-STAGE-008-C — conformance/regression using synthetic paths plus already-exposed 007 cases:**
    closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`; no threshold learning or qualification claim;
-4. **P3-STAGE-008-D — one fresh task-disjoint development screen:** preregistration is now allowed,
-   but fresh data access remains closed until its own contract is frozen.
+4. **P3-STAGE-008-D — one fresh task-disjoint development screen:** preregistered and active under
+   `config/stage-learning/directional-boundary-development-screen.v1.json`; D1 is the only next
+   executable phase.
 
-C created no Job, market-data read, parameter search, official label, strategy use or trading
-permission. Its acceptance only permits D preregistration.
+C itself created no Job, market-data read or parameter search. After C durable closeout, D's separate
+preregistration opened only the bounded 2019-2021 development path described below.
 
 ## 10. P3-STAGE-008-B implementation result
 
@@ -300,3 +301,29 @@ These are regression checks on already exposed evidence, not learned cutoffs. C 
 threshold searches, zero parameter trials, zero new market-data reads and zero runtime Jobs. The
 result is `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`, with evidence in
 [008-C conformance acceptance](../acceptance/stage-directional-boundary-repair-c-conformance-20260912.md).
+
+## 12. P3-STAGE-008-D preregistration
+
+D is now preregistered under
+`config/stage-learning/directional-boundary-development-screen.v1.json` and the owner-approved
+A→B→C→D sequence. This state transition does not reopen Stage-007 evidence as fresh data and does
+not touch 2022-2025.
+
+The fresh screen reconstructs the same historical candidate population but excludes both the 515
+previously excluded economic identities and the **entire 512-identity Stage-007 pool**. A deterministic
+new 512-identity pool is split into 256 calibration-capacity identities and 256 evaluation-capacity
+identities with zero overlap.
+
+Calibration uses 2020 and may select at most 64 cases: 16 hash coverage, 32 old-instability-seed and
+16 unchanged Stage-2-shaped controls. Calibration references are sealed before a fixed 27-point
+relocation-guard grid is scored. The grid searches only 20-session absolute return, range traversal
+and counter-direction excursion thresholds; Stage-2 thresholds remain frozen.
+
+Evaluation uses 2021 but its 96 identities and quarter assignments are frozen in D1 **before their
+2021 market data is read**. Evaluation data cannot be opened unless D2 freezes one eligible candidate.
+The evaluation sample is morphology-blind and has no result-dependent backfill. Hard gates require
+Stage-0 precision >=0.80, coverage >=0.55 and definite-negative FPR <=0.10, plus no degradation versus
+old R0 beyond the preregistered limits. Even a pass is only `PROMISING_EXPLORATORY_REPAIR`.
+
+The exact preregistration, four-phase budget and claim ceiling are recorded in
+[D preregistration](../acceptance/stage-directional-boundary-repair-d-preregistration-20260912.md).

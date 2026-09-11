@@ -288,11 +288,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-007-B | Prove source isolation and bind minimal execution | P3-STAGE-007-A | closed; #289; one technical retry consumed, 512 old cohort / 515 identities excluded / 160 fixed cases; docs/acceptance/stage-order-rule-screen-b-prepare-success-20260911.md |
 | P3-STAGE-007-C | Execute one fixed reference and scoring batch | P3-STAGE-007-B | closed; #290; 160 cases / 320 same-origin opinions sealed before one frozen score Job; docs/acceptance/stage-order-rule-screen-cd-closeout-20260911.md |
 | P3-STAGE-007-D | Attribute errors and decide continuation or parking | P3-STAGE-007-C | closed; #291; Stage0 representation/target failure plus recent-window reference-veto defect; no rerun/tuning |
-| P3-STAGE-008 | Repair Stage-0 direction boundary and primary/recent reference semantics | P3-STAGE-007 | blocked delivery; A/B/C closed, D preregistration allowed but data/runtime blocked; docs/design/stage-directional-boundary-repair.md |
+| P3-STAGE-008 | Repair Stage-0 direction boundary and primary/recent reference semantics | P3-STAGE-007 | ready; A/B/C closed, D preregistered and active at D1; docs/design/stage-directional-boundary-repair.md |
 | P3-STAGE-008-A | Freeze semantic decomposition, path Facts and four-party review | P3-STAGE-007 | closed; docs/design/stage-directional-boundary-repair.md; no runtime authority |
 | P3-STAGE-008-B | Implement threshold-free path Facts and primary-first review schema | P3-STAGE-008-A | closed; engineering accepted; docs/acceptance/stage-directional-boundary-repair-b-implementation-20260912.md |
 | P3-STAGE-008-C | Synthetic conformance plus exposed-007 diagnostic regression | P3-STAGE-008-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; docs/acceptance/stage-directional-boundary-repair-c-conformance-20260912.md |
-| P3-STAGE-008-D | One fresh task-disjoint development screen | P3-STAGE-008-C | blocked for data/runtime; preregistration allowed; requires new economic identities |
+| P3-STAGE-008-D | One fresh task-disjoint development screen | P3-STAGE-008-C | ready at D1; calibration 2019-2020 only, evaluation remains sealed until candidate freeze |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

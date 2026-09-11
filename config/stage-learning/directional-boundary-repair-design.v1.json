@@ -2,7 +2,7 @@
   "schema_version": "quanthus.stage-directional-boundary-repair-design.v1",
   "work_item": "P3-STAGE-008",
   "design_status": "approved",
-  "delivery_gate": "blocked",
+  "delivery_gate": "open",
   "predecessor": {
     "work_item": "P3-STAGE-007",
     "closeout": "docs/acceptance/stage-order-rule-screen-cd-closeout-20260911.md",
@@ -198,19 +198,42 @@
   "future_validation_boundary": {
     "stage_007_cases_may_be_used_for_threshold_learning": false,
     "stage_007_cases_may_be_used_for_qualification": false,
-    "new_market_data_read_authorized": false,
+    "new_market_data_read_authorized": true,
     "2022_2024_access_authorized": false,
     "2025_access_authorized": false,
     "fresh_development_screen_requires_new_economic_identities": true,
     "stage_2_threshold_research_authorized": false
   },
+  "development_screen_activation": {
+    "work_item": "P3-STAGE-008-D",
+    "state": "PREREGISTERED_AND_AUTHORIZED",
+    "contract": "config/stage-learning/directional-boundary-development-screen.v1.json",
+    "execution_sequence": [
+      "D1_PREPARE_CALIBRATION_AND_FREEZE_EVALUATION_IDENTITY_PLAN",
+      "D2_SEAL_CALIBRATION_REFERENCES_AND_FREEZE_ONE_CANDIDATE",
+      "D3_PREPARE_EVALUATION_AFTER_CANDIDATE_FREEZE",
+      "D4_SEAL_EVALUATION_REFERENCES_AND_SCORE_FROZEN_CANDIDATE"
+    ],
+    "maximum_result_bearing_jobs": 4,
+    "maximum_parameter_trials": 27,
+    "development_data_years": [2019, 2020, 2021],
+    "calibration_year": 2020,
+    "evaluation_year": 2021,
+    "evaluation_market_data_before_candidate_freeze": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "stage_2_threshold_research": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
   "authority": {
     "design_and_review": true,
     "production_fact_implementation": false,
     "reference_protocol_implementation": false,
-    "runtime_job_submission": false,
-    "market_data_read": false,
-    "parameter_search": false,
+    "runtime_job_submission": true,
+    "market_data_read": true,
+    "parameter_search": true,
     "official_labels": false,
     "daily_or_strategy": false,
     "trading": false

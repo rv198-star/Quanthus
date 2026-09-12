@@ -89,7 +89,7 @@ def test_c_closes_topology_only_and_keeps_evaluation_unread() -> None:
 
 def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> None:
     checkpoint = load(DELIVERY)["validation_preregistration"]
-    assert checkpoint["state"] == "D1_TECHNICAL_RETRY_AUTHORIZED"
+    assert checkpoint["state"] == "D1_TRANSPORT_RECOVERY_AUTHORIZED"
     assert checkpoint["contract_digest"] == (
         "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606"
     )
@@ -110,7 +110,7 @@ def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> N
 def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
     delivery = load(DELIVERY)
     checkpoint = delivery["d1_implementation_checkpoint"]
-    assert checkpoint["state"] == "FIRST_JOB_TECHNICAL_FAIL_RETRY_AUTHORIZED"
+    assert checkpoint["state"] == "SECOND_JOB_TRANSPORT_FAIL_RECOVERY_AUTHORIZED"
     assert checkpoint["execution_contract_digest"] == (
         "sha256:7e59a3fcadfab30369f66b214a82da1e2a38bae33e5e3c5dd80f35f7e7cd5e6f"
     )
@@ -118,7 +118,8 @@ def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
         "quanthus.stage-positive-instability-quantitative-d1-prepare.v1"
     )
     assert checkpoint["maximum_result_bearing_jobs_now"] == 1
-    assert checkpoint["maximum_technical_retry_jobs_remaining"] == 1
+    assert checkpoint["maximum_technical_retry_jobs_remaining"] == 0
+    assert checkpoint["maximum_transport_recovery_jobs_remaining"] == 1
     assert checkpoint["semantic_retries_remaining"] == 0
     assert checkpoint["technical_correction"] == {
         "field": "source_isolation.candidate_cohort_date",
@@ -130,6 +131,28 @@ def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
     assert checkpoint["retry_authorization_digest"] == (
         "sha256:ae2028fa9f3e6bae5725cb86494f0abc98a298085c4e39a12f1d34c3c6ebd08a"
     )
+    assert checkpoint["failed_retry_job"]["job_id"] == (
+        "stage_2612f623a94b44ba86ed71128d16bf48"
+    )
+    assert checkpoint["failed_retry_job"]["artifact_published"] is False
+    assert checkpoint["transport_recovery_authorization_digest"] == (
+        "sha256:9962922fb4ba7ada5e4041c86f01f919fa40969ee5e5a5061c5a0c6440d7a1b1"
+    )
+    assert checkpoint["evidence_scope_digest"] == (
+        "sha256:2d65ce22666a7709a0f67e3d708df085bb624505484bddeec62a7de9b6ecaa0d"
+    )
+    assert digest(load(ROOT / checkpoint["transport_recovery_authorization"])) == (
+        checkpoint["transport_recovery_authorization_digest"]
+    )
+    assert digest(load(ROOT / checkpoint["evidence_scope_contract"])) == (
+        checkpoint["evidence_scope_digest"]
+    )
+    assert checkpoint["evidence_transport_correction"] == {
+        "defect": "order_reference_protocol_v1_ignored_declared_time_scope_fields",
+        "history_start": "2018-09-01",
+        "case_start": "2019-01-01",
+        "development_end": "2019-12-31",
+    }
     assert checkpoint["authorized_market_data_scope"] == {
         "warmup_start": "2018-09-01",
         "development_start": "2019-01-01",
@@ -145,6 +168,9 @@ def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
         "acceptance",
         "retry_acceptance",
         "retry_authorization",
+        "transport_recovery_acceptance",
+        "transport_recovery_authorization",
+        "evidence_scope_contract",
     ):
         assert (ROOT / checkpoint[key]).is_file()
 
@@ -159,7 +185,7 @@ def test_current_authority_is_d1_only() -> None:
         ),
         "market_data_read": True,
         "authorized_market_data_scope": "D1_2018_warmup_2019_development_only",
-        "technical_retry_only": True,
+        "transport_recovery_only": True,
         "parameter_search": False,
         "preserved_2021_evaluation_read": False,
         "2022_2024_access": False,

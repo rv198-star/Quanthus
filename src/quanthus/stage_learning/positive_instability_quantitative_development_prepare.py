@@ -24,8 +24,8 @@ from quanthus.stage_learning.directional_boundary_calibration_prepare import (
 from quanthus.stage_learning.order_proposition_development import build_order_observations
 from quanthus.stage_learning.order_reference_protocol import (
     MAX_BYTES,
-    PROTOCOL_DIGEST,
     build_evidence,
+    load_protocol_contract,
     validate_evidence,
 )
 from quanthus.stage_learning.order_rule_prepare import verify_prepare_artifact
@@ -62,6 +62,8 @@ DEFAULT_CONFIG = (
 ARTIFACT_SCHEMA = "quanthus.stage-positive-instability-quantitative-d1-artifact.v1"
 SUMMARY_SCHEMA = "quanthus.stage-positive-instability-quantitative-d1-summary.v1"
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
+EVIDENCE_SCOPE_PATH = "config/stage-learning/order-reference-evidence-scope-2019.v1.json"
+EVIDENCE_SCOPE_DIGEST = "sha256:2d65ce22666a7709a0f67e3d708df085bb624505484bddeec62a7de9b6ecaa0d"
 
 
 class PositiveInstabilityQuantitativePrepareError(ValueError):
@@ -169,6 +171,11 @@ def run_prepare(
     root = find_project_root()
     config = load_preregistration(root)
     load_execution(root)
+    evidence_protocol = load_protocol_contract(
+        EVIDENCE_SCOPE_PATH,
+        EVIDENCE_SCOPE_DIGEST,
+        root,
+    )
     if config_path.resolve() != (root / DEFAULT_CONFIG).resolve():
         supplied = _object(config_path, "quantitative_development_screen")
         if digest(supplied) != PREREG_DIGEST:
@@ -275,7 +282,7 @@ def run_prepare(
         node_config=node,
         scope=development_scope,
         security_codes=tuple(sorted(development_pool.values())),
-        spec_digest=PROTOCOL_DIGEST,
+        spec_digest=EVIDENCE_SCOPE_DIGEST,
     )
     report_start = _day(scope["development_report_start"])
     report_end = _day(scope["development_report_end"])
@@ -303,15 +310,17 @@ def run_prepare(
             (item["security_code"], date.fromisoformat(item["market_date"]))
             for item in selection["selected"]
         ],
-        InputPolicy(PROTOCOL_DIGEST, selected_codes, source_policy.calendar_ref),
+        InputPolicy(EVIDENCE_SCOPE_DIGEST, selected_codes, source_policy.calendar_ref),
         code_revision=code_revision,
         source_kind="retrospective_development",
         sampling_strata={
             (item["security_code"], date.fromisoformat(item["market_date"])): "representative"
             for item in selection["selected"]
         },
+        protocol_override=evidence_protocol,
+        protocol_digest=EVIDENCE_SCOPE_DIGEST,
     )
-    validate_evidence(evidence)
+    validate_evidence(evidence, expected_protocol_digest=EVIDENCE_SCOPE_DIGEST)
     selected_paths = _selected_path_facts(evidence, path_values)
 
     source_binding = {
@@ -333,6 +342,8 @@ def run_prepare(
         "development_preserved_evaluation_overlap": 0,
         "source_manifest_digest": digest(source_manifest),
         "development_read_scope": development_scope.to_dict(),
+        "evidence_protocol_path": EVIDENCE_SCOPE_PATH,
+        "evidence_protocol_digest": EVIDENCE_SCOPE_DIGEST,
         "preserved_2021_evaluation_market_data_read": False,
         "2020_stage009_development_read": False,
         "2022_2024_read": False,
@@ -357,6 +368,7 @@ def run_prepare(
         "preserved_evaluation_identity_digest": preserved_plan["identity_digest"],
         "preserved_evaluation_plan_digest": digest(preserved_plan),
         "preserved_evaluation_data_read": False,
+        "evidence_protocol_digest": EVIDENCE_SCOPE_DIGEST,
         "development_evidence_digest": digest(evidence),
         "path_facts_digest": digest(selected_paths),
         "source_feature_observation_count": len(feature_rows),
@@ -442,7 +454,9 @@ def verify_artifact(path: Path, *, code_revision: str | None = None) -> dict[str
         if _sha(file_raw) != files[name]:
             raise PositiveInstabilityQuantitativePrepareError("d1_file_digest:" + name)
         payloads[name] = json.loads(file_raw)
-    validate_evidence(payloads["evidence.json"])
+    validate_evidence(
+        payloads["evidence.json"], expected_protocol_digest=EVIDENCE_SCOPE_DIGEST
+    )
     summary = payloads["summary.json"]
     source = payloads["source-binding.json"]
     plan = payloads["preserved-evaluation-plan.json"]
@@ -452,6 +466,9 @@ def verify_artifact(path: Path, *, code_revision: str | None = None) -> dict[str
         or summary.get("parameter_search") is not False
         or summary.get("opinion_count") != 0
         or summary.get("candidate_frozen") is not False
+        or summary.get("evidence_protocol_digest") != EVIDENCE_SCOPE_DIGEST
+        or source.get("evidence_protocol_path") != EVIDENCE_SCOPE_PATH
+        or source.get("evidence_protocol_digest") != EVIDENCE_SCOPE_DIGEST
         or source.get("preserved_2021_evaluation_market_data_read") is not False
         or source.get("development_preserved_evaluation_overlap") != 0
         or source.get("2020_stage009_development_read") is not False

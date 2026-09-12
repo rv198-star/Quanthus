@@ -34,7 +34,7 @@
   },
   "validation_preregistration": {
     "work_item": "P3-STAGE-010-D",
-    "state": "D1_TECHNICAL_RETRY_AUTHORIZED",
+    "state": "D1_TRANSPORT_RECOVERY_AUTHORIZED",
     "contract": "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
     "contract_digest": "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606",
     "acceptance": "docs/acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md",
@@ -52,7 +52,7 @@
   },
   "d1_implementation_checkpoint": {
     "work_item": "P3-STAGE-010-D1",
-    "state": "FIRST_JOB_TECHNICAL_FAIL_RETRY_AUTHORIZED",
+    "state": "SECOND_JOB_TRANSPORT_FAIL_RECOVERY_AUTHORIZED",
     "execution_contract": "config/stage-learning/positive-instability-quantitative-development-execution.v1.json",
     "execution_contract_digest": "sha256:7e59a3fcadfab30369f66b214a82da1e2a38bae33e5e3c5dd80f35f7e7cd5e6f",
     "development_implementation": "src/quanthus/stage_learning/positive_instability_quantitative_development.py",
@@ -62,6 +62,11 @@
     "retry_acceptance": "docs/acceptance/stage-positive-instability-quantitative-d1-retry-20260912.md",
     "retry_authorization": "config/stage-learning/positive-instability-quantitative-d1-retry.v1.json",
     "retry_authorization_digest": "sha256:ae2028fa9f3e6bae5725cb86494f0abc98a298085c4e39a12f1d34c3c6ebd08a",
+    "transport_recovery_acceptance": "docs/acceptance/stage-positive-instability-quantitative-d1-transport-recovery-20260912.md",
+    "transport_recovery_authorization": "config/stage-learning/positive-instability-quantitative-d1-transport-recovery.v1.json",
+    "transport_recovery_authorization_digest": "sha256:9962922fb4ba7ada5e4041c86f01f919fa40969ee5e5a5061c5a0c6440d7a1b1",
+    "evidence_scope_contract": "config/stage-learning/order-reference-evidence-scope-2019.v1.json",
+    "evidence_scope_digest": "sha256:2d65ce22666a7709a0f67e3d708df085bb624505484bddeec62a7de9b6ecaa0d",
     "failed_job": {
       "job_id": "stage_b5e3feae8b9f47faae7566c308444b3c",
       "code_revision": "3b5ada72b44905c520521ade6315552c36330d09",
@@ -75,9 +80,24 @@
       "old_value": "2018-12-31",
       "new_value": "2018-12-28"
     },
+    "failed_retry_job": {
+      "job_id": "stage_2612f623a94b44ba86ed71128d16bf48",
+      "code_revision": "7412361e4c9094ceffda0eb986fbe0033ebc9ee3",
+      "input_digest": "sha256:1690009abc40a826357b893e9a3fd30ffb02c9b3bb5ff7764338b3ea48b8ea2d",
+      "state": "failed",
+      "error": "stage_positive_instability_quantitative_d1_process_failed",
+      "artifact_published": false
+    },
+    "evidence_transport_correction": {
+      "defect": "order_reference_protocol_v1_ignored_declared_time_scope_fields",
+      "history_start": "2018-09-01",
+      "case_start": "2019-01-01",
+      "development_end": "2019-12-31"
+    },
     "authorized_job_kind": "quanthus.stage-positive-instability-quantitative-d1-prepare.v1",
     "maximum_result_bearing_jobs_now": 1,
-    "maximum_technical_retry_jobs_remaining": 1,
+    "maximum_technical_retry_jobs_remaining": 0,
+    "maximum_transport_recovery_jobs_remaining": 1,
     "semantic_retries_remaining": 0,
     "authorized_market_data_scope": {
       "warmup_start": "2018-09-01",
@@ -93,7 +113,7 @@
     "P3-STAGE-010-A": "closed_design_approved",
     "P3-STAGE-010-B": "closed_engineering_accepted",
     "P3-STAGE-010-C": "closed_pass_topology_conformance_only",
-    "P3-STAGE-010-D": "ready_d1_exactly_one_technical_retry_2019_development"
+    "P3-STAGE-010-D": "ready_d1_exactly_one_transport_recovery_2019_development"
   },
   "authority": {
     "implementation": true,
@@ -101,7 +121,7 @@
     "authorized_runtime_kind": "quanthus.stage-positive-instability-quantitative-d1-prepare.v1",
     "market_data_read": true,
     "authorized_market_data_scope": "D1_2018_warmup_2019_development_only",
-    "technical_retry_only": true,
+    "transport_recovery_only": true,
     "parameter_search": false,
     "preserved_2021_evaluation_read": false,
     "2022_2024_access": false,

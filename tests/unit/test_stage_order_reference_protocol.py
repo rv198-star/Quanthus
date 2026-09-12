@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -16,6 +17,8 @@ from .test_structure_trend_evolution import sequence
 from .test_structure_v2_inputs import row
 
 REVISION = "a" * 40
+SCOPE_2019_PATH = "config/stage-learning/order-reference-evidence-scope-2019.v1.json"
+SCOPE_2019_DIGEST = "sha256:2d65ce22666a7709a0f67e3d708df085bb624505484bddeec62a7de9b6ecaa0d"
 
 
 def make_evidence(values=None, indices=(-1,)):
@@ -98,6 +101,49 @@ def test_no_sealed_date_even_if_called_synthetic(year):
     values[-1] = replace(values[-1], market_date=date(year, 1, 1))
     with pytest.raises(api.OrderReferenceError, match="case_outside_development"):
         make_evidence(values)
+
+
+def test_explicit_2019_scope_is_versioned_without_changing_default_v1() -> None:
+    values = []
+    for item in sequence(80):
+        shifted_day = item.market_date - timedelta(days=365)
+        shifted_time = datetime(
+            shifted_day.year,
+            shifted_day.month,
+            shifted_day.day,
+            15,
+            tzinfo=item.result_as_of.tzinfo,
+        )
+        values.append(
+            replace(
+                item,
+                market_date=shifted_day,
+                cutoff=shifted_time,
+            )
+        )
+    key = [("000001", values[-1].market_date)]
+    with pytest.raises(api.OrderReferenceError, match="case_outside_development"):
+        api.build_evidence(
+            values,
+            key,
+            InputPolicy(api.PROTOCOL_DIGEST, ("000001",), "calendar-v1"),
+            code_revision=REVISION,
+            source_kind="synthetic_fixture",
+        )
+
+    protocol = api.load_protocol_contract(SCOPE_2019_PATH, SCOPE_2019_DIGEST)
+    evidence = api.build_evidence(
+        values,
+        key,
+        InputPolicy(SCOPE_2019_DIGEST, ("000001",), "calendar-v1"),
+        code_revision=REVISION,
+        source_kind="synthetic_fixture",
+        protocol_override=protocol,
+        protocol_digest=SCOPE_2019_DIGEST,
+    )
+    assert evidence["cases"][0]["market_date"].startswith("2019-")
+    assert evidence["cases"][0]["protocol_digest"] == SCOPE_2019_DIGEST
+    api.validate_evidence(evidence, expected_protocol_digest=SCOPE_2019_DIGEST)
 
 
 def test_source_after_last_case_or_duplicate_is_rejected():

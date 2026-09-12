@@ -1159,6 +1159,109 @@ def _write_positive_instability_quantitative_d1_retry_authorization(
     )
 
 
+def _write_positive_instability_quantitative_d1_transport_recovery_authorization(
+    worker_paths: StageWorkerPaths, first: dict, retry: dict,
+) -> None:
+    config_dir = worker_paths.control_repo / "config/stage-learning"
+    scope_name = "order-reference-evidence-scope-2019.v1.json"
+    (config_dir / scope_name).write_text(
+        (ROOT / "config/stage-learning" / scope_name).read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    screen = json.loads(
+        (config_dir / "positive-instability-quantitative-development-screen.v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    execution = json.loads(
+        (config_dir / "positive-instability-quantitative-development-execution.v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    scope = json.loads((config_dir / scope_name).read_text(encoding="utf-8"))
+    authorization = {
+        "schema_version": (
+            "quanthus.stage-positive-instability-quantitative-d1-transport-recovery.v1"
+        ),
+        "work_item": "P3-STAGE-010-D1-TRANSPORT-RECOVERY",
+        "recovery_kind": "evidence_transport_only",
+        "failed_chain": {
+            "initial_job": {
+                "job_id": first["job_id"],
+                "code_revision": first["code_revision"],
+                "input_digest": first["input_digest"],
+                "terminal_state": "failed",
+                "error": "stage_positive_instability_quantitative_d1_process_failed",
+                "artifact_published": False,
+            },
+            "technical_retry_job": {
+                "job_id": retry["job_id"],
+                "code_revision": retry["code_revision"],
+                "input_digest": retry["input_digest"],
+                "terminal_state": "failed",
+                "error": "stage_positive_instability_quantitative_d1_process_failed",
+                "artifact_published": False,
+            },
+        },
+        "implementation_conformance_defect": {
+            "old_builder_ignored_declared_time_fields": True,
+            "new_scope_path": f"config/stage-learning/{scope_name}",
+            "new_scope_digest": _digest(scope),
+            "new_scope_history_start": "2018-09-01",
+            "new_scope_case_start": "2019-01-01",
+            "new_scope_development_end": "2019-12-31",
+        },
+        "frozen_parent_contract": {
+            "preregistration_digest": _digest(screen),
+            "execution_digest": _digest(execution),
+            "fresh_pool_size": 512,
+            "development_identity_capacity": 256,
+            "development_case_target": 160,
+            "candidate_count": 9,
+            "preserved_evaluation_plan_digest": (
+                "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7"
+            ),
+            "preserved_evaluation_identity_count": 160,
+        },
+        "observed_result_exposure_before_recovery": {
+            "initial_job_artifact": False,
+            "technical_retry_artifact": False,
+            "development_reference_opinions": 0,
+            "candidate_scores": 0,
+            "candidate_selected": False,
+            "threshold_values_exposed_to_reviewer": False,
+            "preserved_2021_evaluation_read": False,
+            "2022_2024_read": False,
+            "2025_read": False,
+        },
+        "authority": {
+            "maximum_transport_recovery_jobs": 1,
+            "counts_against_result_bearing_market_data_job_budget": False,
+            "same_preregistration_digest_required": True,
+            "same_execution_digest_required": True,
+            "same_identity_exclusion_required": True,
+            "same_sampling_seed_required": True,
+            "same_candidate_grid_required": True,
+            "same_gates_required": True,
+            "same_preserved_evaluation_plan_required": True,
+            "parameter_search": False,
+            "semantic_retry": False,
+            "candidate_replacement": False,
+            "automatic_supplement": False,
+            "preserved_2021_evaluation_read": False,
+            "2022_2024_access": False,
+            "2025_access": False,
+            "official_labels": False,
+            "daily_or_strategy": False,
+            "trading": False,
+        },
+    }
+    recovery_path = (
+        config_dir / "positive-instability-quantitative-d1-transport-recovery.v1.json"
+    )
+    recovery_path.write_text(json.dumps(authorization), encoding="utf-8")
+
+
 def test_positive_instability_quantitative_d1_allows_one_bound_technical_retry(
     tmp_path: Path,
 ) -> None:
@@ -1209,10 +1312,46 @@ def test_positive_instability_quantitative_d1_allows_one_bound_technical_retry(
     assert repeated["job_id"] == retry["job_id"]
     assert repeated["idempotent_reuse"] is True
     assert repeated["technical_retry_of"] == first["job_id"]
-    with pytest.raises(StageWorkerError, match="retry budget is already consumed"):
+
+    retry_job = StageJob.from_dict(
+        json.loads(
+            (worker_paths.queue / f"{retry['job_id']}.json").read_text(encoding="utf-8")
+        )
+    )
+    (worker_paths.queue / f"{retry['job_id']}.json").unlink()
+    StageWorker(worker_paths)._write_status(
+        retry_job,
+        state="failed",
+        stage="terminal",
+        started_at="2026-09-12T14:26:18+00:00",
+        completed_at="2026-09-12T14:28:23+00:00",
+        error="stage_positive_instability_quantitative_d1_process_failed",
+        exit_code=1,
+    )
+    _write_positive_instability_quantitative_d1_transport_recovery_authorization(
+        worker_paths, first, retry
+    )
+
+    recovery_revision = "d" * 40
+    recovery = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+    )
+    assert recovery["job_id"] not in {first["job_id"], retry["job_id"]}
+    assert recovery["transport_recovery_of"] == retry["job_id"]
+    repeated_recovery = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+    )
+    assert repeated_recovery["job_id"] == recovery["job_id"]
+    assert repeated_recovery["idempotent_reuse"] is True
+    assert repeated_recovery["transport_recovery_of"] == retry["job_id"]
+    with pytest.raises(StageWorkerError, match="transport recovery budget is already consumed"):
         submit_job(
             worker_paths,
-            code_revision="d" * 40,
+            code_revision="e" * 40,
             kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
         )
 

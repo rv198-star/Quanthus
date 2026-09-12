@@ -8,14 +8,14 @@
 | Review | `../reviews/stage-positive-instability-quantitative-projection-review-20260912.md` |
 | Machine design | `../../config/stage-learning/positive-instability-quantitative-projection-design.v1.json` |
 | Delivery state | `../../config/stage-learning/positive-instability-quantitative-projection-delivery.v1.json` |
-| Current state | A/B/C closed; first D1 failed on non-trading cohort endpoint before artifact publication; exactly one technical retry authorized with 2018-12-28 correction |
+| Current state | A/B/C closed; initial D1 and its one technical retry both failed before artifact publication; exactly one evidence-transport recovery is authorized, with 2019 scope versioned and preserved 2021 evaluation still unread |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-010-A | Freeze separated quantitative projection topology and adversarial review | P3-STAGE-009 | closed; design approved; no data/runtime authority |
 | P3-STAGE-010-B | Implement deterministic projection contract and synthetic tests | P3-STAGE-010-A | closed; engineering accepted; `../acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md` |
 | P3-STAGE-010-C | Replay consumed Stage-009 evidence as diagnostic conformance | P3-STAGE-010-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; no threshold learning |
-| P3-STAGE-010-D | Fresh 2019 development, freeze one candidate, then optionally open preserved 2021 evaluation | P3-STAGE-010-C | ready for exactly one D1 technical retry after `stage_b5e3feae...` failed before artifact publication; cohort endpoint corrected to 2018-12-28; preserved 2021 evaluation still closed; `../acceptance/stage-positive-instability-quantitative-d1-retry-20260912.md` |
+| P3-STAGE-010-D | Fresh 2019 development, freeze one candidate, then optionally open preserved 2021 evaluation | P3-STAGE-010-C | ready for exactly one evidence-transport recovery after `stage_b5e3feae...` and `stage_2612f623...` both failed before artifact publication; 2018-12-28 cohort endpoint retained, 2019 evidence scope versioned, preserved 2021 evaluation still closed; `../acceptance/stage-positive-instability-quantitative-d1-transport-recovery-20260912.md` |
 
 ## Hard boundaries
 

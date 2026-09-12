@@ -64,9 +64,15 @@ POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA = (
 POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_BUDGET_SCHEMA = (
     "quanthus.stage-positive-instability-quantitative-d1-retry-budget.v1"
 )
+POSITIVE_INSTABILITY_QUANTITATIVE_D1_RECOVERY_BUDGET_SCHEMA = (
+    "quanthus.stage-positive-instability-quantitative-d1-transport-recovery-budget.v1"
+)
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_AUTH = (
     "config/stage-learning/positive-instability-quantitative-d1-retry.v1.json"
+)
+POSITIVE_INSTABILITY_QUANTITATIVE_D1_RECOVERY_AUTH = (
+    "config/stage-learning/positive-instability-quantitative-d1-transport-recovery.v1.json"
 )
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
@@ -365,6 +371,13 @@ class StageWorkerPaths:
     @property
     def positive_instability_quantitative_d1_retry_budget(self) -> Path:
         return self.control_root / "positive-instability-quantitative-d1-retry-budget.json"
+
+    @property
+    def positive_instability_quantitative_d1_recovery_budget(self) -> Path:
+        return (
+            self.control_root
+            / "positive-instability-quantitative-d1-transport-recovery-budget.json"
+        )
 
     @property
     def logs(self) -> Path:
@@ -768,6 +781,19 @@ def _positive_instability_quantitative_d1_retry_budget_value(
     }
 
 
+def _positive_instability_quantitative_d1_recovery_budget_value(
+    retry_job: StageJob, recovery_job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_RECOVERY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-010-D1-TRANSPORT-RECOVERY",
+        "transport_recovery_of": retry_job.job_id,
+        "failed_input_digest": retry_job.input_digest,
+        "job": recovery_job.to_dict(),
+        "input_digest": recovery_job.input_digest,
+    }
+
+
 def _parse_positive_instability_quantitative_d1_marker(
     paths: StageWorkerPaths,
 ) -> StageJob | None:
@@ -814,6 +840,35 @@ def _parse_positive_instability_quantitative_d1_retry_marker(
         or marker.get("input_digest") != job.input_digest
     ):
         raise StageWorkerError("positive instability quantitative D1 retry budget marker differs")
+    return job
+
+
+def _parse_positive_instability_quantitative_d1_recovery_marker(
+    paths: StageWorkerPaths, retry_job: StageJob,
+) -> StageJob | None:
+    marker_path = paths.positive_instability_quantitative_d1_recovery_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "positive instability quantitative D1 recovery budget")
+    if (
+        marker.get("schema_version")
+        != POSITIVE_INSTABILITY_QUANTITATIVE_D1_RECOVERY_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-010-D1-TRANSPORT-RECOVERY"
+        or marker.get("transport_recovery_of") != retry_job.job_id
+        or marker.get("failed_input_digest") != retry_job.input_digest
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError(
+            "positive instability quantitative D1 recovery budget marker differs"
+        )
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError(
+            "positive instability quantitative D1 recovery budget marker differs"
+        )
     return job
 
 
@@ -891,36 +946,189 @@ def _positive_instability_quantitative_d1_retry_authorization(
         raise StageWorkerError("positive instability quantitative D1 retry budget differs")
 
 
-def _existing_positive_instability_quantitative_d1_submission(
-    paths: StageWorkerPaths, *, code_revision: str,
-) -> tuple[dict[str, Any] | None, StageJob | None]:
-    failed_job = _parse_positive_instability_quantitative_d1_marker(paths)
-    if failed_job is None:
-        return None, None
-    if failed_job.code_revision == code_revision:
-        return _idempotent_stage_submission(paths, failed_job), None
-    retry_job = _parse_positive_instability_quantitative_d1_retry_marker(paths, failed_job)
-    if retry_job is not None:
-        if retry_job.code_revision == code_revision:
-            result = _idempotent_stage_submission(paths, retry_job)
-            result["technical_retry_of"] = failed_job.job_id
-            return result, None
-        raise StageWorkerError(
-            "positive instability quantitative D1 technical retry budget is already consumed"
-        )
-    observed = read_status(paths, failed_job.job_id)
+def _positive_instability_quantitative_d1_recovery_authorization(
+    paths: StageWorkerPaths, initial_job: StageJob, retry_job: StageJob,
+) -> None:
+    authorization = _object(
+        paths.control_repo / POSITIVE_INSTABILITY_QUANTITATIVE_D1_RECOVERY_AUTH,
+        "positive instability quantitative D1 transport recovery authorization",
+    )
     if (
-        observed.get("state") != "failed"
-        or observed.get("error") != "stage_positive_instability_quantitative_d1_process_failed"
-        or observed.get("input_digest") != failed_job.input_digest
-        or observed.get("code_revision") != failed_job.code_revision
-        or observed.get("result_ref") is not None
+        authorization.get("schema_version")
+        != "quanthus.stage-positive-instability-quantitative-d1-transport-recovery.v1"
+        or authorization.get("work_item") != "P3-STAGE-010-D1-TRANSPORT-RECOVERY"
+        or authorization.get("recovery_kind") != "evidence_transport_only"
     ):
         raise StageWorkerError(
-            "positive instability quantitative D1 is already bound to another immutable input"
+            "positive instability quantitative D1 recovery authorization differs"
         )
-    _positive_instability_quantitative_d1_retry_authorization(paths, failed_job)
-    return None, failed_job
+    chain = authorization.get("failed_chain")
+    defect = authorization.get("implementation_conformance_defect")
+    frozen = authorization.get("frozen_parent_contract")
+    exposure = authorization.get("observed_result_exposure_before_recovery")
+    authority = authorization.get("authority")
+    if not all(
+        isinstance(value, Mapping)
+        for value in (chain, defect, frozen, exposure, authority)
+    ):
+        raise StageWorkerError(
+            "positive instability quantitative D1 recovery authorization incomplete"
+        )
+    initial = chain.get("initial_job")
+    retry = chain.get("technical_retry_job")
+    if not isinstance(initial, Mapping) or not isinstance(retry, Mapping):
+        raise StageWorkerError("positive instability quantitative D1 recovery chain missing")
+    if (
+        initial.get("job_id") != initial_job.job_id
+        or initial.get("code_revision") != initial_job.code_revision
+        or initial.get("input_digest") != initial_job.input_digest
+        or initial.get("terminal_state") != "failed"
+        or initial.get("error") != "stage_positive_instability_quantitative_d1_process_failed"
+        or initial.get("artifact_published") is not False
+        or retry.get("job_id") != retry_job.job_id
+        or retry.get("code_revision") != retry_job.code_revision
+        or retry.get("input_digest") != retry_job.input_digest
+        or retry.get("terminal_state") != "failed"
+        or retry.get("error") != "stage_positive_instability_quantitative_d1_process_failed"
+        or retry.get("artifact_published") is not False
+    ):
+        raise StageWorkerError("positive instability quantitative D1 recovery chain differs")
+    current = _object(
+        paths.control_repo
+        / "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
+        "positive instability quantitative development screen",
+    )
+    execution = _object(
+        paths.control_repo
+        / "config/stage-learning/positive-instability-quantitative-development-execution.v1.json",
+        "positive instability quantitative development execution",
+    )
+    scope_path = str(defect.get("new_scope_path") or "")
+    if not scope_path:
+        raise StageWorkerError("positive instability quantitative D1 recovery scope missing")
+    scope = _object(paths.control_repo / scope_path, "2019 evidence scope")
+    if (
+        defect.get("old_builder_ignored_declared_time_fields") is not True
+        or defect.get("new_scope_digest") != _digest(scope)
+        or defect.get("new_scope_history_start") != scope.get("history_start")
+        or defect.get("new_scope_case_start") != scope.get("case_start")
+        or defect.get("new_scope_development_end") != scope.get("development_end")
+        or frozen.get("preregistration_digest") != _digest(current)
+        or frozen.get("execution_digest") != _digest(execution)
+        or frozen.get("fresh_pool_size") != 512
+        or frozen.get("development_identity_capacity") != 256
+        or frozen.get("development_case_target") != 160
+        or frozen.get("candidate_count") != 9
+        or frozen.get("preserved_evaluation_identity_count") != 160
+        or frozen.get("preserved_evaluation_plan_digest")
+        != "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7"
+    ):
+        raise StageWorkerError("positive instability quantitative D1 recovery binding drift")
+    for key in (
+        "initial_job_artifact",
+        "technical_retry_artifact",
+        "candidate_selected",
+        "threshold_values_exposed_to_reviewer",
+        "preserved_2021_evaluation_read",
+        "2022_2024_read",
+        "2025_read",
+    ):
+        if exposure.get(key) is not False:
+            raise StageWorkerError(
+                "positive instability quantitative D1 recovery exposure expanded"
+            )
+    for key in ("development_reference_opinions", "candidate_scores"):
+        if exposure.get(key) != 0:
+            raise StageWorkerError(
+                "positive instability quantitative D1 recovery exposure expanded"
+            )
+    for key in (
+        "parameter_search",
+        "semantic_retry",
+        "candidate_replacement",
+        "automatic_supplement",
+        "preserved_2021_evaluation_read",
+        "2022_2024_access",
+        "2025_access",
+        "official_labels",
+        "daily_or_strategy",
+        "trading",
+    ):
+        if authority.get(key) is not False:
+            raise StageWorkerError(
+                "positive instability quantitative D1 recovery authority expanded"
+            )
+    if (
+        authority.get("maximum_transport_recovery_jobs") != 1
+        or authority.get("counts_against_result_bearing_market_data_job_budget") is not False
+        or authority.get("same_preregistration_digest_required") is not True
+        or authority.get("same_execution_digest_required") is not True
+        or authority.get("same_identity_exclusion_required") is not True
+        or authority.get("same_sampling_seed_required") is not True
+        or authority.get("same_candidate_grid_required") is not True
+        or authority.get("same_gates_required") is not True
+        or authority.get("same_preserved_evaluation_plan_required") is not True
+    ):
+        raise StageWorkerError("positive instability quantitative D1 recovery budget differs")
+
+
+def _existing_positive_instability_quantitative_d1_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> tuple[dict[str, Any] | None, StageJob | None, StageJob | None]:
+    initial_job = _parse_positive_instability_quantitative_d1_marker(paths)
+    if initial_job is None:
+        return None, None, None
+    if initial_job.code_revision == code_revision:
+        return _idempotent_stage_submission(paths, initial_job), None, None
+
+    retry_job = _parse_positive_instability_quantitative_d1_retry_marker(paths, initial_job)
+    if retry_job is None:
+        observed = read_status(paths, initial_job.job_id)
+        if (
+            observed.get("state") != "failed"
+            or observed.get("error") != "stage_positive_instability_quantitative_d1_process_failed"
+            or observed.get("input_digest") != initial_job.input_digest
+            or observed.get("code_revision") != initial_job.code_revision
+            or observed.get("result_ref") is not None
+        ):
+            raise StageWorkerError(
+                "positive instability quantitative D1 is already bound to another immutable input"
+            )
+        _positive_instability_quantitative_d1_retry_authorization(paths, initial_job)
+        return None, initial_job, None
+
+    if retry_job.code_revision == code_revision:
+        result = _idempotent_stage_submission(paths, retry_job)
+        result["technical_retry_of"] = initial_job.job_id
+        return result, None, None
+
+    recovery_job = _parse_positive_instability_quantitative_d1_recovery_marker(paths, retry_job)
+    if recovery_job is not None:
+        if recovery_job.code_revision == code_revision:
+            result = _idempotent_stage_submission(paths, recovery_job)
+            result["transport_recovery_of"] = retry_job.job_id
+            result["failed_chain_root"] = initial_job.job_id
+            return result, None, None
+        raise StageWorkerError(
+            "positive instability quantitative D1 transport recovery budget is already consumed"
+        )
+
+    observed_retry = read_status(paths, retry_job.job_id)
+    if (
+        observed_retry.get("state") != "failed"
+        or observed_retry.get("error")
+        != "stage_positive_instability_quantitative_d1_process_failed"
+        or observed_retry.get("input_digest") != retry_job.input_digest
+        or observed_retry.get("code_revision") != retry_job.code_revision
+        or observed_retry.get("result_ref") is not None
+    ):
+        raise StageWorkerError(
+            "positive instability quantitative D1 retry is not eligible for transport recovery"
+        )
+    _positive_instability_quantitative_d1_recovery_authorization(
+        paths, initial_job, retry_job
+    )
+    return None, None, retry_job
 
 
 def _qualification_budget_value(job: StageJob, *, state: str, reserved_at: str) -> dict[str, Any]:
@@ -1614,6 +1822,7 @@ def submit_job(
         raise StageWorkerError("submit kind is not admitted")
     prepare_retry_of: StageJob | None = None
     positive_instability_quantitative_d1_retry_of: StageJob | None = None
+    positive_instability_quantitative_d1_recovery_of: StageJob | None = None
     if kind == STAGE_ORDER_RULE_PREPARE_JOB:
         existing, prepare_retry_of = _existing_order_rule_prepare_submission(
             paths, code_revision=code_revision,
@@ -1645,10 +1854,12 @@ def submit_job(
         if existing is not None:
             return existing
     if kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB:
-        existing, positive_instability_quantitative_d1_retry_of = (
-            _existing_positive_instability_quantitative_d1_submission(
-                paths, code_revision=code_revision,
-            )
+        (
+            existing,
+            positive_instability_quantitative_d1_retry_of,
+            positive_instability_quantitative_d1_recovery_of,
+        ) = _existing_positive_instability_quantitative_d1_submission(
+            paths, code_revision=code_revision,
         )
         if existing is not None:
             return existing
@@ -1672,10 +1883,15 @@ def submit_job(
     positive_instability_quantitative_d1_reserved = (
         job.kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
         and positive_instability_quantitative_d1_retry_of is None
+        and positive_instability_quantitative_d1_recovery_of is None
     )
     positive_instability_quantitative_d1_retry_reserved = (
         job.kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
         and positive_instability_quantitative_d1_retry_of is not None
+    )
+    positive_instability_quantitative_d1_recovery_reserved = (
+        job.kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+        and positive_instability_quantitative_d1_recovery_of is not None
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -1718,6 +1934,13 @@ def submit_job(
                 positive_instability_quantitative_d1_retry_of, job
             ),
         )
+    if positive_instability_quantitative_d1_recovery_reserved:
+        _exclusive_json(
+            paths.positive_instability_quantitative_d1_recovery_budget,
+            _positive_instability_quantitative_d1_recovery_budget_value(
+                positive_instability_quantitative_d1_recovery_of, job
+            ),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -1744,6 +1967,8 @@ def submit_job(
             paths.positive_instability_quantitative_d1_budget.unlink(missing_ok=True)
         if positive_instability_quantitative_d1_retry_reserved:
             paths.positive_instability_quantitative_d1_retry_budget.unlink(missing_ok=True)
+        if positive_instability_quantitative_d1_recovery_reserved:
+            paths.positive_instability_quantitative_d1_recovery_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -1765,12 +1990,16 @@ def submit_job(
             paths.positive_instability_quantitative_d1_budget.unlink(missing_ok=True)
         if positive_instability_quantitative_d1_retry_reserved:
             paths.positive_instability_quantitative_d1_retry_budget.unlink(missing_ok=True)
+        if positive_instability_quantitative_d1_recovery_reserved:
+            paths.positive_instability_quantitative_d1_recovery_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
         result["technical_retry_of"] = prepare_retry_of.job_id
     if positive_instability_quantitative_d1_retry_of is not None:
         result["technical_retry_of"] = positive_instability_quantitative_d1_retry_of.job_id
+    if positive_instability_quantitative_d1_recovery_of is not None:
+        result["transport_recovery_of"] = positive_instability_quantitative_d1_recovery_of.job_id
     return result
 
 

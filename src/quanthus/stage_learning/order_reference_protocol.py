@@ -61,16 +61,42 @@ def _text(value: Any, label: str, limit: int = 2000) -> None:
         raise OrderReferenceError(f"{label}_invalid")
 
 
-def load_protocol(root: Path | None = None) -> dict[str, Any]:
-    root = root or find_project_root()
-    value = json.loads((root / PROTOCOL_PATH).read_text(encoding="utf-8"))
-    if digest(value) != PROTOCOL_DIGEST:
+def _validate_protocol_value(
+    value: Mapping[str, Any], *, expected_digest: str, root: Path,
+) -> dict[str, Any]:
+    protocol = dict(value)
+    if digest(protocol) != expected_digest:
         raise OrderReferenceError("protocol_drift_requires_new_version")
-    for contract in value["fact_contracts"].values():
+    for contract in protocol["fact_contracts"].values():
         fact = json.loads((root / contract["path"]).read_text(encoding="utf-8"))
         if digest(fact) != contract["digest"]:
             raise OrderReferenceError("formal_fact_contract_drift")
-    return value
+    try:
+        history_start = date.fromisoformat(protocol["history_start"])
+        case_start = date.fromisoformat(protocol["case_start"])
+        development_end = date.fromisoformat(protocol["development_end"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise OrderReferenceError("protocol_time_scope_invalid") from exc
+    if not history_start <= case_start <= development_end:
+        raise OrderReferenceError("protocol_time_scope_invalid")
+    return protocol
+
+
+def load_protocol(root: Path | None = None) -> dict[str, Any]:
+    root = root or find_project_root()
+    value = json.loads((root / PROTOCOL_PATH).read_text(encoding="utf-8"))
+    return _validate_protocol_value(value, expected_digest=PROTOCOL_DIGEST, root=root)
+
+
+def load_protocol_contract(
+    path: str, expected_digest: str, root: Path | None = None,
+) -> dict[str, Any]:
+    root = root or find_project_root()
+    try:
+        value = json.loads((root / path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise OrderReferenceError("protocol_unreadable") from exc
+    return _validate_protocol_value(value, expected_digest=expected_digest, root=root)
 
 
 def _measurement(item: Any | None) -> dict[str, Any]:
@@ -92,6 +118,8 @@ def build_evidence(
     source_kind: str,
     sampling_strata: Mapping[tuple[str, date], str] | None = None,
     progress: Callable[[dict], None] | None = None,
+    protocol_override: Mapping[str, Any] | None = None,
+    protocol_digest: str | None = None,
 ) -> dict[str, Any]:
     """Materialize one shared source/Fact closure and per-T views, without fetching data."""
     started = time.perf_counter()
@@ -106,7 +134,18 @@ def build_evidence(
                       "rows": count, "bytes": byte_count, "disposition": "built_once"})
         last_stage = now
 
-    protocol = load_protocol()
+    if protocol_override is None:
+        protocol = load_protocol()
+        active_protocol_digest = PROTOCOL_DIGEST
+    else:
+        if not isinstance(protocol_digest, str) or not protocol_digest.startswith("sha256:"):
+            raise OrderReferenceError("explicit_protocol_digest_required")
+        protocol = _validate_protocol_value(
+            protocol_override,
+            expected_digest=protocol_digest,
+            root=find_project_root(),
+        )
+        active_protocol_digest = protocol_digest
     if not isinstance(code_revision, str) or not _REVISION.fullmatch(code_revision):
         raise OrderReferenceError("exact_code_revision_required")
     if source_kind not in {"synthetic_fixture", "retrospective_development"}:
@@ -117,7 +156,7 @@ def build_evidence(
         raise OrderReferenceError("case_budget")
     if len(set(case_keys)) != len(case_keys):
         raise OrderReferenceError("duplicate_case")
-    if policy.spec_digest != PROTOCOL_DIGEST:
+    if policy.spec_digest != active_protocol_digest:
         raise OrderReferenceError("input_policy_protocol_mismatch")
     keys = sorted(case_keys)
     strata = dict(sampling_strata or {key: "unspecified" for key in keys})
@@ -128,8 +167,13 @@ def build_evidence(
         raise OrderReferenceError("sampling_stratum_scope_mismatch")
     if set(policy.security_codes) != {code for code, _ in keys}:
         raise OrderReferenceError("case_security_denominator_mismatch")
-    if any(type(day) is not date or not date(2020, 1, 1) <= day <= date(2021, 12, 31)
-           for _, day in keys):
+    case_start = date.fromisoformat(protocol["case_start"])
+    development_end = date.fromisoformat(protocol["development_end"])
+    history_start = date.fromisoformat(protocol["history_start"])
+    if any(
+        type(day) is not date or not case_start <= day <= development_end
+        for _, day in keys
+    ):
         raise OrderReferenceError("case_outside_development")
     ordered = sorted(rows, key=lambda row: (row.security_code, row.market_date))
     attempts = {(row.security_code, row.market_date): row for row in ordered}
@@ -140,7 +184,7 @@ def build_evidence(
     last_day = max(day for _, day in keys)
     normalized = []
     for row in ordered:
-        if not date(2019, 1, 1) <= row.market_date <= last_day:
+        if not history_start <= row.market_date <= last_day:
             raise OrderReferenceError("source_outside_declared_time_scope")
         if row.security_code not in policy.security_codes:
             raise OrderReferenceError("source_security_outside_scope")
@@ -201,7 +245,7 @@ def build_evidence(
             "center_shift": measure(RANGE_CENTER_SHIFT, 10, 10),
         }
         payload = _plain({
-            "protocol_digest": PROTOCOL_DIGEST,
+            "protocol_digest": active_protocol_digest,
             "code_revision": code_revision,
             "policy_digest": digest(policy),
             "source_kind": source_kind, "sampling_stratum": strata[(code, day)],
@@ -262,15 +306,24 @@ def _decode_rows(evidence: dict) -> tuple[list[DailyInput], InputPolicy]:
         raise OrderReferenceError(f"stored_source_invalid:{exc}") from exc
 
 
-def validate_evidence(evidence: dict) -> None:
+def validate_evidence(
+    evidence: dict, *, expected_protocol_digest: str = PROTOCOL_DIGEST,
+) -> None:
     """Explicit independent reconstruction; intentionally separate from ordinary packet views."""
     _keys(evidence, {
         "schema_version", "protocol", "input_policy", "source_kind", "code_revision",
         "source_rows", "cases",
     }, "evidence")
-    if (evidence["schema_version"] != EVIDENCE_SCHEMA
-            or digest(evidence["protocol"]) != PROTOCOL_DIGEST):
+    if (
+        evidence["schema_version"] != EVIDENCE_SCHEMA
+        or digest(evidence["protocol"]) != expected_protocol_digest
+    ):
         raise OrderReferenceError("evidence_protocol_mismatch")
+    protocol = _validate_protocol_value(
+        evidence["protocol"],
+        expected_digest=expected_protocol_digest,
+        root=find_project_root(),
+    )
     if not isinstance(evidence["cases"], list) or not 0 < len(evidence["cases"]) <= 160:
         raise OrderReferenceError("case_budget")
     rows, policy = _decode_rows(evidence)
@@ -284,6 +337,8 @@ def validate_evidence(evidence: dict) -> None:
                 (item["security_code"], date.fromisoformat(item["market_date"])):
                 item["sampling_stratum"] for item in evidence["cases"]
             },
+            protocol_override=protocol,
+            protocol_digest=expected_protocol_digest,
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise OrderReferenceError(f"case_reconstruction_invalid:{exc}") from exc

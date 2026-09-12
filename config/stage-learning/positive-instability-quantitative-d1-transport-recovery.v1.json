@@ -1,0 +1,79 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-d1-transport-recovery.v1",
+  "work_item": "P3-STAGE-010-D1-TRANSPORT-RECOVERY",
+  "recovery_kind": "evidence_transport_only",
+  "failed_chain": {
+    "initial_job": {
+      "job_id": "stage_b5e3feae8b9f47faae7566c308444b3c",
+      "code_revision": "3b5ada72b44905c520521ade6315552c36330d09",
+      "input_digest": "sha256:04789f6075e1d9874c5cf07df633565fd81c409dc02a1fdf9c058c70482a543a",
+      "terminal_state": "failed",
+      "error": "stage_positive_instability_quantitative_d1_process_failed",
+      "artifact_published": false,
+      "diagnosis": "candidate_cohort_date_used_natural_year_end_instead_of_final_2018_trading_session"
+    },
+    "technical_retry_job": {
+      "job_id": "stage_2612f623a94b44ba86ed71128d16bf48",
+      "code_revision": "7412361e4c9094ceffda0eb986fbe0033ebc9ee3",
+      "input_digest": "sha256:1690009abc40a826357b893e9a3fd30ffb02c9b3bb5ff7764338b3ea48b8ea2d",
+      "terminal_state": "failed",
+      "error": "stage_positive_instability_quantitative_d1_process_failed",
+      "artifact_published": false,
+      "diagnosis": "order_reference_protocol_v1_hardcoded_case_start_2020_and_source_start_2019_rejected_the_preregistered_2019_case_scope"
+    }
+  },
+  "implementation_conformance_defect": {
+    "existing_protocol_path": "config/stage-learning/order-reference-protocol.v1.json",
+    "existing_protocol_digest": "sha256:927edd8451c9db9adb0ac06e24dcbc55d11e1ac82aac87123a4d9627557eaf1e",
+    "existing_config_declares_time_fields": true,
+    "old_builder_ignored_declared_time_fields": true,
+    "repair": "make build_evidence consume explicit frozen protocol time fields while preserving default v1 behavior exactly",
+    "new_scope_path": "config/stage-learning/order-reference-evidence-scope-2019.v1.json",
+    "new_scope_digest": "sha256:2d65ce22666a7709a0f67e3d708df085bb624505484bddeec62a7de9b6ecaa0d",
+    "new_scope_history_start": "2018-09-01",
+    "new_scope_case_start": "2019-01-01",
+    "new_scope_development_end": "2019-12-31"
+  },
+  "frozen_parent_contract": {
+    "preregistration_digest": "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606",
+    "execution_digest": "sha256:7e59a3fcadfab30369f66b214a82da1e2a38bae33e5e3c5dd80f35f7e7cd5e6f",
+    "fresh_pool_size": 512,
+    "development_identity_capacity": 256,
+    "development_case_target": 160,
+    "candidate_count": 9,
+    "preserved_evaluation_plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+    "preserved_evaluation_identity_count": 160
+  },
+  "observed_result_exposure_before_recovery": {
+    "initial_job_artifact": false,
+    "technical_retry_artifact": false,
+    "development_reference_opinions": 0,
+    "candidate_scores": 0,
+    "candidate_selected": false,
+    "threshold_values_exposed_to_reviewer": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "authority": {
+    "maximum_transport_recovery_jobs": 1,
+    "counts_against_result_bearing_market_data_job_budget": false,
+    "same_preregistration_digest_required": true,
+    "same_execution_digest_required": true,
+    "same_identity_exclusion_required": true,
+    "same_sampling_seed_required": true,
+    "same_candidate_grid_required": true,
+    "same_gates_required": true,
+    "same_preserved_evaluation_plan_required": true,
+    "parameter_search": false,
+    "semantic_retry": false,
+    "candidate_replacement": false,
+    "automatic_supplement": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

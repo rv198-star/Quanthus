@@ -2325,6 +2325,85 @@ def _positive_instability_d1_review_page(
     }
 
 
+def _positive_instability_d1_selection_transport(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_POSITIVE_INSTABILITY_D1_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("positive instability D1 selection result reference missing")
+    detail = result_ref.get("positive_instability_d1")
+    if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
+        raise StageWorkerError("positive instability D1 selection is not ready")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError(
+            "positive instability D1 selection artifact outside job root"
+        ) from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("positive instability D1 selection manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    files = manifest.get("files", {})
+    payload = {}
+    for name in ("threshold-basis.json", "candidate-grid.json", "evaluation-plan.json"):
+        raw = (artifact_root / name).read_bytes()
+        if files.get(name) != _bytes_sha256(raw):
+            raise StageWorkerError("positive instability D1 selection file binding differs")
+        payload[name] = json.loads(raw)
+    if (
+        _digest(payload["threshold-basis.json"]) != detail.get("threshold_basis_digest")
+        or _digest(payload["candidate-grid.json"]) != detail.get("candidate_grid_digest")
+        or _digest(payload["evaluation-plan.json"]) != detail.get("evaluation_plan_digest")
+        or payload["candidate-grid.json"].get("candidate_count") != 27
+        or payload["candidate-grid.json"].get("parameter_search_performed") is not False
+        or payload["threshold-basis.json"].get("labels_used") is not False
+        or payload["evaluation-plan.json"].get("data_read") is not False
+    ):
+        raise StageWorkerError("positive instability D1 selection payload differs")
+    transport = {
+        "schema_version": "quanthus.stage-positive-instability-selection-transport.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "threshold_basis": payload["threshold-basis.json"],
+        "candidate_grid": payload["candidate-grid.json"],
+        "evaluation_plan_binding": {
+            "identity_count": payload["evaluation-plan.json"].get("identity_count"),
+            "identity_digest": payload["evaluation-plan.json"].get("identity_digest"),
+            "data_read": False,
+        },
+        "review_ledger_must_be_sealed_before_use": True,
+        "evaluation_data_read": False,
+        "candidate_output_included": False,
+        "parameter_search_performed": False,
+    }
+    raw = json.dumps(
+        transport, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    compressed = gzip.compress(raw, compresslevel=9, mtime=0)
+    encoded = base64.b64encode(compressed).decode("ascii")
+    if len(encoded) > 180 * 1024:
+        raise StageWorkerError("positive instability D1 selection transport exceeds status budget")
+    return {
+        "schema_version": "quanthus.stage-positive-instability-selection-envelope.v1",
+        "encoding": "gzip+base64",
+        "raw_sha256": _bytes_sha256(raw),
+        "raw_bytes": len(raw),
+        "compressed_bytes": len(compressed),
+        "encoded_bytes": len(encoded),
+        "payload": encoded,
+    }
+
+
 def _positive_instability_d1_virtual_review_status(
     paths: StageWorkerPaths, requested_job_id: str,
 ) -> dict[str, Any] | None:
@@ -2387,10 +2466,16 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
             review_index = _directional_boundary_d3_review_index(paths, observed)
         if review_index is None:
             review_index = _positive_instability_d1_review_index(paths, observed)
-        return (
+        result = (
             observed
             if review_index is None
             else {**observed, "review_transport_index": review_index}
+        )
+        selection_transport = _positive_instability_d1_selection_transport(paths, observed)
+        return (
+            result
+            if selection_transport is None
+            else {**result, "selection_transport": selection_transport}
         )
     for root, state in ((paths.queue, "queued"), (paths.claimed, "claimed")):
         candidate = root / f"{job_id}.json"

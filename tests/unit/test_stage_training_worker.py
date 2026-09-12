@@ -983,11 +983,42 @@ def test_positive_instability_d1_status_exposes_candidate_blind_primary_transpor
     }
     path_raw = json.dumps(path_facts, sort_keys=True, separators=(",", ":")).encode()
     path_sha = "sha256:" + hashlib.sha256(path_raw).hexdigest()
+    threshold_basis = {
+        "schema_version": "test-threshold-basis",
+        "labels_used": False,
+        "range_width20": {"q50": "0.2"},
+    }
+    candidate_grid = {
+        "schema_version": "test-candidate-grid",
+        "candidate_count": 27,
+        "parameter_search_performed": False,
+        "candidates": [{"candidate_id": f"candidate-{index}"} for index in range(27)],
+    }
+    evaluation_plan = {
+        "schema_version": "test-evaluation-plan",
+        "identity_count": 160,
+        "identity_digest": _digest({"evaluation": 160}),
+        "data_read": False,
+    }
+    threshold_raw = json.dumps(threshold_basis, sort_keys=True, separators=(",", ":")).encode()
+    candidate_raw = json.dumps(candidate_grid, sort_keys=True, separators=(",", ":")).encode()
+    evaluation_raw = json.dumps(evaluation_plan, sort_keys=True, separators=(",", ":")).encode()
     artifact = worker_paths.runs / job_id / "stage-positive-instability-d1-test"
     artifact.mkdir(parents=True)
     (artifact / "evidence.json").write_bytes(evidence_raw)
     (artifact / "path-facts.json").write_bytes(path_raw)
-    manifest = {"files": {"evidence.json": evidence_sha, "path-facts.json": path_sha}}
+    (artifact / "threshold-basis.json").write_bytes(threshold_raw)
+    (artifact / "candidate-grid.json").write_bytes(candidate_raw)
+    (artifact / "evaluation-plan.json").write_bytes(evaluation_raw)
+    manifest = {
+        "files": {
+            "evidence.json": evidence_sha,
+            "path-facts.json": path_sha,
+            "threshold-basis.json": "sha256:" + hashlib.sha256(threshold_raw).hexdigest(),
+            "candidate-grid.json": "sha256:" + hashlib.sha256(candidate_raw).hexdigest(),
+            "evaluation-plan.json": "sha256:" + hashlib.sha256(evaluation_raw).hexdigest(),
+        }
+    }
     manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
     manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
     (artifact / "manifest.json").write_bytes(manifest_raw)
@@ -1008,6 +1039,9 @@ def test_positive_instability_d1_status_exposes_candidate_blind_primary_transpor
             "manifest_sha256": manifest_sha,
             "positive_instability_d1": {
                 "development_selected_case_count": 1,
+                "threshold_basis_digest": _digest(threshold_basis),
+                "candidate_grid_digest": _digest(candidate_grid),
+                "evaluation_plan_digest": _digest(evaluation_plan),
                 "review_ready": True,
             },
         },
@@ -1035,6 +1069,14 @@ def test_positive_instability_d1_status_exposes_candidate_blind_primary_transpor
     assert "recent_available" not in review_case
     assert "threshold_basis" not in decoded
     assert "candidate" not in decoded
+    selection = json.loads(
+        gzip.decompress(base64.b64decode(observed["selection_transport"]["payload"]))
+    )
+    assert selection["threshold_basis"] == threshold_basis
+    assert selection["candidate_grid"] == candidate_grid
+    assert selection["evaluation_plan_binding"]["identity_count"] == 160
+    assert selection["review_ledger_must_be_sealed_before_use"] is True
+    assert selection["evaluation_data_read"] is False
 
 
 def test_order_rule_resolve_score_requires_successful_parent_and_is_single_job(

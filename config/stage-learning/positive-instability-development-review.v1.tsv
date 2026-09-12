@@ -1,0 +1,133 @@
+# schema=quanthus.stage-positive-instability-development-review.v1
+# work_item=P3-STAGE-009-D
+# source_job=stage_93c9590d5df34f5e8f38e242077c1e3c
+# source_manifest_sha256=sha256:c49bbf50f01a5319634bdd0e54a1a3716f14e78b462d5570bf3f6c028e64c6b5
+# development_evidence_digest=sha256:136d362f24c65b3fdbd99341b0a48ad9a9de6f3197f58ba3d1d5f1a8ad2187e1
+# provenance=self_simulated|chatgpt-owner-session-stage009d|stage009d-development-review-20260912
+# candidate_output_seen_during_review=false
+# threshold_basis_seen_during_review=false
+# explicit_recent_derived_facts_seen=false
+# cognitive_blinding_claimed=false
+index|short_instability|short_relocation|short_order|fund_instability|fund_relocation|fund_order|short_reason|fund_reason
+0|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+1|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+2|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+3|FALSE|TRUE|FALSE|FALSE|FALSE|FALSE|short view accepts coherent relocation|fund view treats directional evidence as insufficient
+4|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+5|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+6|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+7|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+8|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+9|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+10|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+11|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|short view accepts disorder evidence|fund view finds disorder amplitude or expansion insufficient
+12|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+13|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+14|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+15|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+16|FALSE|TRUE|FALSE|FALSE|FALSE|FALSE|short view accepts coherent relocation|fund view treats directional evidence as insufficient
+17|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+18|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+19|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+20|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+21|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+22|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+23|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+24|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+25|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+26|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+27|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+28|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+29|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+30|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+31|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+32|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+33|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+34|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|short view accepts disorder evidence|fund view finds disorder amplitude or expansion insufficient
+35|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|instability coexists with directional relocation outside Stage0|directional relocation dominates
+36|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+37|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+38|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|instability coexists with directional relocation outside Stage0|directional relocation dominates
+39|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+40|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+41|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+42|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+43|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+44|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|short view accepts disorder evidence|fund view finds disorder amplitude or expansion insufficient
+45|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+46|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+47|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|short view accepts disorder evidence|fund view finds disorder amplitude or expansion insufficient
+48|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+49|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+50|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+51|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+52|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+53|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|instability coexists with directional relocation outside Stage0|directional relocation dominates
+54|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+55|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+56|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+57|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+58|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+59|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+60|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+61|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+62|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+63|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|instability coexists with directional relocation outside Stage0|directional relocation dominates
+64|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+65|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+66|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+67|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+68|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+69|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+70|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+71|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+72|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+73|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+74|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+75|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+76|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+77|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+78|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+79|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+80|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+81|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+82|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+83|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|short view accepts disorder evidence|fund view finds disorder amplitude or expansion insufficient
+84|FALSE|TRUE|FALSE|FALSE|FALSE|FALSE|short view accepts coherent relocation|fund view treats directional evidence as insufficient
+85|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+86|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+87|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+88|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+89|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+90|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+91|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+92|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+93|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+94|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+95|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+96|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+97|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+98|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+99|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+100|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+101|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+102|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+103|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+104|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+105|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+106|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+107|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+108|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive Stage0 or Stage2 proposition|insufficient positive instability relocation or orderly-consolidation evidence
+109|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|short view accepts disorder evidence|fund view finds disorder amplitude or expansion insufficient
+110|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+111|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+112|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+113|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+114|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+115|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable primary structure|orderly consolidation dominates
+116|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+117|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|positive broad or expanding two-sided disorder at primary scale|positive structural instability without coherent relocation
+118|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+119|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on primary movement or boundary|fund view accepts bounded contraction
+120|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable
+121|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|primary path is directionally organized rather than unstable

@@ -1,0 +1,68 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-projection.v1",
+  "work_item": "P3-STAGE-010-B",
+  "design_binding": {
+    "path": "config/stage-learning/positive-instability-quantitative-projection-design.v1.json",
+    "digest": "sha256:b69ba0f9c22569c521b43c29efa252770d1b1b6e8630f66522cb61f60e306b62"
+  },
+  "source_measurements": [
+    "structure.geometry.range-width@20",
+    "structure.geometry.width-change@20_vs_prior20",
+    "structure.geometry.directional-efficiency@20",
+    "structure.geometry.range-traversal@20",
+    "structure.geometry.counter-direction-excursion-share@20"
+  ],
+  "derived_measurements": {
+    "absolute_range_width_gain": {
+      "formula": "current_width - current_width/(1+width_change)",
+      "available_when": "current_width available AND width_change available AND width_change > -1",
+      "catalog_registration": false
+    }
+  },
+  "channels": {
+    "expanding_disorder_20": {
+      "operator": "AND",
+      "inputs": ["width_expansion_material", "amplitude_or_growth_material", "any_path_disorder"],
+      "amplitude_or_growth_material": {
+        "operator": "OR",
+        "inputs": ["expansion_range_width_material", "absolute_range_width_gain_material"]
+      },
+      "any_path_disorder": {
+        "operator": "OR",
+        "inputs": ["expansion_low_directional_efficiency", "expansion_low_range_traversal", "expansion_high_counter_excursion"]
+      }
+    },
+    "broad_reversal_disorder_20": {
+      "operator": "AND",
+      "inputs": ["broad_range_width_material", "broad_path_disorder_two_of_three"],
+      "broad_path_disorder_two_of_three": {
+        "operator": "AT_LEAST_TWO_OF_THREE",
+        "inputs": ["broad_low_directional_efficiency", "broad_low_range_traversal", "broad_high_counter_excursion"]
+      }
+    }
+  },
+  "structural_instability_20": {
+    "operator": "OR",
+    "inputs": ["expanding_disorder_20", "broad_reversal_disorder_20"]
+  },
+  "forbidden_inputs": [
+    "structure.geometry.range-center-shift@20_vs_prior20",
+    "candidate_stage_output",
+    "future_rows",
+    "recent_10d_derived_facts"
+  ],
+  "authority": {
+    "numeric_threshold_values": false,
+    "market_data_read": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "stage_2_change": false,
+    "relocation_guard_retuning": false,
+    "2021_preserved_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

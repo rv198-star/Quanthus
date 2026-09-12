@@ -1,0 +1,30 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-projection-conformance-result.v1",
+  "work_item": "P3-STAGE-010-C",
+  "status": "PASS_TOPOLOGY_CONFORMANCE_ONLY",
+  "source_consumed_failure_diagnostic_digest": "sha256:277cc92a9fcf1315bc0550ea9da4de5ccc2e8ca9d1e2cb2899c6442abda69278",
+  "old_nearest_candidate_false_negative_count": 15,
+  "old_shared_core_fail_counts": {
+    "directional_efficiency": 7,
+    "range_width": 7,
+    "range_width+directional_efficiency": 1
+  },
+  "checks": {
+    "old_failure_is_shared_core_bottleneck": true,
+    "shared_core_is_explicitly_forbidden": true,
+    "expanding_channel_has_no_broad_width_hard_dependency": true,
+    "expanding_channel_has_no_mandatory_low_efficiency_dependency": true,
+    "broad_channel_uses_two_of_three_not_mandatory_efficiency": true,
+    "center_shift_remains_outside_truth_inputs": true,
+    "no_numeric_threshold_values_frozen": true,
+    "consumed_2020_cannot_select_thresholds": true,
+    "preserved_2021_evaluation_still_unread": true
+  },
+  "failed_checks": [],
+  "numeric_thresholds_selected": false,
+  "parameter_trials": 0,
+  "new_market_data_reads": 0,
+  "runtime_jobs": 0,
+  "preserved_2021_evaluation_read": false,
+  "qualification_claim": false
+}

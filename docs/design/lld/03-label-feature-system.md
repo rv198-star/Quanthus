@@ -440,6 +440,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-009-B | Implement approved positive-instability contract | P3-STAGE-009-A | closed; `../../acceptance/stage-positive-instability-b-implementation-20260912.md`; no thresholds/data/runtime |
 | P3-STAGE-009-C | Synthetic plus consumed-evidence conformance diagnostics | P3-STAGE-009-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; `../../acceptance/stage-positive-instability-c-conformance-20260912.md` |
 | P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | closed; `REVISE_OR_PARK_DEVELOPMENT_FAIL`; 2021 evaluation remained unread; `../../acceptance/stage-positive-instability-d-development-closeout-20260912.md` |
+| P3-STAGE-010 | Repair positive-instability quantitative projection topology | P3-STAGE-009 | ready at D implementation before data read; A/B/C closed; `../stage-positive-instability-quantitative-projection-repair.md` |
+| P3-STAGE-010-A | Freeze separated channel projection topology and review | P3-STAGE-009 | closed; design approved; `../stage-positive-instability-quantitative-projection-repair.md` |
+| P3-STAGE-010-B | Implement deterministic separated-channel projection contract | P3-STAGE-010-A | closed; engineering accepted; `../../acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md` |
+| P3-STAGE-010-C | Consumed-evidence topology conformance | P3-STAGE-010-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; no thresholds selected |
+| P3-STAGE-010-D | Fresh 2019 development then exact preserved 2021 evaluation | P3-STAGE-010-C | ready; preregistered implementation before data read; `../../acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md` |
 
 ## 7. Acceptance
 

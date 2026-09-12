@@ -1,0 +1,121 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-projection-design.v1",
+  "work_item": "P3-STAGE-010",
+  "design_status": "approved",
+  "delivery_gate": "open",
+  "predecessor": {
+    "work_item": "P3-STAGE-009",
+    "disposition": "REVISE_OR_PARK_DEVELOPMENT_FAIL",
+    "closeout": "docs/acceptance/stage-positive-instability-d-development-closeout-20260912.md",
+    "failure_diagnostic": "config/stage-learning/positive-instability-development-failure-diagnostic.v1.json"
+  },
+  "scope": {
+    "target": "quantitative projection from continuous Structure Facts into the already-approved P3-STAGE-009 positive-instability channels",
+    "qualitative_stage_0_semantics_changed": false,
+    "stage_2_changed": false,
+    "relocation_guard_retuned": false,
+    "center_shift_truth_authority": false,
+    "new_source_fact_required": false
+  },
+  "consumed_evidence_boundary": {
+    "stage_009_2020_development_consumed": true,
+    "may_diagnose_projection_structure": true,
+    "may_select_new_thresholds": false,
+    "may_qualify_stage_010": false,
+    "stage_009_2021_evaluation_plan_data_read": false,
+    "stage_009_2021_evaluation_plan_may_be_reused_only_after_stage_010_candidate_freeze": true
+  },
+  "projection_model": {
+    "shared_core_forbidden": true,
+    "expanding_disorder_20": {
+      "meaning": "material relative expansion with material amplitude or absolute width growth, plus at least one explicit path-disorder corroborator",
+      "truth_form": "width_expansion_material AND amplitude_or_growth_material AND any_path_disorder",
+      "amplitude_or_growth_material": {
+        "operator": "OR",
+        "inputs": ["current_range_width_material_expansion_channel", "absolute_range_width_gain_material"]
+      },
+      "any_path_disorder": {
+        "operator": "OR",
+        "inputs": ["low_directional_efficiency_expansion", "low_range_traversal_expansion", "high_counter_direction_excursion_expansion"]
+      },
+      "does_not_require": ["broad_reversal_range_width_floor", "low_directional_efficiency_as_mandatory_gate"]
+    },
+    "broad_reversal_disorder_20": {
+      "meaning": "materially broad current range with at least two independent path-disorder corroborators",
+      "truth_form": "current_range_width_material_broad AND at_least_two_of_three_path_disorder",
+      "at_least_two_of_three_path_disorder": [
+        "low_directional_efficiency_broad",
+        "low_range_traversal_broad",
+        "high_counter_direction_excursion_broad"
+      ],
+      "zero_net_handling": "counter-direction excursion may be UNKNOWN; low efficiency plus low traversal can still satisfy two-of-three",
+      "does_not_require": ["fresh_width_expansion", "low_directional_efficiency_as_single_mandatory_gate"]
+    },
+    "structural_instability_20": "expanding_disorder_20 OR broad_reversal_disorder_20"
+  },
+  "derived_measurements": {
+    "absolute_range_width_gain": {
+      "source_facts": ["structure.geometry.range-width@20", "structure.geometry.width-change@20_vs_prior20"],
+      "formula": "prior_width = current_width/(1+width_change); absolute_gain = current_width-prior_width",
+      "defined_when": "width_change > -1 and source facts available",
+      "registration": "projection-local deterministic derived measurement, not a new catalog Fact"
+    }
+  },
+  "adversarial_cases": [
+    {"case": "tiny_range_relative_expansion_without_absolute_growth", "expected": "expanding_disorder_false"},
+    {"case": "moderate_range_large_absolute_growth_with_reversal", "expected": "expanding_disorder_may_be_true_without_broad_channel_floor"},
+    {"case": "monotonic_expanding_trend", "expected": "all_path_disorder_corrobators_false_so_expanding_disorder_false"},
+    {"case": "broad_roundtrip_moderate_efficiency", "expected": "broad_reversal_may_be_true_when_low_traversal_and_high_counter_excursion_are_true"},
+    {"case": "broad_low_efficiency_without_reversal", "expected": "broad_reversal_false_with_only_one_of_three_disorder_signals"},
+    {"case": "zero_net_broad_roundtrip", "expected": "broad_reversal_true_when_low_efficiency_and_low_traversal_true_even_if_counter_unknown"},
+    {"case": "large_center_shift_contracting_orderly", "expected": "center_shift_never_changes_instability_truth"},
+    {"case": "mixed_instability_and_relocation", "expected": "outside_stage0_under_existing_primary_resolver"}
+  ],
+  "future_threshold_search": {
+    "development_year": 2019,
+    "development_requires_new_economic_identities": true,
+    "development_must_exclude": ["Stage-007 exposed pool", "Stage-008 fresh pool", "Stage-009 entire 512-identity fresh pool including sealed evaluation identities"],
+    "threshold_basis_labels_visible": false,
+    "candidate_grid_size": 9,
+    "grid_construction": "cartesian_product_of_three_expansion_profiles_x_three_broad_profiles",
+    "grid_expansion_after_result": false,
+    "expansion_profiles": ["lenient", "balanced", "strict"],
+    "broad_profiles": ["lenient", "balanced", "strict"]
+  },
+  "preserved_evaluation": {
+    "source": "P3-STAGE-009 D1 frozen 2021 evaluation identity/quarter plan",
+    "identity_count": 160,
+    "market_data_read": false,
+    "may_open_before_stage_010_candidate_freeze": false,
+    "may_be_reselected": false,
+    "may_be_backfilled": false,
+    "2022_2024_access": false,
+    "2025_access": false
+  },
+  "review": {
+    "mode": "same_origin_four_responsibility_adversarial_review",
+    "roles": ["short_term_trader", "fund_manager", "quant_researcher", "data_evidence_governance"],
+    "independent_expert_validation": false,
+    "directional_blockers_open": 0,
+    "review_path": "docs/reviews/stage-positive-instability-quantitative-projection-review-20260912.md"
+  },
+  "delivery_sequence": {
+    "P3-STAGE-010-A": "closed_design_approved",
+    "P3-STAGE-010-B": "ready_implementation_only_no_market_read",
+    "P3-STAGE-010-C": "blocked_until_b_consumed_evidence_conformance",
+    "P3-STAGE-010-D": "blocked_until_c_and_fresh_development_preregistration"
+  },
+  "authority": {
+    "design_and_review": true,
+    "implementation": false,
+    "runtime_job_submission": false,
+    "market_data_read": false,
+    "parameter_search": false,
+    "2021_preserved_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-projection-delivery.v1",
+  "work_item": "P3-STAGE-010",
+  "design": {
+    "path": "config/stage-learning/positive-instability-quantitative-projection-design.v1.json",
+    "digest": "sha256:b69ba0f9c22569c521b43c29efa252770d1b1b6e8630f66522cb61f60e306b62",
+    "state": "APPROVED_IMMUTABLE"
+  },
+  "implementation_checkpoint": {
+    "work_item": "P3-STAGE-010-B",
+    "state": "ENGINEERING_IMPLEMENTATION_ACCEPTED",
+    "contract": "config/stage-learning/positive-instability-quantitative-projection.v1.json",
+    "contract_digest": "sha256:10dec4e9a63d1d1277dfd7e345d1f7b9c65cc27bee0bf05671a86c1277171cee",
+    "implementation": "src/quanthus/stage_learning/positive_instability_quantitative_projection.py",
+    "unit_contract": "tests/unit/test_stage_positive_instability_quantitative_projection.py",
+    "acceptance": "docs/acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md",
+    "numeric_threshold_values_frozen": false,
+    "market_data_reads": 0,
+    "runtime_jobs": 0,
+    "parameter_trials": 0
+  },
+  "conformance_checkpoint": {
+    "work_item": "P3-STAGE-010-C",
+    "state": "PASS_TOPOLOGY_CONFORMANCE_ONLY",
+    "runner": "scripts/run_stage_positive_instability_projection_conformance.py",
+    "result": "config/stage-learning/positive-instability-quantitative-projection-conformance-result.v1.json",
+    "result_digest": "sha256:4cd0ca1ca61a67674ee32d08d42dad91c3fa615d0faee7cfcfcd7cc0939480ce",
+    "old_nearest_candidate_false_negative_count": 15,
+    "numeric_thresholds_selected": false,
+    "parameter_trials": 0,
+    "new_market_data_reads": 0,
+    "runtime_jobs": 0,
+    "preserved_2021_evaluation_read": false
+  },
+  "validation_preregistration": {
+    "work_item": "P3-STAGE-010-D",
+    "state": "PREREGISTERED_IMPLEMENTATION_BEFORE_DATA_READ",
+    "contract": "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
+    "contract_digest": "sha256:586dda1fe987842cee2f56084697e994bfb44781c998b8a093c3e3678565a6e2",
+    "acceptance": "docs/acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md",
+    "development_year": 2019,
+    "development_case_target": 160,
+    "candidate_count": 9,
+    "preserved_evaluation_year": 2021,
+    "preserved_evaluation_identity_count": 160,
+    "preserved_evaluation_plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+    "preserved_evaluation_data_read": false,
+    "data_access_authorized_now": false,
+    "runtime_job_submission_authorized_now": false,
+    "2022_2024_access": false,
+    "2025_access": false
+  },
+  "delivery_sequence": {
+    "P3-STAGE-010-A": "closed_design_approved",
+    "P3-STAGE-010-B": "closed_engineering_accepted",
+    "P3-STAGE-010-C": "closed_pass_topology_conformance_only",
+    "P3-STAGE-010-D": "preregistered_implementation_ready_no_data_access"
+  },
+  "authority": {
+    "implementation": true,
+    "runtime_job_submission": false,
+    "market_data_read": false,
+    "parameter_search": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

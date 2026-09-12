@@ -1,0 +1,132 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-development-failure-diagnostic.v1",
+  "work_item": "P3-STAGE-010-D2-DIAGNOSTIC",
+  "source_result": {
+    "path": "config/stage-learning/positive-instability-quantitative-development-selection-result.v1.json",
+    "digest": "sha256:b0a5f439ccf009cfafa593f0db17b1d9a84af225c90f700d35ed20a309ab0bd6",
+    "disposition": "REVISE_OR_PARK_DEVELOPMENT_FAIL",
+    "eligible_count": 0
+  },
+  "diagnosis": "STAGE0_STAGE2_CONTRACT_OVERLAP_IN_CONTRACTING_MID_WIDTH_BAND",
+  "frontier": {
+    "lenient_lenient_candidate_id": "sha256:d906419b59468e8fb480d0320f7d99bad4f409092895189794cfc31ebaaf813e",
+    "lenient_balanced_candidate_id": "sha256:3f29aa90f71717c07fa0f1c0fb5301d4b7b0e8447d1a097dbaaa8d4920974f5c",
+    "shared_expansion_profile": "expansion-lenient",
+    "only_profile_difference": "broad-lenient versus broad-balanced",
+    "broad_lenient_range_width_min": "0.1498501498501498501498501499",
+    "broad_balanced_range_width_min": "0.1703601108033240997229916898",
+    "lenient_lenient_coverage": "0.7037037037037037037037037037",
+    "lenient_lenient_stage2_overlap_count": 2,
+    "lenient_balanced_coverage": "0.6296296296296296296296296296",
+    "lenient_balanced_stage2_overlap_count": 0
+  },
+  "stage0_rescued_by_lenient_broad_profile": [
+    {
+      "index": 4,
+      "security_code": "000548",
+      "market_date": "2019-03-26",
+      "reference": "STAGE_0",
+      "range_width20": "0.1555977229601518026565464896",
+      "width_change20": "-0.1746166764814935985517677591",
+      "efficiency20_abs": "0.09012875536480686695278969957",
+      "range_traversal20": "0.3888888888888888888888888889",
+      "counter_direction_excursion_share20": "0.6111111111111111111111111111"
+    },
+    {
+      "index": 25,
+      "security_code": "002220",
+      "market_date": "2019-11-19",
+      "reference": "STAGE_0",
+      "range_width20": "0.1630901287553648068669527897",
+      "width_change20": "0.076394849785407725321888412",
+      "efficiency20_abs": "0.1176470588235294117647058824",
+      "range_traversal20": "0.2352941176470588235294117647",
+      "counter_direction_excursion_share20": "0.7647058823529411764705882353"
+    },
+    {
+      "index": 97,
+      "security_code": "300735",
+      "market_date": "2019-11-29",
+      "reference": "STAGE_0",
+      "range_width20": "0.1659734600911071499306793424",
+      "width_change20": "0.243421669851521570602554796",
+      "efficiency20_abs": "0.06712328767123287671232876712",
+      "range_traversal20": "0.2873900293255131964809384164",
+      "counter_direction_excursion_share20": "0.8973607038123167155425219941"
+    },
+    {
+      "index": 101,
+      "security_code": "600101",
+      "market_date": "2019-04-19",
+      "reference": "STAGE_0",
+      "range_width20": "0.1548456957227937195452084461",
+      "width_change20": "-0.2689743259937721914288363692",
+      "efficiency20_abs": "0.1968503937007874015748031496",
+      "range_traversal20": "0.4424778761061946902654867257",
+      "counter_direction_excursion_share20": "0.5575221238938053097345132743"
+    }
+  ],
+  "stage2_overlap_cases": [
+    {
+      "index": 65,
+      "security_code": "300155",
+      "market_date": "2019-04-26",
+      "primary_reference": "STAGE_0",
+      "both_review_roles_stage0": true,
+      "old_stage2_predicate": true,
+      "candidate_instability": true,
+      "range_width20": "0.1627118644067796610169491525",
+      "width_change20": "-0.3078674424487730837338730080",
+      "center_shift20_abs": "0.035087719298245614035087719",
+      "efficiency20_abs": "0.01652892561983471074380165289",
+      "range_traversal20": "0.05479452054794520547945205479",
+      "counter_direction_excursion_share20": "0.9452054794520547945205479452"
+    },
+    {
+      "index": 70,
+      "security_code": "300217",
+      "market_date": "2019-10-14",
+      "primary_reference": "NEITHER",
+      "both_review_roles_stage0": false,
+      "old_stage2_predicate": true,
+      "candidate_instability": true,
+      "range_width20": "0.1627486437613019891500904159",
+      "width_change20": "-0.4695962875008170112638619578",
+      "center_shift20_abs": "0.022181146025878003696857671",
+      "efficiency20_abs": "0.1777777777777777777777777778",
+      "range_traversal20": "0.5333333333333333333333333333",
+      "counter_direction_excursion_share20": "0.4"
+    }
+  ],
+  "old_stage2_predicate": {
+    "efficiency20_abs_max": "0.33",
+    "range_width20_max": "0.18",
+    "width_change20_max": "-0.20",
+    "center_shift20_abs_max": "0.04",
+    "uses_directional_path_geometry": false
+  },
+  "findings": {
+    "decisive_cases_share_mid_width_band": true,
+    "all_four_rescued_stage0_widths_below_balanced_floor": true,
+    "both_stage2_overlap_widths_below_balanced_floor": true,
+    "broad_width_floor_alone_cannot_retain_all_four_rescued_stage0_and_remove_both_observed_overlaps": true,
+    "one_overlap_is_unanimous_stage0_reference_under_primary_review": true,
+    "old_stage2_can_call_high_counter_excursion_low_traversal_path_orderly": true,
+    "p010_projection_change_alone_cannot_resolve_without_violating_frozen_stage2_boundary": true
+  },
+  "bounded_conclusion": "P3-STAGE-010 repaired the prior shared-core coverage bottleneck, but fresh 2019 evidence exposes a narrower Stage0/Stage2 truth-boundary conflict. The old Stage2 predicate has no path-geometry term and can classify contracting mid-width structures as Stage2 even when Primary review finds explicit structural instability. A successor should first reopen the joint Stage0/Stage2 semantic boundary; further P010-only threshold tuning is not justified.",
+  "authority": {
+    "diagnostic_only": true,
+    "threshold_change": false,
+    "candidate_addition": false,
+    "candidate_replacement": false,
+    "review_ledger_change": false,
+    "stage_2_change": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

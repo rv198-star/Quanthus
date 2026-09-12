@@ -1,0 +1,123 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-development-selection-closeout.v1",
+  "work_item": "P3-STAGE-010-D2",
+  "disposition": "REVISE_OR_PARK_DEVELOPMENT_FAIL",
+  "source": {
+    "d1_job_id": "stage_8f2bc43d4b1e4943bca4c3e31214c8a5",
+    "d1_code_revision": "b7155e3c1052437fbd24b4617a6bf0a9ab166a86",
+    "d1_manifest_sha256": "sha256:506cb9ea1425afc1f123636603ae21ae969ac5903421f3dc4910db903476ba8c",
+    "development_evidence_digest": "sha256:9b22e002a20971ed47c933b0dfea73e42c21b7cd1f1471a350704486d0d1a163",
+    "review_input_sha256": "sha256:2df3cf27aeb01ae91f5c36b483524d4864543db4f26d7324e25142803f37f610",
+    "review_ledger_sha256": "sha256:e9d93b43903f8753ad8d7f8859493b8a279ec6aad4101856ebeb4d2bcb5e204e",
+    "review_seal_digest": "sha256:b9e5b317256f4a96251c7a0967a65bcb851731b29b8196544598489dd02ee724",
+    "d2_score_revision": "9120eb4fcdb4a59f81081883fb4fff721a89c7c8",
+    "candidate_grid_digest": "sha256:2781679a81a96a5c4adaa488ee555ec13ad53b0361a712b77050e04048fe6332",
+    "threshold_basis_digest": "sha256:97c53f1551bf62a0b444a523bb57689ae44f5c918f0ad15774ca0ace6ea3233e",
+    "selection_transport": "immutable-artifact-direct"
+  },
+  "development_denominator": {
+    "case_count": 160,
+    "primary_reference_counts": {
+      "AMBIGUOUS": 18,
+      "NEITHER": 72,
+      "STAGE_0": 54,
+      "STAGE_2": 16
+    },
+    "atomic_role_disagreement_count": 19,
+    "projected_primary_disagreement_count": 18,
+    "opinion_count": 320
+  },
+  "frozen_008_baseline": {
+    "true_positive": 36,
+    "false_positive": 12,
+    "false_negative": 18,
+    "stage_0_predictions": 48,
+    "definite_positive_references": 54,
+    "definite_negative_references": 88,
+    "precision": "0.75",
+    "positive_reference_coverage": "0.6666666666666666666666666667",
+    "definite_negative_false_positive_rate": "0.1363636363636363636363636364",
+    "candidate_instability_stage2_overlap_count": 0
+  },
+  "candidate_grid": {
+    "trial_count": 9,
+    "eligible_count": 0,
+    "expanded_after_result": false,
+    "trials_digest": "sha256:39b6262c3ae6b570a821a8ffbb8efe96ff2da2e5884df5d5f4ec340fad5d0a24"
+  },
+  "near_pass_frontier": [
+    {
+      "candidate_id": "sha256:d906419b59468e8fb480d0320f7d99bad4f409092895189794cfc31ebaaf813e",
+      "expansion_profile_id": "expansion-lenient",
+      "broad_profile_id": "broad-lenient",
+      "metrics": {
+        "true_positive": 38,
+        "false_positive": 1,
+        "false_negative": 16,
+        "stage_0_predictions": 39,
+        "definite_positive_references": 54,
+        "definite_negative_references": 88,
+        "precision": "0.9743589743589743589743589744",
+        "positive_reference_coverage": "0.7037037037037037037037037037",
+        "definite_negative_false_positive_rate": "0.01136363636363636363636363636",
+        "candidate_instability_stage2_overlap_count": 2
+      },
+      "development_gate_failures": {
+        "stage_2_predictions_must_equal_frozen_stage_2_exactly": {
+          "required_overlap_count": 0,
+          "observed_overlap_count": 2,
+          "pass": false
+        }
+      },
+      "all_other_absolute_gates_pass": true,
+      "precision_not_worse_than_baseline": true,
+      "fpr_not_worse_than_baseline": true,
+      "coverage_loss_vs_baseline_within_limit": true,
+      "removed_at_least_one_baseline_false_positive": true
+    },
+    {
+      "candidate_id": "sha256:3f29aa90f71717c07fa0f1c0fb5301d4b7b0e8447d1a097dbaaa8d4920974f5c",
+      "expansion_profile_id": "expansion-lenient",
+      "broad_profile_id": "broad-balanced",
+      "metrics": {
+        "true_positive": 34,
+        "false_positive": 0,
+        "false_negative": 20,
+        "stage_0_predictions": 34,
+        "definite_positive_references": 54,
+        "definite_negative_references": 88,
+        "precision": "1",
+        "positive_reference_coverage": "0.6296296296296296296296296296",
+        "definite_negative_false_positive_rate": "0",
+        "candidate_instability_stage2_overlap_count": 0
+      },
+      "development_gate_failures": {
+        "minimum_positive_reference_coverage": {
+          "required": "0.70",
+          "observed": "0.6296296296296296296296296296",
+          "pass": false
+        }
+      },
+      "all_other_absolute_gates_pass": true,
+      "precision_not_worse_than_baseline": true,
+      "fpr_not_worse_than_baseline": true,
+      "coverage_loss_vs_baseline_within_limit": true,
+      "removed_at_least_one_baseline_false_positive": true
+    }
+  ],
+  "authority": {
+    "evaluation_data_read": false,
+    "evaluation_job_submitted": false,
+    "candidate_frozen": false,
+    "grid_expansion_after_result": false,
+    "additional_parameter_trials": 0,
+    "additional_development_review": false,
+    "relocation_guard_retuned": false,
+    "stage_2_changed": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

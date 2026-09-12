@@ -291,12 +291,17 @@ nodes.
   shortfall, nine fixed candidates, zero opinions, zero parameter search, and review-ready. The CLI
   mismatch is fixed in `e8ca262`; the failed Worker receipt remains immutable and no additional D1
   Job or market read is authorized. D2 then completed the candidate-blind Primary review over all 160
-  cases and sealed 320 same-origin role opinions with 19 cross-role disagreements before any candidate
-  or threshold-basis read. The sealed ledger SHA-256 is `e9d93b43903f8753ad8d7f8859493b8a279ec6aad4101856ebeb4d2bcb5e204e`;
-  only deterministic scoring of the exact frozen nine candidates is now open. The exact 160-identity
-  2021 plan frozen by Stage-009 remains unread and cannot be reselected or opened before candidate
-  freeze. 2022–2025, Stage2 changes, relocation retuning, official labels, strategy and trading remain
-  closed. Design:
+  cases and sealed 320 same-origin role opinions with 19 atomic cross-role disagreements before any
+  candidate or threshold-basis read. The sealed ledger SHA-256 is `e9d93b43903f8753ad8d7f8859493b8a279ec6aad4101856ebeb4d2bcb5e204e`.
+  D2 then scored exactly the frozen nine candidates and found `eligible_count=0`, so P010 closes
+  `REVISE_OR_PARK_DEVELOPMENT_FAIL` without opening 2021. The near-pass frontier is narrow: the
+  lenient/lenient profile reaches precision 0.9744 / coverage 0.7037 / FPR 0.0114 but conflicts with
+  frozen Stage2 on two cases; the lenient/balanced neighbor removes the overlap but coverage falls to
+  0.6296. A bounded post-result diagnostic shows the decisive cases occupy the same mid-width band and
+  exposes a fresh Stage0/Stage2 truth-boundary conflict, including one unanimous Stage0 reference that
+  the old numeric Stage2 predicate also calls Stage2. The exact 160-identity 2021 plan remains unread.
+  2022–2025, Stage2 changes inside P010, relocation retuning, official labels, strategy and trading
+  remain closed. Design:
   `design/stage-positive-instability-quantitative-projection-repair.md`; B evidence:
   `acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md`; D
   preregistration: `acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md`;
@@ -306,6 +311,7 @@ nodes.
   `acceptance/stage-positive-instability-quantitative-d1-transport-recovery-20260912.md`; recovered
   D1 result: `acceptance/stage-positive-instability-quantitative-d1-recovery-result-20260913.md`;
   D2 review seal: `acceptance/stage-positive-instability-quantitative-d2-review-seal-20260913.md`;
+  D2 closeout: `acceptance/stage-positive-instability-quantitative-d2-development-closeout-20260913.md`;
   route: `work-items/stage-positive-instability-quantitative-projection-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

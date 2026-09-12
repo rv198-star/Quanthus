@@ -34,7 +34,7 @@
   },
   "validation_preregistration": {
     "work_item": "P3-STAGE-010-D",
-    "state": "D2_REVIEW_LEDGER_SEALED_SCORE_READY",
+    "state": "D2_DEVELOPMENT_FAIL_STAGE0_STAGE2_BOUNDARY_DIAGNOSED",
     "contract": "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
     "contract_digest": "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606",
     "acceptance": "docs/acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md",
@@ -129,11 +129,25 @@
     "candidate_grid_expansion_authorized": false,
     "preserved_2021_evaluation_read_authorized": false
   },
+  "d2_selection_checkpoint": {
+    "work_item": "P3-STAGE-010-D2",
+    "state": "REVISE_OR_PARK_DEVELOPMENT_FAIL",
+    "result": "config/stage-learning/positive-instability-quantitative-development-selection-result.v1.json",
+    "result_digest": "sha256:b0a5f439ccf009cfafa593f0db17b1d9a84af225c90f700d35ed20a309ab0bd6",
+    "failure_diagnostic": "config/stage-learning/positive-instability-quantitative-development-failure-diagnostic.v1.json",
+    "failure_diagnostic_digest": "sha256:22aa4f57cdc7f51699ecdbf63ad86135ad64a468c0056c20e3a579e119d218e7",
+    "trial_count": 9,
+    "eligible_count": 0,
+    "candidate_frozen": false,
+    "evaluation_data_read": false,
+    "preserved_2021_evaluation_read_authorized": false,
+    "diagnosis": "STAGE0_STAGE2_CONTRACT_OVERLAP_IN_CONTRACTING_MID_WIDTH_BAND"
+  },
   "delivery_sequence": {
     "P3-STAGE-010-A": "closed_design_approved",
     "P3-STAGE-010-B": "closed_engineering_accepted",
     "P3-STAGE-010-C": "closed_pass_topology_conformance_only",
-    "P3-STAGE-010-D": "d2_review_ledger_sealed_ready_exact_nine_scoring"
+    "P3-STAGE-010-D": "closed_revise_or_park_development_fail_stage0_stage2_boundary"
   },
   "authority": {
     "implementation": true,
@@ -142,8 +156,8 @@
     "market_data_read": false,
     "authorized_market_data_scope": null,
     "candidate_blind_review": false,
-    "candidate_scoring_exact_frozen_grid": true,
-    "maximum_candidate_trials": 9,
+    "candidate_scoring_exact_frozen_grid": false,
+    "maximum_candidate_trials": 0,
     "candidate_grid_expansion": false,
     "transport_recovery_only": false,
     "parameter_search": false,

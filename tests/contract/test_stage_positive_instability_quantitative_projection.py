@@ -89,7 +89,7 @@ def test_c_closes_topology_only_and_keeps_evaluation_unread() -> None:
 
 def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> None:
     checkpoint = load(DELIVERY)["validation_preregistration"]
-    assert checkpoint["state"] == "D2_REVIEW_LEDGER_SEALED_SCORE_READY"
+    assert checkpoint["state"] == "D2_DEVELOPMENT_FAIL_STAGE0_STAGE2_BOUNDARY_DIAGNOSED"
     assert checkpoint["contract_digest"] == (
         "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606"
     )
@@ -208,7 +208,40 @@ def test_d2_review_is_sealed_before_exact_candidate_scoring() -> None:
     assert seal["review"]["ledger_bytes"] == 36197
 
 
-def test_current_authority_is_exact_nine_scoring_only() -> None:
+def test_d2_selection_closes_without_candidate_or_evaluation_read() -> None:
+    checkpoint = load(DELIVERY)["d2_selection_checkpoint"]
+    assert checkpoint["state"] == "REVISE_OR_PARK_DEVELOPMENT_FAIL"
+    assert checkpoint["trial_count"] == 9
+    assert checkpoint["eligible_count"] == 0
+    assert checkpoint["candidate_frozen"] is False
+    assert checkpoint["evaluation_data_read"] is False
+    assert checkpoint["preserved_2021_evaluation_read_authorized"] is False
+    assert checkpoint["diagnosis"] == (
+        "STAGE0_STAGE2_CONTRACT_OVERLAP_IN_CONTRACTING_MID_WIDTH_BAND"
+    )
+    result = load(ROOT / checkpoint["result"])
+    assert digest(result) == checkpoint["result_digest"]
+    assert result["candidate_grid"]["trial_count"] == 9
+    assert result["candidate_grid"]["eligible_count"] == 0
+    assert result["authority"]["candidate_frozen"] is False
+    assert result["authority"]["evaluation_data_read"] is False
+    diagnostic = load(ROOT / checkpoint["failure_diagnostic"])
+    assert digest(diagnostic) == checkpoint["failure_diagnostic_digest"]
+    assert (
+        diagnostic["findings"][
+            "one_overlap_is_unanimous_stage0_reference_under_primary_review"
+        ]
+        is True
+    )
+    assert (
+        diagnostic["findings"][
+            "p010_projection_change_alone_cannot_resolve_without_violating_frozen_stage2_boundary"
+        ]
+        is True
+    )
+
+
+def test_current_authority_is_closed_after_d2_fail() -> None:
     authority = load(DELIVERY)["authority"]
     assert authority == {
         "implementation": True,
@@ -217,8 +250,8 @@ def test_current_authority_is_exact_nine_scoring_only() -> None:
         "market_data_read": False,
         "authorized_market_data_scope": None,
         "candidate_blind_review": False,
-        "candidate_scoring_exact_frozen_grid": True,
-        "maximum_candidate_trials": 9,
+        "candidate_scoring_exact_frozen_grid": False,
+        "maximum_candidate_trials": 0,
         "candidate_grid_expansion": False,
         "transport_recovery_only": False,
         "parameter_search": False,

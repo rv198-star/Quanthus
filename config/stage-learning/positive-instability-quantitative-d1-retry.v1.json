@@ -1,0 +1,49 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-d1-retry.v1",
+  "work_item": "P3-STAGE-010-D",
+  "retry_kind": "technical_only",
+  "parent_job": {
+    "job_id": "stage_b5e3feae8b9f47faae7566c308444b3c",
+    "code_revision": "3b5ada72b44905c520521ade6315552c36330d09",
+    "input_digest": "sha256:04789f6075e1d9874c5cf07df633565fd81c409dc02a1fdf9c058c70482a543a",
+    "terminal_state": "failed",
+    "error": "stage_positive_instability_quantitative_d1_process_failed",
+    "artifact_published": false
+  },
+  "root_cause": {
+    "exception": "quanthus.stage_learning.source.StageDevelopmentSourceError",
+    "message": "identity security_codes must be unique six-digit codes",
+    "diagnosis": "candidate discovery returned an empty cohort because the natural-year endpoint 2018-12-31 was used where the discovery contract requires the final trading session",
+    "project_evidence_for_corrected_endpoint": "2018-12-28 is already present as the year-end market_date in governed project evidence and 2018 bar/state/calendar source partitions are present on RX6800"
+  },
+  "correction": {
+    "field": "source_isolation.candidate_cohort_date",
+    "old_value": "2018-12-31",
+    "new_value": "2018-12-28",
+    "old_preregistration_digest": "sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581",
+    "new_preregistration_digest": "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606",
+    "new_execution_digest": "sha256:7e59a3fcadfab30369f66b214a82da1e2a38bae33e5e3c5dd80f35f7e7cd5e6f"
+  },
+  "unchanged_semantic_contract": {
+    "fresh_pool_size": 512,
+    "development_identity_capacity": 256,
+    "development_case_target": 160,
+    "candidate_count": 9,
+    "development_gates_changed": false,
+    "evaluation_gates_changed": false,
+    "projection_topology_changed": false,
+    "relocation_guard_retuned": false,
+    "stage_2_changed": false,
+    "preserved_2021_evaluation_plan_changed": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false
+  },
+  "budget": {
+    "maximum_retry_jobs": 1,
+    "semantic_retries": 0,
+    "automatic_supplement_rounds": 0,
+    "retry_requires_exact_parent_failure": true,
+    "retry_requires_exact_corrected_preregistration_digest": true
+  }
+}

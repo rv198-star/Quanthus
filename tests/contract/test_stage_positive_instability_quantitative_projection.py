@@ -89,9 +89,9 @@ def test_c_closes_topology_only_and_keeps_evaluation_unread() -> None:
 
 def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> None:
     checkpoint = load(DELIVERY)["validation_preregistration"]
-    assert checkpoint["state"] == "D1_ENGINEERING_ACCEPTED_AND_AUTHORIZED"
+    assert checkpoint["state"] == "D1_TECHNICAL_RETRY_AUTHORIZED"
     assert checkpoint["contract_digest"] == (
-        "sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581"
+        "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606"
     )
     assert checkpoint["development_year"] == 2019
     assert checkpoint["development_case_target"] == 160
@@ -110,14 +110,26 @@ def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> N
 def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
     delivery = load(DELIVERY)
     checkpoint = delivery["d1_implementation_checkpoint"]
-    assert checkpoint["state"] == "ENGINEERING_IMPLEMENTATION_ACCEPTED"
+    assert checkpoint["state"] == "FIRST_JOB_TECHNICAL_FAIL_RETRY_AUTHORIZED"
     assert checkpoint["execution_contract_digest"] == (
-        "sha256:708c2efe94bf48feebd8652c92ca6750a8fe5882541453c2dda8ba17b062c127"
+        "sha256:7e59a3fcadfab30369f66b214a82da1e2a38bae33e5e3c5dd80f35f7e7cd5e6f"
     )
     assert checkpoint["authorized_job_kind"] == (
         "quanthus.stage-positive-instability-quantitative-d1-prepare.v1"
     )
     assert checkpoint["maximum_result_bearing_jobs_now"] == 1
+    assert checkpoint["maximum_technical_retry_jobs_remaining"] == 1
+    assert checkpoint["semantic_retries_remaining"] == 0
+    assert checkpoint["technical_correction"] == {
+        "field": "source_isolation.candidate_cohort_date",
+        "old_value": "2018-12-31",
+        "new_value": "2018-12-28",
+    }
+    assert checkpoint["failed_job"]["job_id"] == "stage_b5e3feae8b9f47faae7566c308444b3c"
+    assert checkpoint["failed_job"]["artifact_published"] is False
+    assert checkpoint["retry_authorization_digest"] == (
+        "sha256:ae2028fa9f3e6bae5725cb86494f0abc98a298085c4e39a12f1d34c3c6ebd08a"
+    )
     assert checkpoint["authorized_market_data_scope"] == {
         "warmup_start": "2018-09-01",
         "development_start": "2019-01-01",
@@ -131,6 +143,8 @@ def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
         "prepare_implementation",
         "worker_implementation",
         "acceptance",
+        "retry_acceptance",
+        "retry_authorization",
     ):
         assert (ROOT / checkpoint[key]).is_file()
 
@@ -145,6 +159,7 @@ def test_current_authority_is_d1_only() -> None:
         ),
         "market_data_read": True,
         "authorized_market_data_scope": "D1_2018_warmup_2019_development_only",
+        "technical_retry_only": True,
         "parameter_search": False,
         "preserved_2021_evaluation_read": False,
         "2022_2024_access": False,

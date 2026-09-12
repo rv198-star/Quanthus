@@ -440,11 +440,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-009-B | Implement approved positive-instability contract | P3-STAGE-009-A | closed; `../../acceptance/stage-positive-instability-b-implementation-20260912.md`; no thresholds/data/runtime |
 | P3-STAGE-009-C | Synthetic plus consumed-evidence conformance diagnostics | P3-STAGE-009-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; `../../acceptance/stage-positive-instability-c-conformance-20260912.md` |
 | P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | closed; `REVISE_OR_PARK_DEVELOPMENT_FAIL`; 2021 evaluation remained unread; `../../acceptance/stage-positive-instability-d-development-closeout-20260912.md` |
-| P3-STAGE-010 | Repair positive-instability quantitative projection topology | P3-STAGE-009 | ready at D1; A/B/C closed; one-shot 2019 development prepare authorized; `../stage-positive-instability-quantitative-projection-repair.md` |
+| P3-STAGE-010 | Repair positive-instability quantitative projection topology | P3-STAGE-009 | ready at D1 technical retry; A/B/C closed; first D1 failed before artifact on non-trading cohort endpoint; one corrected retry authorized; `../stage-positive-instability-quantitative-projection-repair.md` |
 | P3-STAGE-010-A | Freeze separated channel projection topology and review | P3-STAGE-009 | closed; design approved; `../stage-positive-instability-quantitative-projection-repair.md` |
 | P3-STAGE-010-B | Implement deterministic separated-channel projection contract | P3-STAGE-010-A | closed; engineering accepted; `../../acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md` |
 | P3-STAGE-010-C | Consumed-evidence topology conformance | P3-STAGE-010-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; no thresholds selected |
-| P3-STAGE-010-D | Fresh 2019 development then exact preserved 2021 evaluation | P3-STAGE-010-C | ready at D1 only; 2018 warm-up + 2019 development authorized; preserved 2021 evaluation unread; `../../acceptance/stage-positive-instability-quantitative-d1-implementation-20260912.md` |
+| P3-STAGE-010-D | Fresh 2019 development then exact preserved 2021 evaluation | P3-STAGE-010-C | ready for exactly one D1 technical retry with 2018-12-28 cohort endpoint; original failed Job retained; preserved 2021 evaluation unread; `../../acceptance/stage-positive-instability-quantitative-d1-retry-20260912.md` |
 
 ## 7. Acceptance
 

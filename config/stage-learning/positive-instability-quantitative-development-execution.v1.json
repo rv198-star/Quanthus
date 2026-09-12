@@ -3,7 +3,7 @@
   "work_item": "P3-STAGE-010-D",
   "preregistration": {
     "path": "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
-    "digest": "sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581"
+    "digest": "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606"
   },
   "quantile_method": {
     "name": "nearest_rank_ceiling_1_based",

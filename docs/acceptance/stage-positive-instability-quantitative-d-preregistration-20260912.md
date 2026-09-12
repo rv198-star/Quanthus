@@ -3,8 +3,9 @@
 ## State
 
 ```text
-PREREGISTERED / IMPLEMENTATION BEFORE DATA READ
-2019 DEVELOPMENT: NOT READ YET
+PREREGISTERED / D1 TECHNICAL RETRY AUTHORIZED
+FIRST D1: FAILED BEFORE GOVERNED DEVELOPMENT ARTIFACT
+2019 DEVELOPMENT CASE EVIDENCE: NOT PUBLISHED
 PRESERVED 2021 EVALUATION: STILL UNREAD
 2022-2025: SEALED
 ```
@@ -13,7 +14,9 @@ Machine contract:
 `config/stage-learning/positive-instability-quantitative-development-screen.v1.json`
 
 Digest:
-`sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581`
+`sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606`
+
+The original preregistration digest `sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581` is retained in the technical-retry authorization. The only correction is the cohort endpoint `2018-12-31 -> 2018-12-28`; no candidate, gate, identity-plan, or evaluation boundary changed.
 
 ## 1. Why a new development cohort is required
 

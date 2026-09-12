@@ -28,11 +28,11 @@ from quanthus.stage_learning.positive_instability_quantitative_projection import
 from quanthus.structure_v2_inputs import digest
 
 PREREG_PATH = "config/stage-learning/positive-instability-quantitative-development-screen.v1.json"
-PREREG_DIGEST = "sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581"
+PREREG_DIGEST = "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606"
 EXECUTION_PATH = (
     "config/stage-learning/positive-instability-quantitative-development-execution.v1.json"
 )
-EXECUTION_DIGEST = "sha256:708c2efe94bf48feebd8652c92ca6750a8fe5882541453c2dda8ba17b062c127"
+EXECUTION_DIGEST = "sha256:7e59a3fcadfab30369f66b214a82da1e2a38bae33e5e3c5dd80f35f7e7cd5e6f"
 FROZEN_008_RELOCATION = RelocationCandidate(Decimal("0.10"), Decimal("0.50"), Decimal("0.60"))
 DEFINITE_REFERENCES = {"STAGE_0", "STAGE_2", "NEITHER"}
 

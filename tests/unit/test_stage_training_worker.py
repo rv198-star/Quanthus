@@ -1082,7 +1082,84 @@ def test_positive_instability_d1_status_exposes_candidate_blind_primary_transpor
     assert selection["evaluation_data_read"] is False
 
 
-def test_positive_instability_quantitative_d1_is_single_job_with_no_retry(
+def _write_positive_instability_quantitative_d1_retry_authorization(
+    worker_paths: StageWorkerPaths, first: dict,
+) -> None:
+    config_dir = worker_paths.control_repo / "config/stage-learning"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    for name in (
+        "positive-instability-quantitative-development-screen.v1.json",
+        "positive-instability-quantitative-development-execution.v1.json",
+    ):
+        (config_dir / name).write_text(
+            (ROOT / "config/stage-learning" / name).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+    screen = json.loads(
+        (config_dir / "positive-instability-quantitative-development-screen.v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    execution = json.loads(
+        (config_dir / "positive-instability-quantitative-development-execution.v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    authorization = {
+        "schema_version": "quanthus.stage-positive-instability-quantitative-d1-retry.v1",
+        "work_item": "P3-STAGE-010-D",
+        "retry_kind": "technical_only",
+        "parent_job": {
+            "job_id": first["job_id"],
+            "code_revision": first["code_revision"],
+            "input_digest": first["input_digest"],
+            "terminal_state": "failed",
+            "error": "stage_positive_instability_quantitative_d1_process_failed",
+            "artifact_published": False,
+        },
+        "root_cause": {
+            "exception": "quanthus.stage_learning.source.StageDevelopmentSourceError",
+            "message": "identity security_codes must be unique six-digit codes",
+            "diagnosis": "test-only year-end calendar endpoint correction",
+            "project_evidence_for_corrected_endpoint": "2018-12-28",
+        },
+        "correction": {
+            "field": "source_isolation.candidate_cohort_date",
+            "old_value": "2018-12-31",
+            "new_value": "2018-12-28",
+            "old_preregistration_digest": "sha256:" + "0" * 64,
+            "new_preregistration_digest": _digest(screen),
+            "new_execution_digest": _digest(execution),
+        },
+        "unchanged_semantic_contract": {
+            "fresh_pool_size": 512,
+            "development_identity_capacity": 256,
+            "development_case_target": 160,
+            "candidate_count": 9,
+            "development_gates_changed": False,
+            "evaluation_gates_changed": False,
+            "projection_topology_changed": False,
+            "relocation_guard_retuned": False,
+            "stage_2_changed": False,
+            "preserved_2021_evaluation_plan_changed": False,
+            "preserved_2021_evaluation_read": False,
+            "2022_2024_access": False,
+            "2025_access": False,
+        },
+        "budget": {
+            "maximum_retry_jobs": 1,
+            "semantic_retries": 0,
+            "automatic_supplement_rounds": 0,
+            "retry_requires_exact_parent_failure": True,
+            "retry_requires_exact_corrected_preregistration_digest": True,
+        },
+    }
+    (config_dir / "positive-instability-quantitative-d1-retry.v1.json").write_text(
+        json.dumps(authorization), encoding="utf-8"
+    )
+
+
+def test_positive_instability_quantitative_d1_allows_one_bound_technical_retry(
     tmp_path: Path,
 ) -> None:
     worker_paths = paths(tmp_path)
@@ -1096,22 +1173,46 @@ def test_positive_instability_quantitative_d1_is_single_job_with_no_retry(
         code_revision=REVISION,
         kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
     )
-    assert first["kind"] == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
-    assert first["config"] == (
-        "config/stage-learning/positive-instability-quantitative-development-screen.v1.json"
-    )
-    assert _JOB_SPECS[STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB]["wall_seconds"] == 2700
     assert second["job_id"] == first["job_id"]
     assert second["idempotent_reuse"] is True
-    marker = json.loads(
-        worker_paths.positive_instability_quantitative_d1_budget.read_text(encoding="utf-8")
+    job = StageJob.from_dict(
+        json.loads(
+            (worker_paths.queue / f"{first['job_id']}.json").read_text(encoding="utf-8")
+        )
     )
-    assert marker["job"]["job_id"] == first["job_id"]
-    assert marker["input_digest"] == first["input_digest"]
-    with pytest.raises(StageWorkerError, match="no retry"):
+    (worker_paths.queue / f"{first['job_id']}.json").unlink()
+    StageWorker(worker_paths)._write_status(
+        job,
+        state="failed",
+        stage="terminal",
+        started_at="2026-09-12T13:36:49+00:00",
+        completed_at="2026-09-12T13:36:55+00:00",
+        error="stage_positive_instability_quantitative_d1_process_failed",
+        exit_code=1,
+    )
+    _write_positive_instability_quantitative_d1_retry_authorization(worker_paths, first)
+
+    retry_revision = "c" * 40
+    retry = submit_job(
+        worker_paths,
+        code_revision=retry_revision,
+        kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+    )
+    assert retry["job_id"] != first["job_id"]
+    assert retry["technical_retry_of"] == first["job_id"]
+    assert retry["state"] == "queued"
+    repeated = submit_job(
+        worker_paths,
+        code_revision=retry_revision,
+        kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+    )
+    assert repeated["job_id"] == retry["job_id"]
+    assert repeated["idempotent_reuse"] is True
+    assert repeated["technical_retry_of"] == first["job_id"]
+    with pytest.raises(StageWorkerError, match="retry budget is already consumed"):
         submit_job(
             worker_paths,
-            code_revision="c" * 40,
+            code_revision="d" * 40,
             kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
         )
 

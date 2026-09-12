@@ -38,7 +38,7 @@
     "identity_start": "2018-01-01",
     "identity_end": "2019-12-31",
     "candidate_scan_start": "2018-01-01",
-    "candidate_cohort_date": "2018-12-31",
+    "candidate_cohort_date": "2018-12-28",
     "candidate_minimum_observations": 120,
     "candidate_seed": "stage010-d-positive-instability-quantitative-20260912-v1|candidate-population",
     "development_history_start": "2018-09-01",

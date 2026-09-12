@@ -61,7 +61,13 @@ POSITIVE_INSTABILITY_D1_BUDGET_SCHEMA = "quanthus.stage-positive-instability-d1-
 POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA = (
     "quanthus.stage-positive-instability-quantitative-d1-budget.v1"
 )
+POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_BUDGET_SCHEMA = (
+    "quanthus.stage-positive-instability-quantitative-d1-retry-budget.v1"
+)
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
+POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_AUTH = (
+    "config/stage-learning/positive-instability-quantitative-d1-retry.v1.json"
+)
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
 MAIN_REF = "refs/remotes/stage-control/main"
@@ -355,6 +361,10 @@ class StageWorkerPaths:
     @property
     def positive_instability_quantitative_d1_budget(self) -> Path:
         return self.control_root / "positive-instability-quantitative-d1-budget.json"
+
+    @property
+    def positive_instability_quantitative_d1_retry_budget(self) -> Path:
+        return self.control_root / "positive-instability-quantitative-d1-retry-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -745,9 +755,22 @@ def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[st
     }
 
 
-def _existing_positive_instability_quantitative_d1_submission(
-    paths: StageWorkerPaths, *, code_revision: str,
-) -> dict[str, Any] | None:
+def _positive_instability_quantitative_d1_retry_budget_value(
+    failed_job: StageJob, retry_job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-010-D",
+        "technical_retry_of": failed_job.job_id,
+        "failed_input_digest": failed_job.input_digest,
+        "job": retry_job.to_dict(),
+        "input_digest": retry_job.input_digest,
+    }
+
+
+def _parse_positive_instability_quantitative_d1_marker(
+    paths: StageWorkerPaths,
+) -> StageJob | None:
     marker_path = paths.positive_instability_quantitative_d1_budget
     if not marker_path.exists():
         return None
@@ -766,11 +789,138 @@ def _existing_positive_instability_quantitative_d1_submission(
         or marker.get("input_digest") != job.input_digest
     ):
         raise StageWorkerError("positive instability quantitative D1 budget marker differs")
-    if job.code_revision != code_revision:
+    return job
+
+
+def _parse_positive_instability_quantitative_d1_retry_marker(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> StageJob | None:
+    marker_path = paths.positive_instability_quantitative_d1_retry_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "positive instability quantitative D1 retry budget")
+    if (
+        marker.get("schema_version")
+        != POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-010-D"
+        or marker.get("technical_retry_of") != failed_job.job_id
+        or marker.get("failed_input_digest") != failed_job.input_digest
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("positive instability quantitative D1 retry budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("positive instability quantitative D1 retry budget marker differs")
+    return job
+
+
+def _positive_instability_quantitative_d1_retry_authorization(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> None:
+    authorization = _object(
+        paths.control_repo / POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_AUTH,
+        "positive instability quantitative D1 retry authorization",
+    )
+    if (
+        authorization.get("schema_version")
+        != "quanthus.stage-positive-instability-quantitative-d1-retry.v1"
+        or authorization.get("work_item") != "P3-STAGE-010-D"
+        or authorization.get("retry_kind") != "technical_only"
+    ):
+        raise StageWorkerError("positive instability quantitative D1 retry authorization differs")
+    parent = authorization.get("parent_job")
+    correction = authorization.get("correction")
+    unchanged = authorization.get("unchanged_semantic_contract")
+    budget = authorization.get("budget")
+    if not all(isinstance(value, Mapping) for value in (parent, correction, unchanged, budget)):
         raise StageWorkerError(
-            "positive instability quantitative D1 has no retry or replacement authority"
+            "positive instability quantitative D1 retry authorization incomplete"
         )
-    return _idempotent_stage_submission(paths, job)
+    if (
+        parent.get("job_id") != failed_job.job_id
+        or parent.get("code_revision") != failed_job.code_revision
+        or parent.get("input_digest") != failed_job.input_digest
+        or parent.get("terminal_state") != "failed"
+        or parent.get("error") != "stage_positive_instability_quantitative_d1_process_failed"
+        or parent.get("artifact_published") is not False
+    ):
+        raise StageWorkerError("positive instability quantitative D1 retry parent differs")
+    current = _object(
+        paths.control_repo
+        / "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
+        "positive instability quantitative development screen",
+    )
+    execution = _object(
+        paths.control_repo
+        / "config/stage-learning/positive-instability-quantitative-development-execution.v1.json",
+        "positive instability quantitative development execution",
+    )
+    source_isolation = current.get("source_isolation")
+    if not isinstance(source_isolation, Mapping):
+        raise StageWorkerError("positive instability quantitative source isolation missing")
+    if (
+        correction.get("field") != "source_isolation.candidate_cohort_date"
+        or correction.get("old_value") != "2018-12-31"
+        or correction.get("new_value") != "2018-12-28"
+        or source_isolation.get("candidate_cohort_date") != "2018-12-28"
+        or _digest(current) != correction.get("new_preregistration_digest")
+        or _digest(execution) != correction.get("new_execution_digest")
+    ):
+        raise StageWorkerError("positive instability quantitative D1 retry correction drift")
+    for key in (
+        "development_gates_changed", "evaluation_gates_changed", "projection_topology_changed",
+        "relocation_guard_retuned", "stage_2_changed", "preserved_2021_evaluation_plan_changed",
+        "preserved_2021_evaluation_read", "2022_2024_access", "2025_access",
+    ):
+        if unchanged.get(key) is not False:
+            raise StageWorkerError("positive instability quantitative D1 retry semantic drift")
+    if (
+        unchanged.get("fresh_pool_size") != 512
+        or unchanged.get("development_identity_capacity") != 256
+        or unchanged.get("development_case_target") != 160
+        or unchanged.get("candidate_count") != 9
+        or budget.get("maximum_retry_jobs") != 1
+        or budget.get("semantic_retries") != 0
+        or budget.get("automatic_supplement_rounds") != 0
+        or budget.get("retry_requires_exact_parent_failure") is not True
+        or budget.get("retry_requires_exact_corrected_preregistration_digest") is not True
+    ):
+        raise StageWorkerError("positive instability quantitative D1 retry budget differs")
+
+
+def _existing_positive_instability_quantitative_d1_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> tuple[dict[str, Any] | None, StageJob | None]:
+    failed_job = _parse_positive_instability_quantitative_d1_marker(paths)
+    if failed_job is None:
+        return None, None
+    if failed_job.code_revision == code_revision:
+        return _idempotent_stage_submission(paths, failed_job), None
+    retry_job = _parse_positive_instability_quantitative_d1_retry_marker(paths, failed_job)
+    if retry_job is not None:
+        if retry_job.code_revision == code_revision:
+            result = _idempotent_stage_submission(paths, retry_job)
+            result["technical_retry_of"] = failed_job.job_id
+            return result, None
+        raise StageWorkerError(
+            "positive instability quantitative D1 technical retry budget is already consumed"
+        )
+    observed = read_status(paths, failed_job.job_id)
+    if (
+        observed.get("state") != "failed"
+        or observed.get("error") != "stage_positive_instability_quantitative_d1_process_failed"
+        or observed.get("input_digest") != failed_job.input_digest
+        or observed.get("code_revision") != failed_job.code_revision
+        or observed.get("result_ref") is not None
+    ):
+        raise StageWorkerError(
+            "positive instability quantitative D1 is already bound to another immutable input"
+        )
+    _positive_instability_quantitative_d1_retry_authorization(paths, failed_job)
+    return None, failed_job
 
 
 def _qualification_budget_value(job: StageJob, *, state: str, reserved_at: str) -> dict[str, Any]:
@@ -1463,6 +1613,7 @@ def submit_job(
     if spec is None:
         raise StageWorkerError("submit kind is not admitted")
     prepare_retry_of: StageJob | None = None
+    positive_instability_quantitative_d1_retry_of: StageJob | None = None
     if kind == STAGE_ORDER_RULE_PREPARE_JOB:
         existing, prepare_retry_of = _existing_order_rule_prepare_submission(
             paths, code_revision=code_revision,
@@ -1494,8 +1645,10 @@ def submit_job(
         if existing is not None:
             return existing
     if kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB:
-        existing = _existing_positive_instability_quantitative_d1_submission(
-            paths, code_revision=code_revision,
+        existing, positive_instability_quantitative_d1_retry_of = (
+            _existing_positive_instability_quantitative_d1_submission(
+                paths, code_revision=code_revision,
+            )
         )
         if existing is not None:
             return existing
@@ -1518,6 +1671,11 @@ def submit_job(
     positive_instability_d1_reserved = job.kind == STAGE_POSITIVE_INSTABILITY_D1_JOB
     positive_instability_quantitative_d1_reserved = (
         job.kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+        and positive_instability_quantitative_d1_retry_of is None
+    )
+    positive_instability_quantitative_d1_retry_reserved = (
+        job.kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+        and positive_instability_quantitative_d1_retry_of is not None
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -1553,6 +1711,13 @@ def submit_job(
             paths.positive_instability_quantitative_d1_budget,
             _positive_instability_quantitative_d1_budget_value(job),
         )
+    if positive_instability_quantitative_d1_retry_reserved:
+        _exclusive_json(
+            paths.positive_instability_quantitative_d1_retry_budget,
+            _positive_instability_quantitative_d1_retry_budget_value(
+                positive_instability_quantitative_d1_retry_of, job
+            ),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -1577,6 +1742,8 @@ def submit_job(
             paths.positive_instability_d1_budget.unlink(missing_ok=True)
         if positive_instability_quantitative_d1_reserved:
             paths.positive_instability_quantitative_d1_budget.unlink(missing_ok=True)
+        if positive_instability_quantitative_d1_retry_reserved:
+            paths.positive_instability_quantitative_d1_retry_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -1596,10 +1763,14 @@ def submit_job(
             paths.positive_instability_d1_budget.unlink(missing_ok=True)
         if positive_instability_quantitative_d1_reserved:
             paths.positive_instability_quantitative_d1_budget.unlink(missing_ok=True)
+        if positive_instability_quantitative_d1_retry_reserved:
+            paths.positive_instability_quantitative_d1_retry_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
         result["technical_retry_of"] = prepare_retry_of.job_id
+    if positive_instability_quantitative_d1_retry_of is not None:
+        result["technical_retry_of"] = positive_instability_quantitative_d1_retry_of.job_id
     return result
 
 

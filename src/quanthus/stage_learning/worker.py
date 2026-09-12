@@ -46,6 +46,7 @@ STAGE_ORDER_RULE_PREPARE_JOB = "quanthus.stage-order-rule-prepare.v1"
 STAGE_ORDER_RULE_RESOLVE_SCORE_JOB = "quanthus.stage-order-rule-resolve-score.v1"
 STAGE_DIRECTIONAL_BOUNDARY_D1_JOB = "quanthus.stage-directional-boundary-d1-prepare.v1"
 STAGE_DIRECTIONAL_BOUNDARY_D3_JOB = "quanthus.stage-directional-boundary-d3-prepare.v1"
+STAGE_POSITIVE_INSTABILITY_D1_JOB = "quanthus.stage-positive-instability-d1-prepare.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -53,6 +54,7 @@ ORDER_RULE_PREPARE_RETRY_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-retr
 ORDER_RULE_RESOLVE_SCORE_BUDGET_SCHEMA = "quanthus.stage-order-rule-resolve-score-budget.v1"
 DIRECTIONAL_BOUNDARY_D1_BUDGET_SCHEMA = "quanthus.stage-directional-boundary-d1-budget.v1"
 DIRECTIONAL_BOUNDARY_D3_BUDGET_SCHEMA = "quanthus.stage-directional-boundary-d3-budget.v1"
+POSITIVE_INSTABILITY_D1_BUDGET_SCHEMA = "quanthus.stage-positive-instability-d1-budget.v1"
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
@@ -153,6 +155,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.directional_boundary_evaluation_prepare",
         "artifact_glob": "stage-directional-boundary-d3-*",
         "process_error": "stage_directional_boundary_d3_process_failed",
+        "wall_seconds": 2700,
+    },
+    STAGE_POSITIVE_INSTABILITY_D1_JOB: {
+        "config": "config/stage-learning/positive-instability-development-screen.v1.json",
+        "module": "quanthus.stage_learning.positive_instability_development_prepare",
+        "artifact_glob": "stage-positive-instability-d1-*",
+        "process_error": "stage_positive_instability_d1_process_failed",
         "wall_seconds": 2700,
     },
 }
@@ -323,6 +332,10 @@ class StageWorkerPaths:
     @property
     def directional_boundary_d3_budget(self) -> Path:
         return self.control_root / "directional-boundary-d3-budget.json"
+
+    @property
+    def positive_instability_d1_budget(self) -> Path:
+        return self.control_root / "positive-instability-d1-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -664,6 +677,42 @@ def _existing_directional_boundary_d3_submission(
         raise StageWorkerError("directional boundary D3 budget marker differs")
     if job.code_revision != code_revision:
         raise StageWorkerError("directional boundary D3 has no retry or replacement authority")
+    return _idempotent_stage_submission(paths, job)
+
+
+def _positive_instability_d1_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": POSITIVE_INSTABILITY_D1_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-009-D",
+        "phase": "D1_PREPARE_2020_DEVELOPMENT_AND_FREEZE_2021_EVALUATION_IDENTITY_PLAN",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_positive_instability_d1_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.positive_instability_d1_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "positive instability D1 budget")
+    if (
+        marker.get("schema_version") != POSITIVE_INSTABILITY_D1_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-009-D"
+        or marker.get("phase")
+        != "D1_PREPARE_2020_DEVELOPMENT_AND_FREEZE_2021_EVALUATION_IDENTITY_PLAN"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("positive instability D1 budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_POSITIVE_INSTABILITY_D1_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("positive instability D1 budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError("positive instability D1 has no retry or replacement authority")
     return _idempotent_stage_submission(paths, job)
 
 
@@ -1110,6 +1159,32 @@ class StageWorker:
                 "candidate_replacement": verified.get("candidate_replacement"),
                 "review_ready": verified.get("review_ready"),
             }
+        if job.kind == STAGE_POSITIVE_INSTABILITY_D1_JOB:
+            result["positive_instability_d1"] = {
+                "fresh_pool_size": verified.get("fresh_pool_size"),
+                "development_identity_capacity": verified.get("development_identity_capacity"),
+                "evaluation_identity_capacity": verified.get("evaluation_identity_capacity"),
+                "development_selected_case_count": verified.get(
+                    "development_selected_case_count"
+                ),
+                "development_shortfall_count": verified.get("development_shortfall_count"),
+                "development_selection_digest": verified.get("development_selection_digest"),
+                "development_evidence_digest": verified.get("development_evidence_digest"),
+                "threshold_basis_digest": verified.get("threshold_basis_digest"),
+                "candidate_grid_digest": verified.get("candidate_grid_digest"),
+                "candidate_count": verified.get("candidate_count"),
+                "path_facts_digest": verified.get("path_facts_digest"),
+                "evaluation_planned_identity_count": verified.get(
+                    "evaluation_planned_identity_count"
+                ),
+                "evaluation_identity_digest": verified.get("evaluation_identity_digest"),
+                "evaluation_plan_digest": verified.get("evaluation_plan_digest"),
+                "evaluation_data_read": verified.get("evaluation_data_read"),
+                "parameter_search": verified.get("parameter_search"),
+                "opinion_count": verified.get("opinion_count"),
+                "candidate_frozen": verified.get("candidate_frozen"),
+                "review_ready": verified.get("review_ready"),
+            }
         return result
 
     def execute(self, job: StageJob) -> dict[str, Any]:
@@ -1324,6 +1399,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_POSITIVE_INSTABILITY_D1_JOB:
+        existing = _existing_positive_instability_d1_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -1340,6 +1421,7 @@ def submit_job(
     resolve_score_reserved = job.kind == STAGE_ORDER_RULE_RESOLVE_SCORE_JOB
     directional_d1_reserved = job.kind == STAGE_DIRECTIONAL_BOUNDARY_D1_JOB
     directional_d3_reserved = job.kind == STAGE_DIRECTIONAL_BOUNDARY_D3_JOB
+    positive_instability_d1_reserved = job.kind == STAGE_POSITIVE_INSTABILITY_D1_JOB
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
@@ -1364,6 +1446,11 @@ def submit_job(
             paths.directional_boundary_d3_budget,
             _directional_boundary_d3_budget_value(job),
         )
+    if positive_instability_d1_reserved:
+        _exclusive_json(
+            paths.positive_instability_d1_budget,
+            _positive_instability_d1_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -1384,6 +1471,8 @@ def submit_job(
             paths.directional_boundary_d1_budget.unlink(missing_ok=True)
         if directional_d3_reserved:
             paths.directional_boundary_d3_budget.unlink(missing_ok=True)
+        if positive_instability_d1_reserved:
+            paths.positive_instability_d1_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -1399,6 +1488,8 @@ def submit_job(
             paths.directional_boundary_d1_budget.unlink(missing_ok=True)
         if directional_d3_reserved:
             paths.directional_boundary_d3_budget.unlink(missing_ok=True)
+        if positive_instability_d1_reserved:
+            paths.positive_instability_d1_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -2051,6 +2142,238 @@ def _directional_boundary_d3_virtual_review_status(
     return None
 
 
+def _positive_instability_d1_review_evidence(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> tuple[str, str, str, dict[str, Any], dict[str, Any]]:
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("positive instability D1 result reference missing")
+    detail = result_ref.get("positive_instability_d1")
+    if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
+        raise StageWorkerError("positive instability D1 review is not ready")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError("positive instability D1 artifact outside job root") from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("positive instability D1 manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    evidence_raw = (artifact_root / "evidence.json").read_bytes()
+    path_facts_raw = (artifact_root / "path-facts.json").read_bytes()
+    evidence_sha = _bytes_sha256(evidence_raw)
+    path_facts_sha = _bytes_sha256(path_facts_raw)
+    files = manifest.get("files", {})
+    if (
+        files.get("evidence.json") != evidence_sha
+        or files.get("path-facts.json") != path_facts_sha
+    ):
+        raise StageWorkerError("positive instability D1 review file binding differs")
+    evidence = json.loads(evidence_raw)
+    path_facts = json.loads(path_facts_raw)
+    if (
+        not isinstance(evidence.get("source_rows"), dict)
+        or not isinstance(evidence.get("cases"), list)
+        or not isinstance(path_facts.get("cases"), dict)
+    ):
+        raise StageWorkerError("positive instability D1 review evidence shape differs")
+    if len(evidence["cases"]) != detail.get("development_selected_case_count"):
+        raise StageWorkerError("positive instability D1 review denominator differs")
+    return manifest_sha, evidence_sha, path_facts_sha, evidence, path_facts
+
+
+def _positive_instability_d1_review_alias(parent_job_id: str, page: int) -> str:
+    raw = f"{parent_job_id}|positive-instability-d1-primary-page|{page}".encode()
+    return "stage_" + hashlib.sha256(raw).hexdigest()[:32]
+
+
+def _positive_instability_d1_review_index(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_POSITIVE_INSTABILITY_D1_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    manifest_sha, evidence_sha, path_facts_sha, evidence, _path_facts = (
+        _positive_instability_d1_review_evidence(paths, observed)
+    )
+    case_count = len(evidence["cases"])
+    pages = (
+        case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
+    ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+    return {
+        "schema_version": "quanthus.stage-positive-instability-primary-review-index.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "evidence_file_sha256": evidence_sha,
+        "path_facts_file_sha256": path_facts_sha,
+        "case_count": case_count,
+        "page_size": DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+        "page_count": pages,
+        "pages": [
+            {
+                "page": page,
+                "job_id": _positive_instability_d1_review_alias(
+                    str(observed["job_id"]), page
+                ),
+                "start": page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                "count": min(
+                    DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                    case_count - page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                ),
+            }
+            for page in range(pages)
+        ],
+        "threshold_basis_included": False,
+        "candidate_output_included": False,
+        "explicit_recent_derived_facts_included": False,
+        "future_rows_included": False,
+    }
+
+
+def _positive_instability_d1_review_page(
+    paths: StageWorkerPaths, observed: Mapping[str, Any], page: int,
+) -> dict[str, Any]:
+    manifest_sha, evidence_sha, path_facts_sha, evidence, path_facts = (
+        _positive_instability_d1_review_evidence(paths, observed)
+    )
+    cases = evidence["cases"]
+    source_rows = evidence["source_rows"]
+    path_by_case = path_facts["cases"]
+    start = page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+    selected = cases[start:start + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE]
+    if not selected:
+        raise StageWorkerError("positive instability D1 review page outside denominator")
+    compact_cases = []
+    for case in selected:
+        if not isinstance(case, dict):
+            raise StageWorkerError("positive instability D1 review case shape differs")
+        case_id = str(case.get("case_id") or "")
+        if _digest({key: value for key, value in case.items() if key != "case_id"}) != case_id:
+            raise StageWorkerError("positive instability D1 review case digest differs")
+        directional = path_by_case.get(case_id)
+        if not isinstance(directional, dict) or len(directional) != 2:
+            raise StageWorkerError("positive instability D1 path facts missing")
+        refs = case.get("history_refs")
+        if not isinstance(refs, list) or len(refs) < 21:
+            raise StageWorkerError("positive instability D1 primary history too short")
+        history = []
+        for ref in refs[-21:]:
+            row = source_rows.get(ref)
+            if not isinstance(row, dict) or _digest(row) != ref:
+                raise StageWorkerError("positive instability D1 history binding differs")
+            if row.get("market_date") > case.get("market_date"):
+                raise StageWorkerError("positive instability D1 future row")
+            history.append([
+                ref,
+                row.get("market_date"),
+                row.get("high"),
+                row.get("low"),
+                row.get("close"),
+                row.get("coordinate_epoch"),
+                row.get("reset_reason"),
+            ])
+        compact_cases.append({
+            "case_id": case_id,
+            "security_code": case.get("security_code"),
+            "security_id": case.get("security_id"),
+            "market_date": case.get("market_date"),
+            "sampling_stratum": case.get("sampling_stratum"),
+            "coordinate_ref": case.get("coordinate_ref"),
+            "primary_available": case.get("primary_available"),
+            "input_reason": case.get("input_reason"),
+            "availability_reasons": case.get("availability_reasons"),
+            "primary": case.get("primary"),
+            "directional_path_facts": directional,
+            "history": history,
+        })
+    transport = {
+        "schema_version": "quanthus.stage-positive-instability-primary-review-transport.v1",
+        "parent_job_id": observed["job_id"],
+        "page": page,
+        "page_size": DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+        "manifest_sha256": manifest_sha,
+        "evidence_file_sha256": evidence_sha,
+        "path_facts_file_sha256": path_facts_sha,
+        "case_count": len(cases),
+        "cases": compact_cases,
+        "threshold_basis_included": False,
+        "candidate_output_included": False,
+        "explicit_recent_derived_facts_included": False,
+        "future_rows_included": False,
+    }
+    raw = json.dumps(
+        transport, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    compressed = gzip.compress(raw, compresslevel=9, mtime=0)
+    encoded = base64.b64encode(compressed).decode("ascii")
+    if len(encoded) > 180 * 1024:
+        raise StageWorkerError("positive instability D1 review page exceeds status budget")
+    return {
+        "schema_version": "quanthus.stage-positive-instability-primary-review-envelope.v1",
+        "encoding": "gzip+base64",
+        "raw_sha256": _bytes_sha256(raw),
+        "raw_bytes": len(raw),
+        "compressed_bytes": len(compressed),
+        "encoded_bytes": len(encoded),
+        "payload": encoded,
+    }
+
+
+def _positive_instability_d1_virtual_review_status(
+    paths: StageWorkerPaths, requested_job_id: str,
+) -> dict[str, Any] | None:
+    for status_path in sorted(paths.status.glob("stage_*.json")):
+        observed = _object(status_path, "stage job status")
+        if (
+            observed.get("kind") != STAGE_POSITIVE_INSTABILITY_D1_JOB
+            or observed.get("state") != "succeeded"
+        ):
+            continue
+        result_ref = observed.get("result_ref")
+        detail = (
+            result_ref.get("positive_instability_d1")
+            if isinstance(result_ref, Mapping)
+            else None
+        )
+        if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
+            continue
+        case_count = int(detail.get("development_selected_case_count") or 0)
+        pages = (
+            case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
+        ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+        for page in range(pages):
+            alias = _positive_instability_d1_review_alias(str(observed["job_id"]), page)
+            if alias != requested_job_id:
+                continue
+            return {
+                "schema_version": STATUS_SCHEMA,
+                "job_id": requested_job_id,
+                "kind": "quanthus.stage-positive-instability-primary-review-page.v1",
+                "code_revision": observed.get("code_revision"),
+                "input_digest": observed.get("input_digest"),
+                "state": "succeeded",
+                "stage": "virtual_read_only",
+                "submitted_at": observed.get("submitted_at"),
+                "started_at": observed.get("started_at"),
+                "completed_at": observed.get("completed_at"),
+                "parent_job_id": observed["job_id"],
+                "page": page,
+                "review_transport": _positive_instability_d1_review_page(
+                    paths, observed, page
+                ),
+                "error": None,
+                "exit_code": 0,
+                "updated_at": observed.get("updated_at"),
+            }
+    return None
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -2062,6 +2385,8 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
             review_index = _directional_boundary_d1_review_index(paths, observed)
         if review_index is None:
             review_index = _directional_boundary_d3_review_index(paths, observed)
+        if review_index is None:
+            review_index = _positive_instability_d1_review_index(paths, observed)
         return (
             observed
             if review_index is None
@@ -2088,6 +2413,9 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if virtual is not None:
         return virtual
     virtual = _directional_boundary_d3_virtual_review_status(paths, job_id)
+    if virtual is not None:
+        return virtual
+    virtual = _positive_instability_d1_virtual_review_status(paths, job_id)
     if virtual is not None:
         return virtual
     raise StageWorkerError("stage job is not known on this node")

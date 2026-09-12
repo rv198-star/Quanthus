@@ -10,9 +10,13 @@ DIAGNOSTIC = ROOT / "config/stage-learning/orderly-consolidation-boundary-diagno
 DESIGN = ROOT / "config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json"
 DELIVERY = ROOT / "config/stage-learning/orderly-consolidation-boundary-repair-delivery.v1.json"
 PROJECTION = ROOT / "config/stage-learning/orderly-consolidation-projection.v1.json"
+CONFORMANCE = ROOT / (
+    "config/stage-learning/orderly-consolidation-boundary-conformance-result.v1.json"
+)
 DIAGNOSTIC_DIGEST = "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c"
 DESIGN_DIGEST = "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353"
 PROJECTION_DIGEST = "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c"
+CONFORMANCE_DIGEST = "sha256:64741982652b0323a14dcd7c87c1486d7b8998fa085d5c190d3ca9a28a0c91d1"
 
 
 def load(path):
@@ -112,16 +116,27 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
     assert checkpoint["runtime_jobs"] == 0
     for key in ("contract", "implementation", "unit_contract", "acceptance"):
         assert (ROOT / checkpoint[key]).is_file()
+    conformance = value["conformance_checkpoint"]
+    assert conformance["state"] == "PASS_TOPOLOGY_CONFORMANCE_ONLY"
+    assert conformance["result_digest"] == CONFORMANCE_DIGEST
+    assert digest(load(CONFORMANCE)) == CONFORMANCE_DIGEST
+    assert load(CONFORMANCE)["failed_checks"] == []
+    assert conformance["numeric_thresholds_selected"] is False
+    assert conformance["candidate_pairs_scored"] == 0
+    assert conformance["new_market_data_reads"] == 0
+    assert conformance["runtime_jobs"] == 0
+    assert conformance["preserved_2021_evaluation_read"] is False
     assert value["delivery_sequence"] == {
         "P3-STAGE-011-A": "closed_design_approved",
         "P3-STAGE-011-B": "closed_engineering_accepted",
-        "P3-STAGE-011-C": "ready_consumed_evidence_topology_conformance",
-        "P3-STAGE-011-D": "blocked_pending_c_and_fresh_preregistration",
+        "P3-STAGE-011-C": "closed_pass_topology_conformance_only",
+        "P3-STAGE-011-D": "ready_preregistration_design_only",
     }
     assert value["authority"] == {
         "implementation": False,
         "synthetic_conformance": False,
-        "consumed_evidence_topology_diagnostic": True,
+        "consumed_evidence_topology_diagnostic": False,
+        "preregistration_design": True,
         "market_data_read": False,
         "runtime_job_submission": False,
         "parameter_search": False,

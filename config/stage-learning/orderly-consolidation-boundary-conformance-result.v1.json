@@ -1,0 +1,28 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-boundary-conformance-result.v1",
+  "work_item": "P3-STAGE-011-C",
+  "status": "PASS_TOPOLOGY_CONFORMANCE_ONLY",
+  "diagnostic_digest": "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c",
+  "design_digest": "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353",
+  "projection_contract_digest": "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c",
+  "checks": {
+    "center_shift_removed_from_stage2_truth_inputs": true,
+    "coherent_relocation_remains_hard_negative_stage2_condition": true,
+    "directional_path_geometry_remains_relocation_only": true,
+    "future_search_surface_is_bounded_before_fresh_data": true,
+    "legacy_stage2_center_gate_is_the_only_observed_stage2_false_negative_gate": true,
+    "legacy_stage2_has_definite_cross_class_conflict": true,
+    "no_numeric_threshold_selected_from_consumed_evidence": true,
+    "path_churn_not_promoted_to_stage2_truth": true,
+    "positive_stage2_still_requires_narrowness_and_contraction": true,
+    "preserved_2021_remains_unread": true
+  },
+  "failed_checks": [],
+  "numeric_thresholds_selected": false,
+  "candidate_pairs_scored": 0,
+  "parameter_trials": 0,
+  "new_market_data_reads": 0,
+  "runtime_jobs": 0,
+  "preserved_2021_evaluation_read": false,
+  "qualification_claim": false
+}

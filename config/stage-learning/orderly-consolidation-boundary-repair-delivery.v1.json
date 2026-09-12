@@ -29,16 +29,30 @@
     "market_data_reads": 0,
     "runtime_jobs": 0
   },
+  "conformance_checkpoint": {
+    "work_item": "P3-STAGE-011-C",
+    "state": "PASS_TOPOLOGY_CONFORMANCE_ONLY",
+    "runner": "scripts/run_stage_orderly_consolidation_boundary_conformance.py",
+    "result": "config/stage-learning/orderly-consolidation-boundary-conformance-result.v1.json",
+    "result_digest": "sha256:64741982652b0323a14dcd7c87c1486d7b8998fa085d5c190d3ca9a28a0c91d1",
+    "acceptance": "docs/acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md",
+    "numeric_thresholds_selected": false,
+    "candidate_pairs_scored": 0,
+    "new_market_data_reads": 0,
+    "runtime_jobs": 0,
+    "preserved_2021_evaluation_read": false
+  },
   "delivery_sequence": {
     "P3-STAGE-011-A": "closed_design_approved",
     "P3-STAGE-011-B": "closed_engineering_accepted",
-    "P3-STAGE-011-C": "ready_consumed_evidence_topology_conformance",
-    "P3-STAGE-011-D": "blocked_pending_c_and_fresh_preregistration"
+    "P3-STAGE-011-C": "closed_pass_topology_conformance_only",
+    "P3-STAGE-011-D": "ready_preregistration_design_only"
   },
   "authority": {
     "implementation": false,
     "synthetic_conformance": false,
-    "consumed_evidence_topology_diagnostic": true,
+    "consumed_evidence_topology_diagnostic": false,
+    "preregistration_design": true,
     "market_data_read": false,
     "runtime_job_submission": false,
     "parameter_search": false,

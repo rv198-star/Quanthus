@@ -9,14 +9,14 @@
 | Machine design | `../../config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json` |
 | Root-cause diagnostic | `../../config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json` |
 | Delivery state | `../../config/stage-learning/orderly-consolidation-boundary-repair-delivery.v1.json` |
-| Current state | A/B closed; deterministic Stage2 projection accepted; C ready for consumed-evidence topology conformance only; no data/runtime authority |
+| Current state | A/B/C closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; D ready for preregistration design only, with no data/runtime authority |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-011-A | Freeze Stage2 topology and joint 0/2 boundary | P3-STAGE-010 | closed; design approved; consumed P010 evidence diagnostic-only |
 | P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; `../acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md` |
-| P3-STAGE-011-C | Run consumed-evidence topology conformance | P3-STAGE-011-B | ready; diagnostic-only; no threshold learning |
-| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | blocked; requires separate preregistration and source-isolation acceptance |
+| P3-STAGE-011-C | Run consumed-evidence topology conformance | P3-STAGE-011-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; `../acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md` |
+| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | ready for preregistration design only; data/runtime remains closed until preregistration and engineering acceptance |
 
 ## Hard boundaries
 

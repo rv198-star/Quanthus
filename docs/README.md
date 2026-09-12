@@ -248,9 +248,14 @@ nodes.
   for 8/11 remaining false positives but only 2/15 definite Stage0 references; removing only that
   independent positive authority would yield diagnostic-only precision/FPR `0.8125 / 0.0462` with
   coverage about `0.8667`. This does not reopen 008 or qualify the post-hoc predicate. The successor
-  is `P3-STAGE-009`, ready for **design/review only**, to redefine positive structural-instability
-  evidence while keeping runtime/data authority closed. Evidence:
-  `acceptance/stage-directional-boundary-root-cause-validation-20260912.md`; route:
+  is `P3-STAGE-009`. Its A-stage design/review is now closed with a two-channel positive-instability
+  model: expanding disorder and broad-reversal disorder. `range-center-shift` retains descriptive /
+  modifier meaning but has zero proposition-truth authority; no new Fact and no numerical threshold
+  is frozen by A. B is ready for implementation-only work while market reads, runtime Jobs, threshold
+  search, 2022-2025 access and Stage-2 changes remain closed. Evidence:
+  `acceptance/stage-directional-boundary-root-cause-validation-20260912.md`; design:
+  `design/stage-positive-instability-proposition-repair.md`; review:
+  `reviews/stage-positive-instability-proposition-repair-review-20260912.md`; route:
   `work-items/stage-positive-instability-proposition-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

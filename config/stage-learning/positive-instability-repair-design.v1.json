@@ -1,0 +1,138 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-repair-design.v1",
+  "work_item": "P3-STAGE-009",
+  "design_status": "approved",
+  "delivery_gate": "blocked",
+  "predecessor": {
+    "work_item": "P3-STAGE-008",
+    "disposition": "REVISE_OR_PARK_EVALUATION_FAIL",
+    "root_cause_evidence": "docs/acceptance/stage-directional-boundary-root-cause-validation-20260912.md",
+    "root_cause_diagnostic": "config/stage-learning/directional-boundary-root-cause-diagnostic.v1.json"
+  },
+  "target": {
+    "proposition": "structural_instability_20",
+    "meaning": "positive direction-neutral structural disorder at the 20-session primary scale",
+    "residual_bucket_forbidden": true,
+    "center_shift_independent_positive_authority": false,
+    "stage_2_changes_authorized": false,
+    "relocation_guard_retuning_authorized": false
+  },
+  "positive_evidence_model": {
+    "composition": "small_explainable_or_of_positive_channels",
+    "channels": {
+      "expanding_disorder_20": {
+        "meaning": "the current primary-scale structure is materially expanding while the path itself lacks coherent one-way directional organization",
+        "required_fact_roles": [
+          "structure.geometry.width-change@20_vs_prior20",
+          "structure.geometry.directional-efficiency@20",
+          "structure.geometry.range-width@20"
+        ],
+        "center_shift_role": "modifier_only",
+        "single_fact_assertion_forbidden": true
+      },
+      "broad_reversal_disorder_20": {
+        "meaning": "the current primary-scale structure is materially broad and contains substantial path reversal or round-trip behavior even without fresh range expansion",
+        "required_fact_roles": [
+          "structure.geometry.range-width@20",
+          "structure.geometry.directional-efficiency@20",
+          "structure.geometry.range-traversal@20",
+          "structure.geometry.counter-direction-excursion-share@20"
+        ],
+        "zero_net_handling": "counter-direction excursion may be unavailable; low traversal plus low directional efficiency can still corroborate broad round-trip disorder",
+        "center_shift_role": "modifier_only",
+        "single_fact_assertion_forbidden": true
+      }
+    },
+    "resolution": {
+      "TRUE": "at_least_one_positive_channel_true",
+      "FALSE": "all_positive_channels_false",
+      "UNKNOWN": "no_positive_channel_true_and_at_least_one_channel_unknown"
+    },
+    "forbidden_forms": [
+      "center_shift_alone",
+      "width_change_alone",
+      "range_width_alone",
+      "directional_efficiency_alone",
+      "opaque_weighted_composite",
+      "top_1_force",
+      "residual_stage_0"
+    ]
+  },
+  "center_shift_policy": {
+    "fact": "structure.geometry.range-center-shift@20_vs_prior20",
+    "truth_function_role": "none",
+    "allowed_roles": ["description", "modifier", "reason_metadata", "relocation_context"],
+    "may_change_structural_instability_truth": false,
+    "strong_contraction_plus_large_center_shift_default": "not_stage_0_without_independent_positive_disorder_evidence"
+  },
+  "interaction_with_relocation_and_order": {
+    "stage_0_requires": {
+      "structural_instability_20": "TRUE",
+      "coherent_directional_relocation_20": "FALSE",
+      "orderly_consolidation_20": "FALSE"
+    },
+    "instability_true_and_relocation_true": "outside_stage_0_keep_mixed_directional_instability_reason",
+    "instability_true_and_order_true": "AMBIGUOUS_CONFLICT",
+    "relocation_true_and_order_false": "NEITHER",
+    "no_positive_instability_and_no_order_and_no_relocation": "NEITHER_or_UNKNOWN_only_from_explicit_unknown_inputs"
+  },
+  "fact_scope": {
+    "new_threshold_free_fact_required": false,
+    "reuse": [
+      "structure.geometry.range-width@20",
+      "structure.geometry.width-change@20_vs_prior20",
+      "structure.geometry.range-center-shift@20_vs_prior20",
+      "structure.geometry.directional-efficiency@20",
+      "structure.geometry.range-traversal@20",
+      "structure.geometry.counter-direction-excursion-share@20"
+    ],
+    "reason": "the missing defect is proposition composition and evidence authority, not a missing observable dimension"
+  },
+  "threshold_policy": {
+    "thresholds_frozen_by_009_a": false,
+    "consumed_008_evaluation_may_select_thresholds": false,
+    "consumed_008_evaluation_may_qualify_009": false,
+    "post_hoc_counterfactual_may_set_thresholds": false,
+    "future_thresholds_must_be_versioned": true,
+    "future_threshold_search_requires_separate_preregistration": true
+  },
+  "adversarial_cases": [
+    {"case": "monotonic_up_large_expansion", "expected": "relocation_positive_instability_false_or_unknown_never_stage0"},
+    {"case": "monotonic_down_large_expansion", "expected": "relocation_positive_instability_false_or_unknown_never_stage0"},
+    {"case": "one_step_repricing_then_flat", "expected": "relocation_positive_instability_false"},
+    {"case": "strong_contraction_large_center_shift", "expected": "center_shift_cannot_create_instability"},
+    {"case": "strong_contraction_broad_two_sided_reversal", "expected": "broad_reversal_channel_may_create_instability_without_expansion"},
+    {"case": "symmetric_broad_oscillation_zero_net", "expected": "broad_reversal_instability_can_be_true_with_counter_excursion_unavailable"},
+    {"case": "up_down_up_ending_range_edge", "expected": "high_traversal_alone_does_not_prove_relocation_when_counter_excursion_is_high"},
+    {"case": "tiny_range_low_efficiency_noise", "expected": "no_instability_without_material_amplitude_or_expansion"},
+    {"case": "broad_stable_box_no_expansion_no_reversal", "expected": "broadness_alone_cannot_assert_instability"},
+    {"case": "expanding_low_efficiency_disorder", "expected": "expanding_disorder_channel_can_assert_instability"},
+    {"case": "mixed_instability_and_directional_relocation", "expected": "outside_stage0_preserve_both_propositions"},
+    {"case": "missing_primary_fact", "expected": "UNKNOWN_or_INPUT_UNAVAILABLE_never_residual_stage0"}
+  ],
+  "review": {
+    "mode": "same_origin_four_responsibility_adversarial_review",
+    "roles": ["short_term_trader", "fund_manager", "quant_researcher", "data_evidence_governance"],
+    "independent_expert_validation": false,
+    "review_path": "docs/reviews/stage-positive-instability-proposition-repair-review-20260912.md",
+    "directional_blockers_open": 0
+  },
+  "delivery_sequence": {
+    "P3-STAGE-009-A": "closed_design_approved",
+    "P3-STAGE-009-B": "ready_implementation_only_no_market_read",
+    "P3-STAGE-009-C": "blocked_until_b_acceptance",
+    "P3-STAGE-009-D": "blocked_until_c_and_separate_fresh_validation_preregistration"
+  },
+  "authority": {
+    "design_and_review": true,
+    "implementation": false,
+    "runtime_job_submission": false,
+    "market_data_read": false,
+    "parameter_search": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

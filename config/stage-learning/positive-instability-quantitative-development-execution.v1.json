@@ -1,0 +1,52 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-development-execution.v1",
+  "work_item": "P3-STAGE-010-D",
+  "preregistration": {
+    "path": "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
+    "digest": "sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581"
+  },
+  "quantile_method": {
+    "name": "nearest_rank_ceiling_1_based",
+    "definition": "sort ascending; rank=max(1,ceil(q*n)); return ordered[rank-1]",
+    "interpolation": false,
+    "decimal_arithmetic": true
+  },
+  "candidate_identity": {
+    "candidate_count": 9,
+    "includes": [
+      "expansion_profile_id",
+      "broad_profile_id",
+      "expansion_width_change_min",
+      "expansion_range_width_min",
+      "expansion_absolute_width_gain_min",
+      "expansion_efficiency_max",
+      "expansion_traversal_max",
+      "expansion_counter_excursion_min",
+      "broad_range_width_min",
+      "broad_efficiency_max",
+      "broad_traversal_max",
+      "broad_counter_excursion_min"
+    ]
+  },
+  "selection_order": [
+    "precision_desc",
+    "definite_negative_false_positive_rate_asc",
+    "positive_reference_coverage_desc",
+    "candidate_id_asc"
+  ],
+  "baseline": {
+    "stage_0": "P3-STAGE-008 frozen relocation candidate plus inherited old-R0 instability predicate",
+    "stage_2": "unchanged P3-STAGE-008 Stage-2 predicate"
+  },
+  "authority": {
+    "market_data_read": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "implementation": true,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "stage_2_change": false,
+    "relocation_guard_retuning": false
+  }
+}

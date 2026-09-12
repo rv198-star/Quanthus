@@ -277,13 +277,16 @@ nodes.
   failure. A/B/C are already closed: the design forbids a shared broad-width + very-low-efficiency
   core, B implements separate expansion and broad-reversal projections, and C confirms on consumed
   009 evidence that the old shared-core rejection path no longer exists structurally without selecting
-  any new threshold. D is preregistered but has not read data: a fourth fresh identity pool supplies
-  2019 development for exactly nine bundled candidates, while the exact 160-identity 2021 plan frozen
-  by Stage-009 remains unread and cannot be reselected or opened before candidate freeze. 2022–2025,
+  any new threshold. D1 engineering is now accepted and opens exactly one result-bearing prepare Job:
+  a fourth fresh identity pool may read only 2018 warm-up plus 2019 development for exactly nine
+  bundled candidates. The exact 160-identity 2021 plan frozen by Stage-009 remains unread and cannot
+  be reselected or opened before candidate freeze. 2022–2025,
   Stage2 changes, relocation retuning, official labels, strategy and trading remain closed. Design:
   `design/stage-positive-instability-quantitative-projection-repair.md`; B evidence:
   `acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md`; D
   preregistration: `acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md`;
+  D1 engineering acceptance:
+  `acceptance/stage-positive-instability-quantitative-d1-implementation-20260912.md`;
   route: `work-items/stage-positive-instability-quantitative-projection-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

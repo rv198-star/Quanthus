@@ -87,11 +87,11 @@ def test_c_closes_topology_only_and_keeps_evaluation_unread() -> None:
     assert not result["failed_checks"]
 
 
-def test_d_preregistration_freezes_nine_candidates_before_data_read() -> None:
+def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> None:
     checkpoint = load(DELIVERY)["validation_preregistration"]
-    assert checkpoint["state"] == "PREREGISTERED_IMPLEMENTATION_BEFORE_DATA_READ"
+    assert checkpoint["state"] == "D1_ENGINEERING_ACCEPTED_AND_AUTHORIZED"
     assert checkpoint["contract_digest"] == (
-        "sha256:586dda1fe987842cee2f56084697e994bfb44781c998b8a093c3e3678565a6e2"
+        "sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581"
     )
     assert checkpoint["development_year"] == 2019
     assert checkpoint["development_case_target"] == 160
@@ -99,20 +99,52 @@ def test_d_preregistration_freezes_nine_candidates_before_data_read() -> None:
     assert checkpoint["preserved_evaluation_year"] == 2021
     assert checkpoint["preserved_evaluation_identity_count"] == 160
     assert checkpoint["preserved_evaluation_data_read"] is False
-    assert checkpoint["data_access_authorized_now"] is False
-    assert checkpoint["runtime_job_submission_authorized_now"] is False
+    assert checkpoint["data_access_authorized_now"] is True
+    assert checkpoint["runtime_job_submission_authorized_now"] is True
     assert checkpoint["2022_2024_access"] is False
     assert checkpoint["2025_access"] is False
     for key in ("contract", "acceptance"):
         assert (ROOT / checkpoint[key]).is_file()
 
 
-def test_current_authority_is_implementation_only() -> None:
+def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
+    delivery = load(DELIVERY)
+    checkpoint = delivery["d1_implementation_checkpoint"]
+    assert checkpoint["state"] == "ENGINEERING_IMPLEMENTATION_ACCEPTED"
+    assert checkpoint["execution_contract_digest"] == (
+        "sha256:708c2efe94bf48feebd8652c92ca6750a8fe5882541453c2dda8ba17b062c127"
+    )
+    assert checkpoint["authorized_job_kind"] == (
+        "quanthus.stage-positive-instability-quantitative-d1-prepare.v1"
+    )
+    assert checkpoint["maximum_result_bearing_jobs_now"] == 1
+    assert checkpoint["authorized_market_data_scope"] == {
+        "warmup_start": "2018-09-01",
+        "development_start": "2019-01-01",
+        "development_end": "2019-12-31",
+    }
+    assert checkpoint["parameter_search_authorized"] is False
+    assert checkpoint["preserved_2021_evaluation_read_authorized"] is False
+    for key in (
+        "execution_contract",
+        "development_implementation",
+        "prepare_implementation",
+        "worker_implementation",
+        "acceptance",
+    ):
+        assert (ROOT / checkpoint[key]).is_file()
+
+
+def test_current_authority_is_d1_only() -> None:
     authority = load(DELIVERY)["authority"]
     assert authority == {
         "implementation": True,
-        "runtime_job_submission": False,
-        "market_data_read": False,
+        "runtime_job_submission": True,
+        "authorized_runtime_kind": (
+            "quanthus.stage-positive-instability-quantitative-d1-prepare.v1"
+        ),
+        "market_data_read": True,
+        "authorized_market_data_scope": "D1_2018_warmup_2019_development_only",
         "parameter_search": False,
         "preserved_2021_evaluation_read": False,
         "2022_2024_access": False,

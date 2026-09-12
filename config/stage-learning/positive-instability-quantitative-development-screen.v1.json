@@ -2,6 +2,7 @@
   "schema_version": "quanthus.stage-positive-instability-quantitative-development-screen.v1",
   "work_item": "P3-STAGE-010-D",
   "purpose": "Develop exactly nine separated-channel quantitative projections on a new 2019 economic-identity cohort, freeze at most one candidate, then evaluate only that frozen candidate on the previously frozen and still-unread Stage-009 2021 evaluation plan.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
   "bindings": {
     "design": {
       "path": "config/stage-learning/positive-instability-quantitative-projection-design.v1.json"
@@ -10,8 +11,22 @@
       "path": "config/stage-learning/positive-instability-quantitative-projection.v1.json",
       "digest": "sha256:10dec4e9a63d1d1277dfd7e345d1f7b9c65cc27bee0bf05671a86c1277171cee"
     },
+    "stage007_prepare": {
+      "job_id": "stage_95f9b48bd96049b184e0cbf856b9a5e8",
+      "code_revision": "ae99d4973f605c3a6e7044cb6c5f88fd91f98874",
+      "artifact_relative_path": "runs/stage-worker/stage_95f9b48bd96049b184e0cbf856b9a5e8/stage-order-rule-prepare-20260911T080532Z",
+      "manifest_sha256": "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7"
+    },
+    "stage008_d1": {
+      "job_id": "stage_7ffc681cd5254aa0ab3e0d98026c42d7",
+      "code_revision": "071cdbf5cbe8fd1fa71bb042aca48a372193eea6",
+      "artifact_relative_path": "runs/stage-worker/stage_7ffc681cd5254aa0ab3e0d98026c42d7/stage-directional-boundary-d1-20260911T204403Z",
+      "manifest_sha256": "sha256:2ddc4f90376e2061932862c2ef1a8cfd27f8774d1df9bdb59de8bf4e3bf1f9a3"
+    },
     "stage009_d1": {
       "job_id": "stage_93c9590d5df34f5e8f38e242077c1e3c",
+      "code_revision": "552555f23dd92c556db8290e8829d19ccd1d24bb",
+      "artifact_relative_path": "runs/stage-worker/stage_93c9590d5df34f5e8f38e242077c1e3c/stage-positive-instability-d1-20260912T081813Z",
       "manifest_sha256": "sha256:c49bbf50f01a5319634bdd0e54a1a3716f14e78b462d5570bf3f6c028e64c6b5",
       "evaluation_identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
       "evaluation_plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
@@ -20,9 +35,12 @@
     }
   },
   "source_isolation": {
+    "identity_start": "2018-01-01",
+    "identity_end": "2019-12-31",
     "candidate_scan_start": "2018-01-01",
     "candidate_cohort_date": "2018-12-31",
     "candidate_minimum_observations": 120,
+    "candidate_seed": "stage010-d-positive-instability-quantitative-20260912-v1|candidate-population",
     "development_history_start": "2018-09-01",
     "development_report_start": "2019-01-01",
     "development_report_end": "2019-12-31",

@@ -47,6 +47,9 @@ STAGE_ORDER_RULE_RESOLVE_SCORE_JOB = "quanthus.stage-order-rule-resolve-score.v1
 STAGE_DIRECTIONAL_BOUNDARY_D1_JOB = "quanthus.stage-directional-boundary-d1-prepare.v1"
 STAGE_DIRECTIONAL_BOUNDARY_D3_JOB = "quanthus.stage-directional-boundary-d3-prepare.v1"
 STAGE_POSITIVE_INSTABILITY_D1_JOB = "quanthus.stage-positive-instability-d1-prepare.v1"
+STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB = (
+    "quanthus.stage-positive-instability-quantitative-d1-prepare.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -55,6 +58,9 @@ ORDER_RULE_RESOLVE_SCORE_BUDGET_SCHEMA = "quanthus.stage-order-rule-resolve-scor
 DIRECTIONAL_BOUNDARY_D1_BUDGET_SCHEMA = "quanthus.stage-directional-boundary-d1-budget.v1"
 DIRECTIONAL_BOUNDARY_D3_BUDGET_SCHEMA = "quanthus.stage-directional-boundary-d3-budget.v1"
 POSITIVE_INSTABILITY_D1_BUDGET_SCHEMA = "quanthus.stage-positive-instability-d1-budget.v1"
+POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA = (
+    "quanthus.stage-positive-instability-quantitative-d1-budget.v1"
+)
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
@@ -162,6 +168,15 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.positive_instability_development_prepare",
         "artifact_glob": "stage-positive-instability-d1-*",
         "process_error": "stage_positive_instability_d1_process_failed",
+        "wall_seconds": 2700,
+    },
+    STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB: {
+        "config": (
+            "config/stage-learning/positive-instability-quantitative-development-screen.v1.json"
+        ),
+        "module": "quanthus.stage_learning.positive_instability_quantitative_development_prepare",
+        "artifact_glob": "stage-positive-instability-quantitative-d1-*",
+        "process_error": "stage_positive_instability_quantitative_d1_process_failed",
         "wall_seconds": 2700,
     },
 }
@@ -336,6 +351,10 @@ class StageWorkerPaths:
     @property
     def positive_instability_d1_budget(self) -> Path:
         return self.control_root / "positive-instability-d1-budget.json"
+
+    @property
+    def positive_instability_quantitative_d1_budget(self) -> Path:
+        return self.control_root / "positive-instability-quantitative-d1-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -713,6 +732,44 @@ def _existing_positive_instability_d1_submission(
         raise StageWorkerError("positive instability D1 budget marker differs")
     if job.code_revision != code_revision:
         raise StageWorkerError("positive instability D1 has no retry or replacement authority")
+    return _idempotent_stage_submission(paths, job)
+
+
+def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-010-D",
+        "phase": "D1_PREPARE_FRESH_2019_DEVELOPMENT_AND_BIND_PRESERVED_2021_PLAN",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_positive_instability_quantitative_d1_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.positive_instability_quantitative_d1_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "positive instability quantitative D1 budget")
+    if (
+        marker.get("schema_version") != POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-010-D"
+        or marker.get("phase")
+        != "D1_PREPARE_FRESH_2019_DEVELOPMENT_AND_BIND_PRESERVED_2021_PLAN"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("positive instability quantitative D1 budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("positive instability quantitative D1 budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "positive instability quantitative D1 has no retry or replacement authority"
+        )
     return _idempotent_stage_submission(paths, job)
 
 
@@ -1185,6 +1242,37 @@ class StageWorker:
                 "candidate_frozen": verified.get("candidate_frozen"),
                 "review_ready": verified.get("review_ready"),
             }
+        if job.kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB:
+            result["positive_instability_quantitative_d1"] = {
+                "fresh_pool_size": verified.get("fresh_pool_size"),
+                "development_identity_capacity": verified.get("development_identity_capacity"),
+                "development_selected_case_count": verified.get(
+                    "development_selected_case_count"
+                ),
+                "development_shortfall_count": verified.get("development_shortfall_count"),
+                "development_selection_digest": verified.get("development_selection_digest"),
+                "development_evidence_digest": verified.get("development_evidence_digest"),
+                "threshold_basis_digest": verified.get("threshold_basis_digest"),
+                "candidate_grid_digest": verified.get("candidate_grid_digest"),
+                "candidate_count": verified.get("candidate_count"),
+                "path_facts_digest": verified.get("path_facts_digest"),
+                "preserved_evaluation_identity_count": verified.get(
+                    "preserved_evaluation_identity_count"
+                ),
+                "preserved_evaluation_identity_digest": verified.get(
+                    "preserved_evaluation_identity_digest"
+                ),
+                "preserved_evaluation_plan_digest": verified.get(
+                    "preserved_evaluation_plan_digest"
+                ),
+                "preserved_evaluation_data_read": verified.get(
+                    "preserved_evaluation_data_read"
+                ),
+                "parameter_search": verified.get("parameter_search"),
+                "opinion_count": verified.get("opinion_count"),
+                "candidate_frozen": verified.get("candidate_frozen"),
+                "review_ready": verified.get("review_ready"),
+            }
         return result
 
     def execute(self, job: StageJob) -> dict[str, Any]:
@@ -1405,6 +1493,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB:
+        existing = _existing_positive_instability_quantitative_d1_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -1422,6 +1516,9 @@ def submit_job(
     directional_d1_reserved = job.kind == STAGE_DIRECTIONAL_BOUNDARY_D1_JOB
     directional_d3_reserved = job.kind == STAGE_DIRECTIONAL_BOUNDARY_D3_JOB
     positive_instability_d1_reserved = job.kind == STAGE_POSITIVE_INSTABILITY_D1_JOB
+    positive_instability_quantitative_d1_reserved = (
+        job.kind == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+    )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
@@ -1451,6 +1548,11 @@ def submit_job(
             paths.positive_instability_d1_budget,
             _positive_instability_d1_budget_value(job),
         )
+    if positive_instability_quantitative_d1_reserved:
+        _exclusive_json(
+            paths.positive_instability_quantitative_d1_budget,
+            _positive_instability_quantitative_d1_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -1473,6 +1575,8 @@ def submit_job(
             paths.directional_boundary_d3_budget.unlink(missing_ok=True)
         if positive_instability_d1_reserved:
             paths.positive_instability_d1_budget.unlink(missing_ok=True)
+        if positive_instability_quantitative_d1_reserved:
+            paths.positive_instability_quantitative_d1_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -1490,6 +1594,8 @@ def submit_job(
             paths.directional_boundary_d3_budget.unlink(missing_ok=True)
         if positive_instability_d1_reserved:
             paths.positive_instability_d1_budget.unlink(missing_ok=True)
+        if positive_instability_quantitative_d1_reserved:
+            paths.positive_instability_quantitative_d1_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -2148,7 +2254,12 @@ def _positive_instability_d1_review_evidence(
     result_ref = observed.get("result_ref")
     if not isinstance(result_ref, Mapping):
         raise StageWorkerError("positive instability D1 result reference missing")
-    detail = result_ref.get("positive_instability_d1")
+    if observed.get("kind") == STAGE_POSITIVE_INSTABILITY_D1_JOB:
+        detail = result_ref.get("positive_instability_d1")
+    elif observed.get("kind") == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB:
+        detail = result_ref.get("positive_instability_quantitative_d1")
+    else:
+        detail = None
     if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
         raise StageWorkerError("positive instability D1 review is not ready")
     artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
@@ -2453,6 +2564,110 @@ def _positive_instability_d1_virtual_review_status(
     return None
 
 
+def _positive_instability_quantitative_d1_review_alias(
+    parent_job_id: str, page: int
+) -> str:
+    raw = f"{parent_job_id}|positive-instability-quantitative-d1-primary-page|{page}".encode()
+    return "stage_" + hashlib.sha256(raw).hexdigest()[:32]
+
+
+def _positive_instability_quantitative_d1_review_index(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    manifest_sha, evidence_sha, path_facts_sha, evidence, _path_facts = (
+        _positive_instability_d1_review_evidence(paths, observed)
+    )
+    case_count = len(evidence["cases"])
+    pages = (
+        case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
+    ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+    return {
+        "schema_version": "quanthus.stage-positive-instability-primary-review-index.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "evidence_file_sha256": evidence_sha,
+        "path_facts_file_sha256": path_facts_sha,
+        "case_count": case_count,
+        "page_size": DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+        "page_count": pages,
+        "pages": [
+            {
+                "page": page,
+                "job_id": _positive_instability_quantitative_d1_review_alias(
+                    str(observed["job_id"]), page
+                ),
+                "start": page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                "count": min(
+                    DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                    case_count - page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                ),
+            }
+            for page in range(pages)
+        ],
+        "threshold_basis_included": False,
+        "candidate_output_included": False,
+        "explicit_recent_derived_facts_included": False,
+        "future_rows_included": False,
+        "preserved_2021_evaluation_included": False,
+    }
+
+
+def _positive_instability_quantitative_d1_virtual_review_status(
+    paths: StageWorkerPaths, requested_job_id: str,
+) -> dict[str, Any] | None:
+    for status_path in sorted(paths.status.glob("stage_*.json")):
+        observed = _object(status_path, "stage job status")
+        if (
+            observed.get("kind") != STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+            or observed.get("state") != "succeeded"
+        ):
+            continue
+        result_ref = observed.get("result_ref")
+        detail = (
+            result_ref.get("positive_instability_quantitative_d1")
+            if isinstance(result_ref, Mapping)
+            else None
+        )
+        if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
+            continue
+        case_count = int(detail.get("development_selected_case_count") or 0)
+        pages = (
+            case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
+        ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+        for page in range(pages):
+            alias = _positive_instability_quantitative_d1_review_alias(
+                str(observed["job_id"]), page
+            )
+            if alias != requested_job_id:
+                continue
+            return {
+                "schema_version": STATUS_SCHEMA,
+                "job_id": requested_job_id,
+                "kind": "quanthus.stage-positive-instability-primary-review-page.v1",
+                "code_revision": observed.get("code_revision"),
+                "input_digest": observed.get("input_digest"),
+                "state": "succeeded",
+                "stage": "virtual_read_only",
+                "submitted_at": observed.get("submitted_at"),
+                "started_at": observed.get("started_at"),
+                "completed_at": observed.get("completed_at"),
+                "parent_job_id": observed["job_id"],
+                "page": page,
+                "review_transport": _positive_instability_d1_review_page(
+                    paths, observed, page
+                ),
+                "error": None,
+                "exit_code": 0,
+                "updated_at": observed.get("updated_at"),
+            }
+    return None
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -2466,6 +2681,10 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
             review_index = _directional_boundary_d3_review_index(paths, observed)
         if review_index is None:
             review_index = _positive_instability_d1_review_index(paths, observed)
+        if review_index is None:
+            review_index = _positive_instability_quantitative_d1_review_index(
+                paths, observed
+            )
         result = (
             observed
             if review_index is None
@@ -2501,6 +2720,9 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if virtual is not None:
         return virtual
     virtual = _positive_instability_d1_virtual_review_status(paths, job_id)
+    if virtual is not None:
+        return virtual
+    virtual = _positive_instability_quantitative_d1_virtual_review_status(paths, job_id)
     if virtual is not None:
         return virtual
     raise StageWorkerError("stage job is not known on this node")

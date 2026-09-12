@@ -34,9 +34,9 @@
   },
   "validation_preregistration": {
     "work_item": "P3-STAGE-010-D",
-    "state": "PREREGISTERED_IMPLEMENTATION_BEFORE_DATA_READ",
+    "state": "D1_ENGINEERING_ACCEPTED_AND_AUTHORIZED",
     "contract": "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
-    "contract_digest": "sha256:586dda1fe987842cee2f56084697e994bfb44781c998b8a093c3e3678565a6e2",
+    "contract_digest": "sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581",
     "acceptance": "docs/acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md",
     "development_year": 2019,
     "development_case_target": 160,
@@ -45,8 +45,29 @@
     "preserved_evaluation_identity_count": 160,
     "preserved_evaluation_plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
     "preserved_evaluation_data_read": false,
-    "data_access_authorized_now": false,
-    "runtime_job_submission_authorized_now": false,
+    "data_access_authorized_now": true,
+    "runtime_job_submission_authorized_now": true,
+    "2022_2024_access": false,
+    "2025_access": false
+  },
+  "d1_implementation_checkpoint": {
+    "work_item": "P3-STAGE-010-D1",
+    "state": "ENGINEERING_IMPLEMENTATION_ACCEPTED",
+    "execution_contract": "config/stage-learning/positive-instability-quantitative-development-execution.v1.json",
+    "execution_contract_digest": "sha256:708c2efe94bf48feebd8652c92ca6750a8fe5882541453c2dda8ba17b062c127",
+    "development_implementation": "src/quanthus/stage_learning/positive_instability_quantitative_development.py",
+    "prepare_implementation": "src/quanthus/stage_learning/positive_instability_quantitative_development_prepare.py",
+    "worker_implementation": "src/quanthus/stage_learning/worker.py",
+    "acceptance": "docs/acceptance/stage-positive-instability-quantitative-d1-implementation-20260912.md",
+    "authorized_job_kind": "quanthus.stage-positive-instability-quantitative-d1-prepare.v1",
+    "maximum_result_bearing_jobs_now": 1,
+    "authorized_market_data_scope": {
+      "warmup_start": "2018-09-01",
+      "development_start": "2019-01-01",
+      "development_end": "2019-12-31"
+    },
+    "parameter_search_authorized": false,
+    "preserved_2021_evaluation_read_authorized": false,
     "2022_2024_access": false,
     "2025_access": false
   },
@@ -54,12 +75,14 @@
     "P3-STAGE-010-A": "closed_design_approved",
     "P3-STAGE-010-B": "closed_engineering_accepted",
     "P3-STAGE-010-C": "closed_pass_topology_conformance_only",
-    "P3-STAGE-010-D": "preregistered_implementation_ready_no_data_access"
+    "P3-STAGE-010-D": "ready_d1_only_one_shot_2019_development"
   },
   "authority": {
     "implementation": true,
-    "runtime_job_submission": false,
-    "market_data_read": false,
+    "runtime_job_submission": true,
+    "authorized_runtime_kind": "quanthus.stage-positive-instability-quantitative-d1-prepare.v1",
+    "market_data_read": true,
+    "authorized_market_data_scope": "D1_2018_warmup_2019_development_only",
     "parameter_search": false,
     "preserved_2021_evaluation_read": false,
     "2022_2024_access": false,

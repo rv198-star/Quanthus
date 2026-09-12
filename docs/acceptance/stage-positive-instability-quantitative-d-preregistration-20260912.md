@@ -13,7 +13,7 @@ Machine contract:
 `config/stage-learning/positive-instability-quantitative-development-screen.v1.json`
 
 Digest:
-`sha256:586dda1fe987842cee2f56084697e994bfb44781c998b8a093c3e3678565a6e2`
+`sha256:f39abceeaec16307f6edd38bf80d6b14349d26aee7f8f9948faf950137085581`
 
 ## 1. Why a new development cohort is required
 

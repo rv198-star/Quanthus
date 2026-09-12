@@ -20,6 +20,7 @@ from quanthus.stage_learning.worker import (
     STAGE_ORDER_RULE_PREPARE_JOB,
     STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
     STAGE_POSITIVE_INSTABILITY_D1_JOB,
+    STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
     STAGE_QUALIFICATION_JOB,
     STAGE_REFERENCE_PILOT_JOB,
     STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
@@ -176,6 +177,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
         STAGE_POSITIVE_INSTABILITY_D1_JOB,
+        STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
         STAGE_SECOND_GROUP_PROFILE_JOB,
         STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
         STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
@@ -250,6 +252,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
         STAGE_POSITIVE_INSTABILITY_D1_JOB,
+        STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
         STAGE_SECOND_GROUP_PROFILE_JOB,
         STAGE_SECOND_GROUP_REPAIR_PROFILE_JOB,
         STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
@@ -1077,6 +1080,153 @@ def test_positive_instability_d1_status_exposes_candidate_blind_primary_transpor
     assert selection["evaluation_plan_binding"]["identity_count"] == 160
     assert selection["review_ledger_must_be_sealed_before_use"] is True
     assert selection["evaluation_data_read"] is False
+
+
+def test_positive_instability_quantitative_d1_is_single_job_with_no_retry(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    first = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+    )
+    second = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+    )
+    assert first["kind"] == STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB
+    assert first["config"] == (
+        "config/stage-learning/positive-instability-quantitative-development-screen.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB]["wall_seconds"] == 2700
+    assert second["job_id"] == first["job_id"]
+    assert second["idempotent_reuse"] is True
+    marker = json.loads(
+        worker_paths.positive_instability_quantitative_d1_budget.read_text(encoding="utf-8")
+    )
+    assert marker["job"]["job_id"] == first["job_id"]
+    assert marker["input_digest"] == first["input_digest"]
+    with pytest.raises(StageWorkerError, match="no retry"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
+            kind=STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+        )
+
+
+def test_positive_instability_quantitative_d1_status_is_candidate_blind(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "5" * 32
+    source_rows = {}
+    history_refs = []
+    for index in range(21):
+        row = {
+            "market_date": f"2019-04-{index + 1:02d}",
+            "high": str(401 + index),
+            "low": str(399 + index),
+            "close": str(400 + index),
+            "coordinate_epoch": "original-price-quantity-epoch",
+            "reset_reason": None,
+        }
+        ref = _digest(row)
+        source_rows[ref] = row
+        history_refs.append(ref)
+    primary = {
+        "directional_efficiency": {"value": "0.15", "reason": "available"},
+        "range_width": {"value": "0.18", "reason": "available"},
+        "width_change": {"value": "0.40", "reason": "available"},
+        "center_shift": {"value": "0.03", "reason": "available"},
+    }
+    case_body = {
+        "security_code": "000001",
+        "security_id": "security-fourth-pool-A",
+        "market_date": "2019-04-21",
+        "sampling_stratum": "representative",
+        "coordinate_ref": _digest({"coordinate": "fourth-A"}),
+        "primary_available": True,
+        "recent_available": True,
+        "input_reason": "admitted",
+        "availability_reasons": {"trend": "available", "order": "available"},
+        "primary": primary,
+        "recent": {"width_change": {"value": "0.8"}, "center_shift": {"value": "0.9"}},
+        "history_refs": history_refs,
+    }
+    case = {"case_id": _digest(case_body), **case_body}
+    evidence = {"source_rows": source_rows, "cases": [case]}
+    evidence_raw = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
+    evidence_sha = "sha256:" + hashlib.sha256(evidence_raw).hexdigest()
+    path_facts = {
+        "cases": {
+            case["case_id"]: {
+                "structure.geometry.range-traversal": {
+                    "value": "0.2",
+                    "reason": "available",
+                    "revision_id": _digest({"q": 1}),
+                },
+                "structure.geometry.counter-direction-excursion-share": {
+                    "value": "0.8",
+                    "reason": "available",
+                    "revision_id": _digest({"q": 2}),
+                },
+            }
+        }
+    }
+    path_raw = json.dumps(path_facts, sort_keys=True, separators=(",", ":")).encode()
+    path_sha = "sha256:" + hashlib.sha256(path_raw).hexdigest()
+    artifact = worker_paths.runs / job_id / "stage-positive-instability-quantitative-d1-test"
+    artifact.mkdir(parents=True)
+    (artifact / "evidence.json").write_bytes(evidence_raw)
+    (artifact / "path-facts.json").write_bytes(path_raw)
+    manifest = {"files": {"evidence.json": evidence_sha, "path-facts.json": path_sha}}
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-12T10:00:00+00:00",
+        "started_at": "2026-09-12T10:00:01+00:00",
+        "completed_at": "2026-09-12T10:00:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "positive_instability_quantitative_d1": {
+                "development_selected_case_count": 1,
+                "review_ready": True,
+            },
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-12T10:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+    observed = read_status(worker_paths, job_id)
+    index = observed["review_transport_index"]
+    assert index["case_count"] == 1
+    assert index["threshold_basis_included"] is False
+    assert index["candidate_output_included"] is False
+    assert index["preserved_2021_evaluation_included"] is False
+    page_status = read_status(worker_paths, index["pages"][0]["job_id"])
+    decoded = json.loads(
+        gzip.decompress(base64.b64decode(page_status["review_transport"]["payload"]))
+    )
+    review_case = decoded["cases"][0]
+    assert review_case["primary"] == primary
+    assert len(review_case["history"]) == 21
+    assert "recent" not in review_case
+    assert "threshold_basis" not in decoded
+    assert "candidate" not in decoded
 
 
 def test_order_rule_resolve_score_requires_successful_parent_and_is_single_job(

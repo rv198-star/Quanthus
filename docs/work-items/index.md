@@ -298,11 +298,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-009-B | Implement the approved positive-instability contract | P3-STAGE-009-A | closed; engineering accepted; docs/acceptance/stage-positive-instability-b-implementation-20260912.md |
 | P3-STAGE-009-C | Synthetic plus consumed-evidence conformance diagnostics | P3-STAGE-009-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; docs/acceptance/stage-positive-instability-c-conformance-20260912.md |
 | P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | closed; `REVISE_OR_PARK_DEVELOPMENT_FAIL`; 2021 evaluation unread; docs/acceptance/stage-positive-instability-d-development-closeout-20260912.md |
-| P3-STAGE-010 | Repair positive-instability quantitative projection topology | P3-STAGE-009 | ready at D implementation before data read; A/B/C closed; docs/work-items/stage-positive-instability-quantitative-projection-repair.md |
+| P3-STAGE-010 | Repair positive-instability quantitative projection topology | P3-STAGE-009 | ready at D1; A/B/C closed; one-shot 2019 development prepare authorized; docs/work-items/stage-positive-instability-quantitative-projection-repair.md |
 | P3-STAGE-010-A | Freeze separated channel projection topology and adversarial review | P3-STAGE-009 | closed; design approved; docs/design/stage-positive-instability-quantitative-projection-repair.md |
 | P3-STAGE-010-B | Implement deterministic separated-channel projection contract | P3-STAGE-010-A | closed; engineering accepted; docs/acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md |
 | P3-STAGE-010-C | Consumed Stage-009 failure topology conformance | P3-STAGE-010-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; no threshold learning |
-| P3-STAGE-010-D | Fresh 2019 development then exact preserved 2021 evaluation | P3-STAGE-010-C | ready; preregistered implementation before data read; docs/acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md |
+| P3-STAGE-010-D | Fresh 2019 development then exact preserved 2021 evaluation | P3-STAGE-010-C | ready at D1 only; 2018 warm-up + 2019 development authorized; preserved 2021 evaluation unread; docs/acceptance/stage-positive-instability-quantitative-d1-implementation-20260912.md |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

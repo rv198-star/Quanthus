@@ -1,0 +1,106 @@
+# schema=quanthus.stage-directional-boundary-evaluation-review.v1
+# work_item=P3-STAGE-008-D
+# source_job=stage_7617aafa1f3149c0a65935ef291fc521
+# source_manifest_sha256=sha256:a77bc2b439da05da5d10b7291c64caf5d680148c4c69126ba31ea39ac7a99827
+# evaluation_evidence_digest=sha256:912a11480d6e12a3dcc3862bcdb0900592623a419e5282e5bb2500e2ad5086da
+# frozen_candidate_digest=sha256:c815077233ff837e7a8d0ebd884b12dcfb3d6d5c31abfe302cefe97e6997b3ff
+# provenance=self_simulated|chatgpt-owner-session-stage008d|stage008d-evaluation-review-20260912
+# candidate_output_seen_during_review=false
+# explicit_recent_derived_facts_seen=false
+# cognitive_blinding_claimed=false
+index|short_instability|short_relocation|short_order|fund_instability|fund_relocation|fund_order|short_reason|fund_reason
+0|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive primary proposition|no positive primary proposition
+1|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|stable narrow range but contraction is weak|fund view accepts bounded consolidation
+2|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|broad oscillatory expansion without coherent relocation|broad oscillatory expansion without coherent relocation
+3|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|broad unstable path with weak directional coherence|broad unstable path with weak directional coherence
+4|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional relocation dominates|coherent directional relocation dominates
+5|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional repricing dominates broad-range interpretation|directional repricing dominates broad-range interpretation
+6|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|center instability and reversal support disorder|fund view finds no positive primary proposition
+7|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|strong directional advance dominates|strong directional advance dominates
+8|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|instability and coherent decline coexist outside Stage0|coherent directional decline dominates
+9|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional advance dominates|directional advance dominates
+10|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|stable narrow range without convergence|stable narrow range without convergence
+11|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|expansion coexists with coherent decline outside Stage0|directional decline dominates
+12|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|strong directional decline dominates|strong directional decline dominates
+13|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|low-direction expansion supports instability|low-direction expansion supports instability
+14|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable center|bounded contraction with stable center
+15|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional repricing dominates|directional repricing dominates
+16|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+17|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+18|TRUE|FALSE|FALSE|FALSE|TRUE|FALSE|large center migration supports instability|fund view treats the move as directional relocation
+19|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|broad low-direction expansion supports instability|broad low-direction expansion supports instability
+20|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+21|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|narrow range is expanding with oscillatory path|fund view finds no positive primary proposition
+22|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|narrow but not converging|narrow but not converging
+23|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|strong directional decline dominates|strong directional decline dominates
+24|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable center|bounded contraction with stable center
+25|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+26|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|low-direction path with large center instability|low-direction path with large center instability
+27|FALSE|TRUE|FALSE|FALSE|FALSE|TRUE|short-term view sees directional relocation|fund view accepts narrow contraction
+28|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|narrow stable range lacks enough contraction|fund view accepts bounded consolidation
+29|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent directional advance dominates|coherent directional advance dominates
+30|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|contraction is offset by major center migration|contraction is offset by major center migration
+31|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional decline dominates|directional decline dominates
+32|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional advance dominates|directional advance dominates
+33|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable center|bounded contraction with stable center
+34|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|strong directional decline dominates|strong directional decline dominates
+35|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|large two-sided expansion supports instability|large two-sided expansion supports instability
+36|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+37|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|broad path is neither orderly nor clearly unstable|broad path is neither orderly nor clearly unstable
+38|TRUE|FALSE|FALSE|FALSE|TRUE|FALSE|expansion and reversal support instability|fund view treats the move as directional relocation
+39|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive primary proposition|no positive primary proposition
+40|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|strong directional decline dominates|strong directional decline dominates
+41|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|instability coexists with coherent advance outside Stage0|coherent advance dominates
+42|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|low-direction expansion and center shift support instability|low-direction expansion and center shift support instability
+43|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|broad low-direction expansion supports instability|broad low-direction expansion supports instability
+44|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|strong contraction is offset by center migration|strong contraction is offset by center migration
+45|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|low-direction expansion supports instability|low-direction expansion supports instability
+46|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive primary proposition|no positive primary proposition
+47|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+48|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|wide highly reversing path supports structural instability|wide highly reversing path supports structural instability
+49|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|stable narrow range without convergence|stable narrow range without convergence
+50|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|center migration follows directional repricing|center migration follows directional repricing
+51|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|strong directional advance dominates|strong directional advance dominates
+52|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+53|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|contraction is offset by center migration|contraction is offset by center migration
+54|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive primary proposition|no positive primary proposition
+55|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|large directional advance dominates|large directional advance dominates
+56|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable center|bounded contraction with stable center
+57|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on center movement|fund view accepts bounded contraction
+58|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|low-direction expansion and center movement support instability|fund view finds the instability evidence too weak
+59|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|large low-direction expansion supports instability|large low-direction expansion supports instability
+60|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable center|bounded contraction with stable center
+61|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|narrow stable range lacks convergence|narrow stable range lacks convergence
+62|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|low-direction expansion supports instability|low-direction expansion supports instability
+63|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable center|bounded contraction with stable center
+64|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects consolidation on center shift|fund view accepts very narrow contraction
+65|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional decline dominates|directional decline dominates
+66|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable center|bounded contraction with stable center
+67|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional advance dominates|directional advance dominates
+68|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent advance dominates expansion|coherent advance dominates expansion
+69|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional advance dominates|directional advance dominates
+70|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|stable range lacks convergence|stable range lacks convergence
+71|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|expansion coexists with directional advance outside Stage0|directional advance dominates
+72|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|center movement keeps short view out of Stage2|fund view accepts near-boundary consolidation
+73|FALSE|TRUE|FALSE|FALSE|FALSE|TRUE|short view sees coherent decline|fund view accepts narrow contracting structure
+74|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|broad low-direction expansion supports instability|broad low-direction expansion supports instability
+75|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|instability coexists with directional advance outside Stage0|directional advance dominates
+76|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|no positive primary proposition|no positive primary proposition
+77|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+78|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent advance dominates|coherent advance dominates
+79|FALSE|FALSE|FALSE|FALSE|FALSE|TRUE|short view rejects borderline consolidation|fund view accepts bounded contraction
+80|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|broad low-direction expansion supports instability|broad low-direction expansion supports instability
+81|TRUE|TRUE|FALSE|FALSE|TRUE|FALSE|instability coexists with coherent advance outside Stage0|directional advance dominates
+82|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional decline dominates|directional decline dominates
+83|TRUE|FALSE|FALSE|TRUE|FALSE|FALSE|wide low-direction expansion supports instability|wide low-direction expansion supports instability
+84|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|strong directional decline dominates|strong directional decline dominates
+85|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|center migration and oscillation support instability|fund view finds no positive primary proposition
+86|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional advance dominates|directional advance dominates
+87|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|reversals weaken a coherent relocation claim|reversals weaken a coherent relocation claim
+88|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|strong directional advance dominates|strong directional advance dominates
+89|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional advance dominates|directional advance dominates
+90|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|coherent decline dominates|coherent decline dominates
+91|FALSE|FALSE|TRUE|FALSE|FALSE|TRUE|bounded contraction with stable center|bounded contraction with stable center
+92|TRUE|FALSE|FALSE|FALSE|FALSE|FALSE|large center migration and reversal support instability|fund view finds no positive primary proposition
+93|FALSE|FALSE|FALSE|FALSE|FALSE|FALSE|contraction is offset by broad range and center shift|contraction is offset by broad range and center shift
+94|FALSE|TRUE|FALSE|FALSE|TRUE|FALSE|directional decline dominates|directional decline dominates

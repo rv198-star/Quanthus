@@ -1,0 +1,117 @@
+{
+  "schema_version": "quanthus.stage-directional-boundary-evaluation-result.v1",
+  "work_item": "P3-STAGE-008-D",
+  "disposition": "REVISE_OR_PARK_EVALUATION_FAIL",
+  "d3_prepare": {
+    "job_id": "stage_7617aafa1f3149c0a65935ef291fc521",
+    "code_revision": "eceae0ad49b5c4f7d37e728b378327ed9bd384a8",
+    "input_digest": "sha256:78e62bf614673947e358cfcfcf5fc4a0c2e420d2dff8ec7b7ced4e001cc430d7",
+    "manifest_sha256": "sha256:a77bc2b439da05da5d10b7291c64caf5d680148c4c69126ba31ea39ac7a99827",
+    "evaluation_evidence_digest": "sha256:912a11480d6e12a3dcc3862bcdb0900592623a419e5282e5bb2500e2ad5086da",
+    "path_facts_digest": "sha256:71294c12fb9bc8f74aa6fcd494e935016d680761e6d21d681d8a7b6776e148f0",
+    "evaluation_identity_count": 96,
+    "evaluation_selected_case_count": 95,
+    "evaluation_shortfall_count": 1,
+    "cross_quarter_backfill": false,
+    "identity_backfill": false,
+    "candidate_scored_in_d3": false,
+    "parameter_search_in_d3": false,
+    "opinion_count_in_d3": 0
+  },
+  "review": {
+    "path": "config/stage-learning/directional-boundary-evaluation-review.v1.tsv",
+    "sha256": "sha256:ba8ba95b9e4d9493cca5ad3feaa1c6a3ce18383bf2bb53912952c2dbb0eabe4f",
+    "case_count": 95,
+    "opinion_count": 190,
+    "provenance": "same-origin self_simulated primary-only review",
+    "primary_reference_counts": {
+      "AMBIGUOUS": 15,
+      "NEITHER": 57,
+      "STAGE_0": 15,
+      "STAGE_2": 8
+    },
+    "primary_disagreement_count": 15,
+    "candidate_output_seen_during_review": false,
+    "explicit_recent_derived_facts_seen": false,
+    "independent_validation": false
+  },
+  "frozen_candidate": {
+    "contract_digest": "sha256:c815077233ff837e7a8d0ebd884b12dcfb3d6d5c31abfe302cefe97e6997b3ff",
+    "candidate_id": "sha256:d11c368d4111ebf991315a6c61b800a6737d56e5f81792cf153dabcda7cb52fd",
+    "absolute_window_return20_min": "0.10",
+    "range_traversal20_min": "0.50",
+    "counter_direction_excursion_share20_max": "0.60",
+    "evaluation_parameter_search": false,
+    "candidate_replacement_after_evaluation_read": false
+  },
+  "old_r0_stage0": {
+    "case_count": 95,
+    "definite_positive_references": 15,
+    "definite_negative_references": 65,
+    "ambiguous_references": 15,
+    "true_positive": 15,
+    "false_positive": 23,
+    "false_negative": 0,
+    "stage_0_predictions": 38,
+    "precision": "0.3947368421052631578947368421",
+    "positive_reference_coverage": "1",
+    "definite_negative_false_positive_rate": "0.3538461538461538461538461538"
+  },
+  "candidate_stage0": {
+    "case_count": 95,
+    "definite_positive_references": 15,
+    "definite_negative_references": 65,
+    "ambiguous_references": 15,
+    "true_positive": 15,
+    "false_positive": 11,
+    "false_negative": 0,
+    "stage_0_predictions": 26,
+    "precision": "0.5769230769230769230769230769",
+    "positive_reference_coverage": "1",
+    "definite_negative_false_positive_rate": "0.1692307692307692307692307692"
+  },
+  "evaluation_gates": {
+    "minimum_complete_cases": {"required": 80, "observed": 80, "pass": true},
+    "minimum_definite_stage_0_positive_references": {"required": 12, "observed": 15, "pass": true},
+    "minimum_definite_stage_0_negative_references": {"required": 30, "observed": 65, "pass": true},
+    "minimum_stage_0_predictions": {"required": 10, "observed": 26, "pass": true},
+    "minimum_stage_0_precision": {"required": "0.80", "observed": "0.5769230769230769230769230769", "pass": false},
+    "minimum_stage_0_positive_reference_coverage": {"required": "0.55", "observed": "1", "pass": true},
+    "maximum_stage_0_definite_negative_false_positive_rate": {"required": "0.10", "observed": "0.1692307692307692307692307692", "pass": false},
+    "candidate_precision_must_be_gte_old_r0": {"pass": true},
+    "candidate_fpr_must_be_lte_old_r0": {"pass": true},
+    "maximum_absolute_coverage_loss_vs_old_r0": {"required": "0.15", "observed": "0", "pass": true},
+    "if_old_r0_has_false_positive_candidate_must_remove_at_least": {"required": 1, "observed": 12, "pass": true},
+    "stage_2_predictions_must_equal_old_r0_exactly": {"pass": true}
+  },
+  "failure_attribution": {
+    "remaining_false_positive_count": 11,
+    "center_shift_only_stage0_leakage": {
+      "count": 8,
+      "case_indices": [30, 44, 46, 50, 53, 67, 76, 93],
+      "finding": "The inherited R0 instability predicate can still assert Stage 0 from center shift alone even when the current range is contracting or not expanding.",
+      "approved_design_boundary_violated": "center_shift_alone_cannot_assert_stage_0"
+    },
+    "relocation_guard_boundary_generalization": {
+      "count": 3,
+      "case_indices": [17, 29, 68],
+      "absolute_window_return20_range": ["0.083832335329341317365269461", "0.0978021978021978021978021978"],
+      "finding": "These cases retain coherent directional geometry but fall just below the calibration-frozen 10% absolute-return guard.",
+      "evaluation_threshold_retuning_forbidden": true
+    }
+  },
+  "claim_ceiling": {
+    "stage_0_repair_qualified": false,
+    "directional_path_facts_runtime_qualified": false,
+    "stage_2_rule_changed": false,
+    "stage_007_threshold_learning": false,
+    "2022_2024_accessed": false,
+    "2025_accessed": false,
+    "future_outcome_accessed": false,
+    "official_labels_authorized": false,
+    "daily_or_strategy_authorized": false,
+    "trading_authorized": false,
+    "additional_evaluation_parameter_trials_authorized": false,
+    "automatic_supplement_authorized": false
+  }
+}

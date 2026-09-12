@@ -416,24 +416,25 @@ cannot select thresholds or qualify the successor. A four-responsibility adversa
 requiring the counter-direction Fact and a primary-first two-phase review ledger. The review is
 same-origin simulation, not independent expert validation.
 
-P3-STAGE-008-B has now implemented those two threshold-free Facts plus Reference Protocol v2. The
-Fact builder requires 21 contiguous admitted rows and preserves listing/coordinate/gap resets and
-exact revision/source closure. The reference contract commits atomic 20-session primary opinions
-before explicit 10-session derived facts are revealed; the recent schema contains no primary field
-and the primary resolver accepts no recent input. The concepts are Catalog-registered but remain
-outside accepted runtime bindings. C/D remain blocked: no market read, Job, threshold search,
-Stage-2 change, 2022-2025 access, official label, strategy or trading authority is active. Machine
-design: `../../config/stage-learning/directional-boundary-repair-design.v1.json`; B evidence:
-`../../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`; review:
-`../../reviews/stage-directional-boundary-repair-review-20260911.md`.
+P3-STAGE-008-B implemented those two threshold-free Facts plus Reference Protocol v2. C then passed
+exposed diagnostic conformance without threshold learning. D completed a fresh disjoint screen: one
+candidate was frozen from 64 calibration cases before evaluation data was read, then 95 morphology-
+blind 2021 evaluation cases were reviewed and scored. The repair reduced old-R0 false positives from
+23 to 11 while retaining all 15 definite Stage-0 positives, but precision 0.5769 and FPR 0.1692 missed
+the frozen 0.80 / 0.10 gates. Eight remaining false positives expose the inherited center-shift-only
+Stage-0 path, so the approved semantic repair is not fully realized by the executable candidate. The
+concepts remain Catalog-registered but outside accepted runtime bindings. Stage 2 is unchanged and all
+market-read / Job / threshold-search authority is now closed. Machine design:
+`../../config/stage-learning/directional-boundary-repair-design.v1.json`; final evidence:
+`../../acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md`.
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P3-STAGE-008 | Repair Stage-0 direction boundary and primary/recent semantics | P3-STAGE-007 | ready; A/B/C closed, D active at D1 |
+| P3-STAGE-008 | Repair Stage-0 direction boundary and primary/recent semantics | P3-STAGE-007 | closed; `REVISE_OR_PARK_EVALUATION_FAIL`; repair improved but did not meet fresh Stage0 precision/FPR gates |
 | P3-STAGE-008-A | Freeze semantics, path Facts and four-party review | P3-STAGE-007 | closed; `../stage-directional-boundary-repair.md` |
 | P3-STAGE-008-B | Implement threshold-free Facts and primary-first reference schema | P3-STAGE-008-A | closed; `../../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md` |
 | P3-STAGE-008-C | Synthetic conformance plus exposed-007 regression | P3-STAGE-008-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; `../../acceptance/stage-directional-boundary-repair-c-conformance-20260912.md` |
-| P3-STAGE-008-D | Fresh disjoint development screen | P3-STAGE-008-C | ready at D1; evaluation data sealed until D2 candidate freeze |
+| P3-STAGE-008-D | Fresh disjoint development screen | P3-STAGE-008-C | closed; 95 evaluation cases; precision 0.5769 / FPR 0.1692 / coverage 1.0; `../../acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md` |
 
 ## 7. Acceptance
 

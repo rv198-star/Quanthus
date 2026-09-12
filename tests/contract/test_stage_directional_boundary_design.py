@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/directional-boundary-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:cf23f83530925ac78653ab43b9b20be2df30d03d84f1153866f1a6c86204c828"
+DESIGN_DIGEST = "sha256:9621dfe333050cdc94812e07b21e46ae0c7d211b57d05224924ec8b2a273e2f6"
 
 
 def load_design() -> dict:
@@ -16,30 +16,36 @@ def load_design() -> dict:
     return value
 
 
-def test_design_is_approved_and_only_preregistered_d_runtime_is_open() -> None:
+def test_design_is_closed_after_fresh_evaluation_failure() -> None:
     design = load_design()
     assert design["design_status"] == "approved"
-    assert design["delivery_gate"] == "open"
+    assert design["delivery_gate"] == "blocked"
+    assert design["final_disposition"] == "REVISE_OR_PARK_EVALUATION_FAIL"
     assert design["authority"] == {
         "design_and_review": True,
         "production_fact_implementation": False,
         "reference_protocol_implementation": False,
-        "runtime_job_submission": True,
-        "market_data_read": True,
-        "parameter_search": True,
+        "runtime_job_submission": False,
+        "market_data_read": False,
+        "parameter_search": False,
         "official_labels": False,
         "daily_or_strategy": False,
         "trading": False,
     }
     activation = design["development_screen_activation"]
-    assert activation["state"] == "PREREGISTERED_AND_AUTHORIZED"
+    assert activation["state"] == "CLOSED_REVISE_OR_PARK_EVALUATION_FAIL"
     assert activation["maximum_result_bearing_jobs"] == 4
+    assert activation["actual_result_bearing_jobs"] == 2
     assert activation["maximum_parameter_trials"] == 27
+    assert activation["actual_parameter_trials"] == 27
+    assert activation["evaluation_parameter_trials"] == 0
     assert activation["development_data_years"] == [2019, 2020, 2021]
     assert activation["evaluation_market_data_before_candidate_freeze"] is False
     assert activation["2022_2024_access"] is False
     assert activation["2025_access"] is False
     assert activation["stage_2_threshold_research"] is False
+    assert activation["additional_trials_authorized"] is False
+    assert activation["automatic_supplement_authorized"] is False
     assert (ROOT / activation["contract"]).is_file()
 
 
@@ -205,6 +211,35 @@ def test_d2_candidate_is_frozen_before_evaluation_read() -> None:
         assert (ROOT / checkpoint[key]).is_file()
 
 
+def test_d_evaluation_failure_is_bound_and_closes_runtime_authority() -> None:
+    checkpoint = load_design()["evaluation_checkpoint"]
+    assert checkpoint["state"] == "REVISE_OR_PARK_EVALUATION_FAIL"
+    assert checkpoint["evaluation_case_count"] == 95
+    assert checkpoint["evaluation_shortfall_count"] == 1
+    assert checkpoint["primary_opinion_count"] == 190
+    assert checkpoint["old_r0_false_positive_count"] == 23
+    assert checkpoint["candidate_false_positive_count"] == 11
+    assert checkpoint["candidate_precision"] == "0.5769230769230769230769230769"
+    assert checkpoint["candidate_positive_reference_coverage"] == "1"
+    assert checkpoint["candidate_definite_negative_false_positive_rate"] == (
+        "0.1692307692307692307692307692"
+    )
+    assert checkpoint["precision_gate_passed"] is False
+    assert checkpoint["false_positive_rate_gate_passed"] is False
+    assert checkpoint["center_shift_only_stage0_leakage_count"] == 8
+    assert checkpoint["relocation_guard_boundary_generalization_count"] == 3
+    assert checkpoint["evaluation_parameter_search_count"] == 0
+    assert checkpoint["automatic_supplement_rounds"] == 0
+    for key in ("result", "acceptance"):
+        assert (ROOT / checkpoint[key]).is_file()
+    result = json.loads((ROOT / checkpoint["result"]).read_text(encoding="utf-8"))
+    assert digest(result) == checkpoint["result_digest"]
+    assert result["disposition"] == "REVISE_OR_PARK_EVALUATION_FAIL"
+    assert result["failure_attribution"]["center_shift_only_stage0_leakage"]["count"] == 8
+    assert result["failure_attribution"]["relocation_guard_boundary_generalization"]["count"] == 3
+    assert result["claim_ceiling"]["additional_evaluation_parameter_trials_authorized"] is False
+
+
 def test_stage007_is_diagnostic_only_and_future_partitions_remain_closed() -> None:
     design = load_design()
     diagnostic = design["stage_007_design_diagnostic"]
@@ -214,8 +249,14 @@ def test_stage007_is_diagnostic_only_and_future_partitions_remain_closed() -> No
     future = design["future_validation_boundary"]
     assert future["stage_007_cases_may_be_used_for_threshold_learning"] is False
     assert future["stage_007_cases_may_be_used_for_qualification"] is False
-    assert future["new_market_data_read_authorized"] is True
+    assert future["new_market_data_read_authorized"] is False
     assert design["development_screen_activation"]["development_data_years"] == [2019, 2020, 2021]
+    assert design["development_screen_activation"]["state"] == (
+        "CLOSED_REVISE_OR_PARK_EVALUATION_FAIL"
+    )
+    assert design["authority"]["runtime_job_submission"] is False
+    assert design["authority"]["market_data_read"] is False
+    assert design["authority"]["parameter_search"] is False
     assert future["2022_2024_access_authorized"] is False
     assert future["2025_access_authorized"] is False
     assert future["stage_2_threshold_research_authorized"] is False

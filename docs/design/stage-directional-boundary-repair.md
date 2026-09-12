@@ -3,12 +3,13 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | blocked |
+| Final disposition | `REVISE_OR_PARK_EVALUATION_FAIL` |
 | Work item | P3-STAGE-008 |
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | P3-STAGE-007 / `REVISE_TARGET_OR_PARK` |
 | Machine design | `../../config/stage-learning/directional-boundary-repair-design.v1.json` |
-| Machine design digest | `sha256:cf23f83530925ac78653ab43b9b20be2df30d03d84f1153866f1a6c86204c828` |
+| Machine design digest | `sha256:9621dfe333050cdc94812e07b21e46ae0c7d211b57d05224924ec8b2a273e2f6` |
 | Four-party review | [review record](../reviews/stage-directional-boundary-repair-review-20260911.md) |
 | Runtime authority | none |
 
@@ -251,12 +252,12 @@ The four-party review approves the design direction but intentionally leaves del
    engineering acceptance is `../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`;
 3. **P3-STAGE-008-C — conformance/regression using synthetic paths plus already-exposed 007 cases:**
    closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`; no threshold learning or qualification claim;
-4. **P3-STAGE-008-D — one fresh task-disjoint development screen:** preregistered and active under
-   `config/stage-learning/directional-boundary-development-screen.v1.json`; D1 is the only next
-   executable phase.
+4. **P3-STAGE-008-D — one fresh task-disjoint development screen:** closed
+   `REVISE_OR_PARK_EVALUATION_FAIL`; the preregistered calibration/evaluation sequence completed
+   without post-evaluation tuning or supplementation.
 
-C itself created no Job, market-data read or parameter search. After C durable closeout, D's separate
-preregistration opened only the bounded 2019-2021 development path described below.
+C itself created no Job, market-data read or parameter search. D later consumed only the separately
+preregistered bounded 2019-2021 development path and closed all runtime authority after evaluation.
 
 ## 10. P3-STAGE-008-B implementation result
 
@@ -327,3 +328,33 @@ old R0 beyond the preregistered limits. Even a pass is only `PROMISING_EXPLORATO
 
 The exact preregistration, four-phase budget and claim ceiling are recorded in
 [D preregistration](../acceptance/stage-directional-boundary-repair-d-preregistration-20260912.md).
+
+## 13. P3-STAGE-008-D fresh evaluation result
+
+D1 selected 64 calibration cases from 2020 and froze a separate 96-identity 2021 evaluation plan
+without reading evaluation market data. After sealing 128 calibration opinions, the complete
+27-candidate grid produced exactly one eligible relocation guard: absolute 20-session return >=10%,
+range traversal >=0.50 and counter-direction excursion <=0.60. The candidate was committed before
+D3 opened evaluation data.
+
+D3 preserved the morphology-blind quarter/hash plan. Ninety-five of the 96 frozen identities produced
+one Primary case; the one shortfall was retained because backfill was forbidden. D4 then sealed 190
+same-origin Primary opinions before scoring. Fifteen cross-role disagreements remain `AMBIGUOUS`.
+
+The frozen repair reduced old-R0 false positives from 23 to 11 and retained all 15 definite Stage-0
+positives. Precision improved from 0.3947 to 0.5769 and definite-negative FPR from 0.3538 to 0.1692,
+with positive coverage fixed at 1.0. These are meaningful improvements but fail the preregistered
+absolute gates of precision >=0.80 and FPR <=0.10, so the final disposition is
+`REVISE_OR_PARK_EVALUATION_FAIL`.
+
+Attribution shows the repair itself is incomplete rather than merely mis-tuned. Eight of the eleven
+remaining false positives still enter through the inherited R0 center-shift arm even when the current
+range is contracting or not expanding. That contradicts the already-approved rule that center shift
+alone cannot assert Stage 0. The other three cases are directionally coherent but fall just below the
+calibration-frozen 10% absolute-return guard; changing that threshold after evaluation is forbidden.
+
+No evaluation-time parameter search, candidate replacement, supplement or hidden rerun occurred.
+2022-2024 and 2025 remained closed, Stage 2 was unchanged, and Path Geometry stays
+`implemented_unqualified`. Final evidence is
+[D evaluation closeout](../acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md)
+and the machine result is `../../config/stage-learning/directional-boundary-evaluation-result.v1.json`.

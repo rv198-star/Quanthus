@@ -229,26 +229,21 @@ nodes.
   [C/D closeout](acceptance/stage-order-rule-screen-cd-closeout-20260911.md). Route:
   [fixed-rule screen](design/stage-order-rule-screen.md); machine plan:
   `config/stage-order-rule-screen-delivery.v1.json`; rule: `config/stage-learning/order-rule-screen.v1.json`.
-- `P3-STAGE-008` owns the approved successor for the Stage-0 direction boundary and primary/recent
-  reference protocol. A is closed by four-responsibility adversarial design review. B is now also
-  closed at engineering scope: `structure.geometry.range-traversal` and
-  `structure.geometry.counter-direction-excursion-share` are implemented as threshold-free,
-  21-row contiguous Structure Facts, and Reference Protocol v2 mechanically commits the atomic
-  20-session primary ledger before exposing explicit 10-session modifiers. Recent commits contain
-  no primary field and cannot change the primary resolver outcome. The two concepts are registered
-  in the semantic/Data Catalog as reserved concepts but are not added to accepted runtime bindings.
-  Stage-007 remains permanently design-exposed and cannot tune or qualify the successor; Stage 2 is
-  untouched. C is now closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`: all 160 exposed cases reproduced
-  the frozen 28/12 groups and all A-frozen diagnostic medians exactly, with zero threshold search,
-  parameter trials, new market reads or Jobs. D is now separately preregistered and active at D1:
-  only 2019-2020 calibration data may be read next, while 2021 evaluation identities/quarters are
-  frozen without reading their market data until D2 freezes one candidate. Route:
-  [directional-boundary repair](design/stage-directional-boundary-repair.md); B/C evidence:
-  `acceptance/stage-directional-boundary-repair-b-implementation-20260912.md`,
-  `acceptance/stage-directional-boundary-repair-c-conformance-20260912.md`,
-  `acceptance/stage-directional-boundary-repair-d-preregistration-20260912.md`; review:
-  `reviews/stage-directional-boundary-repair-review-20260911.md`; machine design:
-  `config/stage-learning/directional-boundary-repair-design.v1.json`.
+- `P3-STAGE-008` is closed with `REVISE_OR_PARK_EVALUATION_FAIL`. A froze the semantic repair and
+  four-responsibility review; B implemented threshold-free range-traversal / counter-direction
+  excursion Facts plus Primary-first Reference Protocol v2; C reproduced the exposed Stage-007
+  diagnostics exactly without threshold learning. D then used a fresh task-disjoint development
+  screen: 64 calibration cases froze one relocation guard before evaluation data was read, and a
+  morphology-blind 2021 plan produced 95 evaluation cases with one no-backfill shortfall. The frozen
+  guard improved old-R0 Stage0 from precision/FPR `0.3947 / 0.3538` to `0.5769 / 0.1692` while
+  retaining 1.0 positive coverage, but failed the preregistered >=0.80 precision and <=0.10 FPR gates.
+  Attribution found eight remaining false positives caused by the inherited center-shift-only Stage0
+  path, which violates the approved design boundary, plus three directional cases just below the
+  calibration-frozen 10% return guard. No evaluation retuning, supplementation or candidate replacement
+  is allowed. Path Geometry remains implemented-unqualified, Stage 2 is unchanged, and all runtime /
+  market-read / parameter-search authority is closed. Route: [directional-boundary repair](design/stage-directional-boundary-repair.md);
+  final evidence: `acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md`;
+  machine result: `config/stage-learning/directional-boundary-evaluation-result.v1.json`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

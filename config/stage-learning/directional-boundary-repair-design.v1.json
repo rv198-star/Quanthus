@@ -2,7 +2,8 @@
   "schema_version": "quanthus.stage-directional-boundary-repair-design.v1",
   "work_item": "P3-STAGE-008",
   "design_status": "approved",
-  "delivery_gate": "open",
+  "delivery_gate": "blocked",
+  "final_disposition": "REVISE_OR_PARK_EVALUATION_FAIL",
   "predecessor": {
     "work_item": "P3-STAGE-007",
     "closeout": "docs/acceptance/stage-order-rule-screen-cd-closeout-20260911.md",
@@ -215,10 +216,35 @@
     "candidate_replacement_after_evaluation_read": false,
     "acceptance": "docs/acceptance/stage-directional-boundary-repair-d2-candidate-freeze-20260912.md"
   },
+  "evaluation_checkpoint": {
+    "work_item": "P3-STAGE-008-D",
+    "state": "REVISE_OR_PARK_EVALUATION_FAIL",
+    "result": "config/stage-learning/directional-boundary-evaluation-result.v1.json",
+    "result_digest": "sha256:a23891da8e8f1b65aa12c0eeb90a0c20e4e416ac97542ee90ebfabac4ff71c94",
+    "d3_job_id": "stage_7617aafa1f3149c0a65935ef291fc521",
+    "d3_manifest_sha256": "sha256:a77bc2b439da05da5d10b7291c64caf5d680148c4c69126ba31ea39ac7a99827",
+    "evaluation_case_count": 95,
+    "evaluation_shortfall_count": 1,
+    "primary_opinion_count": 190,
+    "primary_disagreement_count": 15,
+    "old_r0_false_positive_count": 23,
+    "candidate_false_positive_count": 11,
+    "candidate_precision": "0.5769230769230769230769230769",
+    "candidate_positive_reference_coverage": "1",
+    "candidate_definite_negative_false_positive_rate": "0.1692307692307692307692307692",
+    "precision_gate_passed": false,
+    "false_positive_rate_gate_passed": false,
+    "center_shift_only_stage0_leakage_count": 8,
+    "relocation_guard_boundary_generalization_count": 3,
+    "evaluation_parameter_search_count": 0,
+    "candidate_replacement_after_evaluation_read": false,
+    "automatic_supplement_rounds": 0,
+    "acceptance": "docs/acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md"
+  },
   "future_validation_boundary": {
     "stage_007_cases_may_be_used_for_threshold_learning": false,
     "stage_007_cases_may_be_used_for_qualification": false,
-    "new_market_data_read_authorized": true,
+    "new_market_data_read_authorized": false,
     "2022_2024_access_authorized": false,
     "2025_access_authorized": false,
     "fresh_development_screen_requires_new_economic_identities": true,
@@ -226,7 +252,7 @@
   },
   "development_screen_activation": {
     "work_item": "P3-STAGE-008-D",
-    "state": "PREREGISTERED_AND_AUTHORIZED",
+    "state": "CLOSED_REVISE_OR_PARK_EVALUATION_FAIL",
     "contract": "config/stage-learning/directional-boundary-development-screen.v1.json",
     "execution_sequence": [
       "D1_PREPARE_CALIBRATION_AND_FREEZE_EVALUATION_IDENTITY_PLAN",
@@ -235,7 +261,10 @@
       "D4_SEAL_EVALUATION_REFERENCES_AND_SCORE_FROZEN_CANDIDATE"
     ],
     "maximum_result_bearing_jobs": 4,
+    "actual_result_bearing_jobs": 2,
     "maximum_parameter_trials": 27,
+    "actual_parameter_trials": 27,
+    "evaluation_parameter_trials": 0,
     "development_data_years": [2019, 2020, 2021],
     "calibration_year": 2020,
     "evaluation_year": 2021,
@@ -245,15 +274,17 @@
     "stage_2_threshold_research": false,
     "official_labels": false,
     "daily_or_strategy": false,
-    "trading": false
+    "trading": false,
+    "additional_trials_authorized": false,
+    "automatic_supplement_authorized": false
   },
   "authority": {
     "design_and_review": true,
     "production_fact_implementation": false,
     "reference_protocol_implementation": false,
-    "runtime_job_submission": true,
-    "market_data_read": true,
-    "parameter_search": true,
+    "runtime_job_submission": false,
+    "market_data_read": false,
+    "parameter_search": false,
     "official_labels": false,
     "daily_or_strategy": false,
     "trading": false

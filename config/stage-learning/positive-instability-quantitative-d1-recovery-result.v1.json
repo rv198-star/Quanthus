@@ -1,0 +1,67 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-d1-recovery-result.v1",
+  "work_item": "P3-STAGE-010-D1",
+  "disposition": "IMMUTABLE_ARTIFACT_INDEPENDENTLY_VERIFIED_AFTER_WORKER_VERIFIER_CLI_FAILURE",
+  "job": {
+    "job_id": "stage_8f2bc43d4b1e4943bca4c3e31214c8a5",
+    "code_revision": "b7155e3c1052437fbd24b4617a6bf0a9ab166a86",
+    "input_digest": "sha256:e78f554af60feb1348c2540e30c113905b2369e090137bccd2fde66b3fdc4bd3",
+    "transport_recovery_of": "stage_2612f623a94b44ba86ed71128d16bf48",
+    "submitted_at": "2026-09-12T15:47:32.885319+00:00",
+    "started_at": "2026-09-12T15:47:34.851332+00:00",
+    "completed_at": "2026-09-12T15:49:43.167295+00:00",
+    "terminal_state": "failed",
+    "terminal_stage": "terminal",
+    "result_ref": null,
+    "terminal_error": "worker verifier subprocess exited 2 before result_ref publication"
+  },
+  "verifier_cli_defect": {
+    "worker_invocation": "verify --artifact <path> --code-revision <sha>",
+    "artifact_module_at_job_revision_expected": "verify <artifact> --code-revision <sha>",
+    "classification": "post-run verifier CLI contract mismatch",
+    "development_run_exit_zero_before_verification": true,
+    "artifact_recomputed": false,
+    "market_data_reread_for_recovery": false,
+    "job_status_rewritten": false,
+    "fix_commit": "e8ca262ee0ae063d621e327c451145ae77d81ec8"
+  },
+  "artifact": {
+    "run_id": "stage-positive-instability-quantitative-d1-20260912T154942Z",
+    "manifest_sha256": "sha256:506cb9ea1425afc1f123636603ae21ae969ac5903421f3dc4910db903476ba8c",
+    "verified": true,
+    "file_count": 8,
+    "fresh_pool_size": 512,
+    "development_identity_capacity": 256,
+    "development_selected_case_count": 160,
+    "development_shortfall_count": 0,
+    "development_selection_digest": "sha256:160cfd29885c3506bcf27ef1036fc596683d3175c5d3169a0172c44eb99711d3",
+    "development_evidence_digest": "sha256:9b22e002a20971ed47c933b0dfea73e42c21b7cd1f1471a350704486d0d1a163",
+    "path_facts_digest": "sha256:d509baae4419ebf3509f5f6ed382e8e0cab8dcf9483edadc564004f144c61c98",
+    "threshold_basis_digest": "sha256:97c53f1551bf62a0b444a523bb57689ae44f5c918f0ad15774ca0ace6ea3233e",
+    "candidate_grid_digest": "sha256:2781679a81a96a5c4adaa488ee555ec13ad53b0361a712b77050e04048fe6332",
+    "candidate_count": 9,
+    "candidate_frozen": false,
+    "opinion_count": 0,
+    "parameter_search": false,
+    "review_ready": true
+  },
+  "preserved_evaluation": {
+    "identity_count": 160,
+    "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+    "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+    "market_data_read": false
+  },
+  "authority_after_recovery": {
+    "d1_result_bearing_job_complete": true,
+    "additional_d1_job_submission": false,
+    "additional_d1_market_data_read": false,
+    "candidate_blind_development_review": true,
+    "candidate_scoring_before_review_ledger_sealed": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

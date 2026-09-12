@@ -89,7 +89,7 @@ def test_c_closes_topology_only_and_keeps_evaluation_unread() -> None:
 
 def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> None:
     checkpoint = load(DELIVERY)["validation_preregistration"]
-    assert checkpoint["state"] == "D1_TRANSPORT_RECOVERY_AUTHORIZED"
+    assert checkpoint["state"] == "D1_ARTIFACT_VERIFIED_REVIEW_READY"
     assert checkpoint["contract_digest"] == (
         "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606"
     )
@@ -99,8 +99,8 @@ def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> N
     assert checkpoint["preserved_evaluation_year"] == 2021
     assert checkpoint["preserved_evaluation_identity_count"] == 160
     assert checkpoint["preserved_evaluation_data_read"] is False
-    assert checkpoint["data_access_authorized_now"] is True
-    assert checkpoint["runtime_job_submission_authorized_now"] is True
+    assert checkpoint["data_access_authorized_now"] is False
+    assert checkpoint["runtime_job_submission_authorized_now"] is False
     assert checkpoint["2022_2024_access"] is False
     assert checkpoint["2025_access"] is False
     for key in ("contract", "acceptance"):
@@ -110,16 +110,16 @@ def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> N
 def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
     delivery = load(DELIVERY)
     checkpoint = delivery["d1_implementation_checkpoint"]
-    assert checkpoint["state"] == "SECOND_JOB_TRANSPORT_FAIL_RECOVERY_AUTHORIZED"
+    assert checkpoint["state"] == "RECOVERY_ARTIFACT_INDEPENDENTLY_VERIFIED"
     assert checkpoint["execution_contract_digest"] == (
         "sha256:7e59a3fcadfab30369f66b214a82da1e2a38bae33e5e3c5dd80f35f7e7cd5e6f"
     )
     assert checkpoint["authorized_job_kind"] == (
         "quanthus.stage-positive-instability-quantitative-d1-prepare.v1"
     )
-    assert checkpoint["maximum_result_bearing_jobs_now"] == 1
+    assert checkpoint["maximum_result_bearing_jobs_now"] == 0
     assert checkpoint["maximum_technical_retry_jobs_remaining"] == 0
-    assert checkpoint["maximum_transport_recovery_jobs_remaining"] == 1
+    assert checkpoint["maximum_transport_recovery_jobs_remaining"] == 0
     assert checkpoint["semantic_retries_remaining"] == 0
     assert checkpoint["technical_correction"] == {
         "field": "source_isolation.candidate_cohort_date",
@@ -158,8 +158,17 @@ def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
         "development_start": "2019-01-01",
         "development_end": "2019-12-31",
     }
+    assert checkpoint["candidate_blind_review_authorized"] is True
     assert checkpoint["parameter_search_authorized"] is False
     assert checkpoint["preserved_2021_evaluation_read_authorized"] is False
+    recovery = load(ROOT / checkpoint["recovery_result"])
+    assert digest(recovery) == checkpoint["recovery_result_digest"]
+    assert recovery["artifact"]["verified"] is True
+    assert recovery["artifact"]["development_selected_case_count"] == 160
+    assert recovery["artifact"]["candidate_count"] == 9
+    assert recovery["artifact"]["opinion_count"] == 0
+    assert recovery["artifact"]["candidate_frozen"] is False
+    assert recovery["preserved_evaluation"]["market_data_read"] is False
     for key in (
         "execution_contract",
         "development_implementation",
@@ -179,13 +188,12 @@ def test_current_authority_is_d1_only() -> None:
     authority = load(DELIVERY)["authority"]
     assert authority == {
         "implementation": True,
-        "runtime_job_submission": True,
-        "authorized_runtime_kind": (
-            "quanthus.stage-positive-instability-quantitative-d1-prepare.v1"
-        ),
-        "market_data_read": True,
-        "authorized_market_data_scope": "D1_2018_warmup_2019_development_only",
-        "transport_recovery_only": True,
+        "runtime_job_submission": False,
+        "authorized_runtime_kind": None,
+        "market_data_read": False,
+        "authorized_market_data_scope": None,
+        "candidate_blind_review": True,
+        "transport_recovery_only": False,
         "parameter_search": False,
         "preserved_2021_evaluation_read": False,
         "2022_2024_access": False,

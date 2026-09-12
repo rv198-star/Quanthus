@@ -283,19 +283,25 @@ nodes.
   (`stage_2612f623...`) then progressed through 2019 market/Fact preparation but failed before artifact
   publication because the old order-reference evidence builder ignored its own configured time-scope
   fields and hard-coded cases to 2020-2021. No reference opinion, candidate score or selected candidate
-  was exposed by either failed Job. A single evidence-transport recovery is now authorized: the default
-  v1 evidence protocol remains unchanged, while P010-D1 explicitly binds the versioned 2019 evidence
-  scope (`2018-09-01` history / 2019 cases). The recovery may still read only the same 2018 warm-up plus
-  2019 development and the same exact nine bundled candidates. The exact 160-identity 2021 plan frozen
-  by Stage-009 remains unread and cannot be reselected or opened before candidate freeze. 2022–2025,
-  Stage2 changes, relocation retuning, official labels, strategy and trading remain closed. Design:
+  was exposed by either failed Job. The single authorized evidence-transport recovery
+  (`stage_8f2bc43...`) completed the 2019 development process and wrote one governed artifact, but the
+  Worker terminal receipt failed in post-run verification because the generic Worker invoked
+  `verify --artifact` while this one module at revision `b7155e3` still exposed a positional artifact
+  argument. The immutable artifact independently verifies exactly: 160/160 development cases, zero
+  shortfall, nine fixed candidates, zero opinions, zero parameter search, and review-ready. The CLI
+  mismatch is fixed in `e8ca262`; the failed Worker receipt remains immutable and no additional D1
+  Job or market read is authorized. Candidate-blind review may now consume only this existing D1
+  evidence. The exact 160-identity 2021 plan frozen by Stage-009 remains unread and cannot be
+  reselected or opened before candidate freeze. 2022–2025, Stage2 changes, relocation retuning,
+  official labels, strategy and trading remain closed. Design:
   `design/stage-positive-instability-quantitative-projection-repair.md`; B evidence:
   `acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md`; D
   preregistration: `acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md`;
   D1 engineering acceptance:
   `acceptance/stage-positive-instability-quantitative-d1-implementation-20260912.md`; technical retry:
   `acceptance/stage-positive-instability-quantitative-d1-retry-20260912.md`; transport recovery:
-  `acceptance/stage-positive-instability-quantitative-d1-transport-recovery-20260912.md`;
+  `acceptance/stage-positive-instability-quantitative-d1-transport-recovery-20260912.md`; recovered
+  D1 result: `acceptance/stage-positive-instability-quantitative-d1-recovery-result-20260913.md`;
   route: `work-items/stage-positive-instability-quantitative-projection-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

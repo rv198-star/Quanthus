@@ -13,10 +13,12 @@ PROJECTION = ROOT / "config/stage-learning/orderly-consolidation-projection.v1.j
 CONFORMANCE = ROOT / (
     "config/stage-learning/orderly-consolidation-boundary-conformance-result.v1.json"
 )
+PREREG = ROOT / "config/stage-learning/orderly-consolidation-joint-development-screen.v1.json"
 DIAGNOSTIC_DIGEST = "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c"
 DESIGN_DIGEST = "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353"
 PROJECTION_DIGEST = "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c"
 CONFORMANCE_DIGEST = "sha256:64741982652b0323a14dcd7c87c1486d7b8998fa085d5c190d3ca9a28a0c91d1"
+PREREG_DIGEST = "sha256:c9b5eff892f3d731170afac052e3810543f7444f5b6025bdef24c1ebfa4c213e"
 
 
 def load(path):
@@ -126,17 +128,28 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
     assert conformance["new_market_data_reads"] == 0
     assert conformance["runtime_jobs"] == 0
     assert conformance["preserved_2021_evaluation_read"] is False
+    prereg = load(PREREG)
+    assert digest(prereg) == PREREG_DIGEST
+    prereg_checkpoint = value["validation_preregistration"]
+    assert prereg_checkpoint["state"] == "PREREGISTERED_IMPLEMENTATION_READY"
+    assert prereg_checkpoint["contract_digest"] == PREREG_DIGEST
+    assert prereg_checkpoint["development_year"] == 2018
+    assert prereg_checkpoint["development_case_target"] == 192
+    assert prereg_checkpoint["candidate_pair_count"] == 27
+    assert prereg_checkpoint["preserved_evaluation_data_read"] is False
+    assert prereg_checkpoint["data_access_authorized_now"] is False
+    assert prereg_checkpoint["runtime_job_submission_authorized_now"] is False
     assert value["delivery_sequence"] == {
         "P3-STAGE-011-A": "closed_design_approved",
         "P3-STAGE-011-B": "closed_engineering_accepted",
         "P3-STAGE-011-C": "closed_pass_topology_conformance_only",
-        "P3-STAGE-011-D": "ready_preregistration_design_only",
+        "P3-STAGE-011-D": "preregistered_ready_d1_engineering",
     }
     assert value["authority"] == {
-        "implementation": False,
+        "implementation": True,
         "synthetic_conformance": False,
         "consumed_evidence_topology_diagnostic": False,
-        "preregistration_design": True,
+        "preregistration_design": False,
         "market_data_read": False,
         "runtime_job_submission": False,
         "parameter_search": False,
@@ -152,5 +165,51 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
         ROOT / "docs/design/stage-orderly-consolidation-boundary-repair.md",
         ROOT / "docs/reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md",
         ROOT / "docs/work-items/stage-orderly-consolidation-boundary-repair.md",
+        ROOT / "docs/acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md",
     ):
         assert path.is_file()
+
+
+def test_d_preregistration_is_fresh_blind_bounded_and_preserves_prior_gates() -> None:
+    value = load(PREREG)
+    source = value["source_isolation"]
+    assert source["candidate_cohort_date"] == "2017-12-29"
+    assert source["development_history_start"] == "2017-09-01"
+    assert source["development_report_start"] == "2018-01-01"
+    assert source["development_report_end"] == "2018-12-31"
+    assert source["fresh_pool_size"] == 512
+    assert source["development_identity_capacity"] == 256
+    for key in (
+        "exclude_stage007_exposed_pool",
+        "exclude_stage008_entire_fresh_pool",
+        "exclude_stage009_entire_512_identity_fresh_pool",
+        "exclude_stage010_entire_512_identity_fresh_pool",
+    ):
+        assert source[key] is True
+    assert source["development_overlap_with_preserved_evaluation"] == 0
+    selection = value["development_selection"]
+    assert selection["planned_identities"] == 192
+    assert selection["quarter_caps"] == {"1": 48, "2": 48, "3": 48, "4": 48}
+    assert selection["selection_uses_morphology"] is False
+    assert selection["cross_quarter_backfill"] is False
+    assert selection["identity_backfill"] is False
+    surface = value["joint_candidate_surface"]
+    assert surface["stage0_profile_count"] == 9
+    assert surface["stage2_profile_count"] == 3
+    assert surface["pair_count"] == 27
+    assert surface["grid_expansion_after_result"] is False
+    gates = value["development_gates"]
+    assert gates["minimum_definite_stage_0_positive_references"] == 18
+    assert gates["minimum_definite_stage_2_positive_references"] == 20
+    assert gates["stage_0_minimum_precision"] == "0.78"
+    assert gates["stage_0_minimum_positive_reference_coverage"] == "0.70"
+    assert gates["stage_0_maximum_definite_negative_false_positive_rate"] == "0.10"
+    assert gates["pair_overlap_count_must_equal"] == 0
+    assert value["preserved_evaluation"]["data_read_before_pair_freeze"] is False
+    assert value["budgets"] == {
+        "maximum_result_bearing_market_data_jobs": 2,
+        "maximum_development_candidate_pairs": 27,
+        "semantic_retries": 0,
+        "automatic_supplement_rounds": 0,
+        "automatic_technical_retries": 0,
+    }

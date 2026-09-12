@@ -42,17 +42,37 @@
     "runtime_jobs": 0,
     "preserved_2021_evaluation_read": false
   },
+  "validation_preregistration": {
+    "work_item": "P3-STAGE-011-D",
+    "state": "PREREGISTERED_IMPLEMENTATION_READY",
+    "contract": "config/stage-learning/orderly-consolidation-joint-development-screen.v1.json",
+    "contract_digest": "sha256:c9b5eff892f3d731170afac052e3810543f7444f5b6025bdef24c1ebfa4c213e",
+    "acceptance": "docs/acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md",
+    "development_year": 2018,
+    "development_case_target": 192,
+    "stage0_profile_count": 9,
+    "stage2_profile_count": 3,
+    "candidate_pair_count": 27,
+    "preserved_evaluation_year": 2021,
+    "preserved_evaluation_identity_count": 160,
+    "preserved_evaluation_plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+    "preserved_evaluation_data_read": false,
+    "data_access_authorized_now": false,
+    "runtime_job_submission_authorized_now": false,
+    "2022_2024_access": false,
+    "2025_access": false
+  },
   "delivery_sequence": {
     "P3-STAGE-011-A": "closed_design_approved",
     "P3-STAGE-011-B": "closed_engineering_accepted",
     "P3-STAGE-011-C": "closed_pass_topology_conformance_only",
-    "P3-STAGE-011-D": "ready_preregistration_design_only"
+    "P3-STAGE-011-D": "preregistered_ready_d1_engineering"
   },
   "authority": {
-    "implementation": false,
+    "implementation": true,
     "synthetic_conformance": false,
     "consumed_evidence_topology_diagnostic": false,
-    "preregistration_design": true,
+    "preregistration_design": false,
     "market_data_read": false,
     "runtime_job_submission": false,
     "parameter_search": false,

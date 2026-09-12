@@ -445,11 +445,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-010-B | Implement deterministic separated-channel projection contract | P3-STAGE-010-A | closed; engineering accepted; `../../acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md` |
 | P3-STAGE-010-C | Consumed-evidence topology conformance | P3-STAGE-010-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; no thresholds selected |
 | P3-STAGE-010-D | Fresh 2019 development then exact preserved 2021 evaluation | P3-STAGE-010-C | closed `REVISE_OR_PARK_DEVELOPMENT_FAIL`; exact 9 trials / 0 eligible; best coverage profile has 2 Stage2 overlaps, zero-overlap neighbor has 0.6296 coverage; 2021 unread; `../../acceptance/stage-positive-instability-quantitative-d2-development-closeout-20260913.md` |
-| P3-STAGE-011 | Repair Stage0/Stage2 joint boundary and orderly-consolidation projection | P3-STAGE-010 | ready; A/B/C closed with `PASS_TOPOLOGY_CONFORMANCE_ONLY`, D preregistration-design ready; `../stage-orderly-consolidation-boundary-repair.md` |
+| P3-STAGE-011 | Repair Stage0/Stage2 joint boundary and orderly-consolidation projection | P3-STAGE-010 | ready; A/B/C closed, D preregistered for fresh 2018 joint development and D1 engineering ready; `../stage-orderly-consolidation-boundary-repair.md` |
 | P3-STAGE-011-A | Freeze Stage2 topology and joint 0/2 boundary | P3-STAGE-010 | closed; design approved; `../stage-orderly-consolidation-boundary-repair.md` |
 | P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; `../../acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md` |
 | P3-STAGE-011-C | Consumed-evidence topology conformance | P3-STAGE-011-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; `../../acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md` |
-| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development | P3-STAGE-011-C | ready for preregistration design only; no data/runtime authority; preserved 2021 remains unread |
+| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development | P3-STAGE-011-C | preregistered; 2018 fifth fresh pool / 192 blind cases / exact 27 pairs frozen; D1 engineering ready, preserved 2021 remains unread; `../../acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md` |
 
 ## 7. Acceptance
 

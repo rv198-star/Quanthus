@@ -326,12 +326,18 @@ nodes.
   zero overlap as a hard pair gate. A/B/C are now closed: the deterministic projection contract is
   implemented, synthetic/adjacent regressions pass without modifying any existing Stage0/Stage2
   code, and consumed-evidence conformance closes `PASS_TOPOLOGY_CONFORMANCE_ONLY` with zero candidate
-  pairs scored and zero new market reads. D is ready only for fresh preregistration design. Market
-  data, runtime Jobs, parameter selection and preserved 2021 access remain closed. Design:
+  pairs scored and zero new market reads. D is now preregistered before fresh data: a fifth fresh
+  economic-identity pool uses 2018 development after 2017-09 warm-up, plans 192 morphology-blind
+  cases (48/quarter), retains the exact nine Stage0 profiles, freezes three Stage2 profiles and an
+  exact 27-pair surface, and preserves the exact still-unread 2021 plan. Stage0 gates inherit P010;
+  Stage2 retains the earlier 20-positive reference-sufficiency floor rather than lowering it after
+  seeing P010. D1 engineering is ready, but market data, runtime Jobs, parameter selection and
+  preserved 2021 access remain closed until that engineering checkpoint is accepted. Design:
   `design/stage-orderly-consolidation-boundary-repair.md`; review:
   `reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; B acceptance:
   `acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md`; C acceptance:
-  `acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md`; route:
+  `acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md`; D preregistration:
+  `acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md`; route:
   `work-items/stage-orderly-consolidation-boundary-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

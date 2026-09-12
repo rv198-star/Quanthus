@@ -1,0 +1,223 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-joint-development-screen.v1",
+  "work_item": "P3-STAGE-011-D",
+  "purpose": "Develop the unchanged nine-profile P010 Stage0 topology jointly with exactly three P011 orderly-consolidation profiles on a fifth fresh 2018 economic-identity cohort, freeze at most one zero-overlap pair, then evaluate only that pair on the exact still-unread Stage009 2021 plan.",
+  "bindings": {
+    "design": {
+      "path": "config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json",
+      "digest": "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353"
+    },
+    "stage0_projection": {
+      "path": "config/stage-learning/positive-instability-quantitative-projection.v1.json",
+      "digest": "sha256:10dec4e9a63d1d1277dfd7e345d1f7b9c65cc27bee0bf05671a86c1277171cee"
+    },
+    "stage2_projection": {
+      "path": "config/stage-learning/orderly-consolidation-projection.v1.json",
+      "digest": "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c"
+    },
+    "stage007_prepare": {
+      "job_id": "stage_95f9b48bd96049b184e0cbf856b9a5e8",
+      "artifact_relative_path": "runs/stage-worker/stage_95f9b48bd96049b184e0cbf856b9a5e8/stage-order-rule-prepare-20260911T080532Z",
+      "manifest_sha256": "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7"
+    },
+    "stage008_d1": {
+      "job_id": "stage_7ffc681cd5254aa0ab3e0d98026c42d7",
+      "artifact_relative_path": "runs/stage-worker/stage_7ffc681cd5254aa0ab3e0d98026c42d7/stage-directional-boundary-d1-20260911T204403Z",
+      "manifest_sha256": "sha256:2ddc4f90376e2061932862c2ef1a8cfd27f8774d1df9bdb59de8bf4e3bf1f9a3"
+    },
+    "stage009_d1": {
+      "job_id": "stage_93c9590d5df34f5e8f38e242077c1e3c",
+      "artifact_relative_path": "runs/stage-worker/stage_93c9590d5df34f5e8f38e242077c1e3c/stage-positive-instability-d1-20260912T081813Z",
+      "manifest_sha256": "sha256:c49bbf50f01a5319634bdd0e54a1a3716f14e78b462d5570bf3f6c028e64c6b5",
+      "evaluation_identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+      "evaluation_plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+      "evaluation_identity_count": 160,
+      "evaluation_data_read": false
+    },
+    "stage010_d1": {
+      "job_id": "stage_8f2bc43d4b1e4943bca4c3e31214c8a5",
+      "code_revision": "b7155e3c1052437fbd24b4617a6bf0a9ab166a86",
+      "artifact_relative_path": "runs/stage-worker/stage_8f2bc43d4b1e4943bca4c3e31214c8a5/stage-positive-instability-quantitative-d1-20260912T154942Z",
+      "manifest_sha256": "sha256:506cb9ea1425afc1f123636603ae21ae969ac5903421f3dc4910db903476ba8c",
+      "fresh_pool_size": 512
+    }
+  },
+  "methodology_rationale": {
+    "development_year": "2018 is the immediately preceding full calendar development year before the consumed P010 2019 cohort; it is frozen before any P011 result-bearing read and all previously exposed economic identities remain excluded",
+    "planned_case_count": "192 fixes 48 hash-selected identities per quarter, expanding review capacity for a two-class joint proposition without morphology-dependent sampling or result-dependent backfill",
+    "stage_0_gate_inheritance": "P010 Stage0 development quality gates are retained exactly; P011 does not tighten or relax them post-result",
+    "stage_2_reference_sufficiency": "minimum 20 definite Stage2 references inherits the pre-existing P3-STAGE-004 Stage2 reference-sufficiency floor and is not lowered to match P010 observed prevalence",
+    "stage_2_quality_floor": "precision>=0.80, coverage>=0.65 and FPR<=0.10 are frozen before fresh data; evaluation permits only the preregistered five-point coverage tolerance to 0.60 while retaining precision/FPR floors"
+  },
+  "source_isolation": {
+    "identity_start": "2017-01-01",
+    "identity_end": "2018-12-31",
+    "candidate_scan_start": "2017-01-01",
+    "candidate_cohort_date": "2017-12-29",
+    "candidate_minimum_observations": 120,
+    "candidate_seed": "stage011-d-joint-orderly-consolidation-20260913-v1|candidate-population",
+    "development_history_start": "2017-09-01",
+    "development_report_start": "2018-01-01",
+    "development_report_end": "2018-12-31",
+    "fresh_pool_size": 512,
+    "development_identity_capacity": 256,
+    "fresh_pool_seed": "stage011-d-joint-orderly-consolidation-20260913-v1|fresh-pool",
+    "exclude_stage007_exposed_pool": true,
+    "exclude_stage008_entire_fresh_pool": true,
+    "exclude_stage009_entire_512_identity_fresh_pool": true,
+    "exclude_stage010_entire_512_identity_fresh_pool": true,
+    "development_overlap_with_preserved_evaluation": 0,
+    "2019_p010_development_read": false,
+    "2020_p009_development_read": false,
+    "2021_preserved_evaluation_read_in_d1": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "development_selection": {
+    "year": 2018,
+    "planned_identities": 192,
+    "quarter_caps": {"1": 48, "2": 48, "3": 48, "4": 48},
+    "sampling_seed": "stage011-d-joint-orderly-consolidation-20260913-v1|development",
+    "identity_selection": "hash_only",
+    "date_selection": "hash_within_assigned_quarter_only",
+    "selection_uses_morphology": false,
+    "one_case_per_economic_identity": true,
+    "cross_quarter_backfill": false,
+    "identity_backfill": false
+  },
+  "threshold_basis": {
+    "source": "all_available_unlabeled_2018_primary_scale_observations_from_development_identity_capacity",
+    "labels_visible": false,
+    "reference_opinions_visible": false,
+    "quantile_method": "nearest_rank_ceiling_1_based",
+    "stage0_absolute_width_gain_included": true,
+    "stage2_positive_contraction_magnitude_included": true
+  },
+  "joint_candidate_surface": {
+    "stage0_profile_count": 9,
+    "stage0_profile_source": "P3-STAGE-010 approved 3 expansion x 3 broad bundled profile topology",
+    "stage2_profile_count": 3,
+    "stage2_profiles": [
+      {
+        "id": "order-lenient",
+        "efficiency_max_quantile": "0.70",
+        "range_width_max_quantile": "0.40",
+        "positive_contraction_min_quantile": "0.30"
+      },
+      {
+        "id": "order-balanced",
+        "efficiency_max_quantile": "0.60",
+        "range_width_max_quantile": "0.30",
+        "positive_contraction_min_quantile": "0.50"
+      },
+      {
+        "id": "order-strict",
+        "efficiency_max_quantile": "0.50",
+        "range_width_max_quantile": "0.20",
+        "positive_contraction_min_quantile": "0.70"
+      }
+    ],
+    "pair_count": 27,
+    "construction": "cartesian_product_exact_p010_stage0_profiles_x_three_p011_stage2_profiles",
+    "grid_expansion_after_result": false,
+    "candidate_replacement_after_result": false
+  },
+  "reference_collection": {
+    "protocol": "order-reference-protocol.v2-primary-only",
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "candidate_output_visible": false,
+    "threshold_basis_visible": false,
+    "explicit_recent_derived_facts_visible": false,
+    "future_rows_visible": false,
+    "primary_opinion_commit_required_before_scoring": true,
+    "independent_validation_claimed": false
+  },
+  "development_gates": {
+    "minimum_complete_cases": 144,
+    "minimum_definite_stage_0_positive_references": 18,
+    "minimum_definite_stage_2_positive_references": 20,
+    "minimum_stage_0_definite_negative_references": 70,
+    "minimum_stage_2_definite_negative_references": 70,
+    "minimum_stage_0_predictions": 15,
+    "minimum_stage_2_predictions": 12,
+    "stage_0_minimum_precision": "0.78",
+    "stage_0_minimum_positive_reference_coverage": "0.70",
+    "stage_0_maximum_definite_negative_false_positive_rate": "0.10",
+    "stage_2_minimum_precision": "0.80",
+    "stage_2_minimum_positive_reference_coverage": "0.65",
+    "stage_2_maximum_definite_negative_false_positive_rate": "0.10",
+    "stage_0_precision_must_be_gte_frozen_008_baseline": true,
+    "stage_0_fpr_must_be_lte_frozen_008_baseline": true,
+    "stage_0_maximum_absolute_coverage_loss_vs_frozen_008_baseline": "0.10",
+    "if_stage_0_baseline_has_false_positive_candidate_must_remove_at_least": 1,
+    "pair_overlap_count_must_equal": 0,
+    "no_eligible_pair_disposition": "REVISE_OR_PARK_DEVELOPMENT_FAIL"
+  },
+  "selection_order": [
+    "minimum_of_stage0_stage2_precision_desc",
+    "maximum_of_stage0_stage2_fpr_asc",
+    "minimum_of_stage0_stage2_coverage_desc",
+    "stage0_candidate_id_asc",
+    "stage2_candidate_id_asc"
+  ],
+  "preserved_evaluation": {
+    "year": 2021,
+    "identity_count": 160,
+    "source_plan_must_match_stage009_digest_exactly": true,
+    "data_read_before_pair_freeze": false,
+    "identity_reselection": false,
+    "cross_quarter_backfill": false,
+    "identity_backfill": false
+  },
+  "evaluation_gates": {
+    "minimum_complete_cases": 120,
+    "minimum_definite_stage_0_positive_references": 18,
+    "minimum_definite_stage_2_positive_references": 15,
+    "minimum_stage_0_definite_negative_references": 70,
+    "minimum_stage_2_definite_negative_references": 70,
+    "minimum_stage_0_predictions": 15,
+    "minimum_stage_2_predictions": 10,
+    "stage_0_minimum_precision": "0.80",
+    "stage_0_minimum_positive_reference_coverage": "0.65",
+    "stage_0_maximum_definite_negative_false_positive_rate": "0.10",
+    "stage_2_minimum_precision": "0.80",
+    "stage_2_minimum_positive_reference_coverage": "0.60",
+    "stage_2_maximum_definite_negative_false_positive_rate": "0.10",
+    "stage_0_precision_must_be_gte_frozen_008_baseline": true,
+    "stage_0_fpr_must_be_lte_frozen_008_baseline": true,
+    "stage_0_maximum_absolute_coverage_loss_vs_frozen_008_baseline": "0.10",
+    "pair_overlap_count_must_equal": 0,
+    "pass_disposition": "PROMISING_EXPLORATORY_JOINT_BOUNDARY_REPAIR",
+    "fail_disposition": "REVISE_OR_PARK_EVALUATION_FAIL"
+  },
+  "execution_sequence": [
+    "D1_PREPARE_FRESH_2018_DEVELOPMENT_AND_BIND_PRESERVED_2021_PLAN",
+    "D2_SEAL_DEVELOPMENT_REFERENCES_SCORE_EXACT_27_AND_FREEZE_AT_MOST_ONE_PAIR",
+    "D3_READ_EXACT_PRESERVED_2021_PLAN_AFTER_PAIR_FREEZE",
+    "D4_SEAL_EVALUATION_REFERENCES_AND_SCORE_FROZEN_PAIR"
+  ],
+  "budgets": {
+    "maximum_result_bearing_market_data_jobs": 2,
+    "maximum_development_candidate_pairs": 27,
+    "semantic_retries": 0,
+    "automatic_supplement_rounds": 0,
+    "automatic_technical_retries": 0
+  },
+  "authority": {
+    "preregistration": true,
+    "implementation_before_data_read": true,
+    "development_data_read_after_implementation_acceptance": true,
+    "runtime_job_submission_after_implementation_acceptance": true,
+    "parameter_search_maximum_pairs": 27,
+    "preserved_2021_evaluation_read_before_pair_freeze": false,
+    "2019_p010_development_access": false,
+    "2020_p009_development_access": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "future_outcome_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

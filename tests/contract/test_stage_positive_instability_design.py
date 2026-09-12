@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/positive-instability-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:f8cbc54f20d86ea590d15aaf6eacb05300851f46ea2ffcb81dea4f433787ba80"
+DESIGN_DIGEST = "sha256:e5393eb71e7500966ad5e497a3918967c2a12a6aa4113b0db2e6888ef5aaddd6"
 
 
 def load_design() -> dict:
@@ -23,8 +23,8 @@ def test_a_design_is_approved_but_runtime_and_data_stay_closed() -> None:
     assert design["delivery_sequence"] == {
         "P3-STAGE-009-A": "closed_design_approved",
         "P3-STAGE-009-B": "closed_engineering_accepted",
-        "P3-STAGE-009-C": "ready_diagnostic_only_no_threshold_learning",
-        "P3-STAGE-009-D": "blocked_until_c_and_separate_fresh_validation_preregistration",
+        "P3-STAGE-009-C": "closed_pass_diagnostic_conformance_only",
+        "P3-STAGE-009-D": "ready_preregistration_only_no_data_access",
     }
     assert design["authority"] == {
         "design_and_review": True,
@@ -138,6 +138,28 @@ def test_b_implementation_checkpoint_opens_only_c_diagnostics() -> None:
     assert checkpoint["relocation_guard_retuned"] is False
     assert checkpoint["next_consumed_evidence_diagnostic_authorized"] is True
     for key in ("contract", "implementation", "unit_contract", "acceptance"):
+        assert (ROOT / checkpoint[key]).is_file()
+
+
+def test_c_conformance_checkpoint_opens_only_d_preregistration() -> None:
+    checkpoint = load_design()["conformance_checkpoint"]
+    assert checkpoint["work_item"] == "P3-STAGE-009-C"
+    assert checkpoint["state"] == "PASS_DIAGNOSTIC_CONFORMANCE_ONLY"
+    assert checkpoint["case_count"] == 95
+    assert checkpoint["center_shift_only_true_stage0_count"] == 2
+    assert checkpoint["center_shift_only_false_positive_count"] == 8
+    assert checkpoint["definite_stage0_count"] == 15
+    assert checkpoint["definite_stage0_positive_width_change_count"] == 13
+    assert checkpoint["definite_stage0_negative_width_change_count"] == 2
+    assert checkpoint["negative_width_change_cases_match_broad_reversal_diagnostic_group"] is True
+    assert checkpoint["numeric_thresholds_selected"] is False
+    assert checkpoint["parameter_trials"] == 0
+    assert checkpoint["new_market_data_reads"] == 0
+    assert checkpoint["runtime_jobs"] == 0
+    assert checkpoint["qualification_claim"] is False
+    assert checkpoint["next_fresh_validation_preregistration_authorized"] is True
+    assert checkpoint["next_fresh_validation_data_access_authorized"] is False
+    for key in ("contract", "result", "runner", "acceptance"):
         assert (ROOT / checkpoint[key]).is_file()
 
 

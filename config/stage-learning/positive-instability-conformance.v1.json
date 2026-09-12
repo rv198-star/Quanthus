@@ -1,0 +1,65 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-conformance.v1",
+  "work_item": "P3-STAGE-009-C",
+  "purpose": "Diagnostic-only conformance over synthetic contract cases and the already-consumed P3-STAGE-008 evaluation; no threshold learning or qualification.",
+  "bindings": {
+    "positive_instability_contract": {
+      "path": "config/stage-learning/positive-instability-contract.v1.json",
+      "digest": "sha256:2160cdb23ed43acb248bafd7bbdace20ff2dd936ab9c8ff5f3b3cda3d74cda7b"
+    },
+    "d3_prepare": {
+      "job_id": "stage_7617aafa1f3149c0a65935ef291fc521",
+      "manifest_sha256": "sha256:a77bc2b439da05da5d10b7291c64caf5d680148c4c69126ba31ea39ac7a99827",
+      "evidence_sha256": "sha256:912a11480d6e12a3dcc3862bcdb0900592623a419e5282e5bb2500e2ad5086da",
+      "case_count": 95
+    },
+    "evaluation_review": {
+      "path": "config/stage-learning/directional-boundary-evaluation-review.v1.tsv",
+      "sha256": "sha256:ba8ba95b9e4d9493cca5ad3feaa1c6a3ce18383bf2bb53912952c2dbb0eabe4f"
+    },
+    "root_cause_diagnostic": {
+      "path": "config/stage-learning/directional-boundary-root-cause-diagnostic.v1.json",
+      "sha256": "sha256:c0f6adf2b9727797c5110a4c42653f51b665ed0ef981900e013de7187e38f741",
+      "semantic_digest": "sha256:dff8fe4603cc21ac7d37764a9d398215fa118f1b2e9f83803d6901d33bdbcc78"
+    }
+  },
+  "fixed_groups": {
+    "center_shift_only_true_stage0_indices": [26, 48],
+    "center_shift_only_false_positive_indices": [30, 44, 46, 50, 53, 67, 76, 93]
+  },
+  "diagnostic_questions": {
+    "true_stage0_group_has_broader_range_than_false_positive_group_median": true,
+    "true_stage0_group_has_lower_directional_efficiency_than_false_positive_group_median": true,
+    "true_stage0_group_has_lower_range_traversal_than_false_positive_group_median": true,
+    "true_stage0_group_has_higher_counter_direction_excursion_than_false_positive_group_median": true,
+    "both_true_stage0_cases_are_more_disorder_like_than_false_positive_group_median_on_all_four_dimensions": true,
+    "center_shift_itself_is_excluded_from_the_b_truth_function": true
+  },
+  "metrics": {
+    "descriptive_only": true,
+    "dimensions": [
+      "range_width20",
+      "efficiency20_abs",
+      "range_traversal20",
+      "counter_direction_excursion_share20",
+      "width_change20",
+      "center_shift20_abs"
+    ],
+    "numeric_cutoff_selection": false,
+    "parameter_trials": 0
+  },
+  "claim_ceiling": {
+    "qualification": false,
+    "threshold_learning": false,
+    "candidate_selection": false,
+    "new_market_data_read": false,
+    "runtime_job": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "stage_2_change": false,
+    "relocation_guard_retuning": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

@@ -133,11 +133,33 @@
     "relocation_guard_retuned": false,
     "next_consumed_evidence_diagnostic_authorized": true
   },
+  "conformance_checkpoint": {
+    "work_item": "P3-STAGE-009-C",
+    "state": "PASS_DIAGNOSTIC_CONFORMANCE_ONLY",
+    "contract": "config/stage-learning/positive-instability-conformance.v1.json",
+    "result": "config/stage-learning/positive-instability-conformance-result.v1.json",
+    "runner": "scripts/run_stage_positive_instability_conformance.py",
+    "acceptance": "docs/acceptance/stage-positive-instability-c-conformance-20260912.md",
+    "case_count": 95,
+    "center_shift_only_true_stage0_count": 2,
+    "center_shift_only_false_positive_count": 8,
+    "definite_stage0_count": 15,
+    "definite_stage0_positive_width_change_count": 13,
+    "definite_stage0_negative_width_change_count": 2,
+    "negative_width_change_cases_match_broad_reversal_diagnostic_group": true,
+    "numeric_thresholds_selected": false,
+    "parameter_trials": 0,
+    "new_market_data_reads": 0,
+    "runtime_jobs": 0,
+    "qualification_claim": false,
+    "next_fresh_validation_preregistration_authorized": true,
+    "next_fresh_validation_data_access_authorized": false
+  },
   "delivery_sequence": {
     "P3-STAGE-009-A": "closed_design_approved",
     "P3-STAGE-009-B": "closed_engineering_accepted",
-    "P3-STAGE-009-C": "ready_diagnostic_only_no_threshold_learning",
-    "P3-STAGE-009-D": "blocked_until_c_and_separate_fresh_validation_preregistration"
+    "P3-STAGE-009-C": "closed_pass_diagnostic_conformance_only",
+    "P3-STAGE-009-D": "ready_preregistration_only_no_data_access"
   },
   "authority": {
     "design_and_review": true,

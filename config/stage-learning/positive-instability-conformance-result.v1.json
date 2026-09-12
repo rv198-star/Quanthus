@@ -1,0 +1,69 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-conformance-result.v1",
+  "work_item": "P3-STAGE-009-C",
+  "status": "PASS_DIAGNOSTIC_CONFORMANCE_ONLY",
+  "source": {
+    "d3_job_id": "stage_7617aafa1f3149c0a65935ef291fc521",
+    "d3_manifest_sha256": "sha256:a77bc2b439da05da5d10b7291c64caf5d680148c4c69126ba31ea39ac7a99827",
+    "evaluation_evidence_sha256": "sha256:912a11480d6e12a3dcc3862bcdb0900592623a419e5282e5bb2500e2ad5086da",
+    "case_count": 95,
+    "read_only_stage_status_calls": 13
+  },
+  "fixed_groups": {
+    "center_shift_only_true_stage0": {
+      "count": 2,
+      "indices": [26, 48],
+      "medians": {
+        "range_width20": "0.2906161340399336223970879503",
+        "efficiency20_abs": "0.04658418620719436887334283370",
+        "range_traversal20": "0.1839337314582931997688306685",
+        "counter_direction_excursion_share20": "0.899441340782122905027932961",
+        "width_change20": "-0.3446501805282089927350807520",
+        "center_shift20_abs": "0.308748547374096166711320702"
+      }
+    },
+    "center_shift_only_false_positive": {
+      "count": 8,
+      "indices": [30, 44, 46, 50, 53, 67, 76, 93],
+      "medians": {
+        "range_width20": "0.1349094545507310867872327048",
+        "efficiency20_abs": "0.1372872108249672632038411174",
+        "range_traversal20": "0.3971423337607620443304634548",
+        "counter_direction_excursion_share20": "0.5553808525506638714185883995",
+        "width_change20": "-0.2426165315973628308859144190",
+        "center_shift20_abs": "0.0987541297252064397019769295"
+      }
+    }
+  },
+  "comparisons": {
+    "true_stage0_group_has_broader_range_than_false_positive_group_median": true,
+    "true_stage0_group_has_lower_directional_efficiency_than_false_positive_group_median": true,
+    "true_stage0_group_has_lower_range_traversal_than_false_positive_group_median": true,
+    "true_stage0_group_has_higher_counter_direction_excursion_than_false_positive_group_median": true,
+    "both_true_stage0_cases_are_more_disorder_like_than_false_positive_group_median_on_all_four_dimensions": true,
+    "center_shift_itself_is_excluded_from_the_b_truth_function": true
+  },
+  "definite_stage0": {
+    "count": 15,
+    "width_change_signs": {
+      "positive": 13,
+      "zero": 0,
+      "negative": 2
+    },
+    "negative_width_change_cases_are_center_shift_only_true_stage0_group": true
+  },
+  "claim_ceiling": {
+    "numeric_thresholds_selected": false,
+    "parameter_trials": 0,
+    "new_market_data_read": false,
+    "runtime_jobs": 0,
+    "qualification_claim": false,
+    "stage_2_changed": false,
+    "relocation_guard_retuned": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

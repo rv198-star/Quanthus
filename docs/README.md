@@ -253,10 +253,14 @@ nodes.
   modifier meaning but has zero proposition-truth authority; no new Fact and no numerical threshold
   is frozen by A. B is now engineering-accepted: the qualitative TRUE/FALSE/UNKNOWN two-channel
   contract and auditable reason ledger are implemented with center shift excluded from the truth
-  function. C is ready for synthetic + consumed-evidence diagnostics only; market reads, runtime Jobs,
-  threshold search, 2022-2025 access and Stage-2 changes remain closed. Evidence:
+  function. C is now closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`: the two negative-width-change true
+  Stage0 cases are exactly the broad/reversal-shaped cases and are geometrically more disorder-like
+  than the eight center-only false positives on all four fixed comparison dimensions. No cutoff was
+  selected. D is ready for preregistration only; market reads, runtime Jobs, threshold search,
+  2022-2025 access and Stage-2 changes remain closed. Evidence:
   `acceptance/stage-directional-boundary-root-cause-validation-20260912.md`,
-  `acceptance/stage-positive-instability-b-implementation-20260912.md`; design:
+  `acceptance/stage-positive-instability-b-implementation-20260912.md`,
+  `acceptance/stage-positive-instability-c-conformance-20260912.md`; design:
   `design/stage-positive-instability-proposition-repair.md`; review:
   `reviews/stage-positive-instability-proposition-repair-review-20260912.md`; route:
   `work-items/stage-positive-instability-proposition-repair.md`.

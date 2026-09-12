@@ -1643,12 +1643,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {
                 "P3-LABEL-004",
                 "P3-DASH-001",
-                "P3-STAGE-009-D",
             },
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-STAGE-009", "P3-STAGE-009-C"},
+            {"P3-STAGE-009", "P3-STAGE-009-D"},
         )
         self.assertTrue(
             all(

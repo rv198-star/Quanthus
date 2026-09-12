@@ -177,7 +177,7 @@ git diff --check: PASS
 Repository-wide gate with the repository development virtualenv explicitly bound as `PYTHON`:
 
 ```text
-2259 passed / 7 skipped
+2264 passed / 7 skipped
 Quanthus doctor: OK
 compileall: PASS
 planning sync: PASS
@@ -203,3 +203,8 @@ This engineering acceptance does not:
 After repository-wide verification and durable push, only one D1 result-bearing prepare Job may be
 submitted on RX6800. If D1 fails or produces an insufficient fixed review denominator, there is no
 automatic retry or supplement; the failure must be classified under a separately governed decision.
+
+RX6800 may expose that already-governed authority to AgentDock only through the root-owned restricted
+helper described in `../operations/quanthus-stage-agentdock-control.md`. That helper is an operating
+channel, not new research authority: it admits only exact-current-main deployment, doctor,
+P011-D1 submission and bounded status reads, and does not expose a generic `qiuyu` shell.

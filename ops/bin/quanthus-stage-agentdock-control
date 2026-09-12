@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Restricted RX6800 control surface for AgentDock-mediated Quanthus Stage operations.
+set -euo pipefail
+
+fail() {
+  echo "quanthus-stage-agentdock-control: $*" >&2
+  exit 2
+}
+
+[[ "$(id -un)" == "qiuyu" ]] || fail "must run as qiuyu through the admitted sudo rule"
+[[ "$(hostname)" == "RX6800" ]] || fail "admitted only on RX6800"
+
+repo_root="/home/qiuyu/quanthus-code/Quanthus"
+training_root="/home/qiuyu/quanthus-data/training"
+git_key="/home/qiuyu/.ssh/quanthus-github-ro"
+worker="${repo_root}/ops/bin/quanthus-stage-worker"
+runtime_identity="${training_root}/control/stage-worker/worker-runtime.json"
+allowed_kind="quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
+
+[[ -d "${repo_root}/.git" ]] || fail "Quanthus control checkout missing"
+[[ -f "${worker}" ]] || fail "stage worker wrapper missing"
+[[ -f "${git_key}" ]] || fail "GitHub read-only deploy key missing"
+
+export QUANTHUS_STAGE_CONTROL_REPO="${repo_root}"
+export QUANTHUS_STAGE_TRAINING_ROOT="${training_root}"
+export QUANTHUS_STAGE_TRAINING_VENV="${repo_root}/.venv-stage-training"
+export QUANTHUS_STAGE_GIT_KEY="${git_key}"
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+export GIT_SSH_COMMAND="ssh -F none -i ${git_key} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/home/qiuyu/.ssh/known_hosts -o GlobalKnownHostsFile=/dev/null"
+
+exact_revision() {
+  [[ "${1:-}" =~ ^[0-9a-f]{40}$ ]] || fail "exact 40-character revision required"
+}
+
+service_revision() {
+  [[ -f "${runtime_identity}" ]] || fail "worker runtime identity missing"
+  "${repo_root}/.venv-stage-training/bin/python" -c \
+    'import json,sys; value=json.load(open(sys.argv[1])); print(value.get("code_revision", ""))' \
+    "${runtime_identity}"
+}
+
+restart_and_verify() {
+  systemctl --user restart quanthus-stage-worker.service
+  for _ in $(seq 1 20); do
+    systemctl --user is-active --quiet quanthus-stage-worker.service && break
+    sleep 1
+  done
+  systemctl --user is-active --quiet quanthus-stage-worker.service || fail "worker service inactive"
+  local expected="$1"
+  local observed=""
+  for _ in $(seq 1 20); do
+    observed="$(service_revision 2>/dev/null || true)"
+    [[ "${observed}" == "${expected}" ]] && break
+    sleep 1
+  done
+  [[ "${observed}" == "${expected}" ]] || fail "worker runtime revision differs"
+  bash "${worker}" doctor
+}
+
+command="${1:-}"
+case "${command}" in
+  deploy)
+    [[ "$#" -eq 2 ]] || fail "usage: deploy <exact-main-revision>"
+    target="$2"
+    exact_revision "${target}"
+    [[ -z "$(git -C "${repo_root}" status --porcelain)" ]] || fail "control checkout must be clean"
+    git -C "${repo_root}" fetch --no-tags git@github.com:rv198-star/Quanthus.git \
+      "+refs/heads/main:refs/remotes/stage-control/main"
+    remote_main="$(git -C "${repo_root}" rev-parse refs/remotes/stage-control/main)"
+    [[ "${target}" == "${remote_main}" ]] || fail "target must equal current GitHub main"
+    git -C "${repo_root}" checkout --detach "${target}"
+    [[ "$(git -C "${repo_root}" rev-parse HEAD)" == "${target}" ]] || fail "checkout revision differs"
+    restart_and_verify "${target}"
+    ;;
+  doctor)
+    [[ "$#" -eq 1 ]] || fail "usage: doctor"
+    bash "${worker}" doctor
+    ;;
+  submit-p011-d1)
+    [[ "$#" -eq 2 ]] || fail "usage: submit-p011-d1 <exact-revision>"
+    target="$2"
+    exact_revision "${target}"
+    [[ "$(git -C "${repo_root}" rev-parse HEAD)" == "${target}" ]] || fail "control checkout revision differs"
+    [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
+    bash "${worker}" submit --kind "${allowed_kind}" --code-revision "${target}"
+    ;;
+  status)
+    [[ "$#" -eq 2 ]] || fail "usage: status <stage_job_id>"
+    [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
+    bash "${worker}" status --job-id "$2"
+    ;;
+  *)
+    fail "allowed commands: deploy | doctor | submit-p011-d1 | status"
+    ;;
+esac

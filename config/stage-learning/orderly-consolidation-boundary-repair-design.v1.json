@@ -1,0 +1,117 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-boundary-repair-design.v1",
+  "work_item": "P3-STAGE-011-A",
+  "title": "Stage 0/2 joint boundary and orderly-consolidation projection repair",
+  "predecessor": {
+    "work_item": "P3-STAGE-010",
+    "disposition": "REVISE_OR_PARK_DEVELOPMENT_FAIL",
+    "failure_diagnostic": "config/stage-learning/positive-instability-quantitative-development-failure-diagnostic.v1.json",
+    "failure_diagnostic_digest": "sha256:22aa4f57cdc7f51699ecdbf63ad86135ad64a468c0056c20e3a579e119d218e7"
+  },
+  "root_cause_diagnostic": {
+    "path": "config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json",
+    "digest": "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c"
+  },
+  "state": "APPROVED_IMMUTABLE",
+  "semantic_target": {
+    "structural_instability_20": "retain P3-STAGE-010 separated expanding-disorder / broad-reversal topology; no tenth candidate and no P010 post-result threshold change",
+    "coherent_directional_relocation_20": "retain the exact frozen P3-STAGE-008 relocation guard; no retuning",
+    "orderly_consolidation_20": "low_directional_efficiency AND materially_narrow_current_range AND material_range_contraction AND coherent_directional_relocation_20=FALSE",
+    "stage_0": "structural_instability_20=TRUE AND coherent_directional_relocation_20=FALSE AND orderly_consolidation_20=FALSE",
+    "stage_2": "structural_instability_20=FALSE AND coherent_directional_relocation_20=FALSE AND orderly_consolidation_20=TRUE",
+    "conflict": "positive orderly_consolidation together with structural_instability or coherent relocation is a semantic conflict, never resolved by precedence"
+  },
+  "truth_authority": {
+    "directional_efficiency20": true,
+    "range_width20": true,
+    "width_change20": true,
+    "center_shift20_abs": false,
+    "range_traversal20": "relocation_guard_only",
+    "counter_direction_excursion_share20": "relocation_guard_only",
+    "path_turnover20": false,
+    "future_outcomes": false
+  },
+  "projection_local_derivations": {
+    "contraction_magnitude20": "max(0, -width_change20)",
+    "catalog_fact": false
+  },
+  "orderly_consolidation_profiles": [
+    {
+      "id": "order-lenient",
+      "efficiency_max_quantile": "0.70",
+      "range_width_max_quantile": "0.40",
+      "positive_contraction_min_quantile": "0.30"
+    },
+    {
+      "id": "order-balanced",
+      "efficiency_max_quantile": "0.60",
+      "range_width_max_quantile": "0.30",
+      "positive_contraction_min_quantile": "0.50"
+    },
+    {
+      "id": "order-strict",
+      "efficiency_max_quantile": "0.50",
+      "range_width_max_quantile": "0.20",
+      "positive_contraction_min_quantile": "0.70"
+    }
+  ],
+  "future_joint_development_shape": {
+    "p010_stage0_profile_count": 9,
+    "stage2_profile_count": 3,
+    "maximum_joint_pairs": 27,
+    "grid_expansion_after_result": false,
+    "pair_overlap_gate": "zero Stage0/Stage2 simultaneous assertions on the complete development denominator",
+    "numeric_thresholds_selected_now": false,
+    "candidate_pair_selected_now": false
+  },
+  "adversarial_cases": [
+    {
+      "id": "tight_strongly_contracting_high_churn",
+      "required": "may be orderly consolidation; high in-band churn alone cannot veto Stage2"
+    },
+    {
+      "id": "mid_width_contracting_two_sided_disorder",
+      "required": "must not become Stage2 merely because efficiency is low, width contracts and center shift is small"
+    },
+    {
+      "id": "narrow_contracting_center_drift_without_relocation",
+      "required": "center motion alone cannot veto Stage2"
+    },
+    {
+      "id": "narrow_contracting_directional_repricing",
+      "required": "coherent relocation vetoes Stage2"
+    },
+    {
+      "id": "narrow_but_not_contracting",
+      "required": "Stage2 false because consolidation requires positive contraction evidence"
+    },
+    {
+      "id": "contracting_but_not_materially_narrow",
+      "required": "Stage2 false; contraction does not substitute for boundedness"
+    },
+    {
+      "id": "missing_primary_measurement",
+      "required": "UNKNOWN / fail closed"
+    }
+  ],
+  "consumed_evidence_boundary": {
+    "p010_2019_review": "diagnostic_only",
+    "p009_2020_development": "diagnostic_only",
+    "numeric_threshold_selection_from_consumed_evidence": false,
+    "candidate_selection_from_consumed_evidence": false
+  },
+  "authority": {
+    "implementation": true,
+    "synthetic_conformance": true,
+    "consumed_evidence_topology_diagnostic": true,
+    "market_data_read": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

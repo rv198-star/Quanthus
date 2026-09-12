@@ -1,0 +1,41 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-boundary-repair-delivery.v1",
+  "work_item": "P3-STAGE-011",
+  "diagnostic": {
+    "path": "config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json",
+    "digest": "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c",
+    "state": "CLOSED_DIAGNOSTIC_ONLY"
+  },
+  "design": {
+    "path": "config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json",
+    "digest": "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353",
+    "state": "APPROVED_IMMUTABLE"
+  },
+  "review": {
+    "path": "docs/reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md",
+    "open_directional_blockers": 0,
+    "same_origin_simulation": true,
+    "independent_validation_claimed": false
+  },
+  "delivery_sequence": {
+    "P3-STAGE-011-A": "closed_design_approved",
+    "P3-STAGE-011-B": "ready_implementation_and_synthetic_only",
+    "P3-STAGE-011-C": "blocked_pending_b_acceptance",
+    "P3-STAGE-011-D": "blocked_pending_c_and_fresh_preregistration"
+  },
+  "authority": {
+    "implementation": true,
+    "synthetic_conformance": true,
+    "consumed_evidence_topology_diagnostic": false,
+    "market_data_read": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "candidate_selection": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

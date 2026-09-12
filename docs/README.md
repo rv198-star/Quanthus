@@ -313,6 +313,21 @@ nodes.
   D2 review seal: `acceptance/stage-positive-instability-quantitative-d2-review-seal-20260913.md`;
   D2 closeout: `acceptance/stage-positive-instability-quantitative-d2-development-closeout-20260913.md`;
   route: `work-items/stage-positive-instability-quantitative-projection-repair.md`.
+- `P3-STAGE-011` is the bounded successor for the Stage0/Stage2 truth-boundary conflict exposed by
+  P010. A read-only replay of the sealed P010 review shows the legacy Stage2 rectangle hits only 6/16
+  definite Stage2 references; all ten misses fail only the old `abs(center_shift20) <= 0.04` hard gate,
+  while the same rectangle also asserts one definite Stage0 and one definite `NEITHER` case. The same
+  replay rejects a generic low-churn repair because true Stage2 references often have high in-band
+  counter excursion and turnover. A therefore freezes a new topology: low directional efficiency +
+  materially narrow current range + material contraction + negative frozen relocation evidence;
+  center shift becomes modifier-only, no new path-order Fact is introduced, and no numeric threshold
+  is selected from consumed evidence. The future Stage2 surface is exactly three bundled quantile
+  profiles; any fresh joint screen is capped at 9 existing Stage0 profiles × 3 Stage2 profiles with
+  zero overlap as a hard pair gate. A is closed and B implementation/synthetic work is ready. Market
+  data, runtime Jobs, parameter selection and preserved 2021 access remain closed. Design:
+  `design/stage-orderly-consolidation-boundary-repair.md`; review:
+  `reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; route:
+  `work-items/stage-orderly-consolidation-boundary-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

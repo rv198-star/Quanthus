@@ -1,0 +1,88 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-boundary-diagnostic.v1",
+  "work_item": "P3-STAGE-011-A-DIAGNOSTIC",
+  "source": {
+    "p010_failure_diagnostic": "config/stage-learning/positive-instability-quantitative-development-failure-diagnostic.v1.json",
+    "p010_failure_diagnostic_digest": "sha256:22aa4f57cdc7f51699ecdbf63ad86135ad64a468c0056c20e3a579e119d218e7",
+    "review_ledger_sha256": "sha256:e9d93b43903f8753ad8d7f8859493b8a279ec6aad4101856ebeb4d2bcb5e204e",
+    "case_count": 160,
+    "market_data_read": false,
+    "preserved_2021_evaluation_read": false
+  },
+  "reference_counts": {
+    "STAGE_0": 54,
+    "STAGE_2": 16,
+    "NEITHER": 72,
+    "AMBIGUOUS": 18
+  },
+  "legacy_stage2": {
+    "predicate": {
+      "efficiency20_abs_max": "0.33",
+      "range_width20_max": "0.18",
+      "width_change20_max": "-0.20",
+      "center_shift20_abs_max": "0.04"
+    },
+    "definite_positive_references": 16,
+    "definite_negative_references": 126,
+    "true_positive": 6,
+    "false_negative": 10,
+    "false_positive": 2,
+    "precision": "0.75",
+    "positive_reference_coverage": "0.375",
+    "definite_negative_false_positive_rate": "0.01587301587301587301587301587",
+    "false_positive_reference_types": {
+      "STAGE_0": 1,
+      "NEITHER": 1
+    }
+  },
+  "stage2_reference_gate_failure_counts": {
+    "efficiency20_abs_gt_0_33": 0,
+    "range_width20_gt_0_18": 0,
+    "width_change20_gt_minus_0_20": 0,
+    "center_shift20_abs_gt_0_04": 10
+  },
+  "distribution_diagnostic": {
+    "STAGE_2": {
+      "range_width20_median": "0.0830999552094974",
+      "range_width20_q90": "0.11634349030470914",
+      "width_change20_median": "-0.530943252741699",
+      "center_shift20_abs_median": "0.0501879829623634",
+      "center_shift20_abs_q90": "0.1279826464208243",
+      "counter_direction_excursion_share20_median": "0.8836671802773498",
+      "path_turnover20_median": "3.9277777777777714"
+    },
+    "STAGE_0": {
+      "range_width20_median": "0.1844548153611874",
+      "range_width20_q10": "0.13850415512465375",
+      "counter_direction_excursion_share20_median": "0.6633333333333333",
+      "path_turnover20_median": "2.678789777059083"
+    },
+    "p010_overlap_range_width20": [
+      "0.1627118644067796610169491525",
+      "0.1627486437613019891500904159"
+    ]
+  },
+  "findings": {
+    "legacy_stage2_generalization_is_not_preserved_on_p010_fresh_references": true,
+    "all_ten_missed_stage2_references_fail_only_the_center_shift_hard_gate": true,
+    "legacy_range_width_ceiling_admits_a_definite_stage0_conflict": true,
+    "generic_low_churn_or_low_counter_excursion_guard_is_rejected_by_consumed_evidence": true,
+    "stage2_true_references_are_tight_and_strongly_contracting_but_can_have_material_center_motion": true,
+    "numeric_replacement_threshold_must_not_be_selected_from_consumed_p010_evidence": true
+  },
+  "bounded_conclusion": "The residual P010 blocker is not evidence for a tenth Stage0 candidate. The frozen Stage2 rectangle no longer conforms to the approved meaning of positive orderly consolidation on the fresh 2019 semantic references: its mandatory center-stability gate causes all ten observed Stage2 false negatives, while its loose absolute-width ceiling permits a definite Stage0 conflict. Existing path churn/counter-excursion cannot be promoted as an order hard gate because true Stage2 references are often highly two-sided inside a tight contracting band. A successor should repair Stage2 topology around low directional efficiency + material narrowness + material contraction + negative coherent-relocation evidence, keep center shift as modifier context, and learn any numeric boundary only on a new disjoint development cohort.",
+  "authority": {
+    "diagnostic_only": true,
+    "threshold_selection": false,
+    "stage0_candidate_addition": false,
+    "stage2_threshold_change": false,
+    "new_fact_authority": false,
+    "market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

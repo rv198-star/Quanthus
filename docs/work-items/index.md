@@ -303,6 +303,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-010-B | Implement deterministic separated-channel projection contract | P3-STAGE-010-A | closed; engineering accepted; docs/acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md |
 | P3-STAGE-010-C | Consumed Stage-009 failure topology conformance | P3-STAGE-010-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; no threshold learning |
 | P3-STAGE-010-D | Fresh 2019 development then exact preserved 2021 evaluation | P3-STAGE-010-C | closed `REVISE_OR_PARK_DEVELOPMENT_FAIL`; 9 trials / 0 eligible; near-pass frontier is Stage2-overlap=2 vs coverage=0.6296, and post-result diagnostic identifies Stage0/Stage2 boundary conflict; 2021 unread; docs/acceptance/stage-positive-instability-quantitative-d2-development-closeout-20260913.md |
+| P3-STAGE-011 | Repair Stage0/Stage2 joint boundary and orderly-consolidation projection | P3-STAGE-010 | ready; A design approved, B implementation/synthetic-only ready, no data/runtime authority; docs/work-items/stage-orderly-consolidation-boundary-repair.md |
+| P3-STAGE-011-A | Freeze Stage2 topology and joint 0/2 boundary | P3-STAGE-010 | closed; design approved; docs/design/stage-orderly-consolidation-boundary-repair.md |
+| P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | ready; implementation only; no market data or threshold selection |
+| P3-STAGE-011-C | Consumed-evidence topology conformance | P3-STAGE-011-B | blocked pending B acceptance; diagnostic-only when opened |
+| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development | P3-STAGE-011-C | blocked pending C and a separate fresh preregistration; preserved 2021 unread |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

@@ -251,9 +251,12 @@ nodes.
   is `P3-STAGE-009`. Its A-stage design/review is now closed with a two-channel positive-instability
   model: expanding disorder and broad-reversal disorder. `range-center-shift` retains descriptive /
   modifier meaning but has zero proposition-truth authority; no new Fact and no numerical threshold
-  is frozen by A. B is ready for implementation-only work while market reads, runtime Jobs, threshold
-  search, 2022-2025 access and Stage-2 changes remain closed. Evidence:
-  `acceptance/stage-directional-boundary-root-cause-validation-20260912.md`; design:
+  is frozen by A. B is now engineering-accepted: the qualitative TRUE/FALSE/UNKNOWN two-channel
+  contract and auditable reason ledger are implemented with center shift excluded from the truth
+  function. C is ready for synthetic + consumed-evidence diagnostics only; market reads, runtime Jobs,
+  threshold search, 2022-2025 access and Stage-2 changes remain closed. Evidence:
+  `acceptance/stage-directional-boundary-root-cause-validation-20260912.md`,
+  `acceptance/stage-positive-instability-b-implementation-20260912.md`; design:
   `design/stage-positive-instability-proposition-repair.md`; review:
   `reviews/stage-positive-instability-proposition-repair-review-20260912.md`; route:
   `work-items/stage-positive-instability-proposition-repair.md`.

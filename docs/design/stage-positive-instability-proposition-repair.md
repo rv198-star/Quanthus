@@ -8,7 +8,7 @@
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | P3-STAGE-008 / `REVISE_OR_PARK_EVALUATION_FAIL` |
 | Machine design | `../../config/stage-learning/positive-instability-repair-design.v1.json` |
-| Machine design digest | `sha256:728ae38af9baa05740467ce12a66f332b25a52656627b6fac2d7a26f0a94c276` |
+| Machine design digest | `sha256:f8cbc54f20d86ea590d15aaf6eacb05300851f46ea2ffcb81dea4f433787ba80` |
 | Root-cause evidence | [post-closeout validation](../acceptance/stage-directional-boundary-root-cause-validation-20260912.md) |
 | Four-responsibility review | [review record](../reviews/stage-positive-instability-proposition-repair-review-20260912.md) |
 | Runtime/data authority | none |
@@ -225,10 +225,18 @@ Therefore:
 
 ```text
 P3-STAGE-009-A: CLOSED / DESIGN APPROVED
-P3-STAGE-009-B: READY / IMPLEMENTATION ONLY
-P3-STAGE-009-C: BLOCKED UNTIL B ACCEPTANCE
+P3-STAGE-009-B: CLOSED / ENGINEERING IMPLEMENTATION ACCEPTED
+P3-STAGE-009-C: READY / DIAGNOSTIC ONLY, NO THRESHOLD LEARNING
 P3-STAGE-009-D: BLOCKED UNTIL C + SEPARATE FRESH-VALIDATION PREREGISTRATION
 ```
 
-B may implement the proposition/channel contract, synthetic adversarial cases and reason codes. B may
-not read market data, submit runtime Jobs, freeze thresholds, or change the relocation/Stage-2 rules.
+B has implemented the proposition/channel contract, synthetic adversarial cases and reason ledger in
+`config/stage-learning/positive-instability-contract.v1.json` and
+`src/quanthus/stage_learning/positive_instability.py`. The implementation contains no numeric
+thresholds, market-data provider, runtime Job path, relocation retuning or Stage-2 mutation. Detailed
+evidence is in
+[009-B engineering acceptance](../acceptance/stage-positive-instability-b-implementation-20260912.md).
+
+C may now run synthetic plus already-consumed evidence diagnostics only. C may verify that the two
+positive channels explain the known 008 error families and preserve true-positive shapes, but may not
+select quantitative thresholds, create qualification claims or open fresh data.

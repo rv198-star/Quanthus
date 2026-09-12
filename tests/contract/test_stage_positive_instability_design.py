@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/positive-instability-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:728ae38af9baa05740467ce12a66f332b25a52656627b6fac2d7a26f0a94c276"
+DESIGN_DIGEST = "sha256:f8cbc54f20d86ea590d15aaf6eacb05300851f46ea2ffcb81dea4f433787ba80"
 
 
 def load_design() -> dict:
@@ -22,8 +22,8 @@ def test_a_design_is_approved_but_runtime_and_data_stay_closed() -> None:
     assert design["delivery_gate"] == "blocked"
     assert design["delivery_sequence"] == {
         "P3-STAGE-009-A": "closed_design_approved",
-        "P3-STAGE-009-B": "ready_implementation_only_no_market_read",
-        "P3-STAGE-009-C": "blocked_until_b_acceptance",
+        "P3-STAGE-009-B": "closed_engineering_accepted",
+        "P3-STAGE-009-C": "ready_diagnostic_only_no_threshold_learning",
         "P3-STAGE-009-D": "blocked_until_c_and_separate_fresh_validation_preregistration",
     }
     assert design["authority"] == {
@@ -121,6 +121,24 @@ def test_consumed_008_evidence_cannot_select_or_qualify_009() -> None:
     assert policy["consumed_008_evaluation_may_qualify_009"] is False
     assert policy["post_hoc_counterfactual_may_set_thresholds"] is False
     assert policy["future_threshold_search_requires_separate_preregistration"] is True
+
+
+def test_b_implementation_checkpoint_opens_only_c_diagnostics() -> None:
+    checkpoint = load_design()["implementation_checkpoint"]
+    assert checkpoint["work_item"] == "P3-STAGE-009-B"
+    assert checkpoint["state"] == "ENGINEERING_IMPLEMENTATION_ACCEPTED"
+    assert checkpoint["contract_digest"] == (
+        "sha256:2160cdb23ed43acb248bafd7bbdace20ff2dd936ab9c8ff5f3b3cda3d74cda7b"
+    )
+    assert checkpoint["numeric_thresholds_frozen"] is False
+    assert checkpoint["market_data_reads"] == 0
+    assert checkpoint["runtime_jobs"] == 0
+    assert checkpoint["parameter_trials"] == 0
+    assert checkpoint["stage_2_changed"] is False
+    assert checkpoint["relocation_guard_retuned"] is False
+    assert checkpoint["next_consumed_evidence_diagnostic_authorized"] is True
+    for key in ("contract", "implementation", "unit_contract", "acceptance"):
+        assert (ROOT / checkpoint[key]).is_file()
 
 
 def test_review_provenance_and_routes_are_bound() -> None:

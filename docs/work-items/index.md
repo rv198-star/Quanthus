@@ -293,10 +293,10 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-008-B | Implement threshold-free path Facts and primary-first review schema | P3-STAGE-008-A | closed; engineering accepted; docs/acceptance/stage-directional-boundary-repair-b-implementation-20260912.md |
 | P3-STAGE-008-C | Synthetic conformance plus exposed-007 diagnostic regression | P3-STAGE-008-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; docs/acceptance/stage-directional-boundary-repair-c-conformance-20260912.md |
 | P3-STAGE-008-D | One fresh task-disjoint development screen | P3-STAGE-008-C | closed; 95 fresh evaluation cases; precision 0.5769 / FPR 0.1692 / coverage 1.0; `REVISE_OR_PARK_EVALUATION_FAIL` |
-| P3-STAGE-009 | Repair the positive Stage-0 structural-instability proposition | P3-STAGE-008 | ready at B implementation only; A design approved; runtime/data authority closed; docs/work-items/stage-positive-instability-proposition-repair.md |
+| P3-STAGE-009 | Repair the positive Stage-0 structural-instability proposition | P3-STAGE-008 | ready at C diagnostic only; A/B closed; runtime/data/threshold authority closed; docs/work-items/stage-positive-instability-proposition-repair.md |
 | P3-STAGE-009-A | Freeze positive-instability semantics and adversarial counterexamples | P3-STAGE-008 | closed; design approved; docs/design/stage-positive-instability-proposition-repair.md |
-| P3-STAGE-009-B | Implement the approved positive-instability contract | P3-STAGE-009-A | ready for implementation only; no market read/runtime/threshold search |
-| P3-STAGE-009-C | Synthetic plus consumed-evidence conformance diagnostics | P3-STAGE-009-B | blocked; diagnostic only, no threshold learning |
+| P3-STAGE-009-B | Implement the approved positive-instability contract | P3-STAGE-009-A | closed; engineering accepted; docs/acceptance/stage-positive-instability-b-implementation-20260912.md |
+| P3-STAGE-009-C | Synthetic plus consumed-evidence conformance diagnostics | P3-STAGE-009-B | ready; diagnostic only, no threshold learning or fresh market read |
 | P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | blocked; requires separate source/identity preregistration |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |

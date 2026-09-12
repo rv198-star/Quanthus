@@ -1,0 +1,92 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-contract.v1",
+  "work_item": "P3-STAGE-009-B",
+  "governing_design": {
+    "path": "config/stage-learning/positive-instability-repair-design.v1.json",
+    "digest": "sha256:728ae38af9baa05740467ce12a66f332b25a52656627b6fac2d7a26f0a94c276"
+  },
+  "truth_values": ["TRUE", "FALSE", "UNKNOWN"],
+  "primitive_evidence": {
+    "range_width_material_20": "future versioned threshold projection over structure.geometry.range-width@20",
+    "width_expansion_material_20": "future versioned threshold projection over structure.geometry.width-change@20_vs_prior20",
+    "low_directional_efficiency_20": "future versioned threshold projection over absolute structure.geometry.directional-efficiency@20",
+    "low_range_traversal_20": "future versioned threshold projection over structure.geometry.range-traversal@20",
+    "high_counter_direction_excursion_20": "future versioned threshold projection over structure.geometry.counter-direction-excursion-share@20; UNKNOWN is valid when zero-net makes the Fact unavailable"
+  },
+  "channels": {
+    "expanding_disorder_20": {
+      "operator": "AND",
+      "inputs": [
+        "range_width_material_20",
+        "width_expansion_material_20",
+        "low_directional_efficiency_20"
+      ]
+    },
+    "broad_reversal_disorder_20": {
+      "operator": "AND",
+      "inputs": [
+        "range_width_material_20",
+        "low_directional_efficiency_20",
+        "reversal_or_roundtrip_20"
+      ],
+      "derived_input": {
+        "reversal_or_roundtrip_20": {
+          "operator": "OR",
+          "inputs": [
+            "low_range_traversal_20",
+            "high_counter_direction_excursion_20"
+          ]
+        }
+      }
+    }
+  },
+  "structural_instability_20": {
+    "operator": "OR",
+    "inputs": ["expanding_disorder_20", "broad_reversal_disorder_20"]
+  },
+  "three_value_logic": {
+    "AND": {
+      "if_any_false": "FALSE",
+      "if_all_true": "TRUE",
+      "otherwise": "UNKNOWN"
+    },
+    "OR": {
+      "if_any_true": "TRUE",
+      "if_all_false": "FALSE",
+      "otherwise": "UNKNOWN"
+    }
+  },
+  "reason_ledger": {
+    "emit_channel_truth": true,
+    "emit_primitive_truth": true,
+    "emit_activated_positive_channels": true,
+    "opaque_score": false
+  },
+  "modifiers": {
+    "range_center_shift_20_vs_prior20": {
+      "allowed": true,
+      "truth_function_role": "none",
+      "may_change_structural_instability_truth": false
+    }
+  },
+  "thresholds": {
+    "numeric_thresholds_in_contract": false,
+    "consumed_008_evaluation_may_supply_thresholds": false,
+    "parameter_search_authorized": false
+  },
+  "authority": {
+    "implementation": true,
+    "synthetic_tests": true,
+    "consumed_evidence_diagnostic": false,
+    "market_data_read": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "stage_2_change": false,
+    "relocation_guard_retuning": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

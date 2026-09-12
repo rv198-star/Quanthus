@@ -117,10 +117,26 @@
     "review_path": "docs/reviews/stage-positive-instability-proposition-repair-review-20260912.md",
     "directional_blockers_open": 0
   },
+  "implementation_checkpoint": {
+    "work_item": "P3-STAGE-009-B",
+    "state": "ENGINEERING_IMPLEMENTATION_ACCEPTED",
+    "contract": "config/stage-learning/positive-instability-contract.v1.json",
+    "contract_digest": "sha256:2160cdb23ed43acb248bafd7bbdace20ff2dd936ab9c8ff5f3b3cda3d74cda7b",
+    "implementation": "src/quanthus/stage_learning/positive_instability.py",
+    "unit_contract": "tests/unit/test_stage_positive_instability.py",
+    "acceptance": "docs/acceptance/stage-positive-instability-b-implementation-20260912.md",
+    "numeric_thresholds_frozen": false,
+    "market_data_reads": 0,
+    "runtime_jobs": 0,
+    "parameter_trials": 0,
+    "stage_2_changed": false,
+    "relocation_guard_retuned": false,
+    "next_consumed_evidence_diagnostic_authorized": true
+  },
   "delivery_sequence": {
     "P3-STAGE-009-A": "closed_design_approved",
-    "P3-STAGE-009-B": "ready_implementation_only_no_market_read",
-    "P3-STAGE-009-C": "blocked_until_b_acceptance",
+    "P3-STAGE-009-B": "closed_engineering_accepted",
+    "P3-STAGE-009-C": "ready_diagnostic_only_no_threshold_learning",
     "P3-STAGE-009-D": "blocked_until_c_and_separate_fresh_validation_preregistration"
   },
   "authority": {

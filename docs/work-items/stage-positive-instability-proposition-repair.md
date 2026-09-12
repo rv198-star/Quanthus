@@ -5,7 +5,7 @@
 | Parent | P3 stock-stage recognition |
 | Predecessor | P3-STAGE-008 / `REVISE_OR_PARK_EVALUATION_FAIL` |
 | Root-cause evidence | `../acceptance/stage-directional-boundary-root-cause-validation-20260912.md` |
-| Current state | A closed / design approved; B ready for implementation only; runtime/data authority closed |
+| Current state | A/B closed; C ready for diagnostic conformance only; runtime/data/threshold authority closed |
 
 P3-STAGE-009 repairs the positive `structural_instability_20` proposition itself. It does **not**
 retune the P3-STAGE-008 relocation guard and does not reopen the consumed 2021 evaluation as a
@@ -14,8 +14,8 @@ parameter-selection surface.
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-009-A | Freeze positive-instability semantics and adversarial counterexamples | P3-STAGE-008 | closed; design approved; `../design/stage-positive-instability-proposition-repair.md`; no market read or runtime |
-| P3-STAGE-009-B | Implement the approved positive-instability contract | P3-STAGE-009-A | ready for implementation only; no market read, runtime Job or threshold search |
-| P3-STAGE-009-C | Synthetic + consumed-evidence conformance diagnostics | P3-STAGE-009-B | blocked; diagnostic only, no threshold learning |
+| P3-STAGE-009-B | Implement the approved positive-instability contract | P3-STAGE-009-A | closed; engineering accepted; `../acceptance/stage-positive-instability-b-implementation-20260912.md` |
+| P3-STAGE-009-C | Synthetic + consumed-evidence conformance diagnostics | P3-STAGE-009-B | ready; diagnostic only, no threshold learning, no fresh market read |
 | P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | blocked; source and identity budget must be separately preregistered |
 
 ## Frozen successor direction
@@ -47,4 +47,4 @@ P3-STAGE-009-A must answer, before implementation:
 6. Can the positive instability contract be expressed with existing Structure Facts, or is one
    additional threshold-free Fact actually necessary?
 
-009-A has now answered these questions and passed same-origin four-responsibility adversarial review with zero open directional blocker. 009-B may implement the channel truth contract, reason ledger and synthetic adversarial cases, but may not read market data, submit runtime Jobs, select quantitative thresholds, retune the 008 relocation guard or change Stage 2.
+009-A answered these questions and passed same-origin four-responsibility adversarial review with zero open directional blocker. 009-B then implemented the channel truth contract and reason ledger without numeric thresholds or runtime/data authority. 009-C may now use synthetic fixtures and already-consumed 008 evidence to test conformance only; it may not select thresholds, qualify the proposition, submit Jobs, read fresh market data, retune the relocation guard or change Stage 2.

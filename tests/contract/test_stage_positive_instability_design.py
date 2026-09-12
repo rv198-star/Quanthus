@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/positive-instability-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:1774a8ee958747d32f3812223175ad4fed33330951091e9ead30e843bc1afa44"
+DESIGN_DIGEST = "sha256:dcdfe5b2c5983d3a9d5feb1ad7b84890e85d6dbe2fb39608c42a92fcf4ec5d7e"
 
 
 def load_design() -> dict:
@@ -16,7 +16,7 @@ def load_design() -> dict:
     return value
 
 
-def test_design_is_approved_and_d_is_only_implementation_ready() -> None:
+def test_design_is_approved_and_d_is_closed_after_development_failure() -> None:
     design = load_design()
     assert design["design_status"] == "approved"
     assert design["delivery_gate"] == "blocked"
@@ -24,11 +24,11 @@ def test_design_is_approved_and_d_is_only_implementation_ready() -> None:
         "P3-STAGE-009-A": "closed_design_approved",
         "P3-STAGE-009-B": "closed_engineering_accepted",
         "P3-STAGE-009-C": "closed_pass_diagnostic_conformance_only",
-        "P3-STAGE-009-D": "preregistered_implementation_ready_no_data_access",
+        "P3-STAGE-009-D": "closed_revise_or_park_development_fail",
     }
     assert design["authority"] == {
         "design_and_review": True,
-        "implementation": True,
+        "implementation": False,
         "runtime_job_submission": False,
         "market_data_read": False,
         "parameter_search": False,
@@ -163,27 +163,57 @@ def test_c_conformance_checkpoint_opens_only_d_preregistration() -> None:
         assert (ROOT / checkpoint[key]).is_file()
 
 
-def test_d_preregistration_is_frozen_before_any_data_access() -> None:
+def test_d_development_closeout_stops_before_evaluation() -> None:
     checkpoint = load_design()["validation_preregistration"]
     assert checkpoint["work_item"] == "P3-STAGE-009-D"
-    assert checkpoint["state"] == "PREREGISTERED_IMPLEMENTATION_BEFORE_DATA_READ"
+    assert checkpoint["state"] == "CLOSED_REVISE_OR_PARK_DEVELOPMENT_FAIL"
     assert checkpoint["contract_digest"] == (
         "sha256:2ad1afc0c0ac1f9ba9822f1b34dc9f9a995e6c8783b7509e8c5189e897f4110a"
     )
-    assert checkpoint["development_year"] == 2020
-    assert checkpoint["evaluation_year"] == 2021
-    assert checkpoint["fresh_pool_size"] == 512
-    assert checkpoint["development_case_target"] == 128
-    assert checkpoint["evaluation_case_target"] == 160
-    assert checkpoint["candidate_count"] == 27
-    assert checkpoint["maximum_result_bearing_market_data_jobs"] == 2
-    assert checkpoint["evaluation_data_read_before_candidate_freeze"] is False
+    assert checkpoint["development_case_count"] == 122
+    assert checkpoint["development_shortfall_count"] == 6
+    assert checkpoint["definite_stage0_count"] == 37
+    assert checkpoint["definite_negative_count"] == 70
+    assert checkpoint["ambiguous_count"] == 15
+    assert checkpoint["candidate_trial_count"] == 27
+    assert checkpoint["eligible_candidate_count"] == 0
+    assert checkpoint["nearest_candidate_precision"] == "0.9565217391304347826086956522"
+    assert checkpoint["nearest_candidate_positive_reference_coverage"] == (
+        "0.5945945945945945945945945946"
+    )
+    assert checkpoint["nearest_candidate_definite_negative_false_positive_rate"] == (
+        "0.01428571428571428571428571429"
+    )
+    assert checkpoint["nearest_candidate_coverage_loss_vs_baseline"] == (
+        "0.1891891891891891891891891892"
+    )
+    assert checkpoint["shared_core_false_negative_count"] == 15
+    assert checkpoint["range_width_core_false_negative_count"] == 8
+    assert checkpoint["directional_efficiency_core_false_negative_count"] == 8
+    assert checkpoint["evaluation_data_read"] is False
+    assert checkpoint["evaluation_job_submitted"] is False
+    assert checkpoint["grid_expanded_after_result"] is False
+    assert checkpoint["additional_parameter_trials"] == 0
     assert checkpoint["2022_2024_access"] is False
     assert checkpoint["2025_access"] is False
-    assert checkpoint["data_access_authorized_now"] is False
-    assert checkpoint["runtime_job_submission_authorized_now"] is False
-    for key in ("contract", "acceptance"):
+    for key in (
+        "contract",
+        "preregistration_acceptance",
+        "closeout_acceptance",
+        "selection_result",
+        "failure_diagnostic",
+    ):
         assert (ROOT / checkpoint[key]).is_file()
+    result = json.loads((ROOT / checkpoint["selection_result"]).read_text(encoding="utf-8"))
+    diagnostic = json.loads((ROOT / checkpoint["failure_diagnostic"]).read_text(encoding="utf-8"))
+    assert digest(result) == checkpoint["selection_result_digest"]
+    assert digest(diagnostic) == checkpoint["failure_diagnostic_digest"]
+    assert result["disposition"] == "REVISE_OR_PARK_DEVELOPMENT_FAIL"
+    assert diagnostic["false_negative_core_fail_counts"] == {
+        "directional_efficiency": 7,
+        "range_width": 7,
+        "range_width+directional_efficiency": 1,
+    }
 
 
 def test_review_provenance_and_routes_are_bound() -> None:

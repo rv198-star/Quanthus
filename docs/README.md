@@ -256,15 +256,20 @@ nodes.
   function. C is now closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`: the two negative-width-change true
   Stage0 cases are exactly the broad/reversal-shaped cases and are geometrically more disorder-like
   than the eight center-only false positives on all four fixed comparison dimensions. No cutoff was
-  selected. D is now preregistered as a development-only task-disjoint 2020→2021 validation over a
-  third fresh economic-identity pool. Its 27 candidates are quantile-profile contracts computed from
-  unlabeled development observations; 2022–2025 remain sealed. Current authority is implementation
-  before data read only: market reads, runtime Jobs and threshold trials remain closed until D1/D3
-  machinery passes engineering acceptance on a durable commit. Evidence:
+  selected. D then executed one preregistered development-only batch on a third task-disjoint pool.
+  D1 produced 122/128 morphology-blind 2020 cases and froze a separate 160-identity 2021 evaluation
+  plan without reading evaluation market data. After 244 Primary opinions were sealed, D2 ran the
+  exact 27-candidate quantile grid and found **0 eligible candidates**. The nearest candidate improved
+  precision/FPR to `0.9565 / 0.0143` but reduced coverage to `0.5946`, failing the `>=0.70` coverage
+  floor and the maximum `0.15` coverage-loss gate. Post-D2 attribution found all 15 false negatives
+  were rejected by the shared absolute-width / very-low-direction-efficiency core before either
+  positive channel could fire; expansion-profile changes were non-binding. D therefore closed
+  `REVISE_OR_PARK_DEVELOPMENT_FAIL` before D3. The 2021 evaluation remains unread; no grid expansion,
+  threshold relaxation, supplement, Stage2 change or 2022–2025 access is authorized. Evidence:
   `acceptance/stage-directional-boundary-root-cause-validation-20260912.md`,
   `acceptance/stage-positive-instability-b-implementation-20260912.md`,
   `acceptance/stage-positive-instability-c-conformance-20260912.md`,
-  `acceptance/stage-positive-instability-d-preregistration-20260912.md`; design:
+  `acceptance/stage-positive-instability-d-development-closeout-20260912.md`; design:
   `design/stage-positive-instability-proposition-repair.md`; review:
   `reviews/stage-positive-instability-proposition-repair-review-20260912.md`; route:
   `work-items/stage-positive-instability-proposition-repair.md`.

@@ -1,0 +1,48 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-development-failure-diagnostic.v1",
+  "work_item": "P3-STAGE-009-D",
+  "status": "POST_D2_DIAGNOSTIC_ONLY",
+  "source": {
+    "d1_job_id": "stage_93c9590d5df34f5e8f38e242077c1e3c",
+    "d1_manifest_sha256": "sha256:c49bbf50f01a5319634bdd0e54a1a3716f14e78b462d5570bf3f6c028e64c6b5",
+    "development_evidence_digest": "sha256:136d362f24c65b3fdbd99341b0a48ad9a9de6f3197f58ba3d1d5f1a8ad2187e1",
+    "review_ledger_sha256": "sha256:77e95605ea6fe7c915a8bc80f1fcec1d2634a9c4dce210848d5fc7cf7ff89a15"
+  },
+  "nearest_candidate_id": "sha256:f46c13b8f6c12fd953d8a4e1973eacf8c35f56cfd7c85d3a1ea8211ab4af7408",
+  "definite_stage0_reference_count": 37,
+  "nearest_candidate_false_negative_count": 15,
+  "false_negative_core_fail_counts": {
+    "directional_efficiency": 7,
+    "range_width": 7,
+    "range_width+directional_efficiency": 1
+  },
+  "false_negative_reason_counts": {
+    "range_width_core_false": 8,
+    "low_directional_efficiency_core_false": 8,
+    "expanding_channel_false_or_unknown": 15,
+    "broad_reversal_channel_false_or_unknown": 15,
+    "frozen_008_relocation_guard_positive": 3
+  },
+  "stage0_reference_channel_activation_counts_before_guards": {
+    "expanding_disorder_20": 6,
+    "broad_reversal_disorder_20": 22
+  },
+  "findings": {
+    "primary_bottleneck": "the preregistered shared core thresholds for material absolute range width and low absolute directional efficiency reject all 15 false-negative Stage0 references before either positive channel can become TRUE",
+    "range_width_core": "8 of 15 false negatives fail the lenient range-width median threshold",
+    "directional_efficiency_core": "8 of 15 false negatives fail the lenient low-efficiency median threshold",
+    "overlap": "1 false negative fails both shared-core predicates",
+    "relocation_guard": "3 false negatives also trigger the frozen 008 relocation guard, but all 3 were already rejected by the positive-instability shared core; relocation is not the dominant D2 failure",
+    "stage_2_guard": "no false negative is attributed to unchanged Stage2 as the decisive cause",
+    "expansion_profile_redundancy": "within each fixed core/reversal profile, all three expansion profiles produced identical development metrics; the expansion threshold was not the binding dimension in this frozen grid",
+    "semantic_interpretation": "the two-channel design remains directionally plausible, but the D implementation made both channels pass through one cross-sectional shared core that is too restrictive for the development references"
+  },
+  "claim_ceiling": {
+    "threshold_change_authorized": false,
+    "grid_expansion_authorized": false,
+    "candidate_replacement_authorized": false,
+    "evaluation_data_read_authorized": false,
+    "qualification_claim": false,
+    "successor_design_may_use_this_as_consumed_development_evidence": true
+  }
+}

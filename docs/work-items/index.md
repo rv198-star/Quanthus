@@ -293,11 +293,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-008-B | Implement threshold-free path Facts and primary-first review schema | P3-STAGE-008-A | closed; engineering accepted; docs/acceptance/stage-directional-boundary-repair-b-implementation-20260912.md |
 | P3-STAGE-008-C | Synthetic conformance plus exposed-007 diagnostic regression | P3-STAGE-008-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; docs/acceptance/stage-directional-boundary-repair-c-conformance-20260912.md |
 | P3-STAGE-008-D | One fresh task-disjoint development screen | P3-STAGE-008-C | closed; 95 fresh evaluation cases; precision 0.5769 / FPR 0.1692 / coverage 1.0; `REVISE_OR_PARK_EVALUATION_FAIL` |
-| P3-STAGE-009 | Repair the positive Stage-0 structural-instability proposition | P3-STAGE-008 | D preregistered; A/B/C closed; implementation before data read; docs/work-items/stage-positive-instability-proposition-repair.md |
+| P3-STAGE-009 | Repair the positive Stage-0 structural-instability proposition | P3-STAGE-008 | closed; `REVISE_OR_PARK_DEVELOPMENT_FAIL`; A/B/C closed, D stopped at 122-case development / 27 candidates / 0 eligible before evaluation; docs/work-items/stage-positive-instability-proposition-repair.md |
 | P3-STAGE-009-A | Freeze positive-instability semantics and adversarial counterexamples | P3-STAGE-008 | closed; design approved; docs/design/stage-positive-instability-proposition-repair.md |
 | P3-STAGE-009-B | Implement the approved positive-instability contract | P3-STAGE-009-A | closed; engineering accepted; docs/acceptance/stage-positive-instability-b-implementation-20260912.md |
 | P3-STAGE-009-C | Synthetic plus consumed-evidence conformance diagnostics | P3-STAGE-009-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; docs/acceptance/stage-positive-instability-c-conformance-20260912.md |
-| P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | preregistered; implementation before data read; docs/acceptance/stage-positive-instability-d-preregistration-20260912.md |
+| P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | closed; `REVISE_OR_PARK_DEVELOPMENT_FAIL`; 2021 evaluation unread; docs/acceptance/stage-positive-instability-d-development-closeout-20260912.md |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

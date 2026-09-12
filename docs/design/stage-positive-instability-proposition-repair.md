@@ -8,7 +8,7 @@
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | P3-STAGE-008 / `REVISE_OR_PARK_EVALUATION_FAIL` |
 | Machine design | `../../config/stage-learning/positive-instability-repair-design.v1.json` |
-| Machine design digest | `sha256:1774a8ee958747d32f3812223175ad4fed33330951091e9ead30e843bc1afa44` |
+| Machine design digest | `sha256:dcdfe5b2c5983d3a9d5feb1ad7b84890e85d6dbe2fb39608c42a92fcf4ec5d7e` |
 | Root-cause evidence | [post-closeout validation](../acceptance/stage-directional-boundary-root-cause-validation-20260912.md) |
 | Four-responsibility review | [review record](../reviews/stage-positive-instability-proposition-repair-review-20260912.md) |
 | Runtime/data authority | none |
@@ -227,7 +227,8 @@ Therefore:
 P3-STAGE-009-A: CLOSED / DESIGN APPROVED
 P3-STAGE-009-B: CLOSED / ENGINEERING IMPLEMENTATION ACCEPTED
 P3-STAGE-009-C: CLOSED / PASS_DIAGNOSTIC_CONFORMANCE_ONLY
-P3-STAGE-009-D: PREREGISTERED / IMPLEMENTATION BEFORE DATA READ
+P3-STAGE-009-D: CLOSED / REVISE_OR_PARK_DEVELOPMENT_FAIL
+P3-STAGE-009:   CLOSED / REVISE_OR_PARK_DEVELOPMENT_FAIL
 ```
 
 B has implemented the proposition/channel contract, synthetic adversarial cases and reason ledger in
@@ -247,15 +248,34 @@ closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY` without selecting any threshold or ope
 Detailed evidence is in
 [009-C conformance acceptance](../acceptance/stage-positive-instability-c-conformance-20260912.md).
 
-D is now preregistered in
-`config/stage-learning/positive-instability-development-screen.v1.json`. It uses a third economic-
-identity pool disjoint from both Stage-007 and Stage-008, 2020 morphology-blind development cases,
-and a pre-frozen 2021 morphology-blind evaluation identity plan. Quantitative thresholds are generated
-from unlabeled development-population quantiles and form exactly 27 preregistered candidates. 2022-2025
-remain sealed, so even a D pass is development-only `PROMISING_EXPLORATORY_REPAIR` rather than formal
-blind qualification. Detailed evidence is in
-[009-D preregistration](../acceptance/stage-positive-instability-d-preregistration-20260912.md).
+D was preregistered in
+`config/stage-learning/positive-instability-development-screen.v1.json` with a third economic-identity
+pool disjoint from both Stage-007 and Stage-008. D1 produced 122 morphology-blind 2020 development
+cases from a planned 128 and froze a separate 160-identity 2021 evaluation plan without reading its
+market data. The 122-case Primary review then sealed 37 definite Stage-0 references, 70 definite
+negatives and 15 ambiguous cases before any candidate output or threshold basis was exposed.
 
-The preregistration currently authorizes implementation only. No D market-data read or runtime Job may
-occur until D1/D3 source isolation, one-shot budgets and Primary-only review transport pass engineering
-acceptance on a durable commit.
+D2 ran the exact frozen 27-candidate quantile grid. The frozen 008 baseline itself met the development
+quality floor (`precision=0.8286`, `coverage=0.7838`, `FPR=0.0857`), but **zero** new candidate met all
+gates. The nearest candidate improved precision/FPR to `0.9565 / 0.0143` but reduced positive coverage
+to `0.5946`, failing both the absolute `>=0.70` coverage gate and the maximum `0.15` coverage-loss gate
+(observed loss `0.1892`). The preregistered no-eligible stop rule therefore closed D before evaluation.
+The 2021 evaluation plan remains unread.
+
+Post-D2 attribution shows the failure is not caused primarily by relocation or Stage2 guards. All 15
+false-negative Stage-0 references were rejected before either positive channel could become TRUE by
+the shared core: eight fail the lenient absolute-range-width median threshold, eight fail the lenient
+low-direction-efficiency median threshold, with one failing both. Only three also trip the frozen 008
+relocation guard, and none is decisively lost to Stage2. Across the frozen grid, changing expansion
+profiles while holding core/reversal profiles fixed produced identical metrics, so expansion was not
+the binding dimension. The bounded conclusion is that the **two-channel semantic direction remains
+plausible, but this quantitative projection collapsed both channels through one cross-sectional shared
+core that is too restrictive for the development references**.
+
+This closeout does not authorize lowering those thresholds, widening the grid, replacing a candidate,
+or opening the held-out evaluation. Any successor must be separately versioned and treat this 2020
+development evidence as consumed. Detailed evidence is in
+[009-D development closeout](../acceptance/stage-positive-instability-d-development-closeout-20260912.md),
+with machine results in `../../config/stage-learning/positive-instability-development-selection-result.v1.json`
+and post-D2 diagnostic in
+`../../config/stage-learning/positive-instability-development-failure-diagnostic.v1.json`.

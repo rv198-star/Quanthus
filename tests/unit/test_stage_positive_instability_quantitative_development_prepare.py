@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
+from quanthus.stage_learning import positive_instability_quantitative_development_prepare as api
 from quanthus.stage_learning.positive_instability_quantitative_development import (
     load_preregistration,
 )
 from quanthus.stage_learning.positive_instability_quantitative_development_prepare import (
     _parser,
     _rank,
+    build_review_export,
     select_development_cases,
 )
+from quanthus.structure_v2_inputs import digest
 
 
 def test_verify_cli_matches_stage_worker_contract() -> None:
@@ -21,6 +25,100 @@ def test_verify_cli_matches_stage_worker_contract() -> None:
     assert args.command == "verify"
     assert args.artifact == Path("/tmp/existing-artifact")
     assert args.code_revision == revision
+
+
+def test_review_export_is_candidate_blind_and_uses_last_21_rows(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    artifact = tmp_path / "artifact"
+    artifact.mkdir()
+    source_rows = {}
+    refs = []
+    for index in range(25):
+        row = {
+            "market_date": f"2019-01-{index + 1:02d}",
+            "high": str(100 + index),
+            "low": str(90 + index),
+            "close": str(95 + index),
+            "coordinate_epoch": "epoch-1",
+            "reset_reason": None,
+        }
+        ref = digest(row)
+        source_rows[ref] = row
+        refs.append(ref)
+    body = {
+        "security_code": "000001",
+        "security_id": "security-1",
+        "market_date": "2019-01-25",
+        "sampling_stratum": "q1",
+        "coordinate_ref": digest({"coordinate": 1}),
+        "primary_available": True,
+        "recent_available": True,
+        "input_reason": "admitted",
+        "availability_reasons": {"trend": "available", "order": "available"},
+        "primary": {"range_width": {"value": "0.2"}},
+        "recent": {"width_change": {"value": "9.9"}},
+        "history_refs": refs,
+    }
+    case = {"case_id": digest(body), **body}
+    evidence = {"source_rows": source_rows, "cases": [case]}
+    paths = {
+        "cases": {
+            case["case_id"]: {
+                "structure.geometry.range-traversal": {"value": "0.3"},
+                "structure.geometry.counter-direction-excursion-share": {"value": "0.7"},
+            }
+        }
+    }
+    (artifact / "evidence.json").write_text(json.dumps(evidence), encoding="utf-8")
+    (artifact / "path-facts.json").write_text(json.dumps(paths), encoding="utf-8")
+    monkeypatch.setattr(
+        api,
+        "verify_artifact",
+        lambda *_args, **_kwargs: {
+            "run_id": "run-1",
+            "manifest_sha256": "sha256:" + "1" * 64,
+            "development_selected_case_count": 1,
+            "development_evidence_digest": "sha256:" + "2" * 64,
+            "path_facts_digest": "sha256:" + "3" * 64,
+        },
+    )
+
+    exported = build_review_export(
+        artifact,
+        job_id="stage_" + "4" * 32,
+        code_revision="a" * 40,
+    )
+    assert exported["case_count"] == 1
+    assert exported["page_count"] == 1
+    assert exported["threshold_basis_included"] is False
+    assert exported["candidate_output_included"] is False
+    assert exported["preserved_2021_evaluation_included"] is False
+    review_case = exported["cases"][0]
+    assert len(review_case["history"]) == 21
+    assert review_case["history"][0][0] == refs[-21]
+    assert "recent" not in review_case
+    assert "threshold_basis" not in exported
+    assert "candidate_grid" not in exported
+
+
+def test_review_export_cli_contract() -> None:
+    args = _parser().parse_args(
+        [
+            "review-export",
+            "--artifact",
+            "/tmp/existing-artifact",
+            "--job-id",
+            "stage_" + "4" * 32,
+            "--code-revision",
+            "a" * 40,
+            "--output",
+            "/tmp/review.json",
+        ]
+    )
+    assert args.command == "review-export"
+    assert args.artifact == Path("/tmp/existing-artifact")
+    assert args.output == Path("/tmp/review.json")
 
 
 def test_development_selection_is_hash_quarter_only_and_no_backfill() -> None:

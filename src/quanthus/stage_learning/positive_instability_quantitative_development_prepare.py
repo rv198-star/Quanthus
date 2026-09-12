@@ -61,7 +61,10 @@ DEFAULT_CONFIG = (
 )
 ARTIFACT_SCHEMA = "quanthus.stage-positive-instability-quantitative-d1-artifact.v1"
 SUMMARY_SCHEMA = "quanthus.stage-positive-instability-quantitative-d1-summary.v1"
+REVIEW_EXPORT_SCHEMA = "quanthus.stage-positive-instability-quantitative-d2-review-input.v1"
+REVIEW_EXPORT_PAGE_SIZE = 8
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
+_JOB_ID = re.compile(r"^stage_[0-9a-f]{32}$")
 EVIDENCE_SCOPE_PATH = "config/stage-learning/order-reference-evidence-scope-2019.v1.json"
 EVIDENCE_SCOPE_DIGEST = "sha256:2d65ce22666a7709a0f67e3d708df085bb624505484bddeec62a7de9b6ecaa0d"
 
@@ -516,6 +519,98 @@ def verify_artifact(path: Path, *, code_revision: str | None = None) -> dict[str
     }
 
 
+def build_review_export(
+    path: Path, *, job_id: str, code_revision: str
+) -> dict[str, Any]:
+    if not _JOB_ID.fullmatch(job_id):
+        raise PositiveInstabilityQuantitativePrepareError("review_export_job_id")
+    if not _REVISION.fullmatch(code_revision):
+        raise PositiveInstabilityQuantitativePrepareError("review_export_code_revision")
+    verified = verify_artifact(path, code_revision=code_revision)
+    root = path.expanduser().resolve()
+    evidence = _object(root / "evidence.json", "quantitative_d1_evidence")
+    path_facts = _object(root / "path-facts.json", "quantitative_d1_path_facts")
+    source_rows = evidence.get("source_rows")
+    cases = evidence.get("cases")
+    path_by_case = path_facts.get("cases")
+    if not isinstance(source_rows, dict) or not isinstance(cases, list):
+        raise PositiveInstabilityQuantitativePrepareError("review_export_evidence_shape")
+    if not isinstance(path_by_case, dict):
+        raise PositiveInstabilityQuantitativePrepareError("review_export_path_facts_shape")
+    if len(cases) != verified["development_selected_case_count"]:
+        raise PositiveInstabilityQuantitativePrepareError("review_export_case_count")
+
+    compact_cases = []
+    for case in cases:
+        if not isinstance(case, dict):
+            raise PositiveInstabilityQuantitativePrepareError("review_export_case_shape")
+        case_id = str(case.get("case_id") or "")
+        body = {key: value for key, value in case.items() if key != "case_id"}
+        if digest(body) != case_id:
+            raise PositiveInstabilityQuantitativePrepareError("review_export_case_digest")
+        directional = path_by_case.get(case_id)
+        if not isinstance(directional, dict) or len(directional) != 2:
+            raise PositiveInstabilityQuantitativePrepareError("review_export_path_facts")
+        refs = case.get("history_refs")
+        if not isinstance(refs, list) or len(refs) < 21:
+            raise PositiveInstabilityQuantitativePrepareError("review_export_history_too_short")
+        history = []
+        for ref in refs[-21:]:
+            row = source_rows.get(ref)
+            if not isinstance(row, dict) or digest(row) != ref:
+                raise PositiveInstabilityQuantitativePrepareError("review_export_history_binding")
+            if row.get("market_date") > case.get("market_date"):
+                raise PositiveInstabilityQuantitativePrepareError("review_export_future_row")
+            history.append(
+                [
+                    ref,
+                    row.get("market_date"),
+                    row.get("high"),
+                    row.get("low"),
+                    row.get("close"),
+                    row.get("coordinate_epoch"),
+                    row.get("reset_reason"),
+                ]
+            )
+        compact_cases.append(
+            {
+                "case_id": case_id,
+                "security_code": case.get("security_code"),
+                "security_id": case.get("security_id"),
+                "market_date": case.get("market_date"),
+                "sampling_stratum": case.get("sampling_stratum"),
+                "coordinate_ref": case.get("coordinate_ref"),
+                "primary_available": case.get("primary_available"),
+                "input_reason": case.get("input_reason"),
+                "availability_reasons": case.get("availability_reasons"),
+                "primary": case.get("primary"),
+                "directional_path_facts": directional,
+                "history": history,
+            }
+        )
+
+    return {
+        "schema_version": REVIEW_EXPORT_SCHEMA,
+        "work_item": "P3-STAGE-010-D2",
+        "source_job_id": job_id,
+        "source_code_revision": code_revision,
+        "source_run_id": verified["run_id"],
+        "manifest_sha256": verified["manifest_sha256"],
+        "development_evidence_digest": verified["development_evidence_digest"],
+        "path_facts_digest": verified["path_facts_digest"],
+        "case_count": len(compact_cases),
+        "page_size": REVIEW_EXPORT_PAGE_SIZE,
+        "page_count": (len(compact_cases) + REVIEW_EXPORT_PAGE_SIZE - 1)
+        // REVIEW_EXPORT_PAGE_SIZE,
+        "cases": compact_cases,
+        "threshold_basis_included": False,
+        "candidate_output_included": False,
+        "explicit_recent_derived_facts_included": False,
+        "future_rows_included": False,
+        "preserved_2021_evaluation_included": False,
+    }
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -527,6 +622,11 @@ def _parser() -> argparse.ArgumentParser:
     verify = commands.add_parser("verify")
     verify.add_argument("--artifact", type=Path, required=True)
     verify.add_argument("--code-revision")
+    review_export = commands.add_parser("review-export")
+    review_export.add_argument("--artifact", type=Path, required=True)
+    review_export.add_argument("--job-id", required=True)
+    review_export.add_argument("--code-revision", required=True)
+    review_export.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -539,8 +639,34 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_root=args.output_root,
             code_revision=args.code_revision,
         )
-    else:
+    elif args.command == "verify":
         result = verify_artifact(args.artifact, code_revision=args.code_revision)
+    else:
+        export = build_review_export(
+            args.artifact,
+            job_id=args.job_id,
+            code_revision=args.code_revision,
+        )
+        raw = canonical(export)
+        output = args.output.expanduser().resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with output.open("xb") as stream:
+                stream.write(raw)
+        except FileExistsError as exc:
+            raise PositiveInstabilityQuantitativePrepareError(
+                "review_export_output_exists"
+            ) from exc
+        result = {
+            "exported": True,
+            "output": str(output),
+            "sha256": _sha(raw),
+            "case_count": export["case_count"],
+            "page_count": export["page_count"],
+            "threshold_basis_included": False,
+            "candidate_output_included": False,
+            "preserved_2021_evaluation_included": False,
+        }
     print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=str))
     return 0
 

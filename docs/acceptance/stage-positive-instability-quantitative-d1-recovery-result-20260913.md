@@ -68,6 +68,13 @@ The verifier CLI was aligned to the Stage Worker contract in commit
 and adds a regression test. It does not change D1 data, selection, thresholds, candidate grid, gates,
 Stage 2, relocation semantics or preserved-evaluation bindings.
 
+A read-only `review-export` command is also available on the same D1 module for D2 handoff. It first
+re-verifies the exact immutable artifact and exact result-bearing revision, then exports only the
+candidate-blind review surface already defined by D1: Primary case fields, the two directional path
+Facts and the last 21 T-time raw rows. It excludes threshold basis, candidate grid/output, explicit
+recent derived Facts, future rows and the preserved 2021 evaluation. Exporting the package performs no
+market-data read, does not rewrite the Worker status and does not consume any runtime/retry budget.
+
 ## Authority after recovery
 
 D1 is now complete for its result-bearing market-data work. No additional D1 Job, technical retry,

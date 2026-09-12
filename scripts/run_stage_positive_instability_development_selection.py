@@ -15,6 +15,7 @@ from quanthus.stage_learning.positive_instability_development_review import (
     load_ledger,
     select_candidate,
 )
+from quanthus.structure_v2_inputs import digest
 
 D1_JOB = "stage_93c9590d5df34f5e8f38e242077c1e3c"
 D1_MANIFEST = "sha256:c49bbf50f01a5319634bdd0e54a1a3716f14e78b462d5570bf3f6c028e64c6b5"
@@ -52,13 +53,109 @@ def decode(envelope: Any, label: str) -> dict[str, Any]:
     return json.loads(raw)
 
 
+def _local_cases_and_selection(training_root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    job_root = training_root.expanduser().resolve() / "runs" / "stage-worker" / D1_JOB
+    runs = sorted(job_root.glob("stage-positive-instability-d1-*"))
+    if len(runs) != 1:
+        raise RuntimeError("local_d1_artifact_count_differs")
+    root = runs[0].resolve()
+    manifest_raw = (root / "manifest.json").read_bytes()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    if manifest_sha != D1_MANIFEST or (root / "READY").read_text().strip() != D1_MANIFEST:
+        raise RuntimeError("local_d1_manifest_binding_mismatch")
+    manifest = json.loads(manifest_raw)
+    files = manifest.get("files", {})
+    payloads = {}
+    for name in (
+        "evidence.json",
+        "path-facts.json",
+        "threshold-basis.json",
+        "candidate-grid.json",
+        "evaluation-plan.json",
+    ):
+        raw = (root / name).read_bytes()
+        observed = "sha256:" + hashlib.sha256(raw).hexdigest()
+        if files.get(name) != observed:
+            raise RuntimeError("local_d1_file_binding_mismatch:" + name)
+        payloads[name] = json.loads(raw)
+    evidence = payloads["evidence.json"]
+    if digest(evidence) != D1_EVIDENCE or len(evidence.get("cases", [])) != D1_CASES:
+        raise RuntimeError("local_d1_evidence_binding_mismatch")
+    source_rows = evidence["source_rows"]
+    path_by_case = payloads["path-facts.json"]["cases"]
+    cases = []
+    for case in evidence["cases"]:
+        case_id = case["case_id"]
+        history = []
+        for ref in case["history_refs"][-21:]:
+            row = source_rows[ref]
+            history.append([
+                ref,
+                row.get("market_date"),
+                row.get("high"),
+                row.get("low"),
+                row.get("close"),
+                row.get("coordinate_epoch"),
+                row.get("reset_reason"),
+            ])
+        cases.append({
+            "case_id": case_id,
+            "security_code": case.get("security_code"),
+            "security_id": case.get("security_id"),
+            "market_date": case.get("market_date"),
+            "primary_available": case.get("primary_available"),
+            "primary": case.get("primary"),
+            "directional_path_facts": path_by_case[case_id],
+            "history": history,
+        })
+    candidate_grid = payloads["candidate-grid.json"]
+    evaluation_plan = payloads["evaluation-plan.json"]
+    if (
+        candidate_grid.get("candidate_count") != 27
+        or candidate_grid.get("parameter_search_performed") is not False
+        or payloads["threshold-basis.json"].get("labels_used") is not False
+        or evaluation_plan.get("data_read") is not False
+    ):
+        raise RuntimeError("local_d1_selection_authority_differs")
+    selection = {
+        "schema_version": "quanthus.stage-positive-instability-selection-transport.v1",
+        "parent_job_id": D1_JOB,
+        "manifest_sha256": D1_MANIFEST,
+        "threshold_basis": payloads["threshold-basis.json"],
+        "candidate_grid": candidate_grid,
+        "evaluation_plan_binding": {
+            "identity_count": evaluation_plan.get("identity_count"),
+            "identity_digest": evaluation_plan.get("identity_digest"),
+            "data_read": False,
+        },
+        "review_ledger_must_be_sealed_before_use": True,
+        "evaluation_data_read": False,
+        "candidate_output_included": False,
+        "parameter_search_performed": False,
+    }
+    return cases, selection
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--socket", type=Path, default="/run/quanthus-mcp-production/control.sock")
     parser.add_argument("--caller", default="stage009-d2-selection")
+    parser.add_argument("--training-root", type=Path)
     args = parser.parse_args()
-    parent = request_status(args.socket, D1_JOB, args.caller)
-    index = parent.get("review_transport_index")
+    if args.training_root is not None:
+        cases, selection = _local_cases_and_selection(args.training_root)
+        parent = {"selection_transport": {"raw_sha256": "local-artifact-direct"}}
+        index = {
+            "manifest_sha256": D1_MANIFEST,
+            "evidence_file_sha256": D1_EVIDENCE,
+            "case_count": D1_CASES,
+            "candidate_output_included": False,
+            "threshold_basis_included": False,
+            "future_rows_included": False,
+        }
+    else:
+        parent = request_status(args.socket, D1_JOB, args.caller)
+        index = parent.get("review_transport_index")
     if not isinstance(index, dict):
         raise RuntimeError("d1_review_index_missing")
     if (
@@ -70,14 +167,15 @@ def main() -> int:
         or index.get("future_rows_included") is not False
     ):
         raise RuntimeError("d1_review_index_binding_mismatch")
-    cases = []
-    for page_ref in index["pages"]:
-        page = decode(
-            request_status(args.socket, page_ref["job_id"], args.caller).get("review_transport"),
-            "review",
-        )
-        cases.extend(page["cases"])
-    selection = decode(parent.get("selection_transport"), "selection")
+    if args.training_root is None:
+        cases = []
+        for page_ref in index["pages"]:
+            page_status = request_status(
+                args.socket, page_ref["job_id"], args.caller
+            )
+            page = decode(page_status.get("review_transport"), "review")
+            cases.extend(page["cases"])
+        selection = decode(parent.get("selection_transport"), "selection")
     if (
         selection.get("parent_job_id") != D1_JOB
         or selection.get("manifest_sha256") != D1_MANIFEST

@@ -435,11 +435,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-008-B | Implement threshold-free Facts and primary-first reference schema | P3-STAGE-008-A | closed; `../../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md` |
 | P3-STAGE-008-C | Synthetic conformance plus exposed-007 regression | P3-STAGE-008-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; `../../acceptance/stage-directional-boundary-repair-c-conformance-20260912.md` |
 | P3-STAGE-008-D | Fresh disjoint development screen | P3-STAGE-008-C | closed; 95 evaluation cases; precision 0.5769 / FPR 0.1692 / coverage 1.0; `../../acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md` |
-| P3-STAGE-009 | Repair the positive Stage-0 structural-instability proposition | P3-STAGE-008 | ready at D preregistration only; A/B/C closed; root-cause evidence `../../acceptance/stage-directional-boundary-root-cause-validation-20260912.md` |
+| P3-STAGE-009 | Repair the positive Stage-0 structural-instability proposition | P3-STAGE-008 | D preregistered; A/B/C closed; implementation before data read; root-cause evidence `../../acceptance/stage-directional-boundary-root-cause-validation-20260912.md` |
 | P3-STAGE-009-A | Freeze positive-instability semantics and adversarial counterexamples | P3-STAGE-008 | closed; `../stage-positive-instability-proposition-repair.md`; no runtime/data authority |
 | P3-STAGE-009-B | Implement approved positive-instability contract | P3-STAGE-009-A | closed; `../../acceptance/stage-positive-instability-b-implementation-20260912.md`; no thresholds/data/runtime |
 | P3-STAGE-009-C | Synthetic plus consumed-evidence conformance diagnostics | P3-STAGE-009-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; `../../acceptance/stage-positive-instability-c-conformance-20260912.md` |
-| P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | ready for preregistration only; no data access before frozen source/identity/grid/job/gate contract |
+| P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | preregistered; implementation before data read; `../../acceptance/stage-positive-instability-d-preregistration-20260912.md` |
 
 ## 7. Acceptance
 

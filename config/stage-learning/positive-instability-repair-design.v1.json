@@ -155,15 +155,34 @@
     "next_fresh_validation_preregistration_authorized": true,
     "next_fresh_validation_data_access_authorized": false
   },
+  "validation_preregistration": {
+    "work_item": "P3-STAGE-009-D",
+    "state": "PREREGISTERED_IMPLEMENTATION_BEFORE_DATA_READ",
+    "contract": "config/stage-learning/positive-instability-development-screen.v1.json",
+    "contract_digest": "sha256:2ad1afc0c0ac1f9ba9822f1b34dc9f9a995e6c8783b7509e8c5189e897f4110a",
+    "acceptance": "docs/acceptance/stage-positive-instability-d-preregistration-20260912.md",
+    "development_year": 2020,
+    "evaluation_year": 2021,
+    "fresh_pool_size": 512,
+    "development_case_target": 128,
+    "evaluation_case_target": 160,
+    "candidate_count": 27,
+    "maximum_result_bearing_market_data_jobs": 2,
+    "evaluation_data_read_before_candidate_freeze": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "data_access_authorized_now": false,
+    "runtime_job_submission_authorized_now": false
+  },
   "delivery_sequence": {
     "P3-STAGE-009-A": "closed_design_approved",
     "P3-STAGE-009-B": "closed_engineering_accepted",
     "P3-STAGE-009-C": "closed_pass_diagnostic_conformance_only",
-    "P3-STAGE-009-D": "ready_preregistration_only_no_data_access"
+    "P3-STAGE-009-D": "preregistered_implementation_ready_no_data_access"
   },
   "authority": {
     "design_and_review": true,
-    "implementation": false,
+    "implementation": true,
     "runtime_job_submission": false,
     "market_data_read": false,
     "parameter_search": false,

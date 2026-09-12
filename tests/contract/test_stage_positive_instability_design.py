@@ -7,7 +7,7 @@ from quanthus.structure_v2_inputs import digest
 
 ROOT = find_project_root()
 DESIGN = ROOT / "config/stage-learning/positive-instability-repair-design.v1.json"
-DESIGN_DIGEST = "sha256:e5393eb71e7500966ad5e497a3918967c2a12a6aa4113b0db2e6888ef5aaddd6"
+DESIGN_DIGEST = "sha256:1774a8ee958747d32f3812223175ad4fed33330951091e9ead30e843bc1afa44"
 
 
 def load_design() -> dict:
@@ -16,7 +16,7 @@ def load_design() -> dict:
     return value
 
 
-def test_a_design_is_approved_but_runtime_and_data_stay_closed() -> None:
+def test_design_is_approved_and_d_is_only_implementation_ready() -> None:
     design = load_design()
     assert design["design_status"] == "approved"
     assert design["delivery_gate"] == "blocked"
@@ -24,11 +24,11 @@ def test_a_design_is_approved_but_runtime_and_data_stay_closed() -> None:
         "P3-STAGE-009-A": "closed_design_approved",
         "P3-STAGE-009-B": "closed_engineering_accepted",
         "P3-STAGE-009-C": "closed_pass_diagnostic_conformance_only",
-        "P3-STAGE-009-D": "ready_preregistration_only_no_data_access",
+        "P3-STAGE-009-D": "preregistered_implementation_ready_no_data_access",
     }
     assert design["authority"] == {
         "design_and_review": True,
-        "implementation": False,
+        "implementation": True,
         "runtime_job_submission": False,
         "market_data_read": False,
         "parameter_search": False,
@@ -160,6 +160,29 @@ def test_c_conformance_checkpoint_opens_only_d_preregistration() -> None:
     assert checkpoint["next_fresh_validation_preregistration_authorized"] is True
     assert checkpoint["next_fresh_validation_data_access_authorized"] is False
     for key in ("contract", "result", "runner", "acceptance"):
+        assert (ROOT / checkpoint[key]).is_file()
+
+
+def test_d_preregistration_is_frozen_before_any_data_access() -> None:
+    checkpoint = load_design()["validation_preregistration"]
+    assert checkpoint["work_item"] == "P3-STAGE-009-D"
+    assert checkpoint["state"] == "PREREGISTERED_IMPLEMENTATION_BEFORE_DATA_READ"
+    assert checkpoint["contract_digest"] == (
+        "sha256:2ad1afc0c0ac1f9ba9822f1b34dc9f9a995e6c8783b7509e8c5189e897f4110a"
+    )
+    assert checkpoint["development_year"] == 2020
+    assert checkpoint["evaluation_year"] == 2021
+    assert checkpoint["fresh_pool_size"] == 512
+    assert checkpoint["development_case_target"] == 128
+    assert checkpoint["evaluation_case_target"] == 160
+    assert checkpoint["candidate_count"] == 27
+    assert checkpoint["maximum_result_bearing_market_data_jobs"] == 2
+    assert checkpoint["evaluation_data_read_before_candidate_freeze"] is False
+    assert checkpoint["2022_2024_access"] is False
+    assert checkpoint["2025_access"] is False
+    assert checkpoint["data_access_authorized_now"] is False
+    assert checkpoint["runtime_job_submission_authorized_now"] is False
+    for key in ("contract", "acceptance"):
         assert (ROOT / checkpoint[key]).is_file()
 
 

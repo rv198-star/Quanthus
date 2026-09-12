@@ -8,7 +8,7 @@
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | P3-STAGE-008 / `REVISE_OR_PARK_EVALUATION_FAIL` |
 | Machine design | `../../config/stage-learning/positive-instability-repair-design.v1.json` |
-| Machine design digest | `sha256:e5393eb71e7500966ad5e497a3918967c2a12a6aa4113b0db2e6888ef5aaddd6` |
+| Machine design digest | `sha256:1774a8ee958747d32f3812223175ad4fed33330951091e9ead30e843bc1afa44` |
 | Root-cause evidence | [post-closeout validation](../acceptance/stage-directional-boundary-root-cause-validation-20260912.md) |
 | Four-responsibility review | [review record](../reviews/stage-positive-instability-proposition-repair-review-20260912.md) |
 | Runtime/data authority | none |
@@ -227,7 +227,7 @@ Therefore:
 P3-STAGE-009-A: CLOSED / DESIGN APPROVED
 P3-STAGE-009-B: CLOSED / ENGINEERING IMPLEMENTATION ACCEPTED
 P3-STAGE-009-C: CLOSED / PASS_DIAGNOSTIC_CONFORMANCE_ONLY
-P3-STAGE-009-D: READY / PREREGISTRATION ONLY, NO DATA ACCESS
+P3-STAGE-009-D: PREREGISTERED / IMPLEMENTATION BEFORE DATA READ
 ```
 
 B has implemented the proposition/channel contract, synthetic adversarial cases and reason ledger in
@@ -247,6 +247,15 @@ closed `PASS_DIAGNOSTIC_CONFORMANCE_ONLY` without selecting any threshold or ope
 Detailed evidence is in
 [009-C conformance acceptance](../acceptance/stage-positive-instability-c-conformance-20260912.md).
 
-D may now be preregistered. No D market-data read is authorized until source partitions, economic
-identity isolation, quantitative candidate grid, result-bearing Job budget, reference protocol, hard
-gates and claim ceiling are frozen in a separate preregistration checkpoint.
+D is now preregistered in
+`config/stage-learning/positive-instability-development-screen.v1.json`. It uses a third economic-
+identity pool disjoint from both Stage-007 and Stage-008, 2020 morphology-blind development cases,
+and a pre-frozen 2021 morphology-blind evaluation identity plan. Quantitative thresholds are generated
+from unlabeled development-population quantiles and form exactly 27 preregistered candidates. 2022-2025
+remain sealed, so even a D pass is development-only `PROMISING_EXPLORATORY_REPAIR` rather than formal
+blind qualification. Detailed evidence is in
+[009-D preregistration](../acceptance/stage-positive-instability-d-preregistration-20260912.md).
+
+The preregistration currently authorizes implementation only. No D market-data read or runtime Job may
+occur until D1/D3 source isolation, one-shot budgets and Primary-only review transport pass engineering
+acceptance on a durable commit.

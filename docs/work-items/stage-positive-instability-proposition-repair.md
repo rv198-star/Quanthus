@@ -5,7 +5,7 @@
 | Parent | P3 stock-stage recognition |
 | Predecessor | P3-STAGE-008 / `REVISE_OR_PARK_EVALUATION_FAIL` |
 | Root-cause evidence | `../acceptance/stage-directional-boundary-root-cause-validation-20260912.md` |
-| Current state | A/B/C closed; D ready for preregistration only; fresh-data/runtime/threshold authority closed |
+| Current state | A/B/C closed; D preregistered and ready for implementation before data read |
 
 P3-STAGE-009 repairs the positive `structural_instability_20` proposition itself. It does **not**
 retune the P3-STAGE-008 relocation guard and does not reopen the consumed 2021 evaluation as a
@@ -16,7 +16,7 @@ parameter-selection surface.
 | P3-STAGE-009-A | Freeze positive-instability semantics and adversarial counterexamples | P3-STAGE-008 | closed; design approved; `../design/stage-positive-instability-proposition-repair.md`; no market read or runtime |
 | P3-STAGE-009-B | Implement the approved positive-instability contract | P3-STAGE-009-A | closed; engineering accepted; `../acceptance/stage-positive-instability-b-implementation-20260912.md` |
 | P3-STAGE-009-C | Synthetic + consumed-evidence conformance diagnostics | P3-STAGE-009-B | closed; `PASS_DIAGNOSTIC_CONFORMANCE_ONLY`; `../acceptance/stage-positive-instability-c-conformance-20260912.md` |
-| P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | ready for preregistration only; no data access until source/identity/grid/job/gate contract is frozen |
+| P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | preregistered; implementation before data read; `../acceptance/stage-positive-instability-d-preregistration-20260912.md` |
 
 ## Frozen successor direction
 

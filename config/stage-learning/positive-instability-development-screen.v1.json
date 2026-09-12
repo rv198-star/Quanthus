@@ -1,0 +1,202 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-development-screen.v1",
+  "work_item": "P3-STAGE-009-D",
+  "purpose": "Run one development-only task-disjoint threshold-development and isolated evaluation over new economic identities while keeping 2022-2025 sealed and preserving the claim ceiling below formal qualification.",
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "bindings": {
+    "positive_instability_design": {
+      "path": "config/stage-learning/positive-instability-repair-design.v1.json",
+      "digest": "sha256:e5393eb71e7500966ad5e497a3918967c2a12a6aa4113b0db2e6888ef5aaddd6"
+    },
+    "positive_instability_contract": {
+      "path": "config/stage-learning/positive-instability-contract.v1.json",
+      "digest": "sha256:2160cdb23ed43acb248bafd7bbdace20ff2dd936ab9c8ff5f3b3cda3d74cda7b"
+    },
+    "stage_007_prepare": {
+      "job_id": "stage_95f9b48bd96049b184e0cbf856b9a5e8",
+      "code_revision": "ae99d4973f605c3a6e7044cb6c5f88fd91f98874",
+      "artifact_relative_path": "runs/stage-worker/stage_95f9b48bd96049b184e0cbf856b9a5e8/stage-order-rule-prepare-20260911T080532Z",
+      "manifest_sha256": "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7",
+      "pool_size": 512,
+      "excluded_economic_identity_count": 515
+    },
+    "stage_008_d1": {
+      "job_id": "stage_7ffc681cd5254aa0ab3e0d98026c42d7",
+      "code_revision": "071cdbf5cbe8fd1fa71bb042aca48a372193eea6",
+      "artifact_relative_path": "runs/stage-worker/stage_7ffc681cd5254aa0ab3e0d98026c42d7/stage-directional-boundary-d1-20260911T204403Z",
+      "manifest_sha256": "sha256:2ddc4f90376e2061932862c2ef1a8cfd27f8774d1df9bdb59de8bf4e3bf1f9a3",
+      "fresh_pool_size": 512,
+      "evaluation_plan_digest": "sha256:bdb24aeb137cbe59148b765b31d7907bd5cb14a467ceec182cb6f2b996d6a743"
+    },
+    "frozen_008_relocation_candidate": {
+      "candidate_id": "sha256:d11c368d4111ebf991315a6c61b800a6737d56e5f81792cf153dabcda7cb52fd",
+      "absolute_window_return20_min": "0.10",
+      "range_traversal20_min": "0.50",
+      "counter_direction_excursion_share20_max": "0.60",
+      "retuning_authorized": false
+    }
+  },
+  "source_scope": {
+    "identity_start": "2019-01-01",
+    "identity_end": "2021-12-31",
+    "candidate_scan_start": "2020-01-02",
+    "candidate_cohort_date": "2020-12-31",
+    "candidate_minimum_observations": 100,
+    "candidate_seed": "stage007-frozen-screen-20260911-v1|candidate-population",
+    "history_start": "2019-01-01",
+    "development_report_start": "2020-01-01",
+    "development_report_end": "2020-12-31",
+    "evaluation_report_start": "2021-01-01",
+    "evaluation_report_end": "2021-12-31"
+  },
+  "fresh_identity_plan": {
+    "exclude_all_stage_007_excluded_identities": true,
+    "exclude_entire_stage_007_pool": true,
+    "exclude_entire_stage_008_fresh_pool": true,
+    "fresh_pool_size": 512,
+    "development_identity_capacity": 256,
+    "evaluation_identity_capacity": 256,
+    "fresh_pool_seed": "stage009-d-positive-instability-20260912-v1|fresh-pool",
+    "cross_panel_identity_overlap_allowed": false,
+    "one_case_per_identity": true
+  },
+  "development_selection": {
+    "year": 2020,
+    "planned_identities": 128,
+    "identities_per_quarter": 32,
+    "selection_uses_morphology": false,
+    "identity_selection": "lowest_hash_from_development_identity_capacity",
+    "quarter_assignment": "32_identities_per_quarter_in_hash_order",
+    "date_selection": "lowest_hash_primary_available_date_within_assigned_quarter",
+    "cross_quarter_backfill": false,
+    "identity_backfill": false,
+    "result_dependent_replacement": false,
+    "sampling_seed": "stage009-d-positive-instability-20260912-v1|development"
+  },
+  "evaluation_selection": {
+    "year": 2021,
+    "planned_identities": 160,
+    "identities_per_quarter": 40,
+    "selection_uses_morphology": false,
+    "identity_selection": "lowest_hash_from_evaluation_identity_capacity",
+    "quarter_assignment": "40_identities_per_quarter_in_hash_order",
+    "date_selection": "lowest_hash_primary_available_date_within_assigned_quarter",
+    "cross_quarter_backfill": false,
+    "identity_backfill": false,
+    "result_dependent_replacement": false,
+    "sampling_seed": "stage009-d-positive-instability-20260912-v1|evaluation"
+  },
+  "threshold_basis": {
+    "labels_used_to_compute_quantiles": false,
+    "population": "all_primary_available_2020_observations_from_development_identity_capacity",
+    "range_width_quantiles": ["0.50", "0.60", "0.70"],
+    "positive_width_change_quantiles": ["0.50", "0.65", "0.80"],
+    "absolute_directional_efficiency_quantiles": ["0.50", "0.40", "0.30"],
+    "range_traversal_quantiles": ["0.50", "0.40", "0.30"],
+    "counter_direction_excursion_quantiles": ["0.50", "0.60", "0.70"],
+    "positive_width_change_basis_requires_value_gt_zero": true,
+    "counter_excursion_basis_excludes_unavailable_zero_net": true
+  },
+  "candidate_grid": {
+    "candidate_count": 27,
+    "shared_core_profiles": [
+      {"id": "core-lenient", "range_width_quantile": "0.50", "low_efficiency_quantile": "0.50"},
+      {"id": "core-balanced", "range_width_quantile": "0.60", "low_efficiency_quantile": "0.40"},
+      {"id": "core-strict", "range_width_quantile": "0.70", "low_efficiency_quantile": "0.30"}
+    ],
+    "expansion_profiles": [
+      {"id": "expansion-lenient", "positive_width_change_quantile": "0.50"},
+      {"id": "expansion-balanced", "positive_width_change_quantile": "0.65"},
+      {"id": "expansion-strict", "positive_width_change_quantile": "0.80"}
+    ],
+    "reversal_profiles": [
+      {"id": "reversal-lenient", "low_traversal_quantile": "0.50", "high_counter_excursion_quantile": "0.50"},
+      {"id": "reversal-balanced", "low_traversal_quantile": "0.40", "high_counter_excursion_quantile": "0.60"},
+      {"id": "reversal-strict", "low_traversal_quantile": "0.30", "high_counter_excursion_quantile": "0.70"}
+    ],
+    "construction": "cartesian_product_core_x_expansion_x_reversal",
+    "grid_expansion_after_result": false
+  },
+  "reference_collection": {
+    "protocol": "order-reference-protocol.v2-primary-only",
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "candidate_output_visible": false,
+    "explicit_recent_derived_facts_visible": false,
+    "future_rows_visible": false,
+    "primary_opinion_commit_required_before_scoring": true,
+    "independent_validation_claimed": false
+  },
+  "development_gates": {
+    "minimum_complete_cases": 96,
+    "minimum_definite_stage_0_positive_references": 15,
+    "minimum_definite_stage_0_negative_references": 50,
+    "minimum_stage_0_predictions": 12,
+    "minimum_stage_0_precision": "0.75",
+    "minimum_stage_0_positive_reference_coverage": "0.70",
+    "maximum_stage_0_definite_negative_false_positive_rate": "0.12",
+    "candidate_precision_must_be_gte_frozen_008_baseline": true,
+    "candidate_fpr_must_be_lte_frozen_008_baseline": true,
+    "maximum_absolute_coverage_loss_vs_frozen_008_baseline": "0.15",
+    "if_baseline_has_false_positive_candidate_must_remove_at_least": 1,
+    "stage_2_predictions_must_equal_frozen_stage_2_exactly": true,
+    "no_eligible_candidate_disposition": "REVISE_OR_PARK_DEVELOPMENT_FAIL"
+  },
+  "evaluation_gates": {
+    "minimum_complete_cases": 120,
+    "minimum_definite_stage_0_positive_references": 18,
+    "minimum_definite_stage_0_negative_references": 70,
+    "minimum_stage_0_predictions": 15,
+    "minimum_stage_0_precision": "0.80",
+    "minimum_stage_0_positive_reference_coverage": "0.65",
+    "maximum_stage_0_definite_negative_false_positive_rate": "0.10",
+    "candidate_precision_must_be_gte_frozen_008_baseline": true,
+    "candidate_fpr_must_be_lte_frozen_008_baseline": true,
+    "maximum_absolute_coverage_loss_vs_frozen_008_baseline": "0.10",
+    "if_baseline_has_false_positive_candidate_must_remove_at_least": 1,
+    "stage_2_predictions_must_equal_frozen_stage_2_exactly": true,
+    "pass_disposition": "PROMISING_EXPLORATORY_REPAIR",
+    "fail_disposition": "REVISE_OR_PARK_EVALUATION_FAIL"
+  },
+  "execution_sequence": [
+    "D1_PREPARE_2020_DEVELOPMENT_AND_FREEZE_2021_EVALUATION_IDENTITY_PLAN",
+    "D2_SEAL_DEVELOPMENT_REFERENCES_SCORE_27_AND_FREEZE_ONE_CANDIDATE",
+    "D3_PREPARE_2021_EVALUATION_AFTER_CANDIDATE_FREEZE",
+    "D4_SEAL_EVALUATION_REFERENCES_AND_SCORE_FROZEN_CANDIDATE"
+  ],
+  "limits": {
+    "maximum_fresh_pool_securities": 512,
+    "maximum_development_cases": 128,
+    "maximum_evaluation_cases": 160,
+    "maximum_raw_opinions": 576,
+    "maximum_parameter_trials": 27,
+    "maximum_result_bearing_market_data_jobs": 2,
+    "maximum_worker_wall_seconds_per_job": 2700,
+    "automatic_supplement_rounds": 0,
+    "semantic_answer_retries": 0
+  },
+  "claim_ceiling": {
+    "development_only_task_disjoint_validation": true,
+    "formal_blind_qualification": false,
+    "human_expert_reference": false,
+    "runtime_fact_qualification": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "authority": {
+    "preregistration": true,
+    "implementation_before_data_read": true,
+    "development_data_read_2019_2021_after_preregistration_freeze": true,
+    "runtime_job_submission_after_implementation_acceptance": true,
+    "parameter_search_maximum_trials": 27,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "future_outcome_access": false,
+    "official_labels": false,
+    "stage_2_threshold_research": false,
+    "relocation_guard_retuning": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "schema_version": "quanthus.stage-directional-boundary-root-cause-diagnostic.v1",
+  "work_item": "P3-STAGE-009-A",
+  "status": "POST_CLOSEOUT_DIAGNOSTIC_ONLY",
+  "source": {
+    "d3_job_id": "stage_7617aafa1f3149c0a65935ef291fc521",
+    "d3_manifest_sha256": "sha256:a77bc2b439da05da5d10b7291c64caf5d680148c4c69126ba31ea39ac7a99827",
+    "evaluation_evidence_digest": "sha256:912a11480d6e12a3dcc3862bcdb0900592623a419e5282e5bb2500e2ad5086da",
+    "evaluation_review_sha256": "sha256:ba8ba95b9e4d9493cca5ad3feaa1c6a3ce18383bf2bb53912952c2dbb0eabe4f",
+    "frozen_candidate_id": "sha256:d11c368d4111ebf991315a6c61b800a6737d56e5f81792cf153dabcda7cb52fd",
+    "case_count": 95
+  },
+  "observed": {
+    "remaining_false_positive_count": 11,
+    "center_shift_only_false_positive_count": 8,
+    "center_shift_only_false_positive_indices": [30, 44, 46, 50, 53, 67, 76, 93],
+    "center_shift_only_share_of_remaining_false_positives": "0.7272727272727272727272727273",
+    "definite_stage_0_reference_count": 15,
+    "definite_stage_0_center_shift_only_count": 2,
+    "definite_stage_0_center_shift_only_indices": [26, 48],
+    "definite_stage_0_center_shift_only_share": "0.1333333333333333333333333333",
+    "non_center_false_positive_indices": [17, 29, 68],
+    "non_center_false_positive_absolute_return20": [
+      "0.0978021978021978021978021978",
+      "0.083832335329341317365269461",
+      "0.094517958412098298676748582"
+    ],
+    "all_non_center_false_positives_within_8_to_10_percent_return_band": true
+  },
+  "frozen_candidate_metrics": {
+    "true_positive": 15,
+    "false_positive": 11,
+    "false_negative": 0,
+    "definite_positive_references": 15,
+    "definite_negative_references": 65,
+    "stage_0_predictions": 26,
+    "precision": "0.5769230769230769230769230769",
+    "positive_reference_coverage": "1",
+    "definite_negative_false_positive_rate": "0.1692307692307692307692307692"
+  },
+  "diagnostic_counterfactual": {
+    "description": "center_shift remains descriptive/modifier evidence but cannot independently assert structural_instability_20; frozen relocation guard remains unchanged",
+    "true_positive": 13,
+    "false_positive": 3,
+    "false_negative": 2,
+    "definite_positive_references": 15,
+    "definite_negative_references": 65,
+    "stage_0_predictions": 16,
+    "precision": "0.8125",
+    "positive_reference_coverage": "0.8666666666666666666666666667",
+    "definite_negative_false_positive_rate": "0.04615384615384615384615384615",
+    "post_evaluation_only": true,
+    "qualification_claim": false,
+    "final_rule_claim": false
+  },
+  "disposition": {
+    "root_cause_direction_confirmed": true,
+    "dominant_defect": "inherited center-shift-only positive instability authority",
+    "secondary_issue": "three coherent directional cases fall just below the calibration-frozen 10 percent return guard",
+    "evaluation_threshold_retuning_authorized": false,
+    "successor": "P3-STAGE-009",
+    "successor_scope": "repair positive structural_instability_20 semantics before implementation or fresh validation"
+  },
+  "authority": {
+    "new_market_data_read": false,
+    "threshold_search": false,
+    "candidate_replacement": false,
+    "stage_008_reopened": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "runtime_job_submission": false,
+    "official_labels": false,
+    "strategy_or_trading": false
+  }
+}

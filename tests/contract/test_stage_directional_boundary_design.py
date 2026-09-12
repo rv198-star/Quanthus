@@ -240,6 +240,35 @@ def test_d_evaluation_failure_is_bound_and_closes_runtime_authority() -> None:
     assert result["claim_ceiling"]["additional_evaluation_parameter_trials_authorized"] is False
 
 
+def test_post_closeout_root_cause_diagnostic_confirms_successor_direction_only() -> None:
+    path = ROOT / "config/stage-learning/directional-boundary-root-cause-diagnostic.v1.json"
+    diagnostic = json.loads(path.read_text(encoding="utf-8"))
+    assert diagnostic["status"] == "POST_CLOSEOUT_DIAGNOSTIC_ONLY"
+    assert diagnostic["observed"]["remaining_false_positive_count"] == 11
+    assert diagnostic["observed"]["center_shift_only_false_positive_count"] == 8
+    assert diagnostic["observed"]["definite_stage_0_reference_count"] == 15
+    assert diagnostic["observed"]["definite_stage_0_center_shift_only_count"] == 2
+    counterfactual = diagnostic["diagnostic_counterfactual"]
+    assert counterfactual["precision"] == "0.8125"
+    assert counterfactual["positive_reference_coverage"] == (
+        "0.8666666666666666666666666667"
+    )
+    assert counterfactual["definite_negative_false_positive_rate"] == (
+        "0.04615384615384615384615384615"
+    )
+    assert counterfactual["post_evaluation_only"] is True
+    assert counterfactual["qualification_claim"] is False
+    assert diagnostic["disposition"]["root_cause_direction_confirmed"] is True
+    assert diagnostic["disposition"]["successor"] == "P3-STAGE-009"
+    assert diagnostic["authority"]["new_market_data_read"] is False
+    assert diagnostic["authority"]["threshold_search"] is False
+    assert diagnostic["authority"]["runtime_job_submission"] is False
+    assert (
+        ROOT / "docs/acceptance/stage-directional-boundary-root-cause-validation-20260912.md"
+    ).is_file()
+    assert (ROOT / "docs/work-items/stage-positive-instability-proposition-repair.md").is_file()
+
+
 def test_stage007_is_diagnostic_only_and_future_partitions_remain_closed() -> None:
     design = load_design()
     diagnostic = design["stage_007_design_diagnostic"]

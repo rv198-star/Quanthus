@@ -243,7 +243,15 @@ nodes.
   is allowed. Path Geometry remains implemented-unqualified, Stage 2 is unchanged, and all runtime /
   market-read / parameter-search authority is closed. Route: [directional-boundary repair](design/stage-directional-boundary-repair.md);
   final evidence: `acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md`;
-  machine result: `config/stage-learning/directional-boundary-evaluation-result.v1.json`.
+  machine result: `config/stage-learning/directional-boundary-evaluation-result.v1.json`. A post-closeout
+  diagnostic then confirmed the dominant remaining root cause: center-shift-only evidence accounts
+  for 8/11 remaining false positives but only 2/15 definite Stage0 references; removing only that
+  independent positive authority would yield diagnostic-only precision/FPR `0.8125 / 0.0462` with
+  coverage about `0.8667`. This does not reopen 008 or qualify the post-hoc predicate. The successor
+  is `P3-STAGE-009`, ready for **design/review only**, to redefine positive structural-instability
+  evidence while keeping runtime/data authority closed. Evidence:
+  `acceptance/stage-directional-boundary-root-cause-validation-20260912.md`; route:
+  `work-items/stage-positive-instability-proposition-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

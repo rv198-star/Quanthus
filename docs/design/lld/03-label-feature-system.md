@@ -435,6 +435,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-008-B | Implement threshold-free Facts and primary-first reference schema | P3-STAGE-008-A | closed; `../../acceptance/stage-directional-boundary-repair-b-implementation-20260912.md` |
 | P3-STAGE-008-C | Synthetic conformance plus exposed-007 regression | P3-STAGE-008-B | closed; PASS_DIAGNOSTIC_CONFORMANCE_ONLY; `../../acceptance/stage-directional-boundary-repair-c-conformance-20260912.md` |
 | P3-STAGE-008-D | Fresh disjoint development screen | P3-STAGE-008-C | closed; 95 evaluation cases; precision 0.5769 / FPR 0.1692 / coverage 1.0; `../../acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md` |
+| P3-STAGE-009 | Repair the positive Stage-0 structural-instability proposition | P3-STAGE-008 | ready for design/review only; root-cause validation confirms center-shift-only leakage is dominant; `../../acceptance/stage-directional-boundary-root-cause-validation-20260912.md` |
+| P3-STAGE-009-A | Freeze positive-instability semantics and adversarial counterexamples | P3-STAGE-008 | ready for design/review only; no runtime/data authority |
+| P3-STAGE-009-B | Implement approved positive-instability contract | P3-STAGE-009-A | blocked |
+| P3-STAGE-009-C | Synthetic plus consumed-evidence conformance diagnostics | P3-STAGE-009-B | blocked; no threshold learning |
+| P3-STAGE-009-D | Fresh task-disjoint validation | P3-STAGE-009-C | blocked; separate source/identity preregistration required |
 
 ## 7. Acceptance
 

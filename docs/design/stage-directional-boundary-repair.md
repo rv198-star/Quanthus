@@ -358,3 +358,30 @@ No evaluation-time parameter search, candidate replacement, supplement or hidden
 `implemented_unqualified`. Final evidence is
 [D evaluation closeout](../acceptance/stage-directional-boundary-repair-d-evaluation-closeout-20260912.md)
 and the machine result is `../../config/stage-learning/directional-boundary-evaluation-result.v1.json`.
+
+## 14. Post-closeout root-cause validation and successor boundary
+
+A bounded post-closeout diagnostic tested whether the inherited center-shift-only instability branch
+is actually the dominant remaining semantic defect rather than a convenient narrative. No new data,
+threshold trial or candidate replacement was opened.
+
+Eight of eleven remaining false positives (72.7%) depend on `center_shift` independently keeping the
+old R0 instability predicate positive, whereas only two of fifteen definite Stage-0 references
+(13.3%) depend on that same branch. A diagnostic-only counterfactual removed only the independent
+positive authority of `center_shift` while preserving the frozen relocation guard. It changed the
+frozen-candidate metrics from 15 TP / 11 FP to 13 TP / 3 FP: precision 0.8125, positive-reference
+coverage about 0.8667 and definite-negative FPR about 0.0462. The numerical gates would be crossed,
+but because the counterfactual was formed after evaluation was observed it is **not** qualification
+or permission to promote that exact predicate.
+
+The four-responsibility review therefore confirms the root-cause direction: P3-STAGE-008 repaired the
+directional-relocation boundary but did not fully replace the inherited positive-instability
+proposition. This is also a design/implementation conformance defect because section 2 already froze
+that center shift alone cannot assert Stage 0.
+
+The next owner is **P3-STAGE-009 — Positive Instability Proposition Repair**. It must redesign the
+positive `structural_instability_20` evidence before implementation, keep center shift descriptive or
+modifier-only, preserve Stage 2, and forbid use of the consumed P3-STAGE-008 evaluation for threshold
+selection. Root-cause evidence:
+[post-closeout validation](../acceptance/stage-directional-boundary-root-cause-validation-20260912.md);
+work-item route: [P3-STAGE-009](../work-items/stage-positive-instability-proposition-repair.md).

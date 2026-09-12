@@ -525,7 +525,7 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--output-root", type=Path, required=True)
     run.add_argument("--code-revision", required=True)
     verify = commands.add_parser("verify")
-    verify.add_argument("artifact", type=Path)
+    verify.add_argument("--artifact", type=Path, required=True)
     verify.add_argument("--code-revision")
     return parser
 

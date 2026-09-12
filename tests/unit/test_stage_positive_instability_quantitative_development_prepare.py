@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from quanthus.stage_learning.positive_instability_quantitative_development import (
     load_preregistration,
 )
 from quanthus.stage_learning.positive_instability_quantitative_development_prepare import (
+    _parser,
     _rank,
     select_development_cases,
 )
+
+
+def test_verify_cli_matches_stage_worker_contract() -> None:
+    revision = "a" * 40
+    args = _parser().parse_args(
+        ["verify", "--artifact", "/tmp/existing-artifact", "--code-revision", revision]
+    )
+    assert args.command == "verify"
+    assert args.artifact == Path("/tmp/existing-artifact")
+    assert args.code_revision == revision
 
 
 def test_development_selection_is_hash_quarter_only_and_no_backfill() -> None:

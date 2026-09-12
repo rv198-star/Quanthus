@@ -17,16 +17,28 @@
     "same_origin_simulation": true,
     "independent_validation_claimed": false
   },
+  "implementation_checkpoint": {
+    "work_item": "P3-STAGE-011-B",
+    "state": "ENGINEERING_IMPLEMENTATION_ACCEPTED",
+    "contract": "config/stage-learning/orderly-consolidation-projection.v1.json",
+    "contract_digest": "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c",
+    "implementation": "src/quanthus/stage_learning/orderly_consolidation_projection.py",
+    "unit_contract": "tests/unit/test_stage_orderly_consolidation_projection.py",
+    "acceptance": "docs/acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md",
+    "numeric_thresholds_selected": false,
+    "market_data_reads": 0,
+    "runtime_jobs": 0
+  },
   "delivery_sequence": {
     "P3-STAGE-011-A": "closed_design_approved",
-    "P3-STAGE-011-B": "ready_implementation_and_synthetic_only",
-    "P3-STAGE-011-C": "blocked_pending_b_acceptance",
+    "P3-STAGE-011-B": "closed_engineering_accepted",
+    "P3-STAGE-011-C": "ready_consumed_evidence_topology_conformance",
     "P3-STAGE-011-D": "blocked_pending_c_and_fresh_preregistration"
   },
   "authority": {
-    "implementation": true,
-    "synthetic_conformance": true,
-    "consumed_evidence_topology_diagnostic": false,
+    "implementation": false,
+    "synthetic_conformance": false,
+    "consumed_evidence_topology_diagnostic": true,
     "market_data_read": false,
     "runtime_job_submission": false,
     "parameter_search": false,

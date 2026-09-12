@@ -1,0 +1,49 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-projection.v1",
+  "work_item": "P3-STAGE-011-B",
+  "governing_design": {
+    "path": "config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json",
+    "digest": "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353"
+  },
+  "inputs": {
+    "efficiency20_abs": "accepted structure.geometry.directional-efficiency@20 absolute value",
+    "range_width20": "accepted structure.geometry.range-width@20",
+    "width_change20": "accepted structure.geometry.width-change@20_vs_prior20",
+    "coherent_directional_relocation20": "separately resolved P3-STAGE-008 relocation proposition"
+  },
+  "projection_local_derivations": {
+    "contraction_magnitude20": "max(0, -width_change20)"
+  },
+  "threshold_bundle": [
+    "efficiency20_abs_max",
+    "range_width20_max",
+    "contraction_magnitude20_min"
+  ],
+  "truth_function": {
+    "low_directional_efficiency": "efficiency20_abs <= efficiency20_abs_max",
+    "materially_narrow_current_range": "range_width20 <= range_width20_max",
+    "material_range_contraction": "contraction_magnitude20 >= contraction_magnitude20_min",
+    "negative_coherent_relocation": "coherent_directional_relocation20 == FALSE",
+    "orderly_consolidation_20": "AND(low_directional_efficiency, materially_narrow_current_range, material_range_contraction, negative_coherent_relocation)"
+  },
+  "non_authoritative_context": {
+    "center_shift20_abs": "modifier_or_attribution_only",
+    "range_traversal20": "relocation_guard_only",
+    "counter_direction_excursion_share20": "relocation_guard_only",
+    "path_turnover20": "not_an_input"
+  },
+  "missing_semantics": "Any unavailable required measurement or UNKNOWN relocation propagates UNKNOWN unless another required primitive is definitively FALSE.",
+  "authority": {
+    "market_data_read": false,
+    "threshold_selection": false,
+    "parameter_search": false,
+    "runtime_job_submission": false,
+    "relocation_guard_retuning": false,
+    "center_shift_truth_authority": false,
+    "new_fact_registration": false,
+    "preserved_2021_evaluation_read": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

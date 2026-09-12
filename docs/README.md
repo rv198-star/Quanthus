@@ -323,10 +323,13 @@ nodes.
   center shift becomes modifier-only, no new path-order Fact is introduced, and no numeric threshold
   is selected from consumed evidence. The future Stage2 surface is exactly three bundled quantile
   profiles; any fresh joint screen is capped at 9 existing Stage0 profiles × 3 Stage2 profiles with
-  zero overlap as a hard pair gate. A is closed and B implementation/synthetic work is ready. Market
-  data, runtime Jobs, parameter selection and preserved 2021 access remain closed. Design:
+  zero overlap as a hard pair gate. A/B are now closed: the deterministic projection contract is
+  implemented and synthetic/adjacent regressions pass without modifying any existing Stage0/Stage2
+  code. C consumed-evidence topology conformance is the only ready step. Market data, runtime Jobs,
+  parameter selection and preserved 2021 access remain closed. Design:
   `design/stage-orderly-consolidation-boundary-repair.md`; review:
-  `reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; route:
+  `reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; B acceptance:
+  `acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md`; route:
   `work-items/stage-orderly-consolidation-boundary-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

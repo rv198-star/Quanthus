@@ -9,13 +9,13 @@
 | Machine design | `../../config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json` |
 | Root-cause diagnostic | `../../config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json` |
 | Delivery state | `../../config/stage-learning/orderly-consolidation-boundary-repair-delivery.v1.json` |
-| Current state | A closed / design approved; B ready for deterministic projection implementation and synthetic tests only; no data/runtime authority |
+| Current state | A/B closed; deterministic Stage2 projection accepted; C ready for consumed-evidence topology conformance only; no data/runtime authority |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-011-A | Freeze Stage2 topology and joint 0/2 boundary | P3-STAGE-010 | closed; design approved; consumed P010 evidence diagnostic-only |
-| P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | ready; implementation only |
-| P3-STAGE-011-C | Run consumed-evidence topology conformance | P3-STAGE-011-B | blocked until B acceptance; no threshold learning |
+| P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; `../acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md` |
+| P3-STAGE-011-C | Run consumed-evidence topology conformance | P3-STAGE-011-B | ready; diagnostic-only; no threshold learning |
 | P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | blocked; requires separate preregistration and source-isolation acceptance |
 
 ## Hard boundaries

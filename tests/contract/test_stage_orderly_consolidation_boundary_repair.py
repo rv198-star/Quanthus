@@ -9,8 +9,10 @@ ROOT = find_project_root()
 DIAGNOSTIC = ROOT / "config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json"
 DESIGN = ROOT / "config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json"
 DELIVERY = ROOT / "config/stage-learning/orderly-consolidation-boundary-repair-delivery.v1.json"
+PROJECTION = ROOT / "config/stage-learning/orderly-consolidation-projection.v1.json"
 DIAGNOSTIC_DIGEST = "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c"
 DESIGN_DIGEST = "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353"
+PROJECTION_DIGEST = "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c"
 
 
 def load(path):
@@ -97,20 +99,29 @@ def test_future_profile_surface_is_bundled_and_capped_before_fresh_data() -> Non
     assert joint["candidate_pair_selected_now"] is False
 
 
-def test_delivery_opens_only_b_implementation_and_synthetic_work() -> None:
+def test_b_projection_contract_is_accepted_without_opening_data_authority() -> None:
     value = load(DELIVERY)
     assert value["diagnostic"]["digest"] == DIAGNOSTIC_DIGEST
     assert value["design"]["digest"] == DESIGN_DIGEST
+    assert digest(load(PROJECTION)) == PROJECTION_DIGEST
+    checkpoint = value["implementation_checkpoint"]
+    assert checkpoint["state"] == "ENGINEERING_IMPLEMENTATION_ACCEPTED"
+    assert checkpoint["contract_digest"] == PROJECTION_DIGEST
+    assert checkpoint["numeric_thresholds_selected"] is False
+    assert checkpoint["market_data_reads"] == 0
+    assert checkpoint["runtime_jobs"] == 0
+    for key in ("contract", "implementation", "unit_contract", "acceptance"):
+        assert (ROOT / checkpoint[key]).is_file()
     assert value["delivery_sequence"] == {
         "P3-STAGE-011-A": "closed_design_approved",
-        "P3-STAGE-011-B": "ready_implementation_and_synthetic_only",
-        "P3-STAGE-011-C": "blocked_pending_b_acceptance",
+        "P3-STAGE-011-B": "closed_engineering_accepted",
+        "P3-STAGE-011-C": "ready_consumed_evidence_topology_conformance",
         "P3-STAGE-011-D": "blocked_pending_c_and_fresh_preregistration",
     }
     assert value["authority"] == {
-        "implementation": True,
-        "synthetic_conformance": True,
-        "consumed_evidence_topology_diagnostic": False,
+        "implementation": False,
+        "synthetic_conformance": False,
+        "consumed_evidence_topology_diagnostic": True,
         "market_data_read": False,
         "runtime_job_submission": False,
         "parameter_search": False,

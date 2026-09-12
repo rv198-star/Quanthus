@@ -9,14 +9,14 @@
 | Machine design | `../../config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json` |
 | Root-cause diagnostic | `../../config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json` |
 | Delivery state | `../../config/stage-learning/orderly-consolidation-boundary-repair-delivery.v1.json` |
-| Current state | A/B/C closed; D preregistration accepted for fresh 2018 joint development; D1 engineering ready, with no data/runtime authority until engineering acceptance |
+| Current state | A/B/C closed; D preregistered; D1 engineering accepted and exactly one fresh-2018 prepare Job is authorized; D2 scoring and preserved 2021 remain closed |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-011-A | Freeze Stage2 topology and joint 0/2 boundary | P3-STAGE-010 | closed; design approved; consumed P010 evidence diagnostic-only |
 | P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; `../acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md` |
 | P3-STAGE-011-C | Run consumed-evidence topology conformance | P3-STAGE-011-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; `../acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md` |
-| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | preregistered; 2018 fifth fresh pool / 192 blind cases / exact 27 pairs frozen; D1 engineering ready, data/runtime still closed; `../acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md` |
+| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | D1 engineering accepted; exactly one 2017-09 warm-up + 2018 development prepare Job authorized, with 192 blind cases / exact 27 pairs and no retry/supplement; D2 scoring and preserved 2021 remain closed; `../acceptance/stage-orderly-consolidation-joint-d1-implementation-20260913.md` |
 
 ## Hard boundaries
 

@@ -14,11 +14,15 @@ CONFORMANCE = ROOT / (
     "config/stage-learning/orderly-consolidation-boundary-conformance-result.v1.json"
 )
 PREREG = ROOT / "config/stage-learning/orderly-consolidation-joint-development-screen.v1.json"
+EXECUTION = ROOT / "config/stage-learning/orderly-consolidation-joint-development-execution.v1.json"
+EVIDENCE_SCOPE = ROOT / "config/stage-learning/order-reference-evidence-scope-2018.v1.json"
 DIAGNOSTIC_DIGEST = "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c"
 DESIGN_DIGEST = "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353"
 PROJECTION_DIGEST = "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c"
 CONFORMANCE_DIGEST = "sha256:64741982652b0323a14dcd7c87c1486d7b8998fa085d5c190d3ca9a28a0c91d1"
 PREREG_DIGEST = "sha256:c9b5eff892f3d731170afac052e3810543f7444f5b6025bdef24c1ebfa4c213e"
+EXECUTION_DIGEST = "sha256:3424f673f11af42d37a454429fb9e624978b18799d10fea21c365f81c0c0d680"
+EVIDENCE_SCOPE_DIGEST = "sha256:2400ccd1c025098b0a3d050aebf39cc0ebc7241289d9db2e8425819f9daf76c9"
 
 
 def load(path):
@@ -139,19 +143,48 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
     assert prereg_checkpoint["preserved_evaluation_data_read"] is False
     assert prereg_checkpoint["data_access_authorized_now"] is False
     assert prereg_checkpoint["runtime_job_submission_authorized_now"] is False
+    d1 = value["d1_implementation_checkpoint"]
+    assert d1["state"] == "ENGINEERING_IMPLEMENTATION_ACCEPTED"
+    assert d1["execution_contract_digest"] == EXECUTION_DIGEST
+    assert digest(load(EXECUTION)) == EXECUTION_DIGEST
+    assert d1["evidence_scope_digest"] == EVIDENCE_SCOPE_DIGEST
+    assert digest(load(EVIDENCE_SCOPE)) == EVIDENCE_SCOPE_DIGEST
+    assert d1["authorized_job_kind"] == (
+        "quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
+    )
+    assert d1["maximum_result_bearing_jobs_now"] == 1
+    assert d1["maximum_technical_retry_jobs_remaining"] == 0
+    assert d1["semantic_retries_remaining"] == 0
+    assert d1["automatic_supplement_rounds_remaining"] == 0
+    assert d1["candidate_blind_review_required_before_scoring"] is True
+    assert d1["candidate_pair_scoring_authorized_in_d1"] is False
+    assert d1["preserved_2021_evaluation_read_authorized"] is False
+    for key in (
+        "execution_contract",
+        "evidence_scope_contract",
+        "joint_development_implementation",
+        "prepare_implementation",
+        "worker_implementation",
+        "acceptance",
+    ):
+        assert (ROOT / d1[key]).is_file()
     assert value["delivery_sequence"] == {
         "P3-STAGE-011-A": "closed_design_approved",
         "P3-STAGE-011-B": "closed_engineering_accepted",
         "P3-STAGE-011-C": "closed_pass_topology_conformance_only",
-        "P3-STAGE-011-D": "preregistered_ready_d1_engineering",
+        "P3-STAGE-011-D": "ready_exactly_one_d1_2018_prepare_job",
     }
     assert value["authority"] == {
         "implementation": True,
         "synthetic_conformance": False,
         "consumed_evidence_topology_diagnostic": False,
         "preregistration_design": False,
-        "market_data_read": False,
-        "runtime_job_submission": False,
+        "market_data_read": True,
+        "authorized_market_data_scope": "D1_2017_09_warmup_2018_development_only",
+        "runtime_job_submission": True,
+        "authorized_runtime_kind": "quanthus.stage-orderly-consolidation-joint-d1-prepare.v1",
+        "candidate_blind_review": False,
+        "candidate_pair_scoring": False,
         "parameter_search": False,
         "candidate_selection": False,
         "preserved_2021_evaluation_read": False,
@@ -166,6 +199,7 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
         ROOT / "docs/reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md",
         ROOT / "docs/work-items/stage-orderly-consolidation-boundary-repair.md",
         ROOT / "docs/acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md",
+        ROOT / "docs/acceptance/stage-orderly-consolidation-joint-d1-implementation-20260913.md",
     ):
         assert path.is_file()
 

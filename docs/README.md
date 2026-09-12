@@ -331,13 +331,18 @@ nodes.
   cases (48/quarter), retains the exact nine Stage0 profiles, freezes three Stage2 profiles and an
   exact 27-pair surface, and preserves the exact still-unread 2021 plan. Stage0 gates inherit P010;
   Stage2 retains the earlier 20-positive reference-sufficiency floor rather than lowering it after
-  seeing P010. D1 engineering is ready, but market data, runtime Jobs, parameter selection and
-  preserved 2021 access remain closed until that engineering checkpoint is accepted. Design:
+  seeing P010. D1 engineering is now accepted: the prepare path verifies Stage007-010 exposure
+  closure, builds only the frozen 2018 basis, publishes exact 9/3/27 identities, binds the unread
+  2021 plan, and exposes only candidate-blind Primary review pages. The D2 pair selector and stop
+  rules are also implemented before any fresh result is seen. Exactly one D1 2017-09 warm-up + 2018
+  prepare Job is now authorized; D2 scoring, all automatic retries/supplements, parameter search and
+  preserved 2021 remain closed. Design:
   `design/stage-orderly-consolidation-boundary-repair.md`; review:
   `reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; B acceptance:
   `acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md`; C acceptance:
   `acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md`; D preregistration:
-  `acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md`; route:
+  `acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md`; D1 engineering:
+  `acceptance/stage-orderly-consolidation-joint-d1-implementation-20260913.md`; route:
   `work-items/stage-orderly-consolidation-boundary-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

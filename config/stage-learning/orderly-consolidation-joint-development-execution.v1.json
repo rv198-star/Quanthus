@@ -1,0 +1,73 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-joint-development-execution.v1",
+  "work_item": "P3-STAGE-011-D",
+  "preregistration": {
+    "path": "config/stage-learning/orderly-consolidation-joint-development-screen.v1.json",
+    "digest": "sha256:c9b5eff892f3d731170afac052e3810543f7444f5b6025bdef24c1ebfa4c213e"
+  },
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "evidence_protocol": {
+    "path": "config/stage-learning/order-reference-evidence-scope-2018.v1.json",
+    "digest": "sha256:2400ccd1c025098b0a3d050aebf39cc0ebc7241289d9db2e8425819f9daf76c9"
+  },
+  "quantile_method": {
+    "name": "nearest_rank_ceiling_1_based",
+    "definition": "sort ascending; rank=max(1,ceil(q*n)); return ordered[rank-1]",
+    "interpolation": false,
+    "decimal_arithmetic": true
+  },
+  "stage0_candidate_identity": {
+    "candidate_count": 9,
+    "source_topology": "P3-STAGE-010 exact bundled topology",
+    "includes": [
+      "expansion_profile_id",
+      "broad_profile_id",
+      "expansion_width_change_min",
+      "expansion_range_width_min",
+      "expansion_absolute_width_gain_min",
+      "expansion_efficiency_max",
+      "expansion_traversal_max",
+      "expansion_counter_excursion_min",
+      "broad_range_width_min",
+      "broad_efficiency_max",
+      "broad_traversal_max",
+      "broad_counter_excursion_min"
+    ]
+  },
+  "stage2_candidate_identity": {
+    "candidate_count": 3,
+    "includes": [
+      "order_profile_id",
+      "efficiency20_abs_max",
+      "range_width20_max",
+      "contraction_magnitude20_min"
+    ]
+  },
+  "pair_identity": {
+    "pair_count": 27,
+    "includes": ["stage0_candidate_id", "stage2_candidate_id"]
+  },
+  "selection_order": [
+    "minimum_of_stage0_stage2_precision_desc",
+    "maximum_of_stage0_stage2_fpr_asc",
+    "minimum_of_stage0_stage2_coverage_desc",
+    "stage0_candidate_id_asc",
+    "stage2_candidate_id_asc"
+  ],
+  "baseline": {
+    "stage_0": "P3-STAGE-008 frozen relocation candidate plus inherited old-R0 instability predicate",
+    "stage_2": "legacy frozen Stage2 rectangle is diagnostic baseline only and is not a candidate"
+  },
+  "authority": {
+    "market_data_read": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "implementation": true,
+    "preserved_2021_evaluation_read": false,
+    "2019_p010_development_access": false,
+    "2020_p009_development_access": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "relocation_guard_retuning": false
+  }
+}

@@ -34,7 +34,7 @@
   },
   "validation_preregistration": {
     "work_item": "P3-STAGE-010-D",
-    "state": "D1_ARTIFACT_VERIFIED_REVIEW_READY",
+    "state": "D2_REVIEW_LEDGER_SEALED_SCORE_READY",
     "contract": "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
     "contract_digest": "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606",
     "acceptance": "docs/acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md",
@@ -112,11 +112,28 @@
     "2022_2024_access": false,
     "2025_access": false
   },
+  "d2_review_checkpoint": {
+    "work_item": "P3-STAGE-010-D2",
+    "state": "DEVELOPMENT_REVIEW_LEDGER_SEALED",
+    "seal": "config/stage-learning/positive-instability-quantitative-d2-review-seal.v1.json",
+    "seal_digest": "sha256:b9e5b317256f4a96251c7a0967a65bcb851731b29b8196544598489dd02ee724",
+    "ledger_sha256": "sha256:e9d93b43903f8753ad8d7f8859493b8a279ec6aad4101856ebeb4d2bcb5e204e",
+    "case_count": 160,
+    "opinion_count": 320,
+    "role_disagreement_count": 19,
+    "candidate_output_seen_during_review": false,
+    "threshold_basis_seen_during_review": false,
+    "preserved_2021_evaluation_seen": false,
+    "candidate_scoring_exact_frozen_grid_authorized": true,
+    "maximum_candidate_trials": 9,
+    "candidate_grid_expansion_authorized": false,
+    "preserved_2021_evaluation_read_authorized": false
+  },
   "delivery_sequence": {
     "P3-STAGE-010-A": "closed_design_approved",
     "P3-STAGE-010-B": "closed_engineering_accepted",
     "P3-STAGE-010-C": "closed_pass_topology_conformance_only",
-    "P3-STAGE-010-D": "d1_artifact_verified_ready_candidate_blind_review"
+    "P3-STAGE-010-D": "d2_review_ledger_sealed_ready_exact_nine_scoring"
   },
   "authority": {
     "implementation": true,
@@ -124,7 +141,10 @@
     "authorized_runtime_kind": null,
     "market_data_read": false,
     "authorized_market_data_scope": null,
-    "candidate_blind_review": true,
+    "candidate_blind_review": false,
+    "candidate_scoring_exact_frozen_grid": true,
+    "maximum_candidate_trials": 9,
+    "candidate_grid_expansion": false,
     "transport_recovery_only": false,
     "parameter_search": false,
     "preserved_2021_evaluation_read": false,

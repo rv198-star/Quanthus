@@ -89,7 +89,7 @@ def test_c_closes_topology_only_and_keeps_evaluation_unread() -> None:
 
 def test_d_preregistration_freezes_nine_candidates_before_evaluation_read() -> None:
     checkpoint = load(DELIVERY)["validation_preregistration"]
-    assert checkpoint["state"] == "D1_ARTIFACT_VERIFIED_REVIEW_READY"
+    assert checkpoint["state"] == "D2_REVIEW_LEDGER_SEALED_SCORE_READY"
     assert checkpoint["contract_digest"] == (
         "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606"
     )
@@ -184,7 +184,31 @@ def test_d1_checkpoint_opens_only_one_2019_prepare_job() -> None:
         assert (ROOT / checkpoint[key]).is_file()
 
 
-def test_current_authority_is_d1_only() -> None:
+def test_d2_review_is_sealed_before_exact_candidate_scoring() -> None:
+    checkpoint = load(DELIVERY)["d2_review_checkpoint"]
+    assert checkpoint["state"] == "DEVELOPMENT_REVIEW_LEDGER_SEALED"
+    assert checkpoint["ledger_sha256"] == (
+        "sha256:e9d93b43903f8753ad8d7f8859493b8a279ec6aad4101856ebeb4d2bcb5e204e"
+    )
+    assert checkpoint["case_count"] == 160
+    assert checkpoint["opinion_count"] == 320
+    assert checkpoint["role_disagreement_count"] == 19
+    assert checkpoint["candidate_output_seen_during_review"] is False
+    assert checkpoint["threshold_basis_seen_during_review"] is False
+    assert checkpoint["preserved_2021_evaluation_seen"] is False
+    assert checkpoint["candidate_scoring_exact_frozen_grid_authorized"] is True
+    assert checkpoint["maximum_candidate_trials"] == 9
+    assert checkpoint["candidate_grid_expansion_authorized"] is False
+    assert checkpoint["preserved_2021_evaluation_read_authorized"] is False
+    seal = load(ROOT / checkpoint["seal"])
+    assert digest(seal) == checkpoint["seal_digest"]
+    assert seal["review"]["immutable_snapshot_artifact_id"] == (
+        "d071b4d27a5f23a2a522c94ce0790dfc"
+    )
+    assert seal["review"]["ledger_bytes"] == 36197
+
+
+def test_current_authority_is_exact_nine_scoring_only() -> None:
     authority = load(DELIVERY)["authority"]
     assert authority == {
         "implementation": True,
@@ -192,7 +216,10 @@ def test_current_authority_is_d1_only() -> None:
         "authorized_runtime_kind": None,
         "market_data_read": False,
         "authorized_market_data_scope": None,
-        "candidate_blind_review": True,
+        "candidate_blind_review": False,
+        "candidate_scoring_exact_frozen_grid": True,
+        "maximum_candidate_trials": 9,
+        "candidate_grid_expansion": False,
         "transport_recovery_only": False,
         "parameter_search": False,
         "preserved_2021_evaluation_read": False,

@@ -1,0 +1,47 @@
+{
+  "schema_version": "quanthus.stage-positive-instability-quantitative-d2-review-seal.v1",
+  "work_item": "P3-STAGE-010-D2",
+  "state": "DEVELOPMENT_REVIEW_LEDGER_SEALED",
+  "source": {
+    "job_id": "stage_8f2bc43d4b1e4943bca4c3e31214c8a5",
+    "code_revision": "b7155e3c1052437fbd24b4617a6bf0a9ab166a86",
+    "manifest_sha256": "sha256:506cb9ea1425afc1f123636603ae21ae969ac5903421f3dc4910db903476ba8c",
+    "development_evidence_digest": "sha256:9b22e002a20971ed47c933b0dfea73e42c21b7cd1f1471a350704486d0d1a163",
+    "path_facts_digest": "sha256:d509baae4419ebf3509f5f6ed382e8e0cab8dcf9483edadc564004f144c61c98",
+    "review_input_sha256": "sha256:2df3cf27aeb01ae91f5c36b483524d4864543db4f26d7324e25142803f37f610"
+  },
+  "review": {
+    "case_count": 160,
+    "role_count": 2,
+    "opinion_count": 320,
+    "role_disagreement_count": 19,
+    "same_origin_simulation": true,
+    "independent_validation_claimed": false,
+    "ledger_sha256": "sha256:e9d93b43903f8753ad8d7f8859493b8a279ec6aad4101856ebeb4d2bcb5e204e",
+    "ledger_bytes": 36197,
+    "immutable_snapshot_artifact_id": "d071b4d27a5f23a2a522c94ce0790dfc",
+    "provenance": "self_simulated|chatgpt-stage010-d2|primary-only|consistency-scaffold-plus-raw-path-review-20260913",
+    "candidate_output_seen_during_review": false,
+    "threshold_basis_seen_during_review": false,
+    "explicit_recent_derived_facts_seen": false,
+    "preserved_2021_evaluation_seen": false,
+    "cognitive_blinding_claimed": false
+  },
+  "authority_after_seal": {
+    "candidate_scoring_exact_frozen_grid": true,
+    "maximum_candidate_trials": 9,
+    "candidate_grid_expansion": false,
+    "candidate_replacement": false,
+    "additional_development_review": false,
+    "additional_d1_job": false,
+    "market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "stage_2_change": false,
+    "relocation_guard_retuning": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

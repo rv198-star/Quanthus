@@ -290,10 +290,13 @@ nodes.
   argument. The immutable artifact independently verifies exactly: 160/160 development cases, zero
   shortfall, nine fixed candidates, zero opinions, zero parameter search, and review-ready. The CLI
   mismatch is fixed in `e8ca262`; the failed Worker receipt remains immutable and no additional D1
-  Job or market read is authorized. Candidate-blind review may now consume only this existing D1
-  evidence. The exact 160-identity 2021 plan frozen by Stage-009 remains unread and cannot be
-  reselected or opened before candidate freeze. 2022–2025, Stage2 changes, relocation retuning,
-  official labels, strategy and trading remain closed. Design:
+  Job or market read is authorized. D2 then completed the candidate-blind Primary review over all 160
+  cases and sealed 320 same-origin role opinions with 19 cross-role disagreements before any candidate
+  or threshold-basis read. The sealed ledger SHA-256 is `e9d93b43903f8753ad8d7f8859493b8a279ec6aad4101856ebeb4d2bcb5e204e`;
+  only deterministic scoring of the exact frozen nine candidates is now open. The exact 160-identity
+  2021 plan frozen by Stage-009 remains unread and cannot be reselected or opened before candidate
+  freeze. 2022–2025, Stage2 changes, relocation retuning, official labels, strategy and trading remain
+  closed. Design:
   `design/stage-positive-instability-quantitative-projection-repair.md`; B evidence:
   `acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md`; D
   preregistration: `acceptance/stage-positive-instability-quantitative-d-preregistration-20260912.md`;
@@ -302,6 +305,7 @@ nodes.
   `acceptance/stage-positive-instability-quantitative-d1-retry-20260912.md`; transport recovery:
   `acceptance/stage-positive-instability-quantitative-d1-transport-recovery-20260912.md`; recovered
   D1 result: `acceptance/stage-positive-instability-quantitative-d1-recovery-result-20260913.md`;
+  D2 review seal: `acceptance/stage-positive-instability-quantitative-d2-review-seal-20260913.md`;
   route: `work-items/stage-positive-instability-quantitative-projection-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

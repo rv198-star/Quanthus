@@ -8,14 +8,14 @@
 | Review | `../reviews/stage-positive-instability-quantitative-projection-review-20260912.md` |
 | Machine design | `../../config/stage-learning/positive-instability-quantitative-projection-design.v1.json` |
 | Delivery state | `../../config/stage-learning/positive-instability-quantitative-projection-delivery.v1.json` |
-| Current state | A/B/C closed; the single D1 transport recovery produced a valid 160-case immutable artifact but the Worker terminal receipt failed in post-run verifier CLI dispatch; the artifact independently verifies and D1 is review-ready, with no further D1 run/read authority and preserved 2021 evaluation still unread |
+| Current state | A/B/C closed; D1 artifact independently verified; D2 candidate-blind review completed and ledger sealed over 160 cases / 320 opinions with 19 cross-role disagreements before any candidate/threshold-basis read; only exact frozen 9-candidate scoring is now open and preserved 2021 remains unread |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-010-A | Freeze separated quantitative projection topology and adversarial review | P3-STAGE-009 | closed; design approved; no data/runtime authority |
 | P3-STAGE-010-B | Implement deterministic projection contract and synthetic tests | P3-STAGE-010-A | closed; engineering accepted; `../acceptance/stage-positive-instability-quantitative-projection-b-implementation-20260912.md` |
 | P3-STAGE-010-C | Replay consumed Stage-009 evidence as diagnostic conformance | P3-STAGE-010-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; no threshold learning |
-| P3-STAGE-010-D | Fresh 2019 development, freeze one candidate, then optionally open preserved 2021 evaluation | P3-STAGE-010-C | D1 artifact independently verified from `stage_8f2bc43...`: 160/160 cases, 9 fixed candidates, 0 opinions, 0 parameter search, review-ready; Worker failed only in post-run verifier CLI dispatch; no further D1 run/read authority; preserved 2021 evaluation remains closed; `../acceptance/stage-positive-instability-quantitative-d1-recovery-result-20260913.md` |
+| P3-STAGE-010-D | Fresh 2019 development, freeze one candidate, then optionally open preserved 2021 evaluation | P3-STAGE-010-C | D2 review ledger sealed before candidate scoring: 160 cases / 320 same-origin opinions / 19 cross-role disagreements, ledger `sha256:e9d93b43...e204e`; exact 9-candidate scoring only; preserved 2021 evaluation remains closed; `../acceptance/stage-positive-instability-quantitative-d2-review-seal-20260913.md` |
 
 ## Hard boundaries
 

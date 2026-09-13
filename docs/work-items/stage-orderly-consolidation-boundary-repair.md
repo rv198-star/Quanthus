@@ -9,14 +9,14 @@
 | Machine design | `../../config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json` |
 | Root-cause diagnostic | `../../config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json` |
 | Delivery state | `../../config/stage-learning/orderly-consolidation-boundary-repair-delivery.v1.json` |
-| Current state | A/B/C closed; D preregistered; first fresh-2018 D1 Job failed on shared protocol-budget conformance before artifact publication; exactly one bounded transport recovery is authorized, with no further retry/supplement; D2 scoring and preserved 2021 remain closed |
+| Current state | A/B/C closed; D1 transport recovery succeeded with 190/192 fixed blind cases and no 2021 read; D2 candidate-blind review is sealed at 83 Stage0 / 21 Stage2 / 74 Neither / 12 Ambiguous; only exact 27-pair development scoring is now open |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-011-A | Freeze Stage2 topology and joint 0/2 boundary | P3-STAGE-010 | closed; design approved; consumed P010 evidence diagnostic-only |
 | P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; `../acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md` |
 | P3-STAGE-011-C | Run consumed-evidence topology conformance | P3-STAGE-011-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; `../acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md` |
-| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | first D1 Job failed after evidence build because shared cold validation ignored signed `max_cases=192` and retained legacy 160; no artifact/review/score exposed; exactly one protocol-budget transport recovery is authorized, no further retry/supplement; D2 and preserved 2021 remain closed; `../acceptance/stage-orderly-consolidation-joint-d1-transport-recovery-20260913.md` |
+| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | D1 recovery succeeded: 190/192 fixed cases, 27-pair surface, no opinions/selection/2021 read; D2 review then sealed 190 cases / 380 opinions before candidate visibility and clears frozen reference sufficiency; exact 27-pair scoring only is ready; `../acceptance/stage-orderly-consolidation-joint-d2-review-seal-20260913.md` |
 
 ## Hard boundaries
 

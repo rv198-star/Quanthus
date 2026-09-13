@@ -340,16 +340,24 @@ nodes.
   `max_cases=160` instead of consuming the signed 2018 protocol `max_cases=192`. No governed artifact,
   review opinion, candidate-pair score or selected pair was exposed. The shared validator now consumes
   signed protocol case/source-row bounds and the signed evidence byte budget without changing any
-  frozen numeric bound. Exactly one separately governed transport recovery is authorized against the
-  exact failed Job/input; no second technical retry, supplement or semantic rerun is opened. D2
-  scoring, parameter search and preserved 2021 remain closed. Design:
+  frozen numeric bound. The one separately governed recovery Job (`stage_8189b797...`) then succeeded
+  and independently verified one artifact with 190/192 fixed blind cases, two retained shortfalls,
+  exact 9/3/27 identities, zero opinions, no selected pair and preserved 2021 still unread. D2 then
+  consumed only the Primary review transport and sealed 380 role opinions before candidate or
+  threshold-basis visibility. The resolved denominator is Stage0=83, Stage2=21, Neither=74 and
+  Ambiguous=12, clearing the frozen reference-sufficiency floors without changing them. The ledger is
+  immutably snapshotted at SHA-256 `1a73c66dd1255970c3a8de81a92adfabe7e57fc668b8deab7a12ef3eb82092f1`.
+  Only deterministic scoring of the exact 27 frozen pairs is now open; no new market read, reviewer
+  regeneration, grid expansion, parameter search or preserved-2021 access is authorized. Design:
   `design/stage-orderly-consolidation-boundary-repair.md`; review:
   `reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; B acceptance:
   `acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md`; C acceptance:
   `acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md`; D preregistration:
   `acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md`; D1 engineering:
   `acceptance/stage-orderly-consolidation-joint-d1-implementation-20260913.md`; D1 transport recovery:
-  `acceptance/stage-orderly-consolidation-joint-d1-transport-recovery-20260913.md`; route:
+  `acceptance/stage-orderly-consolidation-joint-d1-transport-recovery-20260913.md`; D1 result:
+  `acceptance/stage-orderly-consolidation-joint-d1-recovery-result-20260913.md`; D2 review seal:
+  `acceptance/stage-orderly-consolidation-joint-d2-review-seal-20260913.md`; route:
   `work-items/stage-orderly-consolidation-boundary-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

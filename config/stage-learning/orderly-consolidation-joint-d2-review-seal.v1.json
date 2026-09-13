@@ -1,0 +1,68 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-joint-d2-review-seal.v1",
+  "work_item": "P3-STAGE-011-D2",
+  "source_recovery_result": {
+    "path": "config/stage-learning/orderly-consolidation-joint-d1-recovery-result.v1.json",
+    "digest": "sha256:6ad3aebcda3c73b89e0ad3a94cdad89f78527cc1c9cd4506455fa17fd102bc8c"
+  },
+  "source": {
+    "job_id": "stage_8189b79722fc48d1b774aa42f9238852",
+    "code_revision": "bd1449c43d2eb436716f2e2125256a84463901a0",
+    "manifest_sha256": "sha256:14870f6cd1521d453b7ccae6ebdd5d8d6d5ee64875372051f76214eb2227eae8",
+    "development_evidence_digest": "sha256:b1298c1fc4ee40f5e50a155453c889306f4295790df7539dbe3fa3f1e51dcc9d",
+    "path_facts_digest": "sha256:62be0b7668bfcd4de8be51527e3aac7aa1b6592bd8db1582b7f3914c80351074",
+    "review_input_sha256": "sha256:f95ccdb471ec7b7e0af0f20bf1878579bd1892e99ad252a72623387d49ef8bf1"
+  },
+  "review": {
+    "schema": "quanthus.stage-orderly-consolidation-joint-development-review.v1",
+    "case_count": 190,
+    "opinion_count": 380,
+    "ledger_sha256": "sha256:1a73c66dd1255970c3a8de81a92adfabe7e57fc668b8deab7a12ef3eb82092f1",
+    "ledger_bytes": 44311,
+    "immutable_snapshot_artifact_id": "e880c8d158a66ca1806b97e513417ea0",
+    "same_origin_simulation": true,
+    "independent_validation_claimed": false,
+    "atomic_role_disagreement_count": 14,
+    "primary_status_disagreement_count": 12,
+    "primary_reference_counts": {
+      "AMBIGUOUS": 12,
+      "NEITHER": 74,
+      "STAGE_0": 83,
+      "STAGE_2": 21
+    },
+    "candidate_output_seen_during_review": false,
+    "threshold_basis_seen_during_review": false,
+    "explicit_recent_derived_facts_seen": false,
+    "preserved_2021_evaluation_seen": false,
+    "cognitive_blinding_claimed": false
+  },
+  "reference_sufficiency": {
+    "minimum_complete_cases": 144,
+    "observed_complete_cases": 190,
+    "minimum_stage0_positive_references": 18,
+    "observed_stage0_positive_references": 83,
+    "minimum_stage2_positive_references": 20,
+    "observed_stage2_positive_references": 21,
+    "minimum_stage0_definite_negative_references": 70,
+    "observed_stage0_definite_negative_references": 95,
+    "minimum_stage2_definite_negative_references": 70,
+    "observed_stage2_definite_negative_references": 157,
+    "all_reference_sufficiency_gates_pass": true
+  },
+  "authority_after_seal": {
+    "candidate_blind_review": false,
+    "candidate_pair_scoring_exact_frozen_grid": true,
+    "maximum_candidate_pairs": 27,
+    "candidate_grid_expansion": false,
+    "parameter_search": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "2019_p010_development_access": false,
+    "2020_p009_development_access": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

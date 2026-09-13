@@ -1,0 +1,66 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-joint-d1-recovery-result.v1",
+  "work_item": "P3-STAGE-011-D1",
+  "disposition": "TRANSPORT_RECOVERY_SUCCEEDED_REVIEW_READY",
+  "failed_job": {
+    "job_id": "stage_e73f7197d1f34b879d8b31e78db800ce",
+    "code_revision": "e91dfbf77e9d62b66a2d11cf064b3fb0538331ec",
+    "input_digest": "sha256:4a3dfd5da5da9b08c27ff7564ab725d5e968358568dcc2ce9b25e38049545a95",
+    "terminal_state": "failed",
+    "error": "stage_orderly_consolidation_joint_d1_process_failed",
+    "artifact_published": false,
+    "failure_class": "post_build_evidence_validator_ignored_signed_protocol_case_budget"
+  },
+  "recovery_job": {
+    "job_id": "stage_8189b79722fc48d1b774aa42f9238852",
+    "code_revision": "bd1449c43d2eb436716f2e2125256a84463901a0",
+    "input_digest": "sha256:87c537369c69348a5981479671c7d08e244210d0d345fbc1d5a5407bffc9829f",
+    "transport_recovery_of": "stage_e73f7197d1f34b879d8b31e78db800ce",
+    "submitted_at": "2026-09-13T06:29:56.030026+00:00",
+    "started_at": "2026-09-13T06:29:57.534144+00:00",
+    "completed_at": "2026-09-13T06:32:07.206038+00:00",
+    "terminal_state": "succeeded",
+    "exit_code": 0
+  },
+  "artifact": {
+    "run_id": "stage-orderly-consolidation-joint-d1-20260913T063204Z",
+    "manifest_sha256": "sha256:14870f6cd1521d453b7ccae6ebdd5d8d6d5ee64875372051f76214eb2227eae8",
+    "file_count": 8,
+    "fresh_pool_size": 512,
+    "development_identity_capacity": 256,
+    "development_selected_case_count": 190,
+    "development_shortfall_count": 2,
+    "development_selection_digest": "sha256:4be661b466b3b5dc34fbfc7ada98b0f3440a36eff8d524ac0f7a8ffe4eb1031b",
+    "development_evidence_digest": "sha256:b1298c1fc4ee40f5e50a155453c889306f4295790df7539dbe3fa3f1e51dcc9d",
+    "path_facts_digest": "sha256:62be0b7668bfcd4de8be51527e3aac7aa1b6592bd8db1582b7f3914c80351074",
+    "threshold_basis_digest": "sha256:d3556f0cb3bc91ecbe84a9febef79faeee7be131cf01f2ea3bf47b98d291412c",
+    "candidate_grid_digest": "sha256:6d2130ef91b8cdbec8c6c615cdd0d656142ed50d9c25dfd8ebafa14dacbe9a5d",
+    "stage0_candidate_count": 9,
+    "stage2_candidate_count": 3,
+    "candidate_pair_count": 27,
+    "opinion_count": 0,
+    "parameter_search": false,
+    "pair_frozen": false,
+    "review_ready": true
+  },
+  "preserved_evaluation": {
+    "identity_count": 160,
+    "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+    "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+    "market_data_read": false
+  },
+  "authority_after_recovery": {
+    "additional_d1_job_submission": false,
+    "additional_d1_market_data_read": false,
+    "candidate_blind_development_review": true,
+    "candidate_pair_scoring_before_review_ledger_sealed": false,
+    "preserved_2021_evaluation_read": false,
+    "2019_p010_development_access": false,
+    "2020_p009_development_access": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

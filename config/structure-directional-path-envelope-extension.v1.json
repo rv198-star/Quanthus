@@ -1,0 +1,111 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-extension-proposal.v1",
+  "work_item": "P3-STAGE-012-E5",
+  "state": "DESIGN_FROZEN_SYNTHETIC_ONLY_NOT_REGISTERED",
+  "owner": {
+    "blueprint_id": "B6-PATH",
+    "fact_family_id": "directional-path-geometry-v1",
+    "existing_contract": "config/structure-directional-path-geometry.v1.json",
+    "existing_contract_digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c"
+  },
+  "purpose": "Define a neutral close-path envelope escape/re-entry trace under the existing Directional Path Geometry owner so failed directional resolution can be represented without emitting Stage truth or actor intent.",
+  "concept_proposal": {
+    "concept_id": "structure.geometry.close-envelope-resolution-trace",
+    "registration_status": "PROPOSED_NOT_REGISTERED",
+    "result_kind": "structured_path_trace",
+    "concept_version": "0.1.0-synthetic",
+    "summary_fields_are_separate_fact_identities": false
+  },
+  "evaluation_spec": {
+    "primary_path_sessions": 20,
+    "required_contiguous_closes": 21,
+    "prior_close_envelope_sessions": 10,
+    "evaluated_session_indices": "10_through_20_inclusive_within_t_minus_20_through_t_path",
+    "source_measurement": "final_daily_close",
+    "strict_escape": "close > frozen_prior_upper OR close < frozen_prior_lower",
+    "equality_is_inside": true,
+    "event_envelope": "previous_10_closes_frozen_at_escape_session",
+    "reentry": "first_later_close_inside_or_equal_to_frozen_envelope_through_T_only",
+    "reentry_knowledge_time": "known_at_T_for_the_T_ending_trace_not_backdated_to_escape_session",
+    "future_after_T_used": false,
+    "numeric_threshold_learning": false
+  },
+  "trace_fields": {
+    "event": [
+      "session_index",
+      "side",
+      "close",
+      "frozen_lower",
+      "frozen_upper",
+      "resolved_by_t",
+      "reentry_session_index",
+      "reentry_lag_sessions"
+    ],
+    "descriptors": [
+      "escape_count",
+      "resolved_escape_count",
+      "unresolved_escape_count",
+      "upper_escape_count",
+      "lower_escape_count",
+      "resolved_escape_side_sequence",
+      "resolved_escape_side_alternation_count",
+      "resolved_escape_both_sides",
+      "unresolved_escape_sides",
+      "single_unresolved_side_only",
+      "event_trace_digest"
+    ],
+    "descriptor_stage_truth_authority": false
+  },
+  "reset_and_coordinate_semantics": {
+    "reuse_existing_b6_path_segmentation": true,
+    "same_listing_required": true,
+    "same_coordinate_required": true,
+    "hidden_session_gap_requires_reset_and_rewarm": true,
+    "nonadmitted_or_missing_close_requires_reset_and_rewarm": true,
+    "listing_or_coordinate_change_requires_reset_and_rewarm": true,
+    "cross_coordinate_comparison_forbidden": true
+  },
+  "identity_proposal": {
+    "observation_time": "T",
+    "subject_binding": ["security_id", "listing_id"],
+    "spec_identity_includes": [
+      "concept_id",
+      "concept_version",
+      "primary_path_sessions",
+      "prior_close_envelope_sessions",
+      "escape_equality_policy",
+      "reentry_policy",
+      "coordinate_policy",
+      "numeric_policy"
+    ],
+    "observation_revision_includes": [
+      "spec_digest",
+      "coordinate_ref",
+      "T_business_time",
+      "source_closure_digest",
+      "result_digest"
+    ],
+    "event_components_are_independent_backdated_facts": false
+  },
+  "claim_limits": [
+    "The trace describes close-path escape and later re-entry relative to a frozen prior-close envelope; it does not infer intraday breakout behavior.",
+    "A resolved escape does not imply structural disorder, failed strategy, future reversal, actor intent or Stage membership.",
+    "Alternation and event counts are descriptors only and have no Stage threshold authority.",
+    "Synthetic conformance cannot establish market separability, economic usefulness or optimal window lengths."
+  ],
+  "authority": {
+    "structure_owned_prototype_implementation": true,
+    "synthetic_conformance": true,
+    "existing_b6_path_contract_change": false,
+    "semantic_catalog_registration": false,
+    "fact_registration": false,
+    "market_data_read": false,
+    "runtime_job": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "stage_projection": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

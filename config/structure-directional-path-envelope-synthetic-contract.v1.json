@@ -1,0 +1,73 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-synthetic-contract.v1",
+  "work_item": "P3-STAGE-012-E5",
+  "state": "FROZEN_SYNTHETIC_ONLY",
+  "design_binding": {
+    "path": "config/structure-directional-path-envelope-extension.v1.json",
+    "digest": "sha256:22d1031e547dec1db5a5d620b12949cc4a856537569c03d495d04cc4e559a71a"
+  },
+  "cases": [
+    {
+      "id": "orderly-high-churn-contraction",
+      "closes": [10.00, 10.10, 9.90, 10.08, 9.92, 10.06, 9.94, 10.04, 9.96, 10.02, 9.98, 10.01, 9.99, 10.00, 9.98, 10.01, 9.99, 10.00, 9.99, 10.00, 10.00],
+      "expected": {"status": "AVAILABLE", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []}
+    },
+    {
+      "id": "one-leg-repricing-then-hold",
+      "closes": [10.00, 10.05, 9.95, 10.02, 9.98, 10.04, 9.96, 10.03, 9.97, 10.01, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00],
+      "expected": {"status": "AVAILABLE", "escape_count": 1, "resolved_escape_count": 0, "unresolved_escape_count": 1, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": ["UPPER"]}
+    },
+    {
+      "id": "alternating-failed-resolution",
+      "closes": [10.00, 10.10, 9.90, 10.05, 9.95, 10.08, 9.92, 10.04, 9.96, 10.02, 10.40, 10.00, 9.60, 10.00, 10.50, 10.00, 9.50, 10.00, 10.45, 10.00, 9.55],
+      "expected": {"status": "AVAILABLE", "escape_count": 4, "resolved_escape_count": 4, "unresolved_escape_count": 0, "resolved_escape_side_sequence": ["UPPER", "LOWER", "UPPER", "LOWER"], "resolved_escape_side_alternation_count": 3, "resolved_escape_both_sides": true, "unresolved_escape_sides": []}
+    },
+    {
+      "id": "stable-narrow-noise",
+      "closes": [9.95, 10.05, 10.00, 10.02, 9.98, 9.95, 10.05, 10.00, 10.02, 9.98, 9.95, 10.05, 10.00, 10.02, 9.98, 9.95, 10.05, 10.00, 10.02, 9.98, 10.00],
+      "expected": {"status": "AVAILABLE", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []}
+    },
+    {
+      "id": "equality-on-prior-boundary",
+      "closes": [10.00, 10.10, 9.90, 10.05, 9.95, 10.08, 9.92, 10.04, 9.96, 10.02, 10.10, 10.00, 10.05, 9.95, 10.00, 10.02, 9.98, 10.01, 9.99, 10.00, 10.00],
+      "expected": {"status": "AVAILABLE", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []}
+    },
+    {
+      "id": "same-side-resolved-escapes",
+      "closes": [10.00, 10.10, 9.90, 10.05, 9.95, 10.08, 9.92, 10.04, 9.96, 10.02, 10.30, 10.00, 10.05, 9.95, 10.00, 10.50, 10.10, 10.05, 10.00, 10.02, 10.01],
+      "expected": {"status": "AVAILABLE", "escape_count": 2, "resolved_escape_count": 2, "unresolved_escape_count": 0, "resolved_escape_side_sequence": ["UPPER", "UPPER"], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []}
+    },
+    {
+      "id": "t-session-unresolved-escape",
+      "closes": [10.00, 10.10, 9.90, 10.05, 9.95, 10.08, 9.92, 10.04, 9.96, 10.02, 10.00, 10.01, 9.99, 10.00, 10.02, 9.98, 10.01, 9.99, 10.00, 10.00, 10.40],
+      "expected": {"status": "AVAILABLE", "escape_count": 1, "resolved_escape_count": 0, "unresolved_escape_count": 1, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": ["UPPER"]}
+    },
+    {
+      "id": "unavailable-close",
+      "closes": [10.00, 10.10, 9.90, 10.08, 9.92, 10.06, 9.94, 10.04, 9.96, 10.02, null, 10.01, 9.99, 10.00, 9.98, 10.01, 9.99, 10.00, 9.99, 10.00, 10.00],
+      "expected": {"status": "UNAVAILABLE", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []}
+    },
+    {
+      "id": "insufficient-history",
+      "closes": [10.00, 10.10, 9.90, 10.08, 9.92, 10.06, 9.94, 10.04, 9.96, 10.02, 9.98, 10.01, 9.99, 10.00, 9.98, 10.01, 9.99, 10.00, 9.99, 10.00],
+      "expected": {"status": "INSUFFICIENT_HISTORY", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []}
+    }
+  ],
+  "invariance_checks": [
+    "positive_price_scale_preserves_event_geometry",
+    "frozen_stage_e2_descriptors_match_structure_owner_for_original_e3_cases",
+    "T_session_escape_cannot_be_resolved_by_future_after_T",
+    "listing_or_coordinate_change_requires_rewarm",
+    "hidden_session_gap_requires_rewarm"
+  ],
+  "authority": {
+    "synthetic_only": true,
+    "market_data": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "fact_registration": false,
+    "semantic_catalog_change": false,
+    "existing_b6_path_contract_change": false,
+    "preserved_2021_evaluation_read": false
+  }
+}

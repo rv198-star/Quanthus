@@ -191,6 +191,7 @@ def test_stage012_documents_exist_and_route_to_owner_gated_e5() -> None:
         ROOT / "docs/reviews/stage-atomic-proposition-d-expert-review-20260913.md",
         ROOT / "docs/acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md",
         ROOT / "docs/reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md",
+        ROOT / "docs/acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md",
     ):
         assert path.is_file()
 
@@ -205,5 +206,8 @@ def test_stage012_documents_exist_and_route_to_owner_gated_e5() -> None:
         in concept
     )
     assert "P3-STAGE-012-E5" in work_item
-    assert "blocked pending owner approval" in work_item
-    assert "Preserved 2021 remains unread" in work_item
+    assert "closed `PASS_SYNTHETIC_QUALIFICATION`" in work_item
+    assert "P3-STAGE-012-E6" in work_item
+    assert "ready for review only" in work_item
+    assert "proposal, not a registered Fact" in work_item
+    assert "preserved 2021 remain closed" in work_item

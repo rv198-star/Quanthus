@@ -7,7 +7,7 @@
 | Concept | `../design/stage-atomic-proposition-successor-concept.md` |
 | P011 post-closeout review | `../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md` |
 | A-C machine result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
-| Current state | A/B/C/D and E1/E2/E3/E4 closed; post-E review recommends a Structure-owned B6-PATH envelope formalization design, but E5 remains blocked pending owner approval; fresh data, preserved 2021, threshold search and Fact registration remain blocked |
+| Current state | A/B/C/D and E1-E5 closed; E5 passes Structure-owned synthetic qualification without registration; E6 is ready for post-E5 review only; fresh data, preserved 2021, threshold search and Fact registration remain blocked |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
@@ -20,8 +20,9 @@
 | P3-STAGE-012-E2 | Threshold-free range-envelope prototype | P3-STAGE-012-D | closed synthetic prototype only; close-envelope escape/re-entry evidence implemented; not a Fact and no compact-disorder truth |
 | P3-STAGE-012-E3 | Adversarial synthetic conformance | P3-STAGE-012-E1/E2 | closed `PASS_SYNTHETIC_CONFORMANCE`; orderly high-churn, one-leg relocation, failed-resolution disorder, stable narrow noise, mixed atomic state and unavailable inputs all pass |
 | P3-STAGE-012-E4 | Post-E expert review / Fact-projection route decision | P3-STAGE-012-E1/E2/E3 | closed `RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY`; current prototype stays research-only; `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
-| P3-STAGE-012-E5 | Structure-owned B6-PATH envelope formalization design + synthetic qualification | P3-STAGE-012-E4 | blocked pending owner approval; no market data, no Fact registration, no threshold search |
-| P3-STAGE-012-F+ | Fresh-cohort inventory / preregistration / development | P3-STAGE-012-E5 | blocked until E5 closes and a later owner approval explicitly opens fresh work |
+| P3-STAGE-012-E5 | Structure-owned B6-PATH envelope formalization design + synthetic qualification | P3-STAGE-012-E4 | closed `PASS_SYNTHETIC_QUALIFICATION`; neutral trace design approved as a proposal, algorithm core moved to Structure owner, existing B6-PATH/Catalog remain unchanged; `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
+| P3-STAGE-012-E6 | Post-E5 registration/revision/research-only/park review | P3-STAGE-012-E5 | ready for review only; registration and market-data authority remain false |
+| P3-STAGE-012-F+ | Fresh-cohort inventory / preregistration / development | P3-STAGE-012-E6 | blocked until E6 closes and a later owner approval explicitly opens fresh work |
 
 ## Hard boundaries
 
@@ -36,4 +37,6 @@
 
 ## Next decision
 
-E4 is complete. The panel keeps the current `stage_learning` envelope prototype research-only, rejects a new Fact family, and recommends **P3-STAGE-012-E5** only if separately approved: move the neutral envelope escape/re-entry semantics toward the existing `B6-PATH / Directional Path Geometry` owner through a Structure-owned design and synthetic qualification. E5 itself is still blocked. P008 relocation stays frozen; fresh data, Fact registration and preserved 2021 remain closed.
+E5 is complete. The neutral envelope escape/re-entry semantics now have one Structure-owned algorithm core, a frozen 20/10 EvaluationSpec proposal, explicit PIT/reset/coordinate semantics and `PASS_SYNTHETIC_QUALIFICATION`. The current B6-PATH family contract and semantic catalog remain unchanged, so this is still a **proposal, not a registered Fact**.
+
+The required next step is **P3-STAGE-012-E6 post-E5 review**. It must choose exactly one bounded route: `REGISTER_AS_B6_PATH_EXTENSION`, `REVISE_NEUTRAL_CONCEPT`, `KEEP_RESEARCH_ONLY`, or `PARK`. E6 itself may not read market data or register the concept. P008 relocation stays frozen; fresh data and preserved 2021 remain closed.

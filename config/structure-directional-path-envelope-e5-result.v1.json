@@ -1,0 +1,56 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-e5-result.v1",
+  "work_item": "P3-STAGE-012-E5",
+  "state": "READY_FOR_POST_E5_REVIEW",
+  "authorization": {
+    "path": "config/structure-directional-path-envelope-e5-authorization.v1.json",
+    "digest": "sha256:634136cc9df451b8590626a0d2a57e7bb76e0452f3dbe9d333ddd0970bc25430"
+  },
+  "design": {
+    "path": "config/structure-directional-path-envelope-extension.v1.json",
+    "digest": "sha256:22d1031e547dec1db5a5d620b12949cc4a856537569c03d495d04cc4e559a71a",
+    "status": "APPROVED_PROPOSAL_SEMANTICS_NOT_REGISTERED"
+  },
+  "synthetic": {
+    "contract_path": "config/structure-directional-path-envelope-synthetic-contract.v1.json",
+    "contract_digest": "sha256:4dcef798bc12cabf4cc0f0e67c016bc93eb504f1f9cf1bbacb9f8d04d6c6e0ea",
+    "result_path": "config/structure-directional-path-envelope-synthetic-result.v1.json",
+    "result_digest": "sha256:413dd2256158f7e9eb68ee17711832070581af04f930c47bbd60f7ab2db39f9e",
+    "state": "PASS_SYNTHETIC_QUALIFICATION",
+    "failed_check_count": 0
+  },
+  "ownership": {
+    "blueprint_id": "B6-PATH",
+    "existing_fact_family": "directional-path-geometry-v1",
+    "proposed_concept": "structure.geometry.close-envelope-resolution-trace",
+    "stage_learning_detector_remains_authoritative_owner": false,
+    "structure_detector_is_single_algorithm_core": true
+  },
+  "registration": {
+    "existing_b6_path_contract_changed": false,
+    "semantic_catalog_changed": false,
+    "proposed_concept_registered": false,
+    "blueprint_concept_inventory_changed": false
+  },
+  "next_gate": {
+    "work_item": "P3-STAGE-012-E6",
+    "purpose": "Post-E5 review decides REGISTER_AS_B6_PATH_EXTENSION, REVISE_NEUTRAL_CONCEPT, KEEP_RESEARCH_ONLY, or PARK.",
+    "ready_for_review": true,
+    "registration_authorized": false,
+    "market_data_authorized": false
+  },
+  "authority": {
+    "e5_closed": true,
+    "post_e5_review_ready": true,
+    "fact_registration": false,
+    "semantic_catalog_change": false,
+    "runtime_integration": false,
+    "market_data_read": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "fresh_cohort_inventory": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-e5-authorization.v1",
+  "work_item": "P3-STAGE-012-E5",
+  "state": "OWNER_APPROVED_STRUCTURE_DESIGN_AND_SYNTHETIC_ONLY",
+  "base_commit": "0e0cd67961935abed1016b9dc7896afa16d87bab",
+  "review_binding": {
+    "path": "config/stage-learning/stage-atomic-proposition-e4-expert-review-result.v1.json",
+    "digest": "sha256:125a510411eaec2896538005c57dc9650bc707df5c9005ba43975d9a780d409d",
+    "decision": "RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY"
+  },
+  "existing_owner_binding": {
+    "fact_family_id": "directional-path-geometry-v1",
+    "path": "config/structure-directional-path-geometry.v1.json",
+    "digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c",
+    "blueprint_id": "B6-PATH"
+  },
+  "authorized": {
+    "structure_owned_design": true,
+    "structure_owned_threshold_free_prototype": true,
+    "synthetic_conformance": true,
+    "stage_prototype_compatibility_refactor": true
+  },
+  "forbidden": {
+    "existing_b6_path_contract_mutation": true,
+    "semantic_catalog_registration": true,
+    "new_fact_family_registration": true,
+    "market_data_read": true,
+    "runtime_job": true,
+    "threshold_search": true,
+    "candidate_generation": true,
+    "p008_relocation_retune": true,
+    "preserved_2021_evaluation_read": true,
+    "2022_2025_access": true,
+    "daily_or_strategy": true,
+    "trading": true
+  }
+}

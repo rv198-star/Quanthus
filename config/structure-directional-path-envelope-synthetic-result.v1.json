@@ -1,0 +1,53 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-synthetic-result.v1",
+  "work_item": "P3-STAGE-012-E5",
+  "state": "PASS_SYNTHETIC_QUALIFICATION",
+  "design_contract_digest": "sha256:22d1031e547dec1db5a5d620b12949cc4a856537569c03d495d04cc4e559a71a",
+  "synthetic_contract_digest": "sha256:4dcef798bc12cabf4cc0f0e67c016bc93eb504f1f9cf1bbacb9f8d04d6c6e0ea",
+  "checks": {
+    "authority:not_registered": true,
+    "case:alternating-failed-resolution": true,
+    "case:equality-on-prior-boundary": true,
+    "case:insufficient-history": true,
+    "case:one-leg-repricing-then-hold": true,
+    "case:orderly-high-churn-contraction": true,
+    "case:same-side-resolved-escapes": true,
+    "case:stable-narrow-noise": true,
+    "case:t-session-unresolved-escape": true,
+    "case:unavailable-close": true,
+    "compatibility:failed_resolution_path_exact": true,
+    "compatibility:stage_e2:failed_resolution": true,
+    "compatibility:stage_e2:one-leg-repricing-then-hold": true,
+    "compatibility:stage_e2:orderly-high-churn-contraction": true,
+    "compatibility:stage_e2:stable-narrow-noise": true,
+    "compatibility:stage_e2:unavailable-close": true,
+    "invariance:positive_price_scale": true,
+    "pit:T_escape_unresolved": true,
+    "segment:hidden_gap_rewarm": true,
+    "segment:listing_or_coordinate_rewarm": true,
+    "segment:valid": true
+  },
+  "failed_checks": [],
+  "cases": [
+    {"id": "orderly-high-churn-contraction", "status": "AVAILABLE", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []},
+    {"id": "one-leg-repricing-then-hold", "status": "AVAILABLE", "escape_count": 1, "resolved_escape_count": 0, "unresolved_escape_count": 1, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": ["UPPER"]},
+    {"id": "alternating-failed-resolution", "status": "AVAILABLE", "escape_count": 4, "resolved_escape_count": 4, "unresolved_escape_count": 0, "resolved_escape_side_sequence": ["UPPER", "LOWER", "UPPER", "LOWER"], "resolved_escape_side_alternation_count": 3, "resolved_escape_both_sides": true, "unresolved_escape_sides": []},
+    {"id": "stable-narrow-noise", "status": "AVAILABLE", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []},
+    {"id": "equality-on-prior-boundary", "status": "AVAILABLE", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []},
+    {"id": "same-side-resolved-escapes", "status": "AVAILABLE", "escape_count": 2, "resolved_escape_count": 2, "unresolved_escape_count": 0, "resolved_escape_side_sequence": ["UPPER", "UPPER"], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []},
+    {"id": "t-session-unresolved-escape", "status": "AVAILABLE", "escape_count": 1, "resolved_escape_count": 0, "unresolved_escape_count": 1, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": ["UPPER"]},
+    {"id": "unavailable-close", "status": "UNAVAILABLE", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []},
+    {"id": "insufficient-history", "status": "INSUFFICIENT_HISTORY", "escape_count": 0, "resolved_escape_count": 0, "unresolved_escape_count": 0, "resolved_escape_side_sequence": [], "resolved_escape_side_alternation_count": 0, "resolved_escape_both_sides": false, "unresolved_escape_sides": []}
+  ],
+  "claim_ceiling": "Structure-owned synthetic qualification only. No Fact registration, market separability, window optimality, threshold validity, Stage qualification or economic usefulness is claimed.",
+  "authority": {
+    "market_data_read": false,
+    "runtime_job": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "fact_registration": false,
+    "semantic_catalog_change": false,
+    "existing_b6_path_contract_change": false,
+    "preserved_2021_evaluation_read": false
+  }
+}

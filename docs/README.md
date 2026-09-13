@@ -384,8 +384,13 @@ nodes.
   `RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY`: keep the current Stage-learning prototype
   research-only, reject a new Fact family, and route any later formalization through the existing
   `B6-PATH / Directional Path Geometry` owner. Review:
-  `reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md`. E5 remains blocked pending
-  owner approval; fresh data, Fact registration, threshold search and preserved 2021 remain blocked.
+  `reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md`. The owner-approved E5 then
+  moves the detector core under the existing B6-PATH Structure owner, freezes one unregistered
+  `close-envelope-resolution-trace` proposal with explicit 20/10 PIT/reset semantics, and closes
+  `PASS_SYNTHETIC_QUALIFICATION` without changing the active B6-PATH contract or semantic catalog.
+  Design: `design/structure-directional-path-envelope-extension.md`; acceptance:
+  `acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md`. E6 post-E5
+  review is next; fresh data, Fact registration, threshold search and preserved 2021 remain blocked.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

@@ -5,7 +5,7 @@
 | Design status | approved |
 | Delivery gate | accepted |
 | Governing work item | `P3-STRUCT-004` |
-| Current delivery | B1-B5 bounded retrospective vertical accepted; additive `B5-F9` **演化支撑事实族 / Support Evolution Fact Family**, `B6-TREND` **趋势演化事实族 / Trend Evolution Fact Family**, and `B6-ORDER` **结构秩序事实族 / Structure Order Fact Family** accepted; `B6-PATH` **方向路径几何事实族 / Directional Path Geometry Fact Family** is implemented but unqualified under P3-STAGE-008-B; broad B6/B7-B11 remain separately gated |
+| Current delivery | B1-B5 bounded retrospective vertical accepted; additive `B5-F9` **演化支撑事实族 / Support Evolution Fact Family**, `B6-TREND` **趋势演化事实族 / Trend Evolution Fact Family**, and `B6-ORDER` **结构秩序事实族 / Structure Order Fact Family** accepted; `B6-PATH` **方向路径几何事实族 / Directional Path Geometry Fact Family** remains implemented but unqualified, with a non-registered close-envelope escape/re-entry extension proposal synthetically accepted under P3-STAGE-012-E5; broad B6/B7-B11 remain separately gated |
 | Runtime v2 acceptance | ACCEPTED for the fixed development retrospective slice only |
 | Runtime acceptance | `../acceptance/structure-facts-v2-b1-b5-final-acceptance-20260907.md` |
 | Retained pre-result repair | `../acceptance/structure-facts-v2-bounded-derivative-parent-authority-repair-20260907.md`; resolved by independent A/B |
@@ -347,7 +347,8 @@ next gate and evidence. A planned row is not implemented; a contract test is not
 | B5-F9 | **演化支撑事实族 / Support Evolution Fact Family** (`F9` historical capability code) | Accepted additive Route-A B3/B4/B5 extension: support binding, same-support break/reclaim events, unreclaimed process state and continuous support-distance/post-break-rebound measurements; Stage 10/11 remain separate projections |
 | B6-TREND | **趋势演化事实族 / Trend Evolution Fact Family** | Accepted bounded geometry subset: multi-horizon return, directional efficiency, return velocity/velocity delta and rolling-range position/high-low distances; qualified by two immutable independently accepted source artifacts with zero new DWD/provider access; no Stage thresholds |
 | B6-ORDER | **结构秩序事实族 / Structure Order Fact Family** | Accepted bounded geometry subset: midpoint-normalized 10/20/60 range width, 10/20 equal-prior non-overlap width change and range-center shift; reuses B6-TREND directional efficiency and adds no Stage 0/2 meaning |
-| B6 | Geometry/width/compression extensions | Broad B6 remains planned; accepted B6-TREND/B6-ORDER are narrow consumer-driven subsets, not completion of generic geometry inventory |
+| B6-PATH | **方向路径几何事实族 / Directional Path Geometry Fact Family** | Existing range-traversal/counter-excursion implementation remains unqualified; P3-STAGE-012-E5 additionally freezes a Structure-owned `close-envelope-resolution-trace` proposal and passes synthetic qualification, but does not change the active family contract or Catalog |
+| B6 | Geometry/width/compression extensions | Broad B6 remains planned; accepted B6-TREND/B6-ORDER and the non-registered B6-PATH envelope proposal are narrow consumer-driven subsets, not completion of generic geometry inventory |
 | B7 | Episode activity relations | Planned; shared primitives, independent volume availability |
 | B8 | Shared indicators and Data & Indicator Catalog | P3-DICT-001 accepted as an independent read-only catalog; no dependency of B1-B5 and no claim that every reserved indicator has an executable spec |
 | B9 | Disclosure/fundamental/market context | Parallel domains, not missing Structure-owned capabilities |

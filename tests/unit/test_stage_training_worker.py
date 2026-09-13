@@ -1760,11 +1760,38 @@ def test_orderly_consolidation_joint_d1_status_is_candidate_blind(tmp_path: Path
     }
     path_raw = json.dumps(path_facts, sort_keys=True, separators=(",", ":")).encode()
     path_sha = "sha256:" + hashlib.sha256(path_raw).hexdigest()
+    basis = {"labels_used": False, "reference_opinions_used": False}
+    grid = {
+        "stage0_candidate_count": 9,
+        "stage2_candidate_count": 3,
+        "pair_count": 27,
+        "parameter_search_performed": False,
+        "grid_expanded_after_result": False,
+    }
+    plan = {
+        "identity_count": 160,
+        "identity_digest": "sha256:" + "7" * 64,
+        "data_read": False,
+    }
+    basis_raw = json.dumps(basis, sort_keys=True, separators=(",", ":")).encode()
+    grid_raw = json.dumps(grid, sort_keys=True, separators=(",", ":")).encode()
+    plan_raw = json.dumps(plan, sort_keys=True, separators=(",", ":")).encode()
     artifact = worker_paths.runs / job_id / "stage-orderly-consolidation-joint-d1-test"
     artifact.mkdir(parents=True)
     (artifact / "evidence.json").write_bytes(evidence_raw)
     (artifact / "path-facts.json").write_bytes(path_raw)
-    manifest = {"files": {"evidence.json": evidence_sha, "path-facts.json": path_sha}}
+    (artifact / "threshold-basis.json").write_bytes(basis_raw)
+    (artifact / "candidate-grid.json").write_bytes(grid_raw)
+    (artifact / "preserved-evaluation-plan.json").write_bytes(plan_raw)
+    manifest = {
+        "files": {
+            "evidence.json": evidence_sha,
+            "path-facts.json": path_sha,
+            "threshold-basis.json": _digest(basis),
+            "candidate-grid.json": _digest(grid),
+            "preserved-evaluation-plan.json": _digest(plan),
+        }
+    }
     manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
     manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
     (artifact / "manifest.json").write_bytes(manifest_raw)
@@ -1785,6 +1812,9 @@ def test_orderly_consolidation_joint_d1_status_is_candidate_blind(tmp_path: Path
             "manifest_sha256": manifest_sha,
             "orderly_consolidation_joint_d1": {
                 "development_selected_case_count": 1,
+                "threshold_basis_digest": _digest(basis),
+                "candidate_grid_digest": _digest(grid),
+                "preserved_evaluation_plan_digest": _digest(plan),
                 "review_ready": True,
             },
         },
@@ -1809,6 +1839,19 @@ def test_orderly_consolidation_joint_d1_status_is_candidate_blind(tmp_path: Path
     assert "recent" not in review_case
     assert "threshold_basis" not in decoded
     assert "candidate" not in decoded
+    selection = json.loads(
+        gzip.decompress(base64.b64decode(observed["selection_transport"]["payload"]))
+    )
+    assert selection["threshold_basis"] == basis
+    assert selection["candidate_grid"] == grid
+    assert selection["evaluation_plan_binding"] == {
+        "identity_count": 160,
+        "identity_digest": "sha256:" + "7" * 64,
+        "plan_digest": _digest(plan),
+        "data_read": False,
+    }
+    assert selection["review_ledger_must_be_sealed_before_use"] is True
+    assert selection["evaluation_data_read"] is False
 
 
 def test_order_rule_resolve_score_requires_successful_parent_and_is_single_job(

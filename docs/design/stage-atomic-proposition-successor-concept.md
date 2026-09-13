@@ -14,13 +14,13 @@
 | E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
 | Post-E review | `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
 | E5 Structure acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
-| Authority | E9 and F are complete; F freezes the task-disjoint 2016 atomic-first preregistration before data, and delegated P012 authority opens G implementation while fresh market data remains closed until that implementation is accepted |
+| Authority | E9 and F are complete; G engineering is accepted with zero market reads, and delegated P012 authority now permits exactly one G1 fresh-2016 prepare Job after deployment; G2 blind ledger seal and G3 scoring remain mandatory before H or preserved-2021 access |
 
-> P3-STAGE-012 remains a bounded research work item. A-D, E1-E9 and F are closed. F freezes a 2016
-> task-disjoint atomic-first development surface, exact candidate/profile budgets, reviewer blinding and
-> preserved-2021 stop rules before any fresh read. Owner delegation removes repeated approval handoffs
-> inside P012 but does not waive freshness, sealed-ledger or evaluation gates. G may now implement the
-> frozen prepare/review/scoring contract; fresh market data stays closed until implementation acceptance.
+> P3-STAGE-012 remains a bounded research work item. A-D, E1-E9 and F are closed. G engineering now
+> implements the frozen atomic-first prepare/review/scoring contract without reading market data.
+> Owner delegation removes repeated approval handoffs inside P012 but does not waive freshness,
+> sealed-ledger, one-shot Job, candidate-surface or preserved-evaluation gates. Exactly one G1 fresh
+> prepare may run after this revision is deployed; G2 must seal blind atomics before G3 scoring.
 
 ## 1. Why a different successor shape is needed
 
@@ -263,10 +263,10 @@ P3-STAGE-012-E7  CLOSED  PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION / NOT RE
 P3-STAGE-012-E8  CLOSED  REGISTER_RESERVED_MEASUREMENT / CATALOG UNCHANGED
 P3-STAGE-012-E9  CLOSED  REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING
 P3-STAGE-012-F   CLOSED  PREREGISTRATION_FROZEN / 2016 DEVELOPMENT UNREAD
+P3-STAGE-012-G   ENGINEERING ACCEPTED / EXACT ONE G1 PREPARE READY
 -------------------------------------------------------------
-open under delegated P012 authority:
-P3-STAGE-012-G   implement fresh-2016 prepare / blind atomic review / independent scoring
-P3-STAGE-012-H   projection compatibility and candidate freeze
+open under delegated P012 authority after G1/G2/G3 evidence gates:
+P3-STAGE-012-H   projection compatibility and exact candidate freeze
 -------------------------------------------------------------
 only if H passes:
 preserved 2021 evaluation may be considered under separate authority
@@ -346,8 +346,9 @@ Chinese business metadata is present, the deterministic Catalog snapshot is 761 
 concepts / 10 gaps, and no semantic runtime binding was added. The frozen P008 family contract remains
 immutable.
 
-The owner has delegated the remainder of P012 through closeout. F is now closed: a task-disjoint 2016
-development surface, finite atomic candidate/profile surface, reviewer blinding, independent selection
-and projection stop rules are frozen before data. G implementation is next; fresh 2016 remains unread
-until that implementation passes. Preserved 2021 remains unread until a later exact candidate /
-projection freeze.
+The owner has delegated the remainder of P012 through closeout. F is closed and G engineering is now
+accepted. The implementation preserves a finite 9 / 1 / 3 atomic surface, hides the registered envelope
+measurement from blind review, forbids joint pair search, and admits only one one-shot G1 prepare Job.
+Fresh 2016 remains unread in the engineering checkpoint itself. After G1 succeeds, G2 must seal the
+per-role atomic ledger before G3 may decode the selection transport and score the exact surface.
+Preserved 2021 remains unread until a later exact H candidate/projection freeze.

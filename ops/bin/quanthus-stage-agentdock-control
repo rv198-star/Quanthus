@@ -15,7 +15,8 @@ training_root="/home/qiuyu/quanthus-data/training"
 git_key="/home/qiuyu/.ssh/quanthus-github-ro"
 worker="${repo_root}/ops/bin/quanthus-stage-worker"
 runtime_identity="${training_root}/control/stage-worker/worker-runtime.json"
-allowed_kind="quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
+p011_kind="quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
+p012_g1_kind="quanthus.stage-atomic-proposition-g1-prepare.v1"
 
 [[ -d "${repo_root}/.git" ]] || fail "Quanthus control checkout missing"
 [[ -f "${worker}" ]] || fail "stage worker wrapper missing"
@@ -83,7 +84,15 @@ case "${command}" in
     exact_revision "${target}"
     [[ "$(git -C "${repo_root}" rev-parse HEAD)" == "${target}" ]] || fail "control checkout revision differs"
     [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
-    bash "${worker}" submit --kind "${allowed_kind}" --code-revision "${target}"
+    bash "${worker}" submit --kind "${p011_kind}" --code-revision "${target}"
+    ;;
+  submit-p012-g1)
+    [[ "$#" -eq 2 ]] || fail "usage: submit-p012-g1 <exact-revision>"
+    target="$2"
+    exact_revision "${target}"
+    [[ "$(git -C "${repo_root}" rev-parse HEAD)" == "${target}" ]] || fail "control checkout revision differs"
+    [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
+    bash "${worker}" submit --kind "${p012_g1_kind}" --code-revision "${target}"
     ;;
   status)
     [[ "$#" -eq 2 ]] || fail "usage: status <stage_job_id>"
@@ -91,6 +100,6 @@ case "${command}" in
     bash "${worker}" status --job-id "$2"
     ;;
   *)
-    fail "allowed commands: deploy | doctor | submit-p011-d1 | status"
+    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | status"
     ;;
 esac

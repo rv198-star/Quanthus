@@ -409,9 +409,11 @@ nodes.
   The owner has delegated the remainder of P012 through closeout. F now closes
   `PREREGISTRATION_FROZEN`: a task-disjoint 2016 development surface, exact atomic candidate/profile
   budgets, blind-review contract and projection stop rules are frozen before data. Acceptance:
-  `acceptance/stage-atomic-proposition-f-preregistration-20260914.md`. G implementation is next; fresh
-  2016 remains closed until that implementation passes, and preserved 2021 remains closed until a later
-  exact candidate/projection freeze.
+  `acceptance/stage-atomic-proposition-f-preregistration-20260914.md`. G engineering then closes
+  accepted with zero market reads: one exact G1 fresh-2016 prepare kind, blind G2 review transport,
+  envelope-hidden reviewer packets, independent 9 / 1 / 3 atomic scoring and zero joint-pair search.
+  Acceptance: `acceptance/stage-atomic-proposition-g-engineering-20260914.md`. Exactly one G1 Job may
+  run after deployment; preserved 2021 remains closed until a later exact H candidate/projection freeze.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

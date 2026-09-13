@@ -237,6 +237,7 @@ def test_stage012_documents_exist_and_route_to_owner_gated_e5() -> None:
     assert "P3-STAGE-012-F" in work_item
     assert "closed `PREREGISTRATION_FROZEN`" in work_item
     assert "P3-STAGE-012-G" in work_item
-    assert "ready under delegated P012 authority" in work_item
+    assert "engineering accepted" in work_item
+    assert "stage-atomic-proposition-g-engineering-20260914.md" in work_item
     assert "measurement" in work_item
-    assert "preserved-2021" in work_item
+    assert "Preserved 2021" in work_item

@@ -1,0 +1,41 @@
+{
+  "schema_version": "quanthus.stage-order-reference-protocol.v1",
+  "protocol_id": "stage-atomic-scale-reference-2016-v1",
+  "work_item": "P3-STAGE-012-G1",
+  "purpose": "T-only primary evidence for the frozen 2016 P3-STAGE-012 atomic-first development cohort; reviewer packets exclude candidate outputs, threshold basis and the registered envelope-derived measurement.",
+  "profile": {
+    "primary_window_sessions": 20,
+    "recent_window_sessions": 10,
+    "retained_history_sessions": 61,
+    "stage_0_working_name": "structural_instability_at_declared_scale",
+    "stage_2_working_name": "contracting_orderly_consolidation_at_declared_scale",
+    "both_false_allowed": true,
+    "both_true_resolution": "RULE_CONFLICT",
+    "recent_disagreement_changes_primary": false,
+    "knowledge_view": "retrospective"
+  },
+  "fact_contracts": {
+    "trend": {"path": "config/structure-trend-evolution.v1.json", "digest": "sha256:480db6df61901322c107da44eb41687bf4d19d2c6d1297a846a7af68cd224e03"},
+    "order": {"path": "config/structure-order-facts.v1.json", "digest": "sha256:57e5f60e000c4f238f83b4128d2df3acb1c7766fc01bc42829aeb085bbb8491d"}
+  },
+  "review_roles": ["short_term", "fund"],
+  "review_sources": ["deterministic_policy", "self_simulated", "external_ai", "human"],
+  "history_start": "2015-09-01",
+  "case_start": "2016-01-01",
+  "development_end": "2016-12-31",
+  "bounds": {"max_cases": 192, "max_source_rows": 20000, "max_artifact_bytes": 33554432},
+  "authority": {
+    "mechanism_implementation": true,
+    "synthetic_engineering_validation": true,
+    "market_data_acquisition": false,
+    "market_reference_pilot": false,
+    "parameter_search": false,
+    "future_outcome_access": false,
+    "arbitration_access": false,
+    "permanent_blind_access": false,
+    "official_labels": false,
+    "daily_schedule": false,
+    "strategy_consumption": false,
+    "trading": false
+  }
+}

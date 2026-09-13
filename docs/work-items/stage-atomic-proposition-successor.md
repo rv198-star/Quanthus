@@ -7,7 +7,7 @@
 | Concept | `../design/stage-atomic-proposition-successor-concept.md` |
 | P011 post-closeout review | `../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md` |
 | A-C machine result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
-| Current state | A/B/C/D/E1-E9 and F closed; F freezes a task-disjoint 2016 atomic-first preregistration before any fresh market read; G implementation is ready under delegated P012 authority and fresh data remains closed until that implementation passes |
+| Current state | A/B/C/D/E1-E9 and F closed; G engineering is accepted with zero market reads, and exactly one G1 fresh-2016 prepare Job is ready under delegated P012 authority; G2 blind review/G3 scoring remain gated behind G1 and preserved 2021 remains closed |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
@@ -26,8 +26,8 @@
 | P3-STAGE-012-E8 | Reserved registration decision review | P3-STAGE-012-E7 | closed `REGISTER_RESERVED_MEASUREMENT`; four-responsibility review approves naming/boundary registration only and leaves Catalog unchanged; `../reviews/structure-directional-path-envelope-e8-registration-review-20260914.md` |
 | P3-STAGE-012-E9 | Additive reserved semantic registration + metadata/planning alignment | P3-STAGE-012-E8 | closed `REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING`; Catalog 761 entries / 34 semantic concepts / 10 gaps, no runtime binding; `../acceptance/structure-directional-path-envelope-e9-registration-acceptance-20260914.md` |
 | P3-STAGE-012-F | Freshness inventory + atomic-first development preregistration | P3-STAGE-012-E9 | closed `PREREGISTRATION_FROZEN`; 2016 development / 2015 cohort-warmup, exact 9 instability candidates + fixed relocation + 3 order profiles, no joint ranking; `../acceptance/stage-atomic-proposition-f-preregistration-20260914.md` |
-| P3-STAGE-012-G | Implement fresh-2016 prepare / blind atomic review / independent scoring contract | P3-STAGE-012-F | ready under delegated P012 authority; implementation and tests only until accepted, then one fresh result-bearing prepare Job may open |
-| P3-STAGE-012-H+ | Projection compatibility / exact freeze / preserved evaluation | P3-STAGE-012-G | blocked on G fresh evidence and frozen atomic candidates; no separate owner-approval stop inside P012 |
+| P3-STAGE-012-G | Fresh-2016 atomic development | P3-STAGE-012-F | engineering accepted; exact one-shot G1 prepare Job ready under delegated P012 authority, followed by sealed G2 blind atomic review and exact G3 independent scoring; `../acceptance/stage-atomic-proposition-g-engineering-20260914.md` |
+| P3-STAGE-012-H+ | Projection compatibility / exact freeze / preserved evaluation | P3-STAGE-012-G | blocked on G1 fresh evidence, sealed G2 ledger and G3 independent atomic selection; no separate owner-approval stop inside P012 |
 
 ## Hard boundaries
 
@@ -52,4 +52,4 @@ E9 is complete. The concept is now reserved in the Structure semantic Catalog as
 
 F is now closed before any fresh market read. It selects a task-disjoint 2016 development surface, freezes 192 hash-only review identities with no morphology/backfill authority, hides the registered envelope measurement from reviewers, separates instability/relocation/order atomics, forbids joint candidate ranking and keeps the exact 2021 plan closed.
 
-Under delegated P012 authority, **P3-STAGE-012-G** is now ready for implementation only. The fresh 2016 read may start only after the exact G prepare/review/scoring implementation passes its focused and repository gates. Later preserved-2021 evaluation remains gated on an exact instability/order/projection freeze.
+G engineering is now accepted without a market read. Exactly one `quanthus.stage-atomic-proposition-g1-prepare.v1` Job may open the frozen 2015 warm-up / 2016 development scope after this revision is deployed to RX6800. G2 must seal the blind per-role atomic ledger before the selection transport is decoded for G3; there is no automatic retry or joint pair search. Preserved 2021 remains gated on an exact H instability/order/projection freeze.

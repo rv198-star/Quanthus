@@ -1,0 +1,61 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-development-execution.v1",
+  "work_item": "P3-STAGE-012-G",
+  "preregistration": {
+    "path": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json",
+    "digest": "sha256:24aacc70ef7ffa3bbfd0e28e8aa33fd91ba51bbd65da6c13640926215987c54d"
+  },
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "evidence_protocol": {
+    "path": "config/stage-learning/order-reference-evidence-scope-2016.v1.json",
+    "digest": "sha256:6bbe9c56b850d6bb6ebe49766f2e5c9c2860def98fb06b54c5320ea672b6e32b"
+  },
+  "p011_artifact_binding": {
+    "job_id": "stage_8189b79722fc48d1b774aa42f9238852",
+    "run_id": "stage-orderly-consolidation-joint-d1-20260913T063204Z",
+    "artifact_relative_path": "runs/stage-worker/stage_8189b79722fc48d1b774aa42f9238852/stage-orderly-consolidation-joint-d1-20260913T063204Z",
+    "manifest_sha256": "sha256:14870f6cd1521d453b7ccae6ebdd5d8d6d5ee64875372051f76214eb2227eae8",
+    "fresh_pool_size": 512
+  },
+  "quantile_method": {
+    "name": "nearest_rank_ceiling_1_based",
+    "definition": "sort ascending; rank=max(1,ceil(q*n)); return ordered[rank-1]",
+    "interpolation": false,
+    "decimal_arithmetic": true
+  },
+  "candidate_identity": {
+    "instability_candidate_count": 9,
+    "instability_base_topology": "P3-STAGE-010 exact 3x3 profile topology",
+    "instability_fixed_additive_channel": "repeated-failed-envelope-resolution-20",
+    "relocation_candidate_count": 1,
+    "relocation_source": "P3-STAGE-008 exact frozen guard",
+    "order_profile_count": 3,
+    "order_profile_source": "P3-STAGE-011 exact three profiles",
+    "joint_pair_search_count": 0
+  },
+  "review_transport": {
+    "primary_evidence": true,
+    "raw_21_close_path": true,
+    "range_traversal_and_counter_excursion": true,
+    "threshold_basis": false,
+    "candidate_outputs": false,
+    "envelope_measurement": false,
+    "future_rows": false,
+    "preserved_2021": false
+  },
+  "authority": {
+    "implementation": true,
+    "market_data_read": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "candidate_surface_change": false,
+    "joint_pair_search": false,
+    "preserved_2021_evaluation_read": false,
+    "2017_2021_result_bearing_access": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "relocation_guard_retuning": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

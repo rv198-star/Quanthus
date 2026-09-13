@@ -53,6 +53,7 @@ STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB = (
 STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB = (
     "quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
 )
+STAGE_ATOMIC_PROPOSITION_G1_JOB = "quanthus.stage-atomic-proposition-g1-prepare.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -76,6 +77,7 @@ ORDERLY_CONSOLIDATION_JOINT_D1_BUDGET_SCHEMA = (
 ORDERLY_CONSOLIDATION_JOINT_D1_RECOVERY_BUDGET_SCHEMA = (
     "quanthus.stage-orderly-consolidation-joint-d1-transport-recovery-budget.v1"
 )
+ATOMIC_PROPOSITION_G1_BUDGET_SCHEMA = "quanthus.stage-atomic-proposition-g1-budget.v1"
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_AUTH = (
     "config/stage-learning/positive-instability-quantitative-d1-retry.v1.json"
@@ -208,6 +210,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.orderly_consolidation_joint_development_prepare",
         "artifact_glob": "stage-orderly-consolidation-joint-d1-*",
         "process_error": "stage_orderly_consolidation_joint_d1_process_failed",
+        "wall_seconds": 2700,
+    },
+    STAGE_ATOMIC_PROPOSITION_G1_JOB: {
+        "config": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json",
+        "module": "quanthus.stage_learning.atomic_proposition_development_prepare",
+        "artifact_glob": "stage-atomic-proposition-g1-*",
+        "process_error": "stage_atomic_proposition_g1_process_failed",
         "wall_seconds": 2700,
     },
 }
@@ -405,6 +414,10 @@ class StageWorkerPaths:
     @property
     def orderly_consolidation_joint_d1_recovery_budget(self) -> Path:
         return self.control_root / "orderly-consolidation-joint-d1-transport-recovery-budget.json"
+
+    @property
+    def atomic_proposition_g1_budget(self) -> Path:
+        return self.control_root / "atomic-proposition-g1-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -1012,6 +1025,41 @@ def _existing_orderly_consolidation_joint_d1_submission(
         )
     _orderly_consolidation_joint_d1_recovery_authorization(paths, failed_job)
     return None, failed_job
+
+
+def _atomic_proposition_g1_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": ATOMIC_PROPOSITION_G1_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-012-G1",
+        "phase": "G1_PREPARE_FRESH_2016_ATOMIC_DEVELOPMENT",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_atomic_proposition_g1_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.atomic_proposition_g1_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "atomic proposition G1 budget")
+    if (
+        marker.get("schema_version") != ATOMIC_PROPOSITION_G1_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-012-G1"
+        or marker.get("phase") != "G1_PREPARE_FRESH_2016_ATOMIC_DEVELOPMENT"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("atomic proposition G1 budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_ATOMIC_PROPOSITION_G1_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("atomic proposition G1 budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError("atomic proposition G1 has no retry or replacement authority")
+    return _idempotent_stage_submission(paths, job)
 
 
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
@@ -1920,6 +1968,41 @@ class StageWorker:
                 "pair_frozen": verified.get("pair_frozen"),
                 "review_ready": verified.get("review_ready"),
             }
+        if job.kind == STAGE_ATOMIC_PROPOSITION_G1_JOB:
+            result["atomic_proposition_g1"] = {
+                "fresh_pool_size": verified.get("fresh_pool_size"),
+                "development_identity_capacity": verified.get("development_identity_capacity"),
+                "development_selected_case_count": verified.get(
+                    "development_selected_case_count"
+                ),
+                "development_shortfall_count": verified.get("development_shortfall_count"),
+                "development_selection_digest": verified.get("development_selection_digest"),
+                "development_evidence_digest": verified.get("development_evidence_digest"),
+                "threshold_basis_digest": verified.get("threshold_basis_digest"),
+                "candidate_grid_digest": verified.get("candidate_grid_digest"),
+                "envelope_measurements_digest": verified.get("envelope_measurements_digest"),
+                "instability_candidate_count": verified.get("instability_candidate_count"),
+                "order_profile_count": verified.get("order_profile_count"),
+                "relocation_candidate_count": verified.get("relocation_candidate_count"),
+                "joint_pair_search_count": verified.get("joint_pair_search_count"),
+                "path_facts_digest": verified.get("path_facts_digest"),
+                "preserved_evaluation_identity_count": verified.get(
+                    "preserved_evaluation_identity_count"
+                ),
+                "preserved_evaluation_identity_digest": verified.get(
+                    "preserved_evaluation_identity_digest"
+                ),
+                "preserved_evaluation_plan_digest": verified.get(
+                    "preserved_evaluation_plan_digest"
+                ),
+                "preserved_evaluation_data_read": verified.get(
+                    "preserved_evaluation_data_read"
+                ),
+                "parameter_search": verified.get("parameter_search"),
+                "opinion_count": verified.get("opinion_count"),
+                "atomic_freeze": verified.get("atomic_freeze"),
+                "review_ready": verified.get("review_ready"),
+            }
         return result
 
     def execute(self, job: StageJob) -> dict[str, Any]:
@@ -2162,6 +2245,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_ATOMIC_PROPOSITION_G1_JOB:
+        existing = _existing_atomic_proposition_g1_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -2200,6 +2289,7 @@ def submit_job(
         job.kind == STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB
         and orderly_consolidation_joint_d1_recovery_of is not None
     )
+    atomic_proposition_g1_reserved = job.kind == STAGE_ATOMIC_PROPOSITION_G1_JOB
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
@@ -2260,6 +2350,11 @@ def submit_job(
                 orderly_consolidation_joint_d1_recovery_of, job
             ),
         )
+    if atomic_proposition_g1_reserved:
+        _exclusive_json(
+            paths.atomic_proposition_g1_budget,
+            _atomic_proposition_g1_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -2292,6 +2387,8 @@ def submit_job(
             paths.orderly_consolidation_joint_d1_budget.unlink(missing_ok=True)
         if orderly_consolidation_joint_d1_recovery_reserved:
             paths.orderly_consolidation_joint_d1_recovery_budget.unlink(missing_ok=True)
+        if atomic_proposition_g1_reserved:
+            paths.atomic_proposition_g1_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -2319,6 +2416,8 @@ def submit_job(
             paths.orderly_consolidation_joint_d1_budget.unlink(missing_ok=True)
         if orderly_consolidation_joint_d1_recovery_reserved:
             paths.orderly_consolidation_joint_d1_recovery_budget.unlink(missing_ok=True)
+        if atomic_proposition_g1_reserved:
+            paths.atomic_proposition_g1_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -2989,6 +3088,8 @@ def _positive_instability_d1_review_evidence(
         detail = result_ref.get("positive_instability_quantitative_d1")
     elif observed.get("kind") == STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB:
         detail = result_ref.get("orderly_consolidation_joint_d1")
+    elif observed.get("kind") == STAGE_ATOMIC_PROPOSITION_G1_JOB:
+        detail = result_ref.get("atomic_proposition_g1")
     else:
         detail = None
     if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
@@ -3594,6 +3695,205 @@ def _orderly_consolidation_joint_d1_virtual_review_status(
     return None
 
 
+def _atomic_proposition_g1_review_alias(parent_job_id: str, page: int) -> str:
+    raw = f"{parent_job_id}|atomic-proposition-g1-primary-page|{page}".encode()
+    return "stage_" + hashlib.sha256(raw).hexdigest()[:32]
+
+
+def _atomic_proposition_g1_review_index(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_ATOMIC_PROPOSITION_G1_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    manifest_sha, evidence_sha, path_facts_sha, evidence, _path_facts = (
+        _positive_instability_d1_review_evidence(paths, observed)
+    )
+    case_count = len(evidence["cases"])
+    pages = (
+        case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
+    ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+    return {
+        "schema_version": "quanthus.stage-atomic-proposition-g1-primary-review-index.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "evidence_file_sha256": evidence_sha,
+        "path_facts_file_sha256": path_facts_sha,
+        "case_count": case_count,
+        "page_size": DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+        "page_count": pages,
+        "pages": [
+            {
+                "page": page,
+                "job_id": _atomic_proposition_g1_review_alias(str(observed["job_id"]), page),
+                "start": page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                "count": min(
+                    DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                    case_count - page * DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE,
+                ),
+            }
+            for page in range(pages)
+        ],
+        "threshold_basis_included": False,
+        "candidate_output_included": False,
+        "envelope_measurement_included": False,
+        "explicit_recent_derived_facts_included": False,
+        "future_rows_included": False,
+        "preserved_2021_evaluation_included": False,
+    }
+
+
+def _atomic_proposition_g1_selection_transport(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_ATOMIC_PROPOSITION_G1_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("atomic proposition G1 result reference missing")
+    detail = result_ref.get("atomic_proposition_g1")
+    if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
+        raise StageWorkerError("atomic proposition G1 selection is not ready")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError("atomic proposition G1 selection artifact outside job root") from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("atomic proposition G1 selection manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    files = manifest.get("files", {})
+    payload: dict[str, Any] = {}
+    for name in (
+        "threshold-basis.json",
+        "candidate-grid.json",
+        "envelope-measurements.json",
+        "preserved-evaluation-plan.json",
+    ):
+        raw = (artifact_root / name).read_bytes()
+        if files.get(name) != _bytes_sha256(raw):
+            raise StageWorkerError("atomic proposition G1 selection file binding differs")
+        payload[name] = json.loads(raw)
+    basis = payload["threshold-basis.json"]
+    grid = payload["candidate-grid.json"]
+    envelopes = payload["envelope-measurements.json"]
+    plan = payload["preserved-evaluation-plan.json"]
+    if (
+        _digest(basis) != detail.get("threshold_basis_digest")
+        or _digest(grid) != detail.get("candidate_grid_digest")
+        or _digest(envelopes) != detail.get("envelope_measurements_digest")
+        or _digest(plan) != detail.get("preserved_evaluation_plan_digest")
+        or grid.get("instability_candidate_count") != 9
+        or grid.get("order_profile_count") != 3
+        or grid.get("relocation_candidate_count") != 1
+        or grid.get("joint_pair_search_count") != 0
+        or grid.get("parameter_search_performed") is not False
+        or grid.get("grid_expanded_after_result") is not False
+        or basis.get("labels_used") is not False
+        or basis.get("reference_opinions_used") is not False
+        or envelopes.get("review_transport_visible") is not False
+        or plan.get("data_read") is not False
+    ):
+        raise StageWorkerError("atomic proposition G1 selection payload differs")
+    transport = {
+        "schema_version": "quanthus.stage-atomic-proposition-g1-selection-transport.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "threshold_basis": basis,
+        "candidate_grid": grid,
+        "envelope_measurements": envelopes,
+        "evaluation_plan_binding": {
+            "identity_count": plan.get("identity_count"),
+            "identity_digest": plan.get("identity_digest"),
+            "plan_digest": _digest(plan),
+            "data_read": False,
+        },
+        "review_ledger_must_be_sealed_before_use": True,
+        "review_transport_exposed_envelope_measurement": False,
+        "evaluation_data_read": False,
+        "parameter_search_performed": False,
+        "joint_pair_search_count": 0,
+    }
+    raw = json.dumps(
+        transport,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    compressed = gzip.compress(raw, compresslevel=9, mtime=0)
+    encoded = base64.b64encode(compressed).decode("ascii")
+    if len(encoded) > 300 * 1024:
+        raise StageWorkerError("atomic proposition G1 selection transport exceeds status budget")
+    return {
+        "schema_version": "quanthus.stage-atomic-proposition-g1-selection-envelope.v1",
+        "encoding": "gzip+base64",
+        "raw_sha256": _bytes_sha256(raw),
+        "raw_bytes": len(raw),
+        "compressed_bytes": len(compressed),
+        "encoded_bytes": len(encoded),
+        "payload": encoded,
+    }
+
+
+def _atomic_proposition_g1_virtual_review_status(
+    paths: StageWorkerPaths, requested_job_id: str,
+) -> dict[str, Any] | None:
+    for status_path in sorted(paths.status.glob("stage_*.json")):
+        observed = _object(status_path, "stage job status")
+        if (
+            observed.get("kind") != STAGE_ATOMIC_PROPOSITION_G1_JOB
+            or observed.get("state") != "succeeded"
+        ):
+            continue
+        result_ref = observed.get("result_ref")
+        detail = (
+            result_ref.get("atomic_proposition_g1")
+            if isinstance(result_ref, Mapping)
+            else None
+        )
+        if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
+            continue
+        case_count = int(detail.get("development_selected_case_count") or 0)
+        pages = (
+            case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
+        ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+        for page in range(pages):
+            alias = _atomic_proposition_g1_review_alias(str(observed["job_id"]), page)
+            if alias != requested_job_id:
+                continue
+            return {
+                "schema_version": STATUS_SCHEMA,
+                "job_id": requested_job_id,
+                "kind": "quanthus.stage-atomic-proposition-g1-primary-review-page.v1",
+                "code_revision": observed.get("code_revision"),
+                "input_digest": observed.get("input_digest"),
+                "state": "succeeded",
+                "stage": "virtual_read_only",
+                "submitted_at": observed.get("submitted_at"),
+                "started_at": observed.get("started_at"),
+                "completed_at": observed.get("completed_at"),
+                "parent_job_id": observed["job_id"],
+                "page": page,
+                "review_transport": _positive_instability_d1_review_page(
+                    paths, observed, page
+                ),
+                "error": None,
+                "exit_code": 0,
+                "updated_at": observed.get("updated_at"),
+            }
+    return None
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -3613,6 +3913,8 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
             )
         if review_index is None:
             review_index = _orderly_consolidation_joint_d1_review_index(paths, observed)
+        if review_index is None:
+            review_index = _atomic_proposition_g1_review_index(paths, observed)
         result = (
             observed
             if review_index is None
@@ -3623,6 +3925,8 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
             selection_transport = _orderly_consolidation_joint_d1_selection_transport(
                 paths, observed
             )
+        if selection_transport is None:
+            selection_transport = _atomic_proposition_g1_selection_transport(paths, observed)
         return (
             result
             if selection_transport is None
@@ -3658,6 +3962,9 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if virtual is not None:
         return virtual
     virtual = _orderly_consolidation_joint_d1_virtual_review_status(paths, job_id)
+    if virtual is not None:
+        return virtual
+    virtual = _atomic_proposition_g1_virtual_review_status(paths, job_id)
     if virtual is not None:
         return virtual
     raise StageWorkerError("stage job is not known on this node")

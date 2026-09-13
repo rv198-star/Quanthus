@@ -13,6 +13,7 @@ from quanthus.stage_learning.worker import (
     _JOB_SPECS,
     JOB_KIND,
     JOB_SCHEMA,
+    STAGE_ATOMIC_PROPOSITION_G1_JOB,
     STAGE_CAPACITY_CENSUS_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
@@ -175,6 +176,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
+        STAGE_ATOMIC_PROPOSITION_G1_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
@@ -285,6 +287,7 @@ def test_worker_publishes_runtime_identity_receipt(
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
+        STAGE_ATOMIC_PROPOSITION_G1_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
@@ -1697,6 +1700,37 @@ def test_orderly_consolidation_joint_d1_is_one_shot_and_idempotent(tmp_path: Pat
             worker_paths,
             code_revision="c" * 40,
             kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
+        )
+
+
+def test_atomic_proposition_g1_is_one_shot_and_idempotent(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    first = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ATOMIC_PROPOSITION_G1_JOB,
+    )
+    second = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ATOMIC_PROPOSITION_G1_JOB,
+    )
+    assert first["kind"] == STAGE_ATOMIC_PROPOSITION_G1_JOB
+    assert first["config"] == (
+        "config/stage-learning/stage-atomic-proposition-development-screen.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_ATOMIC_PROPOSITION_G1_JOB]["wall_seconds"] == 2700
+    assert second["job_id"] == first["job_id"]
+    assert second["idempotent_reuse"] is True
+    marker = json.loads(worker_paths.atomic_proposition_g1_budget.read_text(encoding="utf-8"))
+    assert marker["schema_version"] == "quanthus.stage-atomic-proposition-g1-budget.v1"
+    assert marker["work_item"] == "P3-STAGE-012-G1"
+    assert marker["job"]["job_id"] == first["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_ATOMIC_PROPOSITION_G1_JOB,
         )
 
 

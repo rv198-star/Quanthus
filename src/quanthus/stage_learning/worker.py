@@ -3996,7 +3996,9 @@ def cancel_job(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     return {**observed, "cancel_requested": True}
 
 
-def _recent_p011_d1_failure(paths: StageWorkerPaths) -> dict[str, Any] | None:
+def _recent_stage_job_failure(
+    paths: StageWorkerPaths, *, kind: str,
+) -> dict[str, Any] | None:
     candidates: list[dict[str, Any]] = []
     for status_path in paths.status.glob("stage_*.json"):
         try:
@@ -4004,8 +4006,10 @@ def _recent_p011_d1_failure(paths: StageWorkerPaths) -> dict[str, Any] | None:
         except StageWorkerError:
             continue
         if (
-            observed.get("kind") == STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB
+            observed.get("kind") == kind
             and observed.get("state") == "failed"
+            and _JOB_ID.fullmatch(str(observed.get("job_id") or ""))
+            and status_path.stem == observed.get("job_id")
         ):
             candidates.append(observed)
     if not candidates:
@@ -4014,9 +4018,12 @@ def _recent_p011_d1_failure(paths: StageWorkerPaths) -> dict[str, Any] | None:
     job_id = str(observed.get("job_id") or "")
     log_path = paths.logs / f"{job_id}.log"
     tail: list[str] = []
-    if log_path.is_file():
+    if log_path.is_file() and not log_path.is_symlink():
         try:
-            raw = log_path.read_text(encoding="utf-8", errors="replace")
+            with log_path.open("rb") as stream:
+                stream.seek(0, os.SEEK_END)
+                stream.seek(max(0, stream.tell() - 16384))
+                raw = stream.read(16384).decode("utf-8", errors="replace")
             tail = raw.splitlines()[-40:]
         except OSError:
             tail = []
@@ -4052,7 +4059,12 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         "python": str(paths.python),
         "job_kinds": tuple(sorted(_JOB_SPECS)),
         "concurrency": 1,
-        "recent_p011_d1_failure": _recent_p011_d1_failure(paths),
+        "recent_p011_d1_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
+        ),
+        "recent_p012_g1_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_ATOMIC_PROPOSITION_G1_JOB,
+        ),
     }
 
 

@@ -172,6 +172,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["ready"] is True
     assert result["concurrency"] == 1
     assert result["recent_p011_d1_failure"] is None
+    assert result["recent_p012_g1_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
@@ -195,14 +196,23 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
 
 
-def test_doctor_exposes_only_bounded_recent_p011_failure_tail(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("kind", "diagnostic_key"),
+    (
+        (STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB, "recent_p011_d1_failure"),
+        (STAGE_ATOMIC_PROPOSITION_G1_JOB, "recent_p012_g1_failure"),
+    ),
+)
+def test_doctor_exposes_only_bounded_recent_failure_tail(
+    tmp_path: Path, kind: str, diagnostic_key: str,
+) -> None:
     worker_paths = paths(tmp_path)
     worker_paths.ensure()
     job = StageJob(
         job_id="stage_" + "9" * 32,
-        kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
+        kind=kind,
         code_revision=REVISION,
-        config="config/stage-learning/orderly-consolidation-joint-development-screen.v1.json",
+        config=_JOB_SPECS[kind]["config"],
         submitted_at="2026-09-13T06:00:00+00:00",
     )
     StageWorker(worker_paths)._write_status(
@@ -211,22 +221,65 @@ def test_doctor_exposes_only_bounded_recent_p011_failure_tail(tmp_path: Path) ->
         stage="terminal",
         started_at="2026-09-13T06:00:01+00:00",
         completed_at="2026-09-13T06:02:00+00:00",
-        error="stage_orderly_consolidation_joint_d1_process_failed",
+        error=_JOB_SPECS[kind]["process_error"],
         exit_code=1,
     )
     lines = [f"line-{index}" for index in range(60)]
-    (worker_paths.logs / f"{job.job_id}.log").write_text("\n".join(lines), encoding="utf-8")
+    log_path = worker_paths.logs / f"{job.job_id}.log"
+    log_path.write_text("x" * 32768 + "\n" + "\n".join(lines), encoding="utf-8")
+    status_path = worker_paths.status / f"{job.job_id}.json"
+    status_before = status_path.read_bytes()
+    worker_paths.atomic_proposition_g1_budget.write_text("immutable-budget", encoding="utf-8")
 
     result = doctor(worker_paths)
-    diagnostic = result["recent_p011_d1_failure"]
+    diagnostic = result[diagnostic_key]
     assert diagnostic["job_id"] == job.job_id
     assert diagnostic["code_revision"] == REVISION
     assert diagnostic["input_digest"] == job.input_digest
-    assert diagnostic["error"] == "stage_orderly_consolidation_joint_d1_process_failed"
+    assert diagnostic["error"] == _JOB_SPECS[kind]["process_error"]
     assert diagnostic["exit_code"] == 1
     assert len(diagnostic["log_tail"]) == 40
     assert diagnostic["log_tail"][0] == "line-20"
     assert diagnostic["log_tail"][-1] == "line-59"
+    assert status_path.read_bytes() == status_before
+    assert worker_paths.atomic_proposition_g1_budget.read_text() == "immutable-budget"
+    assert not list(worker_paths.queue.glob("stage_*.json"))
+    assert "selection_transport" not in result
+    assert "review_transport_index" not in result
+
+
+@pytest.mark.parametrize("invalid_binding", (False, True))
+def test_doctor_failure_log_access_stays_within_exact_job(
+    tmp_path: Path, invalid_binding: bool,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker = StageWorker(worker_paths)
+    job = StageJob(
+        job_id="stage_" + "8" * 32,
+        kind=STAGE_ATOMIC_PROPOSITION_G1_JOB,
+        code_revision=REVISION,
+        config=_JOB_SPECS[STAGE_ATOMIC_PROPOSITION_G1_JOB]["config"],
+        submitted_at="2026-09-13T20:28:15+00:00",
+    )
+    worker._write_status(
+        job, state="failed", stage="terminal", exit_code=1,
+        error="stage_atomic_proposition_g1_process_failed",
+    )
+    outside = tmp_path / "not-a-job-log"
+    outside.write_text("must-not-be-exposed", encoding="utf-8")
+    log_path = worker_paths.logs / f"{job.job_id}.log"
+    log_path.symlink_to(outside)
+    if invalid_binding:
+        status_path = worker_paths.status / f"{job.job_id}.json"
+        value = json.loads(status_path.read_text())
+        value["job_id"] = "../../not-a-job-log"
+        status_path.write_text(json.dumps(value), encoding="utf-8")
+    diagnostic = doctor(worker_paths)["recent_p012_g1_failure"]
+    if invalid_binding:
+        assert diagnostic is None
+    else:
+        assert diagnostic["job_id"] == job.job_id
+        assert diagnostic["log_tail"] == []
 
 
 def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() -> None:

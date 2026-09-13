@@ -393,9 +393,14 @@ nodes.
   `REVISE_NEUTRAL_CONCEPT`: the E5 algorithm and B6-PATH ownership are retained, but direct reserved
   registration is rejected because the proposed `structured_path_trace` result kind is outside the
   approved semantic-catalog vocabulary. Review:
-  `reviews/structure-directional-path-envelope-e6-registration-review-20260914.md`. E7 is blocked
-  pending owner approval for a synthetic-only Catalog-facing representation revision; fresh data,
-  Fact registration, threshold search and preserved 2021 remain blocked.
+  `reviews/structure-directional-path-envelope-e6-registration-review-20260914.md`. The owner-approved
+  E7 then closes `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`: the concept and E5 algorithm/profile
+  remain unchanged, the Catalog-facing kind becomes the existing `measurement`, and the complete
+  escape/re-entry trace stays one T-ending structured measurement value. The active Catalog and
+  B6-PATH contract remain unchanged. Acceptance:
+  `acceptance/structure-directional-path-envelope-e7-representation-acceptance-20260914.md`. E8
+  registration-decision review is next; fresh data, Fact registration, threshold search and preserved
+  2021 remain blocked.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

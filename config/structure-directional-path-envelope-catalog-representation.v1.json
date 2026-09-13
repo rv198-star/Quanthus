@@ -1,0 +1,71 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-catalog-representation.v1",
+  "work_item": "P3-STAGE-012-E7",
+  "state": "CATALOG_FACING_MEASUREMENT_PROPOSAL_NOT_REGISTERED",
+  "owner": {
+    "blueprint_id": "B6-PATH",
+    "fact_family_id": "directional-path-geometry-v1",
+    "semantic_family": "structure.geometry"
+  },
+  "concept": {
+    "concept_id": "structure.geometry.close-envelope-resolution-trace",
+    "concept_version": "0.2.0-synthetic",
+    "result_kind": "measurement",
+    "registration_status": "PROPOSED_NOT_REGISTERED",
+    "meaning": "At T, describe the admitted close path's escape and later re-entry geometry relative to each escape session's frozen prior-close envelope; this is descriptive path geometry, not Stage truth or an event backdated to the escape session."
+  },
+  "representation_decision": {
+    "selected_kind": "measurement",
+    "why_measurement": "The object is one T-ending Observation measuring path organization over a fixed admitted window. Its value may be a deterministic structured record; ObservationRevision binds a value digest and does not require a scalar payload.",
+    "event_rejected": "Re-entry resolution may become known after the escape session and must not be backdated into an escape-time semantic fact.",
+    "process_rejected": "E5 establishes no stable cross-T process identity or append-only start/progress/end lifecycle.",
+    "relation_rejected": "The rolling prior-close envelopes are deterministic evaluation context rather than a separately governed anchor/target identity.",
+    "new_result_kind_rejected": "The approved catalog type system is sufficient; structured_path_trace is not retained as a result kind."
+  },
+  "measurement_value_schema": {
+    "status": "AVAILABLE | UNAVAILABLE | INSUFFICIENT_HISTORY",
+    "reason": "nullable explicit availability/reset reason",
+    "profile": "exact E5 20/10 T-only evaluation profile",
+    "events": "ordered deterministic escape/re-entry explanation records",
+    "descriptors": "deterministic summaries of the same event trace",
+    "events_are_independent_registered_facts": false,
+    "descriptors_are_independent_registered_facts": false,
+    "stage_truth_authority": false
+  },
+  "identity": {
+    "reuse_e5_subject_listing_coordinate_spec_binding": true,
+    "value_digest_covers": ["status", "reason", "profile", "events", "descriptors"],
+    "event_trace_is_explanation_inside_t_measurement": true,
+    "reentry_known_as_of": "T",
+    "future_after_t_used": false
+  },
+  "compatibility": {
+    "e5_algorithm_unchanged": true,
+    "e5_profile_unchanged": true,
+    "e5_event_trace_unchanged": true,
+    "e5_descriptors_unchanged": true,
+    "active_b6_path_contract_unchanged": true,
+    "semantic_catalog_unchanged": true
+  },
+  "claim_limits": [
+    "Measurement classification does not imply scalarity, market validity, economic usefulness or Stage membership.",
+    "Escape/re-entry records are explanation components of the T-ending measurement and are not separately registered events.",
+    "Reserved catalog registration, if later approved, would remain naming/boundary authority only and would not grant runtime or market qualification."
+  ],
+  "authority": {
+    "representation_proposal": true,
+    "synthetic_conformance": true,
+    "catalog_registration": false,
+    "catalog_type_system_change": false,
+    "active_b6_path_contract_change": false,
+    "algorithm_change": false,
+    "market_data_read": false,
+    "runtime_job": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "stage_projection": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

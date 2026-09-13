@@ -4,8 +4,8 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | accepted for synthetic-only proposal |
-| Registration gate | blocked |
-| Work item | `P3-STAGE-012-E5` |
+| Registration gate | blocked pending E8 review |
+| Work item | `P3-STAGE-012-E5 / E7` |
 | Parent | [Structure Facts v2](structure-facts-v2.md) |
 | Existing owner | `B6-PATH / Directional Path Geometry Fact Family` |
 | Existing family contract | `../../config/structure-directional-path-geometry.v1.json` |
@@ -13,7 +13,9 @@
 | Synthetic contract | `../../config/structure-directional-path-envelope-synthetic-contract.v1.json` |
 | Synthetic result | `../../config/structure-directional-path-envelope-synthetic-result.v1.json` |
 | Implementation | `../../src/quanthus/structure_directional_path_envelope.py` |
-| Acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
+| Acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md`; `../acceptance/structure-directional-path-envelope-e7-representation-acceptance-20260914.md` |
+| E7 representation | `../../config/structure-directional-path-envelope-catalog-representation.v1.json` |
+| E7 result | `../../config/structure-directional-path-envelope-e7-representation-result.v1.json` |
 
 ## 1. Decision
 
@@ -151,3 +153,36 @@ only, revise the neutral concept, or park it. That review itself opens no market
 
 Fresh-cohort research, preserved 2021, threshold search, P008 relocation retuning, daily/strategy use
 and trading remain separately blocked.
+
+## 9. E6 registration review and E7 representation repair
+
+E6 retained the E5 semantics and B6-PATH ownership but rejected direct registration because the E5
+provisional `result_kind=structured_path_trace` is not a valid result kind in the approved semantic
+Catalog. E6 explicitly rejected expanding the Catalog type system or coercing the T-ending observation
+into an event/process merely to make registration pass.
+
+E7 resolves only that representation mismatch. The concept identity remains:
+
+```text
+structure.geometry.close-envelope-resolution-trace
+```
+
+The proposed Catalog-facing result kind becomes **`measurement`**. This is one T-ending geometry
+Observation whose structured value contains the exact E5 status, profile, ordered escape/re-entry
+explanation records and deterministic descriptors. The underlying envelope detector and frozen 20/10
+profile are unchanged.
+
+This representation is compatible with the existing Structure object model because
+`ObservationRevision` binds an exact `value_digest`; it does not require a measurement value to be a
+scalar. Escape records remain explanation components inside the T-ending measurement and are not
+separately registered events. Re-entry remains known as of T and is not backdated. The rolling prior
+close envelopes remain EvaluationSpec context rather than independently governed anchor identities.
+
+E7 synthetic representation conformance replays all nine frozen E5 cases and preserves their complete
+value semantics exactly. `measurement` is already an allowed Catalog result kind, the concept remains
+inside the owned `structure.geometry` family, and `catalog.resolve()` still rejects it because E7 does
+not register it.
+
+E7 therefore closes `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`. The next gate is E8 registration
+decision review only. The active semantic Catalog and B6-PATH family contract remain unchanged until a
+later explicit registration action is approved.

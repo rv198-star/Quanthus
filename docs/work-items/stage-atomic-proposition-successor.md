@@ -7,7 +7,7 @@
 | Concept | `../design/stage-atomic-proposition-successor-concept.md` |
 | P011 post-closeout review | `../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md` |
 | A-C machine result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
-| Current state | A/B/C/D and E1-E6 closed; E6 selects `REVISE_NEUTRAL_CONCEPT` because the E5 `structured_path_trace` result kind is not compatible with the frozen semantic catalog object model; E7 is blocked pending owner approval; fresh data, preserved 2021, threshold search and Fact registration remain blocked |
+| Current state | A/B/C/D and E1-E7 closed; E7 closes `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION` without registration; E8 is ready for registration-decision review only; fresh data, preserved 2021, threshold search and Fact registration remain blocked |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
@@ -22,8 +22,9 @@
 | P3-STAGE-012-E4 | Post-E expert review / Fact-projection route decision | P3-STAGE-012-E1/E2/E3 | closed `RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY`; current prototype stays research-only; `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
 | P3-STAGE-012-E5 | Structure-owned B6-PATH envelope formalization design + synthetic qualification | P3-STAGE-012-E4 | closed `PASS_SYNTHETIC_QUALIFICATION`; neutral trace design approved as a proposal, algorithm core moved to Structure owner, existing B6-PATH/Catalog remain unchanged; `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
 | P3-STAGE-012-E6 | Post-E5 registration/revision/research-only/park review | P3-STAGE-012-E5 | closed `REVISE_NEUTRAL_CONCEPT`; E5 algorithm/owner retained, direct registration rejected because `structured_path_trace` is outside the approved Catalog result kinds; `../reviews/structure-directional-path-envelope-e6-registration-review-20260914.md` |
-| P3-STAGE-012-E7 | Catalog-facing neutral concept/result-kind revision | P3-STAGE-012-E6 | blocked pending owner approval; synthetic-only if approved, no new Catalog result kind, no registration or market data |
-| P3-STAGE-012-F+ | Fresh-cohort inventory / preregistration / development | P3-STAGE-012-E7 | blocked until E7 closes, a later registration decision resolves the concept, and a later owner approval explicitly opens fresh work |
+| P3-STAGE-012-E7 | Catalog-facing neutral concept/result-kind revision | P3-STAGE-012-E6 | closed `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`; same concept/algorithm/profile retained, Catalog-facing kind revised to existing `measurement`, active Catalog/B6-PATH unchanged; `../acceptance/structure-directional-path-envelope-e7-representation-acceptance-20260914.md` |
+| P3-STAGE-012-E8 | Reserved registration decision review | P3-STAGE-012-E7 | ready for review only; may choose register/revise/research-only/park but may not mutate the Catalog itself |
+| P3-STAGE-012-F+ | Fresh-cohort inventory / preregistration / development | P3-STAGE-012-E8 | blocked until E8 closes and a later owner approval explicitly opens fresh work |
 
 ## Hard boundaries
 
@@ -40,4 +41,6 @@
 
 E5 is complete. The neutral envelope escape/re-entry semantics have one Structure-owned algorithm core, a frozen 20/10 EvaluationSpec proposal, explicit PIT/reset/coordinate semantics and `PASS_SYNTHETIC_QUALIFICATION`. E6 then closes `REVISE_NEUTRAL_CONCEPT`: the semantic hypothesis and B6-PATH ownership remain accepted, but the proposed `result_kind=structured_path_trace` cannot be registered into the approved Catalog, whose result kinds are limited to reference/measurement/event/relation/process.
 
-The required next owner decision is whether to approve **P3-STAGE-012-E7 synthetic-only representation revision**. E7 may revise only the Catalog-facing neutral concept/result-kind representation while preserving E5 path semantics, T-only knowledge, Stage-E2 parity and B6-PATH ownership. It may not add a new Catalog result kind, register the concept, read market data or open preserved 2021. P008 relocation stays frozen.
+E7 is complete. The proposed concept keeps the exact E5 identity and semantics but now uses the existing Catalog `measurement` result kind. The structured event/descriptors payload remains one T-ending measurement value, not a set of independently registered events/Facts. E7 closes `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`; active Catalog and B6-PATH remain unchanged.
+
+The required next step is **P3-STAGE-012-E8 registration-decision review**. E8 may decide whether the measurement proposal is mature enough for reserved semantic Catalog registration, should be revised again, remain research-only or be parked. E8 itself may not mutate the Catalog or read market data. P008 relocation stays frozen; fresh data and preserved 2021 remain closed.

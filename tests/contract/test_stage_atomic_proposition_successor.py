@@ -213,7 +213,9 @@ def test_stage012_documents_exist_and_route_to_owner_gated_e5() -> None:
     assert "P3-STAGE-012-E6" in work_item
     assert "closed `REVISE_NEUTRAL_CONCEPT`" in work_item
     assert "P3-STAGE-012-E7" in work_item
-    assert "blocked pending owner approval" in work_item
-    assert "structured_path_trace" in work_item
+    assert "closed `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`" in work_item
+    assert "P3-STAGE-012-E8" in work_item
+    assert "ready for review only" in work_item
+    assert "measurement" in work_item
     assert "preserved 2021" in work_item
     assert "remain blocked" in work_item

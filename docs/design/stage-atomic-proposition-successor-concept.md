@@ -14,14 +14,13 @@
 | E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
 | Post-E review | `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
 | E5 Structure acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
-| Authority | E6 is complete with `REVISE_NEUTRAL_CONCEPT`; E5 algorithm/B6-PATH ownership remain accepted, direct registration is rejected for the current `structured_path_trace` representation, and E7 is blocked pending owner approval; no market-data/runtime/parameter/Fact-registration authority |
+| Authority | E7 is complete with `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`; E5 algorithm/B6-PATH ownership remain accepted, the neutral concept now maps to existing Catalog `measurement` without registration, and E8 registration review is next; no market-data/runtime/parameter/Fact-registration authority |
 
-> P3-STAGE-012 remains a **design/synthetic research work item**. A-D and E1-E6 are closed without
-> fresh market data or parameter search. E5 remains a Structure-owned, unregistered proposal. E6
-> identifies a Catalog-facing object-model mismatch rather than a failed semantic hypothesis: the
-> proposed `structured_path_trace` result kind is outside the approved catalog vocabulary. The parent
-> design remains draft and delivery stays blocked pending a separately approved E7 representation
-> revision.
+> P3-STAGE-012 remains a **design/synthetic research work item**. A-D and E1-E7 are closed without
+> fresh market data or parameter search. E7 resolves the E6 object-model mismatch by representing the
+> unchanged T-ending envelope trace as an existing Catalog `measurement`; the concept remains
+> unregistered and the active Catalog/B6-PATH contract remain unchanged. The parent design stays draft
+> and delivery remains blocked pending E8 registration-decision review.
 
 ## 1. Why a different successor shape is needed
 
@@ -260,11 +259,12 @@ P3-STAGE-012-E4  CLOSED  RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY
 -------------------------------------------------------------
 P3-STAGE-012-E5  CLOSED  PASS_SYNTHETIC_QUALIFICATION / NOT REGISTERED
 P3-STAGE-012-E6  CLOSED  REVISE_NEUTRAL_CONCEPT
+P3-STAGE-012-E7  CLOSED  PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION / NOT REGISTERED
 -------------------------------------------------------------
-owner approval required before:
-P3-STAGE-012-E7  Catalog-facing neutral concept/result-kind revision
+next required review:
+P3-STAGE-012-E8  reserved registration decision review
 -------------------------------------------------------------
-only after E7 + later registration decision + owner approval:
+only after E8 + later owner approval:
 P3-STAGE-012-F   fresh-cohort inventory + preregistration
 P3-STAGE-012-G  fresh development / blind atomic review
 P3-STAGE-012-H  projection compatibility and candidate freeze
@@ -329,6 +329,13 @@ catalog result kinds (`reference`, `measurement`, `event`, `relation`, `process`
 refuses both a new type-system member and an unreviewed coercion into `process`, `event`, `measurement`
 or `relation`.
 
-A separately owner-approved E7 may revise only the Catalog-facing neutral representation while
-preserving E5 path semantics, PIT/reset rules and Stage-E2 parity. E7 remains synthetic-only and may
-not register the concept, open market data or preserved 2021, or alter P008 relocation.
+E7 is now complete. It preserves E5 path semantics, PIT/reset rules and Stage-E2 parity while mapping
+the unchanged concept to the existing Catalog `measurement` result kind. The complete escape/re-entry
+trace remains the structured value of one T-ending geometry measurement; its event records and
+summaries are explanation payload, not separately registered Facts. Synthetic representation
+conformance passes all frozen E5 cases, the concept remains unregistered, and the active semantic
+Catalog/B6-PATH contract remain unchanged.
+
+E8 is the next required review. It may decide whether to authorize reserved semantic Catalog
+registration, revise again, keep the concept research-only or park it. E8 itself may not mutate the
+Catalog or open market data.

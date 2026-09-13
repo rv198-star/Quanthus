@@ -1,0 +1,44 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-e7-authorization.v1",
+  "work_item": "P3-STAGE-012-E7",
+  "state": "OWNER_APPROVED_SYNTHETIC_REPRESENTATION_REVISION_ONLY",
+  "owner_approval_date": "2026-09-14",
+  "review_basis_commit": "af340ce2e53e377b06369080b68483487a3b4f98",
+  "review_basis": {
+    "e6_review_digest": "sha256:871c1fabf860a15d630dbaa80ea173160dcf191faab6b78a2d6a57fe13647b42",
+    "e5_closeout_digest": "sha256:5ea1b5bfc64af7c63b80fa767a60e3656b335dc344d4e766fef13a7419171241",
+    "e5_design_digest": "sha256:22d1031e547dec1db5a5d620b12949cc4a856537569c03d495d04cc4e559a71a",
+    "active_b6_path_digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c",
+    "semantic_catalog_digest": "sha256:86bf671c163c69002330102e15b120cd3883b7064d32d806c6f30680082e3a4d"
+  },
+  "scope": [
+    "revise only the catalog-facing neutral concept/result-kind representation",
+    "preserve the E5 escape/re-entry algorithm and 20/10 profile exactly",
+    "prove representation parity on synthetic evidence",
+    "leave the active B6-PATH contract and semantic catalog unchanged"
+  ],
+  "constraints": [
+    "do not add a new semantic catalog result kind",
+    "do not register the proposed concept during E7",
+    "do not split trace descriptors into independent Stage-specific facts",
+    "do not backdate re-entry knowledge into escape-session facts",
+    "do not read market data or preserved 2021",
+    "do not retune P008 relocation or Stage thresholds"
+  ],
+  "authority": {
+    "representation_adapter_implementation": true,
+    "synthetic_conformance": true,
+    "catalog_registration": false,
+    "catalog_type_system_change": false,
+    "active_b6_path_contract_change": false,
+    "algorithm_change": false,
+    "profile_change": false,
+    "market_data_read": false,
+    "runtime_job": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-e6-review-result.v1",
+  "work_item": "P3-STAGE-012-E6",
+  "state": "REVISE_NEUTRAL_CONCEPT",
+  "review_basis_commit": "a806baaf596f471decd0dd22bec16dc701f7da27",
+  "review_basis": {
+    "e5_closeout_digest": "sha256:5ea1b5bfc64af7c63b80fa767a60e3656b335dc344d4e766fef13a7419171241",
+    "e5_design_digest": "sha256:22d1031e547dec1db5a5d620b12949cc4a856537569c03d495d04cc4e559a71a",
+    "e5_synthetic_result_digest": "sha256:413dd2256158f7e9eb68ee17711832070581af04f930c47bbd60f7ab2db39f9e",
+    "active_b6_path_digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c",
+    "semantic_catalog_digest": "sha256:86bf671c163c69002330102e15b120cd3883b7064d32d806c6f30680082e3a4d"
+  },
+  "provenance": {
+    "same_origin_simulation": true,
+    "independent_human_expert_validation": false,
+    "responsibilities": [
+      "short_term_trader",
+      "fund_manager",
+      "quant_researcher",
+      "data_and_evidence_governance"
+    ]
+  },
+  "catalog_facts": {
+    "catalog_authority": "naming_and_boundary_contract_only",
+    "allowed_result_kinds": ["reference", "measurement", "event", "relation", "process"],
+    "registration_value": "reserved",
+    "reserved_registration_is_runtime_or_market_qualification": false,
+    "e5_proposed_result_kind": "structured_path_trace",
+    "e5_result_kind_is_catalog_compatible": false
+  },
+  "perspective_verdicts": {
+    "short_term_trader": {
+      "verdict": "REVISE_NEUTRAL_CONCEPT",
+      "support": "The escape/re-entry trace expresses failed directional resolution without confusing high churn with disorder and retains useful side/persistence context.",
+      "counterexample": "A single escape, a same-side repeated escape, and a one-leg repricing are not equivalent to alternating failed resolution and must remain distinguishable after any catalog-facing rewrite.",
+      "veto": "Do not reduce the trace to one escape-count threshold or a binary Stage0 signal."
+    },
+    "fund_manager": {
+      "verdict": "REVISE_NEUTRAL_CONCEPT",
+      "support": "The observable is neutral price-path organization and belongs under Structure rather than a Stage-specific rule.",
+      "counterexample": "Treating a T-ending retrospective trace as an ongoing Episode would imply process continuity that E5 did not establish.",
+      "veto": "Do not invent a peer Stage or weaken the frozen relocation proposition to accommodate this descriptor."
+    },
+    "quant_researcher": {
+      "verdict": "REVISE_NEUTRAL_CONCEPT",
+      "support": "E5 establishes deterministic synthetic expressibility, PIT behavior, reset semantics, scale invariance, and exact compatibility with the frozen E2 behavior.",
+      "counterexample": "Synthetic qualification does not validate market separability or justify expanding the semantic type system merely to preserve the prototype payload shape.",
+      "veto": "No new catalog result kind, threshold surface, fresh search, or market qualification claim may be introduced by E6."
+    },
+    "data_and_evidence_governance": {
+      "verdict": "REVISE_NEUTRAL_CONCEPT",
+      "support": "B6-PATH is the correct semantic owner and reserved catalog registration would not itself imply runtime qualification.",
+      "counterexample": "The current proposal uses result_kind=structured_path_trace, which the frozen semantic catalog rejects; process/event substitutions would also alter object semantics if done without a dedicated design step.",
+      "veto": "Do not mutate the catalog type system or register an object whose result kind is not already valid under the approved object model."
+    }
+  },
+  "decision": {
+    "selected_route": "REVISE_NEUTRAL_CONCEPT",
+    "rejected_routes": {
+      "REGISTER_AS_B6_PATH_EXTENSION": "Rejected for the current E5 concept shape because structured_path_trace is not a valid catalog result kind and direct registration would require an unapproved type-system change or semantic coercion.",
+      "KEEP_RESEARCH_ONLY": "Rejected as the terminal route because E5 provides enough stable neutral semantics to justify one bounded catalog-facing representation revision rather than indefinite parking.",
+      "PARK": "Rejected because the Structure-owned synthetic qualification is non-degenerate and the remaining blocker is representational, not a failed semantic hypothesis."
+    },
+    "b6_path_owner": "RETAIN",
+    "e5_algorithm_semantics": "RETAIN",
+    "e5_synthetic_result": "RETAIN",
+    "active_b6_path_contract": "UNCHANGED",
+    "semantic_catalog": "UNCHANGED",
+    "p008_relocation": "KEEP_FROZEN",
+    "preserved_2021": "UNREAD_AND_CLOSED"
+  },
+  "next_phase": {
+    "work_item": "P3-STAGE-012-E7",
+    "status": "BLOCKED_PENDING_OWNER_APPROVAL",
+    "purpose": "Revise only the catalog-facing neutral concept/result-kind representation while preserving E5 path semantics and B6-PATH ownership; then run synthetic-only conformance against E5 parity.",
+    "constraints": [
+      "do not add a new semantic catalog result kind",
+      "do not backdate re-entry knowledge into escape-session facts",
+      "do not turn trace descriptors into independent Stage-specific facts merely to fit the catalog",
+      "do not change E5 escape/re-entry algorithm or 20/10 synthetic profile without a separately reviewed semantic reason",
+      "do not register into the active catalog during E7 unless a later explicit registration decision authorizes it",
+      "do not read market data or preserved 2021"
+    ]
+  },
+  "authority": {
+    "review_completed": true,
+    "route_selected": true,
+    "catalog_registration": false,
+    "catalog_type_system_change": false,
+    "active_b6_path_contract_change": false,
+    "algorithm_change": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "runtime_job": false,
+    "market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

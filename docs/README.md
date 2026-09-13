@@ -389,8 +389,13 @@ nodes.
   `close-envelope-resolution-trace` proposal with explicit 20/10 PIT/reset semantics, and closes
   `PASS_SYNTHETIC_QUALIFICATION` without changing the active B6-PATH contract or semantic catalog.
   Design: `design/structure-directional-path-envelope-extension.md`; acceptance:
-  `acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md`. E6 post-E5
-  review is next; fresh data, Fact registration, threshold search and preserved 2021 remain blocked.
+  `acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md`. E6 then closes
+  `REVISE_NEUTRAL_CONCEPT`: the E5 algorithm and B6-PATH ownership are retained, but direct reserved
+  registration is rejected because the proposed `structured_path_trace` result kind is outside the
+  approved semantic-catalog vocabulary. Review:
+  `reviews/structure-directional-path-envelope-e6-registration-review-20260914.md`. E7 is blocked
+  pending owner approval for a synthetic-only Catalog-facing representation revision; fresh data,
+  Fact registration, threshold search and preserved 2021 remain blocked.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

@@ -14,12 +14,14 @@
 | E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
 | Post-E review | `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
 | E5 Structure acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
-| Authority | E5 is complete and synthetic-qualified under B6-PATH ownership without registration; E6 post-E5 review is ready, while market-data/runtime/parameter/Fact-registration authority remains blocked |
+| Authority | E6 is complete with `REVISE_NEUTRAL_CONCEPT`; E5 algorithm/B6-PATH ownership remain accepted, direct registration is rejected for the current `structured_path_trace` representation, and E7 is blocked pending owner approval; no market-data/runtime/parameter/Fact-registration authority |
 
-> P3-STAGE-012 remains a **design/synthetic research work item**. A-D and E1-E5 are closed without
-> fresh market data or parameter search. E5 establishes only a Structure-owned, unregistered proposal;
-> the parent design remains draft and delivery stays blocked. E6 may review registration/revision/
-> research-only/park options but may not register the concept or open market data by itself.
+> P3-STAGE-012 remains a **design/synthetic research work item**. A-D and E1-E6 are closed without
+> fresh market data or parameter search. E5 remains a Structure-owned, unregistered proposal. E6
+> identifies a Catalog-facing object-model mismatch rather than a failed semantic hypothesis: the
+> proposed `structured_path_trace` result kind is outside the approved catalog vocabulary. The parent
+> design remains draft and delivery stays blocked pending a separately approved E7 representation
+> revision.
 
 ## 1. Why a different successor shape is needed
 
@@ -257,11 +259,12 @@ next required review:
 P3-STAGE-012-E4  CLOSED  RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY
 -------------------------------------------------------------
 P3-STAGE-012-E5  CLOSED  PASS_SYNTHETIC_QUALIFICATION / NOT REGISTERED
+P3-STAGE-012-E6  CLOSED  REVISE_NEUTRAL_CONCEPT
 -------------------------------------------------------------
-next required review:
-P3-STAGE-012-E6  post-E5 registration/revision/research-only/park decision
+owner approval required before:
+P3-STAGE-012-E7  Catalog-facing neutral concept/result-kind revision
 -------------------------------------------------------------
-only after E6 + later owner approval:
+only after E7 + later registration decision + owner approval:
 P3-STAGE-012-F   fresh-cohort inventory + preregistration
 P3-STAGE-012-G  fresh development / blind atomic review
 P3-STAGE-012-H  projection compatibility and candidate freeze
@@ -319,6 +322,13 @@ adapter. E5 freezes a 20/10 close-envelope trace proposal, PIT/reset/coordinate 
 synthetic suite, closing `PASS_SYNTHETIC_QUALIFICATION` while leaving the current B6-PATH contract and
 semantic catalog unchanged.
 
-The proposal is **not a registered Fact**. E6 must now decide whether to register it into B6-PATH,
-revise the neutral concept, keep it research-only or park it. E6 itself opens no market data. P008
-relocation remains frozen, fresh cohort work stays blocked, and preserved 2021 remains unread.
+The proposal is **not a registered Fact**. E6 now closes `REVISE_NEUTRAL_CONCEPT`. The semantic
+hypothesis, Structure-owned algorithm and B6-PATH owner remain accepted, but direct registration of the
+current representation is rejected because `structured_path_trace` is not one of the approved semantic
+catalog result kinds (`reference`, `measurement`, `event`, `relation`, `process`). E6 deliberately
+refuses both a new type-system member and an unreviewed coercion into `process`, `event`, `measurement`
+or `relation`.
+
+A separately owner-approved E7 may revise only the Catalog-facing neutral representation while
+preserving E5 path semantics, PIT/reset rules and Stage-E2 parity. E7 remains synthetic-only and may
+not register the concept, open market data or preserved 2021, or alter P008 relocation.

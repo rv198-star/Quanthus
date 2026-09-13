@@ -170,6 +170,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     result = doctor(worker_paths)
     assert result["ready"] is True
     assert result["concurrency"] == 1
+    assert result["recent_p011_d1_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
@@ -190,6 +191,40 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
     }
     assert not any("postgres" in key.lower() or "dsn" in key.lower() for key in result)
+
+
+def test_doctor_exposes_only_bounded_recent_p011_failure_tail(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job = StageJob(
+        job_id="stage_" + "9" * 32,
+        kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
+        code_revision=REVISION,
+        config="config/stage-learning/orderly-consolidation-joint-development-screen.v1.json",
+        submitted_at="2026-09-13T06:00:00+00:00",
+    )
+    StageWorker(worker_paths)._write_status(
+        job,
+        state="failed",
+        stage="terminal",
+        started_at="2026-09-13T06:00:01+00:00",
+        completed_at="2026-09-13T06:02:00+00:00",
+        error="stage_orderly_consolidation_joint_d1_process_failed",
+        exit_code=1,
+    )
+    lines = [f"line-{index}" for index in range(60)]
+    (worker_paths.logs / f"{job.job_id}.log").write_text("\n".join(lines), encoding="utf-8")
+
+    result = doctor(worker_paths)
+    diagnostic = result["recent_p011_d1_failure"]
+    assert diagnostic["job_id"] == job.job_id
+    assert diagnostic["code_revision"] == REVISION
+    assert diagnostic["input_digest"] == job.input_digest
+    assert diagnostic["error"] == "stage_orderly_consolidation_joint_d1_process_failed"
+    assert diagnostic["exit_code"] == 1
+    assert len(diagnostic["log_tail"]) == 40
+    assert diagnostic["log_tail"][0] == "line-20"
+    assert diagnostic["log_tail"][-1] == "line-59"
 
 
 def test_installer_and_unit_freeze_rx6800_resource_and_authority_boundaries() -> None:

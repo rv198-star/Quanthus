@@ -3369,6 +3369,41 @@ def cancel_job(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     return {**observed, "cancel_requested": True}
 
 
+def _recent_p011_d1_failure(paths: StageWorkerPaths) -> dict[str, Any] | None:
+    candidates: list[dict[str, Any]] = []
+    for status_path in paths.status.glob("stage_*.json"):
+        try:
+            observed = _object(status_path, "stage job status")
+        except StageWorkerError:
+            continue
+        if (
+            observed.get("kind") == STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB
+            and observed.get("state") == "failed"
+        ):
+            candidates.append(observed)
+    if not candidates:
+        return None
+    observed = max(candidates, key=lambda item: str(item.get("updated_at") or ""))
+    job_id = str(observed.get("job_id") or "")
+    log_path = paths.logs / f"{job_id}.log"
+    tail: list[str] = []
+    if log_path.is_file():
+        try:
+            raw = log_path.read_text(encoding="utf-8", errors="replace")
+            tail = raw.splitlines()[-40:]
+        except OSError:
+            tail = []
+    return {
+        "job_id": job_id,
+        "code_revision": observed.get("code_revision"),
+        "input_digest": observed.get("input_digest"),
+        "error": observed.get("error"),
+        "exit_code": observed.get("exit_code"),
+        "completed_at": observed.get("completed_at"),
+        "log_tail": tail,
+    }
+
+
 def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
     paths.ensure()
     problems: list[str] = []
@@ -3390,6 +3425,7 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         "python": str(paths.python),
         "job_kinds": tuple(sorted(_JOB_SPECS)),
         "concurrency": 1,
+        "recent_p011_d1_failure": _recent_p011_d1_failure(paths),
     }
 
 

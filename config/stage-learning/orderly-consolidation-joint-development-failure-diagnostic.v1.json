@@ -1,0 +1,95 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-joint-development-failure-diagnostic.v1",
+  "work_item": "P3-STAGE-011-D2-DIAGNOSTIC",
+  "source_result": {
+    "path": "config/stage-learning/orderly-consolidation-joint-development-selection-result.v1.json",
+    "digest": "sha256:9e3c61db83e5b9f6914dbab763c8597686f67d1527355b097020e91b690d0348",
+    "disposition": "REVISE_OR_PARK_DEVELOPMENT_FAIL",
+    "eligible_count": 0
+  },
+  "diagnosis": "STAGE2_REPAIR_SUCCEEDS_BUT_STAGE0_COVERAGE_REMAINS_BOUND_BY_AMPLITUDE_TOPOLOGY_AND_RELOCATION_ALIGNMENT",
+  "gate_failure_frequency": {
+    "stage0_minimum_positive_reference_coverage": 27,
+    "stage2_minimum_precision": 9,
+    "stage2_minimum_positive_reference_coverage": 9,
+    "pair_overlap": 0
+  },
+  "stage2_repair_result": {
+    "balanced_profile_frontier_true_positive": 20,
+    "balanced_profile_frontier_false_positive": 1,
+    "balanced_profile_frontier_false_negative": 1,
+    "precision": "0.9523809523809523809523809524",
+    "positive_reference_coverage": "0.9523809523809523809523809524",
+    "definite_negative_false_positive_rate": "0.006369426751592356687898089172",
+    "proposition_overlap_count": 0,
+    "bounded_conclusion": "The P011 Stage2 topology materially resolves the old center-shift truth-boundary defect on fresh 2018 development evidence. Stage2 is not the binding reason no pair qualifies."
+  },
+  "stage0_frontier": {
+    "best_observed_true_positive": 58,
+    "definite_positive_references": 83,
+    "best_positive_reference_coverage": "0.6987951807228915662650602410",
+    "required_positive_reference_coverage": "0.70",
+    "minimum_integer_true_positive_required": 59,
+    "integer_true_positive_gap": 1,
+    "representative_frontier_pair_id": "sha256:669c8b018adf92501d29143e4e45e04136331c352a75803877c44ba3f91564df",
+    "precision": "0.9354838709677419354838709677",
+    "definite_negative_false_positive_rate": "0.04210526315789473684210526316",
+    "proposition_overlap_count": 0
+  },
+  "representative_frontier_false_negative_attribution": {
+    "false_negative_count": 25,
+    "instability_not_true_count": 14,
+    "relocation_veto_count": 11,
+    "order_veto_count": 1,
+    "counts_overlap": true,
+    "note": "One false negative is both instability_not_true and order_veto."
+  },
+  "positive_instability_channel_diagnostic": {
+    "instability_not_true_count": 14,
+    "all_both_channels_false": true,
+    "all_fail_width_expansion_material": true,
+    "all_fail_absolute_range_width_gain_material": true,
+    "all_fail_broad_range_width_material": true,
+    "broad_lenient_range_width_min": "0.1555993863686171378479070787",
+    "bounded_conclusion": "The current expansion/broad-reversal Stage0 topology has a shared amplitude admission boundary: a path must either be materially expanding/gaining absolute width or already broad. Definite Stage0 references that are narrow/contracting yet exhibit strong reversal disorder can be outside both positive channels by construction."
+  },
+  "relocation_boundary_diagnostic": {
+    "definite_stage0_references_vetoed_by_frozen_relocation_guard": 11,
+    "bounded_conclusion": "The sealed Primary reference and the frozen P008 relocation guard still disagree on a nontrivial set of Stage0-positive cases. This does not prove the guard or the references are wrong; it proves their semantic alignment remains unresolved and cannot be repaired by a result-dependent threshold adjustment inside P011."
+  },
+  "stop_rule": {
+    "candidate_pair_frozen": false,
+    "preserved_2021_evaluation_opened": false,
+    "grid_expansion": false,
+    "threshold_relaxation": false,
+    "reference_rewrite": false,
+    "automatic_supplement": false,
+    "additional_trial": false
+  },
+  "successor_direction": {
+    "requires_new_work_item": true,
+    "do_not_reopen_p011_grid": true,
+    "questions_to_resolve_before_fresh_data": [
+      "whether Stage0 structural instability needs a positive narrow-reversal or contracting-disorder channel that is not amplitude-gated by expansion or broad current width",
+      "whether the frozen relocation guard and Primary semantic review need one explicit shared positive relocation proposition/packet rather than independent numeric and reviewer boundaries",
+      "whether those two issues are one joint topology problem or should be separated before another development screen"
+    ]
+  },
+  "authority": {
+    "diagnostic_only": true,
+    "threshold_change": false,
+    "candidate_addition": false,
+    "candidate_replacement": false,
+    "review_ledger_change": false,
+    "relocation_guard_change": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "2019_p010_development_access": false,
+    "2020_p009_development_access": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

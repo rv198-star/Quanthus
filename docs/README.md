@@ -347,8 +347,17 @@ nodes.
   threshold-basis visibility. The resolved denominator is Stage0=83, Stage2=21, Neither=74 and
   Ambiguous=12, clearing the frozen reference-sufficiency floors without changing them. The ledger is
   immutably snapshotted at SHA-256 `1a73c66dd1255970c3a8de81a92adfabe7e57fc668b8deab7a12ef3eb82092f1`.
-  Only deterministic scoring of the exact 27 frozen pairs is now open; no new market read, reviewer
-  regeneration, grid expansion, parameter search or preserved-2021 access is authorized. Design:
+  D2 then scored exactly the frozen 27 pairs and found `eligible_count=0`, closing P011
+  `REVISE_OR_PARK_DEVELOPMENT_FAIL` before evaluation. The Stage2 repair itself is strong on fresh
+  evidence: the balanced order profile reaches 20/21 TP, precision/coverage 0.9524 and FPR 0.00637
+  with zero proposition overlap. The binding failure is Stage0 absolute coverage: all 27 pairs fail
+  that gate; the best frontier is 58/83 = 0.698795 versus the frozen 0.70 floor, one integer TP short.
+  Post-result attribution shows this is not authority for a one-point hot fix: 14 Stage0 false
+  negatives fall outside both positive-instability channels because they satisfy neither expansion/
+  absolute-width-gain nor broad-current-width admission, while 11 additional definite Stage0
+  references are vetoed by the inherited P008 relocation guard. P011 therefore freezes no pair and
+  preserved 2021 remains unread. No grid expansion, threshold relaxation, review rewrite, supplement
+  or relocation retune is authorized. Design:
   `design/stage-orderly-consolidation-boundary-repair.md`; review:
   `reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; B acceptance:
   `acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md`; C acceptance:
@@ -357,7 +366,8 @@ nodes.
   `acceptance/stage-orderly-consolidation-joint-d1-implementation-20260913.md`; D1 transport recovery:
   `acceptance/stage-orderly-consolidation-joint-d1-transport-recovery-20260913.md`; D1 result:
   `acceptance/stage-orderly-consolidation-joint-d1-recovery-result-20260913.md`; D2 review seal:
-  `acceptance/stage-orderly-consolidation-joint-d2-review-seal-20260913.md`; route:
+  `acceptance/stage-orderly-consolidation-joint-d2-review-seal-20260913.md`; D2 closeout:
+  `acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md`; route:
   `work-items/stage-orderly-consolidation-boundary-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

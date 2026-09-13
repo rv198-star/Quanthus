@@ -1647,7 +1647,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-STAGE-011", "P3-STAGE-011-D"},
+            set(),
         )
         self.assertTrue(
             all(

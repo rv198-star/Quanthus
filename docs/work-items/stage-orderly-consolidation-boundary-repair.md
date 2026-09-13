@@ -9,14 +9,14 @@
 | Machine design | `../../config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json` |
 | Root-cause diagnostic | `../../config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json` |
 | Delivery state | `../../config/stage-learning/orderly-consolidation-boundary-repair-delivery.v1.json` |
-| Current state | A/B/C closed; D1 transport recovery succeeded with 190/192 fixed blind cases and no 2021 read; D2 candidate-blind review is sealed at 83 Stage0 / 21 Stage2 / 74 Neither / 12 Ambiguous; only exact 27-pair development scoring is now open |
+| Current state | CLOSED `REVISE_OR_PARK_DEVELOPMENT_FAIL`; D1 recovery succeeded and D2 sealed/scored the exact 27 pairs with 0 eligible; Stage2 repair is strong, but every pair misses frozen Stage0 coverage; no pair frozen and preserved 2021 remains unread |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-011-A | Freeze Stage2 topology and joint 0/2 boundary | P3-STAGE-010 | closed; design approved; consumed P010 evidence diagnostic-only |
 | P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; `../acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md` |
 | P3-STAGE-011-C | Run consumed-evidence topology conformance | P3-STAGE-011-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; `../acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md` |
-| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | D1 recovery succeeded: 190/192 fixed cases, 27-pair surface, no opinions/selection/2021 read; D2 review then sealed 190 cases / 380 opinions before candidate visibility and clears frozen reference sufficiency; exact 27-pair scoring only is ready; `../acceptance/stage-orderly-consolidation-joint-d2-review-seal-20260913.md` |
+| P3-STAGE-011-D | Fresh joint Stage0/Stage2 development on a new disjoint cohort | P3-STAGE-011-C | closed `REVISE_OR_PARK_DEVELOPMENT_FAIL`; exact 27 pairs / 0 eligible; Stage2 balanced reaches 20/21 TP with precision/coverage 0.9524, but all pairs fail Stage0 coverage and the best is 58/83=0.6988 vs 0.70; 2021 unread; `../acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md` |
 
 ## Hard boundaries
 

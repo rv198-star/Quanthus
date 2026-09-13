@@ -25,6 +25,12 @@ RECOVERY_RESULT = ROOT / (
 D2_REVIEW_SEAL = ROOT / (
     "config/stage-learning/orderly-consolidation-joint-d2-review-seal.v1.json"
 )
+SELECTION_RESULT = ROOT / (
+    "config/stage-learning/orderly-consolidation-joint-development-selection-result.v1.json"
+)
+FAILURE_DIAGNOSTIC = ROOT / (
+    "config/stage-learning/orderly-consolidation-joint-development-failure-diagnostic.v1.json"
+)
 DIAGNOSTIC_DIGEST = "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c"
 DESIGN_DIGEST = "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353"
 PROJECTION_DIGEST = "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c"
@@ -35,6 +41,10 @@ EVIDENCE_SCOPE_DIGEST = "sha256:2400ccd1c025098b0a3d050aebf39cc0ebc7241289d9db2e
 RECOVERY_AUTH_DIGEST = "sha256:a2bbd496830adda80c13bf9a1d61baa0cf3dabcf6439cc53efcc45f6d5f11b2e"
 RECOVERY_RESULT_DIGEST = "sha256:6ad3aebcda3c73b89e0ad3a94cdad89f78527cc1c9cd4506455fa17fd102bc8c"
 D2_REVIEW_SEAL_DIGEST = "sha256:70a9f60426319331b3937991e560fd8a9c1ee6c5bdbd43a87d5cd1373f6606af"
+SELECTION_RESULT_DIGEST = "sha256:9e3c61db83e5b9f6914dbab763c8597686f67d1527355b097020e91b690d0348"
+FAILURE_DIAGNOSTIC_DIGEST = (
+    "sha256:3518ba46bcd32cae6dc34b524e58dc43bb40a5cb54e329e1626371de586bda5a"
+)
 
 
 def load(path):
@@ -214,14 +224,24 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
     assert d2["maximum_candidate_pairs"] == 27
     assert d2["candidate_grid_expansion_authorized"] is False
     assert d2["preserved_2021_evaluation_read_authorized"] is False
+    selection = value["d2_selection_checkpoint"]
+    assert selection["state"] == "REVISE_OR_PARK_DEVELOPMENT_FAIL"
+    assert selection["result_digest"] == SELECTION_RESULT_DIGEST
+    assert digest(load(SELECTION_RESULT)) == SELECTION_RESULT_DIGEST
+    assert selection["failure_diagnostic_digest"] == FAILURE_DIAGNOSTIC_DIGEST
+    assert digest(load(FAILURE_DIAGNOSTIC)) == FAILURE_DIAGNOSTIC_DIGEST
+    assert selection["trial_count"] == 27
+    assert selection["eligible_count"] == 0
+    assert selection["pair_frozen"] is False
+    assert selection["preserved_2021_evaluation_read"] is False
     assert value["delivery_sequence"] == {
         "P3-STAGE-011-A": "closed_design_approved",
         "P3-STAGE-011-B": "closed_engineering_accepted",
         "P3-STAGE-011-C": "closed_pass_topology_conformance_only",
-        "P3-STAGE-011-D": "d2_review_ledger_sealed_ready_exact_27_pair_scoring",
+        "P3-STAGE-011-D": "closed_revise_or_park_development_fail",
     }
     assert value["authority"] == {
-        "implementation": True,
+        "implementation": False,
         "synthetic_conformance": False,
         "transport_recovery_only": False,
         "consumed_evidence_topology_diagnostic": False,
@@ -231,8 +251,8 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
         "runtime_job_submission": False,
         "authorized_runtime_kind": None,
         "candidate_blind_review": False,
-        "candidate_pair_scoring": True,
-        "maximum_candidate_pairs": 27,
+        "candidate_pair_scoring": False,
+        "maximum_candidate_pairs": 0,
         "candidate_grid_expansion": False,
         "parameter_search": False,
         "candidate_selection": False,
@@ -255,6 +275,8 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
         / "docs/acceptance/stage-orderly-consolidation-joint-d1-recovery-result-20260913.md",
         ROOT
         / "docs/acceptance/stage-orderly-consolidation-joint-d2-review-seal-20260913.md",
+        ROOT
+        / "docs/acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md",
     ):
         assert path.is_file()
 

@@ -139,14 +139,27 @@
     "candidate_grid_expansion_authorized": false,
     "preserved_2021_evaluation_read_authorized": false
   },
+  "d2_selection_checkpoint": {
+    "work_item": "P3-STAGE-011-D2",
+    "state": "REVISE_OR_PARK_DEVELOPMENT_FAIL",
+    "result": "config/stage-learning/orderly-consolidation-joint-development-selection-result.v1.json",
+    "result_digest": "sha256:9e3c61db83e5b9f6914dbab763c8597686f67d1527355b097020e91b690d0348",
+    "failure_diagnostic": "config/stage-learning/orderly-consolidation-joint-development-failure-diagnostic.v1.json",
+    "failure_diagnostic_digest": "sha256:3518ba46bcd32cae6dc34b524e58dc43bb40a5cb54e329e1626371de586bda5a",
+    "acceptance": "docs/acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md",
+    "trial_count": 27,
+    "eligible_count": 0,
+    "pair_frozen": false,
+    "preserved_2021_evaluation_read": false
+  },
   "delivery_sequence": {
     "P3-STAGE-011-A": "closed_design_approved",
     "P3-STAGE-011-B": "closed_engineering_accepted",
     "P3-STAGE-011-C": "closed_pass_topology_conformance_only",
-    "P3-STAGE-011-D": "d2_review_ledger_sealed_ready_exact_27_pair_scoring"
+    "P3-STAGE-011-D": "closed_revise_or_park_development_fail"
   },
   "authority": {
-    "implementation": true,
+    "implementation": false,
     "synthetic_conformance": false,
     "transport_recovery_only": false,
     "consumed_evidence_topology_diagnostic": false,
@@ -156,8 +169,8 @@
     "runtime_job_submission": false,
     "authorized_runtime_kind": null,
     "candidate_blind_review": false,
-    "candidate_pair_scoring": true,
-    "maximum_candidate_pairs": 27,
+    "candidate_pair_scoring": false,
+    "maximum_candidate_pairs": 0,
     "candidate_grid_expansion": false,
     "parameter_search": false,
     "candidate_selection": false,

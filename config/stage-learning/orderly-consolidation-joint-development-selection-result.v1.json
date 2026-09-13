@@ -1,0 +1,105 @@
+{
+  "schema_version": "quanthus.stage-orderly-consolidation-joint-development-selection-result.v1",
+  "work_item": "P3-STAGE-011-D2",
+  "disposition": "REVISE_OR_PARK_DEVELOPMENT_FAIL",
+  "source": {
+    "d1_job_id": "stage_8189b79722fc48d1b774aa42f9238852",
+    "d1_code_revision": "bd1449c43d2eb436716f2e2125256a84463901a0",
+    "d1_manifest_sha256": "sha256:14870f6cd1521d453b7ccae6ebdd5d8d6d5ee64875372051f76214eb2227eae8",
+    "development_evidence_digest": "sha256:b1298c1fc4ee40f5e50a155453c889306f4295790df7539dbe3fa3f1e51dcc9d",
+    "review_ledger_sha256": "sha256:1a73c66dd1255970c3a8de81a92adfabe7e57fc668b8deab7a12ef3eb82092f1",
+    "threshold_basis_digest": "sha256:d3556f0cb3bc91ecbe84a9febef79faeee7be131cf01f2ea3bf47b98d291412c",
+    "candidate_grid_digest": "sha256:6d2130ef91b8cdbec8c6c615cdd0d656142ed50d9c25dfd8ebafa14dacbe9a5d",
+    "selection_transport_sha256": "sha256:53bbf1dca9c7362ad5881141ca0296cd247570ef4d557d1260d820c33d95e6e8",
+    "selection_snapshot_artifact_id": "03f8853a1f4f6505b67c26f9ef96b769",
+    "selection_snapshot_sha256": "sha256:b643a37841ad3241e9be6670b89d29d254e510129a9d2620a8baebd3f3cc8fad"
+  },
+  "development_denominator": {
+    "case_count": 190,
+    "primary_reference_counts": {
+      "AMBIGUOUS": 12,
+      "NEITHER": 74,
+      "STAGE_0": 83,
+      "STAGE_2": 21
+    },
+    "atomic_role_disagreement_count": 14,
+    "primary_status_disagreement_count": 12
+  },
+  "frozen_stage0_baseline": {
+    "true_positive": 45,
+    "false_positive": 9,
+    "false_negative": 38,
+    "predictions": 54,
+    "definite_positive_references": 83,
+    "definite_negative_references": 95,
+    "precision": "0.8333333333333333333333333333",
+    "positive_reference_coverage": "0.5421686746987951807228915663",
+    "definite_negative_false_positive_rate": "0.09473684210526315789473684211"
+  },
+  "candidate_grid": {
+    "stage0_candidate_count": 9,
+    "stage2_candidate_count": 3,
+    "pair_count": 27,
+    "eligible_count": 0,
+    "trials_digest": "sha256:a45af35b450ec55fdf3c667bca85420d94d1e3e014678c12a463fd800e1ee5bf",
+    "grid_expanded_after_result": false,
+    "zero_overlap_pair_count": 27
+  },
+  "diagnostic_frontier": [
+    {
+      "pair_id": "sha256:669c8b018adf92501d29143e4e45e04136331c352a75803877c44ba3f91564df",
+      "stage0_profile": "expansion-balanced+broad-lenient",
+      "stage2_profile": "order-balanced",
+      "only_failed_gate": "stage0_minimum_positive_reference_coverage",
+      "stage0": {
+        "true_positive": 58,
+        "false_positive": 4,
+        "false_negative": 25,
+        "precision": "0.9354838709677419354838709677",
+        "positive_reference_coverage": "0.6987951807228915662650602410",
+        "definite_negative_false_positive_rate": "0.04210526315789473684210526316"
+      },
+      "stage2": {
+        "true_positive": 20,
+        "false_positive": 1,
+        "false_negative": 1,
+        "precision": "0.9523809523809523809523809524",
+        "positive_reference_coverage": "0.9523809523809523809523809524",
+        "definite_negative_false_positive_rate": "0.006369426751592356687898089172"
+      },
+      "proposition_overlap_count": 0
+    },
+    {
+      "pair_id": "sha256:94d991eb2bcb7e5c12a0781a1072977a555f8b9a31b226130b0983d123ccc807",
+      "stage0_profile": "expansion-lenient+broad-lenient",
+      "stage2_profile": "order-balanced",
+      "only_failed_gate": "stage0_minimum_positive_reference_coverage",
+      "stage0_coverage": "0.6987951807228915662650602410",
+      "stage2_precision": "0.9523809523809523809523809524",
+      "proposition_overlap_count": 0
+    },
+    {
+      "pair_id": "sha256:d30a7b1ac0e816965d2560ed7bf9947f8ae06a9f8f9224ab24a6f2f82f0a7fd7",
+      "stage0_profile": "expansion-strict+broad-lenient",
+      "stage2_profile": "order-balanced",
+      "only_failed_gate": "stage0_minimum_positive_reference_coverage",
+      "stage0_coverage": "0.6987951807228915662650602410",
+      "stage2_precision": "0.9523809523809523809523809524",
+      "proposition_overlap_count": 0
+    }
+  ],
+  "authority": {
+    "candidate_pair_frozen": false,
+    "evaluation_data_read": false,
+    "candidate_grid_expanded": false,
+    "additional_parameter_trials": 0,
+    "review_regenerated": false,
+    "2019_p010_development_access": false,
+    "2020_p009_development_access": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

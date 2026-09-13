@@ -12,12 +12,13 @@
 | D expert review | `../reviews/stage-atomic-proposition-d-expert-review-20260913.md` |
 | Work-item route | [P3-STAGE-012](../work-items/stage-atomic-proposition-successor.md) |
 | E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
-| Authority | Owner-approved E1/E2/E3 synthetic implementation is complete; post-E review is next; no market-data/runtime/parameter/new-Fact authority |
+| Post-E review | `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
+| Authority | E4 review complete; B6-PATH formalization E5 is recommended but blocked pending owner approval; no market-data/runtime/parameter/Fact-registration authority |
 
 > P3-STAGE-012 remains a **design/synthetic research work item**. A-D are closed and E1/E2/E3 are
 > synthetically accepted without fresh market data or parameter search. The parent design remains
-> draft and delivery stays blocked until the required post-E review chooses whether any formal Fact
-> or projection repair deserves a later owner-approved route.
+> draft and delivery stays blocked. E4 has chosen only a recommended Structure-owned B6-PATH
+> formalization route; E5 still requires separate owner approval before any further implementation.
 
 ## 1. Why a different successor shape is needed
 
@@ -252,9 +253,12 @@ P3-STAGE-012-E2  CLOSED  SYNTHETIC_NON_FACT_ENVELOPE_PROTOTYPE_ACCEPTED
 P3-STAGE-012-E3  CLOSED  PASS_SYNTHETIC_CONFORMANCE
 -------------------------------------------------------------
 next required review:
-P3-STAGE-012-E4  post-E Fact/projection route review
+P3-STAGE-012-E4  CLOSED  RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY
 -------------------------------------------------------------
-only after E4 + later owner approval:
+owner approval required before:
+P3-STAGE-012-E5  Structure-owned B6-PATH envelope formalization + synthetic qualification
+-------------------------------------------------------------
+only after E5 + later owner approval:
 P3-STAGE-012-F   fresh-cohort inventory + preregistration
 P3-STAGE-012-G  fresh development / blind atomic review
 P3-STAGE-012-H  projection compatibility and candidate freeze
@@ -306,7 +310,8 @@ persists on one side; an adversarial failed-resolution path produces alternating
 both sides; unavailable input fails closed; and mixed instability+relocation remains explicit while
 the downstream Stage0/2 projection stays `NEITHER`.
 
-The required next step is E4 post-E expert review. It must decide whether the envelope semantics are
-strong enough to justify a formal threshold-free Fact/projection repair, should remain a research-only
-descriptor, or should be parked. P008 relocation remains frozen, no new Fact is registered, fresh
-cohort work remains blocked, and preserved 2021 remains unread.
+E4 is now complete. The panel keeps the current Stage-learning prototype research-only, rejects a new
+Fact family, and recommends a separately owner-approved E5 that would move the neutral escape/re-entry
+semantics toward the existing B6-PATH / Directional Path Geometry owner through formal design and
+synthetic qualification. No Fact is registered yet; P008 relocation remains frozen, fresh cohort work
+stays blocked, and preserved 2021 remains unread.

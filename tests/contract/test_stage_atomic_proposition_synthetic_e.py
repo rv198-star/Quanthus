@@ -14,6 +14,7 @@ ENVELOPE = ROOT / "config/stage-learning/stage-range-envelope-prototype.v1.json"
 SYNTHETIC = ROOT / "config/stage-learning/stage-atomic-envelope-synthetic-contract.v1.json"
 RESULT = ROOT / "config/stage-learning/stage-atomic-envelope-synthetic-conformance-result.v1.json"
 E_RESULT = ROOT / "config/stage-learning/stage-atomic-proposition-e-synthetic-result.v1.json"
+E4_REVIEW = ROOT / "config/stage-learning/stage-atomic-proposition-e4-expert-review-result.v1.json"
 
 AUTH_DIGEST = "sha256:c617f21613ce506287753c9da572c3793ddb0139385bddc96b2cbf309f1bacb6"
 ATOMIC_DIGEST = "sha256:74900cfde3d7e86744cab8621a3fd14710fd3fd900fa18f53ef9a98ec750a80c"
@@ -21,6 +22,7 @@ ENVELOPE_DIGEST = "sha256:bf34c7790d8341826cc94521d7e5d1c2e6004af172d983d6f4d6ff
 SYNTHETIC_DIGEST = "sha256:df82e410efde252c48b3a94d9552f19c20d368a17ee9cdc09b2822486b9e2dcb"
 RESULT_DIGEST = "sha256:ee09715c69b2e12485ec841af6a96d74370a96b584d7fa9df637e42798820b0f"
 E_RESULT_DIGEST = "sha256:1276254b1274ef4db0421067399b6afe4d43bf24e810dda404fdef2f9fa03036"
+E4_REVIEW_DIGEST = "sha256:125a510411eaec2896538005c57dc9650bc707df5c9005ba43975d9a780d409d"
 
 
 def load(path: Path):
@@ -156,6 +158,41 @@ def test_e_closeout_opens_only_post_e_review() -> None:
         "new_market_data_read",
         "preserved_2021_evaluation_read",
         "fresh_cohort_inventory",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+
+
+def test_post_e_review_routes_only_to_owner_gated_b6_path_formalization() -> None:
+    value = load(E4_REVIEW)
+    assert digest(value) == E4_REVIEW_DIGEST
+    assert value["state"] == "RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY"
+    assert value["review_basis_commit"] == "24fc416a09c535cf7bed501b7937c65ec511a95f"
+    decisions = value["resolved_decisions"]
+    assert decisions["E1_atomic_first_contract"] == "ACCEPT_FOR_SUCCESSOR_ARCHITECTURE"
+    assert decisions["E2_current_stage_learning_prototype"] == "KEEP_SYNTHETIC_RESEARCH_ONLY"
+    assert decisions["formal_fact_registration_now"] == "NOT_AUTHORIZED"
+    assert decisions["new_fact_family"] == "NOT_SUPPORTED"
+    assert decisions["formal_owner_if_promoted"] == "B6_PATH_DIRECTIONAL_PATH_GEOMETRY"
+    assert decisions["p008_relocation"] == "KEEP_FROZEN"
+    assert decisions["fresh_market_data"] == "NOT_AUTHORIZED"
+    assert decisions["preserved_2021"] == "UNREAD_AND_CLOSED"
+    next_phase = value["recommended_next_phase"]
+    assert next_phase["work_item"] == "P3-STAGE-012-E5"
+    assert next_phase["status"] == "RECOMMENDED_PENDING_OWNER_APPROVAL"
+    authority = value["authority"]
+    assert authority["review_completed"] is True
+    assert authority["route_recommended"] is True
+    assert authority["owner_approved_next_phase"] is False
+    for key in (
+        "formal_fact_design",
+        "new_fact_registration",
+        "market_data_read",
+        "threshold_search",
+        "candidate_generation",
+        "runtime_job",
+        "preserved_2021_evaluation_read",
         "daily_or_strategy",
         "trading",
     ):

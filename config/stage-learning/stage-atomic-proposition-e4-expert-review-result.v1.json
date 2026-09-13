@@ -1,0 +1,80 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-e4-expert-review-result.v1",
+  "work_item": "P3-STAGE-012-E4",
+  "state": "RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY",
+  "review_basis_commit": "24fc416a09c535cf7bed501b7937c65ec511a95f",
+  "review_basis": {
+    "E_result": "config/stage-learning/stage-atomic-proposition-e-synthetic-result.v1.json",
+    "E_result_digest": "sha256:1276254b1274ef4db0421067399b6afe4d43bf24e810dda404fdef2f9fa03036",
+    "existing_B6_PATH": "config/structure-directional-path-geometry.v1.json",
+    "existing_B6_PATH_digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c"
+  },
+  "provenance": {
+    "same_origin_simulation": true,
+    "independent_human_expert_validation": false,
+    "responsibilities": ["short_term_trader", "fund_manager", "quant_researcher", "data_and_evidence_governance"]
+  },
+  "perspective_verdicts": {
+    "short_term_trader": {
+      "verdict": "CONTINUE_SYNTHETIC_FORMALIZATION",
+      "support": "Alternating escape-and-reentry expresses failed directional resolution without equating high churn with disorder.",
+      "counterexample": "A single failed breakout or mean reversion is common and must not itself become Stage0.",
+      "veto": "No count threshold or direct compact-disorder classifier may be frozen from the synthetic examples."
+    },
+    "fund_manager": {
+      "verdict": "RETAIN_AS_NEUTRAL_PATH_GEOMETRY",
+      "support": "Persistent one-side escape and alternating failed resolution describe different path organization while allowing relocation and instability to coexist.",
+      "counterexample": "Close-only daily geometry cannot claim intraday breakout intent or actor behavior.",
+      "veto": "Do not create a new peer Stage or weaken P008 relocation."
+    },
+    "quant_researcher": {
+      "verdict": "FORMAL_DESIGN_ONLY_NOT_MARKET_VALIDATION",
+      "support": "The frozen synthetic suite is non-degenerate and exactly reproducible without learned thresholds.",
+      "counterexample": "Hand-constructed paths do not establish market separability, window optimality or useful prediction.",
+      "veto": "No fresh search, threshold selection, candidate grid or qualification claim may follow directly from E."
+    },
+    "data_and_evidence_governance": {
+      "verdict": "OWN_UNDER_EXISTING_B6_PATH_IF_FORMALIZED",
+      "support": "Escape/reentry is neutral causal path geometry and should not remain owned by a Stage-specific module if promoted.",
+      "counterexample": "Registering a Stage-specific hidden Fact would duplicate the existing structure.geometry ownership model.",
+      "veto": "No new Fact family or Catalog registration before a separate structure-owned design/contract and synthetic acceptance."
+    }
+  },
+  "resolved_decisions": {
+    "E1_atomic_first_contract": "ACCEPT_FOR_SUCCESSOR_ARCHITECTURE",
+    "E2_current_stage_learning_prototype": "KEEP_SYNTHETIC_RESEARCH_ONLY",
+    "E3_synthetic_conformance": "ACCEPT_WITH_SYNTHETIC_CLAIM_CEILING",
+    "formal_fact_registration_now": "NOT_AUTHORIZED",
+    "new_fact_family": "NOT_SUPPORTED",
+    "formal_owner_if_promoted": "B6_PATH_DIRECTIONAL_PATH_GEOMETRY",
+    "p008_relocation": "KEEP_FROZEN",
+    "third_instability_channel": "NOT_AUTHORIZED",
+    "fresh_market_data": "NOT_AUTHORIZED",
+    "preserved_2021": "UNREAD_AND_CLOSED"
+  },
+  "recommended_next_phase": {
+    "work_item": "P3-STAGE-012-E5",
+    "status": "RECOMMENDED_PENDING_OWNER_APPROVAL",
+    "purpose": "Design and synthetically qualify a structure-owned B6-PATH envelope escape/reentry extension, migrating neutral semantics out of Stage-specific ownership without registering a Fact or reading market data.",
+    "required_outputs": [
+      "minimal neutral concept set and identities",
+      "exact 20/10 window and reset/coordinate/missingness semantics",
+      "synthetic invariance and adversarial contract",
+      "decision whether the prototype should become formal B6-PATH concepts or remain research-only"
+    ]
+  },
+  "authority": {
+    "review_completed": true,
+    "route_recommended": true,
+    "owner_approved_next_phase": false,
+    "formal_fact_design": false,
+    "new_fact_registration": false,
+    "market_data_read": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "runtime_job": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

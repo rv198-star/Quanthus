@@ -308,7 +308,7 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; docs/acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md |
 | P3-STAGE-011-C | Consumed-evidence topology conformance | P3-STAGE-011-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; docs/acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md |
 | P3-STAGE-011-D | Fresh joint Stage0/Stage2 development | P3-STAGE-011-C | closed `REVISE_OR_PARK_DEVELOPMENT_FAIL`; 190 cases / 380 sealed opinions / exact 27 pairs / 0 eligible; best Stage0 coverage 58/83=0.6988 vs 0.70 while balanced Stage2 is 20/21 TP at precision 0.9524; 2021 unread; docs/acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md |
-| P3-STAGE-012 | Atomic proposition decomposition and compact-disorder boundary | P3-STAGE-011 | ready for required post-E expert review; A-D closed and E1/E2/E3 synthetically accepted; fresh-data/new-Fact authority still blocked; docs/work-items/stage-atomic-proposition-successor.md |
+| P3-STAGE-012 | Atomic proposition decomposition and compact-disorder boundary | P3-STAGE-011 | blocked pending owner approval for E5 B6-PATH envelope formalization; A-D/E1-E4 closed; fresh-data/Fact-registration authority blocked; docs/work-items/stage-atomic-proposition-successor.md |
 | P3-STAGE-012-A | Atomic ontology and resolver audit | P3-STAGE-011 | closed `PASS_ATOMIC_PROPOSITION_FIRST`; docs/acceptance/stage-atomic-proposition-a-ontology-audit-20260913.md |
 | P3-STAGE-012-B | Consumed relocation-conflict adjudication | P3-STAGE-012-A | closed `PASS_CONSUMED_SEMANTIC_ADJUDICATION`; 0 guard-overfire / 2 reference-undercall / 9 genuine-coexistence; docs/acceptance/stage-atomic-proposition-b-relocation-adjudication-20260913.md |
 | P3-STAGE-012-C | Compact-disorder observational sufficiency audit | P3-STAGE-012-A | closed `INCONCLUSIVE`; current Facts/composition insufficient for a positive compact-disorder claim, new Fact not proven; docs/acceptance/stage-atomic-proposition-c-observable-audit-20260913.md |
@@ -317,7 +317,8 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-012-E1 | Atomic Primary review/resolver contract | P3-STAGE-012-D | closed; atomic ledger preserved before projection |
 | P3-STAGE-012-E2 | Threshold-free range-envelope prototype | P3-STAGE-012-D | closed synthetic non-Fact prototype; no compact-disorder truth or threshold selected |
 | P3-STAGE-012-E3 | Adversarial synthetic conformance | P3-STAGE-012-E1/E2 | closed `PASS_SYNTHETIC_CONFORMANCE` |
-| P3-STAGE-012-E4 | Post-E expert review / Fact-projection route decision | P3-STAGE-012-E1/E2/E3 | ready for review only; no market-data/new-Fact authority |
+| P3-STAGE-012-E4 | Post-E expert review / Fact-projection route decision | P3-STAGE-012-E1/E2/E3 | closed `RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY`; docs/reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md |
+| P3-STAGE-012-E5 | Structure-owned B6-PATH envelope formalization design + synthetic qualification | P3-STAGE-012-E4 | blocked pending owner approval; no market data, threshold search or Fact registration |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

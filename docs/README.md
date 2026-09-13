@@ -380,9 +380,12 @@ nodes.
   explicitly not a Fact and emits no compact-disorder truth; E3 closes `PASS_SYNTHETIC_CONFORMANCE`
   across high-churn orderly compression, one-leg repricing, alternating failed resolution, stable
   narrow noise, mixed instability+relocation and unavailable input. Acceptance:
-  `acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md`. The required next step is
-  post-E expert review; fresh data, formal Fact registration, threshold search and preserved 2021
-  remain blocked.
+  `acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md`. Post-E review then closes
+  `RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY`: keep the current Stage-learning prototype
+  research-only, reject a new Fact family, and route any later formalization through the existing
+  `B6-PATH / Directional Path Geometry` owner. Review:
+  `reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md`. E5 remains blocked pending
+  owner approval; fresh data, Fact registration, threshold search and preserved 2021 remain blocked.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

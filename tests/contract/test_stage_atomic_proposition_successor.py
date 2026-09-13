@@ -10,11 +10,13 @@ A = ROOT / "config/stage-learning/stage-atomic-proposition-ontology-audit.v1.jso
 B = ROOT / "config/stage-learning/stage-relocation-conflict-adjudication.v1.json"
 C = ROOT / "config/stage-learning/stage-compact-disorder-observable-audit.v1.json"
 ABC = ROOT / "config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json"
+D = ROOT / "config/stage-learning/stage-atomic-proposition-d-expert-review-result.v1.json"
 
 A_DIGEST = "sha256:f9aac37b172a38b6c756830c04b508f749c67df791465fafab758f618a09aa79"
 B_DIGEST = "sha256:addaa2e0555a93685b722ff48721b938d8153f236fdc06dfbe2e7bb4a6f73645"
 C_DIGEST = "sha256:86ad2e31c474be556c374b87130ad8fa56567734d8ffe077701e889e15dc4259"
 ABC_DIGEST = "sha256:9fd7ac60f7b12bd8ddc8c4875d125658f319ef58cfea4d9fefc95867865ba1af"
+D_DIGEST = "sha256:0b00dd0a327b161cd20a4122e5c5a8cad806ad6f9f5713246b36b412a3fb6af7"
 
 
 def load(path):
@@ -142,13 +144,51 @@ def test_abc_result_opens_only_d_expert_review() -> None:
         assert authority[key] is False
 
 
-def test_stage012_documents_exist_and_route_to_review_only() -> None:
+def test_d_review_recommends_only_owner_gated_synthetic_route() -> None:
+    value = load(D)
+    assert digest(value) == D_DIGEST
+    assert value["state"] == "RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE"
+    decisions = value["resolved_decisions"]
+    assert decisions["atomic_first_qualification"] == "APPROVE_AS_SUCCESSOR_ARCHITECTURE"
+    assert decisions["p008_relocation_implementation"] == "KEEP_FROZEN"
+    assert decisions["p008_relocation_threshold_retune"] == "NOT_SUPPORTED"
+    assert decisions["new_compact_disorder_fact"] == "NOT_AUTHORIZED"
+    assert decisions["third_instability_channel"] == "NOT_AUTHORIZED"
+    assert decisions["fresh_market_experiment"] == "NOT_AUTHORIZED"
+    assert decisions["preserved_2021_evaluation"] == "UNREAD_AND_CLOSED"
+    next_phase = value["recommended_next_phase"]
+    assert next_phase["work_item"] == "P3-STAGE-012-E"
+    assert next_phase["status"] == "RECOMMENDED_PENDING_OWNER_APPROVAL"
+    assert len(next_phase["subwork"]) == 3
+    assert all(item["market_data"] is False for item in next_phase["subwork"])
+    authority = value["authority"]
+    assert authority["review_completed"] is True
+    assert authority["route_recommended"] is True
+    assert authority["owner_approved_next_phase"] is False
+    for key in (
+        "implementation",
+        "synthetic_prototype",
+        "threshold_search",
+        "candidate_generation",
+        "new_fact_registration",
+        "runtime_job",
+        "new_market_data_read",
+        "preserved_2021_evaluation_read",
+        "2022_2025_access",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+
+
+def test_stage012_documents_exist_and_route_to_owner_decision() -> None:
     for path in (
         ROOT / "docs/design/stage-atomic-proposition-successor-concept.md",
         ROOT / "docs/work-items/stage-atomic-proposition-successor.md",
         ROOT / "docs/acceptance/stage-atomic-proposition-a-ontology-audit-20260913.md",
         ROOT / "docs/acceptance/stage-atomic-proposition-b-relocation-adjudication-20260913.md",
         ROOT / "docs/acceptance/stage-atomic-proposition-c-observable-audit-20260913.md",
+        ROOT / "docs/reviews/stage-atomic-proposition-d-expert-review-20260913.md",
     ):
         assert path.is_file()
 
@@ -158,9 +198,7 @@ def test_stage012_documents_exist_and_route_to_review_only() -> None:
     work_item = (ROOT / "docs/work-items/stage-atomic-proposition-successor.md").read_text(
         encoding="utf-8"
     )
-    assert "P3-STAGE-012-D  READY FOR EXPERT REVIEW ONLY" in concept
-    assert (
-        "no implementation, fresh data, preserved 2021, threshold search or new Fact authority"
-        in work_item
-    )
+    assert "P3-STAGE-012-D  CLOSED  RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE" in concept
+    assert "blocked pending owner approval" in work_item
+    assert "synthetic-only" in work_item
     assert "Preserved 2021 remains unread" in work_item

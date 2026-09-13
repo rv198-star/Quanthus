@@ -1,0 +1,117 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-d-expert-review-result.v1",
+  "work_item": "P3-STAGE-012-D",
+  "state": "RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE",
+  "review_basis_commit": "29831e85ef1771235d7d599c86c37c84058e415a",
+  "review_basis": {
+    "A_digest": "sha256:f9aac37b172a38b6c756830c04b508f749c67df791465fafab758f618a09aa79",
+    "B_digest": "sha256:addaa2e0555a93685b722ff48721b938d8153f236fdc06dfbe2e7bb4a6f73645",
+    "C_digest": "sha256:86ad2e31c474be556c374b87130ad8fa56567734d8ffe077701e889e15dc4259",
+    "ABC_digest": "sha256:9fd7ac60f7b12bd8ddc8c4875d125658f319ef58cfea4d9fefc95867865ba1af"
+  },
+  "provenance": {
+    "same_origin_simulation": true,
+    "independent_human_expert_validation": false,
+    "responsibilities": [
+      "short_term_trader",
+      "fund_manager",
+      "quant_researcher",
+      "data_and_evidence_governance"
+    ]
+  },
+  "perspective_verdicts": {
+    "short_term_trader": {
+      "A": "SUPPORT",
+      "B": "SUPPORT_WITH_CLAIM_CEILING",
+      "C": "SUPPORT_INCONCLUSIVE",
+      "key_point": "Mixed directional instability is operationally distinct from direction-neutral Stage0. Compact disorder should be tested through failed envelope resolution rather than generic churn.",
+      "veto": "Do not create a third Stage0 channel directly from the fourteen consumed misses."
+    },
+    "fund_manager": {
+      "A": "SUPPORT",
+      "B": "SUPPORT_KEEP_RELOCATION_FROZEN",
+      "C": "SUPPORT_INCONCLUSIVE",
+      "key_point": "Directional repricing and structural stress may coexist. Preserve mixed instability as context/modifier for now rather than inventing a new peer primary Stage.",
+      "veto": "Do not weaken coherent relocation merely to recover Stage0 coverage."
+    },
+    "quant_researcher": {
+      "A": "SUPPORT",
+      "B": "SUPPORT_DIAGNOSTIC_NOT_GROUND_TRUTH",
+      "C": "SUPPORT_INCONCLUSIVE",
+      "key_point": "A fixes the evaluation target. B rejects result-dependent P008 retuning but the 9/2 semantic adjudication is same-origin diagnostic evidence. C cannot select envelope thresholds or prove a new Fact from consumed data.",
+      "veto": "No numeric threshold, candidate surface, parameter search or fresh experiment may be derived from P011/P012-A-C results."
+    },
+    "data_and_evidence_governance": {
+      "A": "SUPPORT_ATOMIC_LEDGER",
+      "B": "SUPPORT_PRESERVE_HISTORICAL_LEDGER",
+      "C": "SUPPORT_SYNTHETIC_ONLY_HYPOTHESIS",
+      "key_point": "Future review artifacts should preserve per-role atomic truths before projection. Any envelope observable must first exist as a threshold-free synthetic contract with PIT/failure semantics before Fact registration is considered.",
+      "veto": "No hidden feature, Fact identity, market read or preserved-2021 access may be opened by D."
+    }
+  },
+  "resolved_decisions": {
+    "atomic_first_qualification": "APPROVE_AS_SUCCESSOR_ARCHITECTURE",
+    "existing_stage0_stage2_projection": "RETAIN_AS_DOWNSTREAM_PROJECTION_FOR_NEXT_SYNTHETIC_PHASE",
+    "mixed_directional_instability": "PRESERVE_AS_ATOMIC_COEXISTENCE_PLUS_REASON_OR_MODIFIER_NOT_PEER_STAGE",
+    "p008_relocation_implementation": "KEEP_FROZEN",
+    "p008_relocation_threshold_retune": "NOT_SUPPORTED",
+    "p011_stage2_semantic_topology": "RETAIN_AS_LEADING_DESIGN_ASSUMPTION",
+    "compact_disorder_existing_fact_sufficiency": "NOT_DEMONSTRATED",
+    "new_compact_disorder_fact": "NOT_AUTHORIZED",
+    "third_instability_channel": "NOT_AUTHORIZED",
+    "range_envelope_hypothesis": "AUTHORIZE_FOR_SYNTHETIC_ONLY_SEMANTIC_PROTOTYPE_IF_OWNER_APPROVES_NEXT_PHASE",
+    "fresh_market_experiment": "NOT_AUTHORIZED",
+    "preserved_2021_evaluation": "UNREAD_AND_CLOSED"
+  },
+  "recommended_next_phase": {
+    "work_item": "P3-STAGE-012-E",
+    "status": "RECOMMENDED_PENDING_OWNER_APPROVAL",
+    "authority_if_approved": "implementation_and_synthetic_conformance_only",
+    "subwork": [
+      {
+        "id": "P3-STAGE-012-E1",
+        "purpose": "Implement an atomic Primary review/resolver contract that preserves per-role instability, relocation and order truths and reports mixed-state/projection denominators.",
+        "market_data": false
+      },
+      {
+        "id": "P3-STAGE-012-E2",
+        "purpose": "Define and prototype threshold-free range-envelope resolution/persistence semantics on synthetic paths only; no Fact registration.",
+        "market_data": false
+      },
+      {
+        "id": "P3-STAGE-012-E3",
+        "purpose": "Run adversarial synthetic conformance across orderly high-churn compression, one-leg relocation, compact failed-resolution disorder, stable narrow noise, mixed relocation+instability and missing-input cases.",
+        "market_data": false
+      }
+    ]
+  },
+  "minimum_synthetic_conformance": [
+    "atomic instability and relocation coexistence is preserved without forcing Stage0",
+    "orderly high-churn contraction is not rejected merely for internal oscillation",
+    "one-step or one-leg repricing followed by a hold remains relocation rather than compact disorder",
+    "repeated failed envelope resolution can be expressed positively without using future pivots",
+    "stable narrow noise does not become Stage0 by residual logic",
+    "unknown and unavailable inputs fail closed",
+    "no synthetic rule depends on numeric thresholds selected from consumed P008-P011 evidence"
+  ],
+  "review_after_e": {
+    "required": true,
+    "purpose": "Decide whether E2 semantics justify a formal threshold-free Fact/projection repair before any fresh cohort inventory or preregistration."
+  },
+  "authority": {
+    "review_completed": true,
+    "route_recommended": true,
+    "owner_approved_next_phase": false,
+    "implementation": false,
+    "synthetic_prototype": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "new_fact_registration": false,
+    "runtime_job": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2025_access": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

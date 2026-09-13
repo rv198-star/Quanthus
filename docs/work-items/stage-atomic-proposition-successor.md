@@ -7,15 +7,16 @@
 | Concept | `../design/stage-atomic-proposition-successor-concept.md` |
 | P011 post-closeout review | `../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md` |
 | A-C machine result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
-| Current state | A/B/C closed diagnostic-only; D expert review is next; no implementation, fresh data, preserved 2021, threshold search or new Fact authority |
+| Current state | A/B/C closed diagnostic-only; D expert review closed with a synthetic-only route recommendation; P3-STAGE-012 is blocked pending owner approval for E; no implementation, fresh data, preserved 2021, threshold search or new Fact authority |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
 | P3-STAGE-012-A | Atomic ontology and resolver audit | P3-STAGE-011 | closed `PASS_ATOMIC_PROPOSITION_FIRST`; atomic propositions become the next qualification unit before Stage0/2 projection; `../acceptance/stage-atomic-proposition-a-ontology-audit-20260913.md` |
 | P3-STAGE-012-B | Consumed relocation-conflict adjudication | P3-STAGE-012-A | closed `PASS_CONSUMED_SEMANTIC_ADJUDICATION`; 0 guard-overfire / 2 reference-undercall / 9 genuine-coexistence / 0 unresolved; P008 retune not supported; `../acceptance/stage-atomic-proposition-b-relocation-adjudication-20260913.md` |
 | P3-STAGE-012-C | Compact-disorder observational sufficiency audit | P3-STAGE-012-A | closed `INCONCLUSIVE`; current Facts/composition do not positively express compact disorder, but a new Fact is not yet proven; `../acceptance/stage-atomic-proposition-c-observable-audit-20260913.md` |
-| P3-STAGE-012-D | Expert review and bounded repair-route decision | P3-STAGE-012-A/B/C | ready for review only; must choose whether to approve projection/taxonomy repair, synthetic compact-envelope design, relocation work, or park; no result-bearing authority |
-| P3-STAGE-012-E+ | Implementation / synthetic conformance / fresh design | P3-STAGE-012-D | blocked until D explicitly approves a bounded route |
+| P3-STAGE-012-D | Expert review and bounded repair-route decision | P3-STAGE-012-A/B/C | closed `RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE`; atomic-first architecture approved for successor design, P008 relocation stays frozen, no new Fact/fresh-data authority; `../reviews/stage-atomic-proposition-d-expert-review-20260913.md` |
+| P3-STAGE-012-E | Atomic reference/resolver + envelope synthetic package | P3-STAGE-012-D | blocked pending owner approval; recommended E1 atomic review/resolver contract, E2 threshold-free envelope prototype, E3 adversarial synthetic conformance; no market data |
+| P3-STAGE-012-F+ | Fresh-cohort inventory / preregistration / development | P3-STAGE-012-E | blocked until E is approved, implemented, synthetically accepted and reviewed |
 
 ## Hard boundaries
 
@@ -30,7 +31,7 @@
 
 ## Next decision
 
-The next action is **P3-STAGE-012-D expert review** over A-C. It must decide the repair route before any
-implementation or synthetic prototype is authorized. In particular, D should not reopen relocation
-merely because P011 had eleven relocation vetoes: B found no reproducible guard-overfire case in the
-consumed packet.
+D is complete. The recommended next owner decision is whether to approve **P3-STAGE-012-E synthetic-only**:
+E1 atomic review/resolver contract, E2 threshold-free envelope-resolution prototype and E3 adversarial
+synthetic conformance. Until that approval, P3-STAGE-012 remains blocked. P008 relocation stays frozen,
+and neither fresh data nor a new Fact is authorized.

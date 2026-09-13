@@ -9,8 +9,9 @@
 | Predecessor | `P3-STAGE-011 / REVISE_OR_PARK_DEVELOPMENT_FAIL` |
 | Post-closeout review | [P011 expert meeting](../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md) |
 | A-C result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
+| D expert review | `../reviews/stage-atomic-proposition-d-expert-review-20260913.md` |
 | Work-item route | [P3-STAGE-012](../work-items/stage-atomic-proposition-successor.md) |
-| Authority | A-C consumed-evidence diagnostic only; D expert review next; no implementation/data/runtime/parameter authority |
+| Authority | D review complete; synthetic-only E is recommended but blocked pending owner approval; no implementation/data/runtime/parameter authority |
 
 > P3-STAGE-012 is now active only as a **design/diagnostic work item**. A-C are closed without fresh
 > market data or parameter search. The parent design remains draft and delivery remains blocked until
@@ -243,10 +244,12 @@ A-C were explicitly authorized as consumed-evidence diagnostic work and are now 
 P3-STAGE-012-A  CLOSED  PASS_ATOMIC_PROPOSITION_FIRST
 P3-STAGE-012-B  CLOSED  PASS_CONSUMED_SEMANTIC_ADJUDICATION
 P3-STAGE-012-C  CLOSED  INCONCLUSIVE
-P3-STAGE-012-D  READY FOR EXPERT REVIEW ONLY
+P3-STAGE-012-D  CLOSED  RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE
 -------------------------------------------------------------
-only after D selects and approves a bounded route:
-P3-STAGE-012-E  bounded implementation + synthetic conformance
+owner approval required before:
+P3-STAGE-012-E  atomic review/resolver + threshold-free envelope synthetic package
+-------------------------------------------------------------
+only after E acceptance + review:
 P3-STAGE-012-F  fresh-cohort inventory + preregistration
 P3-STAGE-012-G  fresh development / blind atomic review
 P3-STAGE-012-H  projection compatibility and candidate freeze
@@ -289,6 +292,8 @@ disorder independently of Stage2, but the consumed packet does not prove that a 
 Fact is the correct abstraction. A sequential envelope-resolution hypothesis needs synthetic-only
 adversarial semantics before any Fact decision.
 
-The next decision is therefore **P3-STAGE-012-D expert review**. D must choose whether to approve a
-projection/taxonomy repair, a synthetic compact-envelope observable design, any relocation follow-up,
-or a park decision. No implementation or fresh-data authority exists before that review.
+D is now complete. The panel recommends a bounded **synthetic-only E package**, pending owner approval:
+E1 atomic Primary review/resolver contract, E2 threshold-free range-envelope resolution/persistence
+prototype, and E3 adversarial synthetic conformance. P008 relocation remains frozen, mixed directional
+instability remains atomic coexistence plus reason/modifier metadata, and no new Fact is authorized.
+Fresh cohort work remains later and preserved 2021 remains unread.

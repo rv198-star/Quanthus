@@ -1,0 +1,59 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-successor-abc-result.v1",
+  "work_item": "P3-STAGE-012-A-C",
+  "state": "READY_FOR_D_EXPERT_REVIEW",
+  "parent_concept": "docs/design/stage-atomic-proposition-successor-concept.md",
+  "results": {
+    "A": {
+      "path": "config/stage-learning/stage-atomic-proposition-ontology-audit.v1.json",
+      "status": "PASS_ATOMIC_PROPOSITION_FIRST",
+      "bounded_conclusion": "The existing Stage0/Stage2 resolver topology remains a valid starting point, but atomic instability, relocation and order must be reviewed and qualified before projected Stage labels. Instability+relocation is valid coexistence, not a resolver conflict."
+    },
+    "B": {
+      "path": "config/stage-learning/stage-relocation-conflict-adjudication.v1.json",
+      "status": "PASS_CONSUMED_SEMANTIC_ADJUDICATION",
+      "classification_counts": {
+        "guard_overfire": 0,
+        "reference_undercall": 2,
+        "genuine_coexistence": 9,
+        "unresolved": 0
+      },
+      "bounded_conclusion": "The eleven P011 relocation-veto Stage0 cases do not support P008 threshold retuning. The dominant problem is projected-reference compression of atomic coexistence, with two additional likely relocation under-calls."
+    },
+    "C": {
+      "path": "config/stage-learning/stage-compact-disorder-observable-audit.v1.json",
+      "status": "INCONCLUSIVE",
+      "bounded_conclusion": "Current governed summary/path Facts do not independently express a positive compact-disorder proposition, but consumed evidence is insufficient to prove a new Fact is required. Range-envelope resolution/persistence remains a hypothesis requiring synthetic threshold-free semantics."
+    }
+  },
+  "decision_fork_evidence": {
+    "D1_projection_or_taxonomy_repair": "SUPPORTED_FOR_REVIEW",
+    "D2_relocation_proposition_repair": "NOT_SUPPORTED_BY_CURRENT_CONSUMED_EVIDENCE",
+    "D3_compact_disorder_repair": "REQUIRES_SYNTHETIC_OBSERVABLE_REVIEW_BEFORE_ROUTE_SELECTION",
+    "stage2_semantic_topology": "RETAIN_AS_LEADING_DESIGN_ASSUMPTION",
+    "fresh_experiment": "NOT_AUTHORIZED"
+  },
+  "expert_review_questions": [
+    "Should P012 formally change the qualification unit from projected Stage0/Stage2 to atomic propositions first, while retaining the existing downstream Stage0/2 projection?",
+    "Should mixed directional instability remain reason/modifier metadata for now, or should broader taxonomy work explicitly represent it before fresh Stage0 qualification?",
+    "Given zero identified guard-overfire cases in B, should relocation implementation remain frozen through the next successor phase?",
+    "Should C remain INCONCLUSIVE and open a synthetic threshold-free range-envelope observable design, or is the compact-disorder vocabulary itself too weak to justify another Fact?",
+    "What minimum synthetic conformance evidence is required before a compact-disorder Fact or third instability channel may be approved?"
+  ],
+  "authority": {
+    "A_completed": true,
+    "B_completed": true,
+    "C_completed": true,
+    "D_expert_review_ready": true,
+    "D_route_selected": false,
+    "implementation": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "new_fact_registration": false,
+    "runtime_job": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

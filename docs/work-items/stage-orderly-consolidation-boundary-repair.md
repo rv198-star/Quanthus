@@ -31,5 +31,6 @@
 - Simultaneous Stage0/Stage2 assertion remains a hard semantic conflict, not a precedence decision.
 - Preserved 2021 remains unread until a pair is frozen on a new disjoint development cohort.
 - 2022–2025, official labels, daily activation, strategy and trading remain closed.
-- The non-governing successor concept is `../design/stage-atomic-proposition-successor-concept.md`;
-  it does not create P3-STAGE-012 implementation or data authority.
+- The successor route is `../work-items/stage-atomic-proposition-successor.md`. P3-STAGE-012 A/B/C
+  are closed as consumed-evidence diagnostics only; D expert review is next. No implementation,
+  fresh-data or preserved-2021 authority has been created.

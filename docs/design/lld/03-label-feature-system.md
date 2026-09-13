@@ -450,6 +450,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; `../../acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md` |
 | P3-STAGE-011-C | Consumed-evidence topology conformance | P3-STAGE-011-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; `../../acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md` |
 | P3-STAGE-011-D | Fresh joint Stage0/Stage2 development | P3-STAGE-011-C | closed `REVISE_OR_PARK_DEVELOPMENT_FAIL`; 190 cases / 380 sealed opinions / exact 27 pairs / 0 eligible; best Stage0 coverage 58/83=0.6988 vs 0.70 while balanced Stage2 is 20/21 TP at precision 0.9524; preserved 2021 remains unread; `../../acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md` |
+| P3-STAGE-012 | Atomic proposition decomposition and compact-disorder boundary | P3-STAGE-011 | A/B/C closed diagnostic-only; D ready for expert review; no implementation/fresh-data authority; `../stage-atomic-proposition-successor-concept.md` |
+| P3-STAGE-012-A | Atomic ontology and resolver audit | P3-STAGE-011 | closed `PASS_ATOMIC_PROPOSITION_FIRST`; `../../acceptance/stage-atomic-proposition-a-ontology-audit-20260913.md` |
+| P3-STAGE-012-B | Consumed relocation-conflict adjudication | P3-STAGE-012-A | closed `PASS_CONSUMED_SEMANTIC_ADJUDICATION`; P008 guard retune not supported; `../../acceptance/stage-atomic-proposition-b-relocation-adjudication-20260913.md` |
+| P3-STAGE-012-C | Compact-disorder observational sufficiency audit | P3-STAGE-012-A | closed `INCONCLUSIVE`; new Fact not authorized; `../../acceptance/stage-atomic-proposition-c-observable-audit-20260913.md` |
+| P3-STAGE-012-D | Expert review and bounded repair-route decision | P3-STAGE-012-A/B/C | ready for review only; no result-bearing authority |
 
 ## 7. Acceptance
 

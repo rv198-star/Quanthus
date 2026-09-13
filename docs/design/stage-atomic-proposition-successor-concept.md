@@ -4,15 +4,17 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Provisional work item | `P3-STAGE-012` |
+| Work item | `P3-STAGE-012` |
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | `P3-STAGE-011 / REVISE_OR_PARK_DEVELOPMENT_FAIL` |
 | Post-closeout review | [P011 expert meeting](../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md) |
-| Authority | concept only; no implementation/data/runtime/parameter authority |
+| A-C result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
+| Work-item route | [P3-STAGE-012](../work-items/stage-atomic-proposition-successor.md) |
+| Authority | A-C consumed-evidence diagnostic only; D expert review next; no implementation/data/runtime/parameter authority |
 
-> This is a non-governing successor concept. It does not create an active work item, approve an
-> implementation, select thresholds, open market data, or consume preserved 2021. A later approved
-> design must explicitly supersede this concept before result-bearing work begins.
+> P3-STAGE-012 is now active only as a **design/diagnostic work item**. A-C are closed without fresh
+> market data or parameter search. The parent design remains draft and delivery remains blocked until
+> D expert review chooses a bounded repair route. No result-bearing implementation is authorized.
 
 ## 1. Why a different successor shape is needed
 
@@ -233,17 +235,17 @@ economic identities and prior evidence exposure. The next development cohort is 
 that inventory and preregistration. This concept deliberately does not nominate a year or identity
 pool.
 
-## 9. Proposed bounded delivery sequence
+## 9. Bounded delivery sequence and A-C result
 
-This sequence is a proposal, not current authority.
+A-C were explicitly authorized as consumed-evidence diagnostic work and are now closed:
 
 ```text
-P3-STAGE-012-A  atomic ontology + resolver audit
-P3-STAGE-012-B  consumed relocation-conflict adjudication
-P3-STAGE-012-C  compact-disorder observational sufficiency / Fact decision
-P3-STAGE-012-D  adversarial review + choose repair route(s)
+P3-STAGE-012-A  CLOSED  PASS_ATOMIC_PROPOSITION_FIRST
+P3-STAGE-012-B  CLOSED  PASS_CONSUMED_SEMANTIC_ADJUDICATION
+P3-STAGE-012-C  CLOSED  INCONCLUSIVE
+P3-STAGE-012-D  READY FOR EXPERT REVIEW ONLY
 -------------------------------------------------------------
-only after A-D approval:
+only after D selects and approves a bounded route:
 P3-STAGE-012-E  bounded implementation + synthetic conformance
 P3-STAGE-012-F  fresh-cohort inventory + preregistration
 P3-STAGE-012-G  fresh development / blind atomic review
@@ -272,12 +274,21 @@ P012 concept does not authorize:
 - using 2022-2025;
 - daily labels, strategy consumption or trading.
 
-## 11. Decision requested from the owner
+## 11. A-C closed findings and next decision
 
-The recommended next approval, if the owner agrees, is **P3-STAGE-012-A through C design/diagnostic
-work only**. That approval would still carry zero fresh-market-data and zero parameter-search authority.
+A closes the ontology question for the next phase: qualify atomic propositions before Stage0/Stage2
+projection; `instability+relocation` is valid coexistence and remains outside the Stage0/2 projection
+without being discarded.
 
-The key strategic choice is to accept the successor's change of research target:
+B classifies the eleven P011 relocation-veto cases as 0 guard-overfire, 2 likely reference under-calls
+and 9 genuine coexistence cases. This does **not** authorize P008 guard retuning and instead strengthens
+the case for atomic reference review.
 
-> qualify atomic propositions and resolver semantics before optimizing a single projected Stage0
-> label again.
+C remains `INCONCLUSIVE`: current governed summary/path Facts do not positively express compact
+disorder independently of Stage2, but the consumed packet does not prove that a new range-envelope
+Fact is the correct abstraction. A sequential envelope-resolution hypothesis needs synthetic-only
+adversarial semantics before any Fact decision.
+
+The next decision is therefore **P3-STAGE-012-D expert review**. D must choose whether to approve a
+projection/taxonomy repair, a synthetic compact-envelope observable design, any relocation follow-up,
+or a park decision. No implementation or fresh-data authority exists before that review.

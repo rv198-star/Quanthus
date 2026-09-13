@@ -1,0 +1,105 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-ontology-audit.v1",
+  "work_item": "P3-STAGE-012-A",
+  "status": "PASS_ATOMIC_PROPOSITION_FIRST",
+  "purpose": "Audit the Stage0/Stage2 ontology and resolver using only already-consumed P008-P011 evidence before any successor implementation or fresh data.",
+  "sources": {
+    "resolver_implementation": "src/quanthus/stage_learning/order_reference_protocol_v2.py",
+    "p008_design": "config/stage-learning/directional-boundary-repair-design.v1.json",
+    "p009_design": "docs/design/stage-positive-instability-proposition-repair.md",
+    "p011_closeout": "docs/acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md",
+    "p011_failure_diagnostic": "config/stage-learning/orderly-consolidation-joint-development-failure-diagnostic.v1.json"
+  },
+  "atomic_propositions": [
+    "structural_instability_20",
+    "coherent_directional_relocation_20",
+    "orderly_consolidation_20"
+  ],
+  "decisions": {
+    "stage0_is_direction_neutral_instability_projection": true,
+    "stage2_is_positive_orderly_consolidation_projection": true,
+    "instability_and_relocation_may_coexist": true,
+    "instability_and_relocation_coexistence_is_not_a_resolver_conflict": true,
+    "mixed_directional_instability_is_not_stage0": true,
+    "mixed_directional_instability_is_not_assigned_a_new_peer_stage_code": true,
+    "mixed_directional_instability_role_now": "preserve atomic coexistence and reason/modifier metadata pending broader taxonomy review",
+    "order_true_with_instability_or_relocation_true_is_explicit_conflict": true,
+    "atomic_propositions_are_qualification_targets_before_stage_projection": true,
+    "projected_stage_agreement_is_not_sufficient_evidence_that_each_atomic_proposition_is_correct": true,
+    "cross_role_atomic_ledgers_must_be_preserved": true,
+    "top1_force_is_forbidden": true,
+    "residual_stage0_is_forbidden": true
+  },
+  "truth_table": [
+    {
+      "instability": "TRUE",
+      "relocation": "FALSE",
+      "order": "FALSE",
+      "atomic_interpretation": "direction_neutral_structural_instability",
+      "stage0_2_projection": "STAGE_0"
+    },
+    {
+      "instability": "FALSE",
+      "relocation": "FALSE",
+      "order": "TRUE",
+      "atomic_interpretation": "positive_orderly_consolidation",
+      "stage0_2_projection": "STAGE_2"
+    },
+    {
+      "instability": "TRUE",
+      "relocation": "TRUE",
+      "order": "FALSE",
+      "atomic_interpretation": "mixed_directional_instability",
+      "stage0_2_projection": "NEITHER"
+    },
+    {
+      "instability": "FALSE",
+      "relocation": "TRUE",
+      "order": "FALSE",
+      "atomic_interpretation": "coherent_directional_relocation",
+      "stage0_2_projection": "NEITHER"
+    },
+    {
+      "instability": "FALSE",
+      "relocation": "FALSE",
+      "order": "FALSE",
+      "atomic_interpretation": "no_positive_stage0_or_stage2_proposition",
+      "stage0_2_projection": "NEITHER"
+    },
+    {
+      "instability": "TRUE_OR_FALSE",
+      "relocation": "TRUE_OR_FALSE",
+      "order": "TRUE",
+      "condition": "instability==TRUE OR relocation==TRUE",
+      "atomic_interpretation": "positive_order_conflict",
+      "stage0_2_projection": "AMBIGUOUS_CONFLICT"
+    },
+    {
+      "instability": "UNKNOWN_DEPENDENT",
+      "relocation": "UNKNOWN_DEPENDENT",
+      "order": "UNKNOWN_DEPENDENT",
+      "atomic_interpretation": "insufficient_atomic_resolution",
+      "stage0_2_projection": "AMBIGUOUS"
+    }
+  ],
+  "successor_implication": {
+    "qualify_atomic_instability_before_stage0_projection": true,
+    "qualify_atomic_relocation_before_stage0_projection": true,
+    "qualify_atomic_order_before_stage2_projection": true,
+    "measure_mixed_state_rate": true,
+    "measure_projection_conflict_rate": true,
+    "measure_single_stage_coverage": true,
+    "do_not_treat_stage0_false_negative_as_equivalent_to_instability_false_negative": true
+  },
+  "authority": {
+    "diagnostic_only": true,
+    "implementation": false,
+    "threshold_change": false,
+    "candidate_generation": false,
+    "new_fact_registration": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

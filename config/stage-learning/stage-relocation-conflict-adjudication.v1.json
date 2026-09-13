@@ -1,0 +1,119 @@
+{
+  "schema_version": "quanthus.stage-relocation-conflict-adjudication.v1",
+  "work_item": "P3-STAGE-012-B",
+  "status": "PASS_CONSUMED_SEMANTIC_ADJUDICATION",
+  "purpose": "Classify the eleven consumed P011 cases where the sealed projected reference is Stage0 while the frozen P008 relocation guard is positive, without changing either the P011 ledger or P008 thresholds.",
+  "source_bindings": {
+    "p011_review_ledger_sha256": "sha256:1a73c66dd1255970c3a8de81a92adfabe7e57fc668b8deab7a12ef3eb82092f1",
+    "p011_selection_artifact_sha256": "sha256:b643a37841ad3241e9be6670b89d29d254e510129a9d2620a8baebd3f3cc8fad",
+    "p011_failure_diagnostic": "config/stage-learning/orderly-consolidation-joint-development-failure-diagnostic.v1.json",
+    "p008_relocation_design": "config/stage-learning/directional-boundary-repair-design.v1.json",
+    "p009_instability_design": "docs/design/stage-positive-instability-proposition-repair.md"
+  },
+  "classification_semantics": {
+    "R1_GUARD_OVERFIRE": "The frozen numeric guard asserts relocation but full consumed T-only path evidence does not support coherent repricing.",
+    "R2_REFERENCE_UNDERCALL": "The path supports coherent relocation and the original blind atomic reviewer likely under-called relocation; independent instability is not needed to explain the shape.",
+    "R3_GENUINE_COEXISTENCE": "The path supports both coherent relocation and independent structural disorder; the projected Stage0 target collapsed a legitimate mixed atomic state.",
+    "R4_UNRESOLVED": "Consumed T-only evidence does not support a bounded semantic choice among R1-R3."
+  },
+  "packet": {
+    "case_count": 11,
+    "all_sealed_projected_reference_stage0": true,
+    "all_frontier_positive_instability_true": true,
+    "all_frozen_p008_relocation_guard_true": true,
+    "all_frontier_order_false": true
+  },
+  "classification_counts": {
+    "R1_GUARD_OVERFIRE": 0,
+    "R2_REFERENCE_UNDERCALL": 2,
+    "R3_GENUINE_COEXISTENCE": 9,
+    "R4_UNRESOLVED": 0
+  },
+  "cases": [
+    {
+      "index": 5,
+      "case_id": "sha256:c798e71f67eea93a0c816a29af7e648c53c9463b15871cc406a0f3ca60026409",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "A material endpoint repricing coexists with large expansion, giveback and repeated two-sided movement; neither relocation nor instability should erase the other."
+    },
+    {
+      "index": 28,
+      "case_id": "sha256:61609b895b7602b5d47a913479177a895450f2c7372126d85e8bf3c086078138",
+      "classification": "R2_REFERENCE_UNDERCALL",
+      "reason": "The consumed path is dominated by a sustained one-sided decline with limited adverse excursion; broadness is parsimoniously explained by the repricing leg rather than independent disorder."
+    },
+    {
+      "index": 46,
+      "case_id": "sha256:bd003fe07a5a65ce735edabec0bfc6526e04691c920669b85db71699dc7cff2c",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "An initial opposite-side excursion and later sustained decline create both a coherent net repricing and independent broad reversal evidence."
+    },
+    {
+      "index": 47,
+      "case_id": "sha256:01f23223b9069028f36feaed6cf06955d3e322e0e730abd4da4f843b68cefb30",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "A strong downward relocation remains visible, but large intermediate jumps and rebound structure provide separate instability evidence."
+    },
+    {
+      "index": 61,
+      "case_id": "sha256:c3dd103a09c148ad9d9fd758d6e8c14234409c37216a577e5488de142c9b0c49",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "The path completes a material decline while also overshooting and reversing materially inside the window; both atomic propositions are defensible."
+    },
+    {
+      "index": 66,
+      "case_id": "sha256:d7461569a2bf0d0519db497914780e2b3f78eb0467be4a368cdb1021ac998631",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "A coherent lower repricing coexists with a material late rebound and broad two-sided structure rather than a clean relocation-only path."
+    },
+    {
+      "index": 77,
+      "case_id": "sha256:09edf4ebdd94b950cfc8e8179ff50a8f72a424c9ce6e3cbbd5ea4e10b383bc2c",
+      "classification": "R2_REFERENCE_UNDERCALL",
+      "reason": "Most of the window-level change is a completed downward repricing followed by a lower-level hold; the shape matches the existing one-step-or-leg-then-flat relocation semantics more closely than independent instability."
+    },
+    {
+      "index": 100,
+      "case_id": "sha256:0392b3536ae71e34366581fbd65ec1ac971f67fd7bfbc31b6be58dcdcd3c5bde",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "A large net advance is coherent enough to retain relocation while repeated substantial pullbacks and re-expansion retain independent instability."
+    },
+    {
+      "index": 161,
+      "case_id": "sha256:2ca546ebd051d862a192b595ebbddf5f073a596bc6f5b0f0c0e3805feed6c873",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "The decline is directionally meaningful, but the deep overshoot and strong rebound make structural disorder independently positive."
+    },
+    {
+      "index": 167,
+      "case_id": "sha256:7f3aea4416c1be74333c394090fadbf3d4c97c1c2f7cb065d27d4b0310766fb8",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "The path contains a real downward repricing plus a large opposite-side excursion before and during the leg; mixed directional instability is the bounded interpretation."
+    },
+    {
+      "index": 183,
+      "case_id": "sha256:2488a5940c0ff8d591d3a7b869b45876e44d39a25406f41057c485985fb53d35",
+      "classification": "R3_GENUINE_COEXISTENCE",
+      "reason": "A material upward relocation coexists with repeated large reversals; forcing a single Stage0-versus-relocation answer discards atomic information."
+    }
+  ],
+  "bounded_conclusions": {
+    "p011_does_not_demonstrate_a_reproducible_guard_overfire_shape": true,
+    "p008_threshold_retuning_is_not_supported": true,
+    "projected_stage0_reference_should_not_be_reused_as_atomic_instability_or_relocation_ground_truth": true,
+    "future_blind_review_should_score_instability_and_relocation_as_separate_atomic_propositions_before_projection": true,
+    "mixed_directional_instability_requires_explicit_denominator_reporting": true
+  },
+  "claim_ceiling": "Same-origin post-closeout semantic adjudication over consumed evidence. These classifications guide successor design but are not replacement labels and do not rewrite the sealed P011 review ledger.",
+  "authority": {
+    "diagnostic_only": true,
+    "p011_review_rewrite": false,
+    "p008_guard_change": false,
+    "threshold_change": false,
+    "candidate_generation": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

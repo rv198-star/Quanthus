@@ -308,6 +308,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-011-B | Implement deterministic orderly-consolidation projection and synthetic counterexamples | P3-STAGE-011-A | closed; engineering accepted; docs/acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md |
 | P3-STAGE-011-C | Consumed-evidence topology conformance | P3-STAGE-011-B | closed; `PASS_TOPOLOGY_CONFORMANCE_ONLY`; docs/acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md |
 | P3-STAGE-011-D | Fresh joint Stage0/Stage2 development | P3-STAGE-011-C | closed `REVISE_OR_PARK_DEVELOPMENT_FAIL`; 190 cases / 380 sealed opinions / exact 27 pairs / 0 eligible; best Stage0 coverage 58/83=0.6988 vs 0.70 while balanced Stage2 is 20/21 TP at precision 0.9524; 2021 unread; docs/acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md |
+| P3-STAGE-012 | Atomic proposition decomposition and compact-disorder boundary | P3-STAGE-011 | A/B/C closed diagnostic-only; D ready for expert review; no implementation/fresh-data authority; docs/work-items/stage-atomic-proposition-successor.md |
+| P3-STAGE-012-A | Atomic ontology and resolver audit | P3-STAGE-011 | closed `PASS_ATOMIC_PROPOSITION_FIRST`; docs/acceptance/stage-atomic-proposition-a-ontology-audit-20260913.md |
+| P3-STAGE-012-B | Consumed relocation-conflict adjudication | P3-STAGE-012-A | closed `PASS_CONSUMED_SEMANTIC_ADJUDICATION`; 0 guard-overfire / 2 reference-undercall / 9 genuine-coexistence; docs/acceptance/stage-atomic-proposition-b-relocation-adjudication-20260913.md |
+| P3-STAGE-012-C | Compact-disorder observational sufficiency audit | P3-STAGE-012-A | closed `INCONCLUSIVE`; current Facts/composition insufficient for a positive compact-disorder claim, new Fact not proven; docs/acceptance/stage-atomic-proposition-c-observable-audit-20260913.md |
+| P3-STAGE-012-D | Expert review and route decision | P3-STAGE-012-A/B/C | ready for review only; implementation/data authority remains blocked |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

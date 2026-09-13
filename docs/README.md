@@ -369,8 +369,12 @@ nodes.
   `acceptance/stage-orderly-consolidation-joint-d2-review-seal-20260913.md`; D2 closeout:
   `acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md`; post-closeout
   expert review: `reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md`;
-  non-governing successor concept: `design/stage-atomic-proposition-successor-concept.md`; route:
-  `work-items/stage-orderly-consolidation-boundary-repair.md`.
+  successor design/diagnostic route: `design/stage-atomic-proposition-successor-concept.md` and
+  `work-items/stage-atomic-proposition-successor.md`. P3-STAGE-012 A/B/C are now closed diagnostic-only:
+  A keeps atomic propositions ahead of Stage projection, B classifies the eleven relocation conflicts
+  as 0 guard-overfire / 2 reference-undercall / 9 genuine-coexistence, and C closes `INCONCLUSIVE`
+  because current Facts do not positively express compact disorder but a new envelope Fact is not yet
+  proven. D expert review is next; implementation, fresh data and preserved 2021 remain blocked.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

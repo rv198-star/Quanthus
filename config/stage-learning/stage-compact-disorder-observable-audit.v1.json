@@ -1,0 +1,91 @@
+{
+  "schema_version": "quanthus.stage-compact-disorder-observable-audit.v1",
+  "work_item": "P3-STAGE-012-C",
+  "status": "INCONCLUSIVE",
+  "purpose": "Determine whether the fourteen consumed P011 compact/contracting Stage0 misses can be positively distinguished from orderly consolidation using existing governed T-only observables, without selecting thresholds or registering a new Fact.",
+  "source_bindings": {
+    "p011_review_ledger_sha256": "sha256:1a73c66dd1255970c3a8de81a92adfabe7e57fc668b8deab7a12ef3eb82092f1",
+    "p011_selection_artifact_sha256": "sha256:b643a37841ad3241e9be6670b89d29d254e510129a9d2620a8baebd3f3cc8fad",
+    "p011_failure_diagnostic": "config/stage-learning/orderly-consolidation-joint-development-failure-diagnostic.v1.json",
+    "p011_order_projection": "config/stage-learning/orderly-consolidation-projection.v1.json",
+    "p010_instability_projection": "src/quanthus/stage_learning/positive_instability_quantitative_projection.py"
+  },
+  "consumed_packets": {
+    "compact_stage0_miss_count": 14,
+    "definite_stage2_reference_count": 21,
+    "compact_packet_definition": "P011 definite Stage0 false negatives on the representative one-gate frontier where positive-instability itself is FALSE",
+    "stage2_packet_definition": "P011 sealed definite Stage2 references"
+  },
+  "existing_governed_observables_audited": [
+    "range_width20",
+    "width_change20",
+    "directional_efficiency20",
+    "range_center_shift20",
+    "range_traversal20",
+    "counter_direction_excursion_share20"
+  ],
+  "findings": {
+    "all_six_scalar_fact_ranges_overlap_between_compact_stage0_and_stage2": true,
+    "all_14_compact_cases_have_broad_path_disorder_two_of_three_true": true,
+    "all_21_stage2_cases_have_broad_path_disorder_two_of_three_true": true,
+    "generic_path_disorder_or_churn_is_discriminative": false,
+    "balanced_order_projection_true_on_compact_stage0_count": 1,
+    "balanced_order_projection_false_on_compact_stage0_count": 13,
+    "stage2_topology_is_the_primary_source_of_compact_stage0_misses": false,
+    "current_positive_instability_amplitude_admission_is_the_primary_source_of_compact_stage0_misses": true
+  },
+  "post_result_scratch_envelope_diagnostic": {
+    "authority": "diagnostic_only_not_a_fact_not_a_threshold_surface",
+    "derived_from": "already-consumed 21-session blind review paths",
+    "candidate_descriptors": [
+      "rolling_close_envelope_width_direction_changes",
+      "rolling_close_envelope_center_direction_changes",
+      "rolling_close_envelope_reexpansion_share",
+      "rolling_close_envelope_width_total_variation",
+      "rolling_close_envelope_center_total_variation"
+    ],
+    "result": "Some total-variation descriptors shift upward for the compact Stage0 packet, but all tested descriptor ranges still overlap the Stage2 packet. Direction-change and re-expansion descriptors overlap heavily.",
+    "threshold_selected": false,
+    "fact_identity_created": false,
+    "separability_demonstrated": false
+  },
+  "synthetic_semantic_requirements_for_any_future_observable": [
+    "narrow contracting band with high in-band churn must remain eligible for orderly consolidation",
+    "one-step or coherent directional repricing followed by a narrow hold must not become compact disorder",
+    "final narrow width after repeated envelope re-expansion and alternating failed resolution must remain representable as a distinct positive-disorder hypothesis",
+    "stable narrow non-contracting noise must not become structural instability by residual logic",
+    "the observable must be causal and T-only and must not depend on future-confirmed pivots"
+  ],
+  "exit": {
+    "state": "INCONCLUSIVE",
+    "existing_facts_sufficient_for_current_two_channel_stage0_projection": false,
+    "new_fact_required_is_proven": false,
+    "ontology_reclassification_required_is_proven": false,
+    "bounded_conclusion": "Current governed scalar/path summaries and the existing broad-path-disorder composite do not provide an independent positive compact-disorder proposition that separates the consumed compact Stage0 packet from Stage2. A sequential range-envelope/failed-resolution observable is a plausible hypothesis, but consumed data show overlap and cannot authorize a new Fact. Synthetic counterexamples and threshold-free prototype semantics are required before the D decision fork."
+  },
+  "candidate_hypothesis_only": {
+    "working_name": "range_envelope_resolution_or_persistence",
+    "possible_semantics": [
+      "repeated boundary escape followed by rapid re-entry",
+      "alternating boundary pressure without coherent one-side resolution",
+      "repeated envelope re-expansion or re-centering despite a narrow endpoint envelope",
+      "disagreement between endpoint compression and the path of envelope compression"
+    ],
+    "registered_fact": false,
+    "implementation_authorized": false
+  },
+  "authority": {
+    "diagnostic_only": true,
+    "threshold_change": false,
+    "candidate_addition": false,
+    "new_fact_registration": false,
+    "new_fact_implementation": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "2019_p010_development_access": false,
+    "2020_p009_development_access": false,
+    "2022_2025_access": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

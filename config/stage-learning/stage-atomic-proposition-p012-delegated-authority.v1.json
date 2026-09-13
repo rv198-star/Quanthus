@@ -1,0 +1,36 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-p012-delegated-authority.v1",
+  "work_item": "P3-STAGE-012",
+  "state": "OWNER_DELEGATED_THROUGH_P012_CLOSEOUT",
+  "effective_date": "2026-09-14",
+  "scope": "P3-STAGE-012 successor iteration only",
+  "delegated": {
+    "open_next_subwork_after_current_gate_passes": true,
+    "design_and_implementation": true,
+    "synthetic_conformance": true,
+    "freshness_inventory_and_preregistration": true,
+    "bounded_fresh_development_after_preregistration": true,
+    "candidate_blind_atomic_review": true,
+    "expert_review_and_route_selection": true,
+    "freeze_or_fail_closeout": true,
+    "preserved_2021_evaluation_after_exact_candidate_or_projection_freeze": true
+  },
+  "hard_boundaries": {
+    "do_not_rerun_completed_or_consumed_stages": true,
+    "do_not_rewrite_sealed_ledgers": true,
+    "do_not_relax_frozen_gates_after_results": true,
+    "do_not_add_post_result_candidates_or_thresholds": true,
+    "fresh_data_requires_prior_frozen_preregistration": true,
+    "preserved_2021_before_exact_freeze": false,
+    "permanent_blind_2025_access": false,
+    "p008_relocation_retune_from_consumed_p011_evidence": false,
+    "daily_strategy_trading_activation": false,
+    "runtime_production_activation": false
+  },
+  "stop_rules": {
+    "semantic_or_methodological_failure": "close the current bounded phase and design the next P012 successor step from aggregate attribution; do not hot-fix consumed evidence",
+    "technical_failure": "diagnose first; retry only when a separately frozen technical-recovery contract preserves semantic identity",
+    "external_authority_or_tool_blocker": "stop at the durable checkpoint and report the exact blocker rather than bypassing the boundary"
+  },
+  "claim_ceiling": "This delegation removes repeated owner-approval handoffs inside P3-STAGE-012. It does not waive any frozen evidence, freshness, partition, runtime, strategy or trading gate."
+}

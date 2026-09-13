@@ -3,13 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quanthus.structure_semantics import load_semantic_catalog
 from quanthus.structure_v2_inputs import digest
 
 ROOT = Path(__file__).resolve().parents[2]
 RESULT = ROOT / "config/structure-directional-path-envelope-e8-review-result.v1.json"
 RESULT_DIGEST = "sha256:7dd02799c0fba3e6f34d7ad84023ab49394cc9609b90aa448c63eec5d99b49d9"
-CATALOG = ROOT / "config/structure-semantic-catalog.v1.json"
 CONCEPT_ID = "structure.geometry.close-envelope-resolution-trace"
 
 
@@ -42,11 +40,11 @@ def test_e8_uses_reserved_registration_precedent_without_runtime_promotion() -> 
     assert "runtime qualification remained separately gated" in precedent["precedent"]
 
 
-def test_e8_review_does_not_mutate_catalog_and_opens_only_e9() -> None:
-    catalog = load_semantic_catalog(CATALOG)
-    assert all(item.concept_id != CONCEPT_ID for item in catalog.concepts)
-
+def test_e8_review_records_pre_registration_catalog_and_opens_only_e9() -> None:
     value = load()
+    assert value["review_basis"]["semantic_catalog_digest"] == (
+        "sha256:86bf671c163c69002330102e15b120cd3883b7064d32d806c6f30680082e3a4d"
+    )
     next_phase = value["next_phase"]
     assert next_phase["work_item"] == "P3-STAGE-012-E9"
     assert next_phase["status"] == "BLOCKED_PENDING_OWNER_APPROVAL"

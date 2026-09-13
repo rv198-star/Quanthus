@@ -24,7 +24,7 @@ def test_catalog_build_is_deterministic_and_matches_snapshot_manifest() -> None:
     catalog = DataIndicatorCatalog()
     assert catalog.snapshot["snapshot_digest"] == first["snapshot_digest"]
     assert first["summary"] == {
-        "entry_count": 760,
+        "entry_count": 761,
         "gap_count": 10,
         "counts_by_kind": {
             "adm_dataset": 4,
@@ -34,7 +34,7 @@ def test_catalog_build_is_deterministic_and_matches_snapshot_manifest() -> None:
             "feature_spec": 9,
             "label_card": 4,
             "ods_dataset": 57,
-            "semantic_concept": 33,
+            "semantic_concept": 34,
             "semantic_family": 20,
         },
     }
@@ -162,10 +162,14 @@ def test_structure_runtime_bindings_project_only_blueprint_accepted_concepts() -
         assert item["verification_status"] == "accepted"
         assert item["accepted_scope"] == accepted_scope
         assert item["details"]["runtime_binding"]["capability_id"] == capability_id
-    planned = catalog.item("semantic_concept:structure.anchor.confirmed-pivot")
-    assert planned["implementation_status"] == "declared_only"
-    assert planned["verification_status"] == "contract_only"
-    assert "runtime_binding" not in planned["details"]
+    for concept_id in (
+        "structure.anchor.confirmed-pivot",
+        "structure.geometry.close-envelope-resolution-trace",
+    ):
+        planned = catalog.item(f"semantic_concept:{concept_id}")
+        assert planned["implementation_status"] == "declared_only"
+        assert planned["verification_status"] == "contract_only"
+        assert "runtime_binding" not in planned["details"]
 
 
 def test_turnover_field_is_not_silently_promoted_to_turnover_rate() -> None:

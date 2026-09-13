@@ -3,13 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quanthus.structure_semantics import load_semantic_catalog
 from quanthus.structure_v2_inputs import digest
 
 ROOT = Path(__file__).resolve().parents[2]
 RESULT = ROOT / "config/structure-directional-path-envelope-e6-review-result.v1.json"
 RESULT_DIGEST = "sha256:871c1fabf860a15d630dbaa80ea173160dcf191faab6b78a2d6a57fe13647b42"
-CATALOG = ROOT / "config/structure-semantic-catalog.v1.json"
 
 
 def load() -> dict[str, object]:
@@ -46,10 +44,8 @@ def test_e6_identifies_catalog_result_kind_mismatch_without_mutation() -> None:
     ]
     assert facts["e5_proposed_result_kind"] == "structured_path_trace"
     assert facts["e5_result_kind_is_catalog_compatible"] is False
-    catalog = load_semantic_catalog(CATALOG)
-    assert all(
-        item.concept_id != "structure.geometry.close-envelope-resolution-trace"
-        for item in catalog.concepts
+    assert value["review_basis"]["semantic_catalog_digest"] == (
+        "sha256:86bf671c163c69002330102e15b120cd3883b7064d32d806c6f30680082e3a4d"
     )
 
 

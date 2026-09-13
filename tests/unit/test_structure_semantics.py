@@ -46,6 +46,9 @@ def test_catalog_separates_discovery_registration_and_authority() -> None:
     assert catalog.family_of("outcome.structure.breach").boundary == "evaluation_only"
     assert catalog.resolve("structure.interaction.close-reclaim").result_kind == "event"
     assert catalog.resolve("structure.episode.breakout").registration == "reserved"
+    envelope = catalog.resolve("structure.geometry.close-envelope-resolution-trace")
+    assert envelope.result_kind == "measurement"
+    assert envelope.registration == "reserved"
     assert catalog.discover("structure.anc") == ()
     assert catalog.discover("struct") == ()
     assert len(catalog.discover("structure.anchor")) == 3
@@ -235,10 +238,13 @@ def test_blueprint_preserves_gaps_and_has_no_dictionary_dependency_cycle() -> No
     assert rows["B6-ORDER"]["implementation_status"] == "accepted_bounded_v2"
     assert rows["B6-ORDER"]["verification_status"] == "immutable_source_ab"
     assert rows["B6-PATH"]["implementation_status"] == "implemented_unqualified"
-    assert rows["B6-PATH"]["verification_status"] == "unit_and_contract_only"
+    assert rows["B6-PATH"]["verification_status"] == (
+        "unit_and_contract_plus_envelope_synthetic_representation"
+    )
     assert {
         "structure.geometry.range-traversal",
         "structure.geometry.counter-direction-excursion-share",
+        "structure.geometry.close-envelope-resolution-trace",
     }.isdisjoint(bindings)
     assert rows["B6"]["implementation_status"] == "not_started"
     assert rows["B9"]["implementation_status"] == "outside_structure_scope"

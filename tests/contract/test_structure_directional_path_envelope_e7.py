@@ -3,18 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from quanthus.policy import find_project_root
-from quanthus.structure_semantics import load_semantic_catalog
 from quanthus.structure_v2_inputs import digest
-from scripts.run_structure_directional_path_envelope_e7_representation_conformance import run
 
 ROOT = find_project_root()
 AUTH = ROOT / "config/structure-directional-path-envelope-e7-authorization.v1.json"
 REP = ROOT / "config/structure-directional-path-envelope-catalog-representation.v1.json"
 RESULT = ROOT / "config/structure-directional-path-envelope-e7-representation-result.v1.json"
-CATALOG = ROOT / "config/structure-semantic-catalog.v1.json"
 B6_PATH = ROOT / "config/structure-directional-path-geometry.v1.json"
 
 AUTH_DIGEST = "sha256:2ac2219402151cca13c6ff805ba32fd633bf198c5f55d0629332b687203d8225"
@@ -75,25 +70,23 @@ def test_e7_selects_existing_measurement_kind_without_registration() -> None:
     assert value["compatibility"]["semantic_catalog_unchanged"] is True
 
 
-def test_e7_runner_matches_frozen_result_and_keeps_catalog_unmodified() -> None:
+def test_e7_frozen_result_records_pre_registration_catalog_state() -> None:
     frozen = load(RESULT)
     assert digest(frozen) == RESULT_DIGEST
-    assert run() == frozen
     assert frozen["state"] == "PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION"
     assert frozen["failed_checks"] == []
     assert all(frozen["checks"].values())
     assert frozen["active_catalog_digest"] == CATALOG_DIGEST
     assert frozen["active_b6_path_digest"] == B6_PATH_DIGEST
-    assert digest(load(CATALOG)) == CATALOG_DIGEST
+    assert frozen["checks"]["catalog:concept_still_unregistered"] is True
     assert digest(load(B6_PATH)) == B6_PATH_DIGEST
 
 
-def test_proposed_concept_uses_owned_family_but_is_not_registered() -> None:
-    catalog = load_semantic_catalog(CATALOG)
-    assert catalog.family_of(CONCEPT_ID).prefix == "structure.geometry"
-    assert catalog.family_of(CONCEPT_ID).boundary == "owned"
-    with pytest.raises(ValueError, match="unregistered semantic concept"):
-        catalog.resolve(CONCEPT_ID)
+def test_e7_proposal_preserves_owned_geometry_family_before_registration() -> None:
+    value = load(REP)
+    assert value["owner"]["semantic_family"] == "structure.geometry"
+    assert value["concept"]["concept_id"] == CONCEPT_ID
+    assert value["concept"]["registration_status"] == "PROPOSED_NOT_REGISTERED"
 
 
 def test_e7_next_gate_is_review_only() -> None:

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | draft |
-| Delivery gate | blocked |
+| Delivery gate | open |
 | Work item | `P3-STAGE-012` |
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | `P3-STAGE-011 / REVISE_OR_PARK_DEVELOPMENT_FAIL` |
@@ -14,13 +14,13 @@
 | E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
 | Post-E review | `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
 | E5 Structure acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
-| Authority | E8 is complete with `REGISTER_RESERVED_MEASUREMENT`; the neutral concept is approved for reserved naming/boundary registration under B6-PATH, but Catalog mutation is deferred to owner-approved E9; no market-data/runtime/parameter/runtime-qualification authority |
+| Authority | E9 is complete with reserved `measurement` registration and no runtime binding; the owner delegated the remainder of P012 through closeout, so F freshness inventory/preregistration is open while fresh market data remains closed until F freezes |
 
-> P3-STAGE-012 remains a **design/synthetic research work item**. A-D and E1-E8 are closed without
-> fresh market data or parameter search. E7 resolves the E6 object-model mismatch by representing the
-> unchanged T-ending envelope trace as an existing Catalog `measurement`; E8 then approves reserved
-> semantic naming/boundary registration while leaving the Catalog unchanged. The parent design stays
-> draft and delivery remains blocked pending owner approval for E9 additive registration.
+> P3-STAGE-012 remains a bounded research work item. A-D and E1-E9 are closed. The neutral envelope
+> concept is now reserved in the Structure semantic Catalog as naming/boundary authority only; E9 adds
+> no runtime binding or market claim. Owner delegation removes repeated approval handoffs inside P012,
+> but does not waive freshness, preregistration, sealed-ledger or preserved-evaluation gates. F may now
+> freeze the next fresh development contract before any fresh market-data read.
 
 ## 1. Why a different successor shape is needed
 
@@ -261,12 +261,10 @@ P3-STAGE-012-E5  CLOSED  PASS_SYNTHETIC_QUALIFICATION / NOT REGISTERED
 P3-STAGE-012-E6  CLOSED  REVISE_NEUTRAL_CONCEPT
 P3-STAGE-012-E7  CLOSED  PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION / NOT REGISTERED
 P3-STAGE-012-E8  CLOSED  REGISTER_RESERVED_MEASUREMENT / CATALOG UNCHANGED
+P3-STAGE-012-E9  CLOSED  REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING
 -------------------------------------------------------------
-owner approval required before:
-P3-STAGE-012-E9  additive reserved registration + metadata/planning alignment
--------------------------------------------------------------
-only after E9 + later owner approval:
-P3-STAGE-012-F   fresh-cohort inventory + preregistration
+open under delegated P012 authority:
+P3-STAGE-012-F   freshness inventory + atomic-first development preregistration
 P3-STAGE-012-G  fresh development / blind atomic review
 P3-STAGE-012-H  projection compatibility and candidate freeze
 -------------------------------------------------------------
@@ -343,7 +341,11 @@ ownership, a valid existing `measurement` result kind, exact identity/PIT semant
 ceiling. The P3-STAGE-008-B precedent confirms that reserved semantic registration may stabilize naming
 and boundaries while runtime qualification remains separately gated.
 
-Actual Catalog mutation remains separate. E9, if owner-approved, may add the concept as
-`measurement / reserved`, add reviewed business metadata and align deterministic Catalog/planning
-evidence. It may not rewrite the frozen P008 B6-PATH contract, add runtime accepted bindings, read
-market data or preserved 2021, select thresholds/candidates, or change the E5 algorithm/profile.
+E9 has now executed that additive registration: the concept is `measurement / reserved`, reviewed
+Chinese business metadata is present, the deterministic Catalog snapshot is 761 entries / 34 semantic
+concepts / 10 gaps, and no semantic runtime binding was added. The frozen P008 family contract remains
+immutable.
+
+The owner has delegated the remainder of P012 through closeout. F is therefore open for freshness
+inventory and preregistration only. Fresh data remains unread until F freezes; preserved 2021 remains
+unread until a later exact candidate/projection freeze.

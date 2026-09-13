@@ -133,15 +133,20 @@ def test_e5_closeout_is_ready_for_review_but_opens_no_registration_or_market_aut
         assert value["authority"][key] is False
 
 
-def test_existing_b6_path_and_catalog_remain_unmodified_by_e5_registration():
+def test_existing_b6_path_and_catalog_were_unmodified_at_e5_closeout():
     b6 = load(B6_PATH)
     assert digest(b6) == B6_PATH_DIGEST
     assert set(b6["concepts"]) == {
         "structure.geometry.range-traversal",
         "structure.geometry.counter-direction-excursion-share",
     }
-    catalog = CATALOG.read_text(encoding="utf-8")
-    assert CONCEPT not in catalog
+    frozen = load(E5_RESULT)
+    assert frozen["registration"] == {
+        "existing_b6_path_contract_changed": False,
+        "semantic_catalog_changed": False,
+        "proposed_concept_registered": False,
+        "blueprint_concept_inventory_changed": False,
+    }
 
 
 def test_stage_e2_now_uses_structure_owner_for_core_detection():

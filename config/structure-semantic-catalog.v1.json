@@ -35,6 +35,7 @@
     {"concept_id": "structure.geometry.directional-efficiency", "meaning": "指定窗口净收盘变化相对逐期绝对收盘变化路径长度的有符号比例；描述方向效率，不判断趋势质量", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.range-traversal", "meaning": "窗口起点到终点的绝对收盘位移占同窗实际收盘区间宽度的比例；描述价格重定位程度，不单独证明方向一致性", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.counter-direction-excursion-share", "meaning": "相对窗口最终净方向的最大反向收盘偏离占同窗实际收盘区间的比例；描述反向折返强度，不推断未来反转", "result_kind": "measurement", "registration": "reserved"},
+    {"concept_id": "structure.geometry.close-envelope-resolution-trace", "meaning": "截至T描述合格收盘路径相对各逃逸时点冻结前序收盘包络的逃逸与随后回归几何；完整轨迹作为一次T时点结构化测量值，不回写逃逸日事实，也不判断Stage、未来反转或参与者意图", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.return-velocity", "meaning": "指定窗口简单收益除以窗口交易时段数的单位时段变化速度；不等同于未来趋势速度", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.velocity-delta", "meaning": "两个显式窗口单位时段收益速度之差；正负号只表示数学差，不直接命名为加速或减速", "result_kind": "measurement", "registration": "reserved"},
     {"concept_id": "structure.geometry.range-position", "meaning": "当前收盘在指定因果滚动高低区间中的归一化位置；零宽区间不可定义", "result_kind": "measurement", "registration": "reserved"},

@@ -327,6 +327,7 @@
     "structure.geometry.directional-efficiency": ["方向效率", "用窗口净收盘变化除以逐期绝对收盘变化路径长度，保留方向正负；描述走势是否有序，不评价未来趋势质量。"],
     "structure.geometry.range-traversal": ["区间穿越比例", "用窗口起点到终点的绝对收盘位移除以同窗口实际收盘最高最低差；描述本窗口完成了多少价格重定位，不能单独证明方向一致。"],
     "structure.geometry.counter-direction-excursion-share": ["反向偏离占比", "沿窗口最终净方向计算路径中最大的反向收盘偏离，并除以同窗口收盘区间；数值越大只表示反向折返更深，不预测未来反转。"],
+    "structure.geometry.close-envelope-resolution-trace": ["收盘包络逃逸回归轨迹", "截至T记录合格收盘路径相对各逃逸时点冻结前序收盘包络的向上/向下逃逸、是否已回到原包络及相关描述字段；这是T时点的结构几何测量，不回写逃逸日知识，也不等于Stage、突破成败或未来反转。"],
     "structure.geometry.return-velocity": ["窗口收益速度", "将指定窗口简单收益除以窗口交易时段数，得到单位时段变化速度；它是已观察度量，不预测后续速度。"],
     "structure.geometry.velocity-delta": ["收益速度差", "比较两个显式窗口的单位时段收益速度；正负只表示数学差，必须结合方向背景解释，不能直接等同加速或减速。"],
     "structure.geometry.range-position": ["区间位置", "当前收盘在指定滚动高低区间中的归一化位置；区间宽度为零时不可定义，不推断顶部或底部。"],

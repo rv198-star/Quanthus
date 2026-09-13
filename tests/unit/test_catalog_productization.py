@@ -23,7 +23,7 @@ def catalog():
 
 
 def test_every_existing_entry_has_reviewed_chinese_reading(catalog):
-    assert len(catalog.snapshot["entries"]) == 760
+    assert len(catalog.snapshot["entries"]) == 761
     for entry in catalog.snapshot["entries"]:
         assert ZH.search(entry["display_name"]), entry["entry_id"]
         assert ZH.search(entry["description"]), entry["entry_id"]
@@ -81,6 +81,14 @@ def test_directional_path_geometry_concepts_have_reviewed_chinese_readings(catal
     assert "价格重定位" in traversal["description"]
     assert "反向偏离" in counter["display_name"]
     assert "未来反转" in counter["description"]
+    envelope = catalog.item(
+        "semantic_concept:structure.geometry.close-envelope-resolution-trace"
+    )
+    assert "包络逃逸回归" in envelope["display_name"]
+    assert "不回写逃逸日知识" in envelope["description"]
+    assert envelope["implementation_status"] == "declared_only"
+    assert envelope["verification_status"] == "contract_only"
+    assert "runtime_binding" not in envelope["details"]
 
 
 def test_price_index_volume_and_time_units_are_not_guessed(catalog):
@@ -293,8 +301,8 @@ def test_packaging_contains_presentation_and_lineage_closure():
 def test_source_inventory_and_semantic_ids_stay_exact(catalog):
     built = build_catalog()
     assert built["snapshot_digest"] == catalog.snapshot["snapshot_digest"]
-    assert built["summary"]["entry_count"] == 760
-    assert built["summary"]["counts_by_kind"]["semantic_concept"] == 33
+    assert built["summary"]["entry_count"] == 761
+    assert built["summary"]["counts_by_kind"]["semantic_concept"] == 34
     assert built["summary"]["counts_by_kind"]["adm_dataset"] == 4
     assert built["summary"]["counts_by_kind"]["adm_field"] == 76
     assert built["summary"]["counts_by_kind"]["dwd_field"] == 524

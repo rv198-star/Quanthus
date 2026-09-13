@@ -1,0 +1,51 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-e9-registration-result.v1",
+  "work_item": "P3-STAGE-012-E9",
+  "state": "REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING",
+  "decision_basis": {
+    "e8_review_path": "config/structure-directional-path-envelope-e8-review-result.v1.json",
+    "e8_review_digest": "sha256:7dd02799c0fba3e6f34d7ad84023ab49394cc9609b90aa448c63eec5d99b49d9",
+    "selected_route": "REGISTER_RESERVED_MEASUREMENT"
+  },
+  "registration": {
+    "concept_id": "structure.geometry.close-envelope-resolution-trace",
+    "result_kind": "measurement",
+    "registration": "reserved",
+    "semantic_catalog_digest": "sha256:55ba691bf69512ea7dad2d7d54d1313cd8210dfe8a03facf5ab0eec1063534e8",
+    "business_metadata_digest": "sha256:6fce23f20b0fcdee3ba1bb2360b01baeaf082a499069e1ecc03f2e2b44b0f60c",
+    "catalog_snapshot_manifest_digest": "sha256:0b072ec338ecc9fb5a6476b618529faf4bb4069626ccf95544080bb88ce6d258",
+    "catalog_entry_count": 761,
+    "semantic_concept_count": 34,
+    "catalog_gap_count": 10
+  },
+  "blueprint": {
+    "digest": "sha256:f785a8b381e7d9d1139eeea5bd300bceaab2f0ce5af807c8e116f47a44746fd2",
+    "b6_path_status": "registered_but_unqualified_extension",
+    "semantic_runtime_binding_added": false,
+    "active_p008_family_contract_changed": false
+  },
+  "preserved_history": {
+    "e5_algorithm_changed": false,
+    "e5_20_10_profile_changed": false,
+    "e7_historical_proposal_artifacts_rewritten": false,
+    "p008_relocation_changed": false,
+    "preserved_2021_read": false
+  },
+  "next_gate": {
+    "work_item": "P3-STAGE-012-F",
+    "state": "OPEN_UNDER_P012_DELEGATED_AUTHORITY",
+    "purpose": "Freeze freshness inventory and bounded preregistration for the next atomic-first development cycle before any fresh market-data read."
+  },
+  "authority": {
+    "semantic_reserved_registration": true,
+    "runtime_binding": false,
+    "market_data_read": false,
+    "runtime_job": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "E9 registers only a stable Structure semantic name/boundary. It does not qualify the measurement on market data, select a threshold, add a runtime binding, or authorize Stage/daily/strategy/trading use."
+}

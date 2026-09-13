@@ -4,8 +4,8 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | accepted for synthetic-only proposal |
-| Registration gate | blocked pending E8 review |
-| Work item | `P3-STAGE-012-E5 / E7` |
+| Registration gate | accepted as reserved semantic registration; runtime qualification blocked |
+| Work item | `P3-STAGE-012-E5 / E7 / E9` |
 | Parent | [Structure Facts v2](structure-facts-v2.md) |
 | Existing owner | `B6-PATH / Directional Path Geometry Fact Family` |
 | Existing family contract | `../../config/structure-directional-path-geometry.v1.json` |
@@ -13,7 +13,7 @@
 | Synthetic contract | `../../config/structure-directional-path-envelope-synthetic-contract.v1.json` |
 | Synthetic result | `../../config/structure-directional-path-envelope-synthetic-result.v1.json` |
 | Implementation | `../../src/quanthus/structure_directional_path_envelope.py` |
-| Acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md`; `../acceptance/structure-directional-path-envelope-e7-representation-acceptance-20260914.md` |
+| Acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md`; `../acceptance/structure-directional-path-envelope-e7-representation-acceptance-20260914.md`; `../acceptance/structure-directional-path-envelope-e9-registration-acceptance-20260914.md` |
 | E7 representation | `../../config/structure-directional-path-envelope-catalog-representation.v1.json` |
 | E7 result | `../../config/structure-directional-path-envelope-e7-representation-result.v1.json` |
 
@@ -188,7 +188,8 @@ E7 therefore closes `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`. E8 subsequ
 registration under B6-PATH, using the existing `measurement` kind and preserving the E5 algorithm,
 20/10 profile, PIT/reset semantics and claim ceiling.
 
-E8 itself does not mutate the Catalog. The active semantic Catalog and frozen P008 B6-PATH family
-contract remain unchanged until separately owner-approved E9 additive registration. Reserved
-registration, if performed, still grants no runtime binding, market qualification, Stage threshold,
-strategy or trading authority.
+E9 executes that decision additively: `structure.geometry.close-envelope-resolution-trace` is now a
+reserved semantic `measurement`, reviewed Chinese business metadata is published, and the deterministic
+Catalog snapshot is refreshed. The frozen P008 B6-PATH family contract and semantic runtime bindings
+remain unchanged, so registration still grants no runtime binding, market qualification, Stage
+threshold, strategy or trading authority.

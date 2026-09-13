@@ -1,0 +1,120 @@
+{
+  "schema_version": "quanthus.stage-atomic-envelope-synthetic-contract.v1",
+  "work_item": "P3-STAGE-012-E3",
+  "state": "FROZEN_SYNTHETIC_ONLY",
+  "atomic_cases": [
+    {
+      "id": "direction-neutral-instability",
+      "short_term": ["TRUE", "FALSE", "FALSE"],
+      "fund": ["TRUE", "FALSE", "FALSE"],
+      "primary_available": true,
+      "expected_projection": "STAGE_0",
+      "expected_mixed_roles": []
+    },
+    {
+      "id": "mixed-directional-instability",
+      "short_term": ["TRUE", "TRUE", "FALSE"],
+      "fund": ["TRUE", "TRUE", "FALSE"],
+      "primary_available": true,
+      "expected_projection": "NEITHER",
+      "expected_mixed_roles": ["fund", "short_term"]
+    },
+    {
+      "id": "orderly-consolidation",
+      "short_term": ["FALSE", "FALSE", "TRUE"],
+      "fund": ["FALSE", "FALSE", "TRUE"],
+      "primary_available": true,
+      "expected_projection": "STAGE_2",
+      "expected_mixed_roles": []
+    },
+    {
+      "id": "unavailable-primary",
+      "short_term": ["UNKNOWN", "UNKNOWN", "UNKNOWN"],
+      "fund": ["UNKNOWN", "UNKNOWN", "UNKNOWN"],
+      "primary_available": false,
+      "expected_projection": "INPUT_UNAVAILABLE",
+      "expected_mixed_roles": []
+    }
+  ],
+  "envelope_cases": [
+    {
+      "id": "orderly-high-churn-contraction",
+      "closes": [10.00, 10.10, 9.90, 10.08, 9.92, 10.06, 9.94, 10.04, 9.96, 10.02, 9.98, 10.01, 9.99, 10.00, 9.98, 10.01, 9.99, 10.00, 9.99, 10.00, 10.00],
+      "expected": {
+        "status": "AVAILABLE",
+        "escape_count": 0,
+        "resolved_escape_count": 0,
+        "unresolved_escape_count": 0,
+        "resolved_escape_side_sequence": [],
+        "resolved_escape_side_alternation_count": 0,
+        "resolved_escape_both_sides": false,
+        "unresolved_escape_sides": []
+      }
+    },
+    {
+      "id": "one-leg-repricing-then-hold",
+      "closes": [10.00, 10.05, 9.95, 10.02, 9.98, 10.04, 9.96, 10.03, 9.97, 10.01, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00, 12.00],
+      "expected": {
+        "status": "AVAILABLE",
+        "escape_count": 1,
+        "resolved_escape_count": 0,
+        "unresolved_escape_count": 1,
+        "resolved_escape_side_sequence": [],
+        "resolved_escape_side_alternation_count": 0,
+        "resolved_escape_both_sides": false,
+        "unresolved_escape_sides": ["UPPER"]
+      }
+    },
+    {
+      "id": "compact-failed-resolution-disorder",
+      "closes": [10.00, 10.10, 9.90, 10.05, 9.95, 10.08, 9.92, 10.04, 9.96, 10.02, 10.40, 10.00, 9.60, 10.00, 10.50, 10.00, 9.50, 10.00, 10.45, 10.00, 9.55],
+      "expected": {
+        "status": "AVAILABLE",
+        "escape_count": 4,
+        "resolved_escape_count": 4,
+        "unresolved_escape_count": 0,
+        "resolved_escape_side_sequence": ["UPPER", "LOWER", "UPPER", "LOWER"],
+        "resolved_escape_side_alternation_count": 3,
+        "resolved_escape_both_sides": true,
+        "unresolved_escape_sides": []
+      }
+    },
+    {
+      "id": "stable-narrow-noise",
+      "closes": [9.95, 10.05, 10.00, 10.02, 9.98, 9.95, 10.05, 10.00, 10.02, 9.98, 9.95, 10.05, 10.00, 10.02, 9.98, 9.95, 10.05, 10.00, 10.02, 9.98, 10.00],
+      "expected": {
+        "status": "AVAILABLE",
+        "escape_count": 0,
+        "resolved_escape_count": 0,
+        "unresolved_escape_count": 0,
+        "resolved_escape_side_sequence": [],
+        "resolved_escape_side_alternation_count": 0,
+        "resolved_escape_both_sides": false,
+        "unresolved_escape_sides": []
+      }
+    },
+    {
+      "id": "unavailable-close",
+      "closes": [10.00, 10.10, 9.90, 10.08, 9.92, 10.06, 9.94, 10.04, 9.96, 10.02, null, 10.01, 9.99, 10.00, 9.98, 10.01, 9.99, 10.00, 9.99, 10.00, 10.00],
+      "expected": {
+        "status": "UNAVAILABLE",
+        "escape_count": 0,
+        "resolved_escape_count": 0,
+        "unresolved_escape_count": 0,
+        "resolved_escape_side_sequence": [],
+        "resolved_escape_side_alternation_count": 0,
+        "resolved_escape_both_sides": false,
+        "unresolved_escape_sides": []
+      }
+    }
+  ],
+  "authority": {
+    "synthetic_only": true,
+    "market_data": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "new_fact_registration": false,
+    "p008_relocation_change": false,
+    "preserved_2021_evaluation_read": false
+  }
+}

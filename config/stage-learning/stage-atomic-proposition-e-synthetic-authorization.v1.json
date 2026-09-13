@@ -1,0 +1,31 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-e-synthetic-authorization.v1",
+  "work_item": "P3-STAGE-012-E",
+  "state": "OWNER_APPROVED_SYNTHETIC_ONLY",
+  "parent_review": {
+    "path": "config/stage-learning/stage-atomic-proposition-d-expert-review-result.v1.json",
+    "digest": "sha256:0b00dd0a327b161cd20a4122e5c5a8cad806ad6f9f5713246b36b412a3fb6af7",
+    "decision": "RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE"
+  },
+  "subwork": {
+    "E1": "atomic Primary review/resolver contract",
+    "E2": "threshold-free range-envelope resolution/persistence prototype on synthetic paths only",
+    "E3": "adversarial synthetic conformance"
+  },
+  "authority": {
+    "implementation": true,
+    "synthetic_conformance": true,
+    "modify_historical_p008_p011_artifacts": false,
+    "p008_relocation_retune": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "new_fact_registration": false,
+    "new_fact_qualification": false,
+    "runtime_job": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2025_access": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

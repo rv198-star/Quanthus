@@ -1,0 +1,52 @@
+{
+  "schema_version": "quanthus.stage-range-envelope-prototype.v1",
+  "work_item": "P3-STAGE-012-E2",
+  "state": "SYNTHETIC_ONLY_NOT_A_FACT",
+  "purpose": "Describe failed close-envelope resolution and persistence on a T-only primary path without learning thresholds or asserting compact-disorder truth.",
+  "profile": {
+    "primary_history_sessions": 21,
+    "prior_close_envelope_sessions": 10,
+    "boundary_rule": "strict_escape_equality_is_inside",
+    "escape_envelope": "the previous ten closes only",
+    "reentry_rule": "first later close through T that returns inside the escape event's frozen pre-escape envelope",
+    "future_beyond_T": false
+  },
+  "event_schema": {
+    "UPPER_ESCAPE": "current close is strictly above the maximum of the previous ten closes",
+    "LOWER_ESCAPE": "current close is strictly below the minimum of the previous ten closes",
+    "INSIDE": "current close is inside or equal to the previous-ten-close envelope",
+    "RESOLVED_ESCAPE": "a later close by T re-enters the frozen pre-escape envelope",
+    "UNRESOLVED_ESCAPE": "no later close by T re-enters the frozen pre-escape envelope"
+  },
+  "descriptors": [
+    "escape_count",
+    "resolved_escape_count",
+    "unresolved_escape_count",
+    "upper_escape_count",
+    "lower_escape_count",
+    "resolved_escape_side_sequence",
+    "resolved_escape_side_alternation_count",
+    "resolved_escape_both_sides",
+    "unresolved_escape_sides",
+    "single_unresolved_side_only",
+    "event_trace_digest"
+  ],
+  "explicit_non_claims": {
+    "compact_disorder_truth": false,
+    "orderly_consolidation_truth": false,
+    "relocation_truth": false,
+    "numeric_threshold_selected": false,
+    "registered_fact": false,
+    "catalog_asset": false
+  },
+  "authority": {
+    "synthetic_only": true,
+    "implementation": true,
+    "synthetic_conformance": true,
+    "market_data": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "new_fact_registration": false,
+    "preserved_2021_evaluation_read": false
+  }
+}

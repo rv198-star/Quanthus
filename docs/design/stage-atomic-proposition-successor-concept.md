@@ -11,11 +11,13 @@
 | A-C result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
 | D expert review | `../reviews/stage-atomic-proposition-d-expert-review-20260913.md` |
 | Work-item route | [P3-STAGE-012](../work-items/stage-atomic-proposition-successor.md) |
-| Authority | D review complete; synthetic-only E is recommended but blocked pending owner approval; no implementation/data/runtime/parameter authority |
+| E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
+| Authority | Owner-approved E1/E2/E3 synthetic implementation is complete; post-E review is next; no market-data/runtime/parameter/new-Fact authority |
 
-> P3-STAGE-012 is now active only as a **design/diagnostic work item**. A-C are closed without fresh
-> market data or parameter search. The parent design remains draft and delivery remains blocked until
-> D expert review chooses a bounded repair route. No result-bearing implementation is authorized.
+> P3-STAGE-012 remains a **design/synthetic research work item**. A-D are closed and E1/E2/E3 are
+> synthetically accepted without fresh market data or parameter search. The parent design remains
+> draft and delivery stays blocked until the required post-E review chooses whether any formal Fact
+> or projection repair deserves a later owner-approved route.
 
 ## 1. Why a different successor shape is needed
 
@@ -244,13 +246,16 @@ A-C were explicitly authorized as consumed-evidence diagnostic work and are now 
 P3-STAGE-012-A  CLOSED  PASS_ATOMIC_PROPOSITION_FIRST
 P3-STAGE-012-B  CLOSED  PASS_CONSUMED_SEMANTIC_ADJUDICATION
 P3-STAGE-012-C  CLOSED  INCONCLUSIVE
-P3-STAGE-012-D  CLOSED  RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE
+P3-STAGE-012-D   CLOSED  RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE
+P3-STAGE-012-E1  CLOSED  ATOMIC_FIRST_CONTRACT_ACCEPTED
+P3-STAGE-012-E2  CLOSED  SYNTHETIC_NON_FACT_ENVELOPE_PROTOTYPE_ACCEPTED
+P3-STAGE-012-E3  CLOSED  PASS_SYNTHETIC_CONFORMANCE
 -------------------------------------------------------------
-owner approval required before:
-P3-STAGE-012-E  atomic review/resolver + threshold-free envelope synthetic package
+next required review:
+P3-STAGE-012-E4  post-E Fact/projection route review
 -------------------------------------------------------------
-only after E acceptance + review:
-P3-STAGE-012-F  fresh-cohort inventory + preregistration
+only after E4 + later owner approval:
+P3-STAGE-012-F   fresh-cohort inventory + preregistration
 P3-STAGE-012-G  fresh development / blind atomic review
 P3-STAGE-012-H  projection compatibility and candidate freeze
 -------------------------------------------------------------
@@ -292,8 +297,16 @@ disorder independently of Stage2, but the consumed packet does not prove that a 
 Fact is the correct abstraction. A sequential envelope-resolution hypothesis needs synthetic-only
 adversarial semantics before any Fact decision.
 
-D is now complete. The panel recommends a bounded **synthetic-only E package**, pending owner approval:
-E1 atomic Primary review/resolver contract, E2 threshold-free range-envelope resolution/persistence
-prototype, and E3 adversarial synthetic conformance. P008 relocation remains frozen, mixed directional
-instability remains atomic coexistence plus reason/modifier metadata, and no new Fact is authorized.
-Fresh cohort work remains later and preserved 2021 remains unread.
+E1/E2/E3 are now complete under the owner-approved synthetic-only authority. E1 reuses the frozen
+Primary protocol and makes per-role atomic truths, mixed-state roles and projected denominators
+explicit. E2 implements only deterministic close-envelope escape/re-entry evidence and emits no
+compact-disorder truth or Fact identity. E3 closes `PASS_SYNTHETIC_CONFORMANCE`: high-churn orderly
+compression and stable narrow noise produce no failed-resolution escape trace; a one-leg repricing
+persists on one side; an adversarial failed-resolution path produces alternating resolved escapes on
+both sides; unavailable input fails closed; and mixed instability+relocation remains explicit while
+the downstream Stage0/2 projection stays `NEITHER`.
+
+The required next step is E4 post-E expert review. It must decide whether the envelope semantics are
+strong enough to justify a formal threshold-free Fact/projection repair, should remain a research-only
+descriptor, or should be parked. P008 relocation remains frozen, no new Fact is registered, fresh
+cohort work remains blocked, and preserved 2021 remains unread.

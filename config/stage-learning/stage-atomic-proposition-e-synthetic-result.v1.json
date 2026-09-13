@@ -1,0 +1,66 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-e-synthetic-result.v1",
+  "work_item": "P3-STAGE-012-E",
+  "state": "READY_FOR_POST_E_REVIEW",
+  "authorization": {
+    "path": "config/stage-learning/stage-atomic-proposition-e-synthetic-authorization.v1.json",
+    "digest": "sha256:c617f21613ce506287753c9da572c3793ddb0139385bddc96b2cbf309f1bacb6"
+  },
+  "E1": {
+    "state": "ACCEPTED_ATOMIC_FIRST_CONTRACT",
+    "contract": "config/stage-learning/stage-atomic-primary-review-contract.v1.json",
+    "contract_digest": "sha256:74900cfde3d7e86744cab8621a3fd14710fd3fd900fa18f53ef9a98ec750a80c",
+    "implementation": "src/quanthus/stage_learning/atomic_primary_reference.py",
+    "historical_protocol_modified": false
+  },
+  "E2": {
+    "state": "ACCEPTED_SYNTHETIC_NON_FACT_PROTOTYPE",
+    "contract": "config/stage-learning/stage-range-envelope-prototype.v1.json",
+    "contract_digest": "sha256:bf34c7790d8341826cc94521d7e5d1c2e6004af172d983d6f4d6ff6d167c4a6f",
+    "implementation": "src/quanthus/stage_learning/range_envelope_prototype.py",
+    "registered_fact": false,
+    "compact_disorder_truth_emitted": false,
+    "numeric_threshold_selected": false
+  },
+  "E3": {
+    "state": "PASS_SYNTHETIC_CONFORMANCE",
+    "contract": "config/stage-learning/stage-atomic-envelope-synthetic-contract.v1.json",
+    "contract_digest": "sha256:df82e410efde252c48b3a94d9552f19c20d368a17ee9cdc09b2822486b9e2dcb",
+    "result": "config/stage-learning/stage-atomic-envelope-synthetic-conformance-result.v1.json",
+    "result_digest": "sha256:ee09715c69b2e12485ec841af6a96d74370a96b584d7fa9df637e42798820b0f",
+    "failed_checks": 0
+  },
+  "bounded_findings": {
+    "mixed_directional_instability_preserved_before_projection": true,
+    "orderly_high_churn_not_equated_with_failed_resolution": true,
+    "one_leg_repricing_expressible_as_persistent_one_side_escape": true,
+    "alternating_failed_resolution_expressible_without_learned_threshold": true,
+    "stable_narrow_noise_not_residual_instability": true,
+    "unavailable_input_fails_closed": true,
+    "market_separability_proven": false,
+    "new_fact_required_proven": false,
+    "stage_qualification_proven": false
+  },
+  "next_gate": {
+    "work_item": "P3-STAGE-012-E4",
+    "purpose": "Post-E expert review to decide whether to formalize a threshold-free Fact/projection repair, retain the prototype as research-only, or park it.",
+    "status": "READY_FOR_REVIEW_ONLY"
+  },
+  "authority": {
+    "E1_completed": true,
+    "E2_completed": true,
+    "E3_completed": true,
+    "E4_review_ready": true,
+    "formal_fact_design": false,
+    "new_fact_registration": false,
+    "projection_repair": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "runtime_job": false,
+    "new_market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "fresh_cohort_inventory": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

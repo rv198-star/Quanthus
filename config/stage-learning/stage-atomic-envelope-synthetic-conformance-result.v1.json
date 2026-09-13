@@ -1,0 +1,183 @@
+{
+  "schema_version": "quanthus.stage-atomic-envelope-synthetic-conformance-result.v1",
+  "work_item": "P3-STAGE-012-E3",
+  "state": "PASS_SYNTHETIC_CONFORMANCE",
+  "contract_path": "config/stage-learning/stage-atomic-envelope-synthetic-contract.v1.json",
+  "contract_digest": "sha256:df82e410efde252c48b3a94d9552f19c20d368a17ee9cdc09b2822486b9e2dcb",
+  "checks": {
+    "atomic:direction-neutral-instability:mixed_roles": true,
+    "atomic:direction-neutral-instability:projection": true,
+    "atomic:mixed-directional-instability:mixed_roles": true,
+    "atomic:mixed-directional-instability:projection": true,
+    "atomic:orderly-consolidation:mixed_roles": true,
+    "atomic:orderly-consolidation:projection": true,
+    "atomic:unavailable-primary:mixed_roles": true,
+    "atomic:unavailable-primary:projection": true,
+    "authority:no_market_or_fact": true,
+    "envelope:compact-failed-resolution-disorder": true,
+    "envelope:one-leg-repricing-then-hold": true,
+    "envelope:orderly-high-churn-contraction": true,
+    "envelope:stable-narrow-noise": true,
+    "envelope:unavailable-close": true,
+    "semantic:failed_resolution_alternates_both_sides": true,
+    "semantic:one_leg_repricing_persists_one_side": true,
+    "semantic:orderly_high_churn_not_failed_resolution": true,
+    "semantic:stable_narrow_noise_not_failed_resolution": true,
+    "semantic:unavailable_fails_closed": true
+  },
+  "failed_checks": [],
+  "atomic_results": [
+    {
+      "id": "direction-neutral-instability",
+      "projected_primary_reference": "STAGE_0",
+      "mixed_directional_instability_roles": [],
+      "role_atomic_primary": {
+        "short_term": {
+          "structural_instability_20": "TRUE",
+          "coherent_directional_relocation_20": "FALSE",
+          "orderly_consolidation_20": "FALSE"
+        },
+        "fund": {
+          "structural_instability_20": "TRUE",
+          "coherent_directional_relocation_20": "FALSE",
+          "orderly_consolidation_20": "FALSE"
+        }
+      }
+    },
+    {
+      "id": "mixed-directional-instability",
+      "projected_primary_reference": "NEITHER",
+      "mixed_directional_instability_roles": ["fund", "short_term"],
+      "role_atomic_primary": {
+        "short_term": {
+          "structural_instability_20": "TRUE",
+          "coherent_directional_relocation_20": "TRUE",
+          "orderly_consolidation_20": "FALSE"
+        },
+        "fund": {
+          "structural_instability_20": "TRUE",
+          "coherent_directional_relocation_20": "TRUE",
+          "orderly_consolidation_20": "FALSE"
+        }
+      }
+    },
+    {
+      "id": "orderly-consolidation",
+      "projected_primary_reference": "STAGE_2",
+      "mixed_directional_instability_roles": [],
+      "role_atomic_primary": {
+        "short_term": {
+          "structural_instability_20": "FALSE",
+          "coherent_directional_relocation_20": "FALSE",
+          "orderly_consolidation_20": "TRUE"
+        },
+        "fund": {
+          "structural_instability_20": "FALSE",
+          "coherent_directional_relocation_20": "FALSE",
+          "orderly_consolidation_20": "TRUE"
+        }
+      }
+    },
+    {
+      "id": "unavailable-primary",
+      "projected_primary_reference": "INPUT_UNAVAILABLE",
+      "mixed_directional_instability_roles": [],
+      "role_atomic_primary": {
+        "short_term": {
+          "structural_instability_20": "UNKNOWN",
+          "coherent_directional_relocation_20": "UNKNOWN",
+          "orderly_consolidation_20": "UNKNOWN"
+        },
+        "fund": {
+          "structural_instability_20": "UNKNOWN",
+          "coherent_directional_relocation_20": "UNKNOWN",
+          "orderly_consolidation_20": "UNKNOWN"
+        }
+      }
+    }
+  ],
+  "atomic_summary": {
+    "schema_version": "quanthus.stage-atomic-primary-reference-batch.v1",
+    "case_count": 4,
+    "projected_reference_counts": {
+      "INPUT_UNAVAILABLE": 1,
+      "NEITHER": 1,
+      "STAGE_0": 1,
+      "STAGE_2": 1
+    },
+    "mixed_directional_instability_case_count": 1,
+    "projection_disagreement_case_count": 0,
+    "atomic_disagreement_case_count_by_proposition": {
+      "structural_instability_20": 0,
+      "coherent_directional_relocation_20": 0,
+      "orderly_consolidation_20": 0
+    },
+    "stage0_is_not_atomic_instability": true
+  },
+  "envelope_results": [
+    {
+      "id": "orderly-high-churn-contraction",
+      "status": "AVAILABLE",
+      "escape_count": 0,
+      "resolved_escape_count": 0,
+      "unresolved_escape_count": 0,
+      "resolved_escape_side_sequence": [],
+      "resolved_escape_side_alternation_count": 0,
+      "resolved_escape_both_sides": false,
+      "unresolved_escape_sides": []
+    },
+    {
+      "id": "one-leg-repricing-then-hold",
+      "status": "AVAILABLE",
+      "escape_count": 1,
+      "resolved_escape_count": 0,
+      "unresolved_escape_count": 1,
+      "resolved_escape_side_sequence": [],
+      "resolved_escape_side_alternation_count": 0,
+      "resolved_escape_both_sides": false,
+      "unresolved_escape_sides": ["UPPER"]
+    },
+    {
+      "id": "compact-failed-resolution-disorder",
+      "status": "AVAILABLE",
+      "escape_count": 4,
+      "resolved_escape_count": 4,
+      "unresolved_escape_count": 0,
+      "resolved_escape_side_sequence": ["UPPER", "LOWER", "UPPER", "LOWER"],
+      "resolved_escape_side_alternation_count": 3,
+      "resolved_escape_both_sides": true,
+      "unresolved_escape_sides": []
+    },
+    {
+      "id": "stable-narrow-noise",
+      "status": "AVAILABLE",
+      "escape_count": 0,
+      "resolved_escape_count": 0,
+      "unresolved_escape_count": 0,
+      "resolved_escape_side_sequence": [],
+      "resolved_escape_side_alternation_count": 0,
+      "resolved_escape_both_sides": false,
+      "unresolved_escape_sides": []
+    },
+    {
+      "id": "unavailable-close",
+      "status": "UNAVAILABLE",
+      "escape_count": 0,
+      "resolved_escape_count": 0,
+      "unresolved_escape_count": 0,
+      "resolved_escape_side_sequence": [],
+      "resolved_escape_side_alternation_count": 0,
+      "resolved_escape_both_sides": false,
+      "unresolved_escape_sides": []
+    }
+  ],
+  "claim_ceiling": "Synthetic-only conformance. No market separability, Fact qualification, threshold validity or Stage qualification is claimed.",
+  "authority": {
+    "market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "new_fact_registration": false,
+    "p008_relocation_change": false
+  }
+}

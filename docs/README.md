@@ -374,11 +374,15 @@ nodes.
   A keeps atomic propositions ahead of Stage projection, B classifies the eleven relocation conflicts
   as 0 guard-overfire / 2 reference-undercall / 9 genuine-coexistence, and C closes `INCONCLUSIVE`
   because current Facts do not positively express compact disorder but a new envelope Fact is not yet
-  proven. D is now closed with `RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE`: retain atomic-first
-  qualification and the current downstream projection, keep P008 relocation frozen, keep mixed
-  directional instability as atomic coexistence + reason/modifier, and consider only an owner-approved
-  synthetic E package next. Review: `reviews/stage-atomic-proposition-d-expert-review-20260913.md`.
-  Implementation, fresh data, new Fact registration and preserved 2021 remain blocked.
+  proven. D closed with `RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE`, and the owner-approved
+  E1/E2/E3 package is now complete without market data. E1 makes the atomic Primary ledger explicit
+  before projection; E2 implements a threshold-free close-envelope escape/re-entry prototype that is
+  explicitly not a Fact and emits no compact-disorder truth; E3 closes `PASS_SYNTHETIC_CONFORMANCE`
+  across high-churn orderly compression, one-leg repricing, alternating failed resolution, stable
+  narrow noise, mixed instability+relocation and unavailable input. Acceptance:
+  `acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md`. The required next step is
+  post-E expert review; fresh data, formal Fact registration, threshold search and preserved 2021
+  remain blocked.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

@@ -1,0 +1,51 @@
+{
+  "schema_version": "quanthus.stage-atomic-primary-review-contract.v1",
+  "work_item": "P3-STAGE-012-E1",
+  "state": "SYNTHETIC_CONTRACT",
+  "reuses": {
+    "protocol_path": "config/stage-learning/order-reference-protocol.v2.json",
+    "protocol_digest": "sha256:8db37fb3d197668cfe16f9daabaa57c625617460be94ace13a28ccb81e89c88b",
+    "historical_implementation": "src/quanthus/stage_learning/order_reference_protocol_v2.py"
+  },
+  "primary_propositions": [
+    "structural_instability_20",
+    "coherent_directional_relocation_20",
+    "orderly_consolidation_20"
+  ],
+  "truth_values": ["TRUE", "FALSE", "UNKNOWN"],
+  "roles": ["short_term", "fund"],
+  "projection": {
+    "TRUE_FALSE_FALSE": "STAGE_0",
+    "FALSE_FALSE_TRUE": "STAGE_2",
+    "TRUE_TRUE_FALSE": "NEITHER_WITH_MIXED_DIRECTIONAL_INSTABILITY",
+    "FALSE_TRUE_FALSE": "NEITHER_WITH_RELOCATION",
+    "FALSE_FALSE_FALSE": "NEITHER",
+    "ORDER_TRUE_WITH_INSTABILITY_OR_RELOCATION_TRUE": "AMBIGUOUS_CONFLICT",
+    "UNKNOWN_DEPENDENT": "AMBIGUOUS",
+    "INPUT_UNAVAILABLE": "INPUT_UNAVAILABLE"
+  },
+  "required_output": {
+    "preserve_role_atomic_truths": true,
+    "preserve_role_projection": true,
+    "preserve_atomic_disagreement_by_proposition": true,
+    "preserve_mixed_directional_instability_roles": true,
+    "project_only_after_atomic_commit": true,
+    "cross_role_projection_disagreement": "AMBIGUOUS",
+    "report_batch_denominators": [
+      "case_count",
+      "projected_reference_counts",
+      "mixed_directional_instability_case_count",
+      "projection_disagreement_case_count",
+      "atomic_disagreement_case_count_by_proposition"
+    ]
+  },
+  "authority": {
+    "synthetic_only": true,
+    "market_data": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "new_fact_registration": false,
+    "p008_relocation_change": false,
+    "preserved_2021_evaluation_read": false
+  }
+}

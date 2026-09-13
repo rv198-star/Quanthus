@@ -181,7 +181,7 @@ def test_d_review_recommends_only_owner_gated_synthetic_route() -> None:
         assert authority[key] is False
 
 
-def test_stage012_documents_exist_and_route_to_owner_decision() -> None:
+def test_stage012_documents_exist_and_route_to_post_e_review() -> None:
     for path in (
         ROOT / "docs/design/stage-atomic-proposition-successor-concept.md",
         ROOT / "docs/work-items/stage-atomic-proposition-successor.md",
@@ -189,6 +189,7 @@ def test_stage012_documents_exist_and_route_to_owner_decision() -> None:
         ROOT / "docs/acceptance/stage-atomic-proposition-b-relocation-adjudication-20260913.md",
         ROOT / "docs/acceptance/stage-atomic-proposition-c-observable-audit-20260913.md",
         ROOT / "docs/reviews/stage-atomic-proposition-d-expert-review-20260913.md",
+        ROOT / "docs/acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md",
     ):
         assert path.is_file()
 
@@ -198,7 +199,7 @@ def test_stage012_documents_exist_and_route_to_owner_decision() -> None:
     work_item = (ROOT / "docs/work-items/stage-atomic-proposition-successor.md").read_text(
         encoding="utf-8"
     )
-    assert "P3-STAGE-012-D  CLOSED  RECOMMEND_SYNTHETIC_ONLY_ATOMIC_AND_ENVELOPE_ROUTE" in concept
-    assert "blocked pending owner approval" in work_item
-    assert "synthetic-only" in work_item
+    assert "P3-STAGE-012-E3  CLOSED  PASS_SYNTHETIC_CONFORMANCE" in concept
+    assert "P3-STAGE-012-E4" in work_item
+    assert "ready for review only" in work_item
     assert "Preserved 2021 remains unread" in work_item

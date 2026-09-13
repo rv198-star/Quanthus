@@ -14,13 +14,13 @@
 | E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
 | Post-E review | `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
 | E5 Structure acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
-| Authority | E7 is complete with `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`; E5 algorithm/B6-PATH ownership remain accepted, the neutral concept now maps to existing Catalog `measurement` without registration, and E8 registration review is next; no market-data/runtime/parameter/Fact-registration authority |
+| Authority | E8 is complete with `REGISTER_RESERVED_MEASUREMENT`; the neutral concept is approved for reserved naming/boundary registration under B6-PATH, but Catalog mutation is deferred to owner-approved E9; no market-data/runtime/parameter/runtime-qualification authority |
 
-> P3-STAGE-012 remains a **design/synthetic research work item**. A-D and E1-E7 are closed without
+> P3-STAGE-012 remains a **design/synthetic research work item**. A-D and E1-E8 are closed without
 > fresh market data or parameter search. E7 resolves the E6 object-model mismatch by representing the
-> unchanged T-ending envelope trace as an existing Catalog `measurement`; the concept remains
-> unregistered and the active Catalog/B6-PATH contract remain unchanged. The parent design stays draft
-> and delivery remains blocked pending E8 registration-decision review.
+> unchanged T-ending envelope trace as an existing Catalog `measurement`; E8 then approves reserved
+> semantic naming/boundary registration while leaving the Catalog unchanged. The parent design stays
+> draft and delivery remains blocked pending owner approval for E9 additive registration.
 
 ## 1. Why a different successor shape is needed
 
@@ -260,11 +260,12 @@ P3-STAGE-012-E4  CLOSED  RECOMMEND_B6_PATH_ENVELOPE_FORMALIZATION_SYNTHETIC_ONLY
 P3-STAGE-012-E5  CLOSED  PASS_SYNTHETIC_QUALIFICATION / NOT REGISTERED
 P3-STAGE-012-E6  CLOSED  REVISE_NEUTRAL_CONCEPT
 P3-STAGE-012-E7  CLOSED  PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION / NOT REGISTERED
+P3-STAGE-012-E8  CLOSED  REGISTER_RESERVED_MEASUREMENT / CATALOG UNCHANGED
 -------------------------------------------------------------
-next required review:
-P3-STAGE-012-E8  reserved registration decision review
+owner approval required before:
+P3-STAGE-012-E9  additive reserved registration + metadata/planning alignment
 -------------------------------------------------------------
-only after E8 + later owner approval:
+only after E9 + later owner approval:
 P3-STAGE-012-F   fresh-cohort inventory + preregistration
 P3-STAGE-012-G  fresh development / blind atomic review
 P3-STAGE-012-H  projection compatibility and candidate freeze
@@ -336,6 +337,13 @@ summaries are explanation payload, not separately registered Facts. Synthetic re
 conformance passes all frozen E5 cases, the concept remains unregistered, and the active semantic
 Catalog/B6-PATH contract remain unchanged.
 
-E8 is the next required review. It may decide whether to authorize reserved semantic Catalog
-registration, revise again, keep the concept research-only or park it. E8 itself may not mutate the
-Catalog or open market data.
+E8 is complete and selects `REGISTER_RESERVED_MEASUREMENT`. All four responsibilities agree that E7
+has closed the representation defect and that the concept now has stable neutral meaning, B6-PATH
+ownership, a valid existing `measurement` result kind, exact identity/PIT semantics and a bounded claim
+ceiling. The P3-STAGE-008-B precedent confirms that reserved semantic registration may stabilize naming
+and boundaries while runtime qualification remains separately gated.
+
+Actual Catalog mutation remains separate. E9, if owner-approved, may add the concept as
+`measurement / reserved`, add reviewed business metadata and align deterministic Catalog/planning
+evidence. It may not rewrite the frozen P008 B6-PATH contract, add runtime accepted bindings, read
+market data or preserved 2021, select thresholds/candidates, or change the E5 algorithm/profile.

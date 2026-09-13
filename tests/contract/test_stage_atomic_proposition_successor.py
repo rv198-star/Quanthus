@@ -195,6 +195,13 @@ def test_stage012_documents_exist_and_route_to_owner_gated_e5() -> None:
         / "docs/acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md",
         ROOT
         / "docs/reviews/structure-directional-path-envelope-e6-registration-review-20260914.md",
+        ROOT
+        / (
+            "docs/acceptance/"
+            "structure-directional-path-envelope-e7-representation-acceptance-20260914.md"
+        ),
+        ROOT
+        / "docs/reviews/structure-directional-path-envelope-e8-registration-review-20260914.md",
     ):
         assert path.is_file()
 
@@ -215,7 +222,9 @@ def test_stage012_documents_exist_and_route_to_owner_gated_e5() -> None:
     assert "P3-STAGE-012-E7" in work_item
     assert "closed `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`" in work_item
     assert "P3-STAGE-012-E8" in work_item
-    assert "ready for review only" in work_item
+    assert "closed `REGISTER_RESERVED_MEASUREMENT`" in work_item
+    assert "P3-STAGE-012-E9" in work_item
+    assert "blocked pending owner approval" in work_item
     assert "measurement" in work_item
     assert "preserved 2021" in work_item
     assert "remain blocked" in work_item

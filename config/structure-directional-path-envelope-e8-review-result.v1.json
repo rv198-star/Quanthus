@@ -1,0 +1,109 @@
+{
+  "schema_version": "quanthus.directional-path-envelope-e8-review-result.v1",
+  "work_item": "P3-STAGE-012-E8",
+  "state": "REGISTER_RESERVED_MEASUREMENT",
+  "review_basis_commit": "d977886473ad7bfe5d42c97423bb9d3abb7194c0",
+  "review_basis": {
+    "e7_result_digest": "sha256:60e8961761c6f70661fb2faafa53fc2447ac6d66d7d13d518520f1529be2855e",
+    "e7_representation_digest": "sha256:439653ff774e56dd05c79957b003b01e14022f8466cb8bd92140026784ad1beb",
+    "e7_authorization_digest": "sha256:2ac2219402151cca13c6ff805ba32fd633bf198c5f55d0629332b687203d8225",
+    "e5_closeout_digest": "sha256:5ea1b5bfc64af7c63b80fa767a60e3656b335dc344d4e766fef13a7419171241",
+    "active_b6_path_digest": "sha256:d944a1c503b0d6bb71dfae247c94378361f1a4100174a6da93c944cc2cc1030c",
+    "semantic_catalog_digest": "sha256:86bf671c163c69002330102e15b120cd3883b7064d32d806c6f30680082e3a4d",
+    "structure_blueprint_digest": "sha256:650bae6d109fe0072dc95ff7d89c7c8246b4ba2361dc3870977715e75beed2ac"
+  },
+  "provenance": {
+    "same_origin_simulation": true,
+    "independent_human_expert_validation": false,
+    "responsibilities": [
+      "short_term_trader",
+      "fund_manager",
+      "quant_researcher",
+      "data_and_evidence_governance"
+    ]
+  },
+  "registration_precedent": {
+    "work_item": "P3-STAGE-008-B",
+    "precedent": "threshold-free B6-PATH concepts were registered as reserved semantic concepts with zero market-data read, zero runtime Job and zero parameter search; runtime qualification remained separately gated",
+    "evidence": "docs/acceptance/stage-directional-boundary-repair-b-implementation-20260912.md",
+    "catalog_registration_implies_runtime_qualification": false
+  },
+  "perspective_verdicts": {
+    "short_term_trader": {
+      "verdict": "REGISTER_RESERVED_MEASUREMENT",
+      "support": "E7 preserves the complete failed-resolution path organization instead of reducing it to escape count or a Stage0 threshold. Stable reserved naming makes the neutral observable reusable across consumers.",
+      "counterexample": "One escape, repeated same-side escapes and alternating resolved escapes remain semantically distinct inside the structured measurement payload.",
+      "veto": "Registration must not create a binary disorder rule, a Stage label or independent descriptor Facts."
+    },
+    "fund_manager": {
+      "verdict": "REGISTER_RESERVED_MEASUREMENT",
+      "support": "The observation is neutral Structure geometry under the existing B6-PATH owner. Stable semantic identity is useful even before economic or market qualification.",
+      "counterexample": "Reserved naming must not imply that 20/10 is economically optimal or that the trace predicts reversal, accumulation or distribution.",
+      "veto": "Do not turn reserved registration into runtime binding, strategy consumption or a new peer Stage."
+    },
+    "quant_researcher": {
+      "verdict": "REGISTER_RESERVED_MEASUREMENT",
+      "support": "E5/E7 establish deterministic synthetic behavior, exact parity, scale invariance, PIT/reset semantics, structured value-digest compatibility and an existing Catalog result kind without adding a new type.",
+      "counterexample": "Synthetic representation conformance does not establish market separability, window optimality, predictive value or threshold validity.",
+      "veto": "Registration must preserve the current claim ceiling and must not open fresh search, parameter selection or qualification claims."
+    },
+    "data_and_evidence_governance": {
+      "verdict": "REGISTER_RESERVED_MEASUREMENT",
+      "support": "The concept now has a stable three-segment identity, owned structure.geometry namespace, valid measurement result kind, exact EvaluationSpec/identity semantics, fail-closed availability behavior and explicit claim limits. Reserved registration is naming/boundary authority only.",
+      "counterexample": "The active P008 B6-PATH v1 contract is historically frozen and should not be rewritten in place merely to register this additive extension.",
+      "veto": "Actual registration must be additive: semantic catalog plus reviewed business metadata and planning/blueprint evidence alignment, with no runtime binding or mutation of the frozen P008 contract digest."
+    }
+  },
+  "decision": {
+    "selected_route": "REGISTER_RESERVED_MEASUREMENT",
+    "concept_id": "structure.geometry.close-envelope-resolution-trace",
+    "result_kind": "measurement",
+    "registration_value": "reserved",
+    "owner": "B6-PATH / Directional Path Geometry",
+    "rejected_routes": {
+      "REVISE": "E7 removed the only identified representation defect without changing semantics or algorithm, and all frozen representation checks pass.",
+      "KEEP_RESEARCH_ONLY": "The concept meaning, owner, result kind, identity and claim limits are stable enough for naming/boundary registration; indefinite unregistered status adds no governance benefit.",
+      "PARK": "The semantic hypothesis and synthetic qualification are non-degenerate, and no unresolved object-model blocker remains."
+    },
+    "registration_claim_ceiling": "Reserved semantic naming/boundary registration only. No runtime accepted binding, market qualification, Stage qualification, threshold authority, predictive value, economic usefulness or strategy/trading authority follows.",
+    "active_b6_path_contract": "KEEP_FROZEN_AT_P008_DIGEST",
+    "e5_algorithm": "KEEP_UNCHANGED",
+    "e7_representation": "KEEP_UNCHANGED",
+    "p008_relocation": "KEEP_FROZEN",
+    "preserved_2021": "UNREAD_AND_CLOSED"
+  },
+  "next_phase": {
+    "work_item": "P3-STAGE-012-E9",
+    "status": "BLOCKED_PENDING_OWNER_APPROVAL",
+    "purpose": "Perform the additive reserved semantic registration selected by E8, update reviewed Chinese business metadata and deterministic Catalog/planning evidence, and record the B6-PATH extension as registered-but-unqualified without mutating the frozen P008 family contract or creating runtime bindings.",
+    "allowed_mutations_if_approved": [
+      "add structure.geometry.close-envelope-resolution-trace to config/structure-semantic-catalog.v1.json with result_kind=measurement and registration=reserved",
+      "add reviewed Chinese business name/explanation metadata",
+      "refresh deterministic Catalog/semantic contract expectations and documentation",
+      "update Structure blueprint/planning evidence to state registered-but-unqualified B6-PATH extension"
+    ],
+    "forbidden": [
+      "do not mutate the frozen P008 config/structure-directional-path-geometry.v1.json contract in place",
+      "do not add a runtime accepted semantic binding",
+      "do not read market data or preserved 2021",
+      "do not select thresholds or candidates",
+      "do not change the E5 algorithm or 20/10 profile",
+      "do not authorize Stage, daily, strategy or trading use"
+    ]
+  },
+  "authority": {
+    "review_completed": true,
+    "route_selected": true,
+    "catalog_registration_performed": false,
+    "active_b6_path_contract_change": false,
+    "runtime_binding": false,
+    "algorithm_change": false,
+    "threshold_search": false,
+    "candidate_generation": false,
+    "runtime_job": false,
+    "market_data_read": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

@@ -398,9 +398,12 @@ nodes.
   remain unchanged, the Catalog-facing kind becomes the existing `measurement`, and the complete
   escape/re-entry trace stays one T-ending structured measurement value. The active Catalog and
   B6-PATH contract remain unchanged. Acceptance:
-  `acceptance/structure-directional-path-envelope-e7-representation-acceptance-20260914.md`. E8
-  registration-decision review is next; fresh data, Fact registration, threshold search and preserved
-  2021 remain blocked.
+  `acceptance/structure-directional-path-envelope-e7-representation-acceptance-20260914.md`. E8 then
+  closes `REGISTER_RESERVED_MEASUREMENT`: all four review responsibilities approve reserved semantic
+  naming/boundary registration under B6-PATH, explicitly without runtime or market qualification.
+  Review: `reviews/structure-directional-path-envelope-e8-registration-review-20260914.md`. The Catalog
+  itself remains unchanged because actual additive registration is routed to owner-approved E9;
+  fresh data, runtime binding, threshold search and preserved 2021 remain blocked.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

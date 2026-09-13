@@ -183,6 +183,12 @@ value semantics exactly. `measurement` is already an allowed Catalog result kind
 inside the owned `structure.geometry` family, and `catalog.resolve()` still rejects it because E7 does
 not register it.
 
-E7 therefore closes `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`. The next gate is E8 registration
-decision review only. The active semantic Catalog and B6-PATH family contract remain unchanged until a
-later explicit registration action is approved.
+E7 therefore closes `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`. E8 subsequently closes
+`REGISTER_RESERVED_MEASUREMENT`: the concept is approved for reserved semantic naming/boundary
+registration under B6-PATH, using the existing `measurement` kind and preserving the E5 algorithm,
+20/10 profile, PIT/reset semantics and claim ceiling.
+
+E8 itself does not mutate the Catalog. The active semantic Catalog and frozen P008 B6-PATH family
+contract remain unchanged until separately owner-approved E9 additive registration. Reserved
+registration, if performed, still grants no runtime binding, market qualification, Stage threshold,
+strategy or trading authority.

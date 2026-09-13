@@ -334,15 +334,22 @@ nodes.
   seeing P010. D1 engineering is now accepted: the prepare path verifies Stage007-010 exposure
   closure, builds only the frozen 2018 basis, publishes exact 9/3/27 identities, binds the unread
   2021 plan, and exposes only candidate-blind Primary review pages. The D2 pair selector and stop
-  rules are also implemented before any fresh result is seen. Exactly one D1 2017-09 warm-up + 2018
-  prepare Job is now authorized; D2 scoring, all automatic retries/supplements, parameter search and
-  preserved 2021 remain closed. Design:
+  rules are also implemented before any fresh result is seen. The first governed D1 Job
+  (`stage_e73f7197...`) consumed only the authorized 2017-09 warm-up + 2018 development scope but
+  failed after evidence construction because shared cold validation retained a legacy literal
+  `max_cases=160` instead of consuming the signed 2018 protocol `max_cases=192`. No governed artifact,
+  review opinion, candidate-pair score or selected pair was exposed. The shared validator now consumes
+  signed protocol case/source-row bounds and the signed evidence byte budget without changing any
+  frozen numeric bound. Exactly one separately governed transport recovery is authorized against the
+  exact failed Job/input; no second technical retry, supplement or semantic rerun is opened. D2
+  scoring, parameter search and preserved 2021 remain closed. Design:
   `design/stage-orderly-consolidation-boundary-repair.md`; review:
   `reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; B acceptance:
   `acceptance/stage-orderly-consolidation-boundary-b-implementation-20260913.md`; C acceptance:
   `acceptance/stage-orderly-consolidation-boundary-c-conformance-20260913.md`; D preregistration:
   `acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md`; D1 engineering:
-  `acceptance/stage-orderly-consolidation-joint-d1-implementation-20260913.md`; route:
+  `acceptance/stage-orderly-consolidation-joint-d1-implementation-20260913.md`; D1 transport recovery:
+  `acceptance/stage-orderly-consolidation-joint-d1-transport-recovery-20260913.md`; route:
   `work-items/stage-orderly-consolidation-boundary-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

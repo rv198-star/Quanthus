@@ -17,6 +17,8 @@ from .test_structure_trend_evolution import sequence
 from .test_structure_v2_inputs import row
 
 REVISION = "a" * 40
+SCOPE_2018_PATH = "config/stage-learning/order-reference-evidence-scope-2018.v1.json"
+SCOPE_2018_DIGEST = "sha256:2400ccd1c025098b0a3d050aebf39cc0ebc7241289d9db2e8425819f9daf76c9"
 SCOPE_2019_PATH = "config/stage-learning/order-reference-evidence-scope-2019.v1.json"
 SCOPE_2019_DIGEST = "sha256:2d65ce22666a7709a0f67e3d708df085bb624505484bddeec62a7de9b6ecaa0d"
 
@@ -144,6 +146,87 @@ def test_explicit_2019_scope_is_versioned_without_changing_default_v1() -> None:
     assert evidence["cases"][0]["market_date"].startswith("2019-")
     assert evidence["cases"][0]["protocol_digest"] == SCOPE_2019_DIGEST
     api.validate_evidence(evidence, expected_protocol_digest=SCOPE_2019_DIGEST)
+
+
+def test_validator_honors_signed_protocol_case_budget_above_legacy_160() -> None:
+    protocol = api.load_protocol_contract(SCOPE_2018_PATH, SCOPE_2018_DIGEST)
+    cases = [
+        {
+            "security_code": "000001",
+            "market_date": (date(2018, 1, 1) + timedelta(days=index)).isoformat(),
+            "sampling_stratum": "representative",
+        }
+        for index in range(192)
+    ]
+    evidence = {
+        "schema_version": api.EVIDENCE_SCHEMA,
+        "protocol": protocol,
+        "input_policy": {},
+        "source_kind": "retrospective_development",
+        "code_revision": REVISION,
+        "source_rows": {},
+        "cases": cases,
+    }
+    policy = InputPolicy(SCOPE_2018_DIGEST, ("000001",), "calendar-v1")
+    with (
+        patch.object(api, "_decode_rows", return_value=([], policy)) as decode,
+        patch.object(api, "build_evidence", return_value=evidence) as rebuild,
+    ):
+        api.validate_evidence(evidence, expected_protocol_digest=SCOPE_2018_DIGEST)
+    decode.assert_called_once_with(evidence, max_source_rows=20000)
+    assert rebuild.call_args.kwargs["protocol_digest"] == SCOPE_2018_DIGEST
+
+    over_budget = {**evidence, "cases": [*cases, cases[-1]]}
+    with pytest.raises(api.OrderReferenceError, match="case_budget"):
+        api.validate_evidence(over_budget, expected_protocol_digest=SCOPE_2018_DIGEST)
+
+
+def test_protocol_declared_source_row_budget_is_used_by_validator() -> None:
+    protocol = api.load_protocol_contract(SCOPE_2018_PATH, SCOPE_2018_DIGEST)
+    narrowed = copy.deepcopy(protocol)
+    narrowed["bounds"]["max_source_rows"] = 1
+    narrowed_digest = digest(narrowed)
+    record = {
+        "security_code": "000001",
+        "security_id": "security-1",
+        "listing_id": "listing-1",
+        "market_date": "2018-01-02",
+        "cutoff": "2018-01-02T15:00:00+00:00",
+        "high": "1",
+        "low": "1",
+        "close": "1",
+        "volume": "1",
+        "tradable": True,
+        "quality_reason": "available",
+        "coordinate_epoch": "epoch-1",
+        "result_as_of": "2018-01-02T15:00:00+00:00",
+        "revision_id": "revision-1",
+        "source_id": "source-1",
+        "source_digest": "sha256:" + "1" * 64,
+        "member_digest": "sha256:" + "2" * 64,
+        "calendar_ref": "calendar-v1",
+        "reset_reason": None,
+    }
+    evidence = {
+        "schema_version": api.EVIDENCE_SCHEMA,
+        "protocol": narrowed,
+        "input_policy": {},
+        "source_kind": "retrospective_development",
+        "code_revision": REVISION,
+        "source_rows": {
+            digest(record): record,
+            digest({**record, "market_date": "2018-01-03"}): record,
+        },
+        "cases": [
+            {
+                "security_code": "000001",
+                "market_date": "2018-01-02",
+                "sampling_stratum": "representative",
+            }
+        ],
+    }
+    with pytest.raises(api.OrderReferenceError, match="source_row_budget"):
+        api.validate_evidence(evidence, expected_protocol_digest=narrowed_digest)
 
 
 def test_source_after_last_case_or_duplicate_is_rejected():

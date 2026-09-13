@@ -16,6 +16,9 @@ CONFORMANCE = ROOT / (
 PREREG = ROOT / "config/stage-learning/orderly-consolidation-joint-development-screen.v1.json"
 EXECUTION = ROOT / "config/stage-learning/orderly-consolidation-joint-development-execution.v1.json"
 EVIDENCE_SCOPE = ROOT / "config/stage-learning/order-reference-evidence-scope-2018.v1.json"
+RECOVERY_AUTH = ROOT / (
+    "config/stage-learning/orderly-consolidation-joint-d1-transport-recovery.v1.json"
+)
 DIAGNOSTIC_DIGEST = "sha256:d34e9f7ad8a32969e28d2a1d5245caa089a52fb8a7891a8b8f03e69ce3fc3d1c"
 DESIGN_DIGEST = "sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353"
 PROJECTION_DIGEST = "sha256:11569752a0a3ae7c5a6c3f2ecf07b51710442c0f2445a848800203df3cda146c"
@@ -23,6 +26,7 @@ CONFORMANCE_DIGEST = "sha256:64741982652b0323a14dcd7c87c1486d7b8998fa085d5c190d3
 PREREG_DIGEST = "sha256:c9b5eff892f3d731170afac052e3810543f7444f5b6025bdef24c1ebfa4c213e"
 EXECUTION_DIGEST = "sha256:3424f673f11af42d37a454429fb9e624978b18799d10fea21c365f81c0c0d680"
 EVIDENCE_SCOPE_DIGEST = "sha256:2400ccd1c025098b0a3d050aebf39cc0ebc7241289d9db2e8425819f9daf76c9"
+RECOVERY_AUTH_DIGEST = "sha256:a2bbd496830adda80c13bf9a1d61baa0cf3dabcf6439cc53efcc45f6d5f11b2e"
 
 
 def load(path):
@@ -144,7 +148,9 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
     assert prereg_checkpoint["data_access_authorized_now"] is False
     assert prereg_checkpoint["runtime_job_submission_authorized_now"] is False
     d1 = value["d1_implementation_checkpoint"]
-    assert d1["state"] == "ENGINEERING_IMPLEMENTATION_ACCEPTED"
+    assert d1["state"] == (
+        "TECHNICAL_TRANSPORT_RECOVERY_AUTHORIZED_AFTER_CASE_BUDGET_CONFORMANCE_FAILURE"
+    )
     assert d1["execution_contract_digest"] == EXECUTION_DIGEST
     assert digest(load(EXECUTION)) == EXECUTION_DIGEST
     assert d1["evidence_scope_digest"] == EVIDENCE_SCOPE_DIGEST
@@ -152,13 +158,25 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
     assert d1["authorized_job_kind"] == (
         "quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
     )
-    assert d1["maximum_result_bearing_jobs_now"] == 1
+    assert d1["maximum_result_bearing_jobs_now"] == 0
+    assert d1["maximum_transport_recovery_jobs_remaining"] == 1
     assert d1["maximum_technical_retry_jobs_remaining"] == 0
     assert d1["semantic_retries_remaining"] == 0
     assert d1["automatic_supplement_rounds_remaining"] == 0
     assert d1["candidate_blind_review_required_before_scoring"] is True
     assert d1["candidate_pair_scoring_authorized_in_d1"] is False
     assert d1["preserved_2021_evaluation_read_authorized"] is False
+    assert d1["failed_job"] == {
+        "job_id": "stage_e73f7197d1f34b879d8b31e78db800ce",
+        "code_revision": "e91dfbf77e9d62b66a2d11cf064b3fb0538331ec",
+        "input_digest": "sha256:4a3dfd5da5da9b08c27ff7564ab725d5e968358568dcc2ce9b25e38049545a95",
+        "state": "failed",
+        "error": "stage_orderly_consolidation_joint_d1_process_failed",
+        "artifact_published": False,
+        "failure_class": "post_build_evidence_validator_ignored_signed_protocol_case_budget",
+    }
+    assert d1["transport_recovery_authorization_digest"] == RECOVERY_AUTH_DIGEST
+    assert digest(load(RECOVERY_AUTH)) == RECOVERY_AUTH_DIGEST
     for key in (
         "execution_contract",
         "evidence_scope_contract",
@@ -166,17 +184,22 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
         "prepare_implementation",
         "worker_implementation",
         "acceptance",
+        "transport_recovery_acceptance",
+        "transport_recovery_authorization",
     ):
         assert (ROOT / d1[key]).is_file()
     assert value["delivery_sequence"] == {
         "P3-STAGE-011-A": "closed_design_approved",
         "P3-STAGE-011-B": "closed_engineering_accepted",
         "P3-STAGE-011-C": "closed_pass_topology_conformance_only",
-        "P3-STAGE-011-D": "ready_exactly_one_d1_2018_prepare_job",
+        "P3-STAGE-011-D": (
+            "d1_transport_recovery_authorized_after_protocol_budget_conformance_failure"
+        ),
     }
     assert value["authority"] == {
         "implementation": True,
         "synthetic_conformance": False,
+        "transport_recovery_only": True,
         "consumed_evidence_topology_diagnostic": False,
         "preregistration_design": False,
         "market_data_read": True,
@@ -200,8 +223,46 @@ def test_b_projection_contract_is_accepted_without_opening_data_authority() -> N
         ROOT / "docs/work-items/stage-orderly-consolidation-boundary-repair.md",
         ROOT / "docs/acceptance/stage-orderly-consolidation-boundary-d-preregistration-20260913.md",
         ROOT / "docs/acceptance/stage-orderly-consolidation-joint-d1-implementation-20260913.md",
+        ROOT
+        / "docs/acceptance/stage-orderly-consolidation-joint-d1-transport-recovery-20260913.md",
     ):
         assert path.is_file()
+
+
+def test_d1_transport_recovery_is_exactly_one_nonsemantic_budget_conformance_repair() -> None:
+    value = load(RECOVERY_AUTH)
+    assert digest(value) == RECOVERY_AUTH_DIGEST
+    failed = value["failed_job"]
+    assert failed["job_id"] == "stage_e73f7197d1f34b879d8b31e78db800ce"
+    assert failed["code_revision"] == "e91dfbf77e9d62b66a2d11cf064b3fb0538331ec"
+    assert failed["input_digest"] == (
+        "sha256:4a3dfd5da5da9b08c27ff7564ab725d5e968358568dcc2ce9b25e38049545a95"
+    )
+    assert failed["terminal_state"] == "failed"
+    assert failed["artifact_published"] is False
+    defect = value["implementation_conformance_defect"]
+    assert defect["protocol_digest"] == EVIDENCE_SCOPE_DIGEST
+    assert defect["declared_max_cases"] == 192
+    assert defect["validator_hardcoded_case_ceiling"] == 160
+    frozen = value["frozen_parent_contract"]
+    assert frozen["preregistration_digest"] == PREREG_DIGEST
+    assert frozen["execution_digest"] == EXECUTION_DIGEST
+    assert frozen["evidence_scope_digest"] == EVIDENCE_SCOPE_DIGEST
+    assert frozen["candidate_pair_count"] == 27
+    exposure = value["observed_result_exposure_before_recovery"]
+    assert exposure["failed_job_market_data_read"] is True
+    assert exposure["governed_artifact_published"] is False
+    assert exposure["development_reference_opinions"] == 0
+    assert exposure["candidate_pair_scores"] == 0
+    assert exposure["candidate_pair_selected"] is False
+    assert exposure["preserved_2021_evaluation_read"] is False
+    authority = value["authority"]
+    assert authority["maximum_transport_recovery_jobs"] == 1
+    assert authority["counts_against_result_bearing_market_data_job_budget"] is False
+    assert authority["parameter_search"] is False
+    assert authority["semantic_retry"] is False
+    assert authority["automatic_supplement"] is False
+    assert authority["preserved_2021_evaluation_read"] is False
 
 
 def test_d_preregistration_is_fresh_blind_bounded_and_preserves_prior_gates() -> None:

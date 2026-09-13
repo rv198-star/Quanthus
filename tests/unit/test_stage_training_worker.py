@@ -1507,6 +1507,111 @@ def test_positive_instability_quantitative_d1_status_is_candidate_blind(
     assert "candidate" not in decoded
 
 
+def _write_orderly_consolidation_joint_d1_transport_recovery_authorization(
+    worker_paths: StageWorkerPaths, first: dict,
+) -> None:
+    config_dir = worker_paths.control_repo / "config/stage-learning"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    names = (
+        "orderly-consolidation-joint-development-screen.v1.json",
+        "orderly-consolidation-joint-development-execution.v1.json",
+        "order-reference-evidence-scope-2018.v1.json",
+    )
+    for name in names:
+        (config_dir / name).write_text(
+            (ROOT / "config/stage-learning" / name).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+    screen = json.loads(
+        (config_dir / names[0]).read_text(encoding="utf-8")
+    )
+    execution = json.loads(
+        (config_dir / names[1]).read_text(encoding="utf-8")
+    )
+    scope = json.loads(
+        (config_dir / names[2]).read_text(encoding="utf-8")
+    )
+    authorization = {
+        "schema_version": "quanthus.stage-orderly-consolidation-joint-d1-transport-recovery.v1",
+        "work_item": "P3-STAGE-011-D1-TRANSPORT-RECOVERY",
+        "recovery_kind": "protocol_budget_conformance_only",
+        "failed_job": {
+            "job_id": first["job_id"],
+            "code_revision": first["code_revision"],
+            "input_digest": first["input_digest"],
+            "terminal_state": "failed",
+            "error": "stage_orderly_consolidation_joint_d1_process_failed",
+            "artifact_published": False,
+        },
+        "implementation_conformance_defect": {
+            "protocol_path": "config/stage-learning/order-reference-evidence-scope-2018.v1.json",
+            "protocol_digest": _digest(scope),
+            "declared_max_cases": 192,
+            "declared_max_source_rows": 20000,
+            "declared_max_artifact_bytes": 33554432,
+            "builder_consumed_signed_bounds": True,
+            "validator_hardcoded_case_ceiling": 160,
+            "validator_hardcoded_source_row_ceiling": 20000,
+        },
+        "frozen_parent_contract": {
+            "preregistration_digest": _digest(screen),
+            "execution_digest": _digest(execution),
+            "evidence_scope_digest": _digest(scope),
+            "development_year": 2018,
+            "fresh_pool_size": 512,
+            "development_identity_capacity": 256,
+            "development_case_target": 192,
+            "stage0_candidate_count": 9,
+            "stage2_candidate_count": 3,
+            "candidate_pair_count": 27,
+            "preserved_evaluation_plan_digest": (
+                "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7"
+            ),
+            "preserved_evaluation_identity_count": 160,
+        },
+        "observed_result_exposure_before_recovery": {
+            "failed_job_market_data_read": True,
+            "governed_artifact_published": False,
+            "development_reference_opinions": 0,
+            "candidate_pair_scores": 0,
+            "candidate_pair_selected": False,
+            "threshold_values_exposed_to_reviewer": False,
+            "preserved_2021_evaluation_read": False,
+            "2019_p010_development_read": False,
+            "2020_p009_development_read": False,
+            "2022_2024_read": False,
+            "2025_read": False,
+        },
+        "authority": {
+            "maximum_transport_recovery_jobs": 1,
+            "counts_against_result_bearing_market_data_job_budget": False,
+            "same_preregistration_digest_required": True,
+            "same_execution_digest_required": True,
+            "same_evidence_scope_required": True,
+            "same_identity_exclusion_required": True,
+            "same_sampling_seed_required": True,
+            "same_candidate_pair_surface_required": True,
+            "same_gates_required": True,
+            "same_preserved_evaluation_plan_required": True,
+            "parameter_search": False,
+            "semantic_retry": False,
+            "candidate_replacement": False,
+            "automatic_supplement": False,
+            "preserved_2021_evaluation_read": False,
+            "2019_p010_development_access": False,
+            "2020_p009_development_access": False,
+            "2022_2024_access": False,
+            "2025_access": False,
+            "official_labels": False,
+            "daily_or_strategy": False,
+            "trading": False,
+        },
+    }
+    (config_dir / "orderly-consolidation-joint-d1-transport-recovery.v1.json").write_text(
+        json.dumps(authorization), encoding="utf-8"
+    )
+
+
 def test_orderly_consolidation_joint_d1_is_one_shot_and_idempotent(tmp_path: Path) -> None:
     worker_paths = paths(tmp_path)
     first = submit_job(
@@ -1533,10 +1638,64 @@ def test_orderly_consolidation_joint_d1_is_one_shot_and_idempotent(tmp_path: Pat
     assert marker["work_item"] == "P3-STAGE-011-D"
     assert marker["job"]["job_id"] == first["job_id"]
     assert marker["input_digest"] == first["input_digest"]
-    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+    with pytest.raises(StageWorkerError, match="already bound"):
         submit_job(
             worker_paths,
             code_revision="b" * 40,
+            kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
+        )
+
+    job = StageJob.from_dict(
+        json.loads(
+            (worker_paths.queue / f"{first['job_id']}.json").read_text(encoding="utf-8")
+        )
+    )
+    (worker_paths.queue / f"{first['job_id']}.json").unlink()
+    StageWorker(worker_paths)._write_status(
+        job,
+        state="failed",
+        stage="terminal",
+        started_at="2026-09-13T06:09:27+00:00",
+        completed_at="2026-09-13T06:11:32+00:00",
+        error="stage_orderly_consolidation_joint_d1_process_failed",
+        exit_code=1,
+    )
+    with pytest.raises(StageWorkerError, match="cannot read"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
+        )
+
+    _write_orderly_consolidation_joint_d1_transport_recovery_authorization(
+        worker_paths, first
+    )
+    recovery_revision = "b" * 40
+    recovery = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
+    )
+    assert recovery["job_id"] != first["job_id"]
+    assert recovery["transport_recovery_of"] == first["job_id"]
+    repeated = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
+    )
+    assert repeated["job_id"] == recovery["job_id"]
+    assert repeated["idempotent_reuse"] is True
+    assert repeated["transport_recovery_of"] == first["job_id"]
+    marker = json.loads(
+        worker_paths.orderly_consolidation_joint_d1_recovery_budget.read_text(
+            encoding="utf-8"
+        )
+    )
+    assert marker["transport_recovery_of"] == first["job_id"]
+    with pytest.raises(StageWorkerError, match="transport recovery budget is already consumed"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
             kind=STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
         )
 

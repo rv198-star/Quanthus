@@ -73,12 +73,18 @@ POSITIVE_INSTABILITY_QUANTITATIVE_D1_RECOVERY_BUDGET_SCHEMA = (
 ORDERLY_CONSOLIDATION_JOINT_D1_BUDGET_SCHEMA = (
     "quanthus.stage-orderly-consolidation-joint-d1-budget.v1"
 )
+ORDERLY_CONSOLIDATION_JOINT_D1_RECOVERY_BUDGET_SCHEMA = (
+    "quanthus.stage-orderly-consolidation-joint-d1-transport-recovery-budget.v1"
+)
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_AUTH = (
     "config/stage-learning/positive-instability-quantitative-d1-retry.v1.json"
 )
 POSITIVE_INSTABILITY_QUANTITATIVE_D1_RECOVERY_AUTH = (
     "config/stage-learning/positive-instability-quantitative-d1-transport-recovery.v1.json"
+)
+ORDERLY_CONSOLIDATION_JOINT_D1_RECOVERY_AUTH = (
+    "config/stage-learning/orderly-consolidation-joint-d1-transport-recovery.v1.json"
 )
 JOB_KIND = STAGE_HARNESS_JOB  # compatibility alias for the first admitted kind
 GITHUB_REPOSITORY = "git@github.com:rv198-star/Quanthus.git"
@@ -395,6 +401,10 @@ class StageWorkerPaths:
     @property
     def orderly_consolidation_joint_d1_budget(self) -> Path:
         return self.control_root / "orderly-consolidation-joint-d1-budget.json"
+
+    @property
+    def orderly_consolidation_joint_d1_recovery_budget(self) -> Path:
+        return self.control_root / "orderly-consolidation-joint-d1-transport-recovery-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -785,9 +795,22 @@ def _orderly_consolidation_joint_d1_budget_value(job: StageJob) -> dict[str, Any
     }
 
 
-def _existing_orderly_consolidation_joint_d1_submission(
-    paths: StageWorkerPaths, *, code_revision: str,
-) -> dict[str, Any] | None:
+def _orderly_consolidation_joint_d1_recovery_budget_value(
+    failed_job: StageJob, recovery_job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": ORDERLY_CONSOLIDATION_JOINT_D1_RECOVERY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-011-D1-TRANSPORT-RECOVERY",
+        "transport_recovery_of": failed_job.job_id,
+        "failed_input_digest": failed_job.input_digest,
+        "job": recovery_job.to_dict(),
+        "input_digest": recovery_job.input_digest,
+    }
+
+
+def _parse_orderly_consolidation_joint_d1_marker(
+    paths: StageWorkerPaths,
+) -> StageJob | None:
     marker_path = paths.orderly_consolidation_joint_d1_budget
     if not marker_path.exists():
         return None
@@ -806,11 +829,189 @@ def _existing_orderly_consolidation_joint_d1_submission(
         or marker.get("input_digest") != job.input_digest
     ):
         raise StageWorkerError("orderly consolidation joint D1 budget marker differs")
-    if job.code_revision != code_revision:
+    return job
+
+
+def _parse_orderly_consolidation_joint_d1_recovery_marker(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> StageJob | None:
+    marker_path = paths.orderly_consolidation_joint_d1_recovery_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "orderly consolidation joint D1 recovery budget")
+    if (
+        marker.get("schema_version") != ORDERLY_CONSOLIDATION_JOINT_D1_RECOVERY_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-011-D1-TRANSPORT-RECOVERY"
+        or marker.get("transport_recovery_of") != failed_job.job_id
+        or marker.get("failed_input_digest") != failed_job.input_digest
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("orderly consolidation joint D1 recovery budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("orderly consolidation joint D1 recovery budget marker differs")
+    return job
+
+
+def _orderly_consolidation_joint_d1_recovery_authorization(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> None:
+    authorization = _object(
+        paths.control_repo / ORDERLY_CONSOLIDATION_JOINT_D1_RECOVERY_AUTH,
+        "orderly consolidation joint D1 transport recovery authorization",
+    )
+    if (
+        authorization.get("schema_version")
+        != "quanthus.stage-orderly-consolidation-joint-d1-transport-recovery.v1"
+        or authorization.get("work_item") != "P3-STAGE-011-D1-TRANSPORT-RECOVERY"
+        or authorization.get("recovery_kind") != "protocol_budget_conformance_only"
+    ):
+        raise StageWorkerError("orderly consolidation joint D1 recovery authorization differs")
+    failed = authorization.get("failed_job")
+    defect = authorization.get("implementation_conformance_defect")
+    frozen = authorization.get("frozen_parent_contract")
+    exposure = authorization.get("observed_result_exposure_before_recovery")
+    authority = authorization.get("authority")
+    if not all(
+        isinstance(value, Mapping)
+        for value in (failed, defect, frozen, exposure, authority)
+    ):
+        raise StageWorkerError("orderly consolidation joint D1 recovery authorization incomplete")
+    if (
+        failed.get("job_id") != failed_job.job_id
+        or failed.get("code_revision") != failed_job.code_revision
+        or failed.get("input_digest") != failed_job.input_digest
+        or failed.get("terminal_state") != "failed"
+        or failed.get("error") != "stage_orderly_consolidation_joint_d1_process_failed"
+        or failed.get("artifact_published") is not False
+    ):
+        raise StageWorkerError("orderly consolidation joint D1 recovery parent differs")
+
+    prereg = _object(
+        paths.control_repo
+        / "config/stage-learning/orderly-consolidation-joint-development-screen.v1.json",
+        "orderly consolidation joint development screen",
+    )
+    execution = _object(
+        paths.control_repo
+        / "config/stage-learning/orderly-consolidation-joint-development-execution.v1.json",
+        "orderly consolidation joint development execution",
+    )
+    scope_path = str(defect.get("protocol_path") or "")
+    if not scope_path:
+        raise StageWorkerError("orderly consolidation joint D1 recovery scope missing")
+    scope = _object(paths.control_repo / scope_path, "2018 evidence scope")
+    bounds = scope.get("bounds")
+    if not isinstance(bounds, Mapping):
+        raise StageWorkerError("orderly consolidation joint D1 recovery bounds missing")
+    if (
+        defect.get("protocol_digest") != _digest(scope)
+        or defect.get("declared_max_cases") != bounds.get("max_cases")
+        or defect.get("declared_max_source_rows") != bounds.get("max_source_rows")
+        or defect.get("declared_max_artifact_bytes") != bounds.get("max_artifact_bytes")
+        or defect.get("builder_consumed_signed_bounds") is not True
+        or defect.get("validator_hardcoded_case_ceiling") != 160
+        or defect.get("validator_hardcoded_source_row_ceiling") != 20000
+        or frozen.get("preregistration_digest") != _digest(prereg)
+        or frozen.get("execution_digest") != _digest(execution)
+        or frozen.get("evidence_scope_digest") != _digest(scope)
+        or frozen.get("development_year") != 2018
+        or frozen.get("fresh_pool_size") != 512
+        or frozen.get("development_identity_capacity") != 256
+        or frozen.get("development_case_target") != 192
+        or frozen.get("stage0_candidate_count") != 9
+        or frozen.get("stage2_candidate_count") != 3
+        or frozen.get("candidate_pair_count") != 27
+        or frozen.get("preserved_evaluation_identity_count") != 160
+        or frozen.get("preserved_evaluation_plan_digest")
+        != "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7"
+    ):
+        raise StageWorkerError("orderly consolidation joint D1 recovery binding drift")
+
+    if exposure.get("failed_job_market_data_read") is not True:
+        raise StageWorkerError("orderly consolidation joint D1 recovery exposure differs")
+    for key in (
+        "governed_artifact_published",
+        "candidate_pair_selected",
+        "threshold_values_exposed_to_reviewer",
+        "preserved_2021_evaluation_read",
+        "2019_p010_development_read",
+        "2020_p009_development_read",
+        "2022_2024_read",
+        "2025_read",
+    ):
+        if exposure.get(key) is not False:
+            raise StageWorkerError("orderly consolidation joint D1 recovery exposure expanded")
+    for key in ("development_reference_opinions", "candidate_pair_scores"):
+        if exposure.get(key) != 0:
+            raise StageWorkerError("orderly consolidation joint D1 recovery exposure expanded")
+
+    for key in (
+        "parameter_search",
+        "semantic_retry",
+        "candidate_replacement",
+        "automatic_supplement",
+        "preserved_2021_evaluation_read",
+        "2019_p010_development_access",
+        "2020_p009_development_access",
+        "2022_2024_access",
+        "2025_access",
+        "official_labels",
+        "daily_or_strategy",
+        "trading",
+    ):
+        if authority.get(key) is not False:
+            raise StageWorkerError("orderly consolidation joint D1 recovery authority expanded")
+    if (
+        authority.get("maximum_transport_recovery_jobs") != 1
+        or authority.get("counts_against_result_bearing_market_data_job_budget") is not False
+        or authority.get("same_preregistration_digest_required") is not True
+        or authority.get("same_execution_digest_required") is not True
+        or authority.get("same_evidence_scope_required") is not True
+        or authority.get("same_identity_exclusion_required") is not True
+        or authority.get("same_sampling_seed_required") is not True
+        or authority.get("same_candidate_pair_surface_required") is not True
+        or authority.get("same_gates_required") is not True
+        or authority.get("same_preserved_evaluation_plan_required") is not True
+    ):
+        raise StageWorkerError("orderly consolidation joint D1 recovery budget differs")
+
+
+def _existing_orderly_consolidation_joint_d1_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> tuple[dict[str, Any] | None, StageJob | None]:
+    failed_job = _parse_orderly_consolidation_joint_d1_marker(paths)
+    if failed_job is None:
+        return None, None
+    if failed_job.code_revision == code_revision:
+        return _idempotent_stage_submission(paths, failed_job), None
+
+    recovery_job = _parse_orderly_consolidation_joint_d1_recovery_marker(paths, failed_job)
+    if recovery_job is not None:
+        if recovery_job.code_revision == code_revision:
+            result = _idempotent_stage_submission(paths, recovery_job)
+            result["transport_recovery_of"] = failed_job.job_id
+            return result, None
         raise StageWorkerError(
-            "orderly consolidation joint D1 has no retry or replacement authority"
+            "orderly consolidation joint D1 transport recovery budget is already consumed"
         )
-    return _idempotent_stage_submission(paths, job)
+
+    observed = read_status(paths, failed_job.job_id)
+    if (
+        observed.get("state") != "failed"
+        or observed.get("error") != "stage_orderly_consolidation_joint_d1_process_failed"
+        or observed.get("input_digest") != failed_job.input_digest
+        or observed.get("code_revision") != failed_job.code_revision
+        or observed.get("result_ref") is not None
+    ):
+        raise StageWorkerError(
+            "orderly consolidation joint D1 is already bound to another immutable input"
+        )
+    _orderly_consolidation_joint_d1_recovery_authorization(paths, failed_job)
+    return None, failed_job
 
 
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
@@ -1911,6 +2112,7 @@ def submit_job(
     prepare_retry_of: StageJob | None = None
     positive_instability_quantitative_d1_retry_of: StageJob | None = None
     positive_instability_quantitative_d1_recovery_of: StageJob | None = None
+    orderly_consolidation_joint_d1_recovery_of: StageJob | None = None
     if kind == STAGE_ORDER_RULE_PREPARE_JOB:
         existing, prepare_retry_of = _existing_order_rule_prepare_submission(
             paths, code_revision=code_revision,
@@ -1952,7 +2154,10 @@ def submit_job(
         if existing is not None:
             return existing
     if kind == STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB:
-        existing = _existing_orderly_consolidation_joint_d1_submission(
+        (
+            existing,
+            orderly_consolidation_joint_d1_recovery_of,
+        ) = _existing_orderly_consolidation_joint_d1_submission(
             paths, code_revision=code_revision,
         )
         if existing is not None:
@@ -1989,6 +2194,11 @@ def submit_job(
     )
     orderly_consolidation_joint_d1_reserved = (
         job.kind == STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB
+        and orderly_consolidation_joint_d1_recovery_of is None
+    )
+    orderly_consolidation_joint_d1_recovery_reserved = (
+        job.kind == STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB
+        and orderly_consolidation_joint_d1_recovery_of is not None
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -2043,6 +2253,13 @@ def submit_job(
             paths.orderly_consolidation_joint_d1_budget,
             _orderly_consolidation_joint_d1_budget_value(job),
         )
+    if orderly_consolidation_joint_d1_recovery_reserved:
+        _exclusive_json(
+            paths.orderly_consolidation_joint_d1_recovery_budget,
+            _orderly_consolidation_joint_d1_recovery_budget_value(
+                orderly_consolidation_joint_d1_recovery_of, job
+            ),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -2073,6 +2290,8 @@ def submit_job(
             paths.positive_instability_quantitative_d1_recovery_budget.unlink(missing_ok=True)
         if orderly_consolidation_joint_d1_reserved:
             paths.orderly_consolidation_joint_d1_budget.unlink(missing_ok=True)
+        if orderly_consolidation_joint_d1_recovery_reserved:
+            paths.orderly_consolidation_joint_d1_recovery_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -2098,6 +2317,8 @@ def submit_job(
             paths.positive_instability_quantitative_d1_recovery_budget.unlink(missing_ok=True)
         if orderly_consolidation_joint_d1_reserved:
             paths.orderly_consolidation_joint_d1_budget.unlink(missing_ok=True)
+        if orderly_consolidation_joint_d1_recovery_reserved:
+            paths.orderly_consolidation_joint_d1_recovery_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -2106,6 +2327,8 @@ def submit_job(
         result["technical_retry_of"] = positive_instability_quantitative_d1_retry_of.job_id
     if positive_instability_quantitative_d1_recovery_of is not None:
         result["transport_recovery_of"] = positive_instability_quantitative_d1_recovery_of.job_id
+    if orderly_consolidation_joint_d1_recovery_of is not None:
+        result["transport_recovery_of"] = orderly_consolidation_joint_d1_recovery_of.job_id
     return result
 
 

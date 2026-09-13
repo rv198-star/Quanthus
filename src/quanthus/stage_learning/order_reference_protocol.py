@@ -79,6 +79,17 @@ def _validate_protocol_value(
         raise OrderReferenceError("protocol_time_scope_invalid") from exc
     if not history_start <= case_start <= development_end:
         raise OrderReferenceError("protocol_time_scope_invalid")
+    bounds = protocol.get("bounds")
+    if not isinstance(bounds, Mapping) or set(bounds) != {
+        "max_cases",
+        "max_source_rows",
+        "max_artifact_bytes",
+    }:
+        raise OrderReferenceError("protocol_bounds_invalid")
+    if any(type(bounds[key]) is not int or bounds[key] <= 0 for key in bounds):
+        raise OrderReferenceError("protocol_bounds_invalid")
+    if bounds["max_artifact_bytes"] > MAX_BYTES:
+        raise OrderReferenceError("protocol_artifact_budget_exceeds_hard_limit")
     return protocol
 
 
@@ -275,16 +286,18 @@ def build_evidence(
         "source_rows": source_rows, "cases": cases,
     })
     byte_count = len(canonical(result))
-    if byte_count > MAX_BYTES:
+    if byte_count > protocol["bounds"]["max_artifact_bytes"]:
         raise OrderReferenceError("evidence_size_budget")
     observed("case_packets", len(cases), byte_count)
     return result
 
 
-def _decode_rows(evidence: dict) -> tuple[list[DailyInput], InputPolicy]:
+def _decode_rows(
+    evidence: dict, *, max_source_rows: int = 20000,
+) -> tuple[list[DailyInput], InputPolicy]:
     rows = []
     stored = evidence["source_rows"]
-    if not isinstance(stored, dict) or not 0 < len(stored) <= 20000:
+    if not isinstance(stored, dict) or not 0 < len(stored) <= max_source_rows:
         raise OrderReferenceError("source_row_budget")
     names = {item.name for item in fields(DailyInput)}
     try:
@@ -324,9 +337,15 @@ def validate_evidence(
         expected_digest=expected_protocol_digest,
         root=find_project_root(),
     )
-    if not isinstance(evidence["cases"], list) or not 0 < len(evidence["cases"]) <= 160:
+    bounds = protocol["bounds"]
+    if (
+        not isinstance(evidence["cases"], list)
+        or not 0 < len(evidence["cases"]) <= bounds["max_cases"]
+    ):
         raise OrderReferenceError("case_budget")
-    rows, policy = _decode_rows(evidence)
+    rows, policy = _decode_rows(
+        evidence, max_source_rows=bounds["max_source_rows"]
+    )
     try:
         keys = [(item["security_code"], date.fromisoformat(item["market_date"]))
                 for item in evidence["cases"]]

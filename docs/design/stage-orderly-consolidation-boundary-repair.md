@@ -3,14 +3,14 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | blocked |
 | Work item | `P3-STAGE-011` |
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | `P3-STAGE-010 / REVISE_OR_PARK_DEVELOPMENT_FAIL` |
 | Machine design | `../../config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json` |
 | Machine design digest | `sha256:5d1e1ab3298df676829aff34a9c3b6117fa56053fb684f2c630ca04fbd380353` |
 | Root-cause diagnostic | `../../config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json` |
-| Review | [four-responsibility review](../reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md) |
+| Review | [four-responsibility review](../reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md); [post-closeout expert meeting](../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md) |
 
 ## 1. Why P3-STAGE-011 exists
 
@@ -39,6 +39,11 @@ rule called it orderly consolidation.
 
 P3-STAGE-011 therefore reopens the **Stage-0 / Stage-2 proposition boundary**, not P010's Stage-0
 thresholds.
+
+P011 later closed `REVISE_OR_PARK_DEVELOPMENT_FAIL` after exact fresh development and 27-pair scoring;
+see `../acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md`. The
+approved design remains the historical owner of P011 intent, but its delivery gate is now blocked and
+P011 carries no further implementation or data authority.
 
 ## 2. Root-cause conclusion
 

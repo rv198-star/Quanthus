@@ -5,7 +5,7 @@
 | Parent | P3 stock-stage recognition |
 | Predecessor | P3-STAGE-010 / `REVISE_OR_PARK_DEVELOPMENT_FAIL` |
 | Design | `../design/stage-orderly-consolidation-boundary-repair.md` |
-| Review | `../reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md` |
+| Review | `../reviews/stage-orderly-consolidation-boundary-repair-review-20260913.md`; post-closeout expert meeting: `../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md` |
 | Machine design | `../../config/stage-learning/orderly-consolidation-boundary-repair-design.v1.json` |
 | Root-cause diagnostic | `../../config/stage-learning/orderly-consolidation-boundary-diagnostic.v1.json` |
 | Delivery state | `../../config/stage-learning/orderly-consolidation-boundary-repair-delivery.v1.json` |
@@ -31,3 +31,5 @@
 - Simultaneous Stage0/Stage2 assertion remains a hard semantic conflict, not a precedence decision.
 - Preserved 2021 remains unread until a pair is frozen on a new disjoint development cohort.
 - 2022–2025, official labels, daily activation, strategy and trading remain closed.
+- The non-governing successor concept is `../design/stage-atomic-proposition-successor-concept.md`;
+  it does not create P3-STAGE-012 implementation or data authority.

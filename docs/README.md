@@ -367,7 +367,9 @@ nodes.
   `acceptance/stage-orderly-consolidation-joint-d1-transport-recovery-20260913.md`; D1 result:
   `acceptance/stage-orderly-consolidation-joint-d1-recovery-result-20260913.md`; D2 review seal:
   `acceptance/stage-orderly-consolidation-joint-d2-review-seal-20260913.md`; D2 closeout:
-  `acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md`; route:
+  `acceptance/stage-orderly-consolidation-joint-d2-development-closeout-20260913.md`; post-closeout
+  expert review: `reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md`;
+  non-governing successor concept: `design/stage-atomic-proposition-successor-concept.md`; route:
   `work-items/stage-orderly-consolidation-boundary-repair.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

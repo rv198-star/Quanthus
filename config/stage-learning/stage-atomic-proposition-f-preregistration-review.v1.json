@@ -1,0 +1,64 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-f-preregistration-review.v1",
+  "work_item": "P3-STAGE-012-F",
+  "state": "PASS_PREREGISTRATION_REVIEW",
+  "provenance": {
+    "same_origin_simulation": true,
+    "independent_human_expert_validation": false,
+    "responsibilities": [
+      "short_term_trader",
+      "fund_manager",
+      "quant_researcher",
+      "data_and_evidence_governance"
+    ]
+  },
+  "reviewed": {
+    "freshness_inventory_path": "config/stage-learning/stage-atomic-proposition-freshness-inventory.v1.json",
+    "freshness_inventory_digest": "sha256:689da68cfc6aadb5cd6468df952bfb0f7aded716a0150333ce8e23f34387fa5a",
+    "preregistration_path": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json",
+    "preregistration_digest": "sha256:24aacc70ef7ffa3bbfd0e28e8aa33fd91ba51bbd65da6c13640926215987c54d"
+  },
+  "perspectives": {
+    "short_term_trader": {
+      "verdict": "PASS",
+      "support": "The fixed failed-envelope-resolution channel captures alternating failed directional resolution without equating high churn or same-side repricing with disorder.",
+      "veto": "Do not add a looser one-escape or same-side escape channel after seeing 2016 results."
+    },
+    "fund_manager": {
+      "verdict": "PASS",
+      "support": "Instability and relocation remain independent, preserving mixed directional instability rather than forcing it into Stage0.",
+      "veto": "Do not weaken the frozen relocation guard merely to improve projected Stage0 coverage."
+    },
+    "quant_researcher": {
+      "verdict": "PASS",
+      "support": "The 2016 surface is time-disjoint from P008-P011 result-bearing years, the candidate surface is finite before data, atomics are selected independently, and there is no joint pair ranking.",
+      "veto": "No post-result candidate, profile, quantile, compact-channel count or gate adjustment may be learned from 2016."
+    },
+    "data_and_evidence_governance": {
+      "verdict": "PASS",
+      "support": "Reviewer packets hide candidate outputs, threshold basis and the registered envelope measurement while retaining raw T-only path evidence; preserved 2021 remains closed before exact freeze.",
+      "veto": "Do not expose the envelope-derived measurement to the blind reviewer or rewrite prior pool identities to manufacture freshness."
+    }
+  },
+  "resolved_decisions": {
+    "fresh_2016_surface": "APPROVED_FOR_LATER_PREPARE_ONLY",
+    "atomic_first_review": "APPROVED",
+    "fixed_envelope_channel": "APPROVED_AS_SYNTHETIC_TOPOLOGY_NOT_MARKET_SEARCH",
+    "fixed_p008_relocation": "APPROVED_FOR_COMPATIBILITY_EVALUATION_ONLY",
+    "order_core_without_relocation_veto": "APPROVED",
+    "independent_instability_order_freeze": "APPROVED",
+    "joint_pair_search": "FORBIDDEN",
+    "preserved_2021_before_projection_freeze": "FORBIDDEN"
+  },
+  "authority": {
+    "review_completed": true,
+    "implementation_next": true,
+    "fresh_market_data_read": false,
+    "runtime_job": false,
+    "threshold_search": false,
+    "candidate_surface_change": false,
+    "preserved_2021_evaluation_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

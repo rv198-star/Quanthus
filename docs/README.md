@@ -406,9 +406,12 @@ nodes.
   Chinese business metadata is present, the deterministic Catalog snapshot is 761 entries / 34
   semantic concepts / 10 gaps, and no runtime binding is added. Acceptance:
   `acceptance/structure-directional-path-envelope-e9-registration-acceptance-20260914.md`.
-  The owner has delegated the remainder of P012 through closeout, so F freshness inventory /
-  preregistration is ready without another approval handoff; fresh data remains closed until F freezes
-  and preserved 2021 remains closed until a later exact candidate/projection freeze.
+  The owner has delegated the remainder of P012 through closeout. F now closes
+  `PREREGISTRATION_FROZEN`: a task-disjoint 2016 development surface, exact atomic candidate/profile
+  budgets, blind-review contract and projection stop rules are frozen before data. Acceptance:
+  `acceptance/stage-atomic-proposition-f-preregistration-20260914.md`. G implementation is next; fresh
+  2016 remains closed until that implementation passes, and preserved 2021 remains closed until a later
+  exact candidate/projection freeze.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

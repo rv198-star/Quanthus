@@ -7,7 +7,7 @@
 | Concept | `../design/stage-atomic-proposition-successor-concept.md` |
 | P011 post-closeout review | `../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md` |
 | A-C machine result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
-| Current state | A/B/C/D and E1-E9 closed; E9 registers `structure.geometry.close-envelope-resolution-trace` as a reserved `measurement` without runtime binding; P012 remainder is delegated through closeout and F freshness-inventory/preregistration is ready; fresh market data remains closed until F freezes |
+| Current state | A/B/C/D/E1-E9 and F closed; F freezes a task-disjoint 2016 atomic-first preregistration before any fresh market read; G implementation is ready under delegated P012 authority and fresh data remains closed until that implementation passes |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
@@ -25,8 +25,9 @@
 | P3-STAGE-012-E7 | Catalog-facing neutral concept/result-kind revision | P3-STAGE-012-E6 | closed `PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION`; same concept/algorithm/profile retained, Catalog-facing kind revised to existing `measurement`, active Catalog/B6-PATH unchanged; `../acceptance/structure-directional-path-envelope-e7-representation-acceptance-20260914.md` |
 | P3-STAGE-012-E8 | Reserved registration decision review | P3-STAGE-012-E7 | closed `REGISTER_RESERVED_MEASUREMENT`; four-responsibility review approves naming/boundary registration only and leaves Catalog unchanged; `../reviews/structure-directional-path-envelope-e8-registration-review-20260914.md` |
 | P3-STAGE-012-E9 | Additive reserved semantic registration + metadata/planning alignment | P3-STAGE-012-E8 | closed `REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING`; Catalog 761 entries / 34 semantic concepts / 10 gaps, no runtime binding; `../acceptance/structure-directional-path-envelope-e9-registration-acceptance-20260914.md` |
-| P3-STAGE-012-F | Freshness inventory + atomic-first development preregistration | P3-STAGE-012-E9 | ready under delegated P012 authority; no fresh market-data read until preregistration is frozen |
-| P3-STAGE-012-G+ | Fresh atomic review / projection compatibility / freeze / preserved evaluation | P3-STAGE-012-F | blocked on F preregistration and its downstream evidence gates; no separate owner-approval stop inside P012 |
+| P3-STAGE-012-F | Freshness inventory + atomic-first development preregistration | P3-STAGE-012-E9 | closed `PREREGISTRATION_FROZEN`; 2016 development / 2015 cohort-warmup, exact 9 instability candidates + fixed relocation + 3 order profiles, no joint ranking; `../acceptance/stage-atomic-proposition-f-preregistration-20260914.md` |
+| P3-STAGE-012-G | Implement fresh-2016 prepare / blind atomic review / independent scoring contract | P3-STAGE-012-F | ready under delegated P012 authority; implementation and tests only until accepted, then one fresh result-bearing prepare Job may open |
+| P3-STAGE-012-H+ | Projection compatibility / exact freeze / preserved evaluation | P3-STAGE-012-G | blocked on G fresh evidence and frozen atomic candidates; no separate owner-approval stop inside P012 |
 
 ## Hard boundaries
 
@@ -49,4 +50,6 @@ E8 is complete and selects `REGISTER_RESERVED_MEASUREMENT`. The review finds the
 
 E9 is complete. The concept is now reserved in the Structure semantic Catalog as a `measurement`, with reviewed Chinese business metadata and an exact 761-entry deterministic Catalog snapshot. It remains absent from semantic runtime bindings and the frozen P008 family contract is unchanged.
 
-The owner has delegated the remainder of P012 through closeout. Therefore **P3-STAGE-012-F** is now ready without another approval handoff. F may only freeze freshness inventory and preregistration; it may not read fresh market data until that preregistration is durable. Later preserved-2021 evaluation remains gated on an exact candidate/projection freeze.
+F is now closed before any fresh market read. It selects a task-disjoint 2016 development surface, freezes 192 hash-only review identities with no morphology/backfill authority, hides the registered envelope measurement from reviewers, separates instability/relocation/order atomics, forbids joint candidate ranking and keeps the exact 2021 plan closed.
+
+Under delegated P012 authority, **P3-STAGE-012-G** is now ready for implementation only. The fresh 2016 read may start only after the exact G prepare/review/scoring implementation passes its focused and repository gates. Later preserved-2021 evaluation remains gated on an exact instability/order/projection freeze.

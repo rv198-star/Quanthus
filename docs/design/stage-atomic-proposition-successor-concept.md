@@ -14,13 +14,13 @@
 | E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
 | Post-E review | `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
 | E5 Structure acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
-| Authority | E9 is complete with reserved `measurement` registration and no runtime binding; the owner delegated the remainder of P012 through closeout, so F freshness inventory/preregistration is open while fresh market data remains closed until F freezes |
+| Authority | E9 and F are complete; F freezes the task-disjoint 2016 atomic-first preregistration before data, and delegated P012 authority opens G implementation while fresh market data remains closed until that implementation is accepted |
 
-> P3-STAGE-012 remains a bounded research work item. A-D and E1-E9 are closed. The neutral envelope
-> concept is now reserved in the Structure semantic Catalog as naming/boundary authority only; E9 adds
-> no runtime binding or market claim. Owner delegation removes repeated approval handoffs inside P012,
-> but does not waive freshness, preregistration, sealed-ledger or preserved-evaluation gates. F may now
-> freeze the next fresh development contract before any fresh market-data read.
+> P3-STAGE-012 remains a bounded research work item. A-D, E1-E9 and F are closed. F freezes a 2016
+> task-disjoint atomic-first development surface, exact candidate/profile budgets, reviewer blinding and
+> preserved-2021 stop rules before any fresh read. Owner delegation removes repeated approval handoffs
+> inside P012 but does not waive freshness, sealed-ledger or evaluation gates. G may now implement the
+> frozen prepare/review/scoring contract; fresh market data stays closed until implementation acceptance.
 
 ## 1. Why a different successor shape is needed
 
@@ -262,11 +262,11 @@ P3-STAGE-012-E6  CLOSED  REVISE_NEUTRAL_CONCEPT
 P3-STAGE-012-E7  CLOSED  PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION / NOT REGISTERED
 P3-STAGE-012-E8  CLOSED  REGISTER_RESERVED_MEASUREMENT / CATALOG UNCHANGED
 P3-STAGE-012-E9  CLOSED  REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING
+P3-STAGE-012-F   CLOSED  PREREGISTRATION_FROZEN / 2016 DEVELOPMENT UNREAD
 -------------------------------------------------------------
 open under delegated P012 authority:
-P3-STAGE-012-F   freshness inventory + atomic-first development preregistration
-P3-STAGE-012-G  fresh development / blind atomic review
-P3-STAGE-012-H  projection compatibility and candidate freeze
+P3-STAGE-012-G   implement fresh-2016 prepare / blind atomic review / independent scoring
+P3-STAGE-012-H   projection compatibility and candidate freeze
 -------------------------------------------------------------
 only if H passes:
 preserved 2021 evaluation may be considered under separate authority
@@ -346,6 +346,8 @@ Chinese business metadata is present, the deterministic Catalog snapshot is 761 
 concepts / 10 gaps, and no semantic runtime binding was added. The frozen P008 family contract remains
 immutable.
 
-The owner has delegated the remainder of P012 through closeout. F is therefore open for freshness
-inventory and preregistration only. Fresh data remains unread until F freezes; preserved 2021 remains
-unread until a later exact candidate/projection freeze.
+The owner has delegated the remainder of P012 through closeout. F is now closed: a task-disjoint 2016
+development surface, finite atomic candidate/profile surface, reviewer blinding, independent selection
+and projection stop rules are frozen before data. G implementation is next; fresh 2016 remains unread
+until that implementation passes. Preserved 2021 remains unread until a later exact candidate /
+projection freeze.

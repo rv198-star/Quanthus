@@ -1,0 +1,76 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-freshness-inventory.v1",
+  "work_item": "P3-STAGE-012-F",
+  "state": "FROZEN_BEFORE_FRESH_MARKET_READ",
+  "basis_revision": "c00447e1067c83e59044aa6e37096ad6322f6653",
+  "purpose": "Select a task-disjoint fresh atomic-proposition development partition without reading new market results, while preserving all consumed Stage0/Stage2 evidence and the exact still-closed P009 2021 evaluation plan.",
+  "consumed_or_exposed_surfaces": [
+    {
+      "work_item": "P3-STAGE-008-D",
+      "market_years": [2019, 2020, 2021],
+      "status": "consumed_directional_boundary_development_and_evaluation",
+      "identity_policy": "exclude_entire_stage008_fresh_pool"
+    },
+    {
+      "work_item": "P3-STAGE-009-D",
+      "market_years": [2020],
+      "status": "consumed_positive_instability_development",
+      "identity_policy": "exclude_entire_stage009_512_identity_fresh_pool"
+    },
+    {
+      "work_item": "P3-STAGE-010-D",
+      "market_years": [2019],
+      "warmup_or_discovery_start": "2018-09-01",
+      "status": "consumed_quantitative_instability_development",
+      "identity_policy": "exclude_entire_stage010_512_identity_fresh_pool"
+    },
+    {
+      "work_item": "P3-STAGE-011-D",
+      "market_years": [2018],
+      "warmup_or_discovery_start": "2017-01-01",
+      "development_history_start": "2017-09-01",
+      "status": "consumed_joint_boundary_development",
+      "identity_policy": "exclude_entire_stage011_512_identity_fresh_pool",
+      "artifact_manifest_sha256": "sha256:14870f6cd1521d453b7ccae6ebdd5d8d6d5ee64875372051f76214eb2227eae8"
+    }
+  ],
+  "preserved_evaluation": {
+    "source": "P3-STAGE-009 frozen 2021 evaluation identity/quarter plan",
+    "year": 2021,
+    "identity_count": 160,
+    "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+    "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+    "p012_market_data_read": false,
+    "reselection": false,
+    "backfill": false
+  },
+  "selected_fresh_surface": {
+    "development_year": 2016,
+    "identity_start": "2015-01-01",
+    "identity_end": "2016-12-31",
+    "candidate_scan_start": "2015-01-01",
+    "candidate_cohort_date": "2015-12-31",
+    "candidate_cohort_date_evidence": "governed repository evidence contains 2015-12-31 as a market_date; no fresh market file was opened for F",
+    "development_history_start": "2015-09-01",
+    "development_report_start": "2016-01-01",
+    "development_report_end": "2016-12-31",
+    "time_disjoint_from_p008_p011_result_bearing_surfaces": true,
+    "fresh_market_data_read_during_inventory": false
+  },
+  "identity_exclusions": {
+    "exclude_stage007_exposed_pool": true,
+    "exclude_stage008_entire_fresh_pool": true,
+    "exclude_stage009_entire_512_identity_fresh_pool": true,
+    "exclude_stage010_entire_512_identity_fresh_pool": true,
+    "exclude_stage011_entire_512_identity_fresh_pool": true,
+    "exclude_exact_preserved_2021_evaluation_identities": true,
+    "one_case_per_economic_identity": true
+  },
+  "closed_partitions": {
+    "2017_2021_result_bearing_reuse": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "preserved_2021_access_before_exact_freeze": false
+  },
+  "claim_ceiling": "This inventory chooses only a fresh time/identity surface from already-governed project evidence. It does not prove 2016 data availability, sample sufficiency or proposition prevalence; those are fail-closed checks in the later prepare job."
+}

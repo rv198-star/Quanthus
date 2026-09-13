@@ -209,6 +209,8 @@ def test_stage012_documents_exist_and_route_to_owner_gated_e5() -> None:
         ),
         ROOT
         / "docs/acceptance/stage-atomic-proposition-p012-delegated-authority-20260914.md",
+        ROOT
+        / "docs/acceptance/stage-atomic-proposition-f-preregistration-20260914.md",
     ):
         assert path.is_file()
 
@@ -233,6 +235,8 @@ def test_stage012_documents_exist_and_route_to_owner_gated_e5() -> None:
     assert "P3-STAGE-012-E9" in work_item
     assert "closed `REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING`" in work_item
     assert "P3-STAGE-012-F" in work_item
+    assert "closed `PREREGISTRATION_FROZEN`" in work_item
+    assert "P3-STAGE-012-G" in work_item
     assert "ready under delegated P012 authority" in work_item
     assert "measurement" in work_item
     assert "preserved-2021" in work_item

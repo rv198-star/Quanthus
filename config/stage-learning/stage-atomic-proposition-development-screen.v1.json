@@ -1,0 +1,310 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-development-screen.v1",
+  "work_item": "P3-STAGE-012-F",
+  "state": "PREREGISTERED_BEFORE_2016_MARKET_READ",
+  "purpose": "Qualify instability, relocation and orderly-consolidation atomics independently on a fresh 2016 cohort, freeze at most one instability candidate plus one order profile without joint optimization, then test the frozen atomics through the unchanged Stage0/Stage2 resolver before any preserved-2021 read.",
+  "bindings": {
+    "delegated_authority": {
+      "path": "config/stage-learning/stage-atomic-proposition-p012-delegated-authority.v1.json",
+      "digest": "sha256:77b0d77aee4892dea3771ffec5544cdecc9984967297d0db1cb4f7fec627b90f"
+    },
+    "freshness_inventory": {
+      "path": "config/stage-learning/stage-atomic-proposition-freshness-inventory.v1.json",
+      "digest": "sha256:689da68cfc6aadb5cd6468df952bfb0f7aded716a0150333ce8e23f34387fa5a"
+    },
+    "p010_candidate_grid_source": {
+      "path": "config/stage-learning/positive-instability-quantitative-development-screen.v1.json",
+      "digest": "sha256:65dbe27838ce7721f5f3ca3e4a76f52b7a99cd7d819488e752e883adb5a05606"
+    },
+    "p011_order_profile_source": {
+      "path": "config/stage-learning/orderly-consolidation-joint-development-screen.v1.json",
+      "digest": "sha256:c9b5eff892f3d731170afac052e3810543f7444f5b6025bdef24c1ebfa4c213e"
+    },
+    "p008_relocation_design": {
+      "path": "config/stage-learning/directional-boundary-repair-design.v1.json",
+      "digest": "sha256:9621dfe333050cdc94812e07b21e46ae0c7d211b57d05224924ec8b2a273e2f6"
+    },
+    "atomic_review_contract": {
+      "path": "config/stage-learning/stage-atomic-primary-review-contract.v1.json",
+      "digest": "sha256:74900cfde3d7e86744cab8621a3fd14710fd3fd900fa18f53ef9a98ec750a80c"
+    },
+    "envelope_catalog_representation": {
+      "path": "config/structure-directional-path-envelope-catalog-representation.v1.json",
+      "digest": "sha256:439653ff774e56dd05c79957b003b01e14022f8466cb8bd92140026784ad1beb"
+    },
+    "envelope_registration": {
+      "path": "config/structure-directional-path-envelope-e9-registration-result.v1.json",
+      "digest": "sha256:3fadb9fa2c41d39951fdf3385f5d676623d806baeae6265af17bbd45105aa79c"
+    },
+    "p011_last_fresh_artifact": {
+      "path": "config/stage-learning/orderly-consolidation-joint-d1-recovery-result.v1.json",
+      "digest": "sha256:6ad3aebcda3c73b89e0ad3a94cdad89f78527cc1c9cd4506455fa17fd102bc8c"
+    }
+  },
+  "source_isolation": {
+    "identity_start": "2015-01-01",
+    "identity_end": "2016-12-31",
+    "candidate_scan_start": "2015-01-01",
+    "candidate_cohort_date": "2015-12-31",
+    "candidate_minimum_observations": 120,
+    "candidate_seed": "p012-atomic-first-2016-v1|candidate-population",
+    "development_history_start": "2015-09-01",
+    "development_report_start": "2016-01-01",
+    "development_report_end": "2016-12-31",
+    "fresh_pool_size": 512,
+    "development_identity_capacity": 256,
+    "fresh_pool_seed": "p012-atomic-first-2016-v1|fresh-pool",
+    "exclude_stage007_exposed_pool": true,
+    "exclude_stage008_entire_fresh_pool": true,
+    "exclude_stage009_entire_512_identity_fresh_pool": true,
+    "exclude_stage010_entire_512_identity_fresh_pool": true,
+    "exclude_stage011_entire_512_identity_fresh_pool": true,
+    "development_overlap_with_exact_preserved_evaluation": 0,
+    "2017_2021_result_bearing_market_access": false,
+    "2022_2024_access": false,
+    "2025_access": false
+  },
+  "development_selection": {
+    "year": 2016,
+    "planned_identities": 192,
+    "quarter_caps": {"1": 48, "2": 48, "3": 48, "4": 48},
+    "sampling_seed": "p012-atomic-first-2016-v1|development",
+    "identity_selection": "hash_only",
+    "date_selection": "hash_within_assigned_quarter_only",
+    "selection_uses_morphology": false,
+    "one_case_per_economic_identity": true,
+    "cross_quarter_backfill": false,
+    "identity_backfill": false
+  },
+  "review_blinding": {
+    "protocol": "order-reference-protocol.v2-primary-only",
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "atomic_truths": [
+      "structural_instability_20",
+      "coherent_directional_relocation_20",
+      "orderly_consolidation_20"
+    ],
+    "candidate_output_visible": false,
+    "threshold_basis_visible": false,
+    "registered_envelope_measurement_visible": false,
+    "raw_21_close_primary_path_visible": true,
+    "existing_range_traversal_and_counter_excursion_visible": true,
+    "explicit_recent_derived_facts_visible": false,
+    "future_rows_visible": false,
+    "primary_opinion_commit_required_before_scoring": true,
+    "independent_validation_claimed": false
+  },
+  "atomic_reference_resolution": {
+    "per_proposition_true": "both_roles_TRUE",
+    "per_proposition_false": "both_roles_FALSE",
+    "per_proposition_ambiguous": "all_other_role_combinations_including_UNKNOWN",
+    "input_unavailable": "primary_packet_unavailable",
+    "projected_reference": "existing_project_atomic_primary_per_role_then_cross_role_same_status_else_AMBIGUOUS",
+    "mixed_instability_plus_relocation_is_not_stage0": true
+  },
+  "threshold_basis": {
+    "source": "all_available_unlabeled_2016_primary_scale_observations_from_development_identity_capacity",
+    "labels_visible": false,
+    "reference_opinions_visible": false,
+    "quantile_method": "nearest_rank_ceiling_1_based",
+    "instability_basis": [
+      "positive_width_change20",
+      "range_width20",
+      "positive_absolute_width_gain20",
+      "efficiency20_abs",
+      "range_traversal20",
+      "counter_direction_excursion_share20"
+    ],
+    "order_basis": [
+      "efficiency20_abs",
+      "range_width20",
+      "positive_contraction_magnitude20"
+    ],
+    "envelope_channel_uses_market_learned_threshold": false
+  },
+  "instability_candidate_surface": {
+    "selectable_candidate_count": 9,
+    "base_profile_topology": "exact_P010_3x3_expansion_broad_profiles_recomputed_only_from_fresh_2016_unlabeled_basis",
+    "base_profiles_are_attribution_baselines_not_separately_selectable": true,
+    "fixed_additive_channel": {
+      "id": "repeated-failed-envelope-resolution-20",
+      "trace_status_required": "AVAILABLE",
+      "minimum_resolved_escape_count": 3,
+      "resolved_escape_both_sides_required": true,
+      "minimum_resolved_escape_side_alternation_count": 2,
+      "semantic_rationale": "three resolved escapes with at least two side alternations is the minimum U-L-U or L-U-L failed-resolution pattern; counts are frozen from synthetic topology, not learned from market results"
+    },
+    "enhanced_candidate_truth": "P010_quantitative_instability_TRUE OR repeated_failed_envelope_resolution_20_TRUE",
+    "candidate_grid_expansion_after_result": false,
+    "post_result_channel_change": false
+  },
+  "relocation_surface": {
+    "candidate_count": 1,
+    "source": "exact_frozen_P008_relocation_guard",
+    "threshold_retune": false,
+    "parameter_search": false,
+    "instability_truth_can_coexist": true
+  },
+  "order_candidate_surface": {
+    "selectable_profile_count": 3,
+    "profile_ids": ["order-lenient", "order-balanced", "order-strict"],
+    "profile_quantiles_exactly_from_P011": true,
+    "atomic_order_core": "low_directional_efficiency AND material_current_narrowness AND material_positive_contraction",
+    "relocation_veto_inside_atomic_order_truth": false,
+    "center_shift_truth_authority": false,
+    "profile_expansion_after_result": false
+  },
+  "development_sufficiency": {
+    "minimum_complete_cases": 144,
+    "minimum_definite_instability_positive_references": 24,
+    "minimum_definite_relocation_positive_references": 15,
+    "minimum_definite_order_positive_references": 20,
+    "minimum_definite_instability_negative_references": 70,
+    "minimum_definite_relocation_negative_references": 70,
+    "minimum_definite_order_negative_references": 70
+  },
+  "atomic_quality_gates": {
+    "instability": {
+      "minimum_predictions": 18,
+      "minimum_precision": "0.78",
+      "minimum_positive_reference_coverage": "0.70",
+      "maximum_definite_negative_false_positive_rate": "0.10",
+      "minimum_incremental_true_positives_vs_same_profile_base": 1,
+      "incremental_true_positives_must_exceed_incremental_false_positives": true
+    },
+    "relocation": {
+      "minimum_predictions": 12,
+      "minimum_precision": "0.80",
+      "minimum_positive_reference_coverage": "0.65",
+      "maximum_definite_negative_false_positive_rate": "0.10",
+      "selectable": false
+    },
+    "order": {
+      "minimum_predictions": 12,
+      "minimum_precision": "0.80",
+      "minimum_positive_reference_coverage": "0.65",
+      "maximum_definite_negative_false_positive_rate": "0.10"
+    }
+  },
+  "independent_selection": {
+    "instability_order": [
+      "precision_desc",
+      "false_positive_rate_asc",
+      "coverage_desc",
+      "incremental_true_positive_count_desc",
+      "candidate_id_asc"
+    ],
+    "order_order": [
+      "precision_desc",
+      "false_positive_rate_asc",
+      "coverage_desc",
+      "profile_id_asc"
+    ],
+    "joint_pair_ranking_forbidden": true,
+    "freeze_at_most_one_instability_candidate": true,
+    "freeze_at_most_one_order_profile": true,
+    "relocation_is_fixed": true
+  },
+  "projection_compatibility_gate": {
+    "resolver": {
+      "stage0": "instability_TRUE AND relocation_FALSE AND order_FALSE",
+      "stage2": "instability_FALSE AND relocation_FALSE AND order_TRUE",
+      "mixed_directional_instability": "instability_TRUE AND relocation_TRUE AND order_FALSE -> NEITHER with mixed reason",
+      "positive_order_with_instability_or_relocation": "AMBIGUOUS_CONFLICT"
+    },
+    "minimum_definite_stage0_positive_references": 18,
+    "minimum_definite_stage2_positive_references": 20,
+    "minimum_stage0_definite_negative_references": 70,
+    "minimum_stage2_definite_negative_references": 70,
+    "stage0_minimum_predictions": 15,
+    "stage2_minimum_predictions": 12,
+    "stage0_minimum_precision": "0.78",
+    "stage0_minimum_positive_reference_coverage": "0.70",
+    "stage0_maximum_definite_negative_false_positive_rate": "0.10",
+    "stage2_minimum_precision": "0.80",
+    "stage2_minimum_positive_reference_coverage": "0.65",
+    "stage2_maximum_definite_negative_false_positive_rate": "0.10",
+    "maximum_prediction_ambiguous_conflict_rate": "0.05",
+    "mixed_directional_instability_rate_is_reported_not_gated": true,
+    "no_joint_reselection_after_compatibility_result": true
+  },
+  "no_pass_disposition": {
+    "atomic_sufficiency_fail": "REVISE_OR_PARK_ATOMIC_REFERENCE_INSUFFICIENT",
+    "no_eligible_instability_candidate": "REVISE_OR_PARK_INSTABILITY_DEVELOPMENT_FAIL",
+    "fixed_relocation_gate_fail": "REVISE_OR_PARK_RELOCATION_COMPATIBILITY_FAIL",
+    "no_eligible_order_profile": "REVISE_OR_PARK_ORDER_DEVELOPMENT_FAIL",
+    "projection_compatibility_fail": "REVISE_OR_PARK_PROJECTION_COMPATIBILITY_FAIL",
+    "preserved_2021_read_authorized_on_any_development_fail": false
+  },
+  "preserved_evaluation": {
+    "year": 2021,
+    "identity_count": 160,
+    "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+    "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+    "source_plan_must_match_stage009_digest_exactly": true,
+    "data_read_before_exact_instability_order_projection_freeze": false,
+    "identity_reselection": false,
+    "cross_quarter_backfill": false,
+    "identity_backfill": false,
+    "evaluation_sufficiency": {
+      "minimum_complete_cases": 120,
+      "minimum_definite_instability_positive_references": 18,
+      "minimum_definite_relocation_positive_references": 12,
+      "minimum_definite_order_positive_references": 15
+    },
+    "evaluation_atomic_quality": {
+      "instability_minimum_precision": "0.80",
+      "instability_minimum_coverage": "0.65",
+      "instability_maximum_fpr": "0.10",
+      "relocation_minimum_precision": "0.80",
+      "relocation_minimum_coverage": "0.60",
+      "relocation_maximum_fpr": "0.10",
+      "order_minimum_precision": "0.80",
+      "order_minimum_coverage": "0.60",
+      "order_maximum_fpr": "0.10"
+    },
+    "evaluation_projection_quality": {
+      "stage0_minimum_precision": "0.80",
+      "stage0_minimum_coverage": "0.65",
+      "stage0_maximum_fpr": "0.10",
+      "stage2_minimum_precision": "0.80",
+      "stage2_minimum_coverage": "0.60",
+      "stage2_maximum_fpr": "0.10",
+      "maximum_prediction_ambiguous_conflict_rate": "0.05"
+    }
+  },
+  "execution_sequence": [
+    "F_FREEZE_FRESHNESS_AND_PREREGISTRATION",
+    "G1_PREPARE_FRESH_2016_PRIMARY_EVIDENCE_AND_UNLABELED_THRESHOLD_BASIS",
+    "G2_SEAL_BLIND_PER_ROLE_ATOMIC_REVIEW_BEFORE_CANDIDATE_SCORING",
+    "G3_SCORE_EXACT_9_ENHANCED_INSTABILITY_FIXED_RELOCATION_AND_3_ORDER_PROFILES_INDEPENDENTLY",
+    "H_TEST_ONLY_THE_INDEPENDENTLY_FROZEN_ATOMICS_THROUGH_PROJECTION_COMPATIBILITY_AND_FREEZE_EXACT_PROJECTION",
+    "I_READ_EXACT_PRESERVED_2021_ONLY_AFTER_H_FREEZE_AND_SEAL_EVALUATION_ATOMIC_REVIEW",
+    "J_SCORE_FROZEN_ATOMICS_AND_PROJECTION_ON_PRESERVED_2021_AND_CLOSE_P012"
+  ],
+  "budgets": {
+    "maximum_result_bearing_market_data_jobs": 2,
+    "maximum_selectable_instability_candidates": 9,
+    "maximum_selectable_order_profiles": 3,
+    "relocation_candidates": 1,
+    "joint_pair_search_count": 0,
+    "semantic_retries": 0,
+    "automatic_supplement_rounds": 0,
+    "automatic_technical_retries": 0
+  },
+  "authority": {
+    "preregistration": true,
+    "implementation_before_data_read": true,
+    "development_data_read_after_implementation_acceptance": true,
+    "runtime_job_submission_after_implementation_acceptance": true,
+    "preserved_2021_evaluation_read_before_exact_freeze": false,
+    "2017_2021_result_bearing_access_in_development": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "future_outcome_access": false,
+    "official_labels": false,
+    "daily_or_strategy": false,
+    "trading": false
+  }
+}

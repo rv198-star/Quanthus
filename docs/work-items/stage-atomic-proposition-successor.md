@@ -7,7 +7,10 @@
 | Concept | `../design/stage-atomic-proposition-successor-concept.md` |
 | P011 post-closeout review | `../reviews/stage-orderly-consolidation-p011-post-closeout-expert-review-20260913.md` |
 | A-C machine result | `../../config/stage-learning/stage-atomic-proposition-successor-abc-result.v1.json` |
-| Current state | A/B/C/D/E1-E9 and F closed; G engineering is accepted with zero market reads, and exactly one G1 fresh-2016 prepare Job is ready under delegated P012 authority; G2 blind review/G3 scoring remain gated behind G1 and preserved 2021 remains closed |
+| Historical G engineering | engineering accepted before market execution; `../acceptance/stage-atomic-proposition-g-engineering-20260914.md` |
+| Current state | closed `CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY`; the sole G1 failed the frozen 512-identity capacity gate before 2016 development price/evidence loading; prior bounded A-F/G-engineering assets retained, G2-H+ not executed, no market/Stage qualification and preserved 2021 remains closed |
+| Final machine disposition | `../../config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json` |
+| Final evidence / simulated review | `../acceptance/stage-atomic-proposition-p012-capacity-closeout-20260914.md` |
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
@@ -26,8 +29,8 @@
 | P3-STAGE-012-E8 | Reserved registration decision review | P3-STAGE-012-E7 | closed `REGISTER_RESERVED_MEASUREMENT`; four-responsibility review approves naming/boundary registration only and leaves Catalog unchanged; `../reviews/structure-directional-path-envelope-e8-registration-review-20260914.md` |
 | P3-STAGE-012-E9 | Additive reserved semantic registration + metadata/planning alignment | P3-STAGE-012-E8 | closed `REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING`; Catalog 761 entries / 34 semantic concepts / 10 gaps, no runtime binding; `../acceptance/structure-directional-path-envelope-e9-registration-acceptance-20260914.md` |
 | P3-STAGE-012-F | Freshness inventory + atomic-first development preregistration | P3-STAGE-012-E9 | closed `PREREGISTRATION_FROZEN`; 2016 development / 2015 cohort-warmup, exact 9 instability candidates + fixed relocation + 3 order profiles, no joint ranking; `../acceptance/stage-atomic-proposition-f-preregistration-20260914.md` |
-| P3-STAGE-012-G | Fresh-2016 atomic development | P3-STAGE-012-F | engineering accepted; exact one-shot G1 prepare Job ready under delegated P012 authority, followed by sealed G2 blind atomic review and exact G3 independent scoring; `../acceptance/stage-atomic-proposition-g-engineering-20260914.md` |
-| P3-STAGE-012-H+ | Projection compatibility / exact freeze / preserved evaluation | P3-STAGE-012-G | blocked on G1 fresh evidence, sealed G2 ledger and G3 independent atomic selection; no separate owner-approval stop inside P012 |
+| P3-STAGE-012-G | Fresh-2016 atomic development | P3-STAGE-012-F | closed `FAILED_FRESHNESS_CAPACITY_TERMINAL`; original G1 retained, no retry and no G2/G3 execution; engineering acceptance retained; `../acceptance/stage-atomic-proposition-p012-capacity-closeout-20260914.md` |
+| P3-STAGE-012-H+ | Projection compatibility / exact freeze / preserved evaluation | P3-STAGE-012-G | not executed after upstream capacity stop; no exact freeze, preserved read or qualification; overall P012 fail-closeout recorded without relaxing any gate |
 
 ## Hard boundaries
 
@@ -40,7 +43,7 @@
 - Preserved 2021 remains unread.
 - 2022-2025, official labels, daily activation, strategy and trading remain closed.
 
-## Next decision
+## Historical progression and final disposition
 
 E5 is complete. The neutral envelope escape/re-entry semantics have one Structure-owned algorithm core, a frozen 20/10 EvaluationSpec proposal, explicit PIT/reset/coordinate semantics and `PASS_SYNTHETIC_QUALIFICATION`. E6 then closes `REVISE_NEUTRAL_CONCEPT`: the semantic hypothesis and B6-PATH ownership remain accepted, but the proposed `result_kind=structured_path_trace` cannot be registered into the approved Catalog, whose result kinds are limited to reference/measurement/event/relation/process.
 
@@ -52,4 +55,8 @@ E9 is complete. The concept is now reserved in the Structure semantic Catalog as
 
 F is now closed before any fresh market read. It selects a task-disjoint 2016 development surface, freezes 192 hash-only review identities with no morphology/backfill authority, hides the registered envelope measurement from reviewers, separates instability/relocation/order atomics, forbids joint candidate ranking and keeps the exact 2021 plan closed.
 
-G engineering is now accepted without a market read. Exactly one `quanthus.stage-atomic-proposition-g1-prepare.v1` Job may open the frozen 2015 warm-up / 2016 development scope after this revision is deployed to RX6800. G2 must seal the blind per-role atomic ledger before the selection transport is decoded for G3; there is no automatic retry or joint pair search. Preserved 2021 remains gated on an exact H instability/order/projection freeze.
+G engineering was accepted before market execution. The sole admitted `quanthus.stage-atomic-proposition-g1-prepare.v1` Job, `stage_6cccde81c6f24fae949f947a3209cd25`, subsequently failed with `fresh_pool_capacity_insufficient`: fewer than 512 eligible identities remained under the frozen discovery/exclusion rules. The exact surviving count was not logged. Discovery and identity metadata were read, but the 2016 development price/evidence reader and all threshold/scoring stages were not reached.
+
+The same-origin four-role disposition review closes P012 `CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY` through the delegated fail-closeout authority. There is no demonstrated technical defect authorizing a retry, no reduced pool/exclusion gate, and no replacement cohort. G2/G3/H and preserved evaluation were not executed. Accepted atomic-first/synthetic/Catalog/engineering assets remain valid at their previous claim ceilings; market and Stage qualification remain absent.
+
+A resource-first successor is parked: any future capacity-only investigation requires its own preregistration before new source access and must establish a feasible, independently fresh identity/time resource before another market experiment. The closeout authorizes no new Job and does not silently rename a retry.

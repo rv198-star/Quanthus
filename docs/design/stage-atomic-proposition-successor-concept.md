@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | draft |
-| Delivery gate | open |
+| Delivery gate | blocked; P012 fail-closed without market qualification |
 | Work item | `P3-STAGE-012` |
 | Parent | [LLD 03](lld/03-label-feature-system.md) |
 | Predecessor | `P3-STAGE-011 / REVISE_OR_PARK_DEVELOPMENT_FAIL` |
@@ -14,13 +14,14 @@
 | E synthetic acceptance | `../acceptance/stage-atomic-proposition-e-synthetic-acceptance-20260913.md` |
 | Post-E review | `../reviews/stage-atomic-proposition-e4-post-synthetic-review-20260913.md` |
 | E5 Structure acceptance | `../acceptance/structure-directional-path-envelope-e5-synthetic-acceptance-20260914.md` |
-| Authority | E9 and F are complete; G engineering is accepted with zero market reads, and delegated P012 authority now permits exactly one G1 fresh-2016 prepare Job after deployment; G2 blind ledger seal and G3 scoring remain mandatory before H or preserved-2021 access |
+| Authority | delegated fail-closeout exercised: `CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY`; original G1 failed the frozen capacity gate, no retry or G2-H+ execution authorized by closeout |
+| Final disposition | `../../config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json`; `../acceptance/stage-atomic-proposition-p012-capacity-closeout-20260914.md` |
 
-> P3-STAGE-012 remains a bounded research work item. A-D, E1-E9 and F are closed. G engineering now
-> implements the frozen atomic-first prepare/review/scoring contract without reading market data.
-> Owner delegation removes repeated approval handoffs inside P012 but does not waive freshness,
-> sealed-ledger, one-shot Job, candidate-surface or preserved-evaluation gates. Exactly one G1 fresh
-> prepare may run after this revision is deployed; G2 must seal blind atomics before G3 scoring.
+> P3-STAGE-012 is closed `CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY`, not market-qualified.
+> The sole G1 failed before 2016 development price/evidence loading. Prior bounded semantic,
+> synthetic, Catalog and engineering acceptances are retained. No candidate was selected and
+> no projection was frozen. Preserved 2021 remains unread; the original one-shot budget is retained.
+> Historical design below explains the intended pipeline, not permission to rerun it.
 
 ## 1. Why a different successor shape is needed
 
@@ -262,14 +263,15 @@ P3-STAGE-012-E6  CLOSED  REVISE_NEUTRAL_CONCEPT
 P3-STAGE-012-E7  CLOSED  PASS_CATALOG_FACING_MEASUREMENT_REPRESENTATION / NOT REGISTERED
 P3-STAGE-012-E8  CLOSED  REGISTER_RESERVED_MEASUREMENT / CATALOG UNCHANGED
 P3-STAGE-012-E9  CLOSED  REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING
-P3-STAGE-012-F   CLOSED  PREREGISTRATION_FROZEN / 2016 DEVELOPMENT UNREAD
-P3-STAGE-012-G   ENGINEERING ACCEPTED / EXACT ONE G1 PREPARE READY
+P3-STAGE-012-F   CLOSED  PREREGISTRATION_FROZEN / UNREAD AT F FREEZE
+P3-STAGE-012-G   CLOSED  FAILED_FRESHNESS_CAPACITY_TERMINAL
+                G ENGINEERING ACCEPTANCE RETAINED; G2/G3 NOT EXECUTED
 -------------------------------------------------------------
-open under delegated P012 authority after G1/G2/G3 evidence gates:
-P3-STAGE-012-H   projection compatibility and exact candidate freeze
+P3-STAGE-012-H+  NOT EXECUTED AFTER UPSTREAM STOP
+P3-STAGE-012     CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY
 -------------------------------------------------------------
-only if H passes:
-preserved 2021 evaluation may be considered under separate authority
+No exact candidate/projection freeze; preserved 2021 remains unread.
+No technical recovery or new market Job is authorized by closeout.
 ```
 
 The sequence intentionally postpones fresh data until the semantic and observational questions are
@@ -346,9 +348,22 @@ Chinese business metadata is present, the deterministic Catalog snapshot is 761 
 concepts / 10 gaps, and no semantic runtime binding was added. The frozen P008 family contract remains
 immutable.
 
-The owner has delegated the remainder of P012 through closeout. F is closed and G engineering is now
-accepted. The implementation preserves a finite 9 / 1 / 3 atomic surface, hides the registered envelope
-measurement from blind review, forbids joint pair search, and admits only one one-shot G1 prepare Job.
-Fresh 2016 remains unread in the engineering checkpoint itself. After G1 succeeds, G2 must seal the
-per-role atomic ledger before G3 may decode the selection transport and score the exact surface.
-Preserved 2021 remains unread until a later exact H candidate/projection freeze.
+The owner delegated P012 through freeze or fail-closeout. F and G engineering retain their historical
+acceptances, including the finite 9 / 1 / 3 atomic surface, envelope-hidden blind review and prohibition
+on joint pair search. Fresh 2016 was unread at the engineering checkpoint itself. The later unique G1
+failed `fresh_pool_capacity_insufficient` before the 2016 development price/evidence reader. Discovery
+and identity metadata were accessed, but no thresholds, reviews or scores were produced.
+
+## 12. Final disposition and parked resource-first successor
+
+P012 closes `CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY` under its delegated fail-closeout authority.
+The observed fact is fewer than 512 eligible identities for the frozen cohort/exclusion closure;
+the exact surviving count and physical-source versus exclusion contribution are unknown. This is
+not evidence that the atomic/envelope hypothesis failed, nor proof that all future resources are
+exhausted. No demonstrated implementation defect admits a technical retry.
+
+G2/G3/H and preserved evaluation are not executed, rather than passed. No frozen gate, prior ledger,
+candidate topology, threshold, P008 guard or preserved plan is changed. The reserved measurement has
+no new runtime binding. A successor must establish a feasible, independently fresh resource through
+a separately preregistered capacity-only stage before any new development experiment. That design
+is parked; this closeout itself creates no new data-access or Job authority.

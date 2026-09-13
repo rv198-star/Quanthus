@@ -1647,8 +1647,20 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-STAGE-012", "P3-STAGE-012-G"},
+            set(),
         )
+        p012_closeout = json.loads(
+            (root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json")
+            .read_text()
+        )
+        self.assertEqual(p012_closeout["state"], "CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY")
+        self.assertIs(p012_closeout["qualification"]["market_qualification"], False)
+        self.assertEqual(p012_closeout["budgets_and_boundaries"]["technical_retries"], 0)
+        for stable_id in ("P3-STAGE-012", "P3-STAGE-012-G"):
+            self.assertEqual(
+                next(item for item in p3_items if item.stable_id == stable_id).status,
+                "closed",
+            )
         self.assertTrue(
             all(
                 item.status == "closed"

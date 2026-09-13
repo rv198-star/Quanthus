@@ -412,8 +412,13 @@ nodes.
   `acceptance/stage-atomic-proposition-f-preregistration-20260914.md`. G engineering then closes
   accepted with zero market reads: one exact G1 fresh-2016 prepare kind, blind G2 review transport,
   envelope-hidden reviewer packets, independent 9 / 1 / 3 atomic scoring and zero joint-pair search.
-  Acceptance: `acceptance/stage-atomic-proposition-g-engineering-20260914.md`. Exactly one G1 Job may
-  run after deployment; preserved 2021 remains closed until a later exact H candidate/projection freeze.
+  Acceptance: `acceptance/stage-atomic-proposition-g-engineering-20260914.md`. The subsequent sole G1
+  failed the frozen 512-identity freshness-capacity gate before 2016 development price/evidence
+  loading. P012 now closes `CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY`: prior bounded assets are retained,
+  but G2/G3/H and preserved evaluation were not executed and no market/Stage qualification was obtained.
+  No retry, smaller pool, weaker exclusion or replacement cohort is authorized. Preserved 2021 remains
+  unread. Final evidence and same-origin simulated review:
+  `acceptance/stage-atomic-proposition-p012-capacity-closeout-20260914.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

@@ -1,0 +1,140 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-p012-closeout.v1",
+  "work_item": "P3-STAGE-012",
+  "state": "CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY",
+  "decision_date": "2026-09-14",
+  "decision": "FAIL_CLOSED_NO_MARKET_QUALIFICATION",
+  "authority": {
+    "path": "config/stage-learning/stage-atomic-proposition-p012-delegated-authority.v1.json",
+    "digest": "sha256:77b0d77aee4892dea3771ffec5544cdecc9984967297d0db1cb4f7fec627b90f",
+    "route": "delegated freeze_or_fail_closeout",
+    "runtime_or_retry_authority_created": false
+  },
+  "immutable_bindings": {
+    "original_code_revision": "0e689614c6a458c89934c02c23177eecf7142084",
+    "diagnostic_code_revision": "fa528f66e47bcff597cb377c9c694931ff9033f7",
+    "preregistration": {
+      "path": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json",
+      "digest": "sha256:24aacc70ef7ffa3bbfd0e28e8aa33fd91ba51bbd65da6c13640926215987c54d"
+    },
+    "execution": {
+      "path": "config/stage-learning/stage-atomic-proposition-development-execution.v1.json",
+      "digest": "sha256:5203b5c4a325b775722c90c7404fc149567e448cf63d39e731e22fcd6cebe098"
+    },
+    "freshness_inventory": {
+      "path": "config/stage-learning/stage-atomic-proposition-freshness-inventory.v1.json",
+      "digest": "sha256:689da68cfc6aadb5cd6468df952bfb0f7aded716a0150333ce8e23f34387fa5a"
+    },
+    "evidence_scope": {
+      "path": "config/stage-learning/order-reference-evidence-scope-2016.v1.json",
+      "digest": "sha256:6bbe9c56b850d6bb6ebe49766f2e5c9c2860def98fb06b54c5320ea672b6e32b"
+    },
+    "original_g1_budget_file_sha256": "sha256:b4d68a468f8507ccf82a7607fd683819d4bbae1b433e043a7fd0738d09a1ba03"
+  },
+  "original_job_receipt": {
+    "job_id": "stage_6cccde81c6f24fae949f947a3209cd25",
+    "kind": "quanthus.stage-atomic-proposition-g1-prepare.v1",
+    "code_revision": "0e689614c6a458c89934c02c23177eecf7142084",
+    "input_digest": "sha256:369f3e68074dbb56fb7f5dee59a6a757feb6bc416ee782995da05e74e9b3974f",
+    "submitted_at": "2026-09-13T20:28:15.962738+00:00",
+    "started_at": "2026-09-13T20:28:16.580644+00:00",
+    "completed_at": "2026-09-13T20:28:29.790732+00:00",
+    "state": "failed",
+    "stage": "terminal",
+    "error": "stage_atomic_proposition_g1_process_failed",
+    "exit_code": 1,
+    "result_ref": null
+  },
+  "attribution": {
+    "category": "FRESHNESS_SOURCE_CAPACITY_GATE_FAIL",
+    "root_exception_type": "PositiveInstabilityPrepareError",
+    "root_reason": "fresh_pool_capacity_insufficient",
+    "entry_location": "atomic_proposition_development_prepare.py:223 at original revision",
+    "failure_location": "positive_instability_development_prepare.py:114 at original revision",
+    "required_fresh_pool_size": 512,
+    "observed_eligible_count_relation": "less_than_512",
+    "observed_eligible_count_exact": null,
+    "exclusion_versus_source_loss_breakdown": null,
+    "exact_count_not_logged": true,
+    "implementation_deviation_demonstrated": false,
+    "physical_source_corruption_demonstrated": false,
+    "candidate_quality_failure_demonstrated": false,
+    "scope_of_conclusion": "The original frozen 2015-cohort discovery and identity exclusion closure did not yield the required 512 eligible identities. This does not prove global identity exhaustion, source corruption, or failure of the atomic/envelope hypothesis.",
+    "technical_recovery_admissible_on_current_evidence": false
+  },
+  "access_at_failure": {
+    "basis": "original traceback plus audited control-flow order; not a new runtime access audit",
+    "2015_discovery_executed": true,
+    "2015_2016_identity_metadata_projection_executed": true,
+    "2016_development_admissions_reached": false,
+    "threshold_basis_reached": false,
+    "candidate_evaluation_reached": false,
+    "review_packet_built": false,
+    "selection_transport_consumed": false,
+    "g2_ledger_sealed": false,
+    "2016_complete_unread_claim": false,
+    "explanation": "Identity metadata was accessed; 2016 development price/evidence loading is after the failing fresh-pool gate and was not reached. Existing upstream artifacts were verified for binding/isolation, not reused for tuning."
+  },
+  "phase_disposition": {
+    "A_through_E9": "PRIOR_BOUNDED_ACCEPTANCES_RETAINED",
+    "F": "FROZEN_PREREGISTRATION_RETAINED_UNMODIFIED",
+    "G_engineering": "ACCEPTANCE_RETAINED_NOT_MARKET_QUALIFICATION",
+    "G1": "FAILED_FRESHNESS_CAPACITY_TERMINAL",
+    "G2": "NOT_EXECUTED_UPSTREAM_STOP",
+    "G3": "NOT_EXECUTED_UPSTREAM_STOP",
+    "H": "NOT_EXECUTED_UPSTREAM_STOP",
+    "I": "NOT_EXECUTED_UPSTREAM_STOP",
+    "J": "NO_EVALUATION_SCORING_FAIL_CLOSEOUT_ONLY"
+  },
+  "qualification": {
+    "selected_instability_candidates": 0,
+    "selected_order_profiles": 0,
+    "relocation_retuned": false,
+    "exact_projection_frozen": false,
+    "market_qualification": false,
+    "stage_qualification": false,
+    "new_runtime_binding": false,
+    "catalog_reserved_measurement_retained": true
+  },
+  "review": {
+    "method": "same_origin_four_role_simulation",
+    "roles": ["short_term", "fund", "quantitative", "warehouse"],
+    "independent_model_review_claimed": false,
+    "human_expert_review_claimed": false,
+    "primary_case_review_performed": false,
+    "consensus": "CLOSE_P012_INCONCLUSIVE_RETAIN_ACCEPTED_DESIGN_DO_NOT_RELAX_FROZEN_GATE",
+    "evidence": "docs/acceptance/stage-atomic-proposition-p012-capacity-closeout-20260914.md"
+  },
+  "budgets_and_boundaries": {
+    "original_g1_submissions": 1,
+    "technical_retries": 0,
+    "semantic_retries": 0,
+    "new_candidates_or_profiles": 0,
+    "gate_changes": 0,
+    "original_budget_reset": false,
+    "sealed_ledger_rewrites": 0,
+    "preserved_2021_read_authorized": false,
+    "permanent_blind_2025_access": false,
+    "daily_strategy_trading_production_activation": false
+  },
+  "preserved_plan": {
+    "identity_count": 160,
+    "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+    "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+    "evaluation_market_data_state": "UNREAD"
+  },
+  "successor_design_disposition": {
+    "state": "PARKED_RESOURCE_FEASIBILITY_REQUIRED",
+    "automatic_new_market_job_authorized": false,
+    "next_problem": "Establish an actually feasible, independently fresh identity/time resource before preregistering another market experiment.",
+    "design": "A future separately preregistered capacity-only stage should report identity counts and exclusion reasons before any morphology, thresholds, labels or development evidence. Only a feasible and authority-compatible resource may support a new development contract. This closeout authorizes neither that data access nor a rerun of G1.",
+    "rejected_routes": [
+      "reduce the frozen 512 pool after failure",
+      "weaken prior-identity exclusions",
+      "reseed or duplicate-submit without increasing eligible capacity",
+      "silently substitute a new cohort under the original preregistration",
+      "read preserved 2021 or 2025 to find replacement samples"
+    ]
+  },
+  "claim_ceiling": "P012 is administratively and scientifically fail-closed, not successfully market-qualified. Atomic-first design, synthetic envelope conformance, reserved Catalog registration and G engineering remain bounded accepted assets. No precision, coverage, Stage0/Stage2 compatibility or independent validation result was obtained."
+}

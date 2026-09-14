@@ -63,6 +63,10 @@ def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> Non
     assert 'bash "${worker}" submit --kind "${p014_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p014_c_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" seal-p014-review --job-id "$2"' in text
+    assert 'p014_review_submission="/tmp/quanthus-p014-review-submission.json"' in text
+    assert '== "agentdock:agentdock"' in text
+    assert '== "644"' in text
+    assert "524288" in text
 
 
 def test_status_accepts_only_stage_job_ids() -> None:

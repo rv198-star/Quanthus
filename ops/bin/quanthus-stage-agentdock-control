@@ -15,6 +15,7 @@ training_root="/home/qiuyu/quanthus-data/training"
 git_key="/home/qiuyu/.ssh/quanthus-github-ro"
 worker="${repo_root}/ops/bin/quanthus-stage-worker"
 runtime_identity="${training_root}/control/stage-worker/worker-runtime.json"
+p014_review_submission="/tmp/quanthus-p014-review-submission.json"
 p011_kind="quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
 p012_g1_kind="quanthus.stage-atomic-proposition-g1-prepare.v1"
 p013_a_kind="quanthus.stage-development-resource-capacity-census.v1"
@@ -151,7 +152,15 @@ case "${command}" in
   seal-p014-review)
     [[ "$#" -eq 2 ]] || fail "usage: seal-p014-review <stage_job_id>"
     [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
-    bash "${worker}" seal-p014-review --job-id "$2"
+    [[ -f "${p014_review_submission}" && ! -L "${p014_review_submission}" ]] \
+      || fail "fixed P014 review submission missing or symlinked"
+    [[ "$(stat -c '%U:%G' "${p014_review_submission}")" == "agentdock:agentdock" ]] \
+      || fail "fixed P014 review submission owner differs"
+    [[ "$(stat -c '%a' "${p014_review_submission}")" == "644" ]] \
+      || fail "fixed P014 review submission mode differs"
+    [[ "$(stat -c '%s' "${p014_review_submission}")" -le 524288 ]] \
+      || fail "fixed P014 review submission exceeds size budget"
+    cat "${p014_review_submission}" | bash "${worker}" seal-p014-review --job-id "$2"
     ;;
   status)
     [[ "$#" -eq 2 ]] || fail "usage: status <stage_job_id>"

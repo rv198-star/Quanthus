@@ -31,7 +31,7 @@ P015 treats the **entire precommitted 256-row reserve plan** as the resource cei
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
 | P3-STAGE-015-A | Complete-reserve review-packet readiness census | P3-STAGE-014-D | closed `PASS_COMPLETE_RESERVE_REVIEW_READINESS`; sole Job froze 252/256 ready, 4 `PRIMARY_FACTS_UNAVAILABLE`, all prior 192 still ready, and exactly 60 new review-required rows; `../../config/stage-learning/stage-complete-reserve-review-readiness-result.v1.json` |
-| P3-STAGE-015-B | Freeze full ready denominator and additional blind-review set | P3-STAGE-015-A | ready `PASS_ENGINEERING_READY_FOR_ONE_METADATA_FREEZE_JOB`; exact all-60 metadata-only freeze runtime admitted, no semantic sorting or positive-count stop; `../acceptance/stage-complete-reserve-additional-review-set-engineering-20260914.md` |
+| P3-STAGE-015-B | Freeze full ready denominator and additional blind-review set | P3-STAGE-015-A | recovery-ready `PASS_ENGINEERING_READY_FOR_ONE_TECHNICAL_BINDING_RECOVERY`; original one-shot Job failed before artifact reads on a closeout field-path bug, one exact R1 repair is frozen with the all-60 set/predicate unchanged; `../acceptance/stage-complete-reserve-additional-review-set-recovery-20260914.md` |
 | P3-STAGE-015-C | Review only additional ready rows and seal combined ledger | P3-STAGE-015-B | blocked; exact P014 192 opinions reused unchanged |
 | P3-STAGE-015-D | Evaluate unchanged P012 atomic reference sufficiency | P3-STAGE-015-C | blocked; candidate scoring remains closed even on pass until a separate scoring freeze |
 

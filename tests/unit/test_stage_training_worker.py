@@ -715,10 +715,119 @@ def test_complete_reserve_additional_review_set_is_one_shot_and_idempotent(
         kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
     )
     assert repeated["job_id"] == submitted["job_id"]
-    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+    with pytest.raises(StageWorkerError, match="recovery requires exact failed parent"):
         submit_job(
             worker_paths,
             code_revision="b" * 40,
+            kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
+        )
+
+
+def test_complete_reserve_additional_review_set_allows_one_exact_recovery(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
+    )
+    failed_job = StageJob(
+        job_id=submitted["job_id"],
+        kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
+        code_revision=REVISION,
+        config=submitted["config"],
+        submitted_at=submitted["submitted_at"],
+    )
+    StageWorker(worker_paths)._write_status(
+        failed_job,
+        state="failed",
+        stage="terminal",
+        started_at="2026-09-14T16:01:37+00:00",
+        completed_at="2026-09-14T16:01:38+00:00",
+        error="stage_complete_reserve_additional_review_set_process_failed",
+        exit_code=1,
+    )
+    config_root = worker_paths.control_repo / "config/stage-learning"
+    config_root.mkdir(parents=True, exist_ok=True)
+    bindings = {}
+    for key, name in (
+        ("original_p015_b_config", "stage-complete-reserve-additional-review-set.v1.json"),
+        ("p014_closeout", "stage-atomic-proposition-admission-qualified-d1-closeout.v1.json"),
+        ("p015_a_result", "stage-complete-reserve-review-readiness-result.v1.json"),
+    ):
+        path = config_root / name
+        path.write_text(json.dumps({"binding": key}), encoding="utf-8")
+        bindings[key] = {
+            "path": f"config/stage-learning/{name}",
+            "sha256": "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    authority = {
+        "maximum_technical_recovery_jobs": 1,
+        "same_p015_b_config_required": True,
+        "same_readiness_artifact_required": True,
+        "same_qualified_plan_required": True,
+        "same_p014_review_ledger_required": True,
+        "same_expected_additional_review_count_60_required": True,
+        "same_all_matching_rows_included_required": True,
+        "field_path_repair_only": True,
+        "resource_change": False,
+        "selection_predicate_change": False,
+        "positive_count_stop": False,
+        "semantic_sorting": False,
+        "new_identity_discovery": False,
+        "market_data_read": False,
+        "semantic_values_read": False,
+        "reference_opinions_read": False,
+        "candidate_output_read": False,
+        "threshold_basis_read": False,
+        "selection_transport_read": False,
+        "candidate_scoring": False,
+        "preserved_2021_market_read": False,
+        "2025_read": False,
+        "daily_or_strategy": False,
+        "trading": False,
+    }
+    auth = {
+        "schema_version": "quanthus.stage-complete-reserve-additional-review-set-recovery.v1",
+        "work_item": "P3-STAGE-015-B-R1",
+        "disposition": "AUTHORIZE_ONE_TECHNICAL_BINDING_RECOVERY",
+        "failed_job": {
+            "job_id": failed_job.job_id,
+            "code_revision": failed_job.code_revision,
+            "input_digest": failed_job.input_digest,
+            "terminal_state": "failed",
+            "error": "stage_complete_reserve_additional_review_set_process_failed",
+            "artifact_published": False,
+            "runtime_artifact_read_reached": False,
+            "semantic_read_reached": False,
+        },
+        "bindings": bindings,
+        "authority": authority,
+    }
+    (config_root / "stage-complete-reserve-additional-review-set-recovery.v1.json").write_text(
+        json.dumps(auth), encoding="utf-8"
+    )
+
+    recovery_revision = "b" * 40
+    recovered = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
+    )
+    assert recovered["technical_recovery_of"] == failed_job.job_id
+    assert recovered["job_id"] != failed_job.job_id
+    assert worker_paths.complete_reserve_additional_review_set_recovery_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
+    )
+    assert repeated["job_id"] == recovered["job_id"]
+    with pytest.raises(StageWorkerError, match="has no further authority"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
             kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
         )
 

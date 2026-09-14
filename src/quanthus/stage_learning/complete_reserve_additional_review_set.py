@@ -154,7 +154,7 @@ def run_freeze(
         raise CompleteReserveAdditionalReviewSetError("readiness_result_state")
     if plan_result.get("state") != "PASS_QUALIFIED_EXACT_PLAN_FROZEN":
         raise CompleteReserveAdditionalReviewSetError("qualified_plan_result_state")
-    if closeout.get("immutable_review", {}).get("ledger_sha256") != (
+    if closeout.get("review_ledger", {}).get("ledger_sha256") != (
         config["bindings"]["p014_closeout"]["review_ledger_sha256"]
     ):
         raise CompleteReserveAdditionalReviewSetError("p014_review_ledger_binding")

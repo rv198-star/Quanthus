@@ -480,7 +480,7 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-014-E | Independent I/R/O selection and projection compatibility | P3-STAGE-014-D | closed `NOT_REACHED_REFERENCE_INSUFFICIENCY`; candidate scoring and preserved-2021 access did not start |
 | P3-STAGE-015 | Complete precommitted reserve reference route | P3-STAGE-014-D | ready design: use the entire pre-result P014-B 256-row resource ceiling, freeze review-packet readiness for every row, reuse the 192 sealed opinions unchanged, and review every additional ready row before any scoring access |
 | P3-STAGE-015-A | Complete-reserve review-packet readiness census | P3-STAGE-015 | closed `PASS_COMPLETE_RESERVE_REVIEW_READINESS`; sole Job froze 252/256 ready, four primary-fact-unavailable rows, all prior 192 still ready, and exactly 60 new review-required rows |
-| P3-STAGE-015-B | Freeze full ready denominator and additional blind-review set | P3-STAGE-015-A | ready `PASS_ENGINEERING_READY_FOR_ONE_METADATA_FREEZE_JOB`; exact all-60 metadata-only freeze runtime admitted with no semantic selection or positive-count stop |
+| P3-STAGE-015-B | Freeze full ready denominator and additional blind-review set | P3-STAGE-015-A | recovery-ready `PASS_ENGINEERING_READY_FOR_ONE_TECHNICAL_BINDING_RECOVERY`; original one-shot failed before artifact reads on a closeout field-path bug, with one exact R1 repair frozen and all-60 selection unchanged |
 | P3-STAGE-015-C | Review only additional ready rows and seal combined ledger | P3-STAGE-015-B | blocked; no rewrite of P014 opinions |
 | P3-STAGE-015-D | Evaluate unchanged P012 atomic reference sufficiency | P3-STAGE-015-C | blocked; candidate scoring and preserved evaluation remain separate gates |
 

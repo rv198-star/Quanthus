@@ -59,6 +59,9 @@ P015_A_RESULT = (
 P015_B_CONFIG = (
     ROOT / "config/stage-learning/stage-complete-reserve-additional-review-set.v1.json"
 )
+P015_B_RECOVERY = (
+    ROOT / "config/stage-learning/stage-complete-reserve-additional-review-set-recovery.v1.json"
+)
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -668,6 +671,64 @@ def test_stage015_a_result_and_b_freeze_bind_complete_ready_denominator() -> Non
     assert selection["random_sample"] is False
     assert selection["new_identity_discovery"] is False
     assert all(item is False for item in config["authority"].values())
+
+
+def test_stage015_b_recovery_is_one_field_path_technical_recovery_only() -> None:
+    value = json.loads(P015_B_RECOVERY.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-015-B-R1"
+    assert value["disposition"] == "AUTHORIZE_ONE_TECHNICAL_BINDING_RECOVERY"
+    failed = value["failed_job"]
+    assert failed["job_id"] == "stage_66051c46d8d94852888182e67bef3b7a"
+    assert failed["code_revision"] == "6c94ab786b2d3f92f8b5cbd9e68ecb1f066211bb"
+    assert failed["terminal_state"] == "failed"
+    assert failed["artifact_published"] is False
+    assert failed["runtime_artifact_read_reached"] is False
+    assert failed["semantic_read_reached"] is False
+    cause = value["root_cause"]
+    assert cause["class"] == "IMPLEMENTATION_BINDING_FIELD_PATH"
+    assert cause["observed_code_path"] == "closeout['immutable_review']['ledger_sha256']"
+    assert cause["frozen_contract_path"] == "closeout['review_ledger']['ledger_sha256']"
+    assert cause["config_change_required"] is False
+    assert cause["resource_change_required"] is False
+    assert cause["semantic_rule_change_required"] is False
+    binding = value["bindings"]["original_p015_b_config"]
+    assert binding["path"] == (
+        "config/stage-learning/stage-complete-reserve-additional-review-set.v1.json"
+    )
+    assert binding["sha256"] == (
+        "sha256:1bd50e11f8038b2a55a4424e6480ddd29a008463b60fd1fd1b11692e4031f9e9"
+    )
+    authority = value["authority"]
+    assert authority["maximum_technical_recovery_jobs"] == 1
+    for key in (
+        "same_p015_b_config_required",
+        "same_readiness_artifact_required",
+        "same_qualified_plan_required",
+        "same_p014_review_ledger_required",
+        "same_expected_additional_review_count_60_required",
+        "same_all_matching_rows_included_required",
+        "field_path_repair_only",
+    ):
+        assert authority[key] is True
+    for key in (
+        "resource_change",
+        "selection_predicate_change",
+        "positive_count_stop",
+        "semantic_sorting",
+        "new_identity_discovery",
+        "market_data_read",
+        "semantic_values_read",
+        "reference_opinions_read",
+        "candidate_output_read",
+        "threshold_basis_read",
+        "selection_transport_read",
+        "candidate_scoring",
+        "preserved_2021_market_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

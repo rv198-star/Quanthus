@@ -1,0 +1,68 @@
+{
+  "schema_version": "quanthus.stage-complete-reserve-additional-review-set-recovery.v1",
+  "work_item": "P3-STAGE-015-B-R1",
+  "disposition": "AUTHORIZE_ONE_TECHNICAL_BINDING_RECOVERY",
+  "effective_date": "2026-09-14",
+  "failed_job": {
+    "job_id": "stage_66051c46d8d94852888182e67bef3b7a",
+    "code_revision": "6c94ab786b2d3f92f8b5cbd9e68ecb1f066211bb",
+    "input_digest": "sha256:166360a7e8be79bf9af2cdd1f9380a8b48af1b47fae20e47cceff16acb13602f",
+    "terminal_state": "failed",
+    "error": "stage_complete_reserve_additional_review_set_process_failed",
+    "failure_reason": "CompleteReserveAdditionalReviewSetError:p014_review_ledger_binding",
+    "artifact_published": false,
+    "runtime_artifact_read_reached": false,
+    "semantic_read_reached": false
+  },
+  "root_cause": {
+    "class": "IMPLEMENTATION_BINDING_FIELD_PATH",
+    "observed_code_path": "closeout['immutable_review']['ledger_sha256']",
+    "frozen_contract_path": "closeout['review_ledger']['ledger_sha256']",
+    "repair": "Read the already-frozen review_ledger field instead of the nonexistent immutable_review field.",
+    "config_change_required": false,
+    "resource_change_required": false,
+    "semantic_rule_change_required": false
+  },
+  "bindings": {
+    "original_p015_b_config": {
+      "path": "config/stage-learning/stage-complete-reserve-additional-review-set.v1.json",
+      "sha256": "sha256:1bd50e11f8038b2a55a4424e6480ddd29a008463b60fd1fd1b11692e4031f9e9"
+    },
+    "p014_closeout": {
+      "path": "config/stage-learning/stage-atomic-proposition-admission-qualified-d1-closeout.v1.json",
+      "sha256": "sha256:f9b7e4f9130e335d3be1246116d64c4a433ce686d153401f1bab437011283aa7",
+      "review_ledger_sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69"
+    },
+    "p015_a_result": {
+      "path": "config/stage-learning/stage-complete-reserve-review-readiness-result.v1.json",
+      "sha256": "sha256:a6cabcb49d3f8655e8f832782ea6f2f6b7e6bd0079bc4019919cde27c9308c29"
+    }
+  },
+  "authority": {
+    "maximum_technical_recovery_jobs": 1,
+    "same_p015_b_config_required": true,
+    "same_readiness_artifact_required": true,
+    "same_qualified_plan_required": true,
+    "same_p014_review_ledger_required": true,
+    "same_expected_additional_review_count_60_required": true,
+    "same_all_matching_rows_included_required": true,
+    "field_path_repair_only": true,
+    "resource_change": false,
+    "selection_predicate_change": false,
+    "positive_count_stop": false,
+    "semantic_sorting": false,
+    "new_identity_discovery": false,
+    "market_data_read": false,
+    "semantic_values_read": false,
+    "reference_opinions_read": false,
+    "candidate_output_read": false,
+    "threshold_basis_read": false,
+    "selection_transport_read": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This authorization permits one technical recovery of the failed P015-B metadata-freeze Job solely to correct an implementation field-path mismatch. It does not reopen P015-A, P014 review, resource selection, semantic review, scoring, preserved evaluation, or any production authority."
+}

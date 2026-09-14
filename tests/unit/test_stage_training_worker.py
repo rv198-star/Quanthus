@@ -14,6 +14,7 @@ from quanthus.stage_learning.worker import (
     JOB_KIND,
     JOB_SCHEMA,
     STAGE_ATOMIC_PROPOSITION_G1_JOB,
+    STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
     STAGE_CAPACITY_CENSUS_JOB,
     STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
     STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB,
@@ -204,11 +205,13 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p011_d1_failure"] is None
     assert result["recent_p012_g1_failure"] is None
     assert result["recent_p013_c_failure"] is None
+    assert result["recent_p013_d1_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
         STAGE_ATOMIC_PROPOSITION_G1_JOB,
+        STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB,
@@ -235,6 +238,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         (STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB, "recent_p011_d1_failure"),
         (STAGE_ATOMIC_PROPOSITION_G1_JOB, "recent_p012_g1_failure"),
         (STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB, "recent_p013_c_failure"),
+        (STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB, "recent_p013_d1_failure"),
     ),
 )
 def test_doctor_exposes_only_bounded_recent_failure_tail(
@@ -375,6 +379,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
         STAGE_ATOMIC_PROPOSITION_G1_JOB,
+        STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB,
@@ -514,6 +519,33 @@ def test_development_resource_plan_allows_one_bound_metadata_recovery(tmp_path: 
             worker_paths,
             code_revision="c" * 40,
             kind=STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB,
+        )
+
+
+def test_atomic_proposition_successor_d1_is_one_shot_and_idempotent(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+    )
+    assert submitted["kind"] == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/stage-atomic-proposition-successor-development-screen.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB]["wall_seconds"] == 3600
+    assert worker_paths.atomic_proposition_successor_d1_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
         )
 
 
@@ -2072,6 +2104,167 @@ def test_orderly_consolidation_joint_d1_status_is_candidate_blind(tmp_path: Path
         "plan_digest": _digest(plan),
         "data_read": False,
     }
+    assert selection["review_ledger_must_be_sealed_before_use"] is True
+    assert selection["evaluation_data_read"] is False
+
+
+def test_successor_atomic_status_keeps_blind_review_separate_from_selection(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "d" * 32
+    source_rows = {}
+    history_refs = []
+    for index in range(21):
+        row = {
+            "security_code": "688001",
+            "security_id": "security-star-successor",
+            "market_date": f"2020-08-{index + 3:02d}",
+            "high": "10",
+            "low": "9",
+            "close": "9.5",
+            "coordinate_epoch": "epoch",
+            "reset_reason": None,
+        }
+        ref = _digest(row)
+        source_rows[ref] = row
+        history_refs.append(ref)
+    primary = {"stage_0": "UNKNOWN", "stage_2": "FALSE"}
+    case_body = {
+        "security_code": "688001",
+        "security_id": "security-star-successor",
+        "market_date": "2020-08-23",
+        "sampling_stratum": "representative",
+        "coordinate_ref": _digest({"coordinate": "successor"}),
+        "primary_available": True,
+        "recent_available": True,
+        "input_reason": "admitted",
+        "availability_reasons": {"trend": "available", "order": "available"},
+        "primary": primary,
+        "recent": {"width_change": {"value": "0.1"}},
+        "history_refs": history_refs,
+    }
+    case = {"case_id": _digest(case_body), **case_body}
+    evidence = {"source_rows": source_rows, "cases": [case]}
+    path_facts = {
+        "cases": {
+            case["case_id"]: {
+                "structure.geometry.range-traversal": {
+                    "value": "0.2",
+                    "reason": "available",
+                    "revision_id": _digest({"successor": 1}),
+                },
+                "structure.geometry.counter-direction-excursion-share": {
+                    "value": "0.4",
+                    "reason": "available",
+                    "revision_id": _digest({"successor": 2}),
+                },
+            }
+        }
+    }
+    strata = {
+        case["case_id"]: {
+            "era": "STAR_PRE_CHINEXT_20PCT",
+            "board_family": "STAR",
+            "cell": "STAR_PRE_CHINEXT_20PCT/STAR",
+            "plan_role": "primary",
+            "window_id": "STAR_PRE_CHINEXT_20PCT|STAR|01",
+        }
+    }
+    basis = {"labels_used": False, "reference_opinions_used": False}
+    grid = {
+        "instability_candidate_count": 9,
+        "order_profile_count": 3,
+        "relocation_candidate_count": 1,
+        "joint_pair_search_count": 0,
+        "parameter_search_performed": False,
+        "grid_expanded_after_result": False,
+    }
+    envelopes = {"review_transport_visible": False, "cases": {}}
+    plan = {
+        "identity_count": 160,
+        "identity_digest": "sha256:" + "7" * 64,
+        "data_read": False,
+    }
+    payloads = {
+        "evidence.json": evidence,
+        "path-facts.json": path_facts,
+        "case-strata.json": strata,
+        "threshold-basis.json": basis,
+        "candidate-grid.json": grid,
+        "envelope-measurements.json": envelopes,
+        "preserved-evaluation-plan.json": plan,
+    }
+    artifact = worker_paths.runs / job_id / "stage-atomic-proposition-successor-d1-test"
+    artifact.mkdir(parents=True)
+    files = {}
+    for name, value in payloads.items():
+        raw = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        (artifact / name).write_bytes(raw)
+        files[name] = "sha256:" + hashlib.sha256(raw).hexdigest()
+    manifest = {"files": files}
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-14T10:00:00+00:00",
+        "started_at": "2026-09-14T10:00:01+00:00",
+        "completed_at": "2026-09-14T10:00:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "atomic_proposition_successor_d1": {
+                "development_selected_case_count": 1,
+                "threshold_basis_digest": _digest(basis),
+                "candidate_grid_digest": _digest(grid),
+                "envelope_measurements_digest": _digest(envelopes),
+                "preserved_evaluation_plan_digest": _digest(plan),
+                "case_strata_digest": _digest(strata),
+                "review_ready": True,
+            },
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-14T10:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+
+    observed = read_status(worker_paths, job_id)
+    index = observed["review_transport_index"]
+    assert index["case_count"] == 1
+    assert index["era_board_stratum_included"] is True
+    assert index["threshold_basis_included"] is False
+    assert index["candidate_output_included"] is False
+    assert index["envelope_measurement_included"] is False
+    page_status = read_status(worker_paths, index["pages"][0]["job_id"])
+    decoded = json.loads(
+        gzip.decompress(base64.b64decode(page_status["review_transport"]["payload"]))
+    )
+    review_case = decoded["cases"][0]
+    assert review_case["primary"] == primary
+    assert review_case["resource_stratum"] == strata[case["case_id"]]
+    assert len(review_case["history"]) == 21
+    assert "recent" not in review_case
+    assert "threshold_basis" not in decoded
+    assert "candidate_grid" not in decoded
+    assert "envelope_measurements" not in decoded
+    selection = json.loads(
+        gzip.decompress(base64.b64decode(observed["selection_transport"]["payload"]))
+    )
+    assert selection["schema_version"] == (
+        "quanthus.stage-atomic-proposition-successor-d1-selection-transport.v1"
+    )
+    assert selection["threshold_basis"] == basis
+    assert selection["candidate_grid"] == grid
     assert selection["review_ledger_must_be_sealed_before_use"] is True
     assert selection["evaluation_data_read"] is False
 

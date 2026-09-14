@@ -424,12 +424,16 @@ nodes.
   listing board × evidence role` model. MAIN, ChiNext and STAR become hard board strata across
   institutional/rule-defined eras; retrospective bull/bear labels are forbidden for sample selection,
   and historical industry/theme stratification remains non-authoritative until a PIT source exists.
-  The only ready child is a metadata-only capacity census; no price/morphology/label/scoring read is
-  opened. Its one-shot 61-session window implementation and restricted Worker/helper route are now
-  engineering-accepted before the first census run. Design decision, review and engineering evidence:
-  `work-items/stage-development-resource-model.md`,
-  `reviews/stage-development-resource-four-party-review-20260914.md`, and
-  `acceptance/stage-development-resource-capacity-census-engineering-20260914.md`.
+  The metadata census then measured 90,067 exposure-aware identity-window resources versus 18,967
+  under legacy whole-identity burn-down. P013-B froze eight equal era x board cells with 32 reserves
+  each; P013-C froze an exact 256-identity metadata plan with 192 primary and 64 same-cell fallback
+  rows. P013-D runtime engineering is now accepted for one exact-plan result-bearing prepare Job:
+  case T is the frozen 61-session window end, P012 9/1/3 atomic surfaces and numeric gates stay
+  unchanged, blind review adds only era/board stratum metadata, and preserved 2021 / 2022-2025 remain
+  closed. Evidence: `work-items/stage-development-resource-model.md`,
+  `reviews/stage-development-resource-p013b-four-party-review-20260914.md`,
+  `acceptance/stage-atomic-proposition-successor-preregistration-20260914.md`, and
+  `acceptance/stage-atomic-proposition-successor-d1-engineering-20260914.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

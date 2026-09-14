@@ -19,6 +19,7 @@ def test_control_surface_is_bounded_to_rx6800_qiuyu_and_exact_commands() -> None
         "submit-p012-g1)",
         "submit-p013-a)",
         "submit-p013-c)",
+        "submit-p013-d)",
         "status)",
     ):
         assert command in text
@@ -41,11 +42,13 @@ def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> Non
     assert 'p012_g1_kind="quanthus.stage-atomic-proposition-g1-prepare.v1"' in text
     assert 'p013_a_kind="quanthus.stage-development-resource-capacity-census.v1"' in text
     assert 'p013_c_kind="quanthus.stage-development-resource-plan.v1"' in text
+    assert 'p013_d_kind="quanthus.stage-atomic-proposition-successor-d1-prepare.v1"' in text
     assert '[[ "$(service_revision)" == "${target}" ]]' in text
     assert 'bash "${worker}" submit --kind "${p011_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p012_g1_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p013_a_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p013_c_kind}" --code-revision "${target}"' in text
+    assert 'bash "${worker}" submit --kind "${p013_d_kind}" --code-revision "${target}"' in text
 
 
 def test_status_accepts_only_stage_job_ids() -> None:

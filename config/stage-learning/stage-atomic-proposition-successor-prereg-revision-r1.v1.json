@@ -1,0 +1,52 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-successor-prereg-revision-r1.v1",
+  "work_item": "P3-STAGE-013-C",
+  "state": "FROZEN_PRE_RESULT_INPUT_WINDOW_ALIGNMENT_R1",
+  "effective_date": "2026-09-14",
+  "parent_preregistration": {
+    "path": "config/stage-learning/stage-atomic-proposition-successor-development-screen.v1.json",
+    "canonical_digest": "sha256:b6a5ffd38c1cb6901b5436c61b15ac5693a3a81366a287f70fb529f63da1d264"
+  },
+  "finding": "The parent preregistration allowed deterministic hash selection of T inside a 61-session exact plan window while the frozen reviewer evidence contract retains 61 sessions through T. Any T before window_end would require reading pre-window market rows, violating the exact-window read boundary.",
+  "revision": {
+    "case_t_selection_before": "deterministic_hash_among_input_complete_T_dates_inside_exact_window_after_primary_20_session_history",
+    "case_t_selection_after": "exact_plan_window_end_only",
+    "window_end_must_be_input_complete": true,
+    "primary_window_sessions": 20,
+    "retained_history_sessions": 61,
+    "market_read_outside_exact_window": false,
+    "if_window_end_input_unavailable": "apply_pre_frozen_same_cell_fallback_order",
+    "if_cell_fallback_exhausted": "FAIL_CELL_WITHOUT_SUPPLEMENT"
+  },
+  "unchanged": {
+    "exact_plan_manifest_sha256": "sha256:853ade679e1107db238ec68daa8a26755e1d48ef334b9b85d525a8fcd0a3adef",
+    "exact_plan_digest": "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371",
+    "global_identity_unique": true,
+    "cell_count": 8,
+    "reserve_per_cell": 32,
+    "primary_per_cell": 24,
+    "fallback_per_cell": 8,
+    "total_primary": 192,
+    "total_fallback": 64,
+    "instability_candidate_count": 9,
+    "relocation_candidate_count": 1,
+    "order_profile_count": 3,
+    "joint_pair_search_count": 0,
+    "numeric_atomic_quality_gates": "exact_P012",
+    "projection_compatibility_numeric_gates": "exact_P012",
+    "cross_cell_fallback": false,
+    "post_result_identity_replacement": false,
+    "preserved_2021_state": "UNREAD",
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "authority": {
+    "market_data_read_before_revision_freeze": false,
+    "morphology_read_before_revision_freeze": false,
+    "label_or_reference_read_before_revision_freeze": false,
+    "candidate_output_read_before_revision_freeze": false,
+    "candidate_or_gate_change": false,
+    "sampling_identity_change": false
+  },
+  "claim_ceiling": "R1 is a pre-result consistency repair between the exact-window resource contract and the 61-session reviewer evidence contract. It does not use or reveal market outcomes and does not change the scientific candidate/gate question."
+}

@@ -471,7 +471,7 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-013-A | Metadata-only era × board × exposure capacity census | P3-STAGE-013 | closed `PASS_METADATA_CAPACITY_CENSUS`; 90,067 exposure-aware identity-window capacity vs 18,967 legacy whole-identity capacity; no result-bearing read |
 | P3-STAGE-013-B | Freeze board-era quotas and reusable-window policy | P3-STAGE-013-A | closed with additive metadata-only R1 temporal-spread revision; eight cells remain 32 reserve / 24 primary / 8 fallback and current-batch global identity uniqueness stays mandatory |
 | P3-STAGE-013-C | Freeze successor result-bearing preregistration | P3-STAGE-013-B | closed `PASS_EXACT_PLAN_AND_SUCCESSOR_PREREG_FROZEN`; R1 exact plan = 256 unique identities across 8 cells, 192 primary + 64 fallback; P012 atomic surfaces/gates and preserved-2021 boundary remain bound |
-| P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | ready for bounded runtime engineering only; result-bearing Job remains unauthorized until runtime acceptance is committed/pushed |
+| P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | engineering accepted `PASS_ENGINEERING_READY_FOR_ONE_EXACT_PLAN_RESULT_BEARING_JOB`; one exact-plan D1 Job is allowed only after runtime checkpoint commit/push/deploy; preserved 2021 remains unread |
 
 ## 7. Acceptance
 

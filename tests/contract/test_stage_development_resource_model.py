@@ -24,6 +24,16 @@ P013C_RESULT = ROOT / "config/stage-learning/stage-development-resource-plan-res
 P013C_SUCCESSOR = (
     ROOT / "config/stage-learning/stage-atomic-proposition-successor-development-screen.v1.json"
 )
+P013D_PREREG_R1 = (
+    ROOT / "config/stage-learning/stage-atomic-proposition-successor-prereg-revision-r1.v1.json"
+)
+P013D_EXECUTION = (
+    ROOT / "config/stage-learning/stage-atomic-proposition-successor-execution.v1.json"
+)
+P013D_PROTOCOL = ROOT / "config/stage-learning/order-reference-evidence-scope-p013.v1.json"
+P013D_SOURCE = (
+    ROOT / "src/quanthus/stage_learning/atomic_proposition_successor_development_prepare.py"
+)
 
 
 def load_model() -> dict:
@@ -315,6 +325,52 @@ def test_stage013_c_successor_prereg_binds_exact_plan_and_preserves_atomic_surfa
     assert value["authority"]["runtime_job_submission"] is False
     assert value["authority"]["numeric_gate_change"] is False
     assert value["authority"]["2025_read"] is False
+
+
+def test_stage013_d_runtime_is_exact_plan_bounded_and_one_shot() -> None:
+    revision = json.loads(P013D_PREREG_R1.read_text(encoding="utf-8"))
+    assert revision["state"] == "FROZEN_PRE_RESULT_INPUT_WINDOW_ALIGNMENT_R1"
+    assert revision["revision"]["case_t_selection_after"] == "exact_plan_window_end_only"
+    assert revision["unchanged"]["total_primary"] == 192
+    assert revision["unchanged"]["total_fallback"] == 64
+    assert revision["unchanged"]["instability_candidate_count"] == 9
+    assert revision["unchanged"]["relocation_candidate_count"] == 1
+    assert revision["unchanged"]["order_profile_count"] == 3
+    assert revision["unchanged"]["joint_pair_search_count"] == 0
+    assert revision["authority"]["market_data_read_before_revision_freeze"] is False
+
+    execution = json.loads(P013D_EXECUTION.read_text(encoding="utf-8"))
+    assert execution["state"] == "FROZEN_RUNTIME_CONTRACT_BEFORE_FIRST_RESULT_BEARING_JOB"
+    assert execution["exact_plan_artifact"]["plan_digest"] == (
+        "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371"
+    )
+    assert execution["market_read"]["group_by_exact_window"] is True
+    assert execution["market_read"]["read_only_exact_plan_window_dates"] is True
+    assert execution["market_read"]["price_rows_outside_window"] is False
+    assert execution["selection"]["complete_cases_per_cell"] == 24
+    assert execution["selection"]["total_complete_cases"] == 192
+    assert execution["selection"]["fallback_same_cell_only"] is True
+    assert execution["selection"]["cross_cell_fill"] is False
+    assert execution["runtime"]["maximum_jobs"] == 1
+    assert execution["runtime"]["automatic_retries"] == 0
+    assert execution["p012_atomic_contract"]["instability_candidate_count"] == 9
+    assert execution["p012_atomic_contract"]["relocation_candidate_count"] == 1
+    assert execution["p012_atomic_contract"]["order_profile_count"] == 3
+    assert execution["p012_atomic_contract"]["joint_pair_search_count"] == 0
+    assert execution["authority"]["preserved_2021_evaluation_read"] is False
+    assert execution["authority"]["2025_access"] is False
+
+    protocol = json.loads(P013D_PROTOCOL.read_text(encoding="utf-8"))
+    assert protocol["profile"]["retained_history_sessions"] == 61
+    assert protocol["bounds"]["max_cases"] == 192
+    assert protocol["bounds"]["max_source_rows"] == 192 * 61
+    assert protocol["sampling"]["case_t"] == "exact_plan_window_end_only"
+    assert protocol["authority"]["preserved_2021_access"] is False
+    source = P013D_SOURCE.read_text(encoding="utf-8")
+    assert "read_development_admissions" in source
+    assert "discover_development_security_population" not in source
+    assert "exact_plan_window_end_only" in source
+    assert '"cross_cell_fill": False' in source
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

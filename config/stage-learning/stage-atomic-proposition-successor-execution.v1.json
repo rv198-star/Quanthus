@@ -1,0 +1,108 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-successor-execution.v1",
+  "work_item": "P3-STAGE-013-D1",
+  "state": "FROZEN_RUNTIME_CONTRACT_BEFORE_FIRST_RESULT_BEARING_JOB",
+  "preregistration": {
+    "path": "config/stage-learning/stage-atomic-proposition-successor-development-screen.v1.json",
+    "canonical_digest": "sha256:b6a5ffd38c1cb6901b5436c61b15ac5693a3a81366a287f70fb529f63da1d264"
+  },
+  "preregistration_revision": {
+    "path": "config/stage-learning/stage-atomic-proposition-successor-prereg-revision-r1.v1.json",
+    "canonical_digest": "sha256:a446fb995cb48b8bded935a8e664e892cecc91e891c0ae433cb09753702963ed"
+  },
+  "training_node_config": "config/stage-learning/training-node.v1.json",
+  "evidence_protocol": {
+    "path": "config/stage-learning/order-reference-evidence-scope-p013.v1.json",
+    "canonical_digest": "sha256:54587544cbeebbceaa31b50a878180cec851743ab90e1e42aff06c87fd86de85"
+  },
+  "exact_plan_artifact": {
+    "job_id": "stage_060f6edc80774b6b802e56b6c21025bc",
+    "code_revision": "2cd26b00a90402c7be3256dfb3d341dc3b9abe18",
+    "artifact_relative_path": "runs/stage-worker/stage_060f6edc80774b6b802e56b6c21025bc/stage-development-resource-plan-20260914T095217Z",
+    "manifest_sha256": "sha256:853ade679e1107db238ec68daa8a26755e1d48ef334b9b85d525a8fcd0a3adef",
+    "plan_digest": "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371",
+    "identity_digest": "sha256:63c82ab26784bb2407ae76e0f42ed5685b29ca110727d26b20b510e7e4bc7c80",
+    "row_count": 256,
+    "primary_count": 192,
+    "fallback_count": 64
+  },
+  "p012_atomic_contract": {
+    "preregistration_path": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json",
+    "preregistration_digest": "sha256:24aacc70ef7ffa3bbfd0e28e8aa33fd91ba51bbd65da6c13640926215987c54d",
+    "execution_path": "config/stage-learning/stage-atomic-proposition-development-execution.v1.json",
+    "execution_digest": "sha256:5203b5c4a325b775722c90c7404fc149567e448cf63d39e731e22fcd6cebe098",
+    "instability_candidate_count": 9,
+    "relocation_candidate_count": 1,
+    "order_profile_count": 3,
+    "joint_pair_search_count": 0,
+    "numeric_gates_unchanged": true,
+    "resolver_unchanged": true
+  },
+  "market_read": {
+    "group_by_exact_window": true,
+    "read_only_exact_plan_security_codes": true,
+    "read_only_exact_plan_window_dates": true,
+    "case_t": "exact_plan_window_end_only",
+    "window_open_sessions": 61,
+    "price_rows_outside_window": false,
+    "preserved_2021": false,
+    "2022_2024": false,
+    "2025": false
+  },
+  "selection": {
+    "complete_cases_per_cell": 24,
+    "total_complete_cases": 192,
+    "primary_before_fallback": true,
+    "fallback_same_cell_only": true,
+    "fallback_trigger": "window_end_input_unavailable_or_required_primary_facts_unavailable",
+    "fallback_order": "exact_plan_cell_slot_ascending",
+    "fallback_exhaustion": "FAIL_WITHOUT_SUPPLEMENT",
+    "cross_cell_fill": false,
+    "post_result_identity_replacement": false
+  },
+  "threshold_basis": {
+    "all_available_unlabeled_observations_inside_all_256_exact_plan_windows": true,
+    "labels_visible": false,
+    "reference_opinions_visible": false,
+    "candidate_outputs_visible": false,
+    "quantile_method": "nearest_rank_ceiling_1_based"
+  },
+  "review_transport": {
+    "primary_evidence": true,
+    "raw_21_close_path": true,
+    "range_traversal_and_counter_excursion": true,
+    "era_board_stratum_metadata": true,
+    "threshold_basis": false,
+    "candidate_outputs": false,
+    "envelope_measurement": false,
+    "future_rows": false,
+    "preserved_2021": false
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 3600
+  },
+  "authority": {
+    "implementation": true,
+    "result_bearing_market_data_read": true,
+    "runtime_job_submission": true,
+    "parameter_search": false,
+    "candidate_surface_change": false,
+    "numeric_gate_change": false,
+    "joint_pair_search": false,
+    "preserved_2021_evaluation_read": false,
+    "2022_2024_access": false,
+    "2025_access": false,
+    "relocation_guard_retuning": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "technical_failure": {
+    "automatic_retry": false,
+    "retry_requires_separately_frozen_recovery_contract": true,
+    "same_plan_required": true,
+    "same_candidate_surface_required": true,
+    "same_gates_required": true
+  }
+}

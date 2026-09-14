@@ -438,12 +438,18 @@ nodes.
   stopping rule. The new 60-case ledger is immutable and the old 192-case ledger remains unchanged by
   SHA. Exact P012 reference resolution over the combined 252 cases gives definite positive/negative
   counts I=40/147, R=46/170 and O=33/172, so every unchanged P012 reference-sufficiency minimum now
-  passes. P015 closes `PASS_COMPLETE_RESERVE_REFERENCE_SUFFICIENCY`; candidate scoring, projection
-  compatibility and preserved 2021 remain unopened and require a separately frozen successor stage.
-  Evidence and route: `work-items/stage-development-resource-admission-qualified.md`,
+  passes. P015 closes `PASS_COMPLETE_RESERVE_REFERENCE_SUFFICIENCY`; preserved 2021 remains unread.
+  P016 is the separately frozen artifact-only scoring successor. Its result-free four-party review
+  resolves the latent P014-vs-P012 aggregation mismatch by keeping exact P012 count gates pooled while
+  applying the unchanged P012 rate thresholds to equal-weight Era × Board macro ratios; pooled micro
+  rates remain descriptive. P016-B is one independent 9 / fixed-1 / 3 atomic scoring Job with no
+  projection or joint-pair search; P016-C remains a separate blocked projection Job so a projection
+  result cannot trigger candidate reselection. Evidence and route:
+  `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
-  `work-items/stage-complete-reserve-reference.md`, and
-  `acceptance/stage-complete-reserve-reference-sufficiency-20260915.md`.
+  `work-items/stage-complete-reserve-reference.md`,
+  `acceptance/stage-complete-reserve-reference-sufficiency-20260915.md`, and
+  `work-items/stage-combined-atomic-scoring.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

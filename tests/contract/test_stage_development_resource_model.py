@@ -71,6 +71,9 @@ P015_C_CONFIG = (
 P015_D_RESULT = (
     ROOT / "config/stage-learning/stage-complete-reserve-reference-sufficiency-result.v1.json"
 )
+P016_SCORING = ROOT / "config/stage-learning/stage-combined-atomic-scoring.v1.json"
+P016_WORK = ROOT / "docs/work-items/stage-combined-atomic-scoring.md"
+P016_REVIEW = ROOT / "docs/reviews/stage-p016-combined-scoring-four-party-review-20260915.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -865,6 +868,69 @@ def test_stage015_d_passes_reference_sufficiency_without_opening_scoring() -> No
     assert disposition["reference_sufficiency_passed"] is True
     assert disposition["atomic_candidate_quality_passed"] is False
     assert disposition["next_step_requires_separate_scoring_freeze"] is True
+
+
+def test_stage016_freezes_macro_rate_pooled_count_two_job_scoring_route() -> None:
+    value = json.loads(P016_SCORING.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-016-A"
+    assert value["state"] == (
+        "PREREGISTERED_ARTIFACT_ONLY_ATOMIC_SCORING_BEFORE_CANDIDATE_ACCESS"
+    )
+    bindings = value["bindings"]
+    assert bindings["p015_reference_sufficiency_result"]["file_sha256"] == (
+        "sha256:5258606e1a97c0ba53702f233851391134d6bb1f722b90d82f87a140d2a67413"
+    )
+    assert bindings["p014_semantic_artifact"]["manifest_sha256"] == (
+        "sha256:5926d73a04e37b74f7025c2f38314898ee7c5414aa45fe0686de20357ce3c388"
+    )
+    assert bindings["p015_additional_review_artifact"]["manifest_sha256"] == (
+        "sha256:8219bb18b1c5c3236fa5e3dd1ec0ea5112dfc101e286d4dbdab1c72c3d3c8d59"
+    )
+    assert bindings["p014_review_ledger"]["sha256"] == (
+        "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69"
+    )
+    assert bindings["p015_review_ledger"]["sha256"] == (
+        "sha256:db3216d322e00ad40ebd7de435684b43bcaf72cbc66a90dcb49403a8be461e06"
+    )
+    assert value["reference_contract"]["combined_case_count"] == 252
+    surface = value["candidate_surface"]
+    assert surface["instability_candidate_count"] == 9
+    assert surface["relocation_candidate_count"] == 1
+    assert surface["order_profile_count"] == 3
+    assert surface["joint_pair_search_count"] == 0
+    assert surface["threshold_recompute"] is False
+    assert surface["candidate_expansion"] is False
+    aggregate = value["aggregate_contract"]
+    assert aggregate["count_gates"] == "pooled_counts_exact_P012"
+    assert aggregate["rate_gates"] == (
+        "macro_cell_equal_weight_same_numeric_thresholds_as_P012"
+    )
+    assert aggregate["precision"]["zero_prediction_cell_value"] == "0"
+    assert aggregate["positive_reference_coverage"]["mean_over"] == (
+        "cells_with_at_least_one_definite_positive_reference"
+    )
+    assert aggregate["definite_negative_false_positive_rate"]["mean_over"] == (
+        "cells_with_at_least_one_definite_negative_reference"
+    )
+    assert value["runtime"] == {
+        "maximum_jobs": 1,
+        "automatic_retries": 0,
+        "worker_wall_seconds": 900,
+    }
+    authority = value["authority"]
+    assert authority["candidate_scoring"] is True
+    assert authority["projection_compatibility"] is False
+    assert authority["dwd_market_read"] is False
+    assert authority["reference_rewrite"] is False
+    assert authority["candidate_surface_change"] is False
+    assert authority["numeric_gate_change"] is False
+    assert authority["preserved_2021_read"] is False
+    assert authority["2025_read"] is False
+    assert P016_WORK.is_file()
+    assert P016_REVIEW.is_file()
+    assert "PASS_SELECT_MACRO_RATE_POOLED_COUNT_TWO_JOB_SCORING_ROUTE" in P016_REVIEW.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

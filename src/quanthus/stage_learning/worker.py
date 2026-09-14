@@ -80,6 +80,7 @@ STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB = (
 STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB = (
     "quanthus.stage-complete-reserve-additional-review-prepare.v1"
 )
+STAGE_COMBINED_ATOMIC_SCORING_JOB = "quanthus.stage-combined-atomic-scoring.v1"
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -135,6 +136,7 @@ COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_RECOVERY_BUDGET_SCHEMA = (
 COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_BUDGET_SCHEMA = (
     "quanthus.stage-complete-reserve-additional-review-prepare-budget.v1"
 )
+COMBINED_ATOMIC_SCORING_BUDGET_SCHEMA = "quanthus.stage-combined-atomic-scoring-budget.v1"
 DEVELOPMENT_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-development-resource-plan-recovery.v1.json"
 )
@@ -349,6 +351,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-complete-reserve-additional-review-prepare-*",
         "process_error": "stage_complete_reserve_additional_review_prepare_process_failed",
         "wall_seconds": 3600,
+    },
+    STAGE_COMBINED_ATOMIC_SCORING_JOB: {
+        "config": "config/stage-learning/stage-combined-atomic-scoring.v1.json",
+        "module": "quanthus.stage_learning.combined_atomic_scoring",
+        "artifact_glob": "stage-combined-atomic-scoring-*",
+        "process_error": "stage_combined_atomic_scoring_process_failed",
+        "wall_seconds": 900,
     },
 }
 
@@ -598,6 +607,10 @@ class StageWorkerPaths:
     @property
     def complete_reserve_additional_review_prepare_budget(self) -> Path:
         return self.control_root / "complete-reserve-additional-review-prepare-budget.json"
+
+    @property
+    def combined_atomic_scoring_budget(self) -> Path:
+        return self.control_root / "combined-atomic-scoring-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -1841,6 +1854,41 @@ def _existing_complete_reserve_additional_review_prepare_submission(
     return _idempotent_stage_submission(paths, job)
 
 
+def _combined_atomic_scoring_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": COMBINED_ATOMIC_SCORING_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-016-B",
+        "phase": "INDEPENDENT_ATOMIC_SCORING",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_combined_atomic_scoring_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.combined_atomic_scoring_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "combined atomic scoring budget")
+    if (
+        marker.get("schema_version") != COMBINED_ATOMIC_SCORING_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-016-B"
+        or marker.get("phase") != "INDEPENDENT_ATOMIC_SCORING"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("combined atomic scoring budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_COMBINED_ATOMIC_SCORING_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("combined atomic scoring budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError("combined atomic scoring has no retry or replacement authority")
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -2873,6 +2921,21 @@ class StageWorker:
                 ),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_COMBINED_ATOMIC_SCORING_JOB:
+            result["combined_atomic_scoring"] = {
+                "disposition": verified.get("disposition"),
+                "reference_case_count": verified.get("reference_case_count"),
+                "atomic_freeze_available": verified.get("atomic_freeze_available"),
+                "atomic_freeze_digest": verified.get("atomic_freeze_digest"),
+                "instability_trial_count": verified.get("instability_trial_count"),
+                "order_trial_count": verified.get("order_trial_count"),
+                "relocation_fixed": verified.get("relocation_fixed"),
+                "joint_pair_search_count": verified.get("joint_pair_search_count"),
+                "projection_performed": verified.get("projection_performed"),
+                "dwd_market_read": verified.get("dwd_market_read"),
+                "preserved_2021_read": verified.get("preserved_2021_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB:
             result["atomic_proposition_successor_d1"] = {
                 "fresh_pool_size": verified.get("fresh_pool_size"),
@@ -3292,6 +3355,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_COMBINED_ATOMIC_SCORING_JOB:
+        existing = _existing_combined_atomic_scoring_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -3366,6 +3435,7 @@ def submit_job(
     complete_reserve_additional_review_prepare_reserved = (
         job.kind == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB
     )
+    combined_atomic_scoring_reserved = job.kind == STAGE_COMBINED_ATOMIC_SCORING_JOB
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
@@ -3490,6 +3560,11 @@ def submit_job(
             paths.complete_reserve_additional_review_prepare_budget,
             _complete_reserve_additional_review_prepare_budget_value(job),
         )
+    if combined_atomic_scoring_reserved:
+        _exclusive_json(
+            paths.combined_atomic_scoring_budget,
+            _combined_atomic_scoring_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -3546,6 +3621,8 @@ def submit_job(
             paths.complete_reserve_additional_review_set_recovery_budget.unlink(missing_ok=True)
         if complete_reserve_additional_review_prepare_reserved:
             paths.complete_reserve_additional_review_prepare_budget.unlink(missing_ok=True)
+        if combined_atomic_scoring_reserved:
+            paths.combined_atomic_scoring_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -3597,6 +3674,8 @@ def submit_job(
             paths.complete_reserve_additional_review_set_recovery_budget.unlink(missing_ok=True)
         if complete_reserve_additional_review_prepare_reserved:
             paths.complete_reserve_additional_review_prepare_budget.unlink(missing_ok=True)
+        if combined_atomic_scoring_reserved:
+            paths.combined_atomic_scoring_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -6217,6 +6296,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p015_c_failure": _recent_stage_job_failure(
             paths, kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
+        ),
+        "recent_p016_b_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_COMBINED_ATOMIC_SCORING_JOB,
         ),
     }
 

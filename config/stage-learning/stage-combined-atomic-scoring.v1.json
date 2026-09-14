@@ -1,0 +1,176 @@
+{
+  "schema_version": "quanthus.stage-combined-atomic-scoring.v1",
+  "work_item": "P3-STAGE-016-A",
+  "state": "PREREGISTERED_ARTIFACT_ONLY_ATOMIC_SCORING_BEFORE_CANDIDATE_ACCESS",
+  "purpose": "Score the unchanged P012 atomic candidate surfaces against the immutable P015 252-case blind-reference ledger using P014's preregistered Era x Board macro-primary aggregate, without DWD reads, reference rewrites, candidate expansion, joint pair search, projection reselection or preserved-evaluation access.",
+  "bindings": {
+    "p015_reference_sufficiency_result": {
+      "path": "config/stage-learning/stage-complete-reserve-reference-sufficiency-result.v1.json",
+      "file_sha256": "sha256:5258606e1a97c0ba53702f233851391134d6bb1f722b90d82f87a140d2a67413"
+    },
+    "p014_closeout": {
+      "path": "config/stage-learning/stage-atomic-proposition-admission-qualified-d1-closeout.v1.json",
+      "file_sha256": "sha256:f9b7e4f9130e335d3be1246116d64c4a433ce686d153401f1bab437011283aa7"
+    },
+    "p014_preregistration": {
+      "path": "config/stage-learning/stage-atomic-proposition-admission-qualified-development-screen.v1.json",
+      "file_sha256": "sha256:2624598fb62d950f900a078547d525b710aa9e64c6e0ea66fc825239fa506aba"
+    },
+    "p012_preregistration": {
+      "path": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json",
+      "canonical_digest": "sha256:24aacc70ef7ffa3bbfd0e28e8aa33fd91ba51bbd65da6c13640926215987c54d"
+    },
+    "p012_execution": {
+      "path": "config/stage-learning/stage-atomic-proposition-development-execution.v1.json",
+      "canonical_digest": "sha256:5203b5c4a325b775722c90c7404fc149567e448cf63d39e731e22fcd6cebe098"
+    },
+    "p014_semantic_artifact": {
+      "job_id": "stage_7c11b97d47a0473fafa37783056f55f4",
+      "code_revision": "c47527c0f9b93362403a2b2c740b43e1daa3afab",
+      "artifact_relative_path": "runs/stage-worker/stage_7c11b97d47a0473fafa37783056f55f4/stage-atomic-proposition-admission-qualified-d1-20260914T133456Z",
+      "manifest_sha256": "sha256:5926d73a04e37b74f7025c2f38314898ee7c5414aa45fe0686de20357ce3c388",
+      "case_count": 192,
+      "threshold_basis_source": "all_available_unlabeled_primary_scale_observations_inside_all_256_qualified_exact_windows_before_case_selection_and_review",
+      "candidate_grid_pre_reference": true
+    },
+    "p015_additional_review_artifact": {
+      "job_id": "stage_82978e89259e4a139961e81605859fff",
+      "code_revision": "a9a0440997b63babeea699d9c35a32beb00e8f57",
+      "artifact_relative_path": "runs/stage-worker/stage_82978e89259e4a139961e81605859fff/stage-complete-reserve-additional-review-prepare-20260914T175010Z",
+      "manifest_sha256": "sha256:8219bb18b1c5c3236fa5e3dd1ec0ea5112dfc101e286d4dbdab1c72c3d3c8d59",
+      "case_count": 60
+    },
+    "p014_review_ledger": {
+      "relative_path": "control/stage-worker/atomic-review-ledgers/stage_7c11b97d47a0473fafa37783056f55f4.json",
+      "sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69",
+      "case_count": 192
+    },
+    "p015_review_ledger": {
+      "relative_path": "control/stage-worker/atomic-review-ledgers/p015-stage_82978e89259e4a139961e81605859fff.json",
+      "sha256": "sha256:db3216d322e00ad40ebd7de435684b43bcaf72cbc66a90dcb49403a8be461e06",
+      "case_count": 60
+    },
+    "preserved_2021": {
+      "identity_count": 160,
+      "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+      "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+      "state": "UNREAD"
+    }
+  },
+  "reference_contract": {
+    "combined_case_count": 252,
+    "atomic_resolution": "TRUE only when both roles TRUE; FALSE only when both roles FALSE; every other combination including UNKNOWN is AMBIGUOUS",
+    "expected_counts": {
+      "structural_instability_20": {"TRUE": 40, "FALSE": 147, "AMBIGUOUS": 65},
+      "coherent_directional_relocation_20": {"TRUE": 46, "FALSE": 170, "AMBIGUOUS": 36},
+      "orderly_consolidation_20": {"TRUE": 33, "FALSE": 172, "AMBIGUOUS": 47}
+    },
+    "expected_projected_reference_counts": {
+      "STAGE_0": 29,
+      "STAGE_2": 33,
+      "NEITHER": 105,
+      "AMBIGUOUS": 85
+    },
+    "re_review": false,
+    "reference_rewrite": false
+  },
+  "artifact_only_input": {
+    "dwd_market_read": false,
+    "new_identity_discovery": false,
+    "p014_case_source": "p014_semantic_artifact_evidence_path_strata",
+    "p015_case_source": "p015_additional_review_artifact_evidence_path_strata",
+    "p014_threshold_basis_source": "p014_semantic_artifact_threshold_basis",
+    "p014_candidate_grid_source": "p014_semantic_artifact_candidate_grid",
+    "p014_envelope_source": "p014_semantic_artifact_envelope_measurements",
+    "p015_envelope_source": "reconstruct_exact_P012_synthetic_close_envelope_from_p015_published_21_close_history_only",
+    "p015_envelope_market_learned_threshold": false
+  },
+  "candidate_surface": {
+    "instability_candidate_count": 9,
+    "relocation_candidate_count": 1,
+    "order_profile_count": 3,
+    "joint_pair_search_count": 0,
+    "instability_freeze_at_most_one": true,
+    "relocation_fixed_not_selectable": true,
+    "order_freeze_at_most_one": true,
+    "candidate_expansion": false,
+    "threshold_recompute": false,
+    "threshold_retune": false,
+    "post_score_repick": false
+  },
+  "aggregate_contract": {
+    "primary": "macro_equal_weight_across_eight_era_board_cells_for_rate_metrics",
+    "secondary": "pooled_micro_descriptive_only_for_rate_metrics",
+    "cell_count": 8,
+    "count_gates": "pooled_counts_exact_P012",
+    "rate_gates": "macro_cell_equal_weight_same_numeric_thresholds_as_P012",
+    "precision": {
+      "mean_over": "all_eight_cells",
+      "zero_prediction_cell_value": "0"
+    },
+    "positive_reference_coverage": {
+      "mean_over": "cells_with_at_least_one_definite_positive_reference"
+    },
+    "definite_negative_false_positive_rate": {
+      "mean_over": "cells_with_at_least_one_definite_negative_reference"
+    },
+    "instability_incremental_tp_fp_gate": "pooled_counts_exact_P012",
+    "mandatory_diagnostics": [
+      "per-era-board-cell",
+      "per-era",
+      "per-board-family",
+      "pooled-micro"
+    ]
+  },
+  "ranking": {
+    "instability": [
+      "macro_precision_desc",
+      "macro_definite_negative_fpr_asc",
+      "macro_positive_reference_coverage_desc",
+      "pooled_precision_desc",
+      "pooled_definite_negative_fpr_asc",
+      "pooled_positive_reference_coverage_desc",
+      "incremental_true_positive_desc",
+      "candidate_id_asc"
+    ],
+    "order": [
+      "macro_precision_desc",
+      "macro_definite_negative_fpr_asc",
+      "macro_positive_reference_coverage_desc",
+      "pooled_precision_desc",
+      "pooled_definite_negative_fpr_asc",
+      "pooled_positive_reference_coverage_desc",
+      "order_profile_id_asc"
+    ]
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 900
+  },
+  "output": {
+    "artifact_schema": "quanthus.stage-combined-atomic-scoring-artifact.v1",
+    "summary_schema": "quanthus.stage-combined-atomic-scoring-summary.v1",
+    "atomic_freeze_schema": "quanthus.stage-combined-atomic-freeze.v1"
+  },
+  "authority": {
+    "artifact_read": true,
+    "sealed_reference_read": true,
+    "p014_threshold_basis_value_read_after_this_freeze": true,
+    "p014_candidate_grid_value_read_after_this_freeze": true,
+    "candidate_scoring": true,
+    "projection_compatibility": false,
+    "candidate_reselection_after_projection": false,
+    "dwd_market_read": false,
+    "reference_generation": false,
+    "reference_rewrite": false,
+    "candidate_surface_change": false,
+    "numeric_gate_change": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This preregistration authorizes only artifact-closed independent atomic scoring against the immutable 252-case reference set. It does not authorize projection compatibility, preserved-2021 access, strategy use or production behavior."
+}

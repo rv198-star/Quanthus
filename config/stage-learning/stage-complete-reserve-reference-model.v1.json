@@ -62,7 +62,9 @@
       "board_family",
       "review_packet_ready",
       "readiness_reason",
-      "source_member_closure_digest"
+      "source_member_closure_digest",
+      "already_reviewed_in_p014_ledger",
+      "new_review_required"
     ],
     "persist_forbidden": [
       "price_values",

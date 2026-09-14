@@ -1,0 +1,126 @@
+{
+  "schema_version": "quanthus.stage-complete-reserve-review-readiness.v1",
+  "work_item": "P3-STAGE-015-A",
+  "state": "PREREGISTERED_COMPLETE_RESERVE_REVIEW_READINESS_CENSUS",
+  "purpose": "Evaluate review-packet readiness for every row in the exact pre-result P014-B 256-row admission-qualified plan using only the frozen source/fact availability contracts, while retaining no price, morphology, threshold, candidate, envelope or reference values.",
+  "bindings": {
+    "successor_model": {
+      "path": "config/stage-learning/stage-complete-reserve-reference-model.v1.json",
+      "sha256": "sha256:b76cb15884895a8459b9142b644085fc2419179e573d21c544c13949048a5f91"
+    },
+    "qualified_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-qualified-plan-result.v1.json",
+      "sha256": "sha256:ee7bbe9ea643284198340a0d57a1380c65b50651d5f0969ed066fbd5cb98675b"
+    },
+    "qualified_plan_artifact": {
+      "job_id": "stage_9dbc57be4839405790be0e021d8271ba",
+      "code_revision": "fd2bf808b9a3a3e1fdd5e786c968db70f17b10b2",
+      "artifact_relative_path": "runs/stage-worker/stage_9dbc57be4839405790be0e021d8271ba/stage-development-resource-qualified-plan-20260914T120249Z",
+      "manifest_sha256": "sha256:f14c065d0bf18b6491b9220132d1be3c10e608fb9a69f4141c576e351aa7a173",
+      "plan_digest": "sha256:206ed58e8349de59efd52caad958f7bd0f2f9d79f1ee0199eea6a079b6c14829",
+      "identity_digest": "sha256:a3aa679c1792e7545847159c9b4d26dec70b4a925e55bbeb9416852b11f8de05",
+      "row_count": 256
+    },
+    "p014_semantic_artifact": {
+      "job_id": "stage_7c11b97d47a0473fafa37783056f55f4",
+      "code_revision": "c47527c0f9b93362403a2b2c740b43e1daa3afab",
+      "artifact_relative_path": "runs/stage-worker/stage_7c11b97d47a0473fafa37783056f55f4/stage-atomic-proposition-admission-qualified-d1-20260914T133456Z",
+      "manifest_sha256": "sha256:5926d73a04e37b74f7025c2f38314898ee7c5414aa45fe0686de20357ce3c388",
+      "selected_case_count": 192
+    },
+    "p014_closeout": {
+      "path": "config/stage-learning/stage-atomic-proposition-admission-qualified-d1-closeout.v1.json",
+      "sha256": "sha256:f9b7e4f9130e335d3be1246116d64c4a433ce686d153401f1bab437011283aa7",
+      "ledger_sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    }
+  },
+  "resource_contract": {
+    "exact_row_count": 256,
+    "exact_cell_count": 8,
+    "exact_rows_per_cell": 32,
+    "global_identity_unique": true,
+    "case_t": "exact_window_end",
+    "window_sessions": 61,
+    "new_identity_discovery": false,
+    "new_random_sampling": false,
+    "morphology_enrichment": false,
+    "result_count_targeted_top_up": false,
+    "cross_cell_fill": false,
+    "post_result_replacement": false
+  },
+  "readiness_contract": {
+    "primary_fact_ready": "exact P014 primary Structure Trend/Order fact intersection exists at T",
+    "range_traversal_ready": "structure.geometry.range-traversal is available with a value at T",
+    "counter_excursion_ready": "structure.geometry.counter-direction-excursion-share has availability reason available or zero_net_direction at T",
+    "history_ready": "the exact 61-session admitted/stable-coordinate resource window remains intact through T",
+    "review_packet_ready": "all four readiness conditions are true",
+    "inclusion_after_census": "all rows with review_packet_ready=true; no target-count stop rule"
+  },
+  "continuation_gate": {
+    "minimum_total_ready": 192,
+    "minimum_ready_per_cell": 24,
+    "all_p014_reviewed_rows_must_remain_ready": true,
+    "candidate_scoring_on_fail": false,
+    "candidate_scoring_on_pass": false,
+    "next_action_on_pass": "freeze exact full ready denominator and additional-review set before any new opinion"
+  },
+  "retention": {
+    "allowed_fields": [
+      "security_id",
+      "window_id",
+      "era",
+      "board_family",
+      "cell",
+      "review_packet_ready",
+      "readiness_reason",
+      "source_member_closure_digest",
+      "already_reviewed_in_p014_ledger",
+      "new_review_required"
+    ],
+    "forbidden_values": [
+      "OHLC",
+      "volume",
+      "Structure measurement values",
+      "morphology values",
+      "threshold values",
+      "candidate outputs",
+      "envelope measurement values",
+      "reference opinions",
+      "future outcomes"
+    ]
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 3600
+  },
+  "authority": {
+    "exact_window_market_read": true,
+    "review_readiness_computation": true,
+    "persist_price_or_morphology_values": false,
+    "reference_opinion_read": false,
+    "reference_opinion_write": false,
+    "p014_review_ledger_rewrite": false,
+    "selection_transport_read": false,
+    "candidate_output_read": false,
+    "candidate_scoring": false,
+    "parameter_search": false,
+    "numeric_gate_change": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "output": {
+    "ledger_schema": "quanthus.stage-complete-reserve-review-readiness-ledger.v1",
+    "source_binding_schema": "quanthus.stage-complete-reserve-review-readiness-source.v1",
+    "summary_schema": "quanthus.stage-complete-reserve-review-readiness-summary.v1",
+    "artifact_schema": "quanthus.stage-complete-reserve-review-readiness-artifact.v1"
+  },
+  "claim_ceiling": "This census may establish only whether each precommitted P014-B resource can form the frozen blind review packet and the exact resulting ready denominator. It cannot infer atomic truth, candidate quality, Stage projection, market prevalence or economic value."
+}

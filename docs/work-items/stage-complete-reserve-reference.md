@@ -30,7 +30,7 @@ P015 treats the **entire precommitted 256-row reserve plan** as the resource cei
 
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
-| P3-STAGE-015-A | Complete-reserve review-packet readiness census | P3-STAGE-014-D | ready `READY_REVIEW_READINESS_CENSUS`; all 256 precommitted windows examined under availability-only rules; no semantic values retained |
+| P3-STAGE-015-A | Complete-reserve review-packet readiness census | P3-STAGE-014-D | ready `PASS_ENGINEERING_READY_FOR_ONE_REVIEW_READINESS_CENSUS_JOB`; one-shot all-256 availability-only runtime frozen, no semantic values retained; `../acceptance/stage-complete-reserve-review-readiness-engineering-20260914.md` |
 | P3-STAGE-015-B | Freeze full ready denominator and additional blind-review set | P3-STAGE-015-A | blocked until A freezes the exact ready/unready ledger |
 | P3-STAGE-015-C | Review only additional ready rows and seal combined ledger | P3-STAGE-015-B | blocked; exact P014 192 opinions reused unchanged |
 | P3-STAGE-015-D | Evaluate unchanged P012 atomic reference sufficiency | P3-STAGE-015-C | blocked; candidate scoring remains closed even on pass until a separate scoring freeze |

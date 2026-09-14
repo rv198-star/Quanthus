@@ -71,6 +71,9 @@ STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB = (
 STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB = (
     "quanthus.stage-atomic-proposition-admission-qualified-d1-prepare.v1"
 )
+STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB = (
+    "quanthus.stage-complete-reserve-review-readiness.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -113,6 +116,9 @@ DEVELOPMENT_RESOURCE_ADMISSION_BUDGET_SCHEMA = (
 )
 DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_BUDGET_SCHEMA = (
     "quanthus.stage-development-resource-qualified-plan-budget.v1"
+)
+COMPLETE_RESERVE_REVIEW_READINESS_BUDGET_SCHEMA = (
+    "quanthus.stage-complete-reserve-review-readiness-budget.v1"
 )
 DEVELOPMENT_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-development-resource-plan-recovery.v1.json"
@@ -304,6 +310,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-development-resource-qualified-plan-*",
         "process_error": "stage_development_resource_qualified_plan_process_failed",
         "wall_seconds": 600,
+    },
+    STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB: {
+        "config": "config/stage-learning/stage-complete-reserve-review-readiness.v1.json",
+        "module": "quanthus.stage_learning.complete_reserve_review_readiness",
+        "artifact_glob": "stage-complete-reserve-review-readiness-*",
+        "process_error": "stage_complete_reserve_review_readiness_process_failed",
+        "wall_seconds": 3600,
     },
 }
 
@@ -537,6 +550,10 @@ class StageWorkerPaths:
     @property
     def development_resource_qualified_plan_budget(self) -> Path:
         return self.control_root / "development-resource-qualified-plan-budget.json"
+
+    @property
+    def complete_reserve_review_readiness_budget(self) -> Path:
+        return self.control_root / "complete-reserve-review-readiness-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -1524,6 +1541,43 @@ def _existing_development_resource_qualified_plan_submission(
     return _idempotent_stage_submission(paths, job)
 
 
+def _complete_reserve_review_readiness_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": COMPLETE_RESERVE_REVIEW_READINESS_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-015-A",
+        "phase": "COMPLETE_RESERVE_REVIEW_READINESS_CENSUS",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_complete_reserve_review_readiness_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.complete_reserve_review_readiness_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "complete reserve review readiness budget")
+    if (
+        marker.get("schema_version") != COMPLETE_RESERVE_REVIEW_READINESS_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-015-A"
+        or marker.get("phase") != "COMPLETE_RESERVE_REVIEW_READINESS_CENSUS"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("complete reserve review readiness budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("complete reserve review readiness budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "complete reserve review readiness has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -2492,6 +2546,26 @@ class StageWorker:
                 "market_data_read": verified.get("market_data_read"),
                 "semantic_job_authorized": verified.get("semantic_job_authorized"),
             }
+        if job.kind == STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB:
+            result["complete_reserve_review_readiness"] = {
+                "row_count": verified.get("row_count"),
+                "ready_count": verified.get("ready_count"),
+                "unready_count": verified.get("unready_count"),
+                "ready_by_cell": verified.get("ready_by_cell"),
+                "reason_counts": verified.get("reason_counts"),
+                "already_reviewed_ready_count": verified.get(
+                    "already_reviewed_ready_count"
+                ),
+                "new_review_required_count": verified.get("new_review_required_count"),
+                "ledger_digest": verified.get("ledger_digest"),
+                "continuation_pass": verified.get("continuation_pass"),
+                "semantic_values_retained": verified.get("semantic_values_retained"),
+                "reference_opinions_read": verified.get("reference_opinions_read"),
+                "selection_transport_read": verified.get("selection_transport_read"),
+                "candidate_output_read": verified.get("candidate_output_read"),
+                "preserved_2021_market_read": verified.get("preserved_2021_market_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB:
             result["atomic_proposition_successor_d1"] = {
                 "fresh_pool_size": verified.get("fresh_pool_size"),
@@ -2890,6 +2964,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB:
+        existing = _existing_complete_reserve_review_readiness_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -2949,6 +3029,9 @@ def submit_job(
     )
     development_resource_qualified_plan_reserved = (
         job.kind == STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB
+    )
+    complete_reserve_review_readiness_reserved = (
+        job.kind == STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -3052,6 +3135,11 @@ def submit_job(
             paths.development_resource_qualified_plan_budget,
             _development_resource_qualified_plan_budget_value(job),
         )
+    if complete_reserve_review_readiness_reserved:
+        _exclusive_json(
+            paths.complete_reserve_review_readiness_budget,
+            _complete_reserve_review_readiness_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -3100,6 +3188,8 @@ def submit_job(
             paths.development_resource_admission_budget.unlink(missing_ok=True)
         if development_resource_qualified_plan_reserved:
             paths.development_resource_qualified_plan_budget.unlink(missing_ok=True)
+        if complete_reserve_review_readiness_reserved:
+            paths.complete_reserve_review_readiness_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -3143,6 +3233,8 @@ def submit_job(
             paths.development_resource_admission_budget.unlink(missing_ok=True)
         if development_resource_qualified_plan_reserved:
             paths.development_resource_qualified_plan_budget.unlink(missing_ok=True)
+        if complete_reserve_review_readiness_reserved:
+            paths.complete_reserve_review_readiness_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -5327,6 +5419,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p014_c_failure": _recent_stage_job_failure(
             paths, kind=STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+        ),
+        "recent_p015_a_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB,
         ),
     }
 

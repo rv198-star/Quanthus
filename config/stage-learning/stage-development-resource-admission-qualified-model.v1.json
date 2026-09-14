@@ -1,0 +1,128 @@
+{
+  "schema_version": "quanthus.stage-development-resource-admission-qualified-model.v1",
+  "work_item": "P3-STAGE-014",
+  "state": "DESIGN_SELECTED_ADMISSION_SCREEN_REQUIRED_BEFORE_SEMANTIC_READ",
+  "effective_date": "2026-09-14",
+  "purpose": "Insert an outcome-blind input-admission qualification layer between exposure-aware Era x Board resource selection and atomic semantic development so complete-case capacity is known before Structure morphology, threshold, reference or candidate computation.",
+  "bindings": {
+    "p013_resource_model": "config/stage-learning/stage-development-resource-model.v1.json",
+    "p013_capacity_result": "config/stage-learning/stage-development-resource-capacity-census-result.v1.json",
+    "p013_quota_freeze": "config/stage-learning/stage-development-resource-quota-freeze.v1.json",
+    "p013_exact_plan_result": "config/stage-learning/stage-development-resource-plan-result.v1.json",
+    "p013_d_closeout": "config/stage-learning/stage-atomic-proposition-successor-d1-closeout.v1.json",
+    "p012_atomic_preregistration": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json"
+  },
+  "resource_unit": [
+    "economic_identity",
+    "non_overlapping_61_session_window",
+    "pit_listing_board",
+    "admission_role"
+  ],
+  "semantic_target": {
+    "era_board_cell_count": 8,
+    "qualified_reserve_per_cell": 32,
+    "primary_per_cell": 24,
+    "prefrozen_fallback_per_cell": 8,
+    "total_qualified_reserve": 256,
+    "total_primary": 192,
+    "global_identity_unique_in_scored_batch": true,
+    "cross_cell_fill": false,
+    "post_semantic_result_replacement": false,
+    "market_prevalence_claim": false
+  },
+  "candidate_screen": {
+    "identity_order": "metadata_only_deterministic_hash",
+    "identity_seed": "p014-admission-qualified-era-board-v1|identity",
+    "cell_allocation_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "maximum_candidate_identities_per_cell": 256,
+    "candidate_identity_cap_rule": "min(256, exposure_eligible_unique_identity_count_in_cell)",
+    "maximum_windows_per_identity": 4,
+    "window_order": "metadata_only_temporal_spread_then_deterministic_hash",
+    "window_seed": "p014-admission-qualified-era-board-v1|window",
+    "p013_d_exact_identity_windows_excluded_from_overlap": true,
+    "same_identity_disjoint_window_reuse_allowed": true,
+    "same_identity_multiple_qualified_rows_in_new_batch": false,
+    "preserved_2021_identity_global_exclusion": true,
+    "2022_2024_closed": true,
+    "2025_permanent_blind_closed": true
+  },
+  "admission_screen": {
+    "semantic_morphology_read": false,
+    "structure_fact_build": false,
+    "threshold_basis": false,
+    "label_or_reference_read": false,
+    "candidate_output": false,
+    "candidate_scoring": false,
+    "raw_ohlc_published": false,
+    "raw_ohlc_retained_in_artifact": false,
+    "allowed_input_use": "Inspect exact-window daily inputs only to reproduce admission/contiguous-history eligibility and bounded reason codes.",
+    "qualified_window_requires": [
+      "listing covers all 61 declared venue sessions",
+      "every session passes the existing retrospective DailyInput admission contract",
+      "listing identity remains stable through the 61 sessions",
+      "coordinate_ref remains stable through the 61 sessions",
+      "session_index is contiguous through T",
+      "T equals the exact window end"
+    ],
+    "qualified_window_reason": "61_SESSION_CONTIGUOUS_INPUT_READY",
+    "bounded_failure_reasons": [
+      "MISSING_OR_INVALID_DAILY_INPUT",
+      "IDENTITY_OR_LISTING_DISCONTINUITY",
+      "COORDINATE_RESET",
+      "SESSION_GAP",
+      "SOURCE_BINDING_FAILURE"
+    ],
+    "output_only": [
+      "security_id",
+      "security_code",
+      "era",
+      "board_family",
+      "window_id",
+      "window_start",
+      "window_end",
+      "qualified",
+      "reason",
+      "source_binding_digest"
+    ]
+  },
+  "qualified_plan_freeze": {
+    "must_happen_before_semantic_read": true,
+    "selection_from_admission_results_only": true,
+    "selection_order": "cell scarcity order then frozen identity/window order",
+    "first_32_globally_unique_qualified_identities_per_cell": true,
+    "roles": "first 24 primary, next 8 prefrozen fallback under the frozen qualified ordering",
+    "if_any_cell_has_fewer_than_32_qualified_identities": "STOP_WITHOUT_SEMANTIC_JOB",
+    "no_supplement_after_semantic_results": true
+  },
+  "exposure_accounting": {
+    "p013_d_exact_windows": "conservatively treated as L3 consumed for overlapping reuse",
+    "p014_screened_windows": "at least L2_DEVELOPMENT_MARKET_READ",
+    "p014_qualified_plan_before_semantic_run": "L2 only until Structure/threshold computation occurs",
+    "whole_identity_burn_down": false
+  },
+  "atomic_semantic_contract": {
+    "instability_candidate_count": 9,
+    "relocation_candidate_count": 1,
+    "order_profile_count": 3,
+    "joint_pair_search_count": 0,
+    "numeric_atomic_quality_gates": "exact_P012",
+    "projection_compatibility_numeric_gates": "exact_P012",
+    "candidate_or_gate_change": false
+  },
+  "work_sequence": [
+    "P3-STAGE-014-A_FREEZE_AND_RUN_ADMISSION_ONLY_SCREEN",
+    "P3-STAGE-014-B_FREEZE_QUALIFIED_ERA_BOARD_PLAN",
+    "P3-STAGE-014-C_RUN_ATOMIC_SEMANTIC_DEVELOPMENT",
+    "P3-STAGE-014-D_SEAL_REVIEW_SCORE_AND_COMPATIBILITY"
+  ],
+  "claim_ceiling": "Admission qualification establishes only technical input readiness for a balanced semantic stress sample. It does not estimate market prevalence, qualify any atomic proposition, select thresholds, validate economic value or authorize preserved/blind data access."
+}

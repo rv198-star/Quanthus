@@ -1,0 +1,79 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-successor-d1-closeout.v1",
+  "work_item": "P3-STAGE-013-D",
+  "state": "CLOSED_PRE_REVIEW_INPUT_ADMISSION_SHORTFALL",
+  "effective_date": "2026-09-14",
+  "job": {
+    "job_id": "stage_71fe94875bbe428fb464ffc6017af313",
+    "code_revision": "72a961aa84c23c43e1daf5fe4febe215400ad84f",
+    "input_digest": "sha256:61deae484da0243ccd3af56f968505c3e25433035182301e5fd1dd13680d3936",
+    "terminal_state": "failed",
+    "exit_code": 1,
+    "error": "stage_atomic_proposition_successor_d1_process_failed",
+    "failure_reason": "cell_complete_case_shortfall:PRE_STAR/MAIN",
+    "result_ref": null,
+    "artifact_published": false
+  },
+  "execution_position": {
+    "exact_plan_bound": true,
+    "exact_plan_row_count": 256,
+    "exact_plan_unique_identity_count": 256,
+    "market_read_reached": true,
+    "market_read_scope": "only frozen P013 exact 61-session windows",
+    "structure_fact_build_reached": true,
+    "threshold_basis_computation_reached": true,
+    "candidate_grid_computation_reached": true,
+    "case_selection_reached": true,
+    "review_evidence_publication_reached": false,
+    "blind_review_reached": false,
+    "review_ledger_sealed": false,
+    "candidate_scoring_reached": false,
+    "independent_atomic_selection_reached": false,
+    "projection_compatibility_reached": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "root_cause_classification": {
+    "implementation_defect_demonstrated": false,
+    "semantic_candidate_failure_demonstrated": false,
+    "numeric_gate_failure_demonstrated": false,
+    "population_wide_data_scarcity_demonstrated": false,
+    "frozen_sample_input_admission_shortfall_demonstrated": true,
+    "mechanism": "Trend/Order facts require a contiguous admitted history; a 61-session exact resource window is invalidated for T when non-admitted sessions or coordinate/listing resets break the contiguous segment. The frozen 32-resource cell therefore did not yield 24 complete PRE_STAR/MAIN cases even after all eight same-cell fallbacks.",
+    "claim_ceiling": "This closeout demonstrates only that the frozen P013-D sample/admission design could not produce its preregistered complete-case denominator. It does not reject the P012 atomic candidate surfaces, gates, Era x Board resource model, or the wider A-share data population."
+  },
+  "exposure_accounting": {
+    "exact_plan_windows_market_read": 256,
+    "minimum_exposure_level": "L2_DEVELOPMENT_MARKET_READ",
+    "threshold_basis_was_computed_before_failure": true,
+    "conservative_future_overlap_policy": "Until an immutable exact exposure reconstruction proves a narrower set, treat all 256 exact P013-D identity-windows as L3_THRESHOLD_OR_MODEL_BASIS_CONSUMED for future overlapping-window exclusion.",
+    "whole_identity_global_burn": false,
+    "future_same_identity_disjoint_window_reuse": "allowed only through a new preregistered development batch and never counted as independent identity evidence"
+  },
+  "frozen_surfaces_retained": {
+    "era_board_cell_count": 8,
+    "target_complete_cases_per_cell": 24,
+    "atomic_instability_candidate_count": 9,
+    "relocation_candidate_count": 1,
+    "order_profile_count": 3,
+    "joint_pair_search_count": 0,
+    "numeric_atomic_quality_gates": "exact_P012",
+    "projection_compatibility_numeric_gates": "exact_P012",
+    "preserved_2021": "UNREAD",
+    "2025": "PERMANENT_BLIND_UNOPENED"
+  },
+  "retry_authority": {
+    "same_experiment_retry": false,
+    "automatic_retry": false,
+    "increase_fallback_after_result": false,
+    "cross_cell_fill": false,
+    "candidate_or_gate_change": false,
+    "replacement_within_p013_d": false
+  },
+  "successor": {
+    "work_item": "P3-STAGE-014",
+    "disposition": "OPEN_ADMISSION_QUALIFIED_ERA_BOARD_RESERVOIR",
+    "principle": "Freeze a deterministic identity/window candidate order before reading input readiness, qualify resources using admission/contiguous-history conditions only, then freeze the semantic sample before any Structure morphology, threshold, reference or candidate output is read."
+  }
+}

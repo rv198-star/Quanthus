@@ -24,6 +24,13 @@ P013C_RESULT = ROOT / "config/stage-learning/stage-development-resource-plan-res
 P013C_SUCCESSOR = (
     ROOT / "config/stage-learning/stage-atomic-proposition-successor-development-screen.v1.json"
 )
+P013D_CLOSEOUT = (
+    ROOT / "config/stage-learning/stage-atomic-proposition-successor-d1-closeout.v1.json"
+)
+P014_MODEL = (
+    ROOT / "config/stage-learning/stage-development-resource-admission-qualified-model.v1.json"
+)
+P014_WORK = ROOT / "docs/work-items/stage-development-resource-admission-qualified.md"
 P013D_PREREG_R1 = (
     ROOT / "config/stage-learning/stage-atomic-proposition-successor-prereg-revision-r1.v1.json"
 )
@@ -371,6 +378,75 @@ def test_stage013_d_runtime_is_exact_plan_bounded_and_one_shot() -> None:
     assert "discover_development_security_population" not in source
     assert "exact_plan_window_end_only" in source
     assert '"cross_cell_fill": False' in source
+
+
+def test_stage013_d_closeout_is_pre_review_admission_failure_not_atomic_failure() -> None:
+    value = json.loads(P013D_CLOSEOUT.read_text(encoding="utf-8"))
+    assert value["state"] == "CLOSED_PRE_REVIEW_INPUT_ADMISSION_SHORTFALL"
+    job = value["job"]
+    assert job["job_id"] == "stage_71fe94875bbe428fb464ffc6017af313"
+    assert job["terminal_state"] == "failed"
+    assert job["artifact_published"] is False
+    assert job["failure_reason"] == "cell_complete_case_shortfall:PRE_STAR/MAIN"
+    position = value["execution_position"]
+    assert position["market_read_reached"] is True
+    assert position["threshold_basis_computation_reached"] is True
+    assert position["blind_review_reached"] is False
+    assert position["candidate_scoring_reached"] is False
+    assert position["preserved_2021_read"] is False
+    cause = value["root_cause_classification"]
+    assert cause["frozen_sample_input_admission_shortfall_demonstrated"] is True
+    assert cause["semantic_candidate_failure_demonstrated"] is False
+    assert cause["numeric_gate_failure_demonstrated"] is False
+    exposure = value["exposure_accounting"]
+    assert exposure["exact_plan_windows_market_read"] == 256
+    assert exposure["whole_identity_global_burn"] is False
+    retry = value["retry_authority"]
+    assert retry["same_experiment_retry"] is False
+    assert retry["increase_fallback_after_result"] is False
+    assert value["successor"]["work_item"] == "P3-STAGE-014"
+
+
+def test_stage014_inserts_admission_only_screen_before_semantic_development() -> None:
+    value = json.loads(P014_MODEL.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-014"
+    assert value["state"] == "DESIGN_SELECTED_ADMISSION_SCREEN_REQUIRED_BEFORE_SEMANTIC_READ"
+    target = value["semantic_target"]
+    assert target["era_board_cell_count"] == 8
+    assert target["qualified_reserve_per_cell"] == 32
+    assert target["primary_per_cell"] == 24
+    assert target["prefrozen_fallback_per_cell"] == 8
+    assert target["global_identity_unique_in_scored_batch"] is True
+    assert target["cross_cell_fill"] is False
+    screen = value["candidate_screen"]
+    assert screen["maximum_candidate_identities_per_cell"] == 256
+    assert screen["maximum_windows_per_identity"] == 4
+    assert screen["p013_d_exact_identity_windows_excluded_from_overlap"] is True
+    assert screen["same_identity_disjoint_window_reuse_allowed"] is True
+    admission = value["admission_screen"]
+    for key in (
+        "semantic_morphology_read",
+        "structure_fact_build",
+        "threshold_basis",
+        "label_or_reference_read",
+        "candidate_output",
+        "candidate_scoring",
+        "raw_ohlc_published",
+        "raw_ohlc_retained_in_artifact",
+    ):
+        assert admission[key] is False
+    assert "coordinate_ref remains stable" in "\n".join(admission["qualified_window_requires"])
+    freeze = value["qualified_plan_freeze"]
+    assert freeze["must_happen_before_semantic_read"] is True
+    assert freeze["first_32_globally_unique_qualified_identities_per_cell"] is True
+    assert freeze["no_supplement_after_semantic_results"] is True
+    atomic = value["atomic_semantic_contract"]
+    assert atomic["instability_candidate_count"] == 9
+    assert atomic["relocation_candidate_count"] == 1
+    assert atomic["order_profile_count"] == 3
+    assert atomic["joint_pair_search_count"] == 0
+    assert atomic["candidate_or_gate_change"] is False
+    assert P014_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

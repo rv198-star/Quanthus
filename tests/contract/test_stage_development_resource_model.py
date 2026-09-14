@@ -68,6 +68,9 @@ P015_B_RESULT = (
 P015_C_CONFIG = (
     ROOT / "config/stage-learning/stage-complete-reserve-additional-review-prepare.v1.json"
 )
+P015_D_RESULT = (
+    ROOT / "config/stage-learning/stage-complete-reserve-reference-sufficiency-result.v1.json"
+)
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -798,6 +801,70 @@ def test_stage015_b_result_and_c_prepare_keep_review_blind_and_incremental() -> 
         "trading",
     ):
         assert authority[key] is False
+
+
+def test_stage015_d_passes_reference_sufficiency_without_opening_scoring() -> None:
+    value = json.loads(P015_D_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-015-D"
+    assert value["state"] == "PASS_COMPLETE_RESERVE_REFERENCE_SUFFICIENCY"
+    ceiling = value["resource_ceiling"]
+    assert ceiling["total_rows"] == 256
+    assert ceiling["review_ready_rows"] == 252
+    assert ceiling["unready_rows"] == 4
+    assert ceiling["reviewed_existing_rows"] == 192
+    assert ceiling["reviewed_additional_rows"] == 60
+    assert ceiling["all_additional_ready_rows_reviewed"] is True
+    assert ceiling["post_result_case_selection"] is False
+    assert ceiling["positive_count_stop"] is False
+
+    ledgers = value["review_ledgers"]
+    assert ledgers["combined_case_count"] == 252
+    assert ledgers["frozen_p014"]["ledger_sha256"] == (
+        "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69"
+    )
+    assert ledgers["p015_additional"]["ledger_sha256"] == (
+        "sha256:db3216d322e00ad40ebd7de435684b43bcaf72cbc66a90dcb49403a8be461e06"
+    )
+    assert ledgers["old_ledger_rewritten"] is False
+    assert ledgers["old_opinions_re_reviewed"] is False
+
+    resolved = value["combined_reference_resolution"]
+    assert resolved["structural_instability_20"] == {
+        "TRUE": 40,
+        "FALSE": 147,
+        "AMBIGUOUS": 65,
+    }
+    assert resolved["coherent_directional_relocation_20"] == {
+        "TRUE": 46,
+        "FALSE": 170,
+        "AMBIGUOUS": 36,
+    }
+    assert resolved["orderly_consolidation_20"] == {
+        "TRUE": 33,
+        "FALSE": 172,
+        "AMBIGUOUS": 47,
+    }
+
+    gate = value["frozen_p012_reference_sufficiency_gate"]
+    assert gate["minimum_complete_cases"] == 144
+    assert gate["observed_complete_cases"] == 252
+    assert gate["instability_observed_definite_positive"] == 40
+    assert gate["instability_observed_definite_negative"] == 147
+    assert gate["relocation_observed_definite_positive"] == 46
+    assert gate["relocation_observed_definite_negative"] == 170
+    assert gate["order_observed_definite_positive"] == 33
+    assert gate["order_observed_definite_negative"] == 172
+    assert gate["passed"] is True
+    assert gate["gate_change"] is False
+
+    authority = value["execution_ceiling"]
+    assert authority["candidate_scoring_authorized"] is False
+    assert authority["preserved_2021_read"] is False
+    assert authority["2025_read"] is False
+    disposition = value["disposition"]
+    assert disposition["reference_sufficiency_passed"] is True
+    assert disposition["atomic_candidate_quality_passed"] is False
+    assert disposition["next_step_requires_separate_scoring_freeze"] is True
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

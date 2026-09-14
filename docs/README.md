@@ -432,13 +432,18 @@ nodes.
   cases (24 per cell) and an immutable two-role ledger without exposing the candidate selection
   transport. Exact P012 reference resolution passed instability and relocation sufficiency but
   orderly-consolidation had 18 definite positives versus the frozen minimum 20, so P014 closes before
-  candidate scoring and preserved 2021 remains unread. P015 is the selected successor: it uses the
-  complete pre-result P014-B 256-row reserve as a fixed ceiling, first measures review-packet readiness
-  for every row, reuses the sealed 192 opinions unchanged, and reviews every additional ready row—no
-  morphology enrichment and no "add until 20" stopping rule. Evidence and route:
-  `work-items/stage-development-resource-admission-qualified.md`,
-  `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`, and
-  `work-items/stage-complete-reserve-reference.md`.
+  candidate scoring and preserved 2021 remains unread. P015 then used the complete pre-result P014-B
+  256-row reserve as a fixed ceiling: 252 rows were reviewer-ready, all 192 prior cases remained valid,
+  and all 60 additional ready rows were reviewed with no morphology enrichment or "add until 20"
+  stopping rule. The new 60-case ledger is immutable and the old 192-case ledger remains unchanged by
+  SHA. Exact P012 reference resolution over the combined 252 cases gives definite positive/negative
+  counts I=40/147, R=46/170 and O=33/172, so every unchanged P012 reference-sufficiency minimum now
+  passes. P015 closes `PASS_COMPLETE_RESERVE_REFERENCE_SUFFICIENCY`; candidate scoring, projection
+  compatibility and preserved 2021 remain unopened and require a separately frozen successor stage.
+  Evidence and route: `work-items/stage-development-resource-admission-qualified.md`,
+  `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
+  `work-items/stage-complete-reserve-reference.md`, and
+  `acceptance/stage-complete-reserve-reference-sufficiency-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

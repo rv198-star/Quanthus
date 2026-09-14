@@ -1,0 +1,117 @@
+{
+  "schema_version": "quanthus.stage-complete-reserve-reference-sufficiency-result.v1",
+  "work_item": "P3-STAGE-015-D",
+  "state": "PASS_COMPLETE_RESERVE_REFERENCE_SUFFICIENCY",
+  "effective_date": "2026-09-15",
+  "resource_ceiling": {
+    "source": "exact_pre_result_P014_B_qualified_plan",
+    "total_rows": 256,
+    "review_ready_rows": 252,
+    "unready_rows": 4,
+    "reviewed_existing_rows": 192,
+    "reviewed_additional_rows": 60,
+    "all_additional_ready_rows_reviewed": true,
+    "post_result_case_selection": false,
+    "positive_count_stop": false
+  },
+  "p015_c_prepare": {
+    "job_id": "stage_82978e89259e4a139961e81605859fff",
+    "code_revision": "a9a0440997b63babeea699d9c35a32beb00e8f57",
+    "input_digest": "sha256:91cbba58ee5ad0bcb533453a278ee9043efa468d41ce1282c85f0ffc67b228fc",
+    "manifest_sha256": "sha256:8219bb18b1c5c3236fa5e3dd1ec0ea5112dfc101e286d4dbdab1c72c3d3c8d59",
+    "selected_case_count": 60,
+    "shortfall_count": 0,
+    "candidate_output_computed": false,
+    "threshold_basis_computed": false,
+    "envelope_measurement_computed": false,
+    "existing_p014_opinions_read": false,
+    "selection_transport_read": false,
+    "preserved_2021_market_data_read": false,
+    "2025_read": false
+  },
+  "review_ledgers": {
+    "frozen_p014": {
+      "case_count": 192,
+      "ledger_sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69",
+      "immutable_artifact_id": "36ce1db4416cbf0e30f7c57236fbb0a2"
+    },
+    "p015_additional": {
+      "case_count": 60,
+      "ledger_sha256": "sha256:db3216d322e00ad40ebd7de435684b43bcaf72cbc66a90dcb49403a8be461e06",
+      "immutable_artifact_id": "fb4e96743bd800fe775196b407fb21d5"
+    },
+    "combined_case_count": 252,
+    "old_ledger_rewritten": false,
+    "old_opinions_re_reviewed": false,
+    "same_origin_simulation": true,
+    "candidate_output_seen_during_review": false,
+    "threshold_basis_seen_during_review": false,
+    "envelope_measurement_seen_during_review": false,
+    "selection_transport_seen_during_review": false,
+    "future_rows_seen_during_review": false,
+    "preserved_2021_seen_during_review": false
+  },
+  "combined_reference_resolution": {
+    "rule": "TRUE only when both roles TRUE; FALSE only when both roles FALSE; every other combination including any UNKNOWN is AMBIGUOUS",
+    "structural_instability_20": {
+      "TRUE": 40,
+      "FALSE": 147,
+      "AMBIGUOUS": 65
+    },
+    "coherent_directional_relocation_20": {
+      "TRUE": 46,
+      "FALSE": 170,
+      "AMBIGUOUS": 36
+    },
+    "orderly_consolidation_20": {
+      "TRUE": 33,
+      "FALSE": 172,
+      "AMBIGUOUS": 47
+    },
+    "projected_primary_reference": {
+      "STAGE_0": 29,
+      "STAGE_2": 33,
+      "NEITHER": 105,
+      "AMBIGUOUS": 85
+    }
+  },
+  "frozen_p012_reference_sufficiency_gate": {
+    "minimum_complete_cases": 144,
+    "observed_complete_cases": 252,
+    "instability_minimum_definite_positive": 24,
+    "instability_observed_definite_positive": 40,
+    "instability_minimum_definite_negative": 70,
+    "instability_observed_definite_negative": 147,
+    "relocation_minimum_definite_positive": 15,
+    "relocation_observed_definite_positive": 46,
+    "relocation_minimum_definite_negative": 70,
+    "relocation_observed_definite_negative": 170,
+    "order_minimum_definite_positive": 20,
+    "order_observed_definite_positive": 33,
+    "order_minimum_definite_negative": 70,
+    "order_observed_definite_negative": 172,
+    "passed": true,
+    "gate_change": false
+  },
+  "execution_ceiling": {
+    "candidate_scoring_authorized": false,
+    "candidate_grid_values_read": false,
+    "threshold_basis_values_read": false,
+    "envelope_measurements_read_for_scoring": false,
+    "projection_compatibility_reached": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "disposition": {
+    "reference_sufficiency_passed": true,
+    "atomic_candidate_quality_passed": false,
+    "atomic_candidate_failure_demonstrated": false,
+    "projection_compatibility_passed": false,
+    "preserved_evaluation_authorized": false,
+    "next_step_requires_separate_scoring_freeze": true
+  },
+  "claim_ceiling": "P015 establishes only that the complete precommitted 252-case blind atomic-reference ledger satisfies the unchanged P012 reference-sufficiency minima. It does not qualify any instability/order candidate, the fixed relocation guard, Stage projection compatibility, preserved-2021 evaluation, economic value, strategy use or production behavior."
+}

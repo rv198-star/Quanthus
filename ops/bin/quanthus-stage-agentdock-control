@@ -18,6 +18,7 @@ runtime_identity="${training_root}/control/stage-worker/worker-runtime.json"
 p011_kind="quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
 p012_g1_kind="quanthus.stage-atomic-proposition-g1-prepare.v1"
 p013_a_kind="quanthus.stage-development-resource-capacity-census.v1"
+p013_c_kind="quanthus.stage-development-resource-plan.v1"
 
 [[ -d "${repo_root}/.git" ]] || fail "Quanthus control checkout missing"
 [[ -f "${worker}" ]] || fail "stage worker wrapper missing"
@@ -103,12 +104,20 @@ case "${command}" in
     [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
     bash "${worker}" submit --kind "${p013_a_kind}" --code-revision "${target}"
     ;;
+  submit-p013-c)
+    [[ "$#" -eq 2 ]] || fail "usage: submit-p013-c <exact-revision>"
+    target="$2"
+    exact_revision "${target}"
+    [[ "$(git -C "${repo_root}" rev-parse HEAD)" == "${target}" ]] || fail "control checkout revision differs"
+    [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
+    bash "${worker}" submit --kind "${p013_c_kind}" --code-revision "${target}"
+    ;;
   status)
     [[ "$#" -eq 2 ]] || fail "usage: status <stage_job_id>"
     [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
     bash "${worker}" status --job-id "$2"
     ;;
   *)
-    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | status"
+    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | status"
     ;;
 esac

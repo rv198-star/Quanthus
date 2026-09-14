@@ -18,6 +18,8 @@ CENSUS_RESULT = (
 )
 QUOTA_FREEZE = ROOT / "config/stage-learning/stage-development-resource-quota-freeze.v1.json"
 P013B_REVIEW = ROOT / "docs/reviews/stage-development-resource-p013b-four-party-review-20260914.md"
+P013C_PLAN = ROOT / "config/stage-learning/stage-development-resource-plan.v1.json"
+P013C_ACCEPTANCE = ROOT / "docs/acceptance/stage-development-resource-plan-engineering-20260914.md"
 
 
 def load_model() -> dict:
@@ -211,6 +213,36 @@ def test_stage013_b_review_records_all_four_responsibilities_and_no_market_autho
     assert "PASS_FREEZE_EQUAL_ERA_BOARD_RESERVE_AND_REVIEW_QUOTAS" in text
     assert "No result-bearing market read is authorized" in text
     assert "256" in text and "192" in text
+
+
+def test_stage013_c_engineering_freezes_exact_metadata_plan_before_market_read() -> None:
+    value = json.loads(P013C_PLAN.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-013-C"
+    assert value["state"] == "PREREGISTERED_METADATA_PLAN_BEFORE_RESULT_BEARING_READ"
+    selection = value["selection"]
+    assert selection["total_reserve_rows"] == 256
+    assert selection["total_primary_rows"] == 192
+    assert selection["total_fallback_rows"] == 64
+    assert selection["global_identity_unique"] is True
+    assert selection["same_identity_multiple_rows"] is False
+    assert value["runtime"]["maximum_jobs"] == 1
+    assert value["runtime"]["automatic_retries"] == 0
+    for key in (
+        "market_price_read",
+        "morphology_read",
+        "label_or_reference_read",
+        "candidate_output_read",
+        "candidate_scoring",
+        "preserved_2021_market_read",
+        "2022_2024_read",
+        "2025_read",
+        "result_bearing_stage_authorized",
+    ):
+        assert value["authority"][key] is False
+    assert P013C_ACCEPTANCE.is_file()
+    text = P013C_ACCEPTANCE.read_text(encoding="utf-8")
+    assert "PASS_ENGINEERING_READY_FOR_ONE_EXACT_METADATA_PLAN_JOB" in text
+    assert "exactly 256 unique economic identities" in text
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

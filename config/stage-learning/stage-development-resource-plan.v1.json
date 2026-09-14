@@ -1,0 +1,84 @@
+{
+  "schema_version": "quanthus.stage-development-resource-plan.v1",
+  "work_item": "P3-STAGE-013-C",
+  "state": "PREREGISTERED_METADATA_PLAN_BEFORE_RESULT_BEARING_READ",
+  "purpose": "Materialize the exact 256-row era-board identity-window reserve plan under the frozen P013-B quotas using metadata/exposure only, with 192 primary rows and 64 pre-frozen same-cell fallbacks before any price, morphology, reference or candidate read.",
+  "bindings": {
+    "capacity_census_contract": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census.v1.json",
+      "sha256": "sha256:fbeefb8b4cbce35aa1f8c715b8e61dfa857e4ba0b72fe047c5c5d24d59629e25"
+    },
+    "capacity_census_result": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census-result.v1.json",
+      "sha256": "sha256:c9d3b7c98cd7e2924d70923bec97c44b448cf9ef197b3d148473b2656728d29d"
+    },
+    "quota_freeze": {
+      "path": "config/stage-learning/stage-development-resource-quota-freeze.v1.json",
+      "sha256": "sha256:d6dc034d0751419d3eb514034de642f11cae5a5d18e611ececce1e489b0b55ca"
+    },
+    "census_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_0d24e5a8158445fabb2ae26bec742ada/stage-development-resource-census-20260914T053930Z",
+      "job_id": "stage_0d24e5a8158445fabb2ae26bec742ada",
+      "code_revision": "cf3aae3f209e65d8cb6b0c220d6e49e0a7375141",
+      "manifest_sha256": "sha256:354a936dc9dc7262e1cc4f7377e5048cfa8a00b8d9585bb3fe7d39ede47c03c9"
+    }
+  },
+  "selection": {
+    "total_reserve_rows": 256,
+    "total_primary_rows": 192,
+    "total_fallback_rows": 64,
+    "reserve_per_cell": 32,
+    "primary_per_cell": 24,
+    "fallback_per_cell": 8,
+    "identity_seed": "p013-era-board-exposure-v1|identity-reserve",
+    "window_seed": "p013-era-board-exposure-v1|window-assignment",
+    "global_identity_unique": true,
+    "same_identity_multiple_rows": false,
+    "selection_uses_price": false,
+    "selection_uses_morphology": false,
+    "selection_uses_label_or_reference": false,
+    "selection_uses_candidate_output": false,
+    "allocation_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "role_pattern_within_cell": "every_fourth_reserve_slot_is_fallback_otherwise_primary",
+    "window_slot_policy": "evenly_spread_over_chronological_metadata_windows_then_hash_tie_break",
+    "on_any_cell_shortfall": "FAIL_BEFORE_MARKET_READ_NO_CROSS_CELL_FILL"
+  },
+  "output": {
+    "plan_schema": "quanthus.stage-development-resource-exact-plan.v1",
+    "source_binding_schema": "quanthus.stage-development-resource-plan-source-binding.v1",
+    "summary_schema": "quanthus.stage-development-resource-plan-summary.v1",
+    "artifact_schema": "quanthus.stage-development-resource-plan-artifact.v1"
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 600
+  },
+  "authority": {
+    "identity_listing_metadata_read": true,
+    "trading_calendar_metadata_read": true,
+    "prior_exposure_artifact_read": true,
+    "census_artifact_read": true,
+    "market_price_read": false,
+    "morphology_read": false,
+    "label_or_reference_read": false,
+    "candidate_output_read": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "result_bearing_stage_authorized": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This Job may freeze exact metadata-selected identity-window resources and fallback order only. It cannot qualify sample price completeness, proposition prevalence, candidate quality, Stage compatibility, market representativeness or economic value."
+}

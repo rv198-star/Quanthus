@@ -1,0 +1,148 @@
+{
+  "schema_version": "quanthus.stage-development-resource-model.v1",
+  "work_item": "P3-STAGE-013",
+  "state": "DESIGN_SELECTED_CAPACITY_CENSUS_REQUIRED_BEFORE_MARKET_READ",
+  "effective_date": "2026-09-14",
+  "purpose": "Replace whole-identity burn-down and random pool expansion with a deterministic exposure-aware development resource model that represents time and listing-board structure before any successor result-bearing Stage experiment.",
+  "predecessor": {
+    "work_item": "P3-STAGE-012",
+    "disposition": "CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY",
+    "closeout_path": "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json"
+  },
+  "selected_model": {
+    "name": "ERA_BOARD_EXPOSURE_AWARE_DEVELOPMENT_RESERVOIR",
+    "resource_unit": [
+      "economic_identity",
+      "non_overlapping_time_window",
+      "listing_board_at_time",
+      "evidence_role"
+    ],
+    "whole_identity_is_not_default_consumption_unit": true,
+    "random_append_to_reach_capacity": false,
+    "result_aware_expansion": false
+  },
+  "exposure_levels": [
+    {
+      "id": "L0_METADATA_DISCOVERED",
+      "market_result_read": false,
+      "future_development_reuse": true,
+      "identity_global_exclusion": false
+    },
+    {
+      "id": "L1_POOL_RESERVED_NOT_READ",
+      "market_result_read": false,
+      "future_development_reuse": true,
+      "identity_global_exclusion": false
+    },
+    {
+      "id": "L2_DEVELOPMENT_MARKET_READ",
+      "market_result_read": true,
+      "future_development_reuse": "disjoint_window_only",
+      "identity_global_exclusion": false
+    },
+    {
+      "id": "L3_THRESHOLD_OR_MODEL_BASIS_CONSUMED",
+      "market_result_read": true,
+      "future_development_reuse": "disjoint_window_only_and_never_claim_identity_independence",
+      "identity_global_exclusion": false
+    },
+    {
+      "id": "L4_REVIEW_OR_SCORING_CONSUMED",
+      "market_result_read": true,
+      "future_development_reuse": "disjoint_window_only_and_never_claim_identity_independence",
+      "identity_global_exclusion": false
+    },
+    {
+      "id": "L5_PRESERVED_EVALUATION",
+      "market_result_read": false,
+      "future_development_reuse": false,
+      "identity_global_exclusion": true
+    }
+  ],
+  "board_axis": {
+    "authority": "dwd_listing.board_code at the declared point in time",
+    "families": {
+      "MAIN": ["SSE_main", "SZ_main"],
+      "CHINEXT": ["ChiNext"],
+      "STAR": ["STAR"]
+    },
+    "bse_in_scope": false,
+    "board_is_hard_sampling_axis": true,
+    "board_is_not_a_stage_label": true
+  },
+  "time_axis": {
+    "principle": "Use calendar/rule-defined regimes, not bull/bear labels inferred from later returns.",
+    "development_reservoir_end": "2020-12-31",
+    "eras": [
+      {
+        "id": "PRE_STAR",
+        "start": "2012-01-01",
+        "end": "2019-07-21",
+        "eligible_board_families": ["MAIN", "CHINEXT"]
+      },
+      {
+        "id": "STAR_PRE_CHINEXT_20PCT",
+        "start": "2019-07-22",
+        "end": "2020-08-23",
+        "eligible_board_families": ["MAIN", "CHINEXT", "STAR"]
+      },
+      {
+        "id": "STAR_AND_CHINEXT_20PCT",
+        "start": "2020-08-24",
+        "end": "2020-12-31",
+        "eligible_board_families": ["MAIN", "CHINEXT", "STAR"]
+      }
+    ],
+    "regime_boundary_basis": "listing-board availability and versioned trading-rule boundaries, not ex-post market performance",
+    "calendar_subwindows": "capacity census must report non-overlapping usable windows within each era before quotas are frozen"
+  },
+  "sector_axis": {
+    "hard_sampling_axis_now": false,
+    "reason": "Current DWD industry membership is not authoritative historical PIT truth across the full development horizon; static industry mapping is concentration-only and cannot be promoted into historical sector truth.",
+    "allowed_now": "diagnostic metadata only when the classification is authoritative at the sampled time",
+    "future_upgrade": "A separately governed PIT historical sector membership source may add a sector axis without changing the board axis."
+  },
+  "capacity_census_next": {
+    "market_price_read": false,
+    "morphology_read": false,
+    "label_read": false,
+    "candidate_scoring": false,
+    "required_outputs": [
+      "unique economic identities by era x board family",
+      "non-overlapping usable windows by era x board family",
+      "counts by exposure level L0-L5",
+      "counts released by replacing whole-identity exclusion with disjoint-window development reuse",
+      "exact overlap with preserved-2021 identities",
+      "capacity after preserving L5 identity-global exclusion",
+      "capacity loss reasons"
+    ],
+    "quota_freeze_rule": "Exact board-era quotas must be frozen after metadata-only census and before any result-bearing market read; quotas may not be changed after outcome evidence.",
+    "allocation_principles": [
+      "cover every structurally present board-era cell before adding density to already represented cells",
+      "prevent MAIN from consuming the sample merely because it is the largest family",
+      "allocate additional capacity deterministically from metadata-only cell capacity, not randomly",
+      "preserve one-case-per-economic-identity inside each scored review slice unless a later preregistration explicitly changes that rule",
+      "report repeated-identity-across-disjoint-windows separately and never count it as identity-independent evidence"
+    ]
+  },
+  "protected_surfaces": {
+    "preserved_2021": {
+      "identity_count": 160,
+      "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+      "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+      "state": "UNREAD_AND_IDENTITY_GLOBAL_EXCLUSION_RETAINED"
+    },
+    "2022_2024": "CLOSED_PENDING_SEPARATE_AUTHORITY",
+    "2025": "PERMANENT_BLIND_CLOSED"
+  },
+  "explicit_non_goals": [
+    "Do not reopen or rerun P012 G1.",
+    "Do not lower P012 gates or reinterpret its failed receipt as success.",
+    "Do not use 2024 technology-bull knowledge as a retrospective sample-selection label.",
+    "Do not treat current/static industry membership as historical sector truth.",
+    "Do not open 2021, 2022-2024 or 2025 market-result surfaces in the capacity census.",
+    "Do not retune P008 relocation or add Stage candidates in this resource-design step."
+  ],
+  "selected_disposition": "PROCEED_TO_METADATA_ONLY_ERA_BOARD_EXPOSURE_CAPACITY_CENSUS",
+  "claim_ceiling": "This design selects how future development resources are counted and stratified. It does not prove sample sufficiency, authorize a result-bearing Stage experiment, qualify any atomic proposition, or make a market-regime performance claim."
+}

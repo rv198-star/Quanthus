@@ -325,6 +325,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-012-E9 | Additive reserved semantic registration + metadata/planning alignment | P3-STAGE-012-E8 | closed `REGISTERED_RESERVED_MEASUREMENT_NO_RUNTIME_BINDING`; docs/acceptance/structure-directional-path-envelope-e9-registration-acceptance-20260914.md |
 | P3-STAGE-012-F | Freshness inventory + atomic-first development preregistration | P3-STAGE-012-E9 | closed `PREREGISTRATION_FROZEN`; 2016 fresh development selected before data; docs/acceptance/stage-atomic-proposition-f-preregistration-20260914.md |
 | P3-STAGE-012-G | Fresh-2016 atomic development | P3-STAGE-012-F | closed `FAILED_FRESHNESS_CAPACITY_TERMINAL`; historical engineering acceptance retained, no retry or G2/G3 execution; docs/acceptance/stage-atomic-proposition-p012-capacity-closeout-20260914.md |
+| P3-STAGE-013 | Era × board exposure-aware development reservoir | P3-STAGE-012 | ready `READY_METADATA_ONLY_CAPACITY_CENSUS`; replaces random/whole-identity expansion with identity × disjoint-window × PIT-board × exposure accounting; preserved 2021 unread, 2022-2025 closed; docs/work-items/stage-development-resource-model.md |
+| P3-STAGE-013-A | Metadata-only era × board × exposure capacity census | P3-STAGE-013 | ready; no price/morphology/labels/scoring; exact quotas freeze only after census |
+| P3-STAGE-013-B | Freeze board-era quotas and reusable-window policy | P3-STAGE-013-A | blocked on metadata census |
+| P3-STAGE-013-C | Freeze successor result-bearing preregistration | P3-STAGE-013-B | blocked; no inherited pool size without re-derivation |
+| P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | blocked; requires separately accepted preregistration/runtime contract |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

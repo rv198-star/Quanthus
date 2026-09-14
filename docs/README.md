@@ -419,6 +419,14 @@ nodes.
   No retry, smaller pool, weaker exclusion or replacement cohort is authorized. Preserved 2021 remains
   unread. Final evidence and same-origin simulated review:
   `acceptance/stage-atomic-proposition-p012-capacity-closeout-20260914.md`.
+  P3-STAGE-013 is the selected successor resource-governance route. It replaces whole-identity
+  burn-down/random expansion with an exposure-aware `identity × non-overlapping time window × PIT
+  listing board × evidence role` model. MAIN, ChiNext and STAR become hard board strata across
+  institutional/rule-defined eras; retrospective bull/bear labels are forbidden for sample selection,
+  and historical industry/theme stratification remains non-authoritative until a PIT source exists.
+  The only ready child is a metadata-only capacity census; no price/morphology/label/scoring read is
+  opened. Design decision and review: `work-items/stage-development-resource-model.md` and
+  `reviews/stage-development-resource-four-party-review-20260914.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

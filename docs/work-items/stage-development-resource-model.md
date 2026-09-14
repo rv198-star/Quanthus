@@ -28,10 +28,12 @@ The design preserves identity-global exclusion for the exact protected 2021 eval
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
-| P3-STAGE-013-A | Metadata-only era × board × exposure capacity census | P3-STAGE-012 closeout | ready; counts only, no price/morphology/labels/scoring |
+| P3-STAGE-013-A | Metadata-only era × board × exposure capacity census | P3-STAGE-012 closeout | engineering accepted; exact one-shot metadata Job ready after RX6800 deployment; counts only, no price/morphology/labels/scoring; `../acceptance/stage-development-resource-capacity-census-engineering-20260914.md` |
 | P3-STAGE-013-B | Freeze exact successor board-era quotas and reusable-window policy | P3-STAGE-013-A | blocked on census; must freeze before result-bearing read |
 | P3-STAGE-013-C | Build successor development preregistration | P3-STAGE-013-B | blocked; no inherited 512 gate unless re-derived from actual role/capacity need |
 | P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | blocked; requires separately accepted preregistration and runtime contract |
+
+The A execution contract is now frozen before its first metadata census. It uses exact 61-open-session non-overlapping windows, the PIT listing-board axis, exact bound predecessor exposure artifacts and an immutable 160-identity L5 exclusion. The Worker/helper change adds only the one-shot `quanthus.stage-development-resource-capacity-census.v1` route.
 
 ## P3-STAGE-013-A required census output
 

@@ -1,0 +1,140 @@
+{
+  "schema_version": "quanthus.stage-development-resource-capacity-census.v1",
+  "work_item": "P3-STAGE-013-A",
+  "state": "PREREGISTERED_METADATA_ONLY_BEFORE_CENSUS",
+  "purpose": "Measure reusable Stage development capacity by economic identity x disjoint 61-session window x PIT listing board x prior exposure role without reading price paths, morphology, labels, candidate outputs, future outcomes or protected evaluation market rows.",
+  "bindings": {
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    }
+  },
+  "window_contract": {
+    "open_sessions_per_window": 61,
+    "construction": "non_overlapping_open_session_chunks_from_each_era_start_per_trading_venue",
+    "tail_policy": "discard_tail_shorter_than_61_sessions",
+    "listing_membership": "listing interval must cover every session in the window",
+    "identity_ambiguity": "exclude an economic identity from a window when more than one active listing identity maps to that same window",
+    "capacity_proxy_only": true,
+    "bar_completeness_claimed": false
+  },
+  "board_families": {
+    "MAIN": ["SSE_main", "SZ_main"],
+    "CHINEXT": ["ChiNext"],
+    "STAR": ["STAR"]
+  },
+  "eras": [
+    {
+      "id": "PRE_STAR",
+      "start": "2012-01-01",
+      "end": "2019-07-21",
+      "eligible_board_families": ["MAIN", "CHINEXT"]
+    },
+    {
+      "id": "STAR_PRE_CHINEXT_20PCT",
+      "start": "2019-07-22",
+      "end": "2020-08-23",
+      "eligible_board_families": ["MAIN", "CHINEXT", "STAR"]
+    },
+    {
+      "id": "STAR_AND_CHINEXT_20PCT",
+      "start": "2020-08-24",
+      "end": "2020-12-31",
+      "eligible_board_families": ["MAIN", "CHINEXT", "STAR"]
+    }
+  ],
+  "exposure_artifacts": [
+    {
+      "id": "P3-STAGE-007-B",
+      "artifact_relative_path": "runs/stage-worker/stage_95f9b48bd96049b184e0cbf856b9a5e8/stage-order-rule-prepare-20260911T080532Z",
+      "manifest_sha256": "sha256:0331ba6a82db7b4fb60cfbc03f328d899b7939c43936b414d9a4ffbce30b4db7",
+      "fresh_field": "pool",
+      "basis_field": "pool",
+      "selection_file": "selection.json",
+      "read_start": "2019-01-01",
+      "report_start": "2021-01-01",
+      "report_end": "2021-12-31"
+    },
+    {
+      "id": "P3-STAGE-008-D1",
+      "artifact_relative_path": "runs/stage-worker/stage_7ffc681cd5254aa0ab3e0d98026c42d7/stage-directional-boundary-d1-20260911T204403Z",
+      "manifest_sha256": "sha256:2ddc4f90376e2061932862c2ef1a8cfd27f8774d1df9bdb59de8bf4e3bf1f9a3",
+      "fresh_field": "fresh_pool",
+      "basis_field": "calibration_pool",
+      "selection_file": "calibration-selection.json",
+      "read_start": "2019-01-01",
+      "report_start": "2020-01-01",
+      "report_end": "2020-12-31"
+    },
+    {
+      "id": "P3-STAGE-009-D1",
+      "artifact_relative_path": "runs/stage-worker/stage_93c9590d5df34f5e8f38e242077c1e3c/stage-positive-instability-d1-20260912T081813Z",
+      "manifest_sha256": "sha256:c49bbf50f01a5319634bdd0e54a1a3716f14e78b462d5570bf3f6c028e64c6b5",
+      "fresh_field": "fresh_pool",
+      "basis_field": "development_pool",
+      "selection_file": "development-selection.json",
+      "read_start": "2019-01-01",
+      "report_start": "2020-01-01",
+      "report_end": "2020-12-31",
+      "preserved_plan_file": "evaluation-plan.json",
+      "preserved_identity_count": 160,
+      "preserved_identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+      "preserved_plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7"
+    },
+    {
+      "id": "P3-STAGE-010-D1",
+      "artifact_relative_path": "runs/stage-worker/stage_8f2bc43d4b1e4943bca4c3e31214c8a5/stage-positive-instability-quantitative-d1-20260912T154942Z",
+      "manifest_sha256": "sha256:506cb9ea1425afc1f123636603ae21ae969ac5903421f3dc4910db903476ba8c",
+      "fresh_field": "fresh_pool",
+      "basis_field": "development_pool",
+      "selection_file": "development-selection.json",
+      "read_start": "2018-09-01",
+      "report_start": "2019-01-01",
+      "report_end": "2019-12-31"
+    },
+    {
+      "id": "P3-STAGE-011-D1",
+      "artifact_relative_path": "runs/stage-worker/stage_8189b79722fc48d1b774aa42f9238852/stage-orderly-consolidation-joint-d1-20260913T063204Z",
+      "manifest_sha256": "sha256:14870f6cd1521d453b7ccae6ebdd5d8d6d5ee64875372051f76214eb2227eae8",
+      "fresh_field": "fresh_pool",
+      "basis_field": "development_pool",
+      "selection_file": "development-selection.json",
+      "read_start": "2017-09-01",
+      "report_start": "2018-01-01",
+      "report_end": "2018-12-31"
+    }
+  ],
+  "legacy_whole_identity_burn": {
+    "include_stage007_excluded_economic_ids": true,
+    "include_stage007_pool": true,
+    "include_stage008_stage011_fresh_pools": true,
+    "comparison_only": true
+  },
+  "authority": {
+    "identity_metadata_read": true,
+    "listing_board_metadata_read": true,
+    "trading_calendar_metadata_read": true,
+    "prior_exposure_artifact_metadata_read": true,
+    "market_price_read": false,
+    "morphology_read": false,
+    "label_read": false,
+    "candidate_output_read": false,
+    "candidate_scoring": false,
+    "threshold_or_gate_change": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "wall_seconds": 900
+  },
+  "claim_ceiling": "The census measures metadata capacity and prior exposure only. It does not prove bar completeness, sample sufficiency, Stage semantics, candidate quality, market-regime performance, or qualification."
+}

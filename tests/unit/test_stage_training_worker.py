@@ -15,6 +15,7 @@ from quanthus.stage_learning.worker import (
     JOB_SCHEMA,
     STAGE_ATOMIC_PROPOSITION_G1_JOB,
     STAGE_CAPACITY_CENSUS_JOB,
+    STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
     STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
@@ -179,6 +180,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_QUALIFICATION_JOB,
         STAGE_ATOMIC_PROPOSITION_G1_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
+        STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
         STAGE_POSITIVE_INSTABILITY_D1_JOB,
@@ -342,6 +344,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_QUALIFICATION_JOB,
         STAGE_ATOMIC_PROPOSITION_G1_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
+        STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
         STAGE_POSITIVE_INSTABILITY_D1_JOB,
@@ -380,6 +383,33 @@ def test_capacity_census_kind_gets_its_frozen_config(tmp_path: Path) -> None:
     assert submitted["config"] == "config/stage-learning/sample-capacity-census.v1.json"
     assert _JOB_SPECS[STAGE_CAPACITY_CENSUS_JOB]["wall_seconds"] == 1800
     assert not worker_paths.qualification_budget.exists()
+
+
+def test_development_resource_census_is_one_shot_and_idempotent(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
+    )
+    assert submitted["kind"] == STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/stage-development-resource-capacity-census.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB]["wall_seconds"] == 900
+    assert worker_paths.development_resource_census_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
+        )
 
 
 def test_second_group_profile_kind_gets_its_frozen_config(tmp_path: Path) -> None:

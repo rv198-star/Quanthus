@@ -12,7 +12,14 @@ def test_control_surface_is_bounded_to_rx6800_qiuyu_and_exact_commands() -> None
     text = source()
     assert '[[ "$(id -un)" == "qiuyu" ]]' in text
     assert '[[ "$(hostname)" == "RX6800" ]]' in text
-    for command in ("deploy)", "doctor)", "submit-p011-d1)", "submit-p012-g1)", "status)"):
+    for command in (
+        "deploy)",
+        "doctor)",
+        "submit-p011-d1)",
+        "submit-p012-g1)",
+        "submit-p013-a)",
+        "status)",
+    ):
         assert command in text
     for forbidden in ("cancel)", "serve)", "eval ", "bash -c", '"$@"'):
         assert forbidden not in text
@@ -27,13 +34,15 @@ def test_deploy_accepts_only_exact_current_github_main_and_clean_checkout() -> N
     assert 'restart_and_verify "${target}"' in text
 
 
-def test_submit_is_hard_bound_to_p011_and_p012_g1_kinds_and_runtime_revision() -> None:
+def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> None:
     text = source()
     assert 'p011_kind="quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"' in text
     assert 'p012_g1_kind="quanthus.stage-atomic-proposition-g1-prepare.v1"' in text
+    assert 'p013_a_kind="quanthus.stage-development-resource-capacity-census.v1"' in text
     assert '[[ "$(service_revision)" == "${target}" ]]' in text
     assert 'bash "${worker}" submit --kind "${p011_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p012_g1_kind}" --code-revision "${target}"' in text
+    assert 'bash "${worker}" submit --kind "${p013_a_kind}" --code-revision "${target}"' in text
 
 
 def test_status_accepts_only_stage_job_ids() -> None:

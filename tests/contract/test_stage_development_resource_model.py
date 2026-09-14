@@ -8,6 +8,11 @@ ROOT = find_project_root()
 MODEL = ROOT / "config/stage-learning/stage-development-resource-model.v1.json"
 REVIEW = ROOT / "docs/reviews/stage-development-resource-four-party-review-20260914.md"
 WORK_ITEM = ROOT / "docs/work-items/stage-development-resource-model.md"
+CENSUS = ROOT / "config/stage-learning/stage-development-resource-capacity-census.v1.json"
+CENSUS_SOURCE = ROOT / "src/quanthus/stage_learning/development_resource_capacity_census.py"
+CENSUS_ACCEPTANCE = (
+    ROOT / "docs/acceptance/stage-development-resource-capacity-census-engineering-20260914.md"
+)
 
 
 def load_model() -> dict:
@@ -121,6 +126,25 @@ def test_stage013_documents_record_four_party_selection_and_next_gate() -> None:
     assert "P3-STAGE-013-A" in work
     assert "metadata-only" in work
     assert "2025 remains permanent blind" in work
+
+
+def test_stage013_a_engineering_is_metadata_only_and_bounded() -> None:
+    census = json.loads(CENSUS.read_text(encoding="utf-8"))
+    assert census["work_item"] == "P3-STAGE-013-A"
+    assert census["state"] == "PREREGISTERED_METADATA_ONLY_BEFORE_CENSUS"
+    assert census["window_contract"]["open_sessions_per_window"] == 61
+    assert census["runtime"]["maximum_jobs"] == 1
+    assert census["runtime"]["automatic_retries"] == 0
+    source = CENSUS_SOURCE.read_text(encoding="utf-8")
+    assert "dwd_listing.parquet" in source
+    assert "dwd_trading_calendar" in source
+    assert "dwd_security_bar" not in source
+    assert "candidate-grid.json" not in source
+    assert "evidence.json" not in source
+    assert CENSUS_ACCEPTANCE.is_file()
+    assert "PASS_ENGINEERING_READY_FOR_ONE_METADATA_ONLY_JOB" in CENSUS_ACCEPTANCE.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

@@ -4230,6 +4230,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         "recent_p012_g1_failure": _recent_stage_job_failure(
             paths, kind=STAGE_ATOMIC_PROPOSITION_G1_JOB,
         ),
+        "recent_p013_c_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB,
+        ),
     }
 
 

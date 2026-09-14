@@ -175,6 +175,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["concurrency"] == 1
     assert result["recent_p011_d1_failure"] is None
     assert result["recent_p012_g1_failure"] is None
+    assert result["recent_p013_c_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
@@ -205,6 +206,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     (
         (STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB, "recent_p011_d1_failure"),
         (STAGE_ATOMIC_PROPOSITION_G1_JOB, "recent_p012_g1_failure"),
+        (STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB, "recent_p013_c_failure"),
     ),
 )
 def test_doctor_exposes_only_bounded_recent_failure_tail(

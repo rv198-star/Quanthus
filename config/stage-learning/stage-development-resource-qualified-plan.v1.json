@@ -1,0 +1,82 @@
+{
+  "schema_version": "quanthus.stage-development-resource-qualified-plan.v1",
+  "work_item": "P3-STAGE-014-B",
+  "state": "PREREGISTERED_QUALIFIED_PLAN_FROM_IMMUTABLE_ADMISSION_LEDGER",
+  "purpose": "Freeze the exact globally identity-unique 8 x 32 admission-qualified semantic resource plan from the immutable P014-A ledger, without any additional market-data read or semantic computation.",
+  "bindings": {
+    "admission_model": {
+      "path": "config/stage-learning/stage-development-resource-admission-qualified-model.v1.json",
+      "sha256": "sha256:b00ba37aaf4e4a350d05040dbb40d7854f4f8d186480eae00953ca8147fa89a9"
+    },
+    "admission_screen": {
+      "path": "config/stage-learning/stage-development-resource-admission-screen.v1.json",
+      "sha256": "sha256:f3aa75af56133a31e2f26dec125a27fcc30c8c6a33ce1a9715f848c2c75067d8"
+    },
+    "admission_result": {
+      "path": "config/stage-learning/stage-development-resource-admission-result.v1.json",
+      "sha256": "sha256:16f58ce61e4fd8cec8f50496d4b7fcad4b8680d153f73c540a354e1e3c8ae928"
+    },
+    "admission_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_bcaf8263cb724a2798d250909c42331f/stage-development-resource-admission-20260914T114854Z",
+      "job_id": "stage_bcaf8263cb724a2798d250909c42331f",
+      "code_revision": "99b1e25f1dde36ec68d31bdcfffc61d39acf3ce0",
+      "manifest_sha256": "sha256:c21cb8ff0c5340d6afb22942f30f1845bfb3c2371b6b9b79e1baff8f4f3004db"
+    }
+  },
+  "selection": {
+    "cell_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "reserve_per_cell": 32,
+    "primary_per_cell": 24,
+    "fallback_per_cell": 8,
+    "total_rows": 256,
+    "global_identity_unique": true,
+    "per_identity_window_choice": "first_qualified_by_frozen_identity_rank_then_window_rank_then_window_id",
+    "cell_selection": "first_32_not_already_used_global_identities_by_frozen_identity_rank",
+    "role_assignment": "plan_slots_1_24_primary_25_32_fallback",
+    "cross_cell_fill": false,
+    "post_result_replacement": false,
+    "market_read": false,
+    "structure_fact_build": false,
+    "threshold_basis": false,
+    "reference_or_label_read": false,
+    "candidate_output": false,
+    "candidate_scoring": false,
+    "on_any_cell_global_unique_shortfall": "STOP_BEFORE_SEMANTIC_JOB"
+  },
+  "output": {
+    "plan_schema": "quanthus.stage-development-resource-qualified-exact-plan.v1",
+    "summary_schema": "quanthus.stage-development-resource-qualified-plan-summary.v1",
+    "source_binding_schema": "quanthus.stage-development-resource-qualified-plan-source-binding.v1",
+    "artifact_schema": "quanthus.stage-development-resource-qualified-plan-artifact.v1"
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 600
+  },
+  "authority": {
+    "admission_ledger_read": true,
+    "market_price_read": false,
+    "structure_fact_build": false,
+    "threshold_basis": false,
+    "reference_or_label_read": false,
+    "candidate_output": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "semantic_job_authorized": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This Job freezes admission-qualified resources only. It does not reread market values, compute semantics, qualify any candidate or authorize preserved/blind data."
+}

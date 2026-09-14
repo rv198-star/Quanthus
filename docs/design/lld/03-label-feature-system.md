@@ -473,7 +473,8 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-013-C | Freeze successor result-bearing preregistration | P3-STAGE-013-B | closed `PASS_EXACT_PLAN_AND_SUCCESSOR_PREREG_FROZEN`; R1 exact plan = 256 unique identities across 8 cells, 192 primary + 64 fallback; P012 atomic surfaces/gates and preserved-2021 boundary remain bound |
 | P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | closed `CLOSED_PRE_REVIEW_INPUT_ADMISSION_SHORTFALL`; sole exact-plan Job failed before blind review/scoring because `PRE_STAR/MAIN` could not realize 24 complete cases from frozen 24+8 resources; no retry, preserved 2021 unread |
 | P3-STAGE-014 | Admission-qualified Era × Board reservoir | P3-STAGE-013-D | ready design: deterministic exposure-aware candidates are input-admission screened before any Structure/threshold/reference/candidate computation, then exact 8×32 semantic resources freeze |
-| P3-STAGE-014-A | Admission-only Era × Board resource screen | P3-STAGE-014 | engineering accepted `PASS_ENGINEERING_READY_FOR_ONE_ADMISSION_ONLY_JOB`; one one-shot readiness Job, no raw OHLC artifact and no semantic computation |
+| P3-STAGE-014-A | Admission-only Era × Board resource screen | P3-STAGE-014 | closed `PASS_ADMISSION_CAPACITY_READY_FOR_QUALIFIED_PLAN`; all 8 cells meet >=32 readiness capacity, minimum early-STAR=36; no semantic computation |
+| P3-STAGE-014-B | Freeze exact admission-qualified 8×32 plan | P3-STAGE-014-A | engineering accepted `PASS_ENGINEERING_READY_FOR_ONE_QUALIFIED_PLAN_JOB`; ledger-only global-identity freeze, no market read |
 
 ## 7. Acceptance
 

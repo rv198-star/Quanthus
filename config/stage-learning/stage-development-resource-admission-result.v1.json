@@ -1,0 +1,54 @@
+{
+  "schema_version": "quanthus.stage-development-resource-admission-result.v1",
+  "work_item": "P3-STAGE-014-A",
+  "state": "PASS_ADMISSION_CAPACITY_READY_FOR_QUALIFIED_PLAN",
+  "effective_date": "2026-09-14",
+  "job": {
+    "job_id": "stage_bcaf8263cb724a2798d250909c42331f",
+    "code_revision": "99b1e25f1dde36ec68d31bdcfffc61d39acf3ce0",
+    "input_digest": "sha256:93c7a2b076abbb2643e31138a132720dff4760a10445336f4c2d641b6867da53",
+    "terminal_state": "succeeded",
+    "exit_code": 0
+  },
+  "artifact": {
+    "run_id": "stage-development-resource-admission-20260914T114854Z",
+    "artifact_relative_path": "runs/stage-worker/stage_bcaf8263cb724a2798d250909c42331f/stage-development-resource-admission-20260914T114854Z",
+    "manifest_sha256": "sha256:c21cb8ff0c5340d6afb22942f30f1845bfb3c2371b6b9b79e1baff8f4f3004db",
+    "file_count": 3,
+    "verified": true
+  },
+  "totals": {
+    "candidate_window_count": 4608,
+    "candidate_unique_identity_count": 1293,
+    "qualified_window_count": 3942,
+    "qualified_unique_identity_count": 1270,
+    "all_cells_have_required_qualified_capacity": true
+  },
+  "cell_summary": [
+    {"cell": "PRE_STAR/CHINEXT", "candidate_identity_count": 256, "candidate_window_count": 1004, "qualified_unique_identity_count": 255, "qualified_window_count": 865, "failure_reason_counts": {"COORDINATE_RESET": 139}, "required_unique_qualified_identity_count": 32, "sufficient_for_plan_freeze": true},
+    {"cell": "PRE_STAR/MAIN", "candidate_identity_count": 256, "candidate_window_count": 1020, "qualified_unique_identity_count": 253, "qualified_window_count": 904, "failure_reason_counts": {"COORDINATE_RESET": 116}, "required_unique_qualified_identity_count": 32, "sufficient_for_plan_freeze": true},
+    {"cell": "STAR_AND_CHINEXT_20PCT/CHINEXT", "candidate_identity_count": 256, "candidate_window_count": 256, "qualified_unique_identity_count": 248, "qualified_window_count": 248, "failure_reason_counts": {"COORDINATE_RESET": 8}, "required_unique_qualified_identity_count": 32, "sufficient_for_plan_freeze": true},
+    {"cell": "STAR_AND_CHINEXT_20PCT/MAIN", "candidate_identity_count": 256, "candidate_window_count": 256, "qualified_unique_identity_count": 252, "qualified_window_count": 252, "failure_reason_counts": {"COORDINATE_RESET": 4}, "required_unique_qualified_identity_count": 32, "sufficient_for_plan_freeze": true},
+    {"cell": "STAR_AND_CHINEXT_20PCT/STAR", "candidate_identity_count": 70, "candidate_window_count": 70, "qualified_unique_identity_count": 67, "qualified_window_count": 67, "failure_reason_counts": {"COORDINATE_RESET": 3}, "required_unique_qualified_identity_count": 32, "sufficient_for_plan_freeze": true},
+    {"cell": "STAR_PRE_CHINEXT_20PCT/CHINEXT", "candidate_identity_count": 256, "candidate_window_count": 942, "qualified_unique_identity_count": 252, "qualified_window_count": 762, "failure_reason_counts": {"COORDINATE_RESET": 180}, "required_unique_qualified_identity_count": 32, "sufficient_for_plan_freeze": true},
+    {"cell": "STAR_PRE_CHINEXT_20PCT/MAIN", "candidate_identity_count": 256, "candidate_window_count": 960, "qualified_unique_identity_count": 252, "qualified_window_count": 787, "failure_reason_counts": {"COORDINATE_RESET": 169, "MISSING_OR_INVALID_DAILY_INPUT": 4}, "required_unique_qualified_identity_count": 32, "sufficient_for_plan_freeze": true},
+    {"cell": "STAR_PRE_CHINEXT_20PCT/STAR", "candidate_identity_count": 49, "candidate_window_count": 100, "qualified_unique_identity_count": 36, "qualified_window_count": 57, "failure_reason_counts": {"COORDINATE_RESET": 43}, "required_unique_qualified_identity_count": 32, "sufficient_for_plan_freeze": true}
+  ],
+  "interpretation": {
+    "minimum_qualified_unique_identity_count": 36,
+    "minimum_cell": "STAR_PRE_CHINEXT_20PCT/STAR",
+    "p013_d_shortfall_was_population_capacity_failure": false,
+    "pre_semantic_admission_screen_is_sufficient_to_freeze_plan": true,
+    "raw_ohlc_retained": false,
+    "structure_facts_built": false,
+    "threshold_basis_computed": false,
+    "reference_or_label_read": false,
+    "candidate_output_computed": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "next_gate": "Freeze one globally identity-unique 32-resource plan per Era x Board cell from the immutable qualified ledger before any semantic computation.",
+  "claim_ceiling": "The screen proves only bounded input readiness under the frozen candidate order. It does not qualify atomic semantics or estimate market prevalence."
+}

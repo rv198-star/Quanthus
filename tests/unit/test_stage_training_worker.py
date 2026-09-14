@@ -19,6 +19,7 @@ from quanthus.stage_learning.worker import (
     STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
     STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
     STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB,
+    STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
     STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
@@ -208,6 +209,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p013_c_failure"] is None
     assert result["recent_p013_d1_failure"] is None
     assert result["recent_p014_a_failure"] is None
+    assert result["recent_p014_b_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
@@ -218,6 +220,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB,
+        STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
         STAGE_POSITIVE_INSTABILITY_D1_JOB,
@@ -243,6 +246,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         (STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB, "recent_p013_c_failure"),
         (STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB, "recent_p013_d1_failure"),
         (STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB, "recent_p014_a_failure"),
+        (STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB, "recent_p014_b_failure"),
     ),
 )
 def test_doctor_exposes_only_bounded_recent_failure_tail(
@@ -388,6 +392,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB,
+        STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
         STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
         STAGE_POSITIVE_INSTABILITY_D1_JOB,
@@ -578,6 +583,35 @@ def test_development_resource_admission_is_one_shot_and_idempotent(tmp_path: Pat
             worker_paths,
             code_revision="b" * 40,
             kind=STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
+        )
+
+
+def test_development_resource_qualified_plan_is_one_shot_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
+    )
+    assert submitted["kind"] == STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/stage-development-resource-qualified-plan.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB]["wall_seconds"] == 600
+    assert worker_paths.development_resource_qualified_plan_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
         )
 
 

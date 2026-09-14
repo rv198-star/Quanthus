@@ -472,12 +472,17 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-013-B | Freeze board-era quotas and reusable-window policy | P3-STAGE-013-A | closed with additive metadata-only R1 temporal-spread revision; eight cells remain 32 reserve / 24 primary / 8 fallback and current-batch global identity uniqueness stays mandatory |
 | P3-STAGE-013-C | Freeze successor result-bearing preregistration | P3-STAGE-013-B | closed `PASS_EXACT_PLAN_AND_SUCCESSOR_PREREG_FROZEN`; R1 exact plan = 256 unique identities across 8 cells, 192 primary + 64 fallback; P012 atomic surfaces/gates and preserved-2021 boundary remain bound |
 | P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | closed `CLOSED_PRE_REVIEW_INPUT_ADMISSION_SHORTFALL`; sole exact-plan Job failed before blind review/scoring because `PRE_STAR/MAIN` could not realize 24 complete cases from frozen 24+8 resources; no retry, preserved 2021 unread |
-| P3-STAGE-014 | Admission-qualified Era × Board reservoir | P3-STAGE-013-D | ready design: deterministic exposure-aware candidates are input-admission screened before any Structure/threshold/reference/candidate computation, then exact 8×32 semantic resources freeze |
+| P3-STAGE-014 | Admission-qualified Era × Board reservoir | P3-STAGE-013-D | closed `CLOSED_WITH_ATOMIC_REFERENCE_SUFFICIENCY_FAIL`; admission screening and exact 8×32 plan solved the input-readiness defect, but the immutable 192-case blind ledger had orderly-consolidation TRUE=18 < frozen minimum 20 before candidate scoring |
 | P3-STAGE-014-A | Admission-only Era × Board resource screen | P3-STAGE-014 | closed `PASS_ADMISSION_CAPACITY_READY_FOR_QUALIFIED_PLAN`; all 8 cells meet >=32 readiness capacity, minimum early-STAR=36; no semantic computation |
 | P3-STAGE-014-B | Freeze exact admission-qualified 8×32 plan | P3-STAGE-014-A | closed `PASS_QUALIFIED_EXACT_PLAN_FROZEN`; 256 globally unique identities, 8×32, 192 primary + 64 fallback, no market read |
 | P3-STAGE-014-C | Freeze atomic semantic preregistration/runtime on qualified plan | P3-STAGE-014-B | closed `PASS_ENGINEERING_READY_FOR_ONE_QUALIFIED_SEMANTIC_JOB`; exact plan, unchanged P012 9/1/3 surfaces/gates, one-shot runtime and blind transport frozen |
-| P3-STAGE-014-D | Run atomic semantic development on qualified plan | P3-STAGE-014-C | ready `READY_ONE_QUALIFIED_SEMANTIC_JOB`; exactly one governed Job, no automatic retry, blind review before scoring |
-| P3-STAGE-014-E | Independent I/R/O selection and projection compatibility | P3-STAGE-014-D | blocked until D succeeds and immutable review ledger is sealed; preserved 2021 remains unread unless all development gates pass |
+| P3-STAGE-014-D | Run atomic semantic development on qualified plan | P3-STAGE-014-C | closed `CLOSED_ATOMIC_REFERENCE_SUFFICIENCY_FAIL`; 192 complete cases / 8×24, sealed same-origin two-role ledger, exact P012 O-positive reference gate failed 18 < 20; selection transport not read |
+| P3-STAGE-014-E | Independent I/R/O selection and projection compatibility | P3-STAGE-014-D | closed `NOT_REACHED_REFERENCE_INSUFFICIENCY`; candidate scoring and preserved-2021 access did not start |
+| P3-STAGE-015 | Complete precommitted reserve reference route | P3-STAGE-014-D | ready design: use the entire pre-result P014-B 256-row resource ceiling, freeze review-packet readiness for every row, reuse the 192 sealed opinions unchanged, and review every additional ready row before any scoring access |
+| P3-STAGE-015-A | Complete-reserve review-packet readiness census | P3-STAGE-015 | ready `READY_REVIEW_READINESS_CENSUS`; availability/reason-only output, no morphology/threshold/candidate/reference values retained |
+| P3-STAGE-015-B | Freeze full ready denominator and additional blind-review set | P3-STAGE-015-A | blocked until exact readiness ledger freezes |
+| P3-STAGE-015-C | Review only additional ready rows and seal combined ledger | P3-STAGE-015-B | blocked; no rewrite of P014 opinions |
+| P3-STAGE-015-D | Evaluate unchanged P012 atomic reference sufficiency | P3-STAGE-015-C | blocked; candidate scoring and preserved evaluation remain separate gates |
 
 ## 7. Acceptance
 

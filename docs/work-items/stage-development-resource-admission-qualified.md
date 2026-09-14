@@ -1,7 +1,7 @@
 # P3-STAGE-014 — Admission-Qualified Era × Board Reservoir
 
 Design status: approved  
-Delivery gate: open for bounded admission-only engineering
+Delivery gate: closed `CLOSED_WITH_ATOMIC_REFERENCE_SUFFICIENCY_FAIL`
 
 Parent: `stage-development-resource-model.md`  
 Machine design: `../../config/stage-learning/stage-development-resource-admission-qualified-model.v1.json`
@@ -25,8 +25,8 @@ Because threshold-basis construction had already been reached in-process before 
 | P3-STAGE-014-A | Freeze and run deterministic admission-only resource screen | P3-STAGE-013-D | closed `PASS_ADMISSION_CAPACITY_READY_FOR_QUALIFIED_PLAN`; sole Job `stage_bcaf8263cb724a2798d250909c42331f` found all 8 cells >=32, minimum early-STAR=36; no semantic computation; `../acceptance/stage-development-resource-admission-screen-engineering-20260914.md` |
 | P3-STAGE-014-B | Freeze exact admission-qualified 8×32 plan | P3-STAGE-014-A | closed `PASS_QUALIFIED_EXACT_PLAN_FROZEN`; Job `stage_9dbc57be4839405790be0e021d8271ba` produced 256 globally unique identities, 8×32, 192 primary + 64 fallback, no market read; `../../config/stage-learning/stage-development-resource-qualified-plan-result.v1.json` |
 | P3-STAGE-014-C | Freeze atomic semantic preregistration/runtime on exact qualified plan | P3-STAGE-014-B | closed `PASS_ENGINEERING_READY_FOR_ONE_QUALIFIED_SEMANTIC_JOB`; exact qualified plan, P012 9/1/3 surfaces/gates, one-shot runtime and blind transport frozen; `../acceptance/stage-atomic-proposition-admission-qualified-c-engineering-20260914.md` |
-| P3-STAGE-014-D | Run atomic semantic development on qualified plan | P3-STAGE-014-C | ready `READY_ONE_QUALIFIED_SEMANTIC_JOB`; exactly one result-bearing Job, no auto retry; blind review must seal before scoring |
-| P3-STAGE-014-E | Independent I/R/O selection and projection compatibility | P3-STAGE-014-D | preserved 2021 remains unread unless all frozen development gates pass |
+| P3-STAGE-014-D | Run atomic semantic development on qualified plan | P3-STAGE-014-C | closed `CLOSED_ATOMIC_REFERENCE_SUFFICIENCY_FAIL`; sole Job succeeded with 192 complete blind cases, immutable two-role ledger sealed, but exact P012 orderly-consolidation positive-reference gate failed 18 < 20 before any candidate scoring; `../reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md` |
+| P3-STAGE-014-E | Independent I/R/O selection and projection compatibility | P3-STAGE-014-D | closed `NOT_REACHED_REFERENCE_INSUFFICIENCY`; selection transport/candidate values were not read and preserved 2021 remains unread |
 
 ## Admission-only boundary
 

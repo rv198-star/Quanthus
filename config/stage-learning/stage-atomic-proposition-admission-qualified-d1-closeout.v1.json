@@ -1,0 +1,92 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-admission-qualified-d1-closeout.v1",
+  "work_item": "P3-STAGE-014-D",
+  "state": "CLOSED_ATOMIC_REFERENCE_SUFFICIENCY_FAIL",
+  "effective_date": "2026-09-14",
+  "job": {
+    "job_id": "stage_7c11b97d47a0473fafa37783056f55f4",
+    "code_revision": "c47527c0f9b93362403a2b2c740b43e1daa3afab",
+    "input_digest": "sha256:edc23a6f8121dc7e8f582b09265cb4e85ac2650d4348d6b6b467c82cbfcf03ab",
+    "terminal_state": "succeeded",
+    "exit_code": 0,
+    "artifact_manifest_sha256": "sha256:5926d73a04e37b74f7025c2f38314898ee7c5414aa45fe0686de20357ce3c388",
+    "selected_case_count": 192,
+    "selected_case_count_per_era_board_cell": 24,
+    "fallback_used_count": 2,
+    "shortfall_count": 0
+  },
+  "review_ledger": {
+    "schema_version": "quanthus.stage-atomic-proposition-admission-qualified-review-ledger.v1",
+    "ledger_sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69",
+    "immutable_artifact_id": "36ce1db4416cbf0e30f7c57236fbb0a2",
+    "artifact_size_bytes": 155384,
+    "case_count": 192,
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "candidate_output_seen_during_review": false,
+    "threshold_basis_seen_during_review": false,
+    "envelope_measurement_seen_during_review": false,
+    "selection_transport_seen_during_review": false,
+    "future_rows_seen_during_review": false,
+    "preserved_2021_seen_during_review": false
+  },
+  "sealed_role_agreement_diagnostic": {
+    "note": "The immutable seal receipt retained same-role UNKNOWN agreement as a raw diagnostic category. Exact P012 scoring semantics resolve every proposition combination containing UNKNOWN to AMBIGUOUS; the scoring-resolution counts below are authoritative for sufficiency.",
+    "structural_instability_20": {"TRUE": 31, "FALSE": 114, "UNKNOWN": 6, "AMBIGUOUS": 41},
+    "coherent_directional_relocation_20": {"TRUE": 33, "FALSE": 129, "UNKNOWN": 17, "AMBIGUOUS": 13},
+    "orderly_consolidation_20": {"TRUE": 18, "FALSE": 136, "UNKNOWN": 8, "AMBIGUOUS": 30}
+  },
+  "p012_atomic_reference_resolution": {
+    "rule": "TRUE only when both roles TRUE; FALSE only when both roles FALSE; every other combination including any UNKNOWN is AMBIGUOUS",
+    "structural_instability_20": {"TRUE": 31, "FALSE": 114, "AMBIGUOUS": 47},
+    "coherent_directional_relocation_20": {"TRUE": 33, "FALSE": 129, "AMBIGUOUS": 30},
+    "orderly_consolidation_20": {"TRUE": 18, "FALSE": 136, "AMBIGUOUS": 38},
+    "projected_primary_reference": {"STAGE_0": 24, "STAGE_2": 18, "NEITHER": 83, "AMBIGUOUS": 67}
+  },
+  "frozen_reference_sufficiency_gate": {
+    "minimum_complete_cases": 144,
+    "observed_complete_primary_cases": 192,
+    "instability_minimum_definite_positive": 24,
+    "instability_observed_definite_positive": 31,
+    "instability_minimum_definite_negative": 70,
+    "instability_observed_definite_negative": 114,
+    "relocation_minimum_definite_positive": 15,
+    "relocation_observed_definite_positive": 33,
+    "relocation_minimum_definite_negative": 70,
+    "relocation_observed_definite_negative": 129,
+    "order_minimum_definite_positive": 20,
+    "order_observed_definite_positive": 18,
+    "order_minimum_definite_negative": 70,
+    "order_observed_definite_negative": 136,
+    "passed": false,
+    "sole_failed_condition": "order_observed_definite_positive_18_lt_20"
+  },
+  "execution_ceiling": {
+    "selection_transport_read": false,
+    "candidate_grid_values_read": false,
+    "threshold_basis_values_read": false,
+    "envelope_measurements_read_for_scoring": false,
+    "candidate_scoring_reached": false,
+    "independent_atomic_selection_reached": false,
+    "projection_compatibility_reached": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "disposition": {
+    "p012_no_pass_disposition": "REVISE_OR_PARK_ATOMIC_REFERENCE_INSUFFICIENT",
+    "candidate_failure_demonstrated": false,
+    "numeric_quality_gate_failure_demonstrated": false,
+    "projection_failure_demonstrated": false,
+    "order_reference_sufficiency_failure_demonstrated": true,
+    "same_job_retry_authorized": false,
+    "post_result_case_addition_authorized": false,
+    "gate_lowering_authorized": false
+  },
+  "successor": {
+    "work_item": "P3-STAGE-015",
+    "disposition": "OPEN_PRECOMMITTED_COMPLETE_RESERVE_REFERENCE_ROUTE",
+    "principle": "Use the exact P014-B 256-row admission-qualified reserve plan as the complete pre-result resource ceiling. First measure primary-review packet readiness for every row using availability/reason only; then include every review-ready row, reuse the immutable P014 192-case opinions unchanged, and review only previously unreviewed ready rows. Do not select by morphology, candidate output, label, or the number needed to pass the gate. Candidate scoring remains closed until the combined immutable reference ledger independently satisfies the unchanged P012 sufficiency gate."
+  },
+  "claim_ceiling": "P014-D proves that the sealed 192-case admission-qualified blind reference ledger misses only the frozen orderly-consolidation positive-reference minimum (18 versus 20). It does not demonstrate any candidate, threshold, resolver, projection or preserved-evaluation failure because those surfaces were not inspected or scored."
+}

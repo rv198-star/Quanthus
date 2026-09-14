@@ -49,6 +49,12 @@ P014C_ACCEPTANCE = (
     ROOT
     / "docs/acceptance/stage-atomic-proposition-admission-qualified-c-engineering-20260914.md"
 )
+P014D_CLOSEOUT = (
+    ROOT / "config/stage-learning/stage-atomic-proposition-admission-qualified-d1-closeout.v1.json"
+)
+P015_MODEL = ROOT / "config/stage-learning/stage-complete-reserve-reference-model.v1.json"
+P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
+P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
     ROOT / "config/stage-learning/stage-atomic-proposition-successor-prereg-revision-r1.v1.json"
 )
@@ -547,6 +553,77 @@ def test_stage014_c_freezes_one_admission_qualified_semantic_job_before_executio
     assert execution["authority"]["2025_access"] is False
     assert P014C_ACCEPTANCE.is_file()
     assert "PASS_ENGINEERING_READY_FOR_ONE_QUALIFIED_SEMANTIC_JOB" in P014C_ACCEPTANCE.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_stage014_d_closes_before_candidate_scoring_on_exact_reference_sufficiency() -> None:
+    value = json.loads(P014D_CLOSEOUT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-014-D"
+    assert value["state"] == "CLOSED_ATOMIC_REFERENCE_SUFFICIENCY_FAIL"
+    assert value["job"]["job_id"] == "stage_7c11b97d47a0473fafa37783056f55f4"
+    assert value["job"]["selected_case_count"] == 192
+    ledger = value["review_ledger"]
+    assert ledger["ledger_sha256"] == (
+        "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69"
+    )
+    assert ledger["case_count"] == 192
+    assert ledger["selection_transport_seen_during_review"] is False
+    resolved = value["p012_atomic_reference_resolution"]
+    assert resolved["structural_instability_20"] == {"TRUE": 31, "FALSE": 114, "AMBIGUOUS": 47}
+    assert resolved["coherent_directional_relocation_20"] == {
+        "TRUE": 33,
+        "FALSE": 129,
+        "AMBIGUOUS": 30,
+    }
+    assert resolved["orderly_consolidation_20"] == {
+        "TRUE": 18,
+        "FALSE": 136,
+        "AMBIGUOUS": 38,
+    }
+    gate = value["frozen_reference_sufficiency_gate"]
+    assert gate["order_minimum_definite_positive"] == 20
+    assert gate["order_observed_definite_positive"] == 18
+    assert gate["passed"] is False
+    ceiling = value["execution_ceiling"]
+    assert ceiling["selection_transport_read"] is False
+    assert ceiling["candidate_scoring_reached"] is False
+    assert ceiling["preserved_2021_read"] is False
+    assert value["successor"]["work_item"] == "P3-STAGE-015"
+
+
+def test_stage015_uses_complete_precommitted_reserve_without_targeted_top_up() -> None:
+    value = json.loads(P015_MODEL.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-015"
+    assert value["selected_disposition"] == (
+        "PROCEED_TO_COMPLETE_RESERVE_REVIEW_READINESS_CENSUS"
+    )
+    ceiling = value["resource_ceiling"]
+    assert ceiling["source"] == "exact_pre_result_P014_B_qualified_plan"
+    assert ceiling["total_rows"] == 256
+    assert ceiling["rows_per_cell"] == 32
+    assert ceiling["new_identity_discovery"] is False
+    assert ceiling["new_random_sampling"] is False
+    assert ceiling["morphology_enrichment"] is False
+    assert ceiling["result_count_targeted_top_up"] is False
+    readiness = value["review_readiness_census"]
+    assert readiness["inclusion_rule"].startswith("every row with review_packet_ready=true")
+    assert readiness["minimum_count_for_continuation"] == 192
+    assert readiness["per_cell_minimum_for_continuation"] == 24
+    reuse = value["opinion_reuse"]
+    assert reuse["p014_192_case_opinions"] == "immutable_reuse_exactly"
+    assert reuse["re_review_existing_cases"] is False
+    gate = value["combined_reference_gate"]
+    assert gate["numeric_sufficiency"] == "exact_P012"
+    assert gate["order_minimum_definite_positive"] == 20
+    assert gate["gate_change"] is False
+    protected = value["protected_surfaces"]
+    assert protected["p014_candidate_selection_transport_read"] is False
+    assert protected["preserved_2021_market_read"] is False
+    assert protected["2025_read"] is False
+    assert P015_WORK.is_file()
+    assert P014D_REVIEW.is_file()
+    assert "PASS_OPEN_COMPLETE_PRECOMMITTED_RESERVE_REFERENCE_SUCCESSOR" in P014D_REVIEW.read_text(
         encoding="utf-8"
     )
 

@@ -1,0 +1,142 @@
+{
+  "schema_version": "quanthus.stage-complete-reserve-reference-model.v1",
+  "work_item": "P3-STAGE-015",
+  "state": "DESIGN_SELECTED_REVIEW_READINESS_CENSUS_REQUIRED_BEFORE_NEW_OPINIONS",
+  "effective_date": "2026-09-14",
+  "purpose": "Resolve the P014 atomic-reference sufficiency shortfall without result-aware case picking by using the complete P014-B 256-row admission-qualified reserve plan as the immutable resource ceiling, measuring review-packet readiness for every row, reusing the sealed P014 opinions unchanged, and reviewing every additional ready row before any candidate scoring access.",
+  "bindings": {
+    "p014_qualified_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-qualified-plan-result.v1.json",
+      "job_id": "stage_9dbc57be4839405790be0e021d8271ba",
+      "manifest_sha256": "sha256:f14c065d0bf18b6491b9220132d1be3c10e608fb9a69f4141c576e351aa7a173",
+      "plan_digest": "sha256:206ed58e8349de59efd52caad958f7bd0f2f9d79f1ee0199eea6a079b6c14829",
+      "identity_digest": "sha256:a3aa679c1792e7545847159c9b4d26dec70b4a925e55bbeb9416852b11f8de05",
+      "row_count": 256,
+      "unique_identity_count": 256
+    },
+    "p014_semantic_prepare": {
+      "job_id": "stage_7c11b97d47a0473fafa37783056f55f4",
+      "manifest_sha256": "sha256:5926d73a04e37b74f7025c2f38314898ee7c5414aa45fe0686de20357ce3c388",
+      "selected_case_count": 192,
+      "selected_case_count_per_cell": 24
+    },
+    "p014_review_ledger": {
+      "ledger_sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69",
+      "immutable_artifact_id": "36ce1db4416cbf0e30f7c57236fbb0a2",
+      "case_count": 192,
+      "opinions_per_case": 2,
+      "reuse_without_rewrite": true
+    },
+    "p014_closeout": {
+      "path": "config/stage-learning/stage-atomic-proposition-admission-qualified-d1-closeout.v1.json",
+      "state": "CLOSED_ATOMIC_REFERENCE_SUFFICIENCY_FAIL"
+    }
+  },
+  "resource_ceiling": {
+    "source": "exact_pre_result_P014_B_qualified_plan",
+    "total_rows": 256,
+    "era_board_cell_count": 8,
+    "rows_per_cell": 32,
+    "global_identity_unique": true,
+    "new_identity_discovery": false,
+    "new_random_sampling": false,
+    "morphology_enrichment": false,
+    "label_enrichment": false,
+    "result_count_targeted_top_up": false,
+    "cross_cell_fill": false,
+    "post_result_identity_replacement": false
+  },
+  "review_readiness_census": {
+    "scope": "all_256_exact_qualified_identity_windows",
+    "case_t": "exact_window_end",
+    "required_history_sessions": 61,
+    "required_primary_fact_contract": "exact_P014_primary_review_packet",
+    "required_directional_path_facts": [
+      "structure.geometry.range-traversal",
+      "structure.geometry.counter-direction-excursion-share"
+    ],
+    "persist_allowed": [
+      "security_id",
+      "window_id",
+      "era",
+      "board_family",
+      "review_packet_ready",
+      "readiness_reason",
+      "source_member_closure_digest"
+    ],
+    "persist_forbidden": [
+      "price_values",
+      "morphology_values",
+      "threshold_values",
+      "candidate_outputs",
+      "envelope_measurement_values",
+      "reference_opinions",
+      "future_outcomes"
+    ],
+    "inclusion_rule": "every row with review_packet_ready=true is included in the successor reference denominator; no target-count stopping rule",
+    "minimum_count_for_continuation": 192,
+    "per_cell_minimum_for_continuation": 24,
+    "reason": "The census verifies that the complete precommitted reserve can support a larger reference denominator without choosing rows by semantic outcome. The minima prevent a lower-quality successor than P014 but do not define how many extra rows to add."
+  },
+  "opinion_reuse": {
+    "p014_192_case_opinions": "immutable_reuse_exactly",
+    "re_review_existing_cases": false,
+    "new_review_scope": "review_ready_P014_B_rows_not_already_bound_in_P014_ledger",
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "candidate_output_visible": false,
+    "threshold_basis_visible": false,
+    "envelope_measurement_visible": false,
+    "future_rows_visible": false,
+    "preserved_2021_visible": false
+  },
+  "combined_reference_gate": {
+    "resolution": "exact_P012_atomic_reference_resolution",
+    "numeric_sufficiency": "exact_P012",
+    "order_minimum_definite_positive": 20,
+    "gate_change": false,
+    "evaluate_only_after_combined_ledger_seal": true,
+    "candidate_scoring_authority_on_fail": false,
+    "candidate_scoring_authority_on_pass": "requires_separate_P015_scoring_freeze"
+  },
+  "work_sequence": [
+    {
+      "work_item": "P3-STAGE-015-A",
+      "name": "Complete-reserve review-readiness census",
+      "result_bearing_semantic_read": false,
+      "candidate_scoring": false
+    },
+    {
+      "work_item": "P3-STAGE-015-B",
+      "name": "Freeze complete ready denominator and additional blind-review set",
+      "result_bearing_semantic_read": false,
+      "candidate_scoring": false
+    },
+    {
+      "work_item": "P3-STAGE-015-C",
+      "name": "Collect only additional blind opinions and seal combined ledger",
+      "result_bearing_semantic_read": true,
+      "candidate_scoring": false
+    },
+    {
+      "work_item": "P3-STAGE-015-D",
+      "name": "Evaluate unchanged P012 atomic reference sufficiency",
+      "result_bearing_semantic_read": false,
+      "candidate_scoring": false
+    }
+  ],
+  "protected_surfaces": {
+    "p014_review_ledger_rewrite": false,
+    "p014_candidate_selection_transport_read": false,
+    "p014_candidate_scoring": false,
+    "p012_candidate_surface_change": false,
+    "p012_numeric_gate_change": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "selected_disposition": "PROCEED_TO_COMPLETE_RESERVE_REVIEW_READINESS_CENSUS",
+  "claim_ceiling": "P015 is a development reference-sufficiency successor using a resource ceiling fixed before the P014 reference result. It may determine whether more of that precommitted panel is review-ready and whether the combined blind ledger satisfies the unchanged P012 reference minimum. It does not qualify any atomic candidate, Stage projection or market prevalence and does not authorize preserved evaluation."
+}

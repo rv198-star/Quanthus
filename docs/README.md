@@ -426,14 +426,19 @@ nodes.
   and historical industry/theme stratification remains non-authoritative until a PIT source exists.
   The metadata census then measured 90,067 exposure-aware identity-window resources versus 18,967
   under legacy whole-identity burn-down. P013-B froze eight equal era x board cells with 32 reserves
-  each; P013-C froze an exact 256-identity metadata plan with 192 primary and 64 same-cell fallback
-  rows. P013-D runtime engineering is now accepted for one exact-plan result-bearing prepare Job:
-  case T is the frozen 61-session window end, P012 9/1/3 atomic surfaces and numeric gates stay
-  unchanged, blind review adds only era/board stratum metadata, and preserved 2021 / 2022-2025 remain
-  closed. Evidence: `work-items/stage-development-resource-model.md`,
-  `reviews/stage-development-resource-p013b-four-party-review-20260914.md`,
-  `acceptance/stage-atomic-proposition-successor-preregistration-20260914.md`, and
-  `acceptance/stage-atomic-proposition-successor-d1-engineering-20260914.md`.
+  each; P013-C froze an exact 256-identity metadata plan. P013-D exposed a pre-review contiguous-input
+  admission defect, so P014 moved admission qualification ahead of semantic work and froze a new
+  exact admission-qualified 8×32 plan. The sole P014 semantic Job then produced 192 complete blind
+  cases (24 per cell) and an immutable two-role ledger without exposing the candidate selection
+  transport. Exact P012 reference resolution passed instability and relocation sufficiency but
+  orderly-consolidation had 18 definite positives versus the frozen minimum 20, so P014 closes before
+  candidate scoring and preserved 2021 remains unread. P015 is the selected successor: it uses the
+  complete pre-result P014-B 256-row reserve as a fixed ceiling, first measures review-packet readiness
+  for every row, reuses the sealed 192 opinions unchanged, and reviews every additional ready row—no
+  morphology enrichment and no "add until 20" stopping rule. Evidence and route:
+  `work-items/stage-development-resource-admission-qualified.md`,
+  `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`, and
+  `work-items/stage-complete-reserve-reference.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 import uuid
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
@@ -523,6 +524,11 @@ class StageWorkerPaths:
     @property
     def atomic_proposition_admission_qualified_d1_budget(self) -> Path:
         return self.control_root / "atomic-proposition-admission-qualified-d1-budget.json"
+
+    def atomic_proposition_admission_qualified_review_ledger(self, job_id: str) -> Path:
+        if not _JOB_ID.fullmatch(job_id):
+            raise StageWorkerError("P014 review ledger requires a valid parent job id")
+        return self.control_root / "atomic-review-ledgers" / f"{job_id}.json"
 
     @property
     def development_resource_admission_budget(self) -> Path:
@@ -4585,6 +4591,238 @@ def _atomic_proposition_successor_d1_review_page(
     }
 
 
+_P014_REVIEW_SCHEMA = "quanthus.stage-atomic-proposition-admission-qualified-review-ledger.v1"
+_P014_REVIEW_SUBMISSION_SCHEMA = (
+    "quanthus.stage-atomic-proposition-admission-qualified-review-submission.v1"
+)
+_P014_REVIEW_PROPOSITIONS = (
+    "structural_instability_20",
+    "coherent_directional_relocation_20",
+    "orderly_consolidation_20",
+)
+_P014_REVIEW_TRUTH = {"TRUE", "FALSE", "UNKNOWN"}
+
+
+def _p014_review_reference_summary(opinions: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    from quanthus.stage_learning.order_reference_protocol_v2 import project_atomic_primary
+
+    atomic_counts = {name: Counter() for name in _P014_REVIEW_PROPOSITIONS}
+    projected = Counter()
+    disagreements = Counter({name: 0 for name in _P014_REVIEW_PROPOSITIONS})
+    for row in opinions:
+        short = row["short_term"]
+        fund = row["fund"]
+        for proposition in _P014_REVIEW_PROPOSITIONS:
+            left = str(short[proposition])
+            right = str(fund[proposition])
+            reference = left if left == right else "AMBIGUOUS"
+            atomic_counts[proposition][reference] += 1
+            disagreements[proposition] += int(left != right)
+        short_projection = project_atomic_primary(short, available=True)["status"]
+        fund_projection = project_atomic_primary(fund, available=True)["status"]
+        projected_status = (
+            short_projection if short_projection == fund_projection else "AMBIGUOUS"
+        )
+        projected[str(projected_status)] += 1
+    return {
+        "atomic_reference_counts": {
+            proposition: dict(sorted(counts.items()))
+            for proposition, counts in atomic_counts.items()
+        },
+        "atomic_disagreement_count": dict(disagreements),
+        "projected_reference_counts": dict(sorted(projected.items())),
+    }
+
+
+def _validate_p014_review_submission(
+    paths: StageWorkerPaths,
+    observed: Mapping[str, Any],
+    submission: Mapping[str, Any],
+) -> dict[str, Any]:
+    if (
+        observed.get("kind") != STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        raise StageWorkerError("P014 review seal requires the successful exact parent job")
+    manifest_sha, evidence_sha, _path_sha, evidence, _path_facts = (
+        _positive_instability_d1_review_evidence(paths, observed)
+    )
+    expected_fields = {
+        "schema_version",
+        "work_item",
+        "parent_job_id",
+        "source_manifest_sha256",
+        "development_evidence_digest",
+        "provenance",
+        "candidate_output_seen_during_review",
+        "threshold_basis_seen_during_review",
+        "envelope_measurement_seen_during_review",
+        "selection_transport_seen_during_review",
+        "future_rows_seen_during_review",
+        "preserved_2021_seen_during_review",
+        "opinions",
+    }
+    if set(submission) != expected_fields:
+        raise StageWorkerError("P014 review submission fields differ")
+    if (
+        submission.get("schema_version") != _P014_REVIEW_SUBMISSION_SCHEMA
+        or submission.get("work_item") != "P3-STAGE-014-D"
+        or submission.get("parent_job_id") != observed.get("job_id")
+        or submission.get("source_manifest_sha256") != manifest_sha
+        or submission.get("development_evidence_digest") != _digest(evidence)
+    ):
+        raise StageWorkerError("P014 review submission binding differs")
+    if submission.get("development_evidence_digest") != evidence_sha:
+        raise StageWorkerError("P014 review evidence digest differs")
+    for key in (
+        "candidate_output_seen_during_review",
+        "threshold_basis_seen_during_review",
+        "envelope_measurement_seen_during_review",
+        "selection_transport_seen_during_review",
+        "future_rows_seen_during_review",
+        "preserved_2021_seen_during_review",
+    ):
+        if submission.get(key) is not False:
+            raise StageWorkerError("P014 review blinding declaration differs")
+    provenance = submission.get("provenance")
+    if (
+        not isinstance(provenance, Mapping)
+        or set(provenance) != {"kind", "origin_id", "session_id"}
+        or provenance.get("kind") != "self_simulated"
+        or not str(provenance.get("origin_id") or "").strip()
+        or not str(provenance.get("session_id") or "").strip()
+    ):
+        raise StageWorkerError("P014 review provenance differs")
+    opinions = submission.get("opinions")
+    cases = evidence.get("cases")
+    if not isinstance(opinions, list) or not isinstance(cases, list) or len(cases) != 192:
+        raise StageWorkerError("P014 review denominator differs")
+    if len(opinions) != len(cases):
+        raise StageWorkerError("P014 review opinion count differs")
+    normalized: list[dict[str, Any]] = []
+    for index, (raw, case) in enumerate(zip(opinions, cases, strict=True)):
+        if not isinstance(raw, Mapping) or not isinstance(case, Mapping):
+            raise StageWorkerError("P014 review row shape differs")
+        if set(raw) != {
+            "index",
+            "case_id",
+            "short_term",
+            "fund",
+            "short_reason",
+            "fund_reason",
+        }:
+            raise StageWorkerError("P014 review row fields differ")
+        case_id = str(case.get("case_id") or "")
+        if raw.get("index") != index or raw.get("case_id") != case_id:
+            raise StageWorkerError("P014 review row order differs")
+        roles: dict[str, dict[str, str]] = {}
+        for role in ("short_term", "fund"):
+            values = raw.get(role)
+            if not isinstance(values, Mapping) or set(values) != set(_P014_REVIEW_PROPOSITIONS):
+                raise StageWorkerError("P014 review atomic proposition shape differs")
+            if any(str(value) not in _P014_REVIEW_TRUTH for value in values.values()):
+                raise StageWorkerError("P014 review truth value differs")
+            roles[role] = {
+                proposition: str(values[proposition])
+                for proposition in _P014_REVIEW_PROPOSITIONS
+            }
+        short_reason = str(raw.get("short_reason") or "").strip()
+        fund_reason = str(raw.get("fund_reason") or "").strip()
+        if not short_reason or not fund_reason or max(len(short_reason), len(fund_reason)) > 2000:
+            raise StageWorkerError("P014 review reason differs")
+        normalized.append(
+            {
+                "index": index,
+                "case_id": case_id,
+                "short_term": roles["short_term"],
+                "fund": roles["fund"],
+                "short_reason": short_reason,
+                "fund_reason": fund_reason,
+            }
+        )
+    summary = _p014_review_reference_summary(normalized)
+    return {
+        "schema_version": _P014_REVIEW_SCHEMA,
+        "work_item": "P3-STAGE-014-D",
+        "parent_job_id": observed["job_id"],
+        "source_manifest_sha256": manifest_sha,
+        "development_evidence_digest": evidence_sha,
+        "case_count": len(cases),
+        "provenance": dict(provenance),
+        "candidate_output_seen_during_review": False,
+        "threshold_basis_seen_during_review": False,
+        "envelope_measurement_seen_during_review": False,
+        "selection_transport_seen_during_review": False,
+        "future_rows_seen_during_review": False,
+        "preserved_2021_seen_during_review": False,
+        "opinions": normalized,
+        "reference_summary": summary,
+        "submission_digest": _digest(dict(submission)),
+    }
+
+
+def _p014_review_ledger(
+    paths: StageWorkerPaths, observed: Mapping[str, Any], *, required: bool = False,
+) -> dict[str, Any] | None:
+    job_id = str(observed.get("job_id") or "")
+    path = paths.atomic_proposition_admission_qualified_review_ledger(job_id)
+    if not path.is_file():
+        if required:
+            raise StageWorkerError("P014 review ledger must be sealed before selection access")
+        return None
+    ledger = _object(path, "P014 review ledger")
+    submission = {
+        key: ledger[key]
+        for key in (
+            "work_item",
+            "parent_job_id",
+            "source_manifest_sha256",
+            "development_evidence_digest",
+            "provenance",
+            "candidate_output_seen_during_review",
+            "threshold_basis_seen_during_review",
+            "envelope_measurement_seen_during_review",
+            "selection_transport_seen_during_review",
+            "future_rows_seen_during_review",
+            "preserved_2021_seen_during_review",
+            "opinions",
+        )
+    }
+    submission["schema_version"] = _P014_REVIEW_SUBMISSION_SCHEMA
+    expected = _validate_p014_review_submission(paths, observed, submission)
+    if ledger != expected:
+        raise StageWorkerError("P014 review ledger content differs from validated seal")
+    return ledger
+
+
+def seal_p014_review(
+    paths: StageWorkerPaths, job_id: str, submission: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not _JOB_ID.fullmatch(job_id):
+        raise StageWorkerError("P014 review seal requires a valid parent job id")
+    status_path = paths.status / f"{job_id}.json"
+    if not status_path.is_file():
+        raise StageWorkerError("P014 review parent status is missing")
+    observed = _object(status_path, "P014 review parent status")
+    ledger = _validate_p014_review_submission(paths, observed, submission)
+    path = paths.atomic_proposition_admission_qualified_review_ledger(job_id)
+    if path.exists():
+        existing = _object(path, "P014 review ledger")
+        if existing != ledger:
+            raise StageWorkerError("P014 review ledger is already sealed with different content")
+    else:
+        _exclusive_json(path, ledger)
+    return {
+        "schema_version": "quanthus.stage-atomic-proposition-review-seal-receipt.v1",
+        "parent_job_id": job_id,
+        "sealed": True,
+        "ledger_sha256": _file_sha256(path),
+        "case_count": ledger["case_count"],
+        "reference_summary": ledger["reference_summary"],
+        "selection_transport_authorized": True,
+    }
+
+
 def _atomic_proposition_g1_review_alias(parent_job_id: str, page: int) -> str:
     raw = f"{parent_job_id}|atomic-proposition-g1-primary-page|{page}".encode()
     return "stage_" + hashlib.sha256(raw).hexdigest()[:32]
@@ -4646,6 +4884,11 @@ def _atomic_proposition_g1_selection_transport(
             STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
         }
         or observed.get("state") != "succeeded"
+    ):
+        return None
+    if (
+        kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+        and _p014_review_ledger(paths, observed) is None
     ):
         return None
     result_ref = observed.get("result_ref")
@@ -4907,6 +5150,21 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
             if review_index is None
             else {**observed, "review_transport_index": review_index}
         )
+        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+            ledger = _p014_review_ledger(paths, observed)
+            result = {
+                **result,
+                "review_ledger_sealed": ledger is not None,
+                "review_ledger_sha256": (
+                    None
+                    if ledger is None
+                    else _file_sha256(
+                        paths.atomic_proposition_admission_qualified_review_ledger(
+                            str(observed["job_id"])
+                        )
+                    )
+                ),
+            }
         selection_transport = _positive_instability_d1_selection_transport(paths, observed)
         if selection_transport is None:
             selection_transport = _orderly_consolidation_joint_d1_selection_transport(
@@ -5097,6 +5355,8 @@ def _parser() -> argparse.ArgumentParser:
     submit.add_argument("--kind", choices=tuple(sorted(_JOB_SPECS)), default=STAGE_HARNESS_JOB)
     status = sub.add_parser("status")
     status.add_argument("--job-id", required=True)
+    seal_review = sub.add_parser("seal-p014-review")
+    seal_review.add_argument("--job-id", required=True)
     cancel = sub.add_parser("cancel")
     cancel.add_argument("--job-id", required=True)
     sub.add_parser("doctor")
@@ -5129,6 +5389,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = submit_job(paths, code_revision=args.code_revision, kind=args.kind)
         elif args.command == "status":
             result = read_status(paths, args.job_id)
+        elif args.command == "seal-p014-review":
+            try:
+                submission = json.load(sys.stdin)
+            except (OSError, json.JSONDecodeError) as exc:
+                raise StageWorkerError(
+                    "P014 review submission must be one JSON object on stdin"
+                ) from exc
+            if not isinstance(submission, Mapping):
+                raise StageWorkerError("P014 review submission must be one JSON object on stdin")
+            result = seal_p014_review(paths, args.job_id, submission)
         elif args.command == "cancel":
             result = cancel_job(paths, args.job_id)
         else:

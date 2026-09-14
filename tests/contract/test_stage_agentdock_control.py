@@ -23,6 +23,7 @@ def test_control_surface_is_bounded_to_rx6800_qiuyu_and_exact_commands() -> None
         "submit-p014-a)",
         "submit-p014-b)",
         "submit-p014-c)",
+        "seal-p014-review)",
         "status)",
     ):
         assert command in text
@@ -61,6 +62,7 @@ def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> Non
     assert 'bash "${worker}" submit --kind "${p014_a_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p014_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p014_c_kind}" --code-revision "${target}"' in text
+    assert 'bash "${worker}" seal-p014-review --job-id "$2"' in text
 
 
 def test_status_accepts_only_stage_job_ids() -> None:

@@ -148,12 +148,17 @@ case "${command}" in
     [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
     bash "${worker}" submit --kind "${p014_c_kind}" --code-revision "${target}"
     ;;
+  seal-p014-review)
+    [[ "$#" -eq 2 ]] || fail "usage: seal-p014-review <stage_job_id>"
+    [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
+    bash "${worker}" seal-p014-review --job-id "$2"
+    ;;
   status)
     [[ "$#" -eq 2 ]] || fail "usage: status <stage_job_id>"
     [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
     bash "${worker}" status --job-id "$2"
     ;;
   *)
-    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | submit-p013-d | submit-p014-a | submit-p014-b | submit-p014-c | status"
+    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | submit-p013-d | submit-p014-a | submit-p014-b | submit-p014-c | seal-p014-review | status"
     ;;
 esac

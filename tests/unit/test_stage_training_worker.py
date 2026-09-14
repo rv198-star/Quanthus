@@ -45,6 +45,7 @@ from quanthus.stage_learning.worker import (
     cancel_job,
     doctor,
     read_status,
+    seal_p014_review,
     submit_job,
 )
 
@@ -2220,11 +2221,6 @@ def test_orderly_consolidation_joint_d1_status_is_candidate_blind(tmp_path: Path
             "atomic_proposition_successor_d1",
             "quanthus.stage-atomic-proposition-successor-d1-selection-transport.v1",
         ),
-        (
-            STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
-            "atomic_proposition_admission_qualified_d1",
-            "quanthus.stage-atomic-proposition-admission-qualified-d1-selection-transport.v1",
-        ),
     ),
 )
 def test_successor_atomic_status_keeps_blind_review_separate_from_selection(
@@ -2387,6 +2383,163 @@ def test_successor_atomic_status_keeps_blind_review_separate_from_selection(
     assert selection["candidate_grid"] == grid
     assert selection["review_ledger_must_be_sealed_before_use"] is True
     assert selection["evaluation_data_read"] is False
+
+
+def test_p014_selection_transport_requires_immutable_review_ledger(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "e" * 32
+    cases = []
+    strata = {}
+    for index in range(192):
+        case_id = _digest({"p014_case": index})
+        cases.append({"case_id": case_id})
+        strata[case_id] = {
+            "era": "PRE_STAR",
+            "board_family": "MAIN",
+            "cell": "PRE_STAR/MAIN",
+            "plan_role": "primary",
+            "window_id": f"window-{index:03d}",
+        }
+    evidence = {"source_rows": {}, "cases": cases}
+    path_facts = {"cases": {}}
+    basis = {"labels_used": False, "reference_opinions_used": False}
+    grid = {
+        "instability_candidate_count": 9,
+        "order_profile_count": 3,
+        "relocation_candidate_count": 1,
+        "joint_pair_search_count": 0,
+        "parameter_search_performed": False,
+        "grid_expanded_after_result": False,
+    }
+    envelopes = {"review_transport_visible": False, "cases": {}}
+    plan = {
+        "identity_count": 160,
+        "identity_digest": "sha256:" + "7" * 64,
+        "data_read": False,
+    }
+    payloads = {
+        "evidence.json": evidence,
+        "path-facts.json": path_facts,
+        "case-strata.json": strata,
+        "threshold-basis.json": basis,
+        "candidate-grid.json": grid,
+        "envelope-measurements.json": envelopes,
+        "preserved-evaluation-plan.json": plan,
+    }
+    artifact = worker_paths.runs / job_id / "stage-atomic-proposition-p014-test"
+    artifact.mkdir(parents=True)
+    files = {}
+    for name, value in payloads.items():
+        raw = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        (artifact / name).write_bytes(raw)
+        files[name] = "sha256:" + hashlib.sha256(raw).hexdigest()
+    manifest = {"files": files}
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-14T10:00:00+00:00",
+        "started_at": "2026-09-14T10:00:01+00:00",
+        "completed_at": "2026-09-14T10:00:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "atomic_proposition_admission_qualified_d1": {
+                "development_selected_case_count": 192,
+                "threshold_basis_digest": _digest(basis),
+                "candidate_grid_digest": _digest(grid),
+                "envelope_measurements_digest": _digest(envelopes),
+                "preserved_evaluation_plan_digest": _digest(plan),
+                "case_strata_digest": _digest(strata),
+                "review_ready": True,
+            },
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-14T10:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+
+    before = read_status(worker_paths, job_id)
+    assert before["review_ledger_sealed"] is False
+    assert before["review_ledger_sha256"] is None
+    assert "selection_transport" not in before
+
+    opinions = [
+        {
+            "index": index,
+            "case_id": case["case_id"],
+            "short_term": {
+                "structural_instability_20": "FALSE",
+                "coherent_directional_relocation_20": "FALSE",
+                "orderly_consolidation_20": "FALSE",
+            },
+            "fund": {
+                "structural_instability_20": "FALSE",
+                "coherent_directional_relocation_20": "FALSE",
+                "orderly_consolidation_20": "FALSE",
+            },
+            "short_reason": "No positive primary proposition in the blind packet.",
+            "fund_reason": "No positive primary proposition in the blind packet.",
+        }
+        for index, case in enumerate(cases)
+    ]
+    submission = {
+        "schema_version": (
+            "quanthus.stage-atomic-proposition-admission-qualified-review-submission.v1"
+        ),
+        "work_item": "P3-STAGE-014-D",
+        "parent_job_id": job_id,
+        "source_manifest_sha256": manifest_sha,
+        "development_evidence_digest": _digest(evidence),
+        "provenance": {
+            "kind": "self_simulated",
+            "origin_id": "chatgpt-p014-d-test",
+            "session_id": "test-session",
+        },
+        "candidate_output_seen_during_review": False,
+        "threshold_basis_seen_during_review": False,
+        "envelope_measurement_seen_during_review": False,
+        "selection_transport_seen_during_review": False,
+        "future_rows_seen_during_review": False,
+        "preserved_2021_seen_during_review": False,
+        "opinions": opinions,
+    }
+    receipt = seal_p014_review(worker_paths, job_id, submission)
+    assert receipt["sealed"] is True
+    assert receipt["case_count"] == 192
+    assert receipt["reference_summary"]["atomic_reference_counts"] == {
+        "structural_instability_20": {"FALSE": 192},
+        "coherent_directional_relocation_20": {"FALSE": 192},
+        "orderly_consolidation_20": {"FALSE": 192},
+    }
+    repeated = seal_p014_review(worker_paths, job_id, submission)
+    assert repeated["ledger_sha256"] == receipt["ledger_sha256"]
+
+    after = read_status(worker_paths, job_id)
+    assert after["review_ledger_sealed"] is True
+    assert after["review_ledger_sha256"] == receipt["ledger_sha256"]
+    selection = json.loads(
+        gzip.decompress(base64.b64decode(after["selection_transport"]["payload"]))
+    )
+    assert selection["schema_version"] == (
+        "quanthus.stage-atomic-proposition-admission-qualified-d1-selection-transport.v1"
+    )
+    assert selection["review_ledger_must_be_sealed_before_use"] is True
+
+    changed = json.loads(json.dumps(submission))
+    changed["opinions"][0]["short_reason"] = "changed"
+    with pytest.raises(StageWorkerError, match="already sealed"):
+        seal_p014_review(worker_paths, job_id, changed)
 
 
 def test_order_rule_resolve_score_requires_successful_parent_and_is_single_job(

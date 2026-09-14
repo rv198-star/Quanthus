@@ -58,6 +58,9 @@ STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB = (
     "quanthus.stage-development-resource-capacity-census.v1"
 )
 STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB = "quanthus.stage-development-resource-plan.v1"
+STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB = (
+    "quanthus.stage-development-resource-admission-screen.v1"
+)
 STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB = (
     "quanthus.stage-atomic-proposition-successor-d1-prepare.v1"
 )
@@ -94,6 +97,9 @@ DEVELOPMENT_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA = (
 )
 ATOMIC_PROPOSITION_SUCCESSOR_D1_BUDGET_SCHEMA = (
     "quanthus.stage-atomic-proposition-successor-d1-budget.v1"
+)
+DEVELOPMENT_RESOURCE_ADMISSION_BUDGET_SCHEMA = (
+    "quanthus.stage-development-resource-admission-screen-budget.v1"
 )
 DEVELOPMENT_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-development-resource-plan-recovery.v1.json"
@@ -261,6 +267,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-atomic-proposition-successor-d1-*",
         "process_error": "stage_atomic_proposition_successor_d1_process_failed",
         "wall_seconds": 3600,
+    },
+    STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB: {
+        "config": "config/stage-learning/stage-development-resource-admission-screen.v1.json",
+        "module": "quanthus.stage_learning.development_resource_admission_screen",
+        "artifact_glob": "stage-development-resource-admission-*",
+        "process_error": "stage_development_resource_admission_screen_process_failed",
+        "wall_seconds": 2700,
     },
 }
 
@@ -477,6 +490,10 @@ class StageWorkerPaths:
     @property
     def atomic_proposition_successor_d1_budget(self) -> Path:
         return self.control_root / "atomic-proposition-successor-d1-budget.json"
+
+    @property
+    def development_resource_admission_budget(self) -> Path:
+        return self.control_root / "development-resource-admission-screen-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -1341,6 +1358,43 @@ def _existing_atomic_proposition_successor_d1_submission(
     if job.code_revision != code_revision:
         raise StageWorkerError(
             "atomic proposition successor D1 has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
+def _development_resource_admission_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": DEVELOPMENT_RESOURCE_ADMISSION_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-014-A",
+        "phase": "ADMISSION_ONLY_ERA_BOARD_RESOURCE_SCREEN",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_development_resource_admission_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.development_resource_admission_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "development resource admission budget")
+    if (
+        marker.get("schema_version") != DEVELOPMENT_RESOURCE_ADMISSION_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-014-A"
+        or marker.get("phase") != "ADMISSION_ONLY_ERA_BOARD_RESOURCE_SCREEN"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("development resource admission budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("development resource admission budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "development resource admission has no retry or replacement authority"
         )
     return _idempotent_stage_submission(paths, job)
 
@@ -2284,6 +2338,23 @@ class StageWorker:
                 "plan_digest": verified.get("plan_digest"),
                 "market_data_read": verified.get("market_data_read"),
             }
+        if job.kind == STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB:
+            result["development_resource_admission"] = {
+                "candidate_window_count": verified.get("candidate_window_count"),
+                "candidate_unique_identity_count": verified.get(
+                    "candidate_unique_identity_count"
+                ),
+                "qualified_window_count": verified.get("qualified_window_count"),
+                "qualified_unique_identity_count": verified.get(
+                    "qualified_unique_identity_count"
+                ),
+                "cell_summary": verified.get("cell_summary"),
+                "all_cells_have_required_qualified_capacity": verified.get(
+                    "all_cells_have_required_qualified_capacity"
+                ),
+                "raw_ohlc_retained": verified.get("raw_ohlc_retained"),
+                "semantic_job_authorized": verified.get("semantic_job_authorized"),
+            }
         if job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB:
             result["atomic_proposition_successor_d1"] = {
                 "fresh_pool_size": verified.get("fresh_pool_size"),
@@ -2626,6 +2697,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB:
+        existing = _existing_development_resource_admission_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -2676,6 +2753,9 @@ def submit_job(
     )
     atomic_proposition_successor_d1_reserved = (
         job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB
+    )
+    development_resource_admission_reserved = (
+        job.kind == STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -2764,6 +2844,11 @@ def submit_job(
             paths.atomic_proposition_successor_d1_budget,
             _atomic_proposition_successor_d1_budget_value(job),
         )
+    if development_resource_admission_reserved:
+        _exclusive_json(
+            paths.development_resource_admission_budget,
+            _development_resource_admission_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -2806,6 +2891,8 @@ def submit_job(
             paths.development_resource_plan_recovery_budget.unlink(missing_ok=True)
         if atomic_proposition_successor_d1_reserved:
             paths.atomic_proposition_successor_d1_budget.unlink(missing_ok=True)
+        if development_resource_admission_reserved:
+            paths.development_resource_admission_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -2843,6 +2930,8 @@ def submit_job(
             paths.development_resource_plan_recovery_budget.unlink(missing_ok=True)
         if atomic_proposition_successor_d1_reserved:
             paths.atomic_proposition_successor_d1_budget.unlink(missing_ok=True)
+        if development_resource_admission_reserved:
+            paths.development_resource_admission_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -4721,6 +4810,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p013_d1_failure": _recent_stage_job_failure(
             paths, kind=STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+        ),
+        "recent_p014_a_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         ),
     }
 

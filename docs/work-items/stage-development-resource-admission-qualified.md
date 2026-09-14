@@ -22,7 +22,7 @@ Because threshold-basis construction had already been reached in-process before 
 
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
-| P3-STAGE-014-A | Freeze deterministic admission-screen candidate order and bounded input-readiness contract | P3-STAGE-013-D | no semantic read; candidate order fixed before admission data |
+| P3-STAGE-014-A | Freeze deterministic admission-screen candidate order and bounded input-readiness contract | P3-STAGE-013-D | engineering accepted `PASS_ENGINEERING_READY_FOR_ONE_ADMISSION_ONLY_JOB`; one one-shot admission-only Job may run after checkpoint commit/push/deploy; `../acceptance/stage-development-resource-admission-screen-engineering-20260914.md` |
 | P3-STAGE-014-B | Run admission-only screen and publish bounded readiness ledger | P3-STAGE-014-A | pass only if every Era × Board cell has at least 32 qualified unique identities under the frozen scan budget |
 | P3-STAGE-014-C | Freeze exact qualified 8×32 plan | P3-STAGE-014-B | 24 primary + 8 fallback per cell, global identity uniqueness, no cross-cell fill |
 | P3-STAGE-014-D | Run atomic semantic development on qualified plan | P3-STAGE-014-C | same P012 9/1/3 candidate surfaces and numeric gates; blind review before scoring |

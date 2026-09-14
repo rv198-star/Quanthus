@@ -1,0 +1,108 @@
+{
+  "schema_version": "quanthus.stage-development-resource-admission-screen.v1",
+  "work_item": "P3-STAGE-014-A",
+  "state": "PREREGISTERED_ADMISSION_ONLY_BEFORE_INPUT_READ",
+  "purpose": "Screen deterministic exposure-aware Era x Board identity-window candidates for exact 61-session DailyInput/segment readiness before any Structure fact, morphology, threshold, reference or candidate computation.",
+  "bindings": {
+    "admission_model": {
+      "path": "config/stage-learning/stage-development-resource-admission-qualified-model.v1.json",
+      "sha256": "sha256:b00ba37aaf4e4a350d05040dbb40d7854f4f8d186480eae00953ca8147fa89a9"
+    },
+    "p013_d_closeout": {
+      "path": "config/stage-learning/stage-atomic-proposition-successor-d1-closeout.v1.json",
+      "sha256": "sha256:900b9ac43b2dbc774b69505dec799d9ecba931091e4d99669bb1cbfbd20d5adc"
+    },
+    "capacity_census_contract": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census.v1.json",
+      "sha256": "sha256:fbeefb8b4cbce35aa1f8c715b8e61dfa857e4ba0b72fe047c5c5d24d59629e25"
+    },
+    "capacity_census_result": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census-result.v1.json",
+      "sha256": "sha256:c9d3b7c98cd7e2924d70923bec97c44b448cf9ef197b3d148473b2656728d29d"
+    },
+    "p013_exact_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-plan-result.v1.json",
+      "sha256": "sha256:1729ce20bf1ddf6c330025d70d96b046964e7d0b552755834afaa68d3aa20828"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    },
+    "p013_exact_plan_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_060f6edc80774b6b802e56b6c21025bc/stage-development-resource-plan-20260914T095217Z",
+      "job_id": "stage_060f6edc80774b6b802e56b6c21025bc",
+      "code_revision": "2cd26b00a90402c7be3256dfb3d341dc3b9abe18",
+      "manifest_sha256": "sha256:853ade679e1107db238ec68daa8a26755e1d48ef334b9b85d525a8fcd0a3adef",
+      "plan_digest": "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371"
+    }
+  },
+  "candidate_order": {
+    "identity_seed": "p014-admission-qualified-era-board-v1|identity",
+    "window_seed": "p014-admission-qualified-era-board-v1|window",
+    "maximum_candidate_identities_per_cell": 256,
+    "maximum_windows_per_identity": 4,
+    "cell_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "p013_exact_token_overlap_allowed": false,
+    "same_identity_disjoint_windows_allowed": true,
+    "candidate_order_uses_market_values": false,
+    "candidate_order_uses_admission_result": false
+  },
+  "admission_contract": {
+    "window_sessions": 61,
+    "t_is_window_end": true,
+    "every_session_admitted": true,
+    "stable_listing_id": true,
+    "stable_coordinate_ref": true,
+    "contiguous_session_index": true,
+    "raw_ohlc_published": false,
+    "raw_ohlc_artifact_retained": false,
+    "structure_facts_built": false,
+    "morphology_computed": false,
+    "threshold_basis_computed": false,
+    "reference_or_label_read": false,
+    "candidate_output_computed": false,
+    "candidate_scoring": false
+  },
+  "qualification_target": {
+    "required_unique_qualified_identities_per_cell": 32,
+    "future_primary_per_cell": 24,
+    "future_fallback_per_cell": 8,
+    "screen_does_not_assign_primary_or_fallback_roles": true,
+    "if_any_cell_below_required": "STOP_BEFORE_QUALIFIED_PLAN_FREEZE"
+  },
+  "output": {
+    "candidate_ledger_schema": "quanthus.stage-development-resource-admission-ledger.v1",
+    "summary_schema": "quanthus.stage-development-resource-admission-summary.v1",
+    "source_binding_schema": "quanthus.stage-development-resource-admission-source-binding.v1",
+    "artifact_schema": "quanthus.stage-development-resource-admission-artifact.v1"
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 2700
+  },
+  "authority": {
+    "input_readiness_market_read": true,
+    "semantic_market_read": false,
+    "structure_fact_build": false,
+    "threshold_or_model_basis": false,
+    "reference_opinion": false,
+    "candidate_output": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "The Job may qualify exact identity-window input readiness and report bounded attrition. It cannot qualify atomic semantics, estimate market prevalence, select thresholds/candidates or open preserved/blind data."
+}

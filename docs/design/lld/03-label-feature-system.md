@@ -475,7 +475,9 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-014 | Admission-qualified Era × Board reservoir | P3-STAGE-013-D | ready design: deterministic exposure-aware candidates are input-admission screened before any Structure/threshold/reference/candidate computation, then exact 8×32 semantic resources freeze |
 | P3-STAGE-014-A | Admission-only Era × Board resource screen | P3-STAGE-014 | closed `PASS_ADMISSION_CAPACITY_READY_FOR_QUALIFIED_PLAN`; all 8 cells meet >=32 readiness capacity, minimum early-STAR=36; no semantic computation |
 | P3-STAGE-014-B | Freeze exact admission-qualified 8×32 plan | P3-STAGE-014-A | closed `PASS_QUALIFIED_EXACT_PLAN_FROZEN`; 256 globally unique identities, 8×32, 192 primary + 64 fallback, no market read |
-| P3-STAGE-014-C | Freeze atomic semantic preregistration/runtime on qualified plan | P3-STAGE-014-B | ready `READY_SEMANTIC_PREREGISTRATION`; exact plan binding required before semantic read |
+| P3-STAGE-014-C | Freeze atomic semantic preregistration/runtime on qualified plan | P3-STAGE-014-B | closed `PASS_ENGINEERING_READY_FOR_ONE_QUALIFIED_SEMANTIC_JOB`; exact plan, unchanged P012 9/1/3 surfaces/gates, one-shot runtime and blind transport frozen |
+| P3-STAGE-014-D | Run atomic semantic development on qualified plan | P3-STAGE-014-C | ready `READY_ONE_QUALIFIED_SEMANTIC_JOB`; exactly one governed Job, no automatic retry, blind review before scoring |
+| P3-STAGE-014-E | Independent I/R/O selection and projection compatibility | P3-STAGE-014-D | blocked until D succeeds and immutable review ledger is sealed; preserved 2021 remains unread unless all development gates pass |
 
 ## 7. Acceptance
 

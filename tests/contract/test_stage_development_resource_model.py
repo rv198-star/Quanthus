@@ -37,6 +37,18 @@ P014_ADMISSION_RESULT = (
 P014_QUALIFIED_RESULT = (
     ROOT / "config/stage-learning/stage-development-resource-qualified-plan-result.v1.json"
 )
+P014C_PREREG = (
+    ROOT
+    / "config/stage-learning/"
+    "stage-atomic-proposition-admission-qualified-development-screen.v1.json"
+)
+P014C_EXECUTION = (
+    ROOT / "config/stage-learning/stage-atomic-proposition-admission-qualified-execution.v1.json"
+)
+P014C_ACCEPTANCE = (
+    ROOT
+    / "docs/acceptance/stage-atomic-proposition-admission-qualified-c-engineering-20260914.md"
+)
 P013D_PREREG_R1 = (
     ROOT / "config/stage-learning/stage-atomic-proposition-successor-prereg-revision-r1.v1.json"
 )
@@ -483,6 +495,59 @@ def test_stage014_admission_and_qualified_plan_results_close_pre_semantic_resour
     assert plan["authority"]["semantic_job_authorized"] is False
     assert plan["artifact"]["plan_digest"] == (
         "sha256:206ed58e8349de59efd52caad958f7bd0f2f9d79f1ee0199eea6a079b6c14829"
+    )
+
+
+def test_stage014_c_freezes_one_admission_qualified_semantic_job_before_execution() -> None:
+    prereg = json.loads(P014C_PREREG.read_text(encoding="utf-8"))
+    execution = json.loads(P014C_EXECUTION.read_text(encoding="utf-8"))
+    assert prereg["work_item"] == "P3-STAGE-014-C"
+    assert prereg["state"] == "PREREGISTERED_QUALIFIED_PLAN_BEFORE_SEMANTIC_MARKET_READ"
+    plan = prereg["bindings"]["qualified_plan_artifact"]
+    assert plan["job_id"] == "stage_9dbc57be4839405790be0e021d8271ba"
+    assert plan["row_count"] == 256
+    assert plan["unique_identity_count"] == 256
+    assert plan["primary_count"] == 192
+    assert plan["fallback_count"] == 64
+    resource = prereg["resource_plan"]
+    assert resource["input_admission_qualified_before_plan_freeze"] is True
+    assert resource["cross_cell_fallback"] is False
+    assert resource["post_result_identity_replacement"] is False
+    atomic = prereg["atomic_contract"]
+    assert atomic["instability_candidate_count"] == 9
+    assert atomic["relocation_candidate_count"] == 1
+    assert atomic["order_profile_count"] == 3
+    assert atomic["joint_pair_search_count"] == 0
+    assert atomic["numeric_atomic_quality_gates"] == "exact_P012"
+    assert atomic["projection_compatibility_numeric_gates"] == "exact_P012"
+    review = prereg["review"]
+    assert review["candidate_output_visible"] is False
+    assert review["threshold_basis_visible"] is False
+    assert review["envelope_measurement_visible"] is False
+    assert review["immutable_review_ledger_required_before_scoring"] is True
+    assert prereg["preserved_evaluation_gate"]["otherwise_remains_unread"] is True
+    assert prereg["authority"]["runtime_job_submission"] is False
+    assert prereg["authority"]["2025_read"] is False
+
+    assert execution["work_item"] == "P3-STAGE-014-C1"
+    assert execution["runtime"] == {
+        "maximum_jobs": 1,
+        "automatic_retries": 0,
+        "worker_wall_seconds": 3600,
+    }
+    assert execution["market_read"]["read_only_qualified_plan_window_dates"] is True
+    assert execution["market_read"]["price_rows_outside_window"] is False
+    assert execution["selection"]["fallback_same_cell_only"] is True
+    assert execution["selection"]["cross_cell_fill"] is False
+    assert execution["selection"]["post_result_identity_replacement"] is False
+    assert execution["authority"]["parameter_search"] is False
+    assert execution["authority"]["candidate_surface_change"] is False
+    assert execution["authority"]["numeric_gate_change"] is False
+    assert execution["authority"]["preserved_2021_evaluation_read"] is False
+    assert execution["authority"]["2025_access"] is False
+    assert P014C_ACCEPTANCE.is_file()
+    assert "PASS_ENGINEERING_READY_FOR_ONE_QUALIFIED_SEMANTIC_JOB" in P014C_ACCEPTANCE.read_text(
+        encoding="utf-8"
     )
 
 

@@ -13,6 +13,7 @@ from quanthus.stage_learning.worker import (
     _JOB_SPECS,
     JOB_KIND,
     JOB_SCHEMA,
+    STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
     STAGE_ATOMIC_PROPOSITION_G1_JOB,
     STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
     STAGE_CAPACITY_CENSUS_JOB,
@@ -210,12 +211,14 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p013_d1_failure"] is None
     assert result["recent_p014_a_failure"] is None
     assert result["recent_p014_b_failure"] is None
+    assert result["recent_p014_c_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
         STAGE_ATOMIC_PROPOSITION_G1_JOB,
         STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+        STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -247,6 +250,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         (STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB, "recent_p013_d1_failure"),
         (STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB, "recent_p014_a_failure"),
         (STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB, "recent_p014_b_failure"),
+        (STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB, "recent_p014_c_failure"),
     ),
 )
 def test_doctor_exposes_only_bounded_recent_failure_tail(
@@ -388,6 +392,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_QUALIFICATION_JOB,
         STAGE_ATOMIC_PROPOSITION_G1_JOB,
         STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+        STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -556,6 +561,39 @@ def test_atomic_proposition_successor_d1_is_one_shot_and_idempotent(tmp_path: Pa
             worker_paths,
             code_revision="b" * 40,
             kind=STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+        )
+
+
+def test_atomic_proposition_admission_qualified_d1_is_one_shot_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+    )
+    assert submitted["kind"] == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/"
+        "stage-atomic-proposition-admission-qualified-development-screen.v1.json"
+    )
+    assert (
+        _JOB_SPECS[STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB]["wall_seconds"]
+        == 3600
+    )
+    assert worker_paths.atomic_proposition_admission_qualified_d1_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
         )
 
 
@@ -2174,8 +2212,26 @@ def test_orderly_consolidation_joint_d1_status_is_candidate_blind(tmp_path: Path
     assert selection["evaluation_data_read"] is False
 
 
+@pytest.mark.parametrize(
+    ("job_kind", "detail_key", "selection_schema"),
+    (
+        (
+            STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+            "atomic_proposition_successor_d1",
+            "quanthus.stage-atomic-proposition-successor-d1-selection-transport.v1",
+        ),
+        (
+            STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+            "atomic_proposition_admission_qualified_d1",
+            "quanthus.stage-atomic-proposition-admission-qualified-d1-selection-transport.v1",
+        ),
+    ),
+)
 def test_successor_atomic_status_keeps_blind_review_separate_from_selection(
     tmp_path: Path,
+    job_kind: str,
+    detail_key: str,
+    selection_schema: str,
 ) -> None:
     worker_paths = paths(tmp_path)
     worker_paths.ensure()
@@ -2277,7 +2333,7 @@ def test_successor_atomic_status_keeps_blind_review_separate_from_selection(
     status = {
         "schema_version": "quanthus.stage-worker-status.v1",
         "job_id": job_id,
-        "kind": STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+        "kind": job_kind,
         "code_revision": REVISION,
         "input_digest": _digest({"job": job_id}),
         "state": "succeeded",
@@ -2288,7 +2344,7 @@ def test_successor_atomic_status_keeps_blind_review_separate_from_selection(
         "result_ref": {
             "artifact_root": str(artifact),
             "manifest_sha256": manifest_sha,
-            "atomic_proposition_successor_d1": {
+            detail_key: {
                 "development_selected_case_count": 1,
                 "threshold_basis_digest": _digest(basis),
                 "candidate_grid_digest": _digest(grid),
@@ -2326,9 +2382,7 @@ def test_successor_atomic_status_keeps_blind_review_separate_from_selection(
     selection = json.loads(
         gzip.decompress(base64.b64decode(observed["selection_transport"]["payload"]))
     )
-    assert selection["schema_version"] == (
-        "quanthus.stage-atomic-proposition-successor-d1-selection-transport.v1"
-    )
+    assert selection["schema_version"] == selection_schema
     assert selection["threshold_basis"] == basis
     assert selection["candidate_grid"] == grid
     assert selection["review_ledger_must_be_sealed_before_use"] is True

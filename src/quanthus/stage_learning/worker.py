@@ -67,6 +67,9 @@ STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB = (
 STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB = (
     "quanthus.stage-atomic-proposition-successor-d1-prepare.v1"
 )
+STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB = (
+    "quanthus.stage-atomic-proposition-admission-qualified-d1-prepare.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -100,6 +103,9 @@ DEVELOPMENT_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA = (
 )
 ATOMIC_PROPOSITION_SUCCESSOR_D1_BUDGET_SCHEMA = (
     "quanthus.stage-atomic-proposition-successor-d1-budget.v1"
+)
+ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_BUDGET_SCHEMA = (
+    "quanthus.stage-atomic-proposition-admission-qualified-d1-budget.v1"
 )
 DEVELOPMENT_RESOURCE_ADMISSION_BUDGET_SCHEMA = (
     "quanthus.stage-development-resource-admission-screen-budget.v1"
@@ -272,6 +278,16 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.atomic_proposition_successor_development_prepare",
         "artifact_glob": "stage-atomic-proposition-successor-d1-*",
         "process_error": "stage_atomic_proposition_successor_d1_process_failed",
+        "wall_seconds": 3600,
+    },
+    STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB: {
+        "config": (
+            "config/stage-learning/"
+            "stage-atomic-proposition-admission-qualified-development-screen.v1.json"
+        ),
+        "module": "quanthus.stage_learning.atomic_proposition_admission_qualified_prepare",
+        "artifact_glob": "stage-atomic-proposition-admission-qualified-d1-*",
+        "process_error": "stage_atomic_proposition_admission_qualified_d1_process_failed",
         "wall_seconds": 3600,
     },
     STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB: {
@@ -503,6 +519,10 @@ class StageWorkerPaths:
     @property
     def atomic_proposition_successor_d1_budget(self) -> Path:
         return self.control_root / "atomic-proposition-successor-d1-budget.json"
+
+    @property
+    def atomic_proposition_admission_qualified_d1_budget(self) -> Path:
+        return self.control_root / "atomic-proposition-admission-qualified-d1-budget.json"
 
     @property
     def development_resource_admission_budget(self) -> Path:
@@ -1375,6 +1395,51 @@ def _existing_atomic_proposition_successor_d1_submission(
     if job.code_revision != code_revision:
         raise StageWorkerError(
             "atomic proposition successor D1 has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
+def _atomic_proposition_admission_qualified_d1_budget_value(
+    job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-014-C1",
+        "phase": "ADMISSION_QUALIFIED_ATOMIC_FIRST_DEVELOPMENT_PREPARE",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_atomic_proposition_admission_qualified_d1_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.atomic_proposition_admission_qualified_d1_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "atomic proposition admission-qualified D1 budget")
+    if (
+        marker.get("schema_version")
+        != ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-014-C1"
+        or marker.get("phase")
+        != "ADMISSION_QUALIFIED_ATOMIC_FIRST_DEVELOPMENT_PREPARE"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError(
+            "atomic proposition admission-qualified D1 budget marker differs"
+        )
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError(
+            "atomic proposition admission-qualified D1 budget marker differs"
+        )
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "atomic proposition admission-qualified D1 has no retry or replacement authority"
         )
     return _idempotent_stage_submission(paths, job)
 
@@ -2459,6 +2524,44 @@ class StageWorker:
                 "atomic_freeze": verified.get("atomic_freeze"),
                 "review_ready": verified.get("review_ready"),
             }
+        if job.kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+            result["atomic_proposition_admission_qualified_d1"] = {
+                "resource_plan_size": verified.get("resource_plan_size"),
+                "development_identity_capacity": verified.get("development_identity_capacity"),
+                "development_selected_case_count": verified.get(
+                    "development_selected_case_count"
+                ),
+                "development_shortfall_count": verified.get("development_shortfall_count"),
+                "development_selection_digest": verified.get("development_selection_digest"),
+                "development_evidence_digest": verified.get("development_evidence_digest"),
+                "threshold_basis_digest": verified.get("threshold_basis_digest"),
+                "candidate_grid_digest": verified.get("candidate_grid_digest"),
+                "envelope_measurements_digest": verified.get("envelope_measurements_digest"),
+                "case_strata_digest": verified.get("case_strata_digest"),
+                "instability_candidate_count": verified.get("instability_candidate_count"),
+                "order_profile_count": verified.get("order_profile_count"),
+                "relocation_candidate_count": verified.get("relocation_candidate_count"),
+                "joint_pair_search_count": verified.get("joint_pair_search_count"),
+                "path_facts_digest": verified.get("path_facts_digest"),
+                "preserved_evaluation_identity_count": verified.get(
+                    "preserved_evaluation_identity_count"
+                ),
+                "preserved_evaluation_identity_digest": verified.get(
+                    "preserved_evaluation_identity_digest"
+                ),
+                "preserved_evaluation_plan_digest": verified.get(
+                    "preserved_evaluation_plan_digest"
+                ),
+                "preserved_evaluation_data_read": verified.get(
+                    "preserved_evaluation_data_read"
+                ),
+                "selected_cell_counts": verified.get("selected_cell_counts"),
+                "fallback_used_count": verified.get("fallback_used_count"),
+                "parameter_search": verified.get("parameter_search"),
+                "opinion_count": verified.get("opinion_count"),
+                "atomic_freeze": verified.get("atomic_freeze"),
+                "review_ready": verified.get("review_ready"),
+            }
         if job.kind == STAGE_ATOMIC_PROPOSITION_G1_JOB:
             result["atomic_proposition_g1"] = {
                 "fresh_pool_size": verified.get("fresh_pool_size"),
@@ -2763,6 +2866,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+        existing = _existing_atomic_proposition_admission_qualified_d1_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     if kind == STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB:
         existing = _existing_development_resource_admission_submission(
             paths, code_revision=code_revision,
@@ -2825,6 +2934,9 @@ def submit_job(
     )
     atomic_proposition_successor_d1_reserved = (
         job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB
+    )
+    atomic_proposition_admission_qualified_d1_reserved = (
+        job.kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
     )
     development_resource_admission_reserved = (
         job.kind == STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB
@@ -2919,6 +3031,11 @@ def submit_job(
             paths.atomic_proposition_successor_d1_budget,
             _atomic_proposition_successor_d1_budget_value(job),
         )
+    if atomic_proposition_admission_qualified_d1_reserved:
+        _exclusive_json(
+            paths.atomic_proposition_admission_qualified_d1_budget,
+            _atomic_proposition_admission_qualified_d1_budget_value(job),
+        )
     if development_resource_admission_reserved:
         _exclusive_json(
             paths.development_resource_admission_budget,
@@ -2971,6 +3088,8 @@ def submit_job(
             paths.development_resource_plan_recovery_budget.unlink(missing_ok=True)
         if atomic_proposition_successor_d1_reserved:
             paths.atomic_proposition_successor_d1_budget.unlink(missing_ok=True)
+        if atomic_proposition_admission_qualified_d1_reserved:
+            paths.atomic_proposition_admission_qualified_d1_budget.unlink(missing_ok=True)
         if development_resource_admission_reserved:
             paths.development_resource_admission_budget.unlink(missing_ok=True)
         if development_resource_qualified_plan_reserved:
@@ -3012,6 +3131,8 @@ def submit_job(
             paths.development_resource_plan_recovery_budget.unlink(missing_ok=True)
         if atomic_proposition_successor_d1_reserved:
             paths.atomic_proposition_successor_d1_budget.unlink(missing_ok=True)
+        if atomic_proposition_admission_qualified_d1_reserved:
+            paths.atomic_proposition_admission_qualified_d1_budget.unlink(missing_ok=True)
         if development_resource_admission_reserved:
             paths.development_resource_admission_budget.unlink(missing_ok=True)
         if development_resource_qualified_plan_reserved:
@@ -3692,6 +3813,8 @@ def _positive_instability_d1_review_evidence(
         detail = result_ref.get("atomic_proposition_g1")
     elif observed.get("kind") == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB:
         detail = result_ref.get("atomic_proposition_successor_d1")
+    elif observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+        detail = result_ref.get("atomic_proposition_admission_qualified_d1")
     else:
         detail = None
     if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
@@ -4303,7 +4426,12 @@ def _atomic_proposition_successor_d1_case_strata(
     result_ref = observed.get("result_ref")
     if not isinstance(result_ref, Mapping):
         raise StageWorkerError("atomic proposition successor D1 result reference missing")
-    detail = result_ref.get("atomic_proposition_successor_d1")
+    detail_key = (
+        "atomic_proposition_admission_qualified_d1"
+        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+        else "atomic_proposition_successor_d1"
+    )
+    detail = result_ref.get(detail_key)
     if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
         raise StageWorkerError("atomic proposition successor D1 review is not ready")
     artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
@@ -4341,7 +4469,10 @@ def _atomic_proposition_successor_d1_review_index(
     paths: StageWorkerPaths, observed: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     if (
-        observed.get("kind") != STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB
+        observed.get("kind") not in {
+            STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+            STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+        }
         or observed.get("state") != "succeeded"
     ):
         return None
@@ -4355,8 +4486,13 @@ def _atomic_proposition_successor_d1_review_index(
     pages = (
         case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
     ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
+    index_schema = (
+        "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-index.v1"
+        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+        else "quanthus.stage-atomic-proposition-successor-d1-primary-review-index.v1"
+    )
     return {
-        "schema_version": "quanthus.stage-atomic-proposition-successor-d1-primary-review-index.v1",
+        "schema_version": index_schema,
         "parent_job_id": observed["job_id"],
         "manifest_sha256": manifest_sha,
         "evidence_file_sha256": evidence_sha,
@@ -4411,7 +4547,9 @@ def _atomic_proposition_successor_d1_review_page(
             "window_id": stratum.get("window_id"),
         }
     transport["schema_version"] = (
-        "quanthus.stage-atomic-proposition-successor-d1-primary-review-transport.v1"
+        "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-transport.v1"
+        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+        else "quanthus.stage-atomic-proposition-successor-d1-primary-review-transport.v1"
     )
     transport["case_strata_file_sha256"] = strata_sha
     transport["era_board_stratum_included"] = True
@@ -4431,10 +4569,13 @@ def _atomic_proposition_successor_d1_review_page(
     encoded = base64.b64encode(compressed).decode("ascii")
     if len(encoded) > 200 * 1024:
         raise StageWorkerError("atomic proposition successor D1 review page exceeds status budget")
+    envelope_schema = (
+        "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-envelope.v1"
+        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+        else "quanthus.stage-atomic-proposition-successor-d1-primary-review-envelope.v1"
+    )
     return {
-        "schema_version": (
-            "quanthus.stage-atomic-proposition-successor-d1-primary-review-envelope.v1"
-        ),
+        "schema_version": envelope_schema,
         "encoding": "gzip+base64",
         "raw_sha256": _bytes_sha256(encoded_raw),
         "raw_bytes": len(encoded_raw),
@@ -4502,6 +4643,7 @@ def _atomic_proposition_g1_selection_transport(
         kind not in {
             STAGE_ATOMIC_PROPOSITION_G1_JOB,
             STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+            STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
         }
         or observed.get("state") != "succeeded"
     ):
@@ -4509,11 +4651,13 @@ def _atomic_proposition_g1_selection_transport(
     result_ref = observed.get("result_ref")
     if not isinstance(result_ref, Mapping):
         raise StageWorkerError("atomic proposition result reference missing")
-    detail_key = (
-        "atomic_proposition_g1"
-        if kind == STAGE_ATOMIC_PROPOSITION_G1_JOB
-        else "atomic_proposition_successor_d1"
-    )
+    detail_key = {
+        STAGE_ATOMIC_PROPOSITION_G1_JOB: "atomic_proposition_g1",
+        STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB: "atomic_proposition_successor_d1",
+        STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB: (
+            "atomic_proposition_admission_qualified_d1"
+        ),
+    }[str(kind)]
     detail = result_ref.get(detail_key)
     if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
         raise StageWorkerError("atomic proposition G1 selection is not ready")
@@ -4562,11 +4706,17 @@ def _atomic_proposition_g1_selection_transport(
         or plan.get("data_read") is not False
     ):
         raise StageWorkerError("atomic proposition G1 selection payload differs")
-    selection_schema = (
-        "quanthus.stage-atomic-proposition-g1-selection-transport.v1"
-        if kind == STAGE_ATOMIC_PROPOSITION_G1_JOB
-        else "quanthus.stage-atomic-proposition-successor-d1-selection-transport.v1"
-    )
+    selection_schema = {
+        STAGE_ATOMIC_PROPOSITION_G1_JOB: (
+            "quanthus.stage-atomic-proposition-g1-selection-transport.v1"
+        ),
+        STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB: (
+            "quanthus.stage-atomic-proposition-successor-d1-selection-transport.v1"
+        ),
+        STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB: (
+            "quanthus.stage-atomic-proposition-admission-qualified-d1-selection-transport.v1"
+        ),
+    }[str(kind)]
     transport = {
         "schema_version": selection_schema,
         "parent_job_id": observed["job_id"],
@@ -4597,11 +4747,17 @@ def _atomic_proposition_g1_selection_transport(
     encoded = base64.b64encode(compressed).decode("ascii")
     if len(encoded) > 300 * 1024:
         raise StageWorkerError("atomic proposition G1 selection transport exceeds status budget")
-    envelope_schema = (
-        "quanthus.stage-atomic-proposition-g1-selection-envelope.v1"
-        if kind == STAGE_ATOMIC_PROPOSITION_G1_JOB
-        else "quanthus.stage-atomic-proposition-successor-d1-selection-envelope.v1"
-    )
+    envelope_schema = {
+        STAGE_ATOMIC_PROPOSITION_G1_JOB: (
+            "quanthus.stage-atomic-proposition-g1-selection-envelope.v1"
+        ),
+        STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB: (
+            "quanthus.stage-atomic-proposition-successor-d1-selection-envelope.v1"
+        ),
+        STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB: (
+            "quanthus.stage-atomic-proposition-admission-qualified-d1-selection-envelope.v1"
+        ),
+    }[str(kind)]
     return {
         "schema_version": envelope_schema,
         "encoding": "gzip+base64",
@@ -4618,17 +4774,22 @@ def _atomic_proposition_successor_d1_virtual_review_status(
 ) -> dict[str, Any] | None:
     for status_path in sorted(paths.status.glob("stage_*.json")):
         observed = _object(status_path, "stage job status")
+        kind = observed.get("kind")
         if (
-            observed.get("kind") != STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB
+            kind not in {
+                STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
+                STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+            }
             or observed.get("state") != "succeeded"
         ):
             continue
         result_ref = observed.get("result_ref")
-        detail = (
-            result_ref.get("atomic_proposition_successor_d1")
-            if isinstance(result_ref, Mapping)
-            else None
+        detail_key = (
+            "atomic_proposition_admission_qualified_d1"
+            if kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+            else "atomic_proposition_successor_d1"
         )
+        detail = result_ref.get(detail_key) if isinstance(result_ref, Mapping) else None
         if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
             continue
         case_count = int(detail.get("development_selected_case_count") or 0)
@@ -4641,10 +4802,15 @@ def _atomic_proposition_successor_d1_virtual_review_status(
             )
             if alias != requested_job_id:
                 continue
+            virtual_kind = (
+                "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-page.v1"
+                if kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
+                else "quanthus.stage-atomic-proposition-successor-d1-primary-review-page.v1"
+            )
             return {
                 "schema_version": STATUS_SCHEMA,
                 "job_id": requested_job_id,
-                "kind": "quanthus.stage-atomic-proposition-successor-d1-primary-review-page.v1",
+                "kind": virtual_kind,
                 "code_revision": observed.get("code_revision"),
                 "input_digest": observed.get("input_digest"),
                 "state": "succeeded",
@@ -4900,6 +5066,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p014_b_failure": _recent_stage_job_failure(
             paths, kind=STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
+        ),
+        "recent_p014_c_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
         ),
     }
 

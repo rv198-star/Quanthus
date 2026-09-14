@@ -6095,8 +6095,41 @@ def _combined_atomic_scoring_diagnostics(
     def compact_metrics(metrics: Mapping[str, Any]) -> dict[str, Any]:
         pooled = metrics.get("pooled")
         macro = metrics.get("macro")
-        if not isinstance(pooled, Mapping) or not isinstance(macro, Mapping):
+        per_cell = metrics.get("per_cell")
+        if (
+            not isinstance(pooled, Mapping)
+            or not isinstance(macro, Mapping)
+            or not isinstance(per_cell, Mapping)
+        ):
             raise StageWorkerError("combined atomic scoring diagnostic metrics differ")
+
+        def compact_cell(cell_metrics: Mapping[str, Any]) -> dict[str, Any]:
+            return {
+                "definite_positive_references": cell_metrics.get(
+                    "definite_positive_references"
+                ),
+                "definite_negative_references": cell_metrics.get(
+                    "definite_negative_references"
+                ),
+                "predictions": cell_metrics.get("predictions"),
+                "true_positive": cell_metrics.get("true_positive"),
+                "false_positive": cell_metrics.get("false_positive"),
+                "precision": cell_metrics.get("precision"),
+                "positive_reference_coverage": cell_metrics.get(
+                    "positive_reference_coverage"
+                ),
+                "definite_negative_false_positive_rate": cell_metrics.get(
+                    "definite_negative_false_positive_rate"
+                ),
+            }
+
+        compact_cells = {}
+        for cell, cell_metrics in sorted(per_cell.items()):
+            if not isinstance(cell_metrics, Mapping):
+                raise StageWorkerError(
+                    "combined atomic scoring diagnostic per-cell metrics differ"
+                )
+            compact_cells[str(cell)] = compact_cell(cell_metrics)
         return {
             "macro_precision": macro.get("precision"),
             "macro_positive_reference_coverage": macro.get("positive_reference_coverage"),
@@ -6113,6 +6146,7 @@ def _combined_atomic_scoring_diagnostics(
             "pooled_definite_negative_false_positive_rate": pooled.get(
                 "definite_negative_false_positive_rate"
             ),
+            "per_cell": compact_cells,
         }
 
     compact_trials = []

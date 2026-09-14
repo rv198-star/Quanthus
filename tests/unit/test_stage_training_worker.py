@@ -920,6 +920,20 @@ def test_combined_atomic_scoring_status_exposes_bounded_diagnostics_only(
         "positive_reference_coverage": "0.28",
         "definite_negative_false_positive_rate": "0.04",
     }
+    per_cell = {
+        f"ERA{index % 2}/BOARD{index}": {
+            "definite_positive_references": 5,
+            "definite_negative_references": 20,
+            "predictions": 3,
+            "true_positive": 2,
+            "false_positive": 1,
+            "precision": "0.6666666666666666666666666667",
+            "positive_reference_coverage": "0.4",
+            "definite_negative_false_positive_rate": "0.05",
+            "secret_case_level_value": "must-not-leak",
+        }
+        for index in range(8)
+    }
     trials = []
     for index in range(9):
         trials.append(
@@ -930,8 +944,8 @@ def test_combined_atomic_scoring_status_exposes_bounded_diagnostics_only(
                     "broad_profile_id": f"broad-{index % 3}",
                     "secret_threshold": "must-not-leak",
                 },
-                "metrics": {"pooled": pooled, "macro": macro, "per_cell": {}},
-                "base_metrics": {"pooled": pooled, "macro": macro, "per_cell": {}},
+                "metrics": {"pooled": pooled, "macro": macro, "per_cell": per_cell},
+                "base_metrics": {"pooled": pooled, "macro": macro, "per_cell": per_cell},
                 "incremental_true_positive": 1,
                 "incremental_false_positive": 0,
                 "eligible": False,
@@ -983,7 +997,11 @@ def test_combined_atomic_scoring_status_exposes_bounded_diagnostics_only(
     assert diagnostics["candidate_threshold_values_included"] is False
     assert diagnostics["case_predictions_included"] is False
     assert diagnostics["reference_rows_included"] is False
+    first_metrics = diagnostics["instability_trials"][0]["metrics"]
+    assert len(first_metrics["per_cell"]) == 8
+    assert first_metrics["per_cell"]["ERA0/BOARD0"]["true_positive"] == 2
     assert "secret_threshold" not in json.dumps(diagnostics)
+    assert "secret_case_level_value" not in json.dumps(diagnostics)
 
 
 def test_complete_reserve_additional_ready_transport_exposes_metadata_only(

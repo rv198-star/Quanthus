@@ -483,11 +483,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-015-B | Freeze full ready denominator and additional blind-review set | P3-STAGE-015-A | closed `PASS_COMPLETE_ADDITIONAL_REVIEW_SET_FROZEN`; exact R1 recovery fixed only the P014 closeout field path and froze all 60 matching rows without semantic selection |
 | P3-STAGE-015-C | Review only additional ready rows and seal combined ledger | P3-STAGE-015-B | closed `PASS_INCREMENTAL_60_REVIEW_LEDGER_SEALED`; all 60 additional ready cases were blind-reviewed, incremental ledger immutable, original P014 192 opinions unchanged |
 | P3-STAGE-015-D | Evaluate unchanged P012 atomic reference sufficiency | P3-STAGE-015-C | closed `PASS_COMPLETE_RESERVE_REFERENCE_SUFFICIENCY`; 252 complete references pass I/R/O positive and negative minima; candidate scoring and preserved evaluation remain separate gates |
-| P3-STAGE-016 | Combined atomic scoring and projection compatibility | P3-STAGE-015 | ready artifact-only route; exact P012 surfaces/gate numbers remain frozen while P014 Era×Board macro-rate semantics govern quality ratios and pooled counts govern denominator/prediction minima |
+| P3-STAGE-016 | Combined atomic scoring and projection compatibility | P3-STAGE-015 | closed `CLOSED_INSTABILITY_DEVELOPMENT_FAIL`; all 9 frozen global-threshold instability candidates failed the preregistered pooled-count/macro-rate gate and no atomic freeze was produced |
 | P3-STAGE-016-A | Freeze aggregate semantics and scoring artifact closure | P3-STAGE-016 | closed `PASS_SELECT_MACRO_RATE_POOLED_COUNT_TWO_JOB_SCORING_ROUTE`; no candidate values were read before this decision |
-| P3-STAGE-016-B | Independent atomic scoring | P3-STAGE-016-A | ready `PASS_ENGINEERING_READY_FOR_ONE_ARTIFACT_ONLY_ATOMIC_SCORING_JOB`; exactly 9 I, fixed R and 3 O scored independently, zero joint-pair search, no projection |
-| P3-STAGE-016-C | Projection compatibility | P3-STAGE-016-B | blocked until B publishes a frozen I/R/O prediction artifact; resolver cannot trigger reselection |
-| P3-STAGE-016-D | Gate preserved evaluation | P3-STAGE-016-C | blocked; preserved 2021 remains unread inside P016 |
+| P3-STAGE-016-B | Independent atomic scoring | P3-STAGE-016-A | closed `CLOSED_INSTABILITY_DEVELOPMENT_FAIL`; 9 I trials completed, fixed envelope additive channel added zero incremental TP/FP, R/O scoring stopped by the frozen no-pass rule |
+| P3-STAGE-016-C | Projection compatibility | P3-STAGE-016-B | closed `NOT_REACHED_NO_ATOMIC_FREEZE`; resolver and projection gates were not executed |
+| P3-STAGE-016-D | Gate preserved evaluation | P3-STAGE-016-C | closed `PRESERVED_EVALUATION_NOT_AUTHORIZED`; preserved 2021/2025 remain unread and successor work must be separately frozen |
 
 ## 7. Acceptance
 

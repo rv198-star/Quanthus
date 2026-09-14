@@ -439,17 +439,24 @@ nodes.
   SHA. Exact P012 reference resolution over the combined 252 cases gives definite positive/negative
   counts I=40/147, R=46/170 and O=33/172, so every unchanged P012 reference-sufficiency minimum now
   passes. P015 closes `PASS_COMPLETE_RESERVE_REFERENCE_SUFFICIENCY`; preserved 2021 remains unread.
-  P016 is the separately frozen artifact-only scoring successor. Its result-free four-party review
-  resolves the latent P014-vs-P012 aggregation mismatch by keeping exact P012 count gates pooled while
-  applying the unchanged P012 rate thresholds to equal-weight Era × Board macro ratios; pooled micro
-  rates remain descriptive. P016-B is one independent 9 / fixed-1 / 3 atomic scoring Job with no
-  projection or joint-pair search; P016-C remains a separate blocked projection Job so a projection
-  result cannot trigger candidate reselection. Evidence and route:
+  P016 then opened the separately frozen artifact-only candidate-quality question. Its result-free
+  four-party review resolved the latent P014-vs-P012 aggregation mismatch by keeping exact P012 count
+  gates pooled while applying unchanged rate thresholds to equal-weight Era × Board macro ratios.
+  The sole P016-B Job scored all nine frozen instability candidates and closed normally as
+  `REVISE_OR_PARK_INSTABILITY_DEVELOPMENT_FAIL`: zero candidates were eligible, and the fixed synthetic
+  envelope additive channel contributed zero incremental TP and zero incremental FP in every trial.
+  Strict candidates controlled FPR but under-covered older regimes; looser candidates recovered
+  coverage while over-firing in later cells. The frozen stop rule therefore prevented fixed-R/order
+  scoring and projection; preserved 2021/2025 remain unread. Same-origin four-party attribution opens
+  P017 as a new artifact-only development successor using unlabeled Era × Board cell-local quantile
+  calibration rather than denser global threshold search; the zero-gain envelope additive channel is
+  retired from successor eligibility instead of tuned post-result. Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
   `work-items/stage-complete-reserve-reference.md`,
-  `acceptance/stage-complete-reserve-reference-sufficiency-20260915.md`, and
-  `work-items/stage-combined-atomic-scoring.md`.
+  `acceptance/stage-complete-reserve-reference-sufficiency-20260915.md`,
+  `work-items/stage-combined-atomic-scoring.md`, and
+  `reviews/stage-p016-instability-no-pass-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

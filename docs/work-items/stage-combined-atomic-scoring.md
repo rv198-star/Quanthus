@@ -1,7 +1,7 @@
 # P3-STAGE-016 — Combined Atomic Scoring and Projection Compatibility
 
 Design status: approved  
-Delivery gate: open for one artifact-only independent atomic-scoring Job
+Delivery gate: closed `CLOSED_INSTABILITY_DEVELOPMENT_FAIL`
 
 Parent: `stage-complete-reserve-reference.md`  
 Machine scoring contract: `../../config/stage-learning/stage-combined-atomic-scoring.v1.json`
@@ -61,9 +61,9 @@ close-envelope rule. No DWD read occurs.
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
 | P3-STAGE-016-A | Resolve aggregate semantics and freeze artifact-only scoring contract | P3-STAGE-015 | closed `PASS_SELECT_MACRO_RATE_POOLED_COUNT_TWO_JOB_SCORING_ROUTE`; no candidate values read |
-| P3-STAGE-016-B | Independently score/freeze I, fixed R and O | P3-STAGE-016-A | ready `PASS_ENGINEERING_READY_FOR_ONE_ARTIFACT_ONLY_ATOMIC_SCORING_JOB`; one Job, 9 I + fixed R + 3 O, zero joint pair search, no projection; `../acceptance/stage-combined-atomic-scoring-engineering-20260915.md` |
-| P3-STAGE-016-C | Projection compatibility on B's frozen predictions | P3-STAGE-016-B | blocked until B publishes an eligible atomic freeze; no candidate alternatives or reselection |
-| P3-STAGE-016-D | Close and gate preserved evaluation | P3-STAGE-016-C | may authorize a separate preserved-2021 preregistration only if all frozen development/projection gates pass |
+| P3-STAGE-016-B | Independently score/freeze I, fixed R and O | P3-STAGE-016-A | closed `CLOSED_INSTABILITY_DEVELOPMENT_FAIL`; sole Job scored all 9 frozen instability candidates, none eligible, so fixed R and O scoring stopped before execution; `../../config/stage-learning/stage-combined-atomic-scoring-result.v1.json` |
+| P3-STAGE-016-C | Projection compatibility on B's frozen predictions | P3-STAGE-016-B | closed `NOT_REACHED_NO_ATOMIC_FREEZE`; no projection Job or candidate reselection occurred |
+| P3-STAGE-016-D | Close and gate preserved evaluation | P3-STAGE-016-C | closed `PRESERVED_EVALUATION_NOT_AUTHORIZED`; preserved 2021 and 2025 remain unread |
 
 ## P016-B failure semantics
 
@@ -84,11 +84,27 @@ fixed R and single frozen O predictions, apply the unchanged P012 resolver and p
 the same pooled-count / macro-rate semantics, and publish pass/fail diagnostics. It cannot read
 candidate alternatives or change the B freeze.
 
-Even a P016-C pass does not read preserved 2021. It only permits a separately versioned preserved-
-evaluation preregistration.
+P016-C was not reached because P016-B produced no atomic freeze. No projection or preserved-evaluation
+authority was created.
+
+## Final disposition
+
+The sole P016-B scoring Job closed normally as `REVISE_OR_PARK_INSTABILITY_DEVELOPMENT_FAIL` after all
+nine frozen instability candidates failed the unchanged gates. The fixed synthetic envelope channel
+added zero incremental TP and zero incremental FP in every trial. The global raw-scale surface also
+showed a cross-cell precision/coverage trade-off: strict profiles controlled false positives but
+under-covered older regimes, while looser profiles over-fired in later cells.
+
+P016 is therefore closed as a semantic no-pass, not retried or retuned. Same-origin four-party
+attribution selects `P3-STAGE-017` as a new artifact-only development successor based on unlabeled
+Era × Board cell-local quantile calibration; the zero-gain envelope additive channel is retired from
+successor eligibility instead of tuned post-result. Review:
+`../reviews/stage-p016-instability-no-pass-four-party-review-20260915.md`.
 
 ## Claim ceiling
 
-P016 can establish bounded development candidate quality and projection compatibility on the immutable
-252-case balanced Era × Board reference surface. It cannot establish preserved out-of-time validity,
-market prevalence, economic value, strategy value, production suitability or trading authority.
+P016 establishes that the frozen P012 global-threshold instability surface has no eligible candidate
+on the immutable 252-case balanced Era × Board development reference surface under the preregistered
+pooled-count/macro-rate contract. It does not establish relocation, order, projection or preserved
+out-of-time failure because those stages were not reached. It cannot establish market prevalence,
+economic value, strategy value, production suitability or trading authority.

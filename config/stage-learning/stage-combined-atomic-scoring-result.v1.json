@@ -1,0 +1,147 @@
+{
+  "schema_version": "quanthus.stage-combined-atomic-scoring-result.v1",
+  "work_item": "P3-STAGE-016-B",
+  "state": "CLOSED_INSTABILITY_DEVELOPMENT_FAIL",
+  "effective_date": "2026-09-15",
+  "job": {
+    "job_id": "stage_e06cc35f8935424d9e906b9d456bbff2",
+    "code_revision": "cee598ecefb9b42c8c4633ce5ab06a7cb6e72eb9",
+    "input_digest": "sha256:4dc3c84f890e21ea0ed625e2c26630f36d54d964c7141caf88ba4a73ddcd4ce4",
+    "terminal_state": "succeeded",
+    "exit_code": 0,
+    "artifact_manifest_sha256": "sha256:680dff860ca8215e5544363423ab48149c65158de1f92f94d4b7174c2b83adf8",
+    "run_id": "stage-combined-atomic-scoring-20260914T182558Z",
+    "semantic_disposition": "REVISE_OR_PARK_INSTABILITY_DEVELOPMENT_FAIL"
+  },
+  "bindings": {
+    "scoring_contract": {
+      "path": "config/stage-learning/stage-combined-atomic-scoring.v1.json",
+      "file_sha256": "sha256:66b886c19a3f86eccee4f75ecf59a0496d40a976c8fd5fbd9b47ba065b68767d"
+    },
+    "p015_reference_sufficiency": {
+      "path": "config/stage-learning/stage-complete-reserve-reference-sufficiency-result.v1.json",
+      "file_sha256": "sha256:5258606e1a97c0ba53702f233851391134d6bb1f722b90d82f87a140d2a67413",
+      "combined_case_count": 252,
+      "p014_review_ledger_sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69",
+      "p015_review_ledger_sha256": "sha256:db3216d322e00ad40ebd7de435684b43bcaf72cbc66a90dcb49403a8be461e06"
+    },
+    "candidate_surface": {
+      "instability_candidate_count": 9,
+      "relocation_candidate_count": 1,
+      "order_profile_count": 3,
+      "joint_pair_search_count": 0,
+      "candidate_surface_changed": false,
+      "threshold_recomputed": false
+    }
+  },
+  "aggregate_contract": {
+    "pooled_counts": [
+      "complete_reference_count",
+      "definite_positive_references",
+      "definite_negative_references",
+      "minimum_predictions",
+      "instability_incremental_true_positive",
+      "instability_incremental_false_positive"
+    ],
+    "macro_equal_weight_era_board_rates": [
+      "precision",
+      "positive_reference_coverage",
+      "definite_negative_false_positive_rate"
+    ],
+    "numeric_gate_values": "exact_P012",
+    "micro_ratios": "diagnostic_only"
+  },
+  "reference_counts": {
+    "structural_instability_20": {
+      "definite_positive": 40,
+      "definite_negative": 147
+    },
+    "coherent_directional_relocation_20": {
+      "definite_positive": 46,
+      "definite_negative": 170
+    },
+    "orderly_consolidation_20": {
+      "definite_positive": 33,
+      "definite_negative": 172
+    }
+  },
+  "instability_result": {
+    "trial_count": 9,
+    "eligible_candidate_count": 0,
+    "fixed_gate": {
+      "minimum_predictions": 18,
+      "minimum_macro_precision": "0.78",
+      "minimum_macro_positive_reference_coverage": "0.70",
+      "maximum_macro_definite_negative_false_positive_rate": "0.10",
+      "minimum_incremental_true_positives_vs_same_profile_base": 1,
+      "incremental_true_positives_must_exceed_incremental_false_positives": true
+    },
+    "envelope_channel_observation": {
+      "all_nine_trials_incremental_true_positive": 0,
+      "all_nine_trials_incremental_false_positive": 0,
+      "interpretation": "The fixed synthetic close-envelope additive channel contributed no marginal classified reference wins on the 252-case development surface; no post-result envelope retuning is authorized."
+    },
+    "frontier_examples": [
+      {
+        "candidate_id": "sha256:f51e57179699aa689431ddaeb42eaed1d4eb9dd297dc67f06453cb1db75f3aab",
+        "expansion_profile_id": "expansion-lenient",
+        "broad_profile_id": "broad-strict",
+        "macro_precision": "0.6976190476190476190476190476",
+        "macro_positive_reference_coverage": "0.6885912698412698412698412698",
+        "macro_definite_negative_false_positive_rate": "0.0728392998613586848880966528",
+        "pooled_predictions": 35,
+        "incremental_true_positive": 0,
+        "incremental_false_positive": 0
+      },
+      {
+        "candidate_id": "sha256:cf2a7a4e66a2a2cbe53dfd79416fb498b2f9532e6c111370aacc5106ae37eb35",
+        "expansion_profile_id": "expansion-balanced",
+        "broad_profile_id": "broad-strict",
+        "macro_precision": "0.7645833333333333333333333334",
+        "macro_positive_reference_coverage": "0.6207341269841269841269841269",
+        "macro_definite_negative_false_positive_rate": "0.06021303723509605862547039018",
+        "pooled_predictions": 30,
+        "incremental_true_positive": 0,
+        "incremental_false_positive": 0
+      }
+    ],
+    "per_cell_diagnosis": {
+      "pre_star_main": "Strict profiles have high precision but very low positive-reference coverage; global raw thresholds under-detect this older main-board regime.",
+      "pre_star_chinext": "Strict profiles retain precision but lose substantial coverage.",
+      "star_pre_chinext_main": "Coverage can reach 1.0 while precision remains weak under less strict broad profiles, showing a different scale trade-off than PRE_STAR.",
+      "modern_chinext_and_star": "Looser broad profiles recover coverage but produce materially higher false-positive rates; strict broad profiles reduce FPR but cannot meet the global macro precision/coverage pair simultaneously."
+    }
+  },
+  "stop_rule": {
+    "instability_gate_passed": false,
+    "fixed_relocation_scored": false,
+    "order_profiles_scored": false,
+    "atomic_freeze_available": false,
+    "projection_compatibility_reached": false,
+    "post_failure_candidate_reselection": false
+  },
+  "authority_ceiling": {
+    "same_job_retry": false,
+    "candidate_grid_expansion": false,
+    "threshold_retuning": false,
+    "numeric_gate_change": false,
+    "projection_execution": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "successor": {
+    "work_item": "P3-STAGE-017",
+    "disposition": "OPEN_ERA_BOARD_STRATUM_NORMALIZED_INSTABILITY_SUCCESSOR",
+    "principles": [
+      "Treat P016 as a semantic no-pass; never retry the same 9-candidate global-threshold experiment.",
+      "Replace the assumption that one global raw geometry scale is comparable across all Era x Board cells with unlabeled cell-local quantile calibration while keeping a small fixed profile topology.",
+      "Do not tune cell-local quantile coordinates from reference labels; freeze the coordinates before successor scoring.",
+      "Retire the P012 fixed envelope additive channel from successor eligibility rather than post-result tuning it; retain envelope trace only as a diagnostic until a separately justified mechanism exists.",
+      "Reuse the immutable 252-case development artifacts only as development evidence; preserved 2021 stays the untouched out-of-time holdout and requires a later separate authorization."
+    ]
+  },
+  "claim_ceiling": "P016 demonstrates that the frozen P012 global-threshold instability surface has no eligible candidate on the complete 252-case Era x Board development reference set under the preregistered pooled-count/macro-rate quality contract. It does not demonstrate relocation, order, projection or preserved-evaluation failure because the frozen stop rule ended execution before those stages."
+}

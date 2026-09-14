@@ -72,8 +72,12 @@ P015_D_RESULT = (
     ROOT / "config/stage-learning/stage-complete-reserve-reference-sufficiency-result.v1.json"
 )
 P016_SCORING = ROOT / "config/stage-learning/stage-combined-atomic-scoring.v1.json"
+P016_RESULT = ROOT / "config/stage-learning/stage-combined-atomic-scoring-result.v1.json"
 P016_WORK = ROOT / "docs/work-items/stage-combined-atomic-scoring.md"
 P016_REVIEW = ROOT / "docs/reviews/stage-p016-combined-scoring-four-party-review-20260915.md"
+P016_NOPASS_REVIEW = (
+    ROOT / "docs/reviews/stage-p016-instability-no-pass-four-party-review-20260915.md"
+)
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -930,6 +934,52 @@ def test_stage016_freezes_macro_rate_pooled_count_two_job_scoring_route() -> Non
     assert P016_REVIEW.is_file()
     assert "PASS_SELECT_MACRO_RATE_POOLED_COUNT_TWO_JOB_SCORING_ROUTE" in P016_REVIEW.read_text(
         encoding="utf-8"
+    )
+
+
+def test_stage016_closes_semantic_no_pass_without_projection_or_retune() -> None:
+    value = json.loads(P016_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-016-B"
+    assert value["state"] == "CLOSED_INSTABILITY_DEVELOPMENT_FAIL"
+    job = value["job"]
+    assert job["job_id"] == "stage_e06cc35f8935424d9e906b9d456bbff2"
+    assert job["terminal_state"] == "succeeded"
+    assert job["semantic_disposition"] == "REVISE_OR_PARK_INSTABILITY_DEVELOPMENT_FAIL"
+    surface = value["bindings"]["candidate_surface"]
+    assert surface == {
+        "instability_candidate_count": 9,
+        "relocation_candidate_count": 1,
+        "order_profile_count": 3,
+        "joint_pair_search_count": 0,
+        "candidate_surface_changed": False,
+        "threshold_recomputed": False,
+    }
+    instability = value["instability_result"]
+    assert instability["trial_count"] == 9
+    assert instability["eligible_candidate_count"] == 0
+    envelope = instability["envelope_channel_observation"]
+    assert envelope["all_nine_trials_incremental_true_positive"] == 0
+    assert envelope["all_nine_trials_incremental_false_positive"] == 0
+    stop = value["stop_rule"]
+    assert stop["instability_gate_passed"] is False
+    assert stop["fixed_relocation_scored"] is False
+    assert stop["order_profiles_scored"] is False
+    assert stop["atomic_freeze_available"] is False
+    assert stop["projection_compatibility_reached"] is False
+    ceiling = value["authority_ceiling"]
+    assert ceiling["same_job_retry"] is False
+    assert ceiling["candidate_grid_expansion"] is False
+    assert ceiling["threshold_retuning"] is False
+    assert ceiling["numeric_gate_change"] is False
+    assert ceiling["preserved_2021_read"] is False
+    assert ceiling["2025_read"] is False
+    assert value["successor"]["work_item"] == "P3-STAGE-017"
+    assert value["successor"]["disposition"] == (
+        "OPEN_ERA_BOARD_STRATUM_NORMALIZED_INSTABILITY_SUCCESSOR"
+    )
+    assert P016_NOPASS_REVIEW.is_file()
+    assert "PASS_OPEN_P017_STRATUM_NORMALIZED_INSTABILITY_SUCCESSOR" in (
+        P016_NOPASS_REVIEW.read_text(encoding="utf-8")
     )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import date, timedelta
 
 import pytest
@@ -16,6 +17,9 @@ from quanthus.stage_learning.development_resource_plan import (
 ROOT = find_project_root()
 CONFIG = ROOT / "config/stage-learning/stage-development-resource-plan.v1.json"
 QUOTA = ROOT / "config/stage-learning/stage-development-resource-quota-freeze.v1.json"
+REVISION_R1 = (
+    ROOT / "config/stage-learning/stage-development-resource-quota-revision-r1.v1.json"
+)
 
 
 def _window(era: str, family: str, index: int) -> dict:
@@ -114,6 +118,61 @@ def test_exact_plan_is_balanced_and_globally_identity_unique() -> None:
         assert sum(row["role"] == "primary" for row in selected) == 24
         assert sum(row["role"] == "fallback" for row in selected) == 8
         assert all(row["prior_exposure_level"] == "L0_METADATA_DISCOVERED" for row in selected)
+
+
+def test_r1_waterfill_handles_sparse_launch_window_without_changing_cell_quota() -> None:
+    tokens, windows, quota = _synthetic_surface()
+    revision = json.loads(REVISION_R1.read_text(encoding="utf-8"))
+    scarce_cell = quota["selection_policy"]["scarcity_order_for_global_identity_allocation"][0]
+    era, family = scarce_cell.split("/", 1)
+    retained = [
+        row
+        for row in tokens
+        if not (row["era"] == era and row["board_family"] == family)
+    ]
+    cell_windows = [
+        row for row in windows if row["era"] == era and row["board_family"] == family
+    ]
+    sparse_counts = [2, 10, 18, 18]
+    sparse: list[dict] = []
+    identity_index = 0
+    for window, count in zip(cell_windows, sparse_counts, strict=True):
+        for _ in range(count):
+            identity_index += 1
+            identity = f"scarce-{identity_index:03d}"
+            sparse.append(
+                {
+                    "security_id": identity,
+                    "listing_id": f"listing-{identity}",
+                    "security_code": f"9{identity_index:05d}"[-6:],
+                    "era": era,
+                    "board_family": family,
+                    "board_code": window["board_code"],
+                    "venue_id": window["venue_id"],
+                    "window_id": window["window_id"],
+                    "window_start": window["start"],
+                    "window_end": window["end"],
+                    "open_session_count": 61,
+                    "exposure_level": "L0_METADATA_DISCOVERED",
+                }
+            )
+    with pytest.raises(DevelopmentResourcePlanError, match="cell_global_identity_shortfall"):
+        select_exact_plan(tokens=[*retained, *sparse], windows=windows, quota=quota)
+    rows = select_exact_plan(
+        tokens=[*retained, *sparse],
+        windows=windows,
+        quota=quota,
+        temporal_revision=revision,
+    )
+    selected = [
+        row for row in rows if row["era"] == era and row["board_family"] == family
+    ]
+    assert len(selected) == 32
+    assert len({row["security_id"] for row in selected}) == 32
+    by_window = Counter(row["window_id"] for row in selected)
+    assert len(by_window) == 4
+    assert min(by_window.values()) == 2
+    assert sum(by_window.values()) == 32
 
 
 def test_exact_plan_fails_closed_when_global_unique_capacity_is_missing() -> None:

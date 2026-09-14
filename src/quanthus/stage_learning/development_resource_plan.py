@@ -24,6 +24,8 @@ from quanthus.structure_v2_inputs import canonical, digest
 DEFAULT_CONFIG = "config/stage-learning/stage-development-resource-plan.v1.json"
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
 _SHA = re.compile(r"^sha256:[0-9a-f]{64}$")
+_RECOVERY_AUTH = "config/stage-learning/stage-development-resource-plan-recovery.v1.json"
+_QUOTA_REVISION_R1 = "config/stage-learning/stage-development-resource-quota-revision-r1.v1.json"
 
 
 class DevelopmentResourcePlanError(ValueError):
@@ -115,6 +117,35 @@ def _bound_json(root: Path, binding: Mapping[str, Any], label: str) -> dict[str,
     return _object(path, label)
 
 
+def _recovery_policy(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    recovery = _object(root / _RECOVERY_AUTH, "development_resource_plan_recovery")
+    if (
+        recovery.get("schema_version") != "quanthus.stage-development-resource-plan-recovery.v1"
+        or recovery.get("work_item") != "P3-STAGE-013-C-R1"
+        or recovery.get("disposition") != "AUTHORIZE_ONE_METADATA_PLAN_R1_RECOVERY"
+    ):
+        raise DevelopmentResourcePlanError("recovery_authorization_identity")
+    bindings = recovery.get("bindings")
+    if not isinstance(bindings, Mapping):
+        raise DevelopmentResourcePlanError("recovery_authorization_bindings")
+    for key in ("original_plan_config", "parent_quota_freeze", "quota_revision_r1"):
+        binding = bindings.get(key)
+        if not isinstance(binding, Mapping):
+            raise DevelopmentResourcePlanError(f"recovery_binding:{key}")
+        path = root / str(binding.get("path"))
+        expected = str(binding.get("digest"))
+        if not _SHA.fullmatch(expected) or _sha_file(path) != expected:
+            raise DevelopmentResourcePlanError(f"recovery_binding:{key}")
+    revision = _object(root / _QUOTA_REVISION_R1, "quota_revision_r1")
+    if (
+        revision.get("schema_version")
+        != "quanthus.stage-development-resource-quota-revision-r1.v1"
+        or revision.get("disposition") != "APPROVE_CAPACITY_CONSTRAINED_TEMPORAL_SPREAD_R1"
+    ):
+        raise DevelopmentResourcePlanError("quota_revision_r1_identity")
+    return recovery, revision
+
+
 def _window_slots(windows: Sequence[Mapping[str, Any]], count: int) -> list[Mapping[str, Any]]:
     ordered = sorted(
         windows,
@@ -185,9 +216,11 @@ def select_exact_plan(
     tokens: Sequence[Mapping[str, Any]],
     windows: Sequence[Mapping[str, Any]],
     quota: Mapping[str, Any],
+    temporal_revision: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     policy = quota["selection_policy"]
     identity_seed = str(policy["identity_seed"])
+    window_seed = str(policy["window_seed"])
     allocation_order = [
         str(value) for value in policy["scarcity_order_for_global_identity_allocation"]
     ]
@@ -197,6 +230,15 @@ def select_exact_plan(
     }
     if set(allocation_order) != set(quotas):
         raise DevelopmentResourcePlanError("allocation_order_cells")
+    revised_algorithm = None
+    if temporal_revision is not None:
+        revised = temporal_revision.get("revised_temporal_spread")
+        if not isinstance(revised, Mapping):
+            raise DevelopmentResourcePlanError("temporal_revision_shape")
+        revised_algorithm = revised.get("algorithm")
+        if revised_algorithm != "capacity_constrained_max_min_waterfill_v1":
+            raise DevelopmentResourcePlanError("temporal_revision_algorithm")
+
     by_cell_window: dict[str, dict[str, list[Mapping[str, Any]]]] = defaultdict(
         lambda: defaultdict(list)
     )
@@ -214,31 +256,94 @@ def select_exact_plan(
     for allocation_rank, cell in enumerate(allocation_order, start=1):
         reserve = int(quotas[cell]["reserve"])
         cell_windows = list(windows_by_cell[cell].values())
-        slots = _window_slots(cell_windows, reserve)
         rows: list[dict[str, Any]] = []
-        for slot_index, window in enumerate(slots, start=1):
+        assigned_by_window: Counter[str] = Counter()
+        strict_slots = (
+            _window_slots(cell_windows, reserve)
+            if revised_algorithm is None
+            else []
+        )
+        for slot_index in range(1, reserve + 1):
+            if revised_algorithm is None:
+                window = strict_slots[slot_index - 1]
+            else:
+                choices: list[tuple[tuple[Any, ...], Mapping[str, Any]]] = []
+                for candidate_window in cell_windows:
+                    window_id = str(candidate_window["window_id"])
+                    available_ids = {
+                        str(row["security_id"])
+                        for row in by_cell_window[cell].get(window_id, ())
+                        if str(row["security_id"]) not in used
+                    }
+                    if not available_ids:
+                        continue
+                    key = (
+                        assigned_by_window[window_id],
+                        len(available_ids),
+                        _rank(window_seed, cell, window_id),
+                        _day(candidate_window["start"]),
+                        window_id,
+                    )
+                    choices.append((key, candidate_window))
+                if not choices:
+                    raise DevelopmentResourcePlanError(
+                        f"cell_global_identity_shortfall:{cell}"
+                    )
+                choices.sort(key=lambda item: item[0])
+                window = choices[0][1]
+
+            window_id = str(window["window_id"])
             candidates = [
                 row
-                for row in by_cell_window[cell].get(str(window["window_id"]), ())
+                for row in by_cell_window[cell].get(window_id, ())
                 if str(row["security_id"]) not in used
             ]
-            candidates.sort(
-                key=lambda row: (
-                    _rank(
-                        identity_seed,
-                        cell,
-                        window["window_id"],
-                        slot_index,
-                        row["security_id"],
-                    ),
-                    str(row["security_id"]),
+            if revised_algorithm is not None:
+                alternative_windows: dict[str, int] = {}
+                for candidate in candidates:
+                    identity = str(candidate["security_id"])
+                    alternative_windows[identity] = sum(
+                        1
+                        for other_window in cell_windows
+                        if any(
+                            str(other["security_id"]) == identity
+                            for other in by_cell_window[cell].get(
+                                str(other_window["window_id"]), ()
+                            )
+                        )
+                    )
+                candidates.sort(
+                    key=lambda row: (
+                        alternative_windows[str(row["security_id"])],
+                        _rank(
+                            identity_seed,
+                            cell,
+                            window_id,
+                            slot_index,
+                            row["security_id"],
+                        ),
+                        str(row["security_id"]),
+                    )
                 )
-            )
+            else:
+                candidates.sort(
+                    key=lambda row: (
+                        _rank(
+                            identity_seed,
+                            cell,
+                            window_id,
+                            slot_index,
+                            row["security_id"],
+                        ),
+                        str(row["security_id"]),
+                    )
+                )
             if not candidates:
                 raise DevelopmentResourcePlanError(f"cell_global_identity_shortfall:{cell}")
             chosen = candidates[0]
             identity = str(chosen["security_id"])
             used.add(identity)
+            assigned_by_window[window_id] += 1
             role = "fallback" if slot_index % 4 == 0 else "primary"
             rows.append(
                 {
@@ -249,7 +354,7 @@ def select_exact_plan(
                     "board_family": str(chosen["board_family"]),
                     "board_code": str(chosen["board_code"]),
                     "venue_id": str(chosen["venue_id"]),
-                    "window_id": str(chosen["window_id"]),
+                    "window_id": window_id,
                     "window_start": _day(chosen["window_start"]).isoformat(),
                     "window_end": _day(chosen["window_end"]).isoformat(),
                     "open_session_count": int(chosen["open_session_count"]),
@@ -280,6 +385,7 @@ def run_plan(
         raise DevelopmentResourcePlanError("exact_code_revision_required")
     root = find_project_root()
     config = load_config(config_path)
+    recovery, temporal_revision = _recovery_policy(root)
     result = _bound_json(root, config["bindings"]["capacity_census_result"], "census_result")
     quota = _bound_json(root, config["bindings"]["quota_freeze"], "quota_freeze")
     artifact_binding = config["bindings"]["census_artifact"]
@@ -315,7 +421,12 @@ def run_plan(
     if {key: len(value) for key, value in reconstructed.items()} != observed:
         raise DevelopmentResourcePlanError("reconstructed_capacity_differs")
 
-    rows = select_exact_plan(tokens=tokens, windows=windows, quota=quota)
+    rows = select_exact_plan(
+        tokens=tokens,
+        windows=windows,
+        quota=quota,
+        temporal_revision=temporal_revision,
+    )
     if set(row["security_id"] for row in rows) & preserved_ids:
         raise DevelopmentResourcePlanError("preserved_identity_in_plan")
     by_cell = Counter(f"{row['era']}/{row['board_family']}" for row in rows)
@@ -339,6 +450,8 @@ def run_plan(
         "census_manifest_sha256": artifact_binding["manifest_sha256"],
         "census_result_digest": digest(result),
         "quota_freeze_digest": digest(quota),
+        "quota_revision_r1_digest": digest(temporal_revision),
+        "metadata_recovery_of": recovery["failed_job"]["job_id"],
         "base_manifest_sha256": source_binding["base_manifest_sha256"],
         "correction_manifest_sha256": source_binding["correction_manifest_sha256"],
         "preserved_2021_identity_count": len(preserved_ids),
@@ -359,6 +472,8 @@ def run_plan(
         "cell_counts": plan["cell_counts"],
         "identity_digest": plan["identity_digest"],
         "plan_digest": plan["plan_digest"],
+        "temporal_spread_algorithm": temporal_revision["revised_temporal_spread"]["algorithm"],
+        "metadata_recovery_of": recovery["failed_job"]["job_id"],
         "market_price_read": False,
         "morphology_read": False,
         "label_or_reference_read": False,

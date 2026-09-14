@@ -86,6 +86,12 @@ DEVELOPMENT_RESOURCE_CENSUS_BUDGET_SCHEMA = (
     "quanthus.stage-development-resource-capacity-census-budget.v1"
 )
 DEVELOPMENT_RESOURCE_PLAN_BUDGET_SCHEMA = "quanthus.stage-development-resource-plan-budget.v1"
+DEVELOPMENT_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA = (
+    "quanthus.stage-development-resource-plan-recovery-budget.v1"
+)
+DEVELOPMENT_RESOURCE_PLAN_RECOVERY_AUTH = (
+    "config/stage-learning/stage-development-resource-plan-recovery.v1.json"
+)
 ORDER_RULE_PREPARE_RETRY_AUTH = "config/stage-learning/order-rule-prepare-retry.v1.json"
 POSITIVE_INSTABILITY_QUANTITATIVE_D1_RETRY_AUTH = (
     "config/stage-learning/positive-instability-quantitative-d1-retry.v1.json"
@@ -448,6 +454,10 @@ class StageWorkerPaths:
     @property
     def development_resource_plan_budget(self) -> Path:
         return self.control_root / "development-resource-plan-budget.json"
+
+    @property
+    def development_resource_plan_recovery_budget(self) -> Path:
+        return self.control_root / "development-resource-plan-recovery-budget.json"
 
     @property
     def logs(self) -> Path:
@@ -1137,12 +1147,99 @@ def _development_resource_plan_budget_value(job: StageJob) -> dict[str, Any]:
     }
 
 
+def _development_resource_plan_recovery_budget_value(
+    failed_job: StageJob, recovery_job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": DEVELOPMENT_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-013-C-R1",
+        "metadata_recovery_of": failed_job.job_id,
+        "failed_input_digest": failed_job.input_digest,
+        "job": recovery_job.to_dict(),
+        "input_digest": recovery_job.input_digest,
+    }
+
+
+def _development_resource_plan_recovery_authorization(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> dict[str, Any]:
+    auth = _object(
+        paths.control_repo / DEVELOPMENT_RESOURCE_PLAN_RECOVERY_AUTH,
+        "development resource plan recovery authorization",
+    )
+    if (
+        auth.get("schema_version") != "quanthus.stage-development-resource-plan-recovery.v1"
+        or auth.get("work_item") != "P3-STAGE-013-C-R1"
+        or auth.get("disposition") != "AUTHORIZE_ONE_METADATA_PLAN_R1_RECOVERY"
+    ):
+        raise StageWorkerError("development resource plan recovery authorization differs")
+    failure = auth.get("failed_job")
+    authority = auth.get("authority")
+    bindings = auth.get("bindings")
+    if not all(isinstance(value, Mapping) for value in (failure, authority, bindings)):
+        raise StageWorkerError("development resource plan recovery authorization incomplete")
+    if (
+        failure.get("job_id") != failed_job.job_id
+        or failure.get("code_revision") != failed_job.code_revision
+        or failure.get("input_digest") != failed_job.input_digest
+        or failure.get("terminal_state") != "failed"
+        or failure.get("error") != "stage_development_resource_plan_process_failed"
+        or failure.get("artifact_published") is not False
+    ):
+        raise StageWorkerError("development resource plan recovery failure binding differs")
+    required_true = (
+        "same_eight_cell_quotas_required",
+        "same_total_reserve_required",
+        "same_primary_fallback_counts_required",
+        "same_global_identity_uniqueness_required",
+        "same_identity_seed_required",
+        "same_window_seed_required",
+        "same_census_artifact_required",
+        "same_protected_surfaces_required",
+    )
+    required_false = (
+        "cross_cell_fallback",
+        "post_result_replacement",
+        "parameter_search",
+        "semantic_retry",
+        "market_price_read",
+        "morphology_read",
+        "label_or_reference_read",
+        "candidate_output_read",
+        "candidate_scoring",
+        "preserved_2021_market_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    )
+    if authority.get("maximum_metadata_recovery_jobs") != 1:
+        raise StageWorkerError("development resource plan recovery job budget differs")
+    if any(authority.get(key) is not True for key in required_true) or any(
+        authority.get(key) is not False for key in required_false
+    ):
+        raise StageWorkerError("development resource plan recovery authority differs")
+    for key in ("original_plan_config", "parent_quota_freeze", "quota_revision_r1"):
+        binding = bindings.get(key)
+        if not isinstance(binding, Mapping):
+            raise StageWorkerError("development resource plan recovery binding differs")
+        path = paths.control_repo / str(binding.get("path") or "")
+        expected = str(binding.get("digest") or "")
+        try:
+            observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise StageWorkerError("development resource plan recovery binding unreadable") from exc
+        if expected != observed:
+            raise StageWorkerError("development resource plan recovery binding differs")
+    return dict(auth)
+
+
 def _existing_development_resource_plan_submission(
     paths: StageWorkerPaths, *, code_revision: str,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, StageJob | None]:
     marker_path = paths.development_resource_plan_budget
     if not marker_path.exists():
-        return None
+        return None, None
     marker = _object(marker_path, "development resource plan budget")
     if (
         marker.get("schema_version") != DEVELOPMENT_RESOURCE_PLAN_BUDGET_SCHEMA
@@ -1151,15 +1248,45 @@ def _existing_development_resource_plan_submission(
         or not isinstance(marker.get("job"), Mapping)
     ):
         raise StageWorkerError("development resource plan budget marker differs")
-    job = StageJob.from_dict(marker["job"])
+    failed_job = StageJob.from_dict(marker["job"])
     if (
-        job.kind != STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB
-        or marker.get("input_digest") != job.input_digest
+        failed_job.kind != STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB
+        or marker.get("input_digest") != failed_job.input_digest
     ):
         raise StageWorkerError("development resource plan budget marker differs")
-    if job.code_revision != code_revision:
-        raise StageWorkerError("development resource plan has no retry or replacement authority")
-    return _idempotent_stage_submission(paths, job)
+    if failed_job.code_revision == code_revision:
+        return _idempotent_stage_submission(paths, failed_job), None
+    observed = read_status(paths, failed_job.job_id)
+    if (
+        observed.get("state") != "failed"
+        or observed.get("error") != "stage_development_resource_plan_process_failed"
+        or observed.get("input_digest") != failed_job.input_digest
+        or observed.get("code_revision") != failed_job.code_revision
+        or observed.get("result_ref") is not None
+    ):
+        raise StageWorkerError("development resource plan recovery requires exact failed parent")
+    _development_resource_plan_recovery_authorization(paths, failed_job)
+    recovery_path = paths.development_resource_plan_recovery_budget
+    if not recovery_path.exists():
+        return None, failed_job
+    recovery = _object(recovery_path, "development resource plan recovery budget")
+    if (
+        recovery.get("schema_version") != DEVELOPMENT_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA
+        or recovery.get("work_item") != "P3-STAGE-013-C-R1"
+        or recovery.get("metadata_recovery_of") != failed_job.job_id
+        or recovery.get("failed_input_digest") != failed_job.input_digest
+        or not isinstance(recovery.get("job"), Mapping)
+    ):
+        raise StageWorkerError("development resource plan recovery budget marker differs")
+    recovery_job = StageJob.from_dict(recovery["job"])
+    if (
+        recovery_job.kind != STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB
+        or recovery.get("input_digest") != recovery_job.input_digest
+    ):
+        raise StageWorkerError("development resource plan recovery budget marker differs")
+    if recovery_job.code_revision != code_revision:
+        raise StageWorkerError("development resource plan recovery has no further authority")
+    return _idempotent_stage_submission(paths, recovery_job), failed_job
 
 
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
@@ -2329,6 +2456,7 @@ def submit_job(
     positive_instability_quantitative_d1_retry_of: StageJob | None = None
     positive_instability_quantitative_d1_recovery_of: StageJob | None = None
     orderly_consolidation_joint_d1_recovery_of: StageJob | None = None
+    development_resource_plan_recovery_of: StageJob | None = None
     if kind == STAGE_ORDER_RULE_PREPARE_JOB:
         existing, prepare_retry_of = _existing_order_rule_prepare_submission(
             paths, code_revision=code_revision,
@@ -2391,8 +2519,10 @@ def submit_job(
         if existing is not None:
             return existing
     if kind == STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB:
-        existing = _existing_development_resource_plan_submission(
-            paths, code_revision=code_revision,
+        existing, development_resource_plan_recovery_of = (
+            _existing_development_resource_plan_submission(
+                paths, code_revision=code_revision,
+            )
         )
         if existing is not None:
             return existing
@@ -2436,7 +2566,14 @@ def submit_job(
     )
     atomic_proposition_g1_reserved = job.kind == STAGE_ATOMIC_PROPOSITION_G1_JOB
     development_resource_census_reserved = job.kind == STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB
-    development_resource_plan_reserved = job.kind == STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB
+    development_resource_plan_reserved = (
+        job.kind == STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB
+        and development_resource_plan_recovery_of is None
+    )
+    development_resource_plan_recovery_reserved = (
+        job.kind == STAGE_DEVELOPMENT_RESOURCE_PLAN_JOB
+        and development_resource_plan_recovery_of is not None
+    )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
@@ -2512,6 +2649,13 @@ def submit_job(
             paths.development_resource_plan_budget,
             _development_resource_plan_budget_value(job),
         )
+    if development_resource_plan_recovery_reserved:
+        _exclusive_json(
+            paths.development_resource_plan_recovery_budget,
+            _development_resource_plan_recovery_budget_value(
+                development_resource_plan_recovery_of, job
+            ),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -2550,6 +2694,8 @@ def submit_job(
             paths.development_resource_census_budget.unlink(missing_ok=True)
         if development_resource_plan_reserved:
             paths.development_resource_plan_budget.unlink(missing_ok=True)
+        if development_resource_plan_recovery_reserved:
+            paths.development_resource_plan_recovery_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -2583,6 +2729,8 @@ def submit_job(
             paths.development_resource_census_budget.unlink(missing_ok=True)
         if development_resource_plan_reserved:
             paths.development_resource_plan_budget.unlink(missing_ok=True)
+        if development_resource_plan_recovery_reserved:
+            paths.development_resource_plan_recovery_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -2593,6 +2741,8 @@ def submit_job(
         result["transport_recovery_of"] = positive_instability_quantitative_d1_recovery_of.job_id
     if orderly_consolidation_joint_d1_recovery_of is not None:
         result["transport_recovery_of"] = orderly_consolidation_joint_d1_recovery_of.job_id
+    if development_resource_plan_recovery_of is not None:
+        result["metadata_recovery_of"] = development_resource_plan_recovery_of.job_id
     return result
 
 

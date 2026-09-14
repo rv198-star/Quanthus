@@ -1,0 +1,65 @@
+{
+  "schema_version": "quanthus.stage-development-resource-plan-recovery.v1",
+  "work_item": "P3-STAGE-013-C-R1",
+  "recovery_kind": "metadata_plan_temporal_spread_revision_only",
+  "failed_job": {
+    "job_id": "stage_6fff29f632534045a0c67bf6f175474f",
+    "code_revision": "d1008c653b5675b69ed2c9b1a51c2af8a5e88d9d",
+    "input_digest": "sha256:95f1f38502ce37df181fd786cf3d3a2329c50b3c9827fe9f0fbd3bc2f5af9550",
+    "terminal_state": "failed",
+    "error": "stage_development_resource_plan_process_failed",
+    "artifact_published": false,
+    "diagnosis": "cell_global_identity_shortfall:STAR_PRE_CHINEXT_20PCT/STAR under strict per-window slotting"
+  },
+  "bindings": {
+    "original_plan_config": {
+      "path": "config/stage-learning/stage-development-resource-plan.v1.json",
+      "digest": "sha256:f4e62c7e1e829b2efe82c887902b4eb2d196cd09526150ea465accf93edf7a97"
+    },
+    "parent_quota_freeze": {
+      "path": "config/stage-learning/stage-development-resource-quota-freeze.v1.json",
+      "digest": "sha256:d6dc034d0751419d3eb514034de642f11cae5a5d18e611ececce1e489b0b55ca"
+    },
+    "quota_revision_r1": {
+      "path": "config/stage-learning/stage-development-resource-quota-revision-r1.v1.json",
+      "digest": "sha256:a6057cb98068307c1327745c14401e3505cbeebe6e4f72951e7ecbfd895b2b56"
+    },
+    "capacity_census_manifest_sha256": "sha256:354a936dc9dc7262e1cc4f7377e5048cfa8a00b8d9585bb3fe7d39ede47c03c9"
+  },
+  "observed_exposure_before_recovery": {
+    "market_price_read": false,
+    "morphology_read": false,
+    "label_or_reference_read": false,
+    "candidate_output_read": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "authority": {
+    "maximum_metadata_recovery_jobs": 1,
+    "same_eight_cell_quotas_required": true,
+    "same_total_reserve_required": true,
+    "same_primary_fallback_counts_required": true,
+    "same_global_identity_uniqueness_required": true,
+    "same_identity_seed_required": true,
+    "same_window_seed_required": true,
+    "same_census_artifact_required": true,
+    "same_protected_surfaces_required": true,
+    "cross_cell_fallback": false,
+    "post_result_replacement": false,
+    "parameter_search": false,
+    "semantic_retry": false,
+    "market_price_read": false,
+    "morphology_read": false,
+    "label_or_reference_read": false,
+    "candidate_output_read": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "disposition": "AUTHORIZE_ONE_METADATA_PLAN_R1_RECOVERY"
+}

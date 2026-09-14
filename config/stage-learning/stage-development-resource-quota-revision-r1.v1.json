@@ -1,0 +1,63 @@
+{
+  "schema_version": "quanthus.stage-development-resource-quota-revision-r1.v1",
+  "work_item": "P3-STAGE-013-B-R1",
+  "state": "CAPACITY_CONSTRAINED_TEMPORAL_SPREAD_FROZEN_BEFORE_MARKET_READ",
+  "effective_date": "2026-09-14",
+  "parent_quota_freeze": {
+    "path": "config/stage-learning/stage-development-resource-quota-freeze.v1.json",
+    "digest": "sha256:d6dc034d0751419d3eb514034de642f11cae5a5d18e611ececce1e489b0b55ca"
+  },
+  "failed_plan_job": {
+    "job_id": "stage_6fff29f632534045a0c67bf6f175474f",
+    "code_revision": "d1008c653b5675b69ed2c9b1a51c2af8a5e88d9d",
+    "input_digest": "sha256:95f1f38502ce37df181fd786cf3d3a2329c50b3c9827fe9f0fbd3bc2f5af9550",
+    "terminal_state": "failed",
+    "error": "stage_development_resource_plan_process_failed",
+    "artifact_published": false,
+    "diagnosis": "strict_equal_window_slotting_exhausted_available_unique_identity_in_STAR_PRE_CHINEXT_20PCT_STAR_before_32_cell_reserve_was_materialized"
+  },
+  "preserved_parent_surface": {
+    "structurally_present_cell_count": 8,
+    "reserve_per_cell": 32,
+    "primary_per_cell": 24,
+    "fallback_per_cell": 8,
+    "total_reserve": 256,
+    "total_primary": 192,
+    "total_fallback": 64,
+    "global_identity_uniqueness": true,
+    "cross_cell_fallback": false,
+    "post_result_replacement": false,
+    "identity_seed": "p013-era-board-exposure-v1|identity-reserve",
+    "window_seed": "p013-era-board-exposure-v1|window-assignment"
+  },
+  "revised_temporal_spread": {
+    "algorithm": "capacity_constrained_max_min_waterfill_v1",
+    "reason": "P013-A proved at least 32 unique identities at cell level, while the first P013-C materialization proved that strict near-equal allocation across every 61-session window is stronger than the observed window-level capacity in the earliest STAR era. The revision preserves the cell quota and identity-independence target while removing an unneeded per-window equality constraint.",
+    "selection_steps": [
+      "within the current cell, consider only exposure-aware available metadata tokens whose economic identity is not already used by an earlier scarcity-priority cell",
+      "at each slot choose a non-exhausted window with the smallest assigned count",
+      "break equal assigned-count ties by the smallest remaining unique-identity capacity, then frozen window-seed hash, then chronological window start and window id",
+      "within the chosen window choose an identity with the fewest alternative eligible windows in the same cell, then deterministic frozen-seed hash, then economic identity",
+      "remove the chosen economic identity from every window in the current batch",
+      "continue until 32 unique identities are reserved for the cell"
+    ],
+    "representation_floor": "every non-empty eligible metadata window receives one assignment before any still-nonempty window receives a second assignment whenever unique-identity coupling permits",
+    "fixed_max_assignment_difference": null,
+    "exhausted_window_policy": "a metadata window with no remaining globally unused eligible identity is removed from subsequent waterfill rounds; remaining slots stay inside the same era-board cell",
+    "cell_shortfall_policy": "if the union of globally unused eligible economic identities across the cell cannot reach 32, fail before market read; no cross-cell fill",
+    "price_or_morphology_used": false,
+    "result_aware": false
+  },
+  "review_boundaries": {
+    "market_price_read": false,
+    "morphology_read": false,
+    "label_or_reference_read": false,
+    "candidate_output_read": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "disposition": "APPROVE_CAPACITY_CONSTRAINED_TEMPORAL_SPREAD_R1",
+  "claim_ceiling": "R1 repairs metadata-plan feasibility only. It does not change the eight equal era-board cell quotas, create market-prevalence weights, relax global identity uniqueness, authorize result-bearing reads, or qualify any atomic proposition/candidate/Stage projection."
+}

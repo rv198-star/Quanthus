@@ -17,6 +17,7 @@ from quanthus.stage_learning.worker import (
     STAGE_ATOMIC_PROPOSITION_G1_JOB,
     STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
     STAGE_CAPACITY_CENSUS_JOB,
+    STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
     STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
     STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB,
     STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
@@ -49,6 +50,7 @@ from quanthus.stage_learning.worker import (
     doctor,
     read_status,
     seal_p014_review,
+    seal_p015_review,
     submit_job,
 )
 
@@ -218,6 +220,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p014_c_failure"] is None
     assert result["recent_p015_a_failure"] is None
     assert result["recent_p015_b_failure"] is None
+    assert result["recent_p015_c_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
@@ -227,6 +230,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
         STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB,
         STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
+        STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -261,6 +265,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         (STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB, "recent_p014_c_failure"),
         (STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB, "recent_p015_a_failure"),
         (STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB, "recent_p015_b_failure"),
+        (STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB, "recent_p015_c_failure"),
     ),
 )
 def test_doctor_exposes_only_bounded_recent_failure_tail(
@@ -405,6 +410,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
         STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB,
         STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
+        STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -829,6 +835,37 @@ def test_complete_reserve_additional_review_set_allows_one_exact_recovery(
             worker_paths,
             code_revision="c" * 40,
             kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
+        )
+
+
+def test_complete_reserve_additional_review_prepare_is_one_shot_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
+    )
+    assert submitted["kind"] == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/stage-complete-reserve-additional-review-prepare.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB][
+        "wall_seconds"
+    ] == 3600
+    assert worker_paths.complete_reserve_additional_review_prepare_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
         )
 
 
@@ -2809,6 +2846,344 @@ def test_p014_selection_transport_requires_immutable_review_ledger(tmp_path: Pat
     changed["opinions"][0]["short_reason"] = "changed"
     with pytest.raises(StageWorkerError, match="already sealed"):
         seal_p014_review(worker_paths, job_id, changed)
+
+
+def test_p015_review_prepare_status_exposes_blind_pages_without_selection(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "f" * 32
+    source_rows = {}
+    history_refs = []
+    for index in range(21):
+        row = {
+            "security_code": "688001",
+            "security_id": "security-p015-new",
+            "market_date": f"2020-01-{index + 1:02d}",
+            "high": "10",
+            "low": "9",
+            "close": "9.5",
+            "coordinate_epoch": "epoch",
+            "reset_reason": None,
+        }
+        ref = _digest(row)
+        source_rows[ref] = row
+        history_refs.append(ref)
+    case_body = {
+        "security_code": "688001",
+        "security_id": "security-p015-new",
+        "market_date": "2020-01-21",
+        "sampling_stratum": "representative",
+        "coordinate_ref": _digest({"coordinate": "p015"}),
+        "primary_available": True,
+        "input_reason": "admitted_retrospective_only",
+        "availability_reasons": {"trend": "available", "order": "available"},
+        "primary": {
+            "range_width": {
+                "value": "0.1",
+                "reason": "available",
+                "revision_id": _digest({"p": 1}),
+            },
+            "width_change": {
+                "value": "-0.2",
+                "reason": "available",
+                "revision_id": _digest({"p": 2}),
+            },
+            "center_shift": {
+                "value": "0.01",
+                "reason": "available",
+                "revision_id": _digest({"p": 3}),
+            },
+            "directional_efficiency": {
+                "value": "0.05",
+                "reason": "available",
+                "revision_id": _digest({"p": 4}),
+            },
+        },
+        "history_refs": history_refs,
+    }
+    case = {"case_id": _digest(case_body), **case_body}
+    evidence = {"source_rows": source_rows, "cases": [case]}
+    path_facts = {
+        "cases": {
+            case["case_id"]: {
+                "structure.geometry.range-traversal": {
+                    "value": "0.2",
+                    "reason": "available",
+                    "revision_id": _digest({"path": 1}),
+                },
+                "structure.geometry.counter-direction-excursion-share": {
+                    "value": "0.8",
+                    "reason": "available",
+                    "revision_id": _digest({"path": 2}),
+                },
+            }
+        }
+    }
+    strata = {
+        case["case_id"]: {
+            "era": "STAR_AND_CHINEXT_20PCT",
+            "board_family": "STAR",
+            "cell": "STAR_AND_CHINEXT_20PCT/STAR",
+            "plan_role": "fallback",
+            "plan_slot": 25,
+            "window_id": "STAR_AND_CHINEXT_20PCT|STAR|25",
+            "readiness_source_member_closure_digest": "sha256:" + "1" * 64,
+        }
+    }
+    artifact = worker_paths.runs / job_id / "stage-p015-review-prepare-test"
+    artifact.mkdir(parents=True)
+    payloads = {
+        "evidence.json": evidence,
+        "path-facts.json": path_facts,
+        "case-strata.json": strata,
+    }
+    files = {}
+    for name, value in payloads.items():
+        raw = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        (artifact / name).write_bytes(raw)
+        files[name] = "sha256:" + hashlib.sha256(raw).hexdigest()
+    manifest = {"files": files}
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-14T16:30:00+00:00",
+        "started_at": "2026-09-14T16:30:01+00:00",
+        "completed_at": "2026-09-14T16:30:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "complete_reserve_additional_review_prepare": {
+                "development_selected_case_count": 1,
+                "case_strata_digest": _digest(strata),
+                "review_ready": True,
+            },
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-14T16:30:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+
+    observed = read_status(worker_paths, job_id)
+    assert observed["review_ledger_sealed"] is False
+    assert "selection_transport" not in observed
+    index = observed["review_transport_index"]
+    assert index["schema_version"] == (
+        "quanthus.stage-complete-reserve-additional-primary-review-index.v1"
+    )
+    assert index["case_count"] == 1
+    assert index["threshold_basis_included"] is False
+    assert index["candidate_output_included"] is False
+    assert index["envelope_measurement_included"] is False
+    page = read_status(worker_paths, index["pages"][0]["job_id"])
+    decoded = json.loads(gzip.decompress(base64.b64decode(page["review_transport"]["payload"])))
+    assert decoded["schema_version"] == (
+        "quanthus.stage-complete-reserve-additional-primary-review-transport.v1"
+    )
+    assert decoded["cases"][0]["resource_stratum"]["window_id"] == (
+        "STAR_AND_CHINEXT_20PCT|STAR|25"
+    )
+    assert "threshold_basis" not in decoded
+    assert "candidate_grid" not in decoded
+    assert "envelope_measurements" not in decoded
+
+
+def test_p015_seal_reuses_frozen_p014_ledger_without_rewriting_it(tmp_path: Path) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    config_root = worker_paths.control_repo / "config/stage-learning"
+    config_root.mkdir(parents=True, exist_ok=True)
+
+    p014_job_id = "stage_" + "a" * 32
+    old_opinions = [
+        {
+            "index": index,
+            "case_id": _digest({"old": index}),
+            "short_term": {
+                "structural_instability_20": "FALSE",
+                "coherent_directional_relocation_20": "FALSE",
+                "orderly_consolidation_20": "FALSE",
+            },
+            "fund": {
+                "structural_instability_20": "FALSE",
+                "coherent_directional_relocation_20": "FALSE",
+                "orderly_consolidation_20": "FALSE",
+            },
+            "short_reason": "Frozen P014 primary opinion.",
+            "fund_reason": "Frozen P014 primary opinion.",
+        }
+        for index in range(192)
+    ]
+    old_summary = {
+        "atomic_reference_counts": {
+            "structural_instability_20": {"FALSE": 192},
+            "coherent_directional_relocation_20": {"FALSE": 192},
+            "orderly_consolidation_20": {"FALSE": 192},
+        },
+        "atomic_disagreement_count": {
+            "structural_instability_20": 0,
+            "coherent_directional_relocation_20": 0,
+            "orderly_consolidation_20": 0,
+        },
+        "projected_reference_counts": {"NEITHER": 192},
+    }
+    old_ledger = {
+        "schema_version": "quanthus.stage-atomic-proposition-admission-qualified-review-ledger.v1",
+        "work_item": "P3-STAGE-014-D",
+        "case_count": 192,
+        "opinions": old_opinions,
+        "reference_summary": old_summary,
+    }
+    old_path = worker_paths.atomic_proposition_admission_qualified_review_ledger(p014_job_id)
+    old_path.parent.mkdir(parents=True, exist_ok=True)
+    old_path.write_text(json.dumps(old_ledger, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    old_sha = "sha256:" + hashlib.sha256(old_path.read_bytes()).hexdigest()
+
+    closeout = {
+        "job": {"job_id": p014_job_id},
+        "review_ledger": {"ledger_sha256": old_sha, "case_count": 192},
+    }
+    closeout_path = config_root / "stage-atomic-proposition-admission-qualified-d1-closeout.v1.json"
+    closeout_path.write_text(json.dumps(closeout), encoding="utf-8")
+    closeout_sha = "sha256:" + hashlib.sha256(closeout_path.read_bytes()).hexdigest()
+    c_config = {
+        "schema_version": "quanthus.stage-complete-reserve-additional-review-prepare.v1",
+        "work_item": "P3-STAGE-015-C1",
+        "state": "PREREGISTERED_EXACT_60_PRIMARY_BLIND_REVIEW_PREPARE",
+        "bindings": {
+            "p014_closeout": {
+                "path": (
+                    "config/stage-learning/"
+                    "stage-atomic-proposition-admission-qualified-d1-closeout.v1.json"
+                ),
+                "file_sha256": closeout_sha,
+                "review_ledger_sha256": old_sha,
+                "review_case_count": 192,
+            }
+        },
+    }
+    (config_root / "stage-complete-reserve-additional-review-prepare.v1.json").write_text(
+        json.dumps(c_config), encoding="utf-8"
+    )
+
+    job_id = "stage_" + "b" * 32
+    cases = [{"case_id": _digest({"new": index})} for index in range(60)]
+    evidence = {"source_rows": {}, "cases": cases}
+    path_facts = {"cases": {}}
+    artifact = worker_paths.runs / job_id / "stage-complete-reserve-additional-review-test"
+    artifact.mkdir(parents=True)
+    evidence_raw = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
+    paths_raw = json.dumps(path_facts, sort_keys=True, separators=(",", ":")).encode()
+    (artifact / "evidence.json").write_bytes(evidence_raw)
+    (artifact / "path-facts.json").write_bytes(paths_raw)
+    files = {
+        "evidence.json": "sha256:" + hashlib.sha256(evidence_raw).hexdigest(),
+        "path-facts.json": "sha256:" + hashlib.sha256(paths_raw).hexdigest(),
+    }
+    manifest = {"files": files}
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-14T16:30:00+00:00",
+        "started_at": "2026-09-14T16:30:01+00:00",
+        "completed_at": "2026-09-14T16:30:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "complete_reserve_additional_review_prepare": {
+                "development_selected_case_count": 60,
+                "development_evidence_digest": _digest(evidence),
+                "review_ready": True,
+            },
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-14T16:30:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+
+    new_opinions = [
+        {
+            "index": index,
+            "case_id": case["case_id"],
+            "short_term": {
+                "structural_instability_20": "FALSE",
+                "coherent_directional_relocation_20": "FALSE",
+                "orderly_consolidation_20": "TRUE",
+            },
+            "fund": {
+                "structural_instability_20": "FALSE",
+                "coherent_directional_relocation_20": "FALSE",
+                "orderly_consolidation_20": "TRUE",
+            },
+            "short_reason": "New blind packet supports orderly consolidation.",
+            "fund_reason": "New blind packet supports orderly consolidation.",
+        }
+        for index, case in enumerate(cases)
+    ]
+    submission = {
+        "schema_version": "quanthus.stage-complete-reserve-additional-review-submission.v1",
+        "work_item": "P3-STAGE-015-C",
+        "parent_job_id": job_id,
+        "source_manifest_sha256": manifest_sha,
+        "development_evidence_digest": _digest(evidence),
+        "provenance": {
+            "kind": "self_simulated",
+            "origin_id": "chatgpt-p015-c-test",
+            "session_id": "test-session",
+        },
+        "candidate_output_seen_during_review": False,
+        "threshold_basis_seen_during_review": False,
+        "envelope_measurement_seen_during_review": False,
+        "selection_transport_seen_during_review": False,
+        "existing_p014_opinions_seen_during_review": False,
+        "future_rows_seen_during_review": False,
+        "preserved_2021_seen_during_review": False,
+        "opinions": new_opinions,
+    }
+    receipt = seal_p015_review(worker_paths, job_id, submission)
+    assert receipt["sealed"] is True
+    assert receipt["new_case_count"] == 60
+    assert receipt["combined_case_count"] == 252
+    assert receipt["frozen_p014_review_ledger_sha256"] == old_sha
+    assert receipt["candidate_scoring_authorized"] is False
+    assert receipt["preserved_2021_read_authorized"] is False
+    combined = receipt["combined_reference_summary"]
+    assert combined["atomic_reference_counts"]["orderly_consolidation_20"] == {
+        "FALSE": 192,
+        "TRUE": 60,
+    }
+    assert combined["projected_reference_counts"] == {"NEITHER": 192, "STAGE_2": 60}
+    assert old_path.read_text(encoding="utf-8") == json.dumps(
+        old_ledger, sort_keys=True, indent=2
+    ) + "\n"
+
+    repeated = seal_p015_review(worker_paths, job_id, submission)
+    assert repeated["new_review_ledger_sha256"] == receipt["new_review_ledger_sha256"]
+    changed = json.loads(json.dumps(submission))
+    changed["opinions"][0]["short_reason"] = "changed"
+    with pytest.raises(StageWorkerError, match="already sealed"):
+        seal_p015_review(worker_paths, job_id, changed)
 
 
 def test_order_rule_resolve_score_requires_successful_parent_and_is_single_job(

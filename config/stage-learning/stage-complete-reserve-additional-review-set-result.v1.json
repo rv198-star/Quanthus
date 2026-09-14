@@ -1,0 +1,67 @@
+{
+  "schema_version": "quanthus.stage-complete-reserve-additional-review-set-result.v1",
+  "work_item": "P3-STAGE-015-B",
+  "state": "PASS_COMPLETE_ADDITIONAL_REVIEW_SET_FROZEN",
+  "effective_date": "2026-09-14",
+  "initial_job": {
+    "job_id": "stage_66051c46d8d94852888182e67bef3b7a",
+    "code_revision": "6c94ab786b2d3f92f8b5cbd9e68ecb1f066211bb",
+    "input_digest": "sha256:166360a7e8be79bf9af2cdd1f9380a8b48af1b47fae20e47cceff16acb13602f",
+    "terminal_state": "failed",
+    "exit_code": 1,
+    "error": "stage_complete_reserve_additional_review_set_process_failed",
+    "failure_reason": "CompleteReserveAdditionalReviewSetError:p014_review_ledger_binding",
+    "artifact_published": false,
+    "runtime_artifact_read_reached": false
+  },
+  "recovery_job": {
+    "job_id": "stage_ac0fb812b46e4ae5bfe57d7b2dc82aee",
+    "code_revision": "1cfa9a4bc49e748311a02a65e98ca66f564b2f87",
+    "input_digest": "sha256:c780891f6ed560a5107fc79280eb358bd0921a806b9466393de8f10dbdc4ade4",
+    "technical_recovery_of": "stage_66051c46d8d94852888182e67bef3b7a",
+    "terminal_state": "succeeded",
+    "exit_code": 0
+  },
+  "artifact": {
+    "run_id": "stage-complete-reserve-additional-review-set-20260914T161521Z",
+    "artifact_relative_path": "runs/stage-worker/stage_ac0fb812b46e4ae5bfe57d7b2dc82aee/stage-complete-reserve-additional-review-set-20260914T161521Z",
+    "manifest_sha256": "sha256:fb86cf33a2542aa91eff17d7e4faea963e44e0210f9d5f7d7f8dc87da92b5a76",
+    "set_digest": "sha256:e9960db222cdb8bdd2bdffb02ddea1351b9b7610616392d9daaa751a7d879358",
+    "identity_digest": "sha256:01031e7c404431f4e3c861a759bf5bdecafbffd398a4869a443cfe70e4d6cb42",
+    "file_count": 3,
+    "verified": true
+  },
+  "counts": {
+    "row_count": 60,
+    "cell_count": 8
+  },
+  "cell_counts": {
+    "PRE_STAR/CHINEXT": 7,
+    "PRE_STAR/MAIN": 7,
+    "STAR_AND_CHINEXT_20PCT/CHINEXT": 8,
+    "STAR_AND_CHINEXT_20PCT/MAIN": 7,
+    "STAR_AND_CHINEXT_20PCT/STAR": 8,
+    "STAR_PRE_CHINEXT_20PCT/CHINEXT": 7,
+    "STAR_PRE_CHINEXT_20PCT/MAIN": 8,
+    "STAR_PRE_CHINEXT_20PCT/STAR": 8
+  },
+  "selection": {
+    "all_matching_rows_included": true,
+    "positive_count_stop": false,
+    "semantic_selection": false,
+    "resource_replacement": false,
+    "new_identity_discovery": false
+  },
+  "authority": {
+    "semantic_values_read": false,
+    "reference_opinions_read": false,
+    "candidate_output_read": false,
+    "threshold_basis_read": false,
+    "selection_transport_read": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2025_read": false
+  },
+  "next_gate": "Freeze a P015-C blind-review prepare runtime bound to this exact 60-row set. It may expose only P012 primary-review evidence plus frozen Era/Board metadata and may not re-review the immutable P014 192 cases.",
+  "claim_ceiling": "This result freezes the exact additional blind-review denominator from the complete precommitted reserve. It does not contain reviewer opinions, candidate scores, thresholds, Stage projections, market prevalence or economic value."
+}

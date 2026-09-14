@@ -1,0 +1,128 @@
+{
+  "schema_version": "quanthus.stage-complete-reserve-additional-review-prepare.v1",
+  "work_item": "P3-STAGE-015-C1",
+  "state": "PREREGISTERED_EXACT_60_PRIMARY_BLIND_REVIEW_PREPARE",
+  "purpose": "Build reviewer-visible primary-scale evidence for every exact P015-B additional-review resource, without reading or publishing threshold, candidate, envelope, prior-review opinion or protected-evaluation content.",
+  "bindings": {
+    "p015_b_result": {
+      "path": "config/stage-learning/stage-complete-reserve-additional-review-set-result.v1.json",
+      "file_sha256": "sha256:24dd4dc3f12fe2610bb4bf55792de2f8105093cd0079999faf8076c535f43614"
+    },
+    "additional_review_set_artifact": {
+      "job_id": "stage_ac0fb812b46e4ae5bfe57d7b2dc82aee",
+      "code_revision": "1cfa9a4bc49e748311a02a65e98ca66f564b2f87",
+      "artifact_relative_path": "runs/stage-worker/stage_ac0fb812b46e4ae5bfe57d7b2dc82aee/stage-complete-reserve-additional-review-set-20260914T161521Z",
+      "manifest_sha256": "sha256:fb86cf33a2542aa91eff17d7e4faea963e44e0210f9d5f7d7f8dc87da92b5a76",
+      "set_digest": "sha256:e9960db222cdb8bdd2bdffb02ddea1351b9b7610616392d9daaa751a7d879358",
+      "identity_digest": "sha256:01031e7c404431f4e3c861a759bf5bdecafbffd398a4869a443cfe70e4d6cb42",
+      "row_count": 60
+    },
+    "p014_closeout": {
+      "path": "config/stage-learning/stage-atomic-proposition-admission-qualified-d1-closeout.v1.json",
+      "file_sha256": "sha256:f9b7e4f9130e335d3be1246116d64c4a433ce686d153401f1bab437011283aa7",
+      "review_ledger_sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69",
+      "review_case_count": 192
+    },
+    "atomic_review_contract": {
+      "path": "config/stage-learning/stage-atomic-primary-review-contract.v1.json",
+      "canonical_digest": "sha256:74900cfde3d7e86744cab8621a3fd14710fd3fd900fa18f53ef9a98ec750a80c"
+    },
+    "evidence_protocol": {
+      "path": "config/stage-learning/order-reference-evidence-scope-p013.v1.json",
+      "canonical_digest": "sha256:54587544cbeebbceaa31b50a878180cec851743ab90e1e42aff06c87fd86de85"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "file_sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    },
+    "preserved_2021": {
+      "identity_count": 160,
+      "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+      "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+      "state": "UNREAD"
+    }
+  },
+  "resource_set": {
+    "row_count": 60,
+    "source": "exact_P015_B_all_ready_unreviewed_set",
+    "all_matching_rows_included": true,
+    "one_case_per_economic_identity": true,
+    "case_t": "exact_window_end_only",
+    "open_sessions_per_window": 61,
+    "fallback_or_replacement": false,
+    "new_identity_discovery": false,
+    "semantic_selection": false,
+    "positive_count_stop": false
+  },
+  "market_read": {
+    "read_unit": "exact_P015_B_identity_window_only",
+    "read_outside_exact_window": false,
+    "read_identity_history_outside_exact_window": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "review_prepare": {
+    "expected_case_count": 60,
+    "require_primary_structure_facts_at_t": true,
+    "require_range_traversal_at_t": true,
+    "require_counter_direction_excursion_share_at_t": true,
+    "require_primary_21_close_history": true,
+    "publish_evidence": true,
+    "publish_directional_path_facts": true,
+    "publish_era_board_stratum": true,
+    "publish_threshold_basis": false,
+    "publish_candidate_grid": false,
+    "publish_envelope_measurements": false,
+    "read_existing_p014_opinions": false
+  },
+  "review": {
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "primary_atomic_truths": [
+      "structural_instability_20",
+      "coherent_directional_relocation_20",
+      "orderly_consolidation_20"
+    ],
+    "truth_values": ["TRUE", "FALSE", "UNKNOWN"],
+    "candidate_output_visible": false,
+    "threshold_basis_visible": false,
+    "envelope_measurement_visible": false,
+    "existing_p014_opinions_visible": false,
+    "future_rows_visible": false,
+    "preserved_2021_visible": false,
+    "immutable_new_review_ledger_required": true,
+    "combined_reference_resolution_after_new_ledger_seal_only": true
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 3600
+  },
+  "output": {
+    "selection_schema": "quanthus.stage-complete-reserve-additional-review-selection.v1",
+    "source_binding_schema": "quanthus.stage-complete-reserve-additional-review-source-binding.v1",
+    "case_strata_schema": "quanthus.stage-complete-reserve-additional-review-case-strata.v1",
+    "summary_schema": "quanthus.stage-complete-reserve-additional-review-prepare-summary.v1",
+    "artifact_schema": "quanthus.stage-complete-reserve-additional-review-prepare-artifact.v1"
+  },
+  "authority": {
+    "implementation": true,
+    "result_bearing_market_read": true,
+    "structure_fact_build": true,
+    "blind_review_packet_publication": true,
+    "existing_p014_opinion_read": false,
+    "reference_opinion_generation_inside_job": false,
+    "threshold_basis_computation": false,
+    "candidate_output_computation": false,
+    "envelope_measurement_computation": false,
+    "candidate_scoring": false,
+    "selection_transport_read": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This prepare Job may only reconstruct blind reviewer-visible primary evidence for the exact 60-row P015-B set. It cannot generate opinions, combine old/new references, compute or inspect candidates/thresholds/envelope scoring, evaluate sufficiency, or access preserved evaluation."
+}

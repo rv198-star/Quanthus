@@ -62,6 +62,12 @@ P015_B_CONFIG = (
 P015_B_RECOVERY = (
     ROOT / "config/stage-learning/stage-complete-reserve-additional-review-set-recovery.v1.json"
 )
+P015_B_RESULT = (
+    ROOT / "config/stage-learning/stage-complete-reserve-additional-review-set-result.v1.json"
+)
+P015_C_CONFIG = (
+    ROOT / "config/stage-learning/stage-complete-reserve-additional-review-prepare.v1.json"
+)
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -724,6 +730,69 @@ def test_stage015_b_recovery_is_one_field_path_technical_recovery_only() -> None
         "selection_transport_read",
         "candidate_scoring",
         "preserved_2021_market_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+
+
+def test_stage015_b_result_and_c_prepare_keep_review_blind_and_incremental() -> None:
+    result = json.loads(P015_B_RESULT.read_text(encoding="utf-8"))
+    assert result["state"] == "PASS_COMPLETE_ADDITIONAL_REVIEW_SET_FROZEN"
+    assert result["initial_job"]["terminal_state"] == "failed"
+    assert result["initial_job"]["artifact_published"] is False
+    assert result["recovery_job"]["job_id"] == "stage_ac0fb812b46e4ae5bfe57d7b2dc82aee"
+    assert result["recovery_job"]["terminal_state"] == "succeeded"
+    assert result["recovery_job"]["technical_recovery_of"] == (
+        "stage_66051c46d8d94852888182e67bef3b7a"
+    )
+    assert result["counts"] == {"row_count": 60, "cell_count": 8}
+    assert sum(result["cell_counts"].values()) == 60
+    assert result["selection"]["all_matching_rows_included"] is True
+    assert result["selection"]["positive_count_stop"] is False
+    assert result["selection"]["semantic_selection"] is False
+    assert result["authority"]["reference_opinions_read"] is False
+    assert result["authority"]["candidate_scoring"] is False
+    assert result["authority"]["preserved_2021_market_read"] is False
+    assert result["authority"]["2025_read"] is False
+
+    config = json.loads(P015_C_CONFIG.read_text(encoding="utf-8"))
+    assert config["work_item"] == "P3-STAGE-015-C1"
+    assert config["state"] == "PREREGISTERED_EXACT_60_PRIMARY_BLIND_REVIEW_PREPARE"
+    assert config["bindings"]["additional_review_set_artifact"]["row_count"] == 60
+    assert config["bindings"]["p014_closeout"]["review_case_count"] == 192
+    assert config["resource_set"]["all_matching_rows_included"] is True
+    assert config["resource_set"]["positive_count_stop"] is False
+    assert config["review_prepare"]["expected_case_count"] == 60
+    assert config["review_prepare"]["publish_evidence"] is True
+    assert config["review_prepare"]["publish_directional_path_facts"] is True
+    assert config["review_prepare"]["publish_era_board_stratum"] is True
+    assert config["review_prepare"]["publish_threshold_basis"] is False
+    assert config["review_prepare"]["publish_candidate_grid"] is False
+    assert config["review_prepare"]["publish_envelope_measurements"] is False
+    assert config["review_prepare"]["read_existing_p014_opinions"] is False
+    review = config["review"]
+    assert review["roles"] == ["short_term", "fund"]
+    assert review["candidate_output_visible"] is False
+    assert review["threshold_basis_visible"] is False
+    assert review["envelope_measurement_visible"] is False
+    assert review["existing_p014_opinions_visible"] is False
+    assert review["preserved_2021_visible"] is False
+    authority = config["authority"]
+    assert authority["result_bearing_market_read"] is True
+    assert authority["structure_fact_build"] is True
+    assert authority["blind_review_packet_publication"] is True
+    for key in (
+        "existing_p014_opinion_read",
+        "reference_opinion_generation_inside_job",
+        "threshold_basis_computation",
+        "candidate_output_computation",
+        "envelope_measurement_computation",
+        "candidate_scoring",
+        "selection_transport_read",
+        "preserved_2021_read",
+        "2022_2024_read",
         "2025_read",
         "daily_or_strategy",
         "trading",

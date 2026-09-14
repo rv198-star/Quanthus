@@ -77,6 +77,9 @@ STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB = (
 STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB = (
     "quanthus.stage-complete-reserve-additional-review-set.v1"
 )
+STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB = (
+    "quanthus.stage-complete-reserve-additional-review-prepare.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -128,6 +131,9 @@ COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_BUDGET_SCHEMA = (
 )
 COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_RECOVERY_BUDGET_SCHEMA = (
     "quanthus.stage-complete-reserve-additional-review-set-recovery-budget.v1"
+)
+COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_BUDGET_SCHEMA = (
+    "quanthus.stage-complete-reserve-additional-review-prepare-budget.v1"
 )
 DEVELOPMENT_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-development-resource-plan-recovery.v1.json"
@@ -336,6 +342,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-complete-reserve-additional-review-set-*",
         "process_error": "stage_complete_reserve_additional_review_set_process_failed",
         "wall_seconds": 600,
+    },
+    STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB: {
+        "config": "config/stage-learning/stage-complete-reserve-additional-review-prepare.v1.json",
+        "module": "quanthus.stage_learning.complete_reserve_additional_review_prepare",
+        "artifact_glob": "stage-complete-reserve-additional-review-prepare-*",
+        "process_error": "stage_complete_reserve_additional_review_prepare_process_failed",
+        "wall_seconds": 3600,
     },
 }
 
@@ -581,6 +594,15 @@ class StageWorkerPaths:
     @property
     def complete_reserve_additional_review_set_recovery_budget(self) -> Path:
         return self.control_root / "complete-reserve-additional-review-set-recovery-budget.json"
+
+    @property
+    def complete_reserve_additional_review_prepare_budget(self) -> Path:
+        return self.control_root / "complete-reserve-additional-review-prepare-budget.json"
+
+    def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
+        if not _JOB_ID.fullmatch(job_id):
+            raise StageWorkerError("P015 review ledger requires a valid parent job id")
+        return self.control_root / "atomic-review-ledgers" / f"p015-{job_id}.json"
 
     @property
     def logs(self) -> Path:
@@ -1782,6 +1804,43 @@ def _existing_complete_reserve_additional_review_set_submission(
     return _idempotent_stage_submission(paths, recovery_job), failed_job
 
 
+def _complete_reserve_additional_review_prepare_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-015-C1",
+        "phase": "PREPARE_EXACT_60_PRIMARY_BLIND_REVIEW",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_complete_reserve_additional_review_prepare_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.complete_reserve_additional_review_prepare_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "complete reserve additional review prepare budget")
+    if (
+        marker.get("schema_version") != COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-015-C1"
+        or marker.get("phase") != "PREPARE_EXACT_60_PRIMARY_BLIND_REVIEW"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("complete reserve additional review prepare budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("complete reserve additional review prepare budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "complete reserve additional review prepare has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -2786,6 +2845,34 @@ class StageWorker:
                 "preserved_2021_market_read": verified.get("preserved_2021_market_read"),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+            result["complete_reserve_additional_review_prepare"] = {
+                "development_selected_case_count": verified.get(
+                    "development_selected_case_count"
+                ),
+                "development_shortfall_count": verified.get("development_shortfall_count"),
+                "selected_cell_counts": verified.get("selected_cell_counts"),
+                "development_selection_digest": verified.get("development_selection_digest"),
+                "development_evidence_digest": verified.get("development_evidence_digest"),
+                "path_facts_digest": verified.get("path_facts_digest"),
+                "case_strata_digest": verified.get("case_strata_digest"),
+                "existing_p014_review_ledger_sha256": verified.get(
+                    "existing_p014_review_ledger_sha256"
+                ),
+                "existing_p014_opinions_read": verified.get("existing_p014_opinions_read"),
+                "threshold_basis_computed": verified.get("threshold_basis_computed"),
+                "candidate_output_computed": verified.get("candidate_output_computed"),
+                "envelope_measurement_computed": verified.get(
+                    "envelope_measurement_computed"
+                ),
+                "selection_transport_read": verified.get("selection_transport_read"),
+                "opinion_count": verified.get("opinion_count"),
+                "review_ready": verified.get("review_ready"),
+                "preserved_2021_market_data_read": verified.get(
+                    "preserved_2021_market_data_read"
+                ),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB:
             result["atomic_proposition_successor_d1"] = {
                 "fresh_pool_size": verified.get("fresh_pool_size"),
@@ -3199,6 +3286,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+        existing = _existing_complete_reserve_additional_review_prepare_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -3269,6 +3362,9 @@ def submit_job(
     complete_reserve_additional_review_set_recovery_reserved = (
         job.kind == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB
         and complete_reserve_additional_review_set_recovery_of is not None
+    )
+    complete_reserve_additional_review_prepare_reserved = (
+        job.kind == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -3389,6 +3485,11 @@ def submit_job(
                 complete_reserve_additional_review_set_recovery_of, job
             ),
         )
+    if complete_reserve_additional_review_prepare_reserved:
+        _exclusive_json(
+            paths.complete_reserve_additional_review_prepare_budget,
+            _complete_reserve_additional_review_prepare_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -3443,6 +3544,8 @@ def submit_job(
             paths.complete_reserve_additional_review_set_budget.unlink(missing_ok=True)
         if complete_reserve_additional_review_set_recovery_reserved:
             paths.complete_reserve_additional_review_set_recovery_budget.unlink(missing_ok=True)
+        if complete_reserve_additional_review_prepare_reserved:
+            paths.complete_reserve_additional_review_prepare_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -3492,6 +3595,8 @@ def submit_job(
             paths.complete_reserve_additional_review_set_budget.unlink(missing_ok=True)
         if complete_reserve_additional_review_set_recovery_reserved:
             paths.complete_reserve_additional_review_set_recovery_budget.unlink(missing_ok=True)
+        if complete_reserve_additional_review_prepare_reserved:
+            paths.complete_reserve_additional_review_prepare_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -4172,6 +4277,8 @@ def _positive_instability_d1_review_evidence(
         detail = result_ref.get("atomic_proposition_successor_d1")
     elif observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
         detail = result_ref.get("atomic_proposition_admission_qualified_d1")
+    elif observed.get("kind") == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+        detail = result_ref.get("complete_reserve_additional_review_prepare")
     else:
         detail = None
     if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
@@ -4783,11 +4890,12 @@ def _atomic_proposition_successor_d1_case_strata(
     result_ref = observed.get("result_ref")
     if not isinstance(result_ref, Mapping):
         raise StageWorkerError("atomic proposition successor D1 result reference missing")
-    detail_key = (
-        "atomic_proposition_admission_qualified_d1"
-        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
-        else "atomic_proposition_successor_d1"
-    )
+    if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+        detail_key = "atomic_proposition_admission_qualified_d1"
+    elif observed.get("kind") == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+        detail_key = "complete_reserve_additional_review_prepare"
+    else:
+        detail_key = "atomic_proposition_successor_d1"
     detail = result_ref.get(detail_key)
     if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
         raise StageWorkerError("atomic proposition successor D1 review is not ready")
@@ -4829,6 +4937,7 @@ def _atomic_proposition_successor_d1_review_index(
         observed.get("kind") not in {
             STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
             STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+            STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
         }
         or observed.get("state") != "succeeded"
     ):
@@ -4843,11 +4952,14 @@ def _atomic_proposition_successor_d1_review_index(
     pages = (
         case_count + DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE - 1
     ) // DIRECTIONAL_BOUNDARY_PRIMARY_REVIEW_PAGE_SIZE
-    index_schema = (
-        "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-index.v1"
-        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
-        else "quanthus.stage-atomic-proposition-successor-d1-primary-review-index.v1"
-    )
+    if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+        index_schema = (
+            "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-index.v1"
+        )
+    elif observed.get("kind") == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+        index_schema = "quanthus.stage-complete-reserve-additional-primary-review-index.v1"
+    else:
+        index_schema = "quanthus.stage-atomic-proposition-successor-d1-primary-review-index.v1"
     return {
         "schema_version": index_schema,
         "parent_job_id": observed["job_id"],
@@ -4903,11 +5015,18 @@ def _atomic_proposition_successor_d1_review_page(
             "plan_role": stratum.get("plan_role"),
             "window_id": stratum.get("window_id"),
         }
-    transport["schema_version"] = (
-        "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-transport.v1"
-        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
-        else "quanthus.stage-atomic-proposition-successor-d1-primary-review-transport.v1"
-    )
+    if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+        transport["schema_version"] = (
+            "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-transport.v1"
+        )
+    elif observed.get("kind") == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+        transport["schema_version"] = (
+            "quanthus.stage-complete-reserve-additional-primary-review-transport.v1"
+        )
+    else:
+        transport["schema_version"] = (
+            "quanthus.stage-atomic-proposition-successor-d1-primary-review-transport.v1"
+        )
     transport["case_strata_file_sha256"] = strata_sha
     transport["era_board_stratum_included"] = True
     transport["threshold_basis_included"] = False
@@ -4926,11 +5045,16 @@ def _atomic_proposition_successor_d1_review_page(
     encoded = base64.b64encode(compressed).decode("ascii")
     if len(encoded) > 200 * 1024:
         raise StageWorkerError("atomic proposition successor D1 review page exceeds status budget")
-    envelope_schema = (
-        "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-envelope.v1"
-        if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
-        else "quanthus.stage-atomic-proposition-successor-d1-primary-review-envelope.v1"
-    )
+    if observed.get("kind") == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+        envelope_schema = (
+            "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-envelope.v1"
+        )
+    elif observed.get("kind") == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+        envelope_schema = "quanthus.stage-complete-reserve-additional-primary-review-envelope.v1"
+    else:
+        envelope_schema = (
+            "quanthus.stage-atomic-proposition-successor-d1-primary-review-envelope.v1"
+        )
     return {
         "schema_version": envelope_schema,
         "encoding": "gzip+base64",
@@ -4952,6 +5076,8 @@ _P014_REVIEW_PROPOSITIONS = (
     "orderly_consolidation_20",
 )
 _P014_REVIEW_TRUTH = {"TRUE", "FALSE", "UNKNOWN"}
+_P015_REVIEW_SCHEMA = "quanthus.stage-complete-reserve-additional-review-ledger.v1"
+_P015_REVIEW_SUBMISSION_SCHEMA = "quanthus.stage-complete-reserve-additional-review-submission.v1"
 
 
 def _p014_review_reference_summary(opinions: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -5174,6 +5300,296 @@ def seal_p014_review(
     }
 
 
+def _p015_review_contract(paths: StageWorkerPaths) -> tuple[dict[str, Any], dict[str, Any]]:
+    config_path = (
+        paths.control_repo
+        / "config/stage-learning/stage-complete-reserve-additional-review-prepare.v1.json"
+    )
+    config = _object(config_path, "P015 review prepare config")
+    if (
+        config.get("schema_version")
+        != "quanthus.stage-complete-reserve-additional-review-prepare.v1"
+        or config.get("work_item") != "P3-STAGE-015-C1"
+        or config.get("state") != "PREREGISTERED_EXACT_60_PRIMARY_BLIND_REVIEW_PREPARE"
+    ):
+        raise StageWorkerError("P015 review prepare contract differs")
+    binding = config.get("bindings", {}).get("p014_closeout")
+    if not isinstance(binding, Mapping):
+        raise StageWorkerError("P015 review P014 closeout binding missing")
+    closeout_path = paths.control_repo / str(binding.get("path") or "")
+    if _file_sha256(closeout_path) != binding.get("file_sha256"):
+        raise StageWorkerError("P015 review P014 closeout binding differs")
+    closeout = _object(closeout_path, "P014 closeout")
+    if (
+        closeout.get("review_ledger", {}).get("ledger_sha256")
+        != binding.get("review_ledger_sha256")
+        or closeout.get("review_ledger", {}).get("case_count") != binding.get("review_case_count")
+    ):
+        raise StageWorkerError("P015 review frozen P014 ledger binding differs")
+    return config, closeout
+
+
+def _validated_frozen_p014_ledger(
+    paths: StageWorkerPaths, closeout: Mapping[str, Any]
+) -> tuple[dict[str, Any], str]:
+    job_id = str(closeout.get("job", {}).get("job_id") or "")
+    if not _JOB_ID.fullmatch(job_id):
+        raise StageWorkerError("P015 review frozen P014 parent job differs")
+    path = paths.atomic_proposition_admission_qualified_review_ledger(job_id)
+    if not path.is_file():
+        raise StageWorkerError("P015 review frozen P014 ledger is missing")
+    ledger_sha = _file_sha256(path)
+    if ledger_sha != closeout.get("review_ledger", {}).get("ledger_sha256"):
+        raise StageWorkerError("P015 review frozen P014 ledger SHA differs")
+    ledger = _object(path, "frozen P014 review ledger")
+    opinions = ledger.get("opinions")
+    if (
+        ledger.get("schema_version") != _P014_REVIEW_SCHEMA
+        or ledger.get("work_item") != "P3-STAGE-014-D"
+        or ledger.get("case_count") != 192
+        or not isinstance(opinions, list)
+        or len(opinions) != 192
+        or ledger.get("reference_summary") != _p014_review_reference_summary(opinions)
+    ):
+        raise StageWorkerError("P015 review frozen P014 ledger content differs")
+    return ledger, ledger_sha
+
+
+def _validate_p015_review_submission(
+    paths: StageWorkerPaths,
+    observed: Mapping[str, Any],
+    submission: Mapping[str, Any],
+) -> dict[str, Any]:
+    if (
+        observed.get("kind") != STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        raise StageWorkerError("P015 review seal requires the successful exact parent job")
+    manifest_sha, evidence_sha, _path_sha, evidence, _path_facts = (
+        _positive_instability_d1_review_evidence(paths, observed)
+    )
+    expected_fields = {
+        "schema_version",
+        "work_item",
+        "parent_job_id",
+        "source_manifest_sha256",
+        "development_evidence_digest",
+        "provenance",
+        "candidate_output_seen_during_review",
+        "threshold_basis_seen_during_review",
+        "envelope_measurement_seen_during_review",
+        "selection_transport_seen_during_review",
+        "existing_p014_opinions_seen_during_review",
+        "future_rows_seen_during_review",
+        "preserved_2021_seen_during_review",
+        "opinions",
+    }
+    if set(submission) != expected_fields:
+        raise StageWorkerError("P015 review submission fields differ")
+    if (
+        submission.get("schema_version") != _P015_REVIEW_SUBMISSION_SCHEMA
+        or submission.get("work_item") != "P3-STAGE-015-C"
+        or submission.get("parent_job_id") != observed.get("job_id")
+        or submission.get("source_manifest_sha256") != manifest_sha
+        or submission.get("development_evidence_digest") != evidence_sha
+    ):
+        raise StageWorkerError("P015 review submission binding differs")
+    for key in (
+        "candidate_output_seen_during_review",
+        "threshold_basis_seen_during_review",
+        "envelope_measurement_seen_during_review",
+        "selection_transport_seen_during_review",
+        "existing_p014_opinions_seen_during_review",
+        "future_rows_seen_during_review",
+        "preserved_2021_seen_during_review",
+    ):
+        if submission.get(key) is not False:
+            raise StageWorkerError("P015 review blinding declaration differs")
+    provenance = submission.get("provenance")
+    if (
+        not isinstance(provenance, Mapping)
+        or set(provenance) != {"kind", "origin_id", "session_id"}
+        or provenance.get("kind") != "self_simulated"
+        or not str(provenance.get("origin_id") or "").strip()
+        or not str(provenance.get("session_id") or "").strip()
+    ):
+        raise StageWorkerError("P015 review provenance differs")
+    opinions = submission.get("opinions")
+    cases = evidence.get("cases")
+    if not isinstance(opinions, list) or not isinstance(cases, list) or len(cases) != 60:
+        raise StageWorkerError("P015 review denominator differs")
+    if len(opinions) != len(cases):
+        raise StageWorkerError("P015 review opinion count differs")
+    normalized: list[dict[str, Any]] = []
+    for index, (raw, case) in enumerate(zip(opinions, cases, strict=True)):
+        if not isinstance(raw, Mapping) or not isinstance(case, Mapping):
+            raise StageWorkerError("P015 review row shape differs")
+        if set(raw) != {
+            "index",
+            "case_id",
+            "short_term",
+            "fund",
+            "short_reason",
+            "fund_reason",
+        }:
+            raise StageWorkerError("P015 review row fields differ")
+        case_id = str(case.get("case_id") or "")
+        if raw.get("index") != index or raw.get("case_id") != case_id:
+            raise StageWorkerError("P015 review row order differs")
+        roles: dict[str, dict[str, str]] = {}
+        for role in ("short_term", "fund"):
+            values = raw.get(role)
+            if not isinstance(values, Mapping) or set(values) != set(_P014_REVIEW_PROPOSITIONS):
+                raise StageWorkerError("P015 review atomic proposition shape differs")
+            if any(str(value) not in _P014_REVIEW_TRUTH for value in values.values()):
+                raise StageWorkerError("P015 review truth value differs")
+            roles[role] = {
+                proposition: str(values[proposition])
+                for proposition in _P014_REVIEW_PROPOSITIONS
+            }
+        short_reason = str(raw.get("short_reason") or "").strip()
+        fund_reason = str(raw.get("fund_reason") or "").strip()
+        if not short_reason or not fund_reason or max(len(short_reason), len(fund_reason)) > 2000:
+            raise StageWorkerError("P015 review reason differs")
+        normalized.append(
+            {
+                "index": index,
+                "case_id": case_id,
+                "short_term": roles["short_term"],
+                "fund": roles["fund"],
+                "short_reason": short_reason,
+                "fund_reason": fund_reason,
+            }
+        )
+    return {
+        "schema_version": _P015_REVIEW_SCHEMA,
+        "work_item": "P3-STAGE-015-C",
+        "parent_job_id": observed["job_id"],
+        "source_manifest_sha256": manifest_sha,
+        "development_evidence_digest": evidence_sha,
+        "case_count": 60,
+        "provenance": dict(provenance),
+        "candidate_output_seen_during_review": False,
+        "threshold_basis_seen_during_review": False,
+        "envelope_measurement_seen_during_review": False,
+        "selection_transport_seen_during_review": False,
+        "existing_p014_opinions_seen_during_review": False,
+        "future_rows_seen_during_review": False,
+        "preserved_2021_seen_during_review": False,
+        "opinions": normalized,
+        "new_reference_summary": _p014_review_reference_summary(normalized),
+        "submission_digest": _digest(dict(submission)),
+    }
+
+
+def _p015_review_ledger(
+    paths: StageWorkerPaths, observed: Mapping[str, Any], *, required: bool = False,
+) -> dict[str, Any] | None:
+    path = paths.complete_reserve_additional_review_ledger(str(observed.get("job_id") or ""))
+    if not path.is_file():
+        if required:
+            raise StageWorkerError("P015 review ledger must be sealed before combined gate access")
+        return None
+    ledger = _object(path, "P015 additional review ledger")
+    submission = {
+        key: ledger[key]
+        for key in (
+            "work_item",
+            "parent_job_id",
+            "source_manifest_sha256",
+            "development_evidence_digest",
+            "provenance",
+            "candidate_output_seen_during_review",
+            "threshold_basis_seen_during_review",
+            "envelope_measurement_seen_during_review",
+            "selection_transport_seen_during_review",
+            "existing_p014_opinions_seen_during_review",
+            "future_rows_seen_during_review",
+            "preserved_2021_seen_during_review",
+            "opinions",
+        )
+    }
+    submission["schema_version"] = _P015_REVIEW_SUBMISSION_SCHEMA
+    expected = _validate_p015_review_submission(paths, observed, submission)
+    config, closeout = _p015_review_contract(paths)
+    old_ledger, old_sha = _validated_frozen_p014_ledger(paths, closeout)
+    if old_sha != config["bindings"]["p014_closeout"]["review_ledger_sha256"]:
+        raise StageWorkerError("P015 review old ledger contract binding differs")
+    old_ids = {str(item.get("case_id") or "") for item in old_ledger["opinions"]}
+    new_ids = {str(item.get("case_id") or "") for item in expected["opinions"]}
+    if len(new_ids) != 60 or old_ids & new_ids:
+        raise StageWorkerError("P015 review old/new case identity overlap")
+    combined = _p014_review_reference_summary(
+        [*old_ledger["opinions"], *expected["opinions"]]
+    )
+    expected.update(
+        {
+            "frozen_p014_review": {
+                "parent_job_id": closeout["job"]["job_id"],
+                "ledger_sha256": old_sha,
+                "case_count": 192,
+            },
+            "combined_case_count": 252,
+            "combined_reference_summary": combined,
+        }
+    )
+    if ledger != expected:
+        raise StageWorkerError("P015 review ledger content differs from validated seal")
+    return ledger
+
+
+def seal_p015_review(
+    paths: StageWorkerPaths, job_id: str, submission: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not _JOB_ID.fullmatch(job_id):
+        raise StageWorkerError("P015 review seal requires a valid parent job id")
+    status_path = paths.status / f"{job_id}.json"
+    if not status_path.is_file():
+        raise StageWorkerError("P015 review parent status is missing")
+    observed = _object(status_path, "P015 review parent status")
+    ledger = _validate_p015_review_submission(paths, observed, submission)
+    config, closeout = _p015_review_contract(paths)
+    old_ledger, old_sha = _validated_frozen_p014_ledger(paths, closeout)
+    if old_sha != config["bindings"]["p014_closeout"]["review_ledger_sha256"]:
+        raise StageWorkerError("P015 review old ledger contract binding differs")
+    old_ids = {str(item.get("case_id") or "") for item in old_ledger["opinions"]}
+    new_ids = {str(item.get("case_id") or "") for item in ledger["opinions"]}
+    if len(new_ids) != 60 or old_ids & new_ids:
+        raise StageWorkerError("P015 review old/new case identity overlap")
+    ledger.update(
+        {
+            "frozen_p014_review": {
+                "parent_job_id": closeout["job"]["job_id"],
+                "ledger_sha256": old_sha,
+                "case_count": 192,
+            },
+            "combined_case_count": 252,
+            "combined_reference_summary": _p014_review_reference_summary(
+                [*old_ledger["opinions"], *ledger["opinions"]]
+            ),
+        }
+    )
+    path = paths.complete_reserve_additional_review_ledger(job_id)
+    if path.exists():
+        existing = _object(path, "P015 additional review ledger")
+        if existing != ledger:
+            raise StageWorkerError("P015 review ledger is already sealed with different content")
+    else:
+        _exclusive_json(path, ledger)
+    return {
+        "schema_version": "quanthus.stage-complete-reserve-review-seal-receipt.v1",
+        "parent_job_id": job_id,
+        "sealed": True,
+        "new_review_ledger_sha256": _file_sha256(path),
+        "new_case_count": 60,
+        "frozen_p014_review_ledger_sha256": old_sha,
+        "combined_case_count": 252,
+        "combined_reference_summary": ledger["combined_reference_summary"],
+        "candidate_scoring_authorized": False,
+        "preserved_2021_read_authorized": False,
+    }
+
+
 def _atomic_proposition_g1_review_alias(parent_job_id: str, page: int) -> str:
     raw = f"{parent_job_id}|atomic-proposition-g1-primary-page|{page}".encode()
     return "stage_" + hashlib.sha256(raw).hexdigest()[:32]
@@ -5373,16 +5789,18 @@ def _atomic_proposition_successor_d1_virtual_review_status(
             kind not in {
                 STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB,
                 STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
+                STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
             }
             or observed.get("state") != "succeeded"
         ):
             continue
         result_ref = observed.get("result_ref")
-        detail_key = (
-            "atomic_proposition_admission_qualified_d1"
-            if kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
-            else "atomic_proposition_successor_d1"
-        )
+        if kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+            detail_key = "atomic_proposition_admission_qualified_d1"
+        elif kind == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+            detail_key = "complete_reserve_additional_review_prepare"
+        else:
+            detail_key = "atomic_proposition_successor_d1"
         detail = result_ref.get(detail_key) if isinstance(result_ref, Mapping) else None
         if not isinstance(detail, Mapping) or detail.get("review_ready") is not True:
             continue
@@ -5396,11 +5814,16 @@ def _atomic_proposition_successor_d1_virtual_review_status(
             )
             if alias != requested_job_id:
                 continue
-            virtual_kind = (
-                "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-page.v1"
-                if kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB
-                else "quanthus.stage-atomic-proposition-successor-d1-primary-review-page.v1"
-            )
+            if kind == STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB:
+                virtual_kind = (
+                    "quanthus.stage-atomic-proposition-admission-qualified-d1-primary-review-page.v1"
+                )
+            elif kind == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+                virtual_kind = "quanthus.stage-complete-reserve-additional-primary-review-page.v1"
+            else:
+                virtual_kind = (
+                    "quanthus.stage-atomic-proposition-successor-d1-primary-review-page.v1"
+                )
             return {
                 "schema_version": STATUS_SCHEMA,
                 "job_id": requested_job_id,
@@ -5602,6 +6025,22 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
                     )
                 ),
             }
+        if observed.get("kind") == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB:
+            ledger = _p015_review_ledger(paths, observed)
+            ledger_path = paths.complete_reserve_additional_review_ledger(
+                str(observed["job_id"])
+            )
+            result = {
+                **result,
+                "review_ledger_sealed": ledger is not None,
+                "review_ledger_sha256": (
+                    None if ledger is None else _file_sha256(ledger_path)
+                ),
+                "combined_reference_summary": (
+                    None if ledger is None else ledger["combined_reference_summary"]
+                ),
+                "combined_case_count": None if ledger is None else 252,
+            }
         additional_ready_transport = _complete_reserve_additional_ready_transport(
             paths, observed
         )
@@ -5776,6 +6215,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         "recent_p015_b_failure": _recent_stage_job_failure(
             paths, kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_SET_JOB,
         ),
+        "recent_p015_c_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
+        ),
     }
 
 
@@ -5805,6 +6247,8 @@ def _parser() -> argparse.ArgumentParser:
     status.add_argument("--job-id", required=True)
     seal_review = sub.add_parser("seal-p014-review")
     seal_review.add_argument("--job-id", required=True)
+    seal_p015 = sub.add_parser("seal-p015-review")
+    seal_p015.add_argument("--job-id", required=True)
     cancel = sub.add_parser("cancel")
     cancel.add_argument("--job-id", required=True)
     sub.add_parser("doctor")
@@ -5847,6 +6291,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not isinstance(submission, Mapping):
                 raise StageWorkerError("P014 review submission must be one JSON object on stdin")
             result = seal_p014_review(paths, args.job_id, submission)
+        elif args.command == "seal-p015-review":
+            try:
+                submission = json.load(sys.stdin)
+            except (OSError, json.JSONDecodeError) as exc:
+                raise StageWorkerError(
+                    "P015 review submission must be one JSON object on stdin"
+                ) from exc
+            if not isinstance(submission, Mapping):
+                raise StageWorkerError("P015 review submission must be one JSON object on stdin")
+            result = seal_p015_review(paths, args.job_id, submission)
         elif args.command == "cancel":
             result = cancel_job(paths, args.job_id)
         else:

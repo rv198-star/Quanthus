@@ -1,0 +1,86 @@
+{
+  "schema_version": "quanthus.stage-complete-reserve-additional-review-set.v1",
+  "work_item": "P3-STAGE-015-B",
+  "state": "PREREGISTERED_FREEZE_ALL_READY_UNREVIEWED_ROWS",
+  "purpose": "Freeze every technically review-ready P014-B reserve row that is not already represented in the immutable P014 192-case ledger. Selection is metadata-only and must not stop when a semantic positive-count target is reached.",
+  "bindings": {
+    "reference_model": {
+      "path": "config/stage-learning/stage-complete-reserve-reference-model.v1.json",
+      "sha256": "sha256:b76cb15884895a8459b9142b644085fc2419179e573d21c544c13949048a5f91"
+    },
+    "readiness_result": {
+      "path": "config/stage-learning/stage-complete-reserve-review-readiness-result.v1.json",
+      "sha256": "sha256:a6cabcb49d3f8655e8f832782ea6f2f6b7e6bd0079bc4019919cde27c9308c29"
+    },
+    "readiness_artifact": {
+      "job_id": "stage_19326342d3bf497fba2964fbed10c29f",
+      "code_revision": "d5b6c5f539735116583d832e481e6527ed059deb",
+      "artifact_relative_path": "runs/stage-worker/stage_19326342d3bf497fba2964fbed10c29f/stage-complete-reserve-review-readiness-20260914T153909Z",
+      "manifest_sha256": "sha256:99e39c9ccce5f171bac67daee06fe2084216c46bb68bc8a40b4fb605fc55e32a",
+      "ledger_digest": "sha256:9b5f9b6c02f5df91f49fb061339307da5612af97696437b13dca2d10e4996df7",
+      "row_count": 256,
+      "ready_count": 252,
+      "already_reviewed_ready_count": 192,
+      "new_review_required_count": 60
+    },
+    "qualified_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-qualified-plan-result.v1.json",
+      "sha256": "sha256:ee7bbe9ea643284198340a0d57a1380c65b50651d5f0969ed066fbd5cb98675b"
+    },
+    "qualified_plan_artifact": {
+      "job_id": "stage_9dbc57be4839405790be0e021d8271ba",
+      "code_revision": "fd2bf808b9a3a3e1fdd5e786c968db70f17b10b2",
+      "artifact_relative_path": "runs/stage-worker/stage_9dbc57be4839405790be0e021d8271ba/stage-development-resource-qualified-plan-20260914T120249Z",
+      "manifest_sha256": "sha256:f14c065d0bf18b6491b9220132d1be3c10e608fb9a69f4141c576e351aa7a173",
+      "plan_digest": "sha256:206ed58e8349de59efd52caad958f7bd0f2f9d79f1ee0199eea6a079b6c14829",
+      "identity_digest": "sha256:a3aa679c1792e7545847159c9b4d26dec70b4a925e55bbeb9416852b11f8de05"
+    },
+    "p014_closeout": {
+      "path": "config/stage-learning/stage-atomic-proposition-admission-qualified-d1-closeout.v1.json",
+      "sha256": "sha256:f9b7e4f9130e335d3be1246116d64c4a433ce686d153401f1bab437011283aa7",
+      "review_ledger_sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69",
+      "review_case_count": 192
+    }
+  },
+  "selection": {
+    "source_row_count": 256,
+    "ready_row_count": 252,
+    "already_reviewed_ready_count": 192,
+    "expected_additional_review_count": 60,
+    "predicate": "review_packet_ready=true AND already_reviewed_in_p014_ledger=false AND new_review_required=true",
+    "include_every_matching_row": true,
+    "semantic_value_sort": false,
+    "reference_value_sort": false,
+    "positive_count_stop": false,
+    "random_sample": false,
+    "cross_cell_fill": false,
+    "post_result_replacement": false,
+    "new_identity_discovery": false
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 600
+  },
+  "output": {
+    "set_schema": "quanthus.stage-complete-reserve-additional-review-set-artifact-payload.v1",
+    "source_binding_schema": "quanthus.stage-complete-reserve-additional-review-set-source-binding.v1",
+    "summary_schema": "quanthus.stage-complete-reserve-additional-review-set-summary.v1",
+    "artifact_schema": "quanthus.stage-complete-reserve-additional-review-set-artifact.v1"
+  },
+  "authority": {
+    "market_data_read": false,
+    "structure_fact_build": false,
+    "semantic_values_read": false,
+    "reference_opinions_read": false,
+    "candidate_output_read": false,
+    "threshold_basis_read": false,
+    "selection_transport_read": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This job freezes the exact additional blind-review denominator already implied by the pre-result P014-B reserve and P015-A technical readiness ledger. It does not create or evaluate semantic opinions and cannot select rows based on semantic prevalence or candidate quality."
+}

@@ -53,6 +53,12 @@ P014D_CLOSEOUT = (
     ROOT / "config/stage-learning/stage-atomic-proposition-admission-qualified-d1-closeout.v1.json"
 )
 P015_MODEL = ROOT / "config/stage-learning/stage-complete-reserve-reference-model.v1.json"
+P015_A_RESULT = (
+    ROOT / "config/stage-learning/stage-complete-reserve-review-readiness-result.v1.json"
+)
+P015_B_CONFIG = (
+    ROOT / "config/stage-learning/stage-complete-reserve-additional-review-set.v1.json"
+)
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -626,6 +632,42 @@ def test_stage015_uses_complete_precommitted_reserve_without_targeted_top_up() -
     assert "PASS_OPEN_COMPLETE_PRECOMMITTED_RESERVE_REFERENCE_SUCCESSOR" in P014D_REVIEW.read_text(
         encoding="utf-8"
     )
+
+
+def test_stage015_a_result_and_b_freeze_bind_complete_ready_denominator() -> None:
+    result = json.loads(P015_A_RESULT.read_text(encoding="utf-8"))
+    assert result["state"] == "PASS_COMPLETE_RESERVE_REVIEW_READINESS"
+    assert result["job"]["job_id"] == "stage_19326342d3bf497fba2964fbed10c29f"
+    assert result["counts"] == {
+        "row_count": 256,
+        "ready_count": 252,
+        "unready_count": 4,
+        "already_reviewed_ready_count": 192,
+        "new_review_required_count": 60,
+    }
+    assert result["reason_counts"] == {
+        "PRIMARY_FACTS_UNAVAILABLE": 4,
+        "READY": 252,
+    }
+    assert result["authority"]["semantic_values_retained"] is False
+    assert result["authority"]["selection_transport_read"] is False
+    assert result["authority"]["preserved_2021_market_read"] is False
+    assert result["authority"]["2025_read"] is False
+
+    config = json.loads(P015_B_CONFIG.read_text(encoding="utf-8"))
+    assert config["work_item"] == "P3-STAGE-015-B"
+    assert config["state"] == "PREREGISTERED_FREEZE_ALL_READY_UNREVIEWED_ROWS"
+    assert config["bindings"]["readiness_artifact"]["new_review_required_count"] == 60
+    assert config["bindings"]["p014_closeout"]["review_case_count"] == 192
+    selection = config["selection"]
+    assert selection["expected_additional_review_count"] == 60
+    assert selection["include_every_matching_row"] is True
+    assert selection["positive_count_stop"] is False
+    assert selection["semantic_value_sort"] is False
+    assert selection["reference_value_sort"] is False
+    assert selection["random_sample"] is False
+    assert selection["new_identity_discovery"] is False
+    assert all(item is False for item in config["authority"].values())
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

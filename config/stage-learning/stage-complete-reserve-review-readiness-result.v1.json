@@ -1,0 +1,53 @@
+{
+  "schema_version": "quanthus.stage-complete-reserve-review-readiness-result.v1",
+  "work_item": "P3-STAGE-015-A",
+  "state": "PASS_COMPLETE_RESERVE_REVIEW_READINESS",
+  "effective_date": "2026-09-14",
+  "job": {
+    "job_id": "stage_19326342d3bf497fba2964fbed10c29f",
+    "code_revision": "d5b6c5f539735116583d832e481e6527ed059deb",
+    "input_digest": "sha256:935c178c78dfb0735aa96054380a86c76461cd1425a6b069052350665727f985",
+    "terminal_state": "succeeded",
+    "exit_code": 0
+  },
+  "artifact": {
+    "run_id": "stage-complete-reserve-review-readiness-20260914T153909Z",
+    "artifact_relative_path": "runs/stage-worker/stage_19326342d3bf497fba2964fbed10c29f/stage-complete-reserve-review-readiness-20260914T153909Z",
+    "manifest_sha256": "sha256:99e39c9ccce5f171bac67daee06fe2084216c46bb68bc8a40b4fb605fc55e32a",
+    "ledger_digest": "sha256:9b5f9b6c02f5df91f49fb061339307da5612af97696437b13dca2d10e4996df7",
+    "file_count": 3,
+    "verified": true
+  },
+  "counts": {
+    "row_count": 256,
+    "ready_count": 252,
+    "unready_count": 4,
+    "already_reviewed_ready_count": 192,
+    "new_review_required_count": 60
+  },
+  "ready_by_cell": {
+    "PRE_STAR/CHINEXT": 31,
+    "PRE_STAR/MAIN": 31,
+    "STAR_AND_CHINEXT_20PCT/CHINEXT": 32,
+    "STAR_AND_CHINEXT_20PCT/MAIN": 31,
+    "STAR_AND_CHINEXT_20PCT/STAR": 32,
+    "STAR_PRE_CHINEXT_20PCT/CHINEXT": 31,
+    "STAR_PRE_CHINEXT_20PCT/MAIN": 32,
+    "STAR_PRE_CHINEXT_20PCT/STAR": 32
+  },
+  "reason_counts": {
+    "PRIMARY_FACTS_UNAVAILABLE": 4,
+    "READY": 252
+  },
+  "authority": {
+    "semantic_values_retained": false,
+    "reference_opinions_read": false,
+    "selection_transport_read": false,
+    "candidate_output_read": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2025_read": false
+  },
+  "next_gate": "Freeze every new_review_required=true row as the complete additional blind-review set. Do not stop based on order-positive counts and do not reopen the existing P014 ledger.",
+  "claim_ceiling": "This result qualifies only review-packet technical readiness across the pre-result P014-B reserve. It does not contain semantic values, reference opinions, candidate outputs, thresholds, Stage projections, market prevalence or economic value."
+}

@@ -29,6 +29,7 @@ p015_a_kind="quanthus.stage-complete-reserve-review-readiness.v1"
 p015_b_kind="quanthus.stage-complete-reserve-additional-review-set.v1"
 p015_c_kind="quanthus.stage-complete-reserve-additional-review-prepare.v1"
 p016_b_kind="quanthus.stage-combined-atomic-scoring.v1"
+p017_b_kind="quanthus.stage-stratum-normalized-instability.v1"
 
 [[ -d "${repo_root}/.git" ]] || fail "Quanthus control checkout missing"
 [[ -f "${worker}" ]] || fail "stage worker wrapper missing"
@@ -186,6 +187,14 @@ case "${command}" in
     [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
     bash "${worker}" submit --kind "${p016_b_kind}" --code-revision "${target}"
     ;;
+  submit-p017-b)
+    [[ "$#" -eq 2 ]] || fail "usage: submit-p017-b <exact-revision>"
+    target="$2"
+    exact_revision "${target}"
+    [[ "$(git -C "${repo_root}" rev-parse HEAD)" == "${target}" ]] || fail "control checkout revision differs"
+    [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
+    bash "${worker}" submit --kind "${p017_b_kind}" --code-revision "${target}"
+    ;;
   seal-p014-review)
     [[ "$#" -eq 2 ]] || fail "usage: seal-p014-review <stage_job_id>"
     [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
@@ -218,6 +227,6 @@ case "${command}" in
     bash "${worker}" status --job-id "$2"
     ;;
   *)
-    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | submit-p013-d | submit-p014-a | submit-p014-b | submit-p014-c | submit-p015-a | submit-p015-b | submit-p015-c | submit-p016-b | seal-p014-review | seal-p015-review | status"
+    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | submit-p013-d | submit-p014-a | submit-p014-b | submit-p014-c | submit-p015-a | submit-p015-b | submit-p015-c | submit-p016-b | submit-p017-b | seal-p014-review | seal-p015-review | status"
     ;;
 esac

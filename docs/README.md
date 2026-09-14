@@ -450,13 +450,19 @@ nodes.
   scoring and projection; preserved 2021/2025 remain unread. Same-origin four-party attribution opens
   P017 as a new artifact-only development successor using unlabeled Era × Board cell-local quantile
   calibration rather than denser global threshold search; the zero-gain envelope additive channel is
-  retired from successor eligibility instead of tuned post-result. Evidence and route:
+  retired from successor eligibility instead of tuned post-result. Its result-free engineering freeze
+  now binds the exact 252-case surface, builds all eight unlabeled cell bases before any reference-
+  ledger read, keeps the fixed 3×3 profile coordinates and unchanged absolute instability quality
+  thresholds, and admits exactly one scoring Job with no R/O/projection/preserved-data authority.
+  Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
   `work-items/stage-complete-reserve-reference.md`,
   `acceptance/stage-complete-reserve-reference-sufficiency-20260915.md`,
-  `work-items/stage-combined-atomic-scoring.md`, and
-  `reviews/stage-p016-instability-no-pass-four-party-review-20260915.md`.
+  `work-items/stage-combined-atomic-scoring.md`,
+  `reviews/stage-p016-instability-no-pass-four-party-review-20260915.md`,
+  `work-items/stage-stratum-normalized-instability.md`, and
+  `acceptance/stage-stratum-normalized-instability-engineering-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

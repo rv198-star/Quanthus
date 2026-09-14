@@ -346,6 +346,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-016-B | Independently score/freeze I, fixed R and O | P3-STAGE-016-A | closed `CLOSED_INSTABILITY_DEVELOPMENT_FAIL`; all 9 I candidates failed, fixed synthetic envelope added 0 incremental TP/FP in all trials, and the frozen stop rule prevented R/O scoring; config/stage-learning/stage-combined-atomic-scoring-result.v1.json |
 | P3-STAGE-016-C | Projection compatibility on frozen P016-B outputs | P3-STAGE-016-B | closed `NOT_REACHED_NO_ATOMIC_FREEZE`; no projection or candidate reselection occurred |
 | P3-STAGE-016-D | Close P016 and gate preserved evaluation | P3-STAGE-016-C | closed `PRESERVED_EVALUATION_NOT_AUTHORIZED`; preserved 2021/2025 remain unread; P3-STAGE-017 is the selected development successor |
+| P3-STAGE-017 | Era × Board stratum-normalized instability development | P3-STAGE-016 | ready artifact-only successor; exact 252-case development ceiling, eight unlabeled cell-local quantile bases, fixed 3×3 profile coordinates, retired zero-gain envelope eligibility; docs/work-items/stage-stratum-normalized-instability.md |
+| P3-STAGE-017-A | Freeze P017 normalization/topology/blinding semantics | P3-STAGE-017 | ready design; bases/profile thresholds must be frozen before reference-ledger read, no DWD/reference rewrite/gate relaxation |
+| P3-STAGE-017-B | Run stratum-normalized instability scoring | P3-STAGE-017-A | ready `PASS_ENGINEERING_READY_FOR_ONE_STRATUM_NORMALIZED_INSTABILITY_JOB`; one artifact-only Job, 9 profiles, no R/O/projection/preserved read; docs/acceptance/stage-stratum-normalized-instability-engineering-20260915.md |
+| P3-STAGE-017-C | Review P017 semantic outcome | P3-STAGE-017-B | blocked until terminal B result |
+| P3-STAGE-017-D | Close P017 and decide next gate | P3-STAGE-017-C | blocked; later atomic/projection or preserved work requires a separate freeze |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

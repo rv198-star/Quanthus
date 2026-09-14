@@ -488,6 +488,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-016-B | Independent atomic scoring | P3-STAGE-016-A | closed `CLOSED_INSTABILITY_DEVELOPMENT_FAIL`; 9 I trials completed, fixed envelope additive channel added zero incremental TP/FP, R/O scoring stopped by the frozen no-pass rule |
 | P3-STAGE-016-C | Projection compatibility | P3-STAGE-016-B | closed `NOT_REACHED_NO_ATOMIC_FREEZE`; resolver and projection gates were not executed |
 | P3-STAGE-016-D | Gate preserved evaluation | P3-STAGE-016-C | closed `PRESERVED_EVALUATION_NOT_AUTHORIZED`; preserved 2021/2025 remain unread and successor work must be separately frozen |
+| P3-STAGE-017 | Era × Board stratum-normalized instability development | P3-STAGE-016 | ready artifact-only successor; same 252 cases, cell-local unlabeled quantile calibration, same fixed 3×3 profile coordinates, no envelope eligibility |
+| P3-STAGE-017-A | Freeze normalization/topology/blinding semantics | P3-STAGE-017 | ready design; all eight cell bases and 9×8 threshold instances built before reference-ledger read |
+| P3-STAGE-017-B | Score stratum-normalized instability | P3-STAGE-017-A | ready `PASS_ENGINEERING_READY_FOR_ONE_STRATUM_NORMALIZED_INSTABILITY_JOB`; unchanged absolute P012 instability quality thresholds under P016 macro-rate aggregation, no R/O/projection |
+| P3-STAGE-017-C | Review semantic outcome | P3-STAGE-017-B | blocked until B terminal result |
+| P3-STAGE-017-D | Close and decide next gate | P3-STAGE-017-C | blocked; preserved evaluation remains separate and unread |
 
 ## 7. Acceptance
 

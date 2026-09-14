@@ -81,6 +81,9 @@ STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB = (
     "quanthus.stage-complete-reserve-additional-review-prepare.v1"
 )
 STAGE_COMBINED_ATOMIC_SCORING_JOB = "quanthus.stage-combined-atomic-scoring.v1"
+STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB = (
+    "quanthus.stage-stratum-normalized-instability.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -137,6 +140,9 @@ COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_BUDGET_SCHEMA = (
     "quanthus.stage-complete-reserve-additional-review-prepare-budget.v1"
 )
 COMBINED_ATOMIC_SCORING_BUDGET_SCHEMA = "quanthus.stage-combined-atomic-scoring-budget.v1"
+STRATUM_NORMALIZED_INSTABILITY_BUDGET_SCHEMA = (
+    "quanthus.stage-stratum-normalized-instability-budget.v1"
+)
 DEVELOPMENT_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-development-resource-plan-recovery.v1.json"
 )
@@ -357,6 +363,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.combined_atomic_scoring",
         "artifact_glob": "stage-combined-atomic-scoring-*",
         "process_error": "stage_combined_atomic_scoring_process_failed",
+        "wall_seconds": 900,
+    },
+    STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB: {
+        "config": "config/stage-learning/stage-stratum-normalized-instability.v1.json",
+        "module": "quanthus.stage_learning.stratum_normalized_instability",
+        "artifact_glob": "stage-stratum-normalized-instability-*",
+        "process_error": "stage_stratum_normalized_instability_process_failed",
         "wall_seconds": 900,
     },
 }
@@ -611,6 +624,10 @@ class StageWorkerPaths:
     @property
     def combined_atomic_scoring_budget(self) -> Path:
         return self.control_root / "combined-atomic-scoring-budget.json"
+
+    @property
+    def stratum_normalized_instability_budget(self) -> Path:
+        return self.control_root / "stratum-normalized-instability-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -1889,6 +1906,43 @@ def _existing_combined_atomic_scoring_submission(
     return _idempotent_stage_submission(paths, job)
 
 
+def _stratum_normalized_instability_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": STRATUM_NORMALIZED_INSTABILITY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-017-B",
+        "phase": "STRATUM_NORMALIZED_INSTABILITY_DEVELOPMENT_SCORING",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_stratum_normalized_instability_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.stratum_normalized_instability_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "stratum normalized instability budget")
+    if (
+        marker.get("schema_version") != STRATUM_NORMALIZED_INSTABILITY_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-017-B"
+        or marker.get("phase") != "STRATUM_NORMALIZED_INSTABILITY_DEVELOPMENT_SCORING"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("stratum normalized instability budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("stratum normalized instability budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "stratum normalized instability has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -2936,6 +2990,25 @@ class StageWorker:
                 "preserved_2021_read": verified.get("preserved_2021_read"),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB:
+            result["stratum_normalized_instability"] = {
+                "disposition": verified.get("disposition"),
+                "reference_case_count": verified.get("reference_case_count"),
+                "cell_count": verified.get("cell_count"),
+                "candidate_count": verified.get("candidate_count"),
+                "eligible_candidate_count": verified.get("eligible_candidate_count"),
+                "selected_profile_id": verified.get("selected_profile_id"),
+                "prediction_artifact_available": verified.get("prediction_artifact_available"),
+                "basis_digest": verified.get("basis_digest"),
+                "profile_grid_digest": verified.get("profile_grid_digest"),
+                "dwd_market_read": verified.get("dwd_market_read"),
+                "fixed_relocation_scored": verified.get("fixed_relocation_scored"),
+                "order_scored": verified.get("order_scored"),
+                "projection_performed": verified.get("projection_performed"),
+                "preserved_2021_read": verified.get("preserved_2021_read"),
+                "2022_2024_read": verified.get("2022_2024_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB:
             result["atomic_proposition_successor_d1"] = {
                 "fresh_pool_size": verified.get("fresh_pool_size"),
@@ -3361,6 +3434,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB:
+        existing = _existing_stratum_normalized_instability_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -3436,6 +3515,9 @@ def submit_job(
         job.kind == STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB
     )
     combined_atomic_scoring_reserved = job.kind == STAGE_COMBINED_ATOMIC_SCORING_JOB
+    stratum_normalized_instability_reserved = (
+        job.kind == STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
+    )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
     if prepare_reserved:
@@ -3565,6 +3647,11 @@ def submit_job(
             paths.combined_atomic_scoring_budget,
             _combined_atomic_scoring_budget_value(job),
         )
+    if stratum_normalized_instability_reserved:
+        _exclusive_json(
+            paths.stratum_normalized_instability_budget,
+            _stratum_normalized_instability_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -3623,6 +3710,8 @@ def submit_job(
             paths.complete_reserve_additional_review_prepare_budget.unlink(missing_ok=True)
         if combined_atomic_scoring_reserved:
             paths.combined_atomic_scoring_budget.unlink(missing_ok=True)
+        if stratum_normalized_instability_reserved:
+            paths.stratum_normalized_instability_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -3676,6 +3765,8 @@ def submit_job(
             paths.complete_reserve_additional_review_prepare_budget.unlink(missing_ok=True)
         if combined_atomic_scoring_reserved:
             paths.combined_atomic_scoring_budget.unlink(missing_ok=True)
+        if stratum_normalized_instability_reserved:
+            paths.stratum_normalized_instability_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -6425,6 +6516,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p016_b_failure": _recent_stage_job_failure(
             paths, kind=STAGE_COMBINED_ATOMIC_SCORING_JOB,
+        ),
+        "recent_p017_b_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB,
         ),
     }
 

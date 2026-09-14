@@ -78,6 +78,8 @@ P016_REVIEW = ROOT / "docs/reviews/stage-p016-combined-scoring-four-party-review
 P016_NOPASS_REVIEW = (
     ROOT / "docs/reviews/stage-p016-instability-no-pass-four-party-review-20260915.md"
 )
+P017_CONFIG = ROOT / "config/stage-learning/stage-stratum-normalized-instability.v1.json"
+P017_WORK = ROOT / "docs/work-items/stage-stratum-normalized-instability.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -981,6 +983,55 @@ def test_stage016_closes_semantic_no_pass_without_projection_or_retune() -> None
     assert "PASS_OPEN_P017_STRATUM_NORMALIZED_INSTABILITY_SUCCESSOR" in (
         P016_NOPASS_REVIEW.read_text(encoding="utf-8")
     )
+
+
+def test_stage017_freezes_cell_local_unlabeled_instability_successor() -> None:
+    value = json.loads(P017_CONFIG.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-017-A"
+    assert value["state"] == (
+        "PREREGISTERED_ARTIFACT_ONLY_STRATUM_NORMALIZED_INSTABILITY_BEFORE_SCORING"
+    )
+    assert value["bindings"]["p016_result"]["state"] == (
+        "CLOSED_INSTABILITY_DEVELOPMENT_FAIL"
+    )
+    surface = value["development_surface"]
+    assert surface["case_count"] == 252
+    assert surface["expected_cell_count"] == 8
+    assert surface["new_identity_discovery"] is False
+    assert surface["new_random_sampling"] is False
+    assert surface["case_replacement"] is False
+    normalization = value["normalization"]
+    assert normalization["kind"] == "cell_local_unlabeled_quantile_basis"
+    assert normalization["label_or_reference_visibility_during_basis_build"] is False
+    assert normalization["candidate_output_visibility_during_basis_build"] is False
+    assert normalization["cross_cell_pooling"] is False
+    assert normalization["cross_cell_fallback"] is False
+    candidates = value["candidate_surface"]
+    assert candidates["candidate_count"] == 9
+    assert candidates["new_profile_coordinates"] is False
+    assert candidates["candidate_expansion"] is False
+    envelope = value["envelope_successor_disposition"]
+    assert envelope["p012_fixed_additive_channel"] == "RETIRED_FROM_P017_ELIGIBILITY"
+    assert envelope["post_result_threshold_tuning"] is False
+    assert envelope["new_envelope_candidate_search"] is False
+    gate = value["quality_gate"]
+    assert gate["minimum_predictions"] == 18
+    assert gate["minimum_macro_precision"] == "0.78"
+    assert gate["minimum_macro_positive_reference_coverage"] == "0.70"
+    assert gate["maximum_macro_definite_negative_false_positive_rate"] == "0.10"
+    assert gate["numeric_threshold_relaxation"] is False
+    authority = value["authority"]
+    assert authority["artifact_only_development_scoring"] is True
+    assert authority["cell_local_unlabeled_basis_build"] is True
+    assert authority["instability_candidate_scoring"] is True
+    assert authority["dwd_market_read"] is False
+    assert authority["fixed_relocation_scoring"] is False
+    assert authority["order_scoring"] is False
+    assert authority["projection_compatibility"] is False
+    assert authority["preserved_2021_read"] is False
+    assert authority["2025_read"] is False
+    assert P017_WORK.is_file()
+    assert "P3-STAGE-017" in P017_WORK.read_text(encoding="utf-8")
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

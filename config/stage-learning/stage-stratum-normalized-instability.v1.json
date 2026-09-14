@@ -1,0 +1,164 @@
+{
+  "schema_version": "quanthus.stage-stratum-normalized-instability.v1",
+  "work_item": "P3-STAGE-017-A",
+  "state": "PREREGISTERED_ARTIFACT_ONLY_STRATUM_NORMALIZED_INSTABILITY_BEFORE_SCORING",
+  "purpose": "Test whether the fixed P012 3x3 instability profile topology becomes cross-regime comparable when each Era x Board cell receives its own unlabeled quantile basis, without reopening P016 global-threshold scoring, adding candidates, retuning the retired envelope channel, rereviewing references, reading DWD, or opening preserved evaluation.",
+  "bindings": {
+    "p016_result": {
+      "path": "config/stage-learning/stage-combined-atomic-scoring-result.v1.json",
+      "file_sha256": "sha256:9afaac495dcfa0cda11b4ba07969d92f7fa5d9e41ef4f1de97819ab0f2250d23",
+      "state": "CLOSED_INSTABILITY_DEVELOPMENT_FAIL"
+    },
+    "p016_scoring_contract": {
+      "path": "config/stage-learning/stage-combined-atomic-scoring.v1.json",
+      "file_sha256": "sha256:66b886c19a3f86eccee4f75ecf59a0496d40a976c8fd5fbd9b47ba065b68767d"
+    },
+    "p015_reference_sufficiency_result": {
+      "path": "config/stage-learning/stage-complete-reserve-reference-sufficiency-result.v1.json",
+      "file_sha256": "sha256:5258606e1a97c0ba53702f233851391134d6bb1f722b90d82f87a140d2a67413",
+      "combined_case_count": 252
+    },
+    "p012_preregistration": {
+      "path": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json",
+      "canonical_digest": "sha256:24aacc70ef7ffa3bbfd0e28e8aa33fd91ba51bbd65da6c13640926215987c54d"
+    },
+    "p014_semantic_artifact": {
+      "job_id": "stage_7c11b97d47a0473fafa37783056f55f4",
+      "code_revision": "c47527c0f9b93362403a2b2c740b43e1daa3afab",
+      "artifact_relative_path": "runs/stage-worker/stage_7c11b97d47a0473fafa37783056f55f4/stage-atomic-proposition-admission-qualified-d1-20260914T133456Z",
+      "manifest_sha256": "sha256:5926d73a04e37b74f7025c2f38314898ee7c5414aa45fe0686de20357ce3c388",
+      "case_count": 192
+    },
+    "p015_additional_review_artifact": {
+      "job_id": "stage_82978e89259e4a139961e81605859fff",
+      "code_revision": "a9a0440997b63babeea699d9c35a32beb00e8f57",
+      "artifact_relative_path": "runs/stage-worker/stage_82978e89259e4a139961e81605859fff/stage-complete-reserve-additional-review-prepare-20260914T175010Z",
+      "manifest_sha256": "sha256:8219bb18b1c5c3236fa5e3dd1ec0ea5112dfc101e286d4dbdab1c72c3d3c8d59",
+      "case_count": 60
+    },
+    "p014_review_ledger": {
+      "relative_path": "control/stage-worker/atomic-review-ledgers/stage_7c11b97d47a0473fafa37783056f55f4.json",
+      "sha256": "sha256:f17063c28e0f75a8ae5280d6ee66b31f9b9ffc318896a3ae8b7e48efc101ed69",
+      "case_count": 192
+    },
+    "p015_review_ledger": {
+      "relative_path": "control/stage-worker/atomic-review-ledgers/p015-stage_82978e89259e4a139961e81605859fff.json",
+      "sha256": "sha256:db3216d322e00ad40ebd7de435684b43bcaf72cbc66a90dcb49403a8be461e06",
+      "case_count": 60
+    },
+    "preserved_2021": {
+      "identity_count": 160,
+      "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+      "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+      "state": "UNREAD"
+    }
+  },
+  "development_surface": {
+    "case_count": 252,
+    "stratum_axis": "era_board_cell",
+    "expected_cell_count": 8,
+    "case_identity_reuse": "exact_P015_combined_reference_case_ids_only",
+    "new_identity_discovery": false,
+    "new_random_sampling": false,
+    "case_replacement": false,
+    "reference_rewrite": false,
+    "rereview": false
+  },
+  "normalization": {
+    "kind": "cell_local_unlabeled_quantile_basis",
+    "basis_inputs": [
+      "range_width20",
+      "positive_width_change20",
+      "positive_absolute_width_gain20",
+      "efficiency20_abs",
+      "range_traversal20",
+      "counter_direction_excursion_share20"
+    ],
+    "source_cases": "all_252_cases_grouped_by_frozen_era_board_cell",
+    "label_or_reference_visibility_during_basis_build": false,
+    "candidate_output_visibility_during_basis_build": false,
+    "quantile_method": "exact_existing_nearest_rank_ceiling_1_based",
+    "minimum_cases_per_cell": 24,
+    "empty_required_subpopulation": "FAIL_CLOSED_BEFORE_SCORING",
+    "cross_cell_pooling": false,
+    "cross_cell_fallback": false,
+    "post_result_basis_change": false
+  },
+  "candidate_surface": {
+    "topology": "exact_P012_instability_3x3_profile_coordinates_reinstantiated_per_cell_basis",
+    "candidate_count": 9,
+    "expansion_profile_count": 3,
+    "broad_profile_count": 3,
+    "new_profile_coordinates": false,
+    "candidate_expansion": false,
+    "joint_pair_search_count": 0,
+    "cell_threshold_values_are_candidate_parameters": true,
+    "profile_identity_shared_across_cells": true
+  },
+  "envelope_successor_disposition": {
+    "p012_fixed_additive_channel": "RETIRED_FROM_P017_ELIGIBILITY",
+    "reason": "P016 observed incremental TP=0 and incremental FP=0 for the fixed channel in all nine trials on the complete 252-case development surface.",
+    "post_result_threshold_tuning": false,
+    "new_envelope_candidate_search": false,
+    "diagnostic_retention_allowed": true,
+    "p012_envelope_specific_incremental_gate": "NOT_APPLICABLE_BECAUSE_SUCCESSOR_REMOVES_THE_MECHANISM_NOT_LOWERED_TO_ZERO"
+  },
+  "quality_gate": {
+    "proposition": "structural_instability_20",
+    "pooled_reference_and_prediction_counts": "exact_P012",
+    "macro_equal_weight_era_board_rates": "exact_P016_aggregate_contract",
+    "minimum_predictions": 18,
+    "minimum_macro_precision": "0.78",
+    "minimum_macro_positive_reference_coverage": "0.70",
+    "maximum_macro_definite_negative_false_positive_rate": "0.10",
+    "reference_sufficiency": "exact_P012_already_passed_by_P015",
+    "numeric_threshold_relaxation": false,
+    "envelope_incremental_gate_numeric_replacement": false
+  },
+  "selection": {
+    "eligible_first": true,
+    "primary_order": [
+      "macro_precision_desc",
+      "macro_definite_negative_false_positive_rate_asc",
+      "macro_positive_reference_coverage_desc",
+      "pooled_precision_desc",
+      "pooled_definite_negative_false_positive_rate_asc",
+      "pooled_positive_reference_coverage_desc",
+      "profile_id_asc"
+    ],
+    "freeze_at_most_one": true,
+    "post_result_repick": false
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 900
+  },
+  "authority": {
+    "artifact_only_development_scoring": true,
+    "cell_local_unlabeled_basis_build": true,
+    "instability_candidate_scoring": true,
+    "dwd_market_read": false,
+    "reference_generation": false,
+    "reference_rewrite": false,
+    "candidate_surface_change": false,
+    "profile_coordinate_change": false,
+    "numeric_gate_relaxation": false,
+    "fixed_relocation_scoring": false,
+    "order_scoring": false,
+    "projection_compatibility": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "output": {
+    "artifact_schema": "quanthus.stage-stratum-normalized-instability-artifact.v1",
+    "summary_schema": "quanthus.stage-stratum-normalized-instability-summary.v1",
+    "score_schema": "quanthus.stage-stratum-normalized-instability-score.v1",
+    "basis_schema": "quanthus.stage-stratum-normalized-instability-bases.v1",
+    "prediction_schema": "quanthus.stage-stratum-normalized-instability-predictions.v1"
+  },
+  "claim_ceiling": "P017 can establish only whether one of the frozen 3x3 instability profile coordinates is development-eligible when its unlabeled thresholds are calibrated separately inside each frozen Era x Board cell. It cannot establish relocation/order/projection quality, preserved out-of-time validity, market prevalence, economic value, strategy value, production suitability or trading authority."
+}

@@ -41,6 +41,7 @@ from quanthus.stage_learning.worker import (
     StageWorker,
     StageWorkerError,
     StageWorkerPaths,
+    _complete_reserve_additional_ready_transport,
     _consume_qualification_budget,
     _digest,
     cancel_job,
@@ -686,6 +687,97 @@ def test_complete_reserve_review_readiness_is_one_shot_and_idempotent(
             code_revision="b" * 40,
             kind=STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB,
         )
+
+
+def test_complete_reserve_additional_ready_transport_exposes_metadata_only(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "e" * 32
+    rows = []
+    for index in range(256):
+        old = index < 192
+        new = 192 <= index < 252
+        ready = index < 252
+        rows.append(
+            {
+                "security_id": f"security_{index:04d}",
+                "window_id": f"WINDOW|{index:04d}",
+                "era": "PRE_STAR" if index % 2 == 0 else "STAR_PRE_CHINEXT_20PCT",
+                "board_family": "MAIN" if index % 3 == 0 else "CHINEXT",
+                "cell": f"CELL-{index % 8}",
+                "review_packet_ready": ready,
+                "readiness_reason": "READY" if ready else "PRIMARY_FACTS_UNAVAILABLE",
+                "source_member_closure_digest": "sha256:" + f"{index:064x}"[-64:],
+                "already_reviewed_in_p014_ledger": old,
+                "new_review_required": new,
+            }
+        )
+    ledger = {
+        "schema_version": "quanthus.stage-complete-reserve-review-readiness-ledger.v1",
+        "rows": rows,
+        "row_count": 256,
+        "ready_count": 252,
+        "unready_count": 4,
+        "ready_by_cell": {f"CELL-{index}": 31 if index < 4 else 32 for index in range(8)},
+        "reason_counts": {"PRIMARY_FACTS_UNAVAILABLE": 4, "READY": 252},
+        "already_reviewed_ready_count": 192,
+        "new_review_required_count": 60,
+        "ledger_digest": _digest(rows),
+        "semantic_values_retained": False,
+    }
+    artifact = worker_paths.runs / job_id / "stage-complete-reserve-review-readiness-test"
+    artifact.mkdir(parents=True)
+    readiness_raw = json.dumps(ledger, sort_keys=True, separators=(",", ":")).encode()
+    (artifact / "review-readiness.json").write_bytes(readiness_raw)
+    source_raw = b"{}"
+    summary_raw = b"{}"
+    (artifact / "source-binding.json").write_bytes(source_raw)
+    (artifact / "summary.json").write_bytes(summary_raw)
+    files = {
+        "review-readiness.json": "sha256:" + hashlib.sha256(readiness_raw).hexdigest(),
+        "source-binding.json": "sha256:" + hashlib.sha256(source_raw).hexdigest(),
+        "summary.json": "sha256:" + hashlib.sha256(summary_raw).hexdigest(),
+    }
+    manifest = {"files": files}
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    observed = {
+        "job_id": job_id,
+        "kind": STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB,
+        "state": "succeeded",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "complete_reserve_review_readiness": {
+                "continuation_pass": True,
+                "ledger_digest": _digest(rows),
+                "ready_count": 252,
+                "unready_count": 4,
+                "already_reviewed_ready_count": 192,
+                "new_review_required_count": 60,
+            },
+        },
+    }
+    transport = _complete_reserve_additional_ready_transport(worker_paths, observed)
+    assert transport is not None
+    assert transport["new_review_required_count"] == 60
+    assert len(transport["rows"]) == 60
+    assert transport["rows"][0]["security_id"] == "security_0192"
+    assert set(transport["rows"][0]) == {
+        "security_id",
+        "window_id",
+        "era",
+        "board_family",
+        "cell",
+        "source_member_closure_digest",
+    }
+    assert transport["semantic_values_included"] is False
+    assert transport["reference_opinions_included"] is False
+    assert transport["candidate_or_threshold_output_included"] is False
 
 
 def test_second_group_profile_kind_gets_its_frozen_config(tmp_path: Path) -> None:

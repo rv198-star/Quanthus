@@ -5214,6 +5214,92 @@ def _atomic_proposition_g1_virtual_review_status(
     return None
 
 
+def _complete_reserve_additional_ready_transport(
+    paths: StageWorkerPaths, observed: Mapping[str, Any]
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_COMPLETE_RESERVE_REVIEW_READINESS_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("P015 readiness result reference missing")
+    detail = result_ref.get("complete_reserve_review_readiness")
+    if not isinstance(detail, Mapping) or detail.get("continuation_pass") is not True:
+        raise StageWorkerError("P015 readiness continuation is not authorized")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError("P015 readiness artifact outside job root") from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("P015 readiness manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    readiness_raw = (artifact_root / "review-readiness.json").read_bytes()
+    if manifest.get("files", {}).get("review-readiness.json") != _bytes_sha256(readiness_raw):
+        raise StageWorkerError("P015 readiness ledger file binding differs")
+    ledger = json.loads(readiness_raw)
+    rows = ledger.get("rows") if isinstance(ledger, Mapping) else None
+    if not isinstance(rows, list) or len(rows) != 256:
+        raise StageWorkerError("P015 readiness ledger shape differs")
+    if (
+        _digest(rows) != detail.get("ledger_digest")
+        or ledger.get("semantic_values_retained") is not False
+    ):
+        raise StageWorkerError("P015 readiness ledger digest differs")
+    allowed = {
+        "security_id",
+        "window_id",
+        "era",
+        "board_family",
+        "cell",
+        "review_packet_ready",
+        "readiness_reason",
+        "source_member_closure_digest",
+        "already_reviewed_in_p014_ledger",
+        "new_review_required",
+    }
+    if any(not isinstance(row, Mapping) or set(row) != allowed for row in rows):
+        raise StageWorkerError("P015 readiness ledger retention fields differ")
+    additional = [
+        {
+            "security_id": str(row["security_id"]),
+            "window_id": str(row["window_id"]),
+            "era": str(row["era"]),
+            "board_family": str(row["board_family"]),
+            "cell": str(row["cell"]),
+            "source_member_closure_digest": str(row["source_member_closure_digest"]),
+        }
+        for row in rows
+        if row.get("new_review_required") is True
+    ]
+    if (
+        len(additional) != detail.get("new_review_required_count")
+        or len(additional) != 60
+        or len({(row["security_id"], row["window_id"]) for row in additional}) != len(additional)
+    ):
+        raise StageWorkerError("P015 additional review denominator differs")
+    return {
+        "schema_version": "quanthus.stage-complete-reserve-additional-ready-transport.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "ledger_digest": detail.get("ledger_digest"),
+        "ready_count": detail.get("ready_count"),
+        "unready_count": detail.get("unready_count"),
+        "already_reviewed_ready_count": detail.get("already_reviewed_ready_count"),
+        "new_review_required_count": len(additional),
+        "rows": additional,
+        "semantic_values_included": False,
+        "reference_opinions_included": False,
+        "candidate_or_threshold_output_included": False,
+    }
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -5257,6 +5343,11 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
                     )
                 ),
             }
+        additional_ready_transport = _complete_reserve_additional_ready_transport(
+            paths, observed
+        )
+        if additional_ready_transport is not None:
+            result = {**result, "additional_ready_transport": additional_ready_transport}
         selection_transport = _positive_instability_d1_selection_transport(paths, observed)
         if selection_transport is None:
             selection_transport = _orderly_consolidation_joint_d1_selection_transport(

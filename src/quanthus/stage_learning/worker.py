@@ -6061,6 +6061,95 @@ def _complete_reserve_additional_ready_transport(
     }
 
 
+def _combined_atomic_scoring_diagnostics(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_COMBINED_ATOMIC_SCORING_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("combined atomic scoring result reference missing")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError("combined atomic scoring artifact outside job root") from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("combined atomic scoring diagnostic manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    raw = (artifact_root / "atomic-score.json").read_bytes()
+    if manifest.get("files", {}).get("atomic-score.json") != _bytes_sha256(raw):
+        raise StageWorkerError("combined atomic scoring diagnostic file binding differs")
+    score = json.loads(raw)
+    trials = score.get("instability_trials")
+    if not isinstance(trials, list) or len(trials) != 9:
+        raise StageWorkerError("combined atomic scoring diagnostic trial count differs")
+
+    def compact_metrics(metrics: Mapping[str, Any]) -> dict[str, Any]:
+        pooled = metrics.get("pooled")
+        macro = metrics.get("macro")
+        if not isinstance(pooled, Mapping) or not isinstance(macro, Mapping):
+            raise StageWorkerError("combined atomic scoring diagnostic metrics differ")
+        return {
+            "macro_precision": macro.get("precision"),
+            "macro_positive_reference_coverage": macro.get("positive_reference_coverage"),
+            "macro_definite_negative_false_positive_rate": macro.get(
+                "definite_negative_false_positive_rate"
+            ),
+            "pooled_predictions": pooled.get("predictions"),
+            "pooled_true_positive": pooled.get("true_positive"),
+            "pooled_false_positive": pooled.get("false_positive"),
+            "pooled_precision": pooled.get("precision"),
+            "pooled_positive_reference_coverage": pooled.get(
+                "positive_reference_coverage"
+            ),
+            "pooled_definite_negative_false_positive_rate": pooled.get(
+                "definite_negative_false_positive_rate"
+            ),
+        }
+
+    compact_trials = []
+    for trial in trials:
+        if not isinstance(trial, Mapping):
+            raise StageWorkerError("combined atomic scoring diagnostic trial shape differs")
+        candidate = trial.get("candidate")
+        metrics = trial.get("metrics")
+        base_metrics = trial.get("base_metrics")
+        if not all(isinstance(item, Mapping) for item in (candidate, metrics, base_metrics)):
+            raise StageWorkerError("combined atomic scoring diagnostic trial payload differs")
+        compact_trials.append(
+            {
+                "candidate_id": candidate.get("candidate_id"),
+                "expansion_profile_id": candidate.get("expansion_profile_id"),
+                "broad_profile_id": candidate.get("broad_profile_id"),
+                "eligible": trial.get("eligible") is True,
+                "metrics": compact_metrics(metrics),
+                "base_metrics": compact_metrics(base_metrics),
+                "incremental_true_positive": trial.get("incremental_true_positive"),
+                "incremental_false_positive": trial.get("incremental_false_positive"),
+            }
+        )
+    return {
+        "schema_version": "quanthus.stage-combined-atomic-scoring-diagnostics.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "disposition": score.get("disposition"),
+        "reference_case_count": score.get("reference_case_count"),
+        "instability_trials": compact_trials,
+        "candidate_threshold_values_included": False,
+        "case_predictions_included": False,
+        "reference_rows_included": False,
+        "dwd_market_read": False,
+    }
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -6125,6 +6214,9 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
         )
         if additional_ready_transport is not None:
             result = {**result, "additional_ready_transport": additional_ready_transport}
+        scoring_diagnostics = _combined_atomic_scoring_diagnostics(paths, observed)
+        if scoring_diagnostics is not None:
+            result = {**result, "scoring_diagnostics": scoring_diagnostics}
         selection_transport = _positive_instability_d1_selection_transport(paths, observed)
         if selection_transport is None:
             selection_transport = _orderly_consolidation_joint_d1_selection_transport(

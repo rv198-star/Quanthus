@@ -899,6 +899,93 @@ def test_combined_atomic_scoring_is_one_shot_and_idempotent(tmp_path: Path) -> N
         )
 
 
+def test_combined_atomic_scoring_status_exposes_bounded_diagnostics_only(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "8" * 32
+    artifact = worker_paths.runs / job_id / "stage-combined-atomic-scoring-test"
+    artifact.mkdir(parents=True)
+    pooled = {
+        "predictions": 20,
+        "true_positive": 12,
+        "false_positive": 8,
+        "precision": "0.6",
+        "positive_reference_coverage": "0.3",
+        "definite_negative_false_positive_rate": "0.05",
+    }
+    macro = {
+        "precision": "0.55",
+        "positive_reference_coverage": "0.28",
+        "definite_negative_false_positive_rate": "0.04",
+    }
+    trials = []
+    for index in range(9):
+        trials.append(
+            {
+                "candidate": {
+                    "candidate_id": "sha256:" + f"{index:064x}"[-64:],
+                    "expansion_profile_id": f"exp-{index // 3}",
+                    "broad_profile_id": f"broad-{index % 3}",
+                    "secret_threshold": "must-not-leak",
+                },
+                "metrics": {"pooled": pooled, "macro": macro, "per_cell": {}},
+                "base_metrics": {"pooled": pooled, "macro": macro, "per_cell": {}},
+                "incremental_true_positive": 1,
+                "incremental_false_positive": 0,
+                "eligible": False,
+            }
+        )
+    score = {
+        "schema_version": "quanthus.stage-combined-atomic-scoring-result.v1",
+        "disposition": "REVISE_OR_PARK_INSTABILITY_DEVELOPMENT_FAIL",
+        "reference_case_count": 252,
+        "instability_trials": trials,
+    }
+    score_raw = json.dumps(score, sort_keys=True, separators=(",", ":")).encode()
+    (artifact / "atomic-score.json").write_bytes(score_raw)
+    manifest = {
+        "schema_version": "quanthus.stage-combined-atomic-scoring-artifact.v1",
+        "files": {"atomic-score.json": "sha256:" + hashlib.sha256(score_raw).hexdigest()},
+    }
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_COMBINED_ATOMIC_SCORING_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-15T00:00:00+00:00",
+        "started_at": "2026-09-15T00:00:01+00:00",
+        "completed_at": "2026-09-15T00:00:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "combined_atomic_scoring": {"disposition": score["disposition"]},
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-15T00:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+
+    observed = read_status(worker_paths, job_id)
+    diagnostics = observed["scoring_diagnostics"]
+    assert diagnostics["disposition"] == score["disposition"]
+    assert diagnostics["reference_case_count"] == 252
+    assert len(diagnostics["instability_trials"]) == 9
+    assert diagnostics["candidate_threshold_values_included"] is False
+    assert diagnostics["case_predictions_included"] is False
+    assert diagnostics["reference_rows_included"] is False
+    assert "secret_threshold" not in json.dumps(diagnostics)
+
+
 def test_complete_reserve_additional_ready_transport_exposes_metadata_only(
     tmp_path: Path,
 ) -> None:

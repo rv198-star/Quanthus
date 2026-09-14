@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Stable root-owned launcher for AgentDock-mediated Quanthus Stage operations.
+#
+# Install this file once at /usr/local/sbin/quanthus-stage-agentdock-control.
+# sudoers may continue to allow only:
+#   agentdock ALL=(qiuyu) NOPASSWD: /usr/local/sbin/quanthus-stage-agentdock-control
+#
+# The mutable command surface stays in the Git checkout and is always executed as qiuyu,
+# never as root. The launcher refuses helper drift from the currently checked-out commit.
+set -euo pipefail
+
+fail() {
+  echo "quanthus-stage-agentdock-launcher: $*" >&2
+  exit 2
+}
+
+[[ "$(id -un)" == "qiuyu" ]] || fail "must run as qiuyu through the admitted sudo rule"
+[[ "$(hostname)" == "RX6800" ]] || fail "admitted only on RX6800"
+
+repo_root="/home/qiuyu/quanthus-code/Quanthus"
+repo_helper="${repo_root}/ops/bin/quanthus-stage-agentdock-control"
+
+[[ -d "${repo_root}/.git" ]] || fail "Quanthus control checkout missing"
+[[ -f "${repo_helper}" && ! -L "${repo_helper}" ]] || fail "repository helper missing or symlinked"
+[[ "$(stat -c '%U:%G' "${repo_helper}")" == "qiuyu:qiuyu" ]] || fail "repository helper owner differs"
+[[ -z "$(git -C "${repo_root}" diff --name-only HEAD -- ops/bin/quanthus-stage-agentdock-control)" ]] \
+  || fail "repository helper differs from checked-out commit"
+[[ -z "$(git -C "${repo_root}" diff --cached --name-only HEAD -- ops/bin/quanthus-stage-agentdock-control)" ]] \
+  || fail "repository helper index differs from checked-out commit"
+
+git -C "${repo_root}" cat-file -e "HEAD:ops/bin/quanthus-stage-agentdock-control" \
+  || fail "repository helper is not tracked at HEAD"
+
+# Feed the tracked working-tree helper through an already-open stdin file descriptor. If a deploy
+# command checks out a newer revision while this process is running, this invocation continues on
+# the exact helper bytes that passed the checks above. The next invocation automatically uses the
+# helper from the newly deployed revision.
+exec /bin/bash -s -- "$@" < "${repo_helper}"

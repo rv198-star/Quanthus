@@ -468,9 +468,9 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-012-F | Freshness inventory + atomic-first development preregistration | P3-STAGE-012-E9 | closed `PREREGISTRATION_FROZEN`; 2016 fresh development selected before data; `../../acceptance/stage-atomic-proposition-f-preregistration-20260914.md` |
 | P3-STAGE-012-G | Fresh-2016 atomic development | P3-STAGE-012-F | closed `FAILED_FRESHNESS_CAPACITY_TERMINAL`; engineering asset retained, no retry/G2/G3/H; `../../acceptance/stage-atomic-proposition-p012-capacity-closeout-20260914.md` |
 | P3-STAGE-013 | Era × board exposure-aware development reservoir | P3-STAGE-012 | ready `READY_METADATA_ONLY_CAPACITY_CENSUS`; replace whole-identity/random expansion with identity × disjoint-window × PIT-board × exposure accounting; `../../work-items/stage-development-resource-model.md` |
-| P3-STAGE-013-A | Metadata-only era × board × exposure capacity census | P3-STAGE-013 | engineering accepted; exact one-shot metadata Job ready after deployment, no price/morphology/labels/scoring; exact quotas freeze only after census |
-| P3-STAGE-013-B | Freeze board-era quotas and reusable-window policy | P3-STAGE-013-A | blocked pending metadata census |
-| P3-STAGE-013-C | Freeze successor result-bearing preregistration | P3-STAGE-013-B | blocked; no inherited pool size without re-derivation |
+| P3-STAGE-013-A | Metadata-only era × board × exposure capacity census | P3-STAGE-013 | closed `PASS_METADATA_CAPACITY_CENSUS`; 90,067 exposure-aware identity-window capacity vs 18,967 legacy whole-identity capacity; no result-bearing read |
+| P3-STAGE-013-B | Freeze board-era quotas and reusable-window policy | P3-STAGE-013-A | closed `PASS_FREEZE_EQUAL_ERA_BOARD_RESERVE_AND_REVIEW_QUOTAS`; eight present cells each freeze 32 reserve / 24 primary / 8 pre-frozen fallback; global identity uniqueness required in current batch |
+| P3-STAGE-013-C | Freeze successor result-bearing preregistration | P3-STAGE-013-B | ready; exact metadata identity-window plan and unchanged atomic surface must freeze before price read |
 | P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | blocked; requires separately accepted preregistration/runtime contract |
 
 ## 7. Acceptance

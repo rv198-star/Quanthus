@@ -1,0 +1,107 @@
+{
+  "schema_version": "quanthus.stage-development-resource-quota-freeze.v1",
+  "work_item": "P3-STAGE-013-B",
+  "state": "BOARD_ERA_QUOTAS_FROZEN_BEFORE_RESULT_BEARING_READ",
+  "effective_date": "2026-09-14",
+  "bindings": {
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "digest": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    },
+    "capacity_census_contract": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census.v1.json"
+    },
+    "capacity_census_result": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census-result.v1.json",
+      "job_id": "stage_0d24e5a8158445fabb2ae26bec742ada",
+      "manifest_sha256": "sha256:354a936dc9dc7262e1cc4f7377e5048cfa8a00b8d9585bb3fe7d39ede47c03c9"
+    }
+  },
+  "derivation": {
+    "structurally_present_board_era_cell_count": 8,
+    "planned_review_case_count": 192,
+    "review_cases_per_cell": 24,
+    "reserve_identity_windows_per_cell": 32,
+    "prefrozen_fallback_identity_windows_per_cell": 8,
+    "total_reserve_identity_windows": 256,
+    "total_primary_review_identity_windows": 192,
+    "total_prefrozen_fallback_identity_windows": 64,
+    "inherited_512_pool_requirement": false,
+    "reason": "The 192-case atomic-first review target is re-derived as 24 cases across each of eight structurally present era x board cells. Each cell receives eight additional metadata-frozen fallback identity-windows, yielding 32 reserves per cell and 256 total without creating an unused second 256-identity panel."
+  },
+  "cell_quotas": [
+    {"era": "PRE_STAR", "board_family": "MAIN", "reserve": 32, "primary_review": 24, "prefrozen_fallback": 8, "observed_available_unique_identities": 2752},
+    {"era": "PRE_STAR", "board_family": "CHINEXT", "reserve": 32, "primary_review": 24, "prefrozen_fallback": 8, "observed_available_unique_identities": 718},
+    {"era": "STAR_PRE_CHINEXT_20PCT", "board_family": "MAIN", "reserve": 32, "primary_review": 24, "prefrozen_fallback": 8, "observed_available_unique_identities": 2056},
+    {"era": "STAR_PRE_CHINEXT_20PCT", "board_family": "CHINEXT", "reserve": 32, "primary_review": 24, "prefrozen_fallback": 8, "observed_available_unique_identities": 569},
+    {"era": "STAR_PRE_CHINEXT_20PCT", "board_family": "STAR", "reserve": 32, "primary_review": 24, "prefrozen_fallback": 8, "observed_available_unique_identities": 57},
+    {"era": "STAR_AND_CHINEXT_20PCT", "board_family": "MAIN", "reserve": 32, "primary_review": 24, "prefrozen_fallback": 8, "observed_available_unique_identities": 2078},
+    {"era": "STAR_AND_CHINEXT_20PCT", "board_family": "CHINEXT", "reserve": 32, "primary_review": 24, "prefrozen_fallback": 8, "observed_available_unique_identities": 600},
+    {"era": "STAR_AND_CHINEXT_20PCT", "board_family": "STAR", "reserve": 32, "primary_review": 24, "prefrozen_fallback": 8, "observed_available_unique_identities": 102}
+  ],
+  "selection_policy": {
+    "identity_selection": "metadata_only_deterministic_hash",
+    "identity_seed": "p013-era-board-exposure-v1|identity-reserve",
+    "window_selection": "metadata_only_deterministic_temporal_spread",
+    "window_seed": "p013-era-board-exposure-v1|window-assignment",
+    "scarcity_order_for_global_identity_allocation": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "current_batch_global_identity_uniqueness_required": true,
+    "global_identity_uniqueness_failure_disposition": "STOP_BEFORE_MARKET_READ_AND_REVIEW_QUOTA_FEASIBILITY",
+    "same_identity_multiple_cells_in_current_batch": false,
+    "same_identity_future_disjoint_development_window_reuse": "allowed_only_in_later_preregistered_development_batches_and_never_counted_as_identity_independent_evidence",
+    "one_case_per_economic_identity_per_scored_slice": true,
+    "cross_cell_fallback": false,
+    "post_result_identity_replacement": false
+  },
+  "temporal_spread_policy": {
+    "window_length_open_sessions": 61,
+    "non_overlapping_windows": true,
+    "within_cell_assignment": "spread reserve assignments as evenly as feasible across metadata-eligible windows; deterministic hash breaks ties",
+    "maximum_assignment_count_difference_between_eligible_windows": 1,
+    "partial_window_use": false,
+    "price_or_morphology_used_for_window_choice": false
+  },
+  "fallback_policy": {
+    "fallbacks_are_frozen_before_market_read": true,
+    "fallback_order": "deterministic_hash_within_same_era_board_cell",
+    "fallback_trigger": "future input-admission unavailability only",
+    "fallback_may_not_depend_on_reference_or_candidate_result": true,
+    "fallback_may_not_cross_cell": true,
+    "maximum_fallbacks_per_cell": 8,
+    "if_exhausted": "FAIL_SUCCESSOR_DEVELOPMENT_WITHOUT_SUPPLEMENT"
+  },
+  "analysis_policy": {
+    "sampling_intent": "balanced_semantic_stress_not_market_prevalence_estimation",
+    "primary_aggregate": "macro_equal_weight_across_eight_structurally_present_cells",
+    "secondary_aggregate": "pooled_micro_reported_descriptively",
+    "mandatory_diagnostics": [
+      "per-era",
+      "per-board-family",
+      "per-era-board-cell",
+      "repeated-identity-across-prior-development-history"
+    ],
+    "market_prevalence_claim": false,
+    "industry_theme_claim": false
+  },
+  "protected_surfaces": {
+    "preserved_2021_identity_global_exclusion": true,
+    "preserved_2021_market_data_read": false,
+    "2022_2024_market_data_read": false,
+    "2025_market_data_read": false
+  },
+  "next_gate": {
+    "work_item": "P3-STAGE-013-C",
+    "authority": "build exact metadata-selected identity-window plan and successor result-bearing preregistration before any price/morphology/reference/candidate read",
+    "result_bearing_market_read": false
+  },
+  "claim_ceiling": "These quotas are a pre-result sampling and resource-governance freeze. Equal era-board cells are deliberate semantic stress strata, not estimates of A-share board prevalence. No atomic proposition, candidate, threshold, Stage projection or market regime is qualified by this freeze."
+}

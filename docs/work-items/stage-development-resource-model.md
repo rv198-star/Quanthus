@@ -28,9 +28,9 @@ The design preserves identity-global exclusion for the exact protected 2021 eval
 
 | ID | Work | Dependency | Status / exit |
 | --- | --- | --- | --- |
-| P3-STAGE-013-A | Metadata-only era × board × exposure capacity census | P3-STAGE-012 closeout | engineering accepted; exact one-shot metadata Job ready after RX6800 deployment; counts only, no price/morphology/labels/scoring; `../acceptance/stage-development-resource-capacity-census-engineering-20260914.md` |
-| P3-STAGE-013-B | Freeze exact successor board-era quotas and reusable-window policy | P3-STAGE-013-A | blocked on census; must freeze before result-bearing read |
-| P3-STAGE-013-C | Build successor development preregistration | P3-STAGE-013-B | blocked; no inherited 512 gate unless re-derived from actual role/capacity need |
+| P3-STAGE-013-A | Metadata-only era × board × exposure capacity census | P3-STAGE-012 closeout | closed `PASS_METADATA_CAPACITY_CENSUS`; 4,194 identities / 104,833 identity-window capacity / 90,067 exposure-aware available vs 18,967 legacy whole-identity capacity; no price/morphology/labels/scoring; `../acceptance/stage-development-resource-capacity-census-engineering-20260914.md` and `../../config/stage-learning/stage-development-resource-capacity-census-result.v1.json` |
+| P3-STAGE-013-B | Freeze exact successor board-era quotas and reusable-window policy | P3-STAGE-013-A | closed `PASS_FREEZE_EQUAL_ERA_BOARD_RESERVE_AND_REVIEW_QUOTAS`; 8 present cells × 32 reserve / 24 primary / 8 pre-frozen fallback = 256 reserve / 192 primary; current batch requires global identity uniqueness; `../reviews/stage-development-resource-p013b-four-party-review-20260914.md` |
+| P3-STAGE-013-C | Build successor development preregistration | P3-STAGE-013-B | ready; materialize exact metadata-selected identity-window/fallback plan and freeze successor result-bearing contract before price read |
 | P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | blocked; requires separately accepted preregistration and runtime contract |
 
 The A execution contract is now frozen before its first metadata census. It uses exact 61-open-session non-overlapping windows, the PIT listing-board axis, exact bound predecessor exposure artifacts and an immutable 160-identity L5 exclusion. The Worker/helper change adds only the one-shot `quanthus.stage-development-resource-capacity-census.v1` route.

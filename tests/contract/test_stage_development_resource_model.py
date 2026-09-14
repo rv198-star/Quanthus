@@ -13,6 +13,11 @@ CENSUS_SOURCE = ROOT / "src/quanthus/stage_learning/development_resource_capacit
 CENSUS_ACCEPTANCE = (
     ROOT / "docs/acceptance/stage-development-resource-capacity-census-engineering-20260914.md"
 )
+CENSUS_RESULT = (
+    ROOT / "config/stage-learning/stage-development-resource-capacity-census-result.v1.json"
+)
+QUOTA_FREEZE = ROOT / "config/stage-learning/stage-development-resource-quota-freeze.v1.json"
+P013B_REVIEW = ROOT / "docs/reviews/stage-development-resource-p013b-four-party-review-20260914.md"
 
 
 def load_model() -> dict:
@@ -145,6 +150,67 @@ def test_stage013_a_engineering_is_metadata_only_and_bounded() -> None:
     assert "PASS_ENGINEERING_READY_FOR_ONE_METADATA_ONLY_JOB" in CENSUS_ACCEPTANCE.read_text(
         encoding="utf-8"
     )
+
+
+def test_stage013_a_result_proves_capacity_without_market_result_read() -> None:
+    result = json.loads(CENSUS_RESULT.read_text(encoding="utf-8"))
+    assert result["state"] == "PASS_METADATA_CAPACITY_CENSUS"
+    assert result["job"]["terminal_state"] == "succeeded"
+    assert result["artifact"]["verified"] is True
+    totals = result["totals"]
+    assert totals["economic_identity_count"] == 4194
+    assert totals["identity_window_capacity"] == 104833
+    assert totals["exposure_aware_available_capacity"] == 90067
+    assert totals["legacy_whole_identity_available_capacity"] == 18967
+    assert totals["released_capacity_vs_whole_identity"] == 71100
+    cells = [row for row in result["capacity_matrix"] if row["structurally_present"]]
+    assert len(cells) == 8
+    assert min(row["available_unique_identity_count"] for row in cells) == 57
+    assert result["interpretation"]["global_market_data_exhaustion_demonstrated"] is False
+    assert result["interpretation"]["whole_identity_burn_down_is_binding_waste"] is True
+    assert result["interpretation"]["preserved_2021_market_data_read"] is False
+
+
+def test_stage013_b_freezes_equal_cell_quotas_before_result_bearing_read() -> None:
+    value = json.loads(QUOTA_FREEZE.read_text(encoding="utf-8"))
+    assert value["state"] == "BOARD_ERA_QUOTAS_FROZEN_BEFORE_RESULT_BEARING_READ"
+    derivation = value["derivation"]
+    assert derivation["structurally_present_board_era_cell_count"] == 8
+    assert derivation["review_cases_per_cell"] == 24
+    assert derivation["reserve_identity_windows_per_cell"] == 32
+    assert derivation["prefrozen_fallback_identity_windows_per_cell"] == 8
+    assert derivation["total_reserve_identity_windows"] == 256
+    assert derivation["total_primary_review_identity_windows"] == 192
+    assert derivation["inherited_512_pool_requirement"] is False
+    assert len(value["cell_quotas"]) == 8
+    assert all(row["reserve"] == 32 for row in value["cell_quotas"])
+    assert min(row["observed_available_unique_identities"] for row in value["cell_quotas"]) == 57
+    selection = value["selection_policy"]
+    assert selection["current_batch_global_identity_uniqueness_required"] is True
+    assert selection["same_identity_multiple_cells_in_current_batch"] is False
+    assert selection["cross_cell_fallback"] is False
+    assert selection["post_result_identity_replacement"] is False
+    fallback = value["fallback_policy"]
+    assert fallback["fallbacks_are_frozen_before_market_read"] is True
+    assert fallback["maximum_fallbacks_per_cell"] == 8
+    protected = value["protected_surfaces"]
+    assert protected["preserved_2021_market_data_read"] is False
+    assert protected["2025_market_data_read"] is False
+    assert value["next_gate"]["work_item"] == "P3-STAGE-013-C"
+
+
+def test_stage013_b_review_records_all_four_responsibilities_and_no_market_authority() -> None:
+    text = P013B_REVIEW.read_text(encoding="utf-8")
+    for heading in (
+        "Short-term trading perspective",
+        "Fund-manager perspective",
+        "Quantitative research perspective",
+        "Data and evidence governance perspective",
+    ):
+        assert heading in text
+    assert "PASS_FREEZE_EQUAL_ERA_BOARD_RESERVE_AND_REVIEW_QUOTAS" in text
+    assert "No result-bearing market read is authorized" in text
+    assert "256" in text and "192" in text
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

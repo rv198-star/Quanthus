@@ -23,9 +23,9 @@ Because threshold-basis construction had already been reached in-process before 
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
 | P3-STAGE-014-A | Freeze and run deterministic admission-only resource screen | P3-STAGE-013-D | closed `PASS_ADMISSION_CAPACITY_READY_FOR_QUALIFIED_PLAN`; sole Job `stage_bcaf8263cb724a2798d250909c42331f` found all 8 cells >=32, minimum early-STAR=36; no semantic computation; `../acceptance/stage-development-resource-admission-screen-engineering-20260914.md` |
-| P3-STAGE-014-B | Freeze exact admission-qualified 8×32 plan | P3-STAGE-014-A | engineering accepted `PASS_ENGINEERING_READY_FOR_ONE_QUALIFIED_PLAN_JOB`; immutable admission-ledger only, no market read; `../acceptance/stage-development-resource-qualified-plan-engineering-20260914.md` |
-| P3-STAGE-014-C | Freeze exact qualified 8×32 plan | P3-STAGE-014-B | 24 primary + 8 fallback per cell, global identity uniqueness, no cross-cell fill |
-| P3-STAGE-014-D | Run atomic semantic development on qualified plan | P3-STAGE-014-C | same P012 9/1/3 candidate surfaces and numeric gates; blind review before scoring |
+| P3-STAGE-014-B | Freeze exact admission-qualified 8×32 plan | P3-STAGE-014-A | closed `PASS_QUALIFIED_EXACT_PLAN_FROZEN`; Job `stage_9dbc57be4839405790be0e021d8271ba` produced 256 globally unique identities, 8×32, 192 primary + 64 fallback, no market read; `../../config/stage-learning/stage-development-resource-qualified-plan-result.v1.json` |
+| P3-STAGE-014-C | Freeze atomic semantic preregistration/runtime on exact qualified plan | P3-STAGE-014-B | ready `READY_SEMANTIC_PREREGISTRATION`; must bind exact plan digest before any semantic read and retain exact P012 9/1/3 surfaces/gates |
+| P3-STAGE-014-D | Run atomic semantic development on qualified plan | P3-STAGE-014-C | blocked until C engineering acceptance; blind review before scoring |
 | P3-STAGE-014-E | Independent I/R/O selection and projection compatibility | P3-STAGE-014-D | preserved 2021 remains unread unless all frozen development gates pass |
 
 ## Admission-only boundary

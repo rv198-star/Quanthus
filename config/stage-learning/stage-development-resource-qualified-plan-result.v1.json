@@ -1,0 +1,54 @@
+{
+  "schema_version": "quanthus.stage-development-resource-qualified-plan-result.v1",
+  "work_item": "P3-STAGE-014-B",
+  "state": "PASS_QUALIFIED_EXACT_PLAN_FROZEN",
+  "effective_date": "2026-09-14",
+  "job": {
+    "job_id": "stage_9dbc57be4839405790be0e021d8271ba",
+    "code_revision": "fd2bf808b9a3a3e1fdd5e786c968db70f17b10b2",
+    "input_digest": "sha256:46411008d4df93484248fe1073a1ce2a2583ffc07342cedd70487c802a24ace3",
+    "terminal_state": "succeeded",
+    "exit_code": 0
+  },
+  "artifact": {
+    "run_id": "stage-development-resource-qualified-plan-20260914T120249Z",
+    "artifact_relative_path": "runs/stage-worker/stage_9dbc57be4839405790be0e021d8271ba/stage-development-resource-qualified-plan-20260914T120249Z",
+    "manifest_sha256": "sha256:f14c065d0bf18b6491b9220132d1be3c10e608fb9a69f4141c576e351aa7a173",
+    "plan_digest": "sha256:206ed58e8349de59efd52caad958f7bd0f2f9d79f1ee0199eea6a079b6c14829",
+    "identity_digest": "sha256:a3aa679c1792e7545847159c9b4d26dec70b4a925e55bbeb9416852b11f8de05",
+    "file_count": 3,
+    "verified": true
+  },
+  "counts": {
+    "row_count": 256,
+    "unique_identity_count": 256,
+    "primary_count": 192,
+    "fallback_count": 64,
+    "cell_count": 8,
+    "rows_per_cell": 32
+  },
+  "cell_counts": {
+    "PRE_STAR/CHINEXT": 32,
+    "PRE_STAR/MAIN": 32,
+    "STAR_AND_CHINEXT_20PCT/CHINEXT": 32,
+    "STAR_AND_CHINEXT_20PCT/MAIN": 32,
+    "STAR_AND_CHINEXT_20PCT/STAR": 32,
+    "STAR_PRE_CHINEXT_20PCT/CHINEXT": 32,
+    "STAR_PRE_CHINEXT_20PCT/MAIN": 32,
+    "STAR_PRE_CHINEXT_20PCT/STAR": 32
+  },
+  "authority": {
+    "market_data_read": false,
+    "structure_fact_build": false,
+    "threshold_basis": false,
+    "reference_or_label_read": false,
+    "candidate_output": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "semantic_job_authorized": false
+  },
+  "next_gate": "Freeze a separately versioned P014-C atomic semantic preregistration/runtime bound to this exact qualified plan before any semantic market read.",
+  "claim_ceiling": "The plan is input-admission-qualified and globally identity-unique across balanced Era x Board cells. It does not qualify any atomic proposition, threshold, Stage projection, market prevalence or economic value."
+}

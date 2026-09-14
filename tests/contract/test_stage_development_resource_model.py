@@ -31,6 +31,12 @@ P014_MODEL = (
     ROOT / "config/stage-learning/stage-development-resource-admission-qualified-model.v1.json"
 )
 P014_WORK = ROOT / "docs/work-items/stage-development-resource-admission-qualified.md"
+P014_ADMISSION_RESULT = (
+    ROOT / "config/stage-learning/stage-development-resource-admission-result.v1.json"
+)
+P014_QUALIFIED_RESULT = (
+    ROOT / "config/stage-learning/stage-development-resource-qualified-plan-result.v1.json"
+)
 P013D_PREREG_R1 = (
     ROOT / "config/stage-learning/stage-atomic-proposition-successor-prereg-revision-r1.v1.json"
 )
@@ -447,6 +453,37 @@ def test_stage014_inserts_admission_only_screen_before_semantic_development() ->
     assert atomic["joint_pair_search_count"] == 0
     assert atomic["candidate_or_gate_change"] is False
     assert P014_WORK.is_file()
+
+
+def test_stage014_admission_and_qualified_plan_results_close_pre_semantic_resource_work() -> None:
+    admission = json.loads(P014_ADMISSION_RESULT.read_text(encoding="utf-8"))
+    assert admission["state"] == "PASS_ADMISSION_CAPACITY_READY_FOR_QUALIFIED_PLAN"
+    assert admission["job"]["job_id"] == "stage_bcaf8263cb724a2798d250909c42331f"
+    assert admission["totals"]["all_cells_have_required_qualified_capacity"] is True
+    assert admission["totals"]["candidate_window_count"] == 4608
+    assert admission["totals"]["qualified_window_count"] == 3942
+    assert min(row["qualified_unique_identity_count"] for row in admission["cell_summary"]) == 36
+    assert admission["interpretation"]["raw_ohlc_retained"] is False
+    assert admission["interpretation"]["threshold_basis_computed"] is False
+    assert admission["interpretation"]["candidate_scoring"] is False
+
+    plan = json.loads(P014_QUALIFIED_RESULT.read_text(encoding="utf-8"))
+    assert plan["state"] == "PASS_QUALIFIED_EXACT_PLAN_FROZEN"
+    assert plan["job"]["job_id"] == "stage_9dbc57be4839405790be0e021d8271ba"
+    assert plan["counts"] == {
+        "row_count": 256,
+        "unique_identity_count": 256,
+        "primary_count": 192,
+        "fallback_count": 64,
+        "cell_count": 8,
+        "rows_per_cell": 32,
+    }
+    assert set(plan["cell_counts"].values()) == {32}
+    assert plan["authority"]["market_data_read"] is False
+    assert plan["authority"]["semantic_job_authorized"] is False
+    assert plan["artifact"]["plan_digest"] == (
+        "sha256:206ed58e8349de59efd52caad958f7bd0f2f9d79f1ee0199eea6a079b6c14829"
+    )
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

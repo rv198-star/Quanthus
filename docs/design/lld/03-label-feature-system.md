@@ -474,7 +474,8 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-013-D | Result-bearing successor development | P3-STAGE-013-C | closed `CLOSED_PRE_REVIEW_INPUT_ADMISSION_SHORTFALL`; sole exact-plan Job failed before blind review/scoring because `PRE_STAR/MAIN` could not realize 24 complete cases from frozen 24+8 resources; no retry, preserved 2021 unread |
 | P3-STAGE-014 | Admission-qualified Era × Board reservoir | P3-STAGE-013-D | ready design: deterministic exposure-aware candidates are input-admission screened before any Structure/threshold/reference/candidate computation, then exact 8×32 semantic resources freeze |
 | P3-STAGE-014-A | Admission-only Era × Board resource screen | P3-STAGE-014 | closed `PASS_ADMISSION_CAPACITY_READY_FOR_QUALIFIED_PLAN`; all 8 cells meet >=32 readiness capacity, minimum early-STAR=36; no semantic computation |
-| P3-STAGE-014-B | Freeze exact admission-qualified 8×32 plan | P3-STAGE-014-A | engineering accepted `PASS_ENGINEERING_READY_FOR_ONE_QUALIFIED_PLAN_JOB`; ledger-only global-identity freeze, no market read |
+| P3-STAGE-014-B | Freeze exact admission-qualified 8×32 plan | P3-STAGE-014-A | closed `PASS_QUALIFIED_EXACT_PLAN_FROZEN`; 256 globally unique identities, 8×32, 192 primary + 64 fallback, no market read |
+| P3-STAGE-014-C | Freeze atomic semantic preregistration/runtime on qualified plan | P3-STAGE-014-B | ready `READY_SEMANTIC_PREREGISTRATION`; exact plan binding required before semantic read |
 
 ## 7. Acceptance
 

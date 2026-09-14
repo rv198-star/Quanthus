@@ -20,6 +20,10 @@ QUOTA_FREEZE = ROOT / "config/stage-learning/stage-development-resource-quota-fr
 P013B_REVIEW = ROOT / "docs/reviews/stage-development-resource-p013b-four-party-review-20260914.md"
 P013C_PLAN = ROOT / "config/stage-learning/stage-development-resource-plan.v1.json"
 P013C_ACCEPTANCE = ROOT / "docs/acceptance/stage-development-resource-plan-engineering-20260914.md"
+P013C_RESULT = ROOT / "config/stage-learning/stage-development-resource-plan-result.v1.json"
+P013C_SUCCESSOR = (
+    ROOT / "config/stage-learning/stage-atomic-proposition-successor-development-screen.v1.json"
+)
 
 
 def load_model() -> dict:
@@ -243,6 +247,74 @@ def test_stage013_c_engineering_freezes_exact_metadata_plan_before_market_read()
     text = P013C_ACCEPTANCE.read_text(encoding="utf-8")
     assert "PASS_ENGINEERING_READY_FOR_ONE_EXACT_METADATA_PLAN_JOB" in text
     assert "exactly 256 unique economic identities" in text
+
+
+def test_stage013_c_exact_plan_result_is_frozen_and_still_non_result_bearing() -> None:
+    value = json.loads(P013C_RESULT.read_text(encoding="utf-8"))
+    assert value["state"] == "PASS_EXACT_METADATA_PLAN_FROZEN"
+    assert value["failed_attempt"]["artifact_published"] is False
+    assert value["failed_attempt"]["market_data_read"] is False
+    recovery = value["recovery"]
+    assert recovery["job_id"] == "stage_060f6edc80774b6b802e56b6c21025bc"
+    assert recovery["terminal_state"] == "succeeded"
+    artifact = value["artifact"]
+    assert artifact["verified"] is True
+    assert artifact["manifest_sha256"] == (
+        "sha256:853ade679e1107db238ec68daa8a26755e1d48ef334b9b85d525a8fcd0a3adef"
+    )
+    assert artifact["plan_digest"] == (
+        "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371"
+    )
+    counts = value["counts"]
+    assert counts == {
+        "row_count": 256,
+        "unique_identity_count": 256,
+        "primary_count": 192,
+        "fallback_count": 64,
+        "structurally_present_cell_count": 8,
+        "reserve_per_cell": 32,
+        "primary_per_cell": 24,
+        "fallback_per_cell": 8,
+    }
+    assert set(value["cell_counts"].values()) == {32}
+    assert value["authority"]["market_price_read"] is False
+    assert value["authority"]["result_bearing_stage_authorized"] is False
+
+
+def test_stage013_c_successor_prereg_binds_exact_plan_and_preserves_atomic_surface() -> None:
+    value = json.loads(P013C_SUCCESSOR.read_text(encoding="utf-8"))
+    assert value["state"] == "PREREGISTERED_EXACT_PLAN_BEFORE_RESULT_BEARING_MARKET_READ"
+    plan = value["bindings"]["exact_plan_artifact"]
+    assert plan["job_id"] == "stage_060f6edc80774b6b802e56b6c21025bc"
+    assert plan["row_count"] == 256
+    assert plan["unique_identity_count"] == 256
+    assert plan["primary_count"] == 192
+    assert plan["fallback_count"] == 64
+    resources = value["resource_plan"]
+    assert resources["cell_count"] == 8
+    assert resources["reserve_per_cell"] == 32
+    assert resources["primary_per_cell"] == 24
+    assert resources["fallback_per_cell"] == 8
+    assert resources["global_identity_unique"] is True
+    assert resources["cross_cell_fallback"] is False
+    assert resources["post_result_identity_replacement"] is False
+    atomic = value["atomic_contract"]
+    assert atomic["instability_candidate_count"] == 9
+    assert atomic["relocation_candidate_count"] == 1
+    assert atomic["order_profile_count"] == 3
+    assert atomic["joint_pair_search_count"] == 0
+    assert atomic["numeric_atomic_quality_gates"] == "exact_P012"
+    assert atomic["projection_compatibility_numeric_gates"] == "exact_P012"
+    assert atomic["candidate_surface_change"] is False
+    review = value["review"]
+    assert review["primary_aggregate"] == "macro_equal_weight_across_eight_era_board_cells"
+    assert review["candidate_output_visible"] is False
+    assert review["immutable_review_ledger_required_before_scoring"] is True
+    assert value["preserved_evaluation_gate"]["otherwise_remains_unread"] is True
+    assert value["authority"]["result_bearing_market_read"] is False
+    assert value["authority"]["runtime_job_submission"] is False
+    assert value["authority"]["numeric_gate_change"] is False
+    assert value["authority"]["2025_read"] is False
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

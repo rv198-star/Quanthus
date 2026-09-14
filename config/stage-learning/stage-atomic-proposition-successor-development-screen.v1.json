@@ -1,0 +1,158 @@
+{
+  "schema_version": "quanthus.stage-atomic-proposition-successor-development-screen.v1",
+  "work_item": "P3-STAGE-013-C",
+  "state": "PREREGISTERED_EXACT_PLAN_BEFORE_RESULT_BEARING_MARKET_READ",
+  "purpose": "Re-run the P012 atomic-first development question on the exact P013 era x board exposure-aware plan, preserving the atomic candidate surfaces, numeric quality gates, resolver and preserved-2021 boundary while replacing whole-identity burn-down with a balanced preregistered identity-window resource plan.",
+  "bindings": {
+    "exact_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-plan-result.v1.json"
+    },
+    "exact_plan_artifact": {
+      "job_id": "stage_060f6edc80774b6b802e56b6c21025bc",
+      "code_revision": "2cd26b00a90402c7be3256dfb3d341dc3b9abe18",
+      "artifact_relative_path": "runs/stage-worker/stage_060f6edc80774b6b802e56b6c21025bc/stage-development-resource-plan-20260914T095217Z",
+      "manifest_sha256": "sha256:853ade679e1107db238ec68daa8a26755e1d48ef334b9b85d525a8fcd0a3adef",
+      "plan_digest": "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371",
+      "identity_digest": "sha256:63c82ab26784bb2407ae76e0f42ed5685b29ca110727d26b20b510e7e4bc7c80",
+      "row_count": 256,
+      "unique_identity_count": 256,
+      "primary_count": 192,
+      "fallback_count": 64
+    },
+    "quota_freeze": {
+      "path": "config/stage-learning/stage-development-resource-quota-freeze.v1.json",
+      "file_sha256": "sha256:d6dc034d0751419d3eb514034de642f11cae5a5d18e611ececce1e489b0b55ca"
+    },
+    "quota_revision_r1": {
+      "path": "config/stage-learning/stage-development-resource-quota-revision-r1.v1.json",
+      "file_sha256": "sha256:a6057cb98068307c1327745c14401e3505cbeebe6e4f72951e7ecbfd895b2b56"
+    },
+    "p012_atomic_preregistration": {
+      "path": "config/stage-learning/stage-atomic-proposition-development-screen.v1.json",
+      "canonical_digest": "sha256:24aacc70ef7ffa3bbfd0e28e8aa33fd91ba51bbd65da6c13640926215987c54d"
+    },
+    "p012_execution_contract": {
+      "path": "config/stage-learning/stage-atomic-proposition-development-execution.v1.json",
+      "canonical_digest": "sha256:5203b5c4a325b775722c90c7404fc149567e448cf63d39e731e22fcd6cebe098"
+    },
+    "atomic_review_contract": {
+      "path": "config/stage-learning/stage-atomic-primary-review-contract.v1.json",
+      "canonical_digest": "sha256:74900cfde3d7e86744cab8621a3fd14710fd3fd900fa18f53ef9a98ec750a80c"
+    },
+    "preserved_2021": {
+      "identity_count": 160,
+      "identity_digest": "sha256:8bbbd7ca7110d06bfe07db6c2f555cc093b0c1a259aa666e359a637f9157b1e8",
+      "plan_digest": "sha256:2800777b5941892a73cf022ddd9375780f2a4f63985f1ce0c1eae9b3668169a7",
+      "state": "UNREAD"
+    }
+  },
+  "resource_plan": {
+    "cell_count": 8,
+    "reserve_per_cell": 32,
+    "primary_per_cell": 24,
+    "fallback_per_cell": 8,
+    "total_reserve": 256,
+    "total_primary": 192,
+    "total_fallback": 64,
+    "global_identity_unique": true,
+    "cross_cell_fallback": false,
+    "post_result_identity_replacement": false,
+    "fallback_trigger": "input_admission_unavailability_only",
+    "fallback_order": "exact_plan_cell_slot_ascending",
+    "fallback_exhaustion": "FAIL_CELL_WITHOUT_SUPPLEMENT"
+  },
+  "market_read": {
+    "read_unit": "exact_plan_identity_window_only",
+    "open_sessions_per_window": 61,
+    "read_outside_exact_window": false,
+    "read_identity_history_outside_exact_window": false,
+    "2012_2020_exact_plan_windows_authorized": true,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "case_selection": {
+    "target_complete_cases_per_cell": 24,
+    "target_complete_cases_total": 192,
+    "one_case_per_economic_identity": true,
+    "candidate_t_requires_complete_primary_21_close_path": true,
+    "candidate_t_requires_existing_structure_fact_inputs": true,
+    "candidate_t_selection": "deterministic_hash_among_input_complete_T_dates_inside_exact_window_after_primary_20_session_history",
+    "candidate_t_seed": "p013-atomic-successor-v1|case-T",
+    "selection_uses_morphology_values": false,
+    "selection_uses_labels_or_reference": false,
+    "selection_uses_candidate_output": false,
+    "primary_rows_attempted_before_fallback_rows": true,
+    "fallback_only_until_cell_reaches_24_complete_cases": true,
+    "cross_cell_fill": false
+  },
+  "threshold_basis": {
+    "source": "all available unlabeled primary-scale observations inside all exact 256 reserve identity-windows after input admission",
+    "labels_visible": false,
+    "reference_opinions_visible": false,
+    "quantile_method": "nearest_rank_ceiling_1_based",
+    "candidate_topology_and_quantile_coordinates": "exact_P012",
+    "envelope_channel_uses_market_learned_threshold": false
+  },
+  "atomic_contract": {
+    "instability_candidate_count": 9,
+    "instability_surface": "exact_P012_9_enhanced_candidates",
+    "relocation_candidate_count": 1,
+    "relocation_surface": "exact_frozen_P008_guard_as_bound_by_P012",
+    "order_profile_count": 3,
+    "order_surface": "exact_P012_three_profiles",
+    "joint_pair_search_count": 0,
+    "numeric_atomic_quality_gates": "exact_P012",
+    "development_sufficiency_reference_minima": "exact_P012_except_complete_case_balance_is_stricter_per_cell_24x8",
+    "resolver": "exact_P012",
+    "projection_compatibility_numeric_gates": "exact_P012",
+    "candidate_surface_change": false,
+    "threshold_value_reuse_from_P012": false,
+    "thresholds_recomputed_only_from_current_unlabeled_basis": true
+  },
+  "review": {
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "review_packet": "exact_P012_primary_only_visibility_contract",
+    "candidate_output_visible": false,
+    "threshold_basis_visible": false,
+    "envelope_measurement_visible": false,
+    "future_rows_visible": false,
+    "preserved_2021_visible": false,
+    "immutable_review_ledger_required_before_scoring": true,
+    "primary_aggregate": "macro_equal_weight_across_eight_era_board_cells",
+    "secondary_aggregate": "pooled_micro_descriptive_only",
+    "numeric_gate_values": "exact_P012_values_applied_to_primary_macro_metrics",
+    "mandatory_diagnostics": ["per-era", "per-board-family", "per-era-board-cell"]
+  },
+  "selection_and_projection": {
+    "instability_scored_independently": true,
+    "freeze_at_most_one_instability_candidate": true,
+    "relocation_fixed_not_selectable": true,
+    "order_scored_independently": true,
+    "freeze_at_most_one_order_profile": true,
+    "joint_pair_ranking_forbidden": true,
+    "projection_uses_only_frozen_I_R_O": true,
+    "post_projection_reselection": false
+  },
+  "preserved_evaluation_gate": {
+    "read_authorized_only_if_development_atomic_sufficiency_and_I_R_O_quality_and_projection_compatibility_all_pass": true,
+    "otherwise_remains_unread": true,
+    "identity_reselection": false,
+    "plan_change": false
+  },
+  "authority": {
+    "implementation": true,
+    "result_bearing_market_read": false,
+    "runtime_job_submission": false,
+    "parameter_search": false,
+    "candidate_surface_change": false,
+    "numeric_gate_change": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This preregistration freezes the successor result-bearing development question and exact sampling resources before market read. It does not authorize execution, qualify any atomic proposition, or claim board/era market prevalence."
+}

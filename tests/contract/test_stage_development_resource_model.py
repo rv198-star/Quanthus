@@ -120,6 +120,8 @@ P023_RESULT = ROOT / "config/stage-learning/stage-realized-identity-admission-re
 P023_REVIEW = ROOT / "docs/reviews/stage-p023-realized-identity-admission-review-20260916.md"
 P023_WORK = ROOT / "docs/work-items/stage-realized-identity-admission.md"
 P024_CONFIG = ROOT / "config/stage-learning/stage-clustered-identity-admission.v1.json"
+P024_RESULT = ROOT / "config/stage-learning/stage-clustered-identity-admission-result.v1.json"
+P024_REVIEW = ROOT / "docs/reviews/stage-p024-clustered-identity-admission-review-20260916.md"
 P024_WORK = ROOT / "docs/work-items/stage-clustered-identity-admission.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1810,6 +1812,64 @@ def test_stage024_freezes_clustered_identity_supplement_before_new_readiness_rea
     ):
         assert authority[key] is False
     assert P024_WORK.is_file()
+
+
+def test_stage024_closes_no_pass_and_freezes_capacity_limited_semantic_successor() -> None:
+    value = json.loads(P024_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-024"
+    assert value["state"] == "CLOSED_CLUSTERED_ADMISSION_CAPACITY_SHORTFALL_REVIEWED"
+    job = value["job"]
+    assert job["job_id"] == "stage_81bd8645a33d4ae3bb84f64f9a7e7d57"
+    assert job["code_revision"] == "c4e7a2c234f9acb4057fe2f641b159aa9eda4df8"
+    assert job["manifest_sha256"] == (
+        "sha256:f853f1eb0be0d6938e34389ddd955a1fc7ee4017a6e7187714757fa80b6a4318"
+    )
+    assert job["disposition"] == "CLOSED_CLUSTERED_ADMISSION_CAPACITY_SHORTFALL"
+    execution = value["execution"]
+    assert execution["starting_row_count"] == 179
+    assert execution["eligible_conflict_skipped_candidate_count"] == 33
+    assert execution["supplemental_market_read_attempt_count"] == 20
+    assert execution["supplemental_readiness_failure_count"] == 12
+    assert execution["activated_supplement_count"] == 8
+    assert execution["completed_p023_readiness_rerun_count"] == 0
+    panel = value["final_panel"]
+    assert panel["row_count"] == 187
+    assert panel["unique_identity_cluster_count"] == 179
+    assert panel["repeated_identity_cluster_count"] == 8
+    assert panel["independent_identity_evidence_count"] == 179
+    assert panel["repeated_rows_not_independent"] is True
+    assert panel["cell_counts"]["STAR_PRE_CHINEXT_20PCT/STAR"] == 19
+    assert panel["p024_pass_gate_met"] is False
+    review = value["four_party_disposition"]
+    assert review["p024_reinterpreted_as_pass"] is False
+    assert review["automatic_p025"] is False
+    assert review["additional_resource_or_admission_read"] is False
+    assert review["drop_or_merge_early_star"] is False
+    assert review["same_cell_repeated_measure_fill"] is False
+    assert review["freeze_exact_187_row_panel_as_p020_development_resource_ceiling"] is True
+    assert review["independent_evidence_count_is_unique_cluster_count"] is True
+    assert review["early_star_role"] == "CAPACITY_LIMITED_SEMANTIC_STRESS_AND_AUDIT_STRATUM"
+    assert review["cluster_aware_uncertainty_required"] is True
+    assert review["packet_failure_replacement_allowed"] is False
+    authority = value["authority_and_reads"]
+    for key in (
+        "stage1_12_semantic_read",
+        "threshold_or_candidate_read",
+        "reference_opinion_read",
+        "p020_c_semantic_review_authorized_by_p024_runtime",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+    successor = value["successor"]
+    assert successor["work_item"] == "P3-STAGE-020-C"
+    assert successor["disposition"] == (
+        "OPEN_SEPARATE_CAPACITY_LIMITED_BLIND_REFERENCE_PREREGISTRATION"
+    )
+    assert P024_REVIEW.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

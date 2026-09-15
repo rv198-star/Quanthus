@@ -496,14 +496,17 @@ nodes.
   reach 24/24, while early STAR reaches 11/24. P023 therefore closes fail-closed rather than PASS. Its
   review selects P024 to restore the P013 clustered-development model: identity stays unique within
   each cell, while cross-era non-overlapping reuse is explicit and cannot be counted as independent
-  evidence twice. P024-A is now preregistered before any new readiness read. It binds the exact P023
-  no-pass artifact, permits new admission reads only for previously unread early-STAR candidates that
-  P023 skipped solely for realized-identity conflict, requires row count plus unique-cluster count in
-  all later P020-C/D evidence, and forbids an automatic P025/resource loop on failure. P024-B
-  engineering is now accepted with a one-shot/idempotent Worker Job and bounded `submit-p024` control;
-  no new readiness read occurred during engineering. P024-C is the sole ready runtime step. P020
-  remains blocked until a P024 PASS and separate P020-C preregistration. Preserved
-  2021/2022-2024/2025 remain unopened.
+  evidence twice. P024-A was preregistered before any new readiness read and P024-B engineering was
+  accepted with a one-shot/idempotent Worker Job. The sole P024-C Job then considered 33 previously
+  unread early-STAR identity-conflict candidates, performed 20 new readiness reads and activated eight
+  supplements. P024 still closes no-pass: the exact final panel is 187 rows / 179 economic-identity
+  clusters, seven cells reach 24 and early STAR reaches 19/24. The eight repeated cross-era identities
+  remain clusters rather than new independent evidence; no P023 readiness was rerun and no Stage1/12
+  or protected partition was read. The contract-required four-party portfolio review does not rewrite
+  P024 as PASS and opens no P025. It ends resource/admission optimization, freezes the exact 187/179
+  panel as P020's final development-resource ceiling, retains early STAR as a 19-row capacity-limited
+  semantic stress/audit stratum, and opens only a separate P020-C blind-reference preregistration.
+  Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -525,7 +528,8 @@ nodes.
   `work-items/stage-realized-identity-admission.md`,
   `reviews/stage-p023-realized-identity-admission-review-20260916.md`,
   `work-items/stage-clustered-identity-admission.md`,
-  `acceptance/stage-clustered-identity-admission-engineering-20260916.md`, and
+  `acceptance/stage-clustered-identity-admission-engineering-20260916.md`,
+  `reviews/stage-p024-clustered-identity-admission-review-20260916.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

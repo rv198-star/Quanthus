@@ -1,12 +1,14 @@
 # P3-STAGE-024 — Cross-Era Clustered-Identity Development Admission
 
-Design status: approved
-Delivery gate: engineering accepted; one bounded runtime Job ready
+Design status: closed no-pass
+Delivery gate: closed after contract-required four-party portfolio review
 
 Machine contract: `../../config/stage-learning/stage-clustered-identity-admission.v1.json`
+Result: `../../config/stage-learning/stage-clustered-identity-admission-result.v1.json`
 Parent result: `../../config/stage-learning/stage-realized-identity-admission-result.v1.json`
 Parent review: `../reviews/stage-p023-realized-identity-admission-review-20260916.md`
 Engineering acceptance: `../acceptance/stage-clustered-identity-admission-engineering-20260916.md`
+Closeout review: `../reviews/stage-p024-clustered-identity-admission-review-20260916.md`
 
 ## Goal
 
@@ -44,8 +46,8 @@ explicit identity cluster and never count as separate identity-independent obser
 | --- | --- | --- | --- |
 | P3-STAGE-024-A | Freeze clustered-development admission and accounting contract | P3-STAGE-023 | this preregistration; no new readiness read |
 | P3-STAGE-024-B | Implement artifact-bound supplemental admission runtime | P3-STAGE-024-A | closed engineering acceptance; deterministic code/tests only, P023 readings reusable and immutable |
-| P3-STAGE-024-C | Run the sole supplemental admission Job | P3-STAGE-024-B | ready after accepted revision is deployed; PASS only at 8×24 admission-ready rows with within-cell uniqueness and complete cluster accounting |
-| P3-STAGE-024-D | Review/close and gate P020-C preregistration | P3-STAGE-024-C | pass may open only a separately frozen P020-C preregistration; failure returns to four-party portfolio review |
+| P3-STAGE-024-C | Run the sole supplemental admission Job | P3-STAGE-024-B | closed `CLOSED_CLUSTERED_ADMISSION_CAPACITY_SHORTFALL`; 8 supplements activated, final 187 rows / 179 clusters, early STAR 19/24 |
+| P3-STAGE-024-D | Review/close and gate P020-C preregistration | P3-STAGE-024-C | closed four-party review; P024 remains no-pass, no P025 is opened, and separate capacity-limited P020-C preregistration is selected |
 
 ## Pass and failure semantics
 
@@ -65,6 +67,9 @@ frozen contract and only to reproduce the same 61-session technical readiness ch
 raw OHLC, build Structure facts, read Stage1/12 labels or reviewer opinions, search thresholds, score
 candidates, open preserved 2021, open 2022-2024/2025, emit daily/strategy output, or trade.
 
-A P024 PASS does not start semantic review. It permits only a separately frozen P020-C preregistration
-that binds the exact clustered-plan digest and its row/cluster accounting before any T-only packet is
-built.
+The sole Job did not PASS. It closed at 187 rows / 179 identity clusters with early STAR 19/24 while
+all seven other cells reached 24. The required post-failure four-party review preserves that no-pass,
+ends resource/admission optimization, and selects a separate capacity-limited P020-C preregistration
+over the exact immutable 187-row panel. Early STAR remains a distinct stress/audit stratum; it is not
+merged, dropped, filled with same-cell repeats, or claimed statistically equivalent to a 24-row cell.
+No P025 resource successor is opened.

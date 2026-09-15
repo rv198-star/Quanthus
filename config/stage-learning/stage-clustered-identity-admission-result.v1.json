@@ -1,0 +1,80 @@
+{
+  "schema_version": "quanthus.stage-clustered-identity-admission-result.v1",
+  "work_item": "P3-STAGE-024",
+  "state": "CLOSED_CLUSTERED_ADMISSION_CAPACITY_SHORTFALL_REVIEWED",
+  "effective_date": "2026-09-16",
+  "job": {
+    "job_id": "stage_81bd8645a33d4ae3bb84f64f9a7e7d57",
+    "code_revision": "c4e7a2c234f9acb4057fe2f641b159aa9eda4df8",
+    "input_digest": "sha256:5f9656e11e5f43d815ae4694946da737e0665ddfd4dbfc665dfcebbd5b3fe3f7",
+    "terminal_state": "succeeded",
+    "exit_code": 0,
+    "run_id": "stage-clustered-identity-admission-20260915T193239Z",
+    "artifact_relative_path": "runs/stage-worker/stage_81bd8645a33d4ae3bb84f64f9a7e7d57/stage-clustered-identity-admission-20260915T193239Z",
+    "manifest_sha256": "sha256:f853f1eb0be0d6938e34389ddd955a1fc7ee4017a6e7187714757fa80b6a4318",
+    "disposition": "CLOSED_CLUSTERED_ADMISSION_CAPACITY_SHORTFALL"
+  },
+  "execution": {
+    "starting_row_count": 179,
+    "eligible_conflict_skipped_candidate_count": 33,
+    "supplemental_market_read_attempt_count": 20,
+    "supplemental_readiness_failure_count": 12,
+    "activated_supplement_count": 8,
+    "completed_p023_readiness_rerun_count": 0
+  },
+  "final_panel": {
+    "row_count": 187,
+    "unique_identity_cluster_count": 179,
+    "repeated_identity_cluster_count": 8,
+    "independent_identity_evidence_count": 179,
+    "repeated_rows_not_independent": true,
+    "clustered_plan_digest": "sha256:a6b99a0337bc3897948977b1ab7bda7a47441acd6909a6f519529808b66c9329",
+    "cell_counts": {
+      "PRE_STAR/CHINEXT": 24,
+      "PRE_STAR/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/STAR": 24,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 24,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 19
+    },
+    "sole_capacity_limited_stratum": "STAR_PRE_CHINEXT_20PCT/STAR",
+    "old_balanced_stress_target_per_cell": 24,
+    "old_target_shortfall": 5,
+    "p024_pass_gate_met": false
+  },
+  "authority_and_reads": {
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "p020_c_semantic_review_authorized_by_p024_runtime": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "four_party_disposition": {
+    "review_type": "same_origin_simulated_four_perspective_portfolio_review",
+    "p024_reinterpreted_as_pass": false,
+    "automatic_p025": false,
+    "additional_resource_or_admission_read": false,
+    "drop_or_merge_early_star": false,
+    "same_cell_repeated_measure_fill": false,
+    "open_new_years_for_resource_repair": false,
+    "freeze_exact_187_row_panel_as_p020_development_resource_ceiling": true,
+    "independent_evidence_count_is_unique_cluster_count": true,
+    "early_star_role": "CAPACITY_LIMITED_SEMANTIC_STRESS_AND_AUDIT_STRATUM",
+    "market_prevalence_claim": false,
+    "cell_level_precision_equivalence_claim": false,
+    "cluster_aware_uncertainty_required": true,
+    "packet_failure_replacement_allowed": false
+  },
+  "successor": {
+    "work_item": "P3-STAGE-020-C",
+    "disposition": "OPEN_SEPARATE_CAPACITY_LIMITED_BLIND_REFERENCE_PREREGISTRATION",
+    "scope": "Bind the exact immutable P024 187-row / 179-cluster panel as the final development resource ceiling. Build candidate-blind T-only Stage12-context and nested Stage1-condition review packets for those rows only. Preserve early STAR as a 19-row capacity-limited audit/stress stratum, report both row and cluster denominators, and allow no resource replacement. Freeze all review/reference rules before collecting any Stage1/12 opinion."
+  },
+  "claim_ceiling": "P024 remains a no-pass against its preregistered 8x24 balanced-resource gate. The post-failure four-party review does not lower or rewrite that gate. It establishes instead that the exact outcome-blind 187-row / 179-identity-cluster admission-ready panel is the final resource ceiling for a separately preregistered bounded P020 Stage1/12 semantic pilot. Early STAR has 19 distinct within-cell identities and is retained as a capacity-limited semantic stress/audit stratum, not a prevalence or equal-precision sample. No Stage1/12 semantic evidence has yet been read."
+}

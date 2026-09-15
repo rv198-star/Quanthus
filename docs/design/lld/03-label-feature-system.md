@@ -502,7 +502,7 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-020 | Downside lifecycle proposition pilot | P3-STAGE-019, P3-STRUCT-006 | blocked by P020-B exposure-governance shortfall before semantic review; Stage12/Stage1 semantics remain frozen but unopened until P021 resolves admission-only exposure taxonomy |
 | P3-STAGE-020-A | Freeze downside lifecycle semantics/reference protocol | P3-STAGE-020 | closed semantic freeze; multi-proposition first, legal `12-context + 1-nested` coexistence, no threshold search or primary-stage compression |
 | P3-STAGE-020-B | Freeze Era×Board resource/admission plan | P3-STAGE-020-A | closed `CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION`; R1 artifact shows both STAR cells at zero remaining fresh metadata windows under the frozen all-P014-admission-read exclusion, before market admission or semantics |
-| P3-STAGE-020-C | Seal blind semantic references | P3-STAGE-020-B | blocked by P020-B resource shortfall; P021 exposure-governance decision must close first |
+| P3-STAGE-020-C | Seal blind semantic references | P3-STAGE-020-B, P3-STAGE-024 | ready for separate capacity-limited preregistration only; exact P024 187 rows / 179 clusters are the final resource ceiling, early STAR remains a 19-row audit/stress stratum, no replacement |
 | P3-STAGE-020-D | Score finite proposition candidates independently | P3-STAGE-020-C | blocked; no top-1 stage compression |
 | P3-STAGE-020-E | Review/closeout and gate any later preserved work | P3-STAGE-020-D | blocked; 2021/2022-2024/2025 remain unread |
 | P3-STAGE-021 | Admission-only exposure taxonomy repair | P3-STAGE-020-B | closed `CLOSED_REPAIRED_TAXONOMY_GLOBAL_IDENTITY_SHORTFALL`; L2A restores per-cell capacity including STAR, but unchanged 256-reserve global uniqueness reaches 243/256 |
@@ -520,11 +520,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-023-B | Execute sole primary-first admission Job | P3-STAGE-023-A | closed; 142/192 primaries ready, 37 fallbacks activated, semantic/preserved surfaces unopened |
 | P3-STAGE-023-C | Review/close realized plan | P3-STAGE-023-B | closed; strict global identity uniqueness remains the early-STAR bottleneck, P023 no-pass preserved |
 | P3-STAGE-023-D | Gate P020-C preregistration | P3-STAGE-023-C | closed `OPEN_CROSS_ERA_CLUSTERED_IDENTITY_DEVELOPMENT_CONTRACT`; separately freeze P024, P020 remains blocked |
-| P3-STAGE-024 | Cross-era clustered-identity development admission | P3-STAGE-023 | P024-A preregistered; only unread P023 early-STAR identity-conflict skips may receive readiness reads, repeated cross-era identities require non-overlapping windows and explicit cluster accounting |
+| P3-STAGE-024 | Cross-era clustered-identity development admission | P3-STAGE-023 | closed `CLOSED_CLUSTERED_ADMISSION_CAPACITY_SHORTFALL_REVIEWED`; 187 rows / 179 clusters, early STAR 19/24; no P025 resource loop |
 | P3-STAGE-024-A | Freeze clustered-development admission/accounting contract | P3-STAGE-023-D | closed preregistration; repeated rows cannot increase independent-identity evidence and later P020-C/D must report row and unique-cluster counts |
 | P3-STAGE-024-B | Implement artifact-bound supplemental admission | P3-STAGE-024-A | closed engineering acceptance; P023 readiness observations are immutable and cannot be rerun |
-| P3-STAGE-024-C | Execute sole supplemental admission Job | P3-STAGE-024-B | ready after accepted revision deployment; PASS only at 8×24 admission-ready rows with within-cell identity uniqueness and pairwise non-overlap for repeated clusters |
-| P3-STAGE-024-D | Review/close and gate P020-C | P3-STAGE-024-C | blocked; failure requires four-party portfolio review rather than automatic P025/resource repair |
+| P3-STAGE-024-C | Execute sole supplemental admission Job | P3-STAGE-024-B | closed no-pass; 33 eligible unread conflicts, 20 reads, 8 activations, no semantic/protected reads, early STAR remains 5 below old balanced-stress target |
+| P3-STAGE-024-D | Review/close and gate P020-C | P3-STAGE-024-C | closed four-party portfolio review; P024 stays no-pass, exact 187/179 panel becomes final development resource ceiling, separate P020-C preregistration selected |
 
 ## 7. Acceptance
 

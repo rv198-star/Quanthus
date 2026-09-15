@@ -499,10 +499,10 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-018-C | Review channel attribution | P3-STAGE-018-B | closed `PASS_RECOMMEND_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; scale/threshold tuning is no longer the selected route |
 | P3-STAGE-018-D | Close and choose next gate | P3-STAGE-018-C | closed `RECOMMEND_P019_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; retained as local Stage-0 evidence, superseded as active route by P019 portfolio rebaseline |
 | P3-STAGE-019 | Third-group portfolio rebaseline | P3-STAGE-018 | closed `PASS_REBASELINE_THIRD_GROUP_ROUTE`; Stage0 parent qualification parked, expansion retained research-only, broad current eligibility rejected, Stage2/order retained exploratory, `1/12` selected next |
-| P3-STAGE-020 | Downside lifecycle proposition pilot | P3-STAGE-019, P3-STRUCT-006 | ready bounded route; Stage12 downside context + nested Stage1 deceleration/stabilization over accepted Trend Evolution Facts |
+| P3-STAGE-020 | Downside lifecycle proposition pilot | P3-STAGE-019, P3-STRUCT-006 | blocked by P020-B exposure-governance shortfall before semantic review; Stage12/Stage1 semantics remain frozen but unopened until P021 resolves admission-only exposure taxonomy |
 | P3-STAGE-020-A | Freeze downside lifecycle semantics/reference protocol | P3-STAGE-020 | closed semantic freeze; multi-proposition first, legal `12-context + 1-nested` coexistence, no threshold search or primary-stage compression |
-| P3-STAGE-020-B | Freeze Era×Board resource/admission plan | P3-STAGE-020-A | technical recovery ready; initial Job hit metadata `candidate_cell_missing` before any admission market read; one exact R1 may only persist the fresh-window shortfall artifact with unchanged exact-window exclusions and 8×32 quota |
-| P3-STAGE-020-C | Seal blind semantic references | P3-STAGE-020-B | blocked; candidate/threshold/future blind |
+| P3-STAGE-020-B | Freeze Era×Board resource/admission plan | P3-STAGE-020-A | closed `CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION`; R1 artifact shows both STAR cells at zero remaining fresh metadata windows under the frozen all-P014-admission-read exclusion, before market admission or semantics |
+| P3-STAGE-020-C | Seal blind semantic references | P3-STAGE-020-B | blocked by P020-B resource shortfall; P021 exposure-governance decision must close first |
 | P3-STAGE-020-D | Score finite proposition candidates independently | P3-STAGE-020-C | blocked; no top-1 stage compression |
 | P3-STAGE-020-E | Review/closeout and gate any later preserved work | P3-STAGE-020-D | blocked; 2021/2022-2024/2025 remain unread |
 

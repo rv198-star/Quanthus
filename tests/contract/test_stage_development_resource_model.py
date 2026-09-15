@@ -99,6 +99,9 @@ P020_RESOURCE = ROOT / "config/stage-learning/stage-downside-lifecycle-resource-
 P020_RESOURCE_RECOVERY = (
     ROOT / "config/stage-learning/stage-downside-lifecycle-resource-plan-recovery.v1.json"
 )
+P020_RESOURCE_RESULT = (
+    ROOT / "config/stage-learning/stage-downside-lifecycle-resource-result.v1.json"
+)
 P020_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-proposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1397,6 +1400,34 @@ def test_stage020b_recovery_only_persists_pre_admission_capacity_shortfall() -> 
         "trading",
     ):
         assert authority[key] is False
+
+
+def test_stage020b_closes_on_star_fresh_window_exhaustion_before_admission() -> None:
+    value = json.loads(P020_RESOURCE_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-020-B"
+    assert value["state"] == "CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION"
+    recovery = value["execution"]["technical_recovery_job"]
+    assert recovery["job_id"] == "stage_1b0888224e684c7c9593c881ae01d4d4"
+    assert recovery["terminal_state"] == "succeeded"
+    assert recovery["manifest_sha256"] == (
+        "sha256:9864f0c62638660e1eed8976e92a7e2f684f5aecb723d3e9a9e43320fc7101d1"
+    )
+    preflight = value["metadata_preflight"]
+    assert preflight["candidate_window_count"] == 85203
+    cells = preflight["cells"]
+    for cell in ("STAR_PRE_CHINEXT_20PCT/STAR", "STAR_AND_CHINEXT_20PCT/STAR"):
+        assert cells[cell]["candidate_identity_count"] == 0
+        assert cells[cell]["candidate_window_count"] == 0
+        assert cells[cell]["has_any_fresh_exact_window"] is False
+    assert cells["PRE_STAR/MAIN"]["candidate_window_count"] == 62932
+    stop = value["stop_rule"]
+    assert stop["exact_plan_available"] is False
+    assert stop["semantic_review_ready"] is False
+    assert stop["stage1_12_review_started"] is False
+    assert stop["threshold_search_started"] is False
+    assert stop["preserved_2021_read"] is False
+    assert value["successor"]["work_item"] == "P3-STAGE-021"
+    assert value["successor"]["result_bearing_authority"] is False
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

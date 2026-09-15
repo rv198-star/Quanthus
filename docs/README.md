@@ -469,9 +469,15 @@ nodes.
   for a bounded disposition and should not consume the entire program. P019 parks active Stage-0 parent
   qualification, retains expansion as research-only and Stage2/order as a strong exploratory
   proposition, keeps 8/9 parked as modifiers, and restores `1/12` as the next active third-group route.
-  P020 is now the ready semantic successor: Stage12 is a downside-context proposition and Stage1 a
-  nested deceleration/stabilization condition over accepted Trend Evolution Facts, with no top-1
-  primary-stage compression. R/O projection and preserved 2021/2022-2024/2025 remain unopened.
+  P020 then opens the `1/12` route with Stage12 as downside context and Stage1 as a nested
+  deceleration/stabilization condition over accepted Trend Evolution Facts, with no top-1 primary-
+  stage compression. Its first resource Job stops even earlier than semantic review: under the frozen
+  rule that burns every exact window read by P014 admission, both STAR cells have zero remaining fresh
+  metadata windows, while the other six cells retain 85,203 candidates in aggregate. The exact R1
+  artifact was published before any new admission-market read. P020-B therefore closes as a resource-
+  governance shortfall, not a Stage1/12 failure, and selects P021 to review whether admission-only
+  technical reads should be distinguished from semantic development exposure. Preserved
+  2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -485,7 +491,8 @@ nodes.
   `acceptance/stage-instability-channel-decomposition-engineering-20260915.md`,
   `work-items/stage-third-group-portfolio-rebaseline.md`,
   `reviews/stage-p019-third-group-portfolio-rebaseline-20260915.md`, and
-  `work-items/stage-downside-lifecycle-proposition.md`, and
+  `work-items/stage-downside-lifecycle-proposition.md`,
+  `reviews/stage-p020b-resource-shortfall-four-party-review-20260915.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

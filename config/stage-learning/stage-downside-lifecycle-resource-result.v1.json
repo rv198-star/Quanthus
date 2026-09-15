@@ -1,0 +1,110 @@
+{
+  "schema_version": "quanthus.stage-downside-lifecycle-resource-result.v1",
+  "work_item": "P3-STAGE-020-B",
+  "state": "CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION",
+  "effective_date": "2026-09-15",
+  "execution": {
+    "initial_job": {
+      "job_id": "stage_5b87f865e36c4ce0af09f6e9bd4e8daa",
+      "code_revision": "2fd8a71003bdc993943e2f264a6692d3c4198633",
+      "terminal_state": "failed",
+      "artifact_published": false,
+      "candidate_scoring_reached": false,
+      "input_readiness_market_read_reached": false
+    },
+    "technical_recovery_job": {
+      "job_id": "stage_1b0888224e684c7c9593c881ae01d4d4",
+      "code_revision": "6beec74ff778d7269ab3d86052e89bf7f96511bf",
+      "technical_recovery_of": "stage_5b87f865e36c4ce0af09f6e9bd4e8daa",
+      "terminal_state": "succeeded",
+      "exit_code": 0,
+      "manifest_sha256": "sha256:9864f0c62638660e1eed8976e92a7e2f684f5aecb723d3e9a9e43320fc7101d1",
+      "disposition": "CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION"
+    }
+  },
+  "frozen_resource_contract": {
+    "exclude_p013_exact_plan_windows": true,
+    "exclude_all_p014_admission_read_windows": true,
+    "whole_identity_burn_down": false,
+    "same_identity_disjoint_window_reuse_allowed": true,
+    "reserve_per_cell": 32,
+    "primary_per_cell": 24,
+    "fallback_per_cell": 8,
+    "global_identity_unique": true,
+    "post_result_replacement": false
+  },
+  "metadata_preflight": {
+    "candidate_window_count": 85203,
+    "input_readiness_market_read": false,
+    "cells": {
+      "STAR_PRE_CHINEXT_20PCT/STAR": {
+        "candidate_identity_count": 0,
+        "candidate_window_count": 0,
+        "has_any_fresh_exact_window": false
+      },
+      "STAR_AND_CHINEXT_20PCT/STAR": {
+        "candidate_identity_count": 0,
+        "candidate_window_count": 0,
+        "has_any_fresh_exact_window": false
+      },
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": {
+        "candidate_identity_count": 305,
+        "candidate_window_count": 1129,
+        "has_any_fresh_exact_window": true
+      },
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": {
+        "candidate_identity_count": 312,
+        "candidate_window_count": 312,
+        "has_any_fresh_exact_window": true
+      },
+      "PRE_STAR/CHINEXT": {
+        "candidate_identity_count": 700,
+        "candidate_window_count": 12296,
+        "has_any_fresh_exact_window": true
+      },
+      "STAR_PRE_CHINEXT_20PCT/MAIN": {
+        "candidate_identity_count": 1787,
+        "candidate_window_count": 6744,
+        "has_any_fresh_exact_window": true
+      },
+      "STAR_AND_CHINEXT_20PCT/MAIN": {
+        "candidate_identity_count": 1790,
+        "candidate_window_count": 1790,
+        "has_any_fresh_exact_window": true
+      },
+      "PRE_STAR/MAIN": {
+        "candidate_identity_count": 2741,
+        "candidate_window_count": 62932,
+        "has_any_fresh_exact_window": true
+      }
+    }
+  },
+  "stop_rule": {
+    "exact_plan_available": false,
+    "semantic_review_ready": false,
+    "stage1_12_review_started": false,
+    "threshold_search_started": false,
+    "candidate_scoring_started": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "attribution": {
+    "class": "EXPOSURE_TAXONOMY_RESOURCE_EXHAUSTION",
+    "finding": "Under the frozen rule that treats every P014 admission-read exact window as consumed, both STAR era cells have zero remaining metadata candidates even though the other six cells retain substantial capacity.",
+    "not_demonstrated": [
+      "overall_A_share_data_scarcity",
+      "Stage12_or_Stage1_semantic_failure",
+      "need_to_drop_STAR_representation",
+      "need_to_reduce_the_32_per_cell_quota",
+      "need_to_open_2022_2024"
+    ]
+  },
+  "successor": {
+    "work_item": "P3-STAGE-021",
+    "name": "Admission-Only Exposure Taxonomy Repair",
+    "recommended_question": "Should a deterministic input-readiness-only market read that retained no OHLC, computed no semantic facts and exposed no reviewer/candidate result consume the exact window for later independent semantic development?",
+    "result_bearing_authority": false
+  },
+  "claim_ceiling": "P020-B proves only that the currently frozen exact-window freshness rule exhausts both STAR cells before any admission market read. It does not show that the underlying market/history lacks Stage1/12 evidence and does not authorize relaxing freshness, changing quota, dropping boards or opening newer years without a separate governance decision."
+}

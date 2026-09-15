@@ -493,11 +493,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-017-B | Score stratum-normalized instability | P3-STAGE-017-A | closed `CLOSED_STRATUM_NORMALIZED_INSTABILITY_FAIL`; one exact technical recovery completed the intended experiment, no profile passed unchanged P012 quality gates |
 | P3-STAGE-017-C | Review semantic outcome | P3-STAGE-017-B | closed `PASS_OPEN_P018_INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC`; scale normalization is insufficient and no threshold retuning is authorized |
 | P3-STAGE-017-D | Close and decide next gate | P3-STAGE-017-C | closed `PRESERVED_EVALUATION_NOT_AUTHORIZED`; P018 must be separately frozen and all preserved partitions stay unread |
-| P3-STAGE-018 | Instability channel decomposition diagnostic | P3-STAGE-017 | ready artifact-only diagnostic; exact P017 profile grid decomposed into expansion, broad, overlap and parent-OR attribution without new labels or thresholds |
-| P3-STAGE-018-A | Freeze diagnostic closure and channel semantics | P3-STAGE-018 | ready design; exact P017 artifact/bases/grid and immutable parent references only |
-| P3-STAGE-018-B | Execute channel decomposition | P3-STAGE-018-A | ready `PASS_ENGINEERING_READY_FOR_ONE_CHANNEL_DECOMPOSITION_JOB`; one Job, no eligibility/selection/R/O/projection/preserved read |
-| P3-STAGE-018-C | Review channel attribution | P3-STAGE-018-B | blocked until terminal diagnostic result |
-| P3-STAGE-018-D | Close and choose next gate | P3-STAGE-018-C | blocked; mechanism-specific references/candidates require a separate preregistration |
+| P3-STAGE-018 | Instability channel decomposition diagnostic | P3-STAGE-017 | closed `PASS_CHANNEL_DECOMPOSITION_DIAGNOSTIC_COMPLETE`; expansion branch is comparatively clean, broad-only is the dominant false-positive contributor to the parent OR |
+| P3-STAGE-018-A | Freeze diagnostic closure and channel semantics | P3-STAGE-018 | closed `PASS_CHANNEL_DECOMPOSITION_ENGINEERING_FREEZE`; exact P017 artifact/bases/grid and immutable parent references only |
+| P3-STAGE-018-B | Execute channel decomposition | P3-STAGE-018-A | closed `PASS_CHANNEL_DECOMPOSITION_DIAGNOSTIC_COMPLETE`; one Job, no eligibility/selection/R/O/projection/preserved read |
+| P3-STAGE-018-C | Review channel attribution | P3-STAGE-018-B | closed `PASS_RECOMMEND_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; scale/threshold tuning is no longer the selected route |
+| P3-STAGE-018-D | Close and choose next gate | P3-STAGE-018-C | closed `RECOMMEND_P019_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; new child semantics require fresh preregistered blind evidence |
 
 ## 7. Acceptance
 

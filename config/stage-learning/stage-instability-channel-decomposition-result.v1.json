@@ -1,0 +1,108 @@
+{
+  "schema_version": "quanthus.stage-instability-channel-decomposition-result.v1",
+  "work_item": "P3-STAGE-018-B",
+  "state": "PASS_CHANNEL_DECOMPOSITION_DIAGNOSTIC_COMPLETE",
+  "effective_date": "2026-09-15",
+  "job": {
+    "job_id": "stage_4e8eedc28b5542c798a8b33c8276755f",
+    "code_revision": "fbb2c82c354279da41fccb4e70c1a0820af509fe",
+    "input_digest": "sha256:92e9ca376fe51b2ff802423ccc8d731fcd0db4e08e0d3fac06f86279c09078fa",
+    "terminal_state": "succeeded",
+    "manifest_sha256": "sha256:9e246625a68b7454df7f8356f1111e561850be49dfbac3e258a3071c814d55b0"
+  },
+  "surface": {
+    "reference_case_count": 252,
+    "cell_count": 8,
+    "profile_count": 9,
+    "candidate_selection_performed": false,
+    "new_semantic_labels_generated": false
+  },
+  "channel_summary": {
+    "expansion_balanced": {
+      "macro_precision": "0.7916666666666666666666666668",
+      "macro_positive_reference_coverage": "0.4219246031746031746031746031",
+      "macro_definite_negative_false_positive_rate": "0.01303475935828877005347593582",
+      "pooled_predictions": 16,
+      "pooled_true_positive": 14,
+      "pooled_false_positive": 2
+    },
+    "expansion_lenient": {
+      "macro_precision": "0.7458333333333333333333333334",
+      "macro_positive_reference_coverage": "0.4719246031746031746031746031",
+      "macro_definite_negative_false_positive_rate": "0.03260546642899584076054664291",
+      "pooled_predictions": 21,
+      "pooled_true_positive": 16,
+      "pooled_false_positive": 5
+    },
+    "expansion_strict": {
+      "macro_precision": "0.625",
+      "macro_positive_reference_coverage": "0.1862103174603174603174603175",
+      "macro_definite_negative_false_positive_rate": "0.005681818181818181818181818181",
+      "pooled_predictions": 9,
+      "pooled_true_positive": 8,
+      "pooled_false_positive": 1
+    },
+    "broad_balanced": {
+      "macro_precision": "0.4583333333333333333333333334",
+      "macro_positive_reference_coverage": "0.5778769841269841269841269841",
+      "macro_definite_negative_false_positive_rate": "0.1698650103980986333927510398",
+      "pooled_predictions": 46,
+      "pooled_true_positive": 20,
+      "pooled_false_positive": 26
+    },
+    "broad_lenient": {
+      "macro_precision": "0.3408730158730158730158730159",
+      "macro_positive_reference_coverage": "0.6341269841269841269841269841",
+      "macro_definite_negative_false_positive_rate": "0.3134887477718360071301247771",
+      "pooled_predictions": 68,
+      "pooled_true_positive": 22,
+      "pooled_false_positive": 46
+    },
+    "broad_strict": {
+      "macro_precision": "0.525",
+      "macro_positive_reference_coverage": "0.3720238095238095238095238095",
+      "macro_definite_negative_false_positive_rate": "0.09685550356506238859180035651",
+      "pooled_predictions": 29,
+      "pooled_true_positive": 15,
+      "pooled_false_positive": 14
+    }
+  },
+  "closest_parent_profile_attribution": {
+    "profile": "expansion-balanced/broad-strict",
+    "expansion_only_true_positive": 8,
+    "expansion_only_false_positive": 2,
+    "broad_only_true_positive": 9,
+    "broad_only_false_positive": 14,
+    "overlap_true_positive": 6,
+    "overlap_false_positive": 0,
+    "interpretation": "Expansion-only and overlap are comparatively clean; broad-only contributes additional parent-reference positives but more false positives than true positives and is the dominant contaminating branch of the parent OR."
+  },
+  "diagnostic_conclusion": {
+    "scale_mismatch_as_dominant_cause": false,
+    "parent_or_composition_is_primary_quality_problem": true,
+    "expansion_channel_is_high_precision_low_coverage_submechanism": true,
+    "broad_only_channel_is_sufficiently_precise_for_parent_instability": false,
+    "drop_broad_and_apply_parent_coverage_gate_authorized": false,
+    "threshold_retuning_authorized": false
+  },
+  "authority_ceiling": {
+    "additional_p018_job": false,
+    "candidate_selection": false,
+    "threshold_change": false,
+    "new_semantic_labels": false,
+    "reference_rewrite": false,
+    "dwd_market_read": false,
+    "fixed_relocation_scoring": false,
+    "order_scoring": false,
+    "projection_performed": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "successor": {
+    "work_item": "P3-STAGE-019",
+    "disposition": "RECOMMEND_FRESH_BLIND_MECHANISM_REFERENCE_PILOT",
+    "scope": "Design a separately preregistered fresh development review surface that asks reviewers to judge mechanism-level expansion disorder and broad two-way disorder without exposing P017/P018 candidate outputs or thresholds. Do not reuse the already-diagnosed 252 cases as the primary mechanism-label qualification set."
+  },
+  "claim_ceiling": "P018 establishes only that the existing broad-only branch is the dominant false-positive contributor to the frozen parent instability OR on the immutable P017 development surface, while the expansion branch is substantially cleaner but covers only a subset of the parent reference. It does not establish mechanism-specific semantic truth, justify deleting the broad concept, qualify expansion as a standalone stage predicate, or authorize preserved/economic/production/trading use."
+}

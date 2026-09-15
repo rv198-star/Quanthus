@@ -457,11 +457,14 @@ nodes.
   `P=.765/C=.621/FPR=.060` in P016 to `P=.611/C=.650/FPR=.110` after local normalization, while the
   only coverage-passing lenient/lenient profile had very poor precision/FPR. Four-party attribution
   therefore rejects scale normalization as the dominant missing ingredient and selects a separately
-  gated P018 channel-decomposition diagnostic before any new thresholds or semantic labels. P018 is
-  now frozen as diagnostic-only: it reuses the exact P017 bases/profile grid and immutable 252-case
-  parent references to report expansion-only, broad-only, overlap and existing parent-OR attribution;
-  it performs no candidate selection or qualification. R/O, projection and preserved
-  2021/2022-2024/2025 remain unopened.
+  gated P018 channel-decomposition diagnostic before any new thresholds or semantic labels. The sole
+  P018 Job then decomposed the exact P017 profiles without selection or new labels. Expansion was a
+  clean but incomplete child mechanism (balanced macro P≈.792 / C≈.422 / FPR≈.013), while the broad
+  branch carried more recall with substantially worse precision/FPR. In the closest parent profile,
+  expansion-only contributed 8 TP / 2 FP and overlap 6 TP / 0 FP, while broad-only contributed
+  9 TP / 14 FP. P018 therefore closes diagnostic PASS and recommends P019 as a **fresh blind
+  mechanism-reference pilot** instead of more threshold tuning or reusing the already-diagnosed 252
+  cases for new child labels. R/O, projection and preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -471,8 +474,9 @@ nodes.
   `reviews/stage-p016-instability-no-pass-four-party-review-20260915.md`,
   `work-items/stage-stratum-normalized-instability.md`,
   `reviews/stage-p017-stratum-normalized-no-pass-four-party-review-20260915.md`,
-  `work-items/stage-instability-channel-decomposition.md`, and
-  `acceptance/stage-instability-channel-decomposition-engineering-20260915.md`.
+  `work-items/stage-instability-channel-decomposition.md`,
+  `acceptance/stage-instability-channel-decomposition-engineering-20260915.md`, and
+  `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
   proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate

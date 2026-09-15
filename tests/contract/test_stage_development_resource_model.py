@@ -88,6 +88,8 @@ P017_NOPASS_REVIEW = (
 )
 P017_WORK = ROOT / "docs/work-items/stage-stratum-normalized-instability.md"
 P018_CONFIG = ROOT / "config/stage-learning/stage-instability-channel-decomposition.v1.json"
+P018_RESULT = ROOT / "config/stage-learning/stage-instability-channel-decomposition-result.v1.json"
+P018_REVIEW = ROOT / "docs/reviews/stage-p018-channel-decomposition-four-party-review-20260915.md"
 P018_WORK = ROOT / "docs/work-items/stage-instability-channel-decomposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1173,6 +1175,52 @@ def test_stage018_freezes_diagnostic_only_channel_decomposition() -> None:
     ):
         assert authority[key] is False
     assert P018_WORK.is_file()
+
+
+def test_stage018_result_attributes_parent_or_without_creating_child_truth() -> None:
+    value = json.loads(P018_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-018-B"
+    assert value["state"] == "PASS_CHANNEL_DECOMPOSITION_DIAGNOSTIC_COMPLETE"
+    assert value["job"]["job_id"] == "stage_4e8eedc28b5542c798a8b33c8276755f"
+    assert value["surface"] == {
+        "reference_case_count": 252,
+        "cell_count": 8,
+        "profile_count": 9,
+        "candidate_selection_performed": False,
+        "new_semantic_labels_generated": False,
+    }
+    balanced = value["channel_summary"]["expansion_balanced"]
+    assert float(balanced["macro_precision"]) > 0.78
+    assert float(balanced["macro_positive_reference_coverage"]) < 0.70
+    assert float(balanced["macro_definite_negative_false_positive_rate"]) < 0.10
+    broad = value["channel_summary"]["broad_strict"]
+    assert float(broad["macro_precision"]) < 0.78
+    closest = value["closest_parent_profile_attribution"]
+    assert closest["profile"] == "expansion-balanced/broad-strict"
+    assert closest["expansion_only_true_positive"] == 8
+    assert closest["expansion_only_false_positive"] == 2
+    assert closest["broad_only_true_positive"] == 9
+    assert closest["broad_only_false_positive"] == 14
+    assert closest["overlap_true_positive"] == 6
+    assert closest["overlap_false_positive"] == 0
+    conclusion = value["diagnostic_conclusion"]
+    assert conclusion["parent_or_composition_is_primary_quality_problem"] is True
+    assert conclusion["drop_broad_and_apply_parent_coverage_gate_authorized"] is False
+    assert conclusion["threshold_retuning_authorized"] is False
+    ceiling = value["authority_ceiling"]
+    assert ceiling["candidate_selection"] is False
+    assert ceiling["new_semantic_labels"] is False
+    assert ceiling["dwd_market_read"] is False
+    assert ceiling["preserved_2021_read"] is False
+    assert ceiling["2025_read"] is False
+    assert value["successor"]["work_item"] == "P3-STAGE-019"
+    assert value["successor"]["disposition"] == (
+        "RECOMMEND_FRESH_BLIND_MECHANISM_REFERENCE_PILOT"
+    )
+    assert P018_REVIEW.is_file()
+    assert "PASS_RECOMMEND_FRESH_BLIND_MECHANISM_REFERENCE_PILOT" in (
+        P018_REVIEW.read_text(encoding="utf-8")
+    )
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

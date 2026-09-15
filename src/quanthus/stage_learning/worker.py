@@ -771,6 +771,16 @@ class StageWorkerPaths:
     def clustered_identity_admission_budget(self) -> Path:
         return self.control_root / "clustered-identity-admission-budget.json"
 
+    def downside_lifecycle_reference_role_ledger(self, job_id: str, role: str) -> Path:
+        if not _JOB_ID.fullmatch(job_id) or role not in {"short_term", "fund"}:
+            raise StageWorkerError("P020-C role ledger requires valid parent job and role")
+        return self.control_root / "downside-lifecycle-reference-ledgers" / f"{job_id}-{role}.json"
+
+    def downside_lifecycle_reference_result(self, job_id: str) -> Path:
+        if not _JOB_ID.fullmatch(job_id):
+            raise StageWorkerError("P020-C reference result requires a valid parent job id")
+        return self.control_root / "downside-lifecycle-reference-ledgers" / f"{job_id}-result.json"
+
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
             raise StageWorkerError("P015 review ledger requires a valid parent job id")
@@ -7647,6 +7657,336 @@ def export_p020c_review_packets(paths: StageWorkerPaths, job_id: str) -> bytes:
     return raw
 
 
+_P020C_ROLE_SUBMISSION_SCHEMA = "quanthus.stage-downside-lifecycle-review-role-submission.v1"
+_P020C_ROLE_LEDGER_SCHEMA = "quanthus.stage-downside-lifecycle-review-role-ledger.v1"
+_P020C_REFERENCE_RESULT_SCHEMA = "quanthus.stage-downside-lifecycle-reference-result.v1"
+_P020C_STAGE12_VALUES = {"TRUE", "FALSE", "UNKNOWN"}
+_P020C_STAGE1_VALUES = {"TRUE", "FALSE", "UNKNOWN", "NOT_APPLICABLE"}
+
+
+def _p020c_seal_contract(paths: StageWorkerPaths) -> dict[str, Any]:
+    path = (
+        paths.control_repo
+        / "config/stage-learning/stage-downside-lifecycle-reference-seal.v1.json"
+    )
+    value = _object(path, "P020-C reference seal contract")
+    if (
+        value.get("schema_version") != "quanthus.stage-downside-lifecycle-reference-seal.v1"
+        or value.get("work_item") != "P3-STAGE-020-C"
+        or value.get("state")
+        != "PREREGISTERED_ROLE_ISOLATED_SEAL_AND_CLUSTER_AWARE_REFERENCE_GATE_BEFORE_OPINIONS"
+    ):
+        raise StageWorkerError("P020-C reference seal contract differs")
+    binding = value.get("bindings", {}).get("blind_reference_contract")
+    packet = value.get("bindings", {}).get("packet_job")
+    if not isinstance(binding, Mapping) or not isinstance(packet, Mapping):
+        raise StageWorkerError("P020-C reference seal bindings differ")
+    bound_path = paths.control_repo / str(binding.get("path") or "")
+    if _file_sha256(bound_path) != binding.get("sha256"):
+        raise StageWorkerError("P020-C blind-reference contract binding differs")
+    if packet.get("job_id") != "stage_ced93968af3c4aa38af9a49250ab6dc0":
+        raise StageWorkerError("P020-C packet job binding differs")
+    return value
+
+
+def _p020c_packet_evidence(
+    paths: StageWorkerPaths, contract: Mapping[str, Any]
+) -> tuple[dict[str, Any], Path, list[dict[str, Any]], list[dict[str, Any]]]:
+    binding = contract["bindings"]["packet_job"]
+    job_id = str(binding["job_id"])
+    status_path = paths.status / f"{job_id}.json"
+    if not status_path.is_file() or status_path.is_symlink():
+        raise StageWorkerError("P020-C packet job status missing")
+    observed = _object(status_path, "P020-C packet job status")
+    if (
+        observed.get("job_id") != job_id
+        or observed.get("kind") != STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB
+        or observed.get("state") != "succeeded"
+        or observed.get("exit_code") != 0
+        or observed.get("code_revision") != binding.get("code_revision")
+        or observed.get("input_digest") != binding.get("input_digest")
+    ):
+        raise StageWorkerError("P020-C packet job status binding differs")
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("P020-C packet result missing")
+    artifact = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    expected_artifact = (paths.training_root / str(binding["artifact_relative_path"])).resolve()
+    if artifact != expected_artifact:
+        raise StageWorkerError("P020-C packet artifact path binding differs")
+    try:
+        from quanthus.stage_learning.downside_lifecycle_reference_prepare import verify_artifact
+
+        verified = verify_artifact(artifact, code_revision=str(binding["code_revision"]))
+    except (OSError, ValueError) as exc:
+        raise StageWorkerError("P020-C packet artifact deep verification failed") from exc
+    if (
+        verified.get("manifest_sha256") != binding.get("manifest_sha256")
+        or verified.get("review_packet_sha256") != binding.get("review_packet_sha256")
+        or verified.get("case_map_digest") != binding.get("case_map_digest")
+        or verified.get("packet_count") != 187
+        or verified.get("unique_identity_cluster_count") != 179
+        or verified.get("review_opinion_count") != 0
+    ):
+        raise StageWorkerError("P020-C packet artifact binding differs")
+    try:
+        packet_raw = (artifact / "review-packets.jsonl").read_bytes()
+        packets = [json.loads(line) for line in packet_raw.splitlines()]
+        case_map_value = json.loads(
+            (artifact / "case-map.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise StageWorkerError("P020-C packet evidence cannot be read") from exc
+    case_map_rows = case_map_value.get("rows") if isinstance(case_map_value, Mapping) else None
+    if not isinstance(case_map_rows, list) or len(packets) != 187 or len(case_map_rows) != 187:
+        raise StageWorkerError("P020-C packet evidence denominator differs")
+    return observed, artifact, [dict(row) for row in packets], [dict(row) for row in case_map_rows]
+
+
+def _validate_p020c_role_submission(
+    paths: StageWorkerPaths,
+    job_id: str,
+    role: str,
+    submission: Mapping[str, Any],
+) -> dict[str, Any]:
+    contract = _p020c_seal_contract(paths)
+    observed, _artifact, packets, _case_map = _p020c_packet_evidence(paths, contract)
+    if job_id != observed.get("job_id") or role not in {"short_term", "fund"}:
+        raise StageWorkerError("P020-C review role parent binding differs")
+    binding = contract["bindings"]["packet_job"]
+    expected_fields = {
+        "schema_version",
+        "work_item",
+        "parent_job_id",
+        "role",
+        "source_manifest_sha256",
+        "review_packet_sha256",
+        "provenance",
+        "candidate_seen",
+        "threshold_seen",
+        "future_seen",
+        "security_identity_seen",
+        "cluster_identity_seen",
+        "protected_partition_seen",
+        "opinions",
+    }
+    if set(submission) != expected_fields:
+        raise StageWorkerError("P020-C role submission fields differ")
+    if (
+        submission.get("schema_version") != _P020C_ROLE_SUBMISSION_SCHEMA
+        or submission.get("work_item") != "P3-STAGE-020-C"
+        or submission.get("parent_job_id") != job_id
+        or submission.get("role") != role
+        or submission.get("source_manifest_sha256") != binding.get("manifest_sha256")
+        or submission.get("review_packet_sha256") != binding.get("review_packet_sha256")
+    ):
+        raise StageWorkerError("P020-C role submission binding differs")
+    for key in (
+        "candidate_seen",
+        "threshold_seen",
+        "future_seen",
+        "security_identity_seen",
+        "cluster_identity_seen",
+        "protected_partition_seen",
+    ):
+        if submission.get(key) is not False:
+            raise StageWorkerError("P020-C role blinding declaration differs")
+    provenance = submission.get("provenance")
+    if (
+        not isinstance(provenance, Mapping)
+        or set(provenance) != {"kind", "origin_id", "session_id", "model_id"}
+        or provenance.get("kind") != "self_simulated"
+        or not all(
+            str(provenance.get(key) or "").strip()
+            for key in ("origin_id", "session_id", "model_id")
+        )
+    ):
+        raise StageWorkerError("P020-C role provenance differs")
+    opinions = submission.get("opinions")
+    if not isinstance(opinions, list) or len(opinions) != 187:
+        raise StageWorkerError("P020-C role opinion denominator differs")
+    normalized: list[dict[str, Any]] = []
+    for index, (raw, packet) in enumerate(zip(opinions, packets, strict=True)):
+        if not isinstance(raw, Mapping) or not isinstance(packet, Mapping):
+            raise StageWorkerError("P020-C role opinion shape differs")
+        if set(raw) != {
+            "index",
+            "case_id",
+            "downside_context",
+            "deceleration_stabilization",
+            "reason",
+        }:
+            raise StageWorkerError("P020-C role opinion fields differ")
+        case_id = str(packet.get("case_id") or "")
+        if raw.get("index") != index or raw.get("case_id") != case_id:
+            raise StageWorkerError("P020-C role opinion order differs")
+        stage12 = str(raw.get("downside_context") or "")
+        stage1 = str(raw.get("deceleration_stabilization") or "")
+        if stage12 not in _P020C_STAGE12_VALUES or stage1 not in _P020C_STAGE1_VALUES:
+            raise StageWorkerError("P020-C role opinion truth differs")
+        if stage12 == "TRUE":
+            if stage1 == "NOT_APPLICABLE":
+                raise StageWorkerError("P020-C Stage1 must be judged when reviewer Stage12 is TRUE")
+        elif stage1 != "NOT_APPLICABLE":
+            raise StageWorkerError(
+                "P020-C Stage1 must be NOT_APPLICABLE unless reviewer Stage12 is TRUE"
+            )
+        reason = str(raw.get("reason") or "").strip()
+        if not reason or len(reason) > 2000:
+            raise StageWorkerError("P020-C role opinion reason differs")
+        normalized.append(
+            {
+                "index": index,
+                "case_id": case_id,
+                "downside_context": stage12,
+                "deceleration_stabilization": stage1,
+                "reason": reason,
+            }
+        )
+    return {
+        "schema_version": _P020C_ROLE_LEDGER_SCHEMA,
+        "work_item": "P3-STAGE-020-C",
+        "parent_job_id": job_id,
+        "role": role,
+        "source_manifest_sha256": binding["manifest_sha256"],
+        "review_packet_sha256": binding["review_packet_sha256"],
+        "case_count": 187,
+        "provenance": dict(provenance),
+        "candidate_seen": False,
+        "threshold_seen": False,
+        "future_seen": False,
+        "security_identity_seen": False,
+        "cluster_identity_seen": False,
+        "protected_partition_seen": False,
+        "opinions": normalized,
+        "submission_digest": _digest(dict(submission)),
+    }
+
+
+def seal_p020c_review_role(
+    paths: StageWorkerPaths,
+    job_id: str,
+    role: str,
+    submission: Mapping[str, Any],
+) -> dict[str, Any]:
+    ledger = _validate_p020c_role_submission(paths, job_id, role, submission)
+    other_role = "fund" if role == "short_term" else "short_term"
+    # A role can be sealed after the other, but its submission transport must never include/read it.
+    # Isolation is enforced by separate immutable ledgers and reviewer-only packet export.
+    path = paths.downside_lifecycle_reference_role_ledger(job_id, role)
+    if path.exists():
+        existing = _object(path, f"P020-C {role} role ledger")
+        if existing != ledger:
+            raise StageWorkerError("P020-C role ledger already sealed with different content")
+    else:
+        _exclusive_json(path, ledger)
+    return {
+        "schema_version": "quanthus.stage-downside-lifecycle-review-role-seal-receipt.v1",
+        "parent_job_id": job_id,
+        "role": role,
+        "sealed": True,
+        "ledger_sha256": _file_sha256(path),
+        "case_count": 187,
+        "other_role_ledger_visible_to_submission": False,
+        "other_role": other_role,
+        "finalization_ready": paths.downside_lifecycle_reference_role_ledger(
+            job_id, other_role
+        ).is_file(),
+    }
+
+
+def finalize_p020c_review(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
+    contract = _p020c_seal_contract(paths)
+    observed, _artifact, _packets, case_map_rows = _p020c_packet_evidence(paths, contract)
+    if job_id != observed.get("job_id"):
+        raise StageWorkerError("P020-C finalization parent differs")
+    ledgers: dict[str, dict[str, Any]] = {}
+    ledger_shas: dict[str, str] = {}
+    for role in ("short_term", "fund"):
+        path = paths.downside_lifecycle_reference_role_ledger(job_id, role)
+        if not path.is_file():
+            raise StageWorkerError(
+                "P020-C both isolated role ledgers must be sealed before finalization"
+            )
+        ledger = _object(path, f"P020-C {role} role ledger")
+        submission = {
+            "schema_version": _P020C_ROLE_SUBMISSION_SCHEMA,
+            "work_item": ledger["work_item"],
+            "parent_job_id": ledger["parent_job_id"],
+            "role": ledger["role"],
+            "source_manifest_sha256": ledger["source_manifest_sha256"],
+            "review_packet_sha256": ledger["review_packet_sha256"],
+            "provenance": ledger["provenance"],
+            "candidate_seen": ledger["candidate_seen"],
+            "threshold_seen": ledger["threshold_seen"],
+            "future_seen": ledger["future_seen"],
+            "security_identity_seen": ledger["security_identity_seen"],
+            "cluster_identity_seen": ledger["cluster_identity_seen"],
+            "protected_partition_seen": ledger["protected_partition_seen"],
+            "opinions": ledger["opinions"],
+        }
+        expected = _validate_p020c_role_submission(paths, job_id, role, submission)
+        if ledger != expected:
+            raise StageWorkerError("P020-C sealed role ledger validation differs")
+        ledgers[role] = ledger
+        ledger_shas[role] = _file_sha256(path)
+    from quanthus.stage_learning.downside_lifecycle_reference_seal import resolve_rows, summarize
+
+    rows = resolve_rows(
+        ledgers["short_term"]["opinions"],
+        ledgers["fund"]["opinions"],
+        case_map_rows,
+    )
+    summary = summarize(rows, case_map_rows, contract["frozen_gate"])
+    result = {
+        "schema_version": _P020C_REFERENCE_RESULT_SCHEMA,
+        "work_item": "P3-STAGE-020-C",
+        "parent_job_id": job_id,
+        "source_manifest_sha256": contract["bindings"]["packet_job"]["manifest_sha256"],
+        "review_packet_sha256": contract["bindings"]["packet_job"]["review_packet_sha256"],
+        "case_map_digest": contract["bindings"]["packet_job"]["case_map_digest"],
+        "role_ledgers": {
+            role: {
+                "ledger_sha256": ledger_shas[role],
+                "provenance": ledgers[role]["provenance"],
+                "case_count": 187,
+            }
+            for role in ("short_term", "fund")
+        },
+        "same_origin_simulation": True,
+        "roles_isolated_during_opinion_collection": True,
+        "row_resolutions": rows,
+        "reference_summary": summary,
+        "disposition": summary["disposition"],
+        "p020_d_preregistration_authorized": summary["p020_d_preregistration_authorized"],
+        "candidate_scoring_authorized": False,
+        "resource_reopen_authorized": False,
+        "preserved_2021_read_authorized": False,
+        "2022_2024_read_authorized": False,
+        "2025_read_authorized": False,
+    }
+    path = paths.downside_lifecycle_reference_result(job_id)
+    if path.exists():
+        existing = _object(path, "P020-C reference result")
+        if existing != result:
+            raise StageWorkerError(
+                "P020-C reference result already finalized with different content"
+            )
+    else:
+        _exclusive_json(path, result)
+    return {
+        "schema_version": "quanthus.stage-downside-lifecycle-reference-finalize-receipt.v1",
+        "parent_job_id": job_id,
+        "finalized": True,
+        "result_sha256": _file_sha256(path),
+        "disposition": summary["disposition"],
+        "reference_summary": summary,
+        "p020_d_preregistration_authorized": summary["p020_d_preregistration_authorized"],
+        "candidate_scoring_authorized": False,
+        "resource_reopen_authorized": False,
+    }
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -7705,6 +8045,37 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
                     None if ledger is None else ledger["combined_reference_summary"]
                 ),
                 "combined_case_count": None if ledger is None else 252,
+            }
+        if observed.get("kind") == STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB:
+            job_id = str(observed["job_id"])
+            role_seals = {}
+            for role in ("short_term", "fund"):
+                role_path = paths.downside_lifecycle_reference_role_ledger(job_id, role)
+                role_seals[role] = {
+                    "sealed": role_path.is_file(),
+                    "ledger_sha256": _file_sha256(role_path) if role_path.is_file() else None,
+                }
+            reference_path = paths.downside_lifecycle_reference_result(job_id)
+            reference_result = (
+                _object(reference_path, "P020-C reference result")
+                if reference_path.is_file()
+                else None
+            )
+            result = {
+                **result,
+                "p020c_role_seals": role_seals,
+                "p020c_reference_finalized": reference_result is not None,
+                "p020c_reference_result_sha256": (
+                    _file_sha256(reference_path) if reference_result is not None else None
+                ),
+                "p020c_reference_disposition": (
+                    reference_result.get("disposition") if reference_result is not None else None
+                ),
+                "p020c_reference_summary": (
+                    reference_result.get("reference_summary")
+                    if reference_result is not None
+                    else None
+                ),
             }
         additional_ready_transport = _complete_reserve_additional_ready_transport(
             paths, observed
@@ -7959,6 +8330,11 @@ def _parser() -> argparse.ArgumentParser:
     status.add_argument("--job-id", required=True)
     export_p020c = sub.add_parser("export-p020-c-packets")
     export_p020c.add_argument("--job-id", required=True)
+    seal_p020c_role = sub.add_parser("seal-p020-c-review-role")
+    seal_p020c_role.add_argument("--job-id", required=True)
+    seal_p020c_role.add_argument("--role", choices=("short_term", "fund"), required=True)
+    finalize_p020c = sub.add_parser("finalize-p020-c-review")
+    finalize_p020c.add_argument("--job-id", required=True)
     seal_review = sub.add_parser("seal-p014-review")
     seal_review.add_argument("--job-id", required=True)
     seal_p015 = sub.add_parser("seal-p015-review")
@@ -7998,6 +8374,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "export-p020-c-packets":
             sys.stdout.buffer.write(export_p020c_review_packets(paths, args.job_id))
             return 0
+        elif args.command == "seal-p020-c-review-role":
+            try:
+                submission = json.load(sys.stdin)
+            except (OSError, json.JSONDecodeError) as exc:
+                raise StageWorkerError(
+                    "P020-C role submission must be one JSON object on stdin"
+                ) from exc
+            if not isinstance(submission, Mapping):
+                raise StageWorkerError("P020-C role submission must be one JSON object on stdin")
+            result = seal_p020c_review_role(paths, args.job_id, args.role, submission)
+        elif args.command == "finalize-p020-c-review":
+            result = finalize_p020c_review(paths, args.job_id)
         elif args.command == "seal-p014-review":
             try:
                 submission = json.load(sys.stdin)

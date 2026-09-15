@@ -17,6 +17,8 @@ worker="${repo_root}/ops/bin/quanthus-stage-worker"
 runtime_identity="${training_root}/control/stage-worker/worker-runtime.json"
 p014_review_submission="/tmp/quanthus-p014-review-submission.json"
 p015_review_submission="/tmp/quanthus-p015-review-submission.json"
+p020c_short_review_submission="/tmp/quanthus-p020c-short-term-review.json"
+p020c_fund_review_submission="/tmp/quanthus-p020c-fund-review.json"
 p011_kind="quanthus.stage-orderly-consolidation-joint-d1-prepare.v1"
 p012_g1_kind="quanthus.stage-atomic-proposition-g1-prepare.v1"
 p013_a_kind="quanthus.stage-development-resource-capacity-census.v1"
@@ -258,6 +260,39 @@ case "${command}" in
     [[ "$(service_revision)" == "${target}" ]] || fail "worker runtime revision differs"
     bash "${worker}" submit --kind "${p024_kind}" --code-revision "${target}"
     ;;
+  seal-p020-c-short-term)
+    [[ "$#" -eq 2 ]] || fail "usage: seal-p020-c-short-term <stage_job_id>"
+    [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
+    [[ -f "${p020c_short_review_submission}" && ! -L "${p020c_short_review_submission}" ]] \
+      || fail "fixed P020-C short-term review submission missing or symlinked"
+    [[ "$(stat -c '%U:%G' "${p020c_short_review_submission}")" == "agentdock:agentdock" ]] \
+      || fail "fixed P020-C short-term review submission owner differs"
+    [[ "$(stat -c '%a' "${p020c_short_review_submission}")" == "644" ]] \
+      || fail "fixed P020-C short-term review submission mode differs"
+    [[ "$(stat -c '%s' "${p020c_short_review_submission}")" -le 1048576 ]] \
+      || fail "fixed P020-C short-term review submission exceeds size budget"
+    cat "${p020c_short_review_submission}" | bash "${worker}" seal-p020-c-review-role \
+      --job-id "$2" --role short_term
+    ;;
+  seal-p020-c-fund)
+    [[ "$#" -eq 2 ]] || fail "usage: seal-p020-c-fund <stage_job_id>"
+    [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
+    [[ -f "${p020c_fund_review_submission}" && ! -L "${p020c_fund_review_submission}" ]] \
+      || fail "fixed P020-C fund review submission missing or symlinked"
+    [[ "$(stat -c '%U:%G' "${p020c_fund_review_submission}")" == "agentdock:agentdock" ]] \
+      || fail "fixed P020-C fund review submission owner differs"
+    [[ "$(stat -c '%a' "${p020c_fund_review_submission}")" == "644" ]] \
+      || fail "fixed P020-C fund review submission mode differs"
+    [[ "$(stat -c '%s' "${p020c_fund_review_submission}")" -le 1048576 ]] \
+      || fail "fixed P020-C fund review submission exceeds size budget"
+    cat "${p020c_fund_review_submission}" | bash "${worker}" seal-p020-c-review-role \
+      --job-id "$2" --role fund
+    ;;
+  finalize-p020-c-review)
+    [[ "$#" -eq 2 ]] || fail "usage: finalize-p020-c-review <stage_job_id>"
+    [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
+    bash "${worker}" finalize-p020-c-review --job-id "$2"
+    ;;
   seal-p014-review)
     [[ "$#" -eq 2 ]] || fail "usage: seal-p014-review <stage_job_id>"
     [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
@@ -295,6 +330,6 @@ case "${command}" in
     bash "${worker}" export-p020-c-packets --job-id "$2"
     ;;
   *)
-    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | submit-p013-d | submit-p014-a | submit-p014-b | submit-p014-c | submit-p015-a | submit-p015-b | submit-p015-c | submit-p016-b | submit-p017-b | submit-p018-b | submit-p020-b | submit-p020-c-packets | submit-p021-b | submit-p022-b | submit-p023 | submit-p024 | export-p020-c-packets | seal-p014-review | seal-p015-review | status"
+    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | submit-p013-d | submit-p014-a | submit-p014-b | submit-p014-c | submit-p015-a | submit-p015-b | submit-p015-c | submit-p016-b | submit-p017-b | submit-p018-b | submit-p020-b | submit-p020-c-packets | submit-p021-b | submit-p022-b | submit-p023 | submit-p024 | export-p020-c-packets | seal-p020-c-short-term | seal-p020-c-fund | finalize-p020-c-review | seal-p014-review | seal-p015-review | status"
     ;;
 esac

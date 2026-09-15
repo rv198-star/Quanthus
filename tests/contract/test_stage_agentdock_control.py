@@ -36,6 +36,9 @@ def test_control_surface_is_bounded_to_rx6800_qiuyu_and_exact_commands() -> None
         "submit-p023)",
         "submit-p024)",
         "export-p020-c-packets)",
+        "seal-p020-c-short-term)",
+        "seal-p020-c-fund)",
+        "finalize-p020-c-review)",
         "seal-p014-review)",
         "seal-p015-review)",
         "status)",
@@ -95,18 +98,28 @@ def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> Non
     assert 'bash "${worker}" submit --kind "${p017_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p018_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p020_b_kind}" --code-revision "${target}"' in text
-    assert 'bash "${worker}" submit --kind "${p020_c_packet_kind}" --code-revision "${target}"' in text
+    assert (
+        'bash "${worker}" submit --kind "${p020_c_packet_kind}" --code-revision "${target}"'
+        in text
+    )
     assert 'bash "${worker}" submit --kind "${p021_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p022_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p023_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p024_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" seal-p014-review --job-id "$2"' in text
     assert 'bash "${worker}" seal-p015-review --job-id "$2"' in text
+    assert 'bash "${worker}" seal-p020-c-review-role' in text
+    assert '--job-id "$2" --role short_term' in text
+    assert '--job-id "$2" --role fund' in text
+    assert 'bash "${worker}" finalize-p020-c-review --job-id "$2"' in text
     assert 'p014_review_submission="/tmp/quanthus-p014-review-submission.json"' in text
     assert 'p015_review_submission="/tmp/quanthus-p015-review-submission.json"' in text
+    assert 'p020c_short_review_submission="/tmp/quanthus-p020c-short-term-review.json"' in text
+    assert 'p020c_fund_review_submission="/tmp/quanthus-p020c-fund-review.json"' in text
     assert '== "agentdock:agentdock"' in text
     assert '== "644"' in text
     assert "524288" in text
+    assert "1048576" in text
 
 
 def test_status_accepts_only_stage_job_ids() -> None:

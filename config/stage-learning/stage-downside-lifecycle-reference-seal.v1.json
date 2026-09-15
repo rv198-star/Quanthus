@@ -1,0 +1,96 @@
+{
+  "schema_version": "quanthus.stage-downside-lifecycle-reference-seal.v1",
+  "work_item": "P3-STAGE-020-C",
+  "state": "PREREGISTERED_ROLE_ISOLATED_SEAL_AND_CLUSTER_AWARE_REFERENCE_GATE_BEFORE_OPINIONS",
+  "effective_date": "2026-09-16",
+  "purpose": "Freeze role-isolated submission, row resolution, identity-cluster dependence accounting and reference-sufficiency evaluation for the exact already-frozen P020-C packet artifact before either reviewer opinion is collected.",
+  "bindings": {
+    "blind_reference_contract": {
+      "path": "config/stage-learning/stage-downside-lifecycle-blind-reference.v1.json",
+      "sha256": "sha256:3d7f2f366e42c651fcc8155d500d9a50969d38eba4deb8dab6be56c38a2d615c"
+    },
+    "packet_job": {
+      "job_id": "stage_ced93968af3c4aa38af9a49250ab6dc0",
+      "code_revision": "3edd50caf51b0386b0545ee9cd930235bde20528",
+      "input_digest": "sha256:e2c18e0112a0cc12da8912a8ac6828bd3dc64c9bf184abc035647da832c84ac2",
+      "artifact_relative_path": "runs/stage-worker/stage_ced93968af3c4aa38af9a49250ab6dc0/stage-downside-lifecycle-review-packets-20260915T211009Z",
+      "manifest_sha256": "sha256:e89833f5714d0bdead981bd3895483e5f2196a48dc846f429ca9ff04245f7e3d",
+      "review_packet_sha256": "sha256:b683b0fc7d5db6f48b9c31c0a54c8113a98c1ce64ac12bd44d352b5973aedf9d",
+      "case_map_digest": "sha256:6a554b9b3a7312022dcc58e6ec19d9560c41e291cbe02d1cec6011676de896ef"
+    }
+  },
+  "role_submission": {
+    "roles": ["short_term", "fund"],
+    "one_immutable_ledger_per_role": true,
+    "roles_must_be_sealed_separately": true,
+    "role_may_not_read_other_role_ledger_before_seal": true,
+    "required_opinion_count_per_role": 187,
+    "case_order": "exact_review_packet_order",
+    "stage12_values": ["TRUE", "FALSE", "UNKNOWN"],
+    "stage1_values": ["TRUE", "FALSE", "UNKNOWN", "NOT_APPLICABLE"],
+    "stage1_must_be_not_applicable_unless_role_stage12_true": true,
+    "reason_required": true,
+    "maximum_reason_characters": 2000,
+    "same_origin_simulation_must_be_disclosed": true,
+    "candidate_seen": false,
+    "threshold_seen": false,
+    "future_seen": false,
+    "security_identity_seen": false,
+    "cluster_identity_seen": false,
+    "protected_partition_seen": false
+  },
+  "row_resolution": {
+    "stage12_true": "both_roles_TRUE",
+    "stage12_false": "both_roles_FALSE",
+    "stage12_other": "AMBIGUOUS",
+    "stage1_if_resolved_stage12_false": "NOT_APPLICABLE",
+    "stage1_if_resolved_stage12_ambiguous": "AMBIGUOUS",
+    "stage1_true_if_resolved_stage12_true": "both_roles_TRUE",
+    "stage1_false_if_resolved_stage12_true": "both_roles_FALSE",
+    "stage1_other_if_resolved_stage12_true": "AMBIGUOUS"
+  },
+  "cluster_aggregation": {
+    "semantic_truth_unit": "identity_window_row_at_knowledge_cutoff",
+    "dependence_unit": "economic_identity_cluster",
+    "do_not_collapse_cross_era_rows_to_one_truth": true,
+    "stage12_definite_cluster": "cluster_has_at_least_one_row_resolved_TRUE_or_FALSE",
+    "stage12_positive_cluster": "cluster_has_at_least_one_row_resolved_TRUE",
+    "stage12_negative_cluster": "cluster_has_at_least_one_row_resolved_FALSE",
+    "stage12_temporal_polarity_overlap_is_legal": true,
+    "stage12_unjudgeable_cluster": "cluster_has_no_resolved_TRUE_or_FALSE_row",
+    "stage1_applicable_cluster": "cluster_has_at_least_one_row_with_resolved_stage12_TRUE",
+    "stage1_definite_cluster": "applicable_cluster_has_at_least_one_row_with_resolved_stage1_TRUE_or_FALSE",
+    "stage1_positive_cluster": "cluster_has_at_least_one_row_with_resolved_stage12_TRUE_and_stage1_TRUE",
+    "stage1_negative_cluster": "cluster_has_at_least_one_row_with_resolved_stage12_TRUE_and_stage1_FALSE",
+    "stage1_temporal_polarity_overlap_is_legal": true,
+    "stage1_unjudgeable_applicable_cluster": "applicable_cluster_has_no_resolved_stage1_TRUE_or_FALSE_row",
+    "cluster_counts_are_unique_identity_sets": true,
+    "row_counts_are_descriptive_only": true
+  },
+  "frozen_gate": {
+    "independent_cluster_count": 179,
+    "minimum_stage12_definite_clusters": 80,
+    "minimum_stage12_positive_clusters": 20,
+    "minimum_stage12_negative_clusters": 20,
+    "maximum_stage12_unjudgeable_cluster_rate": 0.15,
+    "require_stage12_definite_row_in_all_eight_cells": true,
+    "minimum_stage1_definite_applicable_clusters": 40,
+    "minimum_stage1_positive_clusters": 20,
+    "minimum_stage1_negative_clusters": 20,
+    "maximum_stage1_unjudgeable_applicable_cluster_rate": 0.15,
+    "gate_change_after_first_opinion": false,
+    "pass_disposition": "PASS_CAPACITY_LIMITED_BLIND_REFERENCE_SUFFICIENCY",
+    "fail_disposition": "CLOSED_BLIND_REFERENCE_INSUFFICIENT_NO_RESOURCE_REOPEN"
+  },
+  "successor_authority": {
+    "on_pass": "OPEN_SEPARATE_P020_D_PREREGISTRATION_ONLY",
+    "on_fail": "CLOSE_P020_C_WITHOUT_RESOURCE_REOPEN",
+    "candidate_scoring_directly_authorized": false,
+    "resource_replacement_authorized": false,
+    "preserved_2021_read_authorized": false,
+    "2022_2024_read_authorized": false,
+    "2025_read_authorized": false,
+    "strategy_or_trading_authorized": false
+  },
+  "claim_ceiling": "This additive seal contract freezes how two isolated same-origin role opinions become time-specific row references and cluster-aware sufficiency counts. It does not alter the frozen packet set, semantic definitions or gates and grants no candidate, preserved, strategy or trading authority."
+}

@@ -1,10 +1,11 @@
 # P3-STAGE-020-C — Capacity-Limited Blind Semantic References
 
 Design status: approved preregistration  
-Delivery gate: packet-preparation engineering accepted; sole packet Job ready; opinion collection blocked until packet artifact freeze
+Delivery gate: packet artifact frozen; role-isolated blind opinion collection ready
 
 Parent: `stage-downside-lifecycle-proposition.md`  
 Machine contract: `../../config/stage-learning/stage-downside-lifecycle-blind-reference.v1.json`  
+Seal/aggregation contract: `../../config/stage-learning/stage-downside-lifecycle-reference-seal.v1.json`  
 Resource ceiling: `../../config/stage-learning/stage-clustered-identity-admission-result.v1.json`  
 Semantic source: `../../config/stage-learning/stage-downside-lifecycle-concept.v1.json`  
 Fact substrate: `../design/structure-trend-evolution-facts.md`  
@@ -46,7 +47,8 @@ Two isolated same-origin development roles are used:
 2. `fund` — medium-horizon institutional / risk interpretation.
 
 The same-origin limitation must remain explicit in every result. Each role sees only the frozen T-only
-packet and cannot see the other role's opinion.
+packet and cannot see the other role's opinion. Each role is sealed into a separate immutable ledger;
+the combined resolver is unavailable until both role ledgers exist.
 
 Each role answers Stage 12 first:
 
@@ -75,8 +77,11 @@ Resolution is deliberately conservative:
 
 ## Frozen sufficiency gates
 
-Reference sufficiency is decided on **economic-identity clusters**, not raw rows. Row counts remain
-coverage/descriptive diagnostics. The gate reuses the established second-group development floor of
+Reference sufficiency is decided on **economic-identity clusters**, not raw rows. Row-level truth
+remains time-specific, so a repeated cross-era identity is not collapsed into one timeless label. A
+cluster may contain both a positive and a negative row at different knowledge cutoffs; it still counts
+only once in the overall independent-cluster denominator. Row counts remain coverage/descriptive
+diagnostics. The gate reuses the established second-group development floor of
 20 definite positives, 20 definite negatives and at most 15% unavailable/unjudgeable evidence rather
 than choosing new thresholds after seeing Stage1/12 opinions.
 
@@ -104,10 +109,10 @@ frozen P020-D candidate-scoring preregistration.
 | Step | Work | Exit |
 | --- | --- | --- |
 | Contract | Freeze exact P024 binding, packet visibility, reviewer protocol, cluster denominators and sufficiency gates | closed before semantic packet read |
-| Prepare | Implement T-only Trend Evolution packet builder and deep verifier | closed engineering acceptance; focused 145/145 and repository 2522/7 passed |
-| Packet run | Execute exactly one packet-preparation Job over the immutable 187-row panel | ready after exact engineering revision is durably pushed and deployed |
-| Review | Collect isolated blind opinions for every available packet | blocked until packet artifact is frozen |
-| Seal | Validate and seal the immutable cluster-aware review ledger | blocked until all submitted opinions pass schema/binding checks |
+| Prepare | Implement T-only Trend Evolution packet builder and deep verifier | closed engineering acceptance; exact implementation pushed |
+| Packet run | Execute exactly one packet-preparation Job over the immutable 187-row panel | closed; 187/187 packets and 179/179 clusters available, zero opinions in artifact |
+| Review | Collect isolated blind opinions for every available packet | ready; reviewer-only export deep-verifies the frozen packet artifact and exposes no case-map identity |
+| Seal | Validate separate immutable role ledgers, then resolve rows and cluster-aware sufficiency | ready under additive pre-opinion seal/aggregation contract |
 | Evaluate | Apply the preregistered reference-sufficiency gates | blocked until ledger seal |
 | Closeout | Four-party bounded review and gate any P020-D successor | blocked until evaluation |
 

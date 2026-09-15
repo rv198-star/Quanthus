@@ -1,0 +1,65 @@
+{
+  "schema_version": "quanthus.stage-stratum-normalized-instability-recovery.v1",
+  "work_item": "P3-STAGE-017-B-R1",
+  "disposition": "AUTHORIZE_ONE_TECHNICAL_BINDING_RECOVERY",
+  "effective_date": "2026-09-15",
+  "failed_job": {
+    "job_id": "stage_f670ede6347e4bd5921b66e61a034a9d",
+    "code_revision": "10b998766acd72e27fa46b9ecd3fff4ecaf6a556",
+    "input_digest": "sha256:923f906864ca3887a2370d79b6f8f7b4d9a742abebbc023d6d37e8b0fc41fab0",
+    "terminal_state": "failed",
+    "error": "stage_stratum_normalized_instability_process_failed",
+    "failure_reason": "StratumNormalizedInstabilityError:reference_result_shape",
+    "artifact_published": false,
+    "candidate_scoring_reached": false,
+    "semantic_result_reached": false
+  },
+  "root_cause": {
+    "class": "IMPLEMENTATION_BINDING_FIELD_PATH",
+    "observed_code_path": "p015_result['p012_atomic_reference_resolution']",
+    "frozen_contract_path": "p015_result['combined_reference_resolution']",
+    "repair": "Read the already-frozen combined_reference_resolution field instead of the nonexistent p012_atomic_reference_resolution field.",
+    "config_change_required": false,
+    "resource_change_required": false,
+    "normalization_change_required": false,
+    "candidate_change_required": false,
+    "quality_gate_change_required": false
+  },
+  "bindings": {
+    "original_p017_config": {
+      "path": "config/stage-learning/stage-stratum-normalized-instability.v1.json",
+      "sha256": "sha256:a7efc86350569db5807c08ed212bd6acda96c369ed7b5d0215f6b15ed5bb778b"
+    },
+    "p015_reference_result": {
+      "path": "config/stage-learning/stage-complete-reserve-reference-sufficiency-result.v1.json",
+      "sha256": "sha256:5258606e1a97c0ba53702f233851391134d6bb1f722b90d82f87a140d2a67413"
+    },
+    "p016_result": {
+      "path": "config/stage-learning/stage-combined-atomic-scoring-result.v1.json",
+      "sha256": "sha256:9afaac495dcfa0cda11b4ba07969d92f7fa5d9e41ef4f1de97819ab0f2250d23"
+    }
+  },
+  "authority": {
+    "maximum_technical_recovery_jobs": 1,
+    "same_p017_config_required": true,
+    "same_252_case_surface_required": true,
+    "same_review_ledgers_required": true,
+    "same_eight_cell_normalization_required": true,
+    "same_3x3_profile_coordinates_required": true,
+    "same_quality_gates_required": true,
+    "field_path_repair_only": true,
+    "resource_change": false,
+    "reference_change": false,
+    "normalization_change": false,
+    "candidate_surface_change": false,
+    "numeric_gate_change": false,
+    "envelope_reactivation": false,
+    "dwd_market_read": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This authorization permits one technical recovery of the failed P017-B Job solely to correct an implementation field-path mismatch before candidate scoring. It does not alter the frozen development surface, references, normalization, candidate topology, quality gates, protected data boundaries or production authority."
+}

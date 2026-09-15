@@ -47,14 +47,14 @@ The runtime order is itself part of the blinding contract:
 5. Score all nine fixed profile coordinates under the unchanged pooled-count/macro-rate contract.
 6. Freeze at most one eligible instability profile; otherwise close semantic no-pass.
 
-No automatic retry is authorized after a semantic result.
+No automatic retry is authorized after a semantic result. The initial P017-B process failure did not reach candidate scoring; its separately frozen R1 authority permits one exact field-path technical recovery only.
 
 ## Work sequence
 
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
 | P3-STAGE-017-A | Freeze normalization/topology/blinding semantics | P3-STAGE-016 | ready design: exact 252 surface, eight unlabeled cell bases, fixed 3×3 coordinates, no envelope eligibility |
-| P3-STAGE-017-B | Run artifact-only stratum-normalized instability scoring | P3-STAGE-017-A | ready `PASS_ENGINEERING_READY_FOR_ONE_STRATUM_NORMALIZED_INSTABILITY_JOB`; one Job, 9 profiles, no R/O/projection/preserved read; `../acceptance/stage-stratum-normalized-instability-engineering-20260915.md` |
+| P3-STAGE-017-B | Run artifact-only stratum-normalized instability scoring | P3-STAGE-017-A | technical recovery ready: initial Job `stage_f670ede6347e4bd5921b66e61a034a9d` failed before `_score_profiles` because of a single reference-result field-path bug and published no artifact; one exact R1 recovery is authorized with all semantic bindings unchanged; `../acceptance/stage-stratum-normalized-instability-recovery-20260915.md` |
 | P3-STAGE-017-C | Four-party semantic outcome review | P3-STAGE-017-B | blocked until B publishes a terminal semantic result |
 | P3-STAGE-017-D | Close and decide successor gate | P3-STAGE-017-C | blocked; any further atomic/projection work requires a separate freeze |
 

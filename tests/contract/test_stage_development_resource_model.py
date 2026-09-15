@@ -79,6 +79,9 @@ P016_NOPASS_REVIEW = (
     ROOT / "docs/reviews/stage-p016-instability-no-pass-four-party-review-20260915.md"
 )
 P017_CONFIG = ROOT / "config/stage-learning/stage-stratum-normalized-instability.v1.json"
+P017_RECOVERY = (
+    ROOT / "config/stage-learning/stage-stratum-normalized-instability-recovery.v1.json"
+)
 P017_WORK = ROOT / "docs/work-items/stage-stratum-normalized-instability.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1032,6 +1035,51 @@ def test_stage017_freezes_cell_local_unlabeled_instability_successor() -> None:
     assert authority["2025_read"] is False
     assert P017_WORK.is_file()
     assert "P3-STAGE-017" in P017_WORK.read_text(encoding="utf-8")
+
+
+def test_stage017_recovery_is_exact_field_path_repair_only() -> None:
+    value = json.loads(P017_RECOVERY.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-017-B-R1"
+    assert value["disposition"] == "AUTHORIZE_ONE_TECHNICAL_BINDING_RECOVERY"
+    failed = value["failed_job"]
+    assert failed["job_id"] == "stage_f670ede6347e4bd5921b66e61a034a9d"
+    assert failed["code_revision"] == "10b998766acd72e27fa46b9ecd3fff4ecaf6a556"
+    assert failed["artifact_published"] is False
+    assert failed["candidate_scoring_reached"] is False
+    assert failed["semantic_result_reached"] is False
+    cause = value["root_cause"]
+    assert cause["class"] == "IMPLEMENTATION_BINDING_FIELD_PATH"
+    assert cause["observed_code_path"] == "p015_result['p012_atomic_reference_resolution']"
+    assert cause["frozen_contract_path"] == "p015_result['combined_reference_resolution']"
+    assert cause["config_change_required"] is False
+    assert cause["resource_change_required"] is False
+    authority = value["authority"]
+    assert authority["maximum_technical_recovery_jobs"] == 1
+    for key in (
+        "same_p017_config_required",
+        "same_252_case_surface_required",
+        "same_review_ledgers_required",
+        "same_eight_cell_normalization_required",
+        "same_3x3_profile_coordinates_required",
+        "same_quality_gates_required",
+        "field_path_repair_only",
+    ):
+        assert authority[key] is True
+    for key in (
+        "resource_change",
+        "reference_change",
+        "normalization_change",
+        "candidate_surface_change",
+        "numeric_gate_change",
+        "envelope_reactivation",
+        "dwd_market_read",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

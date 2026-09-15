@@ -485,7 +485,7 @@ def run_scoring(
     if set(references) != set(cases):
         raise StratumNormalizedInstabilityError("reference_case_closure")
     reference_counts = _reference_counts(references)
-    expected_counts = p015_result.get("p012_atomic_reference_resolution")
+    expected_counts = p015_result.get("combined_reference_resolution")
     if not isinstance(expected_counts, Mapping):
         raise StratumNormalizedInstabilityError("reference_result_shape")
     for proposition in (

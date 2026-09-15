@@ -143,6 +143,12 @@ COMBINED_ATOMIC_SCORING_BUDGET_SCHEMA = "quanthus.stage-combined-atomic-scoring-
 STRATUM_NORMALIZED_INSTABILITY_BUDGET_SCHEMA = (
     "quanthus.stage-stratum-normalized-instability-budget.v1"
 )
+STRATUM_NORMALIZED_INSTABILITY_RECOVERY_BUDGET_SCHEMA = (
+    "quanthus.stage-stratum-normalized-instability-recovery-budget.v1"
+)
+STRATUM_NORMALIZED_INSTABILITY_RECOVERY_AUTH = (
+    "config/stage-learning/stage-stratum-normalized-instability-recovery.v1.json"
+)
 DEVELOPMENT_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-development-resource-plan-recovery.v1.json"
 )
@@ -628,6 +634,10 @@ class StageWorkerPaths:
     @property
     def stratum_normalized_instability_budget(self) -> Path:
         return self.control_root / "stratum-normalized-instability-budget.json"
+
+    @property
+    def stratum_normalized_instability_recovery_budget(self) -> Path:
+        return self.control_root / "stratum-normalized-instability-recovery-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -1916,12 +1926,100 @@ def _stratum_normalized_instability_budget_value(job: StageJob) -> dict[str, Any
     }
 
 
+def _stratum_normalized_instability_recovery_budget_value(
+    failed_job: StageJob, recovery_job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": STRATUM_NORMALIZED_INSTABILITY_RECOVERY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-017-B-R1",
+        "technical_recovery_of": failed_job.job_id,
+        "failed_input_digest": failed_job.input_digest,
+        "job": recovery_job.to_dict(),
+        "input_digest": recovery_job.input_digest,
+    }
+
+
+def _stratum_normalized_instability_recovery_authorization(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> dict[str, Any]:
+    auth = _object(
+        paths.control_repo / STRATUM_NORMALIZED_INSTABILITY_RECOVERY_AUTH,
+        "stratum normalized instability recovery authorization",
+    )
+    if (
+        auth.get("schema_version") != "quanthus.stage-stratum-normalized-instability-recovery.v1"
+        or auth.get("work_item") != "P3-STAGE-017-B-R1"
+        or auth.get("disposition") != "AUTHORIZE_ONE_TECHNICAL_BINDING_RECOVERY"
+    ):
+        raise StageWorkerError("stratum normalized instability recovery authorization differs")
+    failure = auth.get("failed_job")
+    authority = auth.get("authority")
+    bindings = auth.get("bindings")
+    if not all(isinstance(value, Mapping) for value in (failure, authority, bindings)):
+        raise StageWorkerError("stratum normalized instability recovery authorization incomplete")
+    if (
+        failure.get("job_id") != failed_job.job_id
+        or failure.get("code_revision") != failed_job.code_revision
+        or failure.get("input_digest") != failed_job.input_digest
+        or failure.get("terminal_state") != "failed"
+        or failure.get("error") != "stage_stratum_normalized_instability_process_failed"
+        or failure.get("artifact_published") is not False
+        or failure.get("candidate_scoring_reached") is not False
+        or failure.get("semantic_result_reached") is not False
+    ):
+        raise StageWorkerError("stratum normalized instability recovery failure binding differs")
+    required_true = (
+        "same_p017_config_required",
+        "same_252_case_surface_required",
+        "same_review_ledgers_required",
+        "same_eight_cell_normalization_required",
+        "same_3x3_profile_coordinates_required",
+        "same_quality_gates_required",
+        "field_path_repair_only",
+    )
+    required_false = (
+        "resource_change",
+        "reference_change",
+        "normalization_change",
+        "candidate_surface_change",
+        "numeric_gate_change",
+        "envelope_reactivation",
+        "dwd_market_read",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    )
+    if authority.get("maximum_technical_recovery_jobs") != 1:
+        raise StageWorkerError("stratum normalized instability recovery job budget differs")
+    if any(authority.get(key) is not True for key in required_true) or any(
+        authority.get(key) is not False for key in required_false
+    ):
+        raise StageWorkerError("stratum normalized instability recovery authority differs")
+    for key in ("original_p017_config", "p015_reference_result", "p016_result"):
+        binding = bindings.get(key)
+        if not isinstance(binding, Mapping):
+            raise StageWorkerError("stratum normalized instability recovery binding differs")
+        path = paths.control_repo / str(binding.get("path") or "")
+        expected = str(binding.get("sha256") or "")
+        try:
+            observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise StageWorkerError(
+                "stratum normalized instability recovery binding unreadable"
+            ) from exc
+        if expected != observed:
+            raise StageWorkerError("stratum normalized instability recovery binding differs")
+    return dict(auth)
+
+
 def _existing_stratum_normalized_instability_submission(
     paths: StageWorkerPaths, *, code_revision: str,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, StageJob | None]:
     marker_path = paths.stratum_normalized_instability_budget
     if not marker_path.exists():
-        return None
+        return None, None
     marker = _object(marker_path, "stratum normalized instability budget")
     if (
         marker.get("schema_version") != STRATUM_NORMALIZED_INSTABILITY_BUDGET_SCHEMA
@@ -1930,17 +2028,47 @@ def _existing_stratum_normalized_instability_submission(
         or not isinstance(marker.get("job"), Mapping)
     ):
         raise StageWorkerError("stratum normalized instability budget marker differs")
-    job = StageJob.from_dict(marker["job"])
+    failed_job = StageJob.from_dict(marker["job"])
     if (
-        job.kind != STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
-        or marker.get("input_digest") != job.input_digest
+        failed_job.kind != STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
+        or marker.get("input_digest") != failed_job.input_digest
     ):
         raise StageWorkerError("stratum normalized instability budget marker differs")
-    if job.code_revision != code_revision:
+    if failed_job.code_revision == code_revision:
+        return _idempotent_stage_submission(paths, failed_job), None
+    observed = read_status(paths, failed_job.job_id)
+    if (
+        observed.get("state") != "failed"
+        or observed.get("error") != "stage_stratum_normalized_instability_process_failed"
+        or observed.get("input_digest") != failed_job.input_digest
+        or observed.get("code_revision") != failed_job.code_revision
+        or observed.get("result_ref") is not None
+    ):
         raise StageWorkerError(
-            "stratum normalized instability has no retry or replacement authority"
+            "stratum normalized instability recovery requires exact failed parent"
         )
-    return _idempotent_stage_submission(paths, job)
+    _stratum_normalized_instability_recovery_authorization(paths, failed_job)
+    recovery_path = paths.stratum_normalized_instability_recovery_budget
+    if not recovery_path.exists():
+        return None, failed_job
+    recovery = _object(recovery_path, "stratum normalized instability recovery budget")
+    if (
+        recovery.get("schema_version") != STRATUM_NORMALIZED_INSTABILITY_RECOVERY_BUDGET_SCHEMA
+        or recovery.get("work_item") != "P3-STAGE-017-B-R1"
+        or recovery.get("technical_recovery_of") != failed_job.job_id
+        or recovery.get("failed_input_digest") != failed_job.input_digest
+        or not isinstance(recovery.get("job"), Mapping)
+    ):
+        raise StageWorkerError("stratum normalized instability recovery budget marker differs")
+    recovery_job = StageJob.from_dict(recovery["job"])
+    if (
+        recovery_job.kind != STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
+        or recovery.get("input_digest") != recovery_job.input_digest
+    ):
+        raise StageWorkerError("stratum normalized instability recovery budget marker differs")
+    if recovery_job.code_revision != code_revision:
+        raise StageWorkerError("stratum normalized instability recovery has no further authority")
+    return _idempotent_stage_submission(paths, recovery_job), failed_job
 
 
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
@@ -3315,6 +3443,7 @@ def submit_job(
     orderly_consolidation_joint_d1_recovery_of: StageJob | None = None
     development_resource_plan_recovery_of: StageJob | None = None
     complete_reserve_additional_review_set_recovery_of: StageJob | None = None
+    stratum_normalized_instability_recovery_of: StageJob | None = None
     if kind == STAGE_ORDER_RULE_PREPARE_JOB:
         existing, prepare_retry_of = _existing_order_rule_prepare_submission(
             paths, code_revision=code_revision,
@@ -3435,8 +3564,10 @@ def submit_job(
         if existing is not None:
             return existing
     if kind == STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB:
-        existing = _existing_stratum_normalized_instability_submission(
-            paths, code_revision=code_revision,
+        existing, stratum_normalized_instability_recovery_of = (
+            _existing_stratum_normalized_instability_submission(
+                paths, code_revision=code_revision,
+            )
         )
         if existing is not None:
             return existing
@@ -3517,6 +3648,11 @@ def submit_job(
     combined_atomic_scoring_reserved = job.kind == STAGE_COMBINED_ATOMIC_SCORING_JOB
     stratum_normalized_instability_reserved = (
         job.kind == STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
+        and stratum_normalized_instability_recovery_of is None
+    )
+    stratum_normalized_instability_recovery_reserved = (
+        job.kind == STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
+        and stratum_normalized_instability_recovery_of is not None
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -3652,6 +3788,13 @@ def submit_job(
             paths.stratum_normalized_instability_budget,
             _stratum_normalized_instability_budget_value(job),
         )
+    if stratum_normalized_instability_recovery_reserved:
+        _exclusive_json(
+            paths.stratum_normalized_instability_recovery_budget,
+            _stratum_normalized_instability_recovery_budget_value(
+                stratum_normalized_instability_recovery_of, job
+            ),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -3712,6 +3855,8 @@ def submit_job(
             paths.combined_atomic_scoring_budget.unlink(missing_ok=True)
         if stratum_normalized_instability_reserved:
             paths.stratum_normalized_instability_budget.unlink(missing_ok=True)
+        if stratum_normalized_instability_recovery_reserved:
+            paths.stratum_normalized_instability_recovery_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -3767,6 +3912,8 @@ def submit_job(
             paths.combined_atomic_scoring_budget.unlink(missing_ok=True)
         if stratum_normalized_instability_reserved:
             paths.stratum_normalized_instability_budget.unlink(missing_ok=True)
+        if stratum_normalized_instability_recovery_reserved:
+            paths.stratum_normalized_instability_recovery_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -3781,6 +3928,8 @@ def submit_job(
         result["metadata_recovery_of"] = development_resource_plan_recovery_of.job_id
     if complete_reserve_additional_review_set_recovery_of is not None:
         result["technical_recovery_of"] = complete_reserve_additional_review_set_recovery_of.job_id
+    if stratum_normalized_instability_recovery_of is not None:
+        result["technical_recovery_of"] = stratum_normalized_instability_recovery_of.job_id
     return result
 
 

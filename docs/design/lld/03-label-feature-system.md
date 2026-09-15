@@ -490,7 +490,7 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-016-D | Gate preserved evaluation | P3-STAGE-016-C | closed `PRESERVED_EVALUATION_NOT_AUTHORIZED`; preserved 2021/2025 remain unread and successor work must be separately frozen |
 | P3-STAGE-017 | Era × Board stratum-normalized instability development | P3-STAGE-016 | ready artifact-only successor; same 252 cases, cell-local unlabeled quantile calibration, same fixed 3×3 profile coordinates, no envelope eligibility |
 | P3-STAGE-017-A | Freeze normalization/topology/blinding semantics | P3-STAGE-017 | ready design; all eight cell bases and 9×8 threshold instances built before reference-ledger read |
-| P3-STAGE-017-B | Score stratum-normalized instability | P3-STAGE-017-A | ready `PASS_ENGINEERING_READY_FOR_ONE_STRATUM_NORMALIZED_INSTABILITY_JOB`; unchanged absolute P012 instability quality thresholds under P016 macro-rate aggregation, no R/O/projection |
+| P3-STAGE-017-B | Score stratum-normalized instability | P3-STAGE-017-A | technical recovery ready; initial Job failed before profile scoring on a single durable-result field-path mismatch, and one exact R1 recovery is authorized with unchanged 252 cases / eight cell bases / 3×3 profiles / quality gates |
 | P3-STAGE-017-C | Review semantic outcome | P3-STAGE-017-B | blocked until B terminal result |
 | P3-STAGE-017-D | Close and decide next gate | P3-STAGE-017-C | blocked; preserved evaluation remains separate and unread |
 

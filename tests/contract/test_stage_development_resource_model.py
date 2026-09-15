@@ -105,6 +105,7 @@ P020_RESOURCE_RESULT = (
 P020_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-proposition.md"
 P021_TAXONOMY = ROOT / "config/stage-learning/stage-admission-exposure-taxonomy.v1.json"
 P021_CAPACITY = ROOT / "config/stage-learning/stage-admission-exposure-capacity.v1.json"
+P021_RESULT = ROOT / "config/stage-learning/stage-admission-exposure-capacity-result.v1.json"
 P021_WORK = ROOT / "docs/work-items/stage-admission-exposure-taxonomy.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1494,6 +1495,46 @@ def test_stage021b_is_metadata_only_capacity_under_frozen_taxonomy() -> None:
         "2025_read",
         "daily_or_strategy",
         "trading",
+    ):
+        assert authority[key] is False
+
+
+def test_stage021_closes_after_restoring_cells_but_not_256_global_uniques() -> None:
+    value = json.loads(P021_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-021-B"
+    assert value["state"] == "CLOSED_REPAIRED_TAXONOMY_GLOBAL_IDENTITY_SHORTFALL"
+    assert value["job"]["job_id"] == "stage_683c30a44be648e284e9168d3fb269b1"
+    assert value["job"]["manifest_sha256"] == (
+        "sha256:2fee116dd5df3241e34820e063cfd2bf06ecf60b4cb60bb284a5a90b4b5eebb3"
+    )
+    exposure = value["exposure_counts"]
+    assert exposure["p014_admission_window_count"] == 4608
+    assert exposure["p014_semantic_consumed_window_count"] == 256
+    assert exposure["p014_admission_only_reusable_window_count"] == 4352
+    capacity = value["capacity"]
+    assert capacity["old_all_cells_capacity_pass"] is False
+    assert capacity["repaired_all_cells_capacity_pass"] is True
+    assert capacity["global_unique_8x32_metadata_feasible"] is False
+    assert capacity["global_unique_selected_row_count"] == 243
+    assert capacity["shortfall"] == 13
+    assert capacity["cells"]["STAR_PRE_CHINEXT_20PCT/STAR"]["repaired_identity_count"] == 48
+    assert capacity["cells"]["STAR_AND_CHINEXT_20PCT/STAR"]["repaired_identity_count"] == 38
+    conclusion = value["conclusion"]
+    assert conclusion["l2a_taxonomy_restores_per_cell_capacity"] is True
+    assert conclusion["unchanged_256_global_unique_reserve_still_fails"] is True
+    assert conclusion["p020_may_reopen_now"] is False
+    assert value["successor"]["work_item"] == "P3-STAGE-022"
+    authority = value["authority"]
+    for key in (
+        "market_bar_read",
+        "admission_market_read",
+        "stage1_12_semantic_read",
+        "threshold_or_candidate_read",
+        "reference_opinion_read",
+        "p020_reopen",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
     ):
         assert authority[key] is False
 

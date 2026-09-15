@@ -42,9 +42,9 @@ P013 exact-plan windows remain consumed. Preserved 2021 identities remain global
 | ID | Work | Dependency | State |
 | --- | --- | --- | --- |
 | P3-STAGE-021-A | Freeze L2A/L2B taxonomy before capacity results | P3-STAGE-020-B | closed taxonomy freeze |
-| P3-STAGE-021-B | Metadata-only old-vs-repaired capacity recomputation | P3-STAGE-021-A | ready for one Job |
-| P3-STAGE-021-C | Four-party review of repaired capacity | P3-STAGE-021-B | blocked |
-| P3-STAGE-021-D | Close P021 and gate any P020 resource successor | P3-STAGE-021-C | blocked |
+| P3-STAGE-021-B | Metadata-only old-vs-repaired capacity recomputation | P3-STAGE-021-A | closed `CLOSED_REPAIRED_TAXONOMY_GLOBAL_IDENTITY_SHORTFALL`; all eight cells individually recover ≥32 identities, but unchanged 8×32 global uniqueness reaches 243/256; `../../config/stage-learning/stage-admission-exposure-capacity-result.v1.json` |
+| P3-STAGE-021-C | Four-party review of repaired capacity | P3-STAGE-021-B | closed; keep final active-case identity independence, but do not spend global uniqueness on dormant fallback reservations; `../reviews/stage-p021-admission-exposure-capacity-review-20260915.md` |
+| P3-STAGE-021-D | Close P021 and gate any P020 resource successor | P3-STAGE-021-C | closed `RECOMMEND_P022_PRIMARY_UNIQUE_CONTINGENT_FALLBACK`; P020 remains blocked |
 
 ## P021-B contract
 

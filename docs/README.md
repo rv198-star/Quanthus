@@ -480,9 +480,14 @@ nodes.
   that distinction before any repaired-capacity result: P014 admission-ledger windows that never
   entered the 256-row qualified semantic plan are `L2A_TECHNICAL_INPUT_ADMISSION_READ` and may be
   reused for later semantic development with explicit technical-read provenance; the 256 qualified-
-  plan windows remain semantic-consumed `L2B` resources. P021-B is ready to compare old-vs-repaired
-  capacity using listing/calendar and immutable artifact metadata only; it cannot reopen P020.
-  Preserved 2021/2022-2024/2025 remain unopened.
+  plan windows remain semantic-consumed `L2B` resources. The sole P021-B metadata Job then restores
+  at least 32 identities in every Era×Board cell (STAR returns to 48 and 38 identities), but the old
+  requirement that all `8×32=256` reserve rows be globally identity-unique still reaches only 243.
+  P021 therefore closes fail-closed and recommends P022: keep all 192 eventual primary/review cases
+  globally identity-unique, but treat dormant fallback reservations as contingency metadata whose
+  cross-cell identity duplication is allowed until activation; any activated fallback must preserve
+  uniqueness in the realized review set. P020 remains blocked. Preserved 2021/2022-2024/2025 remain
+  unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -499,7 +504,8 @@ nodes.
   `work-items/stage-downside-lifecycle-proposition.md`,
   `reviews/stage-p020b-resource-shortfall-four-party-review-20260915.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
-  `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`, and
+  `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
+  `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

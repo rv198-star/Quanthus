@@ -1,0 +1,133 @@
+{
+  "schema_version": "quanthus.stage-admission-exposure-capacity-result.v1",
+  "work_item": "P3-STAGE-021-B",
+  "state": "CLOSED_REPAIRED_TAXONOMY_GLOBAL_IDENTITY_SHORTFALL",
+  "effective_date": "2026-09-15",
+  "job": {
+    "job_id": "stage_683c30a44be648e284e9168d3fb269b1",
+    "code_revision": "ff115fb88238d865821ed9ea93ae92e3aad99b83",
+    "terminal_state": "succeeded",
+    "exit_code": 0,
+    "manifest_sha256": "sha256:2fee116dd5df3241e34820e063cfd2bf06ecf60b4cb60bb284a5a90b4b5eebb3",
+    "disposition": "CLOSED_REPAIRED_TAXONOMY_STILL_CAPACITY_SHORT"
+  },
+  "exposure_counts": {
+    "p014_admission_window_count": 4608,
+    "p014_semantic_consumed_window_count": 256,
+    "p014_admission_only_reusable_window_count": 4352,
+    "restored_admission_only_window_count_in_metadata_reservoir": 4352
+  },
+  "capacity": {
+    "old_all_cells_capacity_pass": false,
+    "repaired_all_cells_capacity_pass": true,
+    "global_unique_8x32_metadata_feasible": false,
+    "global_unique_selected_row_count": 243,
+    "required_global_unique_reserve_rows": 256,
+    "shortfall": 13,
+    "cells": {
+      "STAR_PRE_CHINEXT_20PCT/STAR": {
+        "old_identity_count": 0,
+        "old_window_count": 0,
+        "repaired_identity_count": 48,
+        "repaired_window_count": 68,
+        "restored_identity_count": 48,
+        "restored_window_count": 68,
+        "required_identity_count": 32,
+        "cell_capacity_pass": true
+      },
+      "STAR_AND_CHINEXT_20PCT/STAR": {
+        "old_identity_count": 0,
+        "old_window_count": 0,
+        "repaired_identity_count": 38,
+        "repaired_window_count": 38,
+        "restored_identity_count": 38,
+        "restored_window_count": 38,
+        "required_identity_count": 32,
+        "cell_capacity_pass": true
+      },
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": {
+        "old_identity_count": 305,
+        "old_window_count": 1129,
+        "repaired_identity_count": 561,
+        "repaired_window_count": 2039,
+        "restored_identity_count": 256,
+        "restored_window_count": 910,
+        "required_identity_count": 32,
+        "cell_capacity_pass": true
+      },
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": {
+        "old_identity_count": 312,
+        "old_window_count": 312,
+        "repaired_identity_count": 536,
+        "repaired_window_count": 536,
+        "restored_identity_count": 224,
+        "restored_window_count": 224,
+        "required_identity_count": 32,
+        "cell_capacity_pass": true
+      },
+      "PRE_STAR/CHINEXT": {
+        "old_identity_count": 700,
+        "old_window_count": 12296,
+        "repaired_identity_count": 715,
+        "repaired_window_count": 13268,
+        "restored_identity_count": 255,
+        "restored_window_count": 972,
+        "required_identity_count": 32,
+        "cell_capacity_pass": true
+      },
+      "STAR_PRE_CHINEXT_20PCT/MAIN": {
+        "old_identity_count": 1787,
+        "old_window_count": 6744,
+        "repaired_identity_count": 2043,
+        "repaired_window_count": 7672,
+        "restored_identity_count": 256,
+        "restored_window_count": 928,
+        "required_identity_count": 32,
+        "cell_capacity_pass": true
+      },
+      "STAR_AND_CHINEXT_20PCT/MAIN": {
+        "old_identity_count": 1790,
+        "old_window_count": 1790,
+        "repaired_identity_count": 2014,
+        "repaired_window_count": 2014,
+        "restored_identity_count": 224,
+        "restored_window_count": 224,
+        "required_identity_count": 32,
+        "cell_capacity_pass": true
+      },
+      "PRE_STAR/MAIN": {
+        "old_identity_count": 2741,
+        "old_window_count": 62932,
+        "repaired_identity_count": 2750,
+        "repaired_window_count": 63920,
+        "restored_identity_count": 256,
+        "restored_window_count": 988,
+        "required_identity_count": 32,
+        "cell_capacity_pass": true
+      }
+    }
+  },
+  "authority": {
+    "market_bar_read": false,
+    "admission_market_read": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "p020_reopen": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "conclusion": {
+    "l2a_taxonomy_restores_per_cell_capacity": true,
+    "unchanged_256_global_unique_reserve_still_fails": true,
+    "p020_may_reopen_now": false,
+    "next_question": "Whether global economic-identity uniqueness is required for all 64 unused fallback reserve slots, or only for the final 192 primary/review cases and any fallback case actually activated."
+  },
+  "successor": {
+    "work_item": "P3-STAGE-022",
+    "name": "Primary-Unique Contingent Fallback Resource Contract",
+    "result_bearing_authority": false
+  },
+  "claim_ceiling": "P021 proves that the L2A/L2B taxonomy restores at least 32 metadata-eligible identities in every Era x Board cell, but the unchanged requirement that all 256 reserve rows be globally identity-unique still fails at 243. It does not authorize P020 semantic work or any relaxation of final reviewed-case identity independence."
+}

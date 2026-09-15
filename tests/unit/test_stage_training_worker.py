@@ -131,6 +131,34 @@ def seed_stratum_normalized_instability_recovery_auth(
     target.write_text(json.dumps(recovery), encoding="utf-8")
 
 
+def seed_downside_lifecycle_resource_plan_recovery_auth(
+    worker_paths: StageWorkerPaths, failed_job: StageJob,
+) -> None:
+    relpaths = (
+        "config/stage-learning/stage-downside-lifecycle-resource-plan.v1.json",
+        "config/stage-learning/stage-downside-lifecycle-concept.v1.json",
+        "config/stage-learning/stage-development-resource-model.v1.json",
+    )
+    for relpath in relpaths:
+        target = worker_paths.control_repo / relpath
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relpath).read_bytes())
+    recovery_path = (
+        "config/stage-learning/stage-downside-lifecycle-resource-plan-recovery.v1.json"
+    )
+    recovery = json.loads((ROOT / recovery_path).read_text(encoding="utf-8"))
+    recovery["failed_job"].update(
+        {
+            "job_id": failed_job.job_id,
+            "code_revision": failed_job.code_revision,
+            "input_digest": failed_job.input_digest,
+        }
+    )
+    target = worker_paths.control_repo / recovery_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(recovery), encoding="utf-8")
+
+
 def seed_order_rule_resolve_score_parent(worker_paths: StageWorkerPaths) -> StageJob:
     config = worker_paths.control_repo / "config/stage-learning/order-rule-resolve-score.v1.json"
     config.parent.mkdir(parents=True, exist_ok=True)
@@ -1275,10 +1303,57 @@ def test_downside_lifecycle_resource_plan_is_one_shot_and_idempotent(
         kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
     )
     assert repeated["job_id"] == submitted["job_id"]
-    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+    with pytest.raises(StageWorkerError, match="recovery requires exact failed parent"):
         submit_job(
             worker_paths,
             code_revision="b" * 40,
+            kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
+        )
+
+
+def test_downside_lifecycle_resource_plan_allows_one_exact_pre_admission_recovery(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
+    )
+    marker = json.loads(
+        worker_paths.downside_lifecycle_resource_plan_budget.read_text(encoding="utf-8")
+    )
+    failed_job = StageJob.from_dict(marker["job"])
+    StageWorker(worker_paths)._write_status(
+        failed_job,
+        state="failed",
+        stage="terminal",
+        started_at="2026-09-15T10:49:55+00:00",
+        completed_at="2026-09-15T10:49:56+00:00",
+        error="stage_downside_lifecycle_resource_plan_process_failed",
+        exit_code=1,
+        result_ref=None,
+    )
+    seed_downside_lifecycle_resource_plan_recovery_auth(worker_paths, failed_job)
+    recovery_revision = "b" * 40
+    recovered = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
+    )
+    assert recovered["job_id"] != submitted["job_id"]
+    assert recovered["technical_recovery_of"] == submitted["job_id"]
+    assert worker_paths.downside_lifecycle_resource_plan_recovery_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
+    )
+    assert repeated["job_id"] == recovered["job_id"]
+    with pytest.raises(StageWorkerError, match="has no further authority"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
             kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
         )
 

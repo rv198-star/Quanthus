@@ -158,6 +158,12 @@ INSTABILITY_CHANNEL_DECOMPOSITION_BUDGET_SCHEMA = (
 DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_BUDGET_SCHEMA = (
     "quanthus.stage-downside-lifecycle-resource-plan-budget.v1"
 )
+DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA = (
+    "quanthus.stage-downside-lifecycle-resource-plan-recovery-budget.v1"
+)
+DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_AUTH = (
+    "config/stage-learning/stage-downside-lifecycle-resource-plan-recovery.v1.json"
+)
 STRATUM_NORMALIZED_INSTABILITY_RECOVERY_AUTH = (
     "config/stage-learning/stage-stratum-normalized-instability-recovery.v1.json"
 )
@@ -672,6 +678,10 @@ class StageWorkerPaths:
     @property
     def downside_lifecycle_resource_plan_budget(self) -> Path:
         return self.control_root / "downside-lifecycle-resource-plan-budget.json"
+
+    @property
+    def downside_lifecycle_resource_plan_recovery_budget(self) -> Path:
+        return self.control_root / "downside-lifecycle-resource-plan-recovery-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -2152,12 +2162,104 @@ def _downside_lifecycle_resource_plan_budget_value(job: StageJob) -> dict[str, A
     }
 
 
+def _downside_lifecycle_resource_plan_recovery_budget_value(
+    failed_job: StageJob, recovery_job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-020-B-R1",
+        "technical_recovery_of": failed_job.job_id,
+        "failed_input_digest": failed_job.input_digest,
+        "job": recovery_job.to_dict(),
+        "input_digest": recovery_job.input_digest,
+    }
+
+
+def _downside_lifecycle_resource_plan_recovery_authorization(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> dict[str, Any]:
+    auth = _object(
+        paths.control_repo / DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_AUTH,
+        "downside lifecycle resource plan recovery authorization",
+    )
+    if (
+        auth.get("schema_version")
+        != "quanthus.stage-downside-lifecycle-resource-plan-recovery.v1"
+        or auth.get("work_item") != "P3-STAGE-020-B-R1"
+        or auth.get("disposition")
+        != "AUTHORIZE_ONE_PRE_ADMISSION_CAPACITY_ARTIFACT_RECOVERY"
+    ):
+        raise StageWorkerError("downside lifecycle resource recovery authorization differs")
+    failure = auth.get("failed_job")
+    authority = auth.get("authority")
+    bindings = auth.get("bindings")
+    if not all(isinstance(value, Mapping) for value in (failure, authority, bindings)):
+        raise StageWorkerError("downside lifecycle resource recovery authorization incomplete")
+    if (
+        failure.get("job_id") != failed_job.job_id
+        or failure.get("code_revision") != failed_job.code_revision
+        or failure.get("input_digest") != failed_job.input_digest
+        or failure.get("terminal_state") != "failed"
+        or failure.get("error") != "stage_downside_lifecycle_resource_plan_process_failed"
+        or failure.get("artifact_published") is not False
+        or failure.get("input_readiness_market_read_reached") is not False
+        or failure.get("semantic_read_reached") is not False
+    ):
+        raise StageWorkerError("downside lifecycle resource recovery failure binding differs")
+    required_true = (
+        "same_p020_b_config_required",
+        "same_p013_window_exclusion_required",
+        "same_p014_all_read_window_exclusion_required",
+        "same_era_board_cells_required",
+        "same_8x32_quota_required",
+        "metadata_preflight_and_artifact_only_repair",
+    )
+    required_false = (
+        "sampling_change",
+        "freshness_change",
+        "new_year_or_board",
+        "reuse_excluded_window",
+        "whole_identity_burn_down",
+        "input_readiness_market_read_before_preflight_pass",
+        "semantic_market_read",
+        "reference_opinion",
+        "threshold_basis",
+        "candidate_scoring",
+        "preserved_2021_market_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    )
+    if authority.get("maximum_technical_recovery_jobs") != 1:
+        raise StageWorkerError("downside lifecycle resource recovery job budget differs")
+    if any(authority.get(key) is not True for key in required_true) or any(
+        authority.get(key) is not False for key in required_false
+    ):
+        raise StageWorkerError("downside lifecycle resource recovery authority differs")
+    for key in ("original_p020_b_config", "p020_concept", "resource_model"):
+        binding = bindings.get(key)
+        if not isinstance(binding, Mapping):
+            raise StageWorkerError("downside lifecycle resource recovery binding differs")
+        path = paths.control_repo / str(binding.get("path") or "")
+        expected = str(binding.get("sha256") or "")
+        try:
+            observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise StageWorkerError(
+                "downside lifecycle resource recovery binding unreadable"
+            ) from exc
+        if expected != observed:
+            raise StageWorkerError("downside lifecycle resource recovery binding differs")
+    return dict(auth)
+
+
 def _existing_downside_lifecycle_resource_plan_submission(
     paths: StageWorkerPaths, *, code_revision: str,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, StageJob | None]:
     marker_path = paths.downside_lifecycle_resource_plan_budget
     if not marker_path.exists():
-        return None
+        return None, None
     marker = _object(marker_path, "downside lifecycle resource plan budget")
     if (
         marker.get("schema_version") != DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_BUDGET_SCHEMA
@@ -2166,17 +2268,45 @@ def _existing_downside_lifecycle_resource_plan_submission(
         or not isinstance(marker.get("job"), Mapping)
     ):
         raise StageWorkerError("downside lifecycle resource plan budget marker differs")
-    job = StageJob.from_dict(marker["job"])
+    failed_job = StageJob.from_dict(marker["job"])
     if (
-        job.kind != STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
-        or marker.get("input_digest") != job.input_digest
+        failed_job.kind != STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
+        or marker.get("input_digest") != failed_job.input_digest
     ):
         raise StageWorkerError("downside lifecycle resource plan budget marker differs")
-    if job.code_revision != code_revision:
-        raise StageWorkerError(
-            "downside lifecycle resource plan has no retry or replacement authority"
-        )
-    return _idempotent_stage_submission(paths, job)
+    if failed_job.code_revision == code_revision:
+        return _idempotent_stage_submission(paths, failed_job), None
+    observed = read_status(paths, failed_job.job_id)
+    if (
+        observed.get("state") != "failed"
+        or observed.get("error") != "stage_downside_lifecycle_resource_plan_process_failed"
+        or observed.get("input_digest") != failed_job.input_digest
+        or observed.get("code_revision") != failed_job.code_revision
+        or observed.get("result_ref") is not None
+    ):
+        raise StageWorkerError("downside lifecycle resource recovery requires exact failed parent")
+    _downside_lifecycle_resource_plan_recovery_authorization(paths, failed_job)
+    recovery_path = paths.downside_lifecycle_resource_plan_recovery_budget
+    if not recovery_path.exists():
+        return None, failed_job
+    recovery = _object(recovery_path, "downside lifecycle resource recovery budget")
+    if (
+        recovery.get("schema_version") != DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA
+        or recovery.get("work_item") != "P3-STAGE-020-B-R1"
+        or recovery.get("technical_recovery_of") != failed_job.job_id
+        or recovery.get("failed_input_digest") != failed_job.input_digest
+        or not isinstance(recovery.get("job"), Mapping)
+    ):
+        raise StageWorkerError("downside lifecycle resource recovery budget marker differs")
+    recovery_job = StageJob.from_dict(recovery["job"])
+    if (
+        recovery_job.kind != STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
+        or recovery.get("input_digest") != recovery_job.input_digest
+    ):
+        raise StageWorkerError("downside lifecycle resource recovery budget marker differs")
+    if recovery_job.code_revision != code_revision:
+        raise StageWorkerError("downside lifecycle resource recovery has no further authority")
+    return _idempotent_stage_submission(paths, recovery_job), failed_job
 
 
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
@@ -3587,6 +3717,7 @@ def submit_job(
     development_resource_plan_recovery_of: StageJob | None = None
     complete_reserve_additional_review_set_recovery_of: StageJob | None = None
     stratum_normalized_instability_recovery_of: StageJob | None = None
+    downside_lifecycle_resource_plan_recovery_of: StageJob | None = None
     if kind == STAGE_ORDER_RULE_PREPARE_JOB:
         existing, prepare_retry_of = _existing_order_rule_prepare_submission(
             paths, code_revision=code_revision,
@@ -3721,8 +3852,10 @@ def submit_job(
         if existing is not None:
             return existing
     if kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB:
-        existing = _existing_downside_lifecycle_resource_plan_submission(
-            paths, code_revision=code_revision,
+        existing, downside_lifecycle_resource_plan_recovery_of = (
+            _existing_downside_lifecycle_resource_plan_submission(
+                paths, code_revision=code_revision,
+            )
         )
         if existing is not None:
             return existing
@@ -3814,6 +3947,11 @@ def submit_job(
     )
     downside_lifecycle_resource_plan_reserved = (
         job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
+        and downside_lifecycle_resource_plan_recovery_of is None
+    )
+    downside_lifecycle_resource_plan_recovery_reserved = (
+        job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
+        and downside_lifecycle_resource_plan_recovery_of is not None
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -3966,6 +4104,13 @@ def submit_job(
             paths.downside_lifecycle_resource_plan_budget,
             _downside_lifecycle_resource_plan_budget_value(job),
         )
+    if downside_lifecycle_resource_plan_recovery_reserved:
+        _exclusive_json(
+            paths.downside_lifecycle_resource_plan_recovery_budget,
+            _downside_lifecycle_resource_plan_recovery_budget_value(
+                downside_lifecycle_resource_plan_recovery_of, job
+            ),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -4032,6 +4177,8 @@ def submit_job(
             paths.instability_channel_decomposition_budget.unlink(missing_ok=True)
         if downside_lifecycle_resource_plan_reserved:
             paths.downside_lifecycle_resource_plan_budget.unlink(missing_ok=True)
+        if downside_lifecycle_resource_plan_recovery_reserved:
+            paths.downside_lifecycle_resource_plan_recovery_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -4093,6 +4240,8 @@ def submit_job(
             paths.instability_channel_decomposition_budget.unlink(missing_ok=True)
         if downside_lifecycle_resource_plan_reserved:
             paths.downside_lifecycle_resource_plan_budget.unlink(missing_ok=True)
+        if downside_lifecycle_resource_plan_recovery_reserved:
+            paths.downside_lifecycle_resource_plan_recovery_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -4109,6 +4258,8 @@ def submit_job(
         result["technical_recovery_of"] = complete_reserve_additional_review_set_recovery_of.job_id
     if stratum_normalized_instability_recovery_of is not None:
         result["technical_recovery_of"] = stratum_normalized_instability_recovery_of.job_id
+    if downside_lifecycle_resource_plan_recovery_of is not None:
+        result["technical_recovery_of"] = downside_lifecycle_resource_plan_recovery_of.job_id
     return result
 
 

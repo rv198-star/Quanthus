@@ -96,6 +96,9 @@ P019_REVIEW = ROOT / "docs/reviews/stage-p019-third-group-portfolio-rebaseline-2
 P019_WORK = ROOT / "docs/work-items/stage-third-group-portfolio-rebaseline.md"
 P020_CONCEPT = ROOT / "config/stage-learning/stage-downside-lifecycle-concept.v1.json"
 P020_RESOURCE = ROOT / "config/stage-learning/stage-downside-lifecycle-resource-plan.v1.json"
+P020_RESOURCE_RECOVERY = (
+    ROOT / "config/stage-learning/stage-downside-lifecycle-resource-plan-recovery.v1.json"
+)
 P020_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-proposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1340,6 +1343,53 @@ def test_stage020b_freezes_fresh_exposure_aware_admission_plan_before_review() -
         "candidate_output",
         "candidate_scoring",
         "primary_stage_output",
+        "preserved_2021_market_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+
+
+def test_stage020b_recovery_only_persists_pre_admission_capacity_shortfall() -> None:
+    value = json.loads(P020_RESOURCE_RECOVERY.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-020-B-R1"
+    assert value["disposition"] == (
+        "AUTHORIZE_ONE_PRE_ADMISSION_CAPACITY_ARTIFACT_RECOVERY"
+    )
+    failed = value["failed_job"]
+    assert failed["job_id"] == "stage_5b87f865e36c4ce0af09f6e9bd4e8daa"
+    assert failed["code_revision"] == "2fd8a71003bdc993943e2f264a6692d3c4198633"
+    assert failed["artifact_published"] is False
+    assert failed["input_readiness_market_read_reached"] is False
+    assert failed["semantic_read_reached"] is False
+    cause = value["root_cause"]
+    assert cause["class"] == "EXPECTED_RESOURCE_SHORTFALL_NOT_PERSISTED"
+    assert cause["sampling_change_required"] is False
+    assert cause["freshness_change_required"] is False
+    authority = value["authority"]
+    assert authority["maximum_technical_recovery_jobs"] == 1
+    for key in (
+        "same_p020_b_config_required",
+        "same_p013_window_exclusion_required",
+        "same_p014_all_read_window_exclusion_required",
+        "same_era_board_cells_required",
+        "same_8x32_quota_required",
+        "metadata_preflight_and_artifact_only_repair",
+    ):
+        assert authority[key] is True
+    for key in (
+        "sampling_change",
+        "freshness_change",
+        "new_year_or_board",
+        "reuse_excluded_window",
+        "whole_identity_burn_down",
+        "input_readiness_market_read_before_preflight_pass",
+        "semantic_market_read",
+        "reference_opinion",
+        "threshold_basis",
+        "candidate_scoring",
         "preserved_2021_market_read",
         "2022_2024_read",
         "2025_read",

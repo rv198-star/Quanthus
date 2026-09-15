@@ -227,6 +227,40 @@ def _empty_plan(config: Mapping[str, Any], disposition: str) -> dict[str, Any]:
     }
 
 
+def _metadata_preflight(
+    *,
+    tokens: Sequence[Mapping[str, Any]],
+    consumed: set[tuple[str, str]],
+    config: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], bool]:
+    cells = tuple(str(value) for value in config["candidate_screen"]["cell_allocation_order"])
+    by_cell: dict[str, list[Mapping[str, Any]]] = {cell: [] for cell in cells}
+    for row in tokens:
+        identity = str(row["security_id"])
+        window_id = str(row["window_id"])
+        if (identity, window_id) in consumed:
+            continue
+        cell = f"{row['era']}/{row['board_family']}"
+        if cell in by_cell:
+            by_cell[cell].append(row)
+    summaries = []
+    all_present = True
+    for cell in cells:
+        rows = by_cell[cell]
+        identities = {str(row["security_id"]) for row in rows}
+        present = bool(rows)
+        all_present &= present
+        summaries.append(
+            {
+                "cell": cell,
+                "metadata_candidate_identity_count": len(identities),
+                "metadata_candidate_window_count": len(rows),
+                "has_any_fresh_exact_window": present,
+            }
+        )
+    return summaries, all_present
+
+
 def run_plan(
     *, config_path: Path, training_root: Path, output_root: Path, code_revision: str
 ) -> dict[str, Any]:
@@ -253,36 +287,65 @@ def run_plan(
     tokens, _windows, source_binding, preserved_ids = _reconstruct_tokens(
         root=root, training_root=training_root, config=config
     )
-    screen_model = {"candidate_screen": config["candidate_screen"]}
-    candidates = freeze_candidate_surface(tokens=tokens, consumed=consumed, model=screen_model)
-    if {str(row["security_id"]) for row in candidates} & preserved_ids:
-        raise DownsideLifecycleResourcePlanError("preserved_identity_in_candidates")
-
+    preflight_summary, preflight_pass = _metadata_preflight(
+        tokens=tokens,
+        consumed=consumed,
+        config=config,
+    )
     config_digest = digest(config)
-    ledger, receipts = _screen_candidates(
-        candidates=candidates,
-        training_root=training_root,
-        node=node,
-        spec_digest=config_digest,
-    )
-    cell_summary, capacity_pass = _cell_summary(
-        ledger, required=int(config["selection"]["reserve_per_cell"])
-    )
-
-    disposition = "PASS_RESOURCE_ADMISSION_AND_EXACT_PLAN_FROZEN"
-    selected: list[dict[str, Any]] = []
-    if capacity_pass:
-        try:
-            selected = select_qualified_plan(ledger, config=config)
-        except DevelopmentResourceQualifiedPlanError as exc:
-            if str(exc).startswith("global_unique_qualified_shortfall:"):
-                disposition = "CLOSED_GLOBAL_IDENTITY_CAPACITY_SHORTFALL"
-            else:
-                raise DownsideLifecycleResourcePlanError(
-                    f"qualified_plan_selection:{exc}"
-                ) from exc
+    admission_executed = False
+    if not preflight_pass:
+        ledger: list[dict[str, Any]] = []
+        receipts: list[dict[str, Any]] = []
+        cell_summary = [
+            {
+                **row,
+                "qualified_unique_identity_count": 0,
+                "qualified_window_count": 0,
+                "required_unique_qualified_identity_count": int(
+                    config["selection"]["reserve_per_cell"]
+                ),
+                "sufficient_for_plan_freeze": False,
+                "admission_executed": False,
+            }
+            for row in preflight_summary
+        ]
+        capacity_pass = False
+        disposition = "CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION"
+        selected: list[dict[str, Any]] = []
     else:
-        disposition = "CLOSED_RESOURCE_ADMISSION_CAPACITY_SHORTFALL"
+        screen_model = {"candidate_screen": config["candidate_screen"]}
+        candidates = freeze_candidate_surface(
+            tokens=tokens,
+            consumed=consumed,
+            model=screen_model,
+        )
+        if {str(row["security_id"]) for row in candidates} & preserved_ids:
+            raise DownsideLifecycleResourcePlanError("preserved_identity_in_candidates")
+        ledger, receipts = _screen_candidates(
+            candidates=candidates,
+            training_root=training_root,
+            node=node,
+            spec_digest=config_digest,
+        )
+        admission_executed = True
+        cell_summary, capacity_pass = _cell_summary(
+            ledger, required=int(config["selection"]["reserve_per_cell"])
+        )
+        disposition = "PASS_RESOURCE_ADMISSION_AND_EXACT_PLAN_FROZEN"
+        selected = []
+        if capacity_pass:
+            try:
+                selected = select_qualified_plan(ledger, config=config)
+            except DevelopmentResourceQualifiedPlanError as exc:
+                if str(exc).startswith("global_unique_qualified_shortfall:"):
+                    disposition = "CLOSED_GLOBAL_IDENTITY_CAPACITY_SHORTFALL"
+                else:
+                    raise DownsideLifecycleResourcePlanError(
+                        f"qualified_plan_selection:{exc}"
+                    ) from exc
+        else:
+            disposition = "CLOSED_RESOURCE_ADMISSION_CAPACITY_SHORTFALL"
 
     if selected:
         cell_counts = Counter(str(row["cell"]) for row in selected)
@@ -308,6 +371,9 @@ def run_plan(
     candidate_payload = {
         "schema_version": config["output"]["candidate_ledger_schema"],
         "candidate_order_frozen_before_input_read": True,
+        "metadata_preflight": preflight_summary,
+        "metadata_preflight_passed": preflight_pass,
+        "admission_executed": admission_executed,
         "rows": ledger,
         "row_count": len(ledger),
         "raw_ohlc_retained": False,
@@ -320,6 +386,9 @@ def run_plan(
         **prior,
         "base_manifest_sha256": source_binding["base_manifest_sha256"],
         "correction_manifest_sha256": source_binding["correction_manifest_sha256"],
+        "metadata_preflight": preflight_summary,
+        "metadata_preflight_passed": preflight_pass,
+        "input_readiness_market_read": admission_executed,
         "window_receipts": receipts,
         "window_receipts_digest": digest(receipts),
         "preserved_2021_identity_count": len(preserved_ids),
@@ -334,8 +403,16 @@ def run_plan(
         "code_revision": code_revision,
         "config_digest": config_digest,
         "disposition": disposition,
-        "candidate_window_count": len(ledger),
-        "candidate_unique_identity_count": len({str(row["security_id"]) for row in ledger}),
+        "candidate_window_count": (
+            len(ledger)
+            if admission_executed
+            else sum(int(row["metadata_candidate_window_count"]) for row in preflight_summary)
+        ),
+        "candidate_unique_identity_count": (
+            len({str(row["security_id"]) for row in ledger})
+            if admission_executed
+            else sum(int(row["metadata_candidate_identity_count"]) for row in preflight_summary)
+        ),
         "qualified_window_count": sum(row["qualified"] is True for row in ledger),
         "qualified_unique_identity_count": len(
             {str(row["security_id"]) for row in ledger if row["qualified"] is True}
@@ -360,7 +437,8 @@ def run_plan(
         "2022_2024_read": False,
         "2025_read": False,
         "ready_for_separate_semantic_review_freeze": bool(selected),
-        "input_readiness_market_read": True,
+        "metadata_preflight_passed": preflight_pass,
+        "input_readiness_market_read": admission_executed,
     }
 
     run_id = "stage-downside-lifecycle-resource-plan-" + datetime.now(timezone.utc).strftime(
@@ -428,10 +506,19 @@ def verify_artifact(path: Path, *, code_revision: str | None = None) -> dict[str
             raise DownsideLifecycleResourcePlanError(f"artifact_shape:{name}")
         payloads[name] = value
 
+    summary = payloads["summary.json"]
     ledger = payloads["candidate-ledger.json"]
     rows = ledger.get("rows")
-    if not isinstance(rows, list) or not rows:
+    preflight = ledger.get("metadata_preflight")
+    if not isinstance(rows, list) or not isinstance(preflight, list) or len(preflight) != 8:
         raise DownsideLifecycleResourcePlanError("ledger_rows")
+    if not rows and (
+        summary.get("disposition")
+        != "CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION"
+        or ledger.get("metadata_preflight_passed") is not False
+        or ledger.get("admission_executed") is not False
+    ):
+        raise DownsideLifecycleResourcePlanError("empty_ledger_disposition")
     allowed = {
         "security_id",
         "security_code",
@@ -449,6 +536,8 @@ def verify_artifact(path: Path, *, code_revision: str | None = None) -> dict[str
     }
     if any(not isinstance(row, Mapping) or set(row) != allowed for row in rows):
         raise DownsideLifecycleResourcePlanError("ledger_row_fields")
+    if rows and ledger.get("admission_executed") is not True:
+        raise DownsideLifecycleResourcePlanError("ledger_admission_state")
     if ledger.get("raw_ohlc_retained") is not False:
         raise DownsideLifecycleResourcePlanError("ledger_raw_ohlc")
 
@@ -470,7 +559,6 @@ def verify_artifact(path: Path, *, code_revision: str | None = None) -> dict[str
     if plan.get("plan_digest") != digest(plan_rows):
         raise DownsideLifecycleResourcePlanError("plan_digest")
 
-    summary = payloads["summary.json"]
     if summary.get("exact_plan_digest") != plan.get("plan_digest"):
         raise DownsideLifecycleResourcePlanError("summary_plan_digest")
     if digest(ledger) != summary.get("candidate_ledger_digest"):

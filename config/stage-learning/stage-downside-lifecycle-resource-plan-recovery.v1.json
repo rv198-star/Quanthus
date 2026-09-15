@@ -1,0 +1,64 @@
+{
+  "schema_version": "quanthus.stage-downside-lifecycle-resource-plan-recovery.v1",
+  "work_item": "P3-STAGE-020-B-R1",
+  "disposition": "AUTHORIZE_ONE_PRE_ADMISSION_CAPACITY_ARTIFACT_RECOVERY",
+  "effective_date": "2026-09-15",
+  "failed_job": {
+    "job_id": "stage_5b87f865e36c4ce0af09f6e9bd4e8daa",
+    "code_revision": "2fd8a71003bdc993943e2f264a6692d3c4198633",
+    "input_digest": "sha256:44393ed89fd205107d7cca679b097cf012456d609502453bb89224027fb660bd",
+    "terminal_state": "failed",
+    "error": "stage_downside_lifecycle_resource_plan_process_failed",
+    "failure_reason": "DevelopmentResourceAdmissionScreenError:candidate_cell_missing",
+    "artifact_published": false,
+    "input_readiness_market_read_reached": false,
+    "semantic_read_reached": false
+  },
+  "root_cause": {
+    "class": "EXPECTED_RESOURCE_SHORTFALL_NOT_PERSISTED",
+    "observed_behavior": "The reused strict P014 freeze_candidate_surface raises candidate_cell_missing when any frozen Era x Board cell has zero remaining metadata candidates after exact-window exclusions.",
+    "required_behavior": "Persist the metadata-only pre-admission capacity shortfall as a governed terminal artifact and stop before any market admission or semantic read.",
+    "sampling_change_required": false,
+    "freshness_change_required": false,
+    "semantic_rule_change_required": false
+  },
+  "bindings": {
+    "original_p020_b_config": {
+      "path": "config/stage-learning/stage-downside-lifecycle-resource-plan.v1.json",
+      "sha256": "sha256:e96cfc62fa63cbdb3629d00fe1744333d0f07326e4a8d93fec37d4c08d8a17c0"
+    },
+    "p020_concept": {
+      "path": "config/stage-learning/stage-downside-lifecycle-concept.v1.json",
+      "sha256": "sha256:031c9fc6f3313afa66bfc2b7c42e6edb9c7c2a3c9573363459ce83f4c0112b15"
+    },
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    }
+  },
+  "authority": {
+    "maximum_technical_recovery_jobs": 1,
+    "same_p020_b_config_required": true,
+    "same_p013_window_exclusion_required": true,
+    "same_p014_all_read_window_exclusion_required": true,
+    "same_era_board_cells_required": true,
+    "same_8x32_quota_required": true,
+    "metadata_preflight_and_artifact_only_repair": true,
+    "sampling_change": false,
+    "freshness_change": false,
+    "new_year_or_board": false,
+    "reuse_excluded_window": false,
+    "whole_identity_burn_down": false,
+    "input_readiness_market_read_before_preflight_pass": false,
+    "semantic_market_read": false,
+    "reference_opinion": false,
+    "threshold_basis": false,
+    "candidate_scoring": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This recovery can only convert the failed pre-admission candidate-cell shortfall into a durable metadata-only resource artifact. It cannot expand or replace resources, reuse excluded windows, change freshness policy, read admission bars before metadata preflight passes, open Stage1/12 semantics, or authorize preserved data."
+}

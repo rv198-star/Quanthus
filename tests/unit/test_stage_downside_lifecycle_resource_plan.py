@@ -148,42 +148,26 @@ def test_capacity_shortfall_publishes_fail_closed_artifact_before_review(
             "correction_manifest_sha256": "sha256:correction",
         }, set()),
     )
+    preflight = [
+        {
+            "cell": cell,
+            "metadata_candidate_identity_count": 0 if index == 0 else 10,
+            "metadata_candidate_window_count": 0 if index == 0 else 20,
+            "has_any_fresh_exact_window": index != 0,
+        }
+        for index, cell in enumerate(cells)
+    ]
+    monkeypatch.setattr(subject, "_metadata_preflight", lambda **kwargs: (preflight, False))
     monkeypatch.setattr(
         subject,
         "freeze_candidate_surface",
-        lambda **kwargs: [{"security_id": "candidate"}],
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("must stop before freeze")),
     )
-    rows = []
-    for index, cell in enumerate(cells):
-        era, board = cell.split("/", 1)
-        rows.append(
-            {
-                "security_id": f"S{index}",
-                "security_code": f"C{index}",
-                "era": era,
-                "board_family": board,
-                "cell": cell,
-                "window_id": f"W{index}",
-                "window_start": "2020-01-01",
-                "window_end": "2020-03-31",
-                "identity_rank": 1,
-                "window_rank": 1,
-                "qualified": True,
-                "reason": "61_SESSION_CONTIGUOUS_INPUT_READY",
-                "source_binding_digest": f"sha256:{index:064x}",
-            }
-        )
-    monkeypatch.setattr(subject, "_screen_candidates", lambda **kwargs: (rows, []))
-    cell_summary = [
-        {
-            "cell": cell,
-            "qualified_unique_identity_count": 1,
-            "required_unique_qualified_identity_count": 32,
-            "sufficient_for_plan_freeze": False,
-        }
-        for cell in cells
-    ]
-    monkeypatch.setattr(subject, "_cell_summary", lambda *args, **kwargs: (cell_summary, False))
+    monkeypatch.setattr(
+        subject,
+        "_screen_candidates",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("must stop before admission")),
+    )
     monkeypatch.setattr(
         subject,
         "select_qualified_plan",
@@ -196,10 +180,10 @@ def test_capacity_shortfall_publishes_fail_closed_artifact_before_review(
         output_root=tmp_path / "output",
         code_revision=REVISION,
     )
-    assert result["disposition"] == "CLOSED_RESOURCE_ADMISSION_CAPACITY_SHORTFALL"
+    assert result["disposition"] == "CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION"
     assert result["exact_plan_available"] is False
     assert result["ready_for_separate_semantic_review_freeze"] is False
-    assert result["input_readiness_market_read"] is True
+    assert result["input_readiness_market_read"] is False
     assert result["preserved_2021_market_read"] is False
     verified = subject.verify_artifact(Path(result["run_root"]), code_revision=REVISION)
     assert verified["verified"] is True

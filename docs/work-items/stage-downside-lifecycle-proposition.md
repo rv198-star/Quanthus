@@ -5,6 +5,8 @@ Delivery gate: P020-C ready for separate capacity-limited preregistration only
 
 Parent: `stage-third-group-portfolio-rebaseline.md`  
 Machine concept: `../../config/stage-learning/stage-downside-lifecycle-concept.v1.json`  
+P020-C contract: `../../config/stage-learning/stage-downside-lifecycle-blind-reference.v1.json`  
+P020-C route: `stage-downside-lifecycle-blind-reference.md`  
 Fact substrate: `../design/structure-trend-evolution-facts.md`
 
 ## Goal
@@ -25,7 +27,7 @@ Return to the P3-STAGE-003 third-group plan after parking active Stage-0 optimiz
 | --- | --- | --- | --- |
 | P3-STAGE-020-A | Freeze proposition/nesting/reference semantics | P3-STAGE-019 | closed semantic freeze; no market/result access |
 | P3-STAGE-020-B | Freeze Era×Board exposure/admission capacity and exact development resource plan | P3-STAGE-020-A | closed `CLOSED_FRESH_WINDOW_CAPACITY_SHORTFALL_BEFORE_ADMISSION`; exact R1 artifact shows both STAR cells have zero remaining metadata windows under the frozen rule that excludes every P014 admission-read window; no admission bars or Stage1/12 semantics were read; `../../config/stage-learning/stage-downside-lifecycle-resource-result.v1.json` |
-| P3-STAGE-020-C | Build candidate-blind T-only review packets and seal context/nested-condition references | P3-STAGE-020-B, P3-STAGE-024 | ready for separate preregistration only; exact P024 187-row / 179-cluster panel is final resource ceiling, early STAR is a 19-row capacity-limited audit/stress stratum, no replacement/new resource read |
+| P3-STAGE-020-C | Build candidate-blind T-only review packets and seal context/nested-condition references | P3-STAGE-020-B, P3-STAGE-024 | preregistration frozen; packet preparation ready, opinion collection waits for immutable packet artifact; exact P024 187-row / 179-cluster panel is final resource ceiling, early STAR is a 19-row capacity-limited audit/stress stratum, no replacement/new resource read |
 | P3-STAGE-020-D | Freeze finite candidate topology and independently score context / nested condition | P3-STAGE-020-C | blocked; no top-1 primary-stage compression |
 | P3-STAGE-020-E | Four-party review and closeout | P3-STAGE-020-D | blocked; any preserved evaluation requires a separate later gate |
 

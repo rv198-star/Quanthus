@@ -504,9 +504,13 @@ nodes.
   remain clusters rather than new independent evidence; no P023 readiness was rerun and no Stage1/12
   or protected partition was read. The contract-required four-party portfolio review does not rewrite
   P024 as PASS and opens no P025. It ends resource/admission optimization, freezes the exact 187/179
-  panel as P020's final development-resource ceiling, retains early STAR as a 19-row capacity-limited
-  semantic stress/audit stratum, and opens only a separate P020-C blind-reference preregistration.
-  Preserved 2021/2022-2024/2025 remain unopened.
+  panel as P020's final development-resource ceiling and retains early STAR as a 19-row capacity-limited
+  semantic stress/audit stratum. P020-C is now separately preregistered before any Stage1/12 opinion:
+  every frozen row must be attempted as a candidate/future-blind T-only Trend-Fact packet; short-term
+  and fund roles are isolated, agreement is required for definite references, and reference sufficiency
+  is evaluated on economic-identity clusters using the established 20-positive / 20-negative floors
+  rather than the 187 raw rows. Packet preparation is the only open next action. Preserved
+  2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -529,6 +533,7 @@ nodes.
   `reviews/stage-p023-realized-identity-admission-review-20260916.md`,
   `work-items/stage-clustered-identity-admission.md`,
   `acceptance/stage-clustered-identity-admission-engineering-20260916.md`,
+  `work-items/stage-downside-lifecycle-blind-reference.md`,
   `reviews/stage-p024-clustered-identity-admission-review-20260916.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

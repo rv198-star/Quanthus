@@ -1,0 +1,193 @@
+{
+  "schema_version": "quanthus.stage-downside-lifecycle-blind-reference.v1",
+  "work_item": "P3-STAGE-020-C",
+  "state": "PREREGISTERED_CAPACITY_LIMITED_BLIND_REFERENCE_BEFORE_SEMANTIC_READ",
+  "effective_date": "2026-09-16",
+  "purpose": "Bind the exact immutable P024 187-row / 179-economic-identity-cluster admission-ready panel, prepare candidate-blind future-blind T-only Trend Evolution review packets, and seal independent Stage12 downside-context and nested Stage1 deceleration/stabilization references under frozen cluster-aware sufficiency gates before any candidate scoring.",
+  "bindings": {
+    "p024_result": {
+      "path": "config/stage-learning/stage-clustered-identity-admission-result.v1.json",
+      "sha256": "sha256:355be17b6ccf4a3464bac29d56f8ce98211b6e4ec2d2ab1746642c51b063b470"
+    },
+    "p024_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_81bd8645a33d4ae3bb84f64f9a7e7d57/stage-clustered-identity-admission-20260915T193239Z",
+      "job_id": "stage_81bd8645a33d4ae3bb84f64f9a7e7d57",
+      "code_revision": "c4e7a2c234f9acb4057fe2f641b159aa9eda4df8",
+      "manifest_sha256": "sha256:f853f1eb0be0d6938e34389ddd955a1fc7ee4017a6e7187714757fa80b6a4318",
+      "clustered_plan_digest": "sha256:a6b99a0337bc3897948977b1ab7bda7a47441acd6909a6f519529808b66c9329"
+    },
+    "p020_semantic_concept": {
+      "path": "config/stage-learning/stage-downside-lifecycle-concept.v1.json",
+      "sha256": "sha256:031c9fc6f3313afa66bfc2b7c42e6edb9c7c2a3c9573363459ce83f4c0112b15"
+    },
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    },
+    "trend_fact_contract": {
+      "path": "config/structure-trend-evolution.v1.json",
+      "sha256": "sha256:1e859d371329cc4c97ab8abd4605bd491535d58e1761e066ce497641d5764c33"
+    },
+    "trend_fact_design": {
+      "path": "docs/design/structure-trend-evolution-facts.md",
+      "sha256": "sha256:ee9aa37d349f536c624d2cd58d4271d0f977b7fbc423436fe621e01c2dc60fdc"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    }
+  },
+  "resource_panel": {
+    "source": "exact_immutable_p024_clustered_plan",
+    "row_count": 187,
+    "unique_identity_cluster_count": 179,
+    "repeated_identity_cluster_count": 8,
+    "independent_identity_evidence_count": 179,
+    "clustered_plan_digest": "sha256:a6b99a0337bc3897948977b1ab7bda7a47441acd6909a6f519529808b66c9329",
+    "repeated_rows_not_independent": true,
+    "replacement_or_resource_expansion": false,
+    "additional_admission_read": false,
+    "cell_counts": {
+      "PRE_STAR/CHINEXT": 24,
+      "PRE_STAR/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/STAR": 24,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 24,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 19
+    },
+    "capacity_limited_stratum": "STAR_PRE_CHINEXT_20PCT/STAR",
+    "capacity_limited_stratum_role": "SEMANTIC_STRESS_AND_AUDIT_ONLY",
+    "market_prevalence_claim": false,
+    "equal_cell_precision_claim": false
+  },
+  "packet_contract": {
+    "attempt_every_panel_row": true,
+    "case_id": "opaque_digest_bound_to_clustered_plan_and_exact_identity_window",
+    "security_identity_visible_to_reviewer": false,
+    "identity_cluster_visible_to_reviewer": false,
+    "future_rows_visible": false,
+    "candidate_output_visible": false,
+    "threshold_values_visible": false,
+    "protected_partition_visible": false,
+    "reviewer_visible_context": [
+      "case_id",
+      "knowledge_cutoff",
+      "era",
+      "board_family",
+      "trend_fact_values",
+      "fact_availability_reasons"
+    ],
+    "allowed_fact_concepts": [
+      "structure.geometry.window-return",
+      "structure.geometry.directional-efficiency",
+      "structure.geometry.return-velocity",
+      "structure.geometry.velocity-delta",
+      "structure.geometry.range-position",
+      "structure.geometry.drawdown-from-window-high",
+      "structure.geometry.rebound-from-window-low"
+    ],
+    "required_windows": {
+      "structure.geometry.window-return": [5, 20, 60],
+      "structure.geometry.directional-efficiency": [5, 20],
+      "structure.geometry.return-velocity": [5, 20],
+      "structure.geometry.velocity-delta": [5, 20],
+      "structure.geometry.range-position": [60],
+      "structure.geometry.drawdown-from-window-high": [60],
+      "structure.geometry.rebound-from-window-low": [60]
+    },
+    "raw_ohlc_published_or_retained": false,
+    "packet_failure_disposition": "UNAVAILABLE_NO_REPLACEMENT",
+    "all_rows_remain_in_denominator": true
+  },
+  "review_protocol": {
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "same_origin_must_be_disclosed": true,
+    "roles_isolated_from_each_other": true,
+    "review_all_available_packets": true,
+    "stage12_question_first": true,
+    "stage12_values": ["TRUE", "FALSE", "UNKNOWN"],
+    "stage1_values": ["TRUE", "FALSE", "UNKNOWN", "NOT_APPLICABLE"],
+    "stage1_requires_reviewer_stage12_true": true,
+    "reason_required": true,
+    "maximum_reason_characters": 2000,
+    "candidate_blind": true,
+    "threshold_blind": true,
+    "future_blind": true,
+    "no_top1_primary_stage": true,
+    "opinion_collection_before_packet_freeze": false
+  },
+  "resolution_contract": {
+    "stage12_true": "both_roles_TRUE",
+    "stage12_false": "both_roles_FALSE",
+    "stage12_other": "AMBIGUOUS",
+    "stage1_when_resolved_stage12_false": "NOT_APPLICABLE",
+    "stage1_when_resolved_stage12_ambiguous": "AMBIGUOUS",
+    "stage1_true_when_resolved_stage12_true": "both_roles_TRUE",
+    "stage1_false_when_resolved_stage12_true": "both_roles_FALSE",
+    "stage1_other_when_resolved_stage12_true": "AMBIGUOUS",
+    "unknown_is_not_negative": true,
+    "coexistence_stage12_true_stage1_true_is_legal": true
+  },
+  "reference_sufficiency_gate": {
+    "independence_unit": "economic_identity_cluster",
+    "row_count_is_descriptive_not_independent": true,
+    "minimum_stage12_definite_clusters": 80,
+    "minimum_stage12_definite_positive_clusters": 20,
+    "minimum_stage12_definite_negative_clusters": 20,
+    "maximum_stage12_unavailable_or_unjudgeable_cluster_rate": 0.15,
+    "require_stage12_definite_reference_in_all_eight_cells": true,
+    "minimum_stage1_applicable_definite_clusters": 40,
+    "minimum_stage1_definite_positive_clusters": 20,
+    "minimum_stage1_definite_negative_clusters": 20,
+    "maximum_stage1_unavailable_or_unjudgeable_applicable_cluster_rate": 0.15,
+    "gate_basis": "reuse_second_group_development_reference_floor_20_positive_20_negative_and_15pct_unjudgeable_ceiling_with_cluster_independence",
+    "gate_change_after_opinions": false,
+    "post_opinion_resource_replacement": false,
+    "pass_disposition": "PASS_CAPACITY_LIMITED_BLIND_REFERENCE_SUFFICIENCY",
+    "fail_disposition": "CLOSED_BLIND_REFERENCE_INSUFFICIENT_NO_RESOURCE_REOPEN"
+  },
+  "aggregation": {
+    "primary_independence_denominator": "unique_economic_identity_clusters",
+    "row_level_rates": "descriptive_only",
+    "mandatory_diagnostics": [
+      "per-era",
+      "per-board-family",
+      "per-era-board-cell",
+      "row-count-versus-cluster-count",
+      "capacity-limited-early-STAR",
+      "repeated-cross-era-cluster"
+    ],
+    "future_uncertainty_resampling_unit": "economic_identity_cluster"
+  },
+  "runtime": {
+    "maximum_packet_jobs": 1,
+    "automatic_packet_retries": 0,
+    "worker_wall_seconds": 3600
+  },
+  "output": {
+    "packet_schema": "quanthus.stage-downside-lifecycle-review-packet.v1",
+    "packet_manifest_schema": "quanthus.stage-downside-lifecycle-review-packet-manifest.v1",
+    "source_binding_schema": "quanthus.stage-downside-lifecycle-reference-source-binding.v1",
+    "packet_artifact_schema": "quanthus.stage-downside-lifecycle-review-packet-artifact.v1",
+    "sealed_ledger_schema": "quanthus.stage-downside-lifecycle-reference-ledger.v1",
+    "reference_result_schema": "quanthus.stage-downside-lifecycle-reference-result.v1"
+  },
+  "authority": {
+    "exact_panel_semantic_packet_market_read": true,
+    "raw_ohlc_publish_or_retain": false,
+    "review_opinion_collection_before_packet_freeze": false,
+    "candidate_or_threshold_read": false,
+    "candidate_scoring": false,
+    "primary_stage_compression": false,
+    "labelcard_registration": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P020-C can establish only whether the exact P024 capacity-limited development panel supplies sufficient same-origin synthetic blind references for the Stage12 downside-context and nested Stage1 deceleration/stabilization propositions. It cannot qualify a candidate rule, estimate market prevalence, claim 187 independent observations, open preserved evaluation, authorize strategy use, or trade."
+}

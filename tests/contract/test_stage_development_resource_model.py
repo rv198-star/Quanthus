@@ -103,6 +103,8 @@ P020_RESOURCE_RESULT = (
     ROOT / "config/stage-learning/stage-downside-lifecycle-resource-result.v1.json"
 )
 P020_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-proposition.md"
+P020_C_REFERENCE = ROOT / "config/stage-learning/stage-downside-lifecycle-blind-reference.v1.json"
+P020_C_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-blind-reference.md"
 P021_TAXONOMY = ROOT / "config/stage-learning/stage-admission-exposure-taxonomy.v1.json"
 P021_CAPACITY = ROOT / "config/stage-learning/stage-admission-exposure-capacity.v1.json"
 P021_RESULT = ROOT / "config/stage-learning/stage-admission-exposure-capacity-result.v1.json"
@@ -1870,6 +1872,89 @@ def test_stage024_closes_no_pass_and_freezes_capacity_limited_semantic_successor
         "OPEN_SEPARATE_CAPACITY_LIMITED_BLIND_REFERENCE_PREREGISTRATION"
     )
     assert P024_REVIEW.is_file()
+
+
+def test_p020c_freezes_capacity_limited_cluster_aware_blind_reference_protocol() -> None:
+    value = json.loads(P020_C_REFERENCE.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-020-C"
+    assert value["state"] == (
+        "PREREGISTERED_CAPACITY_LIMITED_BLIND_REFERENCE_BEFORE_SEMANTIC_READ"
+    )
+    panel = value["resource_panel"]
+    assert panel["row_count"] == 187
+    assert panel["unique_identity_cluster_count"] == 179
+    assert panel["repeated_identity_cluster_count"] == 8
+    assert panel["independent_identity_evidence_count"] == 179
+    assert panel["repeated_rows_not_independent"] is True
+    assert panel["replacement_or_resource_expansion"] is False
+    assert panel["additional_admission_read"] is False
+    assert panel["cell_counts"]["STAR_PRE_CHINEXT_20PCT/STAR"] == 19
+    assert panel["capacity_limited_stratum_role"] == "SEMANTIC_STRESS_AND_AUDIT_ONLY"
+
+    packet = value["packet_contract"]
+    assert packet["attempt_every_panel_row"] is True
+    assert packet["security_identity_visible_to_reviewer"] is False
+    assert packet["identity_cluster_visible_to_reviewer"] is False
+    assert packet["future_rows_visible"] is False
+    assert packet["candidate_output_visible"] is False
+    assert packet["threshold_values_visible"] is False
+    assert packet["protected_partition_visible"] is False
+    assert packet["raw_ohlc_published_or_retained"] is False
+    assert packet["packet_failure_disposition"] == "UNAVAILABLE_NO_REPLACEMENT"
+    assert packet["all_rows_remain_in_denominator"] is True
+
+    review = value["review_protocol"]
+    assert review["roles"] == ["short_term", "fund"]
+    assert review["same_origin_simulation"] is True
+    assert review["same_origin_must_be_disclosed"] is True
+    assert review["roles_isolated_from_each_other"] is True
+    assert review["stage12_question_first"] is True
+    assert review["stage1_requires_reviewer_stage12_true"] is True
+    assert review["candidate_blind"] is True
+    assert review["threshold_blind"] is True
+    assert review["future_blind"] is True
+    assert review["opinion_collection_before_packet_freeze"] is False
+
+    resolution = value["resolution_contract"]
+    assert resolution["stage12_true"] == "both_roles_TRUE"
+    assert resolution["stage12_false"] == "both_roles_FALSE"
+    assert resolution["stage12_other"] == "AMBIGUOUS"
+    assert resolution["stage1_when_resolved_stage12_false"] == "NOT_APPLICABLE"
+    assert resolution["unknown_is_not_negative"] is True
+    assert resolution["coexistence_stage12_true_stage1_true_is_legal"] is True
+
+    gate = value["reference_sufficiency_gate"]
+    assert gate["independence_unit"] == "economic_identity_cluster"
+    assert gate["row_count_is_descriptive_not_independent"] is True
+    assert gate["minimum_stage12_definite_clusters"] == 80
+    assert gate["minimum_stage12_definite_positive_clusters"] == 20
+    assert gate["minimum_stage12_definite_negative_clusters"] == 20
+    assert gate["maximum_stage12_unavailable_or_unjudgeable_cluster_rate"] == 0.15
+    assert gate["require_stage12_definite_reference_in_all_eight_cells"] is True
+    assert gate["minimum_stage1_applicable_definite_clusters"] == 40
+    assert gate["minimum_stage1_definite_positive_clusters"] == 20
+    assert gate["minimum_stage1_definite_negative_clusters"] == 20
+    assert gate["maximum_stage1_unavailable_or_unjudgeable_applicable_cluster_rate"] == 0.15
+    assert gate["gate_change_after_opinions"] is False
+    assert gate["post_opinion_resource_replacement"] is False
+
+    authority = value["authority"]
+    assert authority["exact_panel_semantic_packet_market_read"] is True
+    for key in (
+        "raw_ohlc_publish_or_retain",
+        "review_opinion_collection_before_packet_freeze",
+        "candidate_or_threshold_read",
+        "candidate_scoring",
+        "primary_stage_compression",
+        "labelcard_registration",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+    assert P020_C_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

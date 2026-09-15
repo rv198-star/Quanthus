@@ -1,0 +1,133 @@
+{
+  "schema_version": "quanthus.stage-downside-lifecycle-resource-plan.v1",
+  "work_item": "P3-STAGE-020-B",
+  "state": "PREREGISTERED_RESOURCE_ADMISSION_AND_EXACT_PLAN_BEFORE_SEMANTIC_REVIEW",
+  "effective_date": "2026-09-15",
+  "purpose": "Freeze a fresh development resource panel for the Stage12-context / nested-Stage1 route by reusing the exposure-aware Era x Board model, excluding every exact window already consumed by P013 or read by P014 admission, screening only 61-session input readiness, then freezing the same pre-result 8x32 / 24+8 semantic stress quota before any Stage1/12 review or threshold work.",
+  "bindings": {
+    "p020_concept": {
+      "path": "config/stage-learning/stage-downside-lifecycle-concept.v1.json",
+      "sha256": "sha256:031c9fc6f3313afa66bfc2b7c42e6edb9c7c2a3c9573363459ce83f4c0112b15"
+    },
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    },
+    "capacity_census_contract": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census.v1.json",
+      "sha256": "sha256:fbeefb8b4cbce35aa1f8c715b8e61dfa857e4ba0b72fe047c5c5d24d59629e25"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    },
+    "p013_exact_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-plan-result.v1.json",
+      "sha256": "sha256:1729ce20bf1ddf6c330025d70d96b046964e7d0b552755834afaa68d3aa20828"
+    },
+    "p013_exact_plan_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_060f6edc80774b6b802e56b6c21025bc/stage-development-resource-plan-20260914T095217Z",
+      "job_id": "stage_060f6edc80774b6b802e56b6c21025bc",
+      "code_revision": "2cd26b00a90402c7be3256dfb3d341dc3b9abe18",
+      "manifest_sha256": "sha256:853ade679e1107db238ec68daa8a26755e1d48ef334b9b85d525a8fcd0a3adef",
+      "plan_digest": "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371"
+    },
+    "p014_admission_result": {
+      "path": "config/stage-learning/stage-development-resource-admission-result.v1.json",
+      "sha256": "sha256:16f58ce61e4fd8cec8f50496d4b7fcad4b8680d153f73c540a354e1e3c8ae928"
+    },
+    "p014_admission_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_bcaf8263cb724a2798d250909c42331f/stage-development-resource-admission-20260914T114854Z",
+      "job_id": "stage_bcaf8263cb724a2798d250909c42331f",
+      "code_revision": "99b1e25f1dde36ec68d31bdcfffc61d39acf3ce0",
+      "manifest_sha256": "sha256:c21cb8ff0c5340d6afb22942f30f1845bfb3c2371b6b9b79e1baff8f4f3004db"
+    }
+  },
+  "consumption_ceiling": {
+    "exclude_p013_exact_plan_windows": true,
+    "exclude_all_p014_admission_read_windows": true,
+    "whole_identity_burn_down": false,
+    "same_identity_disjoint_window_reuse_allowed": true,
+    "preserved_2021_identity_global_exclusion": true,
+    "2022_2024_closed": true,
+    "2025_closed": true
+  },
+  "candidate_screen": {
+    "identity_seed": "p020-downside-lifecycle-v1|identity",
+    "window_seed": "p020-downside-lifecycle-v1|window",
+    "maximum_candidate_identities_per_cell": 256,
+    "maximum_windows_per_identity": 4,
+    "cell_allocation_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "candidate_order_uses_market_values": false,
+    "candidate_order_uses_semantic_results": false
+  },
+  "admission_contract": {
+    "required_sessions": 61,
+    "qualified_reason": "61_SESSION_CONTIGUOUS_INPUT_READY",
+    "screen_only_input_readiness": true,
+    "raw_ohlc_published": false,
+    "raw_ohlc_retained": false,
+    "structure_fact_build": false,
+    "semantic_label_or_reference_read": false,
+    "threshold_or_candidate_read": false
+  },
+  "selection": {
+    "cell_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "reserve_per_cell": 32,
+    "primary_per_cell": 24,
+    "fallback_per_cell": 8,
+    "total_rows": 256,
+    "global_identity_unique": true,
+    "cell_selection": "first_32_not_already_used_global_identities_by_frozen_identity_rank",
+    "role_assignment": "plan_slots_1_24_primary_25_32_fallback",
+    "cross_cell_fill": false,
+    "post_result_replacement": false,
+    "on_any_cell_global_unique_shortfall": "STOP_BEFORE_SEMANTIC_REVIEW"
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 3600
+  },
+  "authority": {
+    "input_readiness_market_read": true,
+    "semantic_market_read": false,
+    "structure_fact_build": false,
+    "reference_opinion": false,
+    "threshold_basis": false,
+    "candidate_output": false,
+    "candidate_scoring": false,
+    "primary_stage_output": false,
+    "preserved_2021_market_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "output": {
+    "artifact_schema": "quanthus.stage-downside-lifecycle-resource-plan-artifact.v1",
+    "candidate_ledger_schema": "quanthus.stage-downside-lifecycle-admission-ledger.v1",
+    "plan_schema": "quanthus.stage-downside-lifecycle-exact-plan.v1",
+    "source_binding_schema": "quanthus.stage-downside-lifecycle-resource-source-binding.v1",
+    "summary_schema": "quanthus.stage-downside-lifecycle-resource-summary.v1"
+  },
+  "claim_ceiling": "P020-B can establish only deterministic input-ready development resource capacity and an exact balanced plan for later candidate-blind Stage1/12 review. It does not establish semantic prevalence, reference sufficiency, thresholds, candidate quality, primary-stage arbitration, preserved validity, economic value or trading authority."
+}

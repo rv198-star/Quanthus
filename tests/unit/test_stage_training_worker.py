@@ -27,6 +27,7 @@ from quanthus.stage_learning.worker import (
     STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
+    STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
     STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
     STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
     STAGE_ORDER_RULE_PREPARE_JOB,
@@ -253,6 +254,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p016_b_failure"] is None
     assert result["recent_p017_b_failure"] is None
     assert result["recent_p018_b_failure"] is None
+    assert result["recent_p020_b_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
@@ -266,6 +268,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_COMBINED_ATOMIC_SCORING_JOB,
         STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB,
         STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
+        STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -304,6 +307,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         (STAGE_COMBINED_ATOMIC_SCORING_JOB, "recent_p016_b_failure"),
         (STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB, "recent_p017_b_failure"),
         (STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB, "recent_p018_b_failure"),
+        (STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB, "recent_p020_b_failure"),
     ),
 )
 def test_doctor_exposes_only_bounded_recent_failure_tail(
@@ -452,6 +456,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_COMBINED_ATOMIC_SCORING_JOB,
         STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB,
         STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
+        STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -1246,6 +1251,35 @@ def test_instability_channel_decomposition_is_one_shot_and_idempotent(
             worker_paths,
             code_revision="b" * 40,
             kind=STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
+        )
+
+
+def test_downside_lifecycle_resource_plan_is_one_shot_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
+    )
+    assert submitted["kind"] == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/stage-downside-lifecycle-resource-plan.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB]["wall_seconds"] == 3600
+    assert worker_paths.downside_lifecycle_resource_plan_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
         )
 
 

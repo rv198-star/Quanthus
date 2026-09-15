@@ -95,6 +95,7 @@ P019_REBASELINE = ROOT / "config/stage-learning/stage-third-group-portfolio-reba
 P019_REVIEW = ROOT / "docs/reviews/stage-p019-third-group-portfolio-rebaseline-20260915.md"
 P019_WORK = ROOT / "docs/work-items/stage-third-group-portfolio-rebaseline.md"
 P020_CONCEPT = ROOT / "config/stage-learning/stage-downside-lifecycle-concept.v1.json"
+P020_RESOURCE = ROOT / "config/stage-learning/stage-downside-lifecycle-resource-plan.v1.json"
 P020_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-proposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1297,6 +1298,55 @@ def test_stage020_freezes_downside_context_and_nested_stabilization_before_searc
     assert authority["preserved_2021_read"] is False
     assert authority["2025_read"] is False
     assert P020_WORK.is_file()
+
+
+def test_stage020b_freezes_fresh_exposure_aware_admission_plan_before_review() -> None:
+    value = json.loads(P020_RESOURCE.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-020-B"
+    assert value["state"] == (
+        "PREREGISTERED_RESOURCE_ADMISSION_AND_EXACT_PLAN_BEFORE_SEMANTIC_REVIEW"
+    )
+    consumed = value["consumption_ceiling"]
+    assert consumed["exclude_p013_exact_plan_windows"] is True
+    assert consumed["exclude_all_p014_admission_read_windows"] is True
+    assert consumed["whole_identity_burn_down"] is False
+    assert consumed["same_identity_disjoint_window_reuse_allowed"] is True
+    assert consumed["preserved_2021_identity_global_exclusion"] is True
+    screen = value["candidate_screen"]
+    assert screen["maximum_candidate_identities_per_cell"] == 256
+    assert screen["maximum_windows_per_identity"] == 4
+    assert screen["candidate_order_uses_market_values"] is False
+    assert screen["candidate_order_uses_semantic_results"] is False
+    admission = value["admission_contract"]
+    assert admission["required_sessions"] == 61
+    assert admission["screen_only_input_readiness"] is True
+    assert admission["raw_ohlc_published"] is False
+    assert admission["semantic_label_or_reference_read"] is False
+    selection = value["selection"]
+    assert selection["reserve_per_cell"] == 32
+    assert selection["primary_per_cell"] == 24
+    assert selection["fallback_per_cell"] == 8
+    assert selection["total_rows"] == 256
+    assert selection["global_identity_unique"] is True
+    assert selection["cross_cell_fill"] is False
+    assert selection["post_result_replacement"] is False
+    authority = value["authority"]
+    assert authority["input_readiness_market_read"] is True
+    for key in (
+        "semantic_market_read",
+        "structure_fact_build",
+        "reference_opinion",
+        "threshold_basis",
+        "candidate_output",
+        "candidate_scoring",
+        "primary_stage_output",
+        "preserved_2021_market_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

@@ -23,8 +23,8 @@ Return to the P3-STAGE-003 third-group plan after parking active Stage-0 optimiz
 
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
-| P3-STAGE-020-A | Freeze proposition/nesting/reference semantics | P3-STAGE-019 | active; no market/result access |
-| P3-STAGE-020-B | Freeze Era×Board exposure/admission capacity and exact development resource plan | P3-STAGE-020-A | metadata/admission only; no semantic review yet |
+| P3-STAGE-020-A | Freeze proposition/nesting/reference semantics | P3-STAGE-019 | closed semantic freeze; no market/result access |
+| P3-STAGE-020-B | Freeze Era×Board exposure/admission capacity and exact development resource plan | P3-STAGE-020-A | ready `PASS_ENGINEERING_READY_FOR_ONE_DOWNSIDE_LIFECYCLE_RESOURCE_JOB`; one admission-only Job, no semantic review yet; `../acceptance/stage-downside-lifecycle-resource-engineering-20260915.md` |
 | P3-STAGE-020-C | Build candidate-blind T-only review packets and seal context/nested-condition references | P3-STAGE-020-B | blocked until B passes |
 | P3-STAGE-020-D | Freeze finite candidate topology and independently score context / nested condition | P3-STAGE-020-C | blocked; no top-1 primary-stage compression |
 | P3-STAGE-020-E | Four-party review and closeout | P3-STAGE-020-D | blocked; any preserved evaluation requires a separate later gate |

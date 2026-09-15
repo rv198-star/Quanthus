@@ -87,6 +87,9 @@ STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB = (
 STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB = (
     "quanthus.stage-instability-channel-decomposition.v1"
 )
+STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB = (
+    "quanthus.stage-downside-lifecycle-resource-plan.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -151,6 +154,9 @@ STRATUM_NORMALIZED_INSTABILITY_RECOVERY_BUDGET_SCHEMA = (
 )
 INSTABILITY_CHANNEL_DECOMPOSITION_BUDGET_SCHEMA = (
     "quanthus.stage-instability-channel-decomposition-budget.v1"
+)
+DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_BUDGET_SCHEMA = (
+    "quanthus.stage-downside-lifecycle-resource-plan-budget.v1"
 )
 STRATUM_NORMALIZED_INSTABILITY_RECOVERY_AUTH = (
     "config/stage-learning/stage-stratum-normalized-instability-recovery.v1.json"
@@ -390,6 +396,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-instability-channel-decomposition-*",
         "process_error": "stage_instability_channel_decomposition_process_failed",
         "wall_seconds": 900,
+    },
+    STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB: {
+        "config": "config/stage-learning/stage-downside-lifecycle-resource-plan.v1.json",
+        "module": "quanthus.stage_learning.downside_lifecycle_resource_plan",
+        "artifact_glob": "stage-downside-lifecycle-resource-plan-*",
+        "process_error": "stage_downside_lifecycle_resource_plan_process_failed",
+        "wall_seconds": 3600,
     },
 }
 
@@ -655,6 +668,10 @@ class StageWorkerPaths:
     @property
     def instability_channel_decomposition_budget(self) -> Path:
         return self.control_root / "instability-channel-decomposition-budget.json"
+
+    @property
+    def downside_lifecycle_resource_plan_budget(self) -> Path:
+        return self.control_root / "downside-lifecycle-resource-plan-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -2125,6 +2142,43 @@ def _existing_instability_channel_decomposition_submission(
     return _idempotent_stage_submission(paths, job)
 
 
+def _downside_lifecycle_resource_plan_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-020-B",
+        "phase": "DOWNSIDE_LIFECYCLE_RESOURCE_ADMISSION_AND_PLAN",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_downside_lifecycle_resource_plan_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.downside_lifecycle_resource_plan_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "downside lifecycle resource plan budget")
+    if (
+        marker.get("schema_version") != DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-020-B"
+        or marker.get("phase") != "DOWNSIDE_LIFECYCLE_RESOURCE_ADMISSION_AND_PLAN"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("downside lifecycle resource plan budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("downside lifecycle resource plan budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "downside lifecycle resource plan has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -3204,6 +3258,28 @@ class StageWorker:
                 "2022_2024_read": verified.get("2022_2024_read"),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB:
+            result["downside_lifecycle_resource_plan"] = {
+                "disposition": verified.get("disposition"),
+                "candidate_window_count": verified.get("candidate_window_count"),
+                "qualified_window_count": verified.get("qualified_window_count"),
+                "cell_summary": verified.get("cell_summary"),
+                "all_cells_have_required_qualified_capacity": verified.get(
+                    "all_cells_have_required_qualified_capacity"
+                ),
+                "exact_plan_available": verified.get("exact_plan_available"),
+                "exact_plan_row_count": verified.get("exact_plan_row_count"),
+                "exact_plan_primary_count": verified.get("exact_plan_primary_count"),
+                "exact_plan_fallback_count": verified.get("exact_plan_fallback_count"),
+                "exact_plan_digest": verified.get("exact_plan_digest"),
+                "ready_for_separate_semantic_review_freeze": verified.get(
+                    "ready_for_separate_semantic_review_freeze"
+                ),
+                "input_readiness_market_read": verified.get("input_readiness_market_read"),
+                "preserved_2021_market_read": verified.get("preserved_2021_market_read"),
+                "2022_2024_read": verified.get("2022_2024_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB:
             result["atomic_proposition_successor_d1"] = {
                 "fresh_pool_size": verified.get("fresh_pool_size"),
@@ -3644,6 +3720,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB:
+        existing = _existing_downside_lifecycle_resource_plan_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -3729,6 +3811,9 @@ def submit_job(
     )
     instability_channel_decomposition_reserved = (
         job.kind == STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB
+    )
+    downside_lifecycle_resource_plan_reserved = (
+        job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -3876,6 +3961,11 @@ def submit_job(
             paths.instability_channel_decomposition_budget,
             _instability_channel_decomposition_budget_value(job),
         )
+    if downside_lifecycle_resource_plan_reserved:
+        _exclusive_json(
+            paths.downside_lifecycle_resource_plan_budget,
+            _downside_lifecycle_resource_plan_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -3940,6 +4030,8 @@ def submit_job(
             paths.stratum_normalized_instability_recovery_budget.unlink(missing_ok=True)
         if instability_channel_decomposition_reserved:
             paths.instability_channel_decomposition_budget.unlink(missing_ok=True)
+        if downside_lifecycle_resource_plan_reserved:
+            paths.downside_lifecycle_resource_plan_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -3999,6 +4091,8 @@ def submit_job(
             paths.stratum_normalized_instability_recovery_budget.unlink(missing_ok=True)
         if instability_channel_decomposition_reserved:
             paths.instability_channel_decomposition_budget.unlink(missing_ok=True)
+        if downside_lifecycle_resource_plan_reserved:
+            paths.downside_lifecycle_resource_plan_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -6999,6 +7093,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p018_b_failure": _recent_stage_job_failure(
             paths, kind=STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
+        ),
+        "recent_p020_b_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
         ),
     }
 

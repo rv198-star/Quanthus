@@ -493,9 +493,15 @@ nodes.
   activation of the frozen pools reaches 60 unique fallbacks. P022 is therefore not reinterpreted as
   PASS. Its four-party review selects P023. The sole P023 admission Job finds 142/192 primaries
   readiness-ready and activates 37 fallbacks. The final panel is 179/179 identity-unique: seven cells
-  reach 24/24, while early STAR reaches 11/24. P023 therefore closes fail-closed rather than PASS. Its review selects P024 to restore the P013 clustered-development model: identity stays unique
-  within each cell, while cross-era non-overlapping reuse is explicit and cannot be counted as
-  independent evidence twice. P020 remains blocked. Preserved 2021/2022-2024/2025 remain unopened.
+  reach 24/24, while early STAR reaches 11/24. P023 therefore closes fail-closed rather than PASS. Its
+  review selects P024 to restore the P013 clustered-development model: identity stays unique within
+  each cell, while cross-era non-overlapping reuse is explicit and cannot be counted as independent
+  evidence twice. P024-A is now preregistered before any new readiness read. It binds the exact P023
+  no-pass artifact, permits new admission reads only for previously unread early-STAR candidates that
+  P023 skipped solely for realized-identity conflict, requires row count plus unique-cluster count in
+  all later P020-C/D evidence, and forbids an automatic P025/resource loop on failure. P020 remains
+  blocked until a P024 PASS and separate P020-C preregistration. Preserved 2021/2022-2024/2025 remain
+  unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -513,7 +519,10 @@ nodes.
   `reviews/stage-p020b-resource-shortfall-four-party-review-20260915.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
-  `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`, and
+  `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
+  `work-items/stage-realized-identity-admission.md`,
+  `reviews/stage-p023-realized-identity-admission-review-20260916.md`,
+  `work-items/stage-clustered-identity-admission.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

@@ -1,0 +1,132 @@
+{
+  "schema_version": "quanthus.stage-clustered-identity-admission.v1",
+  "work_item": "P3-STAGE-024",
+  "state": "PREREGISTERED_CROSS_ERA_CLUSTERED_IDENTITY_SUPPLEMENT_BEFORE_NEW_READINESS_READ",
+  "effective_date": "2026-09-16",
+  "purpose": "Bind the exact immutable P023 no-pass artifact and fill only its remaining early-STAR technical-readiness deficit from candidates P023 skipped solely because of global realized-identity conflict. Preserve one identity per Era x Board cell, allow cross-era reuse only on non-overlapping exact windows with explicit cluster provenance, and never count repeated identities as independent evidence before any Stage1/12 semantic review.",
+  "bindings": {
+    "p023_result": {
+      "path": "config/stage-learning/stage-realized-identity-admission-result.v1.json",
+      "sha256": "sha256:a19a41c85702a89118be02fa4b82a9033289658a8a2439ff1be6c61537c594d2"
+    },
+    "p023_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_451124246782476ea51fa11b60c346ba/stage-realized-identity-admission-20260915T182835Z",
+      "job_id": "stage_451124246782476ea51fa11b60c346ba",
+      "code_revision": "19117afaa53baa974ffe404ceb3f2ef4a4b805ef",
+      "manifest_sha256": "sha256:bda9ee3e663b54854aa70df12304fee9b431eabd76d2ce9409930ded44567b65",
+      "realized_plan_digest": "sha256:47f467b88946ea5e38889c4e148fe88e04cb101dc499a5206a989137f0fa17e9",
+      "fallback_reservoir_digest": "sha256:fe7134f3ade040c4634ce34464e320a1b7e1a3064919dcf75a00ea8e3a38a493"
+    },
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    }
+  },
+  "starting_panel": {
+    "source": "exact_p023_realized_plan",
+    "row_count": 179,
+    "unique_identity_count": 179,
+    "global_identity_unique": true,
+    "all_rows_admission_ready": true,
+    "cell_counts": {
+      "PRE_STAR/CHINEXT": 24,
+      "PRE_STAR/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/STAR": 24,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 24,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 11
+    }
+  },
+  "supplement_contract": {
+    "deficit_cell": "STAR_PRE_CHINEXT_20PCT/STAR",
+    "starting_cell_count": 11,
+    "target_cell_count": 24,
+    "maximum_activated_supplements": 13,
+    "eligible_source": "P023_FALLBACK_ATTEMPT_SKIPPED_REALIZED_IDENTITY_CONFLICT_ONLY",
+    "require_prior_market_read_false": true,
+    "completed_p023_readiness_must_not_rerun": true,
+    "candidate_order": "P023_FROZEN_IDENTITY_RANK_THEN_WINDOW_RANK",
+    "same_cell_only": true,
+    "within_cell_identity_unique": true,
+    "cross_cell_same_identity_allowed": true,
+    "cross_cell_repeat_requires_non_overlapping_exact_windows": true,
+    "at_most_one_realized_case_per_identity_per_cell": true,
+    "stop_reading_cell_when_target_reached": true,
+    "candidate_order_uses_market_values": false,
+    "candidate_order_uses_semantic_results": false,
+    "candidate_order_uses_admission_results": false,
+    "post_result_candidate_append": false,
+    "cross_cell_fill": false
+  },
+  "cluster_contract": {
+    "cluster_key": "economic_identity_security_id",
+    "target_total_rows": 192,
+    "target_rows_per_cell": 24,
+    "cell_count": 8,
+    "unique_identity_within_each_cell": true,
+    "cross_cell_repeated_identity_is_clustered": true,
+    "cluster_windows_pairwise_non_overlapping": true,
+    "row_count_must_be_reported": true,
+    "unique_cluster_count_must_be_reported": true,
+    "repeated_identity_cluster_count_must_be_reported": true,
+    "independent_identity_evidence_count_equals_unique_cluster_count": true,
+    "repeated_rows_must_not_inflate_independent_evidence": true,
+    "p020_c_must_publish_row_and_unique_cluster_counts": true,
+    "p020_d_must_publish_row_and_unique_cluster_counts": true,
+    "preserved_evaluation_identity_global_exclusion_unchanged": true
+  },
+  "pass_gate": {
+    "required_rows_per_cell": 24,
+    "required_total_rows": 192,
+    "all_rows_admission_ready": true,
+    "within_cell_identity_unique": true,
+    "all_cross_cell_repeat_windows_non_overlapping": true,
+    "cluster_accounting_complete": true,
+    "pass_disposition": "PASS_CLUSTERED_ADMISSION_READY_PLAN_FROZEN",
+    "pass_allows_only": "SEPARATE_P020_C_PREREGISTRATION"
+  },
+  "failure_policy": {
+    "fail_disposition": "CLOSED_CLUSTERED_ADMISSION_CAPACITY_SHORTFALL",
+    "automatic_retry": false,
+    "automatic_p025_resource_repair": false,
+    "quota_lowering": false,
+    "board_drop_or_merge": false,
+    "open_new_years": false,
+    "on_failure": "FOUR_PARTY_PORTFOLIO_REVIEW_BEFORE_ANY_SUCCESSOR"
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 1800
+  },
+  "output": {
+    "supplemental_admission_schema": "quanthus.stage-clustered-identity-supplemental-admission.v1",
+    "clustered_plan_schema": "quanthus.stage-clustered-identity-exact-plan.v1",
+    "cluster_summary_schema": "quanthus.stage-clustered-identity-cluster-summary.v1",
+    "source_binding_schema": "quanthus.stage-clustered-identity-source-binding.v1",
+    "summary_schema": "quanthus.stage-clustered-identity-admission-summary.v1",
+    "artifact_schema": "quanthus.stage-clustered-identity-admission-artifact.v1"
+  },
+  "authority": {
+    "prior_artifact_read": true,
+    "input_readiness_market_read_for_previously_conflict_skipped_candidates": true,
+    "raw_ohlc_publish_or_retain": false,
+    "structure_fact_build": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "p020_c_semantic_review": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P024 may establish only a technically admission-ready 8x24 development panel under explicit cross-era identity clustering. Repeated identities are not independent evidence. A pass cannot collect Stage1/12 opinions or authorize semantic review directly; it only permits a separately frozen P020-C preregistration that binds both row count and unique-cluster count."
+}

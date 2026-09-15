@@ -378,6 +378,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-023-B | Run one primary-first admission / contingent replacement Job | P3-STAGE-023-A | closed; `stage_451124246782476ea51fa11b60c346ba`, 142 primaries ready, 37 fallbacks activated, 179 realized unique identities |
 | P3-STAGE-023-C | Review realized plan and close P023 | P3-STAGE-023-B | closed; no-pass preserved, fallback readiness failures are small relative to identity-conflict pressure and early-STAR scarcity |
 | P3-STAGE-023-D | Gate any P020-C preregistration | P3-STAGE-023-C | closed `OPEN_CROSS_ERA_CLUSTERED_IDENTITY_DEVELOPMENT_CONTRACT`; P020 remains blocked pending separately frozen P024 |
+| P3-STAGE-024 | Cross-era clustered-identity development admission | P3-STAGE-023 | P024-A preregistered before new readiness read; only previously unread early-STAR P023 identity-conflict skips are eligible, cross-era repeats require non-overlapping windows and explicit cluster accounting; docs/work-items/stage-clustered-identity-admission.md |
+| P3-STAGE-024-A | Freeze clustered-development admission/accounting contract | P3-STAGE-023-D | closed preregistration; row count and unique-cluster count are separate, repeated rows never inflate independent-evidence count |
+| P3-STAGE-024-B | Implement artifact-bound supplemental admission runtime | P3-STAGE-024-A | open engineering; no runtime read before frozen contract is durable |
+| P3-STAGE-024-C | Run sole supplemental admission Job | P3-STAGE-024-B | blocked until engineering acceptance; PASS requires 8×24 admission-ready rows with within-cell identity uniqueness and non-overlap cluster checks |
+| P3-STAGE-024-D | Review/close and gate P020-C preregistration | P3-STAGE-024-C | blocked; PASS can open only separate P020-C preregistration, failure requires four-party portfolio review and forbids automatic P025 |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

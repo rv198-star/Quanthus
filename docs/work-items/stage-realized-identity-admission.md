@@ -7,6 +7,7 @@ Machine contract: `../../config/stage-learning/stage-realized-identity-admission
 Parent result: `../../config/stage-learning/stage-primary-unique-contingent-fallback-result.v1.json`
 Result: `../../config/stage-learning/stage-realized-identity-admission-result.v1.json`
 Review: `../reviews/stage-p023-realized-identity-admission-review-20260916.md`
+Successor: `stage-clustered-identity-admission.md`
 
 ## Goal
 

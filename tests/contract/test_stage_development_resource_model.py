@@ -119,6 +119,8 @@ P023_CONFIG = ROOT / "config/stage-learning/stage-realized-identity-admission.v1
 P023_RESULT = ROOT / "config/stage-learning/stage-realized-identity-admission-result.v1.json"
 P023_REVIEW = ROOT / "docs/reviews/stage-p023-realized-identity-admission-review-20260916.md"
 P023_WORK = ROOT / "docs/work-items/stage-realized-identity-admission.md"
+P024_CONFIG = ROOT / "config/stage-learning/stage-clustered-identity-admission.v1.json"
+P024_WORK = ROOT / "docs/work-items/stage-clustered-identity-admission.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -1733,6 +1735,81 @@ def test_stage023_closes_on_early_star_realized_identity_shortfall() -> None:
     assert value["successor"]["work_item"] == "P3-STAGE-024"
     assert value["successor"]["semantic_authority"] is False
     assert P023_REVIEW.is_file()
+
+
+def test_stage024_freezes_clustered_identity_supplement_before_new_readiness_read() -> None:
+    value = json.loads(P024_CONFIG.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-024"
+    assert value["state"] == (
+        "PREREGISTERED_CROSS_ERA_CLUSTERED_IDENTITY_SUPPLEMENT_BEFORE_NEW_READINESS_READ"
+    )
+    assert value["bindings"]["p023_artifact"]["job_id"] == (
+        "stage_451124246782476ea51fa11b60c346ba"
+    )
+    assert value["bindings"]["p023_artifact"]["manifest_sha256"] == (
+        "sha256:bda9ee3e663b54854aa70df12304fee9b431eabd76d2ce9409930ded44567b65"
+    )
+    start = value["starting_panel"]
+    assert start["row_count"] == 179
+    assert start["unique_identity_count"] == 179
+    assert start["global_identity_unique"] is True
+    assert start["cell_counts"]["STAR_PRE_CHINEXT_20PCT/STAR"] == 11
+    supplement = value["supplement_contract"]
+    assert supplement["deficit_cell"] == "STAR_PRE_CHINEXT_20PCT/STAR"
+    assert supplement["starting_cell_count"] == 11
+    assert supplement["target_cell_count"] == 24
+    assert supplement["maximum_activated_supplements"] == 13
+    assert supplement["eligible_source"] == (
+        "P023_FALLBACK_ATTEMPT_SKIPPED_REALIZED_IDENTITY_CONFLICT_ONLY"
+    )
+    assert supplement["require_prior_market_read_false"] is True
+    assert supplement["completed_p023_readiness_must_not_rerun"] is True
+    assert supplement["same_cell_only"] is True
+    assert supplement["within_cell_identity_unique"] is True
+    assert supplement["cross_cell_same_identity_allowed"] is True
+    assert supplement["cross_cell_repeat_requires_non_overlapping_exact_windows"] is True
+    assert supplement["post_result_candidate_append"] is False
+    cluster = value["cluster_contract"]
+    assert cluster["target_total_rows"] == 192
+    assert cluster["target_rows_per_cell"] == 24
+    assert cluster["unique_identity_within_each_cell"] is True
+    assert cluster["cross_cell_repeated_identity_is_clustered"] is True
+    assert cluster["cluster_windows_pairwise_non_overlapping"] is True
+    assert cluster["row_count_must_be_reported"] is True
+    assert cluster["unique_cluster_count_must_be_reported"] is True
+    assert cluster["independent_identity_evidence_count_equals_unique_cluster_count"] is True
+    assert cluster["repeated_rows_must_not_inflate_independent_evidence"] is True
+    assert cluster["p020_c_must_publish_row_and_unique_cluster_counts"] is True
+    assert cluster["p020_d_must_publish_row_and_unique_cluster_counts"] is True
+    assert cluster["preserved_evaluation_identity_global_exclusion_unchanged"] is True
+    gate = value["pass_gate"]
+    assert gate["required_rows_per_cell"] == 24
+    assert gate["required_total_rows"] == 192
+    assert gate["pass_allows_only"] == "SEPARATE_P020_C_PREREGISTRATION"
+    failure = value["failure_policy"]
+    assert failure["automatic_retry"] is False
+    assert failure["automatic_p025_resource_repair"] is False
+    assert failure["quota_lowering"] is False
+    assert failure["board_drop_or_merge"] is False
+    assert failure["open_new_years"] is False
+    assert failure["on_failure"] == "FOUR_PARTY_PORTFOLIO_REVIEW_BEFORE_ANY_SUCCESSOR"
+    authority = value["authority"]
+    assert authority["input_readiness_market_read_for_previously_conflict_skipped_candidates"] is True
+    for key in (
+        "raw_ohlc_publish_or_retain",
+        "structure_fact_build",
+        "stage1_12_semantic_read",
+        "threshold_or_candidate_read",
+        "reference_opinion_read",
+        "p020_c_semantic_review",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+    assert P024_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

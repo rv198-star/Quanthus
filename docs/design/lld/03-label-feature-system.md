@@ -520,6 +520,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-023-B | Execute sole primary-first admission Job | P3-STAGE-023-A | closed; 142/192 primaries ready, 37 fallbacks activated, semantic/preserved surfaces unopened |
 | P3-STAGE-023-C | Review/close realized plan | P3-STAGE-023-B | closed; strict global identity uniqueness remains the early-STAR bottleneck, P023 no-pass preserved |
 | P3-STAGE-023-D | Gate P020-C preregistration | P3-STAGE-023-C | closed `OPEN_CROSS_ERA_CLUSTERED_IDENTITY_DEVELOPMENT_CONTRACT`; separately freeze P024, P020 remains blocked |
+| P3-STAGE-024 | Cross-era clustered-identity development admission | P3-STAGE-023 | P024-A preregistered; only unread P023 early-STAR identity-conflict skips may receive readiness reads, repeated cross-era identities require non-overlapping windows and explicit cluster accounting |
+| P3-STAGE-024-A | Freeze clustered-development admission/accounting contract | P3-STAGE-023-D | closed preregistration; repeated rows cannot increase independent-identity evidence and later P020-C/D must report row and unique-cluster counts |
+| P3-STAGE-024-B | Implement artifact-bound supplemental admission | P3-STAGE-024-A | open engineering; P023 readiness observations are immutable and cannot be rerun |
+| P3-STAGE-024-C | Execute sole supplemental admission Job | P3-STAGE-024-B | blocked until engineering acceptance; PASS only at 8×24 admission-ready rows with within-cell identity uniqueness and pairwise non-overlap for repeated clusters |
+| P3-STAGE-024-D | Review/close and gate P020-C | P3-STAGE-024-C | blocked; failure requires four-party portfolio review rather than automatic P025/resource repair |
 
 ## 7. Acceptance
 

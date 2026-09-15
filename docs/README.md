@@ -491,15 +491,11 @@ nodes.
   Its exact fallback gate nevertheless closes no-pass at 62/64: only early STAR has fewer than eight
   non-primary dormant candidates (`6/8`), while every other cell reaches `8/8`; worst-case simultaneous
   activation of the frozen pools reaches 60 unique fallbacks. P022 is therefore not reinterpreted as
-  PASS. Its four-party review selects P023. P023 is now preregistered before input read: it binds the
-  exact P022 192-row primary plan, freezes a deterministic same-cell fallback reservoir, admits all
-  primaries first, then builds identity independence from the **realized admission-ready panel** rather
-  than every planned identity. A failed primary does not consume realized identity; a fallback whose
-  identity is already realized is skipped without market read; activated fallbacks may only fill the
-  same cell and must preserve global identity uniqueness. Even a P023 PASS only permits a separately
-  frozen P020-C preregistration, not immediate Stage1/12 review. P020 remains blocked until this
-  technical admission successor freezes a final 8×24 globally unique realized plan. Preserved
-  2021/2022-2024/2025 remain unopened.
+  PASS. Its four-party review selects P023. The sole P023 admission Job finds 142/192 primaries
+  readiness-ready and activates 37 fallbacks. The final panel is 179/179 identity-unique: seven cells
+  reach 24/24, while early STAR reaches 11/24. P023 therefore closes fail-closed rather than PASS. Its review selects P024 to restore the P013 clustered-development model: identity stays unique
+  within each cell, while cross-era non-overlapping reuse is explicit and cannot be counted as
+  independent evidence twice. P020 remains blocked. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,

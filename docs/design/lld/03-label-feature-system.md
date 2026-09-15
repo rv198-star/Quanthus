@@ -515,11 +515,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-022-B | Freeze exact primary plan / fallback pools and test feasibility | P3-STAGE-022-A | closed; sole metadata Job freezes 8×24 primary PASS and 62 dormant fallbacks, 64-simultaneous activation remains diagnostic only |
 | P3-STAGE-022-C | Review P022 feasibility | P3-STAGE-022-B | closed; planned-primary exclusion is too strong for contingency, while realized review identity uniqueness remains mandatory |
 | P3-STAGE-022-D | Close and gate any admission successor | P3-STAGE-022-C | closed `OPEN_REALIZED_IDENTITY_ADMISSION_AND_CONTINGENT_REPLACEMENT`; P023 requires separate freeze, P020 remains blocked |
-| P3-STAGE-023 | Realized-identity admission and contingent replacement | P3-STAGE-022 | ready engineering route; bind exact 192-row primary panel, admit all primaries first, then activate same-cell fallbacks only for technical deficits while preserving global uniqueness of the realized 8×24 panel |
+| P3-STAGE-023 | Realized-identity admission and contingent replacement | P3-STAGE-022 | closed `CLOSED_REALIZED_ADMISSION_CAPACITY_SHORTFALL`; realized panel = 179 globally unique, seven cells 24/24, early STAR 11/24 |
 | P3-STAGE-023-A | Freeze primary-first / realized-identity semantics | P3-STAGE-022 | closed preregistration; fallback membership/order frozen before input readiness results |
-| P3-STAGE-023-B | Execute sole primary-first admission Job | P3-STAGE-023-A | ready after engineering acceptance; readiness-only market access, no Structure/Stage1/12 semantic read |
-| P3-STAGE-023-C | Review/close realized plan | P3-STAGE-023-B | blocked until Job terminal artifact |
-| P3-STAGE-023-D | Gate P020-C preregistration | P3-STAGE-023-C | blocked; even PASS does not start review, it only permits a separately frozen P020-C preregistration |
+| P3-STAGE-023-B | Execute sole primary-first admission Job | P3-STAGE-023-A | closed; 142/192 primaries ready, 37 fallbacks activated, semantic/preserved surfaces unopened |
+| P3-STAGE-023-C | Review/close realized plan | P3-STAGE-023-B | closed; strict global identity uniqueness remains the early-STAR bottleneck, P023 no-pass preserved |
+| P3-STAGE-023-D | Gate P020-C preregistration | P3-STAGE-023-C | closed `OPEN_CROSS_ERA_CLUSTERED_IDENTITY_DEVELOPMENT_CONTRACT`; separately freeze P024, P020 remains blocked |
 
 ## 7. Acceptance
 

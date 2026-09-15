@@ -373,11 +373,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-022-B | Freeze exact primary plan / fallback pools and test metadata feasibility | P3-STAGE-022-A | closed `CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL`; sole Job `stage_cfe744f4b8c941deb7520d1faa31c232`, 192/192 primary PASS, fallback 62/64; config/stage-learning/stage-primary-unique-contingent-fallback-result.v1.json |
 | P3-STAGE-022-C | Four-party review P022 feasibility | P3-STAGE-022-B | closed; do not lower fallback ceiling; bind uniqueness to realized admission-ready cases rather than all planned identities |
 | P3-STAGE-022-D | Close and gate any P020 admission successor | P3-STAGE-022-C | closed `OPEN_REALIZED_IDENTITY_ADMISSION_AND_CONTINGENT_REPLACEMENT`; separately freeze P023, P020 remains blocked |
-| P3-STAGE-023 | Realized-identity admission and contingent replacement | P3-STAGE-022 | ready engineering route; exact P022 192-row primary plan is screened first, technical failures do not consume realized identity, same-cell fallbacks activate only to fill readiness deficits while preserving global identity uniqueness; docs/work-items/stage-realized-identity-admission.md |
+| P3-STAGE-023 | Realized-identity admission and contingent replacement | P3-STAGE-022 | closed `CLOSED_REALIZED_ADMISSION_CAPACITY_SHORTFALL`; sole Job realizes 179 globally unique admission-ready rows, seven cells 24/24 and early STAR 11/24; docs/work-items/stage-realized-identity-admission.md |
 | P3-STAGE-023-A | Freeze primary-first / realized-identity semantics | P3-STAGE-022 | closed preregistration before input read; config/stage-learning/stage-realized-identity-admission.v1.json |
-| P3-STAGE-023-B | Run one primary-first admission / contingent replacement Job | P3-STAGE-023-A | ready after repository acceptance; 61-session readiness only, no Stage1/12 semantic read |
-| P3-STAGE-023-C | Review realized plan and close P023 | P3-STAGE-023-B | blocked until sole Job completes |
-| P3-STAGE-023-D | Gate any P020-C preregistration | P3-STAGE-023-C | blocked; a PASS may only authorize a separately frozen P020-C preregistration bound to exact realized-plan digest |
+| P3-STAGE-023-B | Run one primary-first admission / contingent replacement Job | P3-STAGE-023-A | closed; `stage_451124246782476ea51fa11b60c346ba`, 142 primaries ready, 37 fallbacks activated, 179 realized unique identities |
+| P3-STAGE-023-C | Review realized plan and close P023 | P3-STAGE-023-B | closed; no-pass preserved, fallback readiness failures are small relative to identity-conflict pressure and early-STAR scarcity |
+| P3-STAGE-023-D | Gate any P020-C preregistration | P3-STAGE-023-C | closed `OPEN_CROSS_ERA_CLUSTERED_IDENTITY_DEVELOPMENT_CONTRACT`; P020 remains blocked pending separately frozen P024 |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

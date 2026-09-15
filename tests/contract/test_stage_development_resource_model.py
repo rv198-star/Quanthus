@@ -116,6 +116,8 @@ P022_RESULT = (
 )
 P022_WORK = ROOT / "docs/work-items/stage-primary-unique-contingent-fallback.md"
 P023_CONFIG = ROOT / "config/stage-learning/stage-realized-identity-admission.v1.json"
+P023_RESULT = ROOT / "config/stage-learning/stage-realized-identity-admission-result.v1.json"
+P023_REVIEW = ROOT / "docs/reviews/stage-p023-realized-identity-admission-review-20260916.md"
 P023_WORK = ROOT / "docs/work-items/stage-realized-identity-admission.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1692,6 +1694,45 @@ def test_stage023_freezes_realized_identity_admission_before_semantic_review() -
     ):
         assert authority[key] is False
     assert P023_WORK.is_file()
+
+
+def test_stage023_closes_on_early_star_realized_identity_shortfall() -> None:
+    value = json.loads(P023_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-023"
+    assert value["state"] == "CLOSED_REALIZED_ADMISSION_CAPACITY_SHORTFALL"
+    job = value["job"]
+    assert job["job_id"] == "stage_451124246782476ea51fa11b60c346ba"
+    assert job["manifest_sha256"] == (
+        "sha256:bda9ee3e663b54854aa70df12304fee9b431eabd76d2ce9409930ded44567b65"
+    )
+    primary = value["primary_admission"]
+    assert primary == {
+        "attempted": 192,
+        "ready": 142,
+        "failed": 50,
+        "all_primary_read_before_fallback_activation": True,
+    }
+    fallback = value["fallback"]
+    assert fallback["market_read_attempt_count"] == 42
+    assert fallback["activated_count"] == 37
+    assert fallback["readiness_failure_count"] == 5
+    assert fallback["realized_identity_conflict_skip_count"] == 113
+    realized = value["realized_plan"]
+    assert realized["row_count"] == 179
+    assert realized["unique_identity_count"] == 179
+    assert realized["global_identity_unique"] is True
+    assert realized["cell_counts"]["STAR_PRE_CHINEXT_20PCT/STAR"] == 11
+    assert realized["deficits"]["STAR_PRE_CHINEXT_20PCT/STAR"] == 13
+    for cell, count in realized["cell_counts"].items():
+        if cell != "STAR_PRE_CHINEXT_20PCT/STAR":
+            assert count == 24
+    reads = value["authority_and_reads"]
+    assert reads["stage1_12_semantic_read"] is False
+    assert reads["p020_c_semantic_review_authorized"] is False
+    assert reads["preserved_2021_read"] is False
+    assert value["successor"]["work_item"] == "P3-STAGE-024"
+    assert value["successor"]["semantic_authority"] is False
+    assert P023_REVIEW.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

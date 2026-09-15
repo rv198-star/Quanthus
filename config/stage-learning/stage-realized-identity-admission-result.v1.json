@@ -1,0 +1,82 @@
+{
+  "schema_version": "quanthus.stage-realized-identity-admission-result.v1",
+  "work_item": "P3-STAGE-023",
+  "state": "CLOSED_REALIZED_ADMISSION_CAPACITY_SHORTFALL",
+  "effective_date": "2026-09-16",
+  "job": {
+    "job_id": "stage_451124246782476ea51fa11b60c346ba",
+    "code_revision": "19117afaa53baa974ffe404ceb3f2ef4a4b805ef",
+    "input_digest": "sha256:67387f2107d9398c456b5d4924456a559d4b5e87f0a51664b159d60625dd13bb",
+    "terminal_state": "succeeded",
+    "exit_code": 0,
+    "manifest_sha256": "sha256:bda9ee3e663b54854aa70df12304fee9b431eabd76d2ce9409930ded44567b65",
+    "disposition": "CLOSED_REALIZED_ADMISSION_CAPACITY_SHORTFALL"
+  },
+  "primary_admission": {
+    "attempted": 192,
+    "ready": 142,
+    "failed": 50,
+    "all_primary_read_before_fallback_activation": true
+  },
+  "fallback": {
+    "reservoir_row_count": 4446,
+    "market_read_attempt_count": 42,
+    "activated_count": 37,
+    "readiness_failure_count": 5,
+    "realized_identity_conflict_skip_count": 113,
+    "reservoir_digest": "sha256:fe7134f3ade040c4634ce34464e320a1b7e1a3064919dcf75a00ea8e3a38a493"
+  },
+  "realized_plan": {
+    "row_count": 179,
+    "unique_identity_count": 179,
+    "global_identity_unique": true,
+    "plan_digest": "sha256:47f467b88946ea5e38889c4e148fe88e04cb101dc499a5206a989137f0fa17e9",
+    "cell_counts": {
+      "PRE_STAR/CHINEXT": 24,
+      "PRE_STAR/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/STAR": 24,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 24,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 11
+    },
+    "deficits": {
+      "PRE_STAR/CHINEXT": 0,
+      "PRE_STAR/MAIN": 0,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 0,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 0,
+      "STAR_AND_CHINEXT_20PCT/STAR": 0,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 0,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 0,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 13
+    }
+  },
+  "authority_and_reads": {
+    "raw_ohlc_published_or_retained": false,
+    "structure_fact_build": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "p020_c_semantic_review_authorized": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "attribution": {
+    "realized_identity_model_helped": true,
+    "technical_deficits_filled_by_fallback": 37,
+    "remaining_deficit": 13,
+    "only_blocking_cell": "STAR_PRE_CHINEXT_20PCT/STAR",
+    "fallback_readiness_failure_count": 5,
+    "identity_conflict_skip_count": 113,
+    "interpretation": "P023 preserved global uniqueness for all 179 realized rows and filled seven of eight cells. The remaining gap cannot be explained mainly by fallback readiness failures; strict global identity exclusion and scarce early-STAR identity availability remain the dominant resource constraint."
+  },
+  "successor": {
+    "work_item": "P3-STAGE-024",
+    "name": "Cross-Era Clustered-Identity Development Contract",
+    "recommended_scope": "Return to the P013 identity×non-overlapping-window×role development model. Require 24 distinct identities inside each Era×Board cell, allow the same economic identity to appear across non-overlapping era cells with explicit cluster provenance, preserve identity-global exclusion for preserved evaluation, and never count repeated cross-era identities as independent evidence. A separately frozen technical successor may process only previously skipped global-conflict candidates needed to fill remaining same-cell deficits; completed readiness reads must not be rerun.",
+    "semantic_authority": false
+  },
+  "claim_ceiling": "P023 shows that primary-first realized-identity replacement reaches 179 globally unique admission-ready development cases and closes only on a 13-case early-STAR deficit. It does not establish Stage1/12 semantic quality and does not authorize weakening preserved identity independence, opening newer years, dropping STAR, or beginning semantic review."
+}

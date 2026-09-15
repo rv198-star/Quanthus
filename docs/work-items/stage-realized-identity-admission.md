@@ -1,10 +1,12 @@
 # P3-STAGE-023 — Realized-Identity Admission and Contingent Replacement
 
-Design status: approved for execution engineering  
-Delivery gate: ready for one primary-first admission Job after repository acceptance
+Design status: closed fail-closed
+Delivery gate: `CLOSED_REALIZED_ADMISSION_CAPACITY_SHORTFALL`
 
 Machine contract: `../../config/stage-learning/stage-realized-identity-admission.v1.json`  
 Parent result: `../../config/stage-learning/stage-primary-unique-contingent-fallback-result.v1.json`
+Result: `../../config/stage-learning/stage-realized-identity-admission-result.v1.json`
+Review: `../reviews/stage-p023-realized-identity-admission-review-20260916.md`
 
 ## Goal
 
@@ -35,9 +37,9 @@ technical input-readiness deficits while preserving global identity uniqueness o
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
 | P3-STAGE-023-A | Freeze primary-first admission / realized-identity semantics | P3-STAGE-022 | closed preregistration in machine config; no input read |
-| P3-STAGE-023-B | Execute one primary-first admission and contingent replacement Job | P3-STAGE-023-A | ready after engineering acceptance |
-| P3-STAGE-023-C | Review realized plan and close P023 | P3-STAGE-023-B | blocked until sole Job completes |
-| P3-STAGE-023-D | Gate P020-C preregistration | P3-STAGE-023-C | blocked; a P023 PASS may only make a separately versioned P020-C preregistration legal |
+| P3-STAGE-023-B | Execute one primary-first admission and contingent replacement Job | P3-STAGE-023-A | closed; sole Job `stage_451124246782476ea51fa11b60c346ba`, 142/192 primaries ready, 37 fallbacks activated, realized panel 179/192 |
+| P3-STAGE-023-C | Review realized plan and close P023 | P3-STAGE-023-B | closed; seven cells 24/24, early STAR 11/24; preserve no-pass and move to clustered cross-era development contract |
+| P3-STAGE-023-D | Gate P020-C preregistration | P3-STAGE-023-C | closed `OPEN_CROSS_ERA_CLUSTERED_IDENTITY_DEVELOPMENT_CONTRACT`; P020 remains blocked pending separately frozen P024 |
 
 ## Failure semantics
 

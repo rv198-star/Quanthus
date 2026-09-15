@@ -7589,6 +7589,64 @@ def _primary_unique_contingent_fallback_diagnostics(
     }
 
 
+def export_p020c_review_packets(paths: StageWorkerPaths, job_id: str) -> bytes:
+    """Return only the deep-verified reviewer-visible P020-C packet transport."""
+    if not _JOB_ID.fullmatch(job_id):
+        raise StageWorkerError("P020-C packet export requires a valid stage job id")
+    status_path = paths.status / f"{job_id}.json"
+    if not status_path.is_file() or status_path.is_symlink():
+        raise StageWorkerError("P020-C packet export requires an existing terminal status")
+    observed = _object(status_path, "P020-C packet job status")
+    if (
+        observed.get("job_id") != job_id
+        or observed.get("kind") != STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB
+        or observed.get("state") != "succeeded"
+        or observed.get("exit_code") != 0
+    ):
+        raise StageWorkerError("P020-C packet export requires the succeeded packet job")
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("P020-C packet export result reference is missing")
+    artifact_value = result_ref.get("artifact_root")
+    if not isinstance(artifact_value, str) or not artifact_value:
+        raise StageWorkerError("P020-C packet export artifact root is missing")
+    artifact = Path(artifact_value).resolve()
+    job_root = (paths.runs / job_id).resolve()
+    if artifact.parent != job_root or not artifact.name.startswith(
+        "stage-downside-lifecycle-review-packets-"
+    ):
+        raise StageWorkerError("P020-C packet export artifact root is outside the exact job")
+    try:
+        from quanthus.stage_learning.downside_lifecycle_reference_prepare import verify_artifact
+
+        verified = verify_artifact(
+            artifact,
+            code_revision=str(observed.get("code_revision") or ""),
+        )
+    except (OSError, ValueError) as exc:
+        raise StageWorkerError("P020-C packet export artifact verification failed") from exc
+    bounded = result_ref.get("downside_lifecycle_reference_prepare")
+    if not isinstance(bounded, Mapping):
+        raise StageWorkerError("P020-C packet export bounded result is missing")
+    if (
+        verified.get("manifest_sha256") != result_ref.get("manifest_sha256")
+        or verified.get("review_packet_sha256") != bounded.get("review_packet_sha256")
+        or verified.get("packet_count") != 187
+        or verified.get("review_opinion_count") != 0
+    ):
+        raise StageWorkerError("P020-C packet export result binding differs")
+    packet_path = artifact / "review-packets.jsonl"
+    if not packet_path.is_file() or packet_path.is_symlink():
+        raise StageWorkerError("P020-C reviewer packet transport is missing")
+    raw = packet_path.read_bytes()
+    observed_sha = "sha256:" + hashlib.sha256(raw).hexdigest()
+    if observed_sha != bounded.get("review_packet_sha256"):
+        raise StageWorkerError("P020-C reviewer packet digest differs")
+    if len(raw) > 2 * 1024 * 1024 or len(raw.splitlines()) != 187:
+        raise StageWorkerError("P020-C reviewer packet transport exceeds bounded shape")
+    return raw
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -7899,6 +7957,8 @@ def _parser() -> argparse.ArgumentParser:
     submit.add_argument("--kind", choices=tuple(sorted(_JOB_SPECS)), default=STAGE_HARNESS_JOB)
     status = sub.add_parser("status")
     status.add_argument("--job-id", required=True)
+    export_p020c = sub.add_parser("export-p020-c-packets")
+    export_p020c.add_argument("--job-id", required=True)
     seal_review = sub.add_parser("seal-p014-review")
     seal_review.add_argument("--job-id", required=True)
     seal_p015 = sub.add_parser("seal-p015-review")
@@ -7935,6 +7995,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = submit_job(paths, code_revision=args.code_revision, kind=args.kind)
         elif args.command == "status":
             result = read_status(paths, args.job_id)
+        elif args.command == "export-p020-c-packets":
+            sys.stdout.buffer.write(export_p020c_review_packets(paths, args.job_id))
+            return 0
         elif args.command == "seal-p014-review":
             try:
                 submission = json.load(sys.stdin)

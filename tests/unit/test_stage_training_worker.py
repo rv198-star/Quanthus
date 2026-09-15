@@ -57,6 +57,7 @@ from quanthus.stage_learning.worker import (
     _digest,
     cancel_job,
     doctor,
+    export_p020c_review_packets,
     read_status,
     seal_p014_review,
     seal_p015_review,
@@ -1612,6 +1613,55 @@ def test_downside_lifecycle_reference_prepare_is_one_shot_and_idempotent(
             code_revision="b" * 40,
             kind=STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
         )
+
+
+def test_p020c_packet_export_is_reviewer_only_and_exact_job_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "7" * 32
+    artifact = (
+        worker_paths.runs
+        / job_id
+        / "stage-downside-lifecycle-review-packets-test"
+    )
+    artifact.mkdir(parents=True)
+    raw = b"{}\n" * 187
+    (artifact / "review-packets.jsonl").write_bytes(raw)
+    packet_sha = "sha256:" + hashlib.sha256(raw).hexdigest()
+    manifest_sha = "sha256:" + "3" * 64
+    observed = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
+        "code_revision": REVISION,
+        "state": "succeeded",
+        "stage": "terminal",
+        "exit_code": 0,
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "downside_lifecycle_reference_prepare": {
+                "review_packet_sha256": packet_sha,
+            },
+        },
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(
+        json.dumps(observed), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "quanthus.stage_learning.downside_lifecycle_reference_prepare.verify_artifact",
+        lambda path, code_revision=None: {
+            "manifest_sha256": manifest_sha,
+            "review_packet_sha256": packet_sha,
+            "packet_count": 187,
+            "review_opinion_count": 0,
+        },
+    )
+    assert export_p020c_review_packets(worker_paths, job_id) == raw
+    with pytest.raises(StageWorkerError, match="valid stage job id"):
+        export_p020c_review_packets(worker_paths, "not-a-job")
 
 
 def test_combined_atomic_scoring_status_exposes_bounded_diagnostics_only(

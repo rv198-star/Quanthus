@@ -289,7 +289,12 @@ case "${command}" in
     [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
     bash "${worker}" status --job-id "$2"
     ;;
+  export-p020-c-packets)
+    [[ "$#" -eq 2 ]] || fail "usage: export-p020-c-packets <stage_job_id>"
+    [[ "$2" =~ ^stage_[0-9a-f]{32}$ ]] || fail "valid stage job id required"
+    bash "${worker}" export-p020-c-packets --job-id "$2"
+    ;;
   *)
-    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | submit-p013-d | submit-p014-a | submit-p014-b | submit-p014-c | submit-p015-a | submit-p015-b | submit-p015-c | submit-p016-b | submit-p017-b | submit-p018-b | submit-p020-b | submit-p020-c-packets | submit-p021-b | submit-p022-b | submit-p023 | submit-p024 | seal-p014-review | seal-p015-review | status"
+    fail "allowed commands: deploy | doctor | submit-p011-d1 | submit-p012-g1 | submit-p013-a | submit-p013-c | submit-p013-d | submit-p014-a | submit-p014-b | submit-p014-c | submit-p015-a | submit-p015-b | submit-p015-c | submit-p016-b | submit-p017-b | submit-p018-b | submit-p020-b | submit-p020-c-packets | submit-p021-b | submit-p022-b | submit-p023 | submit-p024 | export-p020-c-packets | seal-p014-review | seal-p015-review | status"
     ;;
 esac

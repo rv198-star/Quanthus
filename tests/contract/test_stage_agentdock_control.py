@@ -35,6 +35,7 @@ def test_control_surface_is_bounded_to_rx6800_qiuyu_and_exact_commands() -> None
         "submit-p022-b)",
         "submit-p023)",
         "submit-p024)",
+        "export-p020-c-packets)",
         "seal-p014-review)",
         "seal-p015-review)",
         "status)",
@@ -112,6 +113,7 @@ def test_status_accepts_only_stage_job_ids() -> None:
     text = source()
     assert '[[ "$2" =~ ^stage_[0-9a-f]{32}$ ]]' in text
     assert 'bash "${worker}" status --job-id "$2"' in text
+    assert 'bash "${worker}" export-p020-c-packets --job-id "$2"' in text
 
 
 def test_control_script_has_no_generic_file_or_shell_forwarding() -> None:

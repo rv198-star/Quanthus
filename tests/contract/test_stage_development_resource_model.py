@@ -111,6 +111,9 @@ P022_CONTRACT = ROOT / "config/stage-learning/stage-primary-unique-contingent-fa
 P022_FEASIBILITY = (
     ROOT / "config/stage-learning/stage-primary-unique-contingent-fallback-feasibility.v1.json"
 )
+P022_RESULT = (
+    ROOT / "config/stage-learning/stage-primary-unique-contingent-fallback-result.v1.json"
+)
 P022_WORK = ROOT / "docs/work-items/stage-primary-unique-contingent-fallback.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1601,6 +1604,43 @@ def test_stage022b_is_metadata_only_result_before_run_feasibility() -> None:
         "trading",
     ):
         assert authority[key] is False
+
+
+def test_stage022_closes_with_primary_pass_and_localized_fallback_shortfall() -> None:
+    value = json.loads(P022_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-022-B"
+    assert value["state"] == "CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL"
+    job = value["job"]
+    assert job["job_id"] == "stage_cfe744f4b8c941deb7520d1faa31c232"
+    assert job["manifest_sha256"] == (
+        "sha256:4018c600f98953c2b57dfa10ab5dcf654cb194ff444eef1e28a0645cf1fb740e"
+    )
+    primary = value["primary"]
+    assert primary["row_count"] == 192
+    assert primary["unique_identity_count"] == 192
+    assert primary["all_cells_24"] is True
+    assert primary["global_identity_unique"] is True
+    assert set(primary["cell_counts"].values()) == {24}
+    fallback = value["dormant_fallback"]
+    assert fallback["row_count"] == 62
+    assert fallback["ceiling"] == 64
+    assert fallback["all_cells_8"] is False
+    assert fallback["primary_identity_overlap_count"] == 0
+    assert fallback["cell_counts"]["STAR_PRE_CHINEXT_20PCT/STAR"] == 6
+    for cell, count in fallback["cell_counts"].items():
+        if cell != "STAR_PRE_CHINEXT_20PCT/STAR":
+            assert count == 8
+    worst = fallback["worst_case_simultaneous_activation"]
+    assert worst["max_count"] == 60
+    assert worst["all_64_feasible"] is False
+    reads = value["authority_and_reads"]
+    assert reads["market_bar_read"] is False
+    assert reads["stage1_12_semantic_read"] is False
+    assert reads["p020_reopen_authorized"] is False
+    assert value["attribution"]["primary_independence_problem_solved"] is True
+    assert value["attribution"]["fallback_shortfall"] == 2
+    assert value["successor"]["work_item"] == "P3-STAGE-023"
+    assert value["successor"]["semantic_authority"] is False
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

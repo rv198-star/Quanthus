@@ -1,0 +1,106 @@
+{
+  "schema_version": "quanthus.stage-primary-unique-contingent-fallback-result.v1",
+  "work_item": "P3-STAGE-022-B",
+  "state": "CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL",
+  "effective_date": "2026-09-16",
+  "job": {
+    "job_id": "stage_cfe744f4b8c941deb7520d1faa31c232",
+    "code_revision": "661a10ddc7cee121afefb1f8a41a2e82f7420bce",
+    "terminal_state": "succeeded",
+    "exit_code": 0,
+    "manifest_sha256": "sha256:4018c600f98953c2b57dfa10ab5dcf654cb194ff444eef1e28a0645cf1fb740e",
+    "disposition": "CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL"
+  },
+  "primary": {
+    "row_count": 192,
+    "unique_identity_count": 192,
+    "all_cells_24": true,
+    "global_identity_unique": true,
+    "plan_digest": "sha256:8009fb9450b5d476110aca1d763173d604aea58a2e968bac6ae8a9b36dc66c96",
+    "cell_counts": {
+      "PRE_STAR/CHINEXT": 24,
+      "PRE_STAR/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 24,
+      "STAR_AND_CHINEXT_20PCT/STAR": 24,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 24,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 24,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 24
+    }
+  },
+  "dormant_fallback": {
+    "row_count": 62,
+    "ceiling": 64,
+    "all_cells_8": false,
+    "primary_identity_overlap_count": 0,
+    "pool_digest": "sha256:f7eaf5d9cfc89889cf1f82b1fba6cdf2ab04778f5c578c7d6a1a960d1a4b718d",
+    "cell_counts": {
+      "PRE_STAR/CHINEXT": 8,
+      "PRE_STAR/MAIN": 8,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 8,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 8,
+      "STAR_AND_CHINEXT_20PCT/STAR": 8,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 8,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 8,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 6
+    },
+    "available_non_primary_identity_counts": {
+      "PRE_STAR/CHINEXT": 649,
+      "PRE_STAR/MAIN": 2679,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 480,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 1952,
+      "STAR_AND_CHINEXT_20PCT/STAR": 9,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 503,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 1980,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 6
+    },
+    "worst_case_simultaneous_activation": {
+      "diagnostic_only": true,
+      "max_count": 60,
+      "all_64_feasible": false,
+      "cell_activation_counts": {
+        "PRE_STAR/CHINEXT": 8,
+        "PRE_STAR/MAIN": 8,
+        "STAR_AND_CHINEXT_20PCT/CHINEXT": 7,
+        "STAR_AND_CHINEXT_20PCT/MAIN": 8,
+        "STAR_AND_CHINEXT_20PCT/STAR": 7,
+        "STAR_PRE_CHINEXT_20PCT/CHINEXT": 8,
+        "STAR_PRE_CHINEXT_20PCT/MAIN": 8,
+        "STAR_PRE_CHINEXT_20PCT/STAR": 6
+      }
+    }
+  },
+  "authority_and_reads": {
+    "market_bar_read": false,
+    "admission_market_read": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "fallback_activation": false,
+    "p020_reopen_authorized": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "attribution": {
+    "primary_independence_problem_solved": true,
+    "fallback_shortfall_is_localized": true,
+    "only_cell_below_eight_dormant_fallback_candidates": "STAR_PRE_CHINEXT_20PCT/STAR",
+    "fallback_shortfall": 2,
+    "cause": "P022 excludes all 192 planned-primary economic identities from every dormant fallback pool before any technical readiness outcome is known. Early STAR has 48 repaired metadata identities; after globally unique primary matching, only six identities remain outside the entire planned-primary set.",
+    "not_demonstrated": [
+      "failure_of_192_primary_global_identity_uniqueness",
+      "need_to_lower_primary_24_per_cell",
+      "need_to_drop_STAR",
+      "need_to_open_2022_2024",
+      "Stage12_or_Stage1_semantic_failure"
+    ]
+  },
+  "successor": {
+    "work_item": "P3-STAGE-023",
+    "name": "Realized-Identity Admission and Contingent Replacement",
+    "recommended_scope": "Freeze the exact P022 192-row primary plan and an ordered same-cell fallback reservoir before admission. Admit all primaries first. The realized active identity set contains only admission-ready primaries. Fill technical-readiness deficits from the frozen same-cell fallback order, skipping identities already realized elsewhere; planned primaries that failed readiness do not consume realized identity independence. Stop fail-closed if any cell cannot realize 24 admission-ready globally identity-unique cases. No Stage1/12 semantic review until the final realized plan is frozen.",
+    "semantic_authority": false
+  },
+  "claim_ceiling": "P022 proves that the repaired metadata reservoir can freeze an exact 192-case, 8x24, globally identity-unique primary panel. It also shows that excluding every planned primary identity from dormant fallback reservations leaves only six early-STAR fallback identities and 62/64 fallback rows overall. This no-pass must remain historical; it does not authorize lowering fallback ceilings or semantic work."
+}

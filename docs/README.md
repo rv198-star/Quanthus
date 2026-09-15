@@ -486,12 +486,16 @@ nodes.
   P021 therefore closes fail-closed and recommends P022: keep all 192 eventual primary/review cases
   globally identity-unique, but treat dormant fallback reservations as contingency metadata whose
   cross-cell identity duplication is allowed until activation; any activated fallback must preserve
-  uniqueness in the realized review set. P022 is now frozen before feasibility execution: it uses
-  deterministic bipartite matching to freeze 24 primary identities per cell (192 globally unique),
-  then freezes eight non-primary dormant fallback candidates per cell. Worst-case simultaneous
-  activation of all 64 fallbacks is diagnostic only; actual later activation must be same-cell and
-  globally unique against the realized panel. P020 remains blocked until P022 passes and a separate
-  admission successor is frozen. Preserved 2021/2022-2024/2025 remain unopened.
+  uniqueness in the realized review set. The sole P022 metadata Job proves the core primary condition:
+  all eight cells freeze exactly 24 primary rows and all 192 economic identities are globally unique.
+  Its exact fallback gate nevertheless closes no-pass at 62/64: only early STAR has fewer than eight
+  non-primary dormant candidates (`6/8`), while every other cell reaches `8/8`; worst-case simultaneous
+  activation of the frozen pools reaches 60 unique fallbacks. P022 is therefore not reinterpreted as
+  PASS. Its four-party review selects P023, which must bind the exact 192-row primary plan and a frozen
+  same-cell fallback order, admit primaries first, then build identity independence from the **realized
+  admission-ready panel** rather than from every planned identity. P020 remains blocked until that
+  technical admission successor freezes a final 8×24 globally unique realized plan. Preserved
+  2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,

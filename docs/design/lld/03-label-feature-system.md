@@ -510,11 +510,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-021-B | Metadata-only repaired-capacity recomputation | P3-STAGE-021-A | closed; all eight cells individually meet ≥32 identities, global unique 8×32 reserve reaches 243/256 |
 | P3-STAGE-021-C | Review repaired capacity | P3-STAGE-021-B | closed; preserve global uniqueness of realized review cases, not necessarily dormant fallback reservations |
 | P3-STAGE-021-D | Close and gate any P020 successor | P3-STAGE-021-C | closed `RECOMMEND_P022_PRIMARY_UNIQUE_CONTINGENT_FALLBACK`; P020 remains blocked |
-| P3-STAGE-022 | Primary-unique / contingent-fallback resource contract | P3-STAGE-021 | ready metadata-only route; 8×24 active primary identities must be globally unique, dormant fallback reservations are same-cell contingency rather than active cases |
+| P3-STAGE-022 | Primary-unique / contingent-fallback resource contract | P3-STAGE-021 | closed `CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL`; exact primary panel reaches 192/192 globally unique, dormant fallback pool reaches 62/64 with early STAR at 6/8 |
 | P3-STAGE-022-A | Freeze primary/fallback independence semantics | P3-STAGE-022 | closed preregistration before feasibility result; no market/admission/semantic read |
-| P3-STAGE-022-B | Freeze exact primary plan / fallback pools and test feasibility | P3-STAGE-022-A | ready one-shot metadata Job; bipartite primary matching, eight dormant fallback candidates per cell, 64-simultaneous activation diagnostic only |
-| P3-STAGE-022-C | Review P022 feasibility | P3-STAGE-022-B | blocked |
-| P3-STAGE-022-D | Close and gate any admission successor | P3-STAGE-022-C | blocked; P020 remains blocked |
+| P3-STAGE-022-B | Freeze exact primary plan / fallback pools and test feasibility | P3-STAGE-022-A | closed; sole metadata Job freezes 8×24 primary PASS and 62 dormant fallbacks, 64-simultaneous activation remains diagnostic only |
+| P3-STAGE-022-C | Review P022 feasibility | P3-STAGE-022-B | closed; planned-primary exclusion is too strong for contingency, while realized review identity uniqueness remains mandatory |
+| P3-STAGE-022-D | Close and gate any admission successor | P3-STAGE-022-C | closed `OPEN_REALIZED_IDENTITY_ADMISSION_AND_CONTINGENT_REPLACEMENT`; P023 requires separate freeze, P020 remains blocked |
 
 ## 7. Acceptance
 

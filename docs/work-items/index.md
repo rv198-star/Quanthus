@@ -368,11 +368,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-021-B | Recompute Era×Board capacity under frozen taxonomy | P3-STAGE-021-A | closed `CLOSED_REPAIRED_TAXONOMY_GLOBAL_IDENTITY_SHORTFALL`; per-cell capacity restored, global unique 8×32 = 243/256; config/stage-learning/stage-admission-exposure-capacity-result.v1.json |
 | P3-STAGE-021-C | Four-party review repaired capacity | P3-STAGE-021-B | closed; final active review identities stay globally unique, dormant fallbacks need not be globally unique by reservation alone |
 | P3-STAGE-021-D | Close P021 and gate any P020 successor | P3-STAGE-021-C | closed `RECOMMEND_P022_PRIMARY_UNIQUE_CONTINGENT_FALLBACK`; P020 remains blocked until a separately frozen resource contract passes |
-| P3-STAGE-022 | Primary-unique / contingent-fallback resource contract | P3-STAGE-021 | ready metadata-only route; preserve 8×24 active primary cases as globally identity-unique while treating 8 per-cell fallback rows as dormant contingent reservations; docs/work-items/stage-primary-unique-contingent-fallback.md |
+| P3-STAGE-022 | Primary-unique / contingent-fallback resource contract | P3-STAGE-021 | closed `CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL`; exact 8×24 primary panel = 192 globally unique identities, but dormant fallback pool = 62/64 with early STAR at 6/8; docs/work-items/stage-primary-unique-contingent-fallback.md |
 | P3-STAGE-022-A | Freeze primary/fallback independence semantics | P3-STAGE-021 | closed preregistration; 192 active primary identities globally unique, dormant fallback overlap legal only before activation |
-| P3-STAGE-022-B | Freeze exact primary plan / fallback pools and test metadata feasibility | P3-STAGE-022-A | ready one-shot metadata Job; no market/admission/semantic read; docs/acceptance/stage-primary-unique-contingent-fallback-engineering-20260916.md |
-| P3-STAGE-022-C | Four-party review P022 feasibility | P3-STAGE-022-B | blocked until B executes |
-| P3-STAGE-022-D | Close and gate any P020 admission successor | P3-STAGE-022-C | blocked; P020 remains blocked |
+| P3-STAGE-022-B | Freeze exact primary plan / fallback pools and test metadata feasibility | P3-STAGE-022-A | closed `CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL`; sole Job `stage_cfe744f4b8c941deb7520d1faa31c232`, 192/192 primary PASS, fallback 62/64; config/stage-learning/stage-primary-unique-contingent-fallback-result.v1.json |
+| P3-STAGE-022-C | Four-party review P022 feasibility | P3-STAGE-022-B | closed; do not lower fallback ceiling; bind uniqueness to realized admission-ready cases rather than all planned identities |
+| P3-STAGE-022-D | Close and gate any P020 admission successor | P3-STAGE-022-C | closed `OPEN_REALIZED_IDENTITY_ADMISSION_AND_CONTINGENT_REPLACEMENT`; separately freeze P023, P020 remains blocked |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

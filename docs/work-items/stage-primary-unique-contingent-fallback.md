@@ -1,11 +1,16 @@
 # P3-STAGE-022 — Primary-Unique / Contingent-Fallback Resource Contract
 
-Design status: approved  
-Delivery gate: ready for one metadata-only feasibility Job
+Design status: closed `CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL`
+
+Delivery gate: P023 admission-only successor recommended; P020 remains blocked
 
 Parent: `stage-admission-exposure-taxonomy.md`  
 Machine contract: `../../config/stage-learning/stage-primary-unique-contingent-fallback.v1.json`  
 Execution contract: `../../config/stage-learning/stage-primary-unique-contingent-fallback-feasibility.v1.json`
+
+Result: `../../config/stage-learning/stage-primary-unique-contingent-fallback-result.v1.json`
+
+Review: `../reviews/stage-p022-primary-unique-contingent-fallback-review-20260916.md`
 
 ## Goal
 
@@ -50,12 +55,13 @@ reservations to be globally unique would recreate the P021 `8×32=256` pre-consu
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
 | P3-STAGE-022-A | Freeze primary/fallback semantics | P3-STAGE-021 | closed result-before-run contract |
-| P3-STAGE-022-B | Freeze exact metadata primary plan and dormant fallback pools | P3-STAGE-022-A | ready one-shot metadata Job |
-| P3-STAGE-022-C | Four-party review feasibility | P3-STAGE-022-B | blocked |
-| P3-STAGE-022-D | Close and gate any admission successor | P3-STAGE-022-C | blocked |
+| P3-STAGE-022-B | Freeze exact metadata primary plan and dormant fallback pools | P3-STAGE-022-A | closed `CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL`; 192/192 primary globally unique PASS, dormant fallback 62/64; early STAR only 6/8 |
+| P3-STAGE-022-C | Four-party review feasibility | P3-STAGE-022-B | closed; preserve P022 no-pass and move identity uniqueness from planned resources to realized admission-ready panel |
+| P3-STAGE-022-D | Close and gate any admission successor | P3-STAGE-022-C | closed `OPEN_REALIZED_IDENTITY_ADMISSION_AND_CONTINGENT_REPLACEMENT`; P023 must be separately frozen; P020 remains blocked |
 
 ## Boundaries
 
-P022 reads no market bars, admission results, Stage1/12 semantics, thresholds, review opinions,
-preserved 2021, 2022-2024 or 2025. It does not reopen P020. If P022 passes, only a separately frozen
-P023 input-admission successor may use the exact P022 primary/fallback artifact.
+P022 read no market bars, admission results, Stage1/12 semantics, thresholds, review opinions,
+preserved 2021, 2022-2024 or 2025. It does not reopen P020. The exact P022 primary plan is valid
+historical evidence, while the preregistered fallback pool gate failed at 62/64 and must not be
+reinterpreted as PASS. Only a separately frozen P023 admission-only successor may use P022 evidence.

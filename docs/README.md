@@ -476,8 +476,13 @@ nodes.
   metadata windows, while the other six cells retain 85,203 candidates in aggregate. The exact R1
   artifact was published before any new admission-market read. P020-B therefore closes as a resource-
   governance shortfall, not a Stage1/12 failure, and selects P021 to review whether admission-only
-  technical reads should be distinguished from semantic development exposure. Preserved
-  2021/2022-2024/2025 remain unopened.
+  technical reads should be distinguished from semantic development exposure. P021-A now freezes
+  that distinction before any repaired-capacity result: P014 admission-ledger windows that never
+  entered the 256-row qualified semantic plan are `L2A_TECHNICAL_INPUT_ADMISSION_READ` and may be
+  reused for later semantic development with explicit technical-read provenance; the 256 qualified-
+  plan windows remain semantic-consumed `L2B` resources. P021-B is ready to compare old-vs-repaired
+  capacity using listing/calendar and immutable artifact metadata only; it cannot reopen P020.
+  Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -492,7 +497,9 @@ nodes.
   `work-items/stage-third-group-portfolio-rebaseline.md`,
   `reviews/stage-p019-third-group-portfolio-rebaseline-20260915.md`, and
   `work-items/stage-downside-lifecycle-proposition.md`,
-  `reviews/stage-p020b-resource-shortfall-four-party-review-20260915.md`, and
+  `reviews/stage-p020b-resource-shortfall-four-party-review-20260915.md`,
+  `work-items/stage-admission-exposure-taxonomy.md`,
+  `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

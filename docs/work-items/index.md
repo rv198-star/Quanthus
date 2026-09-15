@@ -363,6 +363,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-020-C | Seal candidate-blind context/nested-condition references | P3-STAGE-020-B | blocked by P020-B resource shortfall; P021 admission-exposure governance must close first |
 | P3-STAGE-020-D | Freeze finite candidate topology and score propositions independently | P3-STAGE-020-C | blocked; no top-1 primary-stage compression |
 | P3-STAGE-020-E | Four-party review and closeout | P3-STAGE-020-D | blocked; preserved evaluation remains separate |
+| P3-STAGE-021 | Admission-only exposure taxonomy repair | P3-STAGE-020-B | ready governance-only route; distinguish technical input-admission reads from semantic development exposure before any repaired capacity result; docs/work-items/stage-admission-exposure-taxonomy.md |
+| P3-STAGE-021-A | Freeze L2A technical-read / L2B semantic-read taxonomy | P3-STAGE-020-B | closed preregistration; only P014 admission rows outside the qualified semantic plan may be L2A reusable, while P014 qualified-plan windows remain consumed |
+| P3-STAGE-021-B | Recompute Era×Board capacity under frozen taxonomy | P3-STAGE-021-A | ready for one metadata-only Job; unchanged 8 cells and 32/24+8 quota; docs/acceptance/stage-admission-exposure-capacity-engineering-20260915.md |
+| P3-STAGE-021-C | Four-party review repaired capacity | P3-STAGE-021-B | blocked until B completes |
+| P3-STAGE-021-D | Close P021 and gate any P020 successor | P3-STAGE-021-C | blocked; successful capacity alone cannot reopen P020 |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

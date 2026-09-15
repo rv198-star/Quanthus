@@ -1,0 +1,99 @@
+{
+  "schema_version": "quanthus.stage-admission-exposure-taxonomy.v1",
+  "work_item": "P3-STAGE-021-A",
+  "state": "PREREGISTERED_ADMISSION_ONLY_EXPOSURE_TAXONOMY_BEFORE_CAPACITY_RECOMPUTE",
+  "effective_date": "2026-09-15",
+  "purpose": "Refine the P013 exposure model so deterministic input-readiness-only market reads are distinguished from semantic development exposure. Freeze the classification before any repaired-capacity result is computed.",
+  "bindings": {
+    "p020_resource_result": {
+      "path": "config/stage-learning/stage-downside-lifecycle-resource-result.v1.json",
+      "sha256": "sha256:691d8f6bedffdd2e28221e0f94e5d85b2a3e134beebcb2848715185125a78772"
+    },
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    },
+    "p014_admission_result": {
+      "path": "config/stage-learning/stage-development-resource-admission-result.v1.json",
+      "sha256": "sha256:16f58ce61e4fd8cec8f50496d4b7fcad4b8680d153f73c540a354e1e3c8ae928"
+    },
+    "p014_qualified_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-qualified-plan-result.v1.json",
+      "sha256": "sha256:ee7bbe9ea643284198340a0d57a1380c65b50651d5f0969ed066fbd5cb98675b"
+    },
+    "p013_exact_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-plan-result.v1.json",
+      "sha256": "sha256:1729ce20bf1ddf6c330025d70d96b046964e7d0b552755834afaa68d3aa20828"
+    }
+  },
+  "taxonomy": {
+    "L2A_TECHNICAL_INPUT_ADMISSION_READ": {
+      "market_input_read": true,
+      "raw_ohlc_retained_or_published": false,
+      "structure_fact_computed": false,
+      "threshold_or_model_basis_computed": false,
+      "review_or_scoring_exposed": false,
+      "future_semantic_development_reuse": "same_exact_window_allowed_with_technical_read_provenance",
+      "identity_global_exclusion": false,
+      "independence_claim": "technical_read_exposed_not_semantic_exposed",
+      "allowed_source": "P014 admission ledger rows that never entered the P014 qualified semantic plan"
+    },
+    "L2B_SEMANTIC_DEVELOPMENT_READ": {
+      "market_input_read": true,
+      "semantic_or_model_basis_consumed": true,
+      "future_semantic_development_reuse": "disjoint_window_only_and_never_claim_identity_independence",
+      "identity_global_exclusion": false,
+      "required_consumed_set": "all P014 qualified-plan exact identity-windows because the later P014/P015/P016 chain consumed that panel semantically"
+    },
+    "L5_PRESERVED_EVALUATION": {
+      "future_semantic_development_reuse": false,
+      "identity_global_exclusion": true,
+      "unchanged_from_p013": true
+    }
+  },
+  "classification_rules": {
+    "p013_exact_plan_windows": "remain consumed and excluded from P021/P020 semantic-development reuse",
+    "p014_admission_rows_in_qualified_plan": "classify_as_L2B_SEMANTIC_DEVELOPMENT_READ_and_exclude",
+    "p014_admission_rows_not_in_qualified_plan": "classify_as_L2A_TECHNICAL_INPUT_ADMISSION_READ_and_allow_for_later_semantic_development_with_provenance",
+    "whole_identity_burn_down": false,
+    "preserved_2021_identity_global_exclusion": true,
+    "result_aware_row_selection": false
+  },
+  "capacity_recompute_contract": {
+    "work_item": "P3-STAGE-021-B",
+    "metadata_only": true,
+    "same_eight_era_board_cells": true,
+    "same_downstream_quota": {
+      "reserve_per_cell": 32,
+      "primary_per_cell": 24,
+      "fallback_per_cell": 8
+    },
+    "new_years": false,
+    "drop_board": false,
+    "reduce_quota": false,
+    "market_bar_read": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "required_outputs": [
+      "exact count of P014 admission-only reusable windows",
+      "exact count of P014 semantic-plan consumed windows",
+      "candidate identities and windows per Era x Board cell after repaired taxonomy",
+      "restored identities and windows attributable to L2A reclassification per cell",
+      "whether each cell has at least 32 metadata-eligible unique identities before any admission read"
+    ]
+  },
+  "authority_ceiling": {
+    "p020_reopen": false,
+    "market_admission_read": false,
+    "semantic_review": false,
+    "threshold_search": false,
+    "candidate_scoring": false,
+    "preserved_evaluation": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P021-A changes only the development exposure taxonomy for technical admission-only reads. It does not assert that repaired capacity will be sufficient, does not reopen P020, and does not establish Stage1/12 semantic validity or any preserved/economic/trading claim."
+}

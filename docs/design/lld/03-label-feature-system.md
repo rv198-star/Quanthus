@@ -505,6 +505,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-020-C | Seal blind semantic references | P3-STAGE-020-B | blocked by P020-B resource shortfall; P021 exposure-governance decision must close first |
 | P3-STAGE-020-D | Score finite proposition candidates independently | P3-STAGE-020-C | blocked; no top-1 stage compression |
 | P3-STAGE-020-E | Review/closeout and gate any later preserved work | P3-STAGE-020-D | blocked; 2021/2022-2024/2025 remain unread |
+| P3-STAGE-021 | Admission-only exposure taxonomy repair | P3-STAGE-020-B | ready governance-only route; separates technical input-admission reads from semantic development exposure without changing Stage1/12 semantics, cells, quota or protected partitions |
+| P3-STAGE-021-A | Freeze L2A/L2B exposure taxonomy | P3-STAGE-020-B | closed preregistration; P014 admission-only rows outside the qualified plan may be development-reusable with provenance, while qualified-plan windows remain consumed |
+| P3-STAGE-021-B | Metadata-only repaired-capacity recomputation | P3-STAGE-021-A | ready for one Job; compares old-vs-repaired exact-window exclusions across the unchanged eight Era×Board cells and checks unchanged 8×32 global-identity feasibility |
+| P3-STAGE-021-C | Review repaired capacity | P3-STAGE-021-B | blocked until B completes |
+| P3-STAGE-021-D | Close and gate any P020 successor | P3-STAGE-021-C | blocked; P020 cannot reopen from capacity output alone |
 
 ## 7. Acceptance
 

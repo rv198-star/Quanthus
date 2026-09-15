@@ -103,6 +103,9 @@ P020_RESOURCE_RESULT = (
     ROOT / "config/stage-learning/stage-downside-lifecycle-resource-result.v1.json"
 )
 P020_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-proposition.md"
+P021_TAXONOMY = ROOT / "config/stage-learning/stage-admission-exposure-taxonomy.v1.json"
+P021_CAPACITY = ROOT / "config/stage-learning/stage-admission-exposure-capacity.v1.json"
+P021_WORK = ROOT / "docs/work-items/stage-admission-exposure-taxonomy.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -1428,6 +1431,71 @@ def test_stage020b_closes_on_star_fresh_window_exhaustion_before_admission() -> 
     assert stop["preserved_2021_read"] is False
     assert value["successor"]["work_item"] == "P3-STAGE-021"
     assert value["successor"]["result_bearing_authority"] is False
+
+
+def test_stage021_freezes_admission_only_vs_semantic_exposure_before_capacity() -> None:
+    value = json.loads(P021_TAXONOMY.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-021-A"
+    assert value["state"] == (
+        "PREREGISTERED_ADMISSION_ONLY_EXPOSURE_TAXONOMY_BEFORE_CAPACITY_RECOMPUTE"
+    )
+    taxonomy = value["taxonomy"]
+    l2a = taxonomy["L2A_TECHNICAL_INPUT_ADMISSION_READ"]
+    assert l2a["market_input_read"] is True
+    assert l2a["raw_ohlc_retained_or_published"] is False
+    assert l2a["structure_fact_computed"] is False
+    assert l2a["threshold_or_model_basis_computed"] is False
+    assert l2a["review_or_scoring_exposed"] is False
+    assert l2a["identity_global_exclusion"] is False
+    assert l2a["independence_claim"] == "technical_read_exposed_not_semantic_exposed"
+    l2b = taxonomy["L2B_SEMANTIC_DEVELOPMENT_READ"]
+    assert l2b["semantic_or_model_basis_consumed"] is True
+    rules = value["classification_rules"]
+    assert rules["whole_identity_burn_down"] is False
+    assert rules["preserved_2021_identity_global_exclusion"] is True
+    assert rules["result_aware_row_selection"] is False
+    capacity = value["capacity_recompute_contract"]
+    assert capacity["work_item"] == "P3-STAGE-021-B"
+    assert capacity["metadata_only"] is True
+    assert capacity["same_eight_era_board_cells"] is True
+    assert capacity["same_downstream_quota"] == {
+        "reserve_per_cell": 32,
+        "primary_per_cell": 24,
+        "fallback_per_cell": 8,
+    }
+    assert capacity["new_years"] is False
+    assert capacity["drop_board"] is False
+    assert capacity["reduce_quota"] is False
+    assert P021_WORK.is_file()
+
+
+def test_stage021b_is_metadata_only_capacity_under_frozen_taxonomy() -> None:
+    value = json.loads(P021_CAPACITY.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-021-B"
+    assert value["state"] == "PREREGISTERED_METADATA_ONLY_CAPACITY_AFTER_TAXONOMY_FREEZE"
+    comparison = value["comparison"]
+    assert comparison["admission_only_reusable_class"] == "L2A_TECHNICAL_INPUT_ADMISSION_READ"
+    assert comparison["semantic_consumed_class"] == "L2B_SEMANTIC_DEVELOPMENT_READ"
+    capacity = value["capacity_contract"]
+    assert capacity["required_unique_identities_per_cell"] == 32
+    assert capacity["global_identity_unique_reserve_rows"] == 256
+    authority = value["authority"]
+    assert authority["listing_calendar_metadata_read"] is True
+    assert authority["prior_artifact_metadata_read"] is True
+    for key in (
+        "market_bar_read",
+        "admission_market_read",
+        "stage1_12_semantic_read",
+        "threshold_or_candidate_read",
+        "reference_opinion_read",
+        "p020_reopen",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

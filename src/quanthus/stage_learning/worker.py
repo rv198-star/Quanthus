@@ -90,6 +90,9 @@ STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB = (
 STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB = (
     "quanthus.stage-downside-lifecycle-resource-plan.v1"
 )
+STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB = (
+    "quanthus.stage-admission-exposure-capacity.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -160,6 +163,9 @@ DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_BUDGET_SCHEMA = (
 )
 DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA = (
     "quanthus.stage-downside-lifecycle-resource-plan-recovery-budget.v1"
+)
+ADMISSION_EXPOSURE_CAPACITY_BUDGET_SCHEMA = (
+    "quanthus.stage-admission-exposure-capacity-budget.v1"
 )
 DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-downside-lifecycle-resource-plan-recovery.v1.json"
@@ -409,6 +415,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-downside-lifecycle-resource-plan-*",
         "process_error": "stage_downside_lifecycle_resource_plan_process_failed",
         "wall_seconds": 3600,
+    },
+    STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB: {
+        "config": "config/stage-learning/stage-admission-exposure-capacity.v1.json",
+        "module": "quanthus.stage_learning.admission_exposure_capacity",
+        "artifact_glob": "stage-admission-exposure-capacity-*",
+        "process_error": "stage_admission_exposure_capacity_process_failed",
+        "wall_seconds": 600,
     },
 }
 
@@ -682,6 +695,10 @@ class StageWorkerPaths:
     @property
     def downside_lifecycle_resource_plan_recovery_budget(self) -> Path:
         return self.control_root / "downside-lifecycle-resource-plan-recovery-budget.json"
+
+    @property
+    def admission_exposure_capacity_budget(self) -> Path:
+        return self.control_root / "admission-exposure-capacity-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -2309,6 +2326,41 @@ def _existing_downside_lifecycle_resource_plan_submission(
     return _idempotent_stage_submission(paths, recovery_job), failed_job
 
 
+def _admission_exposure_capacity_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": ADMISSION_EXPOSURE_CAPACITY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-021-B",
+        "phase": "ADMISSION_EXPOSURE_TAXONOMY_METADATA_CAPACITY",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_admission_exposure_capacity_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.admission_exposure_capacity_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "admission exposure capacity budget")
+    if (
+        marker.get("schema_version") != ADMISSION_EXPOSURE_CAPACITY_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-021-B"
+        or marker.get("phase") != "ADMISSION_EXPOSURE_TAXONOMY_METADATA_CAPACITY"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("admission exposure capacity budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("admission exposure capacity budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError("admission exposure capacity has no retry or replacement authority")
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -3388,6 +3440,37 @@ class StageWorker:
                 "2022_2024_read": verified.get("2022_2024_read"),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB:
+            result["admission_exposure_capacity"] = {
+                "disposition": verified.get("disposition"),
+                "p014_admission_window_count": verified.get("p014_admission_window_count"),
+                "p014_semantic_consumed_window_count": verified.get(
+                    "p014_semantic_consumed_window_count"
+                ),
+                "p014_admission_only_reusable_window_count": verified.get(
+                    "p014_admission_only_reusable_window_count"
+                ),
+                "restored_admission_only_window_count_in_metadata_reservoir": verified.get(
+                    "restored_admission_only_window_count_in_metadata_reservoir"
+                ),
+                "old_all_cells_capacity_pass": verified.get("old_all_cells_capacity_pass"),
+                "repaired_all_cells_capacity_pass": verified.get(
+                    "repaired_all_cells_capacity_pass"
+                ),
+                "global_unique_8x32_metadata_feasible": verified.get(
+                    "global_unique_8x32_metadata_feasible"
+                ),
+                "global_unique_selected_row_count": verified.get(
+                    "global_unique_selected_row_count"
+                ),
+                "comparison_rows": verified.get("comparison_rows"),
+                "market_bar_read": verified.get("market_bar_read"),
+                "stage1_12_semantic_read": verified.get("stage1_12_semantic_read"),
+                "p020_reopen_authorized": verified.get("p020_reopen_authorized"),
+                "preserved_2021_read": verified.get("preserved_2021_read"),
+                "2022_2024_read": verified.get("2022_2024_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB:
             result["downside_lifecycle_resource_plan"] = {
                 "disposition": verified.get("disposition"),
@@ -3859,6 +3942,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB:
+        existing = _existing_admission_exposure_capacity_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -3952,6 +4041,9 @@ def submit_job(
     downside_lifecycle_resource_plan_recovery_reserved = (
         job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB
         and downside_lifecycle_resource_plan_recovery_of is not None
+    )
+    admission_exposure_capacity_reserved = (
+        job.kind == STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -4111,6 +4203,11 @@ def submit_job(
                 downside_lifecycle_resource_plan_recovery_of, job
             ),
         )
+    if admission_exposure_capacity_reserved:
+        _exclusive_json(
+            paths.admission_exposure_capacity_budget,
+            _admission_exposure_capacity_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -4179,6 +4276,8 @@ def submit_job(
             paths.downside_lifecycle_resource_plan_budget.unlink(missing_ok=True)
         if downside_lifecycle_resource_plan_recovery_reserved:
             paths.downside_lifecycle_resource_plan_recovery_budget.unlink(missing_ok=True)
+        if admission_exposure_capacity_reserved:
+            paths.admission_exposure_capacity_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -4242,6 +4341,8 @@ def submit_job(
             paths.downside_lifecycle_resource_plan_budget.unlink(missing_ok=True)
         if downside_lifecycle_resource_plan_recovery_reserved:
             paths.downside_lifecycle_resource_plan_recovery_budget.unlink(missing_ok=True)
+        if admission_exposure_capacity_reserved:
+            paths.admission_exposure_capacity_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -7247,6 +7348,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p020_b_failure": _recent_stage_job_failure(
             paths, kind=STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
+        ),
+        "recent_p021_b_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB,
         ),
     }
 

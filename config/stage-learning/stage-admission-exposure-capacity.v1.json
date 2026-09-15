@@ -1,0 +1,108 @@
+{
+  "schema_version": "quanthus.stage-admission-exposure-capacity.v1",
+  "work_item": "P3-STAGE-021-B",
+  "state": "PREREGISTERED_METADATA_ONLY_CAPACITY_AFTER_TAXONOMY_FREEZE",
+  "effective_date": "2026-09-15",
+  "purpose": "Mechanically recompute the eight Era x Board development-resource capacities after the P021-A exposure taxonomy freeze, comparing the old all-P014-admission-read exclusion with the repaired exclusion that keeps only semantically consumed P014 qualified-plan windows excluded.",
+  "bindings": {
+    "taxonomy": {
+      "path": "config/stage-learning/stage-admission-exposure-taxonomy.v1.json",
+      "sha256": "sha256:e39584f4985168d73f01b9bb86df17fb1c2f0b947a4c3452d634b3b52b6a4620"
+    },
+    "p020_resource_contract": {
+      "path": "config/stage-learning/stage-downside-lifecycle-resource-plan.v1.json",
+      "sha256": "sha256:e96cfc62fa63cbdb3629d00fe1744333d0f07326e4a8d93fec37d4c08d8a17c0"
+    },
+    "capacity_census_contract": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census.v1.json",
+      "sha256": "sha256:fbeefb8b4cbce35aa1f8c715b8e61dfa857e4ba0b72fe047c5c5d24d59629e25"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    },
+    "p013_exact_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-plan-result.v1.json",
+      "sha256": "sha256:1729ce20bf1ddf6c330025d70d96b046964e7d0b552755834afaa68d3aa20828"
+    },
+    "p013_exact_plan_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_060f6edc80774b6b802e56b6c21025bc/stage-development-resource-plan-20260914T095217Z",
+      "job_id": "stage_060f6edc80774b6b802e56b6c21025bc",
+      "code_revision": "2cd26b00a90402c7be3256dfb3d341dc3b9abe18",
+      "manifest_sha256": "sha256:853ade679e1107db238ec68daa8a26755e1d48ef334b9b85d525a8fcd0a3adef",
+      "plan_digest": "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371"
+    },
+    "p014_admission_result": {
+      "path": "config/stage-learning/stage-development-resource-admission-result.v1.json",
+      "sha256": "sha256:16f58ce61e4fd8cec8f50496d4b7fcad4b8680d153f73c540a354e1e3c8ae928"
+    },
+    "p014_admission_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_bcaf8263cb724a2798d250909c42331f/stage-development-resource-admission-20260914T114854Z",
+      "job_id": "stage_bcaf8263cb724a2798d250909c42331f",
+      "code_revision": "99b1e25f1dde36ec68d31bdcfffc61d39acf3ce0",
+      "manifest_sha256": "sha256:c21cb8ff0c5340d6afb22942f30f1845bfb3c2371b6b9b79e1baff8f4f3004db"
+    },
+    "p014_qualified_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-qualified-plan-result.v1.json",
+      "sha256": "sha256:ee7bbe9ea643284198340a0d57a1380c65b50651d5f0969ed066fbd5cb98675b"
+    },
+    "p014_qualified_plan_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_9dbc57be4839405790be0e021d8271ba/stage-development-resource-qualified-plan-20260914T120249Z",
+      "job_id": "stage_9dbc57be4839405790be0e021d8271ba",
+      "code_revision": "fd2bf808b9a3a3e1fdd5e786c968db70f17b10b2",
+      "manifest_sha256": "sha256:f14c065d0bf18b6491b9220132d1be3c10e608fb9a69f4141c576e351aa7a173",
+      "plan_digest": "sha256:206ed58e8349de59efd52caad958f7bd0f2f9d79f1ee0199eea6a079b6c14829"
+    }
+  },
+  "comparison": {
+    "old_rule": "exclude P013 exact-plan windows plus every P014 admission-ledger exact window",
+    "repaired_rule": "exclude P013 exact-plan windows plus the P014 qualified semantic-plan exact windows only",
+    "admission_only_reusable_class": "L2A_TECHNICAL_INPUT_ADMISSION_READ",
+    "semantic_consumed_class": "L2B_SEMANTIC_DEVELOPMENT_READ",
+    "preserved_identity_global_exclusion": true
+  },
+  "capacity_contract": {
+    "cell_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "required_unique_identities_per_cell": 32,
+    "global_identity_unique_reserve_rows": 256,
+    "identity_seed": "p020-downside-lifecycle-v1|identity",
+    "no_market_prevalence_claim": true,
+    "no_result_aware_selection": true
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 600
+  },
+  "authority": {
+    "listing_calendar_metadata_read": true,
+    "prior_artifact_metadata_read": true,
+    "market_bar_read": false,
+    "admission_market_read": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "p020_reopen": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "output": {
+    "artifact_schema": "quanthus.stage-admission-exposure-capacity-artifact.v1",
+    "summary_schema": "quanthus.stage-admission-exposure-capacity-summary.v1",
+    "comparison_schema": "quanthus.stage-admission-exposure-capacity-comparison.v1",
+    "source_binding_schema": "quanthus.stage-admission-exposure-capacity-source-binding.v1"
+  },
+  "claim_ceiling": "P021-B reports metadata capacity only under the already-frozen taxonomy. It cannot reopen P020, authorize reuse for semantics by itself, establish Stage1/12 quality, or change protected partition boundaries."
+}

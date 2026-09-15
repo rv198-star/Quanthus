@@ -7201,6 +7201,84 @@ def _instability_channel_decomposition_diagnostics(
     }
 
 
+def _primary_unique_contingent_fallback_diagnostics(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("primary unique fallback result reference missing")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError("primary unique fallback artifact outside job root") from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("primary unique fallback manifest binding differs")
+    manifest = json.loads(manifest_raw)
+
+    def bound_json(name: str) -> dict[str, Any]:
+        raw = (artifact_root / name).read_bytes()
+        if manifest.get("files", {}).get(name) != _bytes_sha256(raw):
+            raise StageWorkerError(f"primary unique fallback diagnostic binding differs:{name}")
+        value = json.loads(raw)
+        if not isinstance(value, dict):
+            raise StageWorkerError(f"primary unique fallback diagnostic shape differs:{name}")
+        return value
+
+    primary = bound_json("primary-plan.json")
+    fallback = bound_json("fallback-pools.json")
+    summary = bound_json("summary.json")
+    cell_receipts = fallback.get("cell_receipts")
+    worst_case = fallback.get("worst_case_simultaneous_activation")
+    if not isinstance(cell_receipts, list) or not isinstance(worst_case, Mapping):
+        raise StageWorkerError("primary unique fallback diagnostic payload differs")
+    compact_capacity = []
+    for receipt in cell_receipts:
+        if not isinstance(receipt, Mapping):
+            raise StageWorkerError("primary unique fallback cell receipt differs")
+        compact_capacity.append(
+            {
+                "cell": receipt.get("cell"),
+                "available_non_primary_identity_count": receipt.get(
+                    "available_non_primary_identity_count"
+                ),
+                "frozen_fallback_candidate_count": receipt.get(
+                    "frozen_fallback_candidate_count"
+                ),
+                "fallback_ceiling": receipt.get("fallback_ceiling"),
+                "sufficient": receipt.get("sufficient"),
+            }
+        )
+    return {
+        "schema_version": "quanthus.stage-primary-unique-contingent-fallback-diagnostics.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "disposition": summary.get("disposition"),
+        "primary_cell_counts": primary.get("cell_counts"),
+        "fallback_cell_counts": fallback.get("cell_counts"),
+        "fallback_cell_capacity": compact_capacity,
+        "worst_case_fallback_cell_activation_counts": worst_case.get(
+            "cell_activation_counts"
+        ),
+        "worst_case_simultaneous_fallback_activation_count": summary.get(
+            "worst_case_simultaneous_fallback_activation_count"
+        ),
+        "security_ids_included": False,
+        "windows_included": False,
+        "market_bar_read": False,
+        "stage1_12_semantic_read": False,
+    }
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -7276,6 +7354,14 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
             result = {
                 **result,
                 "instability_channel_decomposition_diagnostics": channel_diagnostics,
+            }
+        fallback_diagnostics = _primary_unique_contingent_fallback_diagnostics(
+            paths, observed
+        )
+        if fallback_diagnostics is not None:
+            result = {
+                **result,
+                "primary_unique_contingent_fallback_diagnostics": fallback_diagnostics,
             }
         selection_transport = _positive_instability_d1_selection_transport(paths, observed)
         if selection_transport is None:

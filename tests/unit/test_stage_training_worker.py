@@ -1263,6 +1263,96 @@ def test_instability_channel_decomposition_status_exposes_bounded_diagnostics_on
     assert "secret_threshold" not in json.dumps(diagnostics)
 
 
+def test_primary_unique_fallback_status_exposes_bounded_cell_diagnostics_only(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "4" * 32
+    artifact = worker_paths.runs / job_id / "stage-primary-unique-contingent-fallback-test"
+    artifact.mkdir(parents=True)
+    primary = {
+        "rows": [{"security_id": "PRIMARY-SECRET"}],
+        "cell_counts": {"ERA/A": 24},
+    }
+    fallback = {
+        "rows": [{"security_id": "FALLBACK-SECRET"}],
+        "cell_counts": {"ERA/A": 7},
+        "cell_receipts": [
+            {
+                "cell": "ERA/A",
+                "available_non_primary_identity_count": 7,
+                "frozen_fallback_candidate_count": 7,
+                "fallback_ceiling": 8,
+                "sufficient": False,
+                "selected_identity_digest": "sha256:" + "1" * 64,
+            }
+        ],
+        "worst_case_simultaneous_activation": {
+            "cell_activation_counts": {"ERA/A": 6}
+        },
+    }
+    summary = {
+        "disposition": "CLOSED_DORMANT_FALLBACK_POOL_SHORTFALL",
+        "worst_case_simultaneous_fallback_activation_count": 6,
+    }
+    payloads = {
+        "primary-plan.json": json.dumps(
+            primary, sort_keys=True, separators=(",", ":")
+        ).encode(),
+        "fallback-pools.json": json.dumps(
+            fallback, sort_keys=True, separators=(",", ":")
+        ).encode(),
+        "summary.json": json.dumps(summary, sort_keys=True, separators=(",", ":")).encode(),
+    }
+    for name, raw in payloads.items():
+        (artifact / name).write_bytes(raw)
+    manifest = {
+        "files": {
+            name: "sha256:" + hashlib.sha256(raw).hexdigest()
+            for name, raw in payloads.items()
+        }
+    }
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-15T00:00:00+00:00",
+        "started_at": "2026-09-15T00:00:01+00:00",
+        "completed_at": "2026-09-15T00:00:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "primary_unique_contingent_fallback": {"disposition": summary["disposition"]},
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-15T00:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+
+    observed = read_status(worker_paths, job_id)
+    diagnostics = observed["primary_unique_contingent_fallback_diagnostics"]
+    assert diagnostics["primary_cell_counts"] == {"ERA/A": 24}
+    assert diagnostics["fallback_cell_counts"] == {"ERA/A": 7}
+    assert diagnostics["fallback_cell_capacity"][0]["fallback_ceiling"] == 8
+    assert diagnostics["fallback_cell_capacity"][0]["sufficient"] is False
+    assert diagnostics["worst_case_fallback_cell_activation_counts"] == {"ERA/A": 6}
+    assert diagnostics["security_ids_included"] is False
+    assert diagnostics["windows_included"] is False
+    rendered = json.dumps(diagnostics)
+    assert "PRIMARY-SECRET" not in rendered
+    assert "FALLBACK-SECRET" not in rendered
+
+
 def test_instability_channel_decomposition_is_one_shot_and_idempotent(
     tmp_path: Path,
 ) -> None:

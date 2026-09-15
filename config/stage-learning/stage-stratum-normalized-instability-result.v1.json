@@ -1,0 +1,172 @@
+{
+  "schema_version": "quanthus.stage-stratum-normalized-instability-result.v1",
+  "work_item": "P3-STAGE-017-B",
+  "state": "CLOSED_STRATUM_NORMALIZED_INSTABILITY_FAIL",
+  "effective_date": "2026-09-15",
+  "initial_job": {
+    "job_id": "stage_f670ede6347e4bd5921b66e61a034a9d",
+    "code_revision": "10b998766acd72e27fa46b9ecd3fff4ecaf6a556",
+    "input_digest": "sha256:923f906864ca3887a2370d79b6f8f7b4d9a742abebbc023d6d37e8b0fc41fab0",
+    "terminal_state": "failed",
+    "artifact_published": false,
+    "semantic_scoring_reached": false,
+    "failure_reason": "StratumNormalizedInstabilityError:reference_result_shape"
+  },
+  "technical_recovery": {
+    "job_id": "stage_5356bab390684fd9ae154e5d14b1a02b",
+    "technical_recovery_of": "stage_f670ede6347e4bd5921b66e61a034a9d",
+    "code_revision": "7562f536c822c5ddfb1f308a87574bf2a8e3d666",
+    "input_digest": "sha256:b4b383517344d97c7b59320381e6e1d0cd4144872d1b2c0f9bca64fe2ba8493f",
+    "terminal_state": "succeeded",
+    "manifest_sha256": "sha256:6bdd7713b246ce7399a45f985f4bf2283a6d7dec6f535e27d0c13bbbe835b8ec",
+    "basis_digest": "sha256:055741aff5b4eec456a8c6ab6cba15c903fede23b602a44714386a7d464c4c88",
+    "profile_grid_digest": "sha256:b26bb103002fc59f8b87b320b2cf46a9681197bcb20fe0931ebea35f02f6d1a7"
+  },
+  "development_surface": {
+    "reference_case_count": 252,
+    "cell_count": 8,
+    "candidate_count": 9,
+    "eligible_candidate_count": 0,
+    "selected_profile_id": null,
+    "prediction_artifact_available": false
+  },
+  "frozen_quality_gate": {
+    "minimum_predictions": 18,
+    "minimum_macro_precision": "0.78",
+    "minimum_macro_positive_reference_coverage": "0.70",
+    "maximum_macro_definite_negative_false_positive_rate": "0.10",
+    "gate_change": false
+  },
+  "trial_summary": [
+    {
+      "expansion_profile_id": "expansion-balanced",
+      "broad_profile_id": "broad-balanced",
+      "macro_precision": "0.4928571428571428571428571429",
+      "macro_positive_reference_coverage": "0.6635912698412698412698412698",
+      "macro_definite_negative_false_positive_rate": "0.1772179515745692216280451575",
+      "pooled_predictions": 51,
+      "pooled_true_positive": 24,
+      "pooled_false_positive": 27,
+      "eligible": false
+    },
+    {
+      "expansion_profile_id": "expansion-balanced",
+      "broad_profile_id": "broad-lenient",
+      "macro_precision": "0.3576388888888888888888888889",
+      "macro_positive_reference_coverage": "0.6948412698412698412698412698",
+      "macro_definite_negative_false_positive_rate": "0.3208416889483065953654188949",
+      "pooled_predictions": 72,
+      "pooled_true_positive": 25,
+      "pooled_false_positive": 47,
+      "eligible": false
+    },
+    {
+      "expansion_profile_id": "expansion-balanced",
+      "broad_profile_id": "broad-strict",
+      "macro_precision": "0.6114583333333333333333333334",
+      "macro_positive_reference_coverage": "0.6497023809523809523809523809",
+      "macro_definite_negative_false_positive_rate": "0.1098902629233511586452762923",
+      "pooled_predictions": 39,
+      "pooled_true_positive": 23,
+      "pooled_false_positive": 16,
+      "eligible": false
+    },
+    {
+      "expansion_profile_id": "expansion-lenient",
+      "broad_profile_id": "broad-balanced",
+      "macro_precision": "0.4691964285714285714285714286",
+      "macro_positive_reference_coverage": "0.6885912698412698412698412698",
+      "macro_definite_negative_false_positive_rate": "0.1967886586452762923351158645",
+      "pooled_predictions": 55,
+      "pooled_true_positive": 25,
+      "pooled_false_positive": 30,
+      "eligible": false
+    },
+    {
+      "expansion_profile_id": "expansion-lenient",
+      "broad_profile_id": "broad-lenient",
+      "macro_precision": "0.3534722222222222222222222222",
+      "macro_positive_reference_coverage": "0.7198412698412698412698412698",
+      "macro_definite_negative_false_positive_rate": "0.3347305778371954842543077838",
+      "pooled_predictions": 75,
+      "pooled_true_positive": 26,
+      "pooled_false_positive": 49,
+      "eligible": false
+    },
+    {
+      "expansion_profile_id": "expansion-lenient",
+      "broad_profile_id": "broad-strict",
+      "macro_precision": "0.5537202380952380952380952381",
+      "macro_positive_reference_coverage": "0.6747023809523809523809523809",
+      "macro_definite_negative_false_positive_rate": "0.1294609699940582293523469994",
+      "pooled_predictions": 43,
+      "pooled_true_positive": 24,
+      "pooled_false_positive": 19,
+      "eligible": false
+    },
+    {
+      "expansion_profile_id": "expansion-strict",
+      "broad_profile_id": "broad-balanced",
+      "macro_precision": "0.4672619047619047619047619048",
+      "macro_positive_reference_coverage": "0.5957341269841269841269841269",
+      "macro_definite_negative_false_positive_rate": "0.1698650103980986333927510398",
+      "pooled_predictions": 47,
+      "pooled_true_positive": 21,
+      "pooled_false_positive": 26,
+      "eligible": false
+    },
+    {
+      "expansion_profile_id": "expansion-strict",
+      "broad_profile_id": "broad-lenient",
+      "macro_precision": "0.3488275613275613275613275614",
+      "macro_positive_reference_coverage": "0.6519841269841269841269841269",
+      "macro_definite_negative_false_positive_rate": "0.3134887477718360071301247771",
+      "pooled_predictions": 69,
+      "pooled_true_positive": 23,
+      "pooled_false_positive": 46,
+      "eligible": false
+    },
+    {
+      "expansion_profile_id": "expansion-strict",
+      "broad_profile_id": "broad-strict",
+      "macro_precision": "0.5437500000000000000000000000",
+      "macro_positive_reference_coverage": "0.4389880952380952380952380952",
+      "macro_definite_negative_false_positive_rate": "0.1025373217468805704099821747",
+      "pooled_predictions": 33,
+      "pooled_true_positive": 18,
+      "pooled_false_positive": 15,
+      "eligible": false
+    }
+  ],
+  "comparison_to_p016": {
+    "same_profile": "expansion-balanced/broad-strict",
+    "p016_macro_precision": "0.7645833333333333333333333334",
+    "p016_macro_positive_reference_coverage": "0.6207341269841269841269841269",
+    "p016_macro_definite_negative_false_positive_rate": "0.06021303723509605862547039018",
+    "p017_macro_precision": "0.6114583333333333333333333334",
+    "p017_macro_positive_reference_coverage": "0.6497023809523809523809523809",
+    "p017_macro_definite_negative_false_positive_rate": "0.1098902629233511586452762923",
+    "interpretation": "Cell-local scale calibration modestly increased coverage but materially reduced precision and worsened FPR; scale mismatch alone is not the dominant failure mode."
+  },
+  "authority_ceiling": {
+    "same_job_retry": false,
+    "additional_recovery": false,
+    "profile_expansion": false,
+    "quantile_change": false,
+    "quality_gate_relaxation": false,
+    "reference_rewrite": false,
+    "dwd_market_read": false,
+    "fixed_relocation_scored": false,
+    "order_scored": false,
+    "projection_performed": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false
+  },
+  "successor": {
+    "work_item": "P3-STAGE-018",
+    "disposition": "OPEN_INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC",
+    "scope": "Decompose the frozen expanding_disorder_20 and broad_reversal_disorder_20 channels against the immutable parent instability reference before any new thresholds or semantic labels are introduced."
+  },
+  "claim_ceiling": "P017 establishes only that the frozen 3x3 profile topology remains development-ineligible after Era x Board cell-local unlabeled calibration on the immutable 252-case development surface. It does not prove the parent instability concept is invalid, does not qualify a successor mechanism, and does not authorize preserved evaluation, strategy use, production use or trading."
+}

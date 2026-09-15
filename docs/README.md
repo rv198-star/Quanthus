@@ -448,12 +448,17 @@ nodes.
   Strict candidates controlled FPR but under-covered older regimes; looser candidates recovered
   coverage while over-firing in later cells. The frozen stop rule therefore prevented fixed-R/order
   scoring and projection; preserved 2021/2025 remain unread. Same-origin four-party attribution opens
-  P017 as a new artifact-only development successor using unlabeled Era × Board cell-local quantile
-  calibration rather than denser global threshold search; the zero-gain envelope additive channel is
-  retired from successor eligibility instead of tuned post-result. Its result-free engineering freeze
-  now binds the exact 252-case surface, builds all eight unlabeled cell bases before any reference-
-  ledger read, keeps the fixed 3×3 profile coordinates and unchanged absolute instability quality
-  thresholds, and admits exactly one scoring Job with no R/O/projection/preserved-data authority.
+  P017 then tested the narrower scale-mismatch hypothesis with unlabeled Era × Board cell-local
+  quantile calibration while retaining the same exact 252-case surface, fixed 3×3 profile coordinates
+  and unchanged instability quality gates. Its initial process failed before scoring on one durable-
+  result field-path mismatch; the separately frozen one-shot R1 recovery corrected only that binding
+  and completed the intended experiment. P017 closed `CLOSED_STRATUM_NORMALIZED_INSTABILITY_FAIL`:
+  0/9 profiles were eligible. The closest balanced/strict profile moved from roughly
+  `P=.765/C=.621/FPR=.060` in P016 to `P=.611/C=.650/FPR=.110` after local normalization, while the
+  only coverage-passing lenient/lenient profile had very poor precision/FPR. Four-party attribution
+  therefore rejects scale normalization as the dominant missing ingredient and selects a separately
+  gated P018 channel-decomposition diagnostic before any new thresholds or semantic labels. R/O,
+  projection and preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,

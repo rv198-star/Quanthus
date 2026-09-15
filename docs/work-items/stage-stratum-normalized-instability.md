@@ -1,7 +1,7 @@
 # P3-STAGE-017 — Era × Board Stratum-Normalized Instability Development
 
 Design status: approved  
-Delivery gate: open for one artifact-only development scoring Job
+Delivery gate: accepted closeout with semantic no-pass
 
 Parent: `stage-combined-atomic-scoring.md`  
 Machine contract: `../../config/stage-learning/stage-stratum-normalized-instability.v1.json`
@@ -53,10 +53,10 @@ No automatic retry is authorized after a semantic result. The initial P017-B pro
 
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
-| P3-STAGE-017-A | Freeze normalization/topology/blinding semantics | P3-STAGE-016 | ready design: exact 252 surface, eight unlabeled cell bases, fixed 3×3 coordinates, no envelope eligibility |
-| P3-STAGE-017-B | Run artifact-only stratum-normalized instability scoring | P3-STAGE-017-A | technical recovery ready: initial Job `stage_f670ede6347e4bd5921b66e61a034a9d` failed before `_score_profiles` because of a single reference-result field-path bug and published no artifact; one exact R1 recovery is authorized with all semantic bindings unchanged; `../acceptance/stage-stratum-normalized-instability-recovery-20260915.md` |
-| P3-STAGE-017-C | Four-party semantic outcome review | P3-STAGE-017-B | blocked until B publishes a terminal semantic result |
-| P3-STAGE-017-D | Close and decide successor gate | P3-STAGE-017-C | blocked; any further atomic/projection work requires a separate freeze |
+| P3-STAGE-017-A | Freeze normalization/topology/blinding semantics | P3-STAGE-016 | closed `PASS_STRATUM_NORMALIZED_INSTABILITY_ENGINEERING_FREEZE`; exact 252 surface, eight unlabeled cell bases, fixed 3×3 coordinates, no envelope eligibility |
+| P3-STAGE-017-B | Run artifact-only stratum-normalized instability scoring | P3-STAGE-017-A | closed `CLOSED_STRATUM_NORMALIZED_INSTABILITY_FAIL`; initial process failed before scoring on one field-path bug, exact R1 recovery succeeded, and 0/9 profiles passed unchanged gates; `../../config/stage-learning/stage-stratum-normalized-instability-result.v1.json` |
+| P3-STAGE-017-C | Four-party semantic outcome review | P3-STAGE-017-B | closed `PASS_OPEN_P018_INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC`; scale normalization alone is rejected as the dominant explanation; `../reviews/stage-p017-stratum-normalized-no-pass-four-party-review-20260915.md` |
+| P3-STAGE-017-D | Close and decide successor gate | P3-STAGE-017-C | closed `PRESERVED_EVALUATION_NOT_AUTHORIZED`; P018 selected for separate preregistration, preserved partitions remain unread |
 
 ## Pass / fail meaning
 

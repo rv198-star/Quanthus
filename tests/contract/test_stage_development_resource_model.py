@@ -82,6 +82,10 @@ P017_CONFIG = ROOT / "config/stage-learning/stage-stratum-normalized-instability
 P017_RECOVERY = (
     ROOT / "config/stage-learning/stage-stratum-normalized-instability-recovery.v1.json"
 )
+P017_RESULT = ROOT / "config/stage-learning/stage-stratum-normalized-instability-result.v1.json"
+P017_NOPASS_REVIEW = (
+    ROOT / "docs/reviews/stage-p017-stratum-normalized-no-pass-four-party-review-20260915.md"
+)
 P017_WORK = ROOT / "docs/work-items/stage-stratum-normalized-instability.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1080,6 +1084,52 @@ def test_stage017_recovery_is_exact_field_path_repair_only() -> None:
         "trading",
     ):
         assert authority[key] is False
+
+
+def test_stage017_closes_no_pass_and_selects_channel_decomposition_diagnostic() -> None:
+    value = json.loads(P017_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-017-B"
+    assert value["state"] == "CLOSED_STRATUM_NORMALIZED_INSTABILITY_FAIL"
+    recovery = value["technical_recovery"]
+    assert recovery["job_id"] == "stage_5356bab390684fd9ae154e5d14b1a02b"
+    assert recovery["technical_recovery_of"] == "stage_f670ede6347e4bd5921b66e61a034a9d"
+    assert recovery["terminal_state"] == "succeeded"
+    surface = value["development_surface"]
+    assert surface == {
+        "reference_case_count": 252,
+        "cell_count": 8,
+        "candidate_count": 9,
+        "eligible_candidate_count": 0,
+        "selected_profile_id": None,
+        "prediction_artifact_available": False,
+    }
+    gate = value["frozen_quality_gate"]
+    assert gate["minimum_macro_precision"] == "0.78"
+    assert gate["minimum_macro_positive_reference_coverage"] == "0.70"
+    assert gate["maximum_macro_definite_negative_false_positive_rate"] == "0.10"
+    assert gate["gate_change"] is False
+    trials = value["trial_summary"]
+    assert len(trials) == 9
+    assert all(item["eligible"] is False for item in trials)
+    assert max(float(item["macro_positive_reference_coverage"]) for item in trials) > 0.70
+    assert max(float(item["macro_precision"]) for item in trials) < 0.78
+    assert min(float(item["macro_definite_negative_false_positive_rate"]) for item in trials) > 0.10
+    ceiling = value["authority_ceiling"]
+    assert ceiling["additional_recovery"] is False
+    assert ceiling["profile_expansion"] is False
+    assert ceiling["quantile_change"] is False
+    assert ceiling["quality_gate_relaxation"] is False
+    assert ceiling["dwd_market_read"] is False
+    assert ceiling["preserved_2021_read"] is False
+    assert ceiling["2025_read"] is False
+    assert value["successor"]["work_item"] == "P3-STAGE-018"
+    assert value["successor"]["disposition"] == (
+        "OPEN_INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC"
+    )
+    assert P017_NOPASS_REVIEW.is_file()
+    assert "PASS_OPEN_P018_INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC" in (
+        P017_NOPASS_REVIEW.read_text(encoding="utf-8")
+    )
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

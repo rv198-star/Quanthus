@@ -462,9 +462,16 @@ nodes.
   clean but incomplete child mechanism (balanced macro P≈.792 / C≈.422 / FPR≈.013), while the broad
   branch carried more recall with substantially worse precision/FPR. In the closest parent profile,
   expansion-only contributed 8 TP / 2 FP and overlap 6 TP / 0 FP, while broad-only contributed
-  9 TP / 14 FP. P018 therefore closes diagnostic PASS and recommends P019 as a **fresh blind
-  mechanism-reference pilot** instead of more threshold tuning or reusing the already-diagnosed 252
-  cases for new child labels. R/O, projection and preserved 2021/2022-2024/2025 remain unopened.
+  9 TP / 14 FP. P018 therefore closes diagnostic PASS and locally recommends a fresh blind
+  mechanism-reference pilot instead of more threshold tuning or reusing the already-diagnosed 252
+  cases for new child labels. P019 then performs the higher-level third-group portfolio check required
+  by the original historical-learning plan: the P004-P018 `0/2` branch has produced enough evidence
+  for a bounded disposition and should not consume the entire program. P019 parks active Stage-0 parent
+  qualification, retains expansion as research-only and Stage2/order as a strong exploratory
+  proposition, keeps 8/9 parked as modifiers, and restores `1/12` as the next active third-group route.
+  P020 is now the ready semantic successor: Stage12 is a downside-context proposition and Stage1 a
+  nested deceleration/stabilization condition over accepted Trend Evolution Facts, with no top-1
+  primary-stage compression. R/O projection and preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -475,7 +482,10 @@ nodes.
   `work-items/stage-stratum-normalized-instability.md`,
   `reviews/stage-p017-stratum-normalized-no-pass-four-party-review-20260915.md`,
   `work-items/stage-instability-channel-decomposition.md`,
-  `acceptance/stage-instability-channel-decomposition-engineering-20260915.md`, and
+  `acceptance/stage-instability-channel-decomposition-engineering-20260915.md`,
+  `work-items/stage-third-group-portfolio-rebaseline.md`,
+  `reviews/stage-p019-third-group-portfolio-rebaseline-20260915.md`, and
+  `work-items/stage-downside-lifecycle-proposition.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

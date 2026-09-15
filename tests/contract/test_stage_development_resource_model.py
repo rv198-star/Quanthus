@@ -91,6 +91,11 @@ P018_CONFIG = ROOT / "config/stage-learning/stage-instability-channel-decomposit
 P018_RESULT = ROOT / "config/stage-learning/stage-instability-channel-decomposition-result.v1.json"
 P018_REVIEW = ROOT / "docs/reviews/stage-p018-channel-decomposition-four-party-review-20260915.md"
 P018_WORK = ROOT / "docs/work-items/stage-instability-channel-decomposition.md"
+P019_REBASELINE = ROOT / "config/stage-learning/stage-third-group-portfolio-rebaseline.v1.json"
+P019_REVIEW = ROOT / "docs/reviews/stage-p019-third-group-portfolio-rebaseline-20260915.md"
+P019_WORK = ROOT / "docs/work-items/stage-third-group-portfolio-rebaseline.md"
+P020_CONCEPT = ROOT / "config/stage-learning/stage-downside-lifecycle-concept.v1.json"
+P020_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-proposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -1221,6 +1226,77 @@ def test_stage018_result_attributes_parent_or_without_creating_child_truth() -> 
     assert "PASS_RECOMMEND_FRESH_BLIND_MECHANISM_REFERENCE_PILOT" in (
         P018_REVIEW.read_text(encoding="utf-8")
     )
+
+
+def test_stage019_reanchors_third_group_and_parks_active_stage0_optimization() -> None:
+    value = json.loads(P019_REBASELINE.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-019"
+    assert value["state"] == "PASS_REBASELINE_THIRD_GROUP_ROUTE"
+    goal = value["parent_goal"]
+    assert goal["program"] == "P3-STAGE-001"
+    assert goal["third_group"] == ["0", "1", "2", "8", "9", "12"]
+    assert goal["subgroups"] == {
+        "0_2": "order_vs_disorder",
+        "1_12": "downside_lifecycle",
+        "8_9": "high_side_modifiers",
+    }
+    decisions = value["portfolio_decisions"]
+    assert decisions["stage_0_parent"]["disposition"] == "PARK_PRIMARY_STAGE_QUALIFICATION"
+    assert decisions["expansion_disorder_child"]["disposition"] == "RETAIN_RESEARCH_MECHANISM_ONLY"
+    assert decisions["broad_reversal_child"]["disposition"] == (
+        "REJECT_AS_CURRENT_ELIGIBILITY_CHANNEL"
+    )
+    assert decisions["stage_2_order"]["disposition"] == (
+        "RETAIN_STRONG_EXPLORATORY_PROPOSITION"
+    )
+    assert decisions["stage_1_12"]["disposition"] == "NEXT_ACTIVE_THIRD_GROUP_ROUTE"
+    assert decisions["stage_8_9"]["disposition"] == "PARKED_MODIFIER_ROUTE"
+    superseded = value["superseded_active_recommendation"]
+    assert superseded["source"] == "P3-STAGE-018-D"
+    assert superseded["active_route"] == "DO_NOT_EXECUTE_NOW"
+    assert value["successor"]["work_item"] == "P3-STAGE-020"
+    ceiling = value["authority_ceiling"]
+    assert ceiling["stage_0_reopen"] is False
+    assert ceiling["preserved_2021_read"] is False
+    assert ceiling["2025_read"] is False
+    assert P019_REVIEW.is_file()
+    assert P019_WORK.is_file()
+
+
+def test_stage020_freezes_downside_context_and_nested_stabilization_before_search() -> None:
+    value = json.loads(P020_CONCEPT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-020-A"
+    assert value["state"] == (
+        "PREREGISTERED_DOWNSIDE_LIFECYCLE_SEMANTICS_BEFORE_REFERENCE_OR_THRESHOLD_SEARCH"
+    )
+    props = value["propositions"]
+    assert props["downside_context"]["stage_vocabulary_relation"] == "Stage_12_context_candidate"
+    assert props["deceleration_stabilization"]["stage_vocabulary_relation"] == (
+        "Stage_1_nested_condition_candidate"
+    )
+    assert props["deceleration_stabilization"]["requires_context"] == "downside_context"
+    relation = value["relationship_contract"]
+    assert relation["multi_proposition_first"] is True
+    assert relation["primary_stage_compression"] is False
+    assert relation["nested_condition_without_context"] == "NOT_APPLICABLE_OR_UNKNOWN_NOT_STAGE_1"
+    assert relation["both_false"] == "NEITHER_IS_LEGAL"
+    protocol = value["reference_protocol"]
+    assert protocol["candidate_blind"] is True
+    assert protocol["threshold_blind"] is True
+    assert protocol["future_blind"] is True
+    assert protocol["coexistence_preserved"] is True
+    next_step = value["next_resource_step"]
+    assert next_step["work_item"] == "P3-STAGE-020-B"
+    assert next_step["reuse_resource_model"] == "P3-STAGE-013_ERA_BOARD_EXPOSURE_AWARE"
+    assert next_step["require_61_contiguous_admitted_sessions"] is True
+    authority = value["authority"]
+    assert authority["threshold_search"] is False
+    assert authority["new_market_read"] is False
+    assert authority["review_opinion_collection"] is False
+    assert authority["primary_stage_output"] is False
+    assert authority["preserved_2021_read"] is False
+    assert authority["2025_read"] is False
+    assert P020_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

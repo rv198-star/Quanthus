@@ -355,7 +355,14 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-018-A | Freeze P018 diagnostic artifact closure and channel semantics | P3-STAGE-018 | closed `PASS_CHANNEL_DECOMPOSITION_ENGINEERING_FREEZE`; exact P017 grid/bases and parent reference closure, no new threshold/profile/reference/label authority |
 | P3-STAGE-018-B | Execute exact channel decomposition | P3-STAGE-018-A | closed `PASS_CHANNEL_DECOMPOSITION_DIAGNOSTIC_COMPLETE`; sole Job `stage_4e8eedc28b5542c798a8b33c8276755f`, no candidate selection or preserved read |
 | P3-STAGE-018-C | Four-party review P018 attribution | P3-STAGE-018-B | closed `PASS_RECOMMEND_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; broad-only drives contamination, parent OR should not be repaired by threshold tuning |
-| P3-STAGE-018-D | Close P018 and decide mechanism-specific next gate | P3-STAGE-018-C | closed `RECOMMEND_P019_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; any child-semantic experiment requires separate preregistration |
+| P3-STAGE-018-D | Close P018 and decide mechanism-specific next gate | P3-STAGE-018-C | closed `RECOMMEND_P019_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; preserved as the local Stage-0 recommendation, later superseded as active route by P3-STAGE-019 portfolio rebaseline |
+| P3-STAGE-019 | Third-group portfolio rebaseline | P3-STAGE-018 | closed `PASS_REBASELINE_THIRD_GROUP_ROUTE`; parks active Stage-0 parent qualification, retains expansion research-only and Stage2/order as strong exploratory, and restores `1/12` as the next active third-group route; docs/work-items/stage-third-group-portfolio-rebaseline.md |
+| P3-STAGE-020 | Downside lifecycle proposition pilot | P3-STAGE-019, P3-STRUCT-006 | ready semantic/design route; Stage12 downside context + nested Stage1 deceleration/stabilization over accepted Trend Evolution Facts; docs/work-items/stage-downside-lifecycle-proposition.md |
+| P3-STAGE-020-A | Freeze downside-context / nested-stabilization semantics and reference protocol | P3-STAGE-020 | ready; no market read, threshold search, review opinion collection or primary-stage compression; config/stage-learning/stage-downside-lifecycle-concept.v1.json |
+| P3-STAGE-020-B | Freeze Era×Board exposure/admission capacity and exact development plan | P3-STAGE-020-A | blocked until A closes; reuse P013 exposure-aware resource model and deterministic 61-session admission |
+| P3-STAGE-020-C | Seal candidate-blind context/nested-condition references | P3-STAGE-020-B | blocked; coexistence and UNKNOWN remain explicit |
+| P3-STAGE-020-D | Freeze finite candidate topology and score propositions independently | P3-STAGE-020-C | blocked; no top-1 primary-stage compression |
+| P3-STAGE-020-E | Four-party review and closeout | P3-STAGE-020-D | blocked; preserved evaluation remains separate |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

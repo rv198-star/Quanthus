@@ -1,0 +1,87 @@
+{
+  "schema_version": "quanthus.stage-third-group-portfolio-rebaseline.v1",
+  "work_item": "P3-STAGE-019",
+  "state": "PASS_REBASELINE_THIRD_GROUP_ROUTE",
+  "effective_date": "2026-09-15",
+  "purpose": "Re-anchor the P004-P018 Stage-0/2 subseries to the parent P3-STAGE-001 / P3-STAGE-003 objective: validate the third-group stage vocabulary by retain/merge/rename/demote/park decisions rather than indefinitely optimizing one Stage-0 classifier.",
+  "bindings": {
+    "p018_result": {
+      "path": "config/stage-learning/stage-instability-channel-decomposition-result.v1.json",
+      "sha256": "sha256:420d6406669451373cbc08111ed43c8695d821dcc9cca994a29f8a51738f1b26"
+    },
+    "third_group_profile": {
+      "path": "docs/design/stock-stage-third-group-profile.md",
+      "sha256": "sha256:2814020c9bd1be56282cb73a7a34129f05d3bf4f6e227f0c11eb9bb970754858"
+    },
+    "historical_learning": {
+      "path": "docs/design/stock-stage-historical-learning.md",
+      "sha256": "sha256:d748cab7f0615c03f10a1e1199d6971258d874f37f711d79d74885f5b8c9e15c"
+    },
+    "state_machine": {
+      "path": "docs/design/stock-stage-state-machine.md",
+      "sha256": "sha256:e5589555fc4096504d7443be9c7f6699c7658a81a0d28459e23d4ac707d40fcc"
+    }
+  },
+  "parent_goal": {
+    "program": "P3-STAGE-001",
+    "goal": "Learn and qualify stock-stage definitions from history under expert semantic constraints, allowing retain, merge, rename, dimension change or park instead of forcing all labels to pass.",
+    "third_group": ["0", "1", "2", "8", "9", "12"],
+    "subgroups": {
+      "0_2": "order_vs_disorder",
+      "1_12": "downside_lifecycle",
+      "8_9": "high_side_modifiers"
+    }
+  },
+  "portfolio_decisions": {
+    "stage_0_parent": {
+      "disposition": "PARK_PRIMARY_STAGE_QUALIFICATION",
+      "reason": "P016 and P017 produced 0/9 eligible parent-instability candidates under two distinct scale treatments; P018 shows the parent proposition mixes a clean low-coverage expansion mechanism with a noisy broad-only mechanism. Further Stage-0 optimization would exceed the intended local-learning budget and drift from the third-group portfolio objective.",
+      "claim": "Not disproven as a market concept; not qualified as a primary Stage predicate."
+    },
+    "expansion_disorder_child": {
+      "disposition": "RETAIN_RESEARCH_MECHANISM_ONLY",
+      "reason": "P018 shows high precision / low FPR but incomplete coverage against the parent instability reference.",
+      "label_authority": false
+    },
+    "broad_reversal_child": {
+      "disposition": "REJECT_AS_CURRENT_ELIGIBILITY_CHANNEL",
+      "reason": "Broad-only predictions are the dominant false-positive source in P018. Descriptive geometry may remain, but no current Stage eligibility use is authorized."
+    },
+    "stage_2_order": {
+      "disposition": "RETAIN_STRONG_EXPLORATORY_PROPOSITION",
+      "reason": "P011 produced a strong orderly-consolidation sub-result while Stage-0 coverage remained the binding joint failure. Stage-2 does not inherit Stage-0 failure, but no official LabelCard/preserved validation is opened here.",
+      "label_authority": false
+    },
+    "stage_1_12": {
+      "disposition": "NEXT_ACTIVE_THIRD_GROUP_ROUTE",
+      "reason": "P3-STAGE-003 already retained Stage 12 as downside context and Stage 1 as nested deceleration/stabilization; the accepted Trend Evolution Fact Family is their intended prerequisite."
+    },
+    "stage_8_9": {
+      "disposition": "PARKED_MODIFIER_ROUTE",
+      "reason": "P3-STAGE-003 reclassified 8/9 as high-side modifiers; Stage 9 still requires a separately justified activity relation."
+    }
+  },
+  "superseded_active_recommendation": {
+    "source": "P3-STAGE-018-D",
+    "historical_recommendation": "RECOMMEND_P019_FRESH_BLIND_MECHANISM_REFERENCE_PILOT",
+    "active_route": "DO_NOT_EXECUTE_NOW",
+    "reason": "The recommendation is locally coherent for Stage 0 but conflicts with the higher-level third-group portfolio objective after explicit route review. It remains preserved as historical evidence, not erased."
+  },
+  "successor": {
+    "work_item": "P3-STAGE-020",
+    "name": "Downside Lifecycle Proposition Pilot",
+    "scope": "Use accepted Trend Evolution Facts to design a bounded Stage-12 downside-context proposition and a nested Stage-1 deceleration/stabilization condition, with positive evidence and legal coexistence; no primary-stage compression or preserved evaluation in the first milestone."
+  },
+  "authority_ceiling": {
+    "new_market_read": false,
+    "stage_0_reopen": false,
+    "stage_2_promotion": false,
+    "stage_8_9_search": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P019 is a portfolio-governance rebaseline. It does not qualify or reject the twelve-state vocabulary as a whole, does not promote Stage 2, and does not prove Stage 0 impossible. It closes active Stage-0 optimization for this sequence and restores the third-group route to the previously retained Stage-1/12 downside lifecycle."
+}

@@ -1,0 +1,112 @@
+{
+  "schema_version": "quanthus.stage-downside-lifecycle-concept.v1",
+  "work_item": "P3-STAGE-020-A",
+  "state": "PREREGISTERED_DOWNSIDE_LIFECYCLE_SEMANTICS_BEFORE_REFERENCE_OR_THRESHOLD_SEARCH",
+  "effective_date": "2026-09-15",
+  "purpose": "Resume the P3-STAGE-003 third-group program on the retained 1/12 downside-lifecycle subgroup after P019 parks active Stage-0 optimization. Freeze proposition semantics, nesting, evidence boundaries and the next metadata/reference route before reading any new result-bearing development surface.",
+  "bindings": {
+    "p019_rebaseline": {
+      "path": "config/stage-learning/stage-third-group-portfolio-rebaseline.v1.json",
+      "sha256": "sha256:76f1808042779523c6008046cfc1bfd57572a0331caf7fe47e1cd2fa4b5b572a"
+    },
+    "trend_evolution_design": {
+      "path": "docs/design/structure-trend-evolution-facts.md",
+      "sha256": "sha256:ee9aa37d349f536c624d2cd58d4271d0f977b7fbc423436fe621e01c2dc60fdc"
+    },
+    "trend_evolution_acceptance": {
+      "path": "docs/acceptance/structure-trend-evolution-result-20260910.md",
+      "sha256": "sha256:ef0cd00886889ff22517df7d8f35de8ea66108bf7bea78ae8f360bc71e975ee7"
+    }
+  },
+  "propositions": {
+    "downside_context": {
+      "semantic_name": "continuing_downside_context",
+      "stage_vocabulary_relation": "Stage_12_context_candidate",
+      "meaning": "Current as-of evidence supports persistent downside direction rather than merely being below a past high.",
+      "allowed_fact_families": [
+        "structure.geometry.window-return",
+        "structure.geometry.directional-efficiency",
+        "structure.geometry.return-velocity",
+        "structure.geometry.drawdown-from-window-high"
+      ],
+      "forbidden_shortcuts": [
+        "future_low",
+        "future_return",
+        "post_T_reversal",
+        "residual_else_class"
+      ]
+    },
+    "deceleration_stabilization": {
+      "semantic_name": "downside_deceleration_stabilization",
+      "stage_vocabulary_relation": "Stage_1_nested_condition_candidate",
+      "meaning": "Inside an established downside context, current evidence supports loss of downside momentum and stabilization/rebound without claiming a durable bottom.",
+      "requires_context": "downside_context",
+      "allowed_fact_families": [
+        "structure.geometry.velocity-delta",
+        "structure.geometry.range-position",
+        "structure.geometry.rebound-from-window-low",
+        "structure.geometry.directional-efficiency",
+        "structure.geometry.window-return"
+      ],
+      "forbidden_shortcuts": [
+        "future_low",
+        "future_recovery",
+        "durable_bottom_claim",
+        "profitability_outcome"
+      ]
+    }
+  },
+  "relationship_contract": {
+    "multi_proposition_first": true,
+    "primary_stage_compression": false,
+    "legal_joint_truth": [
+      {
+        "downside_context": "TRUE",
+        "deceleration_stabilization": "FALSE",
+        "interpretation": "continuing downside context without current stabilization"
+      },
+      {
+        "downside_context": "TRUE",
+        "deceleration_stabilization": "TRUE",
+        "interpretation": "downside context with nested deceleration/stabilization; candidate set may contain both 12 and 1 semantics"
+      }
+    ],
+    "nested_condition_without_context": "NOT_APPLICABLE_OR_UNKNOWN_NOT_STAGE_1",
+    "both_false": "NEITHER_IS_LEGAL",
+    "abstain_or_unjudgeable": "PRESERVE_NOT_NEGATIVE"
+  },
+  "reference_protocol": {
+    "same_origin_simulation_allowed_for_development": true,
+    "same_origin_must_be_labeled": true,
+    "candidate_blind": true,
+    "threshold_blind": true,
+    "future_blind": true,
+    "review_downside_context_and_nested_condition_separately": true,
+    "coexistence_preserved": true,
+    "unknown_preserved": true,
+    "no_top1_forcing": true
+  },
+  "next_resource_step": {
+    "work_item": "P3-STAGE-020-B",
+    "kind": "METADATA_AND_ADMISSION_CAPACITY_BEFORE_REVIEW",
+    "reuse_resource_model": "P3-STAGE-013_ERA_BOARD_EXPOSURE_AWARE",
+    "require_61_contiguous_admitted_sessions": true,
+    "era_board_stratification": true,
+    "new_market_read_before_resource_freeze": false,
+    "post_result_sampling": false
+  },
+  "authority": {
+    "threshold_search": false,
+    "candidate_scoring": false,
+    "new_market_read": false,
+    "review_opinion_collection": false,
+    "primary_stage_output": false,
+    "labelcard_registration": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P020-A freezes only the Stage-12-context / Stage-1-nested-condition semantic architecture and the order of operations for a future bounded development experiment. It does not establish thresholds, label quality, prevalence, primary-stage arbitration, preserved validity, economic value or trading authority."
+}

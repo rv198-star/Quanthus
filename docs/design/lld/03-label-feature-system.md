@@ -497,7 +497,14 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-018-A | Freeze diagnostic closure and channel semantics | P3-STAGE-018 | closed `PASS_CHANNEL_DECOMPOSITION_ENGINEERING_FREEZE`; exact P017 artifact/bases/grid and immutable parent references only |
 | P3-STAGE-018-B | Execute channel decomposition | P3-STAGE-018-A | closed `PASS_CHANNEL_DECOMPOSITION_DIAGNOSTIC_COMPLETE`; one Job, no eligibility/selection/R/O/projection/preserved read |
 | P3-STAGE-018-C | Review channel attribution | P3-STAGE-018-B | closed `PASS_RECOMMEND_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; scale/threshold tuning is no longer the selected route |
-| P3-STAGE-018-D | Close and choose next gate | P3-STAGE-018-C | closed `RECOMMEND_P019_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; new child semantics require fresh preregistered blind evidence |
+| P3-STAGE-018-D | Close and choose next gate | P3-STAGE-018-C | closed `RECOMMEND_P019_FRESH_BLIND_MECHANISM_REFERENCE_PILOT`; retained as local Stage-0 evidence, superseded as active route by P019 portfolio rebaseline |
+| P3-STAGE-019 | Third-group portfolio rebaseline | P3-STAGE-018 | closed `PASS_REBASELINE_THIRD_GROUP_ROUTE`; Stage0 parent qualification parked, expansion retained research-only, broad current eligibility rejected, Stage2/order retained exploratory, `1/12` selected next |
+| P3-STAGE-020 | Downside lifecycle proposition pilot | P3-STAGE-019, P3-STRUCT-006 | ready design route; Stage12 downside context + nested Stage1 deceleration/stabilization over accepted Trend Evolution Facts |
+| P3-STAGE-020-A | Freeze downside lifecycle semantics/reference protocol | P3-STAGE-020 | ready; multi-proposition first, legal `12-context + 1-nested` coexistence, no threshold search or primary-stage compression |
+| P3-STAGE-020-B | Freeze Era×Board resource/admission plan | P3-STAGE-020-A | blocked until A closes; P013 exposure-aware resource model + deterministic 61-session admission |
+| P3-STAGE-020-C | Seal blind semantic references | P3-STAGE-020-B | blocked; candidate/threshold/future blind |
+| P3-STAGE-020-D | Score finite proposition candidates independently | P3-STAGE-020-C | blocked; no top-1 stage compression |
+| P3-STAGE-020-E | Review/closeout and gate any later preserved work | P3-STAGE-020-D | blocked; 2021/2022-2024/2025 remain unread |
 
 ## 7. Acceptance
 

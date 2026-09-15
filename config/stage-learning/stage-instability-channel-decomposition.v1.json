@@ -1,0 +1,98 @@
+{
+  "schema_version": "quanthus.stage-instability-channel-decomposition.v1",
+  "work_item": "P3-STAGE-018-A",
+  "state": "PREREGISTERED_ARTIFACT_ONLY_CHANNEL_DECOMPOSITION_BEFORE_EXECUTION",
+  "purpose": "Diagnose whether P017 instability false positives originate primarily from expanding_disorder_20, broad_reversal_disorder_20, or their OR composition, using the exact P017 profile grid and immutable parent structural_instability_20 development references without introducing new thresholds, labels or candidate selection.",
+  "bindings": {
+    "p017_config": {
+      "path": "config/stage-learning/stage-stratum-normalized-instability.v1.json",
+      "file_sha256": "sha256:a7efc86350569db5807c08ed212bd6acda96c369ed7b5d0215f6b15ed5bb778b"
+    },
+    "p017_result": {
+      "path": "config/stage-learning/stage-stratum-normalized-instability-result.v1.json",
+      "file_sha256": "sha256:1f54614043158844a4192e05ef6979929eaabb0e2f169b22dce02e9c8c789aba",
+      "state": "CLOSED_STRATUM_NORMALIZED_INSTABILITY_FAIL"
+    },
+    "p017_recovery_artifact": {
+      "job_id": "stage_5356bab390684fd9ae154e5d14b1a02b",
+      "code_revision": "7562f536c822c5ddfb1f308a87574bf2a8e3d666",
+      "artifact_relative_path": "runs/stage-worker/stage_5356bab390684fd9ae154e5d14b1a02b/stage-stratum-normalized-instability-20260915T073906Z",
+      "manifest_sha256": "sha256:6bdd7713b246ce7399a45f985f4bf2283a6d7dec6f535e27d0c13bbbe835b8ec",
+      "basis_digest": "sha256:055741aff5b4eec456a8c6ab6cba15c903fede23b602a44714386a7d464c4c88",
+      "profile_grid_digest": "sha256:b26bb103002fc59f8b87b320b2cf46a9681197bcb20fe0931ebea35f02f6d1a7"
+    }
+  },
+  "diagnostic_surface": {
+    "parent_proposition": "structural_instability_20",
+    "channels": [
+      "expanding_disorder_20",
+      "broad_reversal_disorder_20"
+    ],
+    "composition": "expanding_disorder_20 OR broad_reversal_disorder_20",
+    "reference_case_count": 252,
+    "cell_count": 8,
+    "profile_count": 9,
+    "profile_source": "exact_P017_profile_grid",
+    "threshold_source": "exact_P017_cell_local_thresholds",
+    "new_profile_coordinates": false,
+    "new_thresholds": false,
+    "threshold_recompute": false,
+    "reference_rewrite": false,
+    "new_semantic_labels": false
+  },
+  "metrics": {
+    "for_each_profile_and_channel": [
+      "pooled_parent_reference_metrics",
+      "macro_equal_weight_era_board_parent_reference_metrics",
+      "per_cell_parent_reference_metrics"
+    ],
+    "composition_counts": [
+      "expansion_true_count",
+      "broad_true_count",
+      "overlap_true_count",
+      "expansion_only_count",
+      "broad_only_count",
+      "neither_count"
+    ],
+    "reference_attribution_counts": [
+      "expansion_only_true_positive",
+      "expansion_only_false_positive",
+      "broad_only_true_positive",
+      "broad_only_false_positive",
+      "overlap_true_positive",
+      "overlap_false_positive"
+    ],
+    "candidate_selection": false,
+    "eligibility_gate": false,
+    "successor_qualification": false
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 900
+  },
+  "authority": {
+    "artifact_only_diagnostic": true,
+    "channel_decomposition": true,
+    "candidate_scoring_for_selection": false,
+    "candidate_reselection": false,
+    "threshold_change": false,
+    "new_reference_generation": false,
+    "reference_rewrite": false,
+    "dwd_market_read": false,
+    "fixed_relocation_scoring": false,
+    "order_scoring": false,
+    "projection_compatibility": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "output": {
+    "artifact_schema": "quanthus.stage-instability-channel-decomposition-artifact.v1",
+    "summary_schema": "quanthus.stage-instability-channel-decomposition-summary.v1",
+    "diagnostic_schema": "quanthus.stage-instability-channel-decomposition-diagnostic.v1"
+  },
+  "claim_ceiling": "P018 can establish only how the already-frozen P017 expanding and broad disorder channels contribute to parent structural_instability_20 predictions and errors on the immutable development set. It cannot establish mechanism-specific semantic truth, qualify a new candidate, authorize threshold changes, preserved evaluation, strategy use, production use or trading."
+}

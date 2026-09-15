@@ -351,6 +351,11 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-017-B | Run stratum-normalized instability scoring | P3-STAGE-017-A | closed `CLOSED_STRATUM_NORMALIZED_INSTABILITY_FAIL`; recovery Job `stage_5356bab390684fd9ae154e5d14b1a02b` succeeded, 0/9 profiles eligible, no prediction freeze produced |
 | P3-STAGE-017-C | Review P017 semantic outcome | P3-STAGE-017-B | closed `PASS_OPEN_P018_INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC`; next question is expansion-vs-broad channel attribution, not threshold retuning; docs/reviews/stage-p017-stratum-normalized-no-pass-four-party-review-20260915.md |
 | P3-STAGE-017-D | Close P017 and decide next gate | P3-STAGE-017-C | closed `PRESERVED_EVALUATION_NOT_AUTHORIZED`; P018 requires a separate freeze; 2021/2022-2024/2025 remain unread |
+| P3-STAGE-018 | Instability channel decomposition diagnostic | P3-STAGE-017 | ready artifact-only diagnostic; exact P017 252 cases / 9 profile identities / cell thresholds, expansion-vs-broad-vs-overlap attribution only; docs/work-items/stage-instability-channel-decomposition.md |
+| P3-STAGE-018-A | Freeze P018 diagnostic artifact closure and channel semantics | P3-STAGE-018 | ready design; no new threshold/profile/reference/label authority |
+| P3-STAGE-018-B | Execute exact channel decomposition | P3-STAGE-018-A | ready `PASS_ENGINEERING_READY_FOR_ONE_CHANNEL_DECOMPOSITION_JOB`; one Job, no candidate selection or preserved read; docs/acceptance/stage-instability-channel-decomposition-engineering-20260915.md |
+| P3-STAGE-018-C | Four-party review P018 attribution | P3-STAGE-018-B | blocked until terminal diagnostic result |
+| P3-STAGE-018-D | Close P018 and decide mechanism-specific next gate | P3-STAGE-018-C | blocked; any new semantic reference/candidate requires separate preregistration |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

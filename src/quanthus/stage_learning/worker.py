@@ -84,6 +84,9 @@ STAGE_COMBINED_ATOMIC_SCORING_JOB = "quanthus.stage-combined-atomic-scoring.v1"
 STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB = (
     "quanthus.stage-stratum-normalized-instability.v1"
 )
+STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB = (
+    "quanthus.stage-instability-channel-decomposition.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -145,6 +148,9 @@ STRATUM_NORMALIZED_INSTABILITY_BUDGET_SCHEMA = (
 )
 STRATUM_NORMALIZED_INSTABILITY_RECOVERY_BUDGET_SCHEMA = (
     "quanthus.stage-stratum-normalized-instability-recovery-budget.v1"
+)
+INSTABILITY_CHANNEL_DECOMPOSITION_BUDGET_SCHEMA = (
+    "quanthus.stage-instability-channel-decomposition-budget.v1"
 )
 STRATUM_NORMALIZED_INSTABILITY_RECOVERY_AUTH = (
     "config/stage-learning/stage-stratum-normalized-instability-recovery.v1.json"
@@ -376,6 +382,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "module": "quanthus.stage_learning.stratum_normalized_instability",
         "artifact_glob": "stage-stratum-normalized-instability-*",
         "process_error": "stage_stratum_normalized_instability_process_failed",
+        "wall_seconds": 900,
+    },
+    STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB: {
+        "config": "config/stage-learning/stage-instability-channel-decomposition.v1.json",
+        "module": "quanthus.stage_learning.instability_channel_decomposition",
+        "artifact_glob": "stage-instability-channel-decomposition-*",
+        "process_error": "stage_instability_channel_decomposition_process_failed",
         "wall_seconds": 900,
     },
 }
@@ -638,6 +651,10 @@ class StageWorkerPaths:
     @property
     def stratum_normalized_instability_recovery_budget(self) -> Path:
         return self.control_root / "stratum-normalized-instability-recovery-budget.json"
+
+    @property
+    def instability_channel_decomposition_budget(self) -> Path:
+        return self.control_root / "instability-channel-decomposition-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -2071,6 +2088,43 @@ def _existing_stratum_normalized_instability_submission(
     return _idempotent_stage_submission(paths, recovery_job), failed_job
 
 
+def _instability_channel_decomposition_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": INSTABILITY_CHANNEL_DECOMPOSITION_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-018-B",
+        "phase": "INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_instability_channel_decomposition_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.instability_channel_decomposition_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "instability channel decomposition budget")
+    if (
+        marker.get("schema_version") != INSTABILITY_CHANNEL_DECOMPOSITION_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-018-B"
+        or marker.get("phase") != "INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("instability channel decomposition budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("instability channel decomposition budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "instability channel decomposition has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -3137,6 +3191,19 @@ class StageWorker:
                 "2022_2024_read": verified.get("2022_2024_read"),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB:
+            result["instability_channel_decomposition"] = {
+                "disposition": verified.get("disposition"),
+                "reference_case_count": verified.get("reference_case_count"),
+                "cell_count": verified.get("cell_count"),
+                "profile_count": verified.get("profile_count"),
+                "candidate_selection_performed": verified.get("candidate_selection_performed"),
+                "new_semantic_labels_generated": verified.get("new_semantic_labels_generated"),
+                "dwd_market_read": verified.get("dwd_market_read"),
+                "preserved_2021_read": verified.get("preserved_2021_read"),
+                "2022_2024_read": verified.get("2022_2024_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_ATOMIC_PROPOSITION_SUCCESSOR_D1_JOB:
             result["atomic_proposition_successor_d1"] = {
                 "fresh_pool_size": verified.get("fresh_pool_size"),
@@ -3571,6 +3638,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB:
+        existing = _existing_instability_channel_decomposition_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -3653,6 +3726,9 @@ def submit_job(
     stratum_normalized_instability_recovery_reserved = (
         job.kind == STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
         and stratum_normalized_instability_recovery_of is not None
+    )
+    instability_channel_decomposition_reserved = (
+        job.kind == STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -3795,6 +3871,11 @@ def submit_job(
                 stratum_normalized_instability_recovery_of, job
             ),
         )
+    if instability_channel_decomposition_reserved:
+        _exclusive_json(
+            paths.instability_channel_decomposition_budget,
+            _instability_channel_decomposition_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -3857,6 +3938,8 @@ def submit_job(
             paths.stratum_normalized_instability_budget.unlink(missing_ok=True)
         if stratum_normalized_instability_recovery_reserved:
             paths.stratum_normalized_instability_recovery_budget.unlink(missing_ok=True)
+        if instability_channel_decomposition_reserved:
+            paths.instability_channel_decomposition_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -3914,6 +3997,8 @@ def submit_job(
             paths.stratum_normalized_instability_budget.unlink(missing_ok=True)
         if stratum_normalized_instability_recovery_reserved:
             paths.stratum_normalized_instability_recovery_budget.unlink(missing_ok=True)
+        if instability_channel_decomposition_reserved:
+            paths.instability_channel_decomposition_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -6788,6 +6873,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p017_b_failure": _recent_stage_job_failure(
             paths, kind=STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB,
+        ),
+        "recent_p018_b_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
         ),
     }
 

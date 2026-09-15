@@ -27,6 +27,7 @@ from quanthus.stage_learning.worker import (
     STAGE_DEVELOPMENT_RESOURCE_QUALIFIED_PLAN_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
+    STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
     STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
     STAGE_ORDER_RULE_PREPARE_JOB,
     STAGE_ORDER_RULE_RESOLVE_SCORE_JOB,
@@ -251,6 +252,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p015_c_failure"] is None
     assert result["recent_p016_b_failure"] is None
     assert result["recent_p017_b_failure"] is None
+    assert result["recent_p018_b_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
@@ -263,6 +265,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
         STAGE_COMBINED_ATOMIC_SCORING_JOB,
         STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB,
+        STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -300,6 +303,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         (STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB, "recent_p015_c_failure"),
         (STAGE_COMBINED_ATOMIC_SCORING_JOB, "recent_p016_b_failure"),
         (STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB, "recent_p017_b_failure"),
+        (STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB, "recent_p018_b_failure"),
     ),
 )
 def test_doctor_exposes_only_bounded_recent_failure_tail(
@@ -447,6 +451,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_COMPLETE_RESERVE_ADDITIONAL_REVIEW_PREPARE_JOB,
         STAGE_COMBINED_ATOMIC_SCORING_JOB,
         STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB,
+        STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -1103,6 +1108,35 @@ def test_stratum_normalized_instability_status_exposes_bounded_diagnostics_only(
     assert len(first_metrics["per_cell"]) == 8
     assert first_metrics["per_cell"]["ERA0/BOARD0"]["true_positive"] == 2
     assert "secret_threshold" not in json.dumps(diagnostics)
+
+
+def test_instability_channel_decomposition_is_one_shot_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
+    )
+    assert submitted["kind"] == STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/stage-instability-channel-decomposition.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB]["wall_seconds"] == 900
+    assert worker_paths.instability_channel_decomposition_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
+        )
 
 
 def test_combined_atomic_scoring_status_exposes_bounded_diagnostics_only(

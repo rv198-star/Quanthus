@@ -1643,11 +1643,13 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {
                 "P3-LABEL-004",
                 "P3-DASH-001",
+                "P3-STAGE-018-C",
+                "P3-STAGE-018-D",
             },
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            set(),
+            {"P3-STAGE-018", "P3-STAGE-018-A", "P3-STAGE-018-B"},
         )
         p012_closeout = json.loads(
             (root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json")

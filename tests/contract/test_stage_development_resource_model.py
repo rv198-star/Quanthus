@@ -87,6 +87,8 @@ P017_NOPASS_REVIEW = (
     ROOT / "docs/reviews/stage-p017-stratum-normalized-no-pass-four-party-review-20260915.md"
 )
 P017_WORK = ROOT / "docs/work-items/stage-stratum-normalized-instability.md"
+P018_CONFIG = ROOT / "config/stage-learning/stage-instability-channel-decomposition.v1.json"
+P018_WORK = ROOT / "docs/work-items/stage-instability-channel-decomposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -1130,6 +1132,47 @@ def test_stage017_closes_no_pass_and_selects_channel_decomposition_diagnostic() 
     assert "PASS_OPEN_P018_INSTABILITY_CHANNEL_DECOMPOSITION_DIAGNOSTIC" in (
         P017_NOPASS_REVIEW.read_text(encoding="utf-8")
     )
+
+
+def test_stage018_freezes_diagnostic_only_channel_decomposition() -> None:
+    value = json.loads(P018_CONFIG.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-018-A"
+    assert value["state"] == "PREREGISTERED_ARTIFACT_ONLY_CHANNEL_DECOMPOSITION_BEFORE_EXECUTION"
+    surface = value["diagnostic_surface"]
+    assert surface["parent_proposition"] == "structural_instability_20"
+    assert surface["channels"] == ["expanding_disorder_20", "broad_reversal_disorder_20"]
+    assert surface["reference_case_count"] == 252
+    assert surface["cell_count"] == 8
+    assert surface["profile_count"] == 9
+    assert surface["new_profile_coordinates"] is False
+    assert surface["new_thresholds"] is False
+    assert surface["threshold_recompute"] is False
+    assert surface["new_semantic_labels"] is False
+    metrics = value["metrics"]
+    assert metrics["candidate_selection"] is False
+    assert metrics["eligibility_gate"] is False
+    assert metrics["successor_qualification"] is False
+    authority = value["authority"]
+    assert authority["artifact_only_diagnostic"] is True
+    assert authority["channel_decomposition"] is True
+    for key in (
+        "candidate_scoring_for_selection",
+        "candidate_reselection",
+        "threshold_change",
+        "new_reference_generation",
+        "reference_rewrite",
+        "dwd_market_read",
+        "fixed_relocation_scoring",
+        "order_scoring",
+        "projection_compatibility",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+    assert P018_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

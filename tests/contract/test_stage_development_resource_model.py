@@ -107,6 +107,11 @@ P021_TAXONOMY = ROOT / "config/stage-learning/stage-admission-exposure-taxonomy.
 P021_CAPACITY = ROOT / "config/stage-learning/stage-admission-exposure-capacity.v1.json"
 P021_RESULT = ROOT / "config/stage-learning/stage-admission-exposure-capacity-result.v1.json"
 P021_WORK = ROOT / "docs/work-items/stage-admission-exposure-taxonomy.md"
+P022_CONTRACT = ROOT / "config/stage-learning/stage-primary-unique-contingent-fallback.v1.json"
+P022_FEASIBILITY = (
+    ROOT / "config/stage-learning/stage-primary-unique-contingent-fallback-feasibility.v1.json"
+)
+P022_WORK = ROOT / "docs/work-items/stage-primary-unique-contingent-fallback.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -1535,6 +1540,65 @@ def test_stage021_closes_after_restoring_cells_but_not_256_global_uniques() -> N
         "preserved_2021_read",
         "2022_2024_read",
         "2025_read",
+    ):
+        assert authority[key] is False
+
+
+def test_stage022_freezes_primary_identity_independence_not_dormant_reserve_uniqueness() -> None:
+    value = json.loads(P022_CONTRACT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-022"
+    assert value["state"] == (
+        "PREREGISTERED_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_BEFORE_FEASIBILITY_RUN"
+    )
+    primary = value["primary_contract"]
+    assert primary["primary_per_cell"] == 24
+    assert primary["total_primary"] == 192
+    assert primary["global_identity_unique"] is True
+    assert primary["cross_cell_fill"] is False
+    fallback = value["fallback_contract"]
+    assert fallback["fallback_ceiling_per_cell"] == 8
+    assert fallback["total_fallback_ceiling"] == 64
+    assert fallback["fallback_pool_is_dormant_before_activation"] is True
+    assert fallback["same_cell_only"] is True
+    assert fallback["exclude_all_primary_identities"] is True
+    assert fallback["cross_cell_fallback_identity_overlap_may_exist_before_activation"] is True
+    assert fallback["simultaneous_64_fallback_global_uniqueness_is_diagnostic_only"] is True
+    gate = value["feasibility_gate"]
+    assert gate["primary_global_unique_192_required"] is True
+    assert gate["per_cell_dormant_non_primary_fallback_candidates_required"] == 8
+    assert gate["worst_case_64_fallback_simultaneous_activation_required"] is False
+    assert value["successor_if_pass"]["work_item"] == "P3-STAGE-023"
+    assert value["authority"]["p020_reopen"] is False
+    assert P022_WORK.is_file()
+
+
+def test_stage022b_is_metadata_only_result_before_run_feasibility() -> None:
+    value = json.loads(P022_FEASIBILITY.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-022-B"
+    assert value["state"] == (
+        "PREREGISTERED_METADATA_ONLY_FEASIBILITY_AFTER_P022_CONTRACT_FREEZE"
+    )
+    assert value["runtime"] == {
+        "maximum_jobs": 1,
+        "automatic_retries": 0,
+        "worker_wall_seconds": 900,
+    }
+    authority = value["authority"]
+    assert authority["listing_calendar_metadata_read"] is True
+    assert authority["prior_artifact_metadata_read"] is True
+    for key in (
+        "market_bar_read",
+        "admission_market_read",
+        "stage1_12_semantic_read",
+        "threshold_or_candidate_read",
+        "reference_opinion_read",
+        "fallback_activation",
+        "p020_reopen",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
     ):
         assert authority[key] is False
 

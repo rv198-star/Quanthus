@@ -36,6 +36,7 @@ from quanthus.stage_learning.worker import (
     STAGE_ORDERLY_CONSOLIDATION_JOINT_D1_JOB,
     STAGE_POSITIVE_INSTABILITY_D1_JOB,
     STAGE_POSITIVE_INSTABILITY_QUANTITATIVE_D1_JOB,
+    STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB,
     STAGE_QUALIFICATION_JOB,
     STAGE_REFERENCE_PILOT_JOB,
     STAGE_SECOND_GROUP_DEVELOPMENT_JOB,
@@ -285,6 +286,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p018_b_failure"] is None
     assert result["recent_p020_b_failure"] is None
     assert result["recent_p021_b_failure"] is None
+    assert result["recent_p022_b_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
         STAGE_REFERENCE_PILOT_JOB,
@@ -300,6 +302,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
         STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
         STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB,
+        STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -340,6 +343,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         (STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB, "recent_p018_b_failure"),
         (STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB, "recent_p020_b_failure"),
         (STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB, "recent_p021_b_failure"),
+        (STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB, "recent_p022_b_failure"),
     ),
 )
 def test_doctor_exposes_only_bounded_recent_failure_tail(
@@ -490,6 +494,7 @@ def test_worker_publishes_runtime_identity_receipt(
         STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
         STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
         STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB,
+        STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB,
         STAGE_CAPACITY_CENSUS_JOB,
         STAGE_DEVELOPMENT_RESOURCE_ADMISSION_JOB,
         STAGE_DEVELOPMENT_RESOURCE_CENSUS_JOB,
@@ -1389,6 +1394,35 @@ def test_admission_exposure_capacity_is_one_shot_and_idempotent(
             worker_paths,
             code_revision="b" * 40,
             kind=STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB,
+        )
+
+
+def test_primary_unique_contingent_fallback_is_one_shot_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB,
+    )
+    assert submitted["kind"] == STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/stage-primary-unique-contingent-fallback-feasibility.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB]["wall_seconds"] == 900
+    assert worker_paths.primary_unique_contingent_fallback_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB,
         )
 
 

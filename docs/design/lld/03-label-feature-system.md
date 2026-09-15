@@ -510,6 +510,11 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-021-B | Metadata-only repaired-capacity recomputation | P3-STAGE-021-A | closed; all eight cells individually meet ≥32 identities, global unique 8×32 reserve reaches 243/256 |
 | P3-STAGE-021-C | Review repaired capacity | P3-STAGE-021-B | closed; preserve global uniqueness of realized review cases, not necessarily dormant fallback reservations |
 | P3-STAGE-021-D | Close and gate any P020 successor | P3-STAGE-021-C | closed `RECOMMEND_P022_PRIMARY_UNIQUE_CONTINGENT_FALLBACK`; P020 remains blocked |
+| P3-STAGE-022 | Primary-unique / contingent-fallback resource contract | P3-STAGE-021 | ready metadata-only route; 8×24 active primary identities must be globally unique, dormant fallback reservations are same-cell contingency rather than active cases |
+| P3-STAGE-022-A | Freeze primary/fallback independence semantics | P3-STAGE-022 | closed preregistration before feasibility result; no market/admission/semantic read |
+| P3-STAGE-022-B | Freeze exact primary plan / fallback pools and test feasibility | P3-STAGE-022-A | ready one-shot metadata Job; bipartite primary matching, eight dormant fallback candidates per cell, 64-simultaneous activation diagnostic only |
+| P3-STAGE-022-C | Review P022 feasibility | P3-STAGE-022-B | blocked |
+| P3-STAGE-022-D | Close and gate any admission successor | P3-STAGE-022-C | blocked; P020 remains blocked |
 
 ## 7. Acceptance
 

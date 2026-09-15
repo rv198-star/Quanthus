@@ -1,0 +1,50 @@
+{
+  "schema_version": "quanthus.stage-primary-unique-contingent-fallback-feasibility.v1",
+  "work_item": "P3-STAGE-022-B",
+  "state": "PREREGISTERED_METADATA_ONLY_FEASIBILITY_AFTER_P022_CONTRACT_FREEZE",
+  "effective_date": "2026-09-16",
+  "purpose": "Freeze exact metadata-selected 8x24 globally identity-unique primary resources and eight same-cell dormant fallback candidates per cell under the P021 repaired exposure taxonomy, then report worst-case simultaneous fallback activation only as a diagnostic.",
+  "bindings": {
+    "p022_contract": {
+      "path": "config/stage-learning/stage-primary-unique-contingent-fallback.v1.json",
+      "sha256": "sha256:f1917787d3b884bfcdba0f48aebd967cf5c9240404f8d87a547471cde8832e85"
+    },
+    "p021_capacity_contract": {
+      "path": "config/stage-learning/stage-admission-exposure-capacity.v1.json",
+      "sha256": "sha256:b047a5bf667f79030a43cbc93601a0eecc5a05c08c1c198f77a83334882f1598"
+    },
+    "p021_capacity_result": {
+      "path": "config/stage-learning/stage-admission-exposure-capacity-result.v1.json",
+      "sha256": "sha256:8a5dccc336eebaf35b3b493850ef3caf45812e32cfa871c14be20c45ffdb5e96"
+    }
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 900
+  },
+  "output": {
+    "primary_plan_schema": "quanthus.stage-primary-unique-exact-plan.v1",
+    "fallback_pool_schema": "quanthus.stage-contingent-fallback-pools.v1",
+    "source_binding_schema": "quanthus.stage-primary-unique-contingent-fallback-source-binding.v1",
+    "summary_schema": "quanthus.stage-primary-unique-contingent-fallback-summary.v1",
+    "artifact_schema": "quanthus.stage-primary-unique-contingent-fallback-artifact.v1"
+  },
+  "authority": {
+    "listing_calendar_metadata_read": true,
+    "prior_artifact_metadata_read": true,
+    "market_bar_read": false,
+    "admission_market_read": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "fallback_activation": false,
+    "p020_reopen": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P022-B can freeze only a metadata primary/fallback resource surface and report feasibility. It cannot execute admission, activate fallbacks, reopen P020 semantic work or infer Stage1/12 quality."
+}

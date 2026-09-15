@@ -1,0 +1,89 @@
+{
+  "schema_version": "quanthus.stage-primary-unique-contingent-fallback.v1",
+  "work_item": "P3-STAGE-022",
+  "state": "PREREGISTERED_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_BEFORE_FEASIBILITY_RUN",
+  "effective_date": "2026-09-16",
+  "purpose": "Refine the P020/P021 resource contract so global identity independence is attached to realized active review cases rather than dormant fallback reservations. Freeze an 8x24 globally identity-unique primary panel and same-cell contingent fallback pools before any new admission or semantic read.",
+  "bindings": {
+    "p021_taxonomy": {
+      "path": "config/stage-learning/stage-admission-exposure-taxonomy.v1.json",
+      "sha256": "sha256:e39584f4985168d73f01b9bb86df17fb1c2f0b947a4c3452d634b3b52b6a4620"
+    },
+    "p021_capacity_contract": {
+      "path": "config/stage-learning/stage-admission-exposure-capacity.v1.json",
+      "sha256": "sha256:b047a5bf667f79030a43cbc93601a0eecc5a05c08c1c198f77a83334882f1598"
+    },
+    "p021_capacity_result": {
+      "path": "config/stage-learning/stage-admission-exposure-capacity-result.v1.json",
+      "sha256": "sha256:8a5dccc336eebaf35b3b493850ef3caf45812e32cfa871c14be20c45ffdb5e96"
+    },
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    }
+  },
+  "primary_contract": {
+    "cell_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "primary_per_cell": 24,
+    "total_primary": 192,
+    "global_identity_unique": true,
+    "identity_seed": "p022-primary-unique-v1|primary",
+    "window_seed": "p022-primary-unique-v1|primary-window",
+    "selection_uses_metadata_only": true,
+    "post_result_replacement": false,
+    "cross_cell_fill": false,
+    "on_shortfall": "STOP_WITHOUT_ADMISSION_OR_SEMANTIC_REVIEW"
+  },
+  "fallback_contract": {
+    "fallback_ceiling_per_cell": 8,
+    "total_fallback_ceiling": 64,
+    "fallback_pool_is_dormant_before_activation": true,
+    "same_cell_only": true,
+    "exclude_all_primary_identities": true,
+    "cross_cell_fallback_identity_overlap_may_exist_before_activation": true,
+    "fallback_identity_seed": "p022-primary-unique-v1|fallback",
+    "fallback_window_seed": "p022-primary-unique-v1|fallback-window",
+    "activation_trigger": "technical_input_readiness_failure_only",
+    "activation_order": "cell_order_then_frozen_fallback_rank",
+    "activation_requires_global_identity_uniqueness_against_realized_primaries_and_previously_activated_fallbacks": true,
+    "fallback_activation_never_uses_semantic_label_threshold_candidate_or_future_outcome": true,
+    "simultaneous_64_fallback_global_uniqueness_is_diagnostic_only": true,
+    "no_guarantee_all_64_fallbacks_can_activate_simultaneously": true
+  },
+  "feasibility_gate": {
+    "primary_global_unique_192_required": true,
+    "per_cell_dormant_non_primary_fallback_candidates_required": 8,
+    "worst_case_64_fallback_simultaneous_activation_required": false,
+    "market_prevalence_claim": false,
+    "economic_independence_claim_for_dormant_fallbacks": false
+  },
+  "successor_if_pass": {
+    "work_item": "P3-STAGE-023",
+    "scope": "Run a separately frozen input-admission resource plan: screen the exact P022 primary identities and bounded same-cell fallback candidate pools, then activate only the number of fallbacks needed to realize 24 admission-ready globally identity-unique cases per cell before any Stage1/12 semantic review."
+  },
+  "authority": {
+    "listing_calendar_metadata_read": true,
+    "prior_artifact_metadata_read": true,
+    "market_bar_read": false,
+    "admission_market_read": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "p020_reopen": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P022 can establish only metadata feasibility for a 192 globally identity-unique active primary panel plus bounded same-cell contingent fallback pools. It does not itself activate fallbacks, read admission bars, reopen P020 semantic review, prove 64 simultaneous fallback activations, or qualify Stage12/Stage1."
+}

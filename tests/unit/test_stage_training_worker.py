@@ -30,6 +30,7 @@ from quanthus.stage_learning.worker import (
     STAGE_DIRECTIONAL_BOUNDARY_D1_JOB,
     STAGE_DIRECTIONAL_BOUNDARY_D3_JOB,
     STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB,
+    STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
     STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
     STAGE_ORDER_PROPOSITION_DEVELOPMENT_JOB,
     STAGE_ORDER_RULE_PREPARE_JOB,
@@ -291,8 +292,10 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p022_b_failure"] is None
     assert result["recent_p023_failure"] is None
     assert result["recent_p024_failure"] is None
+    assert result["recent_p020c_packet_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
+        STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
         STAGE_ATOMIC_PROPOSITION_G1_JOB,
@@ -348,6 +351,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
         (STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB, "recent_p017_b_failure"),
         (STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB, "recent_p018_b_failure"),
         (STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB, "recent_p020_b_failure"),
+        (STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB, "recent_p020c_packet_failure"),
         (STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB, "recent_p021_b_failure"),
         (STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB, "recent_p022_b_failure"),
         (STAGE_REALIZED_IDENTITY_ADMISSION_JOB, "recent_p023_failure"),
@@ -489,6 +493,7 @@ def test_worker_publishes_runtime_identity_receipt(
     assert receipt["pid"] > 0
     assert set(receipt["job_kinds"]) == {
         JOB_KIND,
+        STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
         STAGE_REFERENCE_PILOT_JOB,
         STAGE_QUALIFICATION_JOB,
         STAGE_ATOMIC_PROPOSITION_G1_JOB,
@@ -1577,6 +1582,35 @@ def test_clustered_identity_admission_is_one_shot_and_idempotent(tmp_path: Path)
             worker_paths,
             code_revision="b" * 40,
             kind=STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB,
+        )
+
+
+def test_downside_lifecycle_reference_prepare_is_one_shot_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
+    )
+    assert submitted["kind"] == STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB
+    assert submitted["config"] == (
+        "config/stage-learning/stage-downside-lifecycle-blind-reference.v1.json"
+    )
+    assert _JOB_SPECS[STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB]["wall_seconds"] == 3600
+    assert worker_paths.downside_lifecycle_reference_prepare_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
+    )
+    assert repeated["job_id"] == submitted["job_id"]
+    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+        submit_job(
+            worker_paths,
+            code_revision="b" * 40,
+            kind=STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
         )
 
 

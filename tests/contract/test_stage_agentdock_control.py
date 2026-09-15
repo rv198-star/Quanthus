@@ -30,6 +30,7 @@ def test_control_surface_is_bounded_to_rx6800_qiuyu_and_exact_commands() -> None
         "submit-p017-b)",
         "submit-p018-b)",
         "submit-p020-b)",
+        "submit-p020-c-packets)",
         "submit-p021-b)",
         "submit-p022-b)",
         "submit-p023)",
@@ -72,6 +73,7 @@ def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> Non
     assert 'p017_b_kind="quanthus.stage-stratum-normalized-instability.v1"' in text
     assert 'p018_b_kind="quanthus.stage-instability-channel-decomposition.v1"' in text
     assert 'p020_b_kind="quanthus.stage-downside-lifecycle-resource-plan.v1"' in text
+    assert 'p020_c_packet_kind="quanthus.stage-downside-lifecycle-reference-prepare.v1"' in text
     assert 'p021_b_kind="quanthus.stage-admission-exposure-capacity.v1"' in text
     assert 'p022_b_kind="quanthus.stage-primary-unique-contingent-fallback.v1"' in text
     assert 'p023_kind="quanthus.stage-realized-identity-admission.v1"' in text
@@ -92,6 +94,7 @@ def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> Non
     assert 'bash "${worker}" submit --kind "${p017_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p018_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p020_b_kind}" --code-revision "${target}"' in text
+    assert 'bash "${worker}" submit --kind "${p020_c_packet_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p021_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p022_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p023_kind}" --code-revision "${target}"' in text

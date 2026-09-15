@@ -1,13 +1,14 @@
 # P3-STAGE-020-C — Capacity-Limited Blind Semantic References
 
 Design status: approved preregistration  
-Delivery gate: packet preparation ready; opinion collection blocked until packet artifact freeze
+Delivery gate: packet-preparation engineering accepted; sole packet Job ready; opinion collection blocked until packet artifact freeze
 
 Parent: `stage-downside-lifecycle-proposition.md`  
 Machine contract: `../../config/stage-learning/stage-downside-lifecycle-blind-reference.v1.json`  
 Resource ceiling: `../../config/stage-learning/stage-clustered-identity-admission-result.v1.json`  
 Semantic source: `../../config/stage-learning/stage-downside-lifecycle-concept.v1.json`  
-Fact substrate: `../design/structure-trend-evolution-facts.md`
+Fact substrate: `../design/structure-trend-evolution-facts.md`  
+Engineering acceptance: `../acceptance/stage-downside-lifecycle-review-packet-engineering-20260916.md`
 
 ## Goal
 
@@ -103,8 +104,8 @@ frozen P020-D candidate-scoring preregistration.
 | Step | Work | Exit |
 | --- | --- | --- |
 | Contract | Freeze exact P024 binding, packet visibility, reviewer protocol, cluster denominators and sufficiency gates | closed before semantic packet read |
-| Prepare | Implement T-only Trend Evolution packet builder and deep verifier | blocked until contract commit is durable |
-| Packet run | Execute exactly one packet-preparation Job over the immutable 187-row panel | blocked until engineering acceptance |
+| Prepare | Implement T-only Trend Evolution packet builder and deep verifier | closed engineering acceptance; focused 145/145 and repository 2522/7 passed |
+| Packet run | Execute exactly one packet-preparation Job over the immutable 187-row panel | ready after exact engineering revision is durably pushed and deployed |
 | Review | Collect isolated blind opinions for every available packet | blocked until packet artifact is frozen |
 | Seal | Validate and seal the immutable cluster-aware review ledger | blocked until all submitted opinions pass schema/binding checks |
 | Evaluate | Apply the preregistered reference-sufficiency gates | blocked until ledger seal |

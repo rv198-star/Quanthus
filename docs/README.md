@@ -509,7 +509,8 @@ nodes.
   every frozen row must be attempted as a candidate/future-blind T-only Trend-Fact packet; short-term
   and fund roles are isolated, agreement is required for definite references, and reference sufficiency
   is evaluated on economic-identity clusters using the established 20-positive / 20-negative floors
-  rather than the 187 raw rows. Packet preparation is the only open next action. Preserved
+  rather than the 187 raw rows. Packet-preparation engineering is accepted; the sole packet Job is the
+  only open next action, and opinions remain blocked until that artifact is frozen. Preserved
   2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
@@ -534,6 +535,7 @@ nodes.
   `work-items/stage-clustered-identity-admission.md`,
   `acceptance/stage-clustered-identity-admission-engineering-20260916.md`,
   `work-items/stage-downside-lifecycle-blind-reference.md`,
+  `acceptance/stage-downside-lifecycle-review-packet-engineering-20260916.md`,
   `reviews/stage-p024-clustered-identity-admission-review-20260916.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency

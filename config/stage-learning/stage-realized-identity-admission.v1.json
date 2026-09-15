@@ -1,0 +1,134 @@
+{
+  "schema_version": "quanthus.stage-realized-identity-admission.v1",
+  "work_item": "P3-STAGE-023",
+  "state": "PREREGISTERED_PRIMARY_FIRST_ADMISSION_AND_CONTINGENT_REPLACEMENT_BEFORE_INPUT_READ",
+  "effective_date": "2026-09-16",
+  "purpose": "Bind the exact P022 192-row primary plan, freeze a bounded same-cell fallback reservoir before readiness results, admit primaries first, and activate fallback rows only for technical input-readiness deficits while maintaining global identity uniqueness of the realized 8x24 panel before any Stage1/12 semantic review.",
+  "bindings": {
+    "p022_result": {
+      "path": "config/stage-learning/stage-primary-unique-contingent-fallback-result.v1.json",
+      "sha256": "sha256:7e6133820638d451b83e1502393f9c4d8c7f8ddc727466fcd9dd3267f8593648"
+    },
+    "p022_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_cfe744f4b8c941deb7520d1faa31c232/stage-primary-unique-contingent-fallback-20260915T170814Z",
+      "job_id": "stage_cfe744f4b8c941deb7520d1faa31c232",
+      "code_revision": "661a10ddc7cee121afefb1f8a41a2e82f7420bce",
+      "manifest_sha256": "sha256:4018c600f98953c2b57dfa10ab5dcf654cb194ff444eef1e28a0645cf1fb740e",
+      "primary_plan_digest": "sha256:8009fb9450b5d476110aca1d763173d604aea58a2e968bac6ae8a9b36dc66c96"
+    },
+    "p021_capacity_contract": {
+      "path": "config/stage-learning/stage-admission-exposure-capacity.v1.json",
+      "sha256": "sha256:b047a5bf667f79030a43cbc93601a0eecc5a05c08c1c198f77a83334882f1598"
+    },
+    "p021_taxonomy": {
+      "path": "config/stage-learning/stage-admission-exposure-taxonomy.v1.json",
+      "sha256": "sha256:e39584f4985168d73f01b9bb86df17fb1c2f0b947a4c3452d634b3b52b6a4620"
+    },
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    }
+  },
+  "primary_contract": {
+    "source": "exact_p022_primary_plan",
+    "row_count": 192,
+    "primary_per_cell": 24,
+    "cell_count": 8,
+    "global_identity_unique": true,
+    "exact_plan_digest": "sha256:8009fb9450b5d476110aca1d763173d604aea58a2e968bac6ae8a9b36dc66c96",
+    "read_all_primaries_before_fallback_activation": true,
+    "primary_failure_consumes_realized_identity": false,
+    "primary_success_consumes_realized_identity": true
+  },
+  "fallback_reservoir": {
+    "cell_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "maximum_candidate_identities_per_cell": 256,
+    "maximum_windows_per_identity": 4,
+    "identity_seed": "p023-realized-identity-v1|fallback-identity",
+    "window_seed": "p023-realized-identity-v1|fallback-window",
+    "membership_and_order_frozen_before_input_read": true,
+    "same_cell_only": true,
+    "exclude_exact_primary_identity_window": true,
+    "planned_primary_identity_may_appear_in_other_fallback_windows": true,
+    "planned_primary_identity_alone_does_not_block_fallback_membership": true,
+    "realized_primary_identity_blocks_fallback_activation_globally": true,
+    "activated_fallback_identity_blocks_later_activation_globally": true,
+    "same_identity_multiple_candidate_windows_allowed": true,
+    "at_most_one_realized_case_per_identity": true,
+    "cross_cell_fill": false,
+    "candidate_order_uses_market_values": false,
+    "candidate_order_uses_semantic_results": false,
+    "candidate_order_uses_admission_results": false
+  },
+  "admission_contract": {
+    "required_sessions": 61,
+    "qualified_reason": "61_SESSION_CONTIGUOUS_INPUT_READY",
+    "primary_phase": "ADMIT_ALL_192_EXACT_PRIMARY_ROWS_FIRST",
+    "fallback_phase": "ONLY_AFTER_PRIMARY_REALIZED_SET_IS_COMPLETE",
+    "fallback_trigger": "CELL_TECHNICAL_READINESS_DEFICIT_ONLY",
+    "fallback_processing_order": "frozen_cell_order_then_frozen_identity_then_window_order",
+    "skip_fallback_without_market_read_if_identity_already_realized": true,
+    "activate_first_qualified_nonconflicting_candidate_until_cell_has_24": true,
+    "stop_cell_when_realized_count_reaches_24": true,
+    "on_any_cell_realized_shortfall": "CLOSED_REALIZED_ADMISSION_CAPACITY_SHORTFALL",
+    "raw_ohlc_published": false,
+    "raw_ohlc_retained": false,
+    "structure_fact_build": false,
+    "stage1_12_reference_or_label_read": false,
+    "threshold_or_candidate_read": false
+  },
+  "realized_plan_gate": {
+    "required_rows_per_cell": 24,
+    "required_total_rows": 192,
+    "global_identity_unique": true,
+    "all_rows_admission_ready": true,
+    "primary_or_activated_fallback_role_recorded": true,
+    "freeze_before_stage1_12_review": true,
+    "pass_disposition": "PASS_REALIZED_ADMISSION_READY_PLAN_FROZEN",
+    "pass_allows_only": "SEPARATE_P020_C_PREREGISTRATION"
+  },
+  "runtime": {
+    "maximum_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 3600
+  },
+  "output": {
+    "fallback_reservoir_schema": "quanthus.stage-realized-identity-fallback-reservoir.v1",
+    "primary_admission_schema": "quanthus.stage-realized-identity-primary-admission.v1",
+    "fallback_admission_schema": "quanthus.stage-realized-identity-fallback-admission.v1",
+    "realized_plan_schema": "quanthus.stage-realized-identity-exact-plan.v1",
+    "source_binding_schema": "quanthus.stage-realized-identity-source-binding.v1",
+    "summary_schema": "quanthus.stage-realized-identity-admission-summary.v1",
+    "artifact_schema": "quanthus.stage-realized-identity-admission-artifact.v1"
+  },
+  "authority": {
+    "listing_calendar_metadata_read": true,
+    "prior_artifact_metadata_read": true,
+    "input_readiness_market_read": true,
+    "raw_ohlc_publish_or_retain": false,
+    "structure_fact_build": false,
+    "stage1_12_semantic_read": false,
+    "threshold_or_candidate_read": false,
+    "reference_opinion_read": false,
+    "p020_c_semantic_review": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P023 can establish only an exact 192-row, 8x24, input-admission-ready and globally identity-unique realized development plan. A pass does not collect Stage1/12 opinions or authorize semantic review directly; it only permits a separately frozen P020-C preregistration."
+}

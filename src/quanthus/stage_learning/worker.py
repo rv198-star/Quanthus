@@ -96,6 +96,9 @@ STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB = (
 STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB = (
     "quanthus.stage-primary-unique-contingent-fallback.v1"
 )
+STAGE_REALIZED_IDENTITY_ADMISSION_JOB = (
+    "quanthus.stage-realized-identity-admission.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -172,6 +175,9 @@ ADMISSION_EXPOSURE_CAPACITY_BUDGET_SCHEMA = (
 )
 PRIMARY_UNIQUE_CONTINGENT_FALLBACK_BUDGET_SCHEMA = (
     "quanthus.stage-primary-unique-contingent-fallback-budget.v1"
+)
+REALIZED_IDENTITY_ADMISSION_BUDGET_SCHEMA = (
+    "quanthus.stage-realized-identity-admission-budget.v1"
 )
 DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-downside-lifecycle-resource-plan-recovery.v1.json"
@@ -438,6 +444,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-primary-unique-contingent-fallback-*",
         "process_error": "stage_primary_unique_contingent_fallback_process_failed",
         "wall_seconds": 900,
+    },
+    STAGE_REALIZED_IDENTITY_ADMISSION_JOB: {
+        "config": "config/stage-learning/stage-realized-identity-admission.v1.json",
+        "module": "quanthus.stage_learning.realized_identity_admission",
+        "artifact_glob": "stage-realized-identity-admission-*",
+        "process_error": "stage_realized_identity_admission_process_failed",
+        "wall_seconds": 3600,
     },
 }
 
@@ -719,6 +732,10 @@ class StageWorkerPaths:
     @property
     def primary_unique_contingent_fallback_budget(self) -> Path:
         return self.control_root / "primary-unique-contingent-fallback-budget.json"
+
+    @property
+    def realized_identity_admission_budget(self) -> Path:
+        return self.control_root / "realized-identity-admission-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -2418,6 +2435,44 @@ def _existing_primary_unique_contingent_fallback_submission(
     return _idempotent_stage_submission(paths, job)
 
 
+def _realized_identity_admission_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": REALIZED_IDENTITY_ADMISSION_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-023",
+        "phase": "PRIMARY_FIRST_ADMISSION_AND_REALIZED_IDENTITY_REPLACEMENT",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_realized_identity_admission_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.realized_identity_admission_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "realized identity admission budget")
+    if (
+        marker.get("schema_version") != REALIZED_IDENTITY_ADMISSION_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-023"
+        or marker.get("phase")
+        != "PRIMARY_FIRST_ADMISSION_AND_REALIZED_IDENTITY_REPLACEMENT"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("realized identity admission budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_REALIZED_IDENTITY_ADMISSION_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("realized identity admission budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "realized identity admission has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -3565,6 +3620,39 @@ class StageWorker:
                 "2022_2024_read": verified.get("2022_2024_read"),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_REALIZED_IDENTITY_ADMISSION_JOB:
+            result["realized_identity_admission"] = {
+                "disposition": verified.get("disposition"),
+                "primary_admission_count": verified.get("primary_admission_count"),
+                "primary_ready_count": verified.get("primary_ready_count"),
+                "primary_failure_count": verified.get("primary_failure_count"),
+                "fallback_reservoir_row_count": verified.get("fallback_reservoir_row_count"),
+                "fallback_market_read_attempt_count": verified.get(
+                    "fallback_market_read_attempt_count"
+                ),
+                "fallback_identity_conflict_skip_count": verified.get(
+                    "fallback_identity_conflict_skip_count"
+                ),
+                "activated_fallback_count": verified.get("activated_fallback_count"),
+                "realized_row_count": verified.get("realized_row_count"),
+                "realized_unique_identity_count": verified.get(
+                    "realized_unique_identity_count"
+                ),
+                "realized_cell_counts": verified.get("realized_cell_counts"),
+                "realized_deficits": verified.get("realized_deficits"),
+                "realized_global_identity_unique": verified.get(
+                    "realized_global_identity_unique"
+                ),
+                "realized_plan_digest": verified.get("realized_plan_digest"),
+                "fallback_reservoir_digest": verified.get("fallback_reservoir_digest"),
+                "ready_for_separate_p020c_preregistration": verified.get(
+                    "ready_for_separate_p020c_preregistration"
+                ),
+                "stage1_12_semantic_read": verified.get("stage1_12_semantic_read"),
+                "preserved_2021_read": verified.get("preserved_2021_read"),
+                "2022_2024_read": verified.get("2022_2024_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB:
             result["downside_lifecycle_resource_plan"] = {
                 "disposition": verified.get("disposition"),
@@ -4048,6 +4136,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_REALIZED_IDENTITY_ADMISSION_JOB:
+        existing = _existing_realized_identity_admission_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -4147,6 +4241,9 @@ def submit_job(
     )
     primary_unique_contingent_fallback_reserved = (
         job.kind == STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB
+    )
+    realized_identity_admission_reserved = (
+        job.kind == STAGE_REALIZED_IDENTITY_ADMISSION_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -4316,6 +4413,11 @@ def submit_job(
             paths.primary_unique_contingent_fallback_budget,
             _primary_unique_contingent_fallback_budget_value(job),
         )
+    if realized_identity_admission_reserved:
+        _exclusive_json(
+            paths.realized_identity_admission_budget,
+            _realized_identity_admission_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -4388,6 +4490,8 @@ def submit_job(
             paths.admission_exposure_capacity_budget.unlink(missing_ok=True)
         if primary_unique_contingent_fallback_reserved:
             paths.primary_unique_contingent_fallback_budget.unlink(missing_ok=True)
+        if realized_identity_admission_reserved:
+            paths.realized_identity_admission_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -4455,6 +4559,8 @@ def submit_job(
             paths.admission_exposure_capacity_budget.unlink(missing_ok=True)
         if primary_unique_contingent_fallback_reserved:
             paths.primary_unique_contingent_fallback_budget.unlink(missing_ok=True)
+        if realized_identity_admission_reserved:
+            paths.realized_identity_admission_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -7552,6 +7658,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p022_b_failure": _recent_stage_job_failure(
             paths, kind=STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB,
+        ),
+        "recent_p023_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_REALIZED_IDENTITY_ADMISSION_JOB,
         ),
     }
 

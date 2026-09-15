@@ -115,6 +115,8 @@ P022_RESULT = (
     ROOT / "config/stage-learning/stage-primary-unique-contingent-fallback-result.v1.json"
 )
 P022_WORK = ROOT / "docs/work-items/stage-primary-unique-contingent-fallback.md"
+P023_CONFIG = ROOT / "config/stage-learning/stage-realized-identity-admission.v1.json"
+P023_WORK = ROOT / "docs/work-items/stage-realized-identity-admission.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -1641,6 +1643,55 @@ def test_stage022_closes_with_primary_pass_and_localized_fallback_shortfall() ->
     assert value["attribution"]["fallback_shortfall"] == 2
     assert value["successor"]["work_item"] == "P3-STAGE-023"
     assert value["successor"]["semantic_authority"] is False
+
+
+def test_stage023_freezes_realized_identity_admission_before_semantic_review() -> None:
+    value = json.loads(P023_CONFIG.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-023"
+    assert value["state"] == (
+        "PREREGISTERED_PRIMARY_FIRST_ADMISSION_AND_CONTINGENT_REPLACEMENT_BEFORE_INPUT_READ"
+    )
+    primary = value["primary_contract"]
+    assert primary["row_count"] == 192
+    assert primary["primary_per_cell"] == 24
+    assert primary["global_identity_unique"] is True
+    assert primary["read_all_primaries_before_fallback_activation"] is True
+    assert primary["primary_failure_consumes_realized_identity"] is False
+    assert primary["primary_success_consumes_realized_identity"] is True
+    fallback = value["fallback_reservoir"]
+    assert fallback["same_cell_only"] is True
+    assert fallback["membership_and_order_frozen_before_input_read"] is True
+    assert fallback["planned_primary_identity_may_appear_in_other_fallback_windows"] is True
+    assert fallback["realized_primary_identity_blocks_fallback_activation_globally"] is True
+    assert fallback["activated_fallback_identity_blocks_later_activation_globally"] is True
+    assert fallback["at_most_one_realized_case_per_identity"] is True
+    assert fallback["cross_cell_fill"] is False
+    admission = value["admission_contract"]
+    assert admission["required_sessions"] == 61
+    assert admission["fallback_trigger"] == "CELL_TECHNICAL_READINESS_DEFICIT_ONLY"
+    assert admission["skip_fallback_without_market_read_if_identity_already_realized"] is True
+    gate = value["realized_plan_gate"]
+    assert gate["required_rows_per_cell"] == 24
+    assert gate["required_total_rows"] == 192
+    assert gate["global_identity_unique"] is True
+    assert gate["pass_allows_only"] == "SEPARATE_P020_C_PREREGISTRATION"
+    authority = value["authority"]
+    assert authority["input_readiness_market_read"] is True
+    for key in (
+        "raw_ohlc_publish_or_retain",
+        "structure_fact_build",
+        "stage1_12_semantic_read",
+        "threshold_or_candidate_read",
+        "reference_opinion_read",
+        "p020_c_semantic_review",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+    assert P023_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

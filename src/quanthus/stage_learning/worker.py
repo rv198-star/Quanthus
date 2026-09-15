@@ -6626,6 +6626,123 @@ def _stratum_normalized_instability_diagnostics(
     }
 
 
+def _instability_channel_decomposition_diagnostics(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("instability channel decomposition result reference missing")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError(
+            "instability channel decomposition artifact outside job root"
+        ) from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("instability channel decomposition manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    raw = (artifact_root / "channel-decomposition.json").read_bytes()
+    if manifest.get("files", {}).get("channel-decomposition.json") != _bytes_sha256(raw):
+        raise StageWorkerError("instability channel decomposition diagnostic file binding differs")
+    diagnostic = json.loads(raw)
+    profiles = diagnostic.get("profiles")
+    if not isinstance(profiles, list) or len(profiles) != 9:
+        raise StageWorkerError("instability channel decomposition profile count differs")
+
+    def compact_metrics(value: Mapping[str, Any]) -> dict[str, Any]:
+        pooled = value.get("pooled")
+        macro = value.get("macro")
+        per_cell = value.get("per_cell")
+        if (
+            not isinstance(pooled, Mapping)
+            or not isinstance(macro, Mapping)
+            or not isinstance(per_cell, Mapping)
+        ):
+            raise StageWorkerError("instability channel decomposition metrics differ")
+        cells: dict[str, dict[str, Any]] = {}
+        for cell, metrics in sorted(per_cell.items()):
+            if not isinstance(metrics, Mapping):
+                raise StageWorkerError("instability channel decomposition cell metrics differ")
+            cells[str(cell)] = {
+                "predictions": metrics.get("predictions"),
+                "true_positive": metrics.get("true_positive"),
+                "false_positive": metrics.get("false_positive"),
+                "precision": metrics.get("precision"),
+                "positive_reference_coverage": metrics.get("positive_reference_coverage"),
+                "definite_negative_false_positive_rate": metrics.get(
+                    "definite_negative_false_positive_rate"
+                ),
+            }
+        return {
+            "macro_precision": macro.get("precision"),
+            "macro_positive_reference_coverage": macro.get("positive_reference_coverage"),
+            "macro_definite_negative_false_positive_rate": macro.get(
+                "definite_negative_false_positive_rate"
+            ),
+            "pooled_predictions": pooled.get("predictions"),
+            "pooled_true_positive": pooled.get("true_positive"),
+            "pooled_false_positive": pooled.get("false_positive"),
+            "pooled_precision": pooled.get("precision"),
+            "pooled_positive_reference_coverage": pooled.get("positive_reference_coverage"),
+            "pooled_definite_negative_false_positive_rate": pooled.get(
+                "definite_negative_false_positive_rate"
+            ),
+            "per_cell": cells,
+        }
+
+    compact_profiles = []
+    for row in profiles:
+        if not isinstance(row, Mapping):
+            raise StageWorkerError("instability channel decomposition profile shape differs")
+        expansion = row.get("expanding_disorder_20")
+        broad = row.get("broad_reversal_disorder_20")
+        parent_or = row.get("parent_or")
+        attribution = row.get("attribution")
+        if not all(
+            isinstance(item, Mapping)
+            for item in (expansion, broad, parent_or, attribution)
+        ):
+            raise StageWorkerError("instability channel decomposition profile payload differs")
+        compact_profiles.append(
+            {
+                "profile_id": row.get("profile_id"),
+                "expansion_profile_id": row.get("expansion_profile_id"),
+                "broad_profile_id": row.get("broad_profile_id"),
+                "expanding_disorder_20": compact_metrics(expansion),
+                "broad_reversal_disorder_20": compact_metrics(broad),
+                "parent_or": compact_metrics(parent_or),
+                "attribution": dict(attribution),
+            }
+        )
+    return {
+        "schema_version": "quanthus.stage-instability-channel-decomposition-diagnostics.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "disposition": diagnostic.get("disposition"),
+        "reference_case_count": diagnostic.get("reference_case_count"),
+        "profile_count": diagnostic.get("profile_count"),
+        "profiles": compact_profiles,
+        "threshold_values_included": False,
+        "case_predictions_included": False,
+        "reference_rows_included": False,
+        "candidate_selection_performed": False,
+        "new_semantic_labels_generated": False,
+        "dwd_market_read": False,
+        "preserved_2021_read": False,
+        "2025_read": False,
+    }
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -6696,6 +6813,12 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
         stratum_diagnostics = _stratum_normalized_instability_diagnostics(paths, observed)
         if stratum_diagnostics is not None:
             result = {**result, "stratum_normalized_instability_diagnostics": stratum_diagnostics}
+        channel_diagnostics = _instability_channel_decomposition_diagnostics(paths, observed)
+        if channel_diagnostics is not None:
+            result = {
+                **result,
+                "instability_channel_decomposition_diagnostics": channel_diagnostics,
+            }
         selection_transport = _positive_instability_d1_selection_transport(paths, observed)
         if selection_transport is None:
             selection_transport = _orderly_consolidation_joint_d1_selection_transport(

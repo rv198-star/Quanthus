@@ -1110,6 +1110,116 @@ def test_stratum_normalized_instability_status_exposes_bounded_diagnostics_only(
     assert "secret_threshold" not in json.dumps(diagnostics)
 
 
+def test_instability_channel_decomposition_status_exposes_bounded_diagnostics_only(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "6" * 32
+    artifact = worker_paths.runs / job_id / "stage-instability-channel-decomposition-test"
+    artifact.mkdir(parents=True)
+    metrics = {
+        "pooled": {
+            "predictions": 10,
+            "true_positive": 6,
+            "false_positive": 4,
+            "precision": "0.6",
+            "positive_reference_coverage": "0.5",
+            "definite_negative_false_positive_rate": "0.1",
+        },
+        "macro": {
+            "precision": "0.55",
+            "positive_reference_coverage": "0.48",
+            "definite_negative_false_positive_rate": "0.11",
+        },
+        "per_cell": {
+            "ERA/BOARD": {
+                "predictions": 2,
+                "true_positive": 1,
+                "false_positive": 1,
+                "precision": "0.5",
+                "positive_reference_coverage": "0.5",
+                "definite_negative_false_positive_rate": "0.1",
+                "secret_threshold": "must-not-leak",
+            }
+        },
+    }
+    profiles = [
+        {
+            "profile_id": f"profile-{index}",
+            "expansion_profile_id": f"exp-{index // 3}",
+            "broad_profile_id": f"broad-{index % 3}",
+            "expanding_disorder_20": metrics,
+            "broad_reversal_disorder_20": metrics,
+            "parent_or": metrics,
+            "attribution": {
+                "expansion_true_count": 10,
+                "broad_true_count": 8,
+                "overlap_true_count": 3,
+                "expansion_only_count": 7,
+                "broad_only_count": 5,
+                "neither_count": 240,
+                "expansion_only_true_positive": 4,
+                "expansion_only_false_positive": 3,
+                "broad_only_true_positive": 2,
+                "broad_only_false_positive": 3,
+                "overlap_true_positive": 2,
+                "overlap_false_positive": 1,
+            },
+        }
+        for index in range(9)
+    ]
+    payload = {
+        "schema_version": "quanthus.stage-instability-channel-decomposition-diagnostic.v1",
+        "disposition": "PASS_CHANNEL_DECOMPOSITION_DIAGNOSTIC_COMPLETE",
+        "reference_case_count": 252,
+        "profile_count": 9,
+        "profiles": profiles,
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    (artifact / "channel-decomposition.json").write_bytes(raw)
+    manifest = {
+        "schema_version": "quanthus.stage-instability-channel-decomposition-artifact.v1",
+        "files": {"channel-decomposition.json": "sha256:" + hashlib.sha256(raw).hexdigest()},
+    }
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_INSTABILITY_CHANNEL_DECOMPOSITION_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-15T00:00:00+00:00",
+        "started_at": "2026-09-15T00:00:01+00:00",
+        "completed_at": "2026-09-15T00:00:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "instability_channel_decomposition": {"disposition": payload["disposition"]},
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-15T00:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+
+    observed = read_status(worker_paths, job_id)
+    diagnostics = observed["instability_channel_decomposition_diagnostics"]
+    assert diagnostics["profile_count"] == 9
+    assert len(diagnostics["profiles"]) == 9
+    assert diagnostics["threshold_values_included"] is False
+    assert diagnostics["case_predictions_included"] is False
+    assert diagnostics["reference_rows_included"] is False
+    assert diagnostics["candidate_selection_performed"] is False
+    assert diagnostics["profiles"][0]["attribution"]["expansion_only_false_positive"] == 3
+    assert "secret_threshold" not in json.dumps(diagnostics)
+
+
 def test_instability_channel_decomposition_is_one_shot_and_idempotent(
     tmp_path: Path,
 ) -> None:

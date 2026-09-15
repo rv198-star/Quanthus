@@ -1,11 +1,12 @@
 # P3-STAGE-024 — Cross-Era Clustered-Identity Development Admission
 
-Design status: approved  
-Delivery gate: open engineering; no new readiness read until this contract is durably frozen
+Design status: approved
+Delivery gate: engineering accepted; one bounded runtime Job ready
 
-Machine contract: `../../config/stage-learning/stage-clustered-identity-admission.v1.json`  
-Parent result: `../../config/stage-learning/stage-realized-identity-admission-result.v1.json`  
+Machine contract: `../../config/stage-learning/stage-clustered-identity-admission.v1.json`
+Parent result: `../../config/stage-learning/stage-realized-identity-admission-result.v1.json`
 Parent review: `../reviews/stage-p023-realized-identity-admission-review-20260916.md`
+Engineering acceptance: `../acceptance/stage-clustered-identity-admission-engineering-20260916.md`
 
 ## Goal
 
@@ -42,8 +43,8 @@ explicit identity cluster and never count as separate identity-independent obser
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
 | P3-STAGE-024-A | Freeze clustered-development admission and accounting contract | P3-STAGE-023 | this preregistration; no new readiness read |
-| P3-STAGE-024-B | Implement artifact-bound supplemental admission runtime | P3-STAGE-024-A | deterministic code/tests only; P023 readings reusable and immutable |
-| P3-STAGE-024-C | Run the sole supplemental admission Job | P3-STAGE-024-B | PASS only at 8×24 admission-ready rows with within-cell uniqueness and complete cluster accounting |
+| P3-STAGE-024-B | Implement artifact-bound supplemental admission runtime | P3-STAGE-024-A | closed engineering acceptance; deterministic code/tests only, P023 readings reusable and immutable |
+| P3-STAGE-024-C | Run the sole supplemental admission Job | P3-STAGE-024-B | ready after accepted revision is deployed; PASS only at 8×24 admission-ready rows with within-cell uniqueness and complete cluster accounting |
 | P3-STAGE-024-D | Review/close and gate P020-C preregistration | P3-STAGE-024-C | pass may open only a separately frozen P020-C preregistration; failure returns to four-party portfolio review |
 
 ## Pass and failure semantics

@@ -499,9 +499,11 @@ nodes.
   evidence twice. P024-A is now preregistered before any new readiness read. It binds the exact P023
   no-pass artifact, permits new admission reads only for previously unread early-STAR candidates that
   P023 skipped solely for realized-identity conflict, requires row count plus unique-cluster count in
-  all later P020-C/D evidence, and forbids an automatic P025/resource loop on failure. P020 remains
-  blocked until a P024 PASS and separate P020-C preregistration. Preserved 2021/2022-2024/2025 remain
-  unopened.
+  all later P020-C/D evidence, and forbids an automatic P025/resource loop on failure. P024-B
+  engineering is now accepted with a one-shot/idempotent Worker Job and bounded `submit-p024` control;
+  no new readiness read occurred during engineering. P024-C is the sole ready runtime step. P020
+  remains blocked until a P024 PASS and separate P020-C preregistration. Preserved
+  2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -522,7 +524,8 @@ nodes.
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
   `work-items/stage-realized-identity-admission.md`,
   `reviews/stage-p023-realized-identity-admission-review-20260916.md`,
-  `work-items/stage-clustered-identity-admission.md`, and
+  `work-items/stage-clustered-identity-admission.md`,
+  `acceptance/stage-clustered-identity-admission-engineering-20260916.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
 - The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
   proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;

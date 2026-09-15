@@ -99,6 +99,9 @@ STAGE_PRIMARY_UNIQUE_CONTINGENT_FALLBACK_JOB = (
 STAGE_REALIZED_IDENTITY_ADMISSION_JOB = (
     "quanthus.stage-realized-identity-admission.v1"
 )
+STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB = (
+    "quanthus.stage-clustered-identity-admission.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -178,6 +181,9 @@ PRIMARY_UNIQUE_CONTINGENT_FALLBACK_BUDGET_SCHEMA = (
 )
 REALIZED_IDENTITY_ADMISSION_BUDGET_SCHEMA = (
     "quanthus.stage-realized-identity-admission-budget.v1"
+)
+CLUSTERED_IDENTITY_ADMISSION_BUDGET_SCHEMA = (
+    "quanthus.stage-clustered-identity-admission-budget.v1"
 )
 DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-downside-lifecycle-resource-plan-recovery.v1.json"
@@ -451,6 +457,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "artifact_glob": "stage-realized-identity-admission-*",
         "process_error": "stage_realized_identity_admission_process_failed",
         "wall_seconds": 3600,
+    },
+    STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB: {
+        "config": "config/stage-learning/stage-clustered-identity-admission.v1.json",
+        "module": "quanthus.stage_learning.clustered_identity_admission",
+        "artifact_glob": "stage-clustered-identity-admission-*",
+        "process_error": "stage_clustered_identity_admission_process_failed",
+        "wall_seconds": 1800,
     },
 }
 
@@ -736,6 +749,10 @@ class StageWorkerPaths:
     @property
     def realized_identity_admission_budget(self) -> Path:
         return self.control_root / "realized-identity-admission-budget.json"
+
+    @property
+    def clustered_identity_admission_budget(self) -> Path:
+        return self.control_root / "clustered-identity-admission-budget.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -2473,6 +2490,44 @@ def _existing_realized_identity_admission_submission(
     return _idempotent_stage_submission(paths, job)
 
 
+def _clustered_identity_admission_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": CLUSTERED_IDENTITY_ADMISSION_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-024",
+        "phase": "CROSS_ERA_CLUSTERED_IDENTITY_SUPPLEMENTAL_ADMISSION",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_clustered_identity_admission_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.clustered_identity_admission_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "clustered identity admission budget")
+    if (
+        marker.get("schema_version") != CLUSTERED_IDENTITY_ADMISSION_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-024"
+        or marker.get("phase")
+        != "CROSS_ERA_CLUSTERED_IDENTITY_SUPPLEMENTAL_ADMISSION"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("clustered identity admission budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("clustered identity admission budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "clustered identity admission has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -3653,6 +3708,44 @@ class StageWorker:
                 "2022_2024_read": verified.get("2022_2024_read"),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB:
+            result["clustered_identity_admission"] = {
+                "disposition": verified.get("disposition"),
+                "starting_row_count": verified.get("starting_row_count"),
+                "eligible_conflict_skipped_candidate_count": verified.get(
+                    "eligible_conflict_skipped_candidate_count"
+                ),
+                "supplemental_market_read_attempt_count": verified.get(
+                    "supplemental_market_read_attempt_count"
+                ),
+                "supplemental_readiness_failure_count": verified.get(
+                    "supplemental_readiness_failure_count"
+                ),
+                "activated_supplement_count": verified.get("activated_supplement_count"),
+                "final_row_count": verified.get("final_row_count"),
+                "final_unique_cluster_count": verified.get("final_unique_cluster_count"),
+                "final_repeated_identity_cluster_count": verified.get(
+                    "final_repeated_identity_cluster_count"
+                ),
+                "final_independent_identity_evidence_count": verified.get(
+                    "final_independent_identity_evidence_count"
+                ),
+                "final_cell_counts": verified.get("final_cell_counts"),
+                "clustered_plan_digest": verified.get("clustered_plan_digest"),
+                "ready_for_separate_p020c_preregistration": verified.get(
+                    "ready_for_separate_p020c_preregistration"
+                ),
+                "completed_p023_readiness_rerun_count": verified.get(
+                    "completed_p023_readiness_rerun_count"
+                ),
+                "repeated_rows_not_independent": verified.get(
+                    "repeated_rows_not_independent"
+                ),
+                "stage1_12_semantic_read": verified.get("stage1_12_semantic_read"),
+                "preserved_2021_read": verified.get("preserved_2021_read"),
+                "2022_2024_read": verified.get("2022_2024_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB:
             result["downside_lifecycle_resource_plan"] = {
                 "disposition": verified.get("disposition"),
@@ -4142,6 +4235,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB:
+        existing = _existing_clustered_identity_admission_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -4244,6 +4343,9 @@ def submit_job(
     )
     realized_identity_admission_reserved = (
         job.kind == STAGE_REALIZED_IDENTITY_ADMISSION_JOB
+    )
+    clustered_identity_admission_reserved = (
+        job.kind == STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -4418,6 +4520,11 @@ def submit_job(
             paths.realized_identity_admission_budget,
             _realized_identity_admission_budget_value(job),
         )
+    if clustered_identity_admission_reserved:
+        _exclusive_json(
+            paths.clustered_identity_admission_budget,
+            _clustered_identity_admission_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -4492,6 +4599,8 @@ def submit_job(
             paths.primary_unique_contingent_fallback_budget.unlink(missing_ok=True)
         if realized_identity_admission_reserved:
             paths.realized_identity_admission_budget.unlink(missing_ok=True)
+        if clustered_identity_admission_reserved:
+            paths.clustered_identity_admission_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -4561,6 +4670,8 @@ def submit_job(
             paths.primary_unique_contingent_fallback_budget.unlink(missing_ok=True)
         if realized_identity_admission_reserved:
             paths.realized_identity_admission_budget.unlink(missing_ok=True)
+        if clustered_identity_admission_reserved:
+            paths.clustered_identity_admission_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -7661,6 +7772,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         ),
         "recent_p023_failure": _recent_stage_job_failure(
             paths, kind=STAGE_REALIZED_IDENTITY_ADMISSION_JOB,
+        ),
+        "recent_p024_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB,
         ),
     }
 

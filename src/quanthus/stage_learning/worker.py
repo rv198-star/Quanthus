@@ -3552,6 +3552,12 @@ class StageWorker:
                 ),
                 "primary_plan_digest": verified.get("primary_plan_digest"),
                 "fallback_pool_digest": verified.get("fallback_pool_digest"),
+                "primary_cell_counts": verified.get("primary_cell_counts"),
+                "fallback_cell_counts": verified.get("fallback_cell_counts"),
+                "fallback_cell_capacity": verified.get("fallback_cell_capacity"),
+                "worst_case_fallback_cell_activation_counts": verified.get(
+                    "worst_case_fallback_cell_activation_counts"
+                ),
                 "market_bar_read": verified.get("market_bar_read"),
                 "stage1_12_semantic_read": verified.get("stage1_12_semantic_read"),
                 "p020_reopen_authorized": verified.get("p020_reopen_authorized"),

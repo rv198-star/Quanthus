@@ -646,6 +646,26 @@ def verify_artifact(path: Path, *, code_revision: str | None = None) -> dict[str
         ),
         "primary_plan_digest": summary.get("primary_plan_digest"),
         "fallback_pool_digest": summary.get("fallback_pool_digest"),
+        "primary_cell_counts": primary.get("cell_counts"),
+        "fallback_cell_counts": fallback.get("cell_counts"),
+        "fallback_cell_capacity": [
+            {
+                "cell": receipt.get("cell"),
+                "available_non_primary_identity_count": receipt.get(
+                    "available_non_primary_identity_count"
+                ),
+                "frozen_fallback_candidate_count": receipt.get(
+                    "frozen_fallback_candidate_count"
+                ),
+                "fallback_ceiling": receipt.get("fallback_ceiling"),
+                "sufficient": receipt.get("sufficient"),
+            }
+            for receipt in fallback.get("cell_receipts", [])
+            if isinstance(receipt, Mapping)
+        ],
+        "worst_case_fallback_cell_activation_counts": fallback.get(
+            "worst_case_simultaneous_activation", {}
+        ).get("cell_activation_counts"),
         "market_bar_read": False,
         "admission_market_read": False,
         "stage1_12_semantic_read": False,

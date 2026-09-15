@@ -1004,6 +1004,107 @@ def test_stratum_normalized_instability_allows_one_exact_binding_recovery(
         )
 
 
+def test_stratum_normalized_instability_status_exposes_bounded_diagnostics_only(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    worker_paths.ensure()
+    job_id = "stage_" + "7" * 32
+    artifact = worker_paths.runs / job_id / "stage-stratum-normalized-instability-test"
+    artifact.mkdir(parents=True)
+    pooled = {
+        "predictions": 20,
+        "true_positive": 12,
+        "false_positive": 8,
+        "precision": "0.6",
+        "positive_reference_coverage": "0.3",
+        "definite_negative_false_positive_rate": "0.05",
+    }
+    macro = {
+        "precision": "0.55",
+        "positive_reference_coverage": "0.28",
+        "definite_negative_false_positive_rate": "0.04",
+    }
+    per_cell = {
+        f"ERA{index % 2}/BOARD{index}": {
+            "definite_positive_references": 5,
+            "definite_negative_references": 20,
+            "predictions": 3,
+            "true_positive": 2,
+            "false_positive": 1,
+            "precision": "0.6666666666666666666666666667",
+            "positive_reference_coverage": "0.4",
+            "definite_negative_false_positive_rate": "0.05",
+            "secret_threshold": "must-not-leak",
+        }
+        for index in range(8)
+    }
+    trials = [
+        {
+            "profile_id": f"profile-{index}",
+            "expansion_profile_id": f"exp-{index // 3}",
+            "broad_profile_id": f"broad-{index % 3}",
+            "metrics": {"pooled": pooled, "macro": macro, "per_cell": per_cell},
+            "eligible": False,
+        }
+        for index in range(9)
+    ]
+    score = {
+        "schema_version": "quanthus.stage-stratum-normalized-instability-score.v1",
+        "disposition": "REVISE_OR_PARK_STRATUM_NORMALIZED_INSTABILITY_FAIL",
+        "reference_case_count": 252,
+        "eligible_candidate_count": 0,
+        "trials": trials,
+    }
+    score_raw = json.dumps(score, sort_keys=True, separators=(",", ":")).encode()
+    (artifact / "instability-score.json").write_bytes(score_raw)
+    manifest = {
+        "schema_version": "quanthus.stage-stratum-normalized-instability-artifact.v1",
+        "files": {
+            "instability-score.json": "sha256:" + hashlib.sha256(score_raw).hexdigest()
+        },
+    }
+    manifest_raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest_sha = "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+    (artifact / "manifest.json").write_bytes(manifest_raw)
+    (artifact / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    status = {
+        "schema_version": "quanthus.stage-worker-status.v1",
+        "job_id": job_id,
+        "kind": STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB,
+        "code_revision": REVISION,
+        "input_digest": _digest({"job": job_id}),
+        "state": "succeeded",
+        "stage": "terminal",
+        "submitted_at": "2026-09-15T00:00:00+00:00",
+        "started_at": "2026-09-15T00:00:01+00:00",
+        "completed_at": "2026-09-15T00:00:02+00:00",
+        "result_ref": {
+            "artifact_root": str(artifact),
+            "manifest_sha256": manifest_sha,
+            "stratum_normalized_instability": {"disposition": score["disposition"]},
+        },
+        "error": None,
+        "exit_code": 0,
+        "updated_at": "2026-09-15T00:00:02+00:00",
+    }
+    (worker_paths.status / f"{job_id}.json").write_text(json.dumps(status), encoding="utf-8")
+
+    observed = read_status(worker_paths, job_id)
+    diagnostics = observed["stratum_normalized_instability_diagnostics"]
+    assert diagnostics["disposition"] == score["disposition"]
+    assert diagnostics["reference_case_count"] == 252
+    assert diagnostics["eligible_candidate_count"] == 0
+    assert len(diagnostics["trials"]) == 9
+    assert diagnostics["cell_threshold_values_included"] is False
+    assert diagnostics["case_predictions_included"] is False
+    assert diagnostics["reference_rows_included"] is False
+    first_metrics = diagnostics["trials"][0]["metrics"]
+    assert len(first_metrics["per_cell"]) == 8
+    assert first_metrics["per_cell"]["ERA0/BOARD0"]["true_positive"] == 2
+    assert "secret_threshold" not in json.dumps(diagnostics)
+
+
 def test_combined_atomic_scoring_status_exposes_bounded_diagnostics_only(
     tmp_path: Path,
 ) -> None:

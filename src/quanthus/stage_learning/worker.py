@@ -6424,6 +6424,123 @@ def _combined_atomic_scoring_diagnostics(
     }
 
 
+def _stratum_normalized_instability_diagnostics(
+    paths: StageWorkerPaths, observed: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if (
+        observed.get("kind") != STAGE_STRATUM_NORMALIZED_INSTABILITY_JOB
+        or observed.get("state") != "succeeded"
+    ):
+        return None
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("stratum normalized instability result reference missing")
+    artifact_root = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / str(observed["job_id"])).resolve()
+    try:
+        artifact_root.relative_to(job_root)
+    except ValueError as exc:
+        raise StageWorkerError("stratum normalized instability artifact outside job root") from exc
+    manifest_raw = (artifact_root / "manifest.json").read_bytes()
+    manifest_sha = _bytes_sha256(manifest_raw)
+    ready = (artifact_root / "READY").read_text(encoding="ascii").strip()
+    if ready != manifest_sha or result_ref.get("manifest_sha256") != manifest_sha:
+        raise StageWorkerError("stratum normalized instability diagnostic manifest binding differs")
+    manifest = json.loads(manifest_raw)
+    raw = (artifact_root / "instability-score.json").read_bytes()
+    if manifest.get("files", {}).get("instability-score.json") != _bytes_sha256(raw):
+        raise StageWorkerError("stratum normalized instability diagnostic file binding differs")
+    score = json.loads(raw)
+    trials = score.get("trials")
+    if not isinstance(trials, list) or len(trials) != 9:
+        raise StageWorkerError("stratum normalized instability diagnostic trial count differs")
+
+    def compact_metrics(metrics: Mapping[str, Any]) -> dict[str, Any]:
+        pooled = metrics.get("pooled")
+        macro = metrics.get("macro")
+        per_cell = metrics.get("per_cell")
+        if (
+            not isinstance(pooled, Mapping)
+            or not isinstance(macro, Mapping)
+            or not isinstance(per_cell, Mapping)
+        ):
+            raise StageWorkerError("stratum normalized instability diagnostic metrics differ")
+        compact_cells: dict[str, dict[str, Any]] = {}
+        for cell, cell_metrics in sorted(per_cell.items()):
+            if not isinstance(cell_metrics, Mapping):
+                raise StageWorkerError(
+                    "stratum normalized instability diagnostic per-cell metrics differ"
+                )
+            compact_cells[str(cell)] = {
+                "definite_positive_references": cell_metrics.get(
+                    "definite_positive_references"
+                ),
+                "definite_negative_references": cell_metrics.get(
+                    "definite_negative_references"
+                ),
+                "predictions": cell_metrics.get("predictions"),
+                "true_positive": cell_metrics.get("true_positive"),
+                "false_positive": cell_metrics.get("false_positive"),
+                "precision": cell_metrics.get("precision"),
+                "positive_reference_coverage": cell_metrics.get(
+                    "positive_reference_coverage"
+                ),
+                "definite_negative_false_positive_rate": cell_metrics.get(
+                    "definite_negative_false_positive_rate"
+                ),
+            }
+        return {
+            "macro_precision": macro.get("precision"),
+            "macro_positive_reference_coverage": macro.get("positive_reference_coverage"),
+            "macro_definite_negative_false_positive_rate": macro.get(
+                "definite_negative_false_positive_rate"
+            ),
+            "pooled_predictions": pooled.get("predictions"),
+            "pooled_true_positive": pooled.get("true_positive"),
+            "pooled_false_positive": pooled.get("false_positive"),
+            "pooled_precision": pooled.get("precision"),
+            "pooled_positive_reference_coverage": pooled.get(
+                "positive_reference_coverage"
+            ),
+            "pooled_definite_negative_false_positive_rate": pooled.get(
+                "definite_negative_false_positive_rate"
+            ),
+            "per_cell": compact_cells,
+        }
+
+    compact_trials = []
+    for trial in trials:
+        if not isinstance(trial, Mapping):
+            raise StageWorkerError("stratum normalized instability diagnostic trial shape differs")
+        metrics = trial.get("metrics")
+        if not isinstance(metrics, Mapping):
+            raise StageWorkerError("stratum normalized instability diagnostic trial metrics differ")
+        compact_trials.append(
+            {
+                "profile_id": trial.get("profile_id"),
+                "expansion_profile_id": trial.get("expansion_profile_id"),
+                "broad_profile_id": trial.get("broad_profile_id"),
+                "eligible": trial.get("eligible") is True,
+                "metrics": compact_metrics(metrics),
+            }
+        )
+    return {
+        "schema_version": "quanthus.stage-stratum-normalized-instability-diagnostics.v1",
+        "parent_job_id": observed["job_id"],
+        "manifest_sha256": manifest_sha,
+        "disposition": score.get("disposition"),
+        "reference_case_count": score.get("reference_case_count"),
+        "eligible_candidate_count": score.get("eligible_candidate_count"),
+        "trials": compact_trials,
+        "cell_threshold_values_included": False,
+        "case_predictions_included": False,
+        "reference_rows_included": False,
+        "dwd_market_read": False,
+        "preserved_2021_read": False,
+        "2025_read": False,
+    }
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -6491,6 +6608,9 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
         scoring_diagnostics = _combined_atomic_scoring_diagnostics(paths, observed)
         if scoring_diagnostics is not None:
             result = {**result, "scoring_diagnostics": scoring_diagnostics}
+        stratum_diagnostics = _stratum_normalized_instability_diagnostics(paths, observed)
+        if stratum_diagnostics is not None:
+            result = {**result, "stratum_normalized_instability_diagnostics": stratum_diagnostics}
         selection_transport = _positive_instability_d1_selection_transport(paths, observed)
         if selection_transport is None:
             selection_transport = _orderly_consolidation_joint_d1_selection_transport(

@@ -127,6 +127,8 @@ P024_CONFIG = ROOT / "config/stage-learning/stage-clustered-identity-admission.v
 P024_RESULT = ROOT / "config/stage-learning/stage-clustered-identity-admission-result.v1.json"
 P024_REVIEW = ROOT / "docs/reviews/stage-p024-clustered-identity-admission-review-20260916.md"
 P024_WORK = ROOT / "docs/work-items/stage-clustered-identity-admission.md"
+P026_CONCEPT = ROOT / "config/stage-learning/stage-high-side-modifier-concept.v1.json"
+P026_WORK = ROOT / "docs/work-items/stage-high-side-modifier-proposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -2038,6 +2040,70 @@ def test_p020c_closes_reference_no_pass_without_gate_or_resource_repair() -> Non
     assert authority["resource_or_admission_reopen"] is False
     assert authority["p026_semantic_preregistration_only"] is True
     assert P020_C_REVIEW.is_file()
+
+
+def test_p026a_freezes_high_side_modifier_semantics_before_any_result_read() -> None:
+    value = json.loads(P026_CONCEPT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-026-A"
+    assert value["state"] == (
+        "PREREGISTERED_HIGH_SIDE_MODIFIER_SEMANTICS_BEFORE_RESOURCE_OR_RESULT_READ"
+    )
+    portfolio = value["portfolio_position"]
+    assert portfolio["subgroup"] == "8_9_high_side_modifiers"
+    assert portfolio["peer_primary_stage_model"] is False
+    assert portfolio["top1_primary_stage_compression"] is False
+    assert portfolio["stage8_current_route"] == "ACTIVE_SEMANTIC_AND_REFERENCE_RESEARCH"
+    assert portfolio["stage9_current_route"] == "PARKED_PENDING_MINIMAL_ACTIVITY_RELATION"
+    props = value["propositions"]
+    assert props["advancing_context"]["role"] == "AUXILIARY_CONTEXT_NOT_STAGE_CODE"
+    assert props["upside_acceleration_extension"]["stage_vocabulary_relation"] == (
+        "Stage_8_modifier_candidate"
+    )
+    assert props["upside_acceleration_extension"]["requires_context"] == "advancing_context"
+    assert props["high_level_price_volume_divergence"]["stage_vocabulary_relation"] == (
+        "Stage_9_modifier_hypothesis"
+    )
+    assert props["high_level_price_volume_divergence"]["price_only_projection_authorized"] is False
+    relationship = value["relationship_contract"]
+    assert relationship["stage8_is_modifier_not_peer_primary_state"] is True
+    assert relationship["stage9_requires_separate_activity_relation"] is True
+    assert relationship["stage9_price_only_fallback"] is False
+    assert relationship["historical_names_are_non_governing"] == ["赶顶", "派发"]
+    audit = value["fact_readiness_audit"]
+    assert audit["stage8"]["status"] == "READY_EXISTING_ACCEPTED_FACT_SUBSTRATE"
+    assert audit["stage8"]["new_fact_family_required_before_reference_pilot"] is False
+    assert audit["stage9"]["status"] == "BLOCKED_MISSING_ACTIVITY_RELATION"
+    assert audit["stage9"]["new_fact_family_required_before_reference_pilot"] is True
+    reference = value["reference_protocol"]
+    assert reference["first_result_bearing_route"] == "STAGE8_ONLY_BLIND_SEMANTIC_REFERENCE"
+    assert reference["stage9_opinion_collection"] is False
+    resource = value["resource_boundary"]
+    assert resource["reuse_p020_rows_as_fresh_evidence"] is False
+    assert resource["reuse_p020_identity_windows_as_fresh_evidence"] is False
+    assert resource["maximum_resource_routes_before_portfolio_review"] == 1
+    assert resource["automatic_resource_repair_successor"] is False
+    assert value["next_step"]["work_item"] == "P3-STAGE-026-B"
+    authority = value["authority"]
+    assert authority["semantic_architecture"] is True
+    assert authority["fact_readiness_audit"] is True
+    for key in (
+        "metadata_resource_design",
+        "new_market_read",
+        "review_opinion_collection",
+        "threshold_search",
+        "candidate_scoring",
+        "stage9_activity_fact_implementation",
+        "stage9_reference_pilot",
+        "primary_stage_output",
+        "labelcard_registration",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+    assert P026_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

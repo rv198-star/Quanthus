@@ -514,7 +514,14 @@ nodes.
   negative. The four-party closeout does not lower the gate or add opinions/resources. Stage12 remains
   research-only, Stage1 remains a supported nested condition but is not promoted independently,
   P020-D is not opened, and the third-group portfolio moves next to separately preregistered high-side
-  8/9 modifier research. Preserved 2021/2022-2024/2025 remain unopened.
+  8/9 modifier research. P026-A now freezes that next semantic boundary without any new result read:
+  `advancing_context` is an auxiliary context, Stage8 becomes an `upside_acceleration_extension`
+  modifier using accepted Trend Evolution facts, and Stage9 remains a
+  `high_level_price_volume_divergence` hypothesis blocked on a separately justified activity relation.
+  Price-only Stage9, future-top wording and distribution/fund-intent semantics are forbidden. The only
+  ready next action is one P020-disjoint exposure-aware Stage8 resource/reference preregistration;
+  resource shortfall returns to portfolio review rather than another repair sequence. Preserved
+  2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -532,6 +539,7 @@ nodes.
   `reviews/stage-p020b-resource-shortfall-four-party-review-20260915.md`,
   `work-items/stage-downside-lifecycle-blind-reference.md`,
   `reviews/stage-p020c-blind-reference-four-party-review-20260916.md`,
+  `work-items/stage-high-side-modifier-proposition.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,

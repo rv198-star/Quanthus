@@ -1,0 +1,190 @@
+{
+  "schema_version": "quanthus.stage-high-side-modifier-concept.v1",
+  "work_item": "P3-STAGE-026-A",
+  "state": "PREREGISTERED_HIGH_SIDE_MODIFIER_SEMANTICS_BEFORE_RESOURCE_OR_RESULT_READ",
+  "effective_date": "2026-09-16",
+  "purpose": "Resume the P019 third-group portfolio after the governance-complete P020-C no-pass by freezing observable high-side modifier semantics before any new resource selection, market read, reference opinion, threshold search or candidate scoring.",
+  "bindings": {
+    "p020_c_closeout": {
+      "path": "config/stage-learning/stage-downside-lifecycle-reference-result.v1.json",
+      "sha256": "sha256:dbf8ad057d7fae7a716f7e57ce984644684d2ed4630f2ec892cefa408c741ef6"
+    },
+    "p019_portfolio_rebaseline": {
+      "path": "config/stage-learning/stage-third-group-portfolio-rebaseline.v1.json",
+      "sha256": "sha256:76f1808042779523c6008046cfc1bfd57572a0331caf7fe47e1cd2fa4b5b572a"
+    },
+    "third_group_review": {
+      "path": "docs/reviews/stock-stage-third-group-profile-result-review-20260910.md",
+      "sha256": "sha256:f5648ca1a080de00463e9163b820b3ef0a4272ae3f4050a559285ea8c4a4bc12"
+    },
+    "trend_fact_contract": {
+      "path": "config/structure-trend-evolution.v1.json",
+      "sha256": "sha256:1e859d371329cc4c97ab8abd4605bd491535d58e1761e066ce497641d5764c33"
+    },
+    "trend_fact_design": {
+      "path": "docs/design/structure-trend-evolution-facts.md",
+      "sha256": "sha256:ee9aa37d349f536c624d2cd58d4271d0f977b7fbc423436fe621e01c2dc60fdc"
+    }
+  },
+  "portfolio_position": {
+    "parent_program": "P3-STAGE-019",
+    "subgroup": "8_9_high_side_modifiers",
+    "stage8_traceability_code": "8",
+    "stage9_traceability_code": "9",
+    "peer_primary_stage_model": false,
+    "top1_primary_stage_compression": false,
+    "stage8_current_route": "ACTIVE_SEMANTIC_AND_REFERENCE_RESEARCH",
+    "stage9_current_route": "PARKED_PENDING_MINIMAL_ACTIVITY_RELATION"
+  },
+  "propositions": {
+    "advancing_context": {
+      "semantic_name": "continuing_advancing_context",
+      "role": "AUXILIARY_CONTEXT_NOT_STAGE_CODE",
+      "meaning": "Current as-of evidence supports persistent upside direction/context rather than merely being above a past low or near a rolling high.",
+      "allowed_fact_families": [
+        "structure.geometry.window-return",
+        "structure.geometry.directional-efficiency",
+        "structure.geometry.return-velocity",
+        "structure.geometry.range-position",
+        "structure.geometry.drawdown-from-window-high",
+        "structure.geometry.rebound-from-window-low"
+      ],
+      "forbidden_shortcuts": [
+        "future_high",
+        "future_return",
+        "post_T_reversal",
+        "distance_from_low_alone",
+        "upper_range_position_alone",
+        "residual_else_class"
+      ]
+    },
+    "upside_acceleration_extension": {
+      "semantic_name": "upside_acceleration_extension_modifier",
+      "stage_vocabulary_relation": "Stage_8_modifier_candidate",
+      "meaning": "Inside an established advancing context, current evidence supports strengthening recent upside velocity and/or high-side extension without claiming an imminent top, exhaustion outcome or future reversal.",
+      "requires_context": "advancing_context",
+      "allowed_fact_families": [
+        "structure.geometry.window-return",
+        "structure.geometry.directional-efficiency",
+        "structure.geometry.return-velocity",
+        "structure.geometry.velocity-delta",
+        "structure.geometry.range-position",
+        "structure.geometry.drawdown-from-window-high",
+        "structure.geometry.rebound-from-window-low"
+      ],
+      "observable_channels": [
+        "recent_upside_velocity_strengthening_relative_to_medium_horizon",
+        "current_high_side_extension_inside_confirmed_advancing_context"
+      ],
+      "forbidden_shortcuts": [
+        "future_high",
+        "future_reversal",
+        "top_confirmation",
+        "exhaustion_claim",
+        "profitability_outcome",
+        "stage8_from_range_position_alone"
+      ]
+    },
+    "high_level_price_volume_divergence": {
+      "semantic_name": "high_level_price_volume_divergence_modifier",
+      "stage_vocabulary_relation": "Stage_9_modifier_hypothesis",
+      "meaning": "Inside a high-side advancing context, current price evidence shows slowing/weakening while an independently defined activity relation shows elevated or divergent participation; no actor intent is inferred.",
+      "requires_context": "advancing_context",
+      "price_side_fact_families": [
+        "structure.geometry.window-return",
+        "structure.geometry.directional-efficiency",
+        "structure.geometry.return-velocity",
+        "structure.geometry.velocity-delta",
+        "structure.geometry.range-position",
+        "structure.geometry.drawdown-from-window-high"
+      ],
+      "required_missing_fact_family": "high_side_activity_relation",
+      "price_only_projection_authorized": false,
+      "forbidden_shortcuts": [
+        "future_top",
+        "future_drawdown",
+        "distribution_intent",
+        "fund_flow_intent",
+        "price_only_stage9",
+        "volume_level_without_high_side_price_context"
+      ]
+    }
+  },
+  "relationship_contract": {
+    "multi_proposition_first": true,
+    "primary_stage_compression": false,
+    "stage8_requires_advancing_context": true,
+    "stage8_is_modifier_not_peer_primary_state": true,
+    "stage9_requires_advancing_context": true,
+    "stage9_requires_separate_activity_relation": true,
+    "stage9_price_only_fallback": false,
+    "stage8_and_stage9_future_coexistence_may_be_legal": true,
+    "unknown_or_unjudgeable_preserved": true,
+    "historical_names_are_non_governing": ["赶顶", "派发"]
+  },
+  "fact_readiness_audit": {
+    "stage8": {
+      "status": "READY_EXISTING_ACCEPTED_FACT_SUBSTRATE",
+      "basis": "accepted Trend Evolution Fact Family already contains direction, efficiency, velocity, velocity-delta, range-position, drawdown and rebound measurements required for an as-of Stage8 semantic reference experiment",
+      "new_fact_family_required_before_reference_pilot": false
+    },
+    "stage9": {
+      "status": "BLOCKED_MISSING_ACTIVITY_RELATION",
+      "basis": "the accepted third-group review explicitly lacks a joint high-position x slowing-price x elevated-activity relation; price-only evidence cannot satisfy Stage9 semantics",
+      "new_fact_family_required_before_reference_pilot": true,
+      "minimum_future_relation_scope": [
+        "current_or_recent_activity_relative_to_prior_admitted_baseline",
+        "joint_binding_to_high_side_price_context",
+        "T_only_point_in_time_semantics",
+        "no_fund_or_distribution_intent"
+      ]
+    }
+  },
+  "reference_protocol": {
+    "first_result_bearing_route": "STAGE8_ONLY_BLIND_SEMANTIC_REFERENCE",
+    "context_and_modifier_judged_separately": true,
+    "modifier_not_applicable_without_advancing_context": true,
+    "candidate_blind": true,
+    "threshold_blind": true,
+    "future_blind": true,
+    "same_origin_simulation_allowed_for_development": true,
+    "same_origin_must_be_labeled": true,
+    "unknown_preserved": true,
+    "no_top1_forcing": true,
+    "stage9_opinion_collection": false
+  },
+  "resource_boundary": {
+    "reuse_p020_rows_as_fresh_evidence": false,
+    "reuse_p020_identity_windows_as_fresh_evidence": false,
+    "exposure_aware_sampling_required": true,
+    "era_board_diagnostics_required": true,
+    "require_61_contiguous_admitted_sessions": true,
+    "maximum_resource_routes_before_portfolio_review": 1,
+    "automatic_resource_repair_successor": false,
+    "resource_shortfall_disposition": "FAIL_CLOSE_TO_FOUR_PARTY_PORTFOLIO_REVIEW"
+  },
+  "next_step": {
+    "work_item": "P3-STAGE-026-B",
+    "name": "Stage8 Blind-Reference Resource Preregistration",
+    "scope": "Freeze one bounded exposure-aware, P020-disjoint development resource and blind-reference contract for advancing_context plus Stage8 upside_acceleration_extension. No Stage9 activity or opinion route opens here."
+  },
+  "authority": {
+    "semantic_architecture": true,
+    "fact_readiness_audit": true,
+    "metadata_resource_design": false,
+    "new_market_read": false,
+    "review_opinion_collection": false,
+    "threshold_search": false,
+    "candidate_scoring": false,
+    "stage9_activity_fact_implementation": false,
+    "stage9_reference_pilot": false,
+    "primary_stage_output": false,
+    "labelcard_registration": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "P026-A freezes only observable high-side modifier semantics and the existing-fact readiness split. It does not establish Stage8 thresholds, qualify Stage8 or Stage9, open a market/reference read, create a Stage9 activity Fact, estimate prevalence, compress to a primary stage, authorize preserved evaluation, strategy use or trading."
+}

@@ -525,6 +525,12 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-024-B | Implement artifact-bound supplemental admission | P3-STAGE-024-A | closed engineering acceptance; P023 readiness observations are immutable and cannot be rerun |
 | P3-STAGE-024-C | Execute sole supplemental admission Job | P3-STAGE-024-B | closed no-pass; 33 eligible unread conflicts, 20 reads, 8 activations, no semantic/protected reads, early STAR remains 5 below old balanced-stress target |
 | P3-STAGE-024-D | Review/close and gate P020-C | P3-STAGE-024-C | closed four-party portfolio review; P024 stays no-pass, exact 187/179 panel becomes final development resource ceiling, separate P020-C preregistration selected |
+| P3-STAGE-026 | High-side modifier proposition route | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | ready; Stage8 upside-acceleration/extension active as modifier research, Stage9 remains activity-blocked |
+| P3-STAGE-026-A | Freeze high-side semantic architecture and fact-readiness split | P3-STAGE-026 | closed preregistration; auxiliary advancing context + Stage8 modifier only, Stage9 price-only projection forbidden |
+| P3-STAGE-026-B | Freeze one P020-disjoint Stage8 resource/reference contract | P3-STAGE-026-A | ready; exposure-aware one-route budget, no automatic resource-repair successor |
+| P3-STAGE-026-C | Prepare T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | blocked until resource/reference preregistration |
+| P3-STAGE-026-D | Gate finite Stage8 candidate topology | P3-STAGE-026-C | blocked until reference sufficiency PASS |
+| P3-STAGE-026-E | Four-party high-side portfolio closeout / Stage9 activity decision | P3-STAGE-026-D or earlier fail-close | blocked; protected/strategy/trading surfaces remain closed |
 
 ## 7. Acceptance
 

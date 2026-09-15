@@ -1,0 +1,123 @@
+{
+  "schema_version": "quanthus.stage-downside-lifecycle-reference-result.v1",
+  "work_item": "P3-STAGE-020-C",
+  "state": "CLOSED_BLIND_REFERENCE_INSUFFICIENT_NO_RESOURCE_REOPEN_REVIEWED",
+  "effective_date": "2026-09-16",
+  "packet_job": {
+    "job_id": "stage_ced93968af3c4aa38af9a49250ab6dc0",
+    "code_revision": "3edd50caf51b0386b0545ee9cd930235bde20528",
+    "run_id": "stage-downside-lifecycle-review-packets-20260915T211009Z",
+    "manifest_sha256": "sha256:e89833f5714d0bdead981bd3895483e5f2196a48dc846f429ca9ff04245f7e3d",
+    "review_packet_sha256": "sha256:b683b0fc7d5db6f48b9c31c0a54c8113a98c1ce64ac12bd44d352b5973aedf9d",
+    "case_map_digest": "sha256:6a554b9b3a7312022dcc58e6ec19d9560c41e291cbe02d1cec6011676de896ef",
+    "packet_count": 187,
+    "unique_identity_cluster_count": 179,
+    "available_packet_count": 187,
+    "unavailable_packet_count": 0
+  },
+  "blind_review": {
+    "same_origin_simulation": true,
+    "model_id": "gpt-6-astra",
+    "roles": ["short_term", "fund"],
+    "roles_isolated_until_immutable_seal": true,
+    "short_term_ledger_sha256": "sha256:1cb6422e1c83dd4b54975df7bd893f6146dbdf0beab286d175c236f803270d58",
+    "fund_ledger_sha256": "sha256:c4421780e321e0399a2fb79e8d80784c3c25eaf89a54502b5d72ca63394df7b0",
+    "fund_transport_normalization": {
+      "semantic_values_changed": false,
+      "reason": "raw JSON array positions 149 and 150 were emitted in reverse physical order while each row carried its correct unique index and case_id",
+      "action": "deterministic_sort_by_explicit_index_before_submission",
+      "reordered_position_count": 2
+    },
+    "candidate_seen": false,
+    "threshold_seen": false,
+    "future_seen": false,
+    "security_identity_seen": false,
+    "cluster_identity_seen": false,
+    "protected_partition_seen": false
+  },
+  "reference_result": {
+    "result_sha256": "sha256:965d6c45228b29670ee494824aa2b585d05348b5f3c3922240056ce6718540ef",
+    "disposition": "CLOSED_BLIND_REFERENCE_INSUFFICIENT_NO_RESOURCE_REOPEN",
+    "passed": false,
+    "row_count": 187,
+    "independent_cluster_count": 179,
+    "row_reference_counts": {
+      "stage12": {"TRUE": 78, "FALSE": 74, "AMBIGUOUS": 35},
+      "stage1": {"TRUE": 30, "FALSE": 43, "AMBIGUOUS": 40, "NOT_APPLICABLE": 74}
+    },
+    "stage12": {
+      "definite_cluster_count": 149,
+      "positive_cluster_count": 76,
+      "negative_cluster_count": 73,
+      "unjudgeable_cluster_count": 30,
+      "unjudgeable_cluster_rate_fraction": "30/179",
+      "temporal_polarity_overlap_cluster_count": 0
+    },
+    "stage1": {
+      "applicable_cluster_count": 76,
+      "definite_applicable_cluster_count": 71,
+      "positive_cluster_count": 30,
+      "negative_cluster_count": 41,
+      "unjudgeable_applicable_cluster_count": 5,
+      "unjudgeable_applicable_cluster_rate_fraction": "5/76",
+      "temporal_polarity_overlap_cluster_count": 0
+    },
+    "per_cell": {
+      "PRE_STAR/CHINEXT": {"rows": 24, "stage12_definite_rows": 22, "stage12_true_rows": 14, "stage12_false_rows": 8},
+      "PRE_STAR/MAIN": {"rows": 24, "stage12_definite_rows": 22, "stage12_true_rows": 10, "stage12_false_rows": 12},
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": {"rows": 24, "stage12_definite_rows": 19, "stage12_true_rows": 13, "stage12_false_rows": 6},
+      "STAR_AND_CHINEXT_20PCT/MAIN": {"rows": 24, "stage12_definite_rows": 20, "stage12_true_rows": 7, "stage12_false_rows": 13},
+      "STAR_AND_CHINEXT_20PCT/STAR": {"rows": 24, "stage12_definite_rows": 20, "stage12_true_rows": 15, "stage12_false_rows": 5},
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": {"rows": 24, "stage12_definite_rows": 19, "stage12_true_rows": 4, "stage12_false_rows": 15},
+      "STAR_PRE_CHINEXT_20PCT/MAIN": {"rows": 24, "stage12_definite_rows": 18, "stage12_true_rows": 9, "stage12_false_rows": 9},
+      "STAR_PRE_CHINEXT_20PCT/STAR": {"rows": 19, "stage12_definite_rows": 12, "stage12_true_rows": 6, "stage12_false_rows": 6}
+    }
+  },
+  "frozen_gate_evaluation": {
+    "minimum_stage12_definite_clusters": true,
+    "minimum_stage12_positive_clusters": true,
+    "minimum_stage12_negative_clusters": true,
+    "maximum_stage12_unjudgeable_cluster_rate": false,
+    "stage12_definite_row_in_all_eight_cells": true,
+    "minimum_stage1_definite_applicable_clusters": true,
+    "minimum_stage1_positive_clusters": true,
+    "minimum_stage1_negative_clusters": true,
+    "maximum_stage1_unjudgeable_applicable_cluster_rate": true,
+    "sole_failed_gate": "maximum_stage12_unjudgeable_cluster_rate",
+    "observed_stage12_unjudgeable_rate": "30/179",
+    "frozen_ceiling": "15%",
+    "gate_lowered_after_result": false,
+    "post_opinion_replacement": false
+  },
+  "four_party_disposition": {
+    "review_type": "same_origin_simulated_four_perspective_portfolio_review",
+    "reinterpret_as_pass": false,
+    "p020_d_opened": false,
+    "candidate_scoring_authorized": false,
+    "resource_reopen_authorized": false,
+    "stage12_disposition": "RETAIN_RESEARCH_CONTEXT_NOT_QUALIFIED",
+    "stage1_disposition": "RETAIN_SUPPORTED_NESTED_CONDITION_NOT_STANDALONE_QUALIFIED",
+    "stage1_gate_pass_does_not_override_stage12_parent_failure": true,
+    "active_downside_qualification_route": "PARK_AFTER_REFERENCE_NO_PASS",
+    "portfolio_route": "RETURN_TO_P019_THIRD_GROUP_PORTFOLIO",
+    "next_route": "HIGH_SIDE_MODIFIERS_8_9",
+    "stage8_next_scope": "SEPARATELY_PREREGISTER_UPSIDE_ACCELERATION_EXTENSION_MODIFIER_USING_ACCEPTED_TREND_EVOLUTION_FACTS",
+    "stage9_next_scope": "KEEP_BLOCKED_UNTIL_MINIMAL_HIGH_SIDE_ACTIVITY_RELATION_IS_SEPARATELY_JUSTIFIED",
+    "p025_resource_repair": false,
+    "successor_work_item": "P3-STAGE-026"
+  },
+  "authority": {
+    "p020_d_preregistration": false,
+    "candidate_scoring": false,
+    "resource_or_admission_reopen": false,
+    "additional_stage1_12_opinion": false,
+    "gate_change": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false,
+    "p026_semantic_preregistration_only": true
+  },
+  "claim_ceiling": "P020-C is a genuine no-pass against the preregistered Stage12/Stage1 blind-reference sufficiency contract. Stage12 produced substantial balanced definite evidence across all eight Era x Board cells, but 30/179 economic-identity clusters remained unjudgeable, exceeding the frozen 15% ceiling. Stage1 passed its nested sufficiency gates inside resolved downside contexts, which supports retaining it as a research condition but cannot qualify it independently of the failed Stage12 parent context. No gate is lowered, no opinion or resource is added, P020-D remains unopened, and protected/economic/trading authority remains closed."
+}

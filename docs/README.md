@@ -505,13 +505,16 @@ nodes.
   or protected partition was read. The contract-required four-party portfolio review does not rewrite
   P024 as PASS and opens no P025. It ends resource/admission optimization, freezes the exact 187/179
   panel as P020's final development-resource ceiling and retains early STAR as a 19-row capacity-limited
-  semantic stress/audit stratum. P020-C is now separately preregistered before any Stage1/12 opinion:
-  every frozen row must be attempted as a candidate/future-blind T-only Trend-Fact packet; short-term
-  and fund roles are isolated, agreement is required for definite references, and reference sufficiency
-  is evaluated on economic-identity clusters using the established 20-positive / 20-negative floors
-  rather than the 187 raw rows. Packet-preparation engineering is accepted; the sole packet Job is the
-  only open next action, and opinions remain blocked until that artifact is frozen. Preserved
-  2021/2022-2024/2025 remain unopened.
+  semantic stress/audit stratum. P020-C then freezes the review contract before any Stage1/12 opinion,
+  builds 187/187 candidate/future-blind T-only Trend-Fact packets and seals two isolated same-origin
+  reviewer ledgers before cluster-aware resolution. The final result is a genuine reference no-pass:
+  Stage12 has 149/179 definite clusters (76 positive, 73 negative) and definite references in all eight
+  cells, but `30/179 = 16.76%` remain unjudgeable against the frozen 15% ceiling. Every other Stage12
+  gate and every Stage1 gate passes; Stage1 has 71 definite applicable clusters, 30 positive and 41
+  negative. The four-party closeout does not lower the gate or add opinions/resources. Stage12 remains
+  research-only, Stage1 remains a supported nested condition but is not promoted independently,
+  P020-D is not opened, and the third-group portfolio moves next to separately preregistered high-side
+  8/9 modifier research. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -527,6 +530,8 @@ nodes.
   `reviews/stage-p019-third-group-portfolio-rebaseline-20260915.md`, and
   `work-items/stage-downside-lifecycle-proposition.md`,
   `reviews/stage-p020b-resource-shortfall-four-party-review-20260915.md`,
+  `work-items/stage-downside-lifecycle-blind-reference.md`,
+  `reviews/stage-p020c-blind-reference-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,

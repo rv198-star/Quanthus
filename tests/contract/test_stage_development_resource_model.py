@@ -104,6 +104,8 @@ P020_RESOURCE_RESULT = (
 )
 P020_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-proposition.md"
 P020_C_REFERENCE = ROOT / "config/stage-learning/stage-downside-lifecycle-blind-reference.v1.json"
+P020_C_RESULT = ROOT / "config/stage-learning/stage-downside-lifecycle-reference-result.v1.json"
+P020_C_REVIEW = ROOT / "docs/reviews/stage-p020c-blind-reference-four-party-review-20260916.md"
 P020_C_WORK = ROOT / "docs/work-items/stage-downside-lifecycle-blind-reference.md"
 P021_TAXONOMY = ROOT / "config/stage-learning/stage-admission-exposure-taxonomy.v1.json"
 P021_CAPACITY = ROOT / "config/stage-learning/stage-admission-exposure-capacity.v1.json"
@@ -1955,6 +1957,87 @@ def test_p020c_freezes_capacity_limited_cluster_aware_blind_reference_protocol()
     ):
         assert authority[key] is False
     assert P020_C_WORK.is_file()
+
+
+def test_p020c_closes_reference_no_pass_without_gate_or_resource_repair() -> None:
+    value = json.loads(P020_C_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-020-C"
+    assert value["state"] == (
+        "CLOSED_BLIND_REFERENCE_INSUFFICIENT_NO_RESOURCE_REOPEN_REVIEWED"
+    )
+    packet = value["packet_job"]
+    assert packet["job_id"] == "stage_ced93968af3c4aa38af9a49250ab6dc0"
+    assert packet["manifest_sha256"] == (
+        "sha256:e89833f5714d0bdead981bd3895483e5f2196a48dc846f429ca9ff04245f7e3d"
+    )
+    assert packet["review_packet_sha256"] == (
+        "sha256:b683b0fc7d5db6f48b9c31c0a54c8113a98c1ce64ac12bd44d352b5973aedf9d"
+    )
+    assert packet["packet_count"] == 187
+    assert packet["unique_identity_cluster_count"] == 179
+    review = value["blind_review"]
+    assert review["roles"] == ["short_term", "fund"]
+    assert review["roles_isolated_until_immutable_seal"] is True
+    assert review["short_term_ledger_sha256"].startswith("sha256:")
+    assert review["fund_ledger_sha256"].startswith("sha256:")
+    assert review["fund_transport_normalization"]["semantic_values_changed"] is False
+    assert review["fund_transport_normalization"]["reordered_position_count"] == 2
+    for key in (
+        "candidate_seen",
+        "threshold_seen",
+        "future_seen",
+        "security_identity_seen",
+        "cluster_identity_seen",
+        "protected_partition_seen",
+    ):
+        assert review[key] is False
+    result = value["reference_result"]
+    assert result["disposition"] == "CLOSED_BLIND_REFERENCE_INSUFFICIENT_NO_RESOURCE_REOPEN"
+    assert result["passed"] is False
+    assert result["independent_cluster_count"] == 179
+    assert result["stage12"]["definite_cluster_count"] == 149
+    assert result["stage12"]["positive_cluster_count"] == 76
+    assert result["stage12"]["negative_cluster_count"] == 73
+    assert result["stage12"]["unjudgeable_cluster_count"] == 30
+    assert result["stage12"]["unjudgeable_cluster_rate_fraction"] == "30/179"
+    assert result["stage1"]["applicable_cluster_count"] == 76
+    assert result["stage1"]["definite_applicable_cluster_count"] == 71
+    assert result["stage1"]["positive_cluster_count"] == 30
+    assert result["stage1"]["negative_cluster_count"] == 41
+    assert result["stage1"]["unjudgeable_applicable_cluster_count"] == 5
+    gates = value["frozen_gate_evaluation"]
+    gate_keys = (
+        "minimum_stage12_definite_clusters",
+        "minimum_stage12_positive_clusters",
+        "minimum_stage12_negative_clusters",
+        "maximum_stage12_unjudgeable_cluster_rate",
+        "stage12_definite_row_in_all_eight_cells",
+        "minimum_stage1_definite_applicable_clusters",
+        "minimum_stage1_positive_clusters",
+        "minimum_stage1_negative_clusters",
+        "maximum_stage1_unjudgeable_applicable_cluster_rate",
+    )
+    failed = [key for key in gate_keys if gates[key] is False]
+    assert failed == ["maximum_stage12_unjudgeable_cluster_rate"]
+    assert gates["sole_failed_gate"] == "maximum_stage12_unjudgeable_cluster_rate"
+    assert gates["gate_lowered_after_result"] is False
+    assert gates["post_opinion_replacement"] is False
+    disposition = value["four_party_disposition"]
+    assert disposition["reinterpret_as_pass"] is False
+    assert disposition["p020_d_opened"] is False
+    assert disposition["resource_reopen_authorized"] is False
+    assert disposition["stage12_disposition"] == "RETAIN_RESEARCH_CONTEXT_NOT_QUALIFIED"
+    assert disposition["stage1_disposition"] == (
+        "RETAIN_SUPPORTED_NESTED_CONDITION_NOT_STANDALONE_QUALIFIED"
+    )
+    assert disposition["next_route"] == "HIGH_SIDE_MODIFIERS_8_9"
+    assert disposition["successor_work_item"] == "P3-STAGE-026"
+    authority = value["authority"]
+    assert authority["p020_d_preregistration"] is False
+    assert authority["candidate_scoring"] is False
+    assert authority["resource_or_admission_reopen"] is False
+    assert authority["p026_semantic_preregistration_only"] is True
+    assert P020_C_REVIEW.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

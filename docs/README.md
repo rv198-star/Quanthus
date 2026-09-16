@@ -547,9 +547,14 @@ nodes.
   implementation architecture. Stage10/11 remain the strongest accepted context+nested projection;
   3/4 remain development event-phase candidates with external qualification inconclusive; 5/6/7 stay
   parked on continuous Facts; 2 remains strong exploratory; 1/12 remain layered research semantics;
-  8/9 remain modifiers. No historical code is currently an official peer primary stage. The only ready
-  successor is P3-STAGE-028, a schema/governance-only Layered Stage Proposition Bundle whose v1 keeps
-  `primary_stage` absent/null. Preserved 2021/2022-2024/2025 remain unopened.
+  8/9 remain modifiers. No historical code is currently an official peer primary stage. P3-STAGE-028
+  is now closed `PASS_FIRST_MILESTONE_STAGE_PROPOSITION_MVP`: the Layered Stage Proposition Bundle
+  contract, strict validator, deterministic canonical serialization, five executable boundary examples
+  and a non-production `development_shadow` consumer view are accepted. Stage10 context + Stage11
+  nested rebound can be consumed together without Top-1 compression; research/parked assertions remain
+  audit-only and are filtered rather than promoted. `primary_stage` remains null. This closes the
+  current large iteration at an explicit phase boundary: no P029 is automatically opened; the next
+  action is value review of the delivered MVP. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -575,7 +580,10 @@ nodes.
   `design/stock-stage-vocabulary-portfolio.md`,
   `work-items/stage-whole-vocabulary-portfolio-synthesis.md`,
   `reviews/stage-p027-whole-vocabulary-portfolio-review-20260916.md`,
+  `design/stage-proposition-bundle.md`,
   `work-items/stage-layered-proposition-bundle.md`,
+  `acceptance/stage-proposition-bundle-mvp-20260916.md`,
+  `reviews/stage-p028-layered-bundle-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
@@ -591,7 +599,11 @@ nodes.
   single-valued FSM as the implementation architecture. The accepted architecture is
   `design/stock-stage-vocabulary-portfolio.md`: contexts/structural states, event/nested conditions and
   modifiers are separate proposition layers over continuous Facts; `X` stays control flow and
-  `ABSTAIN` stays epistemic. The qualification and field-dependency proposals remain
+  `ABSTAIN` stays epistemic. P3-STAGE-028 has now implemented that architecture as the versioned
+  `design/stage-proposition-bundle.md` contract. Only accepted Stage10/11 development projections may
+  enter the non-production development-shadow consumer view; all other historical codes remain at their
+  P027 evidence grade. The phase is intentionally paused here for value review, with no automatic
+  successor. The qualification and field-dependency proposals remain
   `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`; they do not
   activate peer primary labels, new result-bearing research, or daily/strategy Shadow.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,

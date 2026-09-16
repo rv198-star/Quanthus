@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组mixed closeout后，10/11由`P3-STAGE-002`正式化为可重叠context+nested development Projection Contract，5/6/7保持INCONCLUSIVE_PARKED。第三组P003-P026已完成并关闭：0 primary资格park、2 strong exploratory、12/1 layered downside reference no-pass、8 research modifier资源no-pass、9 activity-blocked modifier。`P3-STAGE-027`现已接受分层vocabulary portfolio：历史码1..12加neutral 0全部保留追溯，但flat single-valued FSM被supersede为historical vocabulary graph；当前无official peer primary stage。下一ready scope仅P028分层Proposition Bundle schema/governance，primary_stage继续null/absent。无active逐code补样/搜索权限，2022-2024不重读，2025、QUALIFIED、LabelCard、日更、消费者或交易仍未开放 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组mixed closeout后，10/11由`P3-STAGE-002`正式化为可重叠context+nested development Projection Contract，5/6/7保持INCONCLUSIVE_PARKED。第三组P003-P026与P027 synthesis均已关闭；`P3-STAGE-028`已接受Layered Stage Proposition Bundle第一阶段MVP：历史码1..12加neutral 0保留追溯但不再是peer primary stages，accepted 10/11可在non-production development-shadow共同表示，research/parked项保持audit-only，`primary_stage=null`。当前无ready successor、无active逐code补样/搜索权限；2022-2024不重读，2025、QUALIFIED、LabelCard、日更、生产消费者或交易仍未开放 |
 | Version | 0.1 |
 | Parent | `stock-stage-vocabulary-portfolio.md`; `lld/03-label-feature-system.md`（`stock-stage-state-machine.md`仅保留历史词汇/转移图） |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |

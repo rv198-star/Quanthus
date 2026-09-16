@@ -1,0 +1,282 @@
+{
+  "schema_version": "quanthus.stage-proposition-bundle-contract.v1",
+  "work_item": "P3-STAGE-028",
+  "version": "1.0.0",
+  "state": "FROZEN_LAYERED_BUNDLE_SCHEMA_GOVERNANCE_NO_NEW_RESULT_READ",
+  "effective_date": "2026-09-16",
+  "purpose": "Represent already-governed stock-stage propositions as layered, evidence-bound assertions without recreating a flat primary-stage classifier or promoting any proposition beyond its P027 authority.",
+  "bindings": {
+    "p027_portfolio_synthesis": {
+      "path": "config/stage-learning/stage-whole-vocabulary-portfolio-synthesis.v1.json",
+      "sha256": "sha256:d71aac7893611f62b3ebc58df81f395b5d7b7c88a1dc255840f502c3e3638fe5"
+    }
+  },
+  "bundle_schema": {
+    "output_schema_version": "quanthus.stage-proposition-bundle.v1",
+    "required_fields": [
+      "schema_version",
+      "contract_version",
+      "security_id",
+      "knowledge_cutoff",
+      "control_state",
+      "epistemic_status",
+      "status_reasons",
+      "context_assertions",
+      "condition_assertions",
+      "modifier_assertions",
+      "fact_refs",
+      "primary_stage"
+    ],
+    "assertion_fields": [
+      "proposition_id",
+      "historical_stage_code",
+      "layer",
+      "verdict",
+      "proposition_version",
+      "evidence_grade",
+      "use_authority",
+      "reason_codes",
+      "fact_refs",
+      "provenance_refs"
+    ],
+    "control_states": ["ACTIVE", "X"],
+    "epistemic_statuses": ["ASSERTED", "AMBIGUOUS", "ABSTAIN", "RULE_CONFLICT", "NOT_EVALUATED"],
+    "verdicts": ["TRUE", "FALSE", "AMBIGUOUS", "UNKNOWN", "NOT_APPLICABLE"],
+    "layers": ["context_or_structural_state", "event_or_nested_condition", "modifier"],
+    "primary_stage_policy": "REQUIRED_NULL_V1",
+    "deterministic_assertion_order": "proposition_id_ascending",
+    "deterministic_fact_ref_order": "lexicographic_unique"
+  },
+  "evidence_grades": {
+    "accepted_development_projection": {
+      "max_surface": "development_shadow",
+      "official_label": false,
+      "description": "Accepted bounded development projection contract; may be represented to governed development-shadow consumers but remains non-production and non-LabelCard."
+    },
+    "development_candidate": {
+      "max_surface": "audit",
+      "official_label": false,
+      "description": "Frozen development candidate whose external qualification is incomplete or inconclusive."
+    },
+    "strong_exploratory": {
+      "max_surface": "audit",
+      "official_label": false,
+      "description": "Strong exploratory proposition without preserved validation or official publication authority."
+    },
+    "research_supported_parent_context_not_qualified": {
+      "max_surface": "audit",
+      "official_label": false,
+      "description": "Nested proposition has support, but its required parent context is not qualified."
+    },
+    "research_only": {
+      "max_surface": "audit",
+      "official_label": false,
+      "description": "Research-only proposition with no consumer authority."
+    },
+    "research_only_resource_no_pass": {
+      "max_surface": "audit",
+      "official_label": false,
+      "description": "Research semantics retained, but the sole frozen resource route did not pass."
+    },
+    "research_reference_no_pass": {
+      "max_surface": "audit",
+      "official_label": false,
+      "description": "Research context retained after a preregistered blind-reference no-pass."
+    },
+    "parked": {
+      "max_surface": "audit",
+      "official_label": false,
+      "description": "Discrete proposition is parked; continuous Facts remain authoritative."
+    },
+    "parked_missing_fact_relation": {
+      "max_surface": "audit",
+      "official_label": false,
+      "description": "Proposition is blocked until a separately governed missing Fact relation exists."
+    }
+  },
+  "surface_policy": {
+    "audit": {
+      "consumer_kind": "governance_and_review_only",
+      "may_include_all_catalogued_grades": true,
+      "strategy_or_trading_authority": false
+    },
+    "development_shadow": {
+      "consumer_kind": "non_production_expert_development_preview",
+      "allowed_evidence_grades": ["accepted_development_projection"],
+      "allowed_historical_stage_codes": [10, 11],
+      "strategy_or_trading_authority": false
+    }
+  },
+  "proposition_catalog": [
+    {
+      "proposition_id": "stock_stage.context.neutral_disorder",
+      "historical_stage_code": 0,
+      "layer": "context_or_structural_state",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "research_only",
+      "use_authority": "audit",
+      "parent_proposition_id": null,
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.condition.downside_stabilization",
+      "historical_stage_code": 1,
+      "layer": "event_or_nested_condition",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "research_supported_parent_context_not_qualified",
+      "use_authority": "audit",
+      "parent_proposition_id": "stock_stage.context.downside",
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.condition.orderly_consolidation",
+      "historical_stage_code": 2,
+      "layer": "event_or_nested_condition",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "strong_exploratory",
+      "use_authority": "audit",
+      "parent_proposition_id": null,
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.event.breakout_probe",
+      "historical_stage_code": 3,
+      "layer": "event_or_nested_condition",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "development_candidate",
+      "use_authority": "audit",
+      "parent_proposition_id": null,
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.condition.breakout_acceptance",
+      "historical_stage_code": 4,
+      "layer": "event_or_nested_condition",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "development_candidate",
+      "use_authority": "audit",
+      "parent_proposition_id": null,
+      "required_provenance_prefix": "stage3_episode:"
+    },
+    {
+      "proposition_id": "stock_stage.context.advancing",
+      "historical_stage_code": 5,
+      "layer": "context_or_structural_state",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "parked",
+      "use_authority": "audit",
+      "parent_proposition_id": null,
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.condition.pullback_test",
+      "historical_stage_code": 6,
+      "layer": "event_or_nested_condition",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "parked",
+      "use_authority": "audit",
+      "parent_proposition_id": "stock_stage.context.advancing",
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.condition.repair_rebuild",
+      "historical_stage_code": 7,
+      "layer": "event_or_nested_condition",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "parked",
+      "use_authority": "audit",
+      "parent_proposition_id": null,
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.modifier.upside_acceleration_extension",
+      "historical_stage_code": 8,
+      "layer": "modifier",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "research_only_resource_no_pass",
+      "use_authority": "audit",
+      "parent_proposition_id": "stock_stage.context.advancing",
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.modifier.high_side_price_volume_divergence",
+      "historical_stage_code": 9,
+      "layer": "modifier",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "parked_missing_fact_relation",
+      "use_authority": "audit",
+      "parent_proposition_id": "stock_stage.context.advancing",
+      "required_provenance_prefix": null
+    },
+    {
+      "proposition_id": "stock_stage.context.structural_failure",
+      "historical_stage_code": 10,
+      "layer": "context_or_structural_state",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "accepted_development_projection",
+      "use_authority": "development_shadow",
+      "parent_proposition_id": null,
+      "required_provenance_prefix": "stage10_confirmation:"
+    },
+    {
+      "proposition_id": "stock_stage.condition.post_break_rebound",
+      "historical_stage_code": 11,
+      "layer": "event_or_nested_condition",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "accepted_development_projection",
+      "use_authority": "development_shadow",
+      "parent_proposition_id": "stock_stage.context.structural_failure",
+      "required_provenance_prefix": "stage10_confirmation:"
+    },
+    {
+      "proposition_id": "stock_stage.context.downside",
+      "historical_stage_code": 12,
+      "layer": "context_or_structural_state",
+      "proposition_version": "1.0.0",
+      "evidence_grade": "research_reference_no_pass",
+      "use_authority": "audit",
+      "parent_proposition_id": null,
+      "required_provenance_prefix": null
+    }
+  ],
+  "coexistence_rules": {
+    "cross_layer_true_assertions_may_coexist": true,
+    "same_layer_multiple_true_requires_epistemic_ambiguous": true,
+    "neutral_code_0_true_cannot_coexist_with_other_true_context": true,
+    "true_nested_assertion_requires_true_parent_in_same_bundle_when_parent_is_declared": true,
+    "stage_10_and_11_true_together_is_legal": true,
+    "stage_4_true_requires_prior_stage3_episode_provenance": true
+  },
+  "epistemic_and_control_rules": {
+    "abstain_is_not_neutral_code_0": true,
+    "abstain_requires_zero_true_assertions": true,
+    "control_x_is_not_market_stage": true,
+    "control_x_requires_epistemic_not_evaluated": true,
+    "control_x_requires_empty_assertion_layers": true,
+    "active_control_forbids_epistemic_not_evaluated_without_status_reason": true,
+    "rule_conflict_requires_zero_true_assertions": true
+  },
+  "fact_and_provenance_rules": {
+    "every_assertion_requires_fact_refs": true,
+    "every_assertion_requires_reason_codes": true,
+    "every_assertion_requires_provenance_refs": true,
+    "top_level_fact_refs_equal_assertion_fact_ref_union": true,
+    "representation_may_not_mutate_evidence_grade_or_use_authority": true
+  },
+  "authority": {
+    "schema_and_validator": true,
+    "deterministic_serialization": true,
+    "development_shadow_view_for_accepted_projections": true,
+    "new_market_read": false,
+    "new_reference_opinion": false,
+    "holdout_read": false,
+    "candidate_or_threshold_search": false,
+    "primary_stage_compression": false,
+    "labelcard_publication": false,
+    "production_expert_consumption": false,
+    "daily_inference": false,
+    "strategy_consumption": false,
+    "trading": false
+  },
+  "claim_ceiling": "P028 v1 is a representation and governance contract only. It can serialize previously governed propositions and expose accepted Stage10/11 development projections to a non-production development-shadow expert view. It does not calculate new stage truth from market data, qualify any historical code, publish a primary stage, activate a LabelCard, open a holdout, or grant production expert, strategy or trading authority."
+}

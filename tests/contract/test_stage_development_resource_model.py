@@ -145,6 +145,12 @@ P027_SYNTHESIS = ROOT / "config/stage-learning/stage-whole-vocabulary-portfolio-
 P027_DESIGN = ROOT / "docs/design/stock-stage-vocabulary-portfolio.md"
 P027_REVIEW = ROOT / "docs/reviews/stage-p027-whole-vocabulary-portfolio-review-20260916.md"
 P027_WORK = ROOT / "docs/work-items/stage-whole-vocabulary-portfolio-synthesis.md"
+P028_CONTRACT = ROOT / "config/stage-learning/stage-proposition-bundle.v1.json"
+P028_EXAMPLES = ROOT / "config/stage-learning/stage-proposition-bundle-examples.v1.json"
+P028_RESULT = ROOT / "config/stage-learning/stage-proposition-bundle-result.v1.json"
+P028_DESIGN = ROOT / "docs/design/stage-proposition-bundle.md"
+P028_ACCEPTANCE = ROOT / "docs/acceptance/stage-proposition-bundle-mvp-20260916.md"
+P028_REVIEW = ROOT / "docs/reviews/stage-p028-layered-bundle-four-party-review-20260916.md"
 P028_WORK = ROOT / "docs/work-items/stage-layered-proposition-bundle.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -2302,7 +2308,10 @@ def test_p027_synthesizes_full_historical_vocabulary_as_layered_portfolio() -> N
     assert conclusions["all_directional_codes_accounted_for"] is True
     assert conclusions["neutral_code_accounted_for"] is True
     assert conclusions["no_official_peer_primary_stage_is_currently_qualified"] is True
-    assert conclusions["facts_should_feed_proposition_bundle_before_any_future_primary_compression"] is True
+    assert (
+        conclusions["facts_should_feed_proposition_bundle_before_any_future_primary_compression"]
+        is True
+    )
     assert value["successor"]["work_item"] == "P3-STAGE-028"
     authority = value["authority"]
     assert authority["portfolio_governance"] is True
@@ -2322,6 +2331,117 @@ def test_p027_synthesizes_full_historical_vocabulary_as_layered_portfolio() -> N
     assert P027_REVIEW.is_file()
     assert P027_WORK.is_file()
     assert P028_WORK.is_file()
+
+
+def test_p028_freezes_layered_bundle_schema_without_representation_promotion() -> None:
+    value = json.loads(P028_CONTRACT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-028"
+    assert value["version"] == "1.0.0"
+    assert value["state"] == "FROZEN_LAYERED_BUNDLE_SCHEMA_GOVERNANCE_NO_NEW_RESULT_READ"
+    binding = value["bindings"]["p027_portfolio_synthesis"]
+    observed = "sha256:" + hashlib.sha256((ROOT / binding["path"]).read_bytes()).hexdigest()
+    assert observed == binding["sha256"]
+
+    schema = value["bundle_schema"]
+    assert schema["output_schema_version"] == "quanthus.stage-proposition-bundle.v1"
+    assert schema["primary_stage_policy"] == "REQUIRED_NULL_V1"
+    assert schema["control_states"] == ["ACTIVE", "X"]
+    assert "ABSTAIN" in schema["epistemic_statuses"]
+    assert schema["layers"] == [
+        "context_or_structural_state",
+        "event_or_nested_condition",
+        "modifier",
+    ]
+
+    catalog = value["proposition_catalog"]
+    assert len(catalog) == 13
+    assert {item["historical_stage_code"] for item in catalog} == set(range(13))
+    assert len({item["proposition_id"] for item in catalog}) == 13
+    by_code = {item["historical_stage_code"]: item for item in catalog}
+    assert by_code[1]["parent_proposition_id"] == "stock_stage.context.downside"
+    assert by_code[4]["required_provenance_prefix"] == "stage3_episode:"
+    assert by_code[8]["layer"] == "modifier"
+    assert by_code[10]["use_authority"] == "development_shadow"
+    assert by_code[11]["use_authority"] == "development_shadow"
+    assert by_code[11]["parent_proposition_id"] == "stock_stage.context.structural_failure"
+    assert all(
+        by_code[code]["use_authority"] == "audit"
+        for code in range(13)
+        if code not in {10, 11}
+    )
+
+    surface = value["surface_policy"]
+    assert surface["development_shadow"]["allowed_evidence_grades"] == [
+        "accepted_development_projection"
+    ]
+    assert surface["development_shadow"]["allowed_historical_stage_codes"] == [10, 11]
+    assert surface["development_shadow"]["strategy_or_trading_authority"] is False
+
+    coexistence = value["coexistence_rules"]
+    assert coexistence["cross_layer_true_assertions_may_coexist"] is True
+    assert coexistence["stage_10_and_11_true_together_is_legal"] is True
+    assert coexistence["neutral_code_0_true_cannot_coexist_with_other_true_context"] is True
+    epistemic = value["epistemic_and_control_rules"]
+    assert epistemic["abstain_is_not_neutral_code_0"] is True
+    assert epistemic["control_x_is_not_market_stage"] is True
+    assert epistemic["control_x_requires_empty_assertion_layers"] is True
+    facts = value["fact_and_provenance_rules"]
+    assert facts["top_level_fact_refs_equal_assertion_fact_ref_union"] is True
+    assert facts["representation_may_not_mutate_evidence_grade_or_use_authority"] is True
+
+    authority = value["authority"]
+    assert authority["schema_and_validator"] is True
+    assert authority["deterministic_serialization"] is True
+    assert authority["development_shadow_view_for_accepted_projections"] is True
+    for key in (
+        "new_market_read",
+        "new_reference_opinion",
+        "holdout_read",
+        "candidate_or_threshold_search",
+        "primary_stage_compression",
+        "labelcard_publication",
+        "production_expert_consumption",
+        "daily_inference",
+        "strategy_consumption",
+        "trading",
+    ):
+        assert authority[key] is False
+    assert P028_DESIGN.is_file()
+    assert P028_WORK.is_file()
+
+
+def test_p028_closes_first_stage_proposition_mvp_without_automatic_successor() -> None:
+    value = json.loads(P028_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-028"
+    assert value["state"] == "PASS_FIRST_MILESTONE_STAGE_PROPOSITION_MVP"
+    for binding in value["bindings"].values():
+        path = ROOT / binding["path"]
+        observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        assert observed == binding["sha256"]
+    delivered = value["delivered"]
+    assert delivered["historical_market_codes"] == list(range(13))
+    assert delivered["stable_proposition_id_count"] == 13
+    assert delivered["published_contract_example_count"] == 5
+    assert delivered["development_shadow_historical_stage_codes"] == [10, 11]
+    assert delivered["primary_stage_non_null_count"] == 0
+    assert delivered["neutral_abstain_x_structurally_distinct"] is True
+    assert delivered["deterministic_canonical_serialization"] is True
+    assert delivered["representation_as_promotion_blocked"] is True
+    compatibility = value["expert_compatibility"]
+    assert compatibility["development_shadow_view_available"] is True
+    assert compatibility["accepted_nested_10_11_visible_together"] is True
+    assert compatibility["research_stage5_8_filtered_from_development_shadow"] is True
+    assert compatibility["production_expert_authority"] is False
+    assert compatibility["strategy_or_trading_authority"] is False
+    boundary = value["phase_boundary"]
+    assert boundary["individual_stock_stage_recognition_mvp_phase_1"] == (
+        "ACHIEVED_REPRESENTATION_AND_GOVERNANCE_LEVEL"
+    )
+    assert boundary["automatic_successor"] is None
+    assert boundary["automatic_p029"] is False
+    assert P028_EXAMPLES.is_file()
+    assert P028_ACCEPTANCE.is_file()
+    assert P028_REVIEW.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

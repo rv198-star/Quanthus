@@ -1,0 +1,143 @@
+{
+  "schema_version": "quanthus.stage-proposition-bundle-examples.v1",
+  "work_item": "P3-STAGE-028",
+  "example_kind": "synthetic_contract_examples_not_market_evidence",
+  "contract": "config/stage-learning/stage-proposition-bundle.v1.json",
+  "examples": {
+    "accepted_nested_10_11": {
+      "schema_version": "quanthus.stage-proposition-bundle.v1",
+      "contract_version": "1.0.0",
+      "security_id": "example-security-10-11",
+      "knowledge_cutoff": "2026-09-15T15:00:00+08:00",
+      "control_state": "ACTIVE",
+      "epistemic_status": "ASSERTED",
+      "status_reasons": [],
+      "context_assertions": [
+        {
+          "proposition_id": "stock_stage.context.structural_failure",
+          "historical_stage_code": 10,
+          "layer": "context_or_structural_state",
+          "verdict": "TRUE",
+          "proposition_version": "1.0.0",
+          "evidence_grade": "accepted_development_projection",
+          "use_authority": "development_shadow",
+          "reason_codes": ["stage_10_context_confirmed"],
+          "fact_refs": ["fact:signed-distance:fixture", "fact:support-process:fixture"],
+          "provenance_refs": ["stage10_confirmation:fixture-confirmation", "support_projection:fixture"]
+        }
+      ],
+      "condition_assertions": [
+        {
+          "proposition_id": "stock_stage.condition.post_break_rebound",
+          "historical_stage_code": 11,
+          "layer": "event_or_nested_condition",
+          "verdict": "TRUE",
+          "proposition_version": "1.0.0",
+          "evidence_grade": "accepted_development_projection",
+          "use_authority": "development_shadow",
+          "reason_codes": ["stage_11_rebound_condition_active"],
+          "fact_refs": ["fact:post-break-rebound:fixture", "fact:support-process:fixture"],
+          "provenance_refs": ["stage10_confirmation:fixture-confirmation", "support_projection:fixture"]
+        }
+      ],
+      "modifier_assertions": [],
+      "fact_refs": ["fact:post-break-rebound:fixture", "fact:signed-distance:fixture", "fact:support-process:fixture"],
+      "primary_stage": null
+    },
+    "neutral_0": {
+      "schema_version": "quanthus.stage-proposition-bundle.v1",
+      "contract_version": "1.0.0",
+      "security_id": "example-security-neutral",
+      "knowledge_cutoff": "2026-09-15T15:00:00+08:00",
+      "control_state": "ACTIVE",
+      "epistemic_status": "ASSERTED",
+      "status_reasons": [],
+      "context_assertions": [
+        {
+          "proposition_id": "stock_stage.context.neutral_disorder",
+          "historical_stage_code": 0,
+          "layer": "context_or_structural_state",
+          "verdict": "TRUE",
+          "proposition_version": "1.0.0",
+          "evidence_grade": "research_only",
+          "use_authority": "audit",
+          "reason_codes": ["neutral_disorder_research_example"],
+          "fact_refs": ["fact:structure-order:fixture"],
+          "provenance_refs": ["p027:stage0:research-only"]
+        }
+      ],
+      "condition_assertions": [],
+      "modifier_assertions": [],
+      "fact_refs": ["fact:structure-order:fixture"],
+      "primary_stage": null
+    },
+    "abstain": {
+      "schema_version": "quanthus.stage-proposition-bundle.v1",
+      "contract_version": "1.0.0",
+      "security_id": "example-security-abstain",
+      "knowledge_cutoff": "2026-09-15T15:00:00+08:00",
+      "control_state": "ACTIVE",
+      "epistemic_status": "ABSTAIN",
+      "status_reasons": ["usable_evidence_insufficient"],
+      "context_assertions": [],
+      "condition_assertions": [],
+      "modifier_assertions": [],
+      "fact_refs": [],
+      "primary_stage": null
+    },
+    "control_x": {
+      "schema_version": "quanthus.stage-proposition-bundle.v1",
+      "contract_version": "1.0.0",
+      "security_id": "example-security-x",
+      "knowledge_cutoff": "2026-09-15T15:00:00+08:00",
+      "control_state": "X",
+      "epistemic_status": "NOT_EVALUATED",
+      "status_reasons": ["ordinary_stage_evaluation_frozen"],
+      "context_assertions": [],
+      "condition_assertions": [],
+      "modifier_assertions": [],
+      "fact_refs": [],
+      "primary_stage": null
+    },
+    "research_modifier_audit_only": {
+      "schema_version": "quanthus.stage-proposition-bundle.v1",
+      "contract_version": "1.0.0",
+      "security_id": "example-security-modifier",
+      "knowledge_cutoff": "2026-09-15T15:00:00+08:00",
+      "control_state": "ACTIVE",
+      "epistemic_status": "ASSERTED",
+      "status_reasons": [],
+      "context_assertions": [
+        {
+          "proposition_id": "stock_stage.context.advancing",
+          "historical_stage_code": 5,
+          "layer": "context_or_structural_state",
+          "verdict": "TRUE",
+          "proposition_version": "1.0.0",
+          "evidence_grade": "parked",
+          "use_authority": "audit",
+          "reason_codes": ["advancing_context_research_example"],
+          "fact_refs": ["fact:trend-evolution:fixture"],
+          "provenance_refs": ["p027:stage5:parked"]
+        }
+      ],
+      "condition_assertions": [],
+      "modifier_assertions": [
+        {
+          "proposition_id": "stock_stage.modifier.upside_acceleration_extension",
+          "historical_stage_code": 8,
+          "layer": "modifier",
+          "verdict": "TRUE",
+          "proposition_version": "1.0.0",
+          "evidence_grade": "research_only_resource_no_pass",
+          "use_authority": "audit",
+          "reason_codes": ["upside_acceleration_research_example"],
+          "fact_refs": ["fact:trend-evolution:fixture"],
+          "provenance_refs": ["p026:stage8:resource-no-pass"]
+        }
+      ],
+      "fact_refs": ["fact:trend-evolution:fixture"],
+      "primary_stage": null
+    }
+  }
+}

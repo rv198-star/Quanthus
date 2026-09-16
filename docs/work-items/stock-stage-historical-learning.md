@@ -11,7 +11,7 @@
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Machine plan | `../../config/stock-stage-learning-delivery.v1.json` |
 | GitHub | 父工单 #246；A #238、B #239、C #240、D #241、E #242、F #243、G #244、H #245、I #247、J #248；A-F/I closed，G/H/J及父工单open/blocked |
-| Current scope | A-F/I已关闭，F为sample-feasibility INCONCLUSIVE；J真实holdout继续blocked。后续分组研究现已由P027统一收口：10/11为accepted development context+nested projection，3/4为frozen development event candidates且外样本qualification inconclusive，5/6/7 parked，0 primary资格park、2 strong exploratory、12/1 layered research no-pass、8 research modifier资源no-pass、9 activity-blocked modifier。flat single-valued FSM已被supersede为分层vocabulary portfolio；当前唯一ready child为P3-STAGE-028 schema/governance contract，primary_stage继续null/absent；2025、正式QUALIFIED、日更、消费者和策略权限仍关闭 |
+| Current scope | A-F/I已关闭，F为sample-feasibility INCONCLUSIVE；J真实holdout继续blocked。P027已统一收口全部历史stage vocabulary；P028现已完成Layered Stage Proposition Bundle第一阶段MVP：13个历史market code映射到stable proposition ids，context/condition/modifier分层，neutral 0/ABSTAIN/X分离，`primary_stage=null`，accepted 10/11可进入non-production development-shadow，research/parked项保持audit-only。当前阶段目标已取得且无ready successor；下一步先评审MVP价值，不自动开启P029。2025、正式QUALIFIED、日更、生产消费者和策略权限仍关闭 |
 
 ## 1. 逐步执行路线
 
@@ -40,7 +40,7 @@
 
 当前不消耗新的holdout，也不再逐code追参。P027已经把历史码1..12与neutral 0的证据等级和语义角色统一到`stock-stage-vocabulary-portfolio.md`：连续Facts是权威底座，context/structural state、event/nested condition、modifier分层表示；`X`是control，`ABSTAIN`是epistemic outcome。没有任何历史码当前被授权为official peer primary stage。
 
-下一步P3-STAGE-028只冻结Layered Stage Proposition Bundle的schema与治理：stable proposition id、historical code traceability、evidence grade、coexistence/ambiguity、Fact references、ABSTAIN/X边界以及哪些accepted development projection可进入governed shadow surface。v1必须保持`primary_stage` absent/null，representation不能自动晋级research/parked proposition。J真实holdout、G日更、正式LabelCard/消费者/策略继续blocked；2025不动。
+P3-STAGE-028已完成Layered Stage Proposition Bundle的schema、governance与最小实现：stable proposition id、historical code traceability、evidence grade、coexistence/ambiguity、Fact references、ABSTAIN/X边界、strict validator、deterministic serialization，以及accepted Stage10/11的non-production development-shadow consumer view均已落地。v1保持`primary_stage=null`，representation不能自动晋级research/parked proposition。当前不继续生成新P0XX；J真实holdout、G日更、正式LabelCard/生产消费者/策略继续blocked，2025不动。下一步是由负责人评审这个阶段性MVP是否值得进入下一阶段。
 
 ## 4. 原提案迁移
 

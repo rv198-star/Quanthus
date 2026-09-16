@@ -1,0 +1,81 @@
+{
+  "schema_version": "quanthus.stage-proposition-bundle-result.v1",
+  "work_item": "P3-STAGE-028",
+  "state": "PASS_FIRST_MILESTONE_STAGE_PROPOSITION_MVP",
+  "effective_date": "2026-09-16",
+  "bindings": {
+    "contract": {
+      "path": "config/stage-learning/stage-proposition-bundle.v1.json",
+      "sha256": "sha256:652cddb4be100a2990b47cf8946112de3b5ddadb284ea6d63df2da981440a07b"
+    },
+    "examples": {
+      "path": "config/stage-learning/stage-proposition-bundle-examples.v1.json",
+      "sha256": "sha256:750176f12b45a715a51aa47efbf6b8dab7dcc531efd10c8e07b99a9779ad6e68"
+    },
+    "implementation": {
+      "path": "src/quanthus/stage_proposition_bundle.py",
+      "sha256": "sha256:7313fabc11154792d8b5d4ec8bb4fc2e0a34712959c89470a07502d3ee587d20"
+    },
+    "design": {
+      "path": "docs/design/stage-proposition-bundle.md",
+      "sha256": "sha256:c07ea4ecdc42a3a3c1281cb2774a570a8d53885f3674ea526f68ced7afe66fba"
+    },
+    "four_party_review": {
+      "path": "docs/reviews/stage-p028-layered-bundle-four-party-review-20260916.md",
+      "sha256": "sha256:a2b6ada3819eeaec36cfaf22929b25ef0cc7c8ea074de0d64ee12cf994c04f14"
+    },
+    "acceptance": {
+      "path": "docs/acceptance/stage-proposition-bundle-mvp-20260916.md",
+      "sha256": "sha256:296f0dd1d523258687dce86418cec8d70942f177ed1036392dc43ac52b4c766e"
+    }
+  },
+  "delivered": {
+    "historical_market_code_count": 13,
+    "historical_market_codes": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "stable_proposition_id_count": 13,
+    "assertion_layers": [
+      "context_or_structural_state",
+      "event_or_nested_condition",
+      "modifier"
+    ],
+    "published_contract_example_count": 5,
+    "development_shadow_historical_stage_codes": [10, 11],
+    "primary_stage_non_null_count": 0,
+    "neutral_abstain_x_structurally_distinct": true,
+    "deterministic_canonical_serialization": true,
+    "exact_fact_reference_closure": true,
+    "representation_as_promotion_blocked": true
+  },
+  "expert_compatibility": {
+    "development_shadow_view_available": true,
+    "accepted_nested_10_11_visible_together": true,
+    "research_stage5_8_filtered_from_development_shadow": true,
+    "production_expert_authority": false,
+    "strategy_or_trading_authority": false
+  },
+  "verification": {
+    "focused_unit_and_contract_tests": 14,
+    "focused_failures": 0,
+    "ruff_passed": true,
+    "repository_make_check_required_before_commit": true
+  },
+  "authority": {
+    "new_market_read": false,
+    "new_reference_opinion": false,
+    "holdout_read": false,
+    "candidate_or_threshold_search": false,
+    "primary_stage_compression": false,
+    "labelcard_publication": false,
+    "production_expert_consumption": false,
+    "daily_inference": false,
+    "strategy_consumption": false,
+    "trading": false
+  },
+  "phase_boundary": {
+    "individual_stock_stage_recognition_mvp_phase_1": "ACHIEVED_REPRESENTATION_AND_GOVERNANCE_LEVEL",
+    "automatic_successor": null,
+    "automatic_p029": false,
+    "next_action": "STOP_AND_REVIEW_DELIVERED_MVP_VALUE_BEFORE_ANY_NEW_STAGE_RESEARCH_OR_RUNTIME_PHASE"
+  },
+  "claim_ceiling": "P028 establishes a tested representation/governance MVP for layered stock-stage propositions and a bounded non-production development-shadow consumer view for accepted Stage10/11 projections. It does not qualify every historical Stage, calculate new market truth, authorize a primary stage, open protected data, connect production experts, or authorize strategy/trading."
+}

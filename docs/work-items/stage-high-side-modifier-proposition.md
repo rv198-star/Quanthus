@@ -1,7 +1,7 @@
 # P3-STAGE-026 — High-Side Modifier Proposition Route
 
 Design status: approved semantic/resource preregistration
-Delivery gate: P026-C engineering accepted; sole exact-revision resource/packet Job ready, not executed
+Delivery gate: first P026-C Job failed before any result-bearing read; one exact P026-C-R1 technical recovery authorized
 
 Parent: `stage-third-group-portfolio-rebaseline.md`
 Predecessor closeout: `stage-downside-lifecycle-proposition.md`
@@ -9,6 +9,7 @@ Machine concept: `../../config/stage-learning/stage-high-side-modifier-concept.v
 Resource/reference contract: `../../config/stage-learning/stage-high-side-modifier-blind-reference.v1.json`
 P026-B pre-result review: `../reviews/stage-p026b-resource-contract-four-party-review-20260916.md`
 P026-C engineering acceptance: `../acceptance/stage-high-side-modifier-reference-engineering-20260916.md`
+P026-C-R1 recovery review: `../reviews/stage-p026c-pre-read-technical-recovery-review-20260916.md`
 Fact substrate: `../design/structure-trend-evolution-facts.md`
 Historical evidence: `../reviews/stock-stage-third-group-profile-result-review-20260910.md`
 
@@ -120,13 +121,15 @@ with >=20 positive and >=20 negative, Stage8 >=40 definite applicable clusters w
 | --- | --- | --- | --- |
 | P3-STAGE-026-A | Freeze high-side semantic architecture and fact-readiness split | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | closed preregistration; zero new market/result/opinion reads |
 | P3-STAGE-026-B | Freeze one P020-disjoint exposure-aware Stage8 resource/reference contract | P3-STAGE-026-A | closed preregistration; one 20-target/16-floor per-cell route, >=144 rows / >=128 clusters, no Stage9 route |
-| P3-STAGE-026-C | Prepare exact T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | engineering accepted; sole exact-revision resource/packet Job ready, reviewer opinions remain blocked until immutable artifact pass |
+| P3-STAGE-026-C | Prepare exact T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | initial Job failed at pre-read semantic-contract field mapping with no artifact/result read; one separately frozen P026-C-R1 technical recovery authorized |
 | P3-STAGE-026-D | Gate any finite Stage8 candidate topology | P3-STAGE-026-C | blocked; opens only if blind reference sufficiency passes |
 | P3-STAGE-026-E | Four-party portfolio closeout and decide whether Stage9 activity work remains justified | P3-STAGE-026-D or earlier fail-close | blocked; no protected/strategy/trading implication |
 
 ## Boundaries
 
-P026-C engineering is now accepted without executing the Job. The next authority is limited to deployment
-of the exact accepted revision and one resource/admission/T-only packet Job. It does not authorize a second resource route, Stage8
+The first accepted-runtime Job failed at the initial semantic-contract validation before candidate
+reconstruction or any market/admission read. Its failed budget remains immutable. P026-C-R1 separately
+authorizes one exact-revision technical recovery limited to the frozen P026-A field mapping; it does
+not create another resource route or change any P026-B gate. It does not authorize a second resource route, Stage8
 candidate or threshold search, Stage9 activity implementation/opinion, primary-stage compression,
 LabelCard, preserved 2021, 2022-2024, 2025, daily/strategy output or trading.

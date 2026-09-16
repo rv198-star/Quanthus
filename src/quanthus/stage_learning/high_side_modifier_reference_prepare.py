@@ -691,8 +691,14 @@ def run_prepare(
     trend = _bound_json(root, config["bindings"]["trend_fact_contract"], "trend_contract")
     node = _bound_json(root, config["bindings"]["training_node"], "training_node")
     if (
-        semantics.get("state") != "PREREGISTERED_HIGH_SIDE_MODIFIER_SEMANTICS_BEFORE_RESULT_READ"
-        or semantics.get("stage9", {}).get("current_gate") != "BLOCKED_MISSING_ACTIVITY_RELATION"
+        semantics.get("state")
+        != "PREREGISTERED_HIGH_SIDE_MODIFIER_SEMANTICS_BEFORE_RESOURCE_OR_RESULT_READ"
+        or semantics.get("portfolio_position", {}).get("stage9_current_route")
+        != "PARKED_PENDING_MINIMAL_ACTIVITY_RELATION"
+        or semantics.get("propositions", {})
+        .get("high_level_price_volume_divergence", {})
+        .get("price_only_projection_authorized")
+        is not False
     ):
         raise HighSideModifierReferencePrepareError("semantic_state")
     if (

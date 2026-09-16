@@ -529,9 +529,13 @@ nodes.
   without a result-bearing run: candidate order is frozen before input reads, each candidate window is
   read at most once and reused in-memory for readiness plus any Trend packet, resource failure builds no
   semantic packets, reviewer transport is identity/Stage9/candidate/future blind, and short-term/fund
-  opinions have separate immutable seals before cluster-aware finalization. The only ready next action
-  is deployment of the exact accepted revision and the sole P026-C resource/packet Job. Preserved
-  2021/2022-2024/2025 remain unopened.
+  opinions have separate immutable seals before cluster-aware finalization. The first P026-C Job then
+  failed at the initial P026-A semantic-contract field mapping before candidate reconstruction,
+  training-root exposure traversal, market/admission reads, resource gating or artifact publication.
+  The failed Job remains immutable and is not interpreted as a Stage8 resource/semantic result. A
+  four-party review authorizes exactly one P026-C-R1 technical recovery that corrects only the runtime
+  field mapping while preserving P026-A/B semantics, samples, exposure exclusions and gates. No further
+  retry is authorized. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -552,6 +556,7 @@ nodes.
   `work-items/stage-high-side-modifier-proposition.md`,
   `reviews/stage-p026b-resource-contract-four-party-review-20260916.md`,
   `acceptance/stage-high-side-modifier-reference-engineering-20260916.md`,
+  `reviews/stage-p026c-pre-read-technical-recovery-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,

@@ -185,6 +185,9 @@ DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_BUDGET_SCHEMA = (
 HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_BUDGET_SCHEMA = (
     "quanthus.stage-high-side-modifier-reference-prepare-budget.v1"
 )
+HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_RECOVERY_BUDGET_SCHEMA = (
+    "quanthus.stage-high-side-modifier-reference-prepare-recovery-budget.v1"
+)
 ADMISSION_EXPOSURE_CAPACITY_BUDGET_SCHEMA = (
     "quanthus.stage-admission-exposure-capacity-budget.v1"
 )
@@ -199,6 +202,9 @@ CLUSTERED_IDENTITY_ADMISSION_BUDGET_SCHEMA = (
 )
 DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_AUTH = (
     "config/stage-learning/stage-downside-lifecycle-resource-plan-recovery.v1.json"
+)
+HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_RECOVERY_AUTH = (
+    "config/stage-learning/stage-high-side-modifier-reference-prepare-recovery.v1.json"
 )
 STRATUM_NORMALIZED_INSTABILITY_RECOVERY_AUTH = (
     "config/stage-learning/stage-stratum-normalized-instability-recovery.v1.json"
@@ -771,6 +777,10 @@ class StageWorkerPaths:
     @property
     def high_side_modifier_reference_prepare_budget(self) -> Path:
         return self.control_root / "high-side-modifier-reference-prepare-budget.json"
+
+    @property
+    def high_side_modifier_reference_prepare_recovery_budget(self) -> Path:
+        return self.control_root / "high-side-modifier-reference-prepare-recovery-budget.json"
 
     @property
     def admission_exposure_capacity_budget(self) -> Path:
@@ -2629,12 +2639,122 @@ def _high_side_modifier_reference_prepare_budget_value(job: StageJob) -> dict[st
     }
 
 
+def _high_side_modifier_reference_prepare_recovery_budget_value(
+    failed_job: StageJob, recovery_job: StageJob,
+) -> dict[str, Any]:
+    return {
+        "schema_version": HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_RECOVERY_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-026-C-R1",
+        "technical_recovery_of": failed_job.job_id,
+        "failed_input_digest": failed_job.input_digest,
+        "job": recovery_job.to_dict(),
+        "input_digest": recovery_job.input_digest,
+    }
+
+
+def _high_side_modifier_reference_prepare_recovery_authorization(
+    paths: StageWorkerPaths, failed_job: StageJob,
+) -> dict[str, Any]:
+    auth = _object(
+        paths.control_repo / HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_RECOVERY_AUTH,
+        "high-side modifier reference prepare recovery authorization",
+    )
+    if (
+        auth.get("schema_version")
+        != "quanthus.stage-high-side-modifier-reference-prepare-recovery.v1"
+        or auth.get("work_item") != "P3-STAGE-026-C-R1"
+        or auth.get("disposition")
+        != "AUTHORIZE_ONE_PRE_READ_TECHNICAL_CONTRACT_MAPPING_RECOVERY"
+    ):
+        raise StageWorkerError(
+            "high-side modifier reference prepare recovery authorization differs"
+        )
+    failure = auth.get("failed_job")
+    authority = auth.get("authority")
+    bindings = auth.get("bindings")
+    if not all(isinstance(value, Mapping) for value in (failure, authority, bindings)):
+        raise StageWorkerError(
+            "high-side modifier reference prepare recovery authorization incomplete"
+        )
+    if (
+        failure.get("job_id") != failed_job.job_id
+        or failure.get("code_revision") != failed_job.code_revision
+        or failure.get("input_digest") != failed_job.input_digest
+        or failure.get("terminal_state") != "failed"
+        or failure.get("error") != "stage_high_side_modifier_reference_prepare_process_failed"
+        or failure.get("failure_reason")
+        != "HighSideModifierReferencePrepareError:semantic_state"
+        or failure.get("artifact_published") is not False
+        or failure.get("candidate_reservoir_reconstruction_reached") is not False
+        or failure.get("market_or_admission_read_reached") is not False
+        or failure.get("resource_gate_reached") is not False
+        or failure.get("trend_fact_packet_build_reached") is not False
+        or failure.get("review_opinion_reached") is not False
+    ):
+        raise StageWorkerError(
+            "high-side modifier reference prepare recovery failure binding differs"
+        )
+    required_true = (
+        "same_p026_b_contract_required",
+        "same_p026_a_semantics_required",
+        "same_resource_selection_required",
+        "same_exposure_exclusions_required",
+        "same_reference_gates_required",
+        "contract_field_mapping_repair_only",
+    )
+    required_false = (
+        "resource_change",
+        "sample_change",
+        "candidate_order_change",
+        "semantic_rule_change",
+        "review_protocol_change",
+        "gate_change",
+        "protected_partition_change",
+        "candidate_or_threshold_read",
+        "stage9_activity_or_opinion_read",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    )
+    if authority.get("maximum_technical_recovery_jobs") != 1:
+        raise StageWorkerError(
+            "high-side modifier reference prepare recovery job budget differs"
+        )
+    if any(authority.get(key) is not True for key in required_true) or any(
+        authority.get(key) is not False for key in required_false
+    ):
+        raise StageWorkerError(
+            "high-side modifier reference prepare recovery authority differs"
+        )
+    for key in ("p026_b_contract", "p026_a_semantics", "p026_c_engineering_acceptance"):
+        binding = bindings.get(key)
+        if not isinstance(binding, Mapping):
+            raise StageWorkerError(
+                "high-side modifier reference prepare recovery binding differs"
+            )
+        path = paths.control_repo / str(binding.get("path") or "")
+        expected = str(binding.get("sha256") or "")
+        try:
+            observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise StageWorkerError(
+                "high-side modifier reference prepare recovery binding unreadable"
+            ) from exc
+        if expected != observed:
+            raise StageWorkerError(
+                "high-side modifier reference prepare recovery binding differs"
+            )
+    return dict(auth)
+
+
 def _existing_high_side_modifier_reference_prepare_submission(
     paths: StageWorkerPaths, *, code_revision: str,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, StageJob | None]:
     marker_path = paths.high_side_modifier_reference_prepare_budget
     if not marker_path.exists():
-        return None
+        return None, None
     marker = _object(marker_path, "high-side modifier reference prepare budget")
     if (
         marker.get("schema_version") != HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_BUDGET_SCHEMA
@@ -2643,17 +2763,56 @@ def _existing_high_side_modifier_reference_prepare_submission(
         or not isinstance(marker.get("job"), Mapping)
     ):
         raise StageWorkerError("high-side modifier reference prepare budget marker differs")
-    job = StageJob.from_dict(marker["job"])
+    failed_job = StageJob.from_dict(marker["job"])
     if (
-        job.kind != STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
-        or marker.get("input_digest") != job.input_digest
+        failed_job.kind != STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
+        or marker.get("input_digest") != failed_job.input_digest
     ):
         raise StageWorkerError("high-side modifier reference prepare budget marker differs")
-    if job.code_revision != code_revision:
+    if failed_job.code_revision == code_revision:
+        return _idempotent_stage_submission(paths, failed_job), None
+    observed = read_status(paths, failed_job.job_id)
+    if (
+        observed.get("state") != "failed"
+        or observed.get("error") != "stage_high_side_modifier_reference_prepare_process_failed"
+        or observed.get("input_digest") != failed_job.input_digest
+        or observed.get("code_revision") != failed_job.code_revision
+        or observed.get("result_ref") is not None
+    ):
         raise StageWorkerError(
-            "high-side modifier reference prepare has no retry or replacement authority"
+            "high-side modifier reference prepare recovery requires exact failed parent"
         )
-    return _idempotent_stage_submission(paths, job)
+    _high_side_modifier_reference_prepare_recovery_authorization(paths, failed_job)
+    recovery_path = paths.high_side_modifier_reference_prepare_recovery_budget
+    if not recovery_path.exists():
+        return None, failed_job
+    recovery = _object(
+        recovery_path, "high-side modifier reference prepare recovery budget"
+    )
+    if (
+        recovery.get("schema_version")
+        != HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_RECOVERY_BUDGET_SCHEMA
+        or recovery.get("work_item") != "P3-STAGE-026-C-R1"
+        or recovery.get("technical_recovery_of") != failed_job.job_id
+        or recovery.get("failed_input_digest") != failed_job.input_digest
+        or not isinstance(recovery.get("job"), Mapping)
+    ):
+        raise StageWorkerError(
+            "high-side modifier reference prepare recovery budget marker differs"
+        )
+    recovery_job = StageJob.from_dict(recovery["job"])
+    if (
+        recovery_job.kind != STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
+        or recovery.get("input_digest") != recovery_job.input_digest
+    ):
+        raise StageWorkerError(
+            "high-side modifier reference prepare recovery budget marker differs"
+        )
+    if recovery_job.code_revision != code_revision:
+        raise StageWorkerError(
+            "high-side modifier reference prepare recovery has no further authority"
+        )
+    return _idempotent_stage_submission(paths, recovery_job), failed_job
 
 
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
@@ -4246,6 +4405,7 @@ def submit_job(
     complete_reserve_additional_review_set_recovery_of: StageJob | None = None
     stratum_normalized_instability_recovery_of: StageJob | None = None
     downside_lifecycle_resource_plan_recovery_of: StageJob | None = None
+    high_side_modifier_reference_prepare_recovery_of: StageJob | None = None
     if kind == STAGE_ORDER_RULE_PREPARE_JOB:
         existing, prepare_retry_of = _existing_order_rule_prepare_submission(
             paths, code_revision=code_revision,
@@ -4418,8 +4578,10 @@ def submit_job(
         if existing is not None:
             return existing
     if kind == STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB:
-        existing = _existing_high_side_modifier_reference_prepare_submission(
-            paths, code_revision=code_revision,
+        existing, high_side_modifier_reference_prepare_recovery_of = (
+            _existing_high_side_modifier_reference_prepare_submission(
+                paths, code_revision=code_revision,
+            )
         )
         if existing is not None:
             return existing
@@ -4534,6 +4696,11 @@ def submit_job(
     )
     high_side_modifier_reference_prepare_reserved = (
         job.kind == STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
+        and high_side_modifier_reference_prepare_recovery_of is None
+    )
+    high_side_modifier_reference_prepare_recovery_reserved = (
+        job.kind == STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
+        and high_side_modifier_reference_prepare_recovery_of is not None
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -4723,6 +4890,13 @@ def submit_job(
             paths.high_side_modifier_reference_prepare_budget,
             _high_side_modifier_reference_prepare_budget_value(job),
         )
+    if high_side_modifier_reference_prepare_recovery_reserved:
+        _exclusive_json(
+            paths.high_side_modifier_reference_prepare_recovery_budget,
+            _high_side_modifier_reference_prepare_recovery_budget_value(
+                high_side_modifier_reference_prepare_recovery_of, job
+            ),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -4803,6 +4977,8 @@ def submit_job(
             paths.downside_lifecycle_reference_prepare_budget.unlink(missing_ok=True)
         if high_side_modifier_reference_prepare_reserved:
             paths.high_side_modifier_reference_prepare_budget.unlink(missing_ok=True)
+        if high_side_modifier_reference_prepare_recovery_reserved:
+            paths.high_side_modifier_reference_prepare_recovery_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -4878,6 +5054,8 @@ def submit_job(
             paths.downside_lifecycle_reference_prepare_budget.unlink(missing_ok=True)
         if high_side_modifier_reference_prepare_reserved:
             paths.high_side_modifier_reference_prepare_budget.unlink(missing_ok=True)
+        if high_side_modifier_reference_prepare_recovery_reserved:
+            paths.high_side_modifier_reference_prepare_recovery_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -4896,6 +5074,8 @@ def submit_job(
         result["technical_recovery_of"] = stratum_normalized_instability_recovery_of.job_id
     if downside_lifecycle_resource_plan_recovery_of is not None:
         result["technical_recovery_of"] = downside_lifecycle_resource_plan_recovery_of.job_id
+    if high_side_modifier_reference_prepare_recovery_of is not None:
+        result["technical_recovery_of"] = high_side_modifier_reference_prepare_recovery_of.job_id
     return result
 
 

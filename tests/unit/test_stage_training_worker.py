@@ -139,6 +139,34 @@ def seed_stratum_normalized_instability_recovery_auth(
     target.write_text(json.dumps(recovery), encoding="utf-8")
 
 
+def seed_high_side_modifier_reference_prepare_recovery_auth(
+    worker_paths: StageWorkerPaths, failed_job: StageJob,
+) -> None:
+    relpaths = (
+        "config/stage-learning/stage-high-side-modifier-blind-reference.v1.json",
+        "config/stage-learning/stage-high-side-modifier-concept.v1.json",
+        "docs/acceptance/stage-high-side-modifier-reference-engineering-20260916.md",
+    )
+    for relpath in relpaths:
+        target = worker_paths.control_repo / relpath
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relpath).read_bytes())
+    recovery_path = (
+        "config/stage-learning/stage-high-side-modifier-reference-prepare-recovery.v1.json"
+    )
+    recovery = json.loads((ROOT / recovery_path).read_text(encoding="utf-8"))
+    recovery["failed_job"].update(
+        {
+            "job_id": failed_job.job_id,
+            "code_revision": failed_job.code_revision,
+            "input_digest": failed_job.input_digest,
+        }
+    )
+    target = worker_paths.control_repo / recovery_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(recovery), encoding="utf-8")
+
+
 def seed_downside_lifecycle_resource_plan_recovery_auth(
     worker_paths: StageWorkerPaths, failed_job: StageJob,
 ) -> None:
@@ -1691,10 +1719,67 @@ def test_high_side_modifier_reference_prepare_is_one_shot_and_idempotent(
         kind=STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
     )
     assert repeated["job_id"] == submitted["job_id"]
-    with pytest.raises(StageWorkerError, match="no retry or replacement authority"):
+    with pytest.raises(StageWorkerError, match="recovery requires exact failed parent"):
         submit_job(
             worker_paths,
             code_revision="b" * 40,
+            kind=STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
+        )
+
+
+def test_high_side_modifier_reference_allows_one_authorized_pre_read_recovery(
+    tmp_path: Path,
+) -> None:
+    worker_paths = paths(tmp_path)
+    submitted = submit_job(
+        worker_paths,
+        code_revision=REVISION,
+        kind=STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
+    )
+    failed_job = StageJob(
+        job_id=submitted["job_id"],
+        kind=submitted["kind"],
+        code_revision=submitted["code_revision"],
+        config=submitted["config"],
+        submitted_at=submitted["submitted_at"],
+    )
+    (worker_paths.status / f"{failed_job.job_id}.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "quanthus.stage-worker-status.v1",
+                "job_id": failed_job.job_id,
+                "kind": failed_job.kind,
+                "code_revision": failed_job.code_revision,
+                "input_digest": failed_job.input_digest,
+                "state": "failed",
+                "stage": "terminal",
+                "exit_code": 1,
+                "error": "stage_high_side_modifier_reference_prepare_process_failed",
+                "result_ref": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    seed_high_side_modifier_reference_prepare_recovery_auth(worker_paths, failed_job)
+    recovery_revision = "b" * 40
+    recovery = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
+    )
+    assert recovery["technical_recovery_of"] == failed_job.job_id
+    assert recovery["code_revision"] == recovery_revision
+    assert worker_paths.high_side_modifier_reference_prepare_recovery_budget.is_file()
+    repeated = submit_job(
+        worker_paths,
+        code_revision=recovery_revision,
+        kind=STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
+    )
+    assert repeated["job_id"] == recovery["job_id"]
+    with pytest.raises(StageWorkerError, match="no further authority"):
+        submit_job(
+            worker_paths,
+            code_revision="c" * 40,
             kind=STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
         )
 

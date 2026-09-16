@@ -128,6 +128,13 @@ P024_RESULT = ROOT / "config/stage-learning/stage-clustered-identity-admission-r
 P024_REVIEW = ROOT / "docs/reviews/stage-p024-clustered-identity-admission-review-20260916.md"
 P024_WORK = ROOT / "docs/work-items/stage-clustered-identity-admission.md"
 P026_CONCEPT = ROOT / "config/stage-learning/stage-high-side-modifier-concept.v1.json"
+P026_REFERENCE = ROOT / "config/stage-learning/stage-high-side-modifier-blind-reference.v1.json"
+P026_RECOVERY = (
+    ROOT / "config/stage-learning/stage-high-side-modifier-reference-prepare-recovery.v1.json"
+)
+P026_RECOVERY_REVIEW = (
+    ROOT / "docs/reviews/stage-p026c-pre-read-technical-recovery-review-20260916.md"
+)
 P026_WORK = ROOT / "docs/work-items/stage-high-side-modifier-proposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -1802,7 +1809,10 @@ def test_stage024_freezes_clustered_identity_supplement_before_new_readiness_rea
     assert failure["open_new_years"] is False
     assert failure["on_failure"] == "FOUR_PARTY_PORTFOLIO_REVIEW_BEFORE_ANY_SUCCESSOR"
     authority = value["authority"]
-    assert authority["input_readiness_market_read_for_previously_conflict_skipped_candidates"] is True
+    assert (
+        authority["input_readiness_market_read_for_previously_conflict_skipped_candidates"]
+        is True
+    )
     for key in (
         "raw_ohlc_publish_or_retain",
         "structure_fact_build",
@@ -2104,6 +2114,90 @@ def test_p026a_freezes_high_side_modifier_semantics_before_any_result_read() -> 
     ):
         assert authority[key] is False
     assert P026_WORK.is_file()
+
+
+def test_p026b_freezes_one_bounded_stage8_resource_and_reference_route() -> None:
+    value = json.loads(P026_REFERENCE.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-026-B"
+    assert value["state"] == (
+        "PREREGISTERED_STAGE8_CAPACITY_LIMITED_BLIND_REFERENCE_BEFORE_NEW_MARKET_READ"
+    )
+    exposure = value["exposure_contract"]
+    assert exposure["p014_admission_only_l2a_exact_window_reuse_allowed"] is True
+    assert exposure["l2b_l3_l4_same_exact_window_reuse"] is False
+    assert exposure["p020_exact_row_or_identity_window_reuse_as_fresh_stage8_evidence"] is False
+    selection = value["resource_selection"]
+    assert selection["target_admission_ready_rows_per_cell"] == 20
+    assert selection["minimum_admission_ready_rows_per_cell"] == 16
+    assert selection["maximum_candidate_identities_per_cell"] == 64
+    assert selection["maximum_precommitted_windows_per_identity"] == 2
+    assert selection["minimum_selected_rows"] == 144
+    assert selection["minimum_unique_economic_identity_clusters"] == 128
+    assert selection["technical_fallback_order_frozen_before_read"] is True
+    assert selection["no_post_result_replacement"] is True
+    gate = value["reference_sufficiency_gate"]
+    assert gate["minimum_context_definite_clusters"] == 80
+    assert gate["minimum_context_positive_clusters"] == 20
+    assert gate["minimum_context_negative_clusters"] == 20
+    assert gate["maximum_context_unavailable_or_unjudgeable_cluster_rate"] == 0.15
+    assert gate["minimum_stage8_applicable_definite_clusters"] == 40
+    assert gate["minimum_stage8_positive_clusters"] == 20
+    assert gate["minimum_stage8_negative_clusters"] == 20
+    assert gate["maximum_stage8_unavailable_or_unjudgeable_applicable_cluster_rate"] == 0.15
+    assert gate["gate_change_after_opinions"] is False
+    assert gate["post_opinion_resource_replacement"] is False
+    assert value["review_protocol"]["stage9_opinion_collection"] is False
+
+
+def test_p026c_recovery_is_one_pre_read_contract_mapping_repair_only() -> None:
+    value = json.loads(P026_RECOVERY.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-026-C-R1"
+    assert value["disposition"] == (
+        "AUTHORIZE_ONE_PRE_READ_TECHNICAL_CONTRACT_MAPPING_RECOVERY"
+    )
+    failed = value["failed_job"]
+    assert failed["job_id"] == "stage_18276b459d774fdc84d1abae23280ca2"
+    assert failed["code_revision"] == "d3421bb922d0911345e35331fd7e082a97996db3"
+    assert failed["input_digest"] == (
+        "sha256:4ee7a7097f3f7a17915602d329592c76948b2a9dfe28e32dfcb52562ce6eb504"
+    )
+    assert failed["terminal_state"] == "failed"
+    assert failed["artifact_published"] is False
+    assert failed["candidate_reservoir_reconstruction_reached"] is False
+    assert failed["market_or_admission_read_reached"] is False
+    assert failed["resource_gate_reached"] is False
+    assert failed["trend_fact_packet_build_reached"] is False
+    assert failed["review_opinion_reached"] is False
+    root = value["root_cause"]
+    assert root["class"] == "IMPLEMENTATION_CONTRACT_FIELD_MAPPING"
+    assert root["config_change_required"] is False
+    assert root["resource_change_required"] is False
+    assert root["semantic_rule_change_required"] is False
+    assert root["selection_rule_change_required"] is False
+    assert root["reference_gate_change_required"] is False
+    authority = value["authority"]
+    assert authority["maximum_technical_recovery_jobs"] == 1
+    assert authority["same_p026_b_contract_required"] is True
+    assert authority["same_p026_a_semantics_required"] is True
+    assert authority["contract_field_mapping_repair_only"] is True
+    for key in (
+        "resource_change",
+        "sample_change",
+        "candidate_order_change",
+        "semantic_rule_change",
+        "review_protocol_change",
+        "gate_change",
+        "protected_partition_change",
+        "candidate_or_threshold_read",
+        "stage9_activity_or_opinion_read",
+        "preserved_2021_read",
+        "2022_2024_read",
+        "2025_read",
+        "daily_or_strategy",
+        "trading",
+    ):
+        assert authority[key] is False
+    assert P026_RECOVERY_REVIEW.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

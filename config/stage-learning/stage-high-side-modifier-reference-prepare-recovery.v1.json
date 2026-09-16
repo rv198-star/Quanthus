@@ -1,0 +1,76 @@
+{
+  "schema_version": "quanthus.stage-high-side-modifier-reference-prepare-recovery.v1",
+  "work_item": "P3-STAGE-026-C-R1",
+  "disposition": "AUTHORIZE_ONE_PRE_READ_TECHNICAL_CONTRACT_MAPPING_RECOVERY",
+  "effective_date": "2026-09-16",
+  "failed_job": {
+    "job_id": "stage_18276b459d774fdc84d1abae23280ca2",
+    "code_revision": "d3421bb922d0911345e35331fd7e082a97996db3",
+    "input_digest": "sha256:4ee7a7097f3f7a17915602d329592c76948b2a9dfe28e32dfcb52562ce6eb504",
+    "terminal_state": "failed",
+    "error": "stage_high_side_modifier_reference_prepare_process_failed",
+    "failure_reason": "HighSideModifierReferencePrepareError:semantic_state",
+    "artifact_published": false,
+    "candidate_reservoir_reconstruction_reached": false,
+    "market_or_admission_read_reached": false,
+    "resource_gate_reached": false,
+    "trend_fact_packet_build_reached": false,
+    "review_opinion_reached": false
+  },
+  "root_cause": {
+    "class": "IMPLEMENTATION_CONTRACT_FIELD_MAPPING",
+    "observed_runtime_expectations": [
+      "state=PREREGISTERED_HIGH_SIDE_MODIFIER_SEMANTICS_BEFORE_RESULT_READ",
+      "stage9.current_gate=BLOCKED_MISSING_ACTIVITY_RELATION"
+    ],
+    "frozen_contract_values": [
+      "state=PREREGISTERED_HIGH_SIDE_MODIFIER_SEMANTICS_BEFORE_RESOURCE_OR_RESULT_READ",
+      "portfolio_position.stage9_current_route=PARKED_PENDING_MINIMAL_ACTIVITY_RELATION",
+      "propositions.high_level_price_volume_divergence.price_only_projection_authorized=false"
+    ],
+    "repair": "Validate the exact frozen P026-A state and Stage9 parked/price-only-forbidden fields; do not change the P026-A or P026-B contracts.",
+    "config_change_required": false,
+    "resource_change_required": false,
+    "semantic_rule_change_required": false,
+    "selection_rule_change_required": false,
+    "reference_gate_change_required": false
+  },
+  "bindings": {
+    "p026_b_contract": {
+      "path": "config/stage-learning/stage-high-side-modifier-blind-reference.v1.json",
+      "sha256": "sha256:c3b92f240dde995f114cb85393b4887532650631900eba5f68632278ff4e4391"
+    },
+    "p026_a_semantics": {
+      "path": "config/stage-learning/stage-high-side-modifier-concept.v1.json",
+      "sha256": "sha256:12af38d25d7246f1cce83d2a690de4cf94917af09339497ac31288f87d5b5f96"
+    },
+    "p026_c_engineering_acceptance": {
+      "path": "docs/acceptance/stage-high-side-modifier-reference-engineering-20260916.md",
+      "sha256": "sha256:bb660f55337e5d8c79af5a15e23fdb7006e6b0644045ab4fa835eb8a9754d097"
+    }
+  },
+  "authority": {
+    "maximum_technical_recovery_jobs": 1,
+    "same_p026_b_contract_required": true,
+    "same_p026_a_semantics_required": true,
+    "same_resource_selection_required": true,
+    "same_exposure_exclusions_required": true,
+    "same_reference_gates_required": true,
+    "contract_field_mapping_repair_only": true,
+    "resource_change": false,
+    "sample_change": false,
+    "candidate_order_change": false,
+    "semantic_rule_change": false,
+    "review_protocol_change": false,
+    "gate_change": false,
+    "protected_partition_change": false,
+    "candidate_or_threshold_read": false,
+    "stage9_activity_or_opinion_read": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "claim_ceiling": "This authorization permits exactly one pre-read technical recovery of P026-C solely to correct runtime validation against already-frozen P026-A field names and locations. It does not alter resource selection, exposure accounting, Stage8/Stage9 semantics, reference gates, reviewer protocol, protected partitions or candidate/scoring authority."
+}

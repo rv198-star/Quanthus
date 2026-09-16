@@ -1,7 +1,7 @@
 # P3-STAGE-026 — High-Side Modifier Proposition Route
 
-Design status: approved semantic/resource preregistration
-Delivery gate: first P026-C Job failed before any result-bearing read; one exact P026-C-R1 technical recovery authorized
+Design status: approved semantic/resource route; closed after resource no-pass
+Delivery gate: closed `CLOSED_STAGE8_RESOURCE_CAPACITY_SHORTFALL_NO_REPAIR`; whole-vocabulary portfolio synthesis selected
 
 Parent: `stage-third-group-portfolio-rebaseline.md`
 Predecessor closeout: `stage-downside-lifecycle-proposition.md`
@@ -10,6 +10,8 @@ Resource/reference contract: `../../config/stage-learning/stage-high-side-modifi
 P026-B pre-result review: `../reviews/stage-p026b-resource-contract-four-party-review-20260916.md`
 P026-C engineering acceptance: `../acceptance/stage-high-side-modifier-reference-engineering-20260916.md`
 P026-C-R1 recovery review: `../reviews/stage-p026c-pre-read-technical-recovery-review-20260916.md`
+P026-C resource closeout: `../reviews/stage-p026c-stage8-resource-shortfall-four-party-review-20260916.md`
+Machine result: `../../config/stage-learning/stage-high-side-modifier-reference-result.v1.json`
 Fact substrate: `../design/structure-trend-evolution-facts.md`
 Historical evidence: `../reviews/stock-stage-third-group-profile-result-review-20260910.md`
 
@@ -121,15 +123,23 @@ with >=20 positive and >=20 negative, Stage8 >=40 definite applicable clusters w
 | --- | --- | --- | --- |
 | P3-STAGE-026-A | Freeze high-side semantic architecture and fact-readiness split | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | closed preregistration; zero new market/result/opinion reads |
 | P3-STAGE-026-B | Freeze one P020-disjoint exposure-aware Stage8 resource/reference contract | P3-STAGE-026-A | closed preregistration; one 20-target/16-floor per-cell route, >=144 rows / >=128 clusters, no Stage9 route |
-| P3-STAGE-026-C | Prepare exact T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | initial Job failed at pre-read semantic-contract field mapping with no artifact/result read; one separately frozen P026-C-R1 technical recovery authorized |
-| P3-STAGE-026-D | Gate any finite Stage8 candidate topology | P3-STAGE-026-C | blocked; opens only if blind reference sufficiency passes |
-| P3-STAGE-026-E | Four-party portfolio closeout and decide whether Stage9 activity work remains justified | P3-STAGE-026-D or earlier fail-close | blocked; no protected/strategy/trading implication |
+| P3-STAGE-026-C | Prepare exact T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | closed resource no-pass after R1: 136 rows / 136 clusters; both STAR cells below frozen 16-row floor; zero reviewer packets/opinions |
+| P3-STAGE-026-C-R1 | One pre-read technical contract-mapping recovery | P3-STAGE-026-C | closed; exact failed parent recovered once, preserving P026-A/B semantics/resources/gates; no further retry authority |
+| P3-STAGE-026-D | Gate any finite Stage8 candidate topology | P3-STAGE-026-C | closed not opened because blind reference collection never began |
+| P3-STAGE-026-E | Four-party portfolio closeout and decide whether Stage9 activity work remains justified | P3-STAGE-026-D or earlier fail-close | closed; Stage8 research-only, Stage9 parked, no resource repair; select P3-STAGE-027 whole-vocabulary synthesis |
 
 ## Boundaries
 
 The first accepted-runtime Job failed at the initial semantic-contract validation before candidate
-reconstruction or any market/admission read. Its failed budget remains immutable. P026-C-R1 separately
-authorizes one exact-revision technical recovery limited to the frozen P026-A field mapping; it does
-not create another resource route or change any P026-B gate. It does not authorize a second resource route, Stage8
-candidate or threshold search, Stage9 activity implementation/opinion, primary-stage compression,
-LabelCard, preserved 2021, 2022-2024, 2025, daily/strategy output or trading.
+reconstruction or any market/admission read. Its failed budget remains immutable. P026-C-R1 then used
+the single separately authorized technical recovery and completed the exact frozen resource route. The
+result is a genuine resource no-pass: 136 selected rows / 136 independent clusters, with all six
+MAIN/ChiNext cells at the 20-row target but the two STAR cells at 5 and 11, below the frozen 16-row
+floor; the total row floor of 144 also fails. No reviewer packet or opinion was created.
+
+The four-party closeout preserves the no-pass without lowering gates, dropping/merging STAR, reusing
+P020 exact windows or opening another fallback/resource route. Stage8 remains a research-only modifier;
+Stage9 remains parked pending a separately justified activity relation. P026-D is not opened. P026
+closes and selects a separate governance-only P3-STAGE-027 whole-vocabulary portfolio synthesis. No
+candidate/threshold search, Stage9 implementation/opinion, primary-stage compression, LabelCard,
+preserved 2021, 2022-2024, 2025, daily/strategy output or trading is authorized.

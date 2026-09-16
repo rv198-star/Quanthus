@@ -525,13 +525,13 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-024-B | Implement artifact-bound supplemental admission | P3-STAGE-024-A | closed engineering acceptance; P023 readiness observations are immutable and cannot be rerun |
 | P3-STAGE-024-C | Execute sole supplemental admission Job | P3-STAGE-024-B | closed no-pass; 33 eligible unread conflicts, 20 reads, 8 activations, no semantic/protected reads, early STAR remains 5 below old balanced-stress target |
 | P3-STAGE-024-D | Review/close and gate P020-C | P3-STAGE-024-C | closed four-party portfolio review; P024 stays no-pass, exact 187/179 panel becomes final development resource ceiling, separate P020-C preregistration selected |
-| P3-STAGE-026 | High-side modifier proposition route | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | ready; Stage8 upside-acceleration/extension active as modifier research, Stage9 remains activity-blocked |
+| P3-STAGE-026 | High-side modifier proposition route | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | closed `CLOSED_STAGE8_RESOURCE_CAPACITY_SHORTFALL_NO_REPAIR`; Stage8 retained research-only, Stage9 parked |
 | P3-STAGE-026-A | Freeze high-side semantic architecture and fact-readiness split | P3-STAGE-026 | closed preregistration; auxiliary advancing context + Stage8 modifier only, Stage9 price-only projection forbidden |
 | P3-STAGE-026-B | Freeze one P020-disjoint Stage8 resource/reference contract | P3-STAGE-026-A | closed preregistration; target 20/cell, hard floors >=16/cell, >=144 rows, >=128 identity clusters, one route only |
-| P3-STAGE-026-C | Prepare T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | blocked pending P026-C-R1; first Job stopped at pre-read semantic-contract mapping with no artifact/result evidence |
-| P3-STAGE-026-C-R1 | One pre-read technical contract-mapping recovery | P3-STAGE-026-C | ready; same P026-A/B semantics/resource/reference contract, exact failed parent, no further retry authority |
-| P3-STAGE-026-D | Gate finite Stage8 candidate topology | P3-STAGE-026-C | blocked until reference sufficiency PASS |
-| P3-STAGE-026-E | Four-party high-side portfolio closeout / Stage9 activity decision | P3-STAGE-026-D or earlier fail-close | blocked; protected/strategy/trading surfaces remain closed |
+| P3-STAGE-026-C | Prepare T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | closed resource no-pass after R1; 136 rows/136 clusters, STAR cells 5/11 below floor 16, no packets/opinions |
+| P3-STAGE-026-C-R1 | One pre-read technical contract-mapping recovery | P3-STAGE-026-C | closed; exact failed parent recovered once under unchanged P026-A/B contract, no further retry authority |
+| P3-STAGE-026-D | Gate finite Stage8 candidate topology | P3-STAGE-026-C | closed not opened; resource failure occurred before semantic reference collection |
+| P3-STAGE-026-E | Four-party high-side portfolio closeout / Stage9 activity decision | P3-STAGE-026-D or earlier fail-close | closed; no gate lowering/resource repair; separate P3-STAGE-027 whole-vocabulary synthesis selected |
 
 ## 7. Acceptance
 

@@ -532,10 +532,16 @@ nodes.
   opinions have separate immutable seals before cluster-aware finalization. The first P026-C Job then
   failed at the initial P026-A semantic-contract field mapping before candidate reconstruction,
   training-root exposure traversal, market/admission reads, resource gating or artifact publication.
-  The failed Job remains immutable and is not interpreted as a Stage8 resource/semantic result. A
-  four-party review authorizes exactly one P026-C-R1 technical recovery that corrects only the runtime
-  field mapping while preserving P026-A/B semantics, samples, exposure exclusions and gates. No further
-  retry is authorized. Preserved 2021/2022-2024/2025 remain unopened.
+  The failed Job remains immutable and is not interpreted as a Stage8 resource/semantic result. The
+  one authorized P026-C-R1 technical recovery corrected only that field mapping and completed the exact
+  frozen route. Its resource result is a genuine no-pass: 136 rows / 136 independent clusters are
+  selected, all six MAIN/ChiNext cells reach the 20-row target, but the two STAR cells reach only 5 and
+  11 versus the frozen 16-row floor, and total rows remain below the 144 floor. The Job therefore emits
+  zero reviewer packets and zero opinions. Four-party closeout preserves the no-pass without lowering
+  gates, dropping/merging STAR, reusing P020 exact windows or opening another resource repair. Stage8
+  remains research-only; Stage9 remains parked pending an activity relation; P026-D is not opened. The
+  next route is a separate governance-only P3-STAGE-027 whole-vocabulary portfolio synthesis over the
+  already frozen evidence. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -557,6 +563,7 @@ nodes.
   `reviews/stage-p026b-resource-contract-four-party-review-20260916.md`,
   `acceptance/stage-high-side-modifier-reference-engineering-20260916.md`,
   `reviews/stage-p026c-pre-read-technical-recovery-review-20260916.md`,
+  `reviews/stage-p026c-stage8-resource-shortfall-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,

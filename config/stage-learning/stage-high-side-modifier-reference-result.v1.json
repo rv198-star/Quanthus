@@ -1,0 +1,105 @@
+{
+  "schema_version": "quanthus.stage-high-side-modifier-reference-result.v1",
+  "work_item": "P3-STAGE-026-C",
+  "state": "CLOSED_STAGE8_RESOURCE_CAPACITY_SHORTFALL_NO_REPAIR",
+  "effective_date": "2026-09-16",
+  "execution": {
+    "initial_pre_read_failure": {
+      "job_id": "stage_18276b459d774fdc84d1abae23280ca2",
+      "code_revision": "d3421bb922d0911345e35331fd7e082a97996db3",
+      "input_digest": "sha256:4ee7a7097f3f7a17915602d329592c76948b2a9dfe28e32dfcb52562ce6eb504",
+      "terminal_state": "failed",
+      "error": "stage_high_side_modifier_reference_prepare_process_failed",
+      "failure_reason": "HighSideModifierReferencePrepareError:semantic_state",
+      "artifact_published": false,
+      "result_bearing_read_reached": false,
+      "disposition": "SUPERSEDED_BY_EXPLICIT_PRE_READ_TECHNICAL_RECOVERY_ONLY"
+    },
+    "technical_recovery": {
+      "authorization": "config/stage-learning/stage-high-side-modifier-reference-prepare-recovery.v1.json",
+      "job_id": "stage_8895e17ca20544b3a3d9e38f88175977",
+      "code_revision": "69b7cd166b8c76736bad48984fba78572ad051f3",
+      "input_digest": "sha256:202cdbf64f998c54f46544451fb732e6f26fdedb4c6e10bef4acedc1ba23cc3b",
+      "technical_recovery_of": "stage_18276b459d774fdc84d1abae23280ca2",
+      "terminal_state": "succeeded",
+      "exit_code": 0,
+      "run_id": "stage-high-side-modifier-reference-20260916T034459Z",
+      "manifest_sha256": "sha256:69db3111eb6d97e45c34731eba254feb544ddc8ce4d0b74a55f00f07b760f570",
+      "resource_plan_digest": "sha256:417b0f5e955ce3b74775ab302c7470149af5b2379629aa0e8c421a42734c983c"
+    }
+  },
+  "resource_result": {
+    "disposition": "CLOSED_STAGE8_RESOURCE_CAPACITY_SHORTFALL_NO_REPAIR_FOUR_PARTY_REVIEW",
+    "resource_gate_passed": false,
+    "selected_row_count": 136,
+    "selected_unique_identity_cluster_count": 136,
+    "minimum_total_rows": 144,
+    "minimum_unique_identity_clusters": 128,
+    "minimum_rows_per_cell": 16,
+    "target_rows_per_cell": 20,
+    "cell_counts": {
+      "PRE_STAR/CHINEXT": 20,
+      "PRE_STAR/MAIN": 20,
+      "STAR_AND_CHINEXT_20PCT/CHINEXT": 20,
+      "STAR_AND_CHINEXT_20PCT/MAIN": 20,
+      "STAR_AND_CHINEXT_20PCT/STAR": 11,
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT": 20,
+      "STAR_PRE_CHINEXT_20PCT/MAIN": 20,
+      "STAR_PRE_CHINEXT_20PCT/STAR": 5
+    },
+    "decisive_visible_shortfalls": [
+      "selected_row_count_136_below_minimum_144",
+      "STAR_PRE_CHINEXT_20PCT_STAR_5_below_cell_minimum_16",
+      "STAR_AND_CHINEXT_20PCT_STAR_11_below_cell_minimum_16"
+    ],
+    "visible_pass_evidence": [
+      "selected_unique_identity_cluster_count_136_meets_minimum_128",
+      "all_six_MAIN_or_CHINEXT_cells_reach_target_20"
+    ],
+    "shortfall_localization": "STAR_BOARD_CELLS_ONLY_ON_VISIBLE_CELL_COUNTS"
+  },
+  "semantic_boundary": {
+    "review_packet_count": 0,
+    "available_packet_count": 0,
+    "unavailable_packet_count": 0,
+    "review_packet_sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "case_map_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "ready_for_blind_review": false,
+    "review_opinion_count": 0,
+    "role_ledgers_created": false,
+    "reference_gate_evaluated": false,
+    "stage8_semantic_failure_demonstrated": false,
+    "stage9_opinion_collected": false
+  },
+  "protected_surfaces": {
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "candidate_or_threshold_read": false,
+    "candidate_scoring": false,
+    "primary_stage_output": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "four_party_disposition": {
+    "stage8": "RETAIN_RESEARCH_ONLY_MODIFIER_RESOURCE_QUALIFICATION_NOT_OPEN",
+    "stage9": "PARKED_PENDING_MINIMAL_ACTIVITY_RELATION",
+    "resource_repair": "CLOSED_NO_P027_P028_RESOURCE_REPAIR",
+    "gate_lowering": false,
+    "drop_or_merge_star": false,
+    "reuse_p020_exact_windows": false,
+    "additional_fallback_or_post_result_replacement": false,
+    "next_route": "WHOLE_VOCABULARY_PORTFOLIO_SYNTHESIS",
+    "successor_work_item": "P3-STAGE-027"
+  },
+  "not_demonstrated": [
+    "Stage8 semantic invalidity",
+    "Stage8 reference insufficiency after review",
+    "Stage9 semantic quality",
+    "need to lower the 16-row cell floor",
+    "need to remove or merge STAR",
+    "need to reopen P020 resources",
+    "need to open protected partitions"
+  ],
+  "claim_ceiling": "P026-C establishes only that the single preregistered P020-disjoint Stage8 development resource route fails its frozen capacity gate, visibly because both STAR Era x Board cells remain below the 16-row floor and total selected rows are 136 below the 144 floor. No Stage8 blind semantic reference was collected, so semantic failure is not demonstrated. No Stage9, candidate, protected-partition, strategy or trading authority is opened."
+}

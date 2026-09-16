@@ -135,6 +135,10 @@ P026_RECOVERY = (
 P026_RECOVERY_REVIEW = (
     ROOT / "docs/reviews/stage-p026c-pre-read-technical-recovery-review-20260916.md"
 )
+P026_RESULT = ROOT / "config/stage-learning/stage-high-side-modifier-reference-result.v1.json"
+P026_CLOSEOUT_REVIEW = (
+    ROOT / "docs/reviews/stage-p026c-stage8-resource-shortfall-four-party-review-20260916.md"
+)
 P026_WORK = ROOT / "docs/work-items/stage-high-side-modifier-proposition.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -2198,6 +2202,54 @@ def test_p026c_recovery_is_one_pre_read_contract_mapping_repair_only() -> None:
     ):
         assert authority[key] is False
     assert P026_RECOVERY_REVIEW.is_file()
+
+
+def test_p026c_closes_resource_shortfall_without_semantic_or_repair_authority() -> None:
+    value = json.loads(P026_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-026-C"
+    assert value["state"] == "CLOSED_STAGE8_RESOURCE_CAPACITY_SHORTFALL_NO_REPAIR"
+    recovery = value["execution"]["technical_recovery"]
+    assert recovery["job_id"] == "stage_8895e17ca20544b3a3d9e38f88175977"
+    assert recovery["technical_recovery_of"] == "stage_18276b459d774fdc84d1abae23280ca2"
+    assert recovery["terminal_state"] == "succeeded"
+    resource = value["resource_result"]
+    assert resource["resource_gate_passed"] is False
+    assert resource["selected_row_count"] == 136
+    assert resource["selected_unique_identity_cluster_count"] == 136
+    assert resource["minimum_total_rows"] == 144
+    assert resource["minimum_unique_identity_clusters"] == 128
+    assert resource["minimum_rows_per_cell"] == 16
+    assert resource["cell_counts"]["STAR_PRE_CHINEXT_20PCT/STAR"] == 5
+    assert resource["cell_counts"]["STAR_AND_CHINEXT_20PCT/STAR"] == 11
+    for cell in (
+        "PRE_STAR/MAIN",
+        "PRE_STAR/CHINEXT",
+        "STAR_PRE_CHINEXT_20PCT/MAIN",
+        "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+        "STAR_AND_CHINEXT_20PCT/MAIN",
+        "STAR_AND_CHINEXT_20PCT/CHINEXT",
+    ):
+        assert resource["cell_counts"][cell] == 20
+    semantic = value["semantic_boundary"]
+    assert semantic["review_packet_count"] == 0
+    assert semantic["review_opinion_count"] == 0
+    assert semantic["role_ledgers_created"] is False
+    assert semantic["reference_gate_evaluated"] is False
+    assert semantic["stage8_semantic_failure_demonstrated"] is False
+    assert semantic["stage9_opinion_collected"] is False
+    protected = value["protected_surfaces"]
+    assert all(observed is False for observed in protected.values())
+    disposition = value["four_party_disposition"]
+    assert disposition["stage8"] == "RETAIN_RESEARCH_ONLY_MODIFIER_RESOURCE_QUALIFICATION_NOT_OPEN"
+    assert disposition["stage9"] == "PARKED_PENDING_MINIMAL_ACTIVITY_RELATION"
+    assert disposition["resource_repair"] == "CLOSED_NO_P027_P028_RESOURCE_REPAIR"
+    assert disposition["gate_lowering"] is False
+    assert disposition["drop_or_merge_star"] is False
+    assert disposition["reuse_p020_exact_windows"] is False
+    assert disposition["additional_fallback_or_post_result_replacement"] is False
+    assert disposition["next_route"] == "WHOLE_VOCABULARY_PORTFOLIO_SYNTHESIS"
+    assert disposition["successor_work_item"] == "P3-STAGE-027"
+    assert P026_CLOSEOUT_REVIEW.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

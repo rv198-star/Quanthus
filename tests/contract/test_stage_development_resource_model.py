@@ -192,7 +192,10 @@ P032_ACCEPTANCE = (
 P032_REVIEW = ROOT / "docs/reviews/stage-p032-level1-evidence-four-party-review-20260916.md"
 P032_WORK = ROOT / "docs/work-items/stage-level1-historical-realtime-evidence-feasibility.md"
 P033_PREREG = ROOT / "config/stage-learning/stage-consumer-utility-prereg.v1.json"
+P033_RESULT = ROOT / "config/stage-learning/stage-consumer-utility-result.v1.json"
 P033_ROUTE_REVIEW = ROOT / "docs/reviews/stage-p033-value-route-review-20260916.md"
+P033_RESULT_REVIEW = ROOT / "docs/reviews/stage-p033-consumer-utility-four-party-review-20260916.md"
+P033_ACCEPTANCE = ROOT / "docs/acceptance/stage-p033-consumer-utility-20260916.md"
 P033_WORK = ROOT / "docs/work-items/stage-consumer-utility.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
@@ -2723,6 +2726,55 @@ def test_p033_preregisters_layered_overlay_consumer_utility_over_facts_only() ->
     assert value["resource_budget"]["new_market_data_reads"] == 0
     assert value["resource_budget"]["new_dwd_provider_opens"] == 0
     assert P033_ROUTE_REVIEW.is_file()
+    assert P033_WORK.is_file()
+
+
+def test_p033_preserves_mechanical_pass_but_closes_attribution_inconclusive() -> None:
+    value = json.loads(P033_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-033"
+    assert value["state"] == "INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION_MECHANICAL_GATE_PASS"
+    for binding in value["bindings"].values():
+        path = ROOT / binding["path"]
+        observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        assert observed == binding["sha256"]
+    prep = value["packet_preparation"]
+    assert prep["recovery_state"] == "succeeded"
+    assert prep["packet_count"] == 40
+    assert prep["facts_only_packet_count"] == 20
+    assert prep["facts_plus_layered_packet_count"] == 20
+    assert prep["market_data_reads"] == 0
+    assert prep["dwd_provider_opens"] == 0
+    assert prep["strict_pit_claim"] is False
+    evaluation = value["evaluation"]
+    assert evaluation["role_session_count"] == 4
+    assert evaluation["model_identity_consistent_across_four_roles"] is True
+    assert evaluation["answer_key_hidden_until_all_outputs_sealed"] is True
+    assert evaluation["completed_packet_replay"] is False
+    assert evaluation["model_or_provider_changed"] is False
+    metrics = value["mechanical_metrics"]
+    assert metrics["facts_only"]["critical_error_packet_count"] == 12
+    assert metrics["facts_plus_layered"]["critical_error_packet_count"] == 0
+    assert metrics["facts_only"]["all_four_correct_packet_count"] == 8
+    assert metrics["facts_plus_layered"]["all_four_correct_packet_count"] == 20
+    assert metrics["critical_error_reduction_packets"] == 12
+    assert metrics["each_role_critical_errors_facts_only"] == 3
+    assert metrics["each_role_critical_errors_layered"] == 0
+    assert metrics["preregistered_mechanical_gate"] == "PASS_CONSUMER_UTILITY_INCREMENT"
+    assert metrics["mechanical_decision_robust_to_timeout_elapsed_bound"] is True
+    audit = value["post_result_design_audit"]
+    assert audit["reviewer_count"] == 4
+    assert audit["mechanical_gate_pass_accepted_count"] == 4
+    assert audit["information_equivalence_unproven_count"] == 4
+    assert audit["inconclusive_attribution_count"] == 4
+    disposition = value["phase_disposition"]
+    assert disposition["mechanical_gate"] == "PASS_CONSUMER_UTILITY_INCREMENT"
+    assert disposition["research_goal"] == "INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION"
+    assert disposition["experiment_invalid"] is False
+    assert disposition["continuous_facts_remain_authoritative_substrate"] is True
+    assert disposition["layered_overlay_remains_development_semantic_surface"] is True
+    assert disposition["automatic_successor"] is None
+    assert P033_RESULT_REVIEW.is_file()
+    assert P033_ACCEPTANCE.is_file()
     assert P033_WORK.is_file()
 
 

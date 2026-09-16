@@ -3,10 +3,13 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved bounded experiment |
-| Delivery gate | open |
+| Delivery gate | accepted |
 | Predecessors | `P3-STAGE-029`, `P3-STAGE-032`, `P3-STRUCT-002` |
 | Governing preregistration | `../../config/stage-learning/stage-consumer-utility-prereg.v1.json` |
 | Route review | `../reviews/stage-p033-value-route-review-20260916.md` |
+| Result review | `../reviews/stage-p033-consumer-utility-four-party-review-20260916.md` |
+| Acceptance | `../acceptance/stage-p033-consumer-utility-20260916.md` |
+| Machine result | `../../config/stage-learning/stage-consumer-utility-result.v1.json` |
 | Authority | development-only interpretation experiment |
 
 ## Goal
@@ -94,8 +97,18 @@ to include those already-bound documents in the Event Worker build context/image
 arms, assignments, questions, metrics, gates, model contract and claim ceiling remain unchanged.
 No further retry is authorized without review if the recovery fails for a different reason.
 
-## Completion
+## Result and closeout
 
-P033 closes only after deterministic packet/assignment generation, sealed four-role evaluator
-outputs, preregistered metric calculation, role-separated result review, repository verification and
-push. It opens no automatic successor.
+P033 is closed `INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION_MECHANICAL_GATE_PASS`.
+The preregistered mechanical accuracy path passed strongly: Facts-only produced 12/20 critical-error
+packets while Facts+Layered produced 0/20, and the Layered elapsed ratio remained below the 1.25x
+ceiling under both interruption-accounting bounds.
+
+Post-result four-role review unanimously found that the Facts-only packet did not establish
+information equivalence with the Layered packet. The current Facts snapshot may not uniquely
+reconstruct prior Stage10 confirmation/state history, while the Layered arm directly carries the
+derived state. The observed product-package advantage is therefore real, but pure layered-expression
+causality remains unproven.
+
+Continuous Facts remain the authoritative substrate. Layered Stage10/11 retains bounded development
+communication value. No successor is automatically opened.

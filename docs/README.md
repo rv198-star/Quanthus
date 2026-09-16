@@ -578,7 +578,16 @@ nodes.
   to contemporaneous T=15:30 dissemination binding. Four independent phase reviews accepted the
   no-pass 4/4 and stop the current Stage historical PIT source-evidence hunt. P029 is preserved only
   as retrospective development-shadow semantics; no commercial archive search or PIT-lite is
-  authorized. Preserved 2021/2022-2024/2025 remain unopened.
+  authorized. P3-STAGE-033 then returned to product value on the exact P029 population. Its frozen
+  40-evaluation Facts-only vs Facts+Layered experiment mechanically passed the preregistered accuracy
+  gate (critical-error packets 12/20 -> 0/20, every role 3 -> 0, no elapsed-time penalty), but the
+  post-result four-role audit unanimously found that information equivalence had not been proven:
+  current Facts-only packets may omit prior Stage10 confirmation/state-history information while the
+  Layered arm directly exposes the derived state. P033 therefore closes
+  `INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION_MECHANICAL_GATE_PASS`: the current Layered packet has
+  bounded communication value for already-derived Stage10/11 semantics, while Continuous Facts remain
+  authoritative and pure layered-expression causality is unproven. No successor is automatically
+  opened. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -621,6 +630,9 @@ nodes.
   `work-items/stage-level1-historical-realtime-evidence-feasibility.md`,
   `acceptance/stage-p032-level1-historical-realtime-evidence-feasibility-20260916.md`,
   `reviews/stage-p032-level1-evidence-four-party-review-20260916.md`,
+  `work-items/stage-consumer-utility.md`,
+  `acceptance/stage-p033-consumer-utility-20260916.md`,
+  `reviews/stage-p033-consumer-utility-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
@@ -647,7 +659,11 @@ nodes.
   source-evidence routes (EOD archive, then Level-1 historical/realtime evidence) without establishing
   exact historical version-to-dissemination binding. The Stage claim remains unchanged and the current
   historical PIT source-evidence hunt is now closed by 4/4 phase review; no commercial archive search,
-  source integration or weaker PIT proxy is authorized. The qualification and field-dependency proposals remain
+  source integration or weaker PIT proxy is authorized. P3-STAGE-033 subsequently tested the remaining
+  bounded product question and closed attribution-inconclusive despite a strong mechanical packet-level
+  PASS: the current Layered surface improves communication of already-derived Stage10/11 semantics, but
+  an information-equivalent Facts control was not established. Continuous Facts therefore remain the
+  authoritative substrate and no automatic Stage successor is open. The qualification and field-dependency proposals remain
   `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`; they do not
   activate peer primary labels, new result-bearing research, or daily/strategy Shadow.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,

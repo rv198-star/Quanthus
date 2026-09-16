@@ -1,0 +1,95 @@
+{
+  "schema_version": "quanthus.stage-consumer-utility-result.v1",
+  "work_item": "P3-STAGE-033",
+  "state": "INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION_MECHANICAL_GATE_PASS",
+  "effective_date": "2026-09-16",
+  "bindings": {
+    "preregistration": {
+      "path": "config/stage-learning/stage-consumer-utility-prereg.v1.json",
+      "sha256": "sha256:7306fe44d091209b2c5cf3c346d3d4fdf0c328efc0a9cc906bac24a19b6de7c5"
+    },
+    "route_review": {
+      "path": "docs/reviews/stage-p033-value-route-review-20260916.md",
+      "sha256": "sha256:62808affd03902c4955d29d504cc51ad24cd1819b770e4bbf59daee1ce9c562a"
+    },
+    "p029_result": {
+      "path": "config/stage-learning/stage-proposition-bundle-real-data-replay-result.v1.json",
+      "sha256": "sha256:83b6e7ddd1ccb31a83b4bb19698b8eeee1ff10d56169a4feaae3eec9388f3ed0"
+    },
+    "continuous_facts_preference": {
+      "path": "docs/acceptance/structure-intelligence-economic-final-acceptance-20260906.md",
+      "sha256": "sha256:381e4e29499bbc6b38326e4a9f01e1fd997d18cff457f1f8425ba10ef7302cde"
+    }
+  },
+  "packet_preparation": {
+    "initial_job_id": "job_de97ed388c6e4971995fddd34ac7ba5e",
+    "initial_state": "failed_before_packet_publication",
+    "technical_recovery_revision": "a09c16ca343b7afb195d6e7215fdad4438f3d8bb",
+    "recovery_job_id": "job_e35b2be0d93f4c4f9e928c2cfb409942",
+    "recovery_state": "succeeded",
+    "packet_count": 40,
+    "facts_only_packet_count": 20,
+    "facts_plus_layered_packet_count": 20,
+    "market_data_reads": 0,
+    "dwd_provider_opens": 0,
+    "strict_pit_claim": false,
+    "experiment_result_available_at_packet_publication": false,
+    "manifest_sha256": "sha256:6786c911e906de1ac1609a20b1840d1a65038a8c9d7e8a79df748f949dc23435"
+  },
+  "evaluation": {
+    "model_identity_consistent_across_four_roles": true,
+    "role_session_count": 4,
+    "answer_key_hidden_until_all_outputs_sealed": true,
+    "arm_label_hidden": true,
+    "fund_role_host_timeout_recovered_in_same_session": true,
+    "completed_packet_replay": false,
+    "model_or_provider_changed": false
+  },
+  "mechanical_metrics": {
+    "facts_only": {
+      "evaluation_count": 20,
+      "critical_error_packet_count": 12,
+      "all_four_correct_packet_count": 8,
+      "abstain_answer_count": 28,
+      "median_elapsed_seconds": "7.1505",
+      "median_visible_response_tokens": "95"
+    },
+    "facts_plus_layered": {
+      "evaluation_count": 20,
+      "critical_error_packet_count": 0,
+      "all_four_correct_packet_count": 20,
+      "abstain_answer_count": 0,
+      "median_elapsed_seconds_lower_bound": "6.3385",
+      "median_elapsed_seconds_conservative_upper_bound": "6.6010",
+      "median_visible_response_tokens": "95"
+    },
+    "critical_error_reduction_packets": 12,
+    "each_role_critical_errors_facts_only": 3,
+    "each_role_critical_errors_layered": 0,
+    "elapsed_ratio_lower_bound": "0.8864415076",
+    "elapsed_ratio_conservative_upper_bound": "0.9231522271",
+    "visible_response_token_ratio": "1.0",
+    "preregistered_mechanical_gate": "PASS_CONSUMER_UTILITY_INCREMENT",
+    "mechanical_decision_robust_to_timeout_elapsed_bound": true
+  },
+  "post_result_design_audit": {
+    "reviewer_count": 4,
+    "mechanical_gate_pass_accepted_count": 4,
+    "information_equivalence_unproven_count": 4,
+    "inconclusive_attribution_count": 4,
+    "finding": "Facts-only packets exposed current Support Evolution facts and definitions but did not establish that those displayed inputs uniquely reconstruct prior Stage10 confirmation and state history. Layered packets directly exposed the derived Stage10/11 state, so the observed gap mixes information completion and state derivation with presentation and semantic organization.",
+    "valid_bounded_value": "The current Layered product packet communicates already-derived Stage10/11 state more reliably for the frozen Q1-Q4 task than the current Facts-only packet.",
+    "unsupported_attribution": "P033 does not isolate pure layered-expression utility under information-equivalent inputs."
+  },
+  "phase_disposition": {
+    "mechanical_gate": "PASS_CONSUMER_UTILITY_INCREMENT",
+    "research_goal": "INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION",
+    "experiment_invalid": false,
+    "stage_architecture_rejected": false,
+    "continuous_facts_remain_authoritative_substrate": true,
+    "layered_overlay_remains_development_semantic_surface": true,
+    "automatic_successor": null
+  },
+  "next_question_if_separately_authorized": "Can Stage10/11 truth be uniquely reconstructed from an information-complete, semantically equivalent control packet, and if so does layered presentation still reduce interpretation error or review cost?",
+  "claim_ceiling": "P033 establishes that on the exact retrospective P029 ten-observation population and frozen Q1-Q4 task, the current Facts+Layered product packet achieved materially better canonical-answer alignment than the current Facts-only packet and passed the preregistered mechanical accuracy/time gate. Because information equivalence between packet designs was not established, P033 does not prove pure layered-expression causality, independent state-recognition ability, prediction, economics, strict PIT, out-of-sample generalization, production-expert authority, strategy authority or trading authority."
+}
